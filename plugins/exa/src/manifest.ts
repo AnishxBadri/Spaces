@@ -1,12 +1,28 @@
 import { z } from 'zod'
 import { defineManifest } from '@spaces/sdk'
 
+/** What one watch holds: its own criteria, and how many companies a run hands on. */
+export const watchSettings = z.object({
+  criteria: z
+    .string()
+    .max(1000)
+    .default('')
+    .describe('Look for — blank uses the space’s criteria'),
+  cap: z
+    .int()
+    .min(1)
+    .max(100)
+    .default(10)
+    .describe('At most this many companies per run'),
+})
+
 /**
  * Exa's manifest. The build emits it as dist/manifest.json with `settings`
  * as JSON Schema.
- * - `research` names no Facts and no Identity: a web hit is evidence, never
- *   a field, and research never births a record.
- * - `Secrets` is in `uses` because the job reads the key from it for the
+ * - Neither job names Facts or Identity: a web hit is evidence, never a
+ *   field, and Exa never births a record — a found company is a candidate
+ *   the host turns into a card. (D72)
+ * - `Secrets` is in `uses` because each job reads the key from it for the
  *   `x-api-key` header.
  * - Without the workspace `search` key the host degrades the integration,
  *   so the Research action is absent rather than failing when pressed.
@@ -19,7 +35,7 @@ export const manifest = defineManifest({
   name: 'Exa',
   roles: ['research'],
   description:
-    'Researches a company on the open web through Exa: each page found becomes a web signal on the record, and a short brief citing them waits in Review as a note to accept. Sends Exa the company name and domain.',
+    'Researches a company on the open web through Exa: each page found becomes a web signal on the record, and a short brief citing them waits in Review as a note to accept. Watches a space through an Exa webset: each company found waits in Review as a card under the space, and a page about a company already filed there becomes a web signal on it. Sends Exa the company name and domain, and for a watch the space’s criteria, its nearest memo and its companies’ domains.',
   requires: { credential: { kind: 'search', scope: 'workspace' } },
   settings: z.object({
     maxResults: z
@@ -39,6 +55,20 @@ export const manifest = defineManifest({
     research: {
       trigger: 'action',
       uses: ['Config', 'Secrets', 'Http', 'Read', 'Content', 'Ai', 'Judgment'],
+    },
+    watch: {
+      trigger: 'watch',
+      uses: [
+        'Config',
+        'Secrets',
+        'Http',
+        'Spaces',
+        'Discover',
+        'Content',
+        'Log',
+        'Receipts',
+      ],
+      settings: watchSettings,
     },
   },
   actions: [

@@ -1,0 +1,272 @@
+{
+  "data": [
+    {
+      "id": "witem_01k79q3a01",
+      "object": "webset_item",
+      "source": "search",
+      "sourceId": "webset_search_01k79q2zx4",
+      "websetId": "webset_01k79q2zx3",
+      "properties": {
+        "type": "company",
+        "url": "https://pickwell.example",
+        "description": "Pickwell builds suction-gripper picking arms that retrofit onto existing warehouse shelving.",
+        "content": null,
+        "company": {
+          "name": "Pickwell",
+          "location": "Berlin, Germany",
+          "employees": 34,
+          "industry": "Robotics",
+          "about": "Pickwell builds suction-gripper picking arms that retrofit onto existing warehouse shelving.",
+          "logoUrl": null
+        }
+      },
+      "evaluations": [
+        {
+          "criterion": "Companies building robots that pick, pack or move goods inside warehouses. Seed to Series B.",
+          "reasoning": "Pickwell builds warehouse robots and its last disclosed round is within seed to Series B.",
+          "satisfied": "yes",
+          "references": [
+            {
+              "title": "Pickwell raises a seed round for retrofit picking arms",
+              "snippet": "Pickwell builds suction-gripper picking arms that retrofit onto existing warehouse shelving.",
+              "url": "https://news.example/2026/08/pickwell-seed"
+            }
+          ]
+        }
+      ],
+      "enrichments": [],
+      "createdAt": "2026-10-10T00:04:00.000Z",
+      "updatedAt": "2026-10-10T00:04:00.000Z"
+    },
+    {
+      "id": "witem_01k79q3a02",
+      "object": "webset_item",
+      "source": "search",
+      "sourceId": "webset_search_01k79q2zx4",
+      "websetId": "webset_01k79q2zx3",
+      "properties": {
+        "type": "company",
+        "url": "https://www.northwind-robotics.example/",
+        "description": "Northwind Robotics makes picking arms that learn a new SKU from a single demonstration.",
+        "content": null,
+        "company": {
+          "name": "Northwind Robotics",
+          "location": "Pune, India",
+          "employees": 58,
+          "industry": "Robotics",
+          "about": "Northwind Robotics makes picking arms that learn a new SKU from a single demonstration.",
+          "logoUrl": null
+        }
+      },
+      "evaluations": [
+        {
+          "criterion": "Companies building robots that pick, pack or move goods inside warehouses. Seed to Series B.",
+          "reasoning": "Northwind Robotics builds warehouse robots and its last disclosed round is within seed to Series B.",
+          "satisfied": "yes",
+          "references": [
+            {
+              "title": "Northwind Robotics raises $6.5M to teach warehouse robots new SKUs",
+              "snippet": "Northwind Robotics makes picking arms that learn a new SKU from a single demonstration.",
+              "url": "https://news.example/2026/09/northwind-robotics-series-a"
+            }
+          ]
+        }
+      ],
+      "enrichments": [],
+      "createdAt": "2026-10-10T00:04:00.000Z",
+      "updatedAt": "2026-10-10T00:04:00.000Z"
+    },
+    {
+      "id": "witem_01k79q3a03",
+      "object": "webset_item",
+      "source": "search",
+      "sourceId": "webset_search_01k79q2zx4",
+      "websetId": "webset_01k79q2zx3",
+      "properties": {
+        "type": "company",
+        "url": "https://boxbot.example/about",
+        "description": "Boxbot Systems sells autonomous case-packing cells for third-party logistics warehouses.",
+        "content": null,
+        "company": {
+          "name": "Boxbot Systems",
+          "location": "Lyon, France",
+          "employees": 21,
+          "industry": "Robotics",
+          "about": "Boxbot Systems sells autonomous case-packing cells for third-party logistics warehouses.",
+          "logoUrl": null
+        }
+      },
+      "evaluations": [
+        {
+          "criterion": "Companies building robots that pick, pack or move goods inside warehouses. Seed to Series B.",
+          "reasoning": "Boxbot Systems builds warehouse robots and its last disclosed round is within seed to Series B.",
+          "satisfied": "yes",
+          "references": [
+            {
+              "title": "Boxbot runs a case-packing pilot with a 3PL",
+              "snippet": "Boxbot Systems sells autonomous case-packing cells for third-party logistics warehouses.",
+              "url": "https://trade.example/logistics/boxbot-3pl-pilot"
+            }
+          ]
+        }
+      ],
+      "enrichments": [],
+      "createdAt": "2026-10-10T00:04:00.000Z",
+      "updatedAt": "2026-10-10T00:04:00.000Z"
+    },
+    {
+      "id": "witem_01k79q3a04",
+      "object": "webset_item",
+      "source": "search",
+      "sourceId": "webset_search_01k79q2zx4",
+      "websetId": "webset_01k79q2zx3",
+      "properties": {
+        "type": "company",
+        "url": "https://tote-runner.example",
+        "description": "Tote Runner makes small mobile robots that carry totes between pick stations.",
+        "content": null,
+        "company": {
+          "name": "Tote Runner",
+          "location": "Austin, Texas",
+          "employees": 46,
+          "industry": "Robotics",
+          "about": "Tote Runner makes small mobile robots that carry totes between pick stations.",
+          "logoUrl": null
+        }
+      },
+      "evaluations": [
+        {
+          "criterion": "Companies building robots that pick, pack or move goods inside warehouses. Seed to Series B.",
+          "reasoning": "Tote Runner builds warehouse robots and its last disclosed round is within seed to Series B.",
+          "satisfied": "yes",
+          "references": [
+            {
+              "title": "Tote Runner closes its Series A",
+              "snippet": "Tote Runner makes small mobile robots that carry totes between pick stations.",
+              "url": "https://blog.example/2026/tote-runner-series-a"
+            }
+          ]
+        }
+      ],
+      "enrichments": [],
+      "createdAt": "2026-10-10T00:04:00.000Z",
+      "updatedAt": "2026-10-10T00:04:00.000Z"
+    },
+    {
+      "id": "witem_01k79q3a05",
+      "object": "webset_item",
+      "source": "search",
+      "sourceId": "webset_search_01k79q2zx4",
+      "websetId": "webset_01k79q2zx3",
+      "properties": {
+        "type": "company",
+        "url": "https://shelfsense.example",
+        "description": "ShelfSense combines shelf-scanning drones with a picking arm for dark stores.",
+        "content": null,
+        "company": {
+          "name": "ShelfSense",
+          "location": "Singapore",
+          "employees": 18,
+          "industry": "Robotics",
+          "about": "ShelfSense combines shelf-scanning drones with a picking arm for dark stores.",
+          "logoUrl": null
+        }
+      },
+      "evaluations": [
+        {
+          "criterion": "Companies building robots that pick, pack or move goods inside warehouses. Seed to Series B.",
+          "reasoning": "ShelfSense builds warehouse robots and its last disclosed round is within seed to Series B.",
+          "satisfied": "yes",
+          "references": [
+            {
+              "title": "ShelfSense brings picking robots to dark stores",
+              "snippet": "ShelfSense combines shelf-scanning drones with a picking arm for dark stores.",
+              "url": "https://news.example/2026/07/shelfsense-dark-stores"
+            }
+          ]
+        }
+      ],
+      "enrichments": [],
+      "createdAt": "2026-10-10T00:04:00.000Z",
+      "updatedAt": "2026-10-10T00:04:00.000Z"
+    },
+    {
+      "id": "witem_01k79q3a06",
+      "object": "webset_item",
+      "source": "search",
+      "sourceId": "webset_search_01k79q2zx4",
+      "websetId": "webset_01k79q2zx3",
+      "properties": {
+        "type": "company",
+        "url": "https://gantrylabs.example",
+        "description": "Gantry Labs builds overhead gantry robots that pack mixed orders into shipping boxes.",
+        "content": null,
+        "company": {
+          "name": "Gantry Labs",
+          "location": "Toronto, Canada",
+          "employees": 27,
+          "industry": "Robotics",
+          "about": "Gantry Labs builds overhead gantry robots that pack mixed orders into shipping boxes.",
+          "logoUrl": null
+        }
+      },
+      "evaluations": [
+        {
+          "criterion": "Companies building robots that pick, pack or move goods inside warehouses. Seed to Series B.",
+          "reasoning": "Gantry Labs builds warehouse robots and its last disclosed round is within seed to Series B.",
+          "satisfied": "yes",
+          "references": [
+            {
+              "title": "Controls Engineer — Gantry Labs",
+              "snippet": "Gantry Labs builds overhead gantry robots that pack mixed orders into shipping boxes.",
+              "url": "https://jobs.example/gantry-labs/controls-engineer"
+            }
+          ]
+        }
+      ],
+      "enrichments": [],
+      "createdAt": "2026-10-10T00:04:00.000Z",
+      "updatedAt": "2026-10-10T00:04:00.000Z"
+    },
+    {
+      "id": "witem_01k79q3a07",
+      "object": "webset_item",
+      "source": "search",
+      "sourceId": "webset_search_01k79q2zx4",
+      "websetId": "webset_01k79q2zx3",
+      "properties": {
+        "type": "company",
+        "url": "https://palletpilot.example",
+        "description": "PalletPilot retrofits forklifts to move pallets autonomously inside warehouses.",
+        "content": null,
+        "company": {
+          "name": "PalletPilot",
+          "location": "Leeds, United Kingdom",
+          "employees": 39,
+          "industry": "Robotics",
+          "about": "PalletPilot retrofits forklifts to move pallets autonomously inside warehouses.",
+          "logoUrl": null
+        }
+      },
+      "evaluations": [
+        {
+          "criterion": "Companies building robots that pick, pack or move goods inside warehouses. Seed to Series B.",
+          "reasoning": "PalletPilot builds warehouse robots and its last disclosed round is within seed to Series B.",
+          "satisfied": "yes",
+          "references": [
+            {
+              "title": "Episode 171: autonomous forklifts with PalletPilot",
+              "snippet": "PalletPilot retrofits forklifts to move pallets autonomously inside warehouses.",
+              "url": "https://podcast.example/episodes/171"
+            }
+          ]
+        }
+      ],
+      "enrichments": [],
+      "createdAt": "2026-10-10T00:04:00.000Z",
+      "updatedAt": "2026-10-10T00:04:00.000Z"
+    }
+  ],
+  "hasMore": true,
+  "nextCursor": "witem_01k79q3a07"
+}

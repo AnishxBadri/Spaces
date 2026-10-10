@@ -1,0 +1,46 @@
+{
+  "id": "webset_01k79q2zx3",
+  "object": "webset",
+  "status": "running",
+  "externalId": "watch-1",
+  "title": null,
+  "searches": [
+    {
+      "id": "webset_search_01k79q2zx4",
+      "object": "webset_search",
+      "status": "created",
+      "websetId": "webset_01k79q2zx3",
+      "query": "Companies matching: Companies building robots that pick, pack or move goods inside warehouses. Seed to Series B.",
+      "entity": { "type": "company" },
+      "criteria": [
+        {
+          "description": "Companies building robots that pick, pack or move goods inside warehouses. Seed to Series B.",
+          "successRate": 0
+        }
+      ],
+      "count": 10,
+      "behavior": "override",
+      "exclude": [],
+      "scope": [],
+      "progress": {
+        "found": 0,
+        "analyzed": 0,
+        "completion": 0,
+        "timeLeft": null
+      },
+      "recall": null,
+      "metadata": {},
+      "canceledAt": null,
+      "canceledReason": null,
+      "createdAt": "2026-10-10T00:00:00.000Z",
+      "updatedAt": "2026-10-10T00:00:00.000Z"
+    }
+  ],
+  "imports": [],
+  "enrichments": [],
+  "monitors": [],
+  "excludes": [],
+  "metadata": {},
+  "createdAt": "2026-10-10T00:00:00.000Z",
+  "updatedAt": "2026-10-10T00:00:00.000Z"
+}

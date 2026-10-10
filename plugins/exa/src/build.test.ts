@@ -5,7 +5,7 @@ import { manifestSchema, satisfiesSdk, settingsJsonSchema } from '@spaces/sdk'
 import { build } from 'vite'
 import { z } from 'zod'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { manifest } from './manifest.ts'
+import { manifest, watchSettings } from './manifest.ts'
 
 /**
  * The Exa bundle as the loader will find it: `vite build` with this
@@ -29,13 +29,18 @@ describe('the exa bundle', () => {
     const bare = [...bundle.matchAll(/^import .* from "([^"]+)";$/gm)].map(
       (m) => m[1],
     )
-    expect(bare.sort()).toEqual(['@spaces/sdk', 'effect', 'zod'])
+    expect(bare.sort()).toEqual([
+      '@spaces/sdk',
+      '@spaces/sdk/identity',
+      'effect',
+      'zod',
+    ])
     expect(bundle).not.toMatch(/node_modules/)
   })
 })
 
 describe('the exa manifest.json', () => {
-  it('parses under manifestSchema: a research plugin requiring a workspace search key', () => {
+  it('parses under manifestSchema: a research action and a watch, requiring a workspace search key', () => {
     const parsed = manifestSchema.parse(emitted)
     expect(parsed.id).toBe('exa')
     expect(parsed.roles).toEqual(['research'])
@@ -57,6 +62,20 @@ describe('the exa manifest.json', () => {
           'Judgment',
         ],
       },
+      watch: {
+        trigger: 'watch',
+        uses: [
+          'Config',
+          'Secrets',
+          'Http',
+          'Spaces',
+          'Discover',
+          'Content',
+          'Log',
+          'Receipts',
+        ],
+        settings: settingsJsonSchema(watchSettings),
+      },
     })
     expect(parsed.actions).toEqual([
       { id: 'research', label: 'Research', on: 'company', job: 'research' },
@@ -72,6 +91,12 @@ describe('the exa manifest.json', () => {
     expect(z.safeParse(manifest.settings, { maxResults: 0 }).success).toBe(
       false,
     )
+  })
+
+  it('a watch defaults to the space’s criteria and ten companies a run', () => {
+    expect(z.parse(watchSettings, {})).toEqual({ criteria: '', cap: 10 })
+    expect(z.safeParse(watchSettings, { cap: 0 }).success).toBe(false)
+    expect(z.safeParse(watchSettings, { cap: 101 }).success).toBe(false)
   })
 
   it('has the version the package declares', () => {

@@ -1,5 +1,5 @@
 {
-  "//": "Exa's answers to the tests' searches, matched on method and URL in order, with no network. Files are relative to fixtures/. The key travels in the x-api-key header and is never recorded.",
+  "//": "Exa's answers to the tests' calls, matched on method and URL in order, with no network. Files are relative to fixtures/. The key travels in the x-api-key header and is never recorded. The websets answers are hand-written in Exa's documented websets shape.",
   "keyHeader": "x-api-key",
   "interactions": [
     {
@@ -27,6 +27,41 @@
       "name": "out of credits",
       "method": "POST",
       "url": "https://api.exa.ai/search",
+      "status": 402,
+      "file": "error-402.json"
+    },
+    {
+      "name": "webset created",
+      "method": "POST",
+      "url": "https://api.exa.ai/websets/v0/websets",
+      "status": 201,
+      "file": "webset-create.json"
+    },
+    {
+      "name": "seven items",
+      "method": "GET",
+      "url": "https://api.exa.ai/websets/v0/websets/webset_01k79q2zx3/items?limit=50",
+      "status": 200,
+      "file": "webset-items.json"
+    },
+    {
+      "name": "no more items",
+      "method": "GET",
+      "url": "https://api.exa.ai/websets/v0/websets/webset_01k79q2zx3/items?limit=50&cursor=witem_01k79q3a07",
+      "status": 200,
+      "file": "webset-items-empty.json"
+    },
+    {
+      "name": "webset create, revoked key",
+      "method": "POST",
+      "url": "https://api.exa.ai/websets/v0/websets",
+      "status": 401,
+      "file": "error-401.json"
+    },
+    {
+      "name": "webset items, out of credits",
+      "method": "GET",
+      "url": "https://api.exa.ai/websets/v0/websets/webset_01k79q2zx3/items?limit=50",
       "status": 402,
       "file": "error-402.json"
     }

@@ -1,5 +1,5 @@
 {
-  "//": "Exa research: one `action` job, Research on a company — Exa's web search, one signal per hit and one brief citing them, proposed as a note. Depends on @spaces/sdk only; effect and zod are peers the host provides, so the bundle leaves them as bare imports. The key is the workspace `search` credential the Secrets port hands the job.",
+  "//": "Exa research: an `action` job, Research on a company — Exa's web search, one signal per hit and one brief citing them, proposed as a note — and a `watch` job, an Exa webset made from a space's brief and paged from the cursor in the watch's state, each company found handed to Discover and a member's hit a signal. Depends on @spaces/sdk only; effect and zod are peers the host provides, so the bundle leaves them as bare imports. The key is the workspace `search` credential the Secrets port hands the job.",
   "name": "@spaces/plugin-exa",
   "version": "0.1.0",
   "private": true,
