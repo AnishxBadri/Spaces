@@ -10,6 +10,8 @@ import { cn } from '#/lib/utils'
  * - Keyboard: ←→ move and wrap, Home/End jump, and moving selects (automatic
  *   activation). Only the open tab is in the tab order.
  * - Filter rows under a tab keep the underline grammar; this is the tab head.
+ * - `size="head"` is a record body's 44px head, the height of a section's
+ *   bone band; the default bar is 36px.
  *
  * Generic over the tab ids so a caller with a union gets it back in
  * `onValueChange`.
@@ -49,6 +51,7 @@ export function Tabs<T extends string>({
   onValueChange,
   label,
   disabled,
+  size = 'bar',
   children,
   className,
 }: {
@@ -58,6 +61,7 @@ export function Tabs<T extends string>({
   /** Names the tablist for screen readers. */
   label: string
   disabled?: boolean | undefined
+  size?: 'bar' | 'head' | undefined
   /** The open tab's body; rendered as its `tabpanel` when given. */
   children?: ReactNode
   className?: string | undefined
@@ -87,7 +91,10 @@ export function Tabs<T extends string>({
         aria-label={label}
         onKeyDown={onKeyDown}
         // No overflow clip: the open tab hangs 1px over this foot rule.
-        className="flex items-end border-b border-hairline bg-bone pt-1"
+        className={cn(
+          'flex items-end border-b border-hairline bg-bone pt-1',
+          size === 'head' && 'h-11 px-3',
+        )}
       >
         {items.map((t, i) => {
           const open = i === selected
@@ -108,7 +115,8 @@ export function Tabs<T extends string>({
                 if (!open) onValueChange(t.id)
               }}
               className={cn(
-                'focus-ring-inset flex h-8 shrink-0 items-center gap-2 px-3 label-caps whitespace-nowrap transition-colors duration-150 ease-out-quart disabled:opacity-50',
+                'focus-ring-inset flex shrink-0 items-center gap-2 px-3 label-caps whitespace-nowrap transition-colors duration-150 ease-out-quart disabled:opacity-50',
+                size === 'head' ? 'h-9.75' : 'h-8',
                 open
                   ? 'tab-open -mb-px text-foreground'
                   : 'text-graphite hover:text-foreground',

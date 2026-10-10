@@ -26,6 +26,11 @@ export type RecordReadout = {
   label: ReactNode
   value: ReactNode
   tone?: 'muted' | 'bad' | undefined
+  /**
+   * A figure rather than a number — a bar with its labels: the cell takes
+   * twice the width and draws `value` as given.
+   */
+  figure?: boolean | undefined
 }
 
 export function RecordHeader({
@@ -96,20 +101,27 @@ export function RecordHeader({
             {readouts.map((r, i) => (
               <div
                 key={i}
-                className="flex max-w-55 min-w-28 flex-1 basis-0 flex-col justify-center gap-0.5 border-r border-rule px-4 first:pl-0 last:border-r-0"
+                className={cn(
+                  'flex min-w-28 basis-0 flex-col justify-center gap-0.5 border-r border-rule px-4 first:pl-0 last:border-r-0',
+                  r.figure ? 'max-w-110 flex-2' : 'max-w-55 flex-1',
+                )}
               >
-                <span
-                  className={cn(
-                    'truncate mono text-page leading-6.5',
-                    r.tone === 'bad'
-                      ? 'text-destructive'
-                      : r.tone === 'muted' || r.value === '—'
-                        ? 'text-graphite'
-                        : 'text-foreground',
-                  )}
-                >
-                  {r.value}
-                </span>
+                {r.figure ? (
+                  <div className="flex h-6.5 min-w-0 items-end">{r.value}</div>
+                ) : (
+                  <span
+                    className={cn(
+                      'truncate mono text-page leading-6.5',
+                      r.tone === 'bad'
+                        ? 'text-destructive'
+                        : r.tone === 'muted' || r.value === '—'
+                          ? 'text-graphite'
+                          : 'text-foreground',
+                    )}
+                  >
+                    {r.value}
+                  </span>
+                )}
                 <span className="truncate text-label text-graphite">
                   {r.label}
                 </span>
@@ -124,15 +136,35 @@ export function RecordHeader({
   )
 }
 
-/** Body: the page left, the rail right on bone. The rail never scrolls
- *  with the body on wide screens; it sticks under the folded head's bar. */
+/**
+ * Body: the page left, the rail right on bone. The rail never scrolls with
+ * the body on wide screens; it sticks under the folded head's bar.
+ * - With `details` it is the tabbed record (D74): the 320px details column
+ *   on bone left, and `children` — the tab head over its view — taking the
+ *   rest, edge to edge.
+ */
 export function RecordBody({
   children,
   rail,
+  details,
 }: {
   children: ReactNode
   rail?: ReactNode
+  details?: ReactNode
 }) {
+  if (details !== undefined) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
+        <aside
+          aria-label="Details"
+          className="flex w-full shrink-0 flex-col border-b border-hairline bg-bone xl:sticky xl:top-10 xl:max-h-[calc(100dvh-2.5rem)] xl:w-80 xl:overflow-y-auto xl:border-r xl:border-b-0"
+        >
+          {details}
+        </aside>
+        <div className="flex min-w-0 flex-1 flex-col pb-8">{children}</div>
+      </div>
+    )
+  }
   return (
     <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
       <div className="flex min-w-0 flex-1 flex-col gap-8 px-8 pt-6 pb-8">

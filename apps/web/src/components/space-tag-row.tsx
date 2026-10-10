@@ -9,10 +9,10 @@ import { cn } from '#/lib/utils'
 type Hit = { id: string; name: string }
 
 /**
- * The composer row of a space's Companies ledger: tagging happens where the
- * list is, not on each company's record. Type a name, ↵ tags the
- * highlighted match, the row stays open for the next one (a market map is
- * built in runs, not one at a time), esc or an empty blur closes it.
+ * The composer row of a space's Companies tab, over the rows: tagging
+ * happens where the list is, not on each company's record. Type a name, ↵
+ * tags the highlighted match, the row stays open for the next one (a market
+ * map is built in runs), esc or an empty blur closes it.
  */
 export function TagCompanyRow({
   spaceId,
@@ -78,7 +78,7 @@ export function TagCompanyRow({
 
   if (!open) {
     return (
-      <LedgerRow last>
+      <LedgerRow>
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -88,7 +88,7 @@ export function TagCompanyRow({
             +
           </span>
           <span className="min-w-0 flex-1 truncate text-body text-graphite">
-            {taggedIds.size === 0 ? 'Tag a company…' : 'Tag another company…'}
+            Tag a company into {spaceName}…
           </span>
           <kbd className="shrink-0 mono text-micro text-graphite">↵</kbd>
         </button>
@@ -99,7 +99,7 @@ export function TagCompanyRow({
   const term = q.trim()
 
   return (
-    <li className="flex flex-col">
+    <li className="flex flex-col border-b border-rule">
       <div className="flex h-ledger-row items-center gap-3 px-3">
         <span className="w-3.5 shrink-0 text-center mono text-ui text-primary">
           +

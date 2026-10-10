@@ -107,19 +107,30 @@ export function TemplatePicker({
 /**
  * "Save as template" — by-example capture, the only creation path. Renders
  * as a quiet menu-ish button; opens a one-field naming dialog.
+ * - Given `open`, the caller owns the dialog (a menu item opens it) and no
+ *   trigger is drawn.
  */
 export function SaveAsTemplateAction({
   entityLabel,
   defaultName,
   onSave,
   trigger,
+  open: controlled,
+  onOpenChange,
 }: {
   entityLabel: 'note' | 'space' | 'company' | 'person' | 'deal'
   defaultName?: string
   onSave: (name: string) => Promise<void>
   trigger?: React.ReactNode
+  open?: boolean | undefined
+  onOpenChange?: ((open: boolean) => void) | undefined
 }) {
-  const [open, setOpen] = useState(false)
+  const [own, setOwn] = useState(false)
+  const open = controlled ?? own
+  const setOpen = (next: boolean) => {
+    setOwn(next)
+    onOpenChange?.(next)
+  }
   const [name, setName] = useState(defaultName ?? '')
   const [pending, setPending] = useState(false)
 
@@ -142,7 +153,7 @@ export function SaveAsTemplateAction({
 
   return (
     <>
-      {trigger ? (
+      {controlled !== undefined ? null : trigger ? (
         <span onClick={() => setOpen(true)}>{trigger}</span>
       ) : (
         <button

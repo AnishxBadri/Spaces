@@ -1,4 +1,4 @@
-import { Effect, Schema } from 'effect'
+import { Clock, Effect, Schema } from 'effect'
 import {
   and,
   asc,
@@ -7,11 +7,13 @@ import {
   inArray,
   isNotNull,
   isNull,
+  max,
   or,
   sql,
 } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
+  attribute,
   company,
   entity,
   entitySpace,
@@ -165,6 +167,7 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
         isSeeded: space.isSeeded,
         archivedAt: space.archivedAt,
         criteria: space.criteria,
+        createdAt: entity.createdAt,
       })
       .from(space)
       .innerJoin(entity, eq(entity.id, space.entityId))
@@ -210,6 +213,7 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
         name: entity.canonicalName,
         values: entity.values,
         taggedVia: entitySpace.source,
+        filedAt: entitySpace.createdAt,
       })
       .from(entitySpace)
       .innerJoin(entity, eq(entity.id, entitySpace.entityId))
@@ -258,9 +262,46 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
       stage: jsonString(v.funding_stage),
       geo: jsonString(v.location),
       taggedVia: c.taggedVia,
+      filedAt: c.filedAt.toISOString(),
       deals: dealCounts.get(c.id) ?? 0,
     }
   })
+
+  // The stage bar and the default sort follow the company `funding_stage`
+  // options as the registry orders them, so a renamed or added stage
+  // reorders the page with no code change.
+  const stageOptions =
+    (yield* query(() =>
+      db
+        .select({ options: attribute.options })
+        .from(attribute)
+        .innerJoin(objectDef, eq(objectDef.id, attribute.objectId))
+        .where(
+          and(
+            eq(objectDef.slug, 'companies'),
+            eq(objectDef.isSystem, true),
+            eq(attribute.slug, 'funding_stage'),
+          ),
+        ),
+    )).at(0)?.options.options ?? []
+
+  // Last filed: the newest filing of any kind into this space.
+  const lastFiledRow = (yield* query(() =>
+    db
+      .select({ at: max(entitySpace.createdAt) })
+      .from(entitySpace)
+      .where(eq(entitySpace.spaceId, id)),
+  )).at(0)
+  const now = yield* Clock.currentTimeMillis
+  const lastFiled = lastFiledRow?.at
+    ? {
+        on: lastFiledRow.at.toISOString(),
+        days: Math.max(
+          0,
+          Math.floor((now - lastFiledRow.at.getTime()) / 86_400_000),
+        ),
+      }
+    : null
 
   // Custom-object records tagged here (spec §9: customs live in the
   // research graph). Grouped by object on the page; each links through
@@ -368,6 +409,9 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
     parentId: head.parentId,
     isSeeded: head.isSeeded,
     criteria: head.criteria,
+    createdAt: head.createdAt.toISOString(),
+    lastFiled,
+    stageOptions: stageOptions.map((o) => ({ id: o.id, label: o.label })),
     archive,
     archivedUnder: archivedUnder
       ? { id: archivedUnder.id, name: archivedUnder.name }
