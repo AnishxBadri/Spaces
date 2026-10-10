@@ -22,6 +22,7 @@ import type { EnqueueOptions } from '../../queue/sender'
 import { setValues } from '../attributes/values'
 import { resolveEntity } from '../entities/resolve'
 import { dispatchDomainEvent } from '../events/dispatch'
+import { writeIntegrationInteraction } from '../interactions/write'
 import { ModelCall } from '../ports/ai'
 import { autoEnrichProgram } from './auto'
 import { runEnrichment } from './run'
@@ -373,6 +374,75 @@ describe('the host checks, in order', () => {
     expect(first.outcome).toBe('queued')
     expect(second).toEqual({ outcome: 'skipped', check: 'queued' })
     expect(sent).toHaveLength(1)
+  })
+})
+
+describe('interaction.logged', () => {
+  /** A synced meeting with one outside person in it: the events its write hands back. */
+  const meetingWith = async () => {
+    const calendar = (
+      await db
+        .insert(integration)
+        .values({ capabilityId: 'google-calendar', version: '1.0.0' })
+        .returning({ id: integration.id })
+    ).at(0)
+    if (!calendar) throw new Error('no calendar row')
+    const personId = (
+      await resolveEntity({
+        kind: 'person',
+        name: 'Priya',
+        keys: { email: `priya-${String(++n)}@meeting-auto.example` },
+        source: { class: 'manual' },
+      })
+    ).entityId
+    const written = await db.transaction((tx) =>
+      writeIntegrationInteraction(tx, {
+        integrationId: calendar.id,
+        kind: 'meeting',
+        messageId: `uid-${randomUUID()}`,
+        threadId: null,
+        subject: 'Intro',
+        occurredAt: new Date(NOW),
+        body: null,
+        edges: [personId],
+      }),
+    )
+    if (written.kind !== 'written') throw new Error('no meeting')
+    return { personId, events: written.events }
+  }
+
+  it('a participant of a synced meeting is enriched once when the meeting scope is on', async () => {
+    const source = await installSource({ autoEnrichScopes: ['meeting'] })
+    const { personId, events } = await meetingWith()
+    expect(events).toEqual([
+      expect.objectContaining({
+        name: 'interaction.logged',
+        entityId: personId,
+        kind: 'person',
+        interactionKind: 'meeting',
+      }),
+    ])
+    const [logged] = events
+    expect(await withClock(dispatchDomainEvent(logged))).toEqual([
+      'enrichment.run',
+    ])
+    // The same person in a second meeting before the run: still one job.
+    await withClock(dispatchDomainEvent(logged))
+    expect(sent).toHaveLength(1)
+    expect(sent.at(0)?.data).toMatchObject({
+      entityId: personId,
+      trigger: 'interaction.logged',
+      sources: [source],
+    })
+  })
+
+  it('and not when it is off', async () => {
+    await installSource({ autoEnrichScopes: ['deal'] })
+    const { events } = await meetingWith()
+    const [logged] = events
+    expect(outcomeOf(await auto(logged))).toBe('scope')
+    expect(await withClock(dispatchDomainEvent(logged))).toEqual([])
+    expect(sent).toEqual([])
   })
 })
 

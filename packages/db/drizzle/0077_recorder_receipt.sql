@@ -1,0 +1,1 @@
+ALTER TABLE "enrichment_record" ALTER COLUMN "entity_id" DROP NOT NULL;

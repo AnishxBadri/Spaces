@@ -354,6 +354,8 @@ export const whyOf = (reason: string | null): string => {
       return 'was created'
     case 'identity.added':
       return 'got a domain or email'
+    case 'interaction.logged':
+      return 'was in a meeting'
     default:
       return reason
   }

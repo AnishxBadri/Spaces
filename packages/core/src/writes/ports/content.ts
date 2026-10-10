@@ -15,6 +15,7 @@ import { activity } from '@spaces/db/schema/activity'
 import { Content, JobPermanent, JobRetryable } from '@spaces/sdk'
 import type {
   DocumentClaim,
+  DomainEvent,
   InteractionClaim,
   JobError,
   JsonObject,
@@ -31,17 +32,26 @@ import {
   documentIntakeMessage,
   intakeDocumentProgram,
 } from '../documents/intake'
-import { writeIntegrationInteraction } from '../interactions/write'
+import {
+  ArtifactNotOwned,
+  writeIntegrationInteraction,
+  writeRecordedInteraction,
+} from '../interactions/write'
+import type { BodyVisibility, RecordedArtifact } from '../interactions/write'
 import { MeetingLane } from '../interactions/meeting-lane'
-import type { MeetingInput } from '../interactions/meeting-lane'
+import type {
+  MeetingInput,
+  ParticipantInput,
+} from '../interactions/meeting-lane'
+import { dispatchDomainEvent } from '../events/dispatch'
 import type { DocumentFilingTarget } from '../../documents/filing'
 import type { Enqueue } from '../../queue/enqueue'
+import type { Json } from '@spaces/db/json'
 import type { DocumentIntakeFailure } from '../documents/intake'
-import type { BodyVisibility } from '../interactions/write'
 import type { Tx } from '../attributes/values'
 import type { BoundIntegration } from './binding'
 import { integrationMeta } from './identity'
-import { ReceiptNotOwned, checkReceipt } from './receipts'
+import { ReceiptNotOwned, checkReceipt, insertReceipt } from './receipts'
 
 /**
  * ContentLive's interaction and signal lanes (sdk-7b; spec §4, D52, D57):
@@ -90,6 +100,14 @@ import { ReceiptNotOwned, checkReceipt } from './receipts'
  *   workspace-rooted greps in `../documents/intake.test.ts` fail naming a
  *   second writer. Targets follow `merged_into_id` to the survivor, as the
  *   interaction lane's edges do.
+ * - `logInteraction` with a `recorder` payload (D68) stores the payload as a
+ *   receipt with no record before anything else, resolves its participants
+ *   through the `MeetingLane`'s participants module, and hands the rest to
+ *   `writeRecordedInteraction`, which attaches it to the calendar meeting or
+ *   births a call. It writes no note: what the notes become is the host's
+ *   landing rules' (D78).
+ * - Every interaction write's `interaction.logged` events are dispatched
+ *   once it commits.
  */
 
 /**
@@ -273,6 +291,122 @@ export const readMeetingClaim = (
   }
 }
 
+/** Dispatch what a committed write handed back; never fails. */
+const dispatchAll = (events: ReadonlyArray<DomainEvent>) =>
+  Effect.forEach(events, (event) => dispatchDomainEvent(event))
+
+const participantShape = z
+  .object({ email: text, name: z.string().max(400).optional() })
+  .strict()
+
+const artifactShape = z.union([
+  z
+    .object({
+      role: z.literal('recording_link'),
+      url: z.url({ protocol: /^https?$/ }).max(2000),
+      title: z.string().max(400).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      role: z.literal(['transcript', 'attachment']),
+      documentId: z.uuid(),
+    })
+    .strict(),
+])
+
+const recorderShape = z
+  .object({
+    providerEventId: text,
+    icalUid: text.optional(),
+    calendarEventId: text.optional(),
+    durationSeconds: z.number().int().nonnegative().optional(),
+    raw: jsonValue,
+    artifacts: z.array(artifactShape).max(50).optional(),
+  })
+  .strict()
+
+/** A recorder payload, checked: the writer's keys and artifacts. */
+type RecorderInput = {
+  providerEventId: string
+  icalUid: string | null
+  calendarEventId: string | null
+  durationSeconds: number | null
+  raw: Json
+  artifacts: Array<RecordedArtifact>
+}
+
+const issuesOf = (error: z.ZodError, at: string) =>
+  error.issues
+    .map((i) => `${[at, ...i.path.map(String)].join('.')}: ${i.message}`)
+    .join('; ')
+
+/**
+ * The parts of an interaction claim a bundle could get wrong at runtime: its
+ * participants, its recorder payload, and having somewhere to live.
+ */
+export const readInteractionShape = (
+  claim: InteractionClaim,
+):
+  | {
+      ok: true
+      participants: Array<ParticipantInput>
+      recorder: RecorderInput | null
+    }
+  | { ok: false; reason: string } => {
+  const people = z
+    .array(participantShape)
+    .max(1000)
+    .safeParse(claim.participants ?? [])
+  if (!people.success)
+    return { ok: false, reason: issuesOf(people.error, 'participants') }
+  const participants = [
+    ...new Map(
+      people.data.map((p) => {
+        const email = p.email.toLowerCase()
+        return [email, { email, name: blankToNull(p.name) }]
+      }),
+    ).values(),
+  ]
+  if ((claim.entityIds ?? []).length === 0 && participants.length === 0)
+    return {
+      ok: false,
+      reason: 'an interaction names at least one entity or participant',
+    }
+  if (claim.recorder === undefined)
+    return { ok: true, participants, recorder: null }
+  // The type forbids a body here; a bundle is JavaScript.
+  if (Object.hasOwn(claim, 'body'))
+    return {
+      ok: false,
+      reason: "a recorder's payload carries no body: its notes are the host's",
+    }
+  const parsed = recorderShape.safeParse(claim.recorder)
+  if (!parsed.success)
+    return { ok: false, reason: issuesOf(parsed.error, 'recorder') }
+  const r = parsed.data
+  return {
+    ok: true,
+    participants,
+    recorder: {
+      providerEventId: r.providerEventId,
+      icalUid: r.icalUid ?? null,
+      calendarEventId: r.calendarEventId ?? null,
+      durationSeconds: r.durationSeconds ?? null,
+      raw: r.raw,
+      artifacts: (r.artifacts ?? []).map((a): RecordedArtifact =>
+        a.role === 'recording_link'
+          ? {
+              role: a.role,
+              url: a.url,
+              title: blankToNull(a.title) ?? 'Recording',
+            }
+          : { role: a.role, documentId: a.documentId },
+      ),
+    },
+  }
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const FILING_KINDS: ReadonlySet<string> = new Set(['record', 'space'])
@@ -443,18 +577,45 @@ export const ContentLive = (
 
   const logInteraction = Effect.fn('Content.logInteraction')(function* (
     claim: InteractionClaim,
-  ) {
+  ): Effect.fn.Return<
+    { interactionId: string },
+    JobError,
+    Enqueue | MeetingLane
+  > {
     const occurredAt = yield* parseTimestamp('logInteraction', claim.occurredAt)
-    const edges = yield* survivors(claim.entityIds)
+    const read = readInteractionShape(claim)
+    if (!read.ok) {
+      return yield* new JobPermanent({
+        reason: `Content.logInteraction: ${read.reason}`,
+      })
+    }
+    const { participants, recorder } = read
+
+    // The payload first, whole, before anything it claims is applied (D68).
+    const receiptId =
+      recorder === null
+        ? null
+        : yield* Effect.tryPromise({
+            try: () =>
+              insertReceipt(row, {
+                entityId: null,
+                raw: recorder.raw,
+                creditsUsed: null,
+              }),
+            catch: retryable('logInteraction'),
+          })
+
+    const given = claim.entityIds ?? []
+    const edges =
+      given.length === 0 ? { missing: [], ids: [] } : yield* survivors(given)
     if (edges.missing.length > 0) {
       return yield* new JobPermanent({
         reason: `Content.logInteraction: no record ${edges.missing.join(', ')}`,
       })
     }
-    const messageId = claim.messageId ?? null
 
     let authorId: string | null = null
-    if (claim.body !== undefined) {
+    if (claim.body !== undefined || participants.length > 0) {
       authorId = yield* Effect.tryPromise({
         try: () => bodyAuthor(row.id),
         catch: retryable('logInteraction'),
@@ -466,6 +627,45 @@ export const ContentLive = (
         })
       }
     }
+    const people =
+      participants.length === 0 || authorId === null
+        ? []
+        : yield* (yield* MeetingLane).participants(
+            { integrationId: row.id, authorId },
+            participants,
+          )
+    const entityIds = [...edges.ids, ...people]
+
+    if (recorder !== null && receiptId !== null) {
+      const recorded = yield* Effect.tryPromise({
+        try: () =>
+          db.transaction((tx) =>
+            writeRecordedInteraction(tx, {
+              integrationId: row.id,
+              providerEventId: recorder.providerEventId,
+              icalUid: recorder.icalUid,
+              calendarEventId: recorder.calendarEventId,
+              occurredAt,
+              subject: blankToNull(claim.subject),
+              durationSeconds: recorder.durationSeconds,
+              emails: participants.map((p) => p.email),
+              receiptId,
+              edges: entityIds,
+              artifacts: recorder.artifacts,
+            }),
+          ),
+        catch: (cause) =>
+          cause instanceof ArtifactNotOwned
+            ? new JobPermanent({
+                reason: `Content.logInteraction: ${cause.message}`,
+              })
+            : retryable('logInteraction')(cause),
+      })
+      yield* dispatchAll(recorded.events)
+      return { interactionId: recorded.interactionId }
+    }
+
+    const messageId = claim.messageId ?? null
     const body =
       claim.body === undefined || authorId === null
         ? null
@@ -487,13 +687,15 @@ export const ContentLive = (
             subject: claim.subject ?? null,
             occurredAt,
             body,
-            edges: edges.ids,
+            edges: entityIds,
           }),
         ),
       catch: retryable('logInteraction'),
     })
-    if (written.kind === 'written')
+    if (written.kind === 'written') {
+      yield* dispatchAll(written.events)
       return { interactionId: written.interactionId }
+    }
 
     // A duplicate: the row the index kept is the answer (one row per
     // messageId), whoever wrote it.
@@ -643,7 +845,8 @@ export const ContentLive = (
       return Content.of({
         fileDocument: (claim) =>
           fileDocument(claim).pipe(Effect.provide(context)),
-        logInteraction,
+        logInteraction: (claim) =>
+          logInteraction(claim).pipe(Effect.provide(context)),
         emitSignal,
         logMeeting: (claim) => logMeeting(claim).pipe(Effect.provide(context)),
       })

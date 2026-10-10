@@ -50,14 +50,18 @@ export function GoneMarker() {
 export function OpenInSourceButton({
   url,
   filename,
+  provider,
   className,
 }: {
   url: string
   filename: string
+  /** The plugin that filed it, named where the link's host says nothing. */
+  provider?: string | null
   className?: string
 }) {
-  // Named for the provider where the link says which: "Open in Drive".
-  const where = storageLinkProvider(url)?.label ?? 'source'
+  // Named for the provider: "Open in Drive" by the link's host, else by the
+  // plugin that filed it ("Open in fathom" for a recording).
+  const where = storageLinkProvider(url)?.label ?? provider ?? 'source'
   return (
     <Button
       size="icon-xs"

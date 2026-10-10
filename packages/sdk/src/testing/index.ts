@@ -270,6 +270,9 @@ export const FactsTest = (
  * Interactions dedupe on `messageId` and signals on `key` per record, as the
  * lanes do; documents never. `signals` is every signal written, a deduped
  * emit left out.
+ * - A recorder's payload attaches to the meeting its `icalUid` or
+ *   `calendarEventId` names, else is one call per `providerEventId`; the
+ *   time-and-attendees fallback is the host's alone.
  * - Meetings key on `uid`: the first claim is `created`, every later one
  *   `updated`. A cancellation finds its meeting by `uid`, else `eventId`.
  * - The fake keeps every meeting: which events are not meetings (internal,
@@ -299,6 +302,22 @@ export const ContentTest = (
       }),
     logInteraction: (claim) =>
       Effect.sync(() => {
+        const recorder = claim.recorder
+        if (recorder !== undefined) {
+          // Attached to the meeting a key names, else one call per event.
+          const meeting =
+            (recorder.icalUid === undefined
+              ? undefined
+              : byUid.get(recorder.icalUid)) ??
+            (recorder.calendarEventId === undefined
+              ? undefined
+              : byEventId.get(recorder.calendarEventId))
+          const key = `recorder ${recorder.providerEventId}`
+          const interactionId =
+            meeting ?? byMessageId.get(key) ?? nextInteraction()
+          if (meeting === undefined) byMessageId.set(key, interactionId)
+          return record('logInteraction', claim, { interactionId })
+        }
         const seen =
           claim.messageId === undefined
             ? undefined

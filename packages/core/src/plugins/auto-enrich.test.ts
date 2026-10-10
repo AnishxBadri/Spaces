@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { autoEnrichConfig, autoEnrichScopeOf, scopeWords } from './auto-enrich'
+import type { DomainEvent } from '@spaces/sdk'
+import {
+  autoEnrichConfig,
+  autoEnrichScopeOf,
+  inScope,
+  scopeWords,
+} from './auto-enrich'
 
 const SPACE = '00000000-0000-4000-8000-0000000000aa'
 
@@ -54,5 +60,31 @@ describe('scopeWords', () => {
       'deal · space',
     )
     expect(scopeWords({ scopes: [], spaces: [] })).toBe('off')
+  })
+})
+
+describe('inScope for interaction.logged', () => {
+  const logged: DomainEvent = {
+    name: 'interaction.logged',
+    entityId: '00000000-0000-4000-8000-000000000001',
+    kind: 'person',
+    occurredAt: '2026-10-10T10:00:00.000Z',
+    interactionId: '00000000-0000-4000-8000-000000000002',
+    interactionKind: 'meeting',
+  }
+  // A deal party filed in every space, so only the meeting scope can decide.
+  const facts = {
+    dealParty: true,
+    filedPaths: ['root'],
+    chosenPaths: new Map<string, string>(),
+  }
+
+  it('is the meeting scope, and only it', () => {
+    expect(inScope({ scopes: ['meeting'], spaces: [] }, logged, facts)).toBe(
+      true,
+    )
+    expect(
+      inScope({ scopes: ['deal', 'space'], spaces: [] }, logged, facts),
+    ).toBe(false)
   })
 })

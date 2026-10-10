@@ -7,7 +7,7 @@ import type { DomainEvent } from '@spaces/sdk'
  * plugin setting. (D76)
  * - `deal`: the record joins a deal; `space`: it is filed into a chosen
  *   space (or a space below one); `meeting`: it appears in a synced
- *   meeting — a word only until that trigger exists.
+ *   meeting or a recorded call (`interaction.logged`).
  * - `autoEnrichSpaces` empty with `space` ticked means every space.
  * - A birth or a new identity is in scope when the record already stands in
  *   one: a party of a live deal, or filed in a chosen space.
@@ -113,5 +113,7 @@ export const inScope = (
         (scope.scopes.includes('deal') && facts.dealParty) ||
         inChosenSpace(scope, facts)
       )
+    case 'interaction.logged':
+      return scope.scopes.includes('meeting')
   }
 }

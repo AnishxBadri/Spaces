@@ -79,6 +79,15 @@ export const scopeFacts = Effect.fn('scopeFacts')(function* (
       const facts: ScopeFacts = { dealParty: true, filedPaths: [], chosenPaths }
       return facts
     }
+    case 'interaction.logged': {
+      // The meeting scope asks nothing about the record.
+      const facts: ScopeFacts = {
+        dealParty: false,
+        filedPaths: [],
+        chosenPaths,
+      }
+      return facts
+    }
     case 'filed': {
       const own = wantsSpace
         ? (yield* spacePaths([event.spaceId])).get(event.spaceId)

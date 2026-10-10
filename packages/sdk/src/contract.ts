@@ -211,21 +211,96 @@ export type DocumentClaim = {
 export type InteractionKind = 'email' | 'meeting' | 'call'
 
 /**
- * `Content.logInteraction(claim)`: one interaction and an edge per entity.
- * `messageId` is the lane's dedupe key — the same id twice is one row; no
- * id is a new row every time, as on the manual path.
+ * Someone on the interaction, by address (SDK 1.5). The host runs every one
+ * through its participants module — the one mail and the calendar arrive
+ * through — so the plugin never resolves a person itself.
  */
-export type InteractionClaim = {
+export type InteractionParticipant = {
+  readonly email: string
+  readonly name?: string
+}
+
+/**
+ * What a recorder kept beside its payload (SDK 1.5), as an artifact of the
+ * interaction (D68):
+ * - `recording_link`: the provider's recording, kept as a link and never
+ *   copied — a document with no bytes, "Open in <provider>".
+ * - `transcript`, `attachment`: a document this integration already filed
+ *   through `Content.fileDocument`.
+ */
+export type InteractionArtifact =
+  | {
+      readonly role: 'recording_link'
+      readonly url: string
+      /** The row's name on the Files tab; omitted → "Recording". */
+      readonly title?: string
+    }
+  | {
+      readonly role: 'transcript' | 'attachment'
+      readonly documentId: string
+    }
+
+/**
+ * A recorder's payload (SDK 1.5, D68): the host decides where it lands.
+ * - It attaches to the calendar meeting `icalUid` names, else the one
+ *   `calendarEventId` names, else the one starting within 30 minutes of
+ *   `occurredAt` whose attendees include every participant email.
+ * - Nothing matches: a `call` is born, keyed by `providerEventId`, so a
+ *   payload delivered twice is one row.
+ * - `raw` is stored whole as a receipt before anything is applied.
+ * - What the recorder's notes become is the host's: a recorder claim
+ *   carries no `body`.
+ */
+export type RecorderPayload = {
+  readonly providerEventId: string
+  readonly icalUid?: string
+  readonly calendarEventId?: string
+  readonly durationSeconds?: number
+  readonly raw: JsonValue
+  readonly artifacts?: ReadonlyArray<InteractionArtifact>
+}
+
+type InteractionClaimBase = {
   readonly _tag: 'interaction'
   readonly kind: InteractionKind
   readonly occurredAt: IsoTimestamp
-  readonly entityIds: readonly [EntityId, ...Array<EntityId>]
   readonly subject?: string
   readonly messageId?: string
   readonly threadId?: string
-  /** The write-up, plain text; becomes the interaction's note. */
-  readonly body?: string
 }
+
+type InteractionEdges =
+  | {
+      readonly entityIds: readonly [EntityId, ...Array<EntityId>]
+      readonly participants?: ReadonlyArray<InteractionParticipant>
+    }
+  | {
+      readonly entityIds?: readonly [EntityId, ...Array<EntityId>]
+      readonly participants: readonly [
+        InteractionParticipant,
+        ...Array<InteractionParticipant>,
+      ]
+    }
+
+type InteractionPayload =
+  | {
+      /** The write-up, plain text; becomes the interaction's note. */
+      readonly body?: string
+      readonly recorder?: never
+    }
+  | { readonly recorder: RecorderPayload; readonly body?: never }
+
+/**
+ * `Content.logInteraction(claim)`: one interaction and an edge per entity
+ * and per participant — at least one of the two.
+ * - `messageId` is the lane's dedupe key: the same id twice is one row; no
+ *   id is a new row every time, as on the manual path.
+ * - With `recorder` (SDK 1.5) the host matches the payload to a calendar
+ *   meeting or births a `call`; `kind` and `messageId` are then the host's.
+ */
+export type InteractionClaim = InteractionClaimBase &
+  InteractionEdges &
+  InteractionPayload
 
 /** A meeting's state on the calendar. A cancelled meeting is marked, never deleted (D68). */
 export type MeetingStatus = 'scheduled' | 'cancelled'
@@ -452,6 +527,7 @@ export const DOMAIN_EVENTS = [
   'filed',
   'deal.linked',
   'identity.added',
+  'interaction.logged',
 ] as const
 export type DomainEventName = (typeof DOMAIN_EVENTS)[number]
 
@@ -470,6 +546,9 @@ type DomainEventBase = {
  *   `dealId` (SDK 1.2);
  * - `identity.added`: a domain or an email `value` was added to the company
  *   or person after its birth, never by a seed or an import.
+ * - `interaction.logged`: the company or person became a participant of the
+ *   meeting or call `interactionId` — a synced meeting, or a recorder's
+ *   payload (SDK 1.5).
  */
 export type DomainEvent =
   | (DomainEventBase & { readonly name: 'entity.created' })
@@ -484,6 +563,12 @@ export type DomainEvent =
       readonly kind: 'company' | 'person'
       readonly key: 'domain' | 'email'
       readonly value: string
+    })
+  | (DomainEventBase & {
+      readonly name: 'interaction.logged'
+      readonly kind: 'company' | 'person'
+      readonly interactionId: string
+      readonly interactionKind: 'meeting' | 'call'
     })
 
 /**

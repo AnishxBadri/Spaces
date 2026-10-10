@@ -62,6 +62,10 @@ const emailMeta = z
   })
   .strict()
 
+const recorderEvent = z
+  .object({ provider_event_id: z.string(), receipt_id: z.string() })
+  .strict()
+
 const meetingMeta = z
   .object({
     kind: z.literal('meeting'),
@@ -72,6 +76,7 @@ const meetingMeta = z
     recurring_instance_id: z.string().nullable(),
     rsvp: z.record(z.string(), rsvp),
     calendar_event_id: z.string().exactOptional(),
+    recorder_events: z.array(recorderEvent).exactOptional(),
   })
   .strict()
 
@@ -80,6 +85,7 @@ const callMeta = z
     kind: z.literal('call'),
     provider_event_id: z.string(),
     duration_seconds: z.number().int().nonnegative().nullable(),
+    receipt_id: z.string().exactOptional(),
   })
   .strict()
 

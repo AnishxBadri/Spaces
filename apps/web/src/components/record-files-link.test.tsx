@@ -44,6 +44,41 @@ describe('the Drive row', () => {
   })
 })
 
+describe('a recorder’s recording', () => {
+  const RECORDING = 'https://fathom.video/calls/42'
+
+  it('carries the recorder’s mark and opens in it', () => {
+    expect(
+      fileMeta({
+        ...row,
+        kind: 'other',
+        sizeBytes: null,
+        sourceCapability: 'fathom',
+      }),
+    ).toContain('via fathom')
+    const html = renderToStaticMarkup(
+      <OpenInSourceButton
+        url={RECORDING}
+        filename="Recording"
+        provider="fathom"
+      />,
+    )
+    expect(html).toContain('title="Open in fathom"')
+    expect(html).toContain(`href="${RECORDING}"`)
+  })
+
+  it('a storage host still names itself over the plugin', () => {
+    const html = renderToStaticMarkup(
+      <OpenInSourceButton
+        url={LINK}
+        filename="Pitch.pdf"
+        provider="google-drive"
+      />,
+    )
+    expect(html).toContain('title="Open in Drive"')
+  })
+})
+
 describe('LinkFetchRow', () => {
   const render = (state: LinkFetch['state']) =>
     renderToStaticMarkup(

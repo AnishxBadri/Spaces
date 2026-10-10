@@ -13,7 +13,10 @@ import type {
  * the noise judgement and the participants module the mailbox runs on — so
  * a calendar attendee and a mail participant are judged by one policy.
  * - The lane decides: refuse, birth a row, or follow the one it holds,
- *   through `writeIntegrationInteraction` and `updateInteraction`.
+ *   through `writeIntegrationInteraction` and `updateInteraction`, and
+ *   dispatches the `interaction.logged` events those hand back.
+ * - `participants` is the same module for any other claim that names people
+ *   by address — a recorder's payload: the records they resolve to.
  * - `NoMeetingLane` is for a process that runs ports but files no meetings.
  */
 
@@ -42,6 +45,9 @@ export type MeetingInput =
     }
   | { _tag: 'meeting-cancelled'; eventId: string; uid: string | null }
 
+/** Someone named by address, trimmed and lowercased. */
+export type ParticipantInput = { email: string; name: string | null }
+
 export type MeetingLaneContext = {
   /** The bound integration: `source_ref` on every row and record it makes. */
   integrationId: string
@@ -56,6 +62,10 @@ export class MeetingLane extends Context.Service<
       ctx: MeetingLaneContext,
       input: MeetingInput,
     ) => Effect.Effect<MeetingResult, JobError>
+    readonly participants: (
+      ctx: MeetingLaneContext,
+      people: ReadonlyArray<ParticipantInput>,
+    ) => Effect.Effect<ReadonlyArray<string>, JobError>
   }
 >()('spaces/core/MeetingLane') {}
 
@@ -66,6 +76,13 @@ export const NoMeetingLane: Layer.Layer<MeetingLane> = Layer.succeed(
       Effect.fail(
         new JobPermanent({
           reason: 'Content.logMeeting: this process keeps no meetings',
+        }),
+      ),
+    participants: () =>
+      Effect.fail(
+        new JobPermanent({
+          reason:
+            'Content.logInteraction: this process resolves no participants',
         }),
       ),
   }),

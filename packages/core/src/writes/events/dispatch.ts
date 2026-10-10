@@ -168,6 +168,15 @@ const eventData = (event: DomainEvent) => {
           value: event.value,
         },
       }
+    case 'interaction.logged':
+      return {
+        event: {
+          name: event.name,
+          ...base,
+          interactionId: event.interactionId,
+          interactionKind: event.interactionKind,
+        },
+      }
   }
 }
 

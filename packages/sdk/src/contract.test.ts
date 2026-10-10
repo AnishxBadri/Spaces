@@ -135,6 +135,31 @@ describe('content claims', () => {
     ])
   })
 
+  it('a recorder claim names participants and carries no body (SDK 1.5)', () => {
+    const recorded: InteractionClaim = {
+      _tag: 'interaction',
+      kind: 'call',
+      occurredAt: '2026-09-30T10:00:00Z',
+      participants: [{ email: 'jane@acme.example', name: 'Jane' }],
+      recorder: {
+        providerEventId: 'rec-1',
+        icalUid: 'uid-1@google.com',
+        raw: { id: 'rec-1' },
+        artifacts: [{ role: 'recording_link', url: 'https://rec.example/1' }],
+      },
+    }
+    // @ts-expect-error — what a recorder's notes become is the host's: no body
+    const summarized: InteractionClaim = {
+      _tag: 'interaction',
+      kind: 'call',
+      occurredAt: '2026-09-30T10:00:00Z',
+      participants: [{ email: 'jane@acme.example' }],
+      body: 'the summary',
+      recorder: { providerEventId: 'rec-2', raw: null },
+    }
+    expect([recorded.kind, summarized.kind]).toEqual(['call', 'call'])
+  })
+
   it('an interaction names at least one entity', () => {
     const none: InteractionClaim = {
       _tag: 'interaction',

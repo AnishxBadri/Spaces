@@ -155,7 +155,11 @@ export class Content extends Context.Service<
     readonly fileDocument: (
       claim: DocumentClaim,
     ) => Effect.Effect<{ readonly documentId: string }, JobError>
-    /** One row per `messageId`; a claim without one is a new row each time. */
+    /**
+     * One row per `messageId`; a claim without one is a new row each time.
+     * A recorder's payload answers the meeting it attached to, or the call
+     * it was born as (SDK 1.5).
+     */
     readonly logInteraction: (
       claim: InteractionClaim,
     ) => Effect.Effect<{ readonly interactionId: string }, JobError>

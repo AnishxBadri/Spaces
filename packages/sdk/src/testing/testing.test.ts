@@ -217,6 +217,48 @@ describe('ContentTest', () => {
     ])
   })
 
+  it('attaches a recorder payload to the meeting its key names, else one call per event (SDK 1.5)', () => {
+    const content = ContentTest()
+    const ids = Effect.runSync(
+      Effect.gen(function* () {
+        const port = yield* Content
+        const meeting = yield* port.logMeeting({
+          _tag: 'meeting',
+          uid: 'evt@google.com',
+          eventId: 'evt',
+          status: 'scheduled',
+          startsAt: '2026-10-12T10:00:00Z',
+          endsAt: '2026-10-12T11:00:00Z',
+          attendees: [{ email: 'jane@acme.example', rsvp: 'accepted' }],
+        })
+        const recorded = (providerEventId: string, icalUid?: string) =>
+          port.logInteraction({
+            _tag: 'interaction',
+            kind: 'call',
+            occurredAt: '2026-10-12T10:01:00Z',
+            participants: [{ email: 'jane@acme.example' }],
+            recorder: {
+              providerEventId,
+              ...(icalUid === undefined ? {} : { icalUid }),
+              raw: { id: providerEventId },
+            },
+          })
+        return [
+          meeting.outcome === 'refused' ? null : meeting.interactionId,
+          (yield* recorded('rec-1', 'evt@google.com')).interactionId,
+          (yield* recorded('rec-2')).interactionId,
+          (yield* recorded('rec-2')).interactionId,
+        ]
+      }).pipe(Effect.provide(content.layer)),
+    )
+    expect(ids).toEqual([
+      'interaction-1',
+      'interaction-1',
+      'interaction-2',
+      'interaction-2',
+    ])
+  })
+
   it('writes a keyed signal once per record, and an unkeyed one every time', () => {
     const content = ContentTest()
     const ids = Effect.runSync(

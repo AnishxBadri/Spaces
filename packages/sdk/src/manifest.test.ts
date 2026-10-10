@@ -162,6 +162,7 @@ describe('manifestSchema', () => {
         'filed',
         'deal.linked',
         'identity.added',
+        'interaction.logged',
       ])
       const m = base()
       m.jobs.onFiled = { trigger: 'event', uses: ['Facts'], on: ['filed'] }
@@ -179,6 +180,16 @@ describe('manifestSchema', () => {
         trigger: 'event',
         uses: ['Facts'],
         on: ['identity.added'],
+      }
+      expect(issues(m)).toEqual([])
+    })
+
+    it('takes interaction.logged as an event (SDK 1.5)', () => {
+      const m = base()
+      m.jobs.onMeeting = {
+        trigger: 'event',
+        uses: ['Facts'],
+        on: ['interaction.logged'],
       }
       expect(issues(m)).toEqual([])
     })

@@ -63,6 +63,7 @@ const MeetingLaneTest = Layer.succeed(
         handed.push({ ctx, input })
         return { outcome: 'created', interactionId: 'held-by-the-lane' }
       }),
+    participants: () => Effect.succeed([]),
   }),
 )
 const live = (row: { id: string; capabilityId: string }) =>

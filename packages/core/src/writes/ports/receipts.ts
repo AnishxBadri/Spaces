@@ -23,23 +23,13 @@ export const ReceiptsLive = (
     Receipts.of({
       store: (claim: ReceiptClaim) =>
         Effect.tryPromise({
-          try: async () => {
-            const inserted = (
-              await db
-                .insert(enrichmentRecord)
-                .values({
-                  entityId: claim.entityId,
-                  provider: row.capabilityId,
-                  raw: jsonValue.parse(claim.raw),
-                  creditsUsed: claim.creditsUsed ?? null,
-                  integrationId: row.id,
-                })
-                .returning({ id: enrichmentRecord.id })
-            ).at(0)
-            if (!inserted)
-              throw new Error('enrichment_record insert returned no row')
-            return { receiptId: inserted.id }
-          },
+          try: async () => ({
+            receiptId: await insertReceipt(row, {
+              entityId: claim.entityId,
+              raw: claim.raw,
+              creditsUsed: claim.creditsUsed ?? null,
+            }),
+          }),
           catch: (cause) =>
             new JobRetryable({
               reason: `Receipts.store failed: ${cause instanceof Error ? cause.message : String(cause)}`,
@@ -47,6 +37,34 @@ export const ReceiptsLive = (
         }),
     }),
   )
+
+/**
+ * One `enrichment_record`, committed on its own. `entityId` is null for a
+ * payload about no record — a recorder's, stored before anything is applied.
+ */
+export async function insertReceipt(
+  row: Pick<BoundIntegration, 'id' | 'capabilityId'>,
+  receipt: {
+    entityId: string | null
+    raw: unknown
+    creditsUsed: number | null
+  },
+): Promise<string> {
+  const inserted = (
+    await db
+      .insert(enrichmentRecord)
+      .values({
+        entityId: receipt.entityId,
+        provider: row.capabilityId,
+        raw: jsonValue.parse(receipt.raw),
+        creditsUsed: receipt.creditsUsed,
+        integrationId: row.id,
+      })
+      .returning({ id: enrichmentRecord.id })
+  ).at(0)
+  if (!inserted) throw new Error('enrichment_record insert returned no row')
+  return inserted.id
+}
 
 /** The cited receipt is missing, or another integration's. */
 export class ReceiptNotOwned extends Schema.TaggedError<ReceiptNotOwned>()(

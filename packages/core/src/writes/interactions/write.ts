@@ -1,8 +1,22 @@
-import { and, eq, inArray } from 'drizzle-orm'
-import { entity, interaction, interactionEntity, note } from '@spaces/db/schema'
+import { Schema } from 'effect'
+import { and, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
+import {
+  document,
+  entity,
+  interaction,
+  interactionDocument,
+  interactionEntity,
+  note,
+} from '@spaces/db/schema'
 import type { NoteBody } from '@spaces/db/schema/kinds'
-import type { InteractionMeta } from '@spaces/db/schema/interactions'
+import type {
+  InteractionKind,
+  InteractionMeta,
+  MeetingMeta,
+} from '@spaces/db/schema/interactions'
+import type { DomainEvent } from '@spaces/sdk'
 import { readInteractionMeta } from '../../json'
+import { birthLinkDocument } from '../documents/birth'
 import type { Tx } from '../entities/resolve'
 import { interactionParticipants, recomputeInteractionStats } from './stats'
 
@@ -42,6 +56,10 @@ import { interactionParticipants, recomputeInteractionStats } from './stats'
  * to `recomputeInteractionStats` before the writer returns, and
  * `updateInteraction` does the same for a change in place — a cancellation
  * included — so `interaction_stat` cannot disagree with a committed row.
+ *
+ * **Every write hands back its `interaction.logged` events**: one per company
+ * or person newly edged to a meeting or a call. The caller dispatches them
+ * once its transaction commits; the meeting auto-enrich scope reads them.
  */
 
 /** A long body is kept whole in `body_md` up to here, not truncated at 1 MB by accident. */
@@ -112,6 +130,59 @@ export async function insertBodyNote(
   return noteEntity.id
 }
 
+/** Inserts the edges; answers the ones that were new, in the order given. */
+async function insertEdges(
+  tx: Tx,
+  interactionId: string,
+  entityIds: ReadonlyArray<string>,
+): Promise<Array<string>> {
+  const added: Array<string> = []
+  for (const entityId of new Set(entityIds)) {
+    const inserted = await tx
+      .insert(interactionEntity)
+      .values({ interactionId, entityId })
+      .onConflictDoNothing()
+      .returning({ entityId: interactionEntity.entityId })
+    if (inserted.length > 0) added.push(entityId)
+  }
+  return added
+}
+
+/**
+ * `interaction.logged` for each live company or person among `entityIds`,
+ * when the row is a meeting or a call; nothing for any other kind.
+ */
+async function loggedEvents(
+  tx: Tx,
+  interactionId: string,
+  kind: InteractionKind,
+  entityIds: ReadonlyArray<string>,
+  at: Date = new Date(),
+): Promise<Array<DomainEvent>> {
+  if ((kind !== 'meeting' && kind !== 'call') || entityIds.length === 0)
+    return []
+  const rows = await tx
+    .select({ id: entity.id, kind: entity.kind })
+    .from(entity)
+    .where(and(inArray(entity.id, [...entityIds]), isNull(entity.mergedIntoId)))
+  const kinds = new Map(rows.map((r) => [r.id, r.kind]))
+  return entityIds.flatMap((entityId): Array<DomainEvent> => {
+    const of = kinds.get(entityId)
+    return of === 'company' || of === 'person'
+      ? [
+          {
+            name: 'interaction.logged',
+            entityId,
+            kind: of,
+            occurredAt: at.toISOString(),
+            interactionId,
+            interactionKind: kind,
+          },
+        ]
+      : []
+  })
+}
+
 export type IntegrationInteraction = {
   /** The integration row that wrote it — `source_ref` on every row. */
   integrationId: string
@@ -136,6 +207,8 @@ export type WrittenInteraction =
       noteId: string | null
       /** Every entity edged, deduplicated, in the order given. */
       edges: Array<string>
+      /** To dispatch once the transaction commits. */
+      events: Array<DomainEvent>
     }
   | { kind: 'duplicate' }
 
@@ -180,14 +253,10 @@ export async function writeIntegrationInteraction(
   const given =
     typeof input.edges === 'function' ? await input.edges(tx) : input.edges
   const edges = [...new Set(given)]
-  for (const entityId of edges) {
-    await tx
-      .insert(interactionEntity)
-      .values({ interactionId: row.id, entityId })
-      .onConflictDoNothing()
-  }
+  await insertEdges(tx, row.id, edges)
   await recomputeInteractionStats(tx, edges)
-  return { kind: 'written', interactionId: row.id, noteId, edges }
+  const events = await loggedEvents(tx, row.id, input.kind, edges)
+  return { kind: 'written', interactionId: row.id, noteId, edges, events }
 }
 
 /** What a sync may change on an interaction it wrote earlier. */
@@ -207,20 +276,21 @@ export type InteractionChange = {
  * An interaction changed in place — a meeting moved, renamed or cancelled
  * (D68: a cancelled meeting is marked, never deleted). Its participants'
  * stats, and those of every entity it lost, are rebuilt in the same
- * transaction. Returns false when no such row.
+ * transaction. Answers the `interaction.logged` events for the edges it
+ * added, or null when no such row.
  */
 export async function updateInteraction(
   tx: Tx,
   interactionId: string,
   change: InteractionChange,
-): Promise<boolean> {
+): Promise<Array<DomainEvent> | null> {
   const current = (
     await tx
       .select({ kind: interaction.kind })
       .from(interaction)
       .where(eq(interaction.id, interactionId))
   ).at(0)
-  if (!current) return false
+  if (!current) return null
   let meta: InteractionMeta | null | undefined
   if (change.meta !== undefined) {
     const read = readInteractionMeta(current.kind, change.meta)
@@ -247,14 +317,320 @@ export async function updateInteraction(
           inArray(interactionEntity.entityId, remove),
         ),
       )
-  for (const entityId of new Set(change.edges?.add ?? []))
-    await tx
-      .insert(interactionEntity)
-      .values({ interactionId, entityId })
-      .onConflictDoNothing()
+  const added = await insertEdges(tx, interactionId, change.edges?.add ?? [])
   await recomputeInteractionStats(tx, [
     ...(await interactionParticipants(tx, interactionId)),
     ...remove,
   ])
-  return true
+  return loggedEvents(tx, interactionId, current.kind, added)
+}
+
+/**
+ * A recorder's payload: attach it to the calendar meeting, or birth a `call`
+ * (D68). One meeting, one row.
+ * - The match, in order: the meeting `icalUid` keys (or one instance of its
+ *   series, `<uid>#<start>`, inside the window), the one whose
+ *   `calendar_event_id` is given, else one starting within `MATCH_WINDOW_MS`
+ *   of `occurredAt` whose attendees include **every** payload email. A
+ *   looser match would hang a transcript on the wrong call, which is worse
+ *   than a duplicate.
+ * - An attach unions the participants, adds the artifacts and appends the
+ *   payload to `meta.recorder_events`; no row is born.
+ * - No match births a `call` keyed by the provider event id, so a payload
+ *   delivered twice is one row through `interaction_message_id_unique`.
+ * - Serialized per (integration, provider event) by an advisory lock, so a
+ *   replay racing the first delivery reads it rather than doubling it.
+ * - Writes no note: what a recorder's notes become is the caller's (D78).
+ */
+
+/** How far from `occurredAt` a meeting may start and still be the one recorded. */
+export const MATCH_WINDOW_MS = 30 * 60 * 1000
+
+/** One artifact as the writer takes it; documents are checked inside. */
+export type RecordedArtifact =
+  | { role: 'recording_link'; url: string; title: string }
+  | { role: 'transcript' | 'attachment'; documentId: string }
+
+export type RecordedInteraction = {
+  integrationId: string
+  providerEventId: string
+  icalUid: string | null
+  calendarEventId: string | null
+  occurredAt: Date
+  subject: string | null
+  durationSeconds: number | null
+  /** The participants' emails, lowercased: the fallback's test. */
+  emails: ReadonlyArray<string>
+  /** The receipt the payload was stored in before this ran. */
+  receiptId: string
+  /** The entities the participants resolved to, plus any given by id. */
+  edges: ReadonlyArray<string>
+  artifacts: ReadonlyArray<RecordedArtifact>
+}
+
+export type RecordedOutcome = {
+  /** `duplicate`: this payload was already applied; nothing was added. */
+  outcome: 'attached' | 'born' | 'duplicate'
+  interactionId: string
+  /** To dispatch once the transaction commits. */
+  events: Array<DomainEvent>
+}
+
+/** An artifact names a document that is missing or another integration's. */
+export class ArtifactNotOwned extends Schema.TaggedError<ArtifactNotOwned>()(
+  'ArtifactNotOwned',
+  { documentId: Schema.String, message: Schema.String },
+) {}
+
+/** The row's line where an extract would say what the text is. */
+const RECORDING_NOTE = 'a recording — kept at the provider, never copied'
+
+type HeldMeeting = { id: string; meta: MeetingMeta }
+
+const asMeeting = (row: {
+  id: string
+  meta: InteractionMeta | null
+}): HeldMeeting | null =>
+  row.meta?.kind === 'meeting' ? { id: row.id, meta: row.meta } : null
+
+/** The meeting a recorder's payload belongs to, or null. */
+async function recordedMeeting(
+  tx: Tx,
+  r: RecordedInteraction,
+): Promise<HeldMeeting | null> {
+  const at = r.occurredAt.getTime()
+  const inWindow = and(
+    eq(interaction.kind, 'meeting'),
+    gte(interaction.occurredAt, new Date(at - MATCH_WINDOW_MS)),
+    lte(interaction.occurredAt, new Date(at + MATCH_WINDOW_MS)),
+  )
+  const nearest = sql`abs(extract(epoch from ${interaction.occurredAt} - ${r.occurredAt.toISOString()}::timestamptz))`
+  const meetings = () =>
+    tx
+      .select({
+        id: interaction.id,
+        meta: interaction.meta,
+        occurredAt: interaction.occurredAt,
+      })
+      .from(interaction)
+
+  if (r.icalUid !== null) {
+    const exact = (
+      await meetings().where(
+        and(
+          eq(interaction.kind, 'meeting'),
+          eq(interaction.messageId, r.icalUid),
+        ),
+      )
+    ).at(0)
+    const instance =
+      exact ??
+      (
+        await meetings()
+          .where(
+            and(
+              inWindow,
+              sql`starts_with(${interaction.messageId}, ${`${r.icalUid}#`})`,
+            ),
+          )
+          .orderBy(nearest)
+          .limit(1)
+      ).at(0)
+    const held = instance === undefined ? null : asMeeting(instance)
+    if (held !== null) return held
+  }
+
+  if (r.calendarEventId !== null) {
+    const byEvent = (
+      await meetings()
+        .where(
+          and(
+            eq(interaction.kind, 'meeting'),
+            sql`${interaction.meta} ->> 'calendar_event_id' = ${r.calendarEventId}`,
+          ),
+        )
+        .limit(1)
+    ).at(0)
+    const held = byEvent === undefined ? null : asMeeting(byEvent)
+    if (held !== null) return held
+  }
+
+  // The fallback: every payload email among the meeting's attendees.
+  if (r.emails.length === 0) return null
+  const candidates = await meetings().where(inWindow).orderBy(nearest)
+  for (const row of candidates) {
+    const held = asMeeting(row)
+    if (held === null || held.meta.status === 'cancelled') continue
+    const attendees = new Set(Object.keys(held.meta.rsvp))
+    if (held.meta.organizer !== null) attendees.add(held.meta.organizer)
+    if (r.emails.every((email) => attendees.has(email))) return held
+  }
+  return null
+}
+
+/** The records an artifact files against: the row's live company, person and deal edges. */
+async function filingRecords(
+  tx: Tx,
+  interactionId: string,
+): Promise<Array<{ kind: 'record'; entityId: string }>> {
+  const ids = await interactionParticipants(tx, interactionId)
+  if (ids.length === 0) return []
+  const rows = await tx
+    .select({ id: entity.id, kind: entity.kind })
+    .from(entity)
+    .where(and(inArray(entity.id, ids), isNull(entity.mergedIntoId)))
+  return rows.flatMap((row) =>
+    row.kind === 'company' || row.kind === 'person' || row.kind === 'deal'
+      ? [{ kind: 'record', entityId: row.id }]
+      : [],
+  )
+}
+
+/**
+ * The artifacts on `interaction_document`, each with its role.
+ * - A recording is a document with no blob whose `external_url` is the
+ *   provider's — never copied (D68). The same link on the row twice is one.
+ * - A transcript or attachment must be a document this integration filed.
+ */
+async function attachArtifacts(
+  tx: Tx,
+  interactionId: string,
+  integrationId: string,
+  artifacts: ReadonlyArray<RecordedArtifact>,
+): Promise<void> {
+  for (const artifact of artifacts) {
+    if (artifact.role === 'recording_link') {
+      const held = await tx
+        .select({ id: document.entityId })
+        .from(interactionDocument)
+        .innerJoin(
+          document,
+          eq(document.entityId, interactionDocument.documentId),
+        )
+        .where(
+          and(
+            eq(interactionDocument.interactionId, interactionId),
+            eq(interactionDocument.role, 'recording_link'),
+            eq(document.externalUrl, artifact.url),
+          ),
+        )
+        .limit(1)
+      if (held.length > 0) continue
+      const documentId = await birthLinkDocument(tx, {
+        filename: artifact.title,
+        externalUrl: artifact.url,
+        sourceRef: integrationId,
+        fileAgainst: await filingRecords(tx, interactionId),
+        reason: RECORDING_NOTE,
+      })
+      await tx
+        .insert(interactionDocument)
+        .values({ interactionId, documentId, role: 'recording_link' })
+      continue
+    }
+    const filed = (
+      await tx
+        .select({ sourceRef: document.sourceRef })
+        .from(document)
+        .where(eq(document.entityId, artifact.documentId))
+    ).at(0)
+    if (filed?.sourceRef !== integrationId)
+      throw new ArtifactNotOwned({
+        documentId: artifact.documentId,
+        message:
+          filed === undefined
+            ? `no document ${artifact.documentId}`
+            : `document ${artifact.documentId} was filed by another integration`,
+      })
+    await tx
+      .insert(interactionDocument)
+      .values({
+        interactionId,
+        documentId: artifact.documentId,
+        role: artifact.role,
+      })
+      .onConflictDoNothing()
+  }
+}
+
+export async function writeRecordedInteraction(
+  tx: Tx,
+  r: RecordedInteraction,
+): Promise<RecordedOutcome> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`recorder ${r.integrationId} ${r.providerEventId}`}, 0))`,
+  )
+  // Born as a call by an earlier delivery: the same payload again.
+  const asCall = (
+    await tx
+      .select({ id: interaction.id })
+      .from(interaction)
+      .where(eq(interaction.messageId, r.providerEventId))
+  ).at(0)
+  if (asCall !== undefined)
+    return { outcome: 'duplicate', interactionId: asCall.id, events: [] }
+
+  const meeting = await recordedMeeting(tx, r)
+  if (meeting !== null) {
+    const locked = (
+      await tx
+        .select({ id: interaction.id, meta: interaction.meta })
+        .from(interaction)
+        .where(eq(interaction.id, meeting.id))
+        .for('update')
+    ).at(0)
+    const held = locked === undefined ? null : asMeeting(locked)
+    if (held === null) throw new Error(`meeting ${meeting.id} vanished`)
+    const recorded = held.meta.recorder_events ?? []
+    const repeat = recorded.some(
+      (e) => e.provider_event_id === r.providerEventId,
+    )
+    const added = await insertEdges(tx, held.id, r.edges)
+    if (!repeat) {
+      await attachArtifacts(tx, held.id, r.integrationId, r.artifacts)
+      const meta: MeetingMeta = {
+        ...held.meta,
+        recorder_events: [
+          ...recorded,
+          { provider_event_id: r.providerEventId, receipt_id: r.receiptId },
+        ],
+      }
+      await tx
+        .update(interaction)
+        .set({ meta })
+        .where(eq(interaction.id, held.id))
+    }
+    await recomputeInteractionStats(tx, added)
+    return {
+      outcome: repeat ? 'duplicate' : 'attached',
+      interactionId: held.id,
+      events: await loggedEvents(tx, held.id, 'meeting', added),
+    }
+  }
+
+  const written = await writeIntegrationInteraction(tx, {
+    integrationId: r.integrationId,
+    kind: 'call',
+    messageId: r.providerEventId,
+    threadId: null,
+    subject: r.subject,
+    occurredAt: r.occurredAt,
+    meta: {
+      kind: 'call',
+      provider_event_id: r.providerEventId,
+      duration_seconds: r.durationSeconds,
+      receipt_id: r.receiptId,
+    },
+    body: null,
+    edges: r.edges,
+  })
+  // Held by the lock and checked above; a conflict here is a bug.
+  if (written.kind === 'duplicate')
+    throw new Error(`${r.providerEventId} conflicted under its lock`)
+  await attachArtifacts(tx, written.interactionId, r.integrationId, r.artifacts)
+  return {
+    outcome: 'born',
+    interactionId: written.interactionId,
+    events: written.events,
+  }
 }

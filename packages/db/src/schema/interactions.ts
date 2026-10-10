@@ -68,6 +68,15 @@ export type MeetingMeta = {
    * nothing else, finds its row.
    */
   calendar_event_id?: string
+  /** Recorder payloads attached to this meeting, one per provider event (D68). */
+  recorder_events?: Array<RecorderEvent>
+}
+
+/** A recorder payload on a row: the provider's id for it and its receipt. */
+export type RecorderEvent = {
+  provider_event_id: string
+  /** The `enrichment_record` holding the payload whole. */
+  receipt_id: string
 }
 
 /** `interaction.meta` for a call a recorder births (D68). */
@@ -75,6 +84,8 @@ export type CallMeta = {
   kind: 'call'
   provider_event_id: string
   duration_seconds: number | null
+  /** The `enrichment_record` holding the payload whole. */
+  receipt_id?: string
 }
 
 /**
@@ -268,9 +279,12 @@ export const enrichmentRecord = pgTable(
   'enrichment_record',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    entityId: uuid('entity_id')
-      .notNull()
-      .references(() => entity.id),
+    /**
+     * The record the response is about. Null for a recorder's payload: it is
+     * about a meeting, which is not a record, and is stored before any
+     * participant is resolved. A null row never reads as an enrichment.
+     */
+    entityId: uuid('entity_id').references(() => entity.id),
     /** Display text: the manifest id of the plugin that fetched it. */
     provider: text('provider').notNull(),
     raw: jsonb('raw').$type<Json>().notNull(),

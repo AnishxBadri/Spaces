@@ -7,11 +7,14 @@ import {
   updateInteraction,
   writeIntegrationInteraction,
 } from '@spaces/core/writes/interactions/write'
+import { dispatchDomainEvent } from '@spaces/core/writes/events/dispatch'
 import type {
   MeetingInput,
   MeetingLaneContext,
+  ParticipantInput,
 } from '@spaces/core/writes/interactions/meeting-lane'
-import type { MeetingResult } from '@spaces/sdk'
+import type { DomainEvent, MeetingResult } from '@spaces/sdk'
+import { webEnqueue } from '#/lib/enqueue-live'
 import type { Address } from './forwarded'
 import { matchParticipants } from './file'
 import { meetingRefusal } from './noise'
@@ -36,6 +39,8 @@ import type { ParticipantAddresses } from './participant-records'
  * - **Edges follow the attendees.** Each sync edges what the current list
  *   resolves to and drops what only a departed attendee matched; deals and
  *   pins are never touched (D49).
+ * - **Each new participant is an `interaction.logged`**, dispatched once the
+ *   write commits: the meeting auto-enrich scope's trigger.
  */
 
 export class MeetingWriteFailed extends Schema.TaggedError<MeetingWriteFailed>()(
@@ -52,6 +57,12 @@ const write = <T>(f: () => Promise<T>) =>
     try: f,
     catch: (cause) => new MeetingWriteFailed({ cause }),
   })
+
+/** Dispatch what a committed write handed back; never fails. */
+const dispatchAll = (events: ReadonlyArray<DomainEvent> | null) =>
+  Effect.forEach(events ?? [], (event) =>
+    dispatchDomainEvent(event).pipe(Effect.provide(webEnqueue)),
+  )
 
 /** The row a uid, or failing that a calendar event id, names. */
 async function heldMeeting(
@@ -143,14 +154,14 @@ const follow = (meeting: Meeting, heldId: string, records: Array<string>) =>
       const lost = (await matchParticipants(tx, departed)).filter(
         (id) => !current.includes(id),
       )
-      await updateInteraction(tx, heldId, {
+      return updateInteraction(tx, heldId, {
         subject: meeting.subject,
         occurredAt: meeting.startsAt,
         meta: metaOf(meeting, before),
         edges: { add: current, remove: lost },
       })
     }),
-  )
+  ).pipe(Effect.tap(dispatchAll))
 
 const logFull = Effect.fn('logMeeting.full')(function* (
   ctx: MeetingLaneContext,
@@ -198,8 +209,10 @@ const logFull = Effect.fn('logMeeting.full')(function* (
         }),
       ),
     )
-    if (written.kind === 'written')
+    if (written.kind === 'written') {
+      yield* dispatchAll(written.events)
       return { outcome: 'created', interactionId: written.interactionId }
+    }
   }
   // Held, or born by another calendar's sync a moment ago.
   const row = held ?? (yield* write(() => heldMeeting(meeting.uid, null)))
@@ -229,3 +242,30 @@ export const logMeetingProgram = (
   input: MeetingInput,
 ): Effect.Effect<MeetingResult, MeetingWriteFailed> =>
   input._tag === 'meeting' ? logFull(ctx, input) : logCancellation(input)
+
+/**
+ * People a recorder names, through the participants module the mailbox and
+ * the calendar run on: the records they resolve to, plus the ones their
+ * addresses already match. No noise rule — a recorded call happened.
+ */
+export const resolveAttendeesProgram = Effect.fn('resolveAttendees')(function* (
+  ctx: MeetingLaneContext,
+  people: ReadonlyArray<ParticipantInput>,
+): Effect.fn.Return<ReadonlyArray<string>, MeetingWriteFailed> {
+  const addresses: ParticipantAddresses = {
+    from: null,
+    to: people.map((p) => ({ email: p.email, name: p.name })),
+    cc: [],
+  }
+  const decisions = yield* participantDecisionsProgram(
+    addresses,
+    ctx.integrationId,
+  ).pipe(Effect.mapError((e) => new MeetingWriteFailed({ cause: e.cause })))
+  const records = yield* resolveParticipantsProgram(decisions, ctx).pipe(
+    Effect.mapError((e) => new MeetingWriteFailed({ cause: e.cause })),
+  )
+  const matched = yield* write(() =>
+    db.transaction((tx) => matchParticipants(tx, addresses.to)),
+  )
+  return [...new Set([...records.entityIds, ...matched])]
+})

@@ -303,6 +303,13 @@ const eventData = z.object({
       key: z.enum(['domain', 'email']),
       value: z.string().min(1),
     }),
+    z.object({
+      name: z.literal('interaction.logged'),
+      ...eventBase,
+      kind: z.enum(['company', 'person']),
+      interactionId: z.uuid(),
+      interactionKind: z.enum(['meeting', 'call']),
+    }),
   ]),
 })
 const webhookData = z.object({

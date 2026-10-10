@@ -284,7 +284,7 @@ const existingFiling = Effect.fn('birth.existingFiling')(function* (
  * two drops racing produce one edge rather than one edge and one violation.
  */
 async function addEdges(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  tx: BirthTx,
   documentId: string,
   targets: Array<DocumentFilingTarget>,
   userId: string | null,
@@ -344,11 +344,131 @@ async function addEdges(
  * be a statement about nothing.
  */
 async function clearPendingBlob(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  tx: BirthTx,
   blobSha: string | null,
 ): Promise<void> {
   if (blobSha === null) return
   await tx.delete(pendingBlob).where(eq(pendingBlob.sha, blobSha))
+}
+
+type BirthTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+/** Why a row will never be extracted, written at birth. */
+type NoExtraction = { status: 'unsupported'; reason: string }
+
+/**
+ * The rows of one birth inside the caller's transaction: `entity`,
+ * `document`, the filing edges, the pending-blob clear and the activity line.
+ */
+async function insertDocumentRows(
+  tx: BirthTx,
+  input: DocumentBirthInput,
+  extraction: NoExtraction | null,
+): Promise<string> {
+  const userId = actorUserId(input.actor)
+  const targets = input.fileAgainst
+  const [ent] = await tx
+    .insert(entity)
+    .values({
+      kind: 'document',
+      canonicalName: input.filename,
+      sourceClass: input.sourceClass,
+      sourceRef: input.sourceRef,
+      createdBy: userId,
+    })
+    .returning({ id: entity.id })
+
+  await tx.insert(document).values({
+    entityId: ent.id,
+    blobSha: input.blobSha,
+    filename: input.filename,
+    url: input.url ?? null,
+    mime: input.mime,
+    sizeBytes: input.sizeBytes,
+    kind: input.kind,
+    sourceClass: input.sourceClass,
+    sourceRef: input.sourceRef,
+    sourcePath: input.provenance.sourcePath ?? null,
+    externalId: input.provenance.externalId ?? null,
+    externalUrl: input.provenance.externalUrl ?? null,
+    connectionId: input.provenance.connectionId ?? null,
+    uploadedBy: userId,
+    ...(extraction === null
+      ? {}
+      : {
+          extractionStatus: extraction.status,
+          extractionError: extraction.reason,
+        }),
+  })
+
+  await addEdges(tx, ent.id, targets, userId)
+
+  // The upload arrived. See `clearPendingBlob`.
+  await clearPendingBlob(tx, input.blobSha)
+
+  // `activity.subject_entity_id` is NOT NULL, so zero targets and N
+  // targets both need a subject that is not "the one place this went".
+  // The document's own entity id is that subject: one target reads on
+  // the record's or the space's timeline exactly as it did before, and
+  // an unfiled or multiply-filed document gets a stream of its own
+  // rather than an arbitrary target promoted to stand for the rest.
+  const only = targets.length === 1 ? targets.at(0) : undefined
+  await tx.insert(activity).values({
+    actorId: userId,
+    verb: 'document.filed',
+    subjectEntityId: only?.entityId ?? ent.id,
+    objectEntityId: ent.id,
+    meta: {
+      filename: input.filename,
+      kind: input.kind,
+      targets: targets.length,
+      ...actorMeta(input.actor),
+    },
+  })
+
+  return ent.id
+}
+
+/** A provider's link with no bytes — a recorder's recording (D68). */
+export type LinkDocumentInput = {
+  filename: string
+  /** The provider's own link: "Open in <provider>" on the row. */
+  externalUrl: string
+  /** The integration that filed it. */
+  sourceRef: string
+  /** Records only, already checked live by the caller. */
+  fileAgainst: Array<Extract<DocumentFilingTarget, { kind: 'record' }>>
+  /** The row's line where an extract would say what the text is. */
+  reason: string
+}
+
+/**
+ * A document the provider keeps and we never copy, born inside the caller's
+ * transaction so it lands with the interaction it hangs off.
+ * - No blob, so no dedupe and no extraction enqueue: the row is born
+ *   `unsupported`, never `pending`.
+ * - The same rows as any birth, through the same insert.
+ */
+export async function birthLinkDocument(
+  tx: BirthTx,
+  input: LinkDocumentInput,
+): Promise<string> {
+  return insertDocumentRows(
+    tx,
+    {
+      blobSha: null,
+      filename: input.filename,
+      mime: null,
+      sizeBytes: null,
+      kind: 'other',
+      sourceClass: 'integration',
+      sourceRef: input.sourceRef,
+      provenance: { externalUrl: input.externalUrl },
+      fileAgainst: input.fileAgainst,
+      actor: { integrationId: input.sourceRef },
+    },
+    { status: 'unsupported', reason: input.reason },
+  )
 }
 
 /**
@@ -389,64 +509,8 @@ export const birthDocumentProgram = Effect.fn('birthDocumentProgram')(
       return { id: existing, deduped: true }
     }
 
-    const userId = actorUserId(input.actor)
     const id = yield* query(() =>
-      db.transaction(async (tx) => {
-        const [ent] = await tx
-          .insert(entity)
-          .values({
-            kind: 'document',
-            canonicalName: input.filename,
-            sourceClass: input.sourceClass,
-            sourceRef: input.sourceRef,
-            createdBy: userId,
-          })
-          .returning({ id: entity.id })
-
-        await tx.insert(document).values({
-          entityId: ent.id,
-          blobSha: input.blobSha,
-          filename: input.filename,
-          url: input.url ?? null,
-          mime: input.mime,
-          sizeBytes: input.sizeBytes,
-          kind: input.kind,
-          sourceClass: input.sourceClass,
-          sourceRef: input.sourceRef,
-          sourcePath: input.provenance.sourcePath ?? null,
-          externalId: input.provenance.externalId ?? null,
-          externalUrl: input.provenance.externalUrl ?? null,
-          connectionId: input.provenance.connectionId ?? null,
-          uploadedBy: userId,
-        })
-
-        await addEdges(tx, ent.id, targets, userId)
-
-        // The upload arrived. See `clearPendingBlob`.
-        await clearPendingBlob(tx, input.blobSha)
-
-        // `activity.subject_entity_id` is NOT NULL, so zero targets and N
-        // targets both need a subject that is not "the one place this went".
-        // The document's own entity id is that subject: one target reads on
-        // the record's or the space's timeline exactly as it did before, and
-        // an unfiled or multiply-filed document gets a stream of its own
-        // rather than an arbitrary target promoted to stand for the rest.
-        const only = targets.length === 1 ? targets.at(0) : undefined
-        await tx.insert(activity).values({
-          actorId: userId,
-          verb: 'document.filed',
-          subjectEntityId: only?.entityId ?? ent.id,
-          objectEntityId: ent.id,
-          meta: {
-            filename: input.filename,
-            kind: input.kind,
-            targets: targets.length,
-            ...actorMeta(input.actor),
-          },
-        })
-
-        return ent.id
-      }),
+      db.transaction((tx) => insertDocumentRows(tx, input, null)),
     )
 
     // Outside the transaction: a queue that is down must not roll back a

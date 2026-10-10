@@ -472,10 +472,15 @@ function DocumentRow({
           </Button>
         )}
         <FilingControl doc={doc} />
-        {/* Only a document a storage source linked has anywhere to open —
-            an upload, a clip and a url get no action rather than a dead one. */}
+        {/* Only a document a provider linked has anywhere to open — a
+            storage source's file, a recorder's recording; an upload, a clip
+            and a url get no action rather than a dead one. */}
         {doc.externalUrl === null ? null : (
-          <OpenInSourceButton url={doc.externalUrl} filename={doc.filename} />
+          <OpenInSourceButton
+            url={doc.externalUrl}
+            filename={doc.filename}
+            provider={doc.sourceCapability}
+          />
         )}
         <Button
           size="icon-xs"
