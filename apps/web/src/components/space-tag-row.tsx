@@ -135,9 +135,6 @@ export function TagCompanyRow({
           }}
           className="h-full min-w-0 flex-1 bg-transparent text-body outline-none placeholder:text-graphite"
         />
-        <span className="shrink-0 mono text-micro text-graphite">
-          {hits.length > 0 ? '↑↓ · ↵ tag · esc' : 'esc'}
-        </span>
       </div>
       {term ? (
         <ol

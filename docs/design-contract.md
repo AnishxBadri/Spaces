@@ -137,7 +137,13 @@ either: it closes every dialog in every app, so it fails the invariant-line test
 printed key earns its place only when the binding is ours and not guessable — `⌘↵` to
 submit from inside a text field, `L`, `G T`. `↵` on a primary button or on the
 highlighted row of a list is universal too, and is not printed. Amends P8's "esc right"
-in the head and the `↵` on the Review card's primary.
+in the head and the `↵` on the Review card's primary. Built 2026-10-10: `DialogHeader`
+holds the title and the context and nothing right, `DialogContent` has no close of its
+own (Escape still closes; it is never printed), and `components/ui/dialog.test.tsx`
+fails on an `esc` in the primitive. Every caller puts `Cancel` in its foot — a dialog
+with no primary, like the file viewer or the keyboard sheet, carries `Cancel` alone. A
+dialog subtitle that restates scope goes; a consequence survives only as the foot's note
+beside the committing control.
 
 **A readout is never a section count (2026-10-06).** The readout strip under a page or
 record title carries derived and cross-cutting numbers — a ratio, a window, a next run, a
@@ -205,7 +211,7 @@ needs.
 | `SettingsNav`, `SETTINGS_SECTIONS`                                                | `apps/web/src/components/settings/settings-nav.tsx`     | the settings nav grammar — one row per section, groups derived, `admin` in the lane                     |
 | `EmptyState`                                                                      | `apps/web/src/components/empty-state.tsx`               | P5 — dither block, serif sentence, one sans line, the primary with its key                              |
 | `DitherBlock`, `DensityRamp`                                                      | `apps/web/src/components/dither.tsx`                    | the only texture; loading is a density ramp, never a shimmer                                            |
-| `Dialog`, `DialogContent`, `DialogHeader`, `DialogFooter`, …                      | `apps/web/src/components/ui/dialog.tsx`                 | P8 — 44px serif head + mono context + `esc`, 20px body, 52px bone foot                                  |
+| `Dialog`, `DialogContent`, `DialogHeader`, `DialogFooter`, …                      | `apps/web/src/components/ui/dialog.tsx`                 | P8 — 48px serif head + mono context, nothing right; 20px body; 52px bone foot, Cancel + primary         |
 | `useConfirm`, `ConfirmDialog`                                                     | `apps/web/src/components/ui/confirm-dialog.tsx`         | the destructive confirm; it replaces `window.confirm` everywhere                                        |
 | `Button`, `Input`, `Label`, `Popover`, `Tooltip`, `DropdownMenu`                  | `apps/web/src/components/ui/`                           | the atoms — reticle focus, 2px radius, key hints inside                                                 |
 | `Badge`, `badgeClasses`, `badgeTint`                                              | `apps/web/src/components/ui/badge.tsx`                  | the square option badge — takes the option row + index, `archived` and `unselected`                     |
@@ -482,6 +488,10 @@ the sticky head (`HeadBar`, inside `PageHeader` and `RecordHeader`).
 - **Sidebar A** with the collapsible Library group: `DESIGN.md` §5 "Navigation — the
   chassis". `NAV_ITEMS` gains the `library` group and the nav-grammar test with it;
   Documents becomes Files (keeping `G L`), Meetings is new (`G E`).
+- **The sidebar's current row is a hairline box on paper** (`border-hairline`, `bg-paper`),
+  inside the chassis, expanded and collapsed alike — never a tab cut through the
+  chassis edge, never a pine bar. Decided by the owner 2026-10-10, reversing the
+  2026-10-08 shell verdict "active row as a tab cut".
 - **Cmd-K finds only**; Tab hands the query to Ask. **Ask** is a docked 408px column
   plus `/ask`, one thread store, answers in sans (D70 amended; project 24).
 

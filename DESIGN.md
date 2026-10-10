@@ -652,15 +652,16 @@ capital (Portfolio, Mandate) — one list (`NAV_ITEMS`), read in the same order 
 command palette and the keyboard sheet, so the chassis is where nav order is decided.
 Library, Objects and Capital are headings that fold (`▾` / `▸ n`), per browser; a star
 is toggled from the space head's `···` and kept per browser too. Rows are 30px with a
-14px mark slot so every label sits on one lane. The current row is a tab cut into the
-page edge: paper on a hairline, crossing the chassis edge so it joins the page — never a
-pine bar — and every row carries the same box, so nothing shifts. The head row ends on a
+14px mark slot so every label sits on one lane. The current row is a hairline box on
+paper inside the chassis, stopping short of its edge — never a tab cut through it, never
+a pine bar — and every row carries the same box, so nothing shifts. The head row ends on a
 mono `«` that folds the chassis (`⌘\`). The foot is one account row (ink initials
 square, name, email) with Upload and Settings (`G ,`) as icon buttons beside it; its
 menu opens to the right of the chassis — never up into the corner — and holds Keyboard
 and Sign out. Collapsed, the chassis is 48px of
 marks only: the mark on a hairline (which expands it again), `⌘K` on a rule, 36px rows
-with a 24px rule between groups and no headings, the current page in a 36×32 paper box,
+with a 24px rule between groups and no headings, the current page in a 36×32 paper box
+on a hairline,
 names on hover as ink tooltips. Width snaps (never animates) and the preference is per
 browser. Collapses to a drawer under a 48px top bar on mobile.
 
@@ -680,8 +681,9 @@ an object's pinned saved views and the count on Tasks. The decided order:
 - **Counts only on Tasks.** No other row carries a number.
 - **Review is not a row**; Today's Needs-you ledger reaches it (D79).
 - **Upload and Settings leave the list** for icon buttons on the account row.
-- **The current row is a tab cut into the page edge**: paper, joined to the page with
-  no rule between, replacing the paper + rule box. Still never a pine bar.
+- **The current row is a hairline box on paper** (`border-hairline`), expanded and
+  collapsed. Decided by the owner 2026-10-10, reversing this sheet's tab cut into the
+  page edge. Still never a pine bar.
 
 ### Record Pages (P7)
 

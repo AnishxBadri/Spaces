@@ -13,7 +13,6 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -608,7 +607,7 @@ function SaveViewDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
         {open ? (
           <SaveViewForm
             key={`${initial.name}:${initial.visibility}`}
@@ -668,10 +667,6 @@ function SaveViewForm({
     >
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>
-          The current filter, columns, and sort, under a name. Shared views show
-          for everyone; private ones only for you.
-        </DialogDescription>
       </DialogHeader>
       <div className="space-y-1.5">
         <Label htmlFor="view-name">Name</Label>

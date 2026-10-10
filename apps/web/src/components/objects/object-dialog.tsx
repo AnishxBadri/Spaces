@@ -7,7 +7,6 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -73,7 +72,7 @@ export function ObjectDialog(
       {props.trigger ? (
         <DialogTrigger asChild>{props.trigger}</DialogTrigger>
       ) : null}
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
         {open ? (
           <ObjectForm
             {...props}
@@ -196,11 +195,6 @@ function ObjectForm(
         <DialogTitle>
           {props.mode === 'create' ? 'New object' : `Edit ${existing?.plural}`}
         </DialogTitle>
-        <DialogDescription>
-          {props.mode === 'create'
-            ? 'A kind of record you keep — funds, LPs, hires. It gets its own attributes, list, and record pages.'
-            : 'Rename freely. The web address stays what it was.'}
-        </DialogDescription>
       </DialogHeader>
 
       <div className="grid gap-4 sm:grid-cols-2">

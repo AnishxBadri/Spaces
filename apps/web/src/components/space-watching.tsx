@@ -586,7 +586,7 @@ export function AddWatchDialog({
         </div>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">Keep</Button>
+            <Button variant="outline">Cancel</Button>
           </DialogClose>
           <Button
             disabled={engine === undefined || busy}

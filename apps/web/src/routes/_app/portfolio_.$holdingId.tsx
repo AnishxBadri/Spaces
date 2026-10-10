@@ -16,8 +16,8 @@ import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -546,12 +546,9 @@ function AddInvestmentDialog({ companyId }: { companyId: string }) {
       <DialogTrigger asChild>
         <AddTrigger label="Add check" />
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Record a check</DialogTitle>
-          <DialogDescription>
-            An append-only investment event on this holding.
-          </DialogDescription>
         </DialogHeader>
         <form
           className="grid grid-cols-2 gap-4"
@@ -651,6 +648,11 @@ function AddInvestmentDialog({ companyId }: { companyId: string }) {
             </p>
           ) : null}
           <DialogFooter className="col-span-2">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
             <Button type="submit" disabled={f.pending}>
               {f.pending ? 'Saving…' : 'Record check'}
             </Button>
@@ -679,13 +681,9 @@ function AddRoundDialog({ companyId }: { companyId: string }) {
       <DialogTrigger asChild>
         <AddTrigger label="Add round" />
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Record a round</DialogTitle>
-          <DialogDescription>
-            A financing event — the fully-diluted count powers the ownership
-            ledger.
-          </DialogDescription>
         </DialogHeader>
         <form
           className="grid grid-cols-2 gap-4"
@@ -777,6 +775,11 @@ function AddRoundDialog({ companyId }: { companyId: string }) {
             </p>
           ) : null}
           <DialogFooter className="col-span-2">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
             <Button type="submit" disabled={f.pending}>
               {f.pending ? 'Saving…' : 'Record round'}
             </Button>
@@ -807,13 +810,9 @@ function AddMarkDialog({ holdingId }: { holdingId: string }) {
       <DialogTrigger asChild>
         <AddTrigger label="Add mark" />
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Record a mark</DialogTitle>
-          <DialogDescription>
-            Fair value of the whole position at a date. Marks append — history
-            never rewrites.
-          </DialogDescription>
         </DialogHeader>
         <form
           className="grid grid-cols-2 gap-4"
@@ -879,6 +878,11 @@ function AddMarkDialog({ holdingId }: { holdingId: string }) {
             </p>
           ) : null}
           <DialogFooter className="col-span-2">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
             <Button type="submit" disabled={f.pending}>
               {f.pending ? 'Saving…' : 'Record mark'}
             </Button>
@@ -912,12 +916,9 @@ function AddDistributionDialog({ holdingId }: { holdingId: string }) {
       <DialogTrigger asChild>
         <AddTrigger label="Add distribution" />
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Record a distribution</DialogTitle>
-          <DialogDescription>
-            Realized proceeds — or the one honest click: a write-off.
-          </DialogDescription>
         </DialogHeader>
         <form
           className="grid grid-cols-2 gap-4"
@@ -1004,6 +1005,11 @@ function AddDistributionDialog({ holdingId }: { holdingId: string }) {
             </p>
           ) : null}
           <DialogFooter className="col-span-2">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
             <Button
               type="submit"
               disabled={f.pending}

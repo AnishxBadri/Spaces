@@ -57,7 +57,6 @@ export function ConfirmDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        showCloseButton={false}
         className="sm:max-w-[27.5rem]"
         onKeyDown={(e) => {
           if (
@@ -71,7 +70,7 @@ export function ConfirmDialog({
         }}
       >
         <DialogHeader
-          className={cn('flex-nowrap items-center pr-5', !hasBody && 'mb-0')}
+          className={cn('flex-nowrap items-center', !hasBody && 'mb-0')}
         >
           <span
             aria-hidden

@@ -52,8 +52,9 @@ import { cn } from '#/lib/utils'
  * sidebar A). Work (Today, Tasks, Spaces with its starred spaces), then three
  * groups that fold per browser — Library, Objects, Capital.
  *
- * - The current row is a tab cut into the page edge: paper, crossing the
- *   hairline so it joins the page. Never a pine bar (the No-Bar Rule).
+ * - The current row is a hairline box on paper, inside the chassis, expanded
+ *   and collapsed. Never a tab cut through the edge, never a pine bar (the
+ *   No-Bar Rule).
  * - Every row has the same box, current or not, so nothing shifts.
  * - Pinned saved views stand under their object, indented, three then
  *   `▸ n more`; a pin the server no longer answers is pruned.
@@ -300,8 +301,7 @@ export function AppSidebar({
 
   return (
     <div className="relative flex h-full flex-col bg-bone">
-      {/* The chassis edge, drawn here rather than as a border so the current
-          row — positioned, later in the tree — paints over it. */}
+      {/* The chassis edge: a hairline the rows stop short of. */}
       <span
         aria-hidden
         className="pointer-events-none absolute inset-y-0 right-0 w-px bg-hairline"
@@ -363,7 +363,7 @@ export function AppSidebar({
       </div>
 
       <nav
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-2 pb-3 pl-3"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-2 pb-3"
         aria-label="Primary"
       >
         <div className="flex flex-col gap-0.5">
@@ -675,7 +675,7 @@ function AccountMenu({
 /**
  * The collapsed chassis: a 48px cell with the workspace mark on a hairline, ⌘K on a
  * rule, 36px rows of 14px marks with a 24px rule between groups and no
- * headings, the current page in a 36×32 paper box; the foot is Upload,
+ * headings, the current page in a 36×32 hairline paper box; the foot is Upload,
  * Settings and the ink initials square.
  */
 function CollapsedSidebar({
@@ -863,8 +863,8 @@ function CollapsedNavLink({
         className="group focus-ring-inset flex h-9 w-12 shrink-0 items-center justify-center"
         activeProps={{ 'aria-current': 'page' }}
       >
-        {/* Current page = a paper box on a rule (No-Bar Rule), 36×32. */}
-        <span className="flex h-8 w-9 items-center justify-center rounded-md border border-transparent transition-colors group-hover:bg-bone-deep group-aria-[current=page]:border-rule group-aria-[current=page]:bg-paper group-aria-[current=page]:group-hover:bg-paper">
+        {/* Current page = a paper box on a hairline (No-Bar Rule), 36×32. */}
+        <span className="flex h-8 w-9 items-center justify-center rounded-md border border-transparent transition-colors group-hover:bg-bone-deep group-aria-[current=page]:border-hairline group-aria-[current=page]:bg-paper group-aria-[current=page]:group-hover:bg-paper">
           <Icon className="size-3.5 shrink-0" strokeWidth={1.75} />
         </span>
       </Link>
@@ -904,7 +904,7 @@ function FoldGroup({
         aria-expanded={!folded}
         aria-controls={listId}
         onClick={() => setGroupFolded(id, !folded)}
-        className="focus-ring mr-3 flex h-6 items-center gap-1.5 rounded-md px-2.5 text-left text-graphite transition-colors hover:text-foreground"
+        className="focus-ring flex h-6 items-center gap-1.5 rounded-md px-2.5 text-left text-graphite transition-colors hover:text-foreground"
       >
         <span className="field-label leading-4 font-medium">{label}</span>
         <span aria-hidden className="mono text-micro">
@@ -937,7 +937,7 @@ function MoreRow({
       aria-expanded={open}
       aria-label={open ? `Show fewer ${noun}` : `Show ${hidden} more ${noun}`}
       onClick={onToggle}
-      className="focus-ring mr-3 flex h-[1.875rem] items-center rounded-md pl-8.5 text-left mono text-micro text-graphite transition-colors hover:text-foreground"
+      className="focus-ring flex h-[1.875rem] items-center rounded-md pl-8.5 text-left mono text-micro text-graphite transition-colors hover:text-foreground"
     >
       {open ? '▾ less' : `▸ ${hidden} more`}
     </button>
@@ -945,10 +945,9 @@ function MoreRow({
 }
 
 /**
- * One row. Every row carries the same box — left, top and bottom border, no
- * right one, reaching the chassis edge — so the current row changes colour
- * only: paper on a hairline, positioned so it paints over the chassis edge
- * and joins the page.
+ * One row. Every row carries the same box, a full transparent border inside
+ * the nav's gutter, so the current row changes colour only: paper in a
+ * hairline box.
  */
 function NavLink({
   to,
@@ -991,14 +990,13 @@ function NavLink({
         explicitUndefined: true,
       }}
       className={cn(
-        'flex h-[1.875rem] shrink-0 items-center gap-2.5 rounded-l-md rounded-r-none border-y border-l border-transparent pr-5.5 text-ui text-foreground transition-colors',
+        'flex h-[1.875rem] shrink-0 items-center gap-2.5 rounded-md border border-transparent pr-2.5 text-ui text-foreground transition-colors',
         indent ? 'pl-8.5' : 'pl-2.5',
         'hover:bg-bone-deep',
         'focus-ring-inset',
       )}
       activeProps={{
-        className:
-          'relative border-hairline bg-paper font-medium hover:bg-paper',
+        className: 'border-hairline bg-paper font-medium hover:bg-paper',
         'aria-current': 'page',
       }}
     >

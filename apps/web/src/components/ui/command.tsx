@@ -33,7 +33,6 @@ function CommandDialog({
   description = 'Search for a command to run...',
   children,
   className,
-  showCloseButton = true,
   // Forwarded to cmdk. Set false when results are already ranked by the
   // server — cmdk's own scorer would re-filter them and silently drop the
   // fuzzy matches a trigram index was there to find.
@@ -46,7 +45,6 @@ function CommandDialog({
   className?: string
   /** The scrim's ground; the dialog's default when omitted. */
   overlayClassName?: string
-  showCloseButton?: boolean
   shouldFilter?: boolean | undefined
 }) {
   return (
@@ -58,7 +56,6 @@ function CommandDialog({
       <DialogContent
         className={cn('overflow-hidden p-0 sm:max-w-[40rem]', className)}
         {...(overlayClassName === undefined ? {} : { overlayClassName })}
-        showCloseButton={showCloseButton}
       >
         <Command {...(shouldFilter === undefined ? {} : { shouldFilter })}>
           {children}

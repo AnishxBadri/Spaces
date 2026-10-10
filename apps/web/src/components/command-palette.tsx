@@ -980,7 +980,6 @@ export function CommandPalette({
         title="Command palette"
         description="Find a record, a page or an action from the keyboard"
         shouldFilter={false}
-        showCloseButton={false}
         // The palette widens while the preview pane is open; its scrim is
         // bone-deep, never a blur.
         className="sm:has-[[data-preview]]:max-w-[66rem]"

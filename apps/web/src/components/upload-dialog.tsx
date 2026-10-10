@@ -281,7 +281,7 @@ export function UploadDialog() {
           }
         >
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
+            Cancel
           </Button>
         </DialogFooter>
       </DialogContent>

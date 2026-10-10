@@ -5,7 +5,13 @@ import { toast } from 'sonner'
 import { KeyHint } from './page-header'
 import { DitherMark, InitialsMark } from './record/record-parts'
 import { Button } from './ui/button'
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from './ui/dialog'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from './ui/dialog'
 import { Input } from './ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Switch } from './ui/switch'
@@ -234,7 +240,7 @@ export function TaskComposer({
             }
           }}
         >
-          <div className="flex h-12 items-center gap-2.5 border-b border-hairline pr-14 pl-5">
+          <div className="flex h-12 items-center gap-2.5 border-b border-hairline px-5">
             <span className="mono text-ui text-primary">+</span>
             {/* The input is the title: no reticle here — the caret in a
                 sheet that just opened is the focus, and marks at the
@@ -265,6 +271,11 @@ export function TaskComposer({
             <span className="hidden mono text-micro text-graphite sm:inline">
               ↵ add · ⇧↵ add & keep open
             </span>
+            <DialogClose asChild>
+              <Button type="button" size="sm" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
             <Button type="submit" size="sm" pending={pending}>
               {pending ? 'Saving…' : 'Add task'}
               <KeyHint>↵</KeyHint>

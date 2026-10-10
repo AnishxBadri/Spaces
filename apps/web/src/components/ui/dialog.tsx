@@ -4,7 +4,6 @@ import * as React from 'react'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 
 import { cn } from '#/lib/utils.ts'
-import { Button } from '#/components/ui/button.tsx'
 
 function Dialog({
   ...props
@@ -50,10 +49,8 @@ function DialogContent({
   className,
   overlayClassName,
   children,
-  showCloseButton = true,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
-  showCloseButton?: boolean
   /** The scrim's ground, when the window asks for its own. */
   overlayClassName?: string
 }) {
@@ -73,16 +70,6 @@ function DialogContent({
         {...props}
       >
         {children}
-        {showCloseButton && (
-          // The close affordance is the key that closes: `esc`, mono, in the
-          // head's right lane.
-          <DialogPrimitive.Close
-            data-slot="dialog-close"
-            className="focus-ring absolute top-4 right-5 mono text-micro text-graphite transition-colors duration-150 hover:text-foreground disabled:pointer-events-none"
-          >
-            esc<span className="sr-only">ape — close</span>
-          </DialogPrimitive.Close>
-        )}
       </DialogPrimitive.Content>
     </DialogPortal>
   )
@@ -92,10 +79,11 @@ function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="dialog-header"
-      // 48px head on bone: serif title, mono context beside it, hairline
-      // under. The body below stays paper.
+      // 48px head on bone: serif title, mono context beside it, nothing
+      // right; hairline under. The one close is the foot's Cancel — Escape
+      // still closes, and is never printed.
       className={cn(
-        '-mx-5 -mt-5 mb-5 flex min-h-12 flex-row flex-wrap items-baseline gap-x-2.5 border-b border-hairline bg-bone px-5 py-3 pr-14 text-left',
+        '-mx-5 -mt-5 mb-5 flex min-h-12 flex-row flex-wrap items-baseline gap-x-2.5 border-b border-hairline bg-bone px-5 py-3 text-left',
         className,
       )}
       {...props}
@@ -105,19 +93,18 @@ function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
 
 function DialogFooter({
   className,
-  showCloseButton = false,
   note,
   children,
   ...props
 }: React.ComponentProps<'div'> & {
-  showCloseButton?: boolean
   /** Mono line on the left: what will happen, and the counts. */
   note?: React.ReactNode
 }) {
   return (
     <div
       data-slot="dialog-footer"
-      // 52px bone foot: note left, buttons right; the primary carries ⌘↵.
+      // 52px bone foot: note left, then Cancel beside the primary, which
+      // carries ⌘↵. Cancel is the dialog's one close.
       className={cn(
         '-mx-5 mt-5 -mb-5 flex min-h-13 flex-row items-center justify-end gap-2 border-t border-rule bg-bone px-5 py-2.5',
         className,
@@ -130,11 +117,6 @@ function DialogFooter({
         </span>
       ) : null}
       {children}
-      {showCloseButton && (
-        <DialogPrimitive.Close asChild>
-          <Button variant="outline">Close</Button>
-        </DialogPrimitive.Close>
-      )}
     </div>
   )
 }

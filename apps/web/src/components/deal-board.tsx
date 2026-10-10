@@ -512,16 +512,11 @@ export function CloseReasonDialog({
   const [reason, setReason] = useState('')
   return (
     <Dialog open onOpenChange={(o) => !o && onCancel()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>
             {dealName} → {stageLabel}
           </DialogTitle>
-          <DialogDescription>
-            {stageLabel === 'Passed'
-              ? 'Your no. Why? The reason is what future-you rereads.'
-              : 'Their no. What happened? Lost deals teach different lessons.'}
-          </DialogDescription>
         </DialogHeader>
         <form
           onSubmit={(e) => {
@@ -548,6 +543,9 @@ export function CloseReasonDialog({
             }}
           />
           <DialogFooter note="goes to the ledger as close reason">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
             <Button
               type="button"
               variant="outline"

@@ -4,8 +4,8 @@ import { toast } from 'sonner'
 import { Button } from './ui/button'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -166,18 +166,9 @@ export function SaveAsTemplateAction({
         </button>
       )}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Save as template</DialogTitle>
-            <DialogDescription>
-              Captures this {entityLabel}
-              {entityLabel === 'space'
-                ? '’s subtree and glossary — names and skeletons, never content'
-                : entityLabel === 'note'
-                  ? '’s structure — mentions become plain text'
-                  : '’s attribute values — references excluded'}
-              . Future edits here never touch what was captured.
-            </DialogDescription>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-1.5">
@@ -197,6 +188,11 @@ export function SaveAsTemplateAction({
               />
             </div>
             <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline">
+                  Cancel
+                </Button>
+              </DialogClose>
               <Button type="submit" disabled={pending || !name.trim()}>
                 {pending ? 'Saving…' : 'Save template'}
               </Button>

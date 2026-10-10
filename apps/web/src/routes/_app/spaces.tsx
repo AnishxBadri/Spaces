@@ -7,8 +7,8 @@ import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -324,12 +324,9 @@ function CreateSpaceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>New space</DialogTitle>
-          <DialogDescription>
-            A market or theme to research. Nest it to build the map.
-          </DialogDescription>
         </DialogHeader>
         <div className="flex items-center justify-between gap-2">
           {scaffold ? (
@@ -399,6 +396,11 @@ function CreateSpaceDialog({
           ) : null}
 
           <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
             <Button type="submit" disabled={pending}>
               {pending ? 'Creating…' : 'Create space'}
             </Button>

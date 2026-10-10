@@ -51,8 +51,8 @@ import { INTERACTION_STAT_FILTERS } from '#/lib/views/stat-fields'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -496,12 +496,12 @@ function CreatePersonDialog({
           New person
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent
+        className="max-h-[85vh] overflow-y-auto sm:max-w-2xl"
+        aria-describedby={undefined}
+      >
         <DialogHeader>
           <DialogTitle>New person</DialogTitle>
-          <DialogDescription>
-            Email is the strongest identity — add it when you have it.
-          </DialogDescription>
         </DialogHeader>
         {/* Pre-fills the fields below, visibly and editably — never writes. */}
         <div className="flex justify-end">
@@ -588,6 +588,11 @@ function CreatePersonDialog({
           ) : null}
 
           <DialogFooter className="sm:col-span-2">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
             <Button type="submit" disabled={pending}>
               {pending ? 'Adding\u2026' : 'Create person'}
             </Button>

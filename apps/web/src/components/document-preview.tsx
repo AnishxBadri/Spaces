@@ -10,8 +10,10 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from './ui/button'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from './ui/dialog'
@@ -137,9 +139,9 @@ function PreviewBody({ doc, startPage }: { doc: Doc; startPage: number }) {
       {/* The P8 head, at the sheet's edge: the content is `p-0` so the
           body can run bone edge to edge, which means the header's own
           `-mx-5 -mt-5` breakout must be cancelled here or the head hangs
-          20px outside the sheet (2026-09-30). Serif name, mono context
-          beside it, the one action in the right lane before `esc`. */}
-      <DialogHeader className="mx-0 mt-0 mb-0 h-12 shrink-0 flex-nowrap items-center gap-3 py-0 pr-14 pl-5">
+          20px outside the sheet. Serif name, mono context beside it, the
+          one action in the right lane. */}
+      <DialogHeader className="mx-0 mt-0 mb-0 h-12 shrink-0 flex-nowrap items-center gap-3 py-0">
         <DialogTitle className="min-w-0 truncate text-title leading-5">
           {doc.filename}
         </DialogTitle>
@@ -187,6 +189,13 @@ function PreviewBody({ doc, startPage }: { doc: Doc; startPage: number }) {
           <TextPreview doc={doc} format={format} />
         )}
       </div>
+
+      {/* The foot, breakout cancelled like the head's. */}
+      <DialogFooter className="mx-0 mt-0 mb-0 shrink-0">
+        <DialogClose asChild>
+          <Button variant="outline">Cancel</Button>
+        </DialogClose>
+      </DialogFooter>
     </>
   )
 }

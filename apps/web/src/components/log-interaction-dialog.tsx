@@ -1,5 +1,5 @@
 import { useRouter } from '@tanstack/react-router'
-import { Phone, Plus, X } from 'lucide-react'
+import { Phone, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { KeyHint } from '#/components/page-header'
@@ -304,10 +304,6 @@ function AttendeePicker({
           ))}
         </ul>
       ) : null}
-      <p className="text-label text-graphite">
-        <Plus className="mr-0.5 inline size-3" strokeWidth={2} />
-        You're included automatically via the log entry.
-      </p>
     </div>
   )
 }

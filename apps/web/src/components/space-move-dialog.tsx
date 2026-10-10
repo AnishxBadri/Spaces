@@ -119,7 +119,7 @@ export function SpaceMoveDialog({
           }
         >
           <DialogClose asChild>
-            <Button variant="outline">Keep</Button>
+            <Button variant="outline">Cancel</Button>
           </DialogClose>
           <Button disabled={!target || busy} onClick={() => void move()}>
             Move

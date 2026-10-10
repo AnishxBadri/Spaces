@@ -1,8 +1,9 @@
 import { NAV_ITEMS } from './app-sidebar'
+import { Button } from './ui/button'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -25,12 +26,9 @@ export function KeyboardHelp({
   const mod = isMac ? '⌘' : 'Ctrl'
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[40rem]">
+      <DialogContent className="sm:max-w-[40rem]" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Keyboard</DialogTitle>
-          <DialogDescription>
-            every key also shows inside its control
-          </DialogDescription>
         </DialogHeader>
         <div className="flex gap-8 max-sm:flex-col">
           <div className="flex min-w-0 flex-1 flex-col">
@@ -65,7 +63,11 @@ export function KeyboardHelp({
             </Group>
           </div>
         </div>
-        <DialogFooter note="chords wait 800ms · keys are off while typing" />
+        <DialogFooter note="chords wait 800ms · keys are off while typing">
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

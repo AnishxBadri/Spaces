@@ -793,8 +793,8 @@ function AttributeForm({
       }}
       className="flex min-h-0 flex-1 flex-col"
     >
-      {/* 44px head: serif title, mono context; esc is the sheet's own. */}
-      <div className="flex h-11 shrink-0 items-baseline gap-3 border-b border-hairline px-5 pt-[0.6875rem] pr-14">
+      {/* 44px head: serif title, mono context, nothing right. */}
+      <div className="flex h-11 shrink-0 items-baseline gap-3 border-b border-hairline px-5 pt-[0.6875rem]">
         <DialogTitle>
           {mode === 'create' ? 'New attribute' : `Edit ${attr?.name}`}
         </DialogTitle>

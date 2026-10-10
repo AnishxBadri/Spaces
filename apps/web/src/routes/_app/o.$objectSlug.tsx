@@ -47,8 +47,8 @@ import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -531,13 +531,12 @@ function CreateRecordDialog({
           New {object.singular.toLowerCase()}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent
+        className="max-h-[85vh] overflow-y-auto sm:max-w-2xl"
+        aria-describedby={undefined}
+      >
         <DialogHeader>
           <DialogTitle>New {object.singular.toLowerCase()}</DialogTitle>
-          <DialogDescription>
-            The name is what mentions, search, and references show. Everything
-            else can wait.
-          </DialogDescription>
         </DialogHeader>
         <form
           onSubmit={onSubmit}
@@ -576,6 +575,11 @@ function CreateRecordDialog({
             </p>
           ) : null}
           <DialogFooter className="sm:col-span-2">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
             <Button type="submit" disabled={pending}>
               {pending ? 'Adding…' : `Create ${object.singular.toLowerCase()}`}
             </Button>

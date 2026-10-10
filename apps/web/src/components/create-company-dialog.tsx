@@ -13,8 +13,8 @@ import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -104,12 +104,12 @@ export function CreateCompanyDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent
+        className="max-h-[85vh] overflow-y-auto sm:max-w-2xl"
+        aria-describedby={undefined}
+      >
         <DialogHeader>
           <DialogTitle>New company</DialogTitle>
-          <DialogDescription>
-            Domain is the strongest identity — add it when you know it.
-          </DialogDescription>
         </DialogHeader>
         {/* Pre-fills the fields below, visibly and editably — never writes. */}
         <div className="flex justify-end">
@@ -173,6 +173,11 @@ export function CreateCompanyDialog({
           ) : null}
 
           <DialogFooter className="sm:col-span-2">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
             <Button type="submit" disabled={pending}>
               {pending ? 'Adding…' : 'Create company'}
             </Button>

@@ -39,8 +39,8 @@ import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -705,12 +705,12 @@ export function CreateDealDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent
+        className="max-h-[85vh] overflow-y-auto sm:max-w-2xl"
+        aria-describedby={undefined}
+      >
         <DialogHeader>
           <DialogTitle>New deal</DialogTitle>
-          <DialogDescription>
-            One opportunity in one company. It starts at Pre-lead.
-          </DialogDescription>
         </DialogHeader>
         {/* Pre-fills the fields below, visibly and editably — never writes. */}
         <div className="flex justify-end">
@@ -796,6 +796,11 @@ export function CreateDealDialog({
           ) : null}
 
           <DialogFooter className="sm:col-span-2">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
             <Button type="submit" disabled={pending}>
               {pending ? 'Creating…' : 'Create deal'}
             </Button>
