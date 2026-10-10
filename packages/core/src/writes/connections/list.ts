@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, countDistinct, eq, ne } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { accountConnection, document, integration } from '@spaces/db/schema'
 import type { ConnectionDb } from './token'
@@ -46,6 +46,28 @@ export async function listConnectionsFor(
       asc(accountConnection.product),
       asc(accountConnection.externalEmail),
     )
+}
+
+/**
+ * How many members hold a connection under a provider, any product; a
+ * revoked grant does not count. Connection apps prints it on the client.
+ */
+export async function countMembersConnected(
+  provider: string,
+  handle: ConnectionDb = db,
+): Promise<number> {
+  const row = (
+    await handle
+      .select({ value: countDistinct(accountConnection.userId) })
+      .from(accountConnection)
+      .where(
+        and(
+          eq(accountConnection.provider, provider),
+          ne(accountConnection.status, 'revoked'),
+        ),
+      )
+  ).at(0)
+  return row?.value ?? 0
 }
 
 /**

@@ -7,6 +7,7 @@ import {
 } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
+import { fmtRate, fxLedgerRows } from '#/lib/fx-ledger'
 import { setFxRate } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
@@ -23,9 +24,11 @@ function CurrencyRoute() {
 }
 
 /**
- * FX rates — the manual rate table behind portfolio currency conversion
- * (CONTEXT.md, 2026-08-06). Sparse on purpose: a rate per (currency, date)
- * when a non-base event needs one; upserting a correction just recomputes.
+ * FX rates — the manual rate table behind portfolio currency conversion.
+ * - A rate is appended per (currency, date); a correction upserts and every
+ *   derived number recomputes.
+ * - Each row prints the events it covers: the live rate from its date on, a
+ *   superseded one its own range (`fxLedgerRows`).
  */
 function FxSection({
   baseCurrency,
@@ -66,67 +69,57 @@ function FxSection({
     }
   }
 
-  const sorted = [...rates].sort(
-    (a, b) =>
-      a.currency.localeCompare(b.currency) || b.date.localeCompare(a.date),
-  )
-  // Newest per currency is the live rate; older ones are kept for the
-  // events dated before it (rates are append-only, a new date supersedes).
-  const newest = new Set<string>()
-  for (const r of sorted) {
-    if (!newest.has(r.currency)) newest.add(`${r.currency}:${r.date}`)
-    newest.add(r.currency)
-  }
-  const isLive = (r: { currency: string; date: string }) =>
-    newest.has(`${r.currency}:${r.date}`)
+  const rows = fxLedgerRows(rates)
+  const currencies = new Set(rates.map((r) => r.currency)).size
 
   return (
-    <SettingsSection title="Currency & FX rates" crumb="Workspace">
+    <SettingsSection title="Currency & FX" crumb="Workspace">
       <div className="flex flex-col">
         <SettingsGroupHead
           title="Rates"
-          count={`${rates.length} · sparse, dated, newest wins`}
+          count={`${rates.length} · ${currencies} ${currencies === 1 ? 'currency' : 'currencies'}`}
         />
 
-        {/* The ledger head. */}
-        <div className="flex h-8 items-center border-b border-hairline px-3 field-label leading-4 text-graphite">
-          <span className="w-35 shrink-0">Pair</span>
-          <span className="w-40 shrink-0 pr-4 text-right">Rate</span>
-          <span className="w-35 shrink-0">As of</span>
-          <span className="min-w-0 flex-1">Used for</span>
+        <div className="flex h-8 items-center border-b border-hairline field-label leading-4 text-graphite">
+          <span className="min-w-0 flex-1">Pair</span>
+          <span className="w-28 shrink-0 pr-3 text-right">Rate</span>
+          <span className="w-28 shrink-0">From</span>
+          <span className="w-44 shrink-0">Applies to</span>
         </div>
-        {sorted.map((r) => {
-          const live = isLive(r)
-          return (
-            <div
-              key={`${r.currency}:${r.date}`}
+        {rows.map((r) => (
+          <div
+            key={`${r.currency}:${r.date}`}
+            data-fx-row
+            className={cn(
+              'flex h-10 items-center border-b border-rule',
+              r.live ? 'text-foreground' : 'text-graphite',
+            )}
+          >
+            <span
               className={cn(
-                'flex h-9 items-center border-b border-rule px-3',
-                live ? 'text-foreground' : 'text-graphite',
+                'min-w-0 flex-1 truncate text-ui',
+                r.live && 'font-medium',
               )}
             >
-              <span className="w-35 shrink-0 mono text-ui">
-                {r.currency} → {baseCurrency}
-              </span>
-              <span className="w-40 shrink-0 pr-4 numeric text-ui">
-                {r.rateToBase}
-              </span>
-              <span className="w-35 shrink-0 mono text-label">{r.date}</span>
-              <span className="min-w-0 flex-1 truncate mono text-micro text-graphite">
-                {live
-                  ? `events on or after ${r.date}`
-                  : `superseded · kept for events before the newer rate`}
-              </span>
-            </div>
-          )
-        })}
+              {r.currency} → {baseCurrency}
+            </span>
+            <span className="w-28 shrink-0 pr-3 numeric text-right text-label">
+              {fmtRate(r.rateToBase)}
+            </span>
+            <span className="w-28 shrink-0 mono text-micro text-graphite">
+              {r.date}
+            </span>
+            <span className="w-44 shrink-0 truncate text-label">
+              {r.appliesTo}
+            </span>
+          </div>
+        ))}
 
         {/* The composer row: a rate is appended, never edited. */}
         <form
           onSubmit={addRate}
-          className="flex min-h-9 flex-wrap items-center gap-2 border-b border-rule px-3 py-1"
+          className="flex min-h-12 flex-wrap items-center gap-2 border-b border-rule py-2"
         >
-          <span className="mono text-micro text-primary">+</span>
           <Input
             id="fx-ccy"
             aria-label="Currency"
@@ -136,7 +129,7 @@ function FxSection({
             }
             placeholder="EUR"
             maxLength={3}
-            className="h-7 w-20 mono uppercase"
+            className="w-18 mono uppercase"
           />
           <span className="mono text-micro text-graphite">
             → {baseCurrency}
@@ -150,7 +143,7 @@ function FxSection({
             value={form.rate}
             onChange={(e) => setForm((s) => ({ ...s, rate: e.target.value }))}
             placeholder="1.0900"
-            className="h-7 w-28 mono"
+            className="w-24 mono"
           />
           <Input
             id="fx-date"
@@ -158,13 +151,22 @@ function FxSection({
             type="date"
             value={form.date}
             onChange={(e) => setForm((s) => ({ ...s, date: e.target.value }))}
-            className="h-7 w-40 mono"
+            className="w-36 mono"
           />
-          <Button type="submit" size="sm" variant="outline" disabled={pending}>
+          <Button
+            type="submit"
+            size="sm"
+            variant="outline"
+            disabled={pending}
+            className="ml-auto"
+          >
             Add rate
           </Button>
           {error ? (
-            <span role="alert" className="mono text-micro text-destructive">
+            <span
+              role="alert"
+              className="basis-full mono text-micro text-destructive"
+            >
               {error}
             </span>
           ) : null}

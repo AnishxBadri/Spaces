@@ -6,6 +6,7 @@ import {
   redirectUri,
 } from '@spaces/core/providers/registry'
 import type { ProviderId } from '@spaces/core/providers/registry'
+import { countMembersConnected } from '@spaces/core/writes/connections/list'
 import {
   mergeCredentialMeta,
   readWorkspaceCredential,
@@ -59,6 +60,10 @@ const readRow = Effect.fn('readProviderApp')(function* (
   const row = yield* query('Could not read the OAuth client', () =>
     readWorkspaceCredential(provider, KIND),
   )
+  const membersConnected = yield* query(
+    'Could not count the connected members',
+    () => countMembersConnected(provider),
+  )
   return {
     provider,
     label: PROVIDERS[provider].label,
@@ -67,6 +72,7 @@ const readRow = Effect.fn('readProviderApp')(function* (
     secretDisplay: jsonString(row?.meta.display),
     secretSetAt: jsonString(row?.meta.setAt),
     redirectUri: redirectUri(origin(), provider),
+    membersConnected,
   }
 })
 

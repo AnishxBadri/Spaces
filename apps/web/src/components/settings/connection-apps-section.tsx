@@ -1,9 +1,12 @@
 import { useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
-import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { useSettingsDraft } from './settings-form'
-import { SettingsGroupHead, SettingsSection } from './settings-section'
+import {
+  SettingsGroupHead,
+  SettingsRow,
+  SettingsSection,
+} from './settings-section'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import type { ProviderId } from '@spaces/core/providers/registry'
@@ -12,9 +15,9 @@ import { setProviderApp } from '#/lib/server-fns'
 
 /**
  * Settings → Integrations → Connection apps: one OAuth client group per
- * provider — redirect URI, client id and a write-only secret, which never
- * reaches the page (a stored one reads as its `redact()` tail). Every
- * member's Connect leaves through these clients. (D81)
+ * provider — redirect address, client id and a write-only secret, which never
+ * reaches the page (a stored one reads as `●●●● set MM-DD`). Every member's
+ * Connect leaves through these clients. (D81)
  */
 export function ConnectionAppsSection({
   apps,
@@ -34,13 +37,22 @@ export function ConnectionAppsSection({
 export const oauthClientAnchor = (provider: ProviderId) =>
   `oauth-client-${provider}`
 
+/** The group head's readout: who connects through the client, or that none is set. */
+function connectedCount(app: ProviderAppRow): string {
+  if (!app.configured) return 'not set up'
+  const n = app.membersConnected
+  return `${String(n)} ${n === 1 ? 'member' : 'members'} connected`
+}
+
 /**
  * One provider's client: the client id and a write-only secret as one draft
- * in the page's Save bar. The secret settles empty after a save; a stored one
- * reads as its redacted display.
+ * in the page's Save bar. A stored value reads as text with Edit or Replace;
+ * the field opens only when asked. The secret settles empty after a save.
  */
 function OAuthClientGroup({ app }: { app: ProviderAppRow }) {
   const router = useRouter()
+  const [editingId, setEditingId] = useState(false)
+  const [replacing, setReplacing] = useState(false)
   const { draft, set } = useSettingsDraft(
     { clientId: app.clientId ?? '', secret: '' },
     async (next) => {
@@ -51,55 +63,96 @@ function OAuthClientGroup({ app }: { app: ProviderAppRow }) {
       await setProviderApp({
         data: { provider: app.provider, clientId, clientSecret: next.secret },
       })
-      toast(`${app.label} OAuth client saved`)
+      toast(`${app.label} client saved`)
+      setEditingId(false)
+      setReplacing(false)
       void router.invalidate()
       return { clientId, secret: '' }
     },
   )
 
+  const showIdField = app.clientId === null || editingId
+  const showSecretField = app.secretDisplay === null || replacing
+
   return (
     <div id={oauthClientAnchor(app.provider)} className="flex flex-col">
-      <SettingsGroupHead
-        title={`${app.label} OAuth client`}
-        count={app.configured ? 'configured' : 'not configured'}
-      />
-      <RedirectUriRow uri={app.redirectUri} />
-      <FieldRow label="Client ID">
-        <Input
-          aria-label={`${app.label} client ID`}
-          autoComplete="off"
-          spellCheck={false}
-          value={draft.clientId}
-          onChange={(e) => set('clientId', e.target.value)}
-          className="mono"
-        />
-      </FieldRow>
-      <FieldRow label="Secret">
-        <Input
-          aria-label={`${app.label} client secret`}
-          type="password"
-          autoComplete="off"
-          spellCheck={false}
-          value={draft.secret}
-          onChange={(e) => set('secret', e.target.value)}
-          placeholder={
-            app.secretDisplay === null
-              ? 'client secret'
-              : `${app.secretDisplay}${app.secretSetAt ? ` · set ${app.secretSetAt.slice(5, 10)}` : ''}`
-          }
-          className="mono"
-        />
-      </FieldRow>
+      <SettingsGroupHead title={app.label} count={connectedCount(app)} />
+      <RedirectRow uri={app.redirectUri} />
+      <SettingsRow label="Client ID">
+        {showIdField ? (
+          <Input
+            aria-label={`${app.label} client ID`}
+            autoComplete="off"
+            spellCheck={false}
+            value={draft.clientId}
+            onChange={(e) => set('clientId', e.target.value)}
+            placeholder="Paste the client ID"
+            className="w-64 mono"
+          />
+        ) : (
+          <>
+            <span className="min-w-0 flex-1 truncate mono text-label">
+              {app.clientId}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEditingId(true)}
+            >
+              Edit
+            </Button>
+          </>
+        )}
+      </SettingsRow>
+      <SettingsRow label="Client secret">
+        {showSecretField ? (
+          <Input
+            aria-label={`${app.label} client secret`}
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            value={draft.secret}
+            onChange={(e) => set('secret', e.target.value)}
+            placeholder="Paste the client secret"
+            className="w-64 mono"
+          />
+        ) : (
+          <>
+            <span className="min-w-0 flex-1 truncate mono text-label">
+              <span aria-label="stored secret">●●●●</span>
+              {app.secretSetAt ? ` set ${app.secretSetAt.slice(5, 10)}` : ''}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setReplacing(true)}
+            >
+              Replace
+            </Button>
+          </>
+        )}
+      </SettingsRow>
     </div>
   )
 }
 
-/** Where the provider sends people back; pasted into its console as-is. */
-function RedirectUriRow({ uri }: { uri: string }) {
+/** `https://deals.fund.example/api/…/callback` → `…/api/…/callback`. */
+function pathOf(uri: string): string {
+  const at = uri.indexOf('/', uri.indexOf('//') + 2)
+  return at === -1 ? uri : `…${uri.slice(at)}`
+}
+
+/**
+ * Where the provider sends people back; Copy takes the whole address, pasted
+ * into its console as-is. The row prints its path, the origin is the title.
+ */
+function RedirectRow({ uri }: { uri: string }) {
   const [copied, setCopied] = useState(false)
   return (
-    <FieldRow label="Redirect URI">
-      <Value select>{uri}</Value>
+    <SettingsRow label="Redirect address">
+      <span className="min-w-0 flex-1 truncate mono text-label" title={uri}>
+        {pathOf(uri)}
+      </span>
       <Button
         size="sm"
         variant="outline"
@@ -109,36 +162,6 @@ function RedirectUriRow({ uri }: { uri: string }) {
       >
         {copied ? 'Copied' : 'Copy'}
       </Button>
-    </FieldRow>
-  )
-}
-
-/** One row of the canvas's client ledger: caps label lane, mono value, control right. */
-function FieldRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex min-h-12 items-center gap-3.5 border-b border-rule px-3 py-2">
-      <span className="w-30 shrink-0 field-label text-graphite">{label}</span>
-      {children}
-    </div>
-  )
-}
-
-function Value({
-  children,
-  select = false,
-}: {
-  children: ReactNode
-  select?: boolean
-}) {
-  return (
-    <span
-      className={
-        select
-          ? 'min-w-0 flex-1 truncate mono text-label select-all'
-          : 'min-w-0 flex-1 truncate mono text-label'
-      }
-    >
-      {children}
-    </span>
+    </SettingsRow>
   )
 }

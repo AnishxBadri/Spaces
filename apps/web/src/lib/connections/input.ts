@@ -27,6 +27,8 @@ export type ProviderAppRow = {
   secretSetAt: string | null
   /** `<APP_URL>/api/connections/<provider>/callback`, read per request. */
   redirectUri: string
+  /** Members holding a live connection through this client. */
+  membersConnected: number
 }
 
 /** One of the session user's connections, by id. */

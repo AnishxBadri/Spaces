@@ -1,7 +1,7 @@
 import { and, count, eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@spaces/db'
-import { credential } from '@spaces/db/schema'
+import { accountConnection, credential } from '@spaces/db/schema'
 import {
   redact,
   resolveSecret,
@@ -121,6 +121,7 @@ describe('an admin registering the Google OAuth app', () => {
         secretSetAt: null,
         redirectUri:
           'https://deals.fund.example/api/connections/google/callback',
+        membersConnected: 0,
       },
       {
         provider: 'box',
@@ -130,6 +131,7 @@ describe('an admin registering the Google OAuth app', () => {
         secretDisplay: null,
         secretSetAt: null,
         redirectUri: 'https://deals.fund.example/api/connections/box/callback',
+        membersConnected: 0,
       },
     ])
 
@@ -219,6 +221,35 @@ describe('the redirect URI', () => {
     expect(moved.at(0)?.redirectUri).toBe(
       'https://example.com/spaces/api/connections/google/callback',
     )
+  })
+})
+
+describe('the members connected through a client', () => {
+  it('counts each member once across products, and no revoked grant', async () => {
+    const grant = (product: string, status: 'active' | 'revoked') => ({
+      userId: FIXTURE_ACTOR.id,
+      provider: 'google',
+      product,
+      externalEmail: 'anish@fund.example',
+      tokensEnc: Buffer.from('sealed'),
+      status,
+    })
+    await db
+      .insert(accountConnection)
+      .values([
+        grant('gmail', 'active'),
+        grant('calendar', 'active'),
+        grant('drive', 'revoked'),
+      ])
+    asAdmin()
+    const apps = await getProviderAppsHandler()
+    expect(apps.map((a) => [a.provider, a.membersConnected])).toEqual([
+      ['google', 1],
+      ['box', 0],
+    ])
+    await db
+      .delete(accountConnection)
+      .where(eq(accountConnection.provider, 'google'))
   })
 })
 

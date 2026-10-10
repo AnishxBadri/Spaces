@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
-import { asc, desc, eq } from 'drizzle-orm'
+import { and, asc, countDistinct, desc, eq, gte, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { integration, jobRun, mailbox } from '@spaces/db/schema'
+import { integration, interaction, jobRun, mailbox } from '@spaces/db/schema'
 import type { JobRunStatus } from '@spaces/db/schema/jobs'
 import type { MailboxStatus } from '@spaces/db/schema/mail'
 import { QUEUES } from '@spaces/core/queue/names'
@@ -71,6 +71,8 @@ export type MailboxRunView = {
 export type MailboxSettingsView = {
   mailbox: MailboxView | null
   lastRun: MailboxRunView | null
+  /** Threads the mailbox filed since 00:00 UTC; a thread-less message counts alone. */
+  threadsToday: number
 }
 
 export type MailboxTestResult =
@@ -103,6 +105,26 @@ export const readMailboxSettingsProgram = Effect.fn('readMailboxSettings')(
         .orderBy(desc(jobRun.startedAt))
         .limit(1),
     )).at(0)
+    const threads = box
+      ? yield* query('Could not count today’s threads', () =>
+          db
+            .select({
+              value: countDistinct(
+                sql`coalesce(${interaction.threadId}, ${interaction.id}::text)`,
+              ),
+            })
+            .from(interaction)
+            .where(
+              and(
+                eq(interaction.sourceRef, box.integrationId),
+                gte(
+                  interaction.createdAt,
+                  sql`date_trunc('day', now() at time zone 'utc') at time zone 'utc'`,
+                ),
+              ),
+            ),
+        )
+      : []
     const display = credential?.meta.display
     return {
       mailbox: box
@@ -127,6 +149,7 @@ export const readMailboxSettingsProgram = Effect.fn('readMailboxSettings')(
             error: run.error,
           }
         : null,
+      threadsToday: threads.at(0)?.value ?? 0,
     }
   },
 )

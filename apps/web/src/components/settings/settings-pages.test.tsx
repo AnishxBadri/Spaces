@@ -42,6 +42,19 @@ const writes = vi.hoisted(() => ({
   revokeApiToken: vi.fn(async () => ({ ok: true })),
   updateObject: vi.fn(async () => ({ ok: true })),
   setMemberBanned: vi.fn(async () => ({ ok: true })),
+  setMemberRole: vi.fn(async () => ({ ok: true })),
+  createInvite: vi.fn(async () => ({
+    url: 'http://localhost/join?token=once',
+  })),
+  revokeInvite: vi.fn(async () => ({ ok: true })),
+  updateTemplate: vi.fn(async () => ({ ok: true })),
+  createApiToken: vi.fn(async () => ({
+    id: 't9',
+    name: 'Claude Desktop',
+    token: 'spc_plaintext_once',
+    prefix: 'spc_plai',
+    scopes: ['records:read'],
+  })),
   disconnectConnection: vi.fn(
     async ({ data }: { data: { connectionId: string } }) => ({
       connectionId: data.connectionId,
@@ -237,11 +250,67 @@ const shellData = (isAdmin: boolean) => ({
       banned: false,
     },
   ],
-  templates: [],
-  invites: [],
+  templates: [
+    {
+      id: '00000000-0000-4000-8000-0000000000e1',
+      kind: 'note',
+      objectKind: null,
+      noteKind: null,
+      name: 'Seed memo',
+      body: {},
+      suggestOn: ['company', 'deal'],
+      archived: false,
+    },
+    {
+      id: '00000000-0000-4000-8000-0000000000e2',
+      kind: 'space',
+      objectKind: null,
+      noteKind: null,
+      name: 'Market map',
+      body: {},
+      suggestOn: ['space'],
+      archived: false,
+    },
+    {
+      id: '00000000-0000-4000-8000-0000000000e3',
+      kind: 'note',
+      objectKind: null,
+      noteKind: null,
+      name: 'Old IC memo',
+      body: {},
+      suggestOn: [],
+      archived: true,
+    },
+  ],
+  invites: isAdmin
+    ? [
+        {
+          id: '00000000-0000-4000-8000-0000000000e4',
+          email: 'partner@fund.example',
+          role: 'member',
+          createdAt: ISO,
+          expiresAt: new Date(Date.now() + 5 * 86_400_000 - 60_000),
+        },
+        {
+          id: '00000000-0000-4000-8000-0000000000e5',
+          email: null,
+          role: 'member',
+          createdAt: ISO,
+          expiresAt: new Date(Date.now() + 2 * 86_400_000 - 60_000),
+        },
+      ]
+    : [],
   integrations: 1,
   objects: [],
-  fx: { baseCurrency: 'USD', rates: [] },
+  fx: {
+    baseCurrency: 'USD',
+    rates: [
+      { currency: 'EUR', date: '2026-10-01', rateToBase: 1.09 },
+      { currency: 'GBP', date: '2026-09-15', rateToBase: 1.265 },
+      { currency: 'EUR', date: '2026-07-01', rateToBase: 1.072 },
+      { currency: 'EUR', date: '2026-04-01', rateToBase: 1.05 },
+    ],
+  },
 })
 
 const pluginForm = settingsFormOf(
@@ -480,6 +549,7 @@ const loaders: Record<string, () => object> = {
         passwordDisplay: 'set',
       },
       lastRun: null,
+      threadsToday: 3,
     },
   }),
   'connection-apps': () => ({
@@ -492,6 +562,7 @@ const loaders: Record<string, () => object> = {
         secretDisplay: 'set',
         secretSetAt: ISO,
         redirectUri: 'http://localhost/api/connections/google/callback',
+        membersConnected: 2,
       },
     ],
   }),
@@ -603,6 +674,23 @@ async function click(el: Element | null | undefined) {
     await new Promise((resolve) => setTimeout(resolve, 0))
   })
 }
+
+/** Opens a `···` (or any Radix menu) the way a keyboard does. */
+async function openMenu(label: string) {
+  const trigger = document.querySelector(`button[aria-label="${label}"]`)
+  if (!(trigger instanceof HTMLElement)) throw new Error(`no ${label}`)
+  await act(async () => {
+    trigger.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+}
+
+const menuItem = (text: string) =>
+  Array.from(
+    document.querySelectorAll('[role="menuitem"], [role="menuitemcheckbox"]'),
+  ).find((item) => item.textContent.trim() === text)
 
 const byText = (text: string, scope: ParentNode = document) =>
   Array.from(scope.querySelectorAll('button')).find(
@@ -755,9 +843,10 @@ describe('the four acts that break something elsewhere ask first', () => {
 
   it('revoking an API token', async () => {
     await mount('/settings/tokens')
-    await click(byText('revoke'))
+    await openMenu('More for laptop')
+    await click(menuItem('Revoke…'))
     expect(dialog()?.textContent).toContain('Revoke laptop?')
-    expect(dialog()?.textContent).toContain('refused from its next call')
+    expect(dialog()?.textContent).toContain('It cannot come back')
     expect(focused()).toBe('Keep')
     expect(writes.revokeApiToken).not.toHaveBeenCalled()
     await click(byText('Keep', dialog() ?? document))
@@ -791,22 +880,10 @@ describe('the four acts that break something elsewhere ask first', () => {
 
   it('suspending a member', async () => {
     await mount('/settings/members')
-    const trigger = Array.from(document.querySelectorAll('button')).find(
-      (b) => b.textContent.trim() === 'member',
-    )
-    if (!(trigger instanceof HTMLElement)) throw new Error('no role menu')
-    await act(async () => {
-      trigger.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
-      )
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    })
-    const suspend = Array.from(
-      document.querySelectorAll('[role="menuitem"]'),
-    ).find((item) => item.textContent.trim() === 'Suspend access')
-    await click(suspend)
+    await openMenu('More for Priya')
+    await click(menuItem('Suspend access…'))
     expect(dialog()?.textContent).toContain('Suspend Priya?')
-    expect(dialog()?.textContent).toContain('signed out on every device')
+    expect(dialog()?.textContent).toContain('cannot sign in until restored')
     expect(writes.setMemberBanned).not.toHaveBeenCalled()
   })
 })
@@ -1134,5 +1211,177 @@ describe('Integrations → Enrichment (D76)', () => {
     expect(employees?.textContent).toContain('yours')
     expect(employees?.textContent).toContain('not linked')
     expect(byText('Fill from…', employees ?? document)).toBeDefined()
+  })
+})
+
+describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () => {
+  const dialog = () => document.querySelector('[role="dialog"]')
+  const groups = () =>
+    Array.from(document.querySelectorAll('[data-settings-group]')).map((g) =>
+      g.textContent.trim(),
+    )
+
+  it('Members: a People ledger with a role Select per row, Invite in the head, and the waiting invites', async () => {
+    await mount('/settings/members')
+    expect(groups()).toEqual(['People2', 'Waiting to join2'])
+    const rows = Array.from(document.querySelectorAll('[data-member-row]'))
+    expect(rows).toHaveLength(2)
+    // You read your own role; another member's is a Select and a ···.
+    expect(rows.at(0)?.querySelector('[role="combobox"]')).toBeNull()
+    expect(rows.at(0)?.textContent).toContain('Admin')
+    expect(
+      rows.at(1)?.querySelector('button[aria-label="Role of Priya"]')
+        ?.textContent,
+    ).toContain('Member')
+    expect(
+      rows.at(1)?.querySelector('button[aria-label="More for Priya"]'),
+    ).not.toBeNull()
+    // No inline form row and no hint sentence.
+    expect(document.querySelector('section input')).toBeNull()
+    expect(document.body.textContent).not.toContain('within 7 days')
+
+    const invites = Array.from(document.querySelectorAll('[data-invite-row]'))
+    expect(invites.at(0)?.textContent).toContain('partner@fund.example')
+    expect(invites.at(0)?.textContent).toContain('Member · expires in 5 days')
+    expect(invites.at(1)?.textContent).toContain('Anyone with the link')
+    expect(invites.at(1)?.textContent).toContain('one use · expires in 2 days')
+    await openMenu('More for partner@fund.example')
+    await click(menuItem('Revoke invite'))
+    expect(writes.revokeInvite).toHaveBeenCalledWith({
+      data: { id: '00000000-0000-4000-8000-0000000000e4' },
+    })
+  })
+
+  it('Members: Invite opens a window of email and role, and shows the link once', async () => {
+    await mount('/settings/members')
+    const head = document.querySelector('[data-settings-head]')
+    await click(byText('Invite', head ?? document))
+    expect(dialog()?.querySelector('h2')?.textContent).toBe('Invite')
+    expect(dialog()?.textContent).not.toMatch(/\besc\b/)
+    const email = document.querySelector('#invite-email')
+    if (!(email instanceof HTMLInputElement)) throw new Error('no email')
+    await type(email, 'maya@fund.example')
+    await click(byText('Create invite', dialog() ?? document))
+    expect(writes.createInvite).toHaveBeenCalledWith({
+      data: { role: 'member', email: 'maya@fund.example' },
+    })
+    expect(dialog()?.textContent).toContain('http://localhost/join?token=once')
+  })
+
+  it('Members: a role change applies at once, without a confirm', async () => {
+    await mount('/settings/members')
+    await openMenu('More for Priya')
+    await click(menuItem('Make admin'))
+    expect(dialog()).toBeNull()
+    expect(writes.setMemberRole).toHaveBeenCalledWith({
+      data: { userId: 'u-member', role: 'admin' },
+    })
+  })
+
+  it('Templates: Template, Kind and Offered first on lanes, then Archived with Restore', async () => {
+    await mount('/settings/templates')
+    expect(groups()).toEqual(['Templates2', 'Archived1'])
+    const rows = Array.from(document.querySelectorAll('[data-template-row]'))
+    expect(rows.map((r) => r.textContent)).toEqual([
+      'Seed memoNoteCompaniesDeals+···',
+      'Market mapSpace breakdownSpaces+···',
+    ])
+    await openMenu('Where Market map is offered first')
+    await click(menuItem('People'))
+    expect(writes.updateTemplate).toHaveBeenCalledWith({
+      data: {
+        id: '00000000-0000-4000-8000-0000000000e2',
+        suggestOn: ['space', 'person'],
+      },
+    })
+    await click(byText('Restore'))
+    expect(writes.updateTemplate).toHaveBeenLastCalledWith({
+      data: { id: '00000000-0000-4000-8000-0000000000e3', archived: false },
+    })
+  })
+
+  it('API tokens: It may as sentences with the scope under each, Create token under the form, the plaintext once', async () => {
+    await mount('/settings/tokens')
+    expect(groups()).toEqual(['New token', 'Your tokens1 live · 0 revoked'])
+    const scopes = Array.from(
+      document.querySelectorAll('section label span.mono'),
+    ).map((s) => s.textContent)
+    expect(scopes).toEqual([
+      'records:read',
+      'suggestions:write',
+      'capture:write',
+    ])
+    expect(document.body.textContent).not.toContain('None yet')
+    await type(input('Token name'), 'Claude Desktop')
+    await click(
+      document.querySelector('button[aria-label="Read records you can see"]'),
+    )
+    await click(byText('Create token'))
+    expect(writes.createApiToken).toHaveBeenCalledWith({
+      data: { name: 'Claude Desktop', scopes: ['records:read'] },
+    })
+    const panel = document.querySelector('[data-created-token]')
+    expect(panel?.textContent).toContain('Copy it now. Spaces shows it once.')
+    expect(panel?.textContent).toContain('spc_plaintext_once')
+    expect(byText('Copy command', panel ?? document)).toBeDefined()
+  })
+
+  it('Connection apps: GOOGLE with its members connected and sentence-case labels', async () => {
+    await mount('/settings/connection-apps')
+    expect(groups()).toEqual(['Google2 members connected'])
+    const text = document.body.textContent
+    for (const label of ['Redirect address', 'Client ID', 'Client secret'])
+      expect(text).toContain(label)
+    expect(text).toContain('●●●● set 10-09')
+    await click(byText('Replace'))
+    await type(input('Google client secret'), 'GOCSPX-new')
+    expect(bar()?.textContent).toContain('1 change')
+  })
+
+  it('Email forwarding: Address · Since last check · Threads today, then Mail server, Check every, Secure', async () => {
+    await mount('/settings/email-forwarding')
+    const cells = Array.from(
+      document.querySelectorAll('[data-readouts] > div'),
+    ).map((c) => c.textContent)
+    expect(cells).toEqual([
+      'deals@fund.exampleAddress',
+      '—Since last check',
+      '3Threads today',
+    ])
+    const text = document.body.textContent
+    for (const label of ['Mail server', 'Check every', 'Secure', 'Folder'])
+      expect(text).toContain(label)
+    for (const gone of ['IMAP server', 'Poll every', 'TLS'])
+      expect(text).not.toContain(gone)
+    // Test connection sits in the foot row, not a row of its own.
+    const foot = document.querySelector('[data-mailbox-foot]')
+    expect(byText('Test connection', foot ?? document)).toBeDefined()
+    // Hints only where privacy is at stake.
+    const hints = Array.from(
+      document.querySelectorAll('section span.text-label.text-graphite'),
+    )
+      .filter((h) => h.closest('[data-readouts]') === null)
+      .map((h) => h.textContent)
+    expect(hints).toEqual([
+      'What is forwarded here is shared with every member.',
+      'Not your account password.',
+    ])
+  })
+
+  it('Currency & FX: the title, and a range on each superseded rate, no two rows alike', async () => {
+    await mount('/settings/currency')
+    expect(document.querySelector('h1')?.textContent).toBe('Currency & FX')
+    expect(groups()).toEqual(['Rates4 · 2 currencies'])
+    const rows = Array.from(document.querySelectorAll('[data-fx-row]'))
+    const clauses = rows.map((r) => r.lastElementChild?.textContent)
+    expect(clauses).toEqual([
+      'events from 10-01',
+      'events from 09-15',
+      'events 07-01 to 09-30',
+      'events 04-01 to 06-30',
+    ])
+    expect(new Set(rows.map((r) => r.textContent)).size).toBe(rows.length)
+    expect(document.body.textContent).not.toContain('superseded')
+    expect(document.body.textContent).not.toContain('newest wins')
   })
 })

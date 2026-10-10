@@ -30,7 +30,14 @@ export function isApiScope(value: string): value is ApiScope {
 
 /** What each scope lets a token do, as the settings form says it. */
 export const API_SCOPE_HINTS: Record<ApiScope, string> = {
-  'capture:write': 'Post captured pages from the browser extension',
+  'capture:write': 'Save pages from the browser extension',
   'records:read': 'Read records you can see',
   'suggestions:write': 'Propose changes for Review, never write them',
+}
+
+/** Each scope in a word or two, as a token's row lists what it may do. */
+export const API_SCOPE_WORDS: Record<ApiScope, string> = {
+  'capture:write': 'Save pages',
+  'records:read': 'Read',
+  'suggestions:write': 'Propose',
 }

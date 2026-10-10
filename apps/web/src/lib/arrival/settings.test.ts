@@ -2,7 +2,12 @@ import { Effect } from 'effect'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { db } from '@spaces/db'
-import { credential, integration, mailbox } from '@spaces/db/schema'
+import {
+  credential,
+  integration,
+  interaction,
+  mailbox,
+} from '@spaces/db/schema'
 import { FakeImapServer } from '#/test/fake-imap'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { MAILBOX } from './fixtures'
@@ -48,7 +53,7 @@ const fields = () => ({
 describe('Settings → Arrival', () => {
   it('reads as not configured before the first save', async () => {
     const view = await Effect.runPromise(readMailboxSettingsProgram())
-    expect(view).toEqual({ mailbox: null, lastRun: null })
+    expect(view).toEqual({ mailbox: null, lastRun: null, threadsToday: 0 })
   })
 
   it('refuses a first save with no app password', async () => {
@@ -88,6 +93,36 @@ describe('Settings → Arrival', () => {
       passwordDisplay: 'abc…mnop',
     })
     expect(JSON.stringify(view)).not.toContain(SECRET)
+  })
+
+  it("counts today's threads the mailbox filed, a thread-less message alone", async () => {
+    const box = (await db.select().from(mailbox)).at(0)
+    if (!box) throw new Error('no mailbox')
+    const yesterday = new Date(Date.now() - 2 * 86_400_000)
+    const filed = (
+      n: number,
+      threadId: string | null,
+      createdAt = new Date(),
+    ) => ({
+      kind: 'email' as const,
+      sourceClass: 'integration' as const,
+      sourceRef: box.integrationId,
+      messageId: `<m${String(n)}@fund.example>`,
+      threadId,
+      occurredAt: createdAt,
+      createdAt,
+    })
+    await db
+      .insert(interaction)
+      .values([
+        filed(1, 't1'),
+        filed(2, 't1'),
+        filed(3, 't2'),
+        filed(4, null),
+        filed(5, 't3', yesterday),
+      ])
+    const view = await Effect.runPromise(readMailboxSettingsProgram())
+    expect(view.threadsToday).toBe(3)
   })
 
   it('keeps the stored password when a later save leaves it blank', async () => {

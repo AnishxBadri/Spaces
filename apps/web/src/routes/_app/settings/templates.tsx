@@ -1,9 +1,21 @@
 import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
 import { toast } from 'sonner'
-import { SettingsSection } from '#/components/settings/settings-section'
+import {
+  SettingsGroupHead,
+  SettingsRowMenu,
+  SettingsSection,
+} from '#/components/settings/settings-section'
+import { Badge } from '#/components/ui/badge'
+import { Button } from '#/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu'
 import { updateTemplate } from '#/lib/server-fns'
 import type { listTemplates } from '#/lib/server-fns'
-import { cn } from '#/lib/utils'
 
 const shell = getRouteApi('/_app/settings')
 
@@ -19,19 +31,46 @@ function TemplatesRoute() {
 
 type TemplateRow = Awaited<ReturnType<typeof listTemplates>>[number]
 
-const SUGGEST_KINDS = ['company', 'person', 'deal', 'space'] as const
+/** Where a template can be offered first, as the chip names it. */
+const OFFERED_ON = [
+  { value: 'company', label: 'Companies' },
+  { value: 'person', label: 'People' },
+  { value: 'deal', label: 'Deals' },
+  { value: 'space', label: 'Spaces' },
+] as const
+
+const offeredLabel = (value: string) =>
+  OFFERED_ON.find((o) => o.value === value)?.label ?? value
+
+const RECORD_KIND: Record<string, string> = {
+  company: 'Company record',
+  person: 'Person record',
+  deal: 'Deal record',
+}
+
+/** What the template stamps, as a person says it. */
+function templateKindLabel(t: {
+  kind: string
+  objectKind: string | null
+}): string {
+  if (t.kind === 'note') return 'Note'
+  if (t.kind === 'space') return 'Space breakdown'
+  return RECORD_KIND[t.objectKind ?? ''] ?? 'Record'
+}
 
 /**
  * Templates are config, not entities — this is their whole management
  * surface. Creation happens by example ("Save as template" on a note,
- * record, or space), never here.
+ * record, or space), never here. Every change applies at once.
  */
 function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
   const router = useRouter()
+  const live = templates.filter((t) => !t.archived)
+  const archived = templates.filter((t) => t.archived)
 
   async function patch(
     id: string,
-    data: { name?: string; archived?: boolean; suggestOn?: Array<string> },
+    data: { archived?: boolean; suggestOn?: Array<string> },
     ok: string,
   ) {
     try {
@@ -45,83 +84,132 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
 
   return (
     <SettingsSection title="Templates" crumb="Workspace">
-      {templates.length === 0 ? (
-        <p className="border-b border-rule py-3 text-label text-graphite">
-          None yet. Open a note, record, or space you like the shape of and save
-          it as the pattern.
-        </p>
-      ) : (
-        <ul className="flex flex-col">
-          {templates.map((t) => (
-            <li
+      <div className="flex flex-col">
+        <SettingsGroupHead title="Templates" count={live.length} />
+        <div className="flex h-8 items-center gap-3 border-b border-hairline field-label leading-4 text-graphite">
+          <span className="min-w-0 flex-1">Template</span>
+          <span className="w-32 shrink-0">Kind</span>
+          <span className="w-56 shrink-0">Offered first on</span>
+          <span className="w-6 shrink-0" />
+        </div>
+        {live.length === 0 ? (
+          <p className="border-b border-rule py-3 text-label text-graphite">
+            No templates.
+          </p>
+        ) : (
+          live.map((t) => (
+            <div
               key={t.id}
-              className={cn(
-                'flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 border-b border-rule py-2',
-                t.archived && 'text-graphite',
-              )}
+              data-template-row
+              className="flex h-12 items-center gap-3 border-b border-rule"
             >
-              <span className="min-w-0 flex-1">
-                <span
-                  className={cn(
-                    'block truncate text-ui font-medium',
-                    t.archived && 'line-through',
-                  )}
+              <span className="min-w-0 flex-1 truncate text-ui font-medium">
+                {t.name}
+              </span>
+              <span className="w-32 shrink-0 truncate text-label text-graphite">
+                {templateKindLabel(t)}
+              </span>
+              <span className="flex w-56 shrink-0 items-center gap-1 overflow-hidden">
+                {t.suggestOn.map((k) => (
+                  <Badge key={k} option={{ color: 'slate' }} index={0}>
+                    {offeredLabel(k)}
+                  </Badge>
+                ))}
+                <OfferedOnMenu
+                  template={t}
+                  onChange={(suggestOn) =>
+                    patch(t.id, { suggestOn }, 'Offered first on updated')
+                  }
+                />
+              </span>
+              <SettingsRowMenu label={t.name}>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    patch(t.id, { archived: true }, `${t.name} archived`)
+                  }
                 >
-                  {t.name}
-                </span>
-                <span className="block mono text-micro text-graphite">
-                  {t.kind === 'record' ? (t.objectKind ?? 'record') : t.kind}
-                </span>
+                  Archive
+                </DropdownMenuItem>
+              </SettingsRowMenu>
+            </div>
+          ))
+        )}
+      </div>
+
+      {archived.length > 0 ? (
+        <div className="flex flex-col">
+          <SettingsGroupHead title="Archived" count={archived.length} />
+          {archived.map((t) => (
+            <div
+              key={t.id}
+              className="flex h-12 items-center gap-3 border-b border-rule"
+            >
+              <span className="min-w-0 flex-1 truncate text-ui text-graphite line-through">
+                {t.name}
               </span>
-              <span className="flex items-center gap-1">
-                {SUGGEST_KINDS.map((k) => {
-                  const on = t.suggestOn.includes(k)
-                  return (
-                    <button
-                      key={k}
-                      type="button"
-                      aria-pressed={on}
-                      title={`Suggest first on ${k} surfaces`}
-                      onClick={() =>
-                        patch(
-                          t.id,
-                          {
-                            suggestOn: on
-                              ? t.suggestOn.filter((x) => x !== k)
-                              : [...t.suggestOn, k],
-                          },
-                          'Suggestion contexts updated',
-                        )
-                      }
-                      className={cn(
-                        'focus-ring h-6 border px-2 mono text-micro',
-                        on
-                          ? 'border-hairline bg-paper text-foreground'
-                          : 'border-rule text-graphite hover:border-hairline hover:text-foreground',
-                      )}
-                    >
-                      {k}
-                    </button>
-                  )
-                })}
-              </span>
-              <button
-                type="button"
+              <Button
+                size="sm"
+                variant="outline"
                 onClick={() =>
-                  patch(
-                    t.id,
-                    { archived: !t.archived },
-                    t.archived ? 'Template restored' : 'Template archived',
-                  )
+                  patch(t.id, { archived: false }, `${t.name} restored`)
                 }
-                className="focus-ring mono text-micro text-graphite hover:text-foreground"
               >
-                {t.archived ? 'restore' : 'archive'}
-              </button>
-            </li>
+                Restore
+              </Button>
+            </div>
           ))}
-        </ul>
-      )}
+        </div>
+      ) : null}
     </SettingsSection>
+  )
+}
+
+/** The dashed `+`: tick where the template is offered first. */
+function OfferedOnMenu({
+  template,
+  onChange,
+}: {
+  template: TemplateRow
+  onChange: (suggestOn: Array<string>) => void
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Badge
+          asChild
+          option={undefined}
+          index={0}
+          unselected
+          className="justify-center px-1"
+        >
+          <button
+            type="button"
+            aria-label={`Where ${template.name} is offered first`}
+          >
+            +
+          </button>
+        </Badge>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-40">
+        {OFFERED_ON.map((o) => {
+          const on = template.suggestOn.includes(o.value)
+          return (
+            <DropdownMenuCheckboxItem
+              key={o.value}
+              checked={on}
+              onCheckedChange={(next) =>
+                onChange(
+                  next
+                    ? [...template.suggestOn, o.value]
+                    : template.suggestOn.filter((k) => k !== o.value),
+                )
+              }
+            >
+              {o.label}
+            </DropdownMenuCheckboxItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

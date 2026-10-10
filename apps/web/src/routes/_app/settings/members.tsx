@@ -1,21 +1,26 @@
 import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
-import { Copy, Plus } from 'lucide-react'
+import { Copy } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { InitialsMark } from '#/components/record/record-parts'
 import {
-  SettingsRow,
+  SettingsGroupHead,
+  SettingsRowMenu,
   SettingsSection,
 } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '#/components/ui/dropdown-menu'
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '#/components/ui/dialog'
+import { DropdownMenuItem } from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
+import { Label } from '#/components/ui/label'
 import { Select } from '#/components/ui/select'
 import type { SelectItem } from '#/components/ui/select'
 import {
@@ -25,6 +30,7 @@ import {
   setMemberRole,
 } from '#/lib/server-fns'
 import type { listInvites, listMembers } from '#/lib/server-fns'
+import { cn } from '#/lib/utils'
 
 const shell = getRouteApi('/_app/settings')
 
@@ -50,11 +56,27 @@ type Invite = Awaited<ReturnType<typeof listInvites>>[number]
 
 type MemberRole = 'member' | 'admin'
 
-/** The two roles an invite can carry — sentence case, a person reads them. */
+/** The two roles — sentence case, a person reads them. */
 const ROLE_ITEMS: Array<SelectItem<MemberRole>> = [
   { value: 'member', label: 'Member' },
   { value: 'admin', label: 'Admin' },
 ]
+
+const roleOf = (role: string | null): MemberRole =>
+  role === 'admin' ? 'admin' : 'member'
+
+const roleLabel = (role: string | null) =>
+  roleOf(role) === 'admin' ? 'Admin' : 'Member'
+
+/** "expires in 5 days", from the invite's instant. */
+function expiresIn(expiresAt: Date | string): string {
+  const days = Math.max(
+    0,
+    Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86_400_000),
+  )
+  if (days === 0) return 'expires today'
+  return `expires in ${String(days)} ${days === 1 ? 'day' : 'days'}`
+}
 
 function MembersSection({
   me,
@@ -68,37 +90,15 @@ function MembersSection({
   invites: Array<Invite>
 }) {
   const router = useRouter()
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null)
-  const [inviteRole, setInviteRole] = useState<MemberRole>('member')
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [pending, setPending] = useState(false)
+  const [inviting, setInviting] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
 
-  async function invite() {
-    setPending(true)
-    try {
-      const { url } = await createInvite({
-        data: {
-          role: inviteRole,
-          ...(inviteEmail.trim() ? { email: inviteEmail.trim() } : {}),
-        },
-      })
-      setInviteUrl(url)
-      setInviteEmail('')
-      void router.invalidate()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not create invite')
-    } finally {
-      setPending(false)
-    }
-  }
-
-  /** Suspending signs a member out everywhere, so it asks; restoring does not. */
+  /** Suspending signs a member out everywhere, so it asks; restoring does not. (D81) */
   async function setBanned(m: Member) {
     if (!m.banned) {
       const ok = await confirm({
         title: `Suspend ${m.name}?`,
-        body: `${m.name} is signed out on every device and their API tokens stop working. Their notes and history stay; Restore access lets them back in.`,
+        body: 'They cannot sign in until restored, and their API tokens stop working. Their records, notes and tasks stay.',
         action: 'Suspend',
       })
       if (!ok) return
@@ -119,153 +119,289 @@ function MembersSection({
     }
   }
 
+  const setRole = (m: Member, role: MemberRole) =>
+    act(() => setMemberRole({ data: { userId: m.id, role } }), 'Role updated')
+
   return (
-    <SettingsSection title="Members" crumb="Workspace">
-      <ul className="flex flex-col">
-        {members.map((m) => (
-          <li
-            key={m.id}
-            className="flex h-12 items-center gap-3 border-b border-rule px-3"
-          >
-            <InitialsMark name={m.name} />
-            <span className="min-w-0 flex-1">
-              <span className="flex items-baseline gap-2">
-                <span className="truncate text-ui font-medium">
-                  {m.name}
+    <SettingsSection
+      title="Members"
+      crumb="Workspace"
+      action={
+        isAdmin ? (
+          <Button size="sm" onClick={() => setInviting(true)}>
+            Invite
+          </Button>
+        ) : null
+      }
+    >
+      <div className="flex flex-col">
+        <SettingsGroupHead title="People" count={members.length} />
+        <div className="flex h-8 items-center gap-3 border-b border-hairline field-label leading-4 text-graphite">
+          <span className="min-w-0 flex-1">Person</span>
+          <span className="w-28 shrink-0">Role</span>
+          <span className="w-6 shrink-0" />
+        </div>
+        {members.map((m) => {
+          const editable = isAdmin && m.id !== me.id
+          return (
+            <div
+              key={m.id}
+              data-member-row
+              className="flex h-12 items-center gap-3 border-b border-rule"
+            >
+              <InitialsMark
+                name={m.name}
+                className={cn(m.banned && 'opacity-40')}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="flex items-baseline gap-2">
+                  <span
+                    className={cn(
+                      'truncate text-ui font-medium',
+                      m.banned && 'text-graphite',
+                    )}
+                  >
+                    {m.name}
+                  </span>
                   {m.id === me.id ? (
-                    <span className="ml-1.5 mono text-micro font-normal text-graphite">
-                      you
+                    <span className="mono text-micro text-graphite">you</span>
+                  ) : null}
+                  {m.banned ? (
+                    <span className="flex items-center gap-1 mono text-micro text-destructive">
+                      <span aria-hidden className="size-1.5 bg-destructive" />
+                      suspended
                     </span>
                   ) : null}
                 </span>
-                {m.banned ? (
-                  <span className="mono text-micro text-destructive">
-                    suspended
+                <span className="block truncate mono text-micro text-graphite">
+                  {m.email}
+                </span>
+              </span>
+              <span className="w-28 shrink-0">
+                {editable ? (
+                  <Select
+                    aria-label={`Role of ${m.name}`}
+                    value={roleOf(m.role)}
+                    onChange={(role) => void setRole(m, role)}
+                    items={ROLE_ITEMS}
+                    width="trigger"
+                    className="w-28"
+                  />
+                ) : (
+                  <span className="text-ui text-graphite">
+                    {roleLabel(m.role)}
                   </span>
+                )}
+              </span>
+              <span className="flex w-6 shrink-0 justify-end">
+                {editable ? (
+                  <SettingsRowMenu label={m.name}>
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        void setRole(
+                          m,
+                          roleOf(m.role) === 'admin' ? 'member' : 'admin',
+                        )
+                      }
+                    >
+                      Make {roleOf(m.role) === 'admin' ? 'member' : 'admin'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      {...(m.banned ? {} : { variant: 'destructive' as const })}
+                      onSelect={() => void setBanned(m)}
+                    >
+                      {m.banned ? 'Restore access' : 'Suspend access…'}
+                    </DropdownMenuItem>
+                  </SettingsRowMenu>
                 ) : null}
               </span>
-              <span className="block truncate mono text-micro text-graphite">
-                {m.email}
-              </span>
-            </span>
-            {isAdmin && m.id !== me.id ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger className="focus-ring h-6 border border-rule bg-paper px-2 mono text-micro text-graphite hover:border-hairline hover:text-foreground">
-                  {m.role}
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuItem
-                    onSelect={() =>
-                      act(
-                        () =>
-                          setMemberRole({
-                            data: {
-                              userId: m.id,
-                              role: m.role === 'admin' ? 'member' : 'admin',
-                            },
-                          }),
-                        'Role updated',
-                      )
-                    }
-                  >
-                    Make {m.role === 'admin' ? 'member' : 'admin'}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    {...(m.banned ? {} : { variant: 'destructive' as const })}
-                    onSelect={() => void setBanned(m)}
-                  >
-                    {m.banned ? 'Restore access' : 'Suspend access'}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <span className="mono text-micro text-graphite">{m.role}</span>
-            )}
-          </li>
-        ))}
-      </ul>
-
-      {isAdmin ? (
-        <div className="flex flex-col">
-          <SettingsRow
-            label="Invite"
-            hint="With no email, anyone holding the link can join, once, within 7 days."
-          >
-            <Input
-              id="invite-email"
-              type="email"
-              aria-label="Invite by email (optional)"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="partner@fund.com"
-              className="w-52"
-            />
-            {/* Two words: the sheet is the trigger's width, no search box. */}
-            <Select
-              aria-label="Invite role"
-              value={inviteRole}
-              onChange={setInviteRole}
-              items={ROLE_ITEMS}
-              width="trigger"
-              className="w-28"
-            />
-            <Button size="sm" disabled={pending} onClick={invite}>
-              <Plus className="size-3.5" strokeWidth={2} />
-              Create invite
-            </Button>
-          </SettingsRow>
-
-          {inviteUrl ? (
-            <div className="mt-3 flex h-9 items-center gap-2 border border-rule bg-bone px-3">
-              <code className="min-w-0 flex-1 truncate mono text-micro">
-                {inviteUrl}
-              </code>
-              <Button
-                size="xs"
-                variant="outline"
-                onClick={() => {
-                  navigator.clipboard.writeText(inviteUrl).then(
-                    () =>
-                      toast.success('Link copied — send it however you like'),
-                    () => toast.error('Could not copy — select the link above'),
-                  )
-                }}
-              >
-                <Copy className="size-3" strokeWidth={2} />
-                Copy
-              </Button>
             </div>
-          ) : null}
+          )
+        })}
+      </div>
 
-          {invites.length > 0 ? (
-            <ul className="flex flex-col">
-              {invites.map((inv) => (
-                <li
-                  key={inv.id}
-                  className="flex h-8 items-center gap-2 border-b border-rule px-3 mono text-micro text-graphite"
+      {isAdmin && invites.length > 0 ? (
+        <div className="flex flex-col">
+          <SettingsGroupHead title="Waiting to join" count={invites.length} />
+          {invites.map((inv) => (
+            <div
+              key={inv.id}
+              data-invite-row
+              className="flex h-12 items-center gap-3 border-b border-rule"
+            >
+              <span className="min-w-0 flex-1">
+                <span
+                  className={cn(
+                    'block truncate text-ui',
+                    inv.email === null && 'text-graphite',
+                  )}
                 >
-                  <span className="min-w-0 flex-1 truncate">
-                    {inv.email ?? 'open link'} · {inv.role} · expires{' '}
-                    {new Date(inv.expiresAt).toISOString().slice(0, 10)}
-                  </span>
-                  <button
-                    className="focus-ring hover:text-foreground"
-                    onClick={() =>
-                      act(
+                  {inv.email ?? 'Anyone with the link'}
+                </span>
+                <span className="block truncate mono text-micro text-graphite">
+                  {roleLabel(inv.role)}
+                  {inv.email === null ? ' · one use' : ''} ·{' '}
+                  {expiresIn(inv.expiresAt)}
+                </span>
+              </span>
+              <span className="flex w-6 shrink-0 justify-end">
+                <SettingsRowMenu label={inv.email ?? 'the open link'}>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={() =>
+                      void act(
                         () => revokeInvite({ data: { id: inv.id } }),
                         'Invite revoked',
                       )
                     }
                   >
-                    revoke
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+                    Revoke invite
+                  </DropdownMenuItem>
+                </SettingsRowMenu>
+              </span>
+            </div>
+          ))}
         </div>
+      ) : null}
+
+      {isAdmin ? (
+        <InviteDialog
+          open={inviting}
+          onOpenChange={setInviting}
+          onCreated={() => void router.invalidate()}
+        />
       ) : null}
       {confirmDialog}
     </SettingsSection>
+  )
+}
+
+/**
+ * The Invite window: email (optional) and role, then the link, shown once —
+ * only its hash is stored. Cancel in the foot is its one close.
+ */
+function InviteDialog({
+  open,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onCreated: () => void
+}) {
+  const [email, setEmail] = useState('')
+  const [role, setRole] = useState<MemberRole>('member')
+  const [url, setUrl] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function change(next: boolean) {
+    onOpenChange(next)
+    if (!next) {
+      setEmail('')
+      setRole('member')
+      setUrl(null)
+      setError(null)
+    }
+  }
+
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setPending(true)
+    setError(null)
+    try {
+      const created = await createInvite({
+        data: { role, ...(email.trim() ? { email: email.trim() } : {}) },
+      })
+      setUrl(created.url)
+      onCreated()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create invite')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  function copy(link: string) {
+    navigator.clipboard.writeText(link).then(
+      () => toast.success('Link copied'),
+      () => toast.error('Could not copy — select the link'),
+    )
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={change}>
+      <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>Invite</DialogTitle>
+        </DialogHeader>
+        {url === null ? (
+          <form onSubmit={submit} className="flex flex-col gap-3.5" noValidate>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="invite-email">Email</Label>
+              <Input
+                id="invite-email"
+                type="email"
+                autoFocus
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="partner@fund.example"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="invite-role">Role</Label>
+              <Select
+                id="invite-role"
+                aria-label="Invite role"
+                value={role}
+                onChange={setRole}
+                items={ROLE_ITEMS}
+                width="trigger"
+              />
+            </div>
+            {error ? (
+              <p role="alert" className="text-ui text-destructive">
+                {error}
+              </p>
+            ) : null}
+            <DialogFooter
+              note={
+                email.trim() === ''
+                  ? 'anyone with the link · one use · 7 days'
+                  : null
+              }
+            >
+              <DialogClose asChild>
+                <Button type="button" variant="outline">
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={pending}>
+                {pending ? 'Creating…' : 'Create invite'}
+              </Button>
+            </DialogFooter>
+          </form>
+        ) : (
+          <div className="flex flex-col">
+            <div className="flex h-9 items-center gap-2 border border-rule bg-bone px-3">
+              <code className="min-w-0 flex-1 truncate mono text-micro select-all">
+                {url}
+              </code>
+              <Button size="xs" variant="outline" onClick={() => copy(url)}>
+                <Copy className="size-3" strokeWidth={2} />
+                Copy link
+              </Button>
+            </div>
+            <DialogFooter note="shown once">
+              <DialogClose asChild>
+                <Button type="button" variant="outline">
+                  Done
+                </Button>
+              </DialogClose>
+            </DialogFooter>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
