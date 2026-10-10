@@ -15,7 +15,11 @@ import { jsonValue } from '@spaces/core/json'
 import { proposeSuggestionProgram } from './tools-propose'
 import {
   QUERY_RECORDS_MAX,
+  holdingDetailProgram,
+  holdingDetailShape,
   listRegistryProgram,
+  portfolioSummaryProgram,
+  portfolioSummaryShape,
   queryRecordsProgram,
   queryRecordsShape,
   searchRecordsProgram,
@@ -209,6 +213,32 @@ export function buildMcpServer(reader: TokenUser): McpServer {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async (input) => answer(queryRecordsProgram(me, input)),
+  )
+
+  // D70: money over the pure portfolio libraries, never generated.
+  server.registerTool(
+    'portfolio_summary',
+    {
+      title: 'Portfolio summary',
+      description:
+        'The portfolio as the Portfolio page reads it, computed from the event ledger rather than estimated: per holding and for the whole book, invested (cost basis), value (what is still held — the latest mark, or cost when never marked), distributions (cash returned), TVPI, DPI and gross IRR (annualized; 0.15 is 15%). Money is plain numbers in the named currency: each holding in its own currency when all its events share one, else base; the total always in base. A holding missing an exchange rate has null figures, names the rates it needs, and is left out of the total. Each holding carries its id for holding_detail.',
+      inputSchema: portfolioSummaryShape,
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async ({ asOf }) => answer(portfolioSummaryProgram({ asOf })),
+  )
+
+  server.registerTool(
+    'holding_detail',
+    {
+      title: 'Holding detail',
+      description:
+        'One holding’s figures (as portfolio_summary), ownership, and its ledger — investments, marks and distributions — as it stood on the as-of day: entries dated after it are left out, a voided entry is gone once its void had happened, and correction rows never appear. An entry voided after the as-of day is shown, with reversedAt naming when it was voided. Money is plain numbers with each entry’s currency.',
+      inputSchema: holdingDetailShape,
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async ({ holdingId, asOf }) =>
+      answer(holdingDetailProgram({ holdingId, asOf })),
   )
 
   server.registerTool(

@@ -88,20 +88,57 @@ function toReporting(
   return amount * rate
 }
 
+export type MetricsOptions = {
+  baseCurrency: string
+  fxRates?: Array<FxRate> | undefined
+  /** ISO date; defaults to including everything */
+  asOf?: string | undefined
+  /**
+   * 'base' disables the single-currency native shortcut so results are
+   * always in base currency — required when rolling holdings up.
+   */
+  reportIn?: 'native' | 'base'
+}
+
+/**
+ * A holding's dated cash in the reporting currency — investments negative,
+ * distributions positive — and what is still held. `portfolioRollup` pools
+ * these for the book's XIRR.
+ */
+export type HoldingCashFlows = {
+  cash: Array<CashFlow>
+  unrealized: number
+  /** `asOf` when given, else the holding's latest event date */
+  terminalDate: string
+}
+
+export type CashFlowsResult =
+  | ({ ok: true } & HoldingCashFlows)
+  | { ok: false; missingRates: Array<{ currency: string; date: string }> }
+
 export function holdingMetrics(
   events: HoldingEvents,
-  opts: {
-    baseCurrency: string
-    fxRates?: Array<FxRate> | undefined
-    /** ISO date; defaults to including everything */
-    asOf?: string | undefined
-    /**
-     * 'base' disables the single-currency native shortcut so results are
-     * always in base currency — required when rolling holdings up.
-     */
-    reportIn?: 'native' | 'base'
-  },
+  opts: MetricsOptions,
 ): MetricsResult {
+  const r = evaluate(events, opts)
+  return r.ok ? { ok: true, metrics: r.metrics } : r
+}
+
+/** The cash flows `holdingMetrics` solves its XIRR over, on the same rules. */
+export function holdingCashFlows(
+  events: HoldingEvents,
+  opts: MetricsOptions,
+): CashFlowsResult {
+  const r = evaluate(events, opts)
+  return r.ok ? { ok: true, ...r.flows } : r
+}
+
+function evaluate(
+  events: HoldingEvents,
+  opts: MetricsOptions,
+):
+  | { ok: true; metrics: HoldingMetrics; flows: HoldingCashFlows }
+  | { ok: false; missingRates: Array<{ currency: string; date: string }> } {
   const asOf = opts.asOf ?? '9999-12-31'
   // Two windows, one date: `date <= asOf` is when the event happened,
   // `liveAt` is whether its void had happened yet.
@@ -177,7 +214,7 @@ export function holdingMetrics(
     return { ok: false, missingRates: ctx.missing }
   }
 
-  const flows: Array<CashFlow> = [
+  const cash: Array<CashFlow> = [
     ...investments.map((e) => ({
       date: e.date,
       amount: -toReporting(e.amount, e.currency, e.date, ctx),
@@ -187,15 +224,16 @@ export function holdingMetrics(
       amount: toReporting(e.amount, e.currency, e.date, ctx),
     })),
   ]
-  if (unrealized > 0) {
-    const terminalDate =
-      asOf !== '9999-12-31'
-        ? asOf
-        : [...investments, ...marks, ...distributions]
-            .map((e) => e.date)
-            .reduce((a, b) => (b > a ? b : a), '0000-01-01')
-    flows.push({ date: terminalDate, amount: unrealized })
-  }
+  const terminalDate =
+    asOf !== '9999-12-31'
+      ? asOf
+      : [...investments, ...marks, ...distributions]
+          .map((e) => e.date)
+          .reduce((a, b) => (b > a ? b : a), '0000-01-01')
+  const flows: Array<CashFlow> =
+    unrealized > 0
+      ? [...cash, { date: terminalDate, amount: unrealized }]
+      : cash
 
   const ratio = (n: number) => (costBasis > 0 ? n / costBasis : null)
   // Total loss has no root for the NPV solver — the rate is -100% by
@@ -216,5 +254,6 @@ export function holdingMetrics(
       dpi: ratio(realized),
       grossXirr: totalLoss ? -1 : xirr(flows),
     },
+    flows: { cash, unrealized, terminalDate },
   }
 }

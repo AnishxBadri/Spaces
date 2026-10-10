@@ -8,7 +8,8 @@ import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { entity, link, note } from '@spaces/db/schema'
+import { company, entity, link, note } from '@spaces/db/schema'
+import { holding, investment, mark } from '@spaces/db/schema/portfolio'
 import { user } from '@spaces/db/schema/auth'
 import { apiToken } from '@spaces/db/schema/tokens'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
@@ -305,7 +306,9 @@ describe('an MCP client with a per-user token', () => {
     expect(tools.map((t) => t.name).sort()).toEqual([
       'get_context',
       'get_record',
+      'holding_detail', // SPA-269
       'list_registry', // SPA-28
+      'portfolio_summary', // SPA-269
       'propose_suggestion', // SPA-31
       'query_records', // SPA-260
       'search_records', // SPA-28
@@ -809,5 +812,130 @@ describe('SPA-28: search_records and list_registry', () => {
     for (const c of calls)
       expect((await back.callTool(c)).isError).not.toBe(true)
     await back.close()
+  })
+})
+
+describe('portfolio_summary and holding_detail over the wire', () => {
+  /** One USD holding — $250,000 in, marked $600,000 — and a sensitive one. */
+  async function seedHoldings() {
+    const holdingOf = async (name: string, sensitive: boolean) => {
+      const co = (
+        await db
+          .insert(entity)
+          .values({ kind: 'company', canonicalName: name, sensitive })
+          .returning({ id: entity.id })
+      ).at(0)
+      if (!co) throw new Error('company not written')
+      await db.insert(company).values({ entityId: co.id })
+      const h = (
+        await db
+          .insert(holding)
+          .values({ companyId: co.id, openedAt: '2024-01-01' })
+          .returning({ id: holding.id })
+      ).at(0)
+      if (!h) throw new Error('holding not written')
+      await db.insert(investment).values({
+        holdingId: h.id,
+        date: '2024-01-15',
+        amount: '250000.0000',
+        currency: 'USD',
+        instrument: 'priced',
+      })
+      await db.insert(mark).values({
+        holdingId: h.id,
+        date: '2025-01-15',
+        fairValue: '600000.0000',
+        currency: 'USD',
+        basis: 'manual',
+      })
+      return h.id
+    }
+    return {
+      open: await holdingOf('Wire Ledger', false),
+      hushed: await holdingOf('Wire Hushed', true),
+    }
+  }
+
+  it('are registered with their schemas and answer numbers, never strings, with no sensitive holding', async () => {
+    const { open, hushed } = await seedHoldings()
+    const client = await connect((await mint(FIXTURE_ACTOR.id, 'pf')).token)
+    const { tools } = await client.listTools()
+    const summaryTool = tools.find((t) => t.name === 'portfolio_summary')
+    expect(Object.keys(summaryTool?.inputSchema.properties ?? {})).toEqual([
+      'asOf',
+    ])
+    expect(summaryTool?.inputSchema.required ?? []).toEqual([])
+    const detailTool = tools.find((t) => t.name === 'holding_detail')
+    expect(
+      Object.keys(detailTool?.inputSchema.properties ?? {}).sort(),
+    ).toEqual(['asOf', 'holdingId'])
+    expect(detailTool?.inputSchema.required).toEqual(['holdingId'])
+
+    const summary = await client.callTool({
+      name: 'portfolio_summary',
+      arguments: { asOf: '2025-06-30' },
+    })
+    expect(summary.isError).not.toBe(true)
+    const Figures = z.object({
+      currency: z.string(),
+      invested: z.number(),
+      value: z.number(),
+      distributions: z.number(),
+      tvpi: z.number().nullable(),
+      irr: z.number().nullable(),
+    })
+    const book = z.parse(
+      z.object({
+        baseCurrency: z.string(),
+        total: Figures,
+        holdings: z.array(
+          z.object({ holdingId: z.string(), figures: Figures.nullable() }),
+        ),
+      }),
+      JSON.parse(textOf(summary)),
+    )
+    expect(book.holdings.map((h) => h.holdingId)).toEqual([open])
+    expect(book.total).toEqual(
+      expect.objectContaining({
+        currency: 'USD',
+        invested: 250_000,
+        value: 600_000,
+        distributions: 0,
+        tvpi: 2.4,
+      }),
+    )
+    expect(textOf(summary)).not.toContain('Wire Hushed')
+
+    const ledger = await client.callTool({
+      name: 'holding_detail',
+      arguments: { holdingId: open },
+    })
+    expect(ledger.isError).not.toBe(true)
+    const detail = z.parse(
+      z.object({
+        investments: z.array(z.object({ amount: z.number() })),
+        marks: z.array(z.object({ fairValue: z.number() })),
+      }),
+      JSON.parse(textOf(ledger)),
+    )
+    expect(detail.investments.map((i) => i.amount)).toEqual([250_000])
+    expect(detail.marks.map((m) => m.fairValue)).toEqual([600_000])
+
+    const refused = await client.callTool({
+      name: 'holding_detail',
+      arguments: { holdingId: hushed },
+    })
+    expect(refused.isError).toBe(true)
+    expect(textOf(refused)).toBe(
+      `No holding ${hushed} — portfolio_summary lists them`,
+    )
+
+    // zod at the boundary: a day that is not YYYY-MM-DD never reaches the loader.
+    const badDay = await client.callTool({
+      name: 'portfolio_summary',
+      arguments: { asOf: 'last quarter' },
+    })
+    await client.close()
+    expect(badDay.isError).toBe(true)
   })
 })

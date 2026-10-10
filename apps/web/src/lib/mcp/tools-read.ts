@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
@@ -9,10 +9,16 @@ import {
   objectDef,
   space,
 } from '@spaces/db/schema'
+import { holding, investment } from '@spaces/db/schema/portfolio'
 import type { AttributeOptions, EntityValues } from '@spaces/db/schema'
 import { CORE_OBJECTS } from '@spaces/core/attributes/registry'
 import type { IdentityKey } from '@spaces/core/attributes/registry'
+import type { HoldingMetrics } from '@spaces/core/portfolio/metrics'
+import type { Ownership } from '@spaces/core/portfolio/ownership'
+import { liveAt } from '@spaces/core/portfolio/reversal'
+import { sensitivityFor } from '@spaces/core/writes/ai/sensitivity-for'
 import { canReadNoteSql } from '@spaces/core/writes/read/search'
+import { loadHoldingDetail, loadPortfolio } from '#/lib/portfolio/detail'
 import type { Condition, ConditionOp } from '@spaces/core/views/filter'
 import { searchAllProgram } from '#/lib/search/query'
 import type { SearchHit } from '#/lib/search/query'
@@ -34,7 +40,7 @@ import type { SQL } from 'drizzle-orm'
 import { McpToolQueryFailed, McpToolRefused } from './tools'
 
 /**
- * The other two read tools of the MCP surface (SPA-28, spec §5):
+ * The MCP surface's read tools beyond `get_record` (spec §5):
  *
  * - `search_records(query, object?)` — Cmd-K's search, `searchAllProgram`,
  *   run as the token's user. canRead is the program's own: the private-note
@@ -50,6 +56,9 @@ import { McpToolQueryFailed, McpToolRefused } from './tools'
  *   minute ago is in the next answer with no restart.
  * - `query_records(object, conditions, sort, limit)` — the views compiler
  *   behind a door: computed filters, order and counts. (D70, D71)
+ * - `portfolio_summary(asOf?)` and `holding_detail(holdingId, asOf?)` — the
+ *   portfolio loaders and the pure libs, so money is computed too; sensitive
+ *   holdings are absent. (D70, D12)
  *
  * Nothing here writes. `object` is spoken the way a person names it — the
  * slug, the singular or the plural, in any case — so "Fund" and "funds"
@@ -601,3 +610,305 @@ export const queryRecordsProgram = Effect.fn('queryRecordsProgram')(function* (
     rows,
   }
 })
+
+// ---------------------------------------------------------------------------
+// portfolio_summary and holding_detail (D70, D12)
+
+const isoDay = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
+  .describe(
+    'As-of day, YYYY-MM-DD: events dated after it are left out, and a void written after it had not happened yet. Omit for everything',
+  )
+
+/** `portfolio_summary`'s input, validated by zod at the MCP boundary. */
+export const portfolioSummaryShape = { asOf: isoDay.optional() }
+
+/** `holding_detail`'s input, validated by zod at the MCP boundary. */
+export const holdingDetailShape = {
+  holdingId: z
+    .string()
+    .uuid()
+    .describe('A holding id, as portfolio_summary lists it'),
+  asOf: isoDay.optional(),
+}
+
+/** The money a holding or the book is read as, in `currency`. */
+export type PortfolioFigures = {
+  currency: string
+  /** cost basis */
+  invested: number
+  /** what is still held: the latest mark, or cost when never marked */
+  value: number
+  /** cash returned */
+  distributions: number
+  tvpi: number | null
+  dpi: number | null
+  /** gross XIRR, annualized: 0.15 is 15% */
+  irr: number | null
+}
+
+export type HoldingFigures = PortfolioFigures & {
+  lastMarkDate: string | null
+  writtenOff: boolean
+}
+
+type MissingRate = { currency: string; date: string }
+
+export type SummaryHolding = {
+  holdingId: string
+  companyId: string
+  companyName: string
+  openedAt: string
+  /** null when a rate the holding needs is missing — see `missingRates` */
+  figures: HoldingFigures | null
+  missingRates: Array<MissingRate>
+}
+
+export type PortfolioSummary = {
+  asOf: string | null
+  baseCurrency: string
+  /** the book in base currency; holdings missing a rate are left out of it */
+  total: PortfolioFigures & {
+    excludedForMissingRates: Array<{ holdingId: string; companyName: string }>
+  }
+  holdings: Array<SummaryHolding>
+}
+
+const figuresOf = (m: HoldingMetrics): HoldingFigures => ({
+  currency: m.currency,
+  invested: m.costBasis,
+  value: m.unrealized,
+  distributions: m.realized,
+  tvpi: m.tvpi,
+  dpi: m.dpi,
+  irr: m.grossXirr,
+  lastMarkDate: m.lastMarkDate,
+  writtenOff: m.writtenOff,
+})
+
+/**
+ * Holdings whose company, or a deal one of its checks cites, resolves
+ * sensitive by `sensitivityFor` — the egress rule. An MCP answer leaves the
+ * box, so these are absent from both portfolio tools.
+ */
+const sensitiveHoldingsProgram = Effect.fn('sensitiveHoldingsProgram')(
+  function* (only?: string): Effect.fn.Return<Set<string>, McpToolQueryFailed> {
+    const companies = yield* query(() =>
+      db
+        .select({ id: holding.id, entityId: holding.companyId })
+        .from(holding)
+        .where(only === undefined ? undefined : eq(holding.id, only)),
+    )
+    const deals = yield* query(() =>
+      db
+        .selectDistinct({
+          id: investment.holdingId,
+          entityId: investment.dealId,
+        })
+        .from(investment)
+        .where(
+          and(
+            isNotNull(investment.dealId),
+            only === undefined ? undefined : eq(investment.holdingId, only),
+          ),
+        ),
+    )
+    const cited = [...companies, ...deals].flatMap((r) =>
+      r.entityId === null ? [] : [{ id: r.id, entityId: r.entityId }],
+    )
+    const verdicts = yield* Effect.forEach(
+      [...new Set(cited.map((c) => c.entityId))],
+      (entityId) =>
+        sensitivityFor(entityId).pipe(
+          Effect.map((r) => ({
+            entityId,
+            sensitive: r.sensitivity === 'sensitive',
+          })),
+          Effect.mapError((cause) => new McpToolQueryFailed({ cause })),
+        ),
+      { concurrency: 4 },
+    )
+    const sensitive = new Set(
+      verdicts.flatMap((v) => (v.sensitive ? [v.entityId] : [])),
+    )
+    return new Set(
+      cited.flatMap((c) => (sensitive.has(c.entityId) ? [c.id] : [])),
+    )
+  },
+)
+
+/**
+ * The book as `/portfolio` reads it — `loadPortfolio`, whose roll-up is
+ * `portfolioRollup` — with sensitive holdings left out of the rows and the
+ * total alike. Money is the loader's `Number()` parse, never a drizzle string.
+ */
+export const portfolioSummaryProgram = Effect.fn('portfolioSummaryProgram')(
+  function* (input: {
+    asOf?: string | undefined
+  }): Effect.fn.Return<PortfolioSummary, McpToolQueryFailed> {
+    const omit = yield* sensitiveHoldingsProgram()
+    const book = yield* query(() => loadPortfolio(input.asOf, { omit }))
+    const nameOf = new Map(book.holdings.map((h) => [h.id, h.companyName]))
+    const { rollup } = book
+    return {
+      asOf: input.asOf ?? null,
+      baseCurrency: book.baseCurrency,
+      total: {
+        currency: book.baseCurrency,
+        invested: rollup.costBasis,
+        value: rollup.unrealized,
+        distributions: rollup.realized,
+        tvpi: rollup.moic,
+        dpi: rollup.costBasis > 0 ? rollup.realized / rollup.costBasis : null,
+        irr: rollup.grossXirr,
+        excludedForMissingRates: rollup.excludedForMissingRates.map((id) => ({
+          holdingId: id,
+          companyName: nameOf.get(id) ?? '',
+        })),
+      },
+      holdings: book.holdings.map((h) => ({
+        holdingId: h.id,
+        companyId: h.companyId,
+        companyName: h.companyName,
+        openedAt: h.openedAt,
+        figures: h.metrics.ok ? figuresOf(h.metrics.metrics) : null,
+        missingRates: h.metrics.ok ? [] : h.metrics.missingRates,
+      })),
+    }
+  },
+)
+
+type LedgerRow = {
+  date: string
+  reversesId: string | null
+  reversedAt: string | null
+}
+
+/**
+ * The ledger as the pure libs read it at `asOf` (D12): originals only, dated
+ * on or before it, and a voided one only while its void is still ahead.
+ */
+const standingAt = <T extends LedgerRow>(
+  rows: Array<T>,
+  asOf: string | undefined,
+): Array<T> =>
+  liveAt(
+    rows.filter(
+      (r) => r.reversesId === null && (asOf === undefined || r.date <= asOf),
+    ),
+    asOf,
+  )
+
+export type HoldingDetailResult = {
+  holdingId: string
+  companyId: string
+  companyName: string
+  openedAt: string
+  asOf: string | null
+  figures: HoldingFigures | null
+  missingRates: Array<MissingRate>
+  ownership: Ownership
+  /** Each entry's `reversedAt` is set when a void written after `asOf` struck it. */
+  investments: Array<{
+    id: string
+    date: string
+    amount: number
+    currency: string
+    instrument: string
+    shares: number | null
+    cap: number | null
+    discount: number | null
+    vehicle: string | null
+    dealId: string | null
+    reversedAt: string | null
+  }>
+  marks: Array<{
+    id: string
+    date: string
+    fairValue: number
+    currency: string
+    basis: string
+    reversedAt: string | null
+  }>
+  distributions: Array<{
+    id: string
+    date: string
+    amount: number
+    currency: string
+    kind: string
+    sharesSold: number | null
+    pricePerShare: number | null
+    reversedAt: string | null
+  }>
+}
+
+/**
+ * One holding's ledger and figures through `loadHoldingDetail`, the tear
+ * sheet's read. A sensitive holding refuses exactly as an unknown id does,
+ * so its existence does not leak.
+ */
+export const holdingDetailProgram = Effect.fn('holdingDetailProgram')(
+  function* (input: {
+    holdingId: string
+    asOf?: string | undefined
+  }): Effect.fn.Return<
+    HoldingDetailResult,
+    McpToolRefused | McpToolQueryFailed
+  > {
+    const { holdingId, asOf } = input
+    const known = yield* query(() =>
+      db
+        .select({ id: holding.id })
+        .from(holding)
+        .where(eq(holding.id, holdingId)),
+    )
+    const sensitive = yield* sensitiveHoldingsProgram(holdingId)
+    if (known.length === 0 || sensitive.has(holdingId))
+      return yield* new McpToolRefused({
+        message: `No holding ${holdingId} — portfolio_summary lists them`,
+      })
+    const d = yield* query(() => loadHoldingDetail(holdingId, asOf))
+    return {
+      holdingId: d.id,
+      companyId: d.companyId,
+      companyName: d.companyName,
+      openedAt: d.openedAt,
+      asOf: asOf ?? null,
+      figures: d.metrics.ok ? figuresOf(d.metrics.metrics) : null,
+      missingRates: d.metrics.ok ? [] : d.metrics.missingRates,
+      ownership: d.ownership,
+      investments: standingAt(d.investments, asOf).map((r) => ({
+        id: r.id,
+        date: r.date,
+        amount: r.amount,
+        currency: r.currency,
+        instrument: r.instrument,
+        shares: r.shares,
+        cap: r.cap,
+        discount: r.discount,
+        vehicle: r.vehicle,
+        dealId: r.dealId,
+        reversedAt: r.reversedAt,
+      })),
+      marks: standingAt(d.marks, asOf).map((r) => ({
+        id: r.id,
+        date: r.date,
+        fairValue: r.fairValue,
+        currency: r.currency,
+        basis: r.basis,
+        reversedAt: r.reversedAt,
+      })),
+      distributions: standingAt(d.distributions, asOf).map((r) => ({
+        id: r.id,
+        date: r.date,
+        amount: r.amount,
+        currency: r.currency,
+        kind: r.kind,
+        sharesSold: r.sharesSold,
+        pricePerShare: r.pricePerShare,
+        reversedAt: r.reversedAt,
+      })),
+    }
+  },
+)

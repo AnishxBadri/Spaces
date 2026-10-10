@@ -224,9 +224,14 @@ export async function loadHoldingEvents(
  * This is the one read behind Portfolio and Today; the roll-up and the
  * headline figures both surfaces print are `@spaces/core/portfolio/rollup`,
  * so neither can compute a total of its own.
+ * - `omit`: holding ids left out of the rows and the roll-up alike, as
+ *   though absent from the book (the MCP tools drop sensitive holdings).
  */
-export async function loadPortfolio(asOf?: string) {
-  const [base, rates, rows] = await Promise.all([
+export async function loadPortfolio(
+  asOf?: string,
+  opts?: { omit: ReadonlySet<string> },
+) {
+  const [base, rates, allRows] = await Promise.all([
     baseCurrency(),
     loadFxRates(),
     db
@@ -240,6 +245,8 @@ export async function loadPortfolio(asOf?: string) {
       .innerJoin(entity, eq(entity.id, holding.companyId))
       .orderBy(asc(holding.openedAt)),
   ])
+  const rows =
+    opts === undefined ? allRows : allRows.filter((r) => !opts.omit.has(r.id))
   // Rounds power the ownership ledger — one query for every company,
   // fetched alongside the events (independent queries, one round-trip).
   const companyIds = rows.map((r) => r.companyId)

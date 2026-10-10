@@ -1,6 +1,8 @@
 import type { FxRate } from './fx'
-import { holdingMetrics } from './metrics'
+import { holdingCashFlows, holdingMetrics } from './metrics'
 import type { HoldingEvents, MetricsResult } from './metrics'
+import { xirr } from './xirr'
+import type { CashFlow } from './xirr'
 
 /**
  * The portfolio roll-up and its headline — the one computation every surface
@@ -24,6 +26,12 @@ export type PortfolioRollup = {
   unrealized: number
   /** (realized + unrealized) / costBasis */
   moic: number | null
+  /**
+   * Gross XIRR of the book: every included holding's base cash flows pooled,
+   * with what is still held as one flow at `asOf` (else the latest holding
+   * date). -1 on a total loss, as `holdingMetrics` reads it.
+   */
+  grossXirr: number | null
   /** holding ids left out of the sums because a rate is missing */
   excludedForMissingRates: Array<string>
 }
@@ -50,6 +58,8 @@ export function portfolioRollup(
 ): PortfolioRollup {
   const totals = { costBasis: 0, realized: 0, unrealized: 0 }
   const excluded: Array<string> = []
+  const cash: Array<CashFlow> = []
+  let terminalDate = '0000-01-01'
   for (const h of holdings) {
     const inBase =
       h.metrics?.ok === true && h.metrics.metrics.currency === opts.baseCurrency
@@ -67,11 +77,29 @@ export function portfolioRollup(
     totals.costBasis += inBase.metrics.costBasis
     totals.realized += inBase.metrics.realized
     totals.unrealized += inBase.metrics.unrealized
+    const flows = holdingCashFlows(h.events, {
+      baseCurrency: opts.baseCurrency,
+      fxRates: opts.fxRates,
+      asOf: opts.asOf,
+      reportIn: 'base',
+    })
+    if (flows.ok) {
+      cash.push(...flows.cash)
+      if (flows.terminalDate > terminalDate) terminalDate = flows.terminalDate
+    }
   }
   const totalValue = totals.realized + totals.unrealized
+  const totalLoss = totals.costBasis > 0 && totalValue === 0
   return {
     ...totals,
     moic: totals.costBasis > 0 ? totalValue / totals.costBasis : null,
+    grossXirr: totalLoss
+      ? -1
+      : xirr(
+          totals.unrealized > 0
+            ? [...cash, { date: terminalDate, amount: totals.unrealized }]
+            : cash,
+        ),
     excludedForMissingRates: excluded,
   }
 }
