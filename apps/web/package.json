@@ -16,7 +16,7 @@
     "preview": "dotenv -e ../../.env.local -- vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "NODE_OPTIONS=--max-old-space-size=4096 eslint ."
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.60",

@@ -16,7 +16,9 @@ pre-commit:
       stage_fixed: true
     - name: eslint
       glob: '*.{ts,tsx,js,jsx,astro}'
-      run: pnpm exec eslint --fix {staged_files}
+      # Type-aware eslint over a cross-package staged set outruns node's 2 GB
+      # default heap and the hook dies with SIGABRT; 4 GB holds it.
+      run: NODE_OPTIONS=--max-old-space-size=4096 pnpm exec eslint --fix {staged_files}
       stage_fixed: true
 
 pre-push:
