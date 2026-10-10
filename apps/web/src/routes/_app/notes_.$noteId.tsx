@@ -10,6 +10,7 @@ import type { LucideIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { DocumentPreview } from '#/components/document-preview'
+import { FilingRow } from '#/components/filing-row'
 import {
   deriveMarkdown,
   extractMentionIds,
@@ -537,76 +538,6 @@ function VisibilityToggle({
   )
 }
 
-/** One chip: what it is, where it goes, how it is spelled. */
-type FilingChip = {
-  id: string
-  name: string
-  /** null = this kind has no page; the chip reads as text, not a dead link. */
-  href: string | null
-  Icon: LucideIcon | undefined
-}
-
-/**
- * The chip row, once. Both filing lanes draw it — spaces through
- * `entity_space`, records through `link(tagged_in)` — because the two are
- * different *writes*, not different shapes: a square chip, its kind icon,
- * its link, and an × that removes exactly that one edge.
- *
- * Deliberately **not** pre-parameterised for the documents surface. It takes
- * the chips it is given and an adder node; the lane above it owns the write,
- * the picker and the refresh. A third caller adds a third lane, and whatever
- * that lane needs gets argued then, with the caller in front of us.
- */
-function FilingRow({
-  label,
-  chips,
-  busy,
-  removeLabel,
-  onRemove,
-  adder,
-}: {
-  label: string
-  chips: Array<FilingChip>
-  busy: boolean
-  removeLabel: (name: string) => string
-  onRemove: (chip: FilingChip) => void
-  adder: React.ReactNode
-}) {
-  return (
-    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-      <span className="w-24 shrink-0 field-label text-graphite">{label}</span>
-      {/* Square chips, like the subspace chips on a space page. */}
-      {chips.map((chip) => (
-        <span
-          key={chip.id}
-          className="flex h-6 items-center gap-1.5 border border-rule bg-paper pr-1.5 pl-2 text-label font-medium"
-        >
-          {chip.Icon ? (
-            <chip.Icon className="size-2.5 shrink-0" strokeWidth={1.75} />
-          ) : null}
-          {chip.href ? (
-            <Link to={chip.href} className="focus-ring hover:underline">
-              {chip.name}
-            </Link>
-          ) : (
-            chip.name
-          )}
-          <button
-            type="button"
-            aria-label={removeLabel(chip.name)}
-            disabled={busy}
-            onClick={() => onRemove(chip)}
-            className="focus-ring mono text-micro text-graphite hover:text-foreground"
-          >
-            ×
-          </button>
-        </span>
-      ))}
-      {adder}
-    </div>
-  )
-}
-
 /** Run a filing write, then let the loader say what the row now is. */
 function useFiling() {
   const router = useRouter()
@@ -641,7 +572,7 @@ function SpaceFiling({
   allSpaces,
 }: {
   noteId: string
-  filed: Array<{ id: string; name: string }>
+  filed: Array<{ id: string; name: string; archived: boolean }>
   allSpaces: Awaited<ReturnType<typeof listSpaces>>
 }) {
   const { busy, run } = useFiling()
@@ -656,6 +587,7 @@ function SpaceFiling({
         name: s.name,
         href: `/spaces/${s.id}`,
         Icon: Layers,
+        archived: s.archived,
       }))}
       removeLabel={(name) => `Remove from ${name}`}
       onRemove={(chip) =>

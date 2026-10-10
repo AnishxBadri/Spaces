@@ -2,15 +2,9 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import {
-  entity,
-  entitySpace,
-  link,
-  note,
-  objectDef,
-  space,
-} from '@spaces/db/schema'
+import { entity, link, note, objectDef } from '@spaces/db/schema'
 import { canRead, requireUser } from './shared'
+import { recordSpaces } from '#/lib/spaces/filed-in'
 import { jsonValue } from '@spaces/core/json'
 
 export const createNote = createServerFn({ method: 'POST' })
@@ -121,14 +115,9 @@ export const getNote = createServerFn()
       .from(link)
       .innerJoin(entity, eq(entity.id, link.fromEntityId))
       .where(and(eq(link.toEntityId, data.id), eq(link.relation, 'mentions')))
-    // Spaces this note is filed in — the picker's current state.
-    const spaces = await db
-      .select({ id: space.entityId, name: entity.canonicalName })
-      .from(entitySpace)
-      .innerJoin(space, eq(space.entityId, entitySpace.spaceId))
-      .innerJoin(entity, eq(entity.id, space.entityId))
-      .where(eq(entitySpace.entityId, data.id))
-      .orderBy(asc(entity.canonicalName))
+    // Spaces this note is filed in — the picker's current state; an archived
+    // one stays, flagged, and its chip dims.
+    const spaces = await recordSpaces(data.id)
     // Records this note is filed against — the *outbound* tagged_in edges,
     // which is the opposite direction from `backlinks` above. `objectSlug`
     // rides along so a custom record's chip routes through `/o/<slug>/<id>`

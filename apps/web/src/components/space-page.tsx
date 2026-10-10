@@ -204,18 +204,25 @@ export function SpacePageView({
         }
         actions={
           <>
-            <SensitiveToggle entityId={spc.id} state={sensitivity} />
+            <SensitiveToggle
+              entityId={spc.id}
+              state={sensitivity}
+              as="button"
+            />
             <Button variant="outline" onClick={() => void newNote()}>
               Note here
               <KeyHint>N</KeyHint>
             </Button>
-            <Button
-              variant="outline"
-              disabled={watching.engines.length === 0}
-              onClick={() => setAddingWatch(true)}
-            >
-              Add watch
-            </Button>
+            {/* Absent until a watch engine is installed. */}
+            {watching.installed.length > 0 ? (
+              <Button
+                variant="outline"
+                disabled={watching.engines.length === 0}
+                onClick={() => setAddingWatch(true)}
+              >
+                Add watch
+              </Button>
+            ) : null}
             <SpaceMenu
               id={spc.id}
               name={spc.name}
@@ -335,7 +342,6 @@ export function SpacePageView({
               ))}
               <NewSubspace
                 parentId={spc.id}
-                first={spc.children.length === 0}
                 editing={composing}
                 onEditingChange={(editing) => {
                   setComposing(editing)
@@ -397,15 +403,19 @@ function SpaceMenu({
 }) {
   const starred = useStarredSpaces().some((s) => s.id === id)
   useEffect(() => syncStarredSpaceName({ id, name }), [id, name])
-  // Rename and Save as template: focus goes to what they open, not to ···.
+  // Save as template: focus goes to the window it opens, not to ···.
   const keepFocus = useRef(false)
   const opening = (open: () => void) => () => {
     keepFocus.current = true
     open()
   }
-  // New subspace opens once the menu's focus trap has let go; opened
-  // inside it, the field's autofocus is pulled back and its blur closes it.
+  // Rename and New subspace open a field once the menu's focus trap has let
+  // go; opened inside it, the autofocus is pulled back to the item, which
+  // unmounts and leaves focus on the body.
   const afterClose = useRef<(() => void) | null>(null)
+  const afterClosing = (open: () => void) => () => {
+    afterClose.current = open
+  }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -430,15 +440,11 @@ function SpaceMenu({
           {starred ? 'Unstar' : 'Star'}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={opening(onRename)}>
+        <DropdownMenuItem onSelect={afterClosing(onRename)}>
           <Pencil className="size-4" />
           Rename
         </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={() => {
-            afterClose.current = onSubspace
-          }}
-        >
+        <DropdownMenuItem onSelect={afterClosing(onSubspace)}>
           <Plus className="size-4" />
           New subspace
         </DropdownMenuItem>
@@ -468,9 +474,9 @@ function SpaceMenu({
 }
 
 /**
- * Rename in place: the title becomes its own field. ↵ saves, esc keeps the
- * name. Links, filings and watches point at the space id, so nothing else
- * changes. (D73)
+ * Rename in place: the title becomes a boxed field with `↵ save` under it.
+ * ↵ or a blur saves, Escape keeps the name. Links, filings and watches point
+ * at the space id, so nothing else changes. (D73)
  */
 function RenameField({
   id,
@@ -502,30 +508,36 @@ function RenameField({
   }
 
   return (
-    <input
-      autoFocus
-      value={draft}
-      aria-label="Space name"
-      maxLength={120}
-      onChange={(e) => setDraft(e.target.value)}
-      onFocus={(e) => e.currentTarget.select()}
-      onBlur={() => void save()}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') void save()
-        if (e.key === 'Escape') {
-          settled.current = true
-          onDone()
-        }
-      }}
-      className="focus-ring w-full min-w-0 border-b border-rule bg-transparent title-serif outline-none"
-    />
+    <span className="flex min-w-0 flex-col gap-2.5">
+      <input
+        autoFocus
+        value={draft}
+        aria-label="Space name"
+        aria-keyshortcuts="Enter"
+        maxLength={120}
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={(e) => e.currentTarget.select()}
+        onBlur={() => void save()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') void save()
+          if (e.key === 'Escape') {
+            settled.current = true
+            onDone()
+          }
+        }}
+        className="focus-ring-inset h-10 w-full min-w-0 rounded-md border border-hairline bg-paper px-2 title-serif"
+      />
+      <span aria-hidden className="mono text-micro text-graphite">
+        ↵ save
+      </span>
+    </span>
   )
 }
 
 /**
  * Under an archived head: what still holds, and the one way back. A space
  * archived with an ancestor is restored from that ancestor.
- * - Watches are not built yet, so only the filings are counted.
+ * - Archive hides and pauses: filings stay, watches stop running. (D73)
  */
 function ArchivedNotice({
   filings,
@@ -539,15 +551,13 @@ function ArchivedNotice({
   return (
     <div
       role="status"
-      className="mx-8 mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-3 border-double border-hairline bg-paper px-4 py-2.5"
+      className="mx-8 mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-3 border-double border-hairline bg-paper px-4 py-2.5 shadow-solid"
     >
-      <p className="min-w-0 flex-1 text-ui">
-        <span className="font-medium">Archived.</span> Out of the tree and the
-        space picker.
+      <p className="min-w-0 flex-1 text-ui text-graphite">
+        <span className="font-medium text-foreground">Archived</span> · out of
+        the tree and the picker · {filings} filing{filings === 1 ? '' : 's'}{' '}
+        kept · watches paused
       </p>
-      <span className="shrink-0 mono text-micro text-graphite">
-        {filings} filing{filings === 1 ? '' : 's'} kept
-      </span>
       {under ? (
         <Link
           to="/spaces/$spaceId"
@@ -568,13 +578,11 @@ function ArchivedNotice({
 /** The rail's composer: a subspace is added where the map is read. */
 function NewSubspace({
   parentId,
-  first,
   editing,
   onEditingChange: setEditing,
   onCreated,
 }: {
   parentId: string
-  first: boolean
   /** Open from the rail's row or the head's ··· New subspace. */
   editing: boolean
   onEditingChange: (editing: boolean) => void
@@ -628,9 +636,7 @@ function NewSubspace({
         className="focus-ring flex min-w-0 flex-1 items-center gap-2.5 text-left text-graphite transition-colors hover:text-foreground"
       >
         <Plus className="size-3.5 shrink-0 text-primary" strokeWidth={2.5} />
-        <span className="min-w-0 flex-1 truncate">
-          {first ? 'Break it down — add a subspace' : 'Subspace'}
-        </span>
+        <span className="min-w-0 flex-1 truncate">Subspace</span>
       </button>
     </RailItem>
   )

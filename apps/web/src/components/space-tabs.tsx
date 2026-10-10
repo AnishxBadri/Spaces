@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { cellsFor } from './dither'
 import { FilterCount, FilterRow, FilterTab } from './filter-row'
-import { LedgerFigure, LedgerRow } from './ledger-section'
+import { LabelHead, LedgerFigure, LedgerRow } from './ledger-section'
 import { KeyHint } from './page-header'
 import { DitherMark, InitialsMark } from './record/record-parts'
 import type { RecordReadout } from './record/record-parts'
@@ -210,6 +210,39 @@ const rowLink =
 
 // ---------- Companies ----------
 
+/** The Companies rows' fixed lanes, right of the name: 96 · 72 · 88. */
+const LANES = {
+  stage: 'w-24',
+  pipeline: 'w-18',
+  location: 'w-22',
+} as const
+
+/**
+ * Lowercase mono lane heads over the company rows, on the rows' own lanes:
+ * the select box and the mark hold their width, the × its 24px.
+ */
+function CompanyLaneHeads({ selectable }: { selectable: boolean }) {
+  return (
+    <div
+      aria-hidden
+      data-lane-heads
+      className="flex h-7 items-center gap-3 border-b border-rule px-3 mono text-micro text-graphite"
+    >
+      {selectable ? <span className="w-3.5 shrink-0" /> : null}
+      <span className="w-3.5 shrink-0" />
+      <span className="min-w-0 flex-1 truncate">company</span>
+      <span className={cn(LANES.stage, 'shrink-0')}>funding stage</span>
+      <span className={cn(LANES.pipeline, 'shrink-0 text-right')}>
+        pipeline
+      </span>
+      <span className={cn(LANES.location, 'shrink-0 text-right max-md:hidden')}>
+        location
+      </span>
+      <span className="w-6 shrink-0" />
+    </div>
+  )
+}
+
 /**
  * The Companies tab. Its rows are this space's own filings only — a company
  * filed in a subspace is not listed, so a split can only choose those.
@@ -323,17 +356,20 @@ function CompaniesTab({ spc, into }: { spc: Space; into: string | null }) {
         <FilterRow
           label="Show companies"
           end={
-            <Select
-              aria-label="Sort companies"
-              width="content"
-              value={sort}
-              onChange={setSort}
-              items={COMPANY_SORTS.map((s) => ({
-                value: s.id,
-                label: s.label,
-              }))}
-              className="h-7 w-auto"
-            />
+            <span className="flex items-center gap-1.5 text-label text-graphite">
+              Sort
+              <Select
+                aria-label="Sort companies"
+                width="content"
+                value={sort}
+                onChange={setSort}
+                items={COMPANY_SORTS.map((s) => ({
+                  value: s.id,
+                  label: s.label,
+                }))}
+                className="h-7 w-auto border-transparent bg-transparent px-1 text-label text-foreground hover:border-transparent"
+              />
+            </span>
           }
         >
           <FilterTab active={filter === 'all'} onClick={() => setFilter('all')}>
@@ -359,6 +395,11 @@ function CompaniesTab({ spc, into }: { spc: Space; into: string | null }) {
           spaceName={spc.name}
           taggedIds={taggedIds}
         />
+      </ol>
+      {spc.companies.length > 0 ? (
+        <CompanyLaneHeads selectable={selectable} />
+      ) : null}
+      <ol>
         {rows.map((c, i) => {
           const stage = stageLabel(c.stage, spc.stageOptions)
           const on = selected.has(c.id)
@@ -391,14 +432,17 @@ function CompaniesTab({ spc, into }: { spc: Space; into: string | null }) {
                 <span className="min-w-0 flex-1 truncate text-body font-medium">
                   {c.name}
                 </span>
-                {stage ? (
-                  <span className="flex h-5 shrink-0 items-center bg-bone px-1.5 mono text-micro font-medium">
-                    {stage}
-                  </span>
-                ) : null}
+                <span className={cn(LANES.stage, 'flex min-w-0 shrink-0')}>
+                  {stage ? (
+                    <span className="flex h-5 min-w-0 items-center truncate bg-bone px-1.5 mono text-micro font-medium">
+                      {stage}
+                    </span>
+                  ) : null}
+                </span>
                 <span
                   className={cn(
-                    'w-20 shrink-0 truncate text-right mono text-micro',
+                    LANES.pipeline,
+                    'shrink-0 truncate text-right mono text-micro',
                     c.deals > 0 ? 'text-foreground' : 'text-graphite',
                   )}
                 >
@@ -406,7 +450,12 @@ function CompaniesTab({ spc, into }: { spc: Space; into: string | null }) {
                     ? `${c.deals} deal${c.deals === 1 ? '' : 's'}`
                     : 'watching'}
                 </span>
-                <span className="w-24 shrink-0 truncate text-right mono text-label text-graphite max-md:hidden">
+                <span
+                  className={cn(
+                    LANES.location,
+                    'shrink-0 truncate text-right mono text-label text-graphite max-md:hidden',
+                  )}
+                >
                   {c.geo ?? ''}
                 </span>
               </Link>
@@ -436,9 +485,13 @@ function CompaniesTab({ spc, into }: { spc: Space; into: string | null }) {
 
 // ---------- Notes ----------
 
-type NotesFilter = 'filed' | 'mentions'
+type NotesFilter = 'all' | 'filed' | 'mentions'
 
-/** Filed here on purpose, or only mentioning the space from elsewhere. */
+/**
+ * Filed here on purpose, or only mentioning the space from elsewhere; All
+ * lists the filed notes, then the mentions under their own label.
+ * - An archived space's rows go graphite, as its name does. (D73)
+ */
 function NotesTab({
   spc,
   onNewNote,
@@ -446,15 +499,20 @@ function NotesTab({
   spc: Space
   onNewNote: (kind?: 'memo') => void
 }) {
-  const [filter, setFilter] = useState<NotesFilter>('filed')
+  const [filter, setFilter] = useState<NotesFilter>('all')
+  const archived = spc.archive !== null || spc.archivedUnder !== null
+  const ink = archived ? 'text-graphite' : undefined
   return (
     <div className="flex flex-col">
       <FilterRow label="Show notes">
+        <FilterTab active={filter === 'all'} onClick={() => setFilter('all')}>
+          All <FilterCount n={spc.filed.length + spc.notes.length} />
+        </FilterTab>
         <FilterTab
           active={filter === 'filed'}
           onClick={() => setFilter('filed')}
         >
-          Filed <FilterCount n={spc.filed.length} />
+          Filed here <FilterCount n={spc.filed.length} />
         </FilterTab>
         <FilterTab
           active={filter === 'mentions'}
@@ -463,7 +521,7 @@ function NotesTab({
           Mentions <FilterCount n={spc.notes.length} />
         </FilterTab>
       </FilterRow>
-      {filter === 'filed' ? (
+      {filter !== 'mentions' ? (
         <ol>
           {spc.filed.map((f) => (
             <li key={f.id} className="border-b border-rule">
@@ -473,7 +531,12 @@ function NotesTab({
                 className="focus-ring-inset flex flex-col gap-2 px-3 py-4 transition-colors hover:bg-bone"
               >
                 <div className="flex items-baseline justify-between gap-3">
-                  <h3 className="min-w-0 truncate text-title font-medium">
+                  <h3
+                    className={cn(
+                      'min-w-0 truncate text-title font-medium',
+                      ink,
+                    )}
+                  >
                     {f.title || `${spc.name} ${f.kind}`}
                   </h3>
                   <span className="shrink-0 mono text-label text-graphite">
@@ -513,34 +576,41 @@ function NotesTab({
             </button>
           </LedgerRow>
         </ol>
-      ) : (
+      ) : null}
+      {filter === 'all' && spc.notes.length > 0 ? (
+        <LabelHead label="Mentions · filed elsewhere" className="border-t">
+          <span className="mono text-micro text-graphite">
+            {spc.notes.length}
+          </span>
+        </LabelHead>
+      ) : null}
+      {filter !== 'filed' ? (
         <ol>
-          {spc.notes.length === 0 ? (
+          {spc.notes.length === 0 && filter === 'mentions' ? (
             <EmptyRow>No note elsewhere mentions {spc.name}.</EmptyRow>
-          ) : (
-            spc.notes.map((n, i) => (
-              <LedgerRow key={n.id} last={i === spc.notes.length - 1}>
-                <Link
-                  to="/notes/$noteId"
-                  params={{ noteId: n.id }}
-                  className={cn(rowLink, '-mr-3 pr-3')}
-                >
-                  <FileText
-                    className="size-3.5 shrink-0 text-graphite"
-                    strokeWidth={1.75}
-                  />
-                  <span className="min-w-0 flex-1 truncate text-body">
-                    {n.title}
-                  </span>
-                  <LedgerFigure tone="muted">
-                    {n.updatedAt.slice(5, 10)}
-                  </LedgerFigure>
-                </Link>
-              </LedgerRow>
-            ))
-          )}
+          ) : null}
+          {spc.notes.map((n, i) => (
+            <LedgerRow key={n.id} last={i === spc.notes.length - 1}>
+              <Link
+                to="/notes/$noteId"
+                params={{ noteId: n.id }}
+                className={cn(rowLink, '-mr-3 pr-3')}
+              >
+                <FileText
+                  className="size-3.5 shrink-0 text-graphite"
+                  strokeWidth={1.75}
+                />
+                <span className={cn('min-w-0 flex-1 truncate text-body', ink)}>
+                  {n.title}
+                </span>
+                <LedgerFigure tone="muted">
+                  {n.updatedAt.slice(5, 10)}
+                </LedgerFigure>
+              </Link>
+            </LedgerRow>
+          ))}
         </ol>
-      )}
+      ) : null}
     </div>
   )
 }

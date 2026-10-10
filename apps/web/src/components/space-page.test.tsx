@@ -14,6 +14,8 @@ import {
 
 import type * as PageModule from './space-page'
 import type * as TabsModule from './space-tabs'
+import type * as FilingModule from './filing-row'
+import type * as RailRowModule from './record/space-rail-row'
 import type { Space } from './space-tabs'
 import type * as PrefModule from '#/lib/record-tab-pref'
 import type * as RouterModule from '@tanstack/react-router'
@@ -98,6 +100,8 @@ let page: typeof PageModule
 let tabs: typeof TabsModule
 let pref: typeof PrefModule
 let router: typeof RouterModule
+let filing: typeof FilingModule
+let railRow: typeof RailRowModule
 
 /** The space's status stream, fed by hand: what `/api/job-status` would send. */
 class FakeEventSource {
@@ -158,6 +162,8 @@ beforeAll(async () => {
   tabs = await import('./space-tabs')
   pref = await import('#/lib/record-tab-pref')
   router = await import('@tanstack/react-router')
+  filing = await import('./filing-row')
+  railRow = await import('./record/space-rail-row')
 })
 
 afterAll(async () => {
@@ -374,14 +380,28 @@ describe('the space head', () => {
     expect(text(head.querySelector('h1'))).toBe('Property ops')
   })
 
-  it('has Note here and Add watch beside the toggle and the menu', async () => {
+  const headButtons = () =>
+    Array.from(header().querySelectorAll('button'))
+      .filter(
+        (b) => !(b.getAttribute('aria-label') ?? '').startsWith('More for'),
+      )
+      .map((b) => text(b))
+
+  it('draws Not sensitive as a toggle button beside Note here, and no Add watch with no engine installed', async () => {
     await mount('notes')
-    const buttons = Array.from(header().querySelectorAll('button')).filter(
-      (b) =>
-        b.getAttribute('role') !== 'switch' &&
-        !(b.getAttribute('aria-label') ?? '').startsWith('More for'),
-    )
-    expect(buttons.map((b) => text(b))).toEqual(['Note hereN', 'Add watch'])
+    expect(headButtons()).toEqual(['Not sensitive', 'Note hereN'])
+    const toggle = buttonNamed(/^Not sensitive$/)
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+    expect(header().querySelector('[role="switch"]')).toBeNull()
+  })
+
+  it('adds Add watch once a watch engine is installed', async () => {
+    await mount('notes', undefined, {
+      ...noWatches,
+      engines: [exa],
+      installed: ['Exa'],
+    })
+    expect(headButtons()).toEqual(['Not sensitive', 'Note hereN', 'Add watch'])
   })
 
   it('reads three readouts, none of them a tab count', async () => {
@@ -507,14 +527,30 @@ describe('the tabs', () => {
 })
 
 describe('the Notes tab', () => {
-  it('filters Filed and Mentions, and says Referenced nowhere', async () => {
+  it('filters All, Filed here and Mentions, and says Referenced nowhere', async () => {
     await mount('notes')
-    expect(text(buttonNamed(/^Filed/))).toBe('Filed 1')
+    const group = document.querySelector('[aria-label="Show notes"]')
+    expect(
+      Array.from(group?.querySelectorAll('button') ?? []).map((b) => text(b)),
+    ).toEqual(['All 2', 'Filed here 1', 'Mentions 1'])
+    // All: the filed notes, then the mentions.
+    expect(buttonNamed(/^All/).getAttribute('aria-pressed')).toBe('true')
     expect(document.body.textContent).toContain('Property ops thesis')
+    expect(document.body.textContent).toContain('Market map')
+    await act(async () => buttonNamed(/^Filed here/).click())
+    expect(document.body.textContent).toContain('Property ops thesis')
+    expect(document.body.textContent).not.toContain('Market map')
     await act(async () => buttonNamed(/^Mentions/).click())
     expect(document.body.textContent).toContain('Market map')
     expect(document.body.textContent).not.toContain('Property ops thesis')
     expect(document.body.textContent).not.toMatch(/Referenced/i)
+  })
+
+  it('draws its rows in full ink on a live space', async () => {
+    await mount('notes')
+    expect(document.querySelector('h3')?.className).not.toContain(
+      'text-graphite',
+    )
   })
 })
 
@@ -523,6 +559,19 @@ describe('the Companies tab', () => {
     Array.from(document.querySelectorAll('a[href^="/companies/"]')).map((a) =>
       text(a.querySelector('.font-medium')),
     )
+
+  it('heads its lanes company · funding stage · pipeline · location, sorted by Funding stage', async () => {
+    await mount('companies')
+    const heads = document.querySelector('[data-lane-heads]')
+    expect(
+      Array.from(heads?.querySelectorAll('span') ?? [])
+        .map((s) => text(s))
+        .filter(Boolean),
+    ).toEqual(['company', 'funding stage', 'pipeline', 'location'])
+    const sort = buttonNamed(/^Sort companies$/)
+    expect(text(sort)).toBe('Funding stage')
+    expect(text(sort.parentElement)).toBe('SortFunding stage')
+  })
 
   it('sorts by funding stage and filters to the pipeline or the watched', async () => {
     await mount('companies')
@@ -948,8 +997,13 @@ describe('Add watch', () => {
     expect(text(row('w-new'))).toContain('manual')
   })
 
-  it('is off while no engine is enabled', async () => {
+  it('is absent until an engine is installed', async () => {
     await mount('notes')
+    expect(() => buttonNamed(/^Add watch$/)).toThrow()
+  })
+
+  it('is off while no installed engine is enabled', async () => {
+    await mount('notes', undefined, { ...noWatches, installed: ['Exa'] })
     expect(buttonNamed(/^Add watch$/).disabled).toBe(true)
   })
 })
@@ -1005,5 +1059,199 @@ describe("What's moving", () => {
       's4',
       's5',
     ])
+  })
+})
+
+/** Open the head's ··· and choose one item, as a keyboard user would. */
+async function chooseFromMenu(item: string) {
+  const trigger = buttonNamed(/^More for /)
+  await act(async () => {
+    trigger.focus()
+    trigger.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+  const hit = Array.from(document.querySelectorAll('[role="menuitem"]')).find(
+    (el) => text(el) === item,
+  )
+  if (!(hit instanceof HTMLElement)) throw new Error(`no ${item}`)
+  await act(async () => hit.click())
+  // The menu's focus scope lets go on a later tick; the field opens after.
+  for (let i = 0; i < 3; i++) {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+  }
+}
+
+/** Type into whatever holds focus, the way a keystroke would land. */
+async function typeIntoFocus(value: string) {
+  const el = document.activeElement
+  if (!(el instanceof HTMLInputElement)) {
+    throw new Error(`focus is on ${el?.tagName ?? 'nothing'}, not a field`)
+  }
+  const setter = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    'value',
+  )?.set
+  await act(async () => {
+    setter?.call(el, value)
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  return el
+}
+
+async function press(el: Element, key: string) {
+  await act(async () => {
+    el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+  })
+}
+
+describe('Rename from ···', () => {
+  const field = () => header().querySelector('input[aria-label="Space name"]')
+
+  it('lands focus in a boxed field with ↵ save its one printed key', async () => {
+    await mount('notes')
+    await chooseFromMenu('Rename')
+    const input = field()
+    expect(input).not.toBeNull()
+    expect(document.activeElement).toBe(input)
+    expect(input?.className).toContain('border-hairline')
+    expect(input?.className).toContain('h-10')
+    expect(text(input?.nextElementSibling ?? null)).toBe('↵ save')
+    expect(text(header())).not.toContain('esc')
+  })
+
+  it('holds what is typed, and Escape restores the name without a write', async () => {
+    await mount('notes')
+    await chooseFromMenu('Rename')
+    const input = await typeIntoFocus('Property operations')
+    expect(input.value).toBe('Property operations')
+    await press(input, 'Escape')
+    expect(field()).toBeNull()
+    expect(text(header().querySelector('h1'))).toBe('Property ops')
+    expect(fns.get('renameSpace')).not.toHaveBeenCalled()
+  })
+
+  it('saves on Enter, once', async () => {
+    await mount('notes')
+    await chooseFromMenu('Rename')
+    const input = await typeIntoFocus('Property operations')
+    await press(input, 'Enter')
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    const rename = fns.get('renameSpace')
+    expect(rename).toHaveBeenCalledTimes(1)
+    expect(rename).toHaveBeenCalledWith({
+      data: { id: spc.id, name: 'Property operations' },
+    })
+    expect(field()).toBeNull()
+  })
+})
+
+describe('Map', () => {
+  it('ends on + Subspace, with or without subspaces', async () => {
+    await mount('notes', undefined, undefined, {
+      space: { ...spc, children: [] },
+    })
+    const add = buttonNamed(/^Subspace$/)
+    expect(add.querySelector('svg')).not.toBeNull()
+    expect(document.body.textContent).not.toMatch(/Break it down/)
+  })
+})
+
+describe('an archived space', () => {
+  const archivedSpc: Space = {
+    ...spc,
+    archive: { on: '2026-10-08T09:00:00.000Z', spaces: 1, filings: 4 },
+  }
+
+  it('says watches are paused in a notice on the solid shadow', async () => {
+    await mount('notes', undefined, undefined, { space: archivedSpc })
+    const notice = document.querySelector('[role="status"]')
+    expect(text(notice?.querySelector('p') ?? null).replace(/\s+/g, ' ')).toBe(
+      'Archived · out of the tree and the picker · 4 filings kept · watches paused',
+    )
+    expect(notice?.className).toContain('shadow-solid')
+    expect(text(notice)).toContain('Restore')
+  })
+
+  it('draws its Notes rows graphite, filed and mentions alike', async () => {
+    await mount('notes', undefined, undefined, { space: archivedSpc })
+    expect(document.querySelector('h3')?.className).toContain('text-graphite')
+    const mention = Array.from(
+      document.querySelectorAll('a[href^="/notes/"]'),
+    ).find((a) => text(a).startsWith('Market map'))
+    expect(mention?.querySelector('.flex-1')?.className ?? '').toContain(
+      'text-graphite',
+    )
+  })
+
+  it('dims under an archived ancestor too', async () => {
+    await mount('notes', undefined, undefined, {
+      space: { ...spc, archivedUnder: { id: 'p', name: 'Proptech' } },
+    })
+    expect(document.querySelector('h3')?.className).toContain('text-graphite')
+  })
+})
+
+/** Any element under a memory router, for the pieces drawn off the page. */
+async function mountNode(node: React.ReactNode) {
+  const { RouterProvider, createMemoryHistory, createRootRoute, createRouter } =
+    router
+  const r = createRouter({
+    routeTree: createRootRoute({ component: () => node }),
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  })
+  await act(async () => {
+    await r.load()
+    root.render(<RouterProvider router={r} />)
+  })
+}
+
+describe("an archived space's filings elsewhere", () => {
+  it("dims the space's chip on a note page and marks it archived", async () => {
+    await mountNode(
+      <filing.FilingRow
+        label="Filed in space"
+        busy={false}
+        chips={[
+          { id: 'a', name: 'Launch', href: '/spaces/a', Icon: undefined },
+          {
+            id: 'b',
+            name: 'Harbour',
+            href: '/spaces/b',
+            Icon: undefined,
+            archived: true,
+          },
+        ]}
+        removeLabel={(name) => `Remove from ${name}`}
+        onRemove={() => {}}
+        adder={null}
+      />,
+    )
+    const live = document.querySelector('[data-chip="live"]')
+    const gone = document.querySelector('[data-chip="archived"]')
+    expect(live?.className).toContain('font-medium')
+    expect(live?.className).not.toContain('text-graphite')
+    expect(gone?.className).toContain('text-graphite')
+    expect(gone?.className).not.toContain('font-medium')
+    expect(text(gone)).toContain('Harbour')
+    expect(text(gone)).toContain('archived')
+  })
+
+  it("dims the row in a record's Spaces section, with no untag", async () => {
+    await mountNode(
+      <railRow.SpaceRailRow
+        space={{ id: 'b', name: 'Harbour', archived: true }}
+        onRemove={() => {}}
+      />,
+    )
+    const link = document.querySelector('a[href="/spaces/b"]')
+    expect(link?.className).toContain('text-graphite')
+    expect(text(link?.parentElement ?? null)).toContain('archived')
+    expect(document.querySelector('button[aria-label^="Remove"]')).toBeNull()
   })
 })
