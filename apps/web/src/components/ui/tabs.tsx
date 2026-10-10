@@ -16,6 +16,8 @@ import { cn } from '#/lib/utils'
  *   bone band; the default bar is 36px.
  * - `pinned` keeps the head under the folded `HeadBar` while its body
  *   scrolls.
+ * - A switch transitions the text colour only: the open tab's ink fill
+ *   switches at once, so no frame shows two half-inked tabs.
  *
  * Generic over the tab ids so a caller with a union gets it back in
  * `onValueChange`.
@@ -125,7 +127,7 @@ export function Tabs<T extends string>({
                 if (!open) onValueChange(t.id)
               }}
               className={cn(
-                'focus-ring-inset flex shrink-0 items-center gap-2 px-3 label-caps whitespace-nowrap transition-colors duration-150 ease-out-quart disabled:opacity-50',
+                'focus-ring-inset flex shrink-0 items-center gap-2 px-3 label-caps whitespace-nowrap transition-[color] duration-150 ease-out-quart disabled:opacity-50',
                 size === 'head' ? 'h-9.75' : 'h-8',
                 // Closed: ink when it holds something, graphite when empty.
                 open

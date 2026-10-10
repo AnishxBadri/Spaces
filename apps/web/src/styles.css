@@ -140,6 +140,11 @@
   --row-h: 2.25rem;
   --ledger-row-h: 2.5rem;
 
+  /* A note page's left inset (`NOTE_INSET`): where the editor's side menu
+     (`+` and the drag handle, 48px) floats. At least the menu's width, so
+     the menu stays inside the page and never reaches the chassis. */
+  --note-gutter: 3.5rem;
+
   /* The z-index scale (DESIGN.md, Interaction Engineering): five values, no
      others. Anything that needs local ordering isolates instead of climbing.
      Menus sit above modals: a picker opened from inside a dialog must float
@@ -782,6 +787,8 @@
 /**
  * Prose register — The Two Registers Rule. Note bodies read like a page:
  * serif, 17px, generous leading. Everything around them stays ledger.
+ * - No inset of its own: the page's `NOTE_INSET` holds the side menu, so the
+ *   text keeps the title's left edge.
  */
 .prose-note .bn-editor {
   font-family: var(--font-serif);

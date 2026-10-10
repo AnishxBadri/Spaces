@@ -64,6 +64,13 @@ import { cn } from '#/lib/utils'
  * - Collapsed it is 48px of marks only, with no group headings.
  */
 
+/**
+ * The chassis frame's layer: its own stacking context on the z-scale's
+ * sticky step, so nothing from `main` paints over it — the note editor's
+ * floating handles included. A sheet or menu (z-modal and up) still does.
+ */
+export const CHASSIS_LAYER = 'isolate z-sticky'
+
 /** The four groups of the chassis, in the order the nav draws them. */
 export const NAV_GROUP_IDS = ['work', 'library', 'objects', 'capital'] as const
 export type NavGroupId = (typeof NAV_GROUP_IDS)[number]

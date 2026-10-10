@@ -16,6 +16,7 @@ import {
   NoteEditor,
 } from '#/components/editor/note-editor'
 import { KIND_ICONS } from '#/components/editor/mention'
+import { NOTE_INSET } from '#/components/editor/note-column'
 import type { DroppedDocument } from '#/components/editor/note-editor'
 import {
   DOCUMENT_PREVIEW_EVENT,
@@ -42,6 +43,7 @@ import { Input } from '#/components/ui/input'
 import { Segmented } from '#/components/ui/segmented'
 import { Select } from '#/components/ui/select'
 import { recordPath } from '#/lib/record-path'
+import { cn } from '#/lib/utils'
 import { fileInSpaceAction } from '#/lib/file-in-space'
 import { usePageActions } from '#/lib/page-actions'
 import {
@@ -150,8 +152,14 @@ function NotePage() {
   return (
     <div className="flex min-h-full flex-col">
       {/* The head runs the full field on a hairline; the sheet below keeps
-          its 72ch measure at the gutter. */}
-      <div className="flex h-12 shrink-0 items-center justify-between border-b border-hairline px-8">
+          its 72ch measure. Both start at the note inset, so the back link,
+          the title, the filing rows and the body share one left edge. */}
+      <div
+        className={cn(
+          'flex h-12 shrink-0 items-center justify-between border-b border-hairline pr-8',
+          NOTE_INSET,
+        )}
+      >
         <Link
           to="/notes"
           className="focus-ring flex items-center gap-1.5 rounded-md text-ui text-graphite hover:text-foreground"
@@ -193,7 +201,7 @@ function NotePage() {
         </span>
       </div>
 
-      <div className="max-w-[72ch] px-8 pt-6 pb-8">
+      <div className={cn('max-w-[72ch] pt-6 pr-8 pb-8', NOTE_INSET)}>
         <input
           value={title}
           onChange={(e) => {

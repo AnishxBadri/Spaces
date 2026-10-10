@@ -4,11 +4,12 @@ import { describe, expect, it } from 'vitest'
 
 import { Tabs } from './tabs.tsx'
 import type { TabItem } from './tabs.tsx'
+import { declared } from '#/test/tailwind-css'
 
 /**
- * The tab head's two states this file owns: an empty tab drawn at disabled
- * grey with its 0 (D74 — the head stays the record's index), and the head
- * pinned under the folded bar.
+ * The tab head's states this file owns: an empty tab drawn at disabled grey
+ * with its 0 (D74 — the head stays the record's index), the head pinned
+ * under the folded bar, and a switch that never fades the open tab's fill.
  */
 
 type Id = 'notes' | 'files' | 'history'
@@ -111,5 +112,31 @@ describe('a pinned head', () => {
   it('scrolls with the page when not pinned', () => {
     const list = render('notes').querySelector('[role="tablist"]')
     expect(classes(list)).not.toContain('sticky')
+  })
+})
+
+describe('a tab switch', () => {
+  // The open tab is an ink fill under a paper pane; fading that fill is what
+  // left both tabs half-inked for a frame. Only the text colour may move.
+  it('transitions colour only, on the open tab and the closed ones', async () => {
+    const doc = render('notes')
+    for (const t of Array.from(doc.querySelectorAll('[role="tab"]'))) {
+      expect(await declared(t.className, 'transition-property')).toEqual([
+        'color',
+      ])
+      expect(await declared(t.className, 'transition')).toEqual([])
+    }
+  })
+
+  it('switches the fill at once: the open tab still draws one', async () => {
+    const open = tab(render('notes'), 'Notes')
+    // The ink edge; the paper pane is its `::before`.
+    expect(await declared(open.className, 'background')).toContain(
+      'var(--hairline)',
+    )
+    // Within the compositor budget: nothing over 250ms.
+    expect(await declared(open.className, 'transition-duration')).toContain(
+      '150ms',
+    )
   })
 })

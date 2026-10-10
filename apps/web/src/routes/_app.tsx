@@ -6,7 +6,7 @@ import {
 } from '@tanstack/react-router'
 import { Menu, X } from 'lucide-react'
 import { useState } from 'react'
-import { AppSidebar, NAV_ITEMS } from '#/components/app-sidebar'
+import { AppSidebar, CHASSIS_LAYER, NAV_ITEMS } from '#/components/app-sidebar'
 import {
   SettingsChassis,
   useSettingsTakeover,
@@ -69,6 +69,7 @@ function AppShell() {
       <aside
         className={cn(
           'fixed inset-y-0 left-0 hidden md:block',
+          CHASSIS_LAYER,
           narrow ? 'w-12' : 'w-58',
         )}
       >

@@ -7,6 +7,7 @@ import {
   NoteEditor,
 } from '#/components/editor/note-editor'
 import { EmptyState } from '#/components/empty-state'
+import { NOTE_INSET } from '#/components/editor/note-column'
 import { PageHeader } from '#/components/page-header'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -101,6 +102,7 @@ function MandatePage() {
     <div className="flex min-h-full flex-col">
       <PageHeader
         title="Mandate"
+        className={NOTE_INSET}
         description={
           <>
             <span>updated {note.updatedAt.slice(0, 10)}</span>
@@ -123,7 +125,9 @@ function MandatePage() {
 
       <FactsGrid mandate={mandate} stageOptions={stageOptions} />
 
-      <div className="px-8 pt-6 pb-8">
+      {/* The page wears the note inset on every column: the side menu
+          needs the room, and the title and the text keep one edge. */}
+      <div className={cn('pt-6 pr-8 pb-8', NOTE_INSET)}>
         <MandateProse
           noteId={note.id}
           note={note}
@@ -198,7 +202,12 @@ function FactsGrid({
   )
 
   return (
-    <div className="flex shrink-0 flex-col border-b border-hairline px-8">
+    <div
+      className={cn(
+        'flex shrink-0 flex-col border-b border-hairline pr-8',
+        NOTE_INSET,
+      )}
+    >
       <FactRow
         label="Stages"
         note={`${mandate.stages.length} of ${stages.length} · click toggles`}
