@@ -32,6 +32,8 @@
     "@spaces/plugin-tabled",
     "@spaces/plugin-trespass",
     "@spaces/plugin-poller",
-    "@spaces/plugin-gatecrasher"
+    "@spaces/plugin-gatecrasher",
+    "@spaces/plugin-discover",
+    "@spaces/plugin-watcher"
   ]
 }
