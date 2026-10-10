@@ -38,7 +38,9 @@ const slugLiteral = (slug: string) => `'${slug.replaceAll("'", "''")}'::text`
  * `interaction_stat`'s primary key `(entity_id, kind)`, the kind a literal.
  * SQL NULL when the record has no such interaction. (D67)
  */
-export function interactionStatAt(f: InteractionStatField): SQL {
+export function interactionStatAt(
+  f: Pick<InteractionStatField, 'kind' | 'at'>,
+): SQL {
   const col =
     f.at === 'first'
       ? interactionStat.firstAt
@@ -47,6 +49,12 @@ export function interactionStatAt(f: InteractionStatField): SQL {
         : interactionStat.nextAt
   return sql`(select ${col} from ${interactionStat} where ${interactionStat.entityId} = ${entity.id} and ${interactionStat.kind} = ${sql.raw(`'${f.kind}'`)})`
 }
+
+/** A stat as a condition reads it: its UTC day as a jsonb string. */
+export const interactionStatDay = (
+  f: Pick<InteractionStatField, 'kind' | 'at'>,
+): SQL =>
+  sql`to_jsonb(to_char(${interactionStatAt(f)} at time zone 'UTC', 'YYYY-MM-DD'))`
 
 /**
  * The resolver also answers the `stat:` slugs every entity list has: the UTC
@@ -60,11 +68,7 @@ export function entityValuesResolver(
   const typeOf = new Map(registry.map((d) => [d.slug, d.type]))
   return (slug) => {
     const stat = interactionStatField(slug)
-    if (stat)
-      return {
-        expr: sql`to_jsonb(to_char(${interactionStatAt(stat)} at time zone 'UTC', 'YYYY-MM-DD'))`,
-        type: 'date',
-      }
+    if (stat) return { expr: interactionStatDay(stat), type: 'date' }
     const type = typeOf.get(slug)
     if (type === undefined) return null
     return {

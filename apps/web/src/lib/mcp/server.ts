@@ -13,7 +13,13 @@ import type { TokenUser } from '#/lib/tokens/store'
 import { getRecordProgram, resolveEntityRefProgram } from './tools'
 import { jsonValue } from '@spaces/core/json'
 import { proposeSuggestionProgram } from './tools-propose'
-import { listRegistryProgram, searchRecordsProgram } from './tools-read'
+import {
+  QUERY_RECORDS_MAX,
+  listRegistryProgram,
+  queryRecordsProgram,
+  queryRecordsShape,
+  searchRecordsProgram,
+} from './tools-read'
 
 /**
  * The MCP server (SPA-23, `docs/spec-ai-substrate.md` §5): the four
@@ -191,6 +197,18 @@ export function buildMcpServer(reader: TokenUser): McpServer {
     },
     async ({ query, object }) =>
       answer(searchRecordsProgram(me, { query, object })),
+  )
+
+  // D70: structured questions over the views compiler, never generated.
+  server.registerTool(
+    'query_records',
+    {
+      title: 'Query records',
+      description: `Records of one object that meet conditions, sorted, with the total that match — computed in the database by the same compiler as the list pages’ filters and view counts, never estimated and never summarised. Conditions are keyed by attribute slug (see list_registry) with ops is, is_not, contains, empty, not_empty, gt, lt; a bare value means "is". A space condition {id, includeDescendants} keeps records filed in that space and, by default, any space below it. The interaction columns last_interaction, first_email, last_email and next_meeting filter as days and sort by time. Each row carries its id (pass it to get_record or get_context), name, stored values and sort value; at most ${QUERY_RECORDS_MAX} rows, and total counts them all. An unknown attribute or space is refused by name.`,
+      inputSchema: queryRecordsShape,
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async (input) => answer(queryRecordsProgram(me, input)),
   )
 
   server.registerTool(

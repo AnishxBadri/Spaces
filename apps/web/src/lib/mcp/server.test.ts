@@ -307,6 +307,7 @@ describe('an MCP client with a per-user token', () => {
       'get_record',
       'list_registry', // SPA-28
       'propose_suggestion', // SPA-31
+      'query_records', // SPA-260
       'search_records', // SPA-28
     ])
     const ctx = tools.find((t) => t.name === 'get_context')
@@ -629,6 +630,59 @@ describe('SPA-28: search_records and list_registry', () => {
     expect(unknown.isError).toBe(true)
     expect(textOf(unknown)).toContain('No object "Spaceships"')
     expect(textOf(unknown)).toContain('companies')
+  })
+
+  it('query_records is registered beside them, validated by zod, and refuses an unknown slug by name', async () => {
+    const client = await connect((await mint(FIXTURE_ACTOR.id, 'q')).token)
+    const { tools } = await client.listTools()
+    const tool = tools.find((t) => t.name === 'query_records')
+    expect(Object.keys(tool?.inputSchema.properties ?? {}).sort()).toEqual([
+      'conditions',
+      'limit',
+      'object',
+      'sort',
+    ])
+    expect(tool?.inputSchema.required).toEqual(['object'])
+    expect(tool?.description).toContain('never summarised')
+
+    const answered = await client.callTool({
+      name: 'query_records',
+      arguments: {
+        object: 'companies',
+        conditions: { location: { op: 'empty' } },
+        sort: { by: 'last_interaction', direction: 'desc' },
+        limit: 5,
+      },
+    })
+    expect(answered.isError).not.toBe(true)
+    const body = z.parse(
+      z.object({
+        object: z.string(),
+        total: z.number(),
+        rows: z.array(z.object({ id: z.string() })),
+      }),
+      JSON.parse(textOf(answered)),
+    )
+    expect(body.object).toBe('companies')
+    expect(body.rows.map((r) => r.id)).toContain(fixture.companyId)
+
+    // zod at the boundary: an op the grammar has not got never reaches SQL.
+    const badOp = await client.callTool({
+      name: 'query_records',
+      arguments: {
+        object: 'companies',
+        conditions: { location: { op: 'like', value: 'x' } },
+      },
+    })
+    expect(badOp.isError).toBe(true)
+
+    const unknown = await client.callTool({
+      name: 'query_records',
+      arguments: { object: 'companies', conditions: { warp_factor: 9 } },
+    })
+    await client.close()
+    expect(unknown.isError).toBe(true)
+    expect(textOf(unknown)).toContain('No attribute "warp_factor"')
   })
 
   it('list_registry shows a custom object created after the client connected, with no restart', async () => {

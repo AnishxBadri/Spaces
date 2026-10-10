@@ -46,7 +46,12 @@ const ROWS = 8000
  */
 const SLUG = 'spa93_rank'
 
-type Fixture = { objectId: string; attributeId: string; indexName: string }
+type Fixture = {
+  objectId: string
+  objectSlug: string
+  attributeId: string
+  indexName: string
+}
 
 /** One of drizzle's bind values, spelled as a SQL literal for `EXECUTE`. */
 function literalArg(value: unknown): string {
@@ -157,6 +162,34 @@ async function pagePlan(
   }
 }
 
+/**
+ * The page statement `query_records` compiles for the same condition and
+ * sort, canRead clause included, explained as it would run.
+ */
+async function toolPlan(objectSlug: string): Promise<string> {
+  const { db } = await import('@spaces/db')
+  const { Effect } = await import('effect')
+  const { compileRecordQueryProgram, recordsPageStatement } =
+    await import('#/lib/mcp/tools-read')
+  const { FIXTURE_ACTOR } = await import('../../../vitest.seed')
+  const q = await Effect.runPromise(
+    compileRecordQueryProgram(
+      { id: FIXTURE_ACTOR.id },
+      {
+        object: objectSlug,
+        conditions: { [SLUG]: { op: 'not_empty' } },
+        sort: { by: SLUG },
+      },
+    ),
+  )
+  const { sql: text, params } = recordsPageStatement(q).toSQL()
+  const explained = await db.$client.query<{ 'QUERY PLAN': unknown }>({
+    text: `explain (format json) ${text}`,
+    values: params,
+  })
+  return JSON.stringify(explained.rows.at(0)?.['QUERY PLAN'] ?? null)
+}
+
 async function fixture(): Promise<Fixture> {
   const { db } = await import('@spaces/db')
   const { attribute, objectDef } = await import('@spaces/db/schema')
@@ -216,6 +249,7 @@ async function fixture(): Promise<Fixture> {
 
   return {
     objectId,
+    objectSlug: `funds-${tag}`,
     attributeId: attr[0].id,
     indexName: valueIndexName(attr[0].id),
   }
@@ -252,6 +286,11 @@ describe('the paged list plan', () => {
     // a page deep, not eight thousand rows deep.
     expect(warm).toContain('"Presorted Key"')
     expect(warm).toContain('spaces_json_text')
+
+    // `query_records` compiles the same sort, so the same index serves it.
+    const viaTool = await toolPlan(fx.objectSlug)
+    expect(viaTool).toContain(fx.indexName)
+    expect(viaTool).toContain('"Presorted Key"')
 
     // The same plan when the statement is planned without the bind values:
     // `object_id = $1` is an ordinary equality on the index's leading key,
