@@ -71,6 +71,7 @@ const meetingMeta = z
     organizer: z.string().nullable(),
     recurring_instance_id: z.string().nullable(),
     rsvp: z.record(z.string(), rsvp),
+    calendar_event_id: z.string().exactOptional(),
   })
   .strict()
 

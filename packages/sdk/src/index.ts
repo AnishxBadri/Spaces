@@ -42,6 +42,7 @@ export {
   JobRetryable,
   JobRateLimited,
   JobPermanent,
+  CursorInvalid,
 } from './contract.ts'
 export type {
   JsonValue,
@@ -67,6 +68,12 @@ export type {
   DocumentClaim,
   InteractionKind,
   InteractionClaim,
+  MeetingStatus,
+  MeetingRsvp,
+  MeetingAttendee,
+  MeetingClaim,
+  MeetingCancellation,
+  MeetingResult,
   SignalClaim,
   ContentClaim,
   NoteProposal,

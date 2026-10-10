@@ -17,6 +17,9 @@ import type {
   JsonObject,
   JsonValue,
   JudgmentClaim,
+  MeetingCancellation,
+  MeetingClaim,
+  MeetingResult,
   PortName,
   ReceiptClaim,
   Ref,
@@ -159,6 +162,10 @@ export class Content extends Context.Service<
     readonly emitSignal: (
       claim: SignalClaim,
     ) => Effect.Effect<{ readonly signalId: string }, JobError>
+    /** One calendar event, born or followed in place by its `uid` (SDK 1.5). */
+    readonly logMeeting: (
+      claim: MeetingClaim | MeetingCancellation,
+    ) => Effect.Effect<MeetingResult, JobError>
   }
 >()('spaces/sdk/Content') {}
 

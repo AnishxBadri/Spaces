@@ -13,6 +13,7 @@ import { QUEUES } from '@spaces/core/queue/names'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { birthDocumentProgram } from '@spaces/core/writes/documents/birth'
 import { prepareBlobUploadProgram } from '@spaces/core/writes/documents/prepare'
+import { NoMeetingLane } from '@spaces/core/writes/interactions/meeting-lane'
 import { ContentLive } from '@spaces/core/writes/ports/content'
 import { IdentityLive } from '@spaces/core/writes/ports/identity'
 import { LogLive } from '@spaces/core/writes/ports/log'
@@ -113,7 +114,7 @@ describe('the importer importDeck job, on the live ports', () => {
             LogLive(row.capabilityId, {
               sink: (_level, line) => logged.push(line),
             }),
-          ).pipe(Layer.provide(RecordingEnqueue)),
+          ).pipe(Layer.provide(Layer.merge(RecordingEnqueue, NoMeetingLane))),
         ),
       ),
     )

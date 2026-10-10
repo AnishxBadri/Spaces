@@ -1,5 +1,6 @@
 import { Readable } from 'node:stream'
 import { Effect, Layer } from 'effect'
+import { z } from 'zod'
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
@@ -18,6 +19,9 @@ import type {
   JobError,
   JsonObject,
   JsonValue,
+  MeetingCancellation,
+  MeetingClaim,
+  MeetingResult,
   SignalClaim,
 } from '@spaces/sdk'
 import { ref } from '../../context/ref'
@@ -28,6 +32,8 @@ import {
   intakeDocumentProgram,
 } from '../documents/intake'
 import { writeIntegrationInteraction } from '../interactions/write'
+import { MeetingLane } from '../interactions/meeting-lane'
+import type { MeetingInput } from '../interactions/meeting-lane'
 import type { DocumentFilingTarget } from '../../documents/filing'
 import type { Enqueue } from '../../queue/enqueue'
 import type { DocumentIntakeFailure } from '../documents/intake'
@@ -86,6 +92,14 @@ import { ReceiptNotOwned, checkReceipt } from './receipts'
  *   interaction lane's edges do.
  */
 
+/**
+ * `logMeeting` (SDK 1.5) checks the claim — a bundle is JavaScript — and
+ * hands it to the `MeetingLane`, which this Layer requires: the noise rules
+ * and the participants module are the arrival lane's, and a second copy of
+ * either here is how a calendar attendee and a mail participant would drift
+ * apart. Records it creates are created by the body author below.
+ */
+
 /** Until arrival-10's syncer decides per connection, a plugin's body is private (D30). */
 export const PLUGIN_BODY_VISIBILITY: BodyVisibility = 'private'
 
@@ -112,7 +126,9 @@ const survivors = (ids: ReadonlyArray<string>) =>
   })
 
 /** Who a plugin-written body is authored by — see the module comment. */
-const bodyAuthor = async (integrationId: string): Promise<string | null> => {
+export const bodyAuthor = async (
+  integrationId: string,
+): Promise<string | null> => {
   const bound = (
     await db
       .select({
@@ -159,6 +175,102 @@ const parseTimestamp = (what: string, iso: string) => {
         }),
       )
     : Effect.succeed(at)
+}
+
+const text = z.string().trim().min(1).max(2000)
+const instant = z
+  .string()
+  .refine((iso) => !Number.isNaN(new Date(iso).getTime()), 'an ISO timestamp')
+  .transform((iso) => new Date(iso))
+
+/** What a meeting claim must be, read at runtime; an unknown field is refused. */
+const meetingClaim = z.discriminatedUnion('_tag', [
+  z
+    .object({
+      _tag: z.literal('meeting'),
+      uid: text,
+      eventId: text,
+      status: z.enum(['scheduled', 'cancelled']),
+      startsAt: instant,
+      endsAt: instant,
+      subject: z.string().max(2000).optional(),
+      organizer: text.optional(),
+      conferenceUrl: text.optional(),
+      recurringInstanceId: text.optional(),
+      attendees: z
+        .array(
+          z
+            .object({
+              email: text,
+              name: z.string().max(400).optional(),
+              rsvp: z.enum([
+                'accepted',
+                'declined',
+                'tentative',
+                'needs_action',
+              ]),
+              self: z.boolean().optional(),
+            })
+            .strict(),
+        )
+        .max(1000),
+    })
+    .strict(),
+  z
+    .object({
+      _tag: z.literal('meeting-cancelled'),
+      eventId: text,
+      uid: text.optional(),
+    })
+    .strict(),
+])
+
+const blankToNull = (value: string | undefined): string | null => {
+  const trimmed = value?.trim() ?? ''
+  return trimmed === '' ? null : trimmed
+}
+
+/** The claim, checked and normalized, or the reason it is not one. */
+export const readMeetingClaim = (
+  claim: MeetingClaim | MeetingCancellation,
+): { ok: true; input: MeetingInput } | { ok: false; reason: string } => {
+  const parsed = meetingClaim.safeParse(claim)
+  if (!parsed.success)
+    return {
+      ok: false,
+      reason: parsed.error.issues
+        .map((i) => `${i.path.map(String).join('.') || 'claim'}: ${i.message}`)
+        .join('; '),
+    }
+  const c = parsed.data
+  if (c._tag === 'meeting-cancelled')
+    return {
+      ok: true,
+      input: { _tag: c._tag, eventId: c.eventId, uid: c.uid ?? null },
+    }
+  if (c.endsAt.getTime() < c.startsAt.getTime())
+    return { ok: false, reason: 'endsAt: before startsAt' }
+  return {
+    ok: true,
+    input: {
+      _tag: 'meeting',
+      uid: c.uid,
+      eventId: c.eventId,
+      status: c.status,
+      startsAt: c.startsAt,
+      endsAt: c.endsAt,
+      subject: blankToNull(c.subject),
+      organizer: c.organizer?.toLowerCase() ?? null,
+      conferenceUrl: c.conferenceUrl ?? null,
+      recurringInstanceId: c.recurringInstanceId ?? null,
+      attendees: c.attendees.map((a) => ({
+        email: a.email.toLowerCase(),
+        name: blankToNull(a.name),
+        rsvp: a.rsvp,
+        self: a.self ?? false,
+      })),
+    },
+  }
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -245,7 +357,7 @@ const discard = (body: DocumentClaim['body']) =>
 
 export const ContentLive = (
   row: Pick<BoundIntegration, 'id' | 'capabilityId'>,
-): Layer.Layer<Content, never, Enqueue> => {
+): Layer.Layer<Content, never, Enqueue | MeetingLane> => {
   const refuse = (body: DocumentClaim['body'], reason: string) =>
     discard(body).pipe(
       Effect.andThen(
@@ -497,17 +609,43 @@ export const ContentLive = (
     return { signalId }
   })
 
+  const logMeeting = Effect.fn('Content.logMeeting')(function* (
+    claim: MeetingClaim | MeetingCancellation,
+  ): Effect.fn.Return<MeetingResult, JobError, MeetingLane> {
+    const read = readMeetingClaim(claim)
+    if (!read.ok) {
+      return yield* new JobPermanent({
+        reason: `Content.logMeeting: ${read.reason}`,
+      })
+    }
+    const authorId = yield* Effect.tryPromise({
+      try: () => bodyAuthor(row.id),
+      catch: retryable('logMeeting'),
+    })
+    if (authorId === null) {
+      return yield* new JobPermanent({
+        reason: 'Content.logMeeting: no workspace user to create records as',
+      })
+    }
+    return yield* (yield* MeetingLane).log(
+      { integrationId: row.id, authorId },
+      read.input,
+    )
+  })
+
   return Layer.effect(
     Content,
     Effect.gen(function* () {
       // The extraction enqueue at the end of birth runs on the process's
-      // own `Enqueue`, captured once here as `FactsLive` captures it.
-      const context = yield* Effect.context<Enqueue>()
+      // own `Enqueue`, captured once here as `FactsLive` captures it; the
+      // meeting lane the same way.
+      const context = yield* Effect.context<Enqueue | MeetingLane>()
       return Content.of({
         fileDocument: (claim) =>
           fileDocument(claim).pipe(Effect.provide(context)),
         logInteraction,
         emitSignal,
+        logMeeting: (claim) => logMeeting(claim).pipe(Effect.provide(context)),
       })
     }),
   )

@@ -17,6 +17,7 @@ import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
 import {
   Ai,
+  CursorInvalid,
   Discover,
   JobPermanent,
   JobRateLimited,
@@ -37,6 +38,7 @@ import type {
   WebhookInput,
 } from '@spaces/sdk'
 import type { Enqueue } from '@spaces/core/queue/enqueue'
+import type { MeetingLane } from '@spaces/core/writes/interactions/meeting-lane'
 import { AiBinder } from '@spaces/core/writes/ports/ai'
 import { DiscoverBinder } from '@spaces/core/writes/ports/discover'
 import type { DiscoverBinding } from '@spaces/core/writes/ports/discover'
@@ -95,11 +97,19 @@ export type JobInput =
   | WatchInput
 
 /** What a job hands back: a schedule job's cursor, a watch's state, nothing for the rest. */
-export type JobOutput = ScheduleOutput | WatchOutput | void
+export type JobOutput = ScheduleOutput | ScheduleReset | WatchOutput | void
+
+/** A schedule job failed `CursorInvalid`: the stored cursor is cleared, and why. */
+export type ScheduleReset = {
+  readonly nextCursor: null
+  readonly cursorInvalid: string
+}
 
 export type PluginHostOptions = {
   /** Built once, on the first job that hands work back; closed by `releaseAll` or `shutdown`. */
   readonly enqueue: LayerType.Layer<Enqueue>
+  /** What `Content.logMeeting` files through; every meeting is refused without it. */
+  readonly meetings?: LayerType.Layer<MeetingLane>
   /** pg-boss and the wrapper's seams; without it no queue is registered. */
   readonly queues?: PluginQueuesOptions
   readonly fetch?: FetchLike
@@ -364,6 +374,9 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
         grantLayer(plugin.row, declared.uses, {
           settings: plugin.settings,
           enqueue: sharedEnqueue,
+          ...(options.meetings === undefined
+            ? {}
+            : { meetings: options.meetings }),
           ...(plugin.manifest.http?.rateLimit === undefined
             ? {}
             : { rpm: plugin.manifest.http.rateLimit.rpm }),
@@ -675,7 +688,8 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
       }).pipe(
         Effect.provideContext(context),
         Effect.mapError((error) =>
-          isJobError(error)
+          isJobError(error) ||
+          (job.trigger === 'schedule' && error instanceof CursorInvalid)
             ? error
             : new JobPermanent({
                 reason: `${label} failed: ${reasonOf(error)}`,
@@ -712,6 +726,14 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
                 }),
               )
         }),
+        // An expired cursor is an outcome, not a failure: the run closes and
+        // the cursor is cleared with it.
+        Effect.catchTag('CursorInvalid', (error) =>
+          Effect.succeed<ScheduleReset>({
+            nextCursor: null,
+            cursorInvalid: error.reason,
+          }),
+        ),
       )
     })
 

@@ -18,6 +18,7 @@ import {
 import type { PortServices, SpaceBrief } from '../ports.ts'
 import {
   AiTest,
+  CALENDAR_API,
   ContentTest,
   FactsTest,
   HttpTest,
@@ -26,6 +27,7 @@ import {
   ReadTest,
   SecretsTest,
   SpacesTest,
+  makeFakeCalendarApi,
   readEntity,
   testPorts,
 } from './index.ts'
@@ -182,6 +184,36 @@ describe('ContentTest', () => {
       'interaction-1',
       'interaction-2',
       'interaction-3',
+    ])
+  })
+
+  it('keys meetings on uid, and finds a bare cancellation by event id', () => {
+    const content = ContentTest()
+    const outcomes = Effect.runSync(
+      Effect.gen(function* () {
+        const port = yield* Content
+        const meeting = {
+          _tag: 'meeting',
+          uid: 'evt@google.com',
+          eventId: 'evt',
+          status: 'scheduled',
+          startsAt: '2026-10-12T10:00:00Z',
+          endsAt: '2026-10-12T11:00:00Z',
+          attendees: [{ email: 'jane@acme.example', rsvp: 'accepted' }],
+        } as const
+        return [
+          yield* port.logMeeting(meeting),
+          yield* port.logMeeting({ ...meeting, status: 'cancelled' }),
+          yield* port.logMeeting({ _tag: 'meeting-cancelled', eventId: 'evt' }),
+          yield* port.logMeeting({ _tag: 'meeting-cancelled', eventId: 'x' }),
+        ]
+      }).pipe(Effect.provide(content.layer)),
+    )
+    expect(outcomes).toEqual([
+      { outcome: 'created', interactionId: 'interaction-1' },
+      { outcome: 'updated', interactionId: 'interaction-1' },
+      { outcome: 'updated', interactionId: 'interaction-1' },
+      { outcome: 'refused', reason: 'no meeting holds this event' },
     ])
   })
 
@@ -476,5 +508,52 @@ describe('testPorts', () => {
     expect(ports.log.lines).toEqual([
       { level: 'info', message: 'filled', fields: { entityId: 'entity-1' } },
     ])
+  })
+})
+
+describe('makeFakeCalendarApi', () => {
+  const list = async (
+    api: ReturnType<typeof makeFakeCalendarApi>,
+    query: string,
+  ) => {
+    const res = await api.fetch(
+      `${CALENDAR_API}/calendars/primary/events?${query}`,
+      {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${api.accessToken}` },
+      },
+    )
+    return { status: res.status, body: z.json().parse(await res.json()) }
+  }
+
+  it('filters a full list on timeMin, and without one lists all of history', async () => {
+    const now = Date.parse('2026-10-10T12:00:00Z')
+    const api = makeFakeCalendarApi({ now })
+    const all = await list(api, 'singleEvents=true')
+    const bounded = await list(
+      api,
+      'singleEvents=true&timeMin=2026-10-10T09:00:00Z',
+    )
+    expect(JSON.stringify(all.body)).toContain('board-2021')
+    expect(JSON.stringify(bounded.body)).not.toContain('board-2021')
+    expect(JSON.stringify(bounded.body)).toContain('acme-catchup')
+  })
+
+  it('answers 410 to an expired sync token, 400 to a token with a filter, 401 once revoked', async () => {
+    const api = makeFakeCalendarApi()
+    const first = await list(api, 'singleEvents=true')
+    const token = z
+      .object({ nextSyncToken: z.string() })
+      .parse(first.body).nextSyncToken
+    expect(
+      (await list(api, `singleEvents=true&syncToken=${token}&timeMin=x`))
+        .status,
+    ).toBe(400)
+    api.expireSyncTokens()
+    expect(
+      (await list(api, `singleEvents=true&syncToken=${token}`)).status,
+    ).toBe(410)
+    api.revoke()
+    expect((await list(api, 'singleEvents=true')).status).toBe(401)
   })
 })

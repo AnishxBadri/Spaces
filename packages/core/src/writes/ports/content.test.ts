@@ -15,9 +15,19 @@ import {
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { Content } from '@spaces/sdk'
-import type { InteractionClaim, SignalClaim } from '@spaces/sdk'
+import type {
+  InteractionClaim,
+  MeetingCancellation,
+  MeetingClaim,
+  SignalClaim,
+} from '@spaces/sdk'
 import { Enqueue } from '../../queue/enqueue'
 import { resolveEntity } from '../entities/resolve'
+import { MeetingLane } from '../interactions/meeting-lane'
+import type {
+  MeetingInput,
+  MeetingLaneContext,
+} from '../interactions/meeting-lane'
 import { ContentLive } from './content'
 
 /**
@@ -43,8 +53,22 @@ const EnqueueTest = Layer.succeed(
   Enqueue,
   Enqueue.of({ enqueue: () => Effect.succeed(null) }),
 )
+/** What `logMeeting` handed the lane, in order. */
+const handed: Array<{ ctx: MeetingLaneContext; input: MeetingInput }> = []
+const MeetingLaneTest = Layer.succeed(
+  MeetingLane,
+  MeetingLane.of({
+    log: (ctx, input) =>
+      Effect.sync(() => {
+        handed.push({ ctx, input })
+        return { outcome: 'created', interactionId: 'held-by-the-lane' }
+      }),
+  }),
+)
 const live = (row: { id: string; capabilityId: string }) =>
-  ContentLive(row).pipe(Layer.provide(EnqueueTest))
+  ContentLive(row).pipe(
+    Layer.provide(Layer.merge(EnqueueTest, MeetingLaneTest)),
+  )
 
 const run = <TValue>(
   row: { id: string; capabilityId: string },
@@ -507,5 +531,92 @@ describe('provenance is the port’s', () => {
       sourceClass: 'integration',
       sourceRef: row.id,
     })
+  })
+})
+
+describe('Content.logMeeting', () => {
+  const logMeeting = (claim: MeetingClaim | MeetingCancellation) =>
+    Effect.gen(function* () {
+      return yield* (yield* Content).logMeeting(claim)
+    })
+
+  const meeting: MeetingClaim = {
+    _tag: 'meeting',
+    uid: 'evt-1@google.com',
+    eventId: 'evt-1',
+    status: 'scheduled',
+    startsAt: '2026-10-12T10:00:00Z',
+    endsAt: '2026-10-12T11:00:00+00:00',
+    subject: '  Acme catch-up ',
+    organizer: 'Anish@Fund.example',
+    attendees: [
+      { email: ' Jane@Acme.example ', name: 'Jane', rsvp: 'accepted' },
+      { email: 'anish@fund.example', rsvp: 'accepted', self: true },
+    ],
+  }
+
+  it('hands the lane a checked claim, with the row and an author', async () => {
+    handed.length = 0
+    const row = await boundRow('google-calendar')
+    expect(await run(row, logMeeting(meeting))).toEqual({
+      outcome: 'created',
+      interactionId: 'held-by-the-lane',
+    })
+    expect(handed).toHaveLength(1)
+    const [call] = handed
+    expect(call.ctx.integrationId).toBe(row.id)
+    expect(typeof call.ctx.authorId).toBe('string')
+    expect(call.input).toEqual({
+      _tag: 'meeting',
+      uid: 'evt-1@google.com',
+      eventId: 'evt-1',
+      status: 'scheduled',
+      startsAt: new Date('2026-10-12T10:00:00Z'),
+      endsAt: new Date('2026-10-12T11:00:00Z'),
+      subject: 'Acme catch-up',
+      organizer: 'anish@fund.example',
+      conferenceUrl: null,
+      recurringInstanceId: null,
+      attendees: [
+        {
+          email: 'jane@acme.example',
+          name: 'Jane',
+          rsvp: 'accepted',
+          self: false,
+        },
+        {
+          email: 'anish@fund.example',
+          name: null,
+          rsvp: 'accepted',
+          self: true,
+        },
+      ],
+    })
+  })
+
+  it('refuses permanently what is not a meeting claim, naming the field', async () => {
+    handed.length = 0
+    const row = await boundRow('google-calendar')
+    const exit = await runExit(
+      row,
+      logMeeting({ ...meeting, endsAt: 'next tuesday' }),
+    )
+    expect(exit._tag).toBe('Failure')
+    expect(JSON.stringify(exit)).toContain('endsAt')
+    const backwards = await runExit(
+      row,
+      logMeeting({ ...meeting, endsAt: '2026-10-12T09:00:00Z' }),
+    )
+    expect(JSON.stringify(backwards)).toContain('before startsAt')
+    expect(handed).toEqual([])
+  })
+
+  it('passes a bare cancellation through', async () => {
+    handed.length = 0
+    const row = await boundRow('google-calendar')
+    await run(row, logMeeting({ _tag: 'meeting-cancelled', eventId: 'evt-9' }))
+    expect(handed.map((h) => h.input)).toEqual([
+      { _tag: 'meeting-cancelled', eventId: 'evt-9', uid: null },
+    ])
   })
 })

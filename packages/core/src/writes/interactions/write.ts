@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { entity, interaction, interactionEntity, note } from '@spaces/db/schema'
 import type { NoteBody } from '@spaces/db/schema/kinds'
 import type { InteractionMeta } from '@spaces/db/schema/interactions'
@@ -196,12 +196,18 @@ export type InteractionChange = {
   occurredAt?: Date
   /** Replaces the whole `meta`; its `kind` must be the row's. */
   meta?: InteractionMeta
+  /** Edges to add and to drop — an attendee who joined or left. */
+  edges?: {
+    add: ReadonlyArray<string>
+    remove: ReadonlyArray<string>
+  }
 }
 
 /**
  * An interaction changed in place — a meeting moved, renamed or cancelled
  * (D68: a cancelled meeting is marked, never deleted). Its participants'
- * stats are rebuilt in the same transaction. Returns false when no such row.
+ * stats, and those of every entity it lost, are rebuilt in the same
+ * transaction. Returns false when no such row.
  */
 export async function updateInteraction(
   tx: Tx,
@@ -231,9 +237,24 @@ export async function updateInteraction(
       ...(meta === undefined ? {} : { meta }),
     })
     .where(eq(interaction.id, interactionId))
-  await recomputeInteractionStats(
-    tx,
-    await interactionParticipants(tx, interactionId),
-  )
+  const remove = [...new Set(change.edges?.remove ?? [])]
+  if (remove.length > 0)
+    await tx
+      .delete(interactionEntity)
+      .where(
+        and(
+          eq(interactionEntity.interactionId, interactionId),
+          inArray(interactionEntity.entityId, remove),
+        ),
+      )
+  for (const entityId of new Set(change.edges?.add ?? []))
+    await tx
+      .insert(interactionEntity)
+      .values({ interactionId, entityId })
+      .onConflictDoNothing()
+  await recomputeInteractionStats(tx, [
+    ...(await interactionParticipants(tx, interactionId)),
+    ...remove,
+  ])
   return true
 }

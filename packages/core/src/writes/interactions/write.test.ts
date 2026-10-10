@@ -8,12 +8,14 @@ import {
   integration,
   interaction,
   interactionDocument,
+  interactionEntity,
+  interactionStat,
 } from '@spaces/db/schema'
 import type { MergeSnapshotEntry } from '@spaces/db/schema/entities'
 import type { MeetingMeta } from '@spaces/db/schema/interactions'
 import { readInteractionMeta } from '../../json'
 import { repointRegistryInTx } from '../entities/merge'
-import { writeIntegrationInteraction } from './write'
+import { updateInteraction, writeIntegrationInteraction } from './write'
 
 /**
  * `interaction.meta` through the writer, and the artifact join beside it:
@@ -217,5 +219,62 @@ describe('interaction meta and artifacts', () => {
         .filter((e) => e.table === 'interaction_document')
         .map((e) => e.action),
     ).toEqual(['dropped'])
+  })
+})
+
+describe('updateInteraction', () => {
+  const aPerson = async (name: string) => {
+    const ent = (
+      await db
+        .insert(entity)
+        .values({ kind: 'person', canonicalName: name })
+        .returning({ id: entity.id })
+    ).at(0)
+    if (!ent) throw new Error('no person')
+    return ent.id
+  }
+
+  it('adds and drops edges in place, and rebuilds the stats of the one it lost', async () => {
+    const integrationId = await anIntegration()
+    const [jane, sam, lee] = [
+      await aPerson('Jane'),
+      await aPerson('Sam'),
+      await aPerson('Lee'),
+    ]
+    const written = await db.transaction((tx) =>
+      writeIntegrationInteraction(tx, {
+        ...meeting(integrationId, { ...cancelled, status: 'scheduled' }),
+        messageId: `uid-${randomUUID()}`,
+        edges: [jane, sam],
+      }),
+    )
+    if (written.kind !== 'written') throw new Error('not written')
+    const statsOf = async (entityId: string) =>
+      db
+        .select({ kind: interactionStat.kind })
+        .from(interactionStat)
+        .where(eq(interactionStat.entityId, entityId))
+    expect(await statsOf(sam)).not.toEqual([])
+
+    await db.transaction((tx) =>
+      updateInteraction(tx, written.interactionId, {
+        occurredAt: new Date('2026-10-09T10:00:00.000Z'),
+        edges: { add: [jane, lee], remove: [sam] },
+      }),
+    )
+    const edges = await db
+      .select({ entityId: interactionEntity.entityId })
+      .from(interactionEntity)
+      .where(eq(interactionEntity.interactionId, written.interactionId))
+    expect(edges.map((e) => e.entityId).sort()).toEqual([jane, lee].sort())
+    expect(await statsOf(sam)).toEqual([])
+    expect(await statsOf(lee)).not.toEqual([])
+    const row = (
+      await db
+        .select({ occurredAt: interaction.occurredAt })
+        .from(interaction)
+        .where(eq(interaction.id, written.interactionId))
+    ).at(0)
+    expect(row?.occurredAt.toISOString()).toBe('2026-10-09T10:00:00.000Z')
   })
 })

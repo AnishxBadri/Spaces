@@ -3,8 +3,9 @@ import { Effect, Layer } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { ContentLive } from '@spaces/core/writes/ports/content'
 import { Content } from '@spaces/sdk'
-import type { InteractionClaim, SignalClaim } from '@spaces/sdk'
+import type { InteractionClaim, MeetingClaim, SignalClaim } from '@spaces/sdk'
 import { ContentTest } from '@spaces/sdk/testing'
+import { meetingLaneLive } from '../meetings'
 import { insertRow, noEnqueue, runOn, seedCompany } from './support'
 
 /**
@@ -26,7 +27,9 @@ const IMPLEMENTATIONS: ReadonlyArray<ContentImplementation> = [
   {
     name: 'ContentLive',
     make: async () => ({
-      layer: ContentLive(await insertRow()).pipe(Layer.provide(noEnqueue)),
+      layer: ContentLive(await insertRow()).pipe(
+        Layer.provide(Layer.merge(noEnqueue, meetingLaneLive)),
+      ),
       entityId: await seedCompany(
         'Content Co',
         `content-${randomUUID().slice(0, 8)}.example`,
@@ -82,6 +85,44 @@ describe.each(IMPLEMENTATIONS)('Content — $name', (impl) => {
     const a = await runOn(layer, logInteraction(interaction(entityId)))
     const b = await runOn(layer, logInteraction(interaction(entityId)))
     expect(a).not.toBe(b)
+  })
+
+  it('keeps one meeting per uid: created, then followed, then cancelled in place', async () => {
+    const { layer } = await impl.make()
+    const tag = randomUUID().slice(0, 8)
+    const meeting: MeetingClaim = {
+      _tag: 'meeting',
+      uid: `${tag}@calendar.example`,
+      eventId: tag,
+      status: 'scheduled',
+      startsAt: '2026-10-12T10:00:00Z',
+      endsAt: '2026-10-12T11:00:00Z',
+      subject: 'Catch-up',
+      attendees: [{ email: `jane@meet-${tag}.example`, rsvp: 'accepted' }],
+    }
+    const log = (claim: MeetingClaim) =>
+      Effect.gen(function* () {
+        return yield* (yield* Content).logMeeting(claim)
+      })
+    const born = await runOn(layer, log(meeting))
+    expect(born.outcome).toBe('created')
+    const moved = await runOn(
+      layer,
+      log({
+        ...meeting,
+        startsAt: '2026-10-12T12:00:00Z',
+        endsAt: '2026-10-12T13:00:00Z',
+      }),
+    )
+    const cancelled = await runOn(
+      layer,
+      log({ ...meeting, status: 'cancelled' }),
+    )
+    const id = born.outcome === 'refused' ? null : born.interactionId
+    expect([moved, cancelled]).toEqual([
+      { outcome: 'updated', interactionId: id },
+      { outcome: 'updated', interactionId: id },
+    ])
   })
 
   it('emits a new signal each time', async () => {

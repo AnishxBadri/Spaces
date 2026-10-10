@@ -227,6 +227,75 @@ export type InteractionClaim = {
   readonly body?: string
 }
 
+/** A meeting's state on the calendar. A cancelled meeting is marked, never deleted (D68). */
+export type MeetingStatus = 'scheduled' | 'cancelled'
+
+/** An attendee's answer, shown and never edited (D68). */
+export type MeetingRsvp = 'accepted' | 'declined' | 'tentative' | 'needs_action'
+
+/**
+ * One attendee, as the calendar lists them. The host runs every address
+ * through its participants module — the same one mail arrives through — so
+ * the plugin never resolves an attendee itself. Leave meeting rooms out.
+ */
+export type MeetingAttendee = {
+  readonly email: string
+  readonly name?: string
+  readonly rsvp: MeetingRsvp
+  /** This attendee is the connected calendar's owner. */
+  readonly self?: boolean
+}
+
+/**
+ * `Content.logMeeting(claim)` (SDK 1.5): one calendar event, born or followed
+ * in place. `uid` is the row's key — the iCalendar UID, plus the recurrence
+ * instant for one instance of a series — so the same meeting on two
+ * connected calendars is one interaction.
+ * - The host decides whether it is a meeting at all: an event with no
+ *   outside attendee, or one the owner declined, or a cancelled one it never
+ *   saw, writes nothing.
+ * - A meeting it already holds follows the claim: time, status, attendees
+ *   and their answers are rewritten on the same row.
+ */
+export type MeetingClaim = {
+  readonly _tag: 'meeting'
+  readonly uid: string
+  /** The calendar's own id for the event. */
+  readonly eventId: string
+  readonly status: MeetingStatus
+  readonly startsAt: IsoTimestamp
+  readonly endsAt: IsoTimestamp
+  readonly subject?: string
+  /** The organizer's email. */
+  readonly organizer?: string
+  readonly conferenceUrl?: string
+  /** The calendar's id for this instance when the event is one of a series. */
+  readonly recurringInstanceId?: string
+  readonly attendees: ReadonlyArray<MeetingAttendee>
+}
+
+/**
+ * A cancellation that names nothing but the event — what a calendar's change
+ * feed may send for a deleted event. The host marks the meeting it holds
+ * under `uid`, else under `eventId`, as cancelled; it births nothing.
+ */
+export type MeetingCancellation = {
+  readonly _tag: 'meeting-cancelled'
+  readonly eventId: string
+  readonly uid?: string
+}
+
+/**
+ * What `Content.logMeeting` decided: the row it wrote or followed, or why
+ * the event is not a meeting the workspace keeps.
+ */
+export type MeetingResult =
+  | {
+      readonly outcome: 'created' | 'updated'
+      readonly interactionId: string
+    }
+  | { readonly outcome: 'refused'; readonly reason: string }
+
 /**
  * `Content.emitSignal(claim)`: a dated observation about one entity — a web
  * mention, a funding round, a hire. Evidence, not a fact: it never touches
@@ -257,10 +326,15 @@ export type SignalClaim = {
 }
 
 /**
- * The three Content claims, told apart by `_tag`: an interaction carrying a
+ * The Content claims, told apart by `_tag`: an interaction carrying a
  * document's `body` or `fileAgainst` is not an interaction claim.
  */
-export type ContentClaim = DocumentClaim | InteractionClaim | SignalClaim
+export type ContentClaim =
+  | DocumentClaim
+  | InteractionClaim
+  | SignalClaim
+  | MeetingClaim
+  | MeetingCancellation
 
 /** A note the reviewer may accept onto the record. */
 export type NoteProposal = { readonly kind: 'note'; readonly body: string }
@@ -442,12 +516,32 @@ export type ActionJob<TServices = unknown> =
   | ActionRun<TServices>
   | { readonly run: ActionRun<TServices>; readonly cost?: CostHook }
 
-/** `schedule` — Gmail, Calendar: resume from the cursor, hand back the next. */
-export type ScheduleInput = { readonly cursor: string | null }
+/**
+ * `schedule` — Gmail, Calendar: resume from the cursor, hand back the next.
+ * - `connectedAt` (SDK 1.5) is the forward-only floor: the bound
+ *   connection's `created_at`, else the integration's. A syncer fetches
+ *   nothing older.
+ */
+export type ScheduleInput = {
+  readonly cursor: string | null
+  readonly connectedAt?: IsoTimestamp
+}
 export type ScheduleOutput = { readonly nextCursor: string | null }
+
+/**
+ * A schedule job's cursor is no longer valid — an expired sync token. The
+ * host clears the stored cursor and records the run; the next run starts as
+ * the first did, from `connectedAt`, never from the beginning of history.
+ * (SDK 1.5)
+ */
+export class CursorInvalid extends Schema.TaggedError<CursorInvalid>()(
+  'CursorInvalid',
+  { reason: Schema.String },
+) {}
+
 export type ScheduleJob<TServices = unknown> = (
   input: ScheduleInput,
-) => Effect.Effect<ScheduleOutput, JobError, TServices>
+) => Effect.Effect<ScheduleOutput, JobError | CursorInvalid, TServices>
 
 /** `event` — enrich-on-create and its kin. */
 export type EventInput = { readonly event: DomainEvent }

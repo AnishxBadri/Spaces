@@ -1,0 +1,6 @@
+---
+'@spaces/sdk': minor
+'spaces': patch
+---
+
+A syncer can file calendar meetings. `Content.logMeeting` takes a `MeetingClaim` — one event keyed by its `uid` (the iCalendar UID, plus the original start for one instance of a series), with its times, status, organizer, conference link and each attendee's answer — or a `MeetingCancellation` that names only the event, and answers `created`, `updated` or `refused` with a reason. The host judges which events are meetings and resolves attendees through the participants module mail arrives through: an event with no attendee from outside, one the owner declined, or one cancelled before it was seen writes nothing, and a meeting already held follows its event in place, a cancellation marked and never deleted. A schedule job is handed `connectedAt`, the connection's date, which a syncer never fetches before, and may fail `CursorInvalid` when its cursor expired: the host clears the cursor and records the run, and the next run starts again from `connectedAt`. The testing kit's `ContentTest` keys meetings on `uid`, and `makeFakeCalendarApi` is Google Calendar's `events.list` over a fake calendar, with an expired sync token, a 429 and a revoked token among its toggles.

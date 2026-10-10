@@ -20,6 +20,7 @@ import type { DocumentClaim } from '@spaces/sdk'
 import type * as Documents from '../../documents'
 import { QUEUES } from '../../queue/names'
 import { Enqueue } from '../../queue/enqueue'
+import { NoMeetingLane } from '../interactions/meeting-lane'
 import { birthDocumentProgram } from '../documents/birth'
 import { prepareBlobUploadProgram } from '../documents/prepare'
 import { storage } from '../storage'
@@ -109,7 +110,11 @@ const fileDocument = (
     Effect.gen(function* () {
       return yield* (yield* Content).fileDocument(claim)
     }).pipe(
-      Effect.provide(ContentLive(row).pipe(Layer.provide(RecordingEnqueue))),
+      Effect.provide(
+        ContentLive(row).pipe(
+          Layer.provide(Layer.merge(RecordingEnqueue, NoMeetingLane)),
+        ),
+      ),
     ),
   )
 

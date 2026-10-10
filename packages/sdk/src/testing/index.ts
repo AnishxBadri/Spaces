@@ -8,6 +8,7 @@ import type {
   JobError,
   JsonObject,
   JsonValue,
+  MeetingResult,
   PortName,
   SignalClaim,
 } from '../contract.ts'
@@ -269,6 +270,10 @@ export const FactsTest = (
  * Interactions dedupe on `messageId` and signals on `key` per record, as the
  * lanes do; documents never. `signals` is every signal written, a deduped
  * emit left out.
+ * - Meetings key on `uid`: the first claim is `created`, every later one
+ *   `updated`. A cancellation finds its meeting by `uid`, else `eventId`.
+ * - The fake keeps every meeting: which events are not meetings (internal,
+ *   declined, cancelled before they were seen) is the host's to decide.
  */
 export const ContentTest = (
   options: { readonly recorder?: Recorder } = {},
@@ -278,6 +283,8 @@ export const ContentTest = (
   const nextInteraction = counter('interaction')
   const nextSignal = counter('signal')
   const byMessageId = new Map<string, string>()
+  const byUid = new Map<string, string>()
+  const byEventId = new Map<string, string>()
   const byKey = new Map<string, string>()
   const signals: Array<SignalClaim> = []
   const layer = Layer.succeed(Content, {
@@ -312,6 +319,27 @@ export const ContentTest = (
         if (keyed !== null) byKey.set(keyed, signalId)
         signals.push(claim)
         return record('emitSignal', claim, { signalId })
+      }),
+    logMeeting: (claim) =>
+      Effect.sync((): MeetingResult => {
+        const held =
+          (claim.uid === undefined ? undefined : byUid.get(claim.uid)) ??
+          byEventId.get(claim.eventId)
+        if (claim._tag === 'meeting-cancelled')
+          return record(
+            'logMeeting',
+            claim,
+            held === undefined
+              ? { outcome: 'refused', reason: 'no meeting holds this event' }
+              : { outcome: 'updated', interactionId: held },
+          )
+        const interactionId = held ?? nextInteraction()
+        byUid.set(claim.uid, interactionId)
+        byEventId.set(claim.eventId, interactionId)
+        return record('logMeeting', claim, {
+          outcome: held === undefined ? 'created' : 'updated',
+          interactionId,
+        })
       }),
   })
   return { layer, calls, signals }
@@ -883,3 +911,20 @@ export type {
   DriveApiRequest,
   FetchLike,
 } from './fake-drive-api.ts'
+
+// Google Calendar's events.list over a fake calendar — a syncer's provider
+export {
+  makeFakeCalendarApi,
+  fakeCalendarSeed,
+  CALENDAR_API,
+  FAKE_CALENDAR_OWNER,
+  FAKE_CALENDAR_TOKEN,
+} from './fake-calendar-api.ts'
+export type {
+  FakeCalendarApi,
+  FakeCalendarApiOptions,
+  FakeCalendarAttendee,
+  FakeCalendarEvent,
+  FakeCalendarTime,
+  CalendarApiRequest,
+} from './fake-calendar-api.ts'

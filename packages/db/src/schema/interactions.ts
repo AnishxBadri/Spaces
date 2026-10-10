@@ -63,6 +63,11 @@ export type MeetingMeta = {
   recurring_instance_id: string | null
   /** Participant email → their answer. Shown, never edited. */
   rsvp: { [email: string]: MeetingRsvp }
+  /**
+   * The calendar's own id for the event: how a deleted event, which may name
+   * nothing else, finds its row.
+   */
+  calendar_event_id?: string
 }
 
 /** `interaction.meta` for a call a recorder births (D68). */

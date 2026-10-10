@@ -86,24 +86,50 @@ export async function workspaceIdentity(
   return { ownDomains, memberEmails: members.map((m) => m.email) }
 }
 
-export const participantRecordsProgram = Effect.fn('participantRecords')(
+/** The addresses an arrival names: a message's headers, or a meeting's organizer and attendees. */
+export type ParticipantAddresses = Pick<ArrivalMessage, 'from' | 'to' | 'cc'>
+
+const attempt = <T>(f: () => Promise<T>) =>
+  Effect.tryPromise({
+    try: f,
+    catch: (cause) => new ParticipantRecordsFailed({ cause }),
+  })
+
+/** `decideParticipants` against who the workspace is, read now. */
+export const participantDecisionsProgram = Effect.fn('participantDecisions')(
   function* (
-    message: ArrivalMessage,
-    ctx: ParticipantContext,
-  ): Effect.fn.Return<ParticipantRecords, ParticipantRecordsFailed> {
-    const run = <T>(f: () => Promise<T>) =>
-      Effect.tryPromise({
-        try: f,
-        catch: (cause) => new ParticipantRecordsFailed({ cause }),
-      })
-    const identity = yield* run(() => workspaceIdentity(ctx.integrationId))
-    const decisions = decideParticipants({
-      from: message.from,
-      to: message.to,
-      cc: message.cc,
+    addresses: ParticipantAddresses,
+    integrationId: string,
+  ): Effect.fn.Return<Array<ParticipantDecision>, ParticipantRecordsFailed> {
+    const identity = yield* attempt(() => workspaceIdentity(integrationId))
+    return decideParticipants({
+      from: addresses.from,
+      to: addresses.to,
+      cc: addresses.cc,
       ...identity,
     })
+  },
+)
 
+export const participantRecordsProgram = Effect.fn('participantRecords')(
+  function* (
+    addresses: ParticipantAddresses,
+    ctx: ParticipantContext,
+  ): Effect.fn.Return<ParticipantRecords, ParticipantRecordsFailed> {
+    const decisions = yield* participantDecisionsProgram(
+      addresses,
+      ctx.integrationId,
+    )
+    return yield* resolveParticipantsProgram(decisions, ctx)
+  },
+)
+
+/** Every `create` decision through `resolveEntity`, as the module comment says. */
+export const resolveParticipantsProgram = Effect.fn('resolveParticipants')(
+  function* (
+    decisions: Array<ParticipantDecision>,
+    ctx: ParticipantContext,
+  ): Effect.fn.Return<ParticipantRecords, ParticipantRecordsFailed> {
     const source: ResolveSource = {
       class: 'integration',
       ref: ctx.integrationId,
@@ -114,7 +140,7 @@ export const participantRecordsProgram = Effect.fn('participantRecords')(
       const { company, person } = d
       if (company !== null) {
         results.push(
-          yield* run(() =>
+          yield* attempt(() =>
             resolveEntity({
               kind: 'company',
               name: company.name,
@@ -127,7 +153,7 @@ export const participantRecordsProgram = Effect.fn('participantRecords')(
       }
       if (person !== null) {
         results.push(
-          yield* run(() =>
+          yield* attempt(() =>
             resolveEntity({
               kind: 'person',
               ...(person.name === null ? {} : { name: person.name }),

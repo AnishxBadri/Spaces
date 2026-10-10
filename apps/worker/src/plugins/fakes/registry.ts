@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { makeFakeDriveApi } from '@spaces/sdk/testing'
-import type { FakeDriveApi } from '@spaces/sdk/testing'
+import { makeFakeCalendarApi, makeFakeDriveApi } from '@spaces/sdk/testing'
+import type { FakeCalendarApi, FakeDriveApi } from '@spaces/sdk/testing'
 import { workspaceRoot } from '@spaces/core/writes/vault/key'
 import { loadCassette } from './cassette'
 import { makeFakeProvider } from './provider'
@@ -28,6 +28,11 @@ const STATEFUL: { readonly [pluginId: string]: () => FakeDriveApi } = {
   'google-drive': () => makeFakeDriveApi(),
 }
 
+/** The calendar a syncer reads, laid out around the moment it is first asked for. */
+const CALENDARS: { readonly [pluginId: string]: () => FakeCalendarApi } = {
+  'google-calendar': () => makeFakeCalendarApi(),
+}
+
 const PLUGIN_ID = /^[a-z0-9][a-z0-9-]*$/
 
 export const cassetteProviders = (
@@ -37,9 +42,12 @@ export const cassetteProviders = (
   readonly provider: (pluginId: string) => FakeProvider | null
   /** The stateful fake behind a stand-in; null when there is none. */
   readonly api: (pluginId: string) => FakeDriveApi | null
+  /** The fake calendar behind a stand-in; null when there is none. */
+  readonly calendar: (pluginId: string) => FakeCalendarApi | null
 } => {
   const made = new Map<string, FakeProvider | null>()
   const apis = new Map<string, FakeDriveApi | null>()
+  const calendars = new Map<string, FakeCalendarApi | null>()
   const inWorkspace = (pluginId: string) =>
     root !== null && PLUGIN_ID.test(pluginId)
       ? path.join(root, 'plugins', pluginId)
@@ -69,11 +77,24 @@ export const cassetteProviders = (
     apis.set(pluginId, fake)
     return fake
   }
+  const calendar = (pluginId: string): FakeCalendarApi | null => {
+    const cached = calendars.get(pluginId)
+    if (cached !== undefined) return cached
+    const make = Object.hasOwn(CALENDARS, pluginId)
+      ? CALENDARS[pluginId]
+      : undefined
+    const dir = inWorkspace(pluginId)
+    const fake =
+      make !== undefined && dir !== null && existsSync(dir) ? make() : null
+    calendars.set(pluginId, fake)
+    return fake
+  }
   return {
     provider,
     api,
+    calendar,
     standIn: (pluginId): StandIn | null => {
-      const stateful = api(pluginId)
+      const stateful = api(pluginId) ?? calendar(pluginId)
       if (stateful !== null)
         return {
           fetch: stateful.fetch,

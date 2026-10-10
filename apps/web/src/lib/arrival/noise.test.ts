@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { isRoleSender, refusal } from './noise'
-import type { NoiseInput, NoiseReason } from './noise'
+import { isRoleSender, meetingRefusal, refusal } from './noise'
+import type {
+  MeetingNoiseInput,
+  MeetingNoiseReason,
+  NoiseInput,
+  NoiseReason,
+} from './noise'
+import { decideParticipants } from './participants'
 
 /**
  * SPA-56: the noise refusals, as a fixture table and nothing else — no
@@ -136,5 +142,95 @@ describe('isRoleSender', () => {
     expect(isRoleSender('notifications+deals@github.com')).toBe(true)
     expect(isRoleSender('noreply.person@acme.io')).toBe(false)
     expect(isRoleSender('not-an-address')).toBe(false)
+  })
+})
+
+/**
+ * The calendar's refusals, as a table over the participants module's own
+ * decisions — the fund is `fund.example`, with one member on Gmail. No
+ * database: the attendee lists go through `decideParticipants` as the lane
+ * hands them over.
+ */
+describe('meetingRefusal — the calendar table', () => {
+  const decisions = (...emails: Array<string>) =>
+    decideParticipants({
+      from: null,
+      to: emails.map((email) => ({ email, name: null })),
+      cc: [],
+      ownDomains: ['fund.example'],
+      memberEmails: ['anish@fund.example', 'a.partner@gmail.com'],
+    })
+  const external: MeetingNoiseInput = {
+    status: 'scheduled',
+    selfRsvp: 'accepted',
+    decisions: decisions('anish@fund.example', 'jane@acme-robotics.io'),
+  }
+
+  const CALENDAR: ReadonlyArray<{
+    name: string
+    input: Partial<MeetingNoiseInput>
+    verdict: MeetingNoiseReason | null
+  }> = [
+    { name: 'a founder on the invite', input: {}, verdict: null },
+    {
+      name: 'a lawyer on Gmail is outside too',
+      input: { decisions: decisions('anish@fund.example', 'lawyer@gmail.com') },
+      verdict: null,
+    },
+    {
+      name: 'the partner standup: every attendee a member',
+      input: {
+        decisions: decisions('anish@fund.example', 'a.partner@gmail.com'),
+      },
+      verdict: 'internal',
+    },
+    {
+      name: 'a colleague at the fund’s own domain who is not a member',
+      input: { decisions: decisions('anish@fund.example', 'ops@fund.example') },
+      verdict: 'internal',
+    },
+    {
+      name: 'members and a machine',
+      input: {
+        decisions: decisions('anish@fund.example', 'noreply@zoom.us'),
+      },
+      verdict: 'internal',
+    },
+    {
+      name: 'a solo block with no attendees',
+      input: { decisions: decisions() },
+      verdict: 'internal',
+    },
+    {
+      name: 'declined by the owner',
+      input: { selfRsvp: 'declined' },
+      verdict: 'declined',
+    },
+    {
+      name: 'tentative is still a meeting',
+      input: { selfRsvp: 'tentative' },
+      verdict: null,
+    },
+    {
+      name: 'the owner not on the list',
+      input: { selfRsvp: null },
+      verdict: null,
+    },
+    {
+      name: 'cancelled before it was seen',
+      input: { status: 'cancelled' },
+      verdict: 'cancelled',
+    },
+    {
+      name: 'cancelled outranks internal',
+      input: { status: 'cancelled', decisions: decisions() },
+      verdict: 'cancelled',
+    },
+  ]
+
+  it.each(CALENDAR)('$name', ({ input, verdict }) => {
+    expect(meetingRefusal({ ...external, ...input })?.reason ?? null).toBe(
+      verdict,
+    )
   })
 })

@@ -148,6 +148,8 @@ describe('the record page, for a document a plugin filed', () => {
     const { Content } = await import('@spaces/sdk')
     const { Enqueue } = await import('@spaces/core/queue/enqueue')
     const { ContentLive } = await import('@spaces/core/writes/ports/content')
+    const { NoMeetingLane } =
+      await import('@spaces/core/writes/interactions/meeting-lane')
     const { storage } = await import('@spaces/core/writes/storage')
     const { documentProvenance } = await import('#/lib/server/shared')
     const { recordTimelineProgram } = await import('./record')
@@ -189,9 +191,12 @@ describe('the record page, for a document a plugin filed', () => {
         Effect.provide(
           ContentLive(row).pipe(
             Layer.provide(
-              Layer.succeed(
-                Enqueue,
-                Enqueue.of({ enqueue: () => Effect.succeed(null) }),
+              Layer.merge(
+                Layer.succeed(
+                  Enqueue,
+                  Enqueue.of({ enqueue: () => Effect.succeed(null) }),
+                ),
+                NoMeetingLane,
               ),
             ),
           ),

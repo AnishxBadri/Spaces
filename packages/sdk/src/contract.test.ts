@@ -19,6 +19,9 @@ import type {
   InteractionClaim,
   JsonObject,
   JudgmentClaim,
+  MeetingAttendee,
+  MeetingCancellation,
+  MeetingClaim,
   NoteProposal,
   ReceiptClaim,
   Ref,
@@ -66,6 +69,15 @@ describe('claims carry no provenance (D52)', () => {
     >().toEqualTypeOf<never>()
     expectTypeOf<
       Extract<KeysOf<SignalClaim>, Provenance>
+    >().toEqualTypeOf<never>()
+    expectTypeOf<
+      Extract<KeysOf<MeetingClaim>, Provenance>
+    >().toEqualTypeOf<never>()
+    expectTypeOf<
+      Extract<KeysOf<MeetingCancellation>, Provenance>
+    >().toEqualTypeOf<never>()
+    expectTypeOf<
+      Extract<KeysOf<MeetingAttendee>, Provenance>
     >().toEqualTypeOf<never>()
     expectTypeOf<
       Extract<KeysOf<JudgmentClaim>, Provenance>

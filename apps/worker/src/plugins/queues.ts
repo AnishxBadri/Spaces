@@ -3,7 +3,12 @@ import { eq, sql } from 'drizzle-orm'
 import type { PgBoss } from 'pg-boss'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { importBatch, integration, spaceWatch } from '@spaces/db/schema'
+import {
+  accountConnection,
+  importBatch,
+  integration,
+  spaceWatch,
+} from '@spaces/db/schema'
 import { runLinePrefix } from '@spaces/core/import/commit'
 import { fileJobData } from '@spaces/core/import/dialect'
 import type { FileJobData } from '@spaces/core/import/dialect'
@@ -212,16 +217,31 @@ const queueOptions = (declared: JobDeclaration) => {
 // The schedule cursor
 // ---------------------------------------------------------------------------
 
-/** The cursor a schedule job's next run is handed: null before its first. */
-export const readCursor = (
+/**
+ * What a schedule job's next run is handed: its cursor, null before its
+ * first, and `connectedAt` — the bound connection's `created_at`, else the
+ * row's — which a syncer never fetches before.
+ */
+export const readScheduleInput = (
   integrationId: string,
   job: string,
-): Effect.Effect<string | null, JobRetryable> =>
+): Effect.Effect<
+  { readonly cursor: string | null; readonly connectedAt?: string },
+  JobRetryable
+> =>
   Effect.tryPromise({
     try: () =>
       db
-        .select({ cursors: integration.cursors })
+        .select({
+          cursors: integration.cursors,
+          installedAt: integration.createdAt,
+          connectedAt: accountConnection.createdAt,
+        })
         .from(integration)
+        .leftJoin(
+          accountConnection,
+          eq(accountConnection.id, integration.connectionId),
+        )
         .where(eq(integration.id, integrationId)),
     catch: (error) =>
       new JobRetryable({
@@ -229,8 +249,13 @@ export const readCursor = (
       }),
   }).pipe(
     Effect.map((rows) => {
-      const cursors = rows.at(0)?.cursors ?? {}
-      return Object.hasOwn(cursors, job) ? cursors[job] : null
+      const row = rows.at(0)
+      const cursors = row?.cursors ?? {}
+      const cursor = Object.hasOwn(cursors, job) ? cursors[job] : null
+      const since = row?.connectedAt ?? row?.installedAt
+      return since === undefined
+        ? { cursor }
+        : { cursor, connectedAt: since.toISOString() }
     }),
   )
 
@@ -591,8 +616,8 @@ const workPlan = (
           schema: scheduleData,
           run: () =>
             Effect.gen(function* () {
-              const cursor = yield* readCursor(integrationId, plan.job)
-              const out = yield* invoke(integrationId, plan.job, { cursor })
+              const input = yield* readScheduleInput(integrationId, plan.job)
+              const out = yield* invoke(integrationId, plan.job, input)
               if (out === undefined || !('nextCursor' in out)) {
                 return yield* new JobPermanent({
                   reason: `${plan.queue} returned no { nextCursor }`,
@@ -600,7 +625,10 @@ const workPlan = (
               }
               const next = out.nextCursor
               const result: JobClose = {
-                summary: `nextCursor ${next ?? 'null'}`,
+                summary:
+                  'cursorInvalid' in out
+                    ? `cursor invalid, cleared: ${out.cursorInvalid}`
+                    : `nextCursor ${next ?? 'null'}`,
                 close: (tx) => writeCursor(tx, integrationId, plan.job, next),
               }
               return result

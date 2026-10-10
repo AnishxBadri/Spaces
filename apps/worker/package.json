@@ -43,6 +43,7 @@
     "@spaces/plugin-discover": "workspace:*",
     "@spaces/plugin-echo": "workspace:*",
     "@spaces/plugin-gatecrasher": "workspace:*",
+    "@spaces/plugin-google-calendar": "workspace:*",
     "@spaces/plugin-google-drive": "workspace:*",
     "@spaces/plugin-hooked": "workspace:*",
     "@spaces/plugin-importer": "workspace:*",

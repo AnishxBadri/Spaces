@@ -7,6 +7,7 @@ import { startHeartbeat, workerIdentity } from './heartbeat'
 import { workerEnqueue } from './plugins/enqueue'
 import { FAKE_PROVIDERS_ENV, loadFakeProviders } from './plugins/fakes/switch'
 import { makePluginHost } from './plugins/host'
+import { meetingLaneLive } from './plugins/meetings'
 import { storageSourcesLayer } from './plugins/storage-source'
 import {
   AUTOUPDATE_ENV,
@@ -100,6 +101,7 @@ async function main() {
     )
   const plugins = makePluginHost({
     enqueue: workerEnqueue(requireEnv('DATABASE_URL')),
+    meetings: meetingLaneLive,
     queues: { boss, host },
     fakes,
   })

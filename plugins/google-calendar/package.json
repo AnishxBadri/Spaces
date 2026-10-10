@@ -1,0 +1,31 @@
+{
+  "//": "Google Calendar, the first syncer: one `schedule` job lists the connected user's primary calendar with singleEvents and showDeleted, forward-only from the connection's created_at and then from Google's sync token, and hands each event to Content.logMeeting keyed by its iCalUID. The host decides which events are meetings and resolves attendees through its participants module; an expired sync token is CursorInvalid, never a full-history import. Depends on @spaces/sdk only; effect and zod are peers the host provides.",
+  "name": "@spaces/plugin-google-calendar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "pack:plugin": "spaces-plugin-pack .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10",
+    "zod": "^4.3.6"
+  }
+}

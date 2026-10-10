@@ -1,3 +1,5 @@
+import type { ParticipantDecision } from './participants'
+
 /**
  * The arrival lane's noise judgement (SPA-56), pure: which mail is refused
  * before anything is written. Pure and on its own because the calendar lane
@@ -123,5 +125,42 @@ export function refusal(input: NoiseInput): Refusal | null {
       detail: `sent by ${input.sender.trim().toLowerCase()}`,
     }
 
+  return null
+}
+
+/**
+ * The calendar's refusals: which events are not meetings the workspace keeps.
+ * Checked in this order, and only before a meeting is first written — one
+ * already held follows its event, a cancellation included (D68).
+ *
+ * - **cancelled** — an event cancelled before it was ever seen did not happen.
+ * - **declined** — the calendar's owner said no; it is not their meeting.
+ * - **internal** — no attendee from outside: every one is a member, at an
+ *   own domain, or a machine. The participants module decides who is
+ *   outside, so this rule and the mail lane cannot disagree about a person.
+ */
+
+export type MeetingNoiseReason = 'cancelled' | 'declined' | 'internal'
+
+export type MeetingNoiseInput = {
+  status: 'scheduled' | 'cancelled'
+  /** The owner's own answer; null when the owner is not on the list. */
+  selfRsvp: 'accepted' | 'declined' | 'tentative' | 'needs_action' | null
+  /** `decideParticipants` over the organizer and every attendee. */
+  decisions: ReadonlyArray<Pick<ParticipantDecision, 'action'>>
+}
+
+export type MeetingRefusal = { reason: MeetingNoiseReason; detail: string }
+
+/** The refusal for a calendar event, or null when it is a meeting to keep. */
+export function meetingRefusal(
+  input: MeetingNoiseInput,
+): MeetingRefusal | null {
+  if (input.status === 'cancelled')
+    return { reason: 'cancelled', detail: 'cancelled before it was synced' }
+  if (input.selfRsvp === 'declined')
+    return { reason: 'declined', detail: 'declined by the calendar owner' }
+  if (!input.decisions.some((d) => d.action === 'create'))
+    return { reason: 'internal', detail: 'no attendee from outside' }
   return null
 }
