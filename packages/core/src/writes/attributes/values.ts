@@ -22,6 +22,7 @@ import {
 import type { EmbedSource } from '../ai/chunk-sources'
 import {
   identityNorm,
+  isNonIdentityValue,
   toObjectKind,
   valueValidator,
 } from '../../attributes/registry'
@@ -259,6 +260,8 @@ const identityList = (v: Json): Array<string> =>
  * - An element another record holds is refused: dropped from the value and
  *   raised as a `duplicate_candidate`; the rest of the patch still writes.
  * - A slug the patch named without changing it is reconciled the same way.
+ * - A non-identity element (`isNonIdentityValue`) is stored and never
+ *   claimed, so any number of records may hold it.
  */
 async function claimIdentityElements(
   tx: Tx,
@@ -293,7 +296,11 @@ async function claimIdentityElements(
     const kept: Array<string> = []
     for (const value of after) {
       const norm = identityNorm(key, value)
-      if (norm === null) continue
+      if (norm === null) {
+        // A role address is kept as contact data and claims nothing.
+        if (isNonIdentityValue(key, value)) kept.push(value)
+        continue
+      }
       const outcome = await claimIdentityAlias(tx, entityId, key, value, source)
       results.push({ value: norm, outcome })
       if (outcome !== 'suggested_duplicate') kept.push(value)

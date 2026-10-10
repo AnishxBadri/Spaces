@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { isNonIdentityValue } from '@spaces/core/attributes/registry'
+import { ROLE_PREFIXES } from '@spaces/core/entities/normalize'
 import type { Address } from './forwarded'
 import { companyName, decideParticipants } from './participants'
 import type { ParticipantDecision, ParticipantsInput } from './participants'
@@ -114,6 +116,18 @@ describe('decideParticipants', () => {
       company: { domain: 'acme.io', name: 'Acme' },
     })
   })
+
+  it.each([...ROLE_PREFIXES])(
+    'a %s@ address makes no person, and on a person it is a non-identity value',
+    (prefix) => {
+      // The arrival rule and the value rule read the one role list.
+      const address = `${prefix}@acme.io`
+      const decision = one(at(address))
+      if (decision.action === 'create') expect(decision.person).toBeNull()
+      else expect(decision.action).toBe('ignore')
+      expect(isNonIdentityValue('email', address)).toBe(true)
+    },
+  )
 
   it('a shared inbox at a free provider is ignored', () => {
     expect(one(at('hello@gmail.com'))).toMatchObject({

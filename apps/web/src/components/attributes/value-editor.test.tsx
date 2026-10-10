@@ -70,3 +70,33 @@ describe('ValueEditor — currency at rest', () => {
     expect(inputValue(founded, 1987, 'cell').value).toBe('1987')
   })
 })
+
+describe('ValueEditor — a person’s emails', () => {
+  const emails: RegistryEntry = {
+    slug: 'emails',
+    name: 'Emails',
+    type: 'email',
+    isSystem: true,
+    options: { multi: true, identityKey: 'email' },
+  }
+  const render = (def: RegistryEntry, value: Array<string>) =>
+    renderToStaticMarkup(
+      <ValueEditor def={def} value={value} variant="field" onSave={() => {}} />,
+    )
+
+  it('marks a role address as a shared inbox, and only that one', () => {
+    const html = render(emails, ['jane@acme.example', 'info@acme.example'])
+    expect(html).toContain('info@acme.example')
+    expect(html.match(/shared inbox/g)).toHaveLength(1)
+  })
+
+  it('leaves the mark off an email attribute that is not identity', () => {
+    const plain: RegistryEntry = {
+      ...emails,
+      slug: 'billing',
+      isSystem: false,
+      options: { multi: true },
+    }
+    expect(render(plain, ['info@acme.example'])).not.toContain('shared inbox')
+  })
+})

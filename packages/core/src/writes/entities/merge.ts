@@ -21,7 +21,7 @@ import type {
 } from '@spaces/db/schema/entities'
 import type { Json } from '@spaces/db/json'
 import { activity } from '@spaces/db/schema/activity'
-import { identityNorm } from '../../attributes/registry'
+import { identityForm } from '../../attributes/registry'
 import { recomputeInteractionStats } from '../interactions/stats'
 import type { CoreIdentityKey } from '../../attributes/registry'
 import {
@@ -103,9 +103,9 @@ function unionElements(
   const list = (v: Json | undefined): Array<string> =>
     Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
   const out = list(winnerVal)
-  const seen = new Set(out.map((v) => identityNorm(key, v) ?? v))
+  const seen = new Set(out.map((v) => identityForm(key, v) ?? v))
   for (const v of list(loserVal)) {
-    const norm = identityNorm(key, v) ?? v
+    const norm = identityForm(key, v) ?? v
     if (seen.has(norm)) continue
     seen.add(norm)
     out.push(v)

@@ -1536,7 +1536,9 @@ merge_event(id, winner_id, loser_id, merged_by, merged_at, snapshot jsonb, unmer
   **Free-mail domains never create or match a company** — founder@gmail.com is a person
   signal only.
 - Email → lowercase exact. Gmail-only dot/+tag stripping _for matching_; store original.
-  Role prefixes (info@, hello@, team@, careers@) are never person-identity.
+  Role prefixes (info@, hello@, team@, careers@) are never person-identity. On a
+  person's `emails` one is still stored, as a non-identity value with no alias (D75
+  amendment): marked "shared inbox", matched on by nothing, and free for two people to share.
 - Name → unaccent, lowercase, strip legal suffixes (Inc, Ltd, Pvt Ltd, LLC, GmbH, SAS…).
   Feeds `pg_trgm` only.
 

@@ -9,7 +9,7 @@ import {
   entityAlias,
 } from '@spaces/db/schema'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
-import { resolveEntity } from '../entities/resolve'
+import { RESOLVE_NEEDS_NAME_OR_KEY, resolveEntity } from '../entities/resolve'
 import { setValues, setValuesInTx } from './values'
 
 /**
@@ -282,19 +282,86 @@ describe('emails on a person', () => {
 })
 
 describe('the free-mail and role-prefix rules hold on the value side', () => {
-  it('a role email never identifies a person, as a value or a key', async () => {
+  it('a role email is stored on a person as a value that claims nothing', async () => {
     const t = tag()
-    const id = await person('Role')
-    await expect(
-      setValues({
+    const id = await person('Role', `jane-${t}@role.example`)
+    const result = await setValues({
+      entityId: id,
+      patch: {
+        emails: [`jane-${t}@role.example`, `Info@role-${t}.example`],
+      },
+      actor,
+    })
+    expect((await valuesOf(id)).emails).toEqual([
+      `jane-${t}@role.example`,
+      `Info@role-${t}.example`,
+    ])
+    expect(result.identityClaims.emails.map((c) => c.value)).toEqual([
+      `jane-${t}@role.example`,
+    ])
+    expect(result.identityAdded).toEqual([])
+    // Only the identifying address reaches the identity index.
+    expect(await emailAliases(id)).toEqual([`jane-${t}@role.example`])
+    const anyAlias = await db
+      .select({ valueNorm: entityAlias.valueNorm })
+      .from(entityAlias)
+      .where(
+        and(
+          eq(entityAlias.entityId, id),
+          eq(entityAlias.valueNorm, `info@role-${t}.example`),
+        ),
+      )
+    expect(anyAlias).toEqual([])
+  })
+
+  it('two people may both carry the same role email, with no duplicate raised', async () => {
+    const t = tag()
+    const a = await person('Team A')
+    const b = await person('Team B')
+    for (const id of [a, b])
+      await setValues({
         entityId: id,
-        patch: { emails: [`info@role-${t}.example`] },
+        patch: { emails: [`team@acme-${t}.example`] },
         actor,
+      })
+    expect((await valuesOf(a)).emails).toEqual([`team@acme-${t}.example`])
+    expect((await valuesOf(b)).emails).toEqual([`team@acme-${t}.example`])
+    expect(await candidatesBetween(a, b)).toEqual([])
+  })
+
+  it('resolveEntity on a role email resolves no person and creates none', async () => {
+    const t = tag()
+    const role = `info@acme-${t}.example`
+    const holder = await person('Holder')
+    await setValues({ entityId: holder, patch: { emails: [role] }, actor })
+    const people = async () =>
+      (
+        await db
+          .select({ id: entity.id })
+          .from(entity)
+          .where(eq(entity.kind, 'person'))
+      ).length
+    const before = await people()
+    await expect(
+      resolveEntity({
+        kind: 'person',
+        keys: { email: role },
+        source: { class: 'manual' },
       }),
-    ).rejects.toThrow(/never identifies a record/)
-    const keyed = await person('Role key', `careers@role-${t}.example`)
-    expect((await valuesOf(keyed)).emails).toBeUndefined()
-    expect(await emailAliases(keyed)).toEqual([])
+    ).rejects.toThrow(RESOLVE_NEEDS_NAME_OR_KEY)
+    expect(await people()).toBe(before)
+    // As a key beside a name it is no claim: the holder is not matched,
+    // and the record born from the name does not take the address.
+    const named = await resolveEntity({
+      kind: 'person',
+      name: `Someone ${t}`,
+      keys: { email: role },
+      source: { class: 'manual' },
+    })
+    expect(named.action).toBe('created')
+    expect(named.entityId).not.toBe(holder)
+    expect((await valuesOf(named.entityId)).emails).toBeUndefined()
+    expect(await emailAliases(named.entityId)).toEqual([])
   })
 
   it('a free-mail domain never identifies a company', async () => {

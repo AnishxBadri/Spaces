@@ -11,7 +11,13 @@ import { Input } from '#/components/ui/input'
 import { DitherMark, InitialsMark } from '#/components/record/record-parts'
 import { Badge } from '#/components/ui/badge'
 import { Checkbox } from '#/components/ui/checkbox'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '#/components/ui/tooltip'
 import { liveOptions, optionState } from '@spaces/core/attributes/options'
+import { isNonIdentityValue } from '@spaces/core/attributes/registry'
 import { formatDate, formatNumber } from '@spaces/core/format'
 import { fmtMoney } from '@spaces/core/portfolio/format'
 import { listUsers, searchEntities } from '#/lib/server-fns'
@@ -571,11 +577,14 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
             <span className="text-ui text-graphite">—</span>
           ) : (
             selected.map((v) => (
-              <span
-                key={v}
-                className="flex h-5 items-center truncate border border-rule bg-paper px-1.5 mono text-label"
-              >
-                {v}
+              <span key={v} className="flex min-w-0 items-center gap-1">
+                <span className="flex h-5 items-center truncate border border-rule bg-paper px-1.5 mono text-label">
+                  {v}
+                </span>
+                {def.options?.identityKey !== undefined &&
+                isNonIdentityValue(def.options.identityKey, v) ? (
+                  <SharedInboxMark />
+                ) : null}
               </span>
             ))
           )}
@@ -618,6 +627,23 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+/** The quiet mark beside a role address on a person's emails. */
+function SharedInboxMark() {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="shrink-0 mono text-micro text-graphite">
+          shared inbox
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-64">
+        A role address. Kept as contact data; never used to match or create a
+        person.
+      </TooltipContent>
+    </Tooltip>
   )
 }
 

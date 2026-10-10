@@ -199,21 +199,27 @@ const dateString = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
 
 /**
- * The normalizer each identity key is matched by — the same functions
+ * The normal form each identity key is compared in — the same functions
  * `resolveEntity` and the alias writer use, so the validator and the alias
- * agree on what the value means by construction. An email that only a role
- * sends from (`info@`) identifies no person, so it normalizes to nothing.
+ * agree on what the value means by construction. Null: not a valid key.
  */
-const IDENTITY_NORMALIZERS: Record<
-  CoreIdentityKey,
-  (raw: string) => string | null
-> = {
-  domain: normalizeDomain,
-  email: (raw) => {
-    const norm = normalizeEmail(raw)
-    return norm === null || isRoleEmail(norm) ? null : norm
-  },
-  linkedin: normalizeLinkedin,
+const IDENTITY_FORMS: Record<CoreIdentityKey, (raw: string) => string | null> =
+  {
+    domain: normalizeDomain,
+    email: normalizeEmail,
+    linkedin: normalizeLinkedin,
+  }
+
+/**
+ * Whether `raw` is stored on an identity attribute but claims nothing: a
+ * role address (`info@`, `team@` — `isRoleEmail`, the one list) on a
+ * person's emails. It is real contact data, so it is kept, but it never
+ * gains an `entity_alias` row, so nothing matches on it or births from it.
+ */
+export function isNonIdentityValue(key: CoreIdentityKey, raw: string): boolean {
+  if (key !== 'email') return false
+  const form = normalizeEmail(raw)
+  return form !== null && isRoleEmail(form)
 }
 
 /**
@@ -243,14 +249,26 @@ export function storableIdentity(
   }).safeParse([raw]).success
 }
 
-/** The identity normal form of one element, or null when it identifies nothing. */
+/**
+ * The identity normal form of one element, or null when it identifies
+ * nothing: an invalid key, or a non-identity one (`isNonIdentityValue`).
+ */
 export function identityNorm(key: CoreIdentityKey, raw: string): string | null {
-  return IDENTITY_NORMALIZERS[key](raw)
+  return isNonIdentityValue(key, raw) ? null : IDENTITY_FORMS[key](raw)
+}
+
+/**
+ * The normal form an element is de-duplicated on: `identityNorm`, except a
+ * non-identity value keeps one (`Info@acme.example` is `info@acme.example`).
+ */
+export function identityForm(key: CoreIdentityKey, raw: string): string | null {
+  return IDENTITY_FORMS[key](raw)
 }
 
 /**
  * An identity-backed value has to survive normalization, because the claim
- * it makes is the normalized form (spec §9). `domain` is `z.string().max(255)`
+ * it makes is the normalized form (spec §9); a role address survives it and
+ * is stored as non-identity (`isNonIdentityValue`). `domain` is `z.string().max(255)`
  * for everyone else — deliberately permissive, it is a field like any other
  * — but on an attribute carrying `options.identityKey` a value that
  * normalizes to null would be stored and then silently claim nothing, which
@@ -263,7 +281,7 @@ const identityValue = (
   key: CoreIdentityKey,
 ): z.ZodType<string, string> =>
   base.superRefine((raw, ctx) => {
-    if (IDENTITY_NORMALIZERS[key](raw) !== null) return
+    if (IDENTITY_FORMS[key](raw) !== null) return
     ctx.addIssue({
       code: 'custom',
       message: `${raw.trim().toLowerCase()} never identifies a record`,
@@ -292,7 +310,7 @@ const multiText = (
       const out: Array<string> = []
       for (const raw of items) {
         const value = identityElement(type, raw)
-        const norm = key ? (identityNorm(key, value) ?? value) : value
+        const norm = key ? (identityForm(key, value) ?? value) : value
         if (seen.has(norm)) continue
         seen.add(norm)
         out.push(value)
