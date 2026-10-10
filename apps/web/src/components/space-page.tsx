@@ -63,7 +63,7 @@ import { runBinding, usePageActions } from '#/lib/page-actions'
  * A space reads like a record (D73, D74): the head with its stamp, crumb
  * and three readouts; the details column left (Criteria, Watching, What's
  * moving, Map, Glossary, Tasks); the tabbed view right. The route owns which
- * tab is open.
+ * tab is open, and `into` — the subspace a split moves companies into.
  */
 
 type Term = Awaited<ReturnType<typeof listTerms>>[number]
@@ -75,6 +75,7 @@ export function SpacePageView({
   sensitivity,
   watching,
   tab,
+  into,
   onTabChange,
 }: {
   spc: Space
@@ -82,6 +83,7 @@ export function SpacePageView({
   sensitivity: Sensitivity
   watching: SpaceWatching
   tab: SpaceTab
+  into: string | null
   onTabChange: (tab: SpaceTab) => void
 }) {
   const navigate = useNavigate()
@@ -89,6 +91,8 @@ export function SpacePageView({
   const [renaming, setRenaming] = useState(false)
   const [moving, setMoving] = useState(false)
   const [composing, setComposing] = useState(false)
+  // ··· New subspace is a split: the new child becomes Move here's target.
+  const [splitting, setSplitting] = useState(false)
   const [templating, setTemplating] = useState(false)
   const [addingWatch, setAddingWatch] = useState(false)
   const archived = spc.archive !== null || spc.archivedUnder !== null
@@ -125,6 +129,21 @@ export function SpacePageView({
       toast.error(err instanceof Error ? err.message : 'Could not create note')
     }
   }
+  /** A split lands here on Companies, selecting into the new child. (D73) */
+  async function subspaceCreated(id: string) {
+    setComposing(false)
+    if (splitting) {
+      setSplitting(false)
+      await navigate({
+        to: '/spaces/$spaceId',
+        params: { spaceId: spc.id },
+        search: { tab: 'companies', into: id },
+        resetScroll: false,
+      })
+    }
+    void router.invalidate()
+  }
+
   useHotkey('n', () => void newNote())
   usePageActions([
     { id: 'note', label: 'Note here', key: 'N', run: runBinding('N') },
@@ -198,7 +217,10 @@ export function SpacePageView({
               name={spc.name}
               archived={spc.archive !== null}
               onRename={() => setRenaming(true)}
-              onSubspace={() => setComposing(true)}
+              onSubspace={() => {
+                setSplitting(true)
+                setComposing(true)
+              }}
               onMove={() => setMoving(true)}
               onTemplate={() => setTemplating(true)}
               onArchive={() => void archive()}
@@ -311,7 +333,11 @@ export function SpacePageView({
                 parentId={spc.id}
                 first={spc.children.length === 0}
                 editing={composing}
-                onEditingChange={setComposing}
+                onEditingChange={(editing) => {
+                  setComposing(editing)
+                  if (!editing) setSplitting(false)
+                }}
+                onCreated={(id) => void subspaceCreated(id)}
               />
             </RailSection>
 
@@ -329,6 +355,7 @@ export function SpacePageView({
         <SpaceTabs
           spc={spc}
           tab={tab}
+          into={into}
           onTabChange={onTabChange}
           onNewNote={(kind) => void newNote(kind)}
         />
@@ -366,12 +393,15 @@ function SpaceMenu({
 }) {
   const starred = useStarredSpaces().some((s) => s.id === id)
   useEffect(() => syncStarredSpaceName({ id, name }), [id, name])
-  // Rename and New subspace open a field: focus goes there, not back to ···.
+  // Rename and Save as template: focus goes to what they open, not to ···.
   const keepFocus = useRef(false)
   const opening = (open: () => void) => () => {
     keepFocus.current = true
     open()
   }
+  // New subspace opens once the menu's focus trap has let go; opened
+  // inside it, the field's autofocus is pulled back and its blur closes it.
+  const afterClose = useRef<(() => void) | null>(null)
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -385,8 +415,10 @@ function SpaceMenu({
         align="end"
         className="w-48"
         onCloseAutoFocus={(e) => {
-          if (keepFocus.current) e.preventDefault()
+          if (keepFocus.current || afterClose.current) e.preventDefault()
           keepFocus.current = false
+          afterClose.current?.()
+          afterClose.current = null
         }}
       >
         <DropdownMenuItem onSelect={() => toggleStarredSpace({ id, name })}>
@@ -398,7 +430,11 @@ function SpaceMenu({
           <Pencil className="size-4" />
           Rename
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={opening(onSubspace)}>
+        <DropdownMenuItem
+          onSelect={() => {
+            afterClose.current = onSubspace
+          }}
+        >
           <Plus className="size-4" />
           New subspace
         </DropdownMenuItem>
@@ -531,26 +567,33 @@ function NewSubspace({
   first,
   editing,
   onEditingChange: setEditing,
+  onCreated,
 }: {
   parentId: string
   first: boolean
   /** Open from the rail's row or the head's ··· New subspace. */
   editing: boolean
   onEditingChange: (editing: boolean) => void
+  /** The child exists; the page closes the field and reloads. */
+  onCreated: (id: string) => void
 }) {
-  const router = useRouter()
   const [draft, setDraft] = useState('')
+  // Enter saves and the field's blur follows it: one create, not two.
+  const saving = useRef(false)
 
   async function create() {
+    if (saving.current) return
     const name = draft.trim()
     if (!name) return setEditing(false)
+    saving.current = true
     try {
-      await createSpace({ data: { name, parentId } })
+      const { id } = await createSpace({ data: { name, parentId } })
       setDraft('')
-      setEditing(false)
-      void router.invalidate()
+      onCreated(id)
     } catch {
       toast.error('Could not create the subspace')
+    } finally {
+      saving.current = false
     }
   }
 

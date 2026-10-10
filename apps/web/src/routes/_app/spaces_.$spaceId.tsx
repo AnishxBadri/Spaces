@@ -12,7 +12,8 @@ import type { SpaceTab } from '#/lib/spaces/page'
 
 /**
  * A space's page. `?tab=` deep-links a tab; without one the space opens on
- * the tab last used on any space, else Notes. (D74)
+ * the tab last used on any space, else Notes. (D74) `?into=` opens
+ * Companies selecting into that subspace, where a split lands. (D73)
  */
 export const Route = createFileRoute('/_app/spaces_/$spaceId')({
   validateSearch: spaceSearch,
@@ -55,6 +56,7 @@ function SpacePage() {
       sensitivity={sensitivity}
       watching={watching}
       tab={tab}
+      into={search.into ?? null}
       onTabChange={changeTab}
     />
   )

@@ -31,16 +31,27 @@ function walk(dir: string): Array<string> {
 }
 
 describe('one entity_space insert for tagging', () => {
-  it('tagIntoSpace calls insertSpaceTag and inserts nothing itself', () => {
+  it('tagIntoSpace tags through tagByHand, which calls insertSpaceTag', () => {
     const src = read('lib/server/companies.ts')
     const start = src.indexOf('export const tagIntoSpace')
     const end = src.indexOf('export const untagFromSpace')
     expect(start).toBeGreaterThan(-1)
     const body = src.slice(start, end)
-    expect(body).toContain('insertSpaceTag(')
+    expect(body).toContain('tagByHand(')
     expect(body).toContain('emitDomainEvent(emit)')
     expect(body).not.toMatch(INSERT)
     expect(src).not.toMatch(INSERT)
+    const tag = read('lib/spaces/tag.ts')
+    const hand = tag.slice(tag.indexOf('export async function tagByHand'))
+    expect(hand).toContain('insertSpaceTag(tx')
+  })
+
+  it('Move here goes through the hand writers and spells no filing SQL', () => {
+    const src = read('lib/spaces/split.ts')
+    expect(src).toContain('untagByHand(tx')
+    expect(src).toContain('tagByHand(tx')
+    expect(src).not.toMatch(INSERT)
+    expect(src).not.toMatch(/\.delete\(\s*entitySpace\s*\)/)
   })
 
   it('a new tag hands back the filed event its callers dispatch after the commit', () => {
@@ -99,12 +110,32 @@ describe('every filing change reaches chunk.sensitive', () => {
     const deleters = modules(DELETE)
     expect(deleters.map((f) => relative(SRC, f)).sort()).toEqual([
       'lib/documents/refile.ts',
-      'lib/server/companies.ts',
+      'lib/spaces/tag.ts',
     ])
     for (const f of deleters) {
       const src = readFileSync(f, 'utf8')
       expect(src, f).toContain('stampedSensitive(')
       expect(src, f).toContain('enqueueRestamp(')
     }
+  })
+
+  it('every hand untag restamps after the commit', () => {
+    // untagByHand runs in a transaction; its server fns restamp after it.
+    const callers = (needle: string, own: string) =>
+      walk(SRC)
+        .filter((f) => !/\.test\.tsx?$/.test(f))
+        .filter((f) => readFileSync(f, 'utf8').includes(needle))
+        .map((f) => relative(SRC, f))
+        .filter((f) => f !== own)
+        .sort()
+    expect(callers('untagByHand', 'lib/spaces/tag.ts')).toEqual([
+      'lib/server/companies.ts',
+      'lib/spaces/split.ts',
+    ])
+    expect(callers('moveHereProgram', 'lib/spaces/split.ts')).toEqual([
+      'lib/server/spaces.ts',
+    ])
+    for (const f of ['lib/server/companies.ts', 'lib/server/spaces.ts'])
+      expect(read(f), f).toContain('restampUntagged(')
   })
 })

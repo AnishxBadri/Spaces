@@ -195,3 +195,33 @@ export const addSpaceWatch = createServerFn({ method: 'POST' })
       throw new Error(addWatchMessage(failure))
     }
   })
+
+/**
+ * Move here: the chosen companies leave this space for one of its
+ * subspaces, an untag and a tag each. The `filed` events and the lowering
+ * restamps go after the commit. (D73)
+ */
+export const moveIntoSubspace = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      fromSpaceId: z.string().uuid(),
+      toSpaceId: z.string().uuid(),
+      entityIds: z.array(z.string().uuid()).min(1).max(500),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { moveHereMessage, moveHereProgram } = await import('../spaces/split')
+    const { restampUntagged } = await import('../spaces/tag')
+    const { emitDomainEvent } = await import('../events/emit')
+    const { effectFn } = await import('./effect')
+    const result = await effectFn(moveHereProgram)(u.id, data).catch(
+      (failure: unknown) => {
+        throw new Error(moveHereMessage(failure))
+      },
+    )
+    for (const emit of result.emits) await emitDomainEvent(emit)
+    for (const entityId of result.moved)
+      await restampUntagged(entityId, data.fromSpaceId)
+    return { moved: result.moved.length }
+  })

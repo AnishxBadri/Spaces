@@ -17,10 +17,25 @@ export type SpaceTab = (typeof SPACE_TABS)[number]
 /** A space opens on Notes, as a record does. (D74) */
 export const DEFAULT_SPACE_TAB: SpaceTab = 'notes'
 
-/** `?tab=` deep-links a tab; anything else reads as no tab. */
+/**
+ * `?tab=` deep-links a tab; anything else reads as no tab. `?into=` is the
+ * subspace a split moves companies into: the Companies tab opens selecting.
+ */
 export const spaceSearch = z.object({
   tab: z.enum(SPACE_TABS).optional().catch(undefined),
+  into: z.string().uuid().optional().catch(undefined),
 })
+
+/** The subspace Move here targets: the picked one, else the link's. */
+export function moveTarget(
+  children: ReadonlyArray<{ id: string }>,
+  picked: string | null,
+  linked: string | null,
+): string | null {
+  const ids = new Set(children.map((c) => c.id))
+  if (picked !== null && ids.has(picked)) return picked
+  return linked !== null && ids.has(linked) ? linked : null
+}
 
 export function isSpaceTab(value: string | null): value is SpaceTab {
   return value !== null && SPACE_TABS.some((t) => t === value)

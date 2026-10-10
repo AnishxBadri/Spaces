@@ -1,15 +1,19 @@
 import { and, eq, isNull } from 'drizzle-orm'
-import type { db } from '@spaces/db'
+import { db } from '@spaces/db'
 import { entity, entitySpace, space } from '@spaces/db/schema'
 import type { tagSource } from '@spaces/db/schema'
-import { raiseSensitivity } from '@spaces/core/writes/ai/stamp-sensitivity'
+import { activity } from '@spaces/db/schema/activity'
+import {
+  raiseSensitivity,
+  stampedSensitive,
+} from '@spaces/core/writes/ai/stamp-sensitivity'
 import { filed } from '@spaces/core/writes/events/dispatch'
 import type { DomainEvent } from '@spaces/sdk'
 import type { Tx } from '@spaces/core/writes/attributes/values'
 
 /**
- * The one insert that tags a record into a space (SPA-103). Callers: the
- * `tagIntoSpace` server fn (a person picks the space, `source: 'manual'`),
+ * The one insert that tags a record into a space (SPA-103). Callers:
+ * `tagByHand` (a person picks the space, `source: 'manual'`),
  * the `space_tag` accept branch in `acceptProgram` (a person accepts the
  * classify lane's proposal, `source: 'ai'` with the model's confidence) and
  * its discovery-card accepts (`fileDiscovered`, D72). `created_by` is the person either way — a model never
@@ -100,4 +104,69 @@ export async function isLiveSpace(
       .where(and(eq(space.entityId, spaceId), isNull(entity.mergedIntoId)))
   ).at(0)
   return row !== undefined
+}
+
+/** A filing a person changes by hand: who, which record, which space. */
+export type HandFiling = {
+  entityId: string
+  spaceId: string
+  actorId: string
+}
+
+/**
+ * A person tags a record into a space: the filing through `insertSpaceTag`
+ * and its `space.tagged` history line, in the caller's transaction. The
+ * `filed` event it hands back is dispatched after the commit.
+ */
+export async function tagByHand(tx: Tx, f: HandFiling): Promise<SpaceTagged> {
+  const tagged = await insertSpaceTag(tx, {
+    entityId: f.entityId,
+    spaceId: f.spaceId,
+    source: 'manual',
+    confidence: null,
+    createdBy: f.actorId,
+  })
+  await tx.insert(activity).values({
+    actorId: f.actorId,
+    verb: 'space.tagged',
+    subjectEntityId: f.entityId,
+    objectEntityId: f.spaceId,
+  })
+  return tagged
+}
+
+/**
+ * A person untags a record from a space: the filing goes and a
+ * `space.untagged` history line says so, in the caller's transaction.
+ * - The caller runs `restampUntagged` after the commit.
+ */
+export async function untagByHand(tx: Tx, f: HandFiling): Promise<void> {
+  await tx
+    .delete(entitySpace)
+    .where(
+      and(
+        eq(entitySpace.entityId, f.entityId),
+        eq(entitySpace.spaceId, f.spaceId),
+      ),
+    )
+  await tx.insert(activity).values({
+    actorId: f.actorId,
+    verb: 'space.untagged',
+    subjectEntityId: f.entityId,
+    objectEntityId: f.spaceId,
+  })
+}
+
+/**
+ * The lowering half of an untag, after the commit and never inside it:
+ * another space may still hold the record sensitive, so it is a job.
+ */
+export async function restampUntagged(
+  entityId: string,
+  spaceId: string,
+): Promise<void> {
+  const { enqueueRestamp } = await import('../ai/enqueue-restamp')
+  await enqueueRestamp(
+    await stampedSensitive(db, { kind: 'filed', entityId, spaceId }),
+  )
 }

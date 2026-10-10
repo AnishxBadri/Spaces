@@ -55,6 +55,7 @@ vi.mock('#/lib/server-fns', () => {
     'getDocumentText',
     'listEntityTasks',
     'listSpaces',
+    'moveIntoSubspace',
     'moveSpace',
     'prepareDocumentUpload',
     'renameSpace',
@@ -303,7 +304,9 @@ async function mount(
   tab: SpaceTab,
   onTabChange = (_: SpaceTab) => {},
   watching: SpaceWatching = noWatches,
+  opts: { into?: string; space?: Space } = {},
 ) {
+  const shown = opts.space ?? spc
   const { SpacePageView } = page
   const {
     RouterProvider,
@@ -318,11 +321,12 @@ async function mount(
     useRouterState({ select: (s) => s.matches.at(0)?.updatedAt })
     return (
       <SpacePageView
-        spc={spc}
+        spc={shown}
         terms={terms}
         sensitivity={{ sensitivity: 'normal', own: false }}
         watching={served.current}
         tab={tab}
+        into={opts.into ?? null}
         onTabChange={onTabChange}
       />
     )
@@ -339,6 +343,7 @@ async function mount(
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
   })
+  return r
 }
 
 const header = () => {
@@ -562,6 +567,140 @@ describe('the Companies tab', () => {
     expect(fns.get('tagIntoSpace')).toHaveBeenCalledWith({
       data: { entityId: 'c1', spaceId: spc.id },
     })
+  })
+})
+
+describe('split: New subspace, then Move here (D73)', () => {
+  const LEASING = '00000000-0000-4000-8000-000000000003'
+  const bar = () => document.querySelector('[data-selection-bar]')
+  const boxes = () =>
+    Array.from(document.querySelectorAll('button')).filter((b) =>
+      (b.getAttribute('aria-label') ?? '').startsWith('Select '),
+    )
+
+  async function settle() {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+  }
+
+  it('lands a new subspace from ··· on this Companies tab, selecting into it', async () => {
+    const created = fns.get('createSpace')
+    created.mockResolvedValueOnce({ id: LEASING })
+    const r = await mount('notes')
+    const trigger = buttonNamed(/^More for Property ops/)
+    await act(async () => {
+      trigger.focus()
+      trigger.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      )
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    const item = Array.from(
+      document.querySelectorAll('[role="menuitem"]'),
+    ).find((el) => text(el) === 'New subspace')
+    if (!(item instanceof HTMLElement)) throw new Error('no New subspace')
+    await act(async () => item.click())
+    await settle()
+    const field = document.querySelector('input[aria-label="Subspace name"]')
+    if (!(field instanceof HTMLInputElement)) throw new Error('no field')
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )?.set
+    await act(async () => {
+      setter?.call(field, 'Leasing')
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      field.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      )
+    })
+    await settle()
+    expect(created).toHaveBeenCalledTimes(1)
+    expect(created).toHaveBeenCalledWith({
+      data: { name: 'Leasing', parentId: spc.id },
+    })
+    expect(r.state.location.pathname).toBe(`/spaces/${spc.id}`)
+    expect(r.state.location.search).toEqual({
+      tab: 'companies',
+      into: LEASING,
+    })
+  })
+
+  it('opens selecting: every direct filing shows its box, and only those', async () => {
+    await mount('companies', undefined, undefined, { into: LEASING })
+    // The rows are the space's own filings; none is inherited from a child.
+    expect(boxes().map((b) => b.getAttribute('aria-label'))).toEqual([
+      'Select Tenantry',
+      'Select Arbor',
+      'Select Corbel',
+    ])
+    for (const b of boxes()) {
+      expect(b.className).toContain('opacity-100')
+      expect(b.className).not.toMatch(/(^| )opacity-0/)
+    }
+    expect(bar()).toBeNull()
+  })
+
+  it('draws the one 44px bone bar with the count and Move here, gone at zero', async () => {
+    await mount('companies', undefined, undefined, { into: LEASING })
+    await act(async () => buttonNamed(/^Select Tenantry/).click())
+    await act(async () => buttonNamed(/^Select Corbel/).click())
+    const shown = bar()
+    expect(shown).not.toBeNull()
+    expect(document.querySelectorAll('[data-selection-bar]')).toHaveLength(1)
+    expect(shown?.className).toContain('h-11')
+    expect(shown?.className).toContain('bg-bone')
+    expect(text(shown)).toContain('2 selected')
+    // The filter row gives way to the bar while anything is chosen.
+    expect(document.querySelector('[aria-label="Show companies"]')).toBeNull()
+    const verbs = Array.from(shown?.querySelectorAll('button') ?? []).filter(
+      (b) => b.getAttribute('data-variant') === 'default',
+    )
+    expect(verbs.map((b) => text(b))).toEqual(['Move here'])
+    expect(verbs[0]?.hasAttribute('disabled')).toBe(false)
+    await act(async () => buttonNamed(/^Select Tenantry/).click())
+    expect(text(bar())).toContain('1 selected')
+    await act(async () => buttonNamed(/^Select Corbel/).click())
+    expect(bar()).toBeNull()
+    expect(
+      document.querySelector('[aria-label="Show companies"]'),
+    ).not.toBeNull()
+  })
+
+  it('moves the chosen in one call naming this space and the subspace', async () => {
+    const move = fns.get('moveIntoSubspace')
+    move.mockResolvedValueOnce({ moved: 2 })
+    await mount('companies', undefined, undefined, { into: LEASING })
+    await act(async () => buttonNamed(/^Select Tenantry/).click())
+    await act(async () => buttonNamed(/^Select Corbel/).click())
+    await act(async () => buttonNamed(/^Move here$/).click())
+    await settle()
+    expect(move).toHaveBeenCalledTimes(1)
+    expect(move).toHaveBeenCalledWith({
+      data: {
+        fromSpaceId: spc.id,
+        toSpaceId: LEASING,
+        entityIds: ['c1', 'c3'],
+      },
+    })
+    expect(toasts.shown.at(-1)?.message).toBe('2 companies moved to Leasing')
+    expect(bar()).toBeNull()
+  })
+
+  it('waits for a subspace to be picked when the link names none', async () => {
+    await mount('companies')
+    await act(async () => buttonNamed(/^Select Arbor/).click())
+    expect(buttonNamed(/^Move here$/).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('offers no select box in a space with no subspace to move into', async () => {
+    await mount('companies', undefined, undefined, {
+      space: { ...spc, children: [] },
+    })
+    expect(boxes()).toEqual([])
   })
 })
 

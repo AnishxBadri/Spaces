@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { company, entity, entityAlias, entitySpace } from '@spaces/db/schema'
+import { company, entity, entityAlias } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { jsonString } from '@spaces/core/json'
@@ -272,23 +272,11 @@ export const tagIntoSpace = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    // The one entity_space insert (SPA-103), shared with the space_tag accept.
-    const { insertSpaceTag } = await import('../spaces/tag')
+    // The hand tag, shared with Move here; its insert is `insertSpaceTag`.
+    const { tagByHand } = await import('../spaces/tag')
     const { emit } = await db.transaction((tx) =>
-      insertSpaceTag(tx, {
-        entityId: data.entityId,
-        spaceId: data.spaceId,
-        source: 'manual',
-        confidence: null,
-        createdBy: u.id,
-      }),
+      tagByHand(tx, { ...data, actorId: u.id }),
     )
-    await db.insert(activity).values({
-      actorId: u.id,
-      verb: 'space.tagged',
-      subjectEntityId: data.entityId,
-      objectEntityId: data.spaceId,
-    })
     await emitDomainEvent(emit)
     return { ok: true }
   })
@@ -299,24 +287,8 @@ export const untagFromSpace = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const { stampedSensitive } =
-      await import('@spaces/core/writes/ai/stamp-sensitivity')
-    const { enqueueRestamp } = await import('../ai/enqueue-restamp')
-    await db
-      .delete(entitySpace)
-      .where(
-        and(
-          eq(entitySpace.entityId, data.entityId),
-          eq(entitySpace.spaceId, data.spaceId),
-        ),
-      )
-    await db.insert(activity).values({
-      actorId: u.id,
-      verb: 'space.untagged',
-      subjectEntityId: data.entityId,
-      objectEntityId: data.spaceId,
-    })
-    // Lowering is a job: another space may still hold the record sensitive.
-    await enqueueRestamp(await stampedSensitive(db, { kind: 'filed', ...data }))
+    const { restampUntagged, untagByHand } = await import('../spaces/tag')
+    await db.transaction((tx) => untagByHand(tx, { ...data, actorId: u.id }))
+    await restampUntagged(data.entityId, data.spaceId)
     return { ok: true }
   })

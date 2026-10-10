@@ -19,6 +19,7 @@ import {
   COMPANY_SORTS,
   SPACE_TABS,
   filterCompanies,
+  moveTarget,
   sortCompanies,
   spacePeople,
   stageLabel,
@@ -30,7 +31,11 @@ import type {
   SpaceTab,
   StageSegment,
 } from '#/lib/spaces/page'
-import { tagIntoSpace, untagFromSpace } from '#/lib/server-fns'
+import {
+  moveIntoSubspace,
+  tagIntoSpace,
+  untagFromSpace,
+} from '#/lib/server-fns'
 import type { getSpace } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
@@ -100,11 +105,14 @@ export function spaceReadouts(spc: Space): Array<RecordReadout> {
 export function SpaceTabs({
   spc,
   tab,
+  into,
   onTabChange,
   onNewNote,
 }: {
   spc: Space
   tab: SpaceTab
+  /** The subspace a split moves companies into, from the link. */
+  into: string | null
   onTabChange: (tab: SpaceTab) => void
   onNewNote: (kind?: 'memo') => void
 }) {
@@ -123,7 +131,7 @@ export function SpaceTabs({
       onValueChange={onTabChange}
     >
       {tab === 'companies' ? (
-        <CompaniesTab spc={spc} />
+        <CompaniesTab spc={spc} into={into} />
       ) : tab === 'notes' ? (
         <NotesTab spc={spc} onNewNote={onNewNote} />
       ) : tab === 'files' ? (
@@ -190,6 +198,51 @@ function FilterRow({
   )
 }
 
+/**
+ * The selection bar: the filter row's 44px on bone while a row is checked —
+ * the count, the subspace to move into, and Move here as the one pine verb.
+ */
+function SelectionBar({
+  count,
+  subspaces,
+  target,
+  onTarget,
+  busy,
+  onMove,
+}: {
+  count: number
+  subspaces: ReadonlyArray<{ id: string; name: string }>
+  target: string | null
+  onTarget: (id: string) => void
+  busy: boolean
+  onMove: () => void
+}) {
+  return (
+    <div
+      role="toolbar"
+      aria-label="Selected companies"
+      data-selection-bar
+      className="flex h-11 items-center gap-3 border-b border-rule bg-bone px-3"
+    >
+      <span className="tabular shrink-0 mono text-label">{count} selected</span>
+      <span className="shrink-0 text-ui text-graphite">into</span>
+      <Select
+        aria-label="Subspace to move into"
+        width="content"
+        value={target ?? ''}
+        onChange={onTarget}
+        placeholder="Subspace…"
+        items={subspaces.map((s) => ({ value: s.id, label: s.name }))}
+        className="h-7 w-auto min-w-0"
+      />
+      <span className="flex-1" />
+      <Button size="sm" disabled={target === null || busy} onClick={onMove}>
+        Move here
+      </Button>
+    </div>
+  )
+}
+
 function Count({ n }: { n: number }) {
   return <span className="tabular mono text-micro font-normal">{n}</span>
 }
@@ -213,14 +266,26 @@ const rowLink =
 
 // ---------- Companies ----------
 
-function CompaniesTab({ spc }: { spc: Space }) {
+/**
+ * The Companies tab. Its rows are this space's own filings only — a company
+ * filed in a subspace is not listed, so a split can only choose those.
+ * - Selecting needs a subspace to move into; `into` opens it selecting.
+ */
+function CompaniesTab({ spc, into }: { spc: Space; into: string | null }) {
   const router = useRouter()
   const [filter, setFilter] = useState<CompanyFilter>('all')
   const [sort, setSort] = useState<CompanySort>('stage')
-  // Chosen for a split; the action that reads it lands with the split.
+  // Chosen for Move here.
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
+  const [picked, setPicked] = useState<string | null>(null)
+  const [moving, setMoving] = useState(false)
   // Companies mid-untag: faded until the write lands and the row unmounts.
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set())
+
+  const selectable = spc.children.length > 0
+  const selecting = moveTarget(spc.children, null, into) !== null
+  const target = moveTarget(spc.children, picked, into)
+  const chosen = spc.companies.filter((c) => selected.has(c.id))
 
   const inPipeline = spc.companies.filter((c) => c.deals > 0).length
   const watching = spc.companies.length - inPipeline
@@ -260,6 +325,7 @@ function CompaniesTab({ spc }: { spc: Space }) {
 
   /** Untagging reads as the row leaving, not the list flinching. */
   function untag(c: Company) {
+    toggle(c.id, false)
     setLeaving((s) => new Set(s).add(c.id))
     window.setTimeout(() => void writeUntag(c), EXIT_MS)
   }
@@ -273,37 +339,76 @@ function CompaniesTab({ spc }: { spc: Space }) {
     })
   }
 
+  /** Each chosen company is untagged here and tagged in the subspace. */
+  async function moveHere() {
+    const child = spc.children.find((c) => c.id === target)
+    if (!child || chosen.length === 0) return
+    setMoving(true)
+    try {
+      const { moved } = await moveIntoSubspace({
+        data: {
+          fromSpaceId: spc.id,
+          toSpaceId: child.id,
+          entityIds: chosen.map((c) => c.id),
+        },
+      })
+      setSelected(new Set())
+      void router.invalidate()
+      toast(
+        `${moved} compan${moved === 1 ? 'y' : 'ies'} moved to ${child.name}`,
+      )
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not move')
+    } finally {
+      setMoving(false)
+    }
+  }
+
   return (
     <div className="flex flex-col">
-      <FilterRow
-        label="Show companies"
-        end={
-          <Select
-            aria-label="Sort companies"
-            width="content"
-            value={sort}
-            onChange={setSort}
-            items={COMPANY_SORTS.map((s) => ({ value: s.id, label: s.label }))}
-            className="h-7 w-auto"
-          />
-        }
-      >
-        <FilterTab active={filter === 'all'} onClick={() => setFilter('all')}>
-          All <Count n={spc.companies.length} />
-        </FilterTab>
-        <FilterTab
-          active={filter === 'pipeline'}
-          onClick={() => setFilter('pipeline')}
+      {chosen.length > 0 ? (
+        <SelectionBar
+          count={chosen.length}
+          subspaces={spc.children}
+          target={target}
+          onTarget={setPicked}
+          busy={moving}
+          onMove={() => void moveHere()}
+        />
+      ) : (
+        <FilterRow
+          label="Show companies"
+          end={
+            <Select
+              aria-label="Sort companies"
+              width="content"
+              value={sort}
+              onChange={setSort}
+              items={COMPANY_SORTS.map((s) => ({
+                value: s.id,
+                label: s.label,
+              }))}
+              className="h-7 w-auto"
+            />
+          }
         >
-          In pipeline <Count n={inPipeline} />
-        </FilterTab>
-        <FilterTab
-          active={filter === 'watching'}
-          onClick={() => setFilter('watching')}
-        >
-          Watching <Count n={watching} />
-        </FilterTab>
-      </FilterRow>
+          <FilterTab active={filter === 'all'} onClick={() => setFilter('all')}>
+            All <Count n={spc.companies.length} />
+          </FilterTab>
+          <FilterTab
+            active={filter === 'pipeline'}
+            onClick={() => setFilter('pipeline')}
+          >
+            In pipeline <Count n={inPipeline} />
+          </FilterTab>
+          <FilterTab
+            active={filter === 'watching'}
+            onClick={() => setFilter('watching')}
+          >
+            Watching <Count n={watching} />
+          </FilterTab>
+        </FilterRow>
+      )}
       <ol>
         <TagCompanyRow
           spaceId={spc.id}
@@ -312,7 +417,7 @@ function CompaniesTab({ spc }: { spc: Space }) {
         />
         {rows.map((c, i) => {
           const stage = stageLabel(c.stage, spc.stageOptions)
-          const chosen = selected.has(c.id)
+          const on = selected.has(c.id)
           return (
             <LedgerRow
               key={c.id}
@@ -322,15 +427,17 @@ function CompaniesTab({ spc }: { spc: Space }) {
                 leaving.has(c.id) && 'pointer-events-none opacity-0',
               )}
             >
-              <Checkbox
-                checked={chosen}
-                onCheckedChange={(on) => toggle(c.id, on)}
-                aria-label={`Select ${c.name}`}
-                className={cn(
-                  'shrink-0 group-hover:opacity-100 focus-visible:opacity-100',
-                  chosen ? 'opacity-100' : 'opacity-0',
-                )}
-              />
+              {selectable ? (
+                <Checkbox
+                  checked={on}
+                  onCheckedChange={(next) => toggle(c.id, next)}
+                  aria-label={`Select ${c.name}`}
+                  className={cn(
+                    'shrink-0 group-hover:opacity-100 focus-visible:opacity-100',
+                    on || selecting ? 'opacity-100' : 'opacity-0',
+                  )}
+                />
+              ) : null}
               <Link
                 to="/companies/$companyId"
                 params={{ companyId: c.id }}
