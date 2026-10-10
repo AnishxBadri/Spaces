@@ -18,10 +18,20 @@ import {
   Table2,
   Users,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCommandState } from 'cmdk'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { NAV_ITEMS } from './app-sidebar'
 import { DensityRamp } from './dither'
+import { DocumentPreview } from './document-preview'
+import { PreviewPane } from './palette-preview'
+import type {
+  PaneAction,
+  PreviewData,
+  PreviewHit,
+  PreviewLoaders,
+  PreviewTarget,
+} from './palette-preview'
 import { SETTINGS_CRUMBS, SETTINGS_SECTIONS } from './settings/settings-nav'
 import {
   CommandDialog,
@@ -31,6 +41,7 @@ import {
   CommandList,
 } from './ui/command'
 import { authClient } from '#/lib/auth-client'
+import { fileInSpaceAction } from '#/lib/file-in-space'
 import { objectIcon } from '#/lib/object-icons'
 import {
   GLOBAL_ACTIONS,
@@ -39,10 +50,17 @@ import {
 } from '#/lib/page-actions'
 import type { ActionStep, PageAction, StepChoice } from '#/lib/page-actions'
 import { recordPath } from '#/lib/record-path'
-import { listJumpViews, searchAll, searchPassages } from '#/lib/server-fns'
+import {
+  getDocumentPreview,
+  listJumpViews,
+  previewObject,
+  previewPassage,
+  previewRecord,
+  searchAll,
+  searchPassages,
+} from '#/lib/server-fns'
 import { PictureMark } from '#/components/record/record-parts'
 import type { Passage } from '#/lib/search/passages'
-import type { SearchHit } from '#/lib/search/query'
 import type { JumpView } from '#/lib/views/jump'
 import { searchWaves } from '#/lib/search/waves'
 import { cn } from '#/lib/utils'
@@ -58,12 +76,13 @@ import { cn } from '#/lib/utils'
  *   (`searchWaves`), in its own group below.
  * - A verb with a `step` asks its answer in the same palette under its mode
  *   label; ⌫ on the empty input returns to Find with the query restored.
+ * - Highlighting a record, an object or a passage opens `PreviewPane` and
+ *   widens the window; anything else runs the list full width.
  * - Only our own bindings are printed: never esc, ↵ or ⌘K.
  * - cmdk's filtering is off: the server ranked these.
  */
 
-/** A search hit, with its record's picture URL when `searchAll` found one. */
-type Hit = SearchHit & { readonly picture?: string | null }
+type Hit = PreviewHit
 
 const KIND_ICONS: Record<string, LucideIcon> = {
   company: Building2,
@@ -210,6 +229,8 @@ export type JumpTarget = {
   readonly href: string
   readonly key?: string
   readonly icon: LucideIcon
+  /** An object's slug: highlighting it previews its saved views. */
+  readonly preview?: string
 }
 
 type CustomObject = { slug: string; plural: string; icon: string | null }
@@ -227,6 +248,7 @@ export function jumpTargets(
       href: item.to,
       key: item.key,
       icon: item.icon,
+      ...(item.group === 'objects' ? { preview: item.to.slice(1) } : {}),
     })),
     ...objects.map((o): JumpTarget => ({
       id: `object:${o.slug}`,
@@ -234,6 +256,7 @@ export function jumpTargets(
       meta: 'object',
       href: `/o/${o.slug}`,
       icon: objectIcon(o),
+      preview: o.slug,
     })),
     ...views.map((v): JumpTarget => ({
       id: `view:${v.id}`,
@@ -272,6 +295,63 @@ export function matchesQuery(query: string, text: string): boolean {
 
 const actionText = (a: PageAction) => `${a.label} ${a.words ?? ''}`
 
+/**
+ * What the highlighted row previews, from cmdk's selected value: a record,
+ * an object under Jump to, or a passage. Anything else — a page, a view,
+ * settings, a verb, a task — opens no pane.
+ */
+export function previewTarget(
+  value: string,
+  jumps: ReadonlyArray<JumpTarget>,
+  records: ReadonlyArray<Hit>,
+  passages: ReadonlyArray<Passage>,
+): PreviewTarget | null {
+  if (value.startsWith('jump:')) {
+    const j = jumps.find((x) => `jump:${x.id}` === value)
+    return j?.preview === undefined
+      ? null
+      : {
+          kind: 'object',
+          key: value,
+          slug: j.preview,
+          label: j.label,
+          href: j.href,
+        }
+  }
+  if (value.startsWith('record:entity:')) {
+    const hit = records.find(
+      (h) => h.rowKind === 'entity' && `record:entity:${h.id}` === value,
+    )
+    return hit ? { kind: 'record', key: value, hit } : null
+  }
+  if (value.startsWith('passage:')) {
+    const passage = passages.find((p) => `passage:${p.id}` === value)
+    return passage ? { kind: 'passage', key: value, passage } : null
+  }
+  return null
+}
+
+async function loadPreview(
+  loaders: PreviewLoaders,
+  target: PreviewTarget,
+): Promise<PreviewData> {
+  switch (target.kind) {
+    case 'record':
+      return { kind: 'record', data: await loaders.record(target.hit.id) }
+    case 'object':
+      return { kind: 'object', data: await loaders.object(target.slug) }
+    case 'passage':
+      return {
+        kind: 'passage',
+        data: await loaders.passage({
+          id: target.passage.id,
+          page: target.passage.page,
+          snippet: target.passage.snippet,
+        }),
+      }
+  }
+}
+
 type Mode =
   | { readonly kind: 'find' }
   | {
@@ -294,6 +374,10 @@ export type PaletteBodyProps = {
   onRun: (action: PageAction) => void
   /** A step's pick was written; the page under the palette refreshes. */
   onStepDone: () => void
+  /** The preview pane's reads; each runs once per row per opening. */
+  loaders: PreviewLoaders
+  /** Open a file in the viewer, at a page when the passage knows it. */
+  onOpenFile: (id: string, page: number | null) => void
 }
 
 /**
@@ -310,6 +394,8 @@ export function PaletteBody({
   onTask,
   onRun,
   onStepDone,
+  loaders,
+  onOpenFile,
 }: PaletteBodyProps) {
   const [query, setQuery] = useState('')
   const [mode, setMode] = useState<Mode>({ kind: 'find' })
@@ -441,6 +527,89 @@ export function PaletteBody({
       ? choices.filter((c) => !typed || matchesQuery(typed, c.label))
       : []
 
+  // The preview pane follows the highlight; nothing previewable, no pane.
+  // cmdk holds no value until a row mounts, whatever its type says.
+  const selected = useCommandState((s): string | undefined => s.value)
+  const target =
+    finding && selected !== undefined
+      ? previewTarget(selected, jumps, shownRecords, shownPassages)
+      : null
+  // One read per row per opening: the body mounts fresh with the window.
+  const [previews, setPreviews] = useState<ReadonlyMap<string, PreviewData>>(
+    () => new Map(),
+  )
+  const asked = useRef(new Set<string>())
+  useEffect(() => {
+    if (target === null || asked.current.has(target.key)) return
+    const key = target.key
+    asked.current.add(key)
+    loadPreview(loaders, target).then(
+      (data) => setPreviews((prev) => new Map(prev).set(key, data)),
+      () => {},
+    )
+  })
+  const preview = target ? previews.get(target.key) : undefined
+  const pane = useRef<HTMLElement>(null)
+
+  /** → and the foot's actions: focus the pane's first action. */
+  function focusPane(): boolean {
+    const first = pane.current?.querySelector<HTMLElement>('[data-pane-action]')
+    first?.focus()
+    return first !== undefined && first !== null
+  }
+
+  function backToList() {
+    pane.current
+      ?.closest('[cmdk-root]')
+      ?.querySelector<HTMLInputElement>('[cmdk-input]')
+      ?.focus()
+  }
+
+  function paneActions(t: PreviewTarget): Array<PaneAction> {
+    if (t.kind === 'record') {
+      const href = hrefFor(t.hit)
+      const data = preview?.kind === 'record' ? preview.data : undefined
+      const out: Array<PaneAction> = []
+      if (href) out.push({ id: 'open', label: 'Open', run: () => onGo(href) })
+      if (data && data.singular !== null) {
+        const verb = fileInSpaceAction({
+          id: data.id,
+          name: data.name,
+          filedIds: data.spaces.map((s) => s.id),
+        })
+        if ('step' in verb)
+          out.push({
+            id: verb.id,
+            label: verb.label,
+            run: () => startStep(verb.step),
+          })
+      }
+      return out
+    }
+    if (t.kind === 'object') {
+      const data = preview?.kind === 'object' ? preview.data : undefined
+      return [
+        ...(data ?? { views: [] }).views.map((v) => ({
+          id: `view:${v.id}`,
+          label: v.name,
+          run: () => onGo(v.href),
+        })),
+        { id: 'open', label: `Open ${t.label}`, run: () => onGo(t.href) },
+      ]
+    }
+    const p = t.passage
+    if (p.kind === 'document')
+      return [
+        {
+          id: 'open',
+          label: p.page === null ? 'Open' : `Open at p.${String(p.page)}`,
+          run: () => onOpenFile(p.id, p.page),
+        },
+      ]
+    const href = passageHref(p)
+    return href ? [{ id: 'open', label: 'Open', run: () => onGo(href) }] : []
+  }
+
   return (
     <>
       <CommandInput
@@ -466,143 +635,184 @@ export function PaletteBody({
             e.preventDefault()
             backToFind()
           }
+          // → at the end of the query moves into the pane's actions.
+          if (
+            e.key === 'ArrowRight' &&
+            target !== null &&
+            e.currentTarget.selectionStart === e.currentTarget.value.length &&
+            focusPane()
+          )
+            e.preventDefault()
         }}
       />
-      <CommandList className="max-h-[420px] p-0">
-        {mode.kind === 'step' ? (
-          stepChoices.length > 0 ? (
-            <PaletteGroup
-              id="step"
-              heading={mode.step.heading}
-              count={stepChoices.length}
-            >
-              {stepChoices.map((c) => (
-                <CommandItem
-                  key={c.id}
-                  value={`choice:${c.id}`}
-                  onSelect={() => void pick(mode.step, c)}
-                  className={cn(ROW, c.done && 'text-graphite')}
-                >
-                  <span className="flex w-3.5 shrink-0 justify-center">
-                    {c.done ? (
-                      <Check
-                        aria-hidden
-                        className="size-3.5 text-graphite"
-                        strokeWidth={1.75}
+      <div className="flex min-h-0">
+        <CommandList className="max-h-[420px] min-w-0 flex-1 p-0">
+          {mode.kind === 'step' ? (
+            stepChoices.length > 0 ? (
+              <PaletteGroup
+                id="step"
+                heading={mode.step.heading}
+                count={stepChoices.length}
+              >
+                {stepChoices.map((c) => (
+                  <CommandItem
+                    key={c.id}
+                    value={`choice:${c.id}`}
+                    onSelect={() => void pick(mode.step, c)}
+                    className={cn(ROW, c.done && 'text-graphite')}
+                  >
+                    <span className="flex w-3.5 shrink-0 justify-center">
+                      {c.done ? (
+                        <Check
+                          aria-hidden
+                          className="size-3.5 text-graphite"
+                          strokeWidth={1.75}
+                        />
+                      ) : null}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{c.label}</span>
+                    <Lanes {...(c.meta ? { meta: c.meta } : {})} />
+                  </CommandItem>
+                ))}
+              </PaletteGroup>
+            ) : choices !== null ? (
+              <NothingFound />
+            ) : null
+          ) : (
+            <>
+              {jumps.length > 0 ? (
+                <PaletteGroup id="jump" heading="Jump to" count={jumps.length}>
+                  {jumps.map((j) => (
+                    <CommandItem
+                      key={j.id}
+                      value={`jump:${j.id}`}
+                      onSelect={() => onGo(j.href)}
+                      className={ROW}
+                    >
+                      <Glyph icon={j.icon} />
+                      <span className="min-w-0 flex-1 truncate">{j.label}</span>
+                      <Lanes
+                        meta={j.meta}
+                        {...(j.key ? { keys: j.key } : {})}
                       />
-                    ) : null}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{c.label}</span>
-                  <Lanes {...(c.meta ? { meta: c.meta } : {})} />
-                </CommandItem>
-              ))}
-            </PaletteGroup>
-          ) : choices !== null ? (
-            <NothingFound />
-          ) : null
-        ) : (
-          <>
-            {jumps.length > 0 ? (
-              <PaletteGroup id="jump" heading="Jump to" count={jumps.length}>
-                {jumps.map((j) => (
-                  <CommandItem
-                    key={j.id}
-                    value={`jump:${j.id}`}
-                    onSelect={() => onGo(j.href)}
-                    className={ROW}
-                  >
-                    <Glyph icon={j.icon} />
-                    <span className="min-w-0 flex-1 truncate">{j.label}</span>
-                    <Lanes meta={j.meta} {...(j.key ? { keys: j.key } : {})} />
-                  </CommandItem>
-                ))}
-              </PaletteGroup>
-            ) : null}
-            {actions.length > 0 ? (
-              <PaletteGroup
-                id="actions"
-                heading="Actions"
-                count={actions.length}
-              >
-                {actions.map((a) => (
-                  <CommandItem
-                    key={a.id}
-                    value={`action:${a.id}`}
-                    onSelect={() => act(a)}
-                    className={ROW}
-                  >
-                    <Glyph icon={a.icon ?? ChevronRight} />
-                    <span className="min-w-0 flex-1 truncate">{a.label}</span>
-                    <Lanes {...(a.key ? { keys: a.key } : {})} />
-                  </CommandItem>
-                ))}
-              </PaletteGroup>
-            ) : null}
-            {shownRecords.length > 0 ? (
-              <PaletteGroup
-                id="records"
-                heading="Records"
-                count={shownRecords.length}
-              >
-                {shownRecords.map((hit) => {
-                  const href = hrefFor(hit)
-                  // Task ids and entity ids are two id spaces; the key and
-                  // cmdk's value carry the row kind so they cannot collide.
-                  const key = `${hit.rowKind}:${hit.id}`
-                  return (
+                    </CommandItem>
+                  ))}
+                </PaletteGroup>
+              ) : null}
+              {actions.length > 0 ? (
+                <PaletteGroup
+                  id="actions"
+                  heading="Actions"
+                  count={actions.length}
+                >
+                  {actions.map((a) => (
                     <CommandItem
-                      key={key}
-                      value={`record:${key}`}
-                      disabled={!href}
-                      onSelect={() =>
-                        hit.rowKind === 'task'
-                          ? onTask(hit.id)
-                          : href && onGo(href)
-                      }
+                      key={a.id}
+                      value={`action:${a.id}`}
+                      onSelect={() => act(a)}
                       className={ROW}
                     >
-                      <HitLine hit={hit} />
+                      <Glyph icon={a.icon ?? ChevronRight} />
+                      <span className="min-w-0 flex-1 truncate">{a.label}</span>
+                      <Lanes {...(a.key ? { keys: a.key } : {})} />
                     </CommandItem>
-                  )
-                })}
-              </PaletteGroup>
-            ) : null}
-            {shownPassages.length > 0 || passagesPending ? (
-              <PaletteGroup
-                id="passages"
-                heading="Passages"
-                count={shownPassages.length}
-                running={passagesPending}
-              >
-                {shownPassages.map((p) => {
-                  const href = passageHref(p)
-                  return (
-                    <CommandItem
-                      key={p.id}
-                      value={`passage:${p.id}`}
-                      disabled={!href}
-                      onSelect={() => href && onGo(href)}
-                      className={ROW}
-                    >
-                      <Glyph icon={p.kind === 'note' ? Pilcrow : File} />
-                      <span className="min-w-0 flex-1 truncate">
-                        “{p.snippet || p.name}”
-                      </span>
-                      <Lanes meta={passageMeta(p)} />
-                    </CommandItem>
-                  )
-                })}
-              </PaletteGroup>
-            ) : null}
-            {nothingFound ? <NothingFound /> : null}
-          </>
-        )}
-      </CommandList>
+                  ))}
+                </PaletteGroup>
+              ) : null}
+              {shownRecords.length > 0 ? (
+                <PaletteGroup
+                  id="records"
+                  heading="Records"
+                  count={shownRecords.length}
+                >
+                  {shownRecords.map((hit) => {
+                    const href = hrefFor(hit)
+                    // Task ids and entity ids are two id spaces; the key and
+                    // cmdk's value carry the row kind so they cannot collide.
+                    const key = `${hit.rowKind}:${hit.id}`
+                    return (
+                      <CommandItem
+                        key={key}
+                        value={`record:${key}`}
+                        disabled={!href}
+                        onSelect={() =>
+                          hit.rowKind === 'task'
+                            ? onTask(hit.id)
+                            : href && onGo(href)
+                        }
+                        className={ROW}
+                      >
+                        <HitLine hit={hit} />
+                      </CommandItem>
+                    )
+                  })}
+                </PaletteGroup>
+              ) : null}
+              {shownPassages.length > 0 || passagesPending ? (
+                <PaletteGroup
+                  id="passages"
+                  heading="Passages"
+                  count={shownPassages.length}
+                  running={passagesPending}
+                >
+                  {shownPassages.map((p) => {
+                    const href = passageHref(p)
+                    // A file's passage opens the viewer at its page.
+                    const file = p.kind === 'document'
+                    return (
+                      <CommandItem
+                        key={p.id}
+                        value={`passage:${p.id}`}
+                        disabled={!file && !href}
+                        onSelect={() =>
+                          file ? onOpenFile(p.id, p.page) : href && onGo(href)
+                        }
+                        className={ROW}
+                      >
+                        <Glyph icon={p.kind === 'note' ? Pilcrow : File} />
+                        <span className="min-w-0 flex-1 truncate">
+                          “{p.snippet || p.name}”
+                        </span>
+                        <Lanes meta={passageMeta(p)} />
+                      </CommandItem>
+                    )
+                  })}
+                </PaletteGroup>
+              ) : null}
+              {nothingFound ? <NothingFound /> : null}
+            </>
+          )}
+        </CommandList>
+        {target ? (
+          <PreviewPane
+            ref={pane}
+            target={target}
+            data={preview}
+            actions={paneActions(target)}
+            onBack={backToList}
+          />
+        ) : null}
+      </div>
       <div
         data-foot
         className="flex h-8 items-center justify-between gap-3 border-t border-rule bg-bone px-4 mono text-micro text-graphite"
       >
-        <span>{finding ? '↑↓ move' : '↑↓ move · ⌫ back to find'}</span>
+        <span>
+          {finding ? '↑↓ move' : '↑↓ move · ⌫ back to find'}
+          {target ? (
+            <>
+              {' · '}
+              <button
+                type="button"
+                data-foot-actions
+                onClick={focusPane}
+                className="focus-ring hover:text-foreground"
+              >
+                → actions
+              </button>
+            </>
+          ) : null}
+        </span>
         {finding ? null : (
           <span className="min-w-0 truncate">{mode.step.hint}</span>
         )}
@@ -738,26 +948,65 @@ export function CommandPalette({
     if ('run' in live) setTimeout(live.run, 0)
   }
 
+  const loaders = useMemo<PreviewLoaders>(
+    () => ({
+      record: (id) => previewRecord({ data: { id } }),
+      object: (slug) => previewObject({ data: { slug } }),
+      passage: (p) => previewPassage({ data: p }),
+    }),
+    [],
+  )
+
+  /** The file viewer, opened once the palette has closed (as `run`). */
+  const [viewer, setViewer] = useState<{
+    doc: NonNullable<Awaited<ReturnType<typeof getDocumentPreview>>>
+    page: number | null
+  } | null>(null)
+
+  function openFile(id: string, page: number | null) {
+    onOpenChange(false)
+    setTimeout(() => {
+      void getDocumentPreview({ data: { id } }).then((doc) => {
+        if (doc) setViewer({ doc, page })
+      })
+    }, 0)
+  }
+
   return (
-    <CommandDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Command palette"
-      description="Find a record, a page or an action from the keyboard"
-      shouldFilter={false}
-      showCloseButton={false}
-    >
-      <PaletteBody
-        pageActions={pageActions}
-        extraActions={extraActions}
-        jump={jump}
-        searchRecords={(q) => searchAll({ data: { q } })}
-        searchPassages={(q) => searchPassages({ data: { q } })}
-        onGo={go}
-        onTask={goTask}
-        onRun={run}
-        onStepDone={() => void router.invalidate()}
+    <>
+      <CommandDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        title="Command palette"
+        description="Find a record, a page or an action from the keyboard"
+        shouldFilter={false}
+        showCloseButton={false}
+        // The palette widens while the preview pane is open; its scrim is
+        // bone-deep, never a blur.
+        className="sm:has-[[data-preview]]:max-w-[66rem]"
+        overlayClassName="bg-bone-deep/60"
+      >
+        <PaletteBody
+          pageActions={pageActions}
+          extraActions={extraActions}
+          jump={jump}
+          searchRecords={(q) => searchAll({ data: { q } })}
+          searchPassages={(q) => searchPassages({ data: { q } })}
+          onGo={go}
+          onTask={goTask}
+          onRun={run}
+          onStepDone={() => void router.invalidate()}
+          loaders={loaders}
+          onOpenFile={openFile}
+        />
+      </CommandDialog>
+      <DocumentPreview
+        doc={viewer?.doc ?? null}
+        {...(viewer?.page ? { page: viewer.page } : {})}
+        onOpenChange={(next) => {
+          if (!next) setViewer(null)
+        }}
       />
-    </CommandDialog>
+    </>
   )
 }

@@ -47,3 +47,37 @@ export const searchPassages = createServerFn()
       await import('#/lib/search/passages-handler')
     return searchPassagesHandler(data)
   })
+
+/**
+ * Cmd-K's preview pane, one read per highlighted result, cached by the
+ * palette for its life. (D70) The reads are `lib/search/preview.ts`.
+ */
+export const previewRecord = createServerFn()
+  .validator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const { previewRecordHandler } =
+      await import('#/lib/search/preview-handler')
+    return previewRecordHandler(data)
+  })
+
+export const previewObject = createServerFn()
+  .validator(z.object({ slug: z.string().min(1).max(80) }))
+  .handler(async ({ data }) => {
+    const { previewObjectHandler } =
+      await import('#/lib/search/preview-handler')
+    return previewObjectHandler(data)
+  })
+
+export const previewPassage = createServerFn()
+  .validator(
+    z.object({
+      id: z.string().uuid(),
+      page: z.number().int().positive().nullable(),
+      snippet: z.string().max(400),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const { previewPassageHandler } =
+      await import('#/lib/search/preview-handler')
+    return previewPassageHandler(data)
+  })

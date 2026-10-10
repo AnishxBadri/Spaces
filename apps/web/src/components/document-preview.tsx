@@ -100,21 +100,24 @@ function imageType(doc: Doc): string | null {
 
 export function DocumentPreview({
   doc,
+  page,
   onOpenChange,
 }: {
   doc: Doc | null
+  /** The 1-based page a PDF opens at; the first when omitted. */
+  page?: number
   onOpenChange: (open: boolean) => void
 }) {
   return (
     <Dialog open={Boolean(doc)} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[85vh] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
-        {doc ? <PreviewBody doc={doc} /> : null}
+        {doc ? <PreviewBody doc={doc} startPage={page ?? 1} /> : null}
       </DialogContent>
     </Dialog>
   )
 }
 
-function PreviewBody({ doc }: { doc: Doc }) {
+function PreviewBody({ doc, startPage }: { doc: Doc; startPage: number }) {
   const format = detectFormat(doc.filename, doc.mime)
   const asImage = imageType(doc)
   // The one question that decides both halves of this dialog (docsurf-10b):
@@ -177,7 +180,7 @@ function PreviewBody({ doc }: { doc: Doc }) {
         {blobless ? (
           <TextPreview doc={doc} format={format} />
         ) : format === 'pdf' ? (
-          <PdfPreview doc={doc} />
+          <PdfPreview doc={doc} startPage={startPage} />
         ) : asImage ? (
           <ImagePreview doc={doc} type={asImage} />
         ) : (
@@ -247,10 +250,10 @@ function useBlobBytes(id: string) {
   return state
 }
 
-function PdfPreview({ doc }: { doc: Doc }) {
+function PdfPreview({ doc, startPage }: { doc: Doc; startPage: number }) {
   const { bytes, error } = useBlobBytes(doc.id)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(Math.max(1, startPage))
   const [pages, setPages] = useState(0)
   const [renderError, setRenderError] = useState<string | null>(null)
   // Held across renders so paging doesn't re-parse the whole file.
@@ -282,6 +285,11 @@ function PdfPreview({ doc }: { doc: Doc }) {
           // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- pdf.js ships no types for the CDN build; the shape is asserted once per call site
           pdfRef.current = pdf as never
           setPages(pdf.numPages)
+          // A page past the end (the file was replaced) opens on the last.
+          if (page > pdf.numPages) {
+            setPage(pdf.numPages)
+            return
+          }
         }
         // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- pdf.js ships no types for the CDN build; the shape is asserted once per call site
         const pdf = pdfRef.current as unknown as {

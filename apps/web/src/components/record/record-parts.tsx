@@ -95,44 +95,108 @@ export function RecordHeader({
           {badges}
         </div>
         {readouts && readouts.length > 0 ? (
-          // Variant B: equal cells on rules under a hairline, the value in
-          // mono over a sentence-case label.
-          <div className="flex h-16 overflow-x-auto border-t border-hairline">
-            {readouts.map((r, i) => (
-              <div
-                key={i}
-                className={cn(
-                  'flex min-w-28 basis-0 flex-col justify-center gap-0.5 border-r border-rule px-4 first:pl-0 last:border-r-0',
-                  r.figure ? 'max-w-110 flex-2' : 'max-w-55 flex-1',
-                )}
-              >
-                {r.figure ? (
-                  <div className="flex h-6.5 min-w-0 items-end">{r.value}</div>
-                ) : (
-                  <span
-                    className={cn(
-                      'truncate mono text-page leading-6.5',
-                      r.tone === 'bad'
-                        ? 'text-destructive'
-                        : r.tone === 'muted' || r.value === '—'
-                          ? 'text-graphite'
-                          : 'text-foreground',
-                    )}
-                  >
-                    {r.value}
-                  </span>
-                )}
-                <span className="truncate text-label text-graphite">
-                  {r.label}
-                </span>
-              </div>
-            ))}
-          </div>
+          <ReadoutStrip readouts={readouts} />
         ) : (
           <div className="h-1" />
         )}
       </header>
     </>
+  )
+}
+
+/**
+ * The readout strip, variant B: equal cells on rules under a hairline, the
+ * value in mono over a sentence-case label. The record head draws it, and
+ * so does Cmd-K's preview of a record.
+ */
+export function ReadoutStrip({
+  readouts,
+}: {
+  readouts: ReadonlyArray<RecordReadout>
+}) {
+  return (
+    <div
+      data-readouts
+      className="flex h-16 overflow-x-auto border-t border-hairline"
+    >
+      {readouts.map((r, i) => (
+        <div
+          key={i}
+          className={cn(
+            'flex min-w-28 basis-0 flex-col justify-center gap-0.5 border-r border-rule px-4 first:pl-0 last:border-r-0',
+            r.figure ? 'max-w-110 flex-2' : 'max-w-55 flex-1',
+          )}
+        >
+          {r.figure ? (
+            <div className="flex h-6.5 min-w-0 items-end">{r.value}</div>
+          ) : (
+            <span
+              className={cn(
+                'truncate mono text-page leading-6.5',
+                r.tone === 'bad'
+                  ? 'text-destructive'
+                  : r.tone === 'muted' || r.value === '—'
+                    ? 'text-graphite'
+                    : 'text-foreground',
+              )}
+            >
+              {r.value}
+            </span>
+          )}
+          <span className="truncate text-label text-graphite">{r.label}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * A head at preview size, for Cmd-K's pane: the stamp and crumb, then the
+ * name in serif. A `record` head closes on the double rule, as the record
+ * page's does; anything else on a hairline.
+ */
+export function PreviewHead({
+  record = false,
+  stamp,
+  crumb,
+  mark,
+  name,
+  children,
+}: {
+  record?: boolean
+  stamp: string
+  crumb: string
+  mark?: ReactNode
+  name: string
+  /** Under the name: a record's readout strip. */
+  children?: ReactNode
+}) {
+  return (
+    <div
+      className={cn(
+        'flex flex-col gap-3 px-5 pt-4',
+        record ? 'double-rule' : 'border-b border-hairline',
+      )}
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <Stamp kind={stamp} />
+        {crumb ? (
+          <span
+            data-crumb
+            className="min-w-0 truncate mono text-micro tracking-[0.08em] text-graphite uppercase"
+          >
+            {crumb}
+          </span>
+        ) : null}
+      </div>
+      <div className="flex min-w-0 items-center gap-3">
+        {mark}
+        <h2 className="min-w-0 truncate font-serif text-page font-semibold">
+          {name || 'Untitled'}
+        </h2>
+      </div>
+      {children ?? <div className="h-1" />}
+    </div>
   )
 }
 

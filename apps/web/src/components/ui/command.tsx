@@ -38,11 +38,14 @@ function CommandDialog({
   // server — cmdk's own scorer would re-filter them and silently drop the
   // fuzzy matches a trigram index was there to find.
   shouldFilter,
+  overlayClassName,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
   title?: string
   description?: string
   className?: string
+  /** The scrim's ground; the dialog's default when omitted. */
+  overlayClassName?: string
   showCloseButton?: boolean
   shouldFilter?: boolean | undefined
 }) {
@@ -54,6 +57,7 @@ function CommandDialog({
       </DialogHeader>
       <DialogContent
         className={cn('overflow-hidden p-0 sm:max-w-[40rem]', className)}
+        {...(overlayClassName === undefined ? {} : { overlayClassName })}
         showCloseButton={showCloseButton}
       >
         <Command {...(shouldFilter === undefined ? {} : { shouldFilter })}>
