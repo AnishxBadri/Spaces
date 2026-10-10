@@ -373,7 +373,12 @@ export type JobError = JobRetryable | JobRateLimited | JobPermanent
  * The domain events an `event` job may subscribe to (`jobs[name].on`).
  * Closed: a new event is a minor.
  */
-export const DOMAIN_EVENTS = ['entity.created', 'filed', 'deal.linked'] as const
+export const DOMAIN_EVENTS = [
+  'entity.created',
+  'filed',
+  'deal.linked',
+  'identity.added',
+] as const
 export type DomainEventName = (typeof DOMAIN_EVENTS)[number]
 
 /** What every domain event names: the record it is about, and when. */
@@ -388,7 +393,9 @@ type DomainEventBase = {
  * - `entity.created`: a record was born (never by a seed or an import);
  * - `filed`: the record was filed into the space `spaceId` (SDK 1.2);
  * - `deal.linked`: the company or person became a party of the deal
- *   `dealId` (SDK 1.2).
+ *   `dealId` (SDK 1.2);
+ * - `identity.added`: a domain or an email `value` was added to the company
+ *   or person after its birth, never by a seed or an import.
  */
 export type DomainEvent =
   | (DomainEventBase & { readonly name: 'entity.created' })
@@ -397,6 +404,12 @@ export type DomainEvent =
       readonly name: 'deal.linked'
       readonly kind: 'company' | 'person'
       readonly dealId: EntityId
+    })
+  | (DomainEventBase & {
+      readonly name: 'identity.added'
+      readonly kind: 'company' | 'person'
+      readonly key: 'domain' | 'email'
+      readonly value: string
     })
 
 /**

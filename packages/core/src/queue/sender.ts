@@ -31,12 +31,13 @@ export function senderOptions(connectionString: string): ConstructorOptions {
 }
 
 /**
- * What an enqueue may ask of pg-boss beyond the payload. `singletonKey` is
- * the only one so far (SPA-90): on a queue created with the `exclusive`
- * policy, a second job with the same key while one is queued or active is
- * not inserted and `send` answers `null`.
+ * What an enqueue may ask of pg-boss beyond the payload:
+ * - `singletonKey`: on a queue created `exclusive` or `stately`, a second
+ *   job with the same key in a state the policy holds one of is not
+ *   inserted, and `send` answers `null`;
+ * - `startAfter`: the job is not fetched before then (a parked run).
  */
-export type EnqueueOptions = { singletonKey?: string }
+export type EnqueueOptions = { singletonKey?: string; startAfter?: Date }
 
 /**
  * One job as a sender reads it back — the slice of pg-boss's

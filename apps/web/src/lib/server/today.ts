@@ -4,6 +4,7 @@ import { requireUser } from './shared'
 export type {
   BrokenConnection,
   MovingSignal,
+  ParkedSource,
   ReviewGroup,
   TodayAttention,
 } from '../today/attention'

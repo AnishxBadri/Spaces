@@ -522,6 +522,7 @@ describe('enrichment.run', () => {
     expect(await run(co, [])).toEqual({
       ran: false,
       reason: 'no source to ask',
+      parked: null,
     })
     expect(await lines(co)).toHaveLength(1)
   })

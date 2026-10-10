@@ -16,6 +16,7 @@ import {
 import { listenPluginChanged } from './plugins/listen'
 import { makePluginReloader } from './plugins/reload'
 import { pgBossHost, runJob } from './run-job'
+import { CORE_SCHEDULES } from './schedules'
 import { ExtractionStore, extractDocument } from './jobs/extract-document'
 import { clipDocument } from './jobs/clip-document'
 import {
@@ -500,22 +501,9 @@ async function main() {
     runJob(pruneIngress, { host, layer: Layer.empty }),
   )
 
-  // Nightly dedupe sweep at 03:30.
-  await boss.schedule(QUEUES.dedupeSweep, '30 3 * * *', undefined, {
-    tz: 'Etc/UTC',
-  })
-
-  // And the orphan-blob sweep at 04:10 — after the dedupe sweep rather than
-  // beside it, so the two nightly scans never contend for the same tick on a
-  // single-worker self-host.
-  await boss.schedule(QUEUES.sweepOrphanBlobs, '10 4 * * *', undefined, {
-    tz: 'Etc/UTC',
-  })
-
-  // And the ingress prune at 04:40, after both.
-  await boss.schedule(QUEUES.pruneIngress, '40 4 * * *', undefined, {
-    tz: 'Etc/UTC',
-  })
+  // The nightly scans (`CORE_SCHEDULES`): dedupe, orphan blobs, ingress prune.
+  for (const { queue, cron } of CORE_SCHEDULES)
+    await boss.schedule(queue, cron, undefined, { tz: 'Etc/UTC' })
 
   // The heartbeat (SPA-57). Last, so the row only appears once this process
   // is actually working queues — a row written before `boss.work` would claim

@@ -1,10 +1,11 @@
-import { Effect } from 'effect'
+import { Clock, Effect } from 'effect'
 import { and, asc, eq, gte, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { enrichmentRecord, entity, integration } from '@spaces/db/schema'
 import { workspace } from '@spaces/db/schema/workspace'
 import { JobPermanent, JobRetryable } from '@spaces/sdk'
-import type { JobError } from '@spaces/sdk'
+import type { DomainEventName, JobError } from '@spaces/sdk'
+import { nextUtcMidnight } from '../../ai/caps'
 import { EnrichmentCollector } from '../../enrichment/collector'
 import type { Collector } from '../../enrichment/collector'
 import { wantedKeys } from '../../enrichment/plan'
@@ -19,6 +20,7 @@ import {
   enrichmentSettingsOf,
   withBuiltIn,
 } from '../../enrichment/settings'
+import { isCapRefusal } from '@spaces/core/plugins/credit'
 import { EnrichmentSources } from '../../enrichment/sources'
 import type { AskResult } from '../../enrichment/sources'
 import type { WebsiteReader } from '../../enrichment/website'
@@ -28,6 +30,7 @@ import { EntityNotFound } from '../attributes/values'
 import { canonicalId } from '../entities/sweep'
 import type { ModelCall } from '../ports/ai'
 import { applyRun, holdingsOf, linksForEntity } from './apply'
+import { sendRun } from './auto'
 import type { RunApplied, RunSource } from './apply'
 import { fetchPicture } from './picture'
 import { askWebsite, websiteFor } from './website'
@@ -45,11 +48,26 @@ import { askWebsite, websiteFor } from './website'
  *   unless a skip carries a timeline line (the Website on a sensitive record).
  * - A record with no picture that no person held is asked for one too; the
  *   first answer is fetched and stored before `applyRun` sets it.
+ * - An auto run (`trigger` set) whose source refused at its daily cap
+ *   re-queues for that source at the next 00:00 UTC: parked, never dropped.
  */
 
+/** Parked: the run queued again for the capped sources, after the reset. */
+export type Parked = {
+  readonly parked: { readonly by: string; readonly startAfter: string } | null
+}
+
 export type RunOutcome =
-  | { readonly ran: false; readonly reason: string }
-  | ({ readonly ran: true } & Omit<RunApplied, 'reembed'>)
+  | ({ readonly ran: false; readonly reason: string } & Parked)
+  | ({ readonly ran: true } & Omit<RunApplied, 'reembed'> & Parked)
+
+/** Which sources a run asks and why it was queued. */
+export type RunOptions = {
+  /** Ask only these sources; absent asks all. */
+  readonly only?: ReadonlyArray<string>
+  /** The domain event that queued an auto run. */
+  readonly trigger?: DomainEventName
+}
 
 const reasonOf = (error: JobError) => `${error._tag}: ${error.reason}`
 
@@ -123,9 +141,27 @@ const creditsSince = (integrationId: string, entityId: string, since: Date) =>
       ).at(0)?.spent ?? 0,
   )
 
+/** Re-queue an auto run for the sources its daily cap refused. */
+const park = Effect.fn('enrichment.park')(function* (
+  entityId: string,
+  reason: string,
+  trigger: DomainEventName,
+  capped: ReadonlyArray<string>,
+) {
+  const by = capped.at(0)
+  if (by === undefined) return null
+  const startAfter = nextUtcMidnight(new Date(yield* Clock.currentTimeMillis))
+  yield* sendRun(
+    { entityId, reason, sources: [...capped], trigger, parkedBy: by },
+    startAfter,
+  )
+  return { by, startAfter: startAfter.toISOString() }
+})
+
 export const runEnrichment = Effect.fn('runEnrichment')(function* (
   requested: string,
   reason: string,
+  options: RunOptions = {},
 ): Effect.fn.Return<
   RunOutcome,
   JobError,
@@ -150,7 +186,8 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
   const { links, kind } = yield* read('enrichment.run', () =>
     linksForEntity(entityId),
   )
-  if (kind === null) return { ran: false, reason: 'not a company or a person' }
+  if (kind === null)
+    return { ran: false, reason: 'not a company or a person', parked: null }
   const holdings = yield* read('enrichment.run', () =>
     holdingsOf(db, entityId, record.values, links),
   )
@@ -159,7 +196,14 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
     record.pictureSha === null && !record.pictureHeld
       ? PICTURE_KEYS[kind]
       : null
-  const { settings, website, sources } = yield* sourcesFor(kind, entityId)
+  const {
+    settings,
+    website,
+    sources: ordered,
+  } = yield* sourcesFor(kind, entityId)
+  const only = options.only
+  const sources =
+    only === undefined ? ordered : ordered.filter((s) => only.includes(s.id))
   const asker = yield* EnrichmentSources
 
   const ran: Array<RunSource> = []
@@ -205,6 +249,13 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
       for (const key of Object.keys(answer.answers)) answered.add(key)
     }
   }
+  const capped = ran.flatMap((s) =>
+    s.skipped !== undefined && isCapRefusal(s.skipped) ? [s.integrationId] : [],
+  )
+  const parked =
+    options.trigger === undefined
+      ? null
+      : yield* park(entityId, reason, options.trigger, capped)
   if (!ran.some((s) => s.skipped === undefined || s.line !== undefined))
     return {
       ran: false,
@@ -212,6 +263,7 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
         ran.length === 0
           ? 'no source to ask'
           : ran.map((s) => s.skipped).join('; '),
+      parked,
     }
 
   const pictureAnswer =
@@ -231,5 +283,6 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
     suggestionId: applied.suggestionId,
     receiptId: applied.receiptId,
     picture: applied.picture,
+    parked,
   }
 })

@@ -5,6 +5,7 @@ import { attribute, attributeEvent, entity, link } from '@spaces/db/schema'
 import type { attributeEventSource } from '@spaces/db/schema'
 import type { EntityValues } from '@spaces/db/schema/entities'
 import type { Json } from '@spaces/db/json'
+import type { DomainEvent } from '@spaces/sdk'
 import { resolveDefault } from '../../attributes/default-values'
 import { objectIdForKindAsync } from './objects'
 import {
@@ -440,7 +441,25 @@ export type SetValuesResult = {
    * has committed.
    */
   dealParties: Array<DealParty>
+  /**
+   * A domain or email this write claimed for a company or person after its
+   * birth, as the `identity.added` the caller dispatches once it has
+   * committed. Never for a birth (`fillDefaults`), an import, a seed or a merge.
+   */
+  identityAdded: Array<IdentityAddedEvent>
 }
+
+export type IdentityAddedEvent = Extract<
+  DomainEvent,
+  { name: 'identity.added' }
+>
+
+/** The writes that add identity without the record gaining one. */
+const SILENT_IDENTITY: ReadonlySet<EventSource> = new Set([
+  'import',
+  'seed',
+  'merge',
+])
 
 /** A company or person that became a party of a deal. */
 export type DealParty = {
@@ -777,10 +796,33 @@ export async function setValuesInTx(
     }
   }
 
+  // Identity a company or person gained: claimed here and new to it.
+  const identityAdded: Array<IdentityAddedEvent> = []
+  const ownKind =
+    ent.kind === 'company' || ent.kind === 'person' ? ent.kind : null
+  if (ownKind !== null && !fillDefaults && !SILENT_IDENTITY.has(source)) {
+    const at = new Date().toISOString()
+    for (const def of registry) {
+      const key = def.options.identityKey
+      if (key !== 'domain' && key !== 'email') continue
+      for (const claim of elements.claims[def.slug] ?? [])
+        if (claim.outcome === 'added')
+          identityAdded.push({
+            name: 'identity.added',
+            entityId,
+            kind: ownKind,
+            key,
+            value: claim.value,
+            occurredAt: at,
+          })
+    }
+  }
+
   return {
     reembed,
     skipped,
     dealParties,
+    identityAdded,
     changed: changes.filter((c) => c.door !== 'default').map((c) => c.slug),
     defaulted: changes.filter((c) => c.door === 'default').map((c) => c.slug),
     identity,

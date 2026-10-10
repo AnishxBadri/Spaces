@@ -1,11 +1,19 @@
-import { Effect, Predicate } from 'effect'
-import { and, eq, gte, max, sql } from 'drizzle-orm'
+import { Clock, Effect, Predicate } from 'effect'
+import { and, eq, max } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { enrichmentRecord, integration } from '@spaces/db/schema'
-import { capRefusal } from '@spaces/core/plugins/credit'
+import { utcDayStart } from '@spaces/core/ai/caps'
+import {
+  DEFAULT_CACHE_DAYS,
+  capRefusal,
+  creditDefaults,
+  creditPolicy,
+} from '@spaces/core/plugins/credit'
+import type { CreditPolicy } from '@spaces/core/plugins/credit'
+import { spendSince } from '@spaces/core/writes/enrichment/credits'
 import { JobPermanent, JobRetryable } from '@spaces/sdk'
-import type { CostHook, CostInput, Manifest } from '@spaces/sdk'
+import type { CostHook, CostInput } from '@spaces/sdk'
 import { JobSkipped } from '../run-job'
 import { messageOf } from './loader'
 
@@ -17,48 +25,14 @@ import { messageOf } from './loader'
  * - Cap: today's spend plus the job's `cost` estimate over `dailyCreditCap`
  *   refuses it; a job with no `cost` hook is refused once spend reaches the cap.
  * - Spend is only `sum(enrichment_record.credits_used)` for the integration
- *   since UTC midnight, so it survives a restart.
+ *   since UTC midnight (`spendSince`), so it survives a restart.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000
-export const DEFAULT_CACHE_DAYS = 90
-
-/** The two settings the guard reads; a null cap means no cap. */
-export type CreditPolicy = {
-  readonly cacheDays: number
-  readonly dailyCreditCap: number | null
-}
+export { DEFAULT_CACHE_DAYS, creditDefaults, creditPolicy }
+export type { CreditPolicy }
 
 const nonNegative = z.number().nonnegative()
-const declaredSettings = z.object({
-  properties: z.record(z.string(), z.object({ default: z.unknown() }).loose()),
-})
-
-const numberOr = <T>(value: unknown, fallback: T): number | T => {
-  const parsed = nonNegative.safeParse(value)
-  return parsed.success ? parsed.data : fallback
-}
-
-/** The manifest's declared defaults: `cacheDays` 90 and no cap when it declares none. */
-export const creditDefaults = (manifest: Manifest): CreditPolicy => {
-  const parsed = declaredSettings.safeParse(manifest.settings)
-  const declared = parsed.success ? parsed.data.properties : {}
-  const defaultOf = (key: string): unknown =>
-    Object.hasOwn(declared, key) ? declared[key].default : undefined
-  return {
-    cacheDays: numberOr(defaultOf('cacheDays'), DEFAULT_CACHE_DAYS),
-    dailyCreditCap: numberOr(defaultOf('dailyCreditCap'), null),
-  }
-}
-
-/** `integration.config`'s `cacheDays` and `dailyCreditCap`, else the defaults. */
-export const creditPolicy = (
-  config: { readonly [key: string]: unknown },
-  defaults: CreditPolicy,
-): CreditPolicy => ({
-  cacheDays: numberOr(config['cacheDays'], defaults.cacheDays),
-  dailyCreditCap: numberOr(config['dailyCreditCap'], defaults.dailyCreditCap),
-})
 
 const costOutput = z.object({ credits: nonNegative })
 
@@ -76,30 +50,17 @@ export const costOf = (exported: unknown): CostHook | null => {
 const unreadable = (what: string) => (error: unknown) =>
   new JobRetryable({ reason: `could not read ${what}: ${messageOf(error)}` })
 
-/** UTC midnight today, as Postgres reckons it. */
-const utcMidnight = sql`(date_trunc('day', now() at time zone 'UTC') at time zone 'UTC')`
-
-/** Credits this integration's receipts used since UTC midnight. */
+/** Credits this integration's receipts used since UTC midnight, by Effect's `Clock`. */
 export const spendToday = (
   integrationId: string,
 ): Effect.Effect<number, JobRetryable> =>
-  Effect.tryPromise({
-    try: () =>
-      db
-        .select({
-          spent: sql`coalesce(sum(${enrichmentRecord.creditsUsed}), 0)`.mapWith(
-            Number,
-          ),
-        })
-        .from(enrichmentRecord)
-        .where(
-          and(
-            eq(enrichmentRecord.integrationId, integrationId),
-            gte(enrichmentRecord.fetchedAt, utcMidnight),
-          ),
-        ),
-    catch: unreadable("today's credit spend"),
-  }).pipe(Effect.map((rows) => rows.at(0)?.spent ?? 0))
+  Effect.gen(function* () {
+    const since = utcDayStart(new Date(yield* Clock.currentTimeMillis))
+    return yield* Effect.tryPromise({
+      try: () => spendSince(integrationId, since),
+      catch: unreadable("today's credit spend"),
+    })
+  })
 
 const lastEnrichedAt = (integrationId: string, entityId: string) =>
   Effect.tryPromise({

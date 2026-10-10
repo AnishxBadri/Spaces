@@ -9,6 +9,8 @@ import type { DomainEvent } from '@spaces/sdk'
  *   space (or a space below one); `meeting`: it appears in a synced
  *   meeting — a word only until that trigger exists.
  * - `autoEnrichSpaces` empty with `space` ticked means every space.
+ * - A birth or a new identity is in scope when the record already stands in
+ *   one: a party of a live deal, or filed in a chosen space.
  * - The legacy `autoEnrich` boolean reads as `deal` for true and none for
  *   false; with neither key, the default is `deal` alone.
  */
@@ -106,6 +108,7 @@ export const inScope = (
     case 'filed':
       return inChosenSpace(scope, facts)
     case 'entity.created':
+    case 'identity.added':
       return (
         (scope.scopes.includes('deal') && facts.dealParty) ||
         inChosenSpace(scope, facts)

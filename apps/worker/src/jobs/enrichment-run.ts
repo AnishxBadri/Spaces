@@ -1,8 +1,10 @@
 import { Effect, Layer } from 'effect'
-import { z } from 'zod'
 import { Enqueue } from '@spaces/core/queue/enqueue'
 import { QUEUES } from '@spaces/core/queue/names'
+import { enrichmentRunData } from '@spaces/core/enrichment/auto'
+import type { EnrichmentRunData } from '@spaces/core/enrichment/auto'
 import { runEnrichment } from '@spaces/core/writes/enrichment/run'
+import type { RunOutcome } from '@spaces/core/writes/enrichment/run'
 import type { EnrichmentSources } from '@spaces/core/enrichment/sources'
 import { WebsiteReader } from '@spaces/core/enrichment/website'
 import type { ExtractRoute, FetchedPage } from '@spaces/core/enrichment/website'
@@ -22,15 +24,19 @@ import { CLIP_MAX_BYTES, CLIP_TIMEOUT_MS } from './clip-document'
 /**
  * enrichment.run — one record enriched from the owner's sources in order
  * (D76). The summary is the run's timeline line in short, or why nothing
- * was asked.
+ * was asked, and when it parked for a source's daily cap.
+ * - An auto run carries its trigger and the sources in scope; the Enrich
+ *   button sends neither and asks every source.
  */
 
-export const enrichmentRunData = z.object({
-  entityId: z.uuid(),
-  reason: z.string().min(1).max(100),
-})
-
-export type EnrichmentRunData = z.infer<typeof enrichmentRunData>
+const summaryOf = (outcome: RunOutcome): string => {
+  const ran = outcome.ran
+    ? `${String(outcome.fields)} field(s), ${String(outcome.credits)} credit(s)`
+    : `nothing asked: ${outcome.reason}`
+  return outcome.parked === null
+    ? ran
+    : `${ran}; parked until ${outcome.parked.startAfter}`
+}
 
 /** The embeds a run hands back, through the worker's sender. */
 export const enrichmentEnqueue: Layer.Layer<Enqueue> = Enqueue.fromSender({
@@ -103,11 +109,8 @@ export const enrichmentRun: JobDef<
   refs: (data) => ({ entityId: data.entityId }),
   retry: { limit: 2, delaySeconds: 60, backoff: true },
   run: (data) =>
-    runEnrichment(data.entityId, data.reason).pipe(
-      Effect.map((outcome) =>
-        outcome.ran
-          ? `${String(outcome.fields)} field(s), ${String(outcome.credits)} credit(s)`
-          : `nothing asked: ${outcome.reason}`,
-      ),
-    ),
+    runEnrichment(data.entityId, data.reason, {
+      ...(data.sources === undefined ? {} : { only: data.sources }),
+      ...(data.trigger === undefined ? {} : { trigger: data.trigger }),
+    }).pipe(Effect.map(summaryOf)),
 }

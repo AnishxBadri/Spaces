@@ -245,6 +245,8 @@ export const updateRecord = createServerFn({ method: 'POST' })
       // A company or person this write made a deal's party (D76).
       for (const party of result.dealParties)
         await emitDomainEvent(dealLinked(party, 'manual'))
+      // A domain or email the record gained: auto-enrich may run now (D76).
+      for (const added of result.identityAdded) await emitDomainEvent(added)
       // The pipeline→portfolio seam: a deal reaching Invested births a
       // holding (idempotent — follow-ons land on the existing one).
       if (data.patch.stage === 'invested') {

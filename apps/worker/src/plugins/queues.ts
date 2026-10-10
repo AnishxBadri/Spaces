@@ -266,6 +266,13 @@ const eventData = z.object({
       kind: z.enum(['company', 'person']),
       dealId: z.uuid(),
     }),
+    z.object({
+      name: z.literal('identity.added'),
+      ...eventBase,
+      kind: z.enum(['company', 'person']),
+      key: z.enum(['domain', 'email']),
+      value: z.string().min(1),
+    }),
   ]),
 })
 const webhookData = z.object({

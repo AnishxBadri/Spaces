@@ -1,7 +1,11 @@
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { reasonOf } from '#/components/plugin-status-section'
-import type { BrokenConnection, StoppedPlugin } from '#/lib/server-fns'
+import type {
+  BrokenConnection,
+  ParkedSource,
+  StoppedPlugin,
+} from '#/lib/server-fns'
 
 const PLUGIN_STATE: Record<StoppedPlugin['state'], string> = {
   tripped: 'stopped',
@@ -40,19 +44,26 @@ function NoticeLine({
 const fixClass =
   'focus-ring shrink-0 mono text-micro text-primary hover:underline'
 
+/** `00:00 UTC` — the reset, read off the ISO instant so server and client agree. */
+const utcClock = (iso: string) => `${iso.slice(11, 16)} UTC`
+
 /**
  * What stops the machine, one line each with the link that fixes it: a
- * plugin switched on and not running or capped, and the reader's
- * connections in `error`. Renders nothing when all runs. (D79)
+ * plugin switched on and not running or capped, auto-enrich parked at a
+ * source's daily cap, and the reader's connections in `error`. Renders
+ * nothing when all runs. (D76, D79)
  */
 export function NoticesBand({
   stopped,
   broken,
+  parked,
 }: {
   stopped: ReadonlyArray<StoppedPlugin>
   broken: ReadonlyArray<BrokenConnection>
+  parked: ReadonlyArray<ParkedSource>
 }) {
-  if (stopped.length === 0 && broken.length === 0) return null
+  if (stopped.length === 0 && broken.length === 0 && parked.length === 0)
+    return null
   return (
     <section aria-label="Notices" className="border border-hairline bg-paper">
       <ul>
@@ -65,6 +76,23 @@ export function NoticesBand({
             fix={
               <Link to={c.fixTo} className={fixClass}>
                 reconnect ›
+              </Link>
+            }
+          />
+        ))}
+        {parked.map((p) => (
+          <NoticeLine
+            key={`parked:${p.integrationId}`}
+            lane="enrich"
+            what={`Auto-enrich paused · ${p.source} cap reached`}
+            why={`${String(p.waiting)} waiting · resumes ${utcClock(p.resumesAt)}`}
+            fix={
+              <Link
+                to="/settings/plugins/$integrationId"
+                params={{ integrationId: p.integrationId }}
+                className={fixClass}
+              >
+                cap ›
               </Link>
             }
           />

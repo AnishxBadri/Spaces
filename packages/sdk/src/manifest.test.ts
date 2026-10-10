@@ -157,13 +157,28 @@ describe('manifestSchema', () => {
     })
 
     it('takes filed and deal.linked beside entity.created (SDK 1.2)', () => {
-      expect(DOMAIN_EVENTS).toEqual(['entity.created', 'filed', 'deal.linked'])
+      expect(DOMAIN_EVENTS).toEqual([
+        'entity.created',
+        'filed',
+        'deal.linked',
+        'identity.added',
+      ])
       const m = base()
       m.jobs.onFiled = { trigger: 'event', uses: ['Facts'], on: ['filed'] }
       m.jobs.onLinked = {
         trigger: 'event',
         uses: ['Facts'],
         on: ['deal.linked', 'entity.created'],
+      }
+      expect(issues(m)).toEqual([])
+    })
+
+    it('takes identity.added as an event', () => {
+      const m = base()
+      m.jobs.onIdentity = {
+        trigger: 'event',
+        uses: ['Facts'],
+        on: ['identity.added'],
       }
       expect(issues(m)).toEqual([])
     })

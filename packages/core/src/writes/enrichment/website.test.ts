@@ -175,7 +175,11 @@ describe('the Website in the order', () => {
   it('is absent with no AI model set up, and for a person', async () => {
     const id = await company(`k${String(n + 1)}.example`)
     const f = fake({ routes: { normal: 'unrouted', sensitive: 'unrouted' } })
-    expect(await run(id, f)).toEqual({ ran: false, reason: 'no source to ask' })
+    expect(await run(id, f)).toEqual({
+      ran: false,
+      reason: 'no source to ask',
+      parked: null,
+    })
     expect(f.fetched).toEqual([])
 
     const person = (
@@ -189,6 +193,7 @@ describe('the Website in the order', () => {
     expect(await run(person, g)).toEqual({
       ran: false,
       reason: 'no source to ask',
+      parked: null,
     })
     expect(g.fetched).toEqual([])
   })
@@ -199,6 +204,7 @@ describe('the Website in the order', () => {
     expect(await run(id, f)).toEqual({
       ran: false,
       reason: 'no domain to read',
+      parked: null,
     })
     expect(f.calls).toEqual([])
   })
