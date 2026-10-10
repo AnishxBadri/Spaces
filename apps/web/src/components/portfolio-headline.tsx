@@ -1,6 +1,9 @@
 import { ReadoutStrip } from '#/components/page-header'
 import { fmtMoney, fmtMultiple, fmtXirr } from '@spaces/core/portfolio/format'
-import { portfolioHeadline } from '@spaces/core/portfolio/rollup'
+import {
+  portfolioHeadline,
+  portfolioRailHeadline,
+} from '@spaces/core/portfolio/rollup'
 import type {
   HeadlineFigure,
   PortfolioRollup,
@@ -8,9 +11,10 @@ import type {
 
 /**
  * The book's headline, in the two layouts that print it: Portfolio's strip
- * above the holdings table and Today's rail. Both draw the same figures under
- * the same names from `portfolioHeadline` — the layout and whether money is
- * compact are the only things a surface decides.
+ * above the holdings table and Today's rail. Both draw core's figures under
+ * core's names — `portfolioHeadline`, and `portfolioRailHeadline` for the
+ * narrow rail — so the layout and whether money is compact are the only
+ * things a surface decides.
  */
 
 function formatFigure(
@@ -47,7 +51,7 @@ export function PortfolioHeadlineStrip({
   )
 }
 
-/** Today: the rail's ruled rows, money exact. */
+/** Today: the rail's caps rows — Invested, Value, MOIC — money exact. */
 export function PortfolioHeadlineRail({
   rollup,
   baseCurrency,
@@ -57,13 +61,10 @@ export function PortfolioHeadlineRail({
 }) {
   return (
     <>
-      {portfolioHeadline(rollup).map((f) => (
-        <div
-          key={f.key}
-          className="flex h-row items-center justify-between border-t border-rule"
-        >
+      {portfolioRailHeadline(rollup).map((f) => (
+        <div key={f.key} className="flex items-baseline justify-between">
           <span className="field-label text-graphite">{f.label}</span>
-          <span className="mono text-ui font-medium">
+          <span className="mono text-ui text-foreground">
             {formatFigure(f, baseCurrency, false)}
           </span>
         </div>

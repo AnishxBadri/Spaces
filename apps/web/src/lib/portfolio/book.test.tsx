@@ -191,12 +191,12 @@ describe('loadPortfolio — the one book Today and Portfolio read', () => {
       ),
     )
 
-    // Same figures, same names, same order — only the money's precision is
-    // the surface's to choose (Today exact, Portfolio compact).
+    // Same figures from one rollup — only the money's precision is the
+    // surface's to choose (Today exact, Portfolio compact). The rail leaves
+    // Realized out and prints Current value as "Value".
     expect(today).toEqual([
       ['Invested', '$320,000'],
-      ['Current value', '$720,000'],
-      ['Realized', '$50,000'],
+      ['Value', '$720,000'],
       ['MOIC', '2.41×'],
     ])
     expect(portfolio.slice(0, 4)).toEqual([

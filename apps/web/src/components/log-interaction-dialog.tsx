@@ -41,8 +41,11 @@ export function LogInteractionDialog({
   trigger,
   hotkey,
 }: {
-  /** the record the dialog was opened from — pre-added as an attendee */
-  seed: Attendee
+  /**
+   * The record the dialog was opened from — pre-added as an attendee.
+   * Omitted where no record is in view (Today): the room starts empty.
+   */
+  seed?: Attendee
   onLogged?: () => void
   /** custom trigger element — must forward props (plain DOM elements do) */
   trigger?: React.ReactNode
@@ -55,7 +58,9 @@ export function LogInteractionDialog({
   const [kind, setKind] = useState<'meeting' | 'call'>('meeting')
   const [subject, setSubject] = useState('')
   const [occurredAt, setOccurredAt] = useState(localNow)
-  const [attendees, setAttendees] = useState<Array<Attendee>>([seed])
+  const [attendees, setAttendees] = useState<Array<Attendee>>(
+    seed ? [seed] : [],
+  )
   const [error, setError] = useState<string | null>(null)
   /**
    * Which of the two footer buttons is mid-write. One flag rather than two
@@ -72,6 +77,7 @@ export function LogInteractionDialog({
   async function submit(writeUp: boolean) {
     setError(null)
     if (!subject.trim()) return setError('What was it about?')
+    if (attendees.length === 0) return setError('Who was involved?')
     setPending(writeUp ? 'writeUp' : 'log')
     try {
       const logged = await logInteraction({
@@ -86,7 +92,7 @@ export function LogInteractionDialog({
       setOpen(false)
       setSubject('')
       setOccurredAt(localNow())
-      setAttendees([seed])
+      setAttendees(seed ? [seed] : [])
       toast(`${kind === 'meeting' ? 'Meeting' : 'Call'} logged`)
       onLogged?.()
       void router.invalidate()
@@ -113,10 +119,15 @@ export function LogInteractionDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[35rem]">
+      <DialogContent
+        className="sm:max-w-[35rem]"
+        // No record in view, no description: say so rather than leave Radix
+        // looking for one.
+        {...(seed ? {} : { 'aria-describedby': undefined })}
+      >
         <DialogHeader>
           <DialogTitle>Log interaction</DialogTitle>
-          <DialogDescription>{seed.name}</DialogDescription>
+          {seed ? <DialogDescription>{seed.name}</DialogDescription> : null}
         </DialogHeader>
         <form
           onSubmit={(e) => {

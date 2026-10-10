@@ -12,16 +12,17 @@ import { TaskComposer } from '#/components/task-composer'
 import { Badge } from '#/components/ui/badge'
 import type { BadgeOption } from '#/components/ui/badge'
 import { Checkbox } from '#/components/ui/checkbox'
-import { Tabs } from '#/components/ui/tabs'
-import type { TabItem } from '#/components/ui/tabs'
 import type { ReviewGroup } from '#/lib/server-fns'
 import {
   daysBetween,
+  FILTER_ORDER,
   folded,
+  foldSummary,
   inTab,
-  NEEDS_YOU_KINDS,
+  NEEDS_YOU_FOLD,
 } from '#/lib/today/needs-you'
 import type { NeedsYouKind } from '#/lib/today/needs-you'
+import { cn } from '#/lib/utils'
 
 export type StageBadge = {
   option: BadgeOption
@@ -247,8 +248,8 @@ function RowBody({
 }
 
 /**
- * Needs you: one ledger in urgency order with a kind lane, tabs in the head
- * that filter by kind, a fold at eight, and the task composer as its last
+ * Needs you: one ledger in urgency order with a kind lane, sentence-case
+ * filters in the head by kind, a fold at eight, and the task composer as its last
  * row. (D79) The caller orders the rows (`byUrgency`).
  */
 export function NeedsYou({
@@ -273,84 +274,127 @@ export function NeedsYou({
     1,
     ...rows.map((r) => (r.kind === 'deal' ? r.days : 0)),
   )
-  const items: Array<TabItem<Tab>> = [
-    { id: 'all', label: 'All', count: rows.length },
-    ...NEEDS_YOU_KINDS.map((k) => ({
-      id: k,
-      label: TAB_LABEL[k],
-      count: rows.filter((r) => r.kind === k).length,
-    })),
-  ]
+  // A kind with nothing in it has no filter, unless it is the one chosen.
+  const filters = FILTER_ORDER.flatMap((k) => {
+    const count = rows.filter((r) => r.kind === k).length
+    return count > 0 || tab === k ? [{ id: k, count }] : []
+  })
+  const choose = (t: Tab) => {
+    setTab(t)
+    setOpen(false)
+  }
   const late = rows.filter((r) => r.kind === 'task' && r.late).length
   return (
     <section className="flex flex-col">
       <SectionHead
         title="Needs you"
         count={late > 0 ? `${rows.length} · ${late} overdue` : `${rows.length}`}
-      />
-      <Tabs
-        label="Needs you by kind"
-        items={items}
-        value={tab}
-        onValueChange={(t) => {
-          setTab(t)
-          setOpen(false)
-        }}
-      >
-        <ol>
-          {inView.length === 0 ? (
-            <LedgerRow>
-              <span className="text-ui text-graphite">{EMPTY[tab]}</span>
-            </LedgerRow>
-          ) : null}
-          {shown.map((r) => (
-            <LedgerRow
-              key={r.key}
-              wash={r.kind === 'task' ? washes(r.id) : undefined}
-            >
-              <RowBody
-                row={r}
-                today={today}
-                dealScale={dealScale}
-                onComplete={onComplete}
-              />
-            </LedgerRow>
-          ))}
-          {hidden > 0 ? (
-            <LedgerRow>
-              <button
-                type="button"
-                onClick={() => setOpen(true)}
-                className="focus-ring-inset flex h-full w-full items-center gap-3 text-left mono text-micro text-graphite hover:text-foreground"
+        action={
+          <div
+            role="group"
+            aria-label="Needs you by kind"
+            className="flex items-baseline gap-3.5"
+          >
+            <FilterButton active={tab === 'all'} onClick={() => choose('all')}>
+              All
+            </FilterButton>
+            {filters.map((f) => (
+              <FilterButton
+                key={f.id}
+                active={tab === f.id}
+                onClick={() => choose(f.id)}
               >
-                <span className="w-12 shrink-0">+{hidden}</span>
-                show all ›
-              </button>
-            </LedgerRow>
-          ) : null}
-          <LedgerRow last>
-            <TaskComposer
-              hotkey="t"
-              onCreated={onCreated}
-              trigger={
-                <button
-                  type="button"
-                  className="focus-ring-inset flex h-full w-full items-center gap-3 text-left"
-                >
-                  <span className="w-12 shrink-0 mono text-micro text-primary">
-                    +
-                  </span>
-                  <span className="min-w-0 truncate text-body text-graphite">
-                    Add a task…
-                  </span>
-                  <span className="flex-1" />
-                  <KeyHint>T</KeyHint>
-                </button>
-              }
+                {`${TAB_LABEL[f.id]} ${f.count}`}
+              </FilterButton>
+            ))}
+          </div>
+        }
+      />
+      <ol>
+        {inView.length === 0 ? (
+          <LedgerRow>
+            <span className="text-ui text-graphite">{EMPTY[tab]}</span>
+          </LedgerRow>
+        ) : null}
+        {shown.map((r) => (
+          <LedgerRow
+            key={r.key}
+            wash={r.kind === 'task' ? washes(r.id) : undefined}
+          >
+            <RowBody
+              row={r}
+              today={today}
+              dealScale={dealScale}
+              onComplete={onComplete}
             />
           </LedgerRow>
-        </ol>
-      </Tabs>
+        ))}
+        {hidden > 0 ? (
+          <LedgerRow>
+            <button
+              type="button"
+              data-fold
+              onClick={() => setOpen(true)}
+              className="group focus-ring-inset flex h-full w-full items-center justify-between gap-3 text-left mono text-micro text-graphite"
+            >
+              <span className="min-w-0 truncate">
+                {foldSummary(inView.slice(NEEDS_YOU_FOLD))}
+              </span>
+              <span className="shrink-0 text-primary group-hover:underline">
+                show all ›
+              </span>
+            </button>
+          </LedgerRow>
+        ) : null}
+        <LedgerRow last>
+          <TaskComposer
+            hotkey="t"
+            onCreated={onCreated}
+            trigger={
+              <button
+                type="button"
+                className="focus-ring-inset flex h-full w-full items-center gap-3 text-left"
+              >
+                <span className="w-12 shrink-0 mono text-micro text-primary">
+                  +
+                </span>
+                <span className="min-w-0 truncate text-body text-graphite">
+                  Add a task…
+                </span>
+                <span className="flex-1" />
+                <KeyHint>T</KeyHint>
+              </button>
+            }
+          />
+        </LedgerRow>
+      </ol>
     </section>
+  )
+}
+
+/** One kind filter in the ledger head: sentence case, ink when chosen. */
+function FilterButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        'focus-ring font-sans text-ui transition-colors duration-150 ease-out-quart',
+        active
+          ? 'font-medium text-foreground'
+          : 'text-graphite hover:text-foreground',
+      )}
+    >
+      {children}
+    </button>
   )
 }

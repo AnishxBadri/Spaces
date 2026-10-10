@@ -3,6 +3,7 @@ import {
   byUrgency,
   dealsPastMedian,
   folded,
+  foldSummary,
   idleDeals,
   inTab,
   NEEDS_YOU_FOLD,
@@ -107,5 +108,20 @@ describe('todayStamp', () => {
   it('prints weekday, month-day and ISO week', () => {
     expect(todayStamp('2026-10-09')).toBe('Fri 10-09 · W41')
     expect(todayStamp('2026-01-01')).toBe('Thu 01-01 · W1')
+  })
+})
+
+describe('foldSummary', () => {
+  it('counts what the fold hides and names each kind, sheet order', () => {
+    const hidden = [
+      row('deal', 'd', 1),
+      row('task', 'a', 1),
+      row('review', 'r1', 1),
+      row('task', 'b', 1),
+      row('review', 'r2', 1),
+      row('task', 'c', 1),
+    ]
+    expect(foldSummary(hidden)).toBe('+ 6 more · 3 tasks · 2 review · 1 deal')
+    expect(foldSummary([row('mark', 'm', 1)])).toBe('+ 1 more · 1 mark')
   })
 })

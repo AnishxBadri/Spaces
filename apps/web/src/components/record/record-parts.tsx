@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import type { ComponentProps, ReactNode } from 'react'
 import { HeadActions, HeadBar, useHeadFold } from '#/components/head-fold'
 import { SectionHead } from '#/components/ledger-section'
@@ -20,16 +21,21 @@ import { cn } from '#/lib/utils'
  * - `muted` is graphite: a zero, or nothing to measure. A bare `—` reads
  *   graphite without asking.
  * - `bad` is crimson, for a value past its threshold.
+ * - `warn` is amber, for a nonzero value worth a look but not yet bad.
  */
 export type RecordReadout = {
   label: ReactNode
   value: ReactNode
-  tone?: 'muted' | 'bad' | undefined
+  tone?: 'muted' | 'bad' | 'warn' | undefined
   /**
    * A figure rather than a number — a bar with its labels: the cell takes
    * twice the width and draws `value` as given.
    */
   figure?: boolean | undefined
+  /** The list the number was counted from; the cell becomes its link. */
+  to?: string | undefined
+  /** Search params for `to`, when the count is of a filtered list. */
+  search?: Record<string, string> | undefined
 }
 
 export function RecordHeader({
@@ -105,46 +111,76 @@ export function RecordHeader({
 
 /**
  * The readout strip, variant B: equal cells on rules under a hairline, the
- * value in mono over a sentence-case label. The record head draws it, and
- * so does Cmd-K's preview of a record.
+ * value in mono over a sentence-case label. The record head draws it, so do
+ * Cmd-K's preview of a record and Today's head.
+ * - A cell with `to` is a link to the list it counted; hover inks the label.
  */
 export function ReadoutStrip({
   readouts,
+  className,
 }: {
   readouts: ReadonlyArray<RecordReadout>
+  className?: string | undefined
 }) {
   return (
     <div
       data-readouts
-      className="flex h-16 overflow-x-auto border-t border-hairline"
+      className={cn(
+        'flex h-16 overflow-x-auto border-t border-hairline',
+        className,
+      )}
     >
-      {readouts.map((r, i) => (
-        <div
-          key={i}
-          className={cn(
-            'flex min-w-28 basis-0 flex-col justify-center gap-0.5 border-r border-rule px-4 first:pl-0 last:border-r-0',
-            r.figure ? 'max-w-110 flex-2' : 'max-w-55 flex-1',
-          )}
-        >
-          {r.figure ? (
-            <div className="flex h-6.5 min-w-0 items-end">{r.value}</div>
-          ) : (
+      {readouts.map((r, i) => {
+        const cls = cn(
+          'flex min-w-28 basis-0 flex-col justify-center gap-0.5 border-r border-rule px-4 first:pl-0 last:border-r-0',
+          r.figure ? 'max-w-110 flex-2' : 'max-w-55 flex-1',
+        )
+        const inner = (
+          <>
+            {r.figure ? (
+              <div className="flex h-6.5 min-w-0 items-end">{r.value}</div>
+            ) : (
+              <span
+                className={cn(
+                  'truncate mono text-page leading-6.5',
+                  r.tone === 'bad'
+                    ? 'text-destructive'
+                    : r.tone === 'warn'
+                      ? 'text-warning'
+                      : r.tone === 'muted' || r.value === '—'
+                        ? 'text-graphite'
+                        : 'text-foreground',
+                )}
+              >
+                {r.value}
+              </span>
+            )}
             <span
               className={cn(
-                'truncate mono text-page leading-6.5',
-                r.tone === 'bad'
-                  ? 'text-destructive'
-                  : r.tone === 'muted' || r.value === '—'
-                    ? 'text-graphite'
-                    : 'text-foreground',
+                'truncate text-label text-graphite',
+                r.to !== undefined && 'group-hover:text-foreground',
               )}
             >
-              {r.value}
+              {r.label}
             </span>
-          )}
-          <span className="truncate text-label text-graphite">{r.label}</span>
-        </div>
-      ))}
+          </>
+        )
+        return r.to === undefined ? (
+          <div key={i} className={cls}>
+            {inner}
+          </div>
+        ) : (
+          <Link
+            key={i}
+            to={r.to}
+            // Spread: a cell with no filter passes no `search` at all.
+            {...(r.search ? { search: r.search } : {})}
+            className={cn(cls, 'group focus-ring-inset')}
+          >
+            {inner}
+          </Link>
+        )
+      })}
     </div>
   )
 }

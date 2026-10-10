@@ -145,3 +145,18 @@ export function portfolioHeadline(
     { key: 'moic', label: 'MOIC', kind: 'multiple', amount: rollup.moic },
   ]
 }
+
+/**
+ * Today's rail: the headline less Realized, Current value printed "Value".
+ * - Same figures as `portfolioHeadline`, by key; only the one name is short.
+ * - Realized is never folded into Value; it reaches the rail through MOIC.
+ */
+export function portfolioRailHeadline(
+  rollup: PortfolioRollup,
+): Array<HeadlineFigure> {
+  return portfolioHeadline(rollup).flatMap((f): Array<HeadlineFigure> => {
+    if (f.key === 'realized') return []
+    if (f.key === 'current') return [{ ...f, label: 'Value' }]
+    return [f]
+  })
+}

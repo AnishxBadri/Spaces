@@ -1,13 +1,22 @@
-import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
+import type { ReactNode } from 'react'
 import { toast } from 'sonner'
-import { PageHeader, ReadoutStrip } from '#/components/page-header'
-import { PortfolioHeadlineRail } from '#/components/portfolio-headline'
+import { LogInteractionDialog } from '#/components/log-interaction-dialog'
+import { KeyHint, PageHeader } from '#/components/page-header'
+import { ReadoutStrip } from '#/components/record/record-parts'
 import { DayStrip } from '#/components/today/day-strip'
 import { FirstRun } from '#/components/today/first-run'
 import { NeedsYou } from '#/components/today/needs-you'
 import type { NeedsYouRow, StageBadge } from '#/components/today/needs-you'
 import { NoticesBand } from '#/components/today/notices'
-import { TeamActivity, WhatsMoving } from '#/components/today/rail'
+import {
+  PortfolioRail,
+  TeamActivity,
+  unpricedCurrencies,
+  WhatsMoving,
+} from '#/components/today/rail'
+import { todayReadouts } from '#/components/today/readouts'
+import { Button } from '#/components/ui/button'
 import { useBornRows } from '#/lib/born-rows'
 import {
   countCompanies,
@@ -98,13 +107,31 @@ function dueFigure(due: string, today: string): string {
 
 type Loaded = Awaited<ReturnType<typeof loadToday>>
 
+/** The date line above the title — `Sat 10-10 · W41`, as written, not caps. */
+function DateLine({ today }: { today: string }) {
+  return (
+    <span className="tracking-normal normal-case">{todayStamp(today)}</span>
+  )
+}
+
+/** The head: the date line, the plain title, and the day's two verbs. */
+function TodayHead({ today, action }: { today: string; action?: ReactNode }) {
+  return (
+    <PageHeader
+      eyebrow={<DateLine today={today} />}
+      title="Today"
+      {...(action ? { action } : {})}
+    />
+  )
+}
+
 function TodayPage() {
   const data = Route.useLoaderData()
   const today = localToday()
   if (data.empty)
     return (
       <div className="flex min-h-full flex-col">
-        <PageHeader title="Today" description={todayStamp(today)} />
+        <TodayHead today={today} />
         <FirstRun registry={data.registry} />
       </div>
     )
@@ -120,7 +147,8 @@ function TodayLedger({
 }) {
   const router = useRouter()
   usePageActions([
-    { id: 'task', label: 'Add a task', key: 'T', run: runBinding('T') },
+    { id: 'task', label: 'New task', key: 'T', run: runBinding('T') },
+    { id: 'log', label: 'Log interaction', key: 'L', run: runBinding('L') },
     ...GLOBAL_ACTIONS,
   ])
   const {
@@ -236,37 +264,42 @@ function TodayLedger({
     }
   }
 
-  const missingRates = holdings.rollup.excludedForMissingRates.length
-
   return (
     <div className="flex min-h-full flex-col">
-      <PageHeader title="Today" description={todayStamp(today)} />
-      <DayStrip />
-      <ReadoutStrip
-        cells={[
-          { label: 'Overdue', value: overdue, tone: 'bad', to: '/tasks' },
-          {
-            label: 'Deals past stage median',
-            value: pastMedian,
-            tone: 'warn',
-            to: '/deals',
-          },
-          {
-            label: 'Oldest mark',
-            value: oldestAge === null ? '—' : `${oldestAge}d`,
-            ...(oldestAge !== null && oldestAge > STALE_MARK_DAYS
-              ? { tone: 'bad' as const }
-              : {}),
-            to: '/portfolio',
-          },
-          {
-            label: 'Unfiled files',
-            value: unfiledCount,
-            to: '/files',
-            search: { filed: 'unfiled' },
-          },
-        ]}
+      <TodayHead
+        today={today}
+        action={
+          <>
+            {/* The ledger's composer owns T; the button presses it. */}
+            <Button variant="outline" onClick={runBinding('T')}>
+              New task
+              <KeyHint>T</KeyHint>
+            </Button>
+            <LogInteractionDialog
+              hotkey="l"
+              trigger={
+                <Button>
+                  Log interaction
+                  <KeyHint>L</KeyHint>
+                </Button>
+              }
+            />
+          </>
+        }
       />
+      {/* Meetings join the strip once a calendar feeds the day. */}
+      <DayStrip />
+      <div className="border-y border-hairline px-8">
+        <ReadoutStrip
+          className="border-t-0"
+          readouts={todayReadouts({
+            overdue,
+            pastMedian,
+            oldestMarkAge: oldestAge,
+            unfiled: unfiledCount,
+          })}
+        />
+      </div>
 
       <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
         <div className="flex min-w-0 flex-1 flex-col gap-6 px-8 pt-6 pb-10">
@@ -286,45 +319,15 @@ function TodayLedger({
 
         <aside className="flex w-full shrink-0 flex-col border-t border-hairline bg-bone xl:w-100 xl:border-t-0 xl:border-l">
           {holdings.holdings.length > 0 ? (
-            <section className="flex flex-col border-b border-hairline px-6 py-5">
-              <div className="flex items-baseline justify-between pb-2.5">
-                <h2 className="text-title font-medium text-foreground">
-                  Portfolio
-                </h2>
-                <span className="mono text-micro text-graphite">
-                  {holdings.baseCurrency} · {holdings.holdings.length} holding
-                  {holdings.holdings.length === 1 ? '' : 's'}
-                </span>
-              </div>
-              <PortfolioHeadlineRail
-                rollup={holdings.rollup}
-                baseCurrency={holdings.baseCurrency}
-              />
-              {missingRates > 0 ? (
-                <div className="flex h-row items-center justify-between border-t border-rule">
-                  <span className="field-label text-warning">
-                    {missingRates} holding{missingRates === 1 ? '' : 's'}{' '}
-                    unpriced
-                  </span>
-                  <Link
-                    to="/settings/currency"
-                    className="focus-ring mono text-micro text-primary hover:underline"
-                  >
-                    add FX rate ›
-                  </Link>
-                </div>
-              ) : (
-                <div className="flex h-row items-center justify-between border-t border-rule">
-                  <span className="field-label text-graphite">All priced</span>
-                  <Link
-                    to="/portfolio"
-                    className="focus-ring mono text-micro text-foreground hover:underline"
-                  >
-                    portfolio ›
-                  </Link>
-                </div>
+            <PortfolioRail
+              rollup={holdings.rollup}
+              baseCurrency={holdings.baseCurrency}
+              holdingCount={holdings.holdings.length}
+              missing={unpricedCurrencies(
+                holdings.holdings,
+                holdings.rollup.excludedForMissingRates,
               )}
-            </section>
+            />
           ) : null}
           <WhatsMoving signals={attention.moving} today={today} />
           <TeamActivity entries={team} today={today} />

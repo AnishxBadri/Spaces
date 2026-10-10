@@ -128,3 +128,28 @@ export function todayStamp(iso: string): string {
   const weekday = WEEKDAY[new Date(`${iso}T00:00:00Z`).getUTCDay()]
   return `${weekday} ${iso.slice(5, 10)} · W${isoWeek(iso)}`
 }
+
+/** The kinds in the order the head's filters and the fold name them. */
+export const FILTER_ORDER: ReadonlyArray<NeedsYouKind> = [
+  'task',
+  'review',
+  'deal',
+  'mark',
+]
+
+const KIND_NOUN: Record<NeedsYouKind, readonly [string, string]> = {
+  task: ['task', 'tasks'],
+  review: ['review', 'review'],
+  deal: ['deal', 'deals'],
+  mark: ['mark', 'marks'],
+}
+
+/** The fold's line: `+ 6 more · 3 tasks · 2 review · 1 deal`. */
+export function foldSummary(hidden: ReadonlyArray<Ranked>): string {
+  const parts = FILTER_ORDER.flatMap((k) => {
+    const n = hidden.filter((r) => r.kind === k).length
+    if (n === 0) return []
+    return [`${n} ${KIND_NOUN[k][n === 1 ? 0 : 1]}`]
+  })
+  return [`+ ${hidden.length} more`, ...parts].join(' · ')
+}
