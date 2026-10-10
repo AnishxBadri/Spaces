@@ -135,13 +135,54 @@ export type ChangePage = {
 export type PickerConfig = JsonObject
 
 // ---------------------------------------------------------------------------
+// The write half (docs/spec-storage-sources.md §6)
+// ---------------------------------------------------------------------------
+
+/**
+ * What `putFile` uploads. `sha256` is core's hash of the same bytes,
+ * lowercase hex: the collision policy compares it with the provider's own
+ * checksum of a file already under the name.
+ */
+export type StorageUpload = {
+  readonly stream: ReadableStream<Uint8Array>
+  readonly mime: string
+  readonly sha256: string
+}
+
+/** Where `putFile` landed. `name` is the one used, `(n)` suffix and all. */
+export type PutFileResult = {
+  readonly fileId: string
+  readonly revisionId: string
+  readonly name: string
+}
+
+/** A path's folder names: split on `/`, trimmed, empty segments dropped. */
+export const pathSegments = (path: string): ReadonlyArray<string> =>
+  path
+    .split('/')
+    .map((segment) => segment.trim())
+    .filter((segment) => segment !== '')
+
+/**
+ * The `n`th name `putFile` tries in one folder: `name` itself, then
+ * `Term sheet (2).pdf`, `Term sheet (3).pdf`. A leading dot belongs to the
+ * stem (`.env (2)`).
+ */
+export const collisionName = (name: string, n: number): string => {
+  if (n <= 1) return name
+  const dot = name.lastIndexOf('.')
+  return dot <= 0
+    ? `${name} (${n})`
+    : `${name.slice(0, dot)} (${n})${name.slice(dot)}`
+}
+
+// ---------------------------------------------------------------------------
 // The interface
 // ---------------------------------------------------------------------------
 
 /**
- * The read half is typed; the write half (`putFile`, `move`, `rename`,
- * `ensureFolder`, docs/spec-storage-sources.md §6) is declared optional and
- * opaque until write-through lands, so a read-only provider type-checks.
+ * One port, read and write. The write members are optional so a read-only
+ * provider type-checks; `WritableStorageSource` is one that has them.
  */
 export type StorageSource = {
   /** A provider URL → what it names; null when it is not this provider's link. */
@@ -172,10 +213,44 @@ export type StorageSource = {
     cursor: string | null,
   ) => Effect.Effect<ChangePage, CursorExpired | RateLimited | AuthExpired>
   readonly pickerConfig: () => Effect.Effect<PickerConfig, AuthExpired>
-  // Write-through: declared, not yet typed. Optional so a read-side provider
-  // satisfies the interface without them.
-  readonly putFile?: (...args: never) => unknown
-  readonly move?: (...args: never) => unknown
-  readonly rename?: (...args: never) => unknown
-  readonly ensureFolder?: (...args: never) => unknown
+  /**
+   * The folder at `path` under `rootId`, each missing segment created — the
+   * only way a folder is made. Safe under concurrency: calls racing on one
+   * path end with one folder per segment and the same id, though the
+   * provider permits duplicate names. `NotFound` names a missing root.
+   */
+  readonly ensureFolder?: (
+    rootId: string,
+    path: string,
+  ) => Effect.Effect<string, NotFound | RateLimited | AuthExpired>
+  /**
+   * Upload into a folder. The collision policy is the port's: a file under
+   * the name with the same sha gets a new revision; a different sha moves on
+   * to `collisionName(name, 2)`, then 3, by the same rule. Never converted
+   * to a native document.
+   */
+  readonly putFile?: (
+    folderId: string,
+    name: string,
+    upload: StorageUpload,
+  ) => Effect.Effect<PutFileResult, NotFound | RateLimited | AuthExpired>
+  /** Put a file or folder in `folderId` alone. Already there is a no-op. */
+  readonly move?: (
+    id: string,
+    folderId: string,
+  ) => Effect.Effect<void, NotFound | RateLimited | AuthExpired>
+  /** Give a file or folder exactly `name`. Already so named is a no-op. */
+  readonly rename?: (
+    id: string,
+    name: string,
+  ) => Effect.Effect<void, NotFound | RateLimited | AuthExpired>
+}
+
+/** The write members of `StorageSource`. */
+export type StorageSourceWriteMember =
+  'ensureFolder' | 'putFile' | 'move' | 'rename'
+
+/** A provider with the write half. */
+export type WritableStorageSource = StorageSource & {
+  readonly [K in StorageSourceWriteMember]-?: NonNullable<StorageSource[K]>
 }

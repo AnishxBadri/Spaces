@@ -35,7 +35,8 @@ import type { Scrub } from './binding'
  * a shared throttle (in Postgres) is the fix when that deployment exists.
  *
  * Network failures are `JobRetryable`; any other status comes back as a
- * response for the job to judge. `request` reads the body as text; `stream`
+ * response for the job to judge. A string or byte request body is sent as
+ * is, anything else as JSON. `request` reads the response body as text; `stream`
  * hands it over unread, so a download is never buffered here. Every error reason passes through the
  * binding's scrub, so a key carried in a URL is never written whole.
  * Time is Effect's `Clock`, so a test drives it with `TestClock`.
@@ -47,7 +48,7 @@ export type FetchLike = (
   init: {
     readonly method: string
     readonly headers: Record<string, string>
-    readonly body?: string
+    readonly body?: string | Uint8Array<ArrayBuffer>
   },
 ) => Promise<Response>
 
@@ -159,9 +160,13 @@ export const HttpLive = (options: HttpLiveOptions): Layer.Layer<Http> => {
       const headers: Record<string, string> = {}
       for (const [k, v] of Object.entries(request.headers ?? {}))
         headers[k.toLowerCase()] = v
-      let body: string | undefined
+      let body: string | Uint8Array<ArrayBuffer> | undefined
       if (request.body !== undefined) {
-        if (typeof request.body === 'string') body = request.body
+        if (
+          typeof request.body === 'string' ||
+          request.body instanceof Uint8Array
+        )
+          body = request.body
         else {
           body = JSON.stringify(request.body)
           headers['content-type'] ??= 'application/json'

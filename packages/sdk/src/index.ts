@@ -114,9 +114,15 @@ export {
   CursorExpired,
   RateLimited,
   AuthExpired,
+  pathSegments,
+  collisionName,
 } from './storage-source.ts'
 export type {
   StorageSource,
+  WritableStorageSource,
+  StorageSourceWriteMember,
+  StorageUpload,
+  PutFileResult,
   StorageSourceError,
   LinkTarget,
   StorageEntry,

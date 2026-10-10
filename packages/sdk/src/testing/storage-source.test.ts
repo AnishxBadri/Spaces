@@ -8,18 +8,26 @@ import {
   it,
   vi,
 } from 'vitest'
-import { AuthExpired } from '../storage-source.ts'
-import type { StorageSource } from '../storage-source.ts'
+import {
+  AuthExpired,
+  NotFound,
+  collisionName,
+  pathSegments,
+} from '../storage-source.ts'
+import type { StorageSource, WritableStorageSource } from '../storage-source.ts'
 import {
   DOCX_MIME,
   DRIVE_API,
+  DRIVE_UPLOAD_API,
   FAKE_DRIVE_CHAOS_FIXTURE,
   FAKE_DRIVE_CREDENTIALS,
   FAKE_DRIVE_FIXTURE,
   FAKE_DRIVE_SCAN,
   FAKE_DRIVE_SEED,
+  FAKE_DRIVE_WRITE_FIXTURE,
   GOOGLE_DOC_MIME,
   LARGE_FILE_MEMORY_BOUND,
+  RESUMABLE_CHUNK_MULTIPLE,
   fakeDriveLargeChunks,
   makeFakeDrive,
   makeFakeDriveApi,
@@ -27,11 +35,13 @@ import {
   sha256Hex,
   storageSourceChaos,
   storageSourceConformance,
+  storageSourceWriteConformance,
 } from './index.ts'
 import type {
   FakeDriveSeedItem,
   StorageSourceChaosSubject,
   StorageSourceSubject,
+  StorageSourceWriteSubject,
 } from './index.ts'
 
 beforeAll(() => {
@@ -58,6 +68,214 @@ describe('storage-source conformance — the fake Drive', () => {
   it.each(storageSourceConformance(fakeDrive))('$name', ({ run }) =>
     Effect.runPromise(run),
   )
+})
+
+const writableDrive: StorageSourceWriteSubject = {
+  make: () => makeFakeDrive().source,
+  fixture: FAKE_DRIVE_WRITE_FIXTURE,
+}
+
+describe('storage-source write conformance — the fake Drive', () => {
+  it.each(storageSourceWriteConformance(writableDrive))('$name', ({ run }) =>
+    Effect.runPromise(run),
+  )
+})
+
+/** The one write case whose name starts `prefix`, run against `make`: its failure, or null. */
+const writeOutcome = async (
+  make: () => WritableStorageSource,
+  prefix: string,
+) => {
+  const found = storageSourceWriteConformance({
+    ...writableDrive,
+    make,
+  }).filter((c) => c.name.startsWith(prefix))
+  expect(found).toHaveLength(1)
+  const exit = await Effect.runPromiseExit(found[0].run)
+  return Exit.isSuccess(exit) ? null : String(failureOf(exit))
+}
+
+describe('the write cases fail when the port does not hold', () => {
+  it('fails the concurrent case, naming the fork, when ensureFolder looks and then creates', async () => {
+    const naive = (): WritableStorageSource => {
+      const drive = makeFakeDrive()
+      const ensureFolder = (rootId: string, path: string) =>
+        Effect.gen(function* () {
+          let at = rootId
+          for (const name of pathSegments(path)) {
+            const { entries } = yield* drive.source
+              .listFolder(at)
+              .pipe(Effect.catchTag('CursorExpired', Effect.die))
+            const found = entries.find(
+              (e) => e.kind === 'folder' && e.name === name,
+            )
+            // The gap Drive leaves between looking and creating.
+            yield* Effect.yieldNow
+            at =
+              found?.id ??
+              drive.create({ kind: 'folder', name, parentId: at }).id
+          }
+          return at
+        })
+      return { ...drive.source, ensureFolder }
+    }
+    expect(await writeOutcome(naive, 'ensureFolder(A/B/C) twice')).toBeNull()
+    const failure = await writeOutcome(naive, 'four concurrent')
+    expect(failure).toMatch(/four concurrent ensureFolder\(A\/B\) calls gave/)
+  })
+
+  it('fails the revision case when identical bytes make a second file', async () => {
+    const failure = await writeOutcome(() => {
+      const drive = makeFakeDrive()
+      return {
+        ...drive.source,
+        putFile: (folderId, name, upload) =>
+          Effect.flatMap(
+            Effect.promise(() => new Response(upload.stream).arrayBuffer()),
+            (bytes) =>
+              Effect.succeed({
+                fileId: drive.create({
+                  kind: 'file',
+                  name,
+                  parentId: folderId,
+                  mime: upload.mime,
+                  bytes: new Uint8Array(bytes),
+                }).id,
+                revisionId: 'r1',
+                name,
+              }),
+          ),
+      }
+    }, 'putFile of identical bytes')
+    expect(failure).toContain('made a second file')
+  })
+
+  it('fails the docx case when the upload is converted to a native doc', async () => {
+    const failure = await writeOutcome(() => {
+      const drive = makeFakeDrive()
+      return {
+        ...drive.source,
+        putFile: (folderId, name, upload) =>
+          drive.source.putFile(folderId, name, {
+            ...upload,
+            mime: GOOGLE_DOC_MIME,
+          }),
+      }
+    }, 'putFile never converts')
+    expect(failure).toContain(`lists as ${GOOGLE_DOC_MIME} — converted`)
+  })
+
+  it('fails the rename case when a replay writes again', async () => {
+    const failure = await writeOutcome(() => {
+      const drive = makeFakeDrive()
+      return {
+        ...drive.source,
+        rename: (id, name) => Effect.sync(() => drive.rename(id, name)),
+      }
+    }, 'rename is idempotent')
+    expect(failure).toContain('rename replayed changed the file')
+  })
+
+  it('fails the move case when a replay is an error', async () => {
+    const failure = await writeOutcome(() => {
+      const drive = makeFakeDrive()
+      let moved = false
+      return {
+        ...drive.source,
+        move: (id, folderId) =>
+          moved
+            ? Effect.fail(new NotFound({ id }))
+            : Effect.sync(() => {
+                moved = true
+                drive.move(id, folderId)
+              }),
+      }
+    }, 'move is idempotent')
+    expect(failure).toMatch(/NotFound/)
+  })
+})
+
+describe('the fake Drive, written to', () => {
+  const upload = (text: string) =>
+    Effect.gen(function* () {
+      const bytes = new TextEncoder().encode(text)
+      return {
+        stream: new Blob([bytes]).stream(),
+        mime: 'application/pdf',
+        sha256: yield* sha256Hex(bytes),
+      }
+    })
+
+  it('creates a path lazily, once, and shows it as one chain', async () => {
+    const drive = makeFakeDrive()
+    expect(drive.tree('root')).not.toContain('Portfolio')
+    const leaf = await Effect.runPromise(
+      Effect.all(
+        Array.from({ length: 4 }, () =>
+          drive.source.ensureFolder('root', 'Portfolio/Acme/Seed/Legal'),
+        ),
+        { concurrency: 'unbounded' },
+      ),
+    )
+    expect(new Set(leaf).size).toBe(1)
+    expect(drive.tree('root').filter((p) => p.startsWith('Portfolio'))).toEqual(
+      [
+        'Portfolio',
+        'Portfolio/Acme',
+        'Portfolio/Acme/Seed',
+        'Portfolio/Acme/Seed/Legal',
+      ],
+    )
+  })
+
+  it('keeps every revision of a file put twice with the same bytes', async () => {
+    const drive = makeFakeDrive()
+    const put = (text: string) =>
+      Effect.flatMap(upload(text), (u) =>
+        drive.source.putFile('legal', 'SPA.pdf', u),
+      )
+    const first = await Effect.runPromise(put('%PDF spa'))
+    const second = await Effect.runPromise(put('%PDF spa'))
+    expect(drive.revisions(first.fileId)).toEqual([
+      first.revisionId,
+      second.revisionId,
+    ])
+    expect(drive.driveFields(first.fileId)).toMatchObject({
+      headRevisionId: second.revisionId,
+      sha256Checksum: await Effect.runPromise(
+        sha256Hex(new TextEncoder().encode('%PDF spa')),
+      ),
+    })
+  })
+
+  it('refuses a write once revoked, and a write to a missing folder is NotFound', async () => {
+    const drive = makeFakeDrive()
+    drive.revoke()
+    const revoked = await Effect.runPromiseExit(
+      drive.source.ensureFolder('root', 'A'),
+    )
+    expect(failureOf(revoked)).toMatchObject({ _tag: 'AuthExpired' })
+    drive.restore()
+    const missing = await Effect.runPromiseExit(
+      Effect.flatMap(upload('x'), (u) =>
+        drive.source.putFile('nowhere', 'x.pdf', u),
+      ),
+    )
+    expect(failureOf(missing)).toMatchObject({
+      _tag: 'NotFound',
+      id: 'nowhere',
+    })
+  })
+})
+
+describe('collisionName', () => {
+  it('suffixes before the extension, and a dotfile or a bare name at the end', () => {
+    expect(collisionName('Term sheet.pdf', 1)).toBe('Term sheet.pdf')
+    expect(collisionName('Term sheet.pdf', 2)).toBe('Term sheet (2).pdf')
+    expect(collisionName('archive.tar.gz', 3)).toBe('archive.tar (3).gz')
+    expect(collisionName('README', 2)).toBe('README (2)')
+    expect(collisionName('.env', 2)).toBe('.env (2)')
+  })
 })
 
 const chaosDrive: StorageSourceChaosSubject = {
@@ -556,5 +774,111 @@ describe('the fake Drive', () => {
       drive.source.listFolder('legal', { cursor: first.next ?? '' }),
     )
     expect(failureOf(cross)).toMatchObject({ _tag: 'CursorExpired' })
+  })
+})
+
+describe('the fake Drive API, written to', () => {
+  const send = (
+    api: ReturnType<typeof makeFakeDriveApi>,
+    method: string,
+    url: string,
+    init: {
+      readonly headers?: Record<string, string>
+      readonly body?: string | Uint8Array<ArrayBuffer>
+    } = {},
+  ) =>
+    api.fetch(url, {
+      method,
+      headers: {
+        authorization: `Bearer ${api.accessToken}`,
+        ...init.headers,
+      },
+      ...(init.body === undefined ? {} : { body: init.body }),
+    })
+
+  const folder = (name: string) =>
+    JSON.stringify({
+      name,
+      parents: ['root'],
+      mimeType: 'application/vnd.google-apps.folder',
+    })
+
+  it('creates a second folder of the same name, as Drive does', async () => {
+    const api = makeFakeDriveApi()
+    const one = await send(api, 'POST', `${DRIVE_API}/files?fields=id`, {
+      body: folder('Legal'),
+    })
+    const two = await send(api, 'POST', `${DRIVE_API}/files?fields=id`, {
+      body: folder('Legal'),
+    })
+    const ids = [await one.json(), await two.json()]
+    expect(ids[0]).not.toEqual(ids[1])
+    expect(api.drive.tree('root').filter((p) => p === 'Legal')).toHaveLength(2)
+  })
+
+  const start = async (
+    api: ReturnType<typeof makeFakeDriveApi>,
+    mimeType: string,
+  ) => {
+    const response = await send(
+      api,
+      'POST',
+      `${DRIVE_UPLOAD_API}/files?uploadType=resumable&fields=id,mimeType`,
+      { body: JSON.stringify({ name: 'Memo', parents: ['root'], mimeType }) },
+    )
+    expect(response.status).toBe(200)
+    return response.headers.get('location') ?? ''
+  }
+
+  it('holds a resumable upload to the 256 KiB rule, and lands it on the last chunk', async () => {
+    const api = makeFakeDriveApi()
+    const session = await start(api, DOCX_MIME)
+    const odd = await send(api, 'PUT', session, {
+      headers: { 'content-range': 'bytes 0-9/*' },
+      body: new Uint8Array(10),
+    })
+    expect(odd.status).toBe(400)
+    const chunk = new Uint8Array(RESUMABLE_CHUNK_MULTIPLE).fill(7)
+    const partial = await send(api, 'PUT', session, {
+      headers: {
+        'content-range': `bytes 0-${chunk.byteLength - 1}/*`,
+      },
+      body: chunk,
+    })
+    expect(partial.status).toBe(308)
+    expect(partial.headers.get('range')).toBe(`bytes=0-${chunk.byteLength - 1}`)
+    const done = await send(api, 'PUT', session, {
+      headers: { 'content-range': `bytes */${chunk.byteLength}` },
+    })
+    expect(done.status).toBe(200)
+    expect(await done.json()).toMatchObject({ mimeType: DOCX_MIME })
+  })
+
+  it('converts only when the metadata names a native mime', async () => {
+    const api = makeFakeDriveApi()
+    const session = await start(api, GOOGLE_DOC_MIME)
+    const done = await send(api, 'PUT', session, {
+      headers: { 'content-range': 'bytes 0-3/4' },
+      body: new Uint8Array([0x50, 0x4b, 0x03, 0x04]),
+    })
+    expect(await done.json()).toMatchObject({ mimeType: GOOGLE_DOC_MIME })
+  })
+
+  it('refuses a second parent: a move must remove the old one', async () => {
+    const api = makeFakeDriveApi()
+    const added = await send(
+      api,
+      'PATCH',
+      `${DRIVE_API}/files/deck?addParents=legal`,
+      { body: '{}' },
+    )
+    expect(added.status).toBe(403)
+    const moved = await send(
+      api,
+      'PATCH',
+      `${DRIVE_API}/files/deck?addParents=legal&removeParents=dataroom&fields=parents`,
+      { body: '{}' },
+    )
+    expect(await moved.json()).toEqual({ parents: ['legal'] })
   })
 })

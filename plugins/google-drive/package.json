@@ -1,5 +1,5 @@
 {
-  "//": "Google Drive, the read side of the storage-source port: resolveLink, listFolder, getFolder, getFile (native Docs, Sheets and Slides exported, everything else streamed) and changes, over Drive's v3 REST API through the Http port, with the token from Secrets.accessToken(). A bytes pipe with hints — no job uses Facts or Ai. One `schedule` job, `list`, walks the folder its row's settings name and logs each entry with its path. Depends on @spaces/sdk only; effect and zod are peers the host provides. `sandbox` is the opt-in run against a real Drive, never in CI.",
+  "//": "Google Drive, the storage-source port: resolveLink, listFolder, getFolder, getFile (native Docs, Sheets and Slides exported, everything else streamed) and changes, and the write half — ensureFolder (safe under racing creates), putFile (resumable chunks, a same-sha revision or a (2) name), move and rename — over Drive's v3 REST API through the Http port, with the token from Secrets.accessToken(). A bytes pipe with hints — no job uses Facts or Ai. One `schedule` job, `list`, walks the folder its row's settings name and logs each entry with its path. Depends on @spaces/sdk only; effect and zod are peers the host provides. `sandbox` is the opt-in run against a real Drive, never in CI.",
   "name": "@spaces/plugin-google-drive",
   "version": "0.1.0",
   "private": true,

@@ -330,7 +330,8 @@ them; they call nothing:
 ```ts
 storage-source: { resolveLink(url); listFolder(id, { cursor?, pageSize? }); getFolder(id);
                   getFile(id); changes(cursor | null); pickerConfig();
-                  putFile?; move?; rename?; ensureFolder? }   // write half: project 22
+                  ensureFolder?(rootId, path); putFile?(folderId, name, { stream, mime, sha256 });
+                  move?(id, folderId); rename?(id, name) }   // write half: storage-sources §4 as built
 ```
 
 A plugin that implements it says `provides: 'storage-source'` in the

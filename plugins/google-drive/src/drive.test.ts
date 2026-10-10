@@ -6,6 +6,7 @@ import {
   FAKE_DRIVE_CREDENTIALS,
   FAKE_DRIVE_FIXTURE,
   FAKE_DRIVE_SCAN,
+  FAKE_DRIVE_WRITE_FIXTURE,
   HttpFetchTest,
   LogTest,
   SecretsTest,
@@ -13,11 +14,12 @@ import {
   sha256Hex,
   storageSourceChaos,
   storageSourceConformance,
+  storageSourceWriteConformance,
 } from '@spaces/sdk/testing'
 import type { DriveApiRequest, FakeDriveApi } from '@spaces/sdk/testing'
 import type { StorageSource } from '@spaces/sdk'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { driveSource } from './drive.ts'
+import { UPLOAD_CHUNK_BYTES, driveSource } from './drive.ts'
 import { jobs } from './index.ts'
 
 /**
@@ -98,6 +100,186 @@ describe('the storage-source chaos suite, against the fake Drive API', () => {
       memory: () => process.memoryUsage.rss(),
     }),
   )('$name', ({ run: chaos }) => Effect.runPromise(chaos), 60_000)
+})
+
+/**
+ * The write half over HTTP. The fake API's folder create never looks for a
+ * namesake, so four racing ensureFolder calls really do make four folders;
+ * the plugin's resolution is what leaves one.
+ */
+describe('the storage-source write suite, against the fake Drive API', () => {
+  it.each(
+    storageSourceWriteConformance({
+      make: () => subject().source,
+      fixture: FAKE_DRIVE_WRITE_FIXTURE,
+    }),
+  )('$name', ({ run: conform }) => Effect.runPromise(conform))
+})
+
+const folderCreates = (api: FakeDriveApi) =>
+  api.requests.filter((r) => r.method === 'POST' && r.path === '/files')
+
+const encoder = new TextEncoder()
+
+const uploadOf = (bytes: Uint8Array, mime = 'application/pdf') =>
+  Effect.map(sha256Hex(bytes), (sha256) => ({
+    mime,
+    sha256,
+    stream: new Blob([bytes.slice()]).stream(),
+  }))
+
+describe('ensureFolder', () => {
+  it('meets the duplicate-name trap and leaves one chain: racing creates resolve to the oldest, losers delete their own', async () => {
+    const { api, source } = subject()
+    const ids = await run(
+      Effect.all(
+        Array.from({ length: 4 }, () =>
+          source.ensureFolder('root', 'Portfolio/Acme'),
+        ),
+        { concurrency: 'unbounded' },
+      ),
+    )
+    expect(new Set(ids).size).toBe(1)
+    // The trap was really there: more than one Portfolio was created.
+    const creates = folderCreates(api).length
+    expect(creates).toBeGreaterThan(2)
+    const deletes = api.requests.filter((r) => r.method === 'DELETE').length
+    expect(creates - deletes).toBe(2)
+    expect(
+      api.drive.tree('root').filter((p) => p.startsWith('Portfolio')),
+    ).toEqual(['Portfolio', 'Portfolio/Acme'])
+  })
+
+  it('creates lazily: a path that exists costs no create', async () => {
+    const { api, source } = subject()
+    const id = await run(
+      source.ensureFolder('root', 'Acme Data Room/02 Finance/Board'),
+    )
+    expect(id).toBe('board')
+    expect(folderCreates(api)).toEqual([])
+  })
+
+  it('writes into a shared drive with supportsAllDrives', async () => {
+    const { api, source } = subject()
+    const id = await run(source.ensureFolder('sd-portfolio', 'Acme/Legal'))
+    expect(api.drive.tree('sd-portfolio')).toContain('Acme/Legal')
+    expect(api.drive.entry(id)?.parentId).toBe('sd-acme')
+    for (const create of folderCreates(api))
+      expect(create.query.supportsAllDrives).toBe('true')
+  })
+
+  it('finds a name with a quote in it', async () => {
+    const { api, source } = subject()
+    const first = await run(source.ensureFolder('root', "O'Brien \\ Co"))
+    const again = await run(source.ensureFolder('root', "O'Brien \\ Co"))
+    expect(again).toBe(first)
+    expect(folderCreates(api)).toHaveLength(1)
+  })
+
+  it('a revoked token is AuthExpired, and nothing is created', async () => {
+    const { api, source } = subject()
+    api.drive.revoke()
+    expect(await failureTag(source.ensureFolder('root', 'A'))).toMatchObject({
+      _tag: 'AuthExpired',
+    })
+    expect(folderCreates(api)).toEqual([])
+  })
+})
+
+describe('putFile', () => {
+  const uploads = (api: FakeDriveApi) =>
+    api.requests.filter((r) => r.upload && r.method === 'PUT')
+
+  it.each([
+    ['one byte past a chunk', UPLOAD_CHUNK_BYTES + 1, 2],
+    ['exactly one chunk', UPLOAD_CHUNK_BYTES, 2],
+    ['a small file', 1000, 1],
+    ['an empty file', 0, 1],
+  ])(
+    'streams %s in resumable chunks and reads back the same bytes',
+    async (_label, size, puts) => {
+      const { api, source } = subject()
+      const bytes = Uint8Array.from({ length: size }, (_, i) => (i * 31) % 251)
+      const content = await run(uploadOf(bytes))
+      const put = await run(source.putFile('legal', 'Scan.pdf', content))
+      expect(uploads(api)).toHaveLength(puts)
+      const file = await run(source.getFile(put.fileId))
+      const back = await run(bytesOf(file.stream))
+      expect(await run(sha256Hex(back))).toBe(content.sha256)
+      expect(api.drive.revisions(put.fileId)).toEqual([put.revisionId])
+    },
+  )
+
+  it('uploads a revision of the same-sha file in place, with no new file', async () => {
+    const { api, source } = subject()
+    const bytes = encoder.encode('%PDF-1.7 SPA')
+    const put = await run(
+      Effect.flatMap(uploadOf(bytes), (c) =>
+        source.putFile('legal', 'Share purchase agreement.pdf', c),
+      ),
+    )
+    // The seeded SPA holds these bytes: its revision, not a (2).
+    expect(put).toMatchObject({
+      fileId: 'spa',
+      name: 'Share purchase agreement.pdf',
+    })
+    expect(api.drive.revisions('spa')).toHaveLength(2)
+    const opened = api.requests.filter(
+      (r) => r.upload && r.method === 'PATCH' && r.path === '/files/spa',
+    )
+    expect(opened).toHaveLength(1)
+  })
+
+  it('names the docx it uploads by its own mime, never a native one', async () => {
+    const { api, source } = subject()
+    const bytes = Uint8Array.from([0x50, 0x4b, 0x03, 0x04, 1, 2, 3])
+    const put = await run(
+      Effect.flatMap(uploadOf(bytes, DOCX_MIME), (c) =>
+        source.putFile('dataroom', 'Memo.docx', c),
+      ),
+    )
+    expect(api.drive.entry(put.fileId)?.mime).toBe(DOCX_MIME)
+    const listed = (await run(source.listFolder('dataroom'))).entries.find(
+      (e) => e.id === put.fileId,
+    )
+    expect(listed?.mime).toBe(DOCX_MIME)
+  })
+})
+
+describe('move and rename', () => {
+  it('move removes the old parent, and a replay sends nothing', async () => {
+    const { api, source } = subject()
+    await run(source.move('deck', 'legal'))
+    const patches = () =>
+      api.requests.filter((r) => r.method === 'PATCH' && !r.upload)
+    expect(patches().map((r) => r.query)).toEqual([
+      expect.objectContaining({
+        addParents: 'legal',
+        removeParents: 'dataroom',
+      }),
+    ])
+    await run(source.move('deck', 'legal'))
+    expect(patches()).toHaveLength(1)
+    expect(api.drive.entry('deck')?.parentId).toBe('legal')
+  })
+
+  it('rename writes once, and a replay sends nothing', async () => {
+    const { api, source } = subject()
+    await run(source.rename('deck', 'Acme deck v2.pdf'))
+    await run(source.rename('deck', 'Acme deck v2.pdf'))
+    expect(
+      api.requests.filter((r) => r.method === 'PATCH' && !r.upload),
+    ).toHaveLength(1)
+    expect(api.drive.entry('deck')?.name).toBe('Acme deck v2.pdf')
+  })
+
+  it('a move into a missing folder is NotFound naming it', async () => {
+    const { source } = subject()
+    expect(await failureTag(source.move('deck', 'nowhere'))).toMatchObject({
+      _tag: 'NotFound',
+      id: 'nowhere',
+    })
+  })
 })
 
 describe('getFile', () => {

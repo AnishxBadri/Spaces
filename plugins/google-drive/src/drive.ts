@@ -8,21 +8,27 @@ import {
   NotFound,
   RateLimited,
   Secrets,
+  collisionName,
+  pathSegments,
 } from '@spaces/sdk'
 import type {
   ChangePage,
   FolderPage,
   FolderRef,
+  HttpMethod,
   HttpResponse,
   JobError,
+  JsonObject,
   LinkTarget,
   ListFolderOptions,
   PickerConfig,
+  PutFileResult,
   StorageChange,
   StorageEntry,
   StorageFile,
   StorageFolder,
-  StorageSource,
+  StorageUpload,
+  WritableStorageSource,
 } from '@spaces/sdk'
 import { parseDriveLink } from './links.ts'
 
@@ -38,9 +44,15 @@ import { parseDriveLink } from './links.ts'
  *   re-export of an unchanged Doc is new bytes under the same token.
  * - A failure the port's types cannot name — Drive answering a request this
  *   code built wrong, or JSON that is not Drive's — is a defect, not a guess.
+ * - Writes upload in resumable chunks of `UPLOAD_CHUNK_BYTES`: one chunk is
+ *   all a `putFile` holds, whatever the file's size.
  */
 
 export const DRIVE_API = 'https://www.googleapis.com/drive/v3'
+export const DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3'
+
+/** Bytes per resumable chunk. Drive wants every chunk but the last a multiple of 256 KiB. */
+export const UPLOAD_CHUNK_BYTES = 32 * 256 * 1024
 export const FOLDER_MIME = 'application/vnd.google-apps.folder'
 const NATIVE_PREFIX = 'application/vnd.google-apps.'
 
@@ -91,6 +103,9 @@ const driveFile = z.object({
   modifiedTime: z.string().optional(),
   version: z.string().optional(),
   trashed: z.boolean().optional(),
+  createdTime: z.string().optional(),
+  headRevisionId: z.string().optional(),
+  sha256Checksum: z.string().optional(),
 })
 type DriveFile = z.output<typeof driveFile>
 
@@ -151,12 +166,26 @@ const decodeCursor = (text: string): Cursor | null => {
 
 type Params = { readonly [name: string]: string | number | boolean | undefined }
 
-export const driveUrl = (path: string, params: Params = {}): string => {
+export const driveUrl = (
+  path: string,
+  params: Params = {},
+  base = DRIVE_API,
+): string => {
   const search = new URLSearchParams()
   for (const [name, value] of Object.entries(params))
     if (value !== undefined) search.set(name, String(value))
   const query = search.toString()
-  return `${DRIVE_API}${path}${query === '' ? '' : `?${query}`}`
+  return `${base}${path}${query === '' ? '' : `?${query}`}`
+}
+
+/** A string literal in Drive's `q` grammar. */
+export const quoted = (text: string) =>
+  `'${text.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
+
+/** Oldest first: created time, then id. Every caller racing on one name agrees on the first. */
+const byAge = (a: DriveFile, b: DriveFile) => {
+  const order = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0)
+  return order(a.createdTime ?? '', b.createdTime ?? '') || order(a.id, b.id)
 }
 
 const fileUrl = (id: string, suffix = '') =>
@@ -294,18 +323,27 @@ export const driveSource = Effect.gen(function* () {
     Effect.mapError((e) => new AuthExpired({ reason: e.reason })),
   )
 
-  /** One GET for JSON; the response whatever its status. */
-  const get = (url: string) =>
+  /** One request; the response whatever its status. */
+  const send = (
+    method: HttpMethod,
+    url: string,
+    body?: JsonObject | Uint8Array<ArrayBuffer>,
+    headers: { readonly [name: string]: string } = {},
+  ) =>
     Effect.gen(function* () {
       const authorization = yield* bearer
       return yield* fromPort(
         http.request({
-          method: 'GET',
+          method,
           url,
-          headers: { authorization, accept: 'application/json' },
+          headers: { authorization, accept: 'application/json', ...headers },
+          ...(body === undefined ? {} : { body }),
         }),
       )
     })
+
+  /** One GET for JSON; the response whatever its status. */
+  const get = (url: string) => send('GET', url)
 
   /** One GET for JSON that must answer 200. */
   const getOk = <TSchema extends z.ZodType>(
@@ -632,13 +670,274 @@ export const driveSource = Effect.gen(function* () {
     return config
   })
 
-  const source: StorageSource = {
+  // -------------------------------------------------------------------------
+  // The write half
+  // -------------------------------------------------------------------------
+
+  const folderOnly = (id: string) =>
+    Effect.gen(function* () {
+      const meta = yield* metadata(id, 'id,name,mimeType')
+      if (meta.mimeType !== FOLDER_MIME) return yield* new NotFound({ id })
+    })
+
+  /** Every live child of a folder that `clauses` match, oldest first. */
+  const search = (folderId: string, clauses: string, fields: string) =>
+    Effect.gen(function* () {
+      const files: Array<DriveFile> = []
+      let pageToken: string | undefined
+      do {
+        const url = driveUrl('/files', {
+          q: `${quoted(folderId)} in parents and ${clauses} and trashed = false`,
+          fields: `nextPageToken,files(${fields})`,
+          pageSize: PAGE_MAX,
+          pageToken,
+          supportsAllDrives: true,
+          includeItemsFromAllDrives: true,
+        })
+        const page = yield* getOk(url, fileList, folderId)
+        files.push(...page.files)
+        pageToken = page.nextPageToken
+      } while (pageToken !== undefined)
+      return files.sort(byAge)
+    })
+
+  const foldersNamed = (parentId: string, name: string) =>
+    search(
+      parentId,
+      `name = ${quoted(name)} and mimeType = '${FOLDER_MIME}'`,
+      'id,name,mimeType,createdTime',
+    )
+
+  /** Delete a folder this call made and lost, unless something was filed in it meanwhile. */
+  const discard = (id: string) =>
+    Effect.gen(function* () {
+      const inside = driveUrl('/files', {
+        q: `${quoted(id)} in parents and trashed = false`,
+        fields: 'files(id,name,mimeType)',
+        pageSize: 1,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
+      })
+      if ((yield* getOk(inside, fileList, id)).files.length > 0) return
+      const url = driveUrl(fileUrl(id), { supportsAllDrives: true })
+      const response = yield* send('DELETE', url)
+      if (response.status !== 204 && response.status !== 200)
+        return yield* failure(response, id, url)
+    }).pipe(Effect.catchTag('NotFound', () => Effect.void))
+
+  /**
+   * The child folder `name`, made when absent. Drive permits duplicate
+   * names, so a racing call may make one too: after creating, every caller
+   * re-reads and takes the oldest, and a loser deletes its own.
+   */
+  const ensureChild = (parentId: string, name: string) =>
+    Effect.gen(function* () {
+      const found = (yield* foldersNamed(parentId, name)).at(0)
+      if (found !== undefined) return found.id
+      const url = driveUrl('/files', {
+        supportsAllDrives: true,
+        fields: 'id,name,mimeType,createdTime',
+      })
+      const response = yield* send('POST', url, {
+        name,
+        mimeType: FOLDER_MIME,
+        parents: [parentId],
+      })
+      if (response.status !== 200)
+        return yield* failure(response, parentId, url)
+      const made = yield* parse(driveFile, response.body, url)
+      const seen = yield* foldersNamed(parentId, name)
+      const oldest =
+        [...seen.filter((f) => f.id !== made.id), made].sort(byAge).at(0) ??
+        made
+      if (oldest.id !== made.id) yield* discard(made.id)
+      return oldest.id
+    })
+
+  const ensureFolder = Effect.fn('googleDrive.ensureFolder')(function* (
+    rootId: string,
+    path: string,
+  ) {
+    yield* folderOnly(rootId)
+    let at = rootId
+    for (const name of pathSegments(path)) at = yield* ensureChild(at, name)
+    return at
+  })
+
+  /**
+   * Stream `stream` into an open resumable session, one chunk held at a
+   * time; the final answer is the file. A failed read cancels the stream.
+   */
+  const sendChunks = (
+    session: string,
+    stream: ReadableStream<Uint8Array>,
+    id: string,
+  ) =>
+    Effect.suspend(() => {
+      const reader = stream.getReader()
+      return Effect.gen(function* () {
+        const buffer = new Uint8Array(UPLOAD_CHUNK_BYTES)
+        let held = 0
+        let sent = 0
+        const put = (range: string) =>
+          send('PUT', session, buffer.slice(0, held), {
+            'content-range': range,
+          })
+        for (;;) {
+          const read = yield* Effect.promise(() => reader.read())
+          if (read.done) break
+          const chunk = read.value
+          for (let at = 0; at < chunk.byteLength;) {
+            const take = Math.min(
+              UPLOAD_CHUNK_BYTES - held,
+              chunk.byteLength - at,
+            )
+            buffer.set(chunk.subarray(at, at + take), held)
+            held += take
+            at += take
+            if (held < UPLOAD_CHUNK_BYTES) continue
+            const response = yield* put(`bytes ${sent}-${sent + held - 1}/*`)
+            if (response.status !== 308)
+              return yield* failure(response, id, session)
+            sent += held
+            held = 0
+          }
+        }
+        const total = sent + held
+        const last = yield* put(
+          held === 0
+            ? `bytes */${total}`
+            : `bytes ${sent}-${total - 1}/${total}`,
+        )
+        if (last.status !== 200 && last.status !== 201)
+          return yield* failure(last, id, session)
+        return last
+      }).pipe(
+        Effect.onError(() =>
+          Effect.ignore(Effect.tryPromise(() => reader.cancel())),
+        ),
+      )
+    })
+
+  /** One upload: a new file in a folder, or a new revision of a file. */
+  const upload = (
+    target: { readonly folderId: string } | { readonly fileId: string },
+    name: string,
+    content: StorageUpload,
+  ) =>
+    Effect.gen(function* () {
+      const params = {
+        uploadType: 'resumable',
+        supportsAllDrives: true,
+        fields: 'id,name,mimeType,headRevisionId,version',
+      }
+      const revision = 'fileId' in target
+      const id = revision ? target.fileId : target.folderId
+      const url = revision
+        ? driveUrl(fileUrl(target.fileId), params, DRIVE_UPLOAD_API)
+        : driveUrl('/files', params, DRIVE_UPLOAD_API)
+      // The mime is the upload's own: never a native type, so never converted.
+      const started = yield* send(
+        revision ? 'PATCH' : 'POST',
+        url,
+        revision
+          ? {}
+          : { name, parents: [target.folderId], mimeType: content.mime },
+        { 'x-upload-content-type': content.mime },
+      )
+      if (started.status !== 200) return yield* failure(started, id, url)
+      const session = Object.hasOwn(started.headers, 'location')
+        ? started.headers.location
+        : ''
+      // The session is where the bearer token goes next: Drive's host only.
+      if (!session.startsWith(`${DRIVE_UPLOAD_API}/`))
+        return yield* Effect.die(
+          new Error(`Google Drive opened an upload at ${session || 'no URL'}`),
+        )
+      const done = yield* sendChunks(session, content.stream, id)
+      const file = yield* parse(driveFile, done.body, session)
+      const revisionId = file.headRevisionId ?? file.version
+      if (revisionId === undefined)
+        return yield* Effect.die(
+          new Error(`Google Drive named no revision for ${file.id}`),
+        )
+      const result: PutFileResult = { fileId: file.id, revisionId, name }
+      return result
+    })
+
+  /** Past this many names taken, the folder is not one a person keeps. */
+  const COLLISION_LIMIT = 1000
+
+  const putFile = Effect.fn('googleDrive.putFile')(function* (
+    folderId: string,
+    name: string,
+    content: StorageUpload,
+  ) {
+    if (content.mime.startsWith(NATIVE_PREFIX))
+      return yield* Effect.die(
+        new Error(`putFile uploads bytes; ${content.mime} would be converted`),
+      )
+    yield* folderOnly(folderId)
+    const sha = content.sha256.toLowerCase()
+    for (let n = 1; n <= COLLISION_LIMIT; n++) {
+      const tried = collisionName(name, n)
+      const taken = yield* search(
+        folderId,
+        `name = ${quoted(tried)} and mimeType != '${FOLDER_MIME}'`,
+        'id,name,mimeType,createdTime,sha256Checksum',
+      )
+      // Same bytes: a revision of that file. Different: the next name.
+      const same = taken.find((f) => f.sha256Checksum?.toLowerCase() === sha)
+      if (same !== undefined)
+        return yield* upload({ fileId: same.id }, tried, content)
+      if (taken.length === 0) return yield* upload({ folderId }, tried, content)
+    }
+    return yield* Effect.die(
+      new Error(`${folderId} holds ${COLLISION_LIMIT} files named ${name}`),
+    )
+  })
+
+  const move = Effect.fn('googleDrive.move')(function* (
+    id: string,
+    folderId: string,
+  ) {
+    const meta = yield* metadata(id, 'id,name,mimeType,parents')
+    yield* folderOnly(folderId)
+    const parents = meta.parents ?? []
+    const others = parents.filter((p) => p !== folderId)
+    if (others.length === 0 && parents.length > 0) return
+    const url = driveUrl(fileUrl(id), {
+      addParents: parents.includes(folderId) ? undefined : folderId,
+      removeParents: others.length === 0 ? undefined : others.join(','),
+      supportsAllDrives: true,
+      fields: 'id',
+    })
+    const response = yield* send('PATCH', url, {})
+    if (response.status !== 200) return yield* failure(response, id, url)
+  })
+
+  const rename = Effect.fn('googleDrive.rename')(function* (
+    id: string,
+    name: string,
+  ) {
+    const meta = yield* metadata(id, 'id,name,mimeType')
+    if (meta.name === name) return
+    const url = driveUrl(fileUrl(id), { supportsAllDrives: true, fields: 'id' })
+    const response = yield* send('PATCH', url, { name })
+    if (response.status !== 200) return yield* failure(response, id, url)
+  })
+
+  const source: WritableStorageSource = {
     resolveLink,
     listFolder,
     getFolder,
     getFile,
     changes,
     pickerConfig,
+    ensureFolder,
+    putFile,
+    move,
+    rename,
   }
   return source
 })

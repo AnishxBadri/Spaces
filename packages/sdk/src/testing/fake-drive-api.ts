@@ -40,10 +40,18 @@ import type { RecordedCall, TestPort } from './index.ts'
  *   the export is not byte-stable.
  * - Mutate through `drive` (not a second handle on the same `FakeDrive`):
  *   the API keeps its own index of where each item lives.
+ * - Writes are Drive's raw ones: a folder create never looks for one of the
+ *   same name, so racing creates fork the tree as Drive's do. Uploads are
+ *   resumable sessions held to Drive's 256 KiB chunk rule, and convert only
+ *   when the metadata asks for a native mime.
  */
 
 export const DRIVE_API = 'https://www.googleapis.com/drive/v3'
+export const DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3'
 export const DRIVE_FOLDER_MIME = 'application/vnd.google-apps.folder'
+
+/** Every chunk of a resumable upload but the last is a multiple of this. */
+export const RESUMABLE_CHUNK_MULTIPLE = 256 * 1024
 
 /** What `fetch` is handed — `globalThis.fetch`'s shape, as the live Http port calls it. */
 export type FetchLike = (
@@ -51,14 +59,15 @@ export type FetchLike = (
   init: {
     readonly method: string
     readonly headers: Record<string, string>
-    readonly body?: string
+    readonly body?: string | Uint8Array<ArrayBuffer>
   },
 ) => Promise<Response>
 
-/** One request the fake API received. `path` is relative to `DRIVE_API`. */
+/** One request the fake API received. `path` is relative to `DRIVE_API`, or to `DRIVE_UPLOAD_API` for an upload. */
 export type DriveApiRequest = {
   readonly method: string
   readonly url: string
+  readonly upload: boolean
   readonly path: string
   /** A parameter the request did not send reads as undefined. */
   readonly query: { readonly [name: string]: string | undefined }
@@ -180,9 +189,112 @@ const compact = (value: {
   return out
 }
 
-/** `'<id>' in parents`, optionally `and trashed = false` — the one query a listing sends. */
-const PARENTS_QUERY =
-  /^\s*'([^'\\]+)'\s+in\s+parents(?:\s+and\s+trashed\s*=\s*false)?\s*$/
+/** A `files.list` query: one parent, and optionally a name and a mime test. */
+type FileQuery = {
+  readonly parentId: string
+  readonly name?: string
+  readonly mime?: { readonly equal: boolean; readonly value: string }
+}
+
+const QUOTED = String.raw`'((?:[^'\\]|\\.)*)'`
+
+/** One clause of the `q` grammar the fake reads; anything else is Drive's 400. */
+const CLAUSE = new RegExp(
+  String.raw`\s*(?:${QUOTED}\s+in\s+parents|trashed\s*=\s*false|name\s*=\s*${QUOTED}|mimeType\s*(!=|=)\s*${QUOTED})\s*`,
+  'y',
+)
+const AND = /and(?=\s)/y
+
+const unquote = (text: string) => text.replace(/\\(.)/g, '$1')
+
+/** `'<id>' in parents and name = 'A' and mimeType = '…' and trashed = false`, clauses in any order. */
+const parseQuery = (q: string): FileQuery | null => {
+  let parentId: string | undefined
+  let name: string | undefined
+  let mime: FileQuery['mime']
+  for (let at = 0; ;) {
+    CLAUSE.lastIndex = at
+    const clause = CLAUSE.exec(q)
+    if (clause === null) return null
+    const [parent, named, op, mimeValue] = [1, 2, 3, 4].map((i) => clause.at(i))
+    if (parent !== undefined) parentId = unquote(parent)
+    if (named !== undefined) name = unquote(named)
+    if (op !== undefined && mimeValue !== undefined)
+      mime = { equal: op === '=', value: unquote(mimeValue) }
+    at = CLAUSE.lastIndex
+    if (at === q.length) break
+    AND.lastIndex = at
+    if (AND.exec(q) === null) return null
+    at = AND.lastIndex
+  }
+  if (parentId === undefined) return null
+  return {
+    parentId,
+    ...(name === undefined ? {} : { name }),
+    ...(mime === undefined ? {} : { mime }),
+  }
+}
+
+const isRecord = (value: unknown): value is { [key: string]: unknown } =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+/** A JSON request body as an object; null when there is none or it is not one. */
+const jsonBody = (
+  body: string | Uint8Array | undefined,
+): { [key: string]: unknown } | null => {
+  if (body === undefined) return {}
+  const text = typeof body === 'string' ? body : new TextDecoder().decode(body)
+  if (text.trim() === '') return {}
+  try {
+    const parsed: unknown = JSON.parse(text)
+    return isRecord(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+/** `bytes 0-262143/*`, `bytes 262144-300000/300001` or `bytes *\/300001`. */
+const parseContentRange = (
+  header: string | undefined,
+): {
+  readonly start: number | null
+  readonly end: number | null
+  readonly total: number | null
+} | null => {
+  const match = /^bytes (?:(\d+)-(\d+)|\*)\/(\d+|\*)$/.exec(header ?? '')
+  if (match === null) return null
+  const [start, end, total] = [1, 2, 3].map((i) => match.at(i))
+  return {
+    start: start === undefined ? null : Number(start),
+    end: end === undefined ? null : Number(end),
+    total: total === undefined || total === '*' ? null : Number(total),
+  }
+}
+
+const concat = (chunks: ReadonlyArray<Uint8Array>): Uint8Array => {
+  const out = new Uint8Array(chunks.reduce((n, c) => n + c.byteLength, 0))
+  let at = 0
+  for (const chunk of chunks) {
+    out.set(chunk, at)
+    at += chunk.byteLength
+  }
+  return out
+}
+
+/** One resumable upload, from its first request to its last chunk. */
+type UploadSession = {
+  readonly target:
+    | {
+        readonly kind: 'create'
+        readonly name: string
+        readonly parentId: string
+        readonly mime: string
+      }
+    | { readonly kind: 'update'; readonly fileId: string }
+  readonly fields: string | undefined
+  readonly chunks: Array<Uint8Array>
+  received: number
+}
 
 const LIST_PAGE_MAX = 1000
 
@@ -216,6 +328,11 @@ export const makeFakeDriveApi = (
       inner.move(id, parentId)
       place(id, parentId)
     },
+    create: (spec) => {
+      const entry = inner.create(spec)
+      place(entry.id, entry.parentId)
+      return entry
+    },
     // The removed id keeps its last parent, so its removal is filed under its drive.
     remove: (id) => {
       inner.remove(id)
@@ -243,7 +360,11 @@ export const makeFakeDriveApi = (
 
   const fileJson = (entry: StorageEntry): JsonObject => {
     place(entry.id, entry.parentId)
+    const fields = inner.driveFields(entry.id)
     return compact({
+      createdTime: fields?.createdTime,
+      headRevisionId: fields?.headRevisionId,
+      sha256Checksum: fields?.sha256Checksum,
       kind: 'drive#file',
       id: entry.id,
       name: entry.name,
@@ -261,6 +382,7 @@ export const makeFakeDriveApi = (
     chain.forEach((id, i) => place(id, i === 0 ? null : (chain[i - 1] ?? null)))
     const parent = folder.parents.at(-1)
     return compact({
+      createdTime: inner.driveFields(folder.id)?.createdTime,
       kind: 'drive#file',
       id: folder.id,
       name: folder.name,
@@ -420,12 +542,12 @@ export const makeFakeDriveApi = (
     )
 
   const filesList = (query: Query) => {
-    const match = PARENTS_QUERY.exec(query.q ?? '')
-    const folderId = match?.[1]
-    if (folderId === undefined)
+    const parsed = parseQuery(query.q ?? '')
+    if (parsed === null)
       return Promise.resolve(
         driveError(400, 'invalid', `Invalid Value: q=${query.q ?? '(none)'}`),
       )
+    const folderId = parsed.parentId
     const pageSize = Math.min(
       LIST_PAGE_MAX,
       Math.max(1, Number(query.pageSize ?? '100') || 100),
@@ -434,6 +556,42 @@ export const makeFakeDriveApi = (
     const hidden =
       sharedDriveOf(folderId) !== undefined &&
       query.includeItemsFromAllDrives !== 'true'
+    const page = (files: ReadonlyArray<StorageEntry>, next?: string) =>
+      json(
+        200,
+        withFields(
+          compact({
+            kind: 'drive#fileList',
+            incompleteSearch: false,
+            nextPageToken: hidden ? undefined : next,
+            files: hidden ? [] : files.map(fileJson),
+          }),
+          query.fields,
+          LIST_DEFAULT_FIELDS,
+        ),
+      )
+    // A name or mime test: the whole folder filtered, paged by offset.
+    if (parsed.name !== undefined || parsed.mime !== undefined) {
+      const offset =
+        query.pageToken === undefined
+          ? 0
+          : Number(/^filtered:(\d+)$/.exec(query.pageToken)?.[1] ?? NaN)
+      if (Number.isNaN(offset))
+        return Promise.resolve(driveError(400, 'invalid', 'Invalid Value'))
+      const { name, mime } = parsed
+      return answer(listAll(folderId), (entries) => {
+        const matching = entries.filter(
+          (e) =>
+            (name === undefined || e.name === name) &&
+            (mime === undefined || (e.mime === mime.value) === mime.equal),
+        )
+        const end = offset + pageSize
+        return page(
+          matching.slice(offset, end),
+          end < matching.length ? `filtered:${end}` : undefined,
+        )
+      })
+    }
     return answer(
       source.listFolder(
         folderId,
@@ -441,21 +599,240 @@ export const makeFakeDriveApi = (
           ? { pageSize }
           : { pageSize, cursor: query.pageToken },
       ),
-      (page) =>
-        json(
-          200,
-          withFields(
-            compact({
-              kind: 'drive#fileList',
-              incompleteSearch: false,
-              nextPageToken: hidden ? undefined : page.next,
-              files: hidden ? [] : page.entries.map(fileJson),
-            }),
-            query.fields,
-            LIST_DEFAULT_FIELDS,
-          ),
-        ),
+      (listing) => page(listing.entries, listing.next),
     )
+  }
+
+  // -------------------------------------------------------------------------
+  // Writes. Each first reads through a gated port call, so a revoked token
+  // or a rate limit answers a write as it answers a read.
+  // -------------------------------------------------------------------------
+
+  /** A write into a shared drive must say `supportsAllDrives`, or Drive cannot find the parent. */
+  const reachable = (id: string, query: Query) =>
+    sharedDriveOf(id) === undefined || query.supportsAllDrives === 'true'
+
+  const notFound = (id: string) =>
+    driveError(404, 'notFound', `File not found: ${id}.`)
+
+  const entryJson = (id: string, query: Query, fields = query.fields) => {
+    const entry = drive.entry(id)
+    return entry === undefined
+      ? notFound(id)
+      : json(200, withFields(fileJson(entry), fields, FILE_DEFAULT_FIELDS))
+  }
+
+  /** files.create, metadata only: a folder. Never looks for one of the same name. */
+  const filesCreate = (query: Query, body: RequestBody) => {
+    const meta = jsonBody(body)
+    const parents = meta?.parents
+    const parentId = Array.isArray(parents) ? parents.at(0) : undefined
+    const name = meta?.name
+    if (
+      typeof name !== 'string' ||
+      typeof parentId !== 'string' ||
+      !Array.isArray(parents) ||
+      parents.length !== 1 ||
+      meta?.mimeType !== DRIVE_FOLDER_MIME
+    )
+      return Promise.resolve(
+        driveError(
+          400,
+          'badRequest',
+          'The fake creates folders only: name, one parent, the folder mime.',
+        ),
+      )
+    if (!reachable(parentId, query)) return Promise.resolve(notFound(parentId))
+    return answer(source.getFolder(parentId), () => {
+      const entry = drive.create({ kind: 'folder', name, parentId })
+      return entryJson(entry.id, query)
+    })
+  }
+
+  /** files.update, metadata only: `name`, and a move by `addParents`/`removeParents`. */
+  const filesUpdate = (id: string, query: Query, body: RequestBody) => {
+    const meta = jsonBody(body)
+    const name = meta?.name
+    if (meta === null || (name !== undefined && typeof name !== 'string'))
+      return Promise.resolve(driveError(400, 'badRequest', 'Invalid body'))
+    const { addParents, removeParents } = query
+    if (!reachable(id, query)) return Promise.resolve(notFound(id))
+    return answer(
+      Effect.gen(function* () {
+        yield* metadata(id)
+        if (addParents !== undefined) yield* source.getFolder(addParents)
+        const current = drive.entry(id)?.parentId ?? null
+        const removing = (removeParents ?? '').split(',')
+        // Drive keeps one parent: a second is refused, not added.
+        if (
+          addParents !== undefined &&
+          current !== null &&
+          current !== addParents &&
+          !removing.includes(current)
+        )
+          return driveError(
+            403,
+            'cannotAddParent',
+            'Increasing the number of parents is not allowed.',
+          )
+        if (typeof name === 'string') drive.rename(id, name)
+        if (addParents !== undefined && current !== addParents)
+          drive.move(id, addParents)
+        return entryJson(id, query)
+      }),
+      (response) => response,
+    )
+  }
+
+  /** files.delete: gone for good, with everything under it. */
+  const filesDelete = (id: string, query: Query) => {
+    if (!reachable(id, query)) return Promise.resolve(notFound(id))
+    return answer(metadata(id), () => {
+      drive.remove(id)
+      return new Response(null, { status: 204 })
+    })
+  }
+
+  const sessions = new Map<string, UploadSession>()
+  let sessionCount = 0
+
+  /** The first request of a resumable upload: a new file, or new content for one. */
+  const uploadStart = (
+    method: string,
+    fileId: string | undefined,
+    query: Query,
+    headers: Record<string, string>,
+    body: RequestBody,
+  ) => {
+    if (query.uploadType !== 'resumable')
+      return Promise.resolve(
+        driveError(400, 'badRequest', 'The fake takes resumable uploads only'),
+      )
+    const meta = jsonBody(body)
+    if (meta === null)
+      return Promise.resolve(driveError(400, 'badRequest', 'Invalid body'))
+    const open = (target: UploadSession['target']) => {
+      const id = `upload-${++sessionCount}`
+      sessions.set(id, {
+        target,
+        fields: query.fields,
+        chunks: [],
+        received: 0,
+      })
+      const at =
+        target.kind === 'update'
+          ? `/files/${encodeURIComponent(target.fileId)}`
+          : '/files'
+      return new Response(null, {
+        status: 200,
+        headers: {
+          location: `${DRIVE_UPLOAD_API}${at}?uploadType=resumable&upload_id=${id}`,
+        },
+      })
+    }
+    if (method === 'PATCH' && fileId !== undefined) {
+      if (!reachable(fileId, query)) return Promise.resolve(notFound(fileId))
+      return answer(metadata(fileId), (file) =>
+        file.mimeType === DRIVE_FOLDER_MIME
+          ? driveError(400, 'badRequest', 'A folder has no content')
+          : open({ kind: 'update', fileId }),
+      )
+    }
+    const parents = meta.parents
+    const parentId = Array.isArray(parents) ? parents.at(0) : undefined
+    const { name, mimeType } = meta
+    if (
+      method !== 'POST' ||
+      fileId !== undefined ||
+      typeof name !== 'string' ||
+      typeof parentId !== 'string' ||
+      (mimeType !== undefined && typeof mimeType !== 'string')
+    )
+      return Promise.resolve(
+        driveError(400, 'badRequest', 'Invalid upload metadata'),
+      )
+    if (!reachable(parentId, query)) return Promise.resolve(notFound(parentId))
+    const mime =
+      mimeType ??
+      (Object.hasOwn(headers, 'x-upload-content-type')
+        ? headers['x-upload-content-type']
+        : 'application/octet-stream')
+    return answer(source.getFolder(parentId), () =>
+      open({ kind: 'create', name, parentId, mime }),
+    )
+  }
+
+  /** One chunk of a session; the last one lands the file. */
+  const uploadChunk = (
+    sessionId: string,
+    headers: Record<string, string>,
+    body: RequestBody,
+  ) => {
+    const session = sessions.get(sessionId)
+    if (session === undefined)
+      return Promise.resolve(
+        driveError(404, 'notFound', 'No such upload session'),
+      )
+    const range = parseContentRange(headers['content-range'])
+    const bytes =
+      body === undefined
+        ? new Uint8Array()
+        : typeof body === 'string'
+          ? encoder.encode(body)
+          : body
+    const sent = range?.start === null ? 0 : bytes.byteLength
+    const final = range?.total ?? null
+    if (
+      range === null ||
+      (range.start !== null &&
+        (range.start !== session.received ||
+          range.end !== range.start + bytes.byteLength - 1)) ||
+      (range.start === null && bytes.byteLength > 0) ||
+      (final !== null && session.received + sent !== final) ||
+      (final === null && sent % RESUMABLE_CHUNK_MULTIPLE !== 0)
+    )
+      return Promise.resolve(
+        driveError(
+          400,
+          'badContentRange',
+          `Content-Range ${headers['content-range'] ?? '(none)'} does not follow ${session.received} bytes received, or a non-final chunk is not a multiple of 256 KiB`,
+        ),
+      )
+    const { target } = session
+    const parentId =
+      target.kind === 'create'
+        ? target.parentId
+        : (drive.entry(target.fileId)?.parentId ?? target.fileId)
+    return answer(source.getFolder(parentId), () => {
+      session.chunks.push(bytes.slice())
+      session.received += sent
+      if (final === null)
+        return new Response(null, {
+          status: 308,
+          headers:
+            session.received === 0
+              ? {}
+              : { range: `bytes=0-${session.received - 1}` },
+        })
+      sessions.delete(sessionId)
+      const content = concat(session.chunks)
+      if (target.kind === 'update') {
+        drive.upload(target.fileId, content)
+        return entryJson(target.fileId, {}, session.fields)
+      }
+      // Drive converts only when the metadata names a native mime.
+      const native = target.mime.startsWith('application/vnd.google-apps.')
+      if (target.mime === DRIVE_FOLDER_MIME)
+        return driveError(400, 'badRequest', 'A folder has no content')
+      const entry = drive.create({
+        kind: native ? 'native' : 'file',
+        name: target.name,
+        parentId: target.parentId,
+        mime: target.mime,
+        bytes: content,
+      })
+      return entryJson(entry.id, {}, session.fields)
+    })
   }
 
   const startPageToken = (query: Query) => {
@@ -544,8 +921,25 @@ export const makeFakeDriveApi = (
     )
 
   type Query = { readonly [name: string]: string | undefined }
+  type RequestBody = string | Uint8Array<ArrayBuffer> | undefined
 
-  const route = (path: string, query: Query): Promise<Response> => {
+  const route = (
+    method: string,
+    path: string,
+    query: Query,
+    body: RequestBody,
+  ): Promise<Response> => {
+    const fileOf = /^\/files\/([^/]+)$/.exec(path)?.[1]
+    const fileId = fileOf === undefined ? undefined : decodeURIComponent(fileOf)
+    if (method === 'POST' && path === '/files') return filesCreate(query, body)
+    if (method === 'PATCH' && fileId !== undefined)
+      return filesUpdate(fileId, query, body)
+    if (method === 'DELETE' && fileId !== undefined)
+      return filesDelete(fileId, query)
+    if (method !== 'GET')
+      return Promise.resolve(
+        driveError(405, 'methodNotAllowed', `${method} ${path} is not served`),
+      )
     if (path === '/files') return filesList(query)
     if (path === '/changes/startPageToken') return startPageToken(query)
     if (path === '/changes') return changesList(query)
@@ -568,11 +962,30 @@ export const makeFakeDriveApi = (
     const exportOf = /^\/files\/([^/]+)\/export$/.exec(path)?.[1]
     if (exportOf !== undefined)
       return filesExport(decodeURIComponent(exportOf), query)
-    const fileOf = /^\/files\/([^/]+)$/.exec(path)?.[1]
-    if (fileOf !== undefined) return filesGet(decodeURIComponent(fileOf), query)
+    if (fileId !== undefined) return filesGet(fileId, query)
     return Promise.resolve(
       driveError(404, 'notFound', `The fake Drive API has no ${path}`),
     )
+  }
+
+  /** The upload endpoint: a session's first request, or one of its chunks. */
+  const routeUpload = (
+    method: string,
+    path: string,
+    query: Query,
+    headers: Record<string, string>,
+    body: RequestBody,
+  ): Promise<Response> => {
+    const fileOf = /^\/files(?:\/([^/]+))?$/.exec(path)
+    if (fileOf === null)
+      return Promise.resolve(
+        driveError(404, 'notFound', `The fake upload API has no ${path}`),
+      )
+    const named = fileOf.at(1)
+    const fileId = named === undefined ? undefined : decodeURIComponent(named)
+    if (query.upload_id !== undefined && method === 'PUT')
+      return uploadChunk(query.upload_id, headers, body)
+    return uploadStart(method, fileId, query, headers, body)
   }
 
   const fetch: FetchLike = (url, init) => {
@@ -581,26 +994,25 @@ export const makeFakeDriveApi = (
     parsed.searchParams.forEach((value, name) => {
       query[name] = value
     })
-    const path = `${parsed.origin}${parsed.pathname}`.startsWith(DRIVE_API)
-      ? `${parsed.origin}${parsed.pathname}`.slice(DRIVE_API.length)
-      : parsed.pathname
-    requests.push({ method: init.method, url, path, query })
-    if (!`${parsed.origin}${parsed.pathname}`.startsWith(DRIVE_API))
+    const at = `${parsed.origin}${parsed.pathname}`
+    const base = [DRIVE_UPLOAD_API, DRIVE_API].find((api) => at.startsWith(api))
+    const upload = base === DRIVE_UPLOAD_API
+    const path = base === undefined ? parsed.pathname : at.slice(base.length)
+    requests.push({ method: init.method, url, upload, path, query })
+    if (base === undefined)
       return Promise.resolve(
         driveError(404, 'notFound', `${url} is not the Drive API`),
       )
-    const authorization = Object.entries(init.headers).find(
-      ([name]) => name.toLowerCase() === 'authorization',
-    )?.[1]
-    if (authorization !== `Bearer ${credentials.accessToken}`)
+    const headers: Record<string, string> = {}
+    for (const [name, value] of Object.entries(init.headers))
+      headers[name.toLowerCase()] = value
+    if (headers.authorization !== `Bearer ${credentials.accessToken}`)
       return Promise.resolve(
         driveError(401, 'authError', 'Invalid Credentials'),
       )
-    if (init.method !== 'GET')
-      return Promise.resolve(
-        driveError(405, 'methodNotAllowed', `${init.method} is not served`),
-      )
-    return route(path, query)
+    return upload
+      ? routeUpload(init.method, path, query, headers, init.body)
+      : route(init.method, path, query, init.body)
   }
 
   return {
@@ -629,7 +1041,8 @@ export const HttpFetchTest = (fetch: FetchLike): TestPort<Http> => {
       const body =
         request.body === undefined
           ? undefined
-          : typeof request.body === 'string'
+          : typeof request.body === 'string' ||
+              request.body instanceof Uint8Array
             ? request.body
             : JSON.stringify(request.body)
       const res = yield* Effect.tryPromise({

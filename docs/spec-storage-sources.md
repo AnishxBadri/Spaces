@@ -459,6 +459,39 @@ and nothing else:
   loader's `requires.connection`. `scripts/sandbox.ts` runs the conformance
   suite against a real Drive, opt-in, not wired into CI.
 
+**As built — the write half (2026-10-10, SPA-239).** Typed in
+`StorageSource`, optional there and required on `WritableStorageSource`;
+`plugins/google-drive` implements it; nothing in core calls it yet.
+
+- **`ensureFolder(rootId, path) → folderId`** — the sketch's `path` is
+  relative to a root (the bound folder or the mirror root), split on `/`
+  with empty segments dropped. Lazy: a segment is created only when absent.
+  **Concurrency:** Drive permits duplicate folder names, so the plugin
+  resolves rather than locks — after creating, a caller re-reads the name and takes
+  the oldest (`createdTime`, then id; Drive's ids are not ordered), and a
+  loser deletes its own folder unless something was filed in it. A lock
+  would hold only inside one worker process.
+- **`putFile(folderId, name, { stream, mime, sha256 }) → { fileId,
+revisionId, name }`** — `sha256` is core's hash of the bytes, which the
+  collision policy (§5.6) compares with Drive's `sha256Checksum`: a file
+  under the name with the same sha gets a new revision; otherwise
+  `collisionName` tries `name (2).ext`, `(3)`, by the same rule, so the
+  `(2)` bytes put again are a revision of `(2)`. `name` reports the one
+  used. Drive's upload is resumable in 8 MiB chunks, one held at a time;
+  the metadata mime is the upload's own, so nothing is converted to a
+  native Doc. The Http port gained byte bodies (`Uint8Array`) for it.
+- **`move(id, folderId)` and `rename(id, name)`** read the item first and
+  send nothing when it is already there or already so named: a replay is a
+  no-op with the same `changeToken`, not an error. A move removes the old
+  parent (Drive refuses a second).
+- **Conformance.** `storageSourceWriteConformance({ make, fixture })` beside
+  the read suite: `A/B/C` twice is one chain and one id; four concurrent
+  `ensureFolder('A/B')` leave one `B`; identical bytes are a revision,
+  different bytes `(2)`; a docx stays a docx; replayed `move`/`rename`
+  change nothing; a missing id is `NotFound`. The fake Drive's writes are
+  atomic; the fake API's folder create never looks for a namesake, so the
+  plugin meets the trap for real (`FakeDrive.tree` shows the one chain).
+
 ## 5. Bindings — pointing a folder or file at a node (decided 2026-09-14)
 
 ### 5.1 The table

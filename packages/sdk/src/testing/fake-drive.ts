@@ -4,6 +4,8 @@ import {
   CursorExpired,
   NotFound,
   RateLimited,
+  collisionName,
+  pathSegments,
 } from '../storage-source.ts'
 import type {
   ChangePage,
@@ -12,16 +14,20 @@ import type {
   LinkTarget,
   ListFolderOptions,
   PickerConfig,
+  PutFileResult,
   StorageChange,
   StorageEntry,
   StorageFile,
   StorageFolder,
-  StorageSource,
+  StorageUpload,
+  WritableStorageSource,
 } from '../storage-source.ts'
+import { makeSha256 } from './storage-source-conformance.ts'
 import type {
   StorageSourceChaos,
   StorageSourceChaosFixture,
   StorageSourceFixture,
+  StorageSourceWriteFixture,
 } from './storage-source-conformance.ts'
 
 /**
@@ -161,6 +167,12 @@ export const FAKE_DRIVE_FIXTURE: StorageSourceFixture = {
   missingId: 'never-seeded',
 }
 
+/** What the write suite expects of `FAKE_DRIVE_SEED`: My Drive's root takes the writes. */
+export const FAKE_DRIVE_WRITE_FIXTURE: StorageSourceWriteFixture = {
+  rootId: 'root',
+  missingId: 'never-seeded',
+}
+
 /**
  * A file whose bytes are never held: `fakeDriveLargeChunks` makes them one
  * chunk at a time when it is read. Not a seed item, so the seed's shape (and
@@ -250,12 +262,34 @@ type Item = {
   body: Body
   /** Drive's own checksum. Kept so a test can prove it is never surfaced. */
   md5Checksum: string
+  /** Drive's `sha256Checksum`, computed on first ask; never for a native doc or a large file. */
+  sha256: string | undefined
   version: number
   modifiedAt: string
+  readonly createdAt: string
+  /** Revision ids, oldest first; the last is Drive's `headRevisionId`. */
+  readonly revisions: Array<string>
+}
+
+/** A folder or file made by a write, under a generated id; Drive permits a duplicate name. */
+export type FakeDriveCreate = {
+  readonly kind: 'folder' | 'file' | 'native'
+  readonly name: string
+  readonly parentId: string
+  readonly mime?: string
+  readonly bytes?: Uint8Array
+}
+
+/** What Drive's API reports of an item beyond the port's entry. */
+export type FakeDriveFields = {
+  readonly createdTime: string
+  readonly headRevisionId?: string
+  readonly sha256Checksum?: string
 }
 
 export type FakeDrive = {
-  readonly source: StorageSource
+  /** The port, write half included: each write is atomic here, so the fake never forks a path. */
+  readonly source: WritableStorageSource
   /** Add a folder or file under an existing folder; a change. */
   readonly add: (item: FakeDriveSeedItem) => void
   /** Delete an item and everything under it; a removal per item. */
@@ -275,6 +309,16 @@ export type FakeDrive = {
   readonly restore: () => void
   /** Drive's `md5Checksum` for an item — what a provider hash looks like. */
   readonly providerHash: (id: string) => string | undefined
+  /** A new item under a generated id; a change. Duplicate names are allowed, as Drive's are. */
+  readonly create: (item: FakeDriveCreate) => StorageEntry
+  /** New bytes for a file as a new revision; a change. */
+  readonly upload: (id: string, bytes: Uint8Array) => StorageEntry
+  readonly driveFields: (id: string) => FakeDriveFields | undefined
+  readonly revisions: (id: string) => ReadonlyArray<string>
+  /** An item as the port lists it, read past the toggles. */
+  readonly entry: (id: string) => StorageEntry | undefined
+  /** Every path under a folder, parents before children, siblings in listing order. */
+  readonly tree: (folderId: string) => ReadonlyArray<string>
   /** The toggles above as the chaos suite's handle (`vanish` is `vanishAfterList`). */
   readonly chaos: StorageSourceChaos
 }
@@ -353,9 +397,19 @@ export const makeFakeDrive = (
 
   const tick = () => new Date(BASE_MS + ++clock * 1000).toISOString()
 
+  let made = 0
+
+  /** Not in creation order, as Drive's ids are not: "the lowest id" is no clock. */
+  const newId = () =>
+    `n${fakeMd5(encoder.encode(`made:${++made}`)).slice(0, 15)}`
+
   const touch = (item: Item) => {
     item.version += 1
     item.modifiedAt = tick()
+  }
+
+  const newRevision = (item: Item) => {
+    item.revisions.push(`${item.id}-r${item.revisions.length + 1}`)
   }
 
   const placeable = (id: string, parentId: string | null) => {
@@ -364,49 +418,109 @@ export const makeFakeDrive = (
       throw new Error(`fake drive: ${id}'s parent is not a folder`)
   }
 
+  const put = (
+    fields: Pick<Item, 'id' | 'name' | 'kind' | 'parentId' | 'mime' | 'body'>,
+    md5Checksum: string,
+  ): Item => {
+    placeable(fields.id, fields.parentId)
+    const now = tick()
+    const item: Item = {
+      ...fields,
+      md5Checksum,
+      sha256: undefined,
+      version: 1,
+      modifiedAt: now,
+      createdAt: now,
+      revisions: [],
+    }
+    if (item.kind !== 'folder') newRevision(item)
+    items.set(item.id, item)
+    return item
+  }
+
+  const mimeOf = (kind: Item['kind'], mime: string | undefined) =>
+    kind === 'folder'
+      ? FOLDER_MIME
+      : kind === 'native'
+        ? GOOGLE_DOC_MIME
+        : (mime ?? 'application/octet-stream')
+
   const insert = (seed: FakeDriveSeedItem) => {
-    placeable(seed.id, seed.parentId)
     const bytes =
       seed.kind === 'folder'
         ? new Uint8Array()
         : seed.kind === 'native'
           ? docxBytes(seed.content)
           : encoder.encode(seed.content)
-    items.set(seed.id, {
-      id: seed.id,
-      name: seed.name,
-      kind: seed.kind,
-      parentId: seed.parentId,
-      mime:
-        seed.kind === 'folder'
-          ? FOLDER_MIME
-          : seed.kind === 'native'
-            ? GOOGLE_DOC_MIME
-            : seed.mime,
-      body: { _tag: 'bytes', bytes },
-      md5Checksum: fakeMd5(bytes),
-      version: 1,
-      modifiedAt: tick(),
-    })
+    put(
+      {
+        id: seed.id,
+        name: seed.name,
+        kind: seed.kind,
+        parentId: seed.parentId,
+        mime: mimeOf(seed.kind, seed.kind === 'file' ? seed.mime : undefined),
+        body: { _tag: 'bytes', bytes },
+      },
+      fakeMd5(bytes),
+    )
   }
 
   const insertLarge = (file: FakeDriveLargeFile) => {
-    placeable(file.id, file.parentId)
     if (!(file.chunkSize > 0 && file.size >= 0))
       throw new Error(`fake drive: ${file.id} needs a positive chunk size`)
-    items.set(file.id, {
-      id: file.id,
-      name: file.name,
-      kind: 'file',
-      parentId: file.parentId,
-      mime: file.mime,
-      body: { _tag: 'lazy', file },
+    put(
+      {
+        id: file.id,
+        name: file.name,
+        kind: 'file',
+        parentId: file.parentId,
+        mime: file.mime,
+        body: { _tag: 'lazy', file },
+      },
       // Never the bytes: hashing 200 MB here would defeat the point.
-      md5Checksum: fakeMd5(encoder.encode(`${file.id}:${file.size}`)),
-      version: 1,
-      modifiedAt: tick(),
-    })
+      fakeMd5(encoder.encode(`${file.id}:${file.size}`)),
+    )
   }
+
+  /** A write's new item: a generated id, the parent checked. */
+  const create = (spec: FakeDriveCreate): Item => {
+    const bytes = spec.bytes ?? new Uint8Array()
+    return put(
+      {
+        id: newId(),
+        name: spec.name,
+        kind: spec.kind,
+        parentId: spec.parentId,
+        mime: mimeOf(spec.kind, spec.mime),
+        body: { _tag: 'bytes', bytes: bytes.slice() },
+      },
+      fakeMd5(bytes),
+    )
+  }
+
+  /** New content for a file or native doc: a new revision and a new `changeToken`. */
+  const replaceBody = (item: Item, bytes: Uint8Array) => {
+    item.body = { _tag: 'bytes', bytes: bytes.slice() }
+    item.md5Checksum = fakeMd5(bytes)
+    item.sha256 = undefined
+    newRevision(item)
+    touch(item)
+  }
+
+  /** Drive's sha256Checksum: binary content only, and never a large file's. */
+  const sha256Of = (item: Item): string | undefined => {
+    if (item.kind !== 'file' || item.body._tag !== 'bytes') return undefined
+    if (item.sha256 === undefined) {
+      const hash = makeSha256()
+      hash.update(item.body.bytes)
+      item.sha256 = hash.hex()
+    }
+    return item.sha256
+  }
+
+  /** Oldest first, as `ensureFolder` resolves a duplicate: created time, then id. */
+  const byAge = (a: Item, b: Item) =>
+    a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)
 
   for (const seed of options.seed ?? FAKE_DRIVE_SEED) insert(seed)
   for (const file of options.largeFiles ?? []) insertLarge(file)
@@ -613,14 +727,134 @@ export const makeFakeDrive = (
     },
   }
 
-  const source: StorageSource = {
+  const renameItem = (item: Item, name: string) => {
+    item.name = name
+    touch(item)
+    log.push({ id: item.id, removed: false })
+  }
+
+  const moveItem = (item: Item, parentId: string) => {
+    item.parentId = parentId
+    touch(item)
+    log.push({ id: item.id, removed: false })
+  }
+
+  const created = (spec: FakeDriveCreate): Item => {
+    const item = create(spec)
+    log.push({ id: item.id, removed: false })
+    return item
+  }
+
+  const uploaded = (item: Item, bytes: Uint8Array) => {
+    if (item.kind === 'folder')
+      throw new Error(`fake drive: ${item.id} is a folder`)
+    replaceBody(item, bytes)
+    log.push({ id: item.id, removed: false })
+  }
+
+  // The write half. Each decision and its write run in one synchronous step,
+  // so concurrent calls cannot interleave between looking and creating.
+
+  const ensureFolder = Effect.fn('FakeDrive.ensureFolder')(function* (
+    rootId: string,
+    path: string,
+  ) {
+    yield* gate
+    const root = yield* folder(rootId)
+    return yield* Effect.sync(() => {
+      let at = root
+      for (const name of pathSegments(path)) {
+        const found = children(at.id)
+          .filter((i) => i.kind === 'folder' && i.name === name)
+          .sort(byAge)
+          .at(0)
+        at = found ?? created({ kind: 'folder', name, parentId: at.id })
+      }
+      return at.id
+    })
+  })
+
+  const readBytes = (stream: ReadableStream<Uint8Array>) =>
+    Effect.promise(
+      async () => new Uint8Array(await new Response(stream).arrayBuffer()),
+    )
+
+  const putFile = Effect.fn('FakeDrive.putFile')(function* (
+    folderId: string,
+    name: string,
+    upload: StorageUpload,
+  ) {
+    yield* gate
+    yield* folder(folderId)
+    const bytes = yield* readBytes(upload.stream)
+    // Read while the bytes arrived: the folder may be gone now.
+    yield* folder(folderId)
+    return yield* Effect.sync((): PutFileResult => {
+      for (let n = 1; ; n++) {
+        const tried = collisionName(name, n)
+        const taken = children(folderId)
+          .filter((i) => i.kind !== 'folder' && i.name === tried)
+          .sort(byAge)
+        const same = taken.find((i) => sha256Of(i) === upload.sha256)
+        if (same !== undefined) uploaded(same, bytes)
+        const item =
+          same ??
+          (taken.length === 0
+            ? created({
+                kind: 'file',
+                name: tried,
+                parentId: folderId,
+                mime: upload.mime,
+                bytes,
+              })
+            : undefined)
+        if (item !== undefined)
+          return {
+            fileId: item.id,
+            revisionId: item.revisions.at(-1) ?? String(item.version),
+            name: tried,
+          }
+      }
+    })
+  })
+
+  const move = Effect.fn('FakeDrive.move')(function* (
+    id: string,
+    folderId: string,
+  ) {
+    yield* gate
+    const item = yield* lookup(id)
+    yield* folder(folderId)
+    if (item.parentId !== folderId) moveItem(item, folderId)
+  })
+
+  const rename = Effect.fn('FakeDrive.rename')(function* (
+    id: string,
+    name: string,
+  ) {
+    yield* gate
+    const item = yield* lookup(id)
+    if (item.name !== name) renameItem(item, name)
+  })
+
+  const source: WritableStorageSource = {
     resolveLink,
     listFolder,
     getFolder,
     getFile,
     changes,
     pickerConfig,
+    ensureFolder,
+    putFile,
+    move,
+    rename,
   }
+
+  const tree = (folderId: string): Array<string> =>
+    children(folderId).flatMap((child) => [
+      child.name,
+      ...tree(child.id).map((path) => `${child.name}/${path}`),
+    ])
 
   return {
     source,
@@ -632,30 +866,45 @@ export const makeFakeDrive = (
       mustGet(id)
       removeTree(id)
     },
-    rename: (id, name) => {
-      const item = mustGet(id)
-      item.name = name
-      touch(item)
-      log.push({ id, removed: false })
-    },
+    rename: (id, name) => renameItem(mustGet(id), name),
     move: (id, parentId) => {
       const item = mustGet(id)
       if (mustGet(parentId).kind !== 'folder')
         throw new Error(`fake drive: ${parentId} is not a folder`)
-      item.parentId = parentId
-      touch(item)
-      log.push({ id, removed: false })
+      moveItem(item, parentId)
     },
     edit: (id, content) => {
       const item = mustGet(id)
-      if (item.kind === 'folder')
-        throw new Error(`fake drive: ${id} is a folder`)
-      const bytes =
-        item.kind === 'native' ? docxBytes(content) : encoder.encode(content)
-      item.body = { _tag: 'bytes', bytes }
-      item.md5Checksum = fakeMd5(bytes)
-      touch(item)
-      log.push({ id, removed: false })
+      uploaded(
+        item,
+        item.kind === 'native' ? docxBytes(content) : encoder.encode(content),
+      )
+    },
+    create: (spec) => entryOf(created(spec)),
+    upload: (id, bytes) => {
+      const item = mustGet(id)
+      uploaded(item, bytes)
+      return entryOf(item)
+    },
+    driveFields: (id) => {
+      const item = items.get(id)
+      if (item === undefined) return undefined
+      const head = item.revisions.at(-1)
+      const sha256Checksum = sha256Of(item)
+      return {
+        createdTime: item.createdAt,
+        ...(head === undefined ? {} : { headRevisionId: head }),
+        ...(sha256Checksum === undefined ? {} : { sha256Checksum }),
+      }
+    },
+    revisions: (id) => [...(items.get(id)?.revisions ?? [])],
+    entry: (id) => {
+      const item = items.get(id)
+      return item === undefined ? undefined : entryOf(item)
+    },
+    tree: (folderId) => {
+      mustGet(folderId)
+      return tree(folderId)
     },
     rateLimit: chaos.rateLimit,
     evictCursors: chaos.evictCursors,

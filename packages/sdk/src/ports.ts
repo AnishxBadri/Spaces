@@ -359,8 +359,8 @@ export type HttpRequest = {
   readonly method: HttpMethod
   readonly url: string
   readonly headers?: { readonly [name: string]: string }
-  /** A string is sent as-is; anything else as JSON. */
-  readonly body?: string | JsonValue
+  /** A string or bytes are sent as-is (bytes for an upload); anything else as JSON. */
+  readonly body?: string | Uint8Array<ArrayBuffer> | JsonValue
 }
 
 export type HttpResponse = {

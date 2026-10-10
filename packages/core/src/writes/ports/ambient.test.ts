@@ -500,6 +500,34 @@ describe('HttpLive', () => {
     expect(response.headers['x-thing']).toBe('a')
   })
 
+  it('sends a byte body as the bytes, with no JSON content type', async () => {
+    const bodies: Array<string | Uint8Array | undefined> = []
+    const headers: Array<Record<string, string>> = []
+    const layer = HttpLive({
+      integrationId: crypto.randomUUID(),
+      pluginId: 'echo',
+      fetch: (_url, init) => {
+        bodies.push(init.body)
+        headers.push(init.headers)
+        return Promise.resolve(new Response(null, { status: 308 }))
+      },
+    })
+    const bytes = Uint8Array.from([0x25, 0x50, 0x44, 0x46, 0xff, 0x00])
+    const response = await Effect.runPromise(
+      Effect.gen(function* () {
+        return yield* (yield* Http).request({
+          method: 'PUT',
+          url,
+          headers: { 'Content-Range': 'bytes 0-5/6' },
+          body: bytes,
+        })
+      }).pipe(Effect.provide(layer)),
+    )
+    expect(response.status).toBe(308)
+    expect(bodies).toEqual([bytes])
+    expect(headers).toEqual([{ 'content-range': 'bytes 0-5/6' }])
+  })
+
   it('fails a network error JobRetryable, the key in its URL redacted', async () => {
     const secret = 'sk-in-the-url-123456'
     const leakyUrl = `https://provider.example/v1?api_key=${secret}`

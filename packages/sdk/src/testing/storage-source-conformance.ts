@@ -3,6 +3,8 @@ import type {
   StorageEntry,
   StorageSource,
   StorageSourceError,
+  StorageUpload,
+  WritableStorageSource,
 } from '../storage-source.ts'
 
 /**
@@ -919,6 +921,431 @@ export const storageSourceChaos = (
             ours === sha256,
             `SHA-256 of the streamed ${fileId} is ${ours}, not ${sha256}`,
           )
+        }),
+      ),
+    },
+  ]
+}
+
+// ---------------------------------------------------------------------------
+// The write half — ensureFolder, putFile, move, rename
+// ---------------------------------------------------------------------------
+
+/** Where the write suite may write, written independently of the seed. */
+export type StorageSourceWriteFixture = {
+  /** A folder holding nothing named `A`, `Puts`, `Moves` or `Renames`. */
+  readonly rootId: string
+  /** An id the provider has never seen: `NotFound`. */
+  readonly missingId: string
+}
+
+export type StorageSourceWriteSubject = {
+  readonly make: () => WritableStorageSource
+  readonly fixture: StorageSourceWriteFixture
+}
+
+const DOCX = `${OOXML}wordprocessingml.document`
+
+const textEncoder = new TextEncoder()
+
+/** An upload of `content` with the SHA-256 core would have computed, streamed in two chunks. */
+const uploadOf = Effect.fn('uploadOf')(function* (
+  content: string | Uint8Array,
+  mime = 'application/pdf',
+) {
+  const bytes =
+    typeof content === 'string' ? textEncoder.encode(content) : content
+  const sha256 = yield* sha256Hex(bytes)
+  const half = Math.ceil(bytes.byteLength / 2)
+  const upload: StorageUpload = {
+    mime,
+    sha256,
+    stream: new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes.slice(0, half))
+        if (half < bytes.byteLength) controller.enqueue(bytes.slice(half))
+        controller.close()
+      },
+    }),
+  }
+  return upload
+})
+
+/** A folder's whole listing. */
+const listed = Effect.fn('listed')(function* (
+  source: StorageSource,
+  folderId: string,
+) {
+  return (yield* allPages(source, folderId, 100)).flat()
+})
+
+/** The one entry named `name` in a folder; none or several fails. */
+const onlyNamed = Effect.fn('onlyNamed')(function* (
+  source: StorageSource,
+  folderId: string,
+  name: string,
+  kind: StorageEntry['kind'],
+) {
+  const found = (yield* listed(source, folderId)).filter(
+    (e) => e.name === name && e.kind === kind,
+  )
+  const only = found.at(0)
+  if (found.length !== 1 || only === undefined)
+    return yield* new ConformanceFailure({
+      message: `${folderId} holds ${found.length} ${kind}s named ${show(name)}${found.length > 1 ? ` (${found.map((e) => e.id).join(', ')}) — the tree forked` : ''}, expected one`,
+    })
+  return only
+})
+
+/** A file's mime and the SHA-256 of its bytes, as `getFile` streams them. */
+const readBack = Effect.fn('readBack')(function* (
+  source: StorageSource,
+  fileId: string,
+) {
+  const file = yield* source.getFile(fileId)
+  const bytes = yield* readAll(file.stream)
+  return { mime: file.mime, sha256: yield* sha256Hex(bytes) }
+})
+
+/**
+ * The write half's suite (docs/spec-storage-sources.md §6 and §5.6), the
+ * same shape as `storageSourceConformance`.
+ *
+ * - `ensureFolder` is run four at once: Drive permits duplicate folder
+ *   names, so a provider that looks and then creates forks the tree.
+ * - A replayed `move` or `rename` must change nothing: the same
+ *   `changeToken`, and no change in the feed.
+ */
+export const storageSourceWriteConformance = (
+  subject: StorageSourceWriteSubject,
+): ReadonlyArray<ConformanceCase> => {
+  const { rootId, missingId } = subject.fixture
+  const fresh = (
+    body: (
+      source: WritableStorageSource,
+    ) => Effect.Effect<unknown, ConformanceFailure | StorageSourceError>,
+  ): ConformanceCase['run'] =>
+    Effect.suspend(() => body(subject.make())).pipe(Effect.asVoid)
+
+  const absent = Effect.fn('absent')(function* (
+    source: StorageSource,
+    name: string,
+  ) {
+    const before = (yield* listed(source, rootId)).filter(
+      (e) => e.name === name,
+    )
+    yield* check(
+      before.length === 0,
+      `the fixture's root ${rootId} already holds ${show(name)}`,
+    )
+  })
+
+  /** A new folder under the root for one case, so a case reads only its own writes. */
+  const scratch = Effect.fn('scratch')(function* (
+    source: WritableStorageSource,
+    name: string,
+  ) {
+    yield* absent(source, name)
+    return yield* source.ensureFolder(rootId, name)
+  })
+
+  const entryIn = Effect.fn('entryIn')(function* (
+    source: StorageSource,
+    folderId: string,
+    id: string,
+  ) {
+    const entry = (yield* listed(source, folderId)).find((e) => e.id === id)
+    if (entry === undefined)
+      return yield* new ConformanceFailure({
+        message: `${id} is not listed in ${folderId}`,
+      })
+    return entry
+  })
+
+  const quietSince = Effect.fn('quietSince')(function* (
+    source: StorageSource,
+    cursor: string,
+    id: string,
+    label: string,
+  ) {
+    const page = yield* source.changes(cursor)
+    const touched = page.changes.filter(
+      (c) => (c._tag === 'changed' ? c.entry.id : c.id) === id,
+    )
+    yield* check(
+      touched.length === 0,
+      `${label} replayed reported ${show(touched)} — a replay is a no-op`,
+    )
+  })
+
+  return [
+    {
+      name: 'ensureFolder(A/B/C) twice yields one chain of folders and the same id both times',
+      run: fresh((source) =>
+        Effect.gen(function* () {
+          yield* absent(source, 'A')
+          const first = yield* source.ensureFolder(rootId, 'A/B/C')
+          const second = yield* source.ensureFolder(rootId, 'A/B/C')
+          const spelled = yield* source.ensureFolder(rootId, '/A//B/C/')
+          yield* check(
+            first === second && second === spelled,
+            `ensureFolder(A/B/C) gave ${show([first, second])}, and ${show(spelled)} for /A//B/C/`,
+          )
+          const a = yield* onlyNamed(source, rootId, 'A', 'folder')
+          const b = yield* onlyNamed(source, a.id, 'B', 'folder')
+          const c = yield* onlyNamed(source, b.id, 'C', 'folder')
+          yield* check(
+            c.id === first,
+            `ensureFolder(A/B/C) gave ${first}, but A/B/C is ${c.id}`,
+          )
+          const below = [
+            ...(yield* listed(source, a.id)),
+            ...(yield* listed(source, b.id)),
+            ...(yield* listed(source, c.id)),
+          ]
+          yield* check(
+            below.length === 2,
+            `A holds ${show(below.map((e) => e.name))} below it, expected B and C alone`,
+          )
+          const folder = yield* source.getFolder(first)
+          const chain = folder.parents.slice(-2).map((p) => p.name)
+          yield* check(
+            show(chain) === show(['A', 'B']) &&
+              folder.parents.some((p) => p.id === rootId),
+            `getFolder(${first}) ancestry is ${show(folder.parents)}, expected ${rootId} then A, B`,
+          )
+        }),
+      ),
+    },
+    {
+      name: 'four concurrent ensureFolder(A/B) calls yield exactly one B folder and one id — the duplicate-name trap',
+      run: fresh((source) =>
+        Effect.gen(function* () {
+          yield* absent(source, 'A')
+          const ids = yield* Effect.all(
+            Array.from({ length: 4 }, () => source.ensureFolder(rootId, 'A/B')),
+            { concurrency: 'unbounded' },
+          )
+          yield* check(
+            new Set(ids).size === 1,
+            `four concurrent ensureFolder(A/B) calls gave ${show(ids)}`,
+          )
+          const a = yield* onlyNamed(source, rootId, 'A', 'folder')
+          const b = yield* onlyNamed(source, a.id, 'B', 'folder')
+          yield* check(
+            ids.every((id) => id === b.id),
+            `the calls gave ${show(ids)}, but A/B is ${b.id}`,
+          )
+        }),
+      ),
+    },
+    {
+      name: 'putFile of identical bytes under an existing name is a second revision of that file, not a second file',
+      run: fresh((source) =>
+        Effect.gen(function* () {
+          const folderId = yield* scratch(source, 'Puts')
+          const name = 'Term sheet.pdf'
+          const content = '%PDF-1.7 Acme term sheet'
+          const first = yield* source.putFile(
+            folderId,
+            name,
+            yield* uploadOf(content),
+          )
+          const upload = yield* uploadOf(content)
+          const second = yield* source.putFile(folderId, name, upload)
+          yield* check(
+            first.name === name && second.name === name,
+            `putFile(${name}) twice landed as ${show([first.name, second.name])}`,
+          )
+          yield* check(
+            second.fileId === first.fileId,
+            `the same bytes under ${name} made a second file, ${second.fileId} beside ${first.fileId}`,
+          )
+          yield* check(
+            second.revisionId !== first.revisionId,
+            `the second putFile(${name}) reported the first's revision ${first.revisionId}`,
+          )
+          const files = yield* listed(source, folderId)
+          yield* check(
+            files.length === 1,
+            `the folder holds ${show(files.map((e) => e.name))}, expected ${name} alone`,
+          )
+          const back = yield* readBack(source, first.fileId)
+          yield* check(
+            back.sha256 === upload.sha256,
+            `${name} reads back as ${back.sha256}, not the ${upload.sha256} put`,
+          )
+        }),
+      ),
+    },
+    {
+      name: "putFile of different bytes under an existing name lands as 'name (2).ext' and reports the name it used",
+      run: fresh((source) =>
+        Effect.gen(function* () {
+          const folderId = yield* scratch(source, 'Puts')
+          const name = 'Term sheet.pdf'
+          const suffixed = 'Term sheet (2).pdf'
+          const draft2 = '%PDF-1.7 term sheet, draft 2'
+          const v1 = yield* uploadOf('%PDF-1.7 term sheet, draft 1')
+          const v2 = yield* uploadOf(draft2)
+          const first = yield* source.putFile(folderId, name, v1)
+          const second = yield* source.putFile(folderId, name, v2)
+          yield* check(
+            second.name === suffixed,
+            `different bytes under ${name} landed as ${show(second.name)}, expected ${show(suffixed)}`,
+          )
+          yield* check(
+            second.fileId !== first.fileId,
+            `different bytes under ${name} were written over ${first.fileId}`,
+          )
+          const original = yield* onlyNamed(source, folderId, name, 'file')
+          const copy = yield* onlyNamed(source, folderId, suffixed, 'file')
+          yield* check(
+            original.id === first.fileId && copy.id === second.fileId,
+            `the folder lists ${show([original.id, copy.id])}, putFile reported ${show([first.fileId, second.fileId])}`,
+          )
+          const one = yield* readBack(source, first.fileId)
+          const two = yield* readBack(source, second.fileId)
+          yield* check(
+            one.sha256 === v1.sha256 && two.sha256 === v2.sha256,
+            `${name} and ${suffixed} read back with the wrong bytes`,
+          )
+          // The same rule at (2): its bytes again are its revision, not a (3).
+          const again = yield* source.putFile(
+            folderId,
+            name,
+            yield* uploadOf(draft2),
+          )
+          yield* check(
+            again.name === suffixed && again.fileId === second.fileId,
+            `${suffixed}'s bytes put again landed as ${show(again.name)} (${again.fileId}), expected a revision of ${second.fileId}`,
+          )
+          const third = yield* source.putFile(
+            folderId,
+            name,
+            yield* uploadOf('%PDF-1.7 term sheet, draft 3'),
+          )
+          yield* check(
+            third.name === 'Term sheet (3).pdf',
+            `a third set of bytes landed as ${show(third.name)}, expected "Term sheet (3).pdf"`,
+          )
+        }),
+      ),
+    },
+    {
+      name: 'putFile never converts an uploaded docx into a native document',
+      run: fresh((source) =>
+        Effect.gen(function* () {
+          const folderId = yield* scratch(source, 'Puts')
+          const bytes = Uint8Array.from([
+            ...ZIP_MAGIC,
+            ...textEncoder.encode('word/document.xml Acme memo'),
+          ])
+          const upload = yield* uploadOf(bytes, DOCX)
+          const put = yield* source.putFile(folderId, 'Memo.docx', upload)
+          const entry = yield* entryIn(source, folderId, put.fileId)
+          yield* check(
+            entry.mime === DOCX,
+            `Memo.docx lists as ${entry.mime} — converted; expected ${DOCX}`,
+          )
+          const back = yield* readBack(source, put.fileId)
+          yield* check(
+            back.mime === DOCX && back.sha256 === upload.sha256,
+            `Memo.docx reads back as ${back.mime} with ${back.sha256 === upload.sha256 ? 'the same' : 'different'} bytes, expected the docx put`,
+          )
+        }),
+      ),
+    },
+    {
+      name: 'move is idempotent: replaying it is a no-op, not an error',
+      run: fresh((source) =>
+        Effect.gen(function* () {
+          yield* absent(source, 'Moves')
+          const from = yield* source.ensureFolder(rootId, 'Moves/From')
+          const to = yield* source.ensureFolder(rootId, 'Moves/To')
+          const put = yield* source.putFile(
+            from,
+            'Deck.pdf',
+            yield* uploadOf('%PDF-1.7 deck'),
+          )
+          yield* source.move(put.fileId, to)
+          const moved = yield* entryIn(source, to, put.fileId)
+          const start = yield* source.changes(null)
+          yield* source.move(put.fileId, to)
+          const replayed = yield* entryIn(source, to, put.fileId)
+          yield* check(
+            replayed.changeToken === moved.changeToken,
+            `move replayed changed Deck.pdf's changeToken ${moved.changeToken} → ${replayed.changeToken}`,
+          )
+          yield* quietSince(source, start.next, put.fileId, 'move')
+          const left = (yield* listed(source, from)).filter(
+            (e) => e.id === put.fileId,
+          )
+          yield* check(
+            left.length === 0,
+            'Deck.pdf is still listed in the folder it moved from',
+          )
+        }),
+      ),
+    },
+    {
+      name: 'rename is idempotent: replaying it is a no-op, not an error',
+      run: fresh((source) =>
+        Effect.gen(function* () {
+          const folderId = yield* scratch(source, 'Renames')
+          const put = yield* source.putFile(
+            folderId,
+            'Deck.pdf',
+            yield* uploadOf('%PDF-1.7 deck'),
+          )
+          yield* source.rename(put.fileId, 'Deck v2.pdf')
+          const renamed = yield* entryIn(source, folderId, put.fileId)
+          yield* check(
+            renamed.name === 'Deck v2.pdf',
+            `rename gave ${show(renamed.name)}, expected "Deck v2.pdf"`,
+          )
+          const start = yield* source.changes(null)
+          yield* source.rename(put.fileId, 'Deck v2.pdf')
+          const replayed = yield* entryIn(source, folderId, put.fileId)
+          yield* check(
+            replayed.changeToken === renamed.changeToken &&
+              replayed.name === 'Deck v2.pdf',
+            `rename replayed changed the file: changeToken ${renamed.changeToken} → ${replayed.changeToken}, name ${show(replayed.name)}`,
+          )
+          yield* quietSince(source, start.next, put.fileId, 'rename')
+        }),
+      ),
+    },
+    {
+      name: 'a write naming a missing id is NotFound, typed — not a throw',
+      run: fresh((source) =>
+        Effect.gen(function* () {
+          const outcome = (
+            attempt: Effect.Effect<unknown, StorageSourceError>,
+          ) =>
+            Effect.map(outcomeOf(attempt), (o) =>
+              o._tag === 'failed' && o.error._tag === 'NotFound'
+                ? o.error.id === missingId
+                  ? 'NotFound'
+                  : `failed NotFound(${o.error.id})`
+                : told(o),
+            )
+          const upload = yield* uploadOf('%PDF-1.7 orphan')
+          const attempts: ReadonlyArray<
+            readonly [string, Effect.Effect<string>]
+          > = [
+            ['ensureFolder', outcome(source.ensureFolder(missingId, 'A'))],
+            ['putFile', outcome(source.putFile(missingId, 'x.pdf', upload))],
+            ['move', outcome(source.move(missingId, rootId))],
+            ['rename', outcome(source.rename(missingId, 'x.pdf'))],
+          ]
+          for (const [method, attempt] of attempts) {
+            const result = yield* attempt
+            yield* check(
+              result === 'NotFound',
+              `${method}(${missingId}) ${result}, expected NotFound naming it`,
+            )
+          }
         }),
       ),
     },

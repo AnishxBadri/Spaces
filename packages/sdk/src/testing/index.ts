@@ -859,12 +859,23 @@ export type {
   StorageSourceChaosSubject,
 } from './storage-source-conformance.ts'
 
+// The write half — ensureFolder, putFile, move, rename
+export { FAKE_DRIVE_WRITE_FIXTURE } from './fake-drive.ts'
+export type { FakeDriveCreate, FakeDriveFields } from './fake-drive.ts'
+export { storageSourceWriteConformance } from './storage-source-conformance.ts'
+export type {
+  StorageSourceWriteFixture,
+  StorageSourceWriteSubject,
+} from './storage-source-conformance.ts'
+
 // Drive's REST API over the fake Drive, and an Http port over a fetch
 export {
   makeFakeDriveApi,
   HttpFetchTest,
   DRIVE_API,
+  DRIVE_UPLOAD_API,
   DRIVE_FOLDER_MIME,
+  RESUMABLE_CHUNK_MULTIPLE,
 } from './fake-drive-api.ts'
 export type {
   FakeDriveApi,
