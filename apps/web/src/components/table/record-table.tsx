@@ -12,7 +12,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
+import { Checkbox } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
+import type { RowSelection } from './selection-bar'
 import { cn } from '#/lib/utils'
 
 /**
@@ -23,13 +25,15 @@ import { cn } from '#/lib/utils'
  * place; the fix is that there is now only one place to change.
  *
  * In scope (CONTEXT.md's v1 line): show/hide/resize, single sort, sticky header,
- * sticky first column, row → record. Deliberately absent: saved views, bulk
- * edit, calculations row, CSV, virtualization.
+ * sticky first column, row → record, and row checkboxes for a selection bar's
+ * verbs. Deliberately absent: bulk edit, calculations row, CSV, virtualization.
  */
 
 /** Column widths nudge by this much per arrow-key press. */
 const RESIZE_STEP = 16
 const MIN_COLUMN_WIDTH = 64
+/** The checkbox lane's width: `w-8`, which the pinned column's `left-8` clears. */
+const SELECT_WIDTH = 32
 
 /**
  * Grouped, never compact — `Intl.NumberFormat` compact notation prints
@@ -67,6 +71,17 @@ export type ColumnAction = {
   onSelect: () => void
 }
 
+/**
+ * Row checkboxes: a pinned lane before the first column, shared with the
+ * surface's `SelectionBar` through one `useRowSelection`. The head box checks
+ * every loaded row.
+ */
+export type TableSelect<T> = {
+  rows: RowSelection
+  keyOf: (row: T) => string
+  nameOf: (row: T) => string
+}
+
 export function RecordTable<T>({
   table,
   stickyColumnId,
@@ -75,6 +90,7 @@ export function RecordTable<T>({
   onRowClick,
   page,
   columnActions,
+  select,
 }: {
   table: Table<T>
   /** Column pinned to the left edge while the rest scrolls under it. */
@@ -103,8 +119,17 @@ export function RecordTable<T>({
   page?: TablePage
   /** The surface's verbs for one column, by its id; none when omitted. */
   columnActions?: (columnId: string) => ReadonlyArray<ColumnAction>
+  /** Row checkboxes; absent, the table has none. */
+  select?: TableSelect<T>
 }) {
   const rows = table.getRowModel().rows
+  const keys = select ? rows.map((r) => select.keyOf(r.original)) : []
+  const allChecked =
+    select !== undefined &&
+    keys.length > 0 &&
+    select.rows.among(keys).length === keys.length
+  // The pinned column sits after the checkbox lane when there is one.
+  const stickyLeft = select ? 'left-8' : 'left-0'
 
   // `isolate`: the sticky head and pinned column order themselves with small
   // local z values inside one stacking context, so the page's five-step scale
@@ -114,17 +139,27 @@ export function RecordTable<T>({
       <table
         aria-label={label}
         className="w-full border-collapse text-ui"
-        style={{ width: table.getTotalSize() }}
+        style={{ width: table.getTotalSize() + (select ? SELECT_WIDTH : 0) }}
       >
         <thead className="sticky top-0 z-10 bg-paper">
           {table.getHeaderGroups().map((hg) => (
             <tr key={hg.id} className="border-b border-hairline">
+              {select ? (
+                <th className="sticky left-0 z-20 w-8 bg-paper pl-2.5 align-middle">
+                  <Checkbox
+                    checked={allChecked}
+                    onCheckedChange={(on) => select.rows.set(keys, on)}
+                    aria-label={`Select every loaded row of ${label}`}
+                  />
+                </th>
+              ) : null}
               {hg.headers.map((header) => (
                 <HeaderCell
                   key={header.id}
                   header={header}
                   table={table}
                   sticky={header.column.id === stickyColumnId}
+                  stickyLeft={stickyLeft}
                   actions={columnActions?.(header.column.id) ?? []}
                 />
               ))}
@@ -146,6 +181,16 @@ export function RecordTable<T>({
                 onRowClick && 'cursor-pointer',
               )}
             >
+              {select ? (
+                <SelectCell
+                  checked={select.rows.has(select.keyOf(row.original))}
+                  visible={select.rows.active}
+                  name={select.nameOf(row.original)}
+                  onChange={(on) =>
+                    select.rows.set([select.keyOf(row.original)], on)
+                  }
+                />
+              ) : null}
               {row.getVisibleCells().map((cell) => (
                 <td
                   key={cell.id}
@@ -155,7 +200,8 @@ export function RecordTable<T>({
                     cell.column.id === stickyColumnId &&
                       // Opaque at rest and on hover: a translucent tint here
                       // would let the scrolled-under columns bleed through.
-                      'sticky left-0 z-10 bg-paper transition-colors duration-150 ease-out-quart group-hover:bg-row-hover',
+                      'sticky z-10 bg-paper transition-colors duration-150 ease-out-quart group-hover:bg-row-hover',
+                    cell.column.id === stickyColumnId && stickyLeft,
                   )}
                 >
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -171,7 +217,9 @@ export function RecordTable<T>({
             <tr className="h-8 border-t border-hairline">
               <td
                 colSpan={
-                  table.getVisibleLeafColumns().length + (addColumn ? 1 : 0)
+                  table.getVisibleLeafColumns().length +
+                  (addColumn ? 1 : 0) +
+                  (select ? 1 : 0)
                 }
                 className="px-2 align-middle"
               >
@@ -217,15 +265,48 @@ export function RecordTable<T>({
   )
 }
 
+/** One row's checkbox, shown on hover, focus, or while any row is checked. */
+function SelectCell({
+  checked,
+  visible,
+  name,
+  onChange,
+}: {
+  checked: boolean
+  visible: boolean
+  name: string
+  onChange: (on: boolean) => void
+}) {
+  return (
+    <td
+      onClick={(e) => e.stopPropagation()}
+      className="sticky left-0 z-10 w-8 bg-paper pl-2.5 align-middle transition-colors duration-150 ease-out-quart group-hover:bg-row-hover"
+    >
+      <Checkbox
+        checked={checked}
+        onCheckedChange={onChange}
+        aria-label={`Select ${name}`}
+        className={cn(
+          'group-hover:opacity-100 focus-visible:opacity-100',
+          checked || visible ? 'opacity-100' : 'opacity-0',
+        )}
+      />
+    </td>
+  )
+}
+
 function HeaderCell<T>({
   header,
   table,
   sticky,
+  stickyLeft,
   actions,
 }: {
   header: Header<T, unknown>
   table: Table<T>
   sticky: boolean
+  /** The pinned column's offset: after the checkbox lane, or the edge. */
+  stickyLeft: string
   actions: ReadonlyArray<ColumnAction>
 }) {
   const { column } = header
@@ -255,7 +336,8 @@ function HeaderCell<T>({
       }
       className={cn(
         'relative h-8 px-2 text-left align-middle label-caps text-graphite',
-        sticky && 'sticky left-0 z-20 bg-paper',
+        sticky && 'sticky z-20 bg-paper',
+        sticky && stickyLeft,
       )}
     >
       {column.getCanSort() || column.getCanHide() || actions.length > 0 ? (
@@ -378,6 +460,7 @@ export function TableToolbar<T>({
   total,
   shown,
   children,
+  selectionBar,
 }: {
   table: Table<T>
   filter: string
@@ -392,78 +475,87 @@ export function TableToolbar<T>({
   shown: number
   /** Surface-specific controls (e.g. the deals stage chips). */
   children?: ReactNode
+  /**
+   * The `SelectionBar` while rows are checked: it takes the filter line's
+   * place, its 44px overhanging the line's 32 so nothing below moves.
+   */
+  selectionBar?: ReactNode
 }) {
   const hideable = table.getAllLeafColumns().filter((c) => c.getCanHide())
   const hiddenCount = hideable.filter((c) => !c.getIsVisible()).length
 
   return (
     <div className="mt-4 flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          value={filter}
-          onChange={(e) => onFilterChange(e.target.value)}
-          placeholder={filterPlaceholder}
-          aria-label={filterLabel}
-          className="h-8 max-w-xs text-ui"
-        />
+      {selectionBar ? (
+        <div className="relative z-20 -my-1.5">{selectionBar}</div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={filter}
+            onChange={(e) => onFilterChange(e.target.value)}
+            placeholder={filterPlaceholder}
+            aria-label={filterLabel}
+            className="h-8 max-w-xs text-ui"
+          />
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="text-ui">
-              <Columns3 className="size-3.5" strokeWidth={1.75} />
-              Columns
-              {hiddenCount > 0 ? (
-                <span className="tabular text-graphite">
-                  {hideable.length - hiddenCount}/{hideable.length}
-                </span>
-              ) : null}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            className="max-h-80 w-60 overflow-y-auto p-0"
-          >
-            <div className="flex h-8 items-center justify-between border-b border-rule px-2.5">
-              <DropdownMenuLabel className="p-0 field-label leading-4 text-foreground">
-                Columns · {hideable.length - hiddenCount} of {hideable.length}
-              </DropdownMenuLabel>
-              {hiddenCount > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => table.resetColumnVisibility()}
-                  className="focus-ring mono text-field text-graphite hover:text-foreground"
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="text-ui">
+                <Columns3 className="size-3.5" strokeWidth={1.75} />
+                Columns
+                {hiddenCount > 0 ? (
+                  <span className="tabular text-graphite">
+                    {hideable.length - hiddenCount}/{hideable.length}
+                  </span>
+                ) : null}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="max-h-80 w-60 overflow-y-auto p-0"
+            >
+              <div className="flex h-8 items-center justify-between border-b border-rule px-2.5">
+                <DropdownMenuLabel className="p-0 field-label leading-4 text-foreground">
+                  Columns · {hideable.length - hiddenCount} of {hideable.length}
+                </DropdownMenuLabel>
+                {hiddenCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => table.resetColumnVisibility()}
+                    className="focus-ring mono text-field text-graphite hover:text-foreground"
+                  >
+                    reset
+                  </button>
+                ) : null}
+              </div>
+              {hideable.map((c) => (
+                <DropdownMenuCheckboxItem
+                  key={c.id}
+                  checked={c.getIsVisible()}
+                  onCheckedChange={(v) => c.toggleVisibility(Boolean(v))}
                 >
-                  reset
-                </button>
-              ) : null}
-            </div>
-            {hideable.map((c) => (
-              <DropdownMenuCheckboxItem
-                key={c.id}
-                checked={c.getIsVisible()}
-                onCheckedChange={(v) => c.toggleVisibility(Boolean(v))}
-              >
-                {typeof c.columnDef.header === 'string'
-                  ? c.columnDef.header
-                  : c.id}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+                  {typeof c.columnDef.header === 'string'
+                    ? c.columnDef.header
+                    : c.id}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-        {/* A bare "3" reads as an unlabelled artefact; the count says what it
+          {/* A bare "3" reads as an unlabelled artefact; the count says what it
             counts, and only says "of N" once a filter is actually hiding rows. */}
-        <output className="ml-auto text-label whitespace-nowrap text-graphite">
-          <span className="tabular">{shown}</span>
-          {shown === total ? null : (
-            <>
-              {' of '}
-              <span className="tabular">{total}</span>
-            </>
-          )}
-          {` ${total === 1 ? noun.one : noun.many}`}
-        </output>
-      </div>
+          <output className="ml-auto text-label whitespace-nowrap text-graphite">
+            <span className="tabular">{shown}</span>
+            {shown === total ? null : (
+              <>
+                {' of '}
+                <span className="tabular">{total}</span>
+              </>
+            )}
+            {` ${total === 1 ? noun.one : noun.many}`}
+          </output>
+        </div>
+      )}
 
       {children ? (
         <div className="flex flex-wrap items-center gap-2">{children}</div>

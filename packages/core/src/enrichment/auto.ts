@@ -58,6 +58,8 @@ export const enrichmentRunData = z.object({
   trigger: z.enum(DOMAIN_EVENTS).optional(),
   /** Set on a parked run: the source whose daily cap it waits out. */
   parkedBy: z.uuid().optional(),
+  /** Sent from a list's Enrich…: parks at a cap like an auto run. */
+  bulk: z.literal(true).optional(),
 })
 export type EnrichmentRunData = z.infer<typeof enrichmentRunData>
 

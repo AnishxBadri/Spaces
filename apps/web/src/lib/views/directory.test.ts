@@ -375,3 +375,27 @@ describe('Email, Domains and LinkedIn on /people and /companies', () => {
     expect(companyPage.rows[0].values.domains).toEqual([`orbit-${tag}.example`])
   })
 })
+
+describe('listIdsProgram — what the list head’s Enrich… runs over', () => {
+  it('takes the view’s conditions and text box, at most `max`, with the whole count', async () => {
+    const { Effect } = await import('effect')
+    const { listIdsProgram, listCompaniesPageProgram } =
+      await import('./directory')
+    const { slug, inId, outId } = await stageAttribute('company')
+    const { tag } = await companies(slug, inId, outId)
+
+    const narrowed: Array<Condition> = [{ slug, op: 'is', value: inId }]
+    const some = await Effect.runPromise(
+      listIdsProgram('company', narrowed, tag, 1000),
+    )
+    const page = await Effect.runPromise(
+      listCompaniesPageProgram(narrowed, { q: tag, limit: 50 }),
+    )
+    expect(some.total).toBe(5)
+    expect([...some.ids].sort()).toEqual(page.rows.map((r) => r.id).sort())
+
+    const cut = await Effect.runPromise(listIdsProgram('company', [], tag, 10))
+    expect(cut.ids).toHaveLength(10)
+    expect(cut.total).toBe(25)
+  })
+})

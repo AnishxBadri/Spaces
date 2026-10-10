@@ -25,8 +25,9 @@ import { CLIP_MAX_BYTES, CLIP_TIMEOUT_MS } from './clip-document'
  * enrichment.run — one record enriched from the owner's sources in order
  * (D76). The summary is the run's timeline line in short, or why nothing
  * was asked, and when it parked for a source's daily cap.
- * - An auto run carries its trigger and the sources in scope; the Enrich
- *   button sends neither and asks every source.
+ * - An auto run carries its trigger and the sources in scope, a list's
+ *   Enrich… the sources that pass its checks and `bulk`; the Enrich button
+ *   sends none of them and asks every source.
  */
 
 const summaryOf = (outcome: RunOutcome): string => {
@@ -112,5 +113,6 @@ export const enrichmentRun: JobDef<
     runEnrichment(data.entityId, data.reason, {
       ...(data.sources === undefined ? {} : { only: data.sources }),
       ...(data.trigger === undefined ? {} : { trigger: data.trigger }),
+      ...(data.bulk === undefined ? {} : { bulk: data.bulk }),
     }).pipe(Effect.map(summaryOf)),
 }

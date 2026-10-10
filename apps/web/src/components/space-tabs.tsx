@@ -14,6 +14,7 @@ import { Button } from './ui/button'
 import { Checkbox } from './ui/checkbox'
 import { Select } from './ui/select'
 import { Tabs } from './ui/tabs'
+import { SelectionBar } from './table/selection-bar'
 import type { TabItem } from './ui/tabs'
 import {
   COMPANY_SORTS,
@@ -199,10 +200,10 @@ function FilterRow({
 }
 
 /**
- * The selection bar: the filter row's 44px on bone while a row is checked —
- * the count, the subspace to move into, and Move here as the one pine verb.
+ * Move here's selection bar, in place of the filter row: the subspace to
+ * move into, and Move here as the one pine verb.
  */
-function SelectionBar({
+function MoveBar({
   count,
   subspaces,
   target,
@@ -218,13 +219,7 @@ function SelectionBar({
   onMove: () => void
 }) {
   return (
-    <div
-      role="toolbar"
-      aria-label="Selected companies"
-      data-selection-bar
-      className="flex h-11 items-center gap-3 border-b border-rule bg-bone px-3"
-    >
-      <span className="tabular shrink-0 mono text-label">{count} selected</span>
+    <SelectionBar label="Selected companies" count={count}>
       <span className="shrink-0 text-ui text-graphite">into</span>
       <Select
         aria-label="Subspace to move into"
@@ -239,7 +234,7 @@ function SelectionBar({
       <Button size="sm" disabled={target === null || busy} onClick={onMove}>
         Move here
       </Button>
-    </div>
+    </SelectionBar>
   )
 }
 
@@ -367,7 +362,7 @@ function CompaniesTab({ spc, into }: { spc: Space; into: string | null }) {
   return (
     <div className="flex flex-col">
       {chosen.length > 0 ? (
-        <SelectionBar
+        <MoveBar
           count={chosen.length}
           subspaces={spc.children}
           target={target}

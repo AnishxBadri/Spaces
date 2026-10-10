@@ -2,6 +2,7 @@ import { Effect, Schema } from 'effect'
 import {
   and,
   asc,
+  desc,
   eq,
   exists,
   ilike,
@@ -199,11 +200,9 @@ async function spacesFor(
  * `listScope(kind)`, shared with the view chips' counts (SPA-162); `search`
  * is how its text box narrows. Everything else is the pager.
  */
-const pageOfKind = Effect.fn('pageOfKind')(function* (
+/** The kind's live registry, as the conditions and the sort resolve against it. */
+const resolverOf = Effect.fn('resolverOf')(function* (
   kind: 'company' | 'person' | 'deal',
-  search: (q: string) => SQL | undefined,
-  conditions: Array<Condition>,
-  options: ListPageOptions,
 ) {
   const objectId = yield* objectIdForKind(kind)
   // Live attributes only: an archived slug resolves to null and its
@@ -216,20 +215,38 @@ const pageOfKind = Effect.fn('pageOfKind')(function* (
         and(eq(attribute.objectId, objectId), eq(attribute.archived, false)),
       ),
   )
-  const resolve = entityValuesResolver(registry)
-  const plan = planSort(options.sort, resolve)
-  const limit = clampLimit(options.limit)
-  const q = (options.q ?? '').trim()
+  return entityValuesResolver(registry)
+})
 
-  // Everything the reader asked for, cursor excluded: the page is a window
-  // onto this set, and `total` is how big it is. The text box narrows, so it
-  // narrows the count too — "12 of 20,000" when twelve is the whole truth is
-  // two lies in one line.
-  const matching = and(
+/**
+ * Everything the reader asked for, cursor excluded: the page is a window
+ * onto this set, and `total` is how big it is. The text box narrows, so it
+ * narrows the count too.
+ */
+const matchingOf = (
+  kind: 'company' | 'person' | 'deal',
+  resolve: ReturnType<typeof entityValuesResolver>,
+  search: (q: string) => SQL | undefined,
+  conditions: Array<Condition>,
+  q: string,
+) =>
+  and(
     listScope({ kind }),
     compileConditions(conditions, resolve),
     q ? search(q) : undefined,
   )
+
+const pageOfKind = Effect.fn('pageOfKind')(function* (
+  kind: 'company' | 'person' | 'deal',
+  search: (q: string) => SQL | undefined,
+  conditions: Array<Condition>,
+  options: ListPageOptions,
+) {
+  const resolve = yield* resolverOf(kind)
+  const plan = planSort(options.sort, resolve)
+  const limit = clampLimit(options.limit)
+  const q = (options.q ?? '').trim()
+  const matching = matchingOf(kind, resolve, search, conditions, q)
   const cursor = options.cursor ? decodeCursor(options.cursor) : null
 
   const page = yield* query(() =>
@@ -261,6 +278,42 @@ const pageOfKind = Effect.fn('pageOfKind')(function* (
     total: counted.at(0)?.total ?? 0,
     ids: rows.map((r) => r.id),
   }
+})
+
+/**
+ * The ids a list's view holds — its conditions and its text box — newest
+ * first, at most `max`, with the whole count: what the list's `···` Enrich…
+ * runs over.
+ */
+export const listIdsProgram = Effect.fn('listIdsProgram')(function* (
+  kind: 'company' | 'person',
+  conditions: Array<Condition>,
+  q: string,
+  max: number,
+) {
+  const resolve = yield* resolverOf(kind)
+  const matching = matchingOf(
+    kind,
+    resolve,
+    (text) => nameOrAlias(kind === 'company' ? 'domain' : 'email', text),
+    conditions,
+    q.trim(),
+  )
+  const rows = yield* query(() =>
+    db
+      .select({ id: entity.id })
+      .from(entity)
+      .where(matching)
+      .orderBy(desc(entity.createdAt), asc(entity.id))
+      .limit(max),
+  )
+  const counted = yield* query(() =>
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(entity)
+      .where(matching),
+  )
+  return { ids: rows.map((r) => r.id), total: counted.at(0)?.total ?? 0 }
 })
 
 /**

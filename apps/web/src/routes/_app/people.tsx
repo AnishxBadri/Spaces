@@ -45,6 +45,7 @@ import {
 import { PageHeader } from '#/components/page-header'
 import { ImportAction } from '#/components/import/import-action'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
+import { useListEnrich } from '#/components/table/bulk-enrich-dialog'
 import { statColumns } from '#/components/table/stat-columns'
 import { INTERACTION_STAT_FILTERS } from '#/lib/views/stat-fields'
 import { Button } from '#/components/ui/button'
@@ -226,6 +227,14 @@ function PeoplePage() {
     void router.invalidate()
     void queryClient.invalidateQueries({ queryKey: ['people-records'] })
   }, [router, queryClient])
+  // Enrich… from the selection bar or the head's ···, behind an estimate. (D76)
+  const enrich = useListEnrich({
+    kind: 'person',
+    label: 'People',
+    rows,
+    view: { conditions: vs.conditions, q },
+    refresh,
+  })
   const selectView = (id: string | null) =>
     void navigate({ to: '/people', search: id === null ? {} : { view: id } })
 
@@ -335,6 +344,7 @@ function PeoplePage() {
           <>
             <ImportAction objectSlug="people" />
             <CreatePersonDialog companies={companies} registry={registry} />
+            {enrich.menu}
           </>
         }
       />
@@ -360,6 +370,7 @@ function PeoplePage() {
               noun={{ one: 'person', many: 'people' }}
               total={total}
               shown={rows.length}
+              selectionBar={enrich.selectionBar}
             >
               <ViewBar
                 objectId={objectId}
@@ -386,6 +397,7 @@ function PeoplePage() {
                 columnActions={columnRun.columnActions}
                 table={table}
                 label="People"
+                select={enrich.select}
                 stickyColumnId="name"
                 page={{
                   total,
@@ -407,6 +419,7 @@ function PeoplePage() {
           </>
         )}
       </div>
+      {enrich.dialog}
     </div>
   )
 }

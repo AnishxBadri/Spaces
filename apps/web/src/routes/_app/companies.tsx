@@ -39,6 +39,7 @@ import {
 import { PageHeader } from '#/components/page-header'
 import { ImportAction } from '#/components/import/import-action'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
+import { useListEnrich } from '#/components/table/bulk-enrich-dialog'
 import { statColumns } from '#/components/table/stat-columns'
 import { INTERACTION_STAT_FILTERS } from '#/lib/views/stat-fields'
 import { RECORD_PAGE_SIZE } from '#/lib/views/page-size'
@@ -212,6 +213,14 @@ function CompaniesPage() {
     void router.invalidate()
     void queryClient.invalidateQueries({ queryKey: ['company-records'] })
   }, [router, queryClient])
+  // Enrich… from the selection bar or the head's ···, behind an estimate. (D76)
+  const enrich = useListEnrich({
+    kind: 'company',
+    label: 'Companies',
+    rows,
+    view: { conditions: vs.conditions, q },
+    refresh,
+  })
   const selectView = (id: string | null) =>
     void navigate({
       to: '/companies',
@@ -346,6 +355,7 @@ function CompaniesPage() {
           <>
             <ImportAction objectSlug="companies" />
             <CreateCompanyDialog registry={registry} />
+            {enrich.menu}
           </>
         }
       />
@@ -380,6 +390,7 @@ function CompaniesPage() {
               noun={{ one: 'company', many: 'companies' }}
               total={total}
               shown={rows.length}
+              selectionBar={enrich.selectionBar}
             >
               <ViewBar
                 objectId={objectId}
@@ -406,6 +417,7 @@ function CompaniesPage() {
                 columnActions={columnRun.columnActions}
                 table={table}
                 label="Companies"
+                select={enrich.select}
                 stickyColumnId="name"
                 page={{
                   total,
@@ -427,6 +439,7 @@ function CompaniesPage() {
           </>
         )}
       </div>
+      {enrich.dialog}
     </div>
   )
 }

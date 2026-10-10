@@ -52,8 +52,8 @@ import { askWebsite, websiteFor } from './website'
  *   unless a skip carries a timeline line (the Website on a sensitive record).
  * - A record with no picture that no person held is asked for one too; the
  *   first answer is fetched and stored before `applyRun` sets it.
- * - An auto run (`trigger` set) whose source refused at its daily cap
- *   re-queues for that source at the next 00:00 UTC: parked, never dropped.
+ * - An auto or bulk run whose source refused at its daily cap re-queues
+ *   for that source at the next 00:00 UTC: parked, never dropped.
  */
 
 /** Parked: the run queued again for the capped sources, after the reset. */
@@ -71,6 +71,8 @@ export type RunOptions = {
   readonly only?: ReadonlyArray<string>
   /** The domain event that queued an auto run. */
   readonly trigger?: DomainEventName
+  /** Queued from a list's Enrich…; parks at a cap like an auto run. */
+  readonly bulk?: true
 }
 
 const reasonOf = (error: JobError) => `${error._tag}: ${error.reason}`
@@ -152,18 +154,25 @@ const creditsSince = (integrationId: string, entityId: string, since: Date) =>
       ).at(0)?.spent ?? 0,
   )
 
-/** Re-queue an auto run for the sources its daily cap refused. */
+/** Re-queue an auto or bulk run for the sources its daily cap refused. */
 const park = Effect.fn('enrichment.park')(function* (
   entityId: string,
   reason: string,
-  trigger: DomainEventName,
+  carried: Pick<RunOptions, 'trigger' | 'bulk'>,
   capped: ReadonlyArray<string>,
 ) {
   const by = capped.at(0)
   if (by === undefined) return null
   const startAfter = nextUtcMidnight(new Date(yield* Clock.currentTimeMillis))
   yield* sendRun(
-    { entityId, reason, sources: [...capped], trigger, parkedBy: by },
+    {
+      entityId,
+      reason,
+      sources: [...capped],
+      ...(carried.trigger === undefined ? {} : { trigger: carried.trigger }),
+      ...(carried.bulk === undefined ? {} : { bulk: carried.bulk }),
+      parkedBy: by,
+    },
     startAfter,
   )
   return { by, startAfter: startAfter.toISOString() }
@@ -273,9 +282,9 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
     s.skipped !== undefined && isCapRefusal(s.skipped) ? [s.integrationId] : [],
   )
   const parked =
-    options.trigger === undefined
+    options.trigger === undefined && options.bulk === undefined
       ? null
-      : yield* park(entityId, reason, options.trigger, capped)
+      : yield* park(entityId, reason, options, capped)
   if (!ran.some((s) => s.skipped === undefined || s.line !== undefined))
     return {
       ran: false,
