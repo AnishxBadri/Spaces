@@ -24,6 +24,7 @@ export type SetupPath =
   | '/settings/models'
   | '/settings/members'
   | '/settings/plugins'
+  | '/settings/enrichment'
   | '/settings/email-forwarding'
   | '/settings/email-calendar'
   | '/settings/meeting-notes'
@@ -52,7 +53,7 @@ export const SETUP_ITEMS: ReadonlyArray<SetupItem> = [
     id: 'enrichment',
     label: 'Enrichment',
     unlocks: 'Company fields filled from the web',
-    to: '/settings/plugins',
+    to: '/settings/enrichment',
   },
   {
     id: 'forwarding',

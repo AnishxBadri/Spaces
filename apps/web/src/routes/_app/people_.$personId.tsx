@@ -44,6 +44,7 @@ import {
   createNote,
   getEntitySensitivity,
   getPerson,
+  getRecordEnrichment,
   getRecordTimeline,
   listRecordActions,
   listRecordDocuments,
@@ -67,6 +68,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       waiting,
       sensitivity,
       pluginActions,
+      enrichment,
     ] = await Promise.all([
       getPerson({ data: { id: params.personId } }),
       listSpaces(),
@@ -77,6 +79,9 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       countOpenSuggestions({ data: { entityId: params.personId } }),
       getEntitySensitivity({ data: { entityId: params.personId } }),
       listRecordActions({ data: { kind: 'person' } }),
+      getRecordEnrichment({
+        data: { entityId: params.personId, kind: 'person' },
+      }),
     ])
     if (personData.mergedIntoId) {
       throw redirect({
@@ -94,6 +99,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       waiting,
       sensitivity,
       pluginActions,
+      enrichment,
     }
   },
   component: PersonRecordPage,
@@ -110,6 +116,7 @@ function PersonRecordPage() {
     waiting,
     sensitivity,
     pluginActions,
+    enrichment,
   } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
@@ -165,7 +172,11 @@ function PersonRecordPage() {
           <>
             <SensitiveToggle entityId={person.id} state={sensitivity} />
             <SummarizeRecordButton recordId={person.id} />
-            <PluginActions entityId={person.id} actions={pluginActions} />
+            <PluginActions
+              entityId={person.id}
+              actions={pluginActions}
+              enrich={enrichment}
+            />
             <LogInteractionDialog
               seed={{ id: person.id, name: person.name, kind: 'person' }}
               hotkey="l"
@@ -276,6 +287,8 @@ function PersonRecordPage() {
                 def={def}
                 attr={def}
                 objectLabel={'person'}
+                fillFrom="person"
+                whereFrom={enrichment.whereFrom[def.slug]}
                 onAttributeSaved={() => router.invalidate()}
                 value={person.values[def.slug] ?? null}
                 refNames={person.refNames}

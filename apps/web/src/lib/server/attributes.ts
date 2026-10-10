@@ -149,6 +149,8 @@ export const updateAttributeInput = z.object({
        * null clears. The mode is checked against the type by the program.
        */
       ai: aiConfigInput.nullable().optional(),
+      /** "Fill from" (D76): the vocabulary key to link; null unlinks. Checked by the program. */
+      enrichmentKey: z.string().trim().min(1).max(80).nullable().optional(),
     })
     .optional(),
 })

@@ -53,6 +53,7 @@ const MAP: ReadonlyArray<
     'Integrations',
     [
       ['Plugins', '/settings/plugins'],
+      ['Enrichment', '/settings/enrichment'],
       ['Email forwarding', '/settings/email-forwarding'],
       ['Connection apps', '/settings/connection-apps'],
     ],
@@ -187,6 +188,7 @@ describe('the settings nav grammar', () => {
       'Models',
       'Search',
       'Plugins',
+      'Enrichment',
       'Email forwarding',
       'Connection apps',
     ])

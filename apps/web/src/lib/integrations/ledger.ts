@@ -15,6 +15,7 @@ import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
   accountConnection,
+  attribute,
   credential,
   enrichmentRecord,
   entity,
@@ -31,6 +32,9 @@ import {
 } from '@spaces/core/plugins/auto-enrich'
 import type { AutoEnrichScopeName } from '@spaces/core/plugins/auto-enrich'
 import { updateFor } from '@spaces/core/plugins/registry'
+import { answersOf, fillableCount } from '@spaces/core/enrichment/page'
+import { enrichActionFor } from '@spaces/core/enrichment/settings'
+import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
 import { webhookSecretProvider } from '@spaces/core/writes/ingress/receive'
 import { MISSING_SETTINGS } from '@spaces/core/writes/ports/config'
 import { manifestSchema, satisfiesSdk } from '@spaces/sdk'
@@ -317,7 +321,7 @@ export const hasEventJob = (manifest: Manifest | null): boolean =>
   Object.values(manifest.jobs).some((job) => job.trigger === 'event')
 
 /** Every live space, labelled `Fintech / Payments`, in path order. */
-const spaceOptions = query(async () => {
+export const spaceOptions = query(async () => {
   const rows = await db
     .select({
       id: space.entityId,
@@ -338,6 +342,43 @@ const spaceOptions = query(async () => {
         .join(' / '),
     }
   })
+})
+
+/** Whether a plugin answers Enrich on a company or a person: an enrichment source. (D76) */
+export const enrichesRecords = (manifest: Manifest | null): boolean =>
+  enrichActionFor(manifest, 'company') !== null ||
+  enrichActionFor(manifest, 'person') !== null
+
+/**
+ * The host-owned settings an enrichment source's page leaves to the
+ * Enrichment page: the reuse window there replaces its `cacheDays`. (D81)
+ */
+const ENRICHMENT_PAGE_KEYS: ReadonlySet<string> = new Set(['cacheDays'])
+
+/** How many live linked attributes a source can fill: its "can fill n fields". */
+const fillableOf = Effect.fn('fillableOf')(function* (manifest: Manifest) {
+  let n = 0
+  for (const kind of ['company', 'person'] as const) {
+    const answers = answersOf(manifest, kind)
+    if (answers.size === 0) continue
+    const objectId = yield* query(() => objectIdForKindAsync(kind))
+    const rows = yield* query(() =>
+      db
+        .select({ options: attribute.options })
+        .from(attribute)
+        .where(
+          and(eq(attribute.objectId, objectId), eq(attribute.archived, false)),
+        ),
+    )
+    n += fillableCount(
+      rows.flatMap((r) => {
+        const key = r.options.enrichmentKey
+        return typeof key === 'string' ? [key] : []
+      }),
+      answers,
+    )
+  }
+  return n
 })
 
 const fixOf = (row: Row, manifest: Manifest | null): string | null => {
@@ -615,11 +656,19 @@ export const integrationDetailProgram = Effect.fn('integrationDetailProgram')(
           }
         : settingsFormOf(manifest.settings)
     const scoped = hasEventJob(manifest)
-    // An older bundle's on/off switch is the scope's now: not drawn twice.
-    const form: SettingsForm =
-      drawn.ok && scoped
-        ? { ok: true, fields: drawn.fields.filter((f) => f.key !== LEGACY_KEY) }
-        : drawn
+    const enriches = enrichesRecords(manifest)
+    // An older bundle's on/off switch is the scope's now, and an enrichment
+    // source's reuse window and scope are the Enrichment page's: not drawn twice.
+    const form: SettingsForm = drawn.ok
+      ? {
+          ok: true,
+          fields: drawn.fields.filter(
+            (f) =>
+              !(scoped && f.key === LEGACY_KEY) &&
+              !(enriches && ENRICHMENT_PAGE_KEYS.has(f.key)),
+          ),
+        }
+      : drawn
     const scope = autoEnrichScopeOf(row.config)
     const runs = yield* query(() =>
       db
@@ -642,7 +691,10 @@ export const integrationDetailProgram = Effect.fn('integrationDetailProgram')(
       ...view,
       description: manifest?.description ?? null,
       sends: sendsOf(manifest),
-      capabilities: capabilitiesOf(manifest),
+      capabilities: capabilitiesOf(
+        manifest,
+        manifest !== null && enriches ? yield* fillableOf(manifest) : null,
+      ),
       runs: runs.map((r) => ({
         id: r.id,
         job: jobOfQueue(r.queue),
@@ -659,13 +711,14 @@ export const integrationDetailProgram = Effect.fn('integrationDetailProgram')(
       values: form.ok ? formValuesOf(form.fields, row.config) : {},
       secrets,
       webhookUrl: webhookUrlOf(manifest, row.id),
-      autoEnrichForm: scoped
-        ? {
-            scopes: scope.scopes,
-            spaces: scope.spaces,
-            options: yield* spaceOptions,
-          }
-        : null,
+      autoEnrichForm:
+        scoped && !enriches
+          ? {
+              scopes: scope.scopes,
+              spaces: scope.spaces,
+              options: yield* spaceOptions,
+            }
+          : null,
     }
   },
 )

@@ -166,8 +166,8 @@ describe('PluginTemplate', () => {
   it('links each capability to its owning page and holds no control of its own', () => {
     const on = block(render(apollo), 'switches-on')
     expect(on).toContain('Fills company fields')
-    expect(on).toContain('href="/settings/plugins"')
-    expect(on).toContain('Enrichment · coming ›')
+    expect(on).toContain('href="/settings/enrichment')
+    expect(on).toContain('What fills what ›')
     expect(on).not.toMatch(/<(input|button|select)/)
     expect(block(render(rss), 'switches-on')).toContain('href="/spaces"')
     expect(block(render(unread), 'switches-on')).toContain('Nothing elsewhere.')

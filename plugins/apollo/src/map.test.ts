@@ -8,6 +8,7 @@ import {
   organizationEnrichment,
   personEnrichment,
 } from './map.ts'
+import { manifest } from './manifest.ts'
 import { fixture, fixtureNames, fixtureText } from './test-fixtures.ts'
 
 /** Pure: Apollo's JSON in, port arguments out — no database, no ports. */
@@ -328,5 +329,29 @@ describe('the fixtures', () => {
     })
     expect(names.filter((k) => KEYISH.test(k))).toEqual([])
     expect(fixtureText(name)).not.toMatch(/x-api-key/i)
+  })
+})
+
+describe('the manifest’s answers', () => {
+  const declared = (on: 'company' | 'person') =>
+    manifest.actions.find((a) => a.on === on)?.answers ?? []
+
+  it('names every key the mappings answer, each of its own kind', () => {
+    const company = Object.keys(
+      answersOf(organizationEnrichment('e', fixture('organization.json'))),
+    )
+    const person = Object.keys(
+      answersOf(
+        personEnrichment('e', fixture('person-keyhold.json'), undefined, {
+          phone: true,
+        }),
+      ),
+    )
+    for (const key of company) expect(declared('company')).toContain(key)
+    for (const key of person) expect(declared('person')).toContain(key)
+    expect(declared('company').every((k) => k.startsWith('company.'))).toBe(
+      true,
+    )
+    expect(declared('person').every((k) => k.startsWith('person.'))).toBe(true)
   })
 })

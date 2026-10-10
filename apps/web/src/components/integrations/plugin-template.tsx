@@ -32,9 +32,14 @@ export type PluginBlockId = (typeof PLUGIN_BLOCKS)[number]
 /**
  * The page that owns each capability. An owner not built yet links to the
  * catalogue and says so; its entry is the one line to change when it lands.
+ * Enrichment links to its What fills what grid.
  */
 const OWNER = {
-  enrichment: { label: 'Enrichment · coming', to: '/settings/plugins' },
+  enrichment: {
+    label: 'What fills what',
+    to: '/settings/enrichment',
+    hash: 'what-fills-what',
+  },
   watching: { label: 'Watching · coming', to: '/spaces' },
   'email-calendar': {
     label: 'Email & calendar',
@@ -44,7 +49,7 @@ const OWNER = {
   'meeting-notes': { label: 'Meeting notes', to: '/settings/meeting-notes' },
   import: { label: 'Import', to: '/import' },
 } as const satisfies {
-  readonly [O in CapabilityOwner]: { label: string; to: string }
+  readonly [O in CapabilityOwner]: { label: string; to: string; hash?: string }
 }
 
 const LINK =
@@ -205,7 +210,11 @@ function SwitchesOnBlock({ detail }: { detail: IntegrationDetail }) {
                 <span className="min-w-0 flex-1 truncate text-ui text-foreground">
                   {c.what}
                 </span>
-                <Link to={owner.to} className={LINK}>
+                <Link
+                  to={owner.to}
+                  {...('hash' in owner ? { hash: owner.hash } : {})}
+                  className={LINK}
+                >
                   {owner.label} ›
                 </Link>
               </li>

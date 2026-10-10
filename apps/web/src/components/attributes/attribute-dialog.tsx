@@ -46,6 +46,7 @@ import { ValueEditor } from './value-editor'
 import type { OptionDraft } from './option-list-editor'
 import type { RegistryEntry } from './value-editor'
 import { toObjectKind } from '@spaces/core/attributes/registry'
+import { keyWord, linkableKeys } from '@spaces/core/enrichment/link'
 import type {
   AttributeOptions,
   AttributeType,
@@ -187,6 +188,9 @@ const RELATIVE_PRESETS: Array<{ id: string; label: string }> = [
 const isDuration = (v: unknown): v is string =>
   typeof v === 'string' && /^P(?!$)/.test(v)
 
+/** The Fill from picker's "no key" value. */
+const NOT_LINKED = 'none'
+
 const TEXT_LIKE = new Set(['text', 'url', 'email', 'phone', 'domain'])
 const NUMBER_LIKE = new Set(['number', 'currency'])
 const OPTION_TYPES = new Set(['select', 'multi_select', 'status'])
@@ -229,6 +233,11 @@ type Props = {
   objectPlural?: string | undefined
   /** live attribute count — the head reads `19 → 20` on create */
   attributeCount?: number | undefined
+  /**
+   * The record kind whose enrichment vocabulary "Fill from" offers, in edit
+   * mode; absent draws no Fill from (a deal or a custom object). (D76)
+   */
+  fillFrom?: 'company' | 'person' | undefined
   onSaved: () => void
   trigger?: ReactNode
   open?: boolean
@@ -245,6 +254,7 @@ export function AttributeDialog(props: Props) {
     objectLabel,
     objectPlural,
     attributeCount,
+    fillFrom,
     onSaved,
     trigger,
     mode,
@@ -270,6 +280,7 @@ export function AttributeDialog(props: Props) {
             objectLabel={objectLabel ?? objectKind ?? 'record'}
             objectPlural={objectPlural}
             attributeCount={attributeCount}
+            fillFrom={fillFrom}
             mode={mode}
             attr={props.attr}
             onDone={(saved) => {
@@ -289,6 +300,7 @@ function AttributeForm({
   objectLabel,
   objectPlural,
   attributeCount,
+  fillFrom,
   mode,
   attr,
   onDone,
@@ -298,6 +310,7 @@ function AttributeForm({
   objectLabel: string
   objectPlural?: string | undefined
   attributeCount?: number | undefined
+  fillFrom?: 'company' | 'person' | undefined
   mode: 'create' | 'edit'
   attr?: EditableAttribute | undefined
   onDone: (saved: boolean) => void
@@ -355,6 +368,13 @@ function AttributeForm({
   // does not distinguish filtering a list from sorting it, and both want
   // the same btree — `attr_idx_<id>` on `(object_id, <the sort key>)`.
   const [indexed, setIndexed] = useState(attr?.filterable ?? false)
+  // "Fill from" (D76): the linked vocabulary key, or NOT_LINKED.
+  const storedKey = stored.enrichmentKey ?? NOT_LINKED
+  const [fillKey, setFillKey] = useState<string>(storedKey)
+  const fillKeys =
+    mode === 'edit' && fillFrom !== undefined
+      ? linkableKeys(type, fillFrom, stored.targetKind ?? null)
+      : []
   const [dflt, setDflt] = useState<unknown>(stored.default ?? null)
   const [relative, setRelative] = useState(isDuration(stored.default))
   const [error, setError] = useState<string | null>(null)
@@ -517,6 +537,9 @@ function AttributeForm({
               ...(JSON.stringify(dflt) !==
               JSON.stringify(stored.default ?? null)
                 ? { default: dflt }
+                : {}),
+              ...(fillKey !== storedKey
+                ? { enrichmentKey: fillKey === NOT_LINKED ? null : fillKey }
                 : {}),
             },
           },
@@ -796,6 +819,33 @@ function AttributeForm({
           </Field>
 
           {slot}
+
+          {fillKeys.length > 0 || storedKey !== NOT_LINKED ? (
+            <Field label="Fill from" htmlFor="attr-fill-from">
+              <Select
+                id="attr-fill-from"
+                value={fillKey}
+                onChange={setFillKey}
+                items={[
+                  { value: NOT_LINKED, label: 'Not linked' },
+                  ...[
+                    ...new Set([
+                      ...(storedKey === NOT_LINKED ? [] : [storedKey]),
+                      ...fillKeys,
+                    ]),
+                  ].map((key) => ({ value: key, label: keyWord(key) })),
+                ]}
+                width="content"
+                searchPlaceholder="Search keys…"
+                emptyLabel="No key matches."
+              />
+              <p className="mono text-field text-graphite">
+                {fillKey === NOT_LINKED
+                  ? 'enrichment never fills it'
+                  : `fills from ${fillKey}`}
+              </p>
+            </Field>
+          ) : null}
 
           {type === 'checkbox' ? null : (
             <Field label="Default" htmlFor="attr-default" optional>

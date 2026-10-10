@@ -23,11 +23,13 @@ import {
 import { isCapRefusal } from '@spaces/core/plugins/credit'
 import { EnrichmentSources } from '../../enrichment/sources'
 import type { AskResult } from '../../enrichment/sources'
+import { WEBSITE_SENSITIVE } from '../../enrichment/website'
 import type { WebsiteReader } from '../../enrichment/website'
 import type { Enqueue } from '../../queue/enqueue'
 import { enqueueEmbeds } from '../ai/enqueue-embed'
 import { EntityNotFound } from '../attributes/values'
 import { canonicalId } from '../entities/sweep'
+import { subjectSensitivity } from '../ports/ai'
 import type { ModelCall } from '../ports/ai'
 import { applyRun, holdingsOf, linksForEntity } from './apply'
 import { sendRun } from './auto'
@@ -44,6 +46,8 @@ import { askWebsite, websiteFor } from './website'
  *   `EnrichmentCollector`, not on the record.
  * - A source that fails or is declined is recorded in the receipt and the
  *   run goes on to the next.
+ * - A sensitive record asks no outside source: each is skipped, and the
+ *   timeline line says "sensitive".
  * - Nothing asked — no source, nothing wanted — writes nothing at all,
  *   unless a skip carries a timeline line (the Website on a sensitive record).
  * - A record with no picture that no person held is asked for one too; the
@@ -70,6 +74,13 @@ export type RunOptions = {
 }
 
 const reasonOf = (error: JobError) => `${error._tag}: ${error.reason}`
+
+/** An outside source's skip on a sensitive record, named on the timeline line. */
+const OUTSIDE_SENSITIVE: AskResult = {
+  asked: false,
+  reason: 'a sensitive record reaches only local sources',
+  line: WEBSITE_SENSITIVE,
+}
 
 const retryable = (what: string) => (cause: unknown) =>
   cause instanceof EntityNotFound
@@ -205,6 +216,12 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
   const sources =
     only === undefined ? ordered : ordered.filter((s) => only.includes(s.id))
   const asker = yield* EnrichmentSources
+  // A sensitive record never reaches an outside source: only the Website,
+  // read through a local route, may run. (D76)
+  const sensitive =
+    website?.sensitivity.sensitivity === 'sensitive' ||
+    (website === null &&
+      (yield* subjectSensitivity(entityId)).sensitivity === 'sensitive')
 
   const ran: Array<RunSource> = []
   const answers: Array<SourceAnswer> = []
@@ -222,10 +239,13 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
       answers: [],
     }
     const input = { entityId, kind, keys, reuseDays: settings.reuseDays }
+    const builtIn = website !== null && source.id === website.row.id
     const result = yield* (
-      website !== null && source.id === website.row.id
+      builtIn
         ? askWebsite(website, input)
-        : asker.ask(source.id, input)
+        : sensitive
+          ? Effect.succeed<AskResult>(OUTSIDE_SENSITIVE)
+          : asker.ask(source.id, input)
     ).pipe(
       Effect.provideService(EnrichmentCollector, collector),
       Effect.catch((error: JobError) =>

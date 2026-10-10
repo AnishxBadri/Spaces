@@ -49,6 +49,16 @@ export const TYPE_LABELS: Record<string, string> = {
   actor_reference: 'User',
 }
 
+/** The record kind whose vocabulary Fill from offers: Companies and People only. (D76) */
+const fillFromOf = (object: ObjectRow): 'company' | 'person' | undefined =>
+  !object.isSystem
+    ? undefined
+    : object.slug === 'companies'
+      ? 'company'
+      : object.slug === 'people'
+        ? 'person'
+        : undefined
+
 function moveItem<T>(list: Array<T>, from: number, to: number): Array<T> {
   if (to < 0 || to >= list.length || from === to) return list
   const next = [...list]
@@ -426,6 +436,7 @@ function AttributeRow({
         objectId={object.id}
         objectLabel={object.singular}
         objectPlural={object.plural}
+        fillFrom={fillFromOf(object)}
         open={editing}
         onOpenChange={setEditing}
         onSaved={() => router.invalidate()}

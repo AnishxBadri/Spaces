@@ -12,6 +12,8 @@ import {
   REJECT_LEAVE_MS,
 } from '#/components/record/record-parts'
 import type { RejectPhase } from '#/components/record/record-parts'
+import { WhereFromMark } from '#/components/record/where-from'
+import type { WhereFrom } from '#/lib/server-fns'
 
 /**
  * One labelled attribute in a record's property grid. A rejected write (a
@@ -35,6 +37,8 @@ export function RailField({
   objectLabel,
   onAttributeSaved,
   entityId,
+  fillFrom,
+  whereFrom,
 }: {
   def: RegistryEntry
   value: unknown
@@ -49,6 +53,10 @@ export function RailField({
    * its cell trigger beside the value, inside an `AiCellsProvider`.
    */
   entityId?: string | undefined
+  /** The record kind whose vocabulary the edit window's Fill from offers. */
+  fillFrom?: 'company' | 'person' | undefined
+  /** Where the value came from, when a source filled it (D76). */
+  whereFrom?: WhereFrom | undefined
 }) {
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -106,36 +114,58 @@ export function RailField({
           mode="edit"
           attr={attr}
           objectLabel={objectLabel}
+          fillFrom={fillFrom}
           open={editing}
           onOpenChange={setEditing}
           onSaved={() => onAttributeSaved?.()}
         />
       ) : null}
       <MaybeAiCell def={def} entityId={entityId}>
-        <ValueEditor
-          key={attempt}
-          def={def}
-          value={value}
-          variant="field"
-          refNames={refNames}
-          onSave={(v) => {
-            onSave(v).then(
-              () => {
-                setError(null)
-                setReject('rest')
-              },
-              (err: unknown) => {
-                const raw =
-                  err instanceof Error ? err.message : 'Could not save'
-                setError(raw.replace(new RegExp(`^${def.slug}: `), ''))
-                setAttempt((n) => n + 1)
-                setReject('hold')
-              },
-            )
-          }}
-        />
+        <WithWhereFrom label={def.name} from={whereFrom}>
+          <ValueEditor
+            key={attempt}
+            def={def}
+            value={value}
+            variant="field"
+            refNames={refNames}
+            onSave={(v) => {
+              onSave(v).then(
+                () => {
+                  setError(null)
+                  setReject('rest')
+                },
+                (err: unknown) => {
+                  const raw =
+                    err instanceof Error ? err.message : 'Could not save'
+                  setError(raw.replace(new RegExp(`^${def.slug}: `), ''))
+                  setAttempt((n) => n + 1)
+                  setReject('hold')
+                },
+              )
+            }}
+          />
+        </WithWhereFrom>
       </MaybeAiCell>
     </PropertyCell>
+  )
+}
+
+/** The value, then its where-from square when a source filled it. */
+function WithWhereFrom({
+  label,
+  from,
+  children,
+}: {
+  label: string
+  from: WhereFrom | undefined
+  children: ReactNode
+}) {
+  if (from === undefined) return children
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <div className="min-w-0 flex-1">{children}</div>
+      <WhereFromMark label={label} from={from} />
+    </div>
   )
 }
 

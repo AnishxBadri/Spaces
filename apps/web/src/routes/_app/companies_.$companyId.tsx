@@ -39,7 +39,7 @@ import { RecordContext } from '#/components/record-context'
 import { RecordLedger } from '#/components/record-timeline'
 import { WaitingRail } from '#/components/record/waiting-rail'
 import { SuggestSpacesAction } from '#/components/record/suggest-spaces'
-import { EnrichAction, PluginActions } from '#/components/record/plugin-actions'
+import { PluginActions } from '#/components/record/plugin-actions'
 import { CreateDealDialog } from '#/routes/_app/deals'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { jsonStrings } from '@spaces/core/json'
@@ -49,7 +49,7 @@ import {
   countOpenSuggestions,
   createNote,
   getCompany,
-  getEnrichSetup,
+  getRecordEnrichment,
   getEntitySensitivity,
   getRecordTimeline,
   listCompanyDeals,
@@ -78,7 +78,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       waiting,
       sensitivity,
       pluginActions,
-      enrichSetup,
+      enrichment,
     ] = await Promise.all([
       getCompany({ data: { id: params.companyId } }),
       listSpaces(),
@@ -91,7 +91,9 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       countOpenSuggestions({ data: { entityId: params.companyId } }),
       getEntitySensitivity({ data: { entityId: params.companyId } }),
       listRecordActions({ data: { kind: 'company' } }),
-      getEnrichSetup(),
+      getRecordEnrichment({
+        data: { entityId: params.companyId, kind: 'company' },
+      }),
     ])
     // Merged-away records redirect to their survivor — stale URLs keep working.
     if (companyData.mergedIntoId) {
@@ -112,7 +114,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       waiting,
       sensitivity,
       pluginActions,
-      enrichSetup,
+      enrichment,
     }
   },
   component: CompanyRecordPage,
@@ -131,7 +133,7 @@ function CompanyRecordPage() {
     waiting,
     sensitivity,
     pluginActions,
-    enrichSetup,
+    enrichment,
   } = Route.useLoaderData()
   const stageDef = dealRegistry.find((d) => d.slug === 'stage')
   const router = useRouter()
@@ -191,8 +193,11 @@ function CompanyRecordPage() {
           <>
             <SensitiveToggle entityId={company.id} state={sensitivity} />
             <SummarizeRecordButton recordId={company.id} />
-            <EnrichAction entityId={company.id} setup={enrichSetup} />
-            <PluginActions entityId={company.id} actions={pluginActions} />
+            <PluginActions
+              entityId={company.id}
+              actions={pluginActions}
+              enrich={enrichment}
+            />
             <LogInteractionDialog
               seed={{ id: company.id, name: company.name, kind: 'company' }}
               hotkey="l"
@@ -379,6 +384,8 @@ function CompanyRecordPage() {
                 def={def}
                 attr={def}
                 objectLabel={'company'}
+                fillFrom="company"
+                whereFrom={enrichment.whereFrom[def.slug]}
                 onAttributeSaved={() => router.invalidate()}
                 value={company.values[def.slug] ?? null}
                 onSave={async (v) => {

@@ -526,6 +526,21 @@ describe('enrichment.run', () => {
     })
     expect(await lines(co)).toHaveLength(1)
   })
+
+  it('asks no outside source for a sensitive record, and says so on the line', async () => {
+    const co = await company('Secret')
+    await db.update(entity).set({ sensitive: true }).where(eq(entity.id, co))
+    website.knows = { 'company.description': 'Hello' }
+    apollo.knows = { 'company.founded_year': 2019 }
+    const outcome = await run(co, [website, apollo])
+    expect(website.requests).toEqual([])
+    expect(apollo.requests).toEqual([])
+    expect(outcome.ran).toBe(true)
+    expect((await lines(co)).map((m) => m['line'])).toEqual([
+      'Website skipped · sensitive · Apollo skipped · sensitive',
+    ])
+    expect(await valuesOf(co)).not.toHaveProperty('founded')
+  })
 })
 
 describe('the record picture', () => {

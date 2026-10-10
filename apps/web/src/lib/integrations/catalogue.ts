@@ -125,8 +125,9 @@ const targetsOf = (manifest: Manifest) => [
 ]
 
 /**
- * What a plugin sends out of the box, read from the manifest's `requires`:
- * an enrichment source the lookup keys of the records it acts on, a search
+ * What a plugin sends out of the box, read from the manifest's `requires`
+ * and `roles`: an enrichment source (by its key or its role) the lookup
+ * keys of the records it acts on, a search
  * or model key the text it is handed, a connection nothing (it reads the
  * account). Empty until the worker has read the manifest.
  */
@@ -134,7 +135,10 @@ export function sendsOf(manifest: Manifest | null): ReadonlyArray<string> {
   if (manifest === null) return []
   const credential = manifest.requires?.credential
   const connection = manifest.requires?.connection
-  if (credential?.kind === 'enrichment') {
+  if (
+    credential?.kind === 'enrichment' ||
+    (manifest.roles ?? []).includes('enrichment')
+  ) {
     const targets = targetsOf(manifest)
     const keys = (
       targets.length === 0 ? (['company', 'person'] as const) : targets
@@ -174,9 +178,12 @@ const joinAnd = (words: ReadonlyArray<string>): string =>
 /**
  * What a plugin switches on elsewhere, one line per role, each owned by
  * another page. Never a setting: the plugin page links to the owner.
+ * - `fillable`: how many linked attributes an enrichment source can fill,
+ *   read by the caller; null when it was not counted.
  */
 export function capabilitiesOf(
   manifest: Manifest | null,
+  fillable: number | null = null,
 ): ReadonlyArray<Capability> {
   if (manifest === null) return []
   const targets = targetsOf(manifest)
@@ -184,7 +191,10 @@ export function capabilitiesOf(
     switch (role) {
       case 'enrichment':
         return {
-          what: `Fills ${targets.length === 0 ? 'record' : joinAnd(targets)} fields`,
+          what:
+            fillable === null
+              ? `Fills ${targets.length === 0 ? 'record' : joinAnd(targets)} fields`
+              : `Can fill ${plural(fillable, 'field', 'fields')}`,
           owner: 'enrichment',
         }
       case 'research':

@@ -47,6 +47,9 @@ const writes = vi.hoisted(() => ({
       revoke: 'kept',
     }),
   ),
+  saveEnrichmentOrder: vi.fn(async () => undefined),
+  saveEnrichmentAuto: vi.fn(async () => undefined),
+  saveEnrichmentReuse: vi.fn(async () => undefined),
 }))
 
 vi.mock('#/lib/server-fns', async (importOriginal) => ({
@@ -124,6 +127,7 @@ beforeAll(async () => {
     plugins: await import('#/routes/_app/settings/plugins'),
     'plugins/$integrationId':
       await import('#/routes/_app/settings/plugins_.$integrationId'),
+    enrichment: await import('#/routes/_app/settings/enrichment'),
     'email-forwarding': await import('#/routes/_app/settings/email-forwarding'),
     'connection-apps': await import('#/routes/_app/settings/connection-apps'),
   }
@@ -262,6 +266,92 @@ const pluginRow = {
   rollback: null,
 }
 
+const WEBSITE_ID = '00000000-0000-4000-8000-0000000000b1'
+const EXA_ID = '00000000-0000-4000-8000-0000000000b2'
+const ATTR_ID = '00000000-0000-4000-8000-0000000000d1'
+
+/** The Enrichment page: Website, then Apollo on, Exa off; Employees unlinked. */
+const enrichmentPage = {
+  readouts: { fieldsWeek: 41, creditsToday: 3, review: 1 },
+  sources: [
+    {
+      id: WEBSITE_ID,
+      name: 'Website',
+      builtIn: true,
+      sends: 'nothing out · free',
+      on: true,
+      runnable: true,
+      state: 'every new record',
+      integrationId: null,
+    },
+    {
+      id: PLUGIN_ID,
+      name: 'Apollo',
+      builtIn: false,
+      sends: 'domain · email · LinkedIn URL',
+      on: true,
+      runnable: true,
+      state: '3 / 100 credits today',
+      integrationId: PLUGIN_ID,
+    },
+    {
+      id: EXA_ID,
+      name: 'Exa',
+      builtIn: false,
+      sends: 'domain',
+      on: false,
+      runnable: true,
+      state: 'off',
+      integrationId: EXA_ID,
+    },
+  ],
+  auto: { scopes: ['deal'], spaces: [], options: [], paid: ['Apollo', 'Exa'] },
+  reuse: { days: 90, stored: false },
+  grids: [
+    {
+      kind: 'company',
+      label: 'Companies',
+      sources: [
+        { id: WEBSITE_ID, name: 'Website' },
+        { id: PLUGIN_ID, name: 'Apollo' },
+        { id: EXA_ID, name: 'Exa' },
+      ],
+      rows: [
+        {
+          id: '00000000-0000-4000-8000-0000000000d0',
+          slug: 'description',
+          name: 'Description',
+          description: null,
+          type: 'text',
+          options: { enrichmentKey: 'company.description' },
+          filterable: false,
+          isSystem: true,
+          key: 'company.description',
+          keyWord: 'description',
+          cells: ['fills', 'next', 'none'],
+          filledBy: 'Website',
+        },
+        {
+          id: ATTR_ID,
+          slug: 'employees',
+          name: 'Employees',
+          description: null,
+          type: 'number',
+          options: {},
+          filterable: false,
+          isSystem: false,
+          key: null,
+          keyWord: null,
+          cells: ['none', 'none', 'none'],
+          filledBy: null,
+        },
+      ],
+    },
+    { kind: 'person', label: 'People', sources: [], rows: [] },
+  ],
+  runs: [],
+}
+
 const loaders: Record<string, () => object> = {
   general: () => ({
     demo: { total: 8, byKind: { company: 3, person: 1, term: 3, note: 1 } },
@@ -367,6 +457,7 @@ const loaders: Record<string, () => object> = {
       runs: [],
     },
   }),
+  enrichment: () => ({ page: enrichmentPage }),
   'email-forwarding': () => ({
     settings: {
       mailbox: {
@@ -580,6 +671,7 @@ describe('a member on an admin page', () => {
     '/settings/search',
     '/settings/plugins',
     `/settings/plugins/${PLUGIN_ID}`,
+    '/settings/enrichment',
     '/settings/email-forwarding',
     '/settings/connection-apps',
   ])(
@@ -886,5 +978,62 @@ describe('the AI pages, as D81 splits them', () => {
     } finally {
       loaders.search = original
     }
+  })
+})
+
+describe('Integrations → Enrichment (D76)', () => {
+  const rows = () =>
+    Array.from(document.querySelectorAll('[data-block="sources"] li'))
+
+  it('lists the sources in the stored order with what each sends', async () => {
+    await mount('/settings/enrichment')
+    expect(rows().map((r) => r.getAttribute('data-source'))).toEqual([
+      'website',
+      'Apollo',
+      'Exa',
+    ])
+    const text = rows().map((r) => r.textContent)
+    expect(text[0]).toContain('built in')
+    expect(text[0]).toContain('sends nothing out · free')
+    expect(text[1]).toContain('sends domain · email · LinkedIn URL')
+    expect(text[2]).toContain('off')
+  })
+
+  it('writes the order at once: Apollo moved above the Website, Exa switched on', async () => {
+    await mount('/settings/enrichment')
+    await click(document.querySelector('button[aria-label="Move Apollo up"]'))
+    expect(writes.saveEnrichmentOrder).toHaveBeenLastCalledWith({
+      data: { ids: [PLUGIN_ID, WEBSITE_ID] },
+    })
+    await click(document.querySelector('button[aria-label="Ask Exa"]'))
+    expect(writes.saveEnrichmentOrder).toHaveBeenLastCalledWith({
+      data: { ids: [PLUGIN_ID, WEBSITE_ID, EXA_ID] },
+    })
+    expect(bar()?.getAttribute('data-shown')).toBe('false')
+  })
+
+  it('ticks a trigger at once, and collects the reuse days into the Save bar', async () => {
+    await mount('/settings/enrichment')
+    await click(document.querySelector('#auto-space'))
+    expect(writes.saveEnrichmentAuto).toHaveBeenCalledWith({
+      data: { scopes: ['deal', 'space'], spaces: [] },
+    })
+    await type(input('Re-use days'), '30')
+    expect(bar()?.textContent).toContain('1 change')
+    await click(saveControls().at(0))
+    expect(writes.saveEnrichmentReuse).toHaveBeenCalledWith({
+      data: { days: 30 },
+    })
+  })
+
+  it('shows which source fills each linked attribute, and an unlinked one as not linked with Fill from…', async () => {
+    await mount('/settings/enrichment')
+    const grid = document.querySelector('#what-fills-what')
+    const description = grid?.querySelector('[data-attribute="description"]')
+    expect(description?.querySelectorAll('[data-cell="fills"]')).toHaveLength(1)
+    const employees = grid?.querySelector('[data-attribute="employees"]')
+    expect(employees?.textContent).toContain('yours')
+    expect(employees?.textContent).toContain('not linked')
+    expect(byText('Fill from…', employees ?? document)).toBeDefined()
   })
 })

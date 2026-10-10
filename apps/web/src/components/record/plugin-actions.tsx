@@ -1,5 +1,6 @@
-import { useRouter } from '@tanstack/react-router'
+import { Link, useRouter } from '@tanstack/react-router'
 import { useEffect, useReducer, useState } from 'react'
+import type { ActionDispatch } from 'react'
 import { toast } from 'sonner'
 import { LedgerFigure } from '#/components/ledger-section'
 import { NeedsSetup } from '#/components/needs-setup'
@@ -15,7 +16,15 @@ import {
 } from '#/lib/integrations/job-status-view'
 import type { JobStatusState } from '#/lib/integrations/job-status-view'
 import { enrichRecord, fireRecordAction } from '#/lib/server-fns'
-import type { EnrichSetup, RecordAction, SetupAudience } from '#/lib/server-fns'
+import type {
+  LastRun,
+  RecordAction,
+  RecordEnrichment,
+  SetupAudience,
+} from '#/lib/server-fns'
+import { cn } from '#/lib/utils'
+import { askWords } from '@spaces/core/enrichment/link'
+import { QUEUES } from '@spaces/core/queue/names'
 import type { JobStatusEvent } from '@spaces/core/queue/job-status'
 import type { JobStatusRow } from '#/lib/integrations/job-status'
 
@@ -28,25 +37,49 @@ import type { JobStatusRow } from '#/lib/integrations/job-status'
  * - Firing reads pending at once; the status stream turns it into the
  *   outcome, and a reopened page or a reconnected stream reads `job_run`.
  *   No polling.
+ * - With `enrich`, the host's Enrich comes first and asks every source in
+ *   order, so a source's own Enrich action is not drawn beside it. (D76)
  */
 export function PluginActions({
   entityId,
   actions,
+  enrich,
 }: {
   entityId: string
   actions: ReadonlyArray<RecordAction>
+  /** The host's Enrich on a company or a person; absent elsewhere. */
+  enrich?: RecordEnrichView | undefined
 }) {
-  const { state: status, dispatch } = useJobStatus(entityId, actions.length > 0)
-  return actions.map((action) => (
-    <PluginActionButton
-      key={`${action.integrationId}:${action.actionId}`}
-      entityId={entityId}
-      action={action}
-      status={status}
-      onFired={() => dispatch({ kind: 'fired', queue: action.queue })}
-      onRefused={() => dispatch({ kind: 'refused', queue: action.queue })}
-    />
-  ))
+  const { state: status, dispatch } = useJobStatus(
+    entityId,
+    actions.length > 0 || enrich !== undefined,
+  )
+  const shown =
+    enrich === undefined
+      ? actions
+      : actions.filter((a) => !a.actionId.startsWith('enrich'))
+  return (
+    <>
+      {enrich === undefined ? null : (
+        <EnrichAction
+          entityId={entityId}
+          enrich={enrich}
+          status={status}
+          dispatch={dispatch}
+        />
+      )}
+      {shown.map((action) => (
+        <PluginActionButton
+          key={`${action.integrationId}:${action.actionId}`}
+          entityId={entityId}
+          action={action}
+          status={status}
+          onFired={() => dispatch({ kind: 'fired', queue: action.queue })}
+          onRefused={() => dispatch({ kind: 'refused', queue: action.queue })}
+        />
+      ))}
+    </>
+  )
 }
 
 type Action =
@@ -192,49 +225,96 @@ function PluginActionButton({
   )
 }
 
-/** What a company's Enrich asks, and who the reader is told to ask for more. */
-export type EnrichSetupView = EnrichSetup & { readonly audience: SetupAudience }
+/** A record's enrichment and who the reader is told to ask for more. */
+export type RecordEnrichView = RecordEnrichment & {
+  readonly audience: SetupAudience
+  readonly kind: 'company' | 'person'
+}
+
+const LINE_INK: { readonly [T in LastRun['tone'] | 'idle']: string } = {
+  done: 'text-primary',
+  muted: 'text-graphite',
+  warn: 'text-[var(--badge-amber-ink)]',
+  bad: 'text-destructive',
+  idle: 'text-graphite',
+}
+
+const ENRICH_QUEUE = QUEUES.enrichmentRun
+
+/** The Enrich line's words and ink: running, the last run, or what it will ask. */
+export function enrichLine(
+  enrich: RecordEnrichment,
+  running: boolean,
+): { words: string; tone: LastRun['tone'] | 'idle'; square: boolean } {
+  if (running)
+    return {
+      words: `${askWords(enrich.sources)}…`,
+      tone: 'muted',
+      square: true,
+    }
+  if (enrich.last !== null)
+    return { words: enrich.last.words, tone: enrich.last.tone, square: true }
+  if (enrich.sensitive)
+    return {
+      words: enrich.onlyFree
+        ? 'sensitive · Website only'
+        : 'sensitive · local sources only',
+      tone: 'warn',
+      square: true,
+    }
+  return { words: askWords(enrich.sources), tone: 'idle', square: false }
+}
 
 /**
- * A company's Enrich when only the free source is on (D80): the Website,
- * then "More sources ›" in place.
- * - With a plugin source runnable this draws nothing: its own action is in
- *   the head beside it.
- * - With no model the Website cannot read, so the line asks for one instead.
- * - "More sources" opens Plugins until the Enrichment page exists.
+ * The host's Enrich (D76, D80): one button that asks every source in the
+ * owner's order, and one mono line beside it — the sources it will ask
+ * ("Website, then Apollo"), then while it runs and how it went: done with
+ * counts, nothing blank, sensitive (local sources only), a source's limit
+ * reached with the reset, or the failure.
+ * - With only free sources on, "More sources ›" follows, in place.
+ * - A company with no source at all asks for a model instead.
  */
-export function EnrichAction({
+function EnrichAction({
   entityId,
-  setup,
+  enrich,
+  status,
+  dispatch,
 }: {
   entityId: string
-  setup: EnrichSetupView
+  enrich: RecordEnrichView
+  status: JobStatusState
+  dispatch: ActionDispatch<[action: Action]>
 }) {
-  const [state, setState] = useState<'idle' | 'firing' | 'queued'>('idle')
-  if (setup.sources > 0) return null
-  if (!setup.website)
-    return (
+  const [firing, setFiring] = useState(false)
+  if (enrich.sources.length === 0)
+    return enrich.kind === 'company' ? (
       <NeedsSetup
         needs="Enrich needs a model"
         action="Add a model"
         to="/settings/models"
         thing="an AI model"
-        audience={setup.audience}
+        audience={enrich.audience}
       />
-    )
+    ) : null
+
+  const figure = jobStatusFigure(status, ENRICH_QUEUE)
+  const running = figure?.text === 'running…'
+  const line = enrichLine(enrich, running)
 
   async function fire() {
-    setState('firing')
+    setFiring(true)
+    dispatch({ kind: 'fired', queue: ENRICH_QUEUE })
     try {
       const result = await enrichRecord({ data: { entityId } })
-      if (result.queued) setState('queued')
-      else {
-        setState('idle')
+      if (!result.queued) {
+        dispatch({ kind: 'refused', queue: ENRICH_QUEUE })
         toast.error('The worker queue is unreachable; try again shortly')
       }
     } catch (err) {
-      setState('idle')
+      dispatch({ kind: 'refused', queue: ENRICH_QUEUE })
       toast.error(err instanceof Error ? err.message : 'Could not start Enrich')
+    } finally {
+      setFiring(false)
     }
   }
 
@@ -242,22 +322,41 @@ export function EnrichAction({
     <span className="flex items-center gap-2">
       <Button
         variant="outline"
-        pending={state === 'firing'}
+        pending={firing}
         onClick={() => void fire()}
-        title="Enrich from the company's website"
+        title={`Enrich from ${askWords(enrich.sources)}`}
       >
         Enrich
       </Button>
-      {state === 'queued' ? (
-        <LedgerFigure tone="muted">queued</LedgerFigure>
+      <span
+        data-enrich-line={line.tone}
+        className={cn(
+          'flex max-w-80 items-center gap-1.5 truncate mono text-micro',
+          LINE_INK[line.tone],
+        )}
+      >
+        {line.square ? (
+          <span aria-hidden className="size-1.5 shrink-0 bg-current" />
+        ) : null}
+        <span className="truncate">{line.words}</span>
+      </span>
+      {enrich.last?.review === true && !running ? (
+        <Link
+          to="/review"
+          className="focus-ring mono text-micro text-primary hover:underline"
+        >
+          Review ›
+        </Link>
       ) : null}
-      <NeedsSetup
-        needs="Website"
-        action="More sources"
-        to="/settings/plugins"
-        thing="more enrichment sources"
-        audience={setup.audience}
-      />
+      {enrich.onlyFree && !running ? (
+        <NeedsSetup
+          needs="Free sources only"
+          action="More sources"
+          to="/settings/enrichment"
+          thing="more enrichment sources"
+          audience={enrich.audience}
+        />
+      ) : null}
     </span>
   )
 }

@@ -1,10 +1,11 @@
 import { Effect, Schema } from 'effect'
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity, jobRun, workerHeartbeat } from '@spaces/db/schema'
 import { STALE_AFTER, WORKER_ROLE } from '@spaces/db/heartbeat'
 import { ACTION_TARGETS } from '@spaces/sdk'
 import { canRead } from '@spaces/core/read-policy'
+import { QUEUES } from '@spaces/core/queue/names'
 import type { JobStatusEvent } from '@spaces/core/queue/job-status'
 
 /**
@@ -74,7 +75,10 @@ export const jobStatusSnapshotProgram = Effect.fn('jobStatusSnapshotProgram')(
         .where(
           and(
             eq(jobRun.entityId, entityId),
-            sql`starts_with(${jobRun.queue}, 'plugin.')`,
+            or(
+              sql`starts_with(${jobRun.queue}, 'plugin.')`,
+              eq(jobRun.queue, QUEUES.enrichmentRun),
+            ),
           ),
         )
         .orderBy(jobRun.queue, jobRun.watchId, desc(jobRun.startedAt)),

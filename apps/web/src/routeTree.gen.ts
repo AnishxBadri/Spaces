@@ -48,6 +48,7 @@ import { Route as AppSettingsCurrencyRouteImport } from './routes/_app/settings/
 import { Route as AppSettingsEmailCalendarRouteImport } from './routes/_app/settings/email-calendar'
 import { Route as AppSettingsEmailForwardingRouteImport } from './routes/_app/settings/email-forwarding'
 import { Route as AppSettingsEmbeddingsRouteImport } from './routes/_app/settings/embeddings'
+import { Route as AppSettingsEnrichmentRouteImport } from './routes/_app/settings/enrichment'
 import { Route as AppSettingsFilesRouteImport } from './routes/_app/settings/files'
 import { Route as AppSettingsGeneralRouteImport } from './routes/_app/settings/general'
 import { Route as AppSettingsIntegrationsRouteImport } from './routes/_app/settings/integrations'
@@ -275,6 +276,11 @@ const AppSettingsEmbeddingsRoute = AppSettingsEmbeddingsRouteImport.update({
   path: '/embeddings',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppSettingsEnrichmentRoute = AppSettingsEnrichmentRouteImport.update({
+  id: '/enrichment',
+  path: '/enrichment',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppSettingsFilesRoute = AppSettingsFilesRouteImport.update({
   id: '/files',
   path: '/files',
@@ -466,6 +472,7 @@ export interface FileRoutesByFullPath {
   '/settings/email-calendar': typeof AppSettingsEmailCalendarRoute
   '/settings/email-forwarding': typeof AppSettingsEmailForwardingRoute
   '/settings/embeddings': typeof AppSettingsEmbeddingsRoute
+  '/settings/enrichment': typeof AppSettingsEnrichmentRoute
   '/settings/files': typeof AppSettingsFilesRoute
   '/settings/general': typeof AppSettingsGeneralRoute
   '/settings/integrations': typeof AppSettingsIntegrationsRoute
@@ -534,6 +541,7 @@ export interface FileRoutesByTo {
   '/settings/email-calendar': typeof AppSettingsEmailCalendarRoute
   '/settings/email-forwarding': typeof AppSettingsEmailForwardingRoute
   '/settings/embeddings': typeof AppSettingsEmbeddingsRoute
+  '/settings/enrichment': typeof AppSettingsEnrichmentRoute
   '/settings/files': typeof AppSettingsFilesRoute
   '/settings/general': typeof AppSettingsGeneralRoute
   '/settings/integrations': typeof AppSettingsIntegrationsRoute
@@ -605,6 +613,7 @@ export interface FileRoutesById {
   '/_app/settings/email-calendar': typeof AppSettingsEmailCalendarRoute
   '/_app/settings/email-forwarding': typeof AppSettingsEmailForwardingRoute
   '/_app/settings/embeddings': typeof AppSettingsEmbeddingsRoute
+  '/_app/settings/enrichment': typeof AppSettingsEnrichmentRoute
   '/_app/settings/files': typeof AppSettingsFilesRoute
   '/_app/settings/general': typeof AppSettingsGeneralRoute
   '/_app/settings/integrations': typeof AppSettingsIntegrationsRoute
@@ -676,6 +685,7 @@ export interface FileRouteTypes {
     | '/settings/email-calendar'
     | '/settings/email-forwarding'
     | '/settings/embeddings'
+    | '/settings/enrichment'
     | '/settings/files'
     | '/settings/general'
     | '/settings/integrations'
@@ -744,6 +754,7 @@ export interface FileRouteTypes {
     | '/settings/email-calendar'
     | '/settings/email-forwarding'
     | '/settings/embeddings'
+    | '/settings/enrichment'
     | '/settings/files'
     | '/settings/general'
     | '/settings/integrations'
@@ -814,6 +825,7 @@ export interface FileRouteTypes {
     | '/_app/settings/email-calendar'
     | '/_app/settings/email-forwarding'
     | '/_app/settings/embeddings'
+    | '/_app/settings/enrichment'
     | '/_app/settings/files'
     | '/_app/settings/general'
     | '/_app/settings/integrations'
@@ -1139,6 +1151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsEmbeddingsRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/enrichment': {
+      id: '/_app/settings/enrichment'
+      path: '/enrichment'
+      fullPath: '/settings/enrichment'
+      preLoaderRoute: typeof AppSettingsEnrichmentRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/settings/files': {
       id: '/_app/settings/files'
       path: '/files'
@@ -1354,6 +1373,7 @@ interface AppSettingsRouteChildren {
   AppSettingsEmailCalendarRoute: typeof AppSettingsEmailCalendarRoute
   AppSettingsEmailForwardingRoute: typeof AppSettingsEmailForwardingRoute
   AppSettingsEmbeddingsRoute: typeof AppSettingsEmbeddingsRoute
+  AppSettingsEnrichmentRoute: typeof AppSettingsEnrichmentRoute
   AppSettingsFilesRoute: typeof AppSettingsFilesRoute
   AppSettingsGeneralRoute: typeof AppSettingsGeneralRoute
   AppSettingsIntegrationsRoute: typeof AppSettingsIntegrationsRoute
@@ -1384,6 +1404,7 @@ const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsEmailCalendarRoute: AppSettingsEmailCalendarRoute,
   AppSettingsEmailForwardingRoute: AppSettingsEmailForwardingRoute,
   AppSettingsEmbeddingsRoute: AppSettingsEmbeddingsRoute,
+  AppSettingsEnrichmentRoute: AppSettingsEnrichmentRoute,
   AppSettingsFilesRoute: AppSettingsFilesRoute,
   AppSettingsGeneralRoute: AppSettingsGeneralRoute,
   AppSettingsIntegrationsRoute: AppSettingsIntegrationsRoute,

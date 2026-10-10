@@ -2,6 +2,8 @@ import { z } from 'zod'
 import { manifestSchema } from '@spaces/sdk'
 import { autoEnrichScopeOf } from '@spaces/core/plugins/auto-enrich'
 import type { AutoEnrichScope } from '@spaces/core/plugins/auto-enrich'
+import type { Json } from '@spaces/db/json'
+import { jsonRecord } from '../json'
 
 /**
  * The owner's enrichment settings, `workspace.settings.enrichment` (D76):
@@ -106,4 +108,41 @@ export const withBuiltIn = <TRow extends { readonly id: string }>(
   if (settings.sources?.includes(builtIn.id) === true)
     return orderSources(settings, [builtIn, ...rows])
   return [builtIn, ...orderSources(settings, rows)]
+}
+
+/** What the Enrichment page writes; an absent part is left as stored. */
+export type EnrichmentPatch = {
+  readonly sources?: ReadonlyArray<string>
+  /** Null clears it: each source's own `cacheDays` applies again. */
+  readonly reuseDays?: number | null
+  /** One auto-enrich scope, written for each of these integration ids. */
+  readonly scope?: {
+    readonly ids: ReadonlyArray<string>
+    readonly scope: AutoEnrichScope
+  }
+}
+
+/**
+ * The workspace settings with `patch` over `settings.enrichment`; every
+ * other key, and every part the patch leaves out, as stored.
+ */
+export const withEnrichment = (
+  settings: { readonly [key: string]: Json | undefined },
+  patch: EnrichmentPatch,
+): { [key: string]: Json | undefined } => {
+  const current = jsonRecord(settings['enrichment'])
+  const next: { [key: string]: Json } = { ...current }
+  if (patch.sources !== undefined) next['sources'] = [...patch.sources]
+  if (patch.reuseDays === null) delete next['reuseDays']
+  else if (patch.reuseDays !== undefined) next['reuseDays'] = patch.reuseDays
+  if (patch.scope !== undefined) {
+    const scopes = { ...jsonRecord(current['scopes']) }
+    for (const id of patch.scope.ids)
+      scopes[id] = {
+        scopes: [...patch.scope.scope.scopes],
+        spaces: [...patch.scope.scope.spaces],
+      }
+    next['scopes'] = scopes
+  }
+  return { ...settings, enrichment: next }
 }

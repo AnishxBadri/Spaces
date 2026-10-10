@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { DOMAIN_EVENTS, PORT_NAMES } from './contract.ts'
 import type { PortName } from './contract.ts'
 import { isVersion, parseSdkRange } from './range.ts'
+import { ENRICHMENT_VOCABULARY, isVocabularyKey } from './vocabulary.ts'
 
 /**
  * The manifest (docs/spec-plugin-sdk.md §3, amended 2026-09-30 by D51).
@@ -142,6 +143,20 @@ const actionSchema = z.strictObject({
   label: z.string().min(1),
   on: z.enum(ACTION_TARGETS),
   job: z.string().min(1),
+  // An enrich action's vocabulary keys: what the host's Enrichment page
+  // shows it can fill. Each key describes the action's own kind. (SDK 1.5)
+  answers: z
+    .array(
+      z.string().refine(isVocabularyKey, {
+        error: (issue) =>
+          `${JSON.stringify(issue.input)} is not in the enrichment vocabulary`,
+      }),
+    )
+    .min(1)
+    .refine((keys) => new Set(keys).size === keys.length, {
+      error: 'answers names each key once',
+    })
+    .optional(),
 })
 
 /** The on-disk manifest (`manifest.json`). */
@@ -295,6 +310,15 @@ export const manifestSchema = z
       })
     }
     m.actions?.forEach((action, i) => {
+      action.answers?.forEach((key, k) => {
+        const entry = isVocabularyKey(key) ? ENRICHMENT_VOCABULARY[key] : null
+        if (entry !== null && entry.kind !== action.on)
+          ctx.addIssue({
+            code: 'custom',
+            path: ['actions', i, 'answers', k],
+            message: `action ${action.id} is on ${action.on}, and ${key} describes a ${entry.kind}`,
+          })
+      })
       const job = Object.hasOwn(m.jobs, action.job)
         ? m.jobs[action.job]
         : undefined

@@ -1,5 +1,6 @@
 import { Option, Schema } from 'effect'
 import type { JobRunStatus } from '@spaces/db/schema/jobs'
+import { QUEUES } from './names'
 
 /**
  * The `job_status` notification: what `runJob`'s ledger says on the channel
@@ -67,6 +68,9 @@ export const encodeJobStatus = (event: JobStatusEvent): string => {
   return JSON.stringify({ ...event, summary: null, error: null })
 }
 
-/** The queues whose rows are announced: every plugin queue, no core one. */
+/**
+ * The queues whose rows are announced: every plugin queue, and the host's
+ * `enrichment.run`, whose state a record's Enrich shows. No other core one.
+ */
 export const announcesJobStatus = (queue: string): boolean =>
-  queue.startsWith('plugin.')
+  queue.startsWith('plugin.') || queue === QUEUES.enrichmentRun

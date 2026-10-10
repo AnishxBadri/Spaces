@@ -338,6 +338,56 @@ describe('manifestSchema', () => {
       ])
     })
 
+    it('takes the vocabulary keys an enrich action answers (SDK 1.5)', () => {
+      const m = {
+        ...base(),
+        actions: [
+          {
+            id: 'enrich',
+            label: 'Enrich',
+            on: 'company',
+            job: 'enrich',
+            answers: ['company.headcount', 'company.description'],
+          },
+        ],
+      }
+      expect(issues(m)).toEqual([])
+    })
+
+    it('refuses an answer outside the vocabulary or of another kind', () => {
+      const found = issues({
+        ...base(),
+        actions: [
+          {
+            id: 'enrich',
+            label: 'Enrich',
+            on: 'company',
+            job: 'enrich',
+            answers: ['company.headcount', 'company.mood'],
+          },
+        ],
+      })
+      expect(found).toEqual([
+        'actions.0.answers.1: "company.mood" is not in the enrichment vocabulary',
+      ])
+      expect(
+        issues({
+          ...base(),
+          actions: [
+            {
+              id: 'enrich',
+              label: 'Enrich',
+              on: 'company',
+              job: 'enrich',
+              answers: ['company.headcount', 'person.title'],
+            },
+          ],
+        }),
+      ).toEqual([
+        'actions.0.answers.1: action enrich is on company, and person.title describes a person',
+      ])
+    })
+
     it('refuses an action naming a job the manifest does not declare', () => {
       const found = issues({
         ...base(),

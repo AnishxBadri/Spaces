@@ -8,8 +8,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import type { RecordAction } from '#/lib/server-fns'
-import { EnrichAction, PluginActions } from './plugin-actions.tsx'
-import type { EnrichSetupView } from './plugin-actions.tsx'
+import { PluginActions } from './plugin-actions.tsx'
+import type { RecordEnrichView } from './plugin-actions.tsx'
 
 /**
  * The record head's plugin controls: one outline button per action the loader
@@ -52,14 +52,37 @@ describe('PluginActions', () => {
   })
 })
 
-describe('EnrichAction', () => {
+/**
+ * The host's Enrich (D76, D80): one button asking every source in order,
+ * the line beside it naming them, then how the last run went.
+ */
+describe('the host Enrich', () => {
   const ENTITY = 'f1f0b6f2-7c1e-4f0a-9d2a-0000000000aa'
   const admin = { isAdmin: true, admins: ['Anish'] }
+  const view = (over: Partial<RecordEnrichView>): RecordEnrichView => ({
+    sources: ['Website'],
+    onlyFree: true,
+    sensitive: false,
+    last: null,
+    whereFrom: {},
+    audience: admin,
+    kind: 'company',
+    ...over,
+  })
 
-  async function render(setup: EnrichSetupView) {
+  async function render(
+    enrichView: RecordEnrichView,
+    actions: ReadonlyArray<RecordAction> = [],
+  ) {
     const router = createRouter({
       routeTree: createRootRoute({
-        component: () => <EnrichAction entityId={ENTITY} setup={setup} />,
+        component: () => (
+          <PluginActions
+            entityId={ENTITY}
+            actions={actions}
+            enrich={enrichView}
+          />
+        ),
       }),
       history: createMemoryHistory({ initialEntries: ['/'] }),
     })
@@ -68,31 +91,61 @@ describe('EnrichAction', () => {
   }
 
   it('asks the Website and offers more sources in place when only it is on', async () => {
-    const html = await render({ website: true, sources: 0, audience: admin })
+    const html = await render(view({}))
     expect(html).toContain('>Enrich</button>')
-    expect(html).toContain('Website · ')
-    expect(html).toContain('href="/settings/plugins"')
+    expect(html).toContain('>Website</span>')
+    expect(html).toContain('href="/settings/enrichment"')
     expect(html).toContain('More sources ›')
 
-    const member = await render({
-      website: true,
-      sources: 0,
-      audience: { isAdmin: false, admins: ['Anish'] },
-    })
+    const member = await render(
+      view({ audience: { isAdmin: false, admins: ['Anish'] } }),
+    )
     expect(member).toContain('>Enrich</button>')
     expect(member).toContain('Ask Anish to set up more enrichment sources')
   })
 
-  it('asks for a model when the Website cannot read', async () => {
-    const html = await render({ website: false, sources: 0, audience: admin })
+  it('asks for a model when a company has no source at all', async () => {
+    const html = await render(view({ sources: [] }))
     expect(html).not.toContain('<button')
     expect(html).toContain('Enrich needs a model · ')
     expect(html).toContain('href="/settings/models"')
   })
 
-  it('draws nothing when a plugin source carries its own action', async () => {
-    expect(
-      await render({ website: true, sources: 1, audience: admin }),
-    ).not.toContain('Enrich')
+  it('draws one Enrich naming every source in order, in place of a source’s own', async () => {
+    const html = await render(
+      view({ sources: ['Website', 'Apollo'], onlyFree: false }),
+      [enrich],
+    )
+    expect(html.match(/>Enrich<\/button>/g)).toHaveLength(1)
+    expect(html).toContain('Website, then Apollo')
+    expect(html).not.toContain('More sources')
+  })
+
+  it('shows how the last run went: counts with Review, a limit with its reset, sensitive', async () => {
+    const done = await render(
+      view({
+        sources: ['Website', 'Apollo'],
+        onlyFree: false,
+        last: { words: '6 fields · 1 to Review', tone: 'done', review: true },
+      }),
+    )
+    expect(done).toContain('6 fields · 1 to Review')
+    expect(done).toContain('data-enrich-line="done"')
+    expect(done).toContain('href="/review"')
+
+    const capped = await render(
+      view({
+        onlyFree: false,
+        last: {
+          words: 'Apollo limit reached · runs at 00:00 UTC',
+          tone: 'warn',
+          review: false,
+        },
+      }),
+    )
+    expect(capped).toContain('Apollo limit reached · runs at 00:00 UTC')
+
+    const sensitive = await render(view({ sensitive: true }))
+    expect(sensitive).toContain('sensitive · Website only')
   })
 })

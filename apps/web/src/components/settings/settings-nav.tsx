@@ -122,6 +122,13 @@ export const SETTINGS_SECTIONS = [
     group: 'integrations',
     admin: true,
   },
+  // Where enriched values come from: the sources in order and auto-enrich. (D76)
+  {
+    to: '/settings/enrichment',
+    label: 'Enrichment',
+    group: 'integrations',
+    admin: true,
+  },
   // The forwarding mailbox and its app password.
   {
     to: '/settings/email-forwarding',

@@ -441,8 +441,9 @@ describe('the settings form', () => {
     })
     const detail = await getIntegrationHandler({ id: apollo.id })
     expect(detail.form.ok).toBe(true)
+    // `cacheDays` is the Enrichment page's reuse window on an enrichment
+    // source, so its page does not draw it. (D81)
     expect(detail.values).toEqual({
-      cacheDays: '30',
       dailyCreditCap: '100',
       autoEnrich: false,
     })
@@ -778,10 +779,8 @@ describe('auto-enrich scope', () => {
     )
     expect(row?.autoEnrich).toBe('deal')
     const detail = await getIntegrationHandler({ id: apollo.id })
-    expect(detail.autoEnrichForm).toMatchObject({
-      scopes: ['deal'],
-      spaces: [],
-    })
+    // An enrichment source's scope is set on the Enrichment page, not here.
+    expect(detail.autoEnrichForm).toBeNull()
     // The switch is the scope's now: the form does not draw it twice.
     expect(
       detail.form.ok ? detail.form.fields.map((f) => f.key) : [],
