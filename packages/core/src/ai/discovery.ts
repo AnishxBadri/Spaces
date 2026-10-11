@@ -72,10 +72,6 @@ export type FileRecordPayload = {
   entityId: string
 }
 
-export type DiscoveryPayload =
-  | ({ kind: 'add_record' } & AddRecordPayload)
-  | ({ kind: 'file_record' } & FileRecordPayload)
-
 export const evidenceOf = (
   rows: ReadonlyArray<{ url: string; title?: string | undefined }>,
 ): Array<DiscoveryEvidence> =>

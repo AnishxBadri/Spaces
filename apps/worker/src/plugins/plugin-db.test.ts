@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
 import { Enqueue } from '@spaces/core/queue/enqueue'
+import { dropPluginSchemaStatement } from '@spaces/core/writes/plugins/schema'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { JobPermanent, PluginDb } from '@spaces/sdk'
 import type { JsonValue } from '@spaces/sdk'
@@ -20,7 +21,6 @@ import {
   PLUGIN_RUNTIME_ROLE,
   PluginDbLive,
   SECRET_TABLES,
-  dropPluginSchema,
   pluginSchemaName,
 } from './plugin-db'
 
@@ -120,7 +120,7 @@ const TRESPASS = pluginSchemaName('trespass')
 beforeEach(async () => {
   await db.delete(integration).where(isNotNull(integration.id))
   for (const id of ['tabled', 'trespass']) {
-    await Effect.runPromise(dropPluginSchema(id))
+    await db.execute(dropPluginSchemaStatement(id))
   }
 })
 
@@ -534,7 +534,7 @@ describe('containment of plugin_runtime', () => {
   })
 })
 
-describe('dropPluginSchema', () => {
+describe('dropPluginSchemaStatement', () => {
   it('without it the schema survives an uninstall and a reinstall finds its data and journal; with it both go', async () => {
     const root = newPluginsRoot()
     install(root, 'tabled')
@@ -563,7 +563,7 @@ describe('dropPluginSchema', () => {
       await rowsOf<{ body: string }>(`select body from "${TABLED}".note`),
     ).toEqual([{ body: 'kept' }])
 
-    await Effect.runPromise(dropPluginSchema('tabled'))
+    await db.execute(dropPluginSchemaStatement('tabled'))
     expect(await schemaExists(TABLED)).toBe(false)
     const fresh = await run(root)
     expect(fresh.verdicts.at(0)?.line).toContain(

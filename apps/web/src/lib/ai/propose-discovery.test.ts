@@ -19,13 +19,11 @@ import {
 } from '@spaces/core/writes/entities/resolve'
 import type { PreviewResolveInput } from '@spaces/core/writes/entities/resolve'
 import { discoverWith } from '@spaces/core/writes/ports/discover'
+import { proposeDiscoveryWith } from '@spaces/core/writes/suggestions/propose'
+import type { DiscoveryProposeInput } from '@spaces/core/writes/suggestions/propose'
 import { createSpaceRow } from '#/lib/server/shared'
 import { listInboxProgram } from '#/lib/inbox/queue'
-import {
-  acceptProgram,
-  proposeDiscoveryProgram,
-  rejectProgram,
-} from './propose'
+import { acceptProgram, rejectProgram } from './propose'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 const emitted = vi.hoisted((): Array<DomainEvent> => [])
@@ -72,8 +70,8 @@ const addCard = (spaceId: string, domain: string, extra: object = {}) => ({
   proposedBy: { type: 'system' } as const,
 })
 
-const propose = (input: Parameters<typeof proposeDiscoveryProgram>[0]) =>
-  Effect.runPromise(proposeDiscoveryProgram(input))
+const propose = (input: DiscoveryProposeInput) =>
+  proposeDiscoveryWith(db, input)
 
 /** A watch on the space, from a throwaway integration. */
 const aWatch = async (spaceId: string) => {

@@ -203,10 +203,6 @@ export const INSTRUMENT_LABELS: Record<LedgerInstrument, string> = {
   ccd: 'CCD',
 }
 
-export function isInstrument(value: string): value is LedgerInstrument {
-  return INSTRUMENTS.some((i) => i === value)
-}
-
 export const MARK_BASES: ReadonlyArray<LedgerMarkBasis> = [
   'round_price',
   'manual',

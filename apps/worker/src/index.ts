@@ -1,6 +1,5 @@
 import { Effect, Fiber, Layer } from 'effect'
 import { PgBoss } from 'pg-boss'
-import type { Job } from 'pg-boss'
 import { requireEnv } from '#web/lib/server/env'
 import { QUEUES } from '@spaces/core/queue/names'
 import { startHeartbeat, workerIdentity } from './heartbeat'
@@ -65,9 +64,7 @@ import {
  * The worker process. Second process in the app container (or run locally
  * with `pnpm worker`). pg-boss keeps its state in Postgres — no Redis.
  *
- * Handlers are stubs until their features land; registering the queues now
- * pins the seam so web-side code can enqueue from day one. Real jobs go
- * through `runJob` (./run-job.ts) — one wrapper, typed outcomes, and a
+ * Every job goes through `runJob` — one wrapper, typed outcomes, and a
  * promise that never rejects, because a rejecting batch handler fails the
  * whole batch and an uncaught throw past it is a container death.
  */
@@ -113,10 +110,6 @@ async function main() {
   )
   reloader.request(null)
   await Effect.runPromise(reloader.settled())
-
-  const stub = (label: string) => async (jobs: Array<Job>) => {
-    for (const job of jobs) console.log(`[worker] ${label} (stub)`, job.id)
-  }
 
   // The deck reader's queue is `exclusive` (SPA-90): with `singletonKey` set
   // to the document id, pg-boss refuses a second job for a deck while one is
@@ -470,17 +463,15 @@ async function main() {
       ),
     }),
   )
-  // The nightly sweep (SPA-81), second tenant of the wrapper and the queue
-  // the 03:30 schedule below has been firing into a stub since it was
-  // registered. One statement per run, so the default batch of one is right;
-  // includeMetadata is what `runJob` reads retryCount/retryLimit from, and
-  // the job itself carries no Layer — its whole I/O is that statement.
+  // The nightly dedupe sweep, on the 03:30 schedule below. One statement per
+  // run, so the default batch of one is right; includeMetadata is what
+  // `runJob` reads retryCount/retryLimit from, and the job itself carries no
+  // Layer — its whole I/O is that statement.
   await boss.work(
     QUEUES.dedupeSweep,
     { includeMetadata: true },
     runJob(dedupeSweep, { host, layer: Layer.empty }),
   )
-  await boss.work(QUEUES.enrichEntity, stub('entity.enrich'))
   // The deck reader (SPA-90). A model call per filed record, so a batch of
   // one: two decks on one tick would be two providers' latency in series.
   await boss.work(

@@ -82,8 +82,6 @@ export const QUEUES = {
   suggestSpaces: 'entity.suggest-spaces',
   /** Nightly pg_trgm sweep → duplicate_candidate rows. */
   dedupeSweep: 'entity.dedupe-sweep',
-  /** On-demand enrichment, credit-capped in the worker. */
-  enrichEntity: 'entity.enrich',
   /**
    * An enrichment run (D76): the owner's sources asked in order for one
    * record, every answer applied at once. Created `stately` and sent with

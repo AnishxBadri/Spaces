@@ -430,7 +430,7 @@ unsafe-entry · manifest-missing · manifest-mismatch`, checking the
   in `plugin_<id>.spaces_migrations` (name, sha256) — forward-only: an edited
   applied file or a journal row with no file degrades the plugin. FKs from a
   plugin schema to `public.entity(id)` are allowed; none may point back
-  (tested). `dropPluginSchema` is uninstall's drop-data option; without it
+  (tested). `dropPluginSchemaStatement` is uninstall's drop-data option; without it
   the schema and journal survive a reinstall. Rejected: a statement scan
   plus a pinned `search_path` — it works anywhere, but a runtime query could
   still write core tables. The role guards a plugin's mistakes, not a hostile

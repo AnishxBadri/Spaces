@@ -69,7 +69,6 @@ export {
   SuggestionNotOpen,
   SuggestionWriteFailed,
   UnsupportedSuggestionKind,
-  proposeDiscoveryProgram,
   proposeProgram,
   registryFor,
 } from '@spaces/core/writes/suggestions/propose'

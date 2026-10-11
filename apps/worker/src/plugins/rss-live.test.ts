@@ -8,13 +8,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
 import { activity, entity, integration, signal } from '@spaces/db/schema'
 import { Enqueue } from '@spaces/core/queue/enqueue'
+import { dropPluginSchemaStatement } from '@spaces/core/writes/plugins/schema'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import type { FetchLike } from '@spaces/core/writes/ports/http'
 import { JobPermanent } from '@spaces/sdk'
 import { makePluginHost } from './host'
 import type { PluginHost } from './host'
 import { reconcilePlugins } from './loader'
-import { JOURNAL_TABLE, dropPluginSchema, pluginSchemaName } from './plugin-db'
+import { JOURNAL_TABLE, pluginSchemaName } from './plugin-db'
 
 /**
  * The rss plugin end to end on the live ports, over the test database: the
@@ -65,7 +66,7 @@ beforeEach(async () => {
     .update(integration)
     .set({ enabled: false })
     .where(isNotNull(integration.id))
-  await Effect.runPromise(dropPluginSchema('rss'))
+  await db.execute(dropPluginSchemaStatement('rss'))
 })
 
 afterEach(async () => {

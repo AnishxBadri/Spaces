@@ -451,21 +451,3 @@ export const PluginDbLive = (
       ),
   })
 }
-
-/**
- * Drops a plugin's schema, its tables and its journal, as the owning user,
- * on a pooled connection. Uninstall's drop-data option runs the same
- * statement (`dropPluginSchemaStatement`) inside its own transaction; without
- * it the schema survives an uninstall and a reinstall finds its data and
- * journal.
- */
-export const dropPluginSchema = Effect.fn('dropPluginSchema')(function* (
-  pluginId: string,
-  options: Pick<PluginDbOptions, 'pool'> = {},
-): Effect.fn.Return<void, PluginDbRefused> {
-  const pool = options.pool ?? db.$client
-  const schema = pluginSchemaName(pluginId)
-  yield* withClient(pool, (client) =>
-    query(client, `drop schema if exists ${ident(schema)} cascade`),
-  ).pipe(Effect.mapError(refuse(`could not drop schema ${schema}`)))
-})

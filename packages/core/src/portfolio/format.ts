@@ -54,11 +54,3 @@ export function fmtPct(x: number | null): string {
 export function fmtXirr(x: number | null): string {
   return x === null ? '—' : `${(x * 100).toFixed(1)}%`
 }
-
-export function fmtDate(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', {
-    month: 'short',
-    year: 'numeric',
-  })
-}

@@ -8,10 +8,7 @@ import { CORE_SCHEDULES } from './schedules'
  * No periodic refresh: nothing re-enriches a record on a clock. (D76)
  */
 
-const ENRICHMENT_QUEUES: ReadonlyArray<string> = [
-  QUEUES.enrichmentRun,
-  QUEUES.enrichEntity,
-]
+const ENRICHMENT_QUEUES: ReadonlyArray<string> = [QUEUES.enrichmentRun]
 
 describe('the worker’s schedule list', () => {
   it('schedules the three nightly scans, the stats roll and no enrichment queue', () => {

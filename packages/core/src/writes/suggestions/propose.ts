@@ -590,14 +590,3 @@ export async function proposeDiscoveryWith(
     return { outcome: inserted ? 'proposed' : 'merged', suggestion: row }
   })
 }
-
-export const proposeDiscoveryProgram = Effect.fn('proposeDiscoveryProgram')(
-  function* (
-    input: DiscoveryProposeInput,
-  ): Effect.fn.Return<DiscoveryProposed, SuggestionFailure> {
-    return yield* Effect.tryPromise({
-      try: () => proposeDiscoveryWith(db, input),
-      catch: asFailure,
-    })
-  },
-)

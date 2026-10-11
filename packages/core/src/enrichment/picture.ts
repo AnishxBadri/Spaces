@@ -18,8 +18,6 @@ export const PICTURE_KEYS = {
 /** What the run's timeline line calls each kind's picture. */
 export const PICTURE_NAMES = { company: 'Logo', person: 'Photo' } as const
 
-export type PictureKind = keyof typeof PICTURE_KEYS
-
 export const isPictureKey = (key: string): boolean =>
   key === PICTURE_KEYS.company || key === PICTURE_KEYS.person
 

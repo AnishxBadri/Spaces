@@ -27,7 +27,6 @@ export const lockEntrySchema = z.strictObject({
     error: 'sha256 is 64 lowercase hex characters',
   }),
 })
-export type LockEntry = z.infer<typeof lockEntrySchema>
 
 export const lockSchema = z.strictObject({
   core: z.string().min(1).optional(),

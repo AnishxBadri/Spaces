@@ -20,26 +20,6 @@ import type {
  */
 export type { Condition, ConditionOp, ConditionValue, ViewExtra, ViewSort }
 
-const OPS: Array<ConditionOp> = [
-  'is',
-  'is_not',
-  'contains',
-  'empty',
-  'not_empty',
-  'gt',
-  'lt',
-]
-
-/**
- * An untrusted string back to an op, or null if it names none — a view read
- * off the wire or out of a URL. The filter editor no longer needs it: since
- * SPA-38 its picker is typed by `opsFor`, so the op it hands back is already
- * the one the stored condition holds.
- */
-export function toConditionOp(v: string): ConditionOp | null {
-  return OPS.find((op) => op === v) ?? null
-}
-
 /** An editor's value narrowed to what a condition may compare against. */
 export function toConditionValue(v: unknown): ConditionValue {
   if (

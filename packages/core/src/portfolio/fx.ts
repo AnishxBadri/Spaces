@@ -26,14 +26,3 @@ export function rateFor(
   }
   return best === null ? null : best.rateToBase
 }
-
-export function convertToBase(
-  amount: number,
-  currency: string,
-  date: string,
-  rates: Array<FxRate>,
-  baseCurrency: string,
-): number | null {
-  const rate = rateFor(rates, currency, date, baseCurrency)
-  return rate === null ? null : amount * rate
-}
