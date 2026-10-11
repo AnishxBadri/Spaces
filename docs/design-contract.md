@@ -134,11 +134,12 @@ go`, `notes elsewhere never fetched`, a confirm's consequence. Everything else i
 tooltip on the control or the docs, and page blurbs go too.
 
 **One close per dialog, and `esc` is never printed (2026-10-06).** A dialog closes from
-its foot: `Cancel`, unmarked, beside the primary with its key (`⌘↵`). The head carries
+its foot: `Cancel`, unmarked, beside the primary; neither prints a key (A6). The head carries
 no standalone `esc` and no cross. `esc` is not printed anywhere, in a foot key list
 either: it closes every dialog in every app, so it fails the invariant-line test. A
 printed key earns its place only when the binding is ours and not guessable — `⌘↵` to
-submit from inside a text field, `L`, `G T`. `↵` on a primary button or on the
+submit from inside a text field, `L`, `G T` — and then it is in the control's tooltip,
+the `?` sheet and Cmd-K, never inside a button (A2). `↵` on a primary button or on the
 highlighted row of a list is universal too, and is not printed. Amends P8's "esc right"
 in the head and the `↵` on the Review card's primary. Built 2026-10-10: `DialogHeader`
 holds the title and the context and nothing right, `DialogContent` has no close of its
@@ -191,6 +192,54 @@ architecture to a reviewer; the person at 8am needs the value.
   shipped precedent is `/portfolio/$holdingId`; the record page's Notes and Files
   sections were brought to it 2026-09-30.
 
+### The Action Grammar — one shape per element (2026-10-12)
+
+Every control cluster in the app is one of the shapes below, and nothing else. The
+walk of 2026-10-11 counted ten page-head shapes, eight record heads, ten row ends and
+seven dialog feet for what is, each time, the same act; the grammar is what makes a
+cluster predictable before it is read. A new surface is built to it; an existing one is
+brought to it when its file is open.
+
+- **A1 · A page head carries one filled primary, at most one outline secondary to its
+  left, and a boxed `···` at the far right.** All three are 32px. Nothing used less
+  than weekly sits at rest; it is a `···` item. A head with no daily act has no filled
+  button. A `···` that would hold one item is that item as the outline secondary (A7).
+- **A2 · No key is printed inside a button.** A key lives in the button's tooltip, the
+  `?` sheet and Cmd-K. Keys print on the surface only in a composer row's end lane and
+  in the sidebar lane, where they are the row's data. Amends "printed inside the
+  control it triggers" (`DESIGN.md`, Keyboard parity).
+- **A3 · One act has one control per surface, and one label everywhere.** If a section
+  has a composer row for a verb, the head does not also carry it; the key focuses the
+  composer. The label is the same on every surface (`New task`, never `Task` /
+  `Add task`).
+- **A4 · A record head is `[verb] [verb] [···]` on every kind.** The verbs are the two
+  most frequent for that object; Sensitive, Save as template, Copy link and Archive
+  live in the `···`, which every record has. Navigation is a link in the title or the
+  crumb, never an outlined button.
+- **A5 · A row ends on a mono lane and a bare `···`.** The lane holds the row's figure
+  or state word; the `···` appears on hover; the row itself is the link. No word that
+  would read the same on every row (`void`, `record mark ›`, `raised`), and delete is
+  never a bare icon.
+- **A6 · A dialog foot is `note? · Cancel · Primary`.** Cancel is outline, the primary
+  is filled, neither carries an icon or a printed key. There is one commit; a variant
+  is a toggle beside it. The note is for cost, privacy or irreversibility only, and it
+  wraps rather than truncates.
+- **A7 · State is never a control.** No disabled button or menu item announces a
+  missing setup; a `···` with no enabled item does not render; a menu of one item is
+  that item as a button; a toggle shows its state as a switch, not as its label. Where
+  something is missing, the place it would be used carries one link to fix it (D80).
+- **A8 · A number prints once per screen.** The title or the tab carries a list's
+  count, not both; a readout never repeats a section count and a section never repeats
+  a readout; a row prints a date or an age, not both.
+- **A9 · A create window asks only for identity.** Name plus the identity key (domain,
+  email); everything else is `More fields ›`, inferred (company from email, deal name
+  from company and stage, date today) or filled later by enrichment. Focus lands in the
+  first field.
+- **A10 · One tab bar shape, and it hides when there is one view.** Paper tabs with a
+  count on every tab, Filter · Sort · Columns and search to the right; a second axis is
+  a chip in that bar, never a second row; the bar is absent when there is a single
+  view.
+
 ---
 
 ## 2. The primitives that exist
@@ -216,7 +265,7 @@ needs.
 | `DitherBlock`, `DensityRamp`                                                      | `apps/web/src/components/dither.tsx`                    | the only texture; loading is a density ramp, never a shimmer                                            |
 | `Dialog`, `DialogContent`, `DialogHeader`, `DialogFooter`, …                      | `apps/web/src/components/ui/dialog.tsx`                 | P8 — 48px serif head + mono context, nothing right; 20px body; 52px bone foot, Cancel + primary         |
 | `useConfirm`, `ConfirmDialog`                                                     | `apps/web/src/components/ui/confirm-dialog.tsx`         | the destructive confirm; it replaces `window.confirm` everywhere                                        |
-| `Button`, `Input`, `Label`, `Popover`, `Tooltip`, `DropdownMenu`                  | `apps/web/src/components/ui/`                           | the atoms — reticle focus, 2px radius, key hints inside                                                 |
+| `Button`, `Input`, `Label`, `Popover`, `Tooltip`, `DropdownMenu`                  | `apps/web/src/components/ui/`                           | the atoms — reticle focus, 2px radius, keys in tooltips (A2)                                            |
 | `Badge`, `badgeClasses`, `badgeTint`                                              | `apps/web/src/components/ui/badge.tsx`                  | the square option badge — takes the option row + index, `archived` and `unselected`                     |
 | `Select`, `selectClasses`                                                         | `apps/web/src/components/ui/select.tsx`                 | the one picker — an Input-height trigger, a paper sheet, `width` and `inset` per caller                 |
 | `Checkbox`, `checkboxClasses`                                                     | `apps/web/src/components/ui/checkbox.tsx`               | the 14px square that fills with pine; a button, never a native control                                  |
@@ -331,8 +380,8 @@ its section's row lit, and takes the `SettingsSection` head
 
 **A record** — the term page, a provider, a connection. → **`RecordHeader`**,
 `apps/web/src/components/record/record-parts.tsx:21`, used as
-`apps/web/src/routes/_app/deals_.$dealId.tsx:178` uses it: caps mono breadcrumb, actions
-with key hints — all outlined, a record head has no single affirmative to give pine to —
+`apps/web/src/routes/_app/deals_.$dealId.tsx:178` uses it: caps mono breadcrumb, `[verb] [verb] [···]`
+(A4) — all outlined, keys in tooltips, a record head has no single affirmative to give pine to —
 mark + serif name + square badge, readout strip, then `RecordBody` as two columns: a
 320px details column on bone (bone, not bone-deep, even beside a bone nav; the 1px rule
 separates) left — the `PropertyGrid` as single
@@ -396,7 +445,7 @@ all five and still be the wrong surface — that is what the checklist is for.
 
 ### The review checklist
 
-Twenty-one questions. A merge needs a yes to each.
+Twenty-two questions. A merge needs a yes to each.
 
 **Vocabulary**
 
@@ -433,8 +482,9 @@ Twenty-one questions. A merge needs a yes to each.
     250ms?
 15. Does every layer come from the z-scale (`z-sticky … z-toast`), preferring
     `isolation: isolate` over climbing?
-16. Keyboard parity — every working key printed inside the control it triggers,
-    `aria-label` on icon-only buttons, Enter submits, bare keys off while typing?
+16. Keyboard parity — every working key in its control's tooltip, the `?` sheet and
+    Cmd-K (printed on the surface only in a composer row's end lane or the sidebar
+    lane), `aria-label` on icon-only buttons, Enter submits, bare keys off while typing?
 17. Does the surface bound what it draws rather than paginating — a server-side
     cap, a grouping, or a `+ N more` fold? (`DESIGN.md` names virtualization past
     ~200 rows as the target; `RecordTable` deliberately does not carry it yet
@@ -456,6 +506,9 @@ Twenty-one questions. A merge needs a yes to each.
     (bone head, paper rows), space (32–40px between groups) and ink weight (hairline
     opens, rules between rows), with the title in sentence case at the title step?
     (§1, "The Separation Rule")
+22. **Action Grammar** — does every cluster follow it: one filled primary, keys in
+    tooltips not buttons, one control per act, state never a control? (§1, "The
+    Action Grammar")
 
 ### afk or hitl
 

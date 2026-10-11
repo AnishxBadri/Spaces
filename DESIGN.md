@@ -152,8 +152,8 @@ terminal aesthetic. Mono here is a voice for readings, not a costume for the who
 - Paper data field, bone chassis, ink structure, one pine LED
 - Three type voices — serif where a human wrote it, sans for the interface, mono for
   everything measured
-- Keyboard-first; every key that is ours to know is printed inside the control it
-  triggers
+- Keyboard-first; every key that is ours to know is in its control's tooltip, the `?`
+  sheet and Cmd-K — never printed inside a button
 - Printed: one double rule, one stamp, real tabs, dither only for data
 - Nothing blurs, nothing rounds past 2px, nothing is a pill
 - WCAG AA is a floor, not a target: body text ≥ 4.5:1, always
@@ -222,19 +222,19 @@ the instrument measured. Inter Variable (`cv11` + `ss01`), Source Serif 4 Variab
 JetBrains Mono Variable, all self-hosted via Fontsource — no font CDN calls from a
 privacy product.
 
-| voice | step              | size / leading | role                                                |
-| ----- | ----------------- | -------------- | --------------------------------------------------- |
-| serif | display · 600     | 28 / 32        | page titles, record names, the Today sentence       |
-| serif | section · 600     | 18 / 22–24     | dialog titles, settings sections, empty states      |
-| serif | prose · 400       | 17 / 27        | note bodies, theses, reasons                        |
-| sans  | title · 500       | 15 / 22        | a name inside a readout cell                        |
-| sans  | ui · 400 / 500    | 13 / 20        | rows, forms, buttons, the workhorse                 |
-| sans  | body · 400        | 14 / 20        | composer inputs, running UI text                    |
-| mono  | readout · 500     | 18–20 / 22–24  | the readout strip                                   |
-| mono  | numeral · 400     | 13 / 16        | money, counts, dates, IDs, domains in rows          |
-| mono  | label · 500 caps  | 11 / 14, .08em | group and section labels, tabs, stamps              |
-| mono  | field label · 400 | 11 / 16 lower  | column and lane heads, field labels — `field-label` |
-| mono  | key hint · 400    | 11 / 14        | `⌘K G T ↵ ⇧↵ M esc` — inside the control            |
+| voice | step              | size / leading | role                                                    |
+| ----- | ----------------- | -------------- | ------------------------------------------------------- |
+| serif | display · 600     | 28 / 32        | page titles, record names, the Today sentence           |
+| serif | section · 600     | 18 / 22–24     | dialog titles, settings sections, empty states          |
+| serif | prose · 400       | 17 / 27        | note bodies, theses, reasons                            |
+| sans  | title · 500       | 15 / 22        | a name inside a readout cell                            |
+| sans  | ui · 400 / 500    | 13 / 20        | rows, forms, buttons, the workhorse                     |
+| sans  | body · 400        | 14 / 20        | composer inputs, running UI text                        |
+| mono  | readout · 500     | 18–20 / 22–24  | the readout strip                                       |
+| mono  | numeral · 400     | 13 / 16        | money, counts, dates, IDs, domains in rows              |
+| mono  | label · 500 caps  | 11 / 14, .08em | group and section labels, tabs, stamps                  |
+| mono  | field label · 400 | 11 / 16 lower  | column and lane heads, field labels — `field-label`     |
+| mono  | key hint · 400    | 11 / 14        | `⌘K G T ↵ ⇧↵ M` — tooltips, composer end lanes, sidebar |
 
 **Who wrote it decides the voice** (owner 2026-10-08; D78):
 
@@ -460,7 +460,9 @@ load-bearing rules promoted here:
   keyboard focus scrolls into view, Enter submits forms, Cmd/Ctrl+Enter submits
   textareas and dialogs, icon-only buttons carry `aria-label`. Bare-key
   shortcuts (`useHotkey`: T task, L log, M move stage) are ignored while typing
-  and inside dialogs, and every one is printed inside the control it triggers.
+  and inside dialogs, and every one is in its control's tooltip, the `?` sheet and
+  Cmd-K. A key prints on the surface only in a composer row's end lane and the sidebar
+  lane, where it is the row's data; never inside a button (contract §1, A2).
 - **The z-index scale.** sticky 150 · modal 200 · dropdown 250 · tooltip 300 ·
   toast 400 — the utilities `z-sticky … z-toast`, no other values; menus sit above
   modals because a picker opened from inside a dialog floats over it; prefer
@@ -474,8 +476,8 @@ load-bearing rules promoted here:
 - **Shape:** 2px radius, heights 26 / 32 (`sm / default`); the `xs` 24px step is for
   icon-only.
 - **Primary:** the only saturated fill on any surface — pine under white text, hover
-  deepens to pine-hover, press compresses to 0.97. It carries its key hint inside:
-  `<kbd class="mono text-micro opacity-85">⌘↵</kbd>`.
+  deepens to pine-hover, press compresses to 0.97. Its key is in its tooltip, never
+  printed inside it (contract §1, A2).
 - **Outline:** paper, 1px hairline, hover tints to bone. No shadow.
 - **Ghost:** transparent until hover; for in-context quiet actions.
 - **Destructive:** crimson fill, white text — never adjacent to a primary without space.
@@ -567,7 +569,8 @@ band's edge, under its title.
 
 `PageHeader`: serif title (or a sentence when the page has a state to report — "Seven
 things need you. Two are late."), a mono eyebrow above or a mono readout line below,
-actions right with key hints inside the buttons, hairline under, 32px inset, 28px above.
+actions right as `[outline]? [filled] [···]` with keys in tooltips (contract §1, A1 and
+A2), hairline under, 32px inset, 28px above.
 `ReadoutStrip`: cells split by rules on a hairline, caps mono label, mono 20/500 value,
 colour only when nonzero and bad.
 
@@ -690,8 +693,8 @@ an object's pinned saved views and the count on Tasks. The decided order:
 
 ### Record Pages (P7)
 
-`RecordHeader`: mono caps breadcrumb (`DEALS / 7C335C4A / OPENED 2026-07-29`), actions
-with key hints (Log interaction L · Task T · Move stage M), a 28px mark (1-bit dither
+`RecordHeader`: mono caps breadcrumb (`DEALS / 7C335C4A / OPENED 2026-07-29`), two verbs
+and a `···` with keys in tooltips (contract §1, A4), a 28px mark (1-bit dither
 tile, or ink initials for a person) beside the serif name and a square badge, then a
 56px readout strip of the numbers that matter. Body left: the property grid (two
 columns, hairline top and bottom, rules inside, 120px caps labels — three columns
