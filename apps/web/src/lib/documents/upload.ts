@@ -55,6 +55,10 @@ export type UploadDocumentInput = {
   /** Defaults to `guessDocumentKind(file.name)`. */
   kind?: FinalizeInput['kind']
   onPhase: (phase: UploadPhase) => void
+  /** The PUT's progress, 0 to 1; the PUT goes through XHR when it is given. */
+  onProgress?: (fraction: number) => void
+  /** Aborts the PUT; the upload rejects with an `AbortError`. */
+  signal?: AbortSignal
 }
 
 /**
@@ -66,6 +70,8 @@ export async function uploadDocument({
   fileAgainst,
   kind,
   onPhase,
+  onProgress,
+  signal,
 }: UploadDocumentInput): Promise<
   Awaited<ReturnType<typeof finalizeDocumentUpload>>
 > {
@@ -85,15 +91,23 @@ export async function uploadDocument({
     onPhase('uploading')
     // uploadHeaders carry the S3 checksum condition when that driver is
     // live — the signature breaks without them. Empty for local.
-    const response = await fetch(uploadUrl, {
-      method: 'PUT',
-      body: file,
-      headers: uploadHeaders,
-    })
-    if (!response.ok) {
-      throw new Error((await response.text()) || 'Storage rejected the upload')
+    if (onProgress === undefined) {
+      const response = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: uploadHeaders,
+        ...(signal === undefined ? {} : { signal }),
+      })
+      if (!response.ok) {
+        throw new Error(
+          (await response.text()) || 'Storage rejected the upload',
+        )
+      }
+    } else {
+      await putWithProgress(uploadUrl, file, uploadHeaders, onProgress, signal)
     }
   }
+  signal?.throwIfAborted()
 
   onPhase('filing')
   return await finalizeDocumentUpload({
@@ -127,4 +141,35 @@ export async function sha256Hex(file: File): Promise<string> {
   return [...new Uint8Array(digest)]
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('')
+}
+
+/**
+ * The PUT through XHR, the one browser API that reports upload progress.
+ * Same request as the fetch lane: the bytes, the storage headers, nothing else.
+ */
+function putWithProgress(
+  url: string,
+  file: File,
+  headers: Record<string, string>,
+  onProgress: (fraction: number) => void,
+  signal: AbortSignal | undefined,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', url)
+    for (const [name, value] of Object.entries(headers))
+      xhr.setRequestHeader(name, value)
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && e.total > 0) onProgress(e.loaded / e.total)
+    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve()
+      else reject(new Error(xhr.responseText || 'Storage rejected the upload'))
+    }
+    xhr.onerror = () => reject(new Error('Storage rejected the upload'))
+    xhr.onabort = () =>
+      reject(new DOMException('The upload was cancelled', 'AbortError'))
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true })
+    xhr.send(file)
+  })
 }

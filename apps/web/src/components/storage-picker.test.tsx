@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LinkFetchRow, useLinkFetches } from './record-files-link'
 import {
   PickerButton,
-  PickerState,
   StoragePicker,
   readGooglePick,
   usePickerReadiness,
@@ -159,8 +158,7 @@ const openFakePicker = async () => {
   expect(document.querySelector('[role="dialog"]')).not.toBeNull()
 }
 
-const fetching = () =>
-  document.body.textContent.split('Fetching from Drive…').length - 1
+const fetching = () => document.body.textContent.split('fetching.').length - 1
 
 describe('StoragePicker under the fake providers', () => {
   it('attaches three picked files as three fetches, each a pending row', async () => {
@@ -229,27 +227,20 @@ describe('PickerButton', () => {
     expect(consent).toContain('Attach from Drive…')
   })
 
-  it('draws no button for a picker not set up; the head’s meta says it, a link for an admin and none for a member', () => {
+  it('draws Picker not set up disabled until an admin adds the key, for admin and member alike', () => {
     const unconfigured = {
       _tag: 'unconfigured' as const,
       reason: 'needs Picker API key and Picker app id',
       integrationId: 'row',
     }
-    expect(render({ ...unconfigured, settingsHref: null })).toBe('')
-    const state = (settingsHref: `/settings/plugins/${string}` | null) =>
-      renderToStaticMarkup(
-        <PickerState readiness={{ ...unconfigured, settingsHref }} />,
-      )
-    expect(state('/settings/plugins/row')).toContain(
-      'href="/settings/plugins/row"',
-    )
-    const member = state(null)
-    expect(member).toContain('picker not set up')
-    expect(member).not.toContain('href=')
-    expect(member).not.toMatch(/<button/)
-    expect(
-      renderToStaticMarkup(<PickerState readiness={{ _tag: 'ready' }} />),
-    ).toBe('')
+    for (const settingsHref of ['/settings/plugins/row', null] as const) {
+      const html = render({ ...unconfigured, settingsHref })
+      expect(html).toContain('Picker not set up')
+      expect(html).toContain('aria-disabled="true"')
+      expect(html).not.toContain('href=')
+      expect(html).not.toMatch(/<button/)
+    }
+    expect(render({ _tag: 'ready' })).toContain('Attach from Drive')
   })
 })
 

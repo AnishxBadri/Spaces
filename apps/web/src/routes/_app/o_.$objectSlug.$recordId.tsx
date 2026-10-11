@@ -369,7 +369,13 @@ function ObjectRecordPage() {
                 }
               />
             ),
-            files: <RecordFiles entityId={record.id} documents={documents} />,
+            files: (
+              <RecordFiles
+                entityId={record.id}
+                recordName={record.name}
+                documents={documents}
+              />
+            ),
             history: (
               <RecordHistory
                 items={timeline}

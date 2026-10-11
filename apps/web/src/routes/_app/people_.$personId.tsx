@@ -482,7 +482,13 @@ function PersonRecordPage() {
                 }
               />
             ),
-            files: <RecordFiles entityId={person.id} documents={documents} />,
+            files: (
+              <RecordFiles
+                entityId={person.id}
+                recordName={person.name}
+                documents={documents}
+              />
+            ),
             history: <RecordHistory items={timeline} registry={registry} />,
           }}
         />

@@ -523,7 +523,13 @@ function DealRecordPage() {
                 }
               />
             ),
-            files: <RecordFiles entityId={deal.id} documents={documents} />,
+            files: (
+              <RecordFiles
+                entityId={deal.id}
+                recordName={deal.name}
+                documents={documents}
+              />
+            ),
             history: (
               <RecordHistory
                 items={timeline}

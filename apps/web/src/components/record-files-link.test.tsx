@@ -2,33 +2,46 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { OpenInSourceButton } from './document-source.tsx'
-import { fileMeta } from './record-files.tsx'
 import { LinkFetchRow } from './record-files-link.tsx'
 import type { LinkFetch } from './record-files-link.tsx'
+import { endLane, stateWord } from '#/lib/documents/files-tab'
+import { isFolderLink } from '#/lib/documents/storage-link'
 
 /**
- * A Drive file on the Files tab: its row says where in Drive it came from
- * and opens there; a pasted link that has not landed says what it is doing,
- * or why it cannot.
+ * A Drive file on the Files tab: its end lane says where in Drive it came
+ * from and its state lane opens there; a pasted link that has not landed
+ * says what it is doing, or why it cannot.
  */
 
 const LINK = 'https://drive.google.com/file/d/pitch/view'
 
 const row = {
-  kind: 'legal' as const,
+  filename: 'Pitch.pdf',
+  mime: 'application/pdf',
   sizeBytes: 2048,
   createdAt: '2026-10-07T10:00:00.000Z',
-  uploadedByName: 'Anish',
   sourceCapability: 'google-drive',
   sourcePath: null,
+  externalUrl: LINK,
+  externalStatus: 'linked' as const,
+  blobSha: 'a'.repeat(64),
+  url: null,
+  extractionStatus: 'done',
+  extractionError: null,
+  lastRun: null,
 }
 
 describe('the Drive row', () => {
   it('prints the provider path verbatim, and nothing when there is none', () => {
-    expect(fileMeta({ ...row, sourcePath: 'Data room / Legal' })).toContain(
-      ' · via google-drive · from Data room / Legal',
+    expect(endLane({ ...row, sourcePath: 'Data room / Legal' })).toBe(
+      'from Data room / Legal · 2.0 KB · 10-07',
     )
-    expect(fileMeta(row)).not.toContain('from')
+    expect(endLane(row)).not.toContain('from')
+  })
+
+  it('links out as `drive ↗` rather than naming the plugin twice', () => {
+    expect(endLane(row)).not.toContain('via')
+    expect(stateWord(row)).toMatchObject({ text: 'drive ↗', href: LINK })
   })
 
   it('opens a Drive link as Open in Drive, any other as Open in source', () => {
@@ -47,15 +60,14 @@ describe('the Drive row', () => {
 describe('a recorder’s recording', () => {
   const RECORDING = 'https://fathom.video/calls/42'
 
-  it('carries the recorder’s mark and opens in it', () => {
+  it('names the recorder in its state lane and opens in it', () => {
     expect(
-      fileMeta({
+      stateWord({
         ...row,
-        kind: 'other',
-        sizeBytes: null,
         sourceCapability: 'fathom',
+        externalUrl: RECORDING,
       }),
-    ).toContain('via fathom')
+    ).toMatchObject({ text: 'fathom ↗', href: RECORDING })
     const html = renderToStaticMarkup(
       <OpenInSourceButton
         url={RECORDING}
@@ -64,18 +76,12 @@ describe('a recorder’s recording', () => {
       />,
     )
     expect(html).toContain('title="Open in fathom"')
-    expect(html).toContain(`href="${RECORDING}"`)
   })
 
-  it('a storage host still names itself over the plugin', () => {
-    const html = renderToStaticMarkup(
-      <OpenInSourceButton
-        url={LINK}
-        filename="Pitch.pdf"
-        provider="google-drive"
-      />,
-    )
-    expect(html).toContain('title="Open in Drive"')
+  it('an attachment with no link says which plugin filed it', () => {
+    expect(
+      endLane({ ...row, sourceCapability: 'gmail', externalUrl: null }),
+    ).toBe('2.0 KB · 10-07 · via gmail')
   })
 })
 
@@ -83,18 +89,19 @@ describe('LinkFetchRow', () => {
   const render = (state: LinkFetch['state']) =>
     renderToStaticMarkup(
       <LinkFetchRow
-        fetch={{ key: 'k', name: LINK, label: 'Drive', state }}
+        fetch={{ key: 'k', name: LINK, label: 'Drive', link: true, state }}
         onDismiss={() => undefined}
+        onLinkFolder={() => undefined}
       />,
     )
 
-  it('reads Fetching from Drive while the job runs, with no dismiss', () => {
+  it('reads fetching. while the job runs, with no dismiss', () => {
     const html = render({ kind: 'fetching', fetchId: 'f' })
-    expect(html).toContain('Fetching from Drive…')
+    expect(html).toContain('fetching.')
     expect(html).not.toContain('Dismiss')
   })
 
-  it('shows the provider’s reason, and Connect when there is no connection', () => {
+  it('shows the provider’s reason, and Connect Drive when there is no connection', () => {
     expect(
       render({ kind: 'refused', reason: 'Invalid Credentials' }),
     ).toContain('Invalid Credentials')
@@ -107,5 +114,16 @@ describe('LinkFetchRow', () => {
       'href="/api/connections/google/start?product=drive"',
     )
     expect(connect).toContain('Connect Drive')
+    expect(connect).toContain('Connect your Google Drive to fetch this file.')
+  })
+
+  it('refuses a folder link in place and offers Link folder…', () => {
+    const folder = 'https://drive.google.com/drive/folders/0Bx'
+    expect(isFolderLink(folder)).toBe(true)
+    expect(isFolderLink(LINK)).toBe(false)
+    const html = render({ kind: 'folder', url: folder })
+    expect(html).toContain('Link a Drive folder instead to keep it in sync.')
+    expect(html).toContain('Link folder…')
+    expect(html).toContain('Dismiss')
   })
 })

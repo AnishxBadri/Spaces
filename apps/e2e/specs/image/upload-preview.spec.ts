@@ -65,17 +65,18 @@ async function openCompany(page: Page, imageUrl: string) {
 }
 
 /**
- * The Files section's own input. The section's head holds the "upload"
- * control and its body the hidden input (record-files.tsx), so the input is
- * found through the section, not as the button's sibling.
+ * The Files tab's own input. The add row holds the Upload button and the
+ * tab's root the hidden input beside it (`RecordFiles`), so the input is
+ * found through the tab, not as the button's sibling.
  */
 async function upload(page: Page, file: string) {
+  await page.getByRole('tab', { name: /^Files/ }).click()
   await page
-    .getByRole('button', { name: 'upload', exact: true })
-    .locator('xpath=ancestor::section[1]//input[@type="file"]')
+    .getByRole('button', { name: 'Upload', exact: true })
+    .locator('xpath=ancestor::div[2]//input[@type="file"]')
     .setInputFiles(fixture(file))
   await expect(
-    page.getByRole('button', { name: `Preview ${file}` }),
+    page.getByRole('button', { name: file, exact: true }),
   ).toBeVisible()
 }
 
@@ -86,12 +87,12 @@ test('a DOCX previews the text the worker extracted from it', async ({
   const external = offOrigin(page, imageUrl)
   await openCompany(page, imageUrl)
   await upload(page, DOCX.file)
-  // The row says "extracting text…" until the worker has written the text;
-  // the section polls, and the row changes on its own.
-  await expect(page.getByText('extracting text…')).toHaveCount(0, {
+  // The row says "reading text." until the worker has written the text;
+  // the tab polls, and the row changes on its own.
+  await expect(page.getByText('reading text.')).toHaveCount(0, {
     timeout: 60_000,
   })
-  await page.getByRole('button', { name: `Preview ${DOCX.file}` }).click()
+  await page.getByRole('button', { name: DOCX.file, exact: true }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByText(DOCX.marker)).toBeVisible()
   expect(external).toEqual([])
@@ -113,9 +114,9 @@ test('a PDF previews on a canvas, never as a navigation, and downloads as an opa
   })
 
   await upload(page, PDF.file)
-  await page.getByRole('button', { name: `Preview ${PDF.file}` }).click()
+  await page.getByRole('button', { name: PDF.file, exact: true }).click()
   const dialog = page.getByRole('dialog')
-  const canvas = dialog.locator('canvas')
+  const canvas = dialog.getByLabel(`${PDF.file}, page 1`)
   await expect(canvas).toBeVisible()
   // Drawn, not just mounted: pdf.js sizes the backing store when it renders.
   await expect
@@ -126,13 +127,14 @@ test('a PDF previews on a canvas, never as a navigation, and downloads as an opa
   expect(blobRequests.filter((r) => r.isNavigationRequest())).toEqual([])
   await page.keyboard.press('Escape')
 
-  // The row's Download control goes through the signed blob route. The
-  // browser gets a download, not a page, and the headers are the rule.
+  // The row's Download goes through the signed blob route. The browser gets
+  // a download, not a page, and the headers are the rule.
   const response = page.waitForResponse(
     (r) => r.url().includes('/api/blob/') && r.request().method() === 'GET',
   )
   const download = page.waitForEvent('download')
-  await page.getByRole('button', { name: `Download ${PDF.file}` }).click()
+  await page.getByRole('button', { name: `More for ${PDF.file}` }).click()
+  await page.getByRole('menuitem', { name: 'Download' }).click()
   const res = await response
   expect(res.headers()['content-type']).toBe('application/octet-stream')
   expect(res.headers()['content-disposition']).toMatch(/^attachment;/)

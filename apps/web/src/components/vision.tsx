@@ -1,7 +1,6 @@
 import { useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Button } from './ui/button'
 import {
   getEntitySensitivity,
   isLaneRouted,
@@ -140,20 +139,4 @@ export function useVisionReader(
       onRead: () => void read(doc.id),
     }
   }
-}
-
-/** The Files-tab row's control: small, where Read deck sits on a deck. */
-export function VisionRowButton({ reader }: { reader: VisionReader }) {
-  return (
-    <Button
-      size="xs"
-      variant="outline"
-      disabled={reader.reading}
-      onClick={reader.onRead}
-      title="Send the scanned pages to the vision model and store their text"
-      className="mr-1"
-    >
-      {reader.reading ? 'reading…' : 'Read with vision'}
-    </Button>
-  )
 }

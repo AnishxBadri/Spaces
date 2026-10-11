@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Button } from './ui/button'
 import {
   extractKeyTerms,
   getEntitySensitivity,
@@ -128,24 +127,4 @@ export function useKeyTermsExtractor(
       onExtract: () => void start(doc.id),
     }
   }
-}
-
-/** The Files-tab row's control: small, beside Read deck and Summarize. */
-export function KeyTermsRowButton({
-  extractor,
-}: {
-  extractor: KeyTermsExtractor
-}) {
-  return (
-    <Button
-      size="xs"
-      variant="outline"
-      disabled={extractor.extracting}
-      onClick={extractor.onExtract}
-      title="Read the deal’s terms into a note, as a suggestion"
-      className="mr-1"
-    >
-      {extractor.extracting ? 'extracting…' : 'Extract key terms'}
-    </Button>
-  )
 }

@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
+import { DriveMark } from './files/file-glyph'
 import { mintPickerToken, pickerReadiness } from '#/lib/server-fns'
 import type {
   FakePickerFile,
@@ -174,7 +175,7 @@ const LABEL = 'Attach from Drive'
 
 /**
  * The user's Drive picker state, asked once on mount. Held by the Files
- * tab so a picker that is not set up reads in its head's meta.
+ * tab, which draws the Drive button and the link row from it.
  */
 export function usePickerReadiness(): [
   Readiness | null,
@@ -294,35 +295,10 @@ export function StoragePicker({
 const BUTTON = 'shrink-0'
 
 /**
- * `picker not set up`, in mono, for the Files head's meta: the reason in a
- * tooltip, and for an admin a link to the integration's page. Nothing in
- * any other state.
+ * The Drive button, saying what it will do by readiness (D66): Connect Drive
+ * with no connection, Attach from Drive… when Google asks once more,
+ * `Picker not set up` disabled until an admin adds the picker key.
  */
-export function PickerState({ readiness }: { readiness: Readiness | null }) {
-  if (readiness?._tag !== 'unconfigured') return null
-  const label = 'picker not set up'
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        {readiness.settingsHref === null ? (
-          <span tabIndex={0} className="focus-ring cursor-default">
-            {label}
-          </span>
-        ) : (
-          <a
-            href={readiness.settingsHref}
-            className="focus-ring hover:text-foreground"
-          >
-            {label} ›
-          </a>
-        )}
-      </TooltipTrigger>
-      <TooltipContent className="max-w-64">{readiness.reason}</TooltipContent>
-    </Tooltip>
-  )
-}
-
-/** The button itself: open, Connect, re-consent, or refused in a tooltip. */
 export function PickerButton({
   readiness,
   opening,
@@ -332,22 +308,16 @@ export function PickerButton({
   opening: boolean
   onOpen: () => void
 }) {
-  const explained = (label: string, reason: string, href: string | null) => (
+  const disabled = (label: string, reason: string) => (
     <Tooltip>
       <TooltipTrigger asChild>
-        {href === null ? (
-          <span
-            tabIndex={0}
-            aria-disabled="true"
-            className="focus-ring inline-flex h-6 shrink-0 cursor-default items-center rounded-md border border-rule bg-paper px-2 text-label text-graphite"
-          >
-            {label}
-          </span>
-        ) : (
-          <Button asChild size="xs" variant="outline" className={BUTTON}>
-            <a href={href}>{label}</a>
-          </Button>
-        )}
+        <span
+          tabIndex={0}
+          aria-disabled="true"
+          className="focus-ring inline-flex h-[1.625rem] shrink-0 cursor-default items-center rounded-md border border-rule bg-bone-deep px-2 text-label text-graphite"
+        >
+          {label}
+        </span>
       </TooltipTrigger>
       <TooltipContent className="max-w-64">{reason}</TooltipContent>
     </Tooltip>
@@ -356,33 +326,46 @@ export function PickerButton({
   switch (readiness?._tag) {
     case 'connect':
       return (
-        <Button asChild size="xs" variant="outline" className={BUTTON}>
-          <a href={readiness.href}>{readiness.label}</a>
+        <Button asChild size="sm" variant="outline" className={BUTTON}>
+          <a href={readiness.href}>
+            <DriveMark />
+            {readiness.label}
+          </a>
         </Button>
       )
     case 'consent':
-      return explained(
-        `${LABEL}…`,
-        'Google asks once more, for the files you pick.',
-        readiness.href,
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button asChild size="sm" variant="outline" className={BUTTON}>
+              <a href={readiness.href}>
+                <DriveMark />
+                {`${LABEL}…`}
+              </a>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-64">
+            Google asks once more, for the files you pick.
+          </TooltipContent>
+        </Tooltip>
       )
     case 'unconfigured':
-      // A state, not a control: `PickerState` says it in the head's meta.
-      return null
+      return disabled('Picker not set up', readiness.reason)
     case 'refused':
-      return explained(LABEL, readiness.reason, null)
+      return disabled(LABEL, readiness.reason)
     case 'ready':
     case undefined:
       return (
         <Button
           type="button"
-          size="xs"
+          size="sm"
           variant="outline"
           className={BUTTON}
           pending={opening}
           disabled={opening}
           onClick={onOpen}
         >
+          <DriveMark />
           {LABEL}
         </Button>
       )

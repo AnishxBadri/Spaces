@@ -454,7 +454,13 @@ function CompanyRecordPage() {
                 }
               />
             ),
-            files: <RecordFiles entityId={company.id} documents={documents} />,
+            files: (
+              <RecordFiles
+                entityId={company.id}
+                recordName={company.name}
+                documents={documents}
+              />
+            ),
             history: <RecordHistory items={timeline} registry={registry} />,
           }}
         />

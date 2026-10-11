@@ -32,6 +32,7 @@ export const getDocumentPreview = createServerFn()
           filename: document.filename,
           mime: document.mime,
           sizeBytes: document.sizeBytes,
+          kind: document.kind,
           extractionStatus: document.extractionStatus,
           extractionError: document.extractionError,
           // The two columns that decide whether there is a file to fetch at
@@ -55,9 +56,25 @@ export const getDocumentPreview = createServerFn()
       filename: row.filename ?? 'Untitled file',
       mime: row.mime,
       sizeBytes: row.sizeBytes,
+      kind: row.kind,
       extractionStatus: row.extractionStatus,
       extractionError: row.extractionError,
       blobSha: row.blobSha,
       url: row.url,
     }
+  })
+
+/**
+ * The viewer sidebar's facts and the Remove confirm's ledger for one
+ * document: chunk count, words and pages read, the notes that mention it.
+ * The query is `documentDetailsProgram`, reached by a dynamic import so
+ * drizzle and Effect stay out of the client bundle.
+ */
+export const getDocumentDetails = createServerFn()
+  .validator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { documentDetailsProgram } = await import('../documents/details')
+    const { effectFn } = await import('./effect')
+    return effectFn(documentDetailsProgram)(u, data.id)
   })

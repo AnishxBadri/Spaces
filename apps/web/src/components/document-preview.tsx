@@ -1,12 +1,7 @@
-import {
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  ExternalLink,
-  FileWarning,
-  Loader2,
-} from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { Download, ExternalLink, FileWarning, Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import type { PDFDocumentProxy } from 'unpdf/pdfjs'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -17,40 +12,33 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog'
+import { FileGlyph } from './files/file-glyph'
 import { detectFormat } from '@spaces/core/documents/extract'
-import { formatBytes } from '@spaces/core/documents'
+import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
+import type { DocumentKind } from '@spaces/core/documents'
 import { getDocumentDownloadUrl, getDocumentText } from '#/lib/server-fns'
+import { fileType } from '#/lib/documents/files-tab'
 import { cn } from '#/lib/utils'
 
 /**
- * Look at a document without downloading it.
+ * The file viewer: a window over the page, looking at a document without
+ * downloading it. A window rather than a route, so Back undoes reading
+ * position and not the look. (D66)
+ * - Title bar: glyph, name, `deck · 4.1 MB · 14 pages`, a PDF's page nav
+ *   and zoom, Download. It closes from its foot (the close-mark rule).
+ * - A caller may pass a `sidebar` (the Files tab's KIND, FILED ON, …) and
+ *   `foot` actions beside Cancel.
  *
- * A modal is normally the lazy answer, and DESIGN.md says to argue for one.
- * The argument: a preview is an *inspection*, not a destination — you open it,
- * look, and come back to the record you were reading. Giving it a route would
- * make the back button undo your reading position instead of the preview.
- *
- * **Nothing here relaxes the download hardening.** Blobs are still served as
+ * **Nothing here relaxes the download hardening.** Blobs are served as
  * `application/octet-stream; attachment`, because an uploaded `.html` served
- * inline from this origin is stored XSS against the app. The preview fetches
- * those same opaque bytes and renders them itself:
+ * inline from this origin is stored XSS. The viewer fetches those opaque
+ * bytes and renders them itself: a PDF through pdf.js to a canvas, an image
+ * through an object URL whose type we choose, office files from the
+ * extracted text. SVG never renders inline: it is a script vector.
  *
- *   PDF    pdf.js to a canvas, so the browser never navigates to the file
- *   image  an object URL whose type *we* choose, never the stored mime
- *   office the text the worker already extracted — free, and a tab-separated
- *          spreadsheet renders back into a grid
- *
- * The one format that must never render inline is SVG: it is a script vector,
- * and `<img>` is the only safe element for it, so it stays download-only.
- *
- * **A row with no blob is a fourth case** (docsurf-10b): a clipped article
- * has an address and readability's text and no bytes at all, so every branch
- * that fetches a blob is skipped and the text is shown with the URL linked
- * above it. Download becomes "Open source", which is the honest control —
- * `getDocumentDownloadUrl` throws for a null `blob_sha` and should, so the
- * dialog stops offering the button that reaches it rather than softening the
- * throw. A clipped *PDF* is not this case: it has a blob, and it renders
- * through `PdfPreview` exactly as an uploaded deck does.
+ * A row with no blob (a clipped article) has no bytes: its text is shown
+ * with the address linked, and Download becomes Open source, because
+ * `getDocumentDownloadUrl` throws for a null `blob_sha` and should.
  */
 
 type Doc = {
@@ -58,14 +46,11 @@ type Doc = {
   filename: string
   mime: string | null
   sizeBytes: number | null
+  /** The genre, printed first in the title bar's mono line when known. */
+  kind?: DocumentKind | undefined
   extractionStatus: string
   extractionError: string | null
-  /**
-   * Null when there are no bytes to fetch — a clipped article (§3.1: a clip
-   * is why `blob_sha` is nullable). Every blob-reading branch below is
-   * gated on it, because `getDocumentDownloadUrl` throws for a null sha and
-   * that throw is correct: the fix is not to reach it.
-   */
+  /** Null when there are no bytes to fetch — a clipped article. */
   blobSha: string | null
   /** The page a clip was read from, and null on every row that had bytes. */
   url: string | null
@@ -84,9 +69,8 @@ const PREVIEWABLE_IMAGES = new Set([
 function imageType(doc: Doc): string | null {
   const mime = doc.mime?.toLowerCase().split(';')[0].trim()
   if (mime && PREVIEWABLE_IMAGES.has(mime)) return mime
-  // Browsers and mail clients label attachments `application/octet-stream`
-  // constantly, so fall back to the extension — same reasoning as the
-  // extractor's detectFormat.
+  // Attachments are labelled `application/octet-stream` constantly, so fall
+  // back to the extension, as the extractor's detectFormat does.
   const ext = doc.filename.toLowerCase().split('.').pop()
   const byExt: Record<string, string> = {
     png: 'image/png',
@@ -104,30 +88,69 @@ export function DocumentPreview({
   doc,
   page,
   onOpenChange,
+  sidebar = null,
+  foot = null,
 }: {
   doc: Doc | null
   /** The 1-based page a PDF opens at; the first when omitted. */
   page?: number
   onOpenChange: (open: boolean) => void
+  /** The column right of the page. */
+  sidebar?: ReactNode
+  /** Foot actions, left of Cancel. */
+  foot?: ReactNode
 }) {
   return (
     <Dialog open={Boolean(doc)} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[85vh] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
-        {doc ? <PreviewBody doc={doc} startPage={page ?? 1} /> : null}
+      <DialogContent
+        className={cn(
+          'flex h-[85vh] flex-col gap-0 overflow-hidden p-0',
+          sidebar === null
+            ? 'max-w-4xl sm:max-w-4xl'
+            : 'max-w-6xl sm:max-w-6xl',
+        )}
+      >
+        {doc ? (
+          <PreviewBody
+            doc={doc}
+            startPage={page ?? 1}
+            sidebar={sidebar}
+            foot={foot}
+          />
+        ) : null}
       </DialogContent>
     </Dialog>
   )
 }
 
-function PreviewBody({ doc, startPage }: { doc: Doc; startPage: number }) {
+/** A PDF's zoom: fitted to the page column, or a scale the reader chose. */
+type Zoom = 'fit' | number
+
+function PreviewBody({
+  doc,
+  startPage,
+  sidebar,
+  foot,
+}: {
+  doc: Doc
+  startPage: number
+  sidebar: ReactNode
+  foot: ReactNode
+}) {
   const format = detectFormat(doc.filename, doc.mime)
   const asImage = imageType(doc)
-  // The one question that decides both halves of this dialog (docsurf-10b):
-  // a row with no blob has nothing to download and nothing to render from
-  // bytes, so it gets the article's text and a link to where it came from.
-  // A clipped PDF is *not* this case — it has a blob, and everything below
-  // treats it exactly as an uploaded deck.
   const blobless = doc.blobSha === null
+  const isPdf = !blobless && format === 'pdf'
+  const [page, setPage] = useState(Math.max(1, startPage))
+  const [pages, setPages] = useState(0)
+  const [zoom, setZoom] = useState<Zoom>('fit')
+  const [fitScale, setFitScale] = useState(1)
+  const scale = zoom === 'fit' ? fitScale : zoom
+  const onPages = useCallback((n: number) => {
+    setPages(n)
+    // A page past the end (the file was replaced) opens on the last.
+    setPage((p) => Math.min(p, n))
+  }, [])
 
   async function download() {
     const { url } = await getDocumentDownloadUrl({ data: { id: doc.id } })
@@ -136,28 +159,90 @@ function PreviewBody({ doc, startPage }: { doc: Doc; startPage: number }) {
 
   return (
     <>
-      {/* The P8 head, at the sheet's edge: the content is `p-0` so the
-          body can run bone edge to edge, which means the header's own
-          `-mx-5 -mt-5` breakout must be cancelled here or the head hangs
-          20px outside the sheet. Serif name, mono context beside it, the
-          one action in the right lane. */}
+      {/* The title bar at the sheet's edge: the content is `p-0`, so the
+          header's own breakout is cancelled here. */}
       <DialogHeader className="mx-0 mt-0 mb-0 h-12 shrink-0 flex-nowrap items-center gap-3 py-0">
+        <FileGlyph
+          type={fileType({ ...doc, externalUrl: null })}
+          className="-ml-1"
+        />
         <DialogTitle className="min-w-0 truncate text-title leading-5">
           {doc.filename}
         </DialogTitle>
         <DialogDescription className="shrink-0">
           {[
-            format ? format.toUpperCase() : (doc.mime ?? 'Unknown type'),
+            doc.kind === undefined
+              ? format
+                ? format.toUpperCase()
+                : (doc.mime ?? 'Unknown type')
+              : DOCUMENT_KIND_LABELS[doc.kind].toLowerCase(),
             doc.sizeBytes ? formatBytes(doc.sizeBytes) : null,
+            isPdf && pages > 0
+              ? `${String(pages)} page${pages === 1 ? '' : 's'}`
+              : null,
           ]
             .filter(Boolean)
             .join(' · ')}
         </DialogDescription>
         <span className="flex-1" />
+        {isPdf && pages > 1 ? (
+          <div className="flex h-[1.625rem] shrink-0 items-stretch border border-rule bg-paper mono text-micro">
+            <button
+              type="button"
+              aria-label="Previous page"
+              disabled={page <= 1}
+              onClick={() => setPage((n) => Math.max(1, n - 1))}
+              className="focus-ring w-6 border-r border-rule hover:bg-bone disabled:text-graphite"
+            >
+              ‹
+            </button>
+            <span className="tabular flex items-center px-2">
+              {page} / {pages}
+            </span>
+            <button
+              type="button"
+              aria-label="Next page"
+              disabled={page >= pages}
+              onClick={() => setPage((n) => Math.min(pages, n + 1))}
+              className="focus-ring w-6 border-l border-rule hover:bg-bone disabled:text-graphite"
+            >
+              ›
+            </button>
+          </div>
+        ) : null}
+        {isPdf ? (
+          <div className="flex h-[1.625rem] shrink-0 items-stretch border border-rule bg-paper mono text-micro">
+            <button
+              type="button"
+              aria-label="Zoom out"
+              onClick={() => setZoom(Math.max(0.25, scale / 1.25))}
+              className="focus-ring w-6 border-r border-rule hover:bg-bone"
+            >
+              -
+            </button>
+            <button
+              type="button"
+              aria-label="Fit to width"
+              aria-pressed={zoom === 'fit'}
+              onClick={() => setZoom('fit')}
+              className="focus-ring px-2 hover:bg-bone"
+            >
+              fit
+            </button>
+            <button
+              type="button"
+              aria-label="Zoom in"
+              onClick={() => setZoom(Math.min(4, scale * 1.25))}
+              className="focus-ring w-6 border-l border-rule hover:bg-bone"
+            >
+              +
+            </button>
+          </div>
+        ) : null}
         <div className="flex shrink-0 items-center">
           {blobless ? (
             doc.url === null ? null : (
-              <Button size="xs" variant="outline" asChild>
+              <Button size="sm" variant="outline" asChild>
                 <a
                   href={doc.url}
                   target="_blank"
@@ -170,7 +255,7 @@ function PreviewBody({ doc, startPage }: { doc: Doc; startPage: number }) {
               </Button>
             )
           ) : (
-            <Button size="xs" variant="outline" onClick={download}>
+            <Button size="sm" variant="outline" onClick={download}>
               <Download className="size-3" strokeWidth={2} />
               Download
             </Button>
@@ -178,20 +263,35 @@ function PreviewBody({ doc, startPage }: { doc: Doc; startPage: number }) {
         </div>
       </DialogHeader>
 
-      <div className="min-h-0 flex-1 overflow-auto bg-bone">
-        {blobless ? (
-          <TextPreview doc={doc} format={format} />
-        ) : format === 'pdf' ? (
-          <PdfPreview doc={doc} startPage={startPage} />
-        ) : asImage ? (
-          <ImagePreview doc={doc} type={asImage} />
-        ) : (
-          <TextPreview doc={doc} format={format} />
+      <div className="flex min-h-0 flex-1">
+        <div className="min-h-0 min-w-0 flex-1 overflow-auto bg-bone">
+          {blobless ? (
+            <TextPreview doc={doc} format={format} />
+          ) : isPdf ? (
+            <PdfPreview
+              doc={doc}
+              page={page}
+              scale={scale}
+              onPages={onPages}
+              onPage={setPage}
+              onFitScale={setFitScale}
+            />
+          ) : asImage ? (
+            <ImagePreview doc={doc} type={asImage} />
+          ) : (
+            <TextPreview doc={doc} format={format} />
+          )}
+        </div>
+        {sidebar === null ? null : (
+          <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-l border-hairline bg-paper">
+            {sidebar}
+          </aside>
         )}
       </div>
 
       {/* The foot, breakout cancelled like the head's. */}
       <DialogFooter className="mx-0 mt-0 mb-0 shrink-0">
+        {foot}
         <DialogClose asChild>
           <Button variant="outline">Cancel</Button>
         </DialogClose>
@@ -231,9 +331,8 @@ function useBlobBytes(id: string) {
     error: string | null
   }>({ bytes: null, error: null })
 
-  // A run token rather than a boolean: the effect re-runs when the previewed
-  // document changes, and a stale fetch resolving late must not overwrite the
-  // new one's state.
+  // A run token: a stale fetch resolving late must not overwrite the next
+  // document's state.
   const runRef = useRef(0)
 
   useEffect(() => {
@@ -259,129 +358,244 @@ function useBlobBytes(id: string) {
   return state
 }
 
-function PdfPreview({ doc, startPage }: { doc: Doc; startPage: number }) {
-  const { bytes, error } = useBlobBytes(doc.id)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [page, setPage] = useState(Math.max(1, startPage))
-  const [pages, setPages] = useState(0)
-  const [renderError, setRenderError] = useState<string | null>(null)
-  // Held across renders so paging doesn't re-parse the whole file.
-  const pdfRef = useRef<{ numPages: number; getPage: (n: number) => never }>(
-    null,
-  )
-
-  const runRef = useRef(0)
+/** The parsed PDF, held across pages so paging never re-parses the file. */
+function usePdf(bytes: ArrayBuffer | null) {
+  const [state, setState] = useState<{
+    pdf: PDFDocumentProxy | null
+    error: string | null
+  }>({ pdf: null, error: null })
 
   useEffect(() => {
     if (!bytes) return
-    const run = ++runRef.current
-    let cancelled: { cancel: () => void } | null = null
+    const stale = { current: false }
     void (async () => {
       try {
-        // Dynamic: pdf.js is large and only this dialog needs it.
+        // Dynamic: pdf.js is large and only this window needs it.
         const { getDocument } = await import('unpdf/pdfjs')
-        if (!pdfRef.current) {
-          const task = getDocument({
-            data: new Uint8Array(bytes.slice(0)),
-            // unpdf ships a worker-free pdf.js build, so this renders on the
-            // main thread — fine for one page at a time, and it means no
-            // worker asset to serve from a self-hosted container.
-            useWorkerFetch: false,
-            verbosity: 0,
-          })
-          const pdf = await task.promise
-          if (runRef.current !== run) return
-          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- pdf.js ships no types for the CDN build; the shape is asserted once per call site
-          pdfRef.current = pdf as never
-          setPages(pdf.numPages)
-          // A page past the end (the file was replaced) opens on the last.
-          if (page > pdf.numPages) {
-            setPage(pdf.numPages)
-            return
-          }
-        }
-        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- pdf.js ships no types for the CDN build; the shape is asserted once per call site
-        const pdf = pdfRef.current as unknown as {
-          getPage: (n: number) => Promise<never>
-        }
-        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- pdf.js ships no types for the CDN build; the shape is asserted once per call site
-        const p = (await pdf.getPage(page)) as unknown as {
-          getViewport: (o: { scale: number }) => {
-            width: number
-            height: number
-          }
-          render: (o: object) => { promise: Promise<void>; cancel: () => void }
-        }
-        const canvas = canvasRef.current
-        if (!canvas || runRef.current !== run) return
-        const base = p.getViewport({ scale: 1 })
-        // Fit the dialog width, then draw at device resolution so text on a
-        // deck stays legible rather than resampled.
-        const scale = Math.min(2, Math.max(1, 900 / base.width))
-        const viewport = p.getViewport({ scale })
-        const dpr = Math.min(globalThis.devicePixelRatio || 1, 2)
-        canvas.width = Math.floor(viewport.width * dpr)
-        canvas.height = Math.floor(viewport.height * dpr)
-        canvas.style.width = `${Math.floor(viewport.width)}px`
-        canvas.style.height = `${Math.floor(viewport.height)}px`
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-        const task = p.render({ canvasContext: ctx, viewport })
-        cancelled = task
-        await task.promise
+        const pdf = await getDocument({
+          data: new Uint8Array(bytes.slice(0)),
+          // unpdf's pdf.js is worker-free: it renders on the main thread,
+          // fine for a page at a time, and no worker asset to serve.
+          useWorkerFetch: false,
+          verbosity: 0,
+        }).promise
+        if (!stale.current) setState({ pdf, error: null })
       } catch (err) {
-        if (runRef.current !== run) return
-        const message = err instanceof Error ? err.message : String(err)
-        // Paging cancels the previous render on purpose; not a failure.
-        if (!/cancel/i.test(message)) setRenderError(message)
+        if (!stale.current)
+          setState({
+            pdf: null,
+            error: err instanceof Error ? err.message : String(err),
+          })
       }
     })()
     return () => {
-      cancelled?.cancel()
+      stale.current = true
     }
-  }, [bytes, page])
+  }, [bytes])
+
+  return state
+}
+
+/** Draws one page to a canvas at a scale, at device resolution. */
+async function drawPage(
+  pdf: PDFDocumentProxy,
+  n: number,
+  canvas: HTMLCanvasElement,
+  scaleFor: (baseWidth: number) => number,
+  onTask: (task: { cancel: () => void }) => void,
+): Promise<void> {
+  const p = await pdf.getPage(n)
+  const base = p.getViewport({ scale: 1 })
+  const viewport = p.getViewport({ scale: scaleFor(base.width) })
+  const dpr = Math.min(globalThis.devicePixelRatio || 1, 2)
+  canvas.width = Math.floor(viewport.width * dpr)
+  canvas.height = Math.floor(viewport.height * dpr)
+  canvas.style.width = `${Math.floor(viewport.width)}px`
+  canvas.style.height = `${Math.floor(viewport.height)}px`
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  const task = p.render({ canvas: null, canvasContext: ctx, viewport })
+  onTask(task)
+  await task.promise
+}
+
+/** Paging cancels the previous render on purpose; that is not a failure. */
+const cancelled = (err: unknown) =>
+  /cancel/i.test(err instanceof Error ? err.message : String(err))
+
+function PdfPreview({
+  doc,
+  page,
+  scale,
+  onPages,
+  onPage,
+  onFitScale,
+}: {
+  doc: Doc
+  page: number
+  scale: number
+  onPages: (pages: number) => void
+  onPage: (page: number) => void
+  onFitScale: (scale: number) => void
+}) {
+  const { bytes, error } = useBlobBytes(doc.id)
+  const { pdf, error: parseError } = usePdf(bytes)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const columnRef = useRef<HTMLDivElement>(null)
+  const [renderError, setRenderError] = useState<string | null>(null)
+  const [width, setWidth] = useState(900)
+
+  useEffect(() => {
+    if (pdf) onPages(pdf.numPages)
+  }, [pdf, onPages])
+
+  // The column's width, so `fit` fits the page to what is there.
+  useEffect(() => {
+    const el = columnRef.current
+    if (!el) return
+    const measure = () => setWidth(el.clientWidth)
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!pdf || !canvas) return
+    let task: { cancel: () => void } | null = null
+    void drawPage(
+      pdf,
+      Math.min(page, pdf.numPages),
+      canvas,
+      (base) => {
+        const fit = Math.max(0.25, (width - 48) / base)
+        onFitScale(fit)
+        return scale
+      },
+      (t) => {
+        task = t
+      },
+    ).catch((err: unknown) => {
+      if (!cancelled(err))
+        setRenderError(err instanceof Error ? err.message : String(err))
+    })
+    return () => {
+      task?.cancel()
+    }
+  }, [pdf, page, scale, width, onFitScale])
 
   if (error) return <Notice>Could not load the file — {error}</Notice>
-  if (renderError)
-    return <Notice>This PDF could not be rendered — {renderError}</Notice>
-  if (!bytes) return <Spinner label="Loading PDF…" />
+  const failure = parseError ?? renderError
+  if (failure)
+    return <Notice>This PDF could not be rendered — {failure}</Notice>
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-auto p-4">
+    <div className="flex h-full">
+      {pdf && pdf.numPages > 1 ? (
+        <Thumbnails pdf={pdf} page={page} onPage={onPage} />
+      ) : null}
+      <div ref={columnRef} className="min-w-0 flex-1 overflow-auto p-6">
+        {pdf ? null : <Spinner label="Loading PDF…" />}
         <canvas
           ref={canvasRef}
           aria-label={`${doc.filename}, page ${page}`}
-          className="mx-auto rounded-none border border-rule bg-white"
+          className={cn(
+            'mx-auto rounded-none border border-hairline bg-paper',
+            !pdf && 'hidden',
+          )}
         />
+        {pdf ? (
+          <p className="mt-3 text-center mono text-micro text-graphite">
+            page {page} of {pdf.numPages}
+          </p>
+        ) : null}
       </div>
-      {pages > 1 ? (
-        <div className="flex shrink-0 items-center justify-center gap-3 border-t border-rule bg-paper px-4 py-2">
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            aria-label="Previous page"
-            disabled={page <= 1}
-            onClick={() => setPage((n) => Math.max(1, n - 1))}
-          >
-            <ChevronLeft />
-          </Button>
-          <span className="tabular text-label text-graphite">
-            Page {page} of {pages}
-          </span>
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            aria-label="Next page"
-            disabled={page >= pages}
-            onClick={() => setPage((n) => Math.min(pages, n + 1))}
-          >
-            <ChevronRight />
-          </Button>
-        </div>
-      ) : null}
     </div>
+  )
+}
+
+/** The thumbnail rail left of the page; each draws once it scrolls into view. */
+function Thumbnails({
+  pdf,
+  page,
+  onPage,
+}: {
+  pdf: PDFDocumentProxy
+  page: number
+  onPage: (page: number) => void
+}) {
+  return (
+    <ol className="flex w-36 shrink-0 flex-col gap-3 overflow-y-auto border-r border-rule bg-bone py-3 pr-3 pl-2">
+      {Array.from({ length: pdf.numPages }, (_, i) => i + 1).map((n) => (
+        <li key={n} className="flex items-start gap-1.5">
+          <span className="w-4 shrink-0 text-right mono text-micro text-graphite">
+            {n}
+          </span>
+          <Thumb pdf={pdf} n={n} current={n === page} onPick={onPage} />
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function Thumb({
+  pdf,
+  n,
+  current,
+  onPick,
+}: {
+  pdf: PDFDocumentProxy
+  n: number
+  current: boolean
+  onPick: (page: number) => void
+}) {
+  const ref = useRef<HTMLCanvasElement>(null)
+  const [seen, setSeen] = useState(typeof IntersectionObserver === 'undefined')
+
+  useEffect(() => {
+    const el = ref.current
+    if (seen || !el) return
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) setSeen(true)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [seen])
+
+  useEffect(() => {
+    const canvas = ref.current
+    if (!seen || !canvas) return
+    let task: { cancel: () => void } | null = null
+    void drawPage(
+      pdf,
+      n,
+      canvas,
+      (base) => 96 / base,
+      (t) => {
+        task = t
+      },
+    ).catch(() => undefined)
+    return () => {
+      task?.cancel()
+    }
+  }, [seen, pdf, n])
+
+  return (
+    <button
+      type="button"
+      aria-label={`Page ${n}`}
+      aria-current={current ? 'page' : undefined}
+      onClick={() => onPick(n)}
+      className={cn(
+        'focus-ring border bg-paper p-0.5',
+        current ? 'border-foreground' : 'border-rule hover:border-hairline',
+      )}
+    >
+      <canvas ref={ref} className="block h-auto min-h-12 w-24" />
+    </button>
   )
 }
 
@@ -412,16 +626,10 @@ function ImagePreview({ doc, type }: { doc: Doc; type: string }) {
 }
 
 /**
- * Office files and plain text render from the worker's extraction rather than
- * the original bytes — no viewer to ship, and a spreadsheet comes back as the
- * grid it was, because the extractor keeps tabs as column separators.
- *
- * A clipped article arrives here too (docsurf-10b) and for the stronger
- * reason: the extraction is not a fallback for it, it *is* the document —
- * there are no original bytes, only readability's text and the address it
- * came from. So the address is printed above the text: an article read
- * through a clipper should always be one click from the page it was read
- * from, and "download it to open" is advice that cannot be taken.
+ * Office files and plain text render from the worker's extraction — no
+ * viewer to ship, and a spreadsheet comes back as its grid because the
+ * extractor keeps tabs as column separators. A clipped article's text *is*
+ * the document, so its address is printed above it.
  */
 function TextPreview({
   doc,
@@ -520,8 +728,7 @@ function SheetPreview({ text }: { text: string }) {
                           // A leading header row is the near-universal shape
                           // of an exported sheet.
                           r === 0 && 'bg-bone font-medium',
-                          // Numbers align as numbers — the Tabular Rule holds
-                          // inside a preview too.
+                          // Numbers align as numbers inside a preview too.
                           /^[-+]?[\d,.]+%?$/.test(cell.trim()) &&
                             cell.trim() !== '' &&
                             'numeric',

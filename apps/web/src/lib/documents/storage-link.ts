@@ -32,3 +32,12 @@ export function storageLinkProvider(url: string): StorageLinkProvider | null {
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null
   return BY_HOST.get(parsed.hostname) ?? null
 }
+
+/**
+ * A pasted Drive *folder* link. The add row refuses it in place: a folder is
+ * linked through Link a Drive folder, never fetched as a file. (D66)
+ */
+export function isFolderLink(url: string): boolean {
+  if (storageLinkProvider(url) === null) return false
+  return /\/folders\//.test(new URL(url).pathname)
+}

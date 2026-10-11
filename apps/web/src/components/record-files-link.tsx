@@ -1,24 +1,25 @@
 import { useRouter } from '@tanstack/react-router'
-import { File as FileIcon, Link2, Loader2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Button } from './ui/button'
+import { FileGlyph } from './files/file-glyph'
 import {
   attachFromLink,
   attachFromPicker,
   linkFetchStatus,
 } from '#/lib/server-fns'
 import type { PickedFile } from '#/lib/server-fns'
-import { storageLinkProvider } from '#/lib/documents/storage-link'
+import { isFolderLink, storageLinkProvider } from '#/lib/documents/storage-link'
 import { cn } from '#/lib/utils'
 
 /**
- * Attach from a link on the Files tab: the paste row, and the pending rows a
- * pasted Drive link shows while the worker fetches it.
- * - A fetch takes seconds, not an upload's phases: its row reads "Fetching
- *   from Drive…" until the job settles, then the filed row replaces it.
- * - A refusal stays on its row with the provider's reason; no connection
- *   offers Connect there. Either is dismissed by hand.
+ * Attach from a link on the Files tab: the add row, and the `JUST ADDED`
+ * rows a pasted Drive link or a picked file shows while the worker fetches.
+ * - A fetch reads `fetching.` until the job settles; then the filed row,
+ *   in its kind, replaces it.
+ * - A refusal stays on its row with the reason; no connection offers
+ *   Connect Drive there; a folder link is refused in place, before any
+ *   fetch. Each is dismissed by hand. (D66)
  */
 
 export type LinkFetch = {
@@ -26,8 +27,11 @@ export type LinkFetch = {
   /** The row's name: the link without its scheme, or the picked file's name. */
   readonly name: string
   readonly label: string
+  /** A pasted link, printed mono; false for a file picked by name. */
+  readonly link: boolean
   readonly state:
     | { readonly kind: 'sending' }
+    | { readonly kind: 'folder'; readonly url: string }
     | { readonly kind: 'fetching'; readonly fetchId: string }
     | {
         readonly kind: 'connect'
@@ -55,15 +59,18 @@ export function useLinkFetches(entityId: string) {
   async function attach(url: string) {
     const provider = storageLinkProvider(url)
     const key = `${url}-${Math.random()}`
+    const folder = isFolderLink(url)
     setFetches((all) => [
       ...all,
       {
         key,
         name: shown(url),
         label: provider?.label ?? 'the link',
-        state: { kind: 'sending' },
+        link: true,
+        state: folder ? { kind: 'folder', url } : { kind: 'sending' },
       },
     ])
+    if (folder) return
     try {
       const outcome = await attachFromLink({
         data: { url, attachTo: entityId, returnTo: window.location.pathname },
@@ -100,6 +107,7 @@ export function useLinkFetches(entityId: string) {
         key: keyOf(f.id),
         name: f.name,
         label: 'Drive',
+        link: false,
         state: { kind: 'sending' },
       })),
     ])
@@ -181,82 +189,107 @@ export function useLinkFetches(entityId: string) {
   return { fetches, attach, attachPicked, dismiss }
 }
 
-/** One pasted link that has not become a row yet. */
+const FOLDER_REFUSAL =
+  'That’s a folder. Link a Drive folder instead to keep it in sync.'
+
+/** One pasted link or picked file that has not become a row yet. */
 export function LinkFetchRow({
   fetch,
   onDismiss,
+  onLinkFolder = null,
 }: {
   fetch: LinkFetch
   onDismiss: () => void
+  /** Opens Link a Drive folder for a refused folder link. */
+  onLinkFolder?: ((url: string) => void) | null
 }) {
   const { state } = fetch
-  const failed = state.kind === 'refused'
-  const settled = state.kind === 'refused' || state.kind === 'connect'
+  const inFlight = state.kind === 'sending' || state.kind === 'fetching'
+  const reason =
+    state.kind === 'refused'
+      ? state.reason
+      : state.kind === 'folder'
+        ? FOLDER_REFUSAL
+        : state.kind === 'connect'
+          ? `Connect your Google ${fetch.label} to fetch this file.`
+          : null
   return (
-    <li className="flex h-9 items-center gap-2.5 border-t border-rule px-3 text-ui first:border-t-0">
-      <span className="flex size-[1.375rem] shrink-0 items-center justify-center border border-hairline bg-paper">
-        {settled ? (
-          <FileIcon
-            className={cn(
-              'size-3',
-              failed ? 'text-destructive' : 'text-graphite',
-            )}
-            strokeWidth={1.75}
-          />
-        ) : (
-          <Loader2
-            className="size-3 animate-spin text-graphite motion-reduce:animate-none"
-            strokeWidth={1.75}
-          />
-        )}
-      </span>
-      <span className="min-w-0 flex-1 truncate">{fetch.name}</span>
-      {state.kind === 'connect' ? (
-        <a
-          href={state.href}
-          className="focus-ring shrink-0 text-ui text-primary hover:underline"
-        >
-          {state.action}
-        </a>
-      ) : (
+    <li
+      className={cn(
+        'flex min-h-ledger-row items-center gap-3 border-b border-rule px-3 py-1.5',
+        inFlight && 'bg-selected',
+      )}
+    >
+      <FileGlyph type="file" pending />
+      <div className="flex min-w-0 flex-1 flex-col">
         <span
           className={cn(
-            'min-w-0 shrink truncate mono text-micro',
-            failed ? 'text-destructive' : 'text-graphite',
+            'min-w-0 truncate',
+            fetch.link ? 'mono text-label text-graphite' : 'text-body',
           )}
-          title={failed ? state.reason : undefined}
         >
-          {state.kind === 'refused'
-            ? state.reason
-            : `Fetching from ${fetch.label}…`}
+          {fetch.name}
         </span>
-      )}
-      {settled ? (
-        <Button
-          size="icon-xs"
-          variant="ghost"
-          aria-label={`Dismiss ${fetch.name}`}
-          onClick={onDismiss}
-          className="text-graphite"
-        >
-          <X />
+        {reason === null ? null : (
+          <span
+            title={reason}
+            className={cn(
+              'min-w-0 truncate text-label',
+              state.kind === 'connect' ? 'text-foreground' : 'text-destructive',
+            )}
+          >
+            {reason}
+          </span>
+        )}
+      </div>
+      {inFlight ? (
+        <span className="shrink-0 mono text-micro text-foreground">
+          fetching.
+        </span>
+      ) : null}
+      {state.kind === 'connect' ? (
+        <Button asChild size="sm">
+          <a href={state.href}>{state.action}</a>
         </Button>
       ) : null}
+      {state.kind === 'folder' && onLinkFolder !== null ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => onLinkFolder(state.url)}
+        >
+          Link folder…
+        </Button>
+      ) : null}
+      {inFlight ? null : (
+        <button
+          type="button"
+          aria-label={`Dismiss ${fetch.name}`}
+          onClick={onDismiss}
+          className="focus-ring shrink-0 mono text-micro text-graphite hover:text-foreground"
+        >
+          ×
+        </button>
+      )}
     </li>
   )
 }
 
 /**
- * The paste row under the list: a Drive link pasted or entered here is
- * fetched; any other link is saved as a page, as a dropped one is. `action`
- * sits at its end: "Attach from Drive".
+ * The add row that opens the Files tab: `+ Drop files, or paste a Drive
+ * link…`. A Drive link pasted or entered is fetched; any other link is saved
+ * as a page. The tab's count and buttons ride at its end.
  */
-export function LinkPasteRow({
+export function AddRow({
   onLink,
-  action = null,
+  meta = null,
+  children = null,
 }: {
   onLink: (url: string) => void
-  action?: ReactNode
+  /** Mono beside the buttons: the tab's `n · 31 MB`. */
+  meta?: ReactNode
+  children?: ReactNode
 }) {
   const [value, setValue] = useState('')
 
@@ -268,7 +301,7 @@ export function LinkPasteRow({
   }
 
   return (
-    <div className="flex h-9 items-center gap-2.5 border-b border-rule px-3">
+    <div className="flex h-ledger-row shrink-0 items-center gap-3 border-b border-rule px-3">
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -276,12 +309,14 @@ export function LinkPasteRow({
         }}
         className="flex min-w-0 flex-1 items-center gap-2.5"
       >
-        <Link2 className="size-3 shrink-0 text-graphite" strokeWidth={2} />
+        <span aria-hidden className="shrink-0 text-ui text-primary">
+          +
+        </span>
         <input
           type="url"
           value={value}
           aria-label="Paste a Drive link"
-          placeholder="…or paste a Drive link"
+          placeholder="Drop files, or paste a Drive link…"
           onChange={(e) => setValue(e.target.value)}
           onPaste={(e) => {
             const pasted = e.clipboardData.getData('text').trim()
@@ -292,7 +327,10 @@ export function LinkPasteRow({
           className="focus-ring-inset h-7 min-w-0 flex-1 bg-transparent text-ui placeholder:text-graphite"
         />
       </form>
-      {action}
+      {meta === null ? null : (
+        <span className="shrink-0 mono text-micro text-graphite">{meta}</span>
+      )}
+      {children}
     </div>
   )
 }

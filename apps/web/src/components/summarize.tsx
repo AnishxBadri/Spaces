@@ -131,21 +131,6 @@ export function useSummarizer(
   }
 }
 
-/** The Files-tab row's control: small, beside Read deck. */
-export function SummarizeRowButton({ summarizer }: { summarizer: Summarizer }) {
-  return (
-    <Button
-      size="xs"
-      variant="outline"
-      disabled={summarizer.summarizing}
-      onClick={summarizer.onSummarize}
-      className="mr-1"
-    >
-      {summarizer.summarizing ? 'summarizing…' : 'Summarize'}
-    </Button>
-  )
-}
-
 /**
  * The record header's control: summarize what is filed on this record. No
  * button until the lane is routed at the record's sensitivity.
