@@ -423,7 +423,8 @@ function HeaderCell<T>({
           <DropdownMenuTrigger
             title={`${title} column`}
             className={cn(
-              'group/sort focus-ring-inset -mx-2 flex h-8 w-[calc(100%+1rem)] items-center gap-1.5 truncate px-2 transition-colors duration-150 ease-out-quart hover:bg-bone data-[state=open]:bg-bone',
+              // `lowercase` again: a button resets the th's text-transform.
+              'group/sort focus-ring-inset -mx-2 flex h-8 w-[calc(100%+1rem)] items-center gap-1.5 truncate px-2 lowercase transition-colors duration-150 ease-out-quart hover:bg-bone data-[state=open]:bg-bone',
               // A figures column reads from the right, label last.
               numeric ? 'flex-row-reverse text-right' : 'text-left',
               sorted && 'text-foreground',
