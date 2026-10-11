@@ -8,11 +8,7 @@ import {
   storeCredential,
 } from '@spaces/core/writes/vault'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
-import {
-  getConfiguredProvidersHandler,
-  getProviderAppsHandler,
-  setProviderAppHandler,
-} from './provider-apps'
+import { getProviderAppsHandler, setProviderAppHandler } from './provider-apps'
 
 /**
  * Settings → Connections, the OAuth-client block, driven through the
@@ -250,27 +246,5 @@ describe('the members connected through a client', () => {
     await db
       .delete(accountConnection)
       .where(eq(accountConnection.provider, 'google'))
-  })
-})
-
-describe('which providers a member can connect to', () => {
-  it('lists only providers with an active client, to a member, ids only', async () => {
-    await db.delete(credential).where(eq(credential.kind, 'oauth_client'))
-    asMember()
-    expect(await getConfiguredProvidersHandler()).toEqual([])
-    asAdmin()
-    await setProviderAppHandler({
-      provider: 'google',
-      clientId: CLIENT_ID,
-      clientSecret: SECRET,
-    })
-    asMember()
-    expect(await getConfiguredProvidersHandler()).toEqual(['google'])
-  })
-
-  it('refuses no session', async () => {
-    await expect(getConfiguredProvidersHandler()).rejects.toThrow(
-      'Unauthorized',
-    )
   })
 })

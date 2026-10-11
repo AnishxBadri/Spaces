@@ -3,7 +3,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, asc, count, eq, gt, isNull, ne } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { invite, session, user } from '@spaces/db/schema/auth'
+import { invite, user } from '@spaces/db/schema/auth'
 import { workspace } from '@spaces/db/schema/workspace'
 import { requireAdmin, requireUser } from './shared'
 
@@ -94,18 +94,6 @@ export const setMemberBanned = createServerFn({ method: 'POST' })
     // suspension (SPA-28 — a suspended member's MCP token stops answering).
     const { setMemberBannedHandler } = await import('#/lib/members/suspend')
     return setMemberBannedHandler(data)
-  })
-
-/** "Sign out everywhere" — sessions are DB rows, so revocation is a delete. */
-export const revokeMemberSessions = createServerFn({ method: 'POST' })
-  .validator(z.object({ userId: z.string() }))
-  .handler(async ({ data }) => {
-    const u = await requireUser()
-    if (u.id !== data.userId && u.role !== 'admin') {
-      throw new Error('Admins only')
-    }
-    await db.delete(session).where(eq(session.userId, data.userId))
-    return { ok: true }
   })
 
 // ---------- invites ----------

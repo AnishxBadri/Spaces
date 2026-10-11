@@ -16,16 +16,11 @@ import { startFakeIdp } from '@spaces/core/writes/connections/fake-idp'
 import type { FakeIdp } from '@spaces/core/writes/connections/fake-idp'
 import type { ProviderEndpoints } from '@spaces/core/writes/connections/token'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
-import {
-  disconnectConnectionHandler,
-  refreshConnectionHandler,
-  revokeConnectionHandler,
-} from './custody'
+import { disconnectConnectionHandler } from './custody'
 
 /**
- * The two server fns over the token accessor and revocation, driven through
- * their handlers. Only the request is stubbed; the session check, the vault,
- * the database and the fake IdP are real.
+ * Disconnect, driven through its handler. Only the request is stubbed; the
+ * session check, the vault, the database and the fake IdP are real.
  */
 
 const session: { current: { id: string; role: string } | null } = {
@@ -119,65 +114,6 @@ const statusOf = async (id: string) =>
       .from(accountConnection)
       .where(eq(accountConnection.id, id))
   ).at(0)?.status
-
-describe('refreshConnection', () => {
-  it('refreshes the session user’s connection and returns no token', async () => {
-    const row = await connectionOf(FIXTURE_ACTOR.id)
-    const result = await refreshConnectionHandler(
-      { connectionId: row.id },
-      providers,
-    )
-    expect(idp.tokenRequests).toHaveLength(1)
-    expect(result).toEqual({
-      connectionId: row.id,
-      status: 'active',
-      expiresAt: expect.any(String),
-    })
-    expect(JSON.stringify(result)).not.toContain('fake-access')
-  })
-
-  it("answers 'Not your connection' for a teammate's, before any provider call", async () => {
-    const row = await connectionOf(TEAMMATE.id)
-    await expect(
-      refreshConnectionHandler({ connectionId: row.id }, providers),
-    ).rejects.toThrow('Not your connection')
-    await expect(
-      refreshConnectionHandler(
-        { connectionId: crypto.randomUUID() },
-        providers,
-      ),
-    ).rejects.toThrow('Not your connection')
-    expect(idp.tokenRequests).toHaveLength(0)
-  })
-
-  it('refuses without a session', async () => {
-    session.current = null
-    const row = await connectionOf(FIXTURE_ACTOR.id)
-    await expect(
-      refreshConnectionHandler({ connectionId: row.id }, providers),
-    ).rejects.toThrow('Unauthorized')
-  })
-})
-
-describe('revokeConnection', () => {
-  it('revokes the session user’s connection at the provider', async () => {
-    const row = await connectionOf(FIXTURE_ACTOR.id)
-    await expect(
-      revokeConnectionHandler({ connectionId: row.id }, providers),
-    ).resolves.toEqual({ connectionId: row.id, outcome: 'revoked' })
-    expect(idp.revokeRequests).toHaveLength(1)
-    expect(await statusOf(row.id)).toBe('revoked')
-  })
-
-  it("answers 'Not your connection' for a teammate's and leaves it", async () => {
-    const row = await connectionOf(TEAMMATE.id)
-    await expect(
-      revokeConnectionHandler({ connectionId: row.id }, providers),
-    ).rejects.toThrow('Not your connection')
-    expect(idp.revokeRequests).toHaveLength(0)
-    expect(await statusOf(row.id)).toBe('active')
-  })
-})
 
 /** Every line the Effect logger printed while `run` ran. */
 async function logged(run: () => Promise<unknown>): Promise<string> {

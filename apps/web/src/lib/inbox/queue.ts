@@ -44,11 +44,11 @@ import { JUDGMENT, JUDGMENT_REF } from './review-groups'
 import type { InboxSide } from './context'
 
 /**
- * The review inbox's queue (SPA-76, SPA-98) — one list over typed rows and
- * one count over the tables behind them. `lib/server/inbox.ts` is the door
- * (session check, then these programs through `effectFn()`); the programs
- * live here, outside `lib/server/`, so the suite can drive them without a
- * request and nothing below reaches the client bundle (SPA-155).
+ * The review inbox's queue (SPA-76, SPA-98) — one list over typed rows.
+ * `lib/server/inbox.ts` is the door (session check, then these programs
+ * through `effectFn()`); the programs live here, outside `lib/server/`, so
+ * the suite can drive them without a request and nothing below reaches the
+ * client bundle (SPA-155).
  *
  * Two lanes today: `duplicate_candidate` (the sweep's pairs) and
  * `suggestion` (the AI layer's proposals, spec-ai-substrate.md §10). A later
@@ -249,12 +249,6 @@ export type InboxKind = InboxRow['kind']
  * by. A column run's group is suggestions, gathered; it is not a lane.
  */
 export type InboxLane = 'suggestion' | 'duplicate_candidate'
-
-/** `open` is the whole queue; `byKind` is what each lane contributes. */
-export type InboxCounts = {
-  open: number
-  byKind: Record<InboxLane, number>
-}
 
 /**
  * What the queue is narrowed to. Null or absent: not narrowed that way.
@@ -759,45 +753,6 @@ export const listInboxProgram = Effect.fn('listInboxProgram')(function* (
     x.latestAt === y.latestAt ? 0 : x.latestAt < y.latestAt ? 1 : -1,
   )
 })
-
-/**
- * One round trip, one `UNION ALL` of the same two columns per lane — never
- * the list itself. Each arm is an aggregate with no `GROUP BY`, so it always
- * answers one row, zero included, and every caller keeps reading `byKind`:
- * Today's cell is `open`, /companies' banner is `byKind.duplicate_candidate`.
- */
-export const countOpenInboxProgram = Effect.fn('countOpenInboxProgram')(
-  function* (): Effect.fn.Return<InboxCounts, InboxQueryFailed> {
-    const rows = yield* query(() =>
-      db
-        .select({
-          kind: sql<InboxLane>`'suggestion'`.as('kind'),
-          value: count(),
-        })
-        .from(suggestion)
-        .where(eq(suggestion.status, 'open'))
-        .unionAll(
-          db
-            .select({
-              kind: sql<InboxLane>`'duplicate_candidate'`.as('kind'),
-              value: count(),
-            })
-            .from(duplicateCandidate)
-            .where(eq(duplicateCandidate.status, 'open')),
-        ),
-    )
-    const byKind: Record<InboxLane, number> = {
-      duplicate_candidate: 0,
-      suggestion: 0,
-    }
-    let open = 0
-    for (const row of rows) {
-      byKind[row.kind] = row.value
-      open += row.value
-    }
-    return { open, byKind }
-  },
-)
 
 /** The record the inbox is scoped to, named for the header's chip. */
 export type InboxScopeRecord = { id: string; name: string }

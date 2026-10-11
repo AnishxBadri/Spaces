@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * SPA-98. The inbox's second lane: open suggestions grouped one card per
- * record, sharing the queue with duplicate pairs newest-first, and one
- * `UNION ALL` count over both tables. Integration against this worker's test
+ * record, sharing the queue with duplicate pairs newest-first. Integration against this worker's test
  * database, truncated and reseeded before the file was imported (SPA-145) —
  * no cleanup here, and the tests below build on each other's rows.
  */
@@ -175,24 +174,10 @@ describe('listInbox — the suggestion lane', () => {
   })
 })
 
-describe('countOpenInbox — one UNION ALL over both tables', () => {
-  it('is open suggestions plus open duplicate candidates', async () => {
-    const { Effect } = await import('effect')
-    const { countOpenInboxProgram } = await import('./queue')
-    await setup()
-
-    const counts = await Effect.runPromise(countOpenInboxProgram())
-    expect(counts).toEqual({
-      open: 4,
-      byKind: { suggestion: 3, duplicate_candidate: 1 },
-    })
-  })
-})
-
 describe('reject and accept leave the queue', () => {
-  it('never shows a rejected suggestion again, and counts it out', async () => {
+  it('never shows a rejected suggestion again', async () => {
     const { Effect } = await import('effect')
-    const { listInboxProgram, countOpenInboxProgram } = await import('./queue')
+    const { listInboxProgram } = await import('./queue')
     const { rejectProgram } = await import('#/lib/ai/propose')
     const f = await setup()
 
@@ -209,12 +194,6 @@ describe('reject and accept leave the queue', () => {
     // Acme's card now sorts by its remaining member (09:01) — last.
     expect(rows.map((r) => r.id)).toEqual([f.pairId, f.bolt, f.acme])
 
-    const counts = await Effect.runPromise(countOpenInboxProgram())
-    expect(counts).toEqual({
-      open: 3,
-      byKind: { suggestion: 2, duplicate_candidate: 1 },
-    })
-
     // Rejecting again is refused rather than reopening it.
     const again = await Effect.runPromiseExit(
       rejectProgram(f.acmeNote, { type: 'user', id: f.me }),
@@ -224,7 +203,7 @@ describe('reject and accept leave the queue', () => {
 
   it('drops a record’s card once its last suggestion is accepted', async () => {
     const { Effect } = await import('effect')
-    const { listInboxProgram, countOpenInboxProgram } = await import('./queue')
+    const { listInboxProgram } = await import('./queue')
     const { acceptProgram } = await import('#/lib/ai/propose')
     const f = await setup()
 
@@ -236,18 +215,14 @@ describe('reject and accept leave the queue', () => {
 
     const rows = await Effect.runPromise(listInboxProgram())
     expect(rows.map((r) => r.id)).toEqual([f.pairId, f.bolt])
-    const counts = await Effect.runPromise(countOpenInboxProgram())
-    expect(counts.open).toBe(2)
-    // The /companies banner reads this lane alone, unchanged.
-    expect(counts.byKind.duplicate_candidate).toBe(1)
   })
 
-  it('counts zero in both lanes when nothing is open', async () => {
+  it('is empty in both lanes when nothing is open', async () => {
     const { Effect } = await import('effect')
     const { db } = await import('@spaces/db')
     const { duplicateCandidate } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
-    const { countOpenInboxProgram } = await import('./queue')
+    const { listInboxProgram } = await import('./queue')
     const { rejectProgram } = await import('#/lib/ai/propose')
     const f = await setup()
 
@@ -259,10 +234,6 @@ describe('reject and accept leave the queue', () => {
       .set({ status: 'dismissed', resolvedBy: f.me, resolvedAt: new Date() })
       .where(eq(duplicateCandidate.id, f.pairId))
 
-    const counts = await Effect.runPromise(countOpenInboxProgram())
-    expect(counts).toEqual({
-      open: 0,
-      byKind: { suggestion: 0, duplicate_candidate: 0 },
-    })
+    expect(await Effect.runPromise(listInboxProgram())).toEqual([])
   })
 })

@@ -51,12 +51,6 @@ export const seedDemo = createServerFn({ method: 'POST' }).handler(async () => {
   return seedDemoData(u.id)
 })
 
-export const canSeedDemoData = createServerFn().handler(async () => {
-  await requireUser()
-  const { canSeedDemo } = await import('../seeds/demo')
-  return { canSeed: await canSeedDemo() }
-})
-
 /**
  * The workspace logo set or removed from General: written at once, admin
  * only. The bytes it replaced are reclaimed once no row names them. (D81)

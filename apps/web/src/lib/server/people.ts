@@ -2,60 +2,14 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { entity, entityAlias, link, person } from '@spaces/db/schema'
+import { entity, link, person } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
-import { jsonString } from '@spaces/core/json'
 import { groupReferencedBy, referencedByRows, requireUser } from './shared'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import { emitDomainEvent } from '#/lib/events/emit'
 import { pagedListInput, pageOptions } from '#/lib/views/page-input'
 import { recordSpaces } from '#/lib/spaces/filed-in'
-
-export const listPeople = createServerFn().handler(async () => {
-  await requireUser()
-  const rows = await db
-    .select({
-      id: entity.id,
-      name: entity.canonicalName,
-      values: entity.values,
-      createdAt: entity.createdAt,
-    })
-    .from(entity)
-    .innerJoin(person, eq(person.entityId, entity.id))
-    .where(isNull(entity.mergedIntoId))
-    .orderBy(desc(entity.createdAt))
-  if (rows.length === 0) return []
-
-  // Primary email + companies per person, batched.
-  const emails = await db
-    .select({ entityId: entityAlias.entityId, email: entityAlias.valueNorm })
-    .from(entityAlias)
-    .where(and(eq(entityAlias.kind, 'email'), eq(entityAlias.isIdentity, true)))
-  const emailBy = new Map(emails.map((e) => [e.entityId, e.email]))
-
-  // Names for every `companies` value; the value decides which and in what order.
-  const { companyIdsOf, personCompanyEdge } =
-    await import('../people/companies')
-  const named = await db
-    .select({ id: entity.id, name: entity.canonicalName })
-    .from(link)
-    .innerJoin(entity, eq(entity.id, link.toEntityId))
-    .where(and(personCompanyEdge, isNull(entity.mergedIntoId)))
-  const nameBy = new Map(named.map((c) => [c.id, c.name]))
-
-  return rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    headline: jsonString(r.values.job_title),
-    email: emailBy.get(r.id) ?? null,
-    companies: companyIdsOf(r.values).flatMap((id) => {
-      const name = nameBy.get(id)
-      return name === undefined ? [] : [{ id, name }]
-    }),
-    createdAt: r.createdAt.toISOString(),
-  }))
-})
 
 /**
  * The `/people` table, on views-3's paging contract: values, identity emails

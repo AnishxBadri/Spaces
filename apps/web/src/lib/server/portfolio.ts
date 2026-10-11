@@ -4,10 +4,8 @@ import { z } from 'zod'
 import { db } from '@spaces/db'
 import { workspace } from '@spaces/db/schema'
 import { fxRate } from '@spaces/db/schema/portfolio'
-import type { MetricsResult } from '@spaces/core/portfolio/metrics'
-import type { Ownership } from '@spaces/core/portfolio/ownership'
 import { baseCurrency, loadFxRates, loadPortfolio } from '../portfolio/detail'
-import { birthHolding, requireUser } from './shared'
+import { requireUser } from './shared'
 
 /**
  * The financial engine's server layer (CONTEXT.md phase 15). Events are
@@ -31,20 +29,6 @@ export const listHoldings = createServerFn()
     return loadPortfolio(data?.asOf)
   })
 
-export type HoldingDetail = {
-  id: string
-  companyId: string
-  companyName: string
-  openedAt: string
-  metrics: MetricsResult
-  ownership: Ownership
-  rounds: Array<Record<string, unknown>>
-  investments: Array<Record<string, unknown>>
-  marks: Array<Record<string, unknown>>
-  distributions: Array<Record<string, unknown>>
-}
-
-/** The tear-sheet read: every event, plus computed metrics and ownership. */
 /** The tear-sheet read: every event, plus computed metrics and ownership. */
 export const getHolding = createServerFn()
   .validator(z.object({ id: z.string().uuid(), asOf: z.string().optional() }))
@@ -57,19 +41,6 @@ export const getHolding = createServerFn()
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
 const ccy = z.string().length(3).toUpperCase()
 const money = z.number().finite().nonnegative()
-
-export const createHolding = createServerFn({ method: 'POST' })
-  .validator(
-    z.object({ companyId: z.string().uuid(), openedAt: isoDate.optional() }),
-  )
-  .handler(async ({ data }) => {
-    const u = await requireUser()
-    return birthHolding({
-      companyId: data.companyId,
-      actorId: u.id,
-      openedAt: data.openedAt,
-    })
-  })
 
 /**
  * The four event writers are thin callers (SPA-171): the bodies are the

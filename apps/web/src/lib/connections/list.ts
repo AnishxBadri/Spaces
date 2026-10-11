@@ -50,12 +50,6 @@ export const listConnectionsProgram = Effect.fn('listConnections')(function* (
   return listed
 })
 
-/** The server fn's body. `requireUser()` first, always. */
-export async function listConnectionsHandler(): Promise<ConnectionListRow[]> {
-  const user = await requireUser()
-  return effectFn(listConnectionsProgram)(user.id)
-}
-
 /**
  * What the accounts pages draw: the reader's connections, the providers with
  * an OAuth client, and which plugins are installed or offered by the

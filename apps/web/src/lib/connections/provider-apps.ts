@@ -15,11 +15,7 @@ import {
 } from '@spaces/core/writes/vault'
 import { effectFn } from '#/lib/server/effect'
 import { describeExternalOrigin } from '#/lib/server/external-origin'
-import {
-  requireAdmin,
-  requireSettingsReader,
-  requireUser,
-} from '#/lib/server/shared'
+import { requireAdmin, requireSettingsReader } from '#/lib/server/shared'
 import { redactProviderApp } from '#/lib/settings-redact'
 import type { ProviderAppInput, ProviderAppRow } from './input'
 
@@ -147,12 +143,6 @@ export async function getProviderAppsHandler(): Promise<ProviderAppRow[]> {
   const { isAdmin } = await requireSettingsReader()
   const apps = await effectFn(getProviderAppsProgram)()
   return isAdmin ? apps : apps.map(redactProviderApp)
-}
-
-/** Any signed-in member: connecting is theirs, the client is the admin's. */
-export async function getConfiguredProvidersHandler(): Promise<ProviderId[]> {
-  await requireUser()
-  return effectFn(getConfiguredProvidersProgram)()
 }
 
 export async function setProviderAppHandler(

@@ -3,11 +3,11 @@ import { db } from '@spaces/db'
 import { accountConnection, integration, user } from '@spaces/db/schema'
 import { encryptBundle } from '@spaces/core/writes/connections/bundle'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
-import { listAccountsHandler, listConnectionsHandler } from './list'
+import { listAccountsHandler } from './list'
 
 /**
- * The list server fn's body, driven through its handler. Only the request is
- * stubbed; the session check and the database are real.
+ * The accounts server fn's body, driven through its handler. Only the
+ * request is stubbed; the session check and the database are real.
  */
 
 const session: { current: { id: string; role: string } | null } = {
@@ -65,39 +65,6 @@ async function connectionOf(userId: string, externalEmail: string) {
   if (row === undefined) throw new Error('no connection row')
   return row
 }
-
-describe('listMyConnections', () => {
-  it("returns the session user's rows and never another member's", async () => {
-    const mine = await connectionOf(FIXTURE_ACTOR.id, 'me@fund.example')
-    const theirs = await connectionOf(TEAMMATE.id, 'them@fund.example')
-
-    const rows = await listConnectionsHandler()
-    expect(rows).toEqual([
-      {
-        connectionId: mine.id,
-        provider: 'google',
-        product: 'drive',
-        externalEmail: 'me@fund.example',
-        scopes: ['openid', 'email', 'drive.file'],
-        status: 'active',
-        errorReason: null,
-        lastSyncAt: null,
-        connectedAt: mine.createdAt.toISOString(),
-      },
-    ])
-    expect(JSON.stringify(rows)).not.toContain(theirs.id)
-    expect(JSON.stringify(rows)).not.toContain('secret')
-
-    session.current = { id: TEAMMATE.id, role: 'admin' }
-    const theirRows = await listConnectionsHandler()
-    expect(theirRows.map((r) => r.connectionId)).toEqual([theirs.id])
-  })
-
-  it('refuses without a session', async () => {
-    session.current = null
-    await expect(listConnectionsHandler()).rejects.toThrow('Unauthorized')
-  })
-})
 
 describe('getMyAccounts', () => {
   it("hands the reader's rows, the configured providers and which plugins are installed", async () => {

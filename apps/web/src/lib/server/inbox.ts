@@ -27,7 +27,6 @@ export type {
   DiscoveryRow,
   DiscoverySpace,
   DuplicateCandidateRow,
-  InboxCounts,
   InboxFilterLabels,
   InboxKind,
   InboxLane,
@@ -78,13 +77,6 @@ export const listInbox = createServerFn()
     ])
     return { rows, scope, filter }
   })
-
-export const countOpenInbox = createServerFn().handler(async () => {
-  await requireUser()
-  const { countOpenInboxProgram } = await import('../inbox/queue')
-  const { effectFn } = await import('./effect')
-  return effectFn(countOpenInboxProgram)()
-})
 
 export const mergeDuplicate = createServerFn({ method: 'POST' })
   .validator(

@@ -14,7 +14,6 @@ import { user } from '@spaces/db/schema/auth'
 import { apiToken } from '@spaces/db/schema/tokens'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
-import { getRecordContextHandler } from '#/lib/ai/record-context-handler'
 import {
   createApiTokenProgram,
   listApiTokensProgram,
@@ -31,9 +30,8 @@ import { readEmbeddingPinProgram } from '#/lib/ai/embedding-pin'
  * SPA-23 — the MCP read surface, end to end: a real MCP client speaks
  * Streamable HTTP to `handleMcpRequest` (the `/api/mcp` route's whole body)
  * through an in-process fetch, with a token minted by the real store. The
- * one thing a suite cannot build — the browser session `getRecordContext`
- * reads — is stubbed exactly as `ai/providers/settings.test.ts` stubs it,
- * so the record page's own handler runs for the byte-for-byte comparison.
+ * browser session the palette and member handlers read is stubbed, so their
+ * own handlers run for the comparisons.
  */
 
 const session: { current: { id: string; role: string } | null } = {
@@ -323,45 +321,6 @@ describe('an MCP client with a per-user token', () => {
     const rec = tools.find((t) => t.name === 'get_record')
     expect(Object.keys(rec?.inputSchema.properties ?? {})).toEqual(['id'])
     expect(rec?.inputSchema.required).toEqual(['id'])
-  })
-
-  it('get_context returns getRecordContext byte for byte, for the same user, budget and asOf', async () => {
-    const created = await mint(FIXTURE_ACTOR.id, 'context')
-    const client = await connect(created.token)
-    // One clock for both surfaces: only `Date` is faked, so the transport's
-    // timers still run.
-    vi.useFakeTimers({ toFake: ['Date'] })
-    vi.setSystemTime(new Date('2026-09-27T12:00:00.000Z'))
-
-    session.current = { id: FIXTURE_ACTOR.id, role: 'member' }
-    for (const budget of [undefined, 1200]) {
-      const page = await getRecordContextHandler({
-        entityId: fixture.companyId,
-        ...(budget === undefined ? {} : { budgetChars: budget }),
-      })
-      const byId = textOf(
-        await client.callTool({
-          name: 'get_context',
-          arguments: {
-            entity: fixture.companyId,
-            ...(budget === undefined ? {} : { budget }),
-          },
-        }),
-      )
-      expect(byId).toBe(JSON.stringify(page))
-      expect(page.items.length).toBeGreaterThan(0)
-    }
-
-    // By exact name, the same record and the same bytes.
-    const page = await getRecordContextHandler({ entityId: fixture.companyId })
-    const byName = textOf(
-      await client.callTool({
-        name: 'get_context',
-        arguments: { entity: fixture.companyName.toLowerCase() },
-      }),
-    )
-    expect(byName).toBe(JSON.stringify(page))
-    await client.close()
   })
 
   it('never shows a second user the first user’s private note, through either tool', async () => {

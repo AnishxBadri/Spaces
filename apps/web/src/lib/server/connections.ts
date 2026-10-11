@@ -27,13 +27,6 @@ export const getProviderApps = createServerFn().handler(async () => {
   return getProviderAppsHandler()
 })
 
-/** The providers a member can connect to: those with an active OAuth client. */
-export const getConfiguredProviders = createServerFn().handler(async () => {
-  const { getConfiguredProvidersHandler } =
-    await import('../connections/provider-apps')
-  return getConfiguredProvidersHandler()
-})
-
 /** Saves a provider's client id and, when given, its secret; returns the redacted row. */
 export const setProviderApp = createServerFn({ method: 'POST' })
   .validator(providerAppInput)
@@ -41,14 +34,6 @@ export const setProviderApp = createServerFn({ method: 'POST' })
     const { setProviderAppHandler } =
       await import('../connections/provider-apps')
     return setProviderAppHandler(data)
-  })
-
-/** Forces a refresh of one of the session user's connections; never returns the token. */
-export const refreshConnection = createServerFn({ method: 'POST' })
-  .validator(connectionIdInput)
-  .handler(async ({ data }) => {
-    const { refreshConnectionHandler } = await import('../connections/custody')
-    return refreshConnectionHandler(data)
   })
 
 /**
@@ -68,12 +53,4 @@ export const disconnectConnection = createServerFn({ method: 'POST' })
     const { disconnectConnectionHandler } =
       await import('../connections/custody')
     return disconnectConnectionHandler(data)
-  })
-
-/** Revokes one of the session user's connections at the provider and marks it revoked. */
-export const revokeConnection = createServerFn({ method: 'POST' })
-  .validator(connectionIdInput)
-  .handler(async ({ data }) => {
-    const { revokeConnectionHandler } = await import('../connections/custody')
-    return revokeConnectionHandler(data)
   })
