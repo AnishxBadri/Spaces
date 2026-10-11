@@ -235,8 +235,7 @@ export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
  * `docs/spec-storage-sources.md` §11 delta 6).
  *
  * A count, not the list: the readout wants one number, and the shelf query
- * above folds edges into every row it returns to produce it. Same reason
- * `countOpenInbox` exists beside `listInbox`.
+ * above folds edges into every row it returns to produce it.
  *
  * The `merged_into_id` exclusion is the shelf's, restated here because it is
  * the same definition of "a document" — a badge counting tombstones would

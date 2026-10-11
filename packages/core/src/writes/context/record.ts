@@ -13,8 +13,8 @@ import { resolveRefsProgram } from './names'
 /**
  * The record page's Context section, as one program: assemble the record for
  * the requesting user, then label every item's ref for a person to read. The
- * clock and the budget are arguments — `getRecordContext` stamps them at the
- * server-fn boundary — so this stays as deterministic as the assembler is.
+ * clock and the budget are arguments — the caller stamps them at its
+ * boundary — so this stays as deterministic as the assembler is.
  *
  * In core since SPA-182, beside the assembler. Like it, it declares the
  * `SimilarLane` service rather than importing the embedding substrate: the

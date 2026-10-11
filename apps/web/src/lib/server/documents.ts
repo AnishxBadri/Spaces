@@ -336,10 +336,10 @@ export const listDocuments = createServerFn()
  * How many documents are unfiled — one number for Today's readout strip
  * (SPA-124, `docs/spec-storage-sources.md` §11 delta 6).
  *
- * Its own server fn rather than a field on some existing loader's answer,
- * for the reason `countOpenInbox` is its own: Today reads six counters from
- * five domains in one `Promise.all`, and a documents count wedged into the
- * inbox's shape would make one domain's reader answer for another's. The
+ * Its own server fn rather than a field on some existing loader's answer:
+ * Today reads its counters from several domains in one `Promise.all`, and a
+ * documents count wedged into the inbox's shape would make one domain's
+ * reader answer for another's. The
  * predicate behind it is `unfiledPredicate()`, the same fragment
  * `listDocuments({ filed: 'unfiled' })` filters with, so the badge and the
  * list it links to cannot disagree.
