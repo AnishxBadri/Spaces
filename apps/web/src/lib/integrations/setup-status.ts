@@ -10,7 +10,6 @@ import {
   user,
 } from '@spaces/db/schema'
 import { manifestSchema } from '@spaces/sdk'
-import { isLaneRoutedProgram } from '#/lib/ai/route'
 import type { SetupState } from '#/lib/setup/whats-set-up'
 
 /**
@@ -63,16 +62,12 @@ export const setupAudienceProgram = Effect.fn('setupAudienceProgram')(
   },
 )
 
-/** Whether the Extract lane is routed for a normal record — the Website's one need. */
-const websiteAvailable = () =>
-  isLaneRoutedProgram('extract', null).pipe(Effect.map((r) => r.normal))
-
 /**
  * What's set up, each item from where it lives:
  * - AI model: an active `llm` credential in the vault (Ollama is one too).
  * - Team: more than one user.
- * - Enrichment: a runnable plugin with the `enrichment` role, or the Website
- *   source available (Extract routed).
+ * - Enrichment: a runnable plugin with the `enrichment` role. The Website
+ *   source needs nothing, so it never counts. (D80)
  * - Email forwarding: a `mailbox` row.
  * - Google: an `account_connection` with provider google, not revoked.
  * - Granola, Exa: an enabled `integration` row with that capability id.
@@ -129,7 +124,7 @@ export const whatsSetUpProgram = Effect.fn('whatsSetUpProgram')(
     return {
       model: n(llm) > 0,
       team: n(users) > 1,
-      enrichment: enrichmentPlugin || (yield* websiteAvailable()),
+      enrichment: enrichmentPlugin,
       forwarding: n(mailboxes) > 0,
       google: n(google) > 0,
       granola: enabled('granola'),

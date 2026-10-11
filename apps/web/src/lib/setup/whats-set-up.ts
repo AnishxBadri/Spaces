@@ -52,7 +52,7 @@ export const SETUP_ITEMS: ReadonlyArray<SetupItem> = [
   {
     id: 'enrichment',
     label: 'Enrichment',
-    unlocks: 'Company fields filled from the web',
+    unlocks: 'Sources beyond the company website',
     to: '/settings/enrichment',
   },
   {
