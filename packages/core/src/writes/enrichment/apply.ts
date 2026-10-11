@@ -21,6 +21,7 @@ import {
   written,
 } from '../../enrichment/plan'
 import { WEBSITE_NAME } from '../../enrichment/website'
+import type { SkipNote } from '../../enrichment/sources'
 import {
   PICTURE_NAMES,
   PICTURE_KEYS,
@@ -83,6 +84,10 @@ export type RunSource = {
   readonly skipped?: string
   /** The skip in the run's timeline line, when the owner should see it ("sensitive"). */
   readonly line?: string
+  /** Its name on the timeline line when it says which part ran ("Website (markup)"). */
+  readonly name?: string
+  /** A part it skipped that the owner should see, though it ran. */
+  readonly notes?: ReadonlyArray<SkipNote>
 }
 
 export type RunInput = {
@@ -278,11 +283,12 @@ const runReceipt = (
   reason: input.reason,
   sources: input.sources.map((s) => ({
     integrationId: s.integrationId,
-    name: names.get(s.integrationId) ?? s.integrationId,
+    name: s.name ?? names.get(s.integrationId) ?? s.integrationId,
     asked: s.asked === null ? null : [...s.asked],
     credits: s.credits,
     ...(s.skipped === undefined ? {} : { skipped: s.skipped }),
     ...(s.line === undefined ? {} : { line: s.line }),
+    ...(s.notes === undefined ? {} : { notes: s.notes.map((n) => ({ ...n })) }),
   })),
   fields: decision.fields.map((f) => ({
     key: f.key,
@@ -517,7 +523,8 @@ export async function applyRun(input: RunInput): Promise<RunApplied> {
   )
   const fields = written(decision).length
   const credits = input.sources.reduce((sum, s) => sum + s.credits, 0)
-  const nameOf = (s: RunSource) => names.get(s.integrationId) ?? s.integrationId
+  const nameOf = (s: RunSource) =>
+    s.name ?? names.get(s.integrationId) ?? s.integrationId
   const sources = input.sources
     .filter((s) => s.skipped === undefined)
     .map(nameOf)
@@ -527,6 +534,7 @@ export async function applyRun(input: RunInput): Promise<RunApplied> {
         ? []
         : [{ name: nameOf(s), why: s.line }],
     ),
+    ...input.sources.flatMap((s) => s.notes ?? []),
     ...(input.picture?.outcome === 'refused'
       ? [{ name: pictureName(input.picture.key), why: input.picture.why }]
       : []),

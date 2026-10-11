@@ -141,9 +141,12 @@ describe('the sources in order', () => {
       ['Exa', false],
     ])
     expect(page.sources[0].sends).toBe('domain')
+    // No model is routed here: the Website still runs, on its markup. (D80)
     expect(page.sources[1]).toMatchObject({
       builtIn: true,
       sends: 'nothing out · free',
+      runnable: true,
+      state: 'every new record',
       integrationId: null,
     })
     expect(page.sources[2].state).toBe('off')

@@ -12,12 +12,7 @@ import {
   sql,
 } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import {
-  aiRoute,
-  enrichmentRecord,
-  entity,
-  integration,
-} from '@spaces/db/schema'
+import { enrichmentRecord, entity, integration } from '@spaces/db/schema'
 import { workspace } from '@spaces/db/schema/workspace'
 import { manifestSchema } from '@spaces/sdk'
 import { nextUtcMidnight, utcDayStart } from '../../ai/caps'
@@ -129,8 +124,8 @@ type Ordered = { readonly id: string; readonly row: SourceRow | null }
 
 /**
  * The sources a run over `kind` asks, in the owner's order: the Website
- * when a model reads the Extract lane (companies only), then each runnable
- * row with an enrich action for the kind.
+ * (companies only), then each runnable row with an enrich action for the
+ * kind.
  */
 const sourcesOf = (kind: 'company' | 'person', now: Date) =>
   Effect.gen(function* () {
@@ -158,24 +153,14 @@ const sourcesOf = (kind: 'company' | 'person', now: Date) =>
         )
         .orderBy(asc(integration.createdAt)),
     )
-    const routed =
-      kind === 'company'
-        ? yield* read(() =>
-            db
-              .select({ id: aiRoute.id })
-              .from(aiRoute)
-              .where(eq(aiRoute.lane, 'extract'))
-              .limit(1),
-          )
-        : []
     // Read, never made here: the confirm makes the row before it sends.
     const websiteRow = rows.find(
       (r) => r.capabilityId === ENRICHMENT_CAPABILITY,
     )
     const builtIn: Ordered | null =
-      routed.length === 0
-        ? null
-        : { id: websiteRow?.id ?? ENRICHMENT_CAPABILITY, row: null }
+      kind === 'company'
+        ? { id: websiteRow?.id ?? ENRICHMENT_CAPABILITY, row: null }
+        : null
     const plugins = rows
       .filter((r) => enrichActionFor(r.manifest, kind) !== null)
       .map((r): Ordered => ({ id: r.id, row: r }))

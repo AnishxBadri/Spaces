@@ -1,14 +1,17 @@
 import { Effect, Layer } from 'effect'
 import { and, eq } from 'drizzle-orm'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
-import { enrichmentRecord, entity } from '@spaces/db/schema'
+import { aiUsage, enrichmentRecord, entity } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
+import { user } from '@spaces/db/schema/auth'
 import { EnrichmentSources } from '../../enrichment/sources'
 import { WebsiteReader } from '../../enrichment/website'
 import type { ExtractRoute, FetchedPage } from '../../enrichment/website'
 import { jsonRecord } from '../../json'
 import { Enqueue } from '../../queue/enqueue'
+import { createAttributeProgram } from '../attributes/create'
+import { updateAttributeProgram } from '../attributes/update'
 import { resolveEntity } from '../entities/resolve'
 import { ModelCall, ModelCallRefused } from '../ports/ai'
 import type { ModelCallInput } from '../ports/ai'
@@ -16,9 +19,10 @@ import { ENRICHMENT_CAPABILITY } from './apply'
 import { runEnrichment } from './run'
 
 /**
- * The built-in Website inside a run, over a fake reader and model: where it
- * sits in the order, and what a sensitive record lets it do. The guarded
- * fetch and the real model call are the worker's test. (D76, D80)
+ * The built-in Website inside a run, over a fake reader and model: its two
+ * halves, where it sits in the order, and what a sensitive record lets it
+ * do. The guarded fetch and the real model call are the worker's test.
+ * (D76, D80)
  */
 
 const HOME = `<html><head><title>Keyhold</title></head><body>
@@ -29,6 +33,10 @@ const HOME = `<html><head><title>Keyhold</title></head><body>
 type Fake = {
   routes: { normal: ExtractRoute; sensitive: ExtractRoute }
   page: FetchedPage
+  /** Answers by URL ahead of `page`: an icon, an about page. */
+  served?: { readonly [url: string]: FetchedPage }
+  /** What the model answers, over the default. */
+  answer?: Partial<{ [field: string]: string }>
   refusal?: string
   readonly fetched: Array<string>
   readonly calls: Array<ModelCallInput>
@@ -55,7 +63,7 @@ const layers = (f: Fake) =>
         fetch: (url) =>
           Effect.sync(() => {
             f.fetched.push(url)
-            return f.page
+            return f.served?.[url] ?? f.page
           }),
         extractRoute: (sensitivity) => Effect.succeed(f.routes[sensitivity]),
       }),
@@ -77,6 +85,7 @@ const layers = (f: Fake) =>
                     crunchbase: '',
                     blog: '',
                     logo: '',
+                    ...f.answer,
                   },
                 } as const)
               : Effect.fail(
@@ -155,7 +164,7 @@ const websiteReceipts = async (id: string) =>
   ).map((r) => ({ raw: jsonRecord(r.raw), credits: r.credits }))
 
 describe('the Website in the order', () => {
-  it('reads the domain with the owner’s Extract lane and fills the linked attributes', async () => {
+  it('reads the markup, then the Extract lane for what it left empty', async () => {
     const id = await company(`k${String(n + 1)}.example`)
     const f = fake()
     const outcome = await run(id, f)
@@ -169,19 +178,12 @@ describe('the Website in the order', () => {
       'Keyhold runs key handover for rental homes.',
     )
     expect(values['linkedin']).toBe('https://www.linkedin.com/company/keyhold')
-    expect(await lineOf(id)).toEqual(['Enriched · Website · 2 fields'])
+    expect(await lineOf(id)).toEqual([
+      'Enriched · Website (markup + model) · 2 fields',
+    ])
   })
 
-  it('is absent with no AI model set up, and for a person', async () => {
-    const id = await company(`k${String(n + 1)}.example`)
-    const f = fake({ routes: { normal: 'unrouted', sensitive: 'unrouted' } })
-    expect(await run(id, f)).toEqual({
-      ran: false,
-      reason: 'no source to ask',
-      parked: null,
-    })
-    expect(f.fetched).toEqual([])
-
+  it('is absent for a person', async () => {
     const person = (
       await resolveEntity({
         kind: 'person',
@@ -210,22 +212,147 @@ describe('the Website in the order', () => {
   })
 })
 
+describe('the markup half', () => {
+  const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+  const html = (body: string): FetchedPage => ({
+    ok: true,
+    url: 'https://keyhold.example/',
+    contentType: 'text/html',
+    bytes: new TextEncoder().encode(body),
+  })
+  const icon = (tag: string): FetchedPage => ({
+    ok: true,
+    url: 'https://keyhold.example/touch.png',
+    contentType: 'image/png',
+    bytes: new Uint8Array([...PNG, ...new TextEncoder().encode(tag)]),
+  })
+  const RICH = `<!doctype html><html><head>
+    <title>Keyhold — Key handover for rental homes</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/touch.png">
+    <meta property="og:image" content="/share.png">
+  </head><body>
+    <a href="https://twitter.com/intent/tweet?text=hi">Share</a>
+    <a href="https://www.linkedin.com/company/keyhold/">LinkedIn</a>
+    <a href="https://x.com/keyhold">X</a>
+  </body></html>`
+
+  // The owner links their own attribute to `company.twitter`.
+  let twitter = ''
+  beforeAll(async () => {
+    const createdBy = (await db.select({ id: user.id }).from(user).limit(1)).at(
+      0,
+    )?.id
+    if (createdBy === undefined) throw new Error('no fixture user')
+    const created = await Effect.runPromise(
+      createAttributeProgram({
+        objectKind: 'company',
+        name: 'Twitter',
+        type: 'url',
+        createdBy,
+      }),
+    )
+    await Effect.runPromise(
+      updateAttributeProgram({
+        id: created.id,
+        config: { enrichmentKey: 'company.twitter' },
+      }),
+    )
+    twitter = created.slug
+  })
+
+  it('with no model routed fills the title, the logo and the links, and writes no ai_usage', async () => {
+    const domain = `k${String(n + 1)}.example`
+    const id = await company(domain)
+    const f = fake({
+      routes: { normal: 'unrouted', sensitive: 'unrouted' },
+      page: html(RICH),
+      served: { 'https://keyhold.example/touch.png': icon(domain) },
+    })
+    expect(await run(id, f)).toMatchObject({
+      ran: true,
+      fields: 3,
+      credits: 0,
+      picture: 'set',
+    })
+    expect(f.fetched).toEqual([
+      `https://${domain}/`,
+      'https://keyhold.example/touch.png',
+    ])
+    expect(f.calls).toEqual([])
+    expect(await db.select({ id: aiUsage.id }).from(aiUsage)).toEqual([])
+    const values = await valuesOf(id)
+    expect(values['description']).toBe('Key handover for rental homes')
+    expect(values['linkedin']).toBe('https://www.linkedin.com/company/keyhold/')
+    expect(values[twitter]).toBe('https://x.com/keyhold')
+    expect(await lineOf(id)).toEqual([
+      'Enriched · Website (markup) · 3 fields · logo',
+    ])
+    const receipt = (await websiteReceipts(id)).find(
+      (r) => r.raw['source'] === 'website',
+    )
+    expect(receipt?.credits).toBe(0)
+    expect(receipt?.raw['title']).toBe(
+      'Keyhold — Key handover for rental homes',
+    )
+  })
+
+  it('with a model routed runs both halves; the model fills only what the markup left empty', async () => {
+    const id = await company(`k${String(n + 1)}.example`)
+    const f = fake({
+      page: html(`<html><head><title>Keyhold</title>
+        <meta name="description" content="Keys for property managers.">
+      </head><body>
+        <a href="https://www.linkedin.com/company/keyhold">LinkedIn</a>
+        <p>Keyhold is based in Bengaluru.</p>
+      </body></html>`),
+      answer: {
+        description: 'Keyhold runs key handover for rental homes.',
+        location: 'Bengaluru, India',
+        linkedin: 'https://www.linkedin.com/company/keyhold',
+      },
+    })
+    expect(await run(id, f)).toMatchObject({ ran: true, fields: 3 })
+    expect(f.calls).toHaveLength(1)
+    const values = await valuesOf(id)
+    expect(values['description']).toBe('Keys for property managers.')
+    expect(values['location']).toBe('Bengaluru, India')
+    expect(values['linkedin']).toBe('https://www.linkedin.com/company/keyhold')
+    expect(await lineOf(id)).toEqual([
+      'Enriched · Website (markup + model) · 3 fields',
+    ])
+    const raw = (await websiteReceipts(id))
+      .map((r) => r.raw)
+      .find((r) => r['source'] === 'website')
+    expect(raw?.['markup']).toMatchObject({
+      'company.description': 'Keys for property managers.',
+    })
+  })
+})
+
 describe('a sensitive record', () => {
-  it('with Extract cloud-routed: the Website is skipped, and the timeline says so', async () => {
+  it('with Extract cloud-routed: the markup half reads, the model half is skipped and the timeline says so', async () => {
     const id = await company(`k${String(n + 1)}.example`)
     await sensitive(id)
     const f = fake({ routes: { normal: 'cloud', sensitive: 'cloud' } })
-    expect(await run(id, f)).toMatchObject({ ran: true, fields: 0 })
-    expect(f.fetched).toEqual([])
+    expect(await run(id, f)).toMatchObject({ ran: true, fields: 1 })
+    expect(f.fetched).toEqual([`https://k${String(n)}.example/`])
     expect(f.calls).toEqual([])
-    expect(await lineOf(id)).toEqual(['Website skipped · sensitive'])
-    const [receipt] = await websiteReceipts(id)
-    expect(receipt.raw['sources']).toEqual([
-      expect.objectContaining({ name: 'Website', line: 'sensitive' }),
+    expect(await lineOf(id)).toEqual([
+      'Enriched · Website (markup) · 1 field · Website (model) skipped · sensitive',
+    ])
+    const run_ = (await websiteReceipts(id))
+      .map((r) => r.raw)
+      .find((r) => r['run'] === 'enrichment')
+    expect(run_?.['sources']).toEqual([
+      expect.objectContaining({
+        name: 'Website (markup)',
+        notes: [{ name: 'Website (model)', why: 'sensitive' }],
+      }),
     ])
   })
 
-  it('with a local route: the Website reads, at sensitive', async () => {
+  it('with a local route: both halves read, at sensitive', async () => {
     const id = await company(`k${String(n + 1)}.example`)
     await sensitive(id)
     const f = fake({ routes: { normal: 'cloud', sensitive: 'local' } })
@@ -233,10 +360,12 @@ describe('a sensitive record', () => {
     expect(f.calls.map((c) => c.sensitivity.sensitivity)).toEqual(['sensitive'])
   })
 
-  it('refused by the call itself: skipped as sensitive all the same', async () => {
+  it('refused by the call itself: the model half is skipped as sensitive all the same', async () => {
     const id = await company(`k${String(n + 1)}.example`)
     const f = fake({ refusal: 'SensitiveRouteRefused' })
-    expect(await run(id, f)).toMatchObject({ ran: true, fields: 0 })
-    expect(await lineOf(id)).toEqual(['Website skipped · sensitive'])
+    expect(await run(id, f)).toMatchObject({ ran: true, fields: 1 })
+    expect(await lineOf(id)).toEqual([
+      'Enriched · Website (markup) · 1 field · Website (model) skipped · sensitive',
+    ])
   })
 })

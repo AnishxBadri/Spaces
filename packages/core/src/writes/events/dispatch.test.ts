@@ -11,12 +11,14 @@ import {
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { workspace } from '@spaces/db/schema/workspace'
+import type { Json } from '@spaces/db/json'
 import { defineManifest, toManifestJson } from '@spaces/sdk'
 import type { DomainEvent } from '@spaces/sdk'
 import { z } from 'zod'
 import { jsonRecord, jsonValue } from '../../json'
 import { Enqueue } from '../../queue/enqueue'
 import { setValues } from '../attributes/values'
+import { enrichmentRow } from '../enrichment/apply'
 import { mergeEntities } from '../entities/merge'
 import { resolveEntity, resolveEntityInTx } from '../entities/resolve'
 import type { ResolveSource } from '../entities/resolve'
@@ -45,10 +47,24 @@ const recording = Layer.succeed(
       }),
   }),
 )
+/** The built-in Website out of every scope: these tests watch the plugin queues. */
+const websiteOff = async () => ({
+  [(await enrichmentRow()).id]: { scopes: [], spaces: [] },
+})
+
+const setScopes = async (scopes: { [id: string]: Json }) => {
+  const settings = { enrichment: { scopes } }
+  await db
+    .insert(workspace)
+    .values({ id: 1, name: 'Fund', settings })
+    .onConflictDoUpdate({ target: workspace.id, set: { settings } })
+}
+
 // The harness isolates files, not tests: each test installs its own row.
 beforeEach(async () => {
   sent.length = 0
   await db.delete(integration).where(eq(integration.capabilityId, 'apollo'))
+  await setScopes(await websiteOff())
 })
 
 const dispatch = (event: DomainEvent | null) =>
@@ -326,21 +342,11 @@ describe('dispatchDomainEvent', () => {
         .where(eq(integration.capabilityId, 'apollo'))
     ).at(0)
     if (!row) throw new Error('no row')
-    const settings = {
-      enrichment: { scopes: { [row.id]: { scopes: ['space'], spaces: [] } } },
-    }
-    await db
-      .insert(workspace)
-      .values({ id: 1, name: 'Fund', settings })
-      .onConflictDoUpdate({ target: workspace.id, set: { settings } })
-    try {
-      expect(await dispatch(event())).toEqual([])
-    } finally {
-      await db
-        .update(workspace)
-        .set({ settings: {} })
-        .where(eq(workspace.id, 1))
-    }
+    await setScopes({
+      ...(await websiteOff()),
+      [row.id]: { scopes: ['space'], spaces: [] },
+    })
+    expect(await dispatch(event())).toEqual([])
   })
 
   it('with no subscribers, enqueues nothing and no job runs', async () => {

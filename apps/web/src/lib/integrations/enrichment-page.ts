@@ -37,7 +37,6 @@ import type {
 import { jsonRecord, jsonString } from '@spaces/core/json'
 import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
 import { enrichmentRow } from '@spaces/core/writes/enrichment/apply'
-import { isLaneRoutedProgram } from '#/lib/ai/route'
 import { sendsOf } from './catalogue'
 import { integrationLedgerProgram, spaceOptions } from './ledger'
 import type { IntegrationRow, SpaceOption } from './ledger'
@@ -85,9 +84,9 @@ export type EnrichmentSource = {
   readonly sends: string
   /** In the stored order: asked when runnable. */
   readonly on: boolean
-  /** Asked when on: enabled and loaded, or a routed Website. */
+  /** Asked when on: enabled and loaded; the Website always. */
   readonly runnable: boolean
-  /** `every new record`, `3 / 100 credits today`, `off`, `needs a model`. */
+  /** `every new record`, `3 / 100 credits today`, `off`. */
   readonly state: string
   /** The plugin's own page; null for the Website. */
   readonly integrationId: string | null
@@ -240,7 +239,6 @@ const sourcesProgram = Effect.fn('enrichment.sources')(function* () {
   const stored = yield* readSettings
   const settings = enrichmentSettingsOf(stored)
   const website = yield* query(enrichmentRow)
-  const routed = yield* isLaneRoutedProgram('extract', null)
   const plugins = yield* pluginSources
   const order = settings.sources
   const listed = (id: string) => order === null || order.includes(id)
@@ -250,8 +248,8 @@ const sourcesProgram = Effect.fn('enrichment.sources')(function* () {
     builtIn: true,
     sends: 'nothing out · free',
     on: true,
-    runnable: routed.normal,
-    state: routed.normal ? 'every new record' : 'needs a model',
+    runnable: true,
+    state: 'every new record',
     integrationId: null,
   }
   const rows = plugins.map((p): EnrichmentSource => ({

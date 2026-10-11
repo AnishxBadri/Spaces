@@ -6,13 +6,15 @@ import {
   WEBSITE_KEYS,
   aboutLinkOf,
   isHtml,
+  markupAnswers,
   pageItems,
   readPage,
   websiteAnswers,
+  websiteLabel,
 } from './website'
 import type { WebsiteOutput } from './website'
 
-/** The Website source's pure half: a page read, the about link, the answers kept. (D76) */
+/** The Website source's pure half: a page read, the about link, both halves' answers. (D76, D80) */
 
 const HOME = `<!doctype html>
 <html><head>
@@ -75,6 +77,11 @@ describe('readPage', () => {
       'https://keyhold.example/touch.png',
       'https://keyhold.example/share.png',
     ])
+  })
+
+  it('keeps the declared icons, a touch icon first, and the share image apart', () => {
+    expect(page.icons).toEqual(['https://keyhold.example/touch.png'])
+    expect(page.shareImage).toBe('https://keyhold.example/share.png')
   })
 
   it('finds the about page on its own site', () => {
@@ -158,6 +165,58 @@ describe('websiteAnswers', () => {
         WEBSITE_KEYS,
       ),
     ).toEqual({})
+  })
+})
+
+describe('markupAnswers', () => {
+  const page = readPage(HOME, 'https://keyhold.example/')
+
+  it('answers from the markup alone: the meta description, the profile links, the blog, the icon', () => {
+    expect(markupAnswers(page, WEBSITE_KEYS)).toEqual({
+      'company.description': 'Keys for property managers.',
+      'company.linkedin': 'https://www.linkedin.com/company/keyhold/',
+      'company.twitter': 'https://x.com/keyhold',
+      'company.blog': 'https://blog.keyhold.example/',
+      [LOGO_KEY]: 'https://keyhold.example/touch.png',
+    })
+  })
+
+  it('takes a telling title when there is no description, and the share image when there is no icon', () => {
+    const bare = readPage(
+      `<title>Keyhold | Key handover for rental homes</title>
+       <meta property="og:image" content="https://cdn.example/k.png">
+       <link rel="icon" href="/favicon.svg">
+       <a href="https://facebook.com/sharer.php?u=x">Share</a>
+       <a href="https://www.facebook.com/keyhold">Facebook</a>
+       <a href="https://wellfound.com/company/keyhold">Wellfound</a>
+       <a href="https://www.crunchbase.com/organization/keyhold">CB</a>
+       <a href="/blog/">Blog</a>`,
+      'https://keyhold.example/',
+    )
+    expect(markupAnswers(bare, WEBSITE_KEYS)).toEqual({
+      'company.description': 'Key handover for rental homes',
+      'company.facebook': 'https://www.facebook.com/keyhold',
+      'company.angellist': 'https://wellfound.com/company/keyhold',
+      'company.crunchbase': 'https://www.crunchbase.com/organization/keyhold',
+      'company.blog': 'https://keyhold.example/blog/',
+      [LOGO_KEY]: 'https://cdn.example/k.png',
+    })
+  })
+
+  it('answers nothing a page does not say, and no key nobody asked for', () => {
+    const plain = readPage(
+      `<title>Keyhold</title>
+       <a href="https://twitter.com/intent/tweet">Tweet</a>
+       <a href="https://www.linkedin.com/shareArticle?url=x">Share</a>`,
+      'https://keyhold.example/',
+    )
+    expect(markupAnswers(plain, WEBSITE_KEYS)).toEqual({})
+    expect(markupAnswers(page, ['company.location'])).toEqual({})
+  })
+
+  it('names the halves that ran on the timeline', () => {
+    expect(websiteLabel(false)).toBe('Website (markup)')
+    expect(websiteLabel(true)).toBe('Website (markup + model)')
   })
 })
 

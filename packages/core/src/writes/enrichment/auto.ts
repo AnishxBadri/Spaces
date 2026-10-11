@@ -1,7 +1,7 @@
 import { Clock, Effect } from 'effect'
 import { and, eq, isNull } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { aiRoute, entity } from '@spaces/db/schema'
+import { entity } from '@spaces/db/schema'
 import { manifestSchema } from '@spaces/sdk'
 import type { DomainEvent } from '@spaces/sdk'
 import { nextUtcMidnight, utcDayStart } from '../../ai/caps'
@@ -68,18 +68,11 @@ type Candidate =
 const read = <T>(run: () => Promise<T>) => Effect.tryPromise(run)
 
 /**
- * The Website, when a model reads the Extract lane at all: it is on for
- * every record from install, so its scope is every trigger unless the
- * owner set one. (D76, D80)
+ * The Website, with or without a model: it is on for every record from
+ * install, so its scope is every trigger unless the owner set one. (D76, D80)
  */
 const websiteCandidate = (settings: EnrichmentSettings) =>
-  read(async (): Promise<Candidate | null> => {
-    const routed = await db
-      .select({ id: aiRoute.id })
-      .from(aiRoute)
-      .where(eq(aiRoute.lane, 'extract'))
-      .limit(1)
-    if (routed.length === 0) return null
+  read(async (): Promise<Candidate> => {
     const row = await enrichmentRow()
     return {
       id: row.id,

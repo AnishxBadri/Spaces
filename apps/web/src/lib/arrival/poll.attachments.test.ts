@@ -249,12 +249,14 @@ describe('forwarded attachments file themselves (SPA-115)', () => {
     expect(await spacesOf(doc)).toBe(0)
     expect(await storage().exists(deck.sha)).toBe(true)
 
-    // Extraction queued, and no classify call from this lane.
-    expect(enqueued.map((e) => e.name)).toEqual([
+    // Extraction queued, and no classify call from this lane; the company
+    // the thread made is enriched by the Website besides.
+    const queued = enqueued.filter((e) => e.name !== QUEUES.enrichmentRun)
+    expect(queued.map((e) => e.name)).toEqual([
       QUEUES.pollMailbox,
       QUEUES.extractDocument,
     ])
-    expect(enqueued.at(1)?.data).toEqual({ documentId: doc })
+    expect(queued.at(1)?.data).toEqual({ documentId: doc })
 
     // What the Files row prints its "· via <integration>" suffix from.
     const provenance = await documentProvenance([doc])

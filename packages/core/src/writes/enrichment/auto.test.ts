@@ -24,6 +24,7 @@ import { resolveEntity } from '../entities/resolve'
 import { dispatchDomainEvent } from '../events/dispatch'
 import { writeIntegrationInteraction } from '../interactions/write'
 import { ModelCall } from '../ports/ai'
+import { enrichmentRow } from './apply'
 import { autoEnrichProgram } from './auto'
 import { runEnrichment } from './run'
 
@@ -189,11 +190,17 @@ const receipt = (
     fetchedAt,
   })
 
+/** The Website out of every scope, so a paid source's checks are the ones tested. */
+const paidOnly = async () =>
+  enrichmentSettingsOf({
+    enrichment: { scopes: { [(await enrichmentRow()).id]: { scopes: [] } } },
+  })
+
 const auto = async (event: DomainEvent, at: number = Date.now()) =>
   withClock(
     Effect.gen(function* () {
       const ctx = {
-        settings: enrichmentSettingsOf({}),
+        settings: yield* Effect.promise(paidOnly),
         rows: yield* Effect.promise(rows),
       }
       return yield* autoEnrichProgram(event, ctx)
@@ -230,6 +237,19 @@ describe('the host checks, in order', () => {
       'queued',
       'credits',
     ])
+  })
+
+  it('with no paid source and no model, the Website alone queues a company, sensitive or not', async () => {
+    const website = (await enrichmentRow()).id
+    const id = await company()
+    await db.update(entity).set({ sensitive: true }).where(eq(entity.id, id))
+    const out = await withClock(
+      autoEnrichProgram(linked(id), {
+        settings: enrichmentSettingsOf({}),
+        rows: [],
+      }),
+    )
+    expect(out).toMatchObject({ outcome: 'queued', sources: [website] })
   })
 
   it('a record that passes every check queues one run, keyed on the record, for the sources in scope', async () => {
@@ -529,7 +549,7 @@ describe('a run refused at the cap', () => {
     Layer.succeed(
       WebsiteReader,
       WebsiteReader.of({
-        fetch: () => Effect.die(new Error('no fetch expected')),
+        fetch: () => Effect.succeed({ ok: false, reason: 'offline' }),
         extractRoute: () => Effect.succeed('unrouted'),
       }),
     ),

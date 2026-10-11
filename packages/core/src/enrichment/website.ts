@@ -10,9 +10,12 @@ import type { ContextItem } from '../context/types'
 import { PICTURE_KEYS } from './picture'
 
 /**
- * The built-in Website source, pure half (D76): a company's own pages read
- * to text, the Extract lane's fixed schema, and its output turned into
- * vocabulary answers.
+ * The built-in Website source, pure half (D76, D80): a company's own pages
+ * read to text, in two halves.
+ * - The markup half needs no model: the meta description (else the title),
+ *   the icon or share image as the logo, the profile links in the markup.
+ * - The model half is the Extract lane's fixed schema over the page text; it
+ *   answers only the keys the markup half left empty.
  * - No JavaScript runs: a page is its served HTML, read with regexes.
  * - A link or a logo is answered only when the page itself carries it, so
  *   a model cannot invent a profile URL.
@@ -49,11 +52,31 @@ const FIELDS: { readonly [F in FieldName]: VocabularyKey } = {
 /** The logo's key: a picture key, never linked to an attribute. */
 export const LOGO_KEY: VocabularyKey = PICTURE_KEYS.company
 
+/** The profile links only the markup half reads: the model schema has no field for them. */
+const MARKUP_ONLY: ReadonlyArray<VocabularyKey> = [
+  'company.facebook',
+  'company.angellist',
+]
+
 /** The vocabulary keys the source can answer, the logo's among them. */
 export const WEBSITE_KEYS: ReadonlyArray<VocabularyKey> = [
   ...FIELD_NAMES.map((name) => FIELDS[name]),
+  ...MARKUP_ONLY,
   LOGO_KEY,
 ]
+
+/** The keys the model half can answer. */
+export const MODEL_KEYS: ReadonlyArray<VocabularyKey> = [
+  ...FIELD_NAMES.map((name) => FIELDS[name]),
+  LOGO_KEY,
+]
+
+/** The source's name on the run's timeline line, by the halves that ran. */
+export const websiteLabel = (model: boolean): string =>
+  `${WEBSITE_NAME} (${model ? 'markup + model' : 'markup'})`
+
+/** The model half's name when a sensitive record skips it. */
+export const WEBSITE_MODEL_NAME = `${WEBSITE_NAME} (model)`
 
 /** A page's text is cut here before it reaches the model. */
 const PAGE_TEXT_CHARS = 12_000
@@ -110,6 +133,10 @@ export type Page = {
   }>
   /** Logo candidates: logo images, touch icons, the share image. */
   readonly images: ReadonlyArray<string>
+  /** The `<link rel=…icon>` images, a touch icon first; no SVG. */
+  readonly icons: ReadonlyArray<string>
+  /** The `og:image`, when the page names one. */
+  readonly shareImage: string | null
 }
 
 const ENTITIES: { readonly [name: string]: string } = {
@@ -228,11 +255,25 @@ export const readPage = (html: string, url: string): Page => {
       .join(' ')
     if (/logo/i.test(said)) image(attrs.get('src'))
   }
+  const touch: Array<string> = []
+  const plain: Array<string> = []
   for (const m of bare.matchAll(/<link\b([^>]*)>/gi)) {
     const attrs = attrsOf(m[1])
-    if (/icon/i.test(attrs.get('rel') ?? '')) image(attrs.get('href'))
+    const rel = attrs.get('rel') ?? ''
+    if (!/icon/i.test(rel)) continue
+    image(attrs.get('href'))
+    const at = absolute(attrs.get('href') ?? '', url)
+    if (
+      at === null ||
+      /\.svg(\?|$)/i.test(at) ||
+      /svg/i.test(attrs.get('type') ?? '')
+    )
+      continue
+    ;(/apple-touch-icon/i.test(rel) ? touch : plain).push(at)
   }
-  image(meta('og:image') ?? undefined)
+  const ogImage = meta('og:image')
+  image(ogImage ?? undefined)
+  const shareImage = ogImage === null ? null : absolute(ogImage, url)
 
   const body = bare
     .replace(
@@ -247,6 +288,8 @@ export const readPage = (html: string, url: string): Page => {
     text: tidy(stripTags(body)).slice(0, PAGE_TEXT_CHARS),
     links: links.slice(0, MAX_LINKS),
     images: images.slice(0, MAX_IMAGES),
+    icons: [...new Set([...touch, ...plain])],
+    shareImage,
   }
 }
 
@@ -418,5 +461,92 @@ export const websiteAnswers = (
     vocabularyProblem(LOGO_KEY, logo) === null
   )
     answers[LOGO_KEY] = logo
+  return answers
+}
+
+/** Where each profile key's link must point: its hosts and its path shape. */
+const PROFILES: ReadonlyArray<{
+  readonly key: VocabularyKey
+  readonly hosts: ReadonlyArray<string>
+  readonly path: RegExp
+}> = [
+  {
+    key: 'company.linkedin',
+    hosts: ['linkedin.com'],
+    path: /^\/company\/[^/]+\/?$/i,
+  },
+  {
+    key: 'company.twitter',
+    hosts: ['twitter.com', 'x.com'],
+    path: /^\/(?!(?:share|intent|home|i|search|hashtag)(?:\/|$))\w{1,15}\/?$/i,
+  },
+  {
+    key: 'company.facebook',
+    hosts: ['facebook.com', 'fb.com'],
+    path: /^\/(?!(?:sharer|share|dialog|plugins)(?:\.php)?(?:\/|$))[^/]+\/?$/i,
+  },
+  {
+    key: 'company.angellist',
+    hosts: ['angel.co', 'wellfound.com'],
+    path: /^\/company\/[^/]+\/?$/i,
+  },
+  {
+    key: 'company.crunchbase',
+    hosts: ['crunchbase.com'],
+    path: /^\/organization\/[^/]+\/?$/i,
+  },
+]
+
+/** The page's blog: `blog.<site>`, or `/blog` on the site itself. */
+const blogOf = (page: Page): string | null => {
+  const site = siteOf(page.url)
+  if (site === null) return null
+  for (const link of page.links) {
+    const host = siteOf(link.href)
+    if (host === null || (host !== site && !host.endsWith(`.${site}`))) continue
+    const path = new URL(link.href).pathname
+    if (host === `blog.${site}` && path === '/') return link.href
+    if (/^\/blog\/?$/i.test(path)) return link.href
+  }
+  return null
+}
+
+/** A title that says more than the name: its longest part of three words or more. */
+const titleLine = (title: string | null): string | null => {
+  if (title === null) return null
+  const parts = title
+    .split(/\s+[|–—·:-]\s+/)
+    .map(squash)
+    .filter((part) => part.split(' ').length >= 3)
+    .sort((a, b) => b.length - a.length)
+  return parts.at(0) ?? null
+}
+
+/**
+ * The markup half's answers, for the keys asked, with no model:
+ * - the description is the meta description, else a telling title;
+ * - each profile link is the first the page links on the profile's host;
+ * - the logo is a declared icon, a touch icon first, else the share image;
+ * - every answer passes the vocabulary's own check.
+ */
+export const markupAnswers = (
+  page: Page,
+  keys: ReadonlyArray<string>,
+): { [key: string]: Json } => {
+  const answers: { [key: string]: Json } = {}
+  const offer = (key: VocabularyKey, value: string | null) => {
+    if (value === null || !keys.includes(key) || key in answers) return
+    if (vocabularyProblem(key, value) === null) answers[key] = value
+  }
+  const description = page.description ?? titleLine(page.title)
+  offer(FIELDS.description, description?.slice(0, 1000) ?? null)
+  for (const link of page.links) {
+    const path = new URL(link.href).pathname
+    for (const profile of PROFILES)
+      if (hostIs(link.href, profile.hosts) && profile.path.test(path))
+        offer(profile.key, link.href)
+  }
+  offer(FIELDS.blog, blogOf(page))
+  offer(LOGO_KEY, page.icons.at(0) ?? page.shareImage)
   return answers
 }

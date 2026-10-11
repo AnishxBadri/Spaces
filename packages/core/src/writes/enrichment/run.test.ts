@@ -55,12 +55,12 @@ const EnqueueTest = Layer.succeed(
   Enqueue.of({ enqueue: () => Effect.succeed(null) }),
 )
 
-/** No AI model set up: the built-in Website is not in the order. */
+/** No AI model and no network: the built-in Website's fetch fails, so it answers nothing. */
 const NoModel = Layer.mergeAll(
   Layer.succeed(
     WebsiteReader,
     WebsiteReader.of({
-      fetch: () => Effect.die(new Error('no fetch expected')),
+      fetch: () => Effect.succeed({ ok: false, reason: 'offline' }),
       extractRoute: () => Effect.succeed('unrouted'),
     }),
   ),
@@ -518,10 +518,11 @@ describe('enrichment.run', () => {
     await run(co, [website, apollo])
     expect(await lines(co)).toHaveLength(1)
 
+    // Only the built-in Website is left, and it has no domain to read.
     await setOrder([])
     expect(await run(co, [])).toEqual({
       ran: false,
-      reason: 'no source to ask',
+      reason: 'no domain to read',
       parked: null,
     })
     expect(await lines(co)).toHaveLength(1)

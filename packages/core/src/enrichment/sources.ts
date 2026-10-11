@@ -20,8 +20,17 @@ export type AskInput = {
   readonly reuseDays: number | null
 }
 
+/** A part of a source the run skipped, as the timeline line names it. */
+export type SkipNote = { readonly name: string; readonly why: string }
+
 export type AskResult =
-  | { readonly asked: true }
+  | {
+      readonly asked: true
+      /** The source's name on the timeline line, when it says which part ran. */
+      readonly name?: string
+      /** A part it skipped that the owner should see ("Website (model)", "sensitive"). */
+      readonly notes?: ReadonlyArray<SkipNote>
+    }
   | {
       readonly asked: false
       readonly reason: string

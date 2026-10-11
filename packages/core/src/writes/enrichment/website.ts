@@ -2,14 +2,17 @@ import { Effect } from 'effect'
 import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity } from '@spaces/db/schema'
+import type { Json } from '@spaces/db/json'
 import { JobRetryable, Receipts } from '@spaces/sdk'
 import type { JobError } from '@spaces/sdk'
 import type { ResolvedSensitivity } from '../../ai/sensitivity'
 import { CORE_IDENTITY } from '../../attributes/registry'
 import { EnrichmentCollector } from '../../enrichment/collector'
-import type { AskInput, AskResult } from '../../enrichment/sources'
+import type { AskInput, AskResult, SkipNote } from '../../enrichment/sources'
 import {
+  MODEL_KEYS,
   WEBSITE_KEYS,
+  WEBSITE_MODEL_NAME,
   WEBSITE_SCHEMA,
   WEBSITE_SENSITIVE,
   WEBSITE_TASK,
@@ -17,52 +20,58 @@ import {
   aboutLinkOf,
   decodePage,
   isHtml,
+  markupAnswers,
   pageItems,
   readPage,
   websiteAnswers,
+  websiteLabel,
   websiteOutput,
 } from '../../enrichment/website'
-import type { Page } from '../../enrichment/website'
+import type { Page, WebsiteOutput } from '../../enrichment/website'
 import { ModelCall, subjectSensitivity } from '../ports/ai'
 import { ReceiptsLive } from '../ports/receipts'
 import { enrichmentRow } from './apply'
 
 /**
- * The built-in Website source (D76): the company's home page, and its about
- * page when the home page links one, read by the owner's Extract lane.
- * - No key and no credit: its receipt records 0 credits, and the model call
- *   is `ai_usage` on the host's `core.enrichment` row, lane `extract`.
- * - A sensitive record reads only through a local route; otherwise the
- *   source is skipped and the run's timeline line says so.
- * - With no Extract route at all the source is not in the order (D80).
- * - A failed fetch or call ends this source with its reason; the run goes on.
+ * The built-in Website source (D76, D80): the company's home page read in
+ * two halves, then answered as one.
+ * - The markup half always runs and needs no model: no `ai_usage` row.
+ * - The model half reads the home page and its about page with the owner's
+ *   Extract lane, only when a route exists, for the keys the markup half
+ *   left empty; its call is `ai_usage` on the host's `core.enrichment` row.
+ * - No key and no credit: the receipt records 0 credits.
+ * - A sensitive record's model half reads only through a local route;
+ *   otherwise it is skipped and the run's timeline line says so.
+ * - A failed fetch ends this source with its reason; the run goes on.
  */
 
 /** The prompt ceiling: the Extract lane's, as `AiLive` gives it. */
 const BUDGET_CHARS = 48_000
 
-/** The source as a run holds it: its row, the record's sensitivity, whether it may read. */
+/** Whether the model half reads: routed, no route at all, or refused by the record's sensitivity. */
+export type WebsiteModel = 'routed' | 'unrouted' | 'blocked'
+
+/** The source as a run holds it: its row, the record's sensitivity, whether the model half may read. */
 export type WebsitePlan = {
   readonly row: { readonly id: string; readonly capabilityId: string }
   readonly sensitivity: ResolvedSensitivity
-  /** A sensitive record with no local Extract route: in the order, skipped. */
-  readonly blocked: boolean
+  readonly model: WebsiteModel
 }
 
 const declined = (reason: string): AskResult => ({ asked: false, reason })
 
-const SENSITIVE: AskResult = {
-  asked: false,
-  reason: 'a sensitive record reads only through a local Extract route',
-  line: WEBSITE_SENSITIVE,
+const SENSITIVE_NOTE: SkipNote = {
+  name: WEBSITE_MODEL_NAME,
+  why: WEBSITE_SENSITIVE,
 }
 
 const messageOf = (cause: unknown) =>
   cause instanceof Error ? cause.message : String(cause)
 
 /**
- * The Website for this record, or null when it is not in the order: not a
- * company, or no Extract route the record could use or be refused by.
+ * The Website for this record, or null when it is not a company. It is in
+ * the order with or without a model (D80); the plan says whether the model
+ * half may read.
  */
 export const websiteFor = Effect.fn('websiteFor')(function* (
   kind: 'company' | 'person',
@@ -72,23 +81,23 @@ export const websiteFor = Effect.fn('websiteFor')(function* (
   const reader = yield* WebsiteReader
   const sensitivity = yield* subjectSensitivity(entityId)
   const route = yield* reader.extractRoute(sensitivity.sensitivity)
-  let blocked = false
-  if (sensitivity.sensitivity === 'normal') {
-    if (route === 'unrouted') return null
-  } else if (route !== 'local') {
-    if (
-      route === 'unrouted' &&
-      (yield* reader.extractRoute('normal')) === 'unrouted'
-    )
-      return null
-    blocked = true
-  }
+  const model: WebsiteModel =
+    sensitivity.sensitivity === 'normal'
+      ? route === 'unrouted'
+        ? 'unrouted'
+        : 'routed'
+      : route === 'local'
+        ? 'routed'
+        : route === 'unrouted' &&
+            (yield* reader.extractRoute('normal')) === 'unrouted'
+          ? 'unrouted'
+          : 'blocked'
   const row = yield* Effect.tryPromise({
     try: enrichmentRow,
     catch: (cause) =>
       new JobRetryable({ reason: `Website: ${messageOf(cause)}` }),
   })
-  return { row, sensitivity, blocked }
+  return { row, sensitivity, model }
 })
 
 /** The record's first domain, bare. */
@@ -135,28 +144,45 @@ const parsedText = (text: string): unknown => {
   }
 }
 
-/** Ask the Website within a run: its answers go to the run's collector. */
-export const askWebsite = Effect.fn('askWebsite')(function* (
-  plan: WebsitePlan,
-  input: AskInput,
-): Effect.fn.Return<AskResult, JobError, WebsiteReader | ModelCall> {
-  if (plan.blocked) return SENSITIVE
-  const keys = input.keys.filter((k) => WEBSITE_KEYS.some((w) => w === k))
-  if (keys.length === 0) return declined('nothing it reads is wanted')
-  const domain = yield* domainOf(input.entityId)
-  if (domain === null) return declined('no domain to read')
+/** What the model half did: answered, skipped with a note, or failed with its reason. */
+type ModelHalf =
+  | {
+      readonly ran: true
+      readonly pages: ReadonlyArray<Page>
+      readonly extracted: WebsiteOutput
+      readonly answers: { [key: string]: Json }
+    }
+  | {
+      readonly ran: false
+      readonly reason: string
+      readonly note?: SkipNote
+      /** The call was made and failed, as opposed to never made. */
+      readonly failed?: true
+    }
 
-  const home = yield* fetchPage(`https://${domain}/`)
-  if (typeof home === 'string') return declined(home)
+/** The model half: the home and about pages through the Extract lane, for `keys`. */
+const readWithModel = Effect.fn('website.model')(function* (
+  plan: WebsitePlan,
+  home: Page,
+  keys: ReadonlyArray<string>,
+): Effect.fn.Return<ModelHalf, JobError, WebsiteReader | ModelCall> {
+  if (plan.model === 'blocked')
+    return {
+      ran: false,
+      reason: 'a sensitive record reads only through a local Extract route',
+      note: SENSITIVE_NOTE,
+    }
+  if (plan.model === 'unrouted')
+    return { ran: false, reason: 'no model reads the Extract lane' }
+  if (keys.length === 0)
+    return { ran: false, reason: 'the markup answered every key' }
   const pages: Array<Page> = [home]
   const about = aboutLinkOf(home)
   if (about !== null) {
     const page = yield* fetchPage(about)
     if (typeof page !== 'string') pages.push(page)
   }
-
-  const model = yield* ModelCall
-  const called = yield* model
+  const called = yield* (yield* ModelCall)
     .complete({
       lane: 'extract',
       items: pageItems(pages),
@@ -172,24 +198,72 @@ export const askWebsite = Effect.fn('askWebsite')(function* (
     )
   if ('refused' in called)
     return called.refused.tag === 'SensitiveRouteRefused'
-      ? SENSITIVE
-      : declined(`${called.refused.tag}: ${called.refused.message}`)
+      ? {
+          ran: false,
+          reason: called.refused.message,
+          note: SENSITIVE_NOTE,
+        }
+      : {
+          ran: false,
+          reason: `${called.refused.tag}: ${called.refused.message}`,
+          failed: true,
+        }
   const output = websiteOutput.safeParse(
     called.output.kind === 'object'
       ? called.output.object
       : parsedText(called.output.text),
   )
   if (!output.success)
-    return declined('the Extract lane answered outside the schema')
+    return {
+      ran: false,
+      reason: 'the Extract lane answered outside the schema',
+      failed: true,
+    }
+  return {
+    ran: true,
+    pages,
+    extracted: output.data,
+    answers: websiteAnswers(output.data, pages, keys),
+  }
+})
 
-  const answers = websiteAnswers(output.data, pages, keys)
+/**
+ * Ask the Website within a run: the markup half, then the model half for
+ * what it left empty. The answers go to the run's collector as one, under
+ * one receipt, and the result names which halves ran.
+ */
+export const askWebsite = Effect.fn('askWebsite')(function* (
+  plan: WebsitePlan,
+  input: AskInput,
+): Effect.fn.Return<AskResult, JobError, WebsiteReader | ModelCall> {
+  const keys = input.keys.filter((k) => WEBSITE_KEYS.some((w) => w === k))
+  if (keys.length === 0) return declined('nothing it reads is wanted')
+  const domain = yield* domainOf(input.entityId)
+  if (domain === null) return declined('no domain to read')
+
+  const home = yield* fetchPage(`https://${domain}/`)
+  if (typeof home === 'string') return declined(home)
+  const markup = markupAnswers(home, keys)
+  const left = keys.filter(
+    (k) => !(k in markup) && MODEL_KEYS.some((m) => m === k),
+  )
+  const model = yield* readWithModel(plan, home, left)
+  // Neither half answered and the call failed: the source ends with its reason.
+  if (!model.ran && model.failed === true && Object.keys(markup).length === 0)
+    return declined(model.reason)
+  const answers = model.ran ? { ...model.answers, ...markup } : markup
+
   const { receiptId } = yield* Effect.gen(function* () {
     return yield* (yield* Receipts).store({
       entityId: input.entityId,
       raw: {
         source: 'website',
-        pages: pages.map((p) => p.url),
-        extracted: output.data,
+        pages: model.ran ? model.pages.map((p) => p.url) : [home.url],
+        title: home.title,
+        markup,
+        model: model.ran
+          ? { extracted: model.extracted, answers: model.answers }
+          : { skipped: model.reason },
         answers,
       },
       creditsUsed: 0,
@@ -208,6 +282,11 @@ export const askWebsite = Effect.fn('askWebsite')(function* (
       asOf: new Date().toISOString(),
       answers,
     })
-  const asked: AskResult = { asked: true }
+  const note = model.ran ? undefined : model.note
+  const asked: AskResult = {
+    asked: true,
+    name: websiteLabel(model.ran),
+    ...(note === undefined ? {} : { notes: [note] }),
+  }
   return asked
 })

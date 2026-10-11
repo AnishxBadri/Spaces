@@ -150,7 +150,7 @@ const runFixtures = Layer.mergeAll(
   Layer.succeed(
     WebsiteReader,
     WebsiteReader.of({
-      fetch: () => Effect.die(new Error('no fetch expected')),
+      fetch: () => Effect.succeed({ ok: false, reason: 'offline' }),
       extractRoute: () => Effect.succeed('unrouted'),
     }),
   ),

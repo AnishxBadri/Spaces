@@ -214,13 +214,7 @@ function SourcesBlock({
                   : 'text-graphite',
               )}
             >
-              {source.builtIn && !source.runnable ? (
-                <Link to="/settings/models" className={LINK}>
-                  needs a model ›
-                </Link>
-              ) : (
-                source.state
-              )}
+              {source.state}
             </span>
             <span className="flex w-28 shrink-0 items-center justify-end gap-2">
               <button

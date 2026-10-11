@@ -93,9 +93,10 @@ describe('the host Enrich', () => {
   it('asks the Website and offers more sources in place when only it is on', async () => {
     const html = await render(view({}))
     expect(html).toContain('>Enrich</button>')
-    expect(html).toContain('>Website</span>')
+    expect(html).toContain('>Website, then </span>')
     expect(html).toContain('href="/settings/enrichment"')
     expect(html).toContain('More sources ›')
+    expect(html).not.toContain('Free sources only')
 
     const member = await render(
       view({ audience: { isAdmin: false, admins: ['Anish'] } }),
@@ -104,11 +105,13 @@ describe('the host Enrich', () => {
     expect(member).toContain('Ask Anish to set up more enrichment sources')
   })
 
-  it('asks for a model when a company has no source at all', async () => {
-    const html = await render(view({ sources: [] }))
-    expect(html).not.toContain('<button')
-    expect(html).toContain('Enrich needs a model · ')
-    expect(html).toContain('href="/settings/models"')
+  it('never asks a company for a model: the Website needs none', async () => {
+    const html = await render(view({}))
+    expect(html).not.toContain('needs a model')
+    expect(html).not.toContain('href="/settings/models"')
+    expect(await render(view({ sources: [], kind: 'person' }))).not.toContain(
+      '<button',
+    )
   })
 
   it('draws one Enrich naming every source in order, in place of a source’s own', async () => {

@@ -17,6 +17,7 @@ import { Enqueue } from '../../queue/enqueue'
 import type { EnqueueOptions } from '../../queue/sender'
 import { resolveEntity } from '../entities/resolve'
 import { ModelCall } from '../ports/ai'
+import { enrichmentRow } from './apply'
 import { bulkEnrichProgram, bulkEstimateProgram } from './estimate'
 import { runEnrichment } from './run'
 
@@ -168,13 +169,19 @@ describe('the estimate', () => {
         ...keyless,
       ]),
     )
+    // The Website reads a sensitive record too: it sends nothing out.
     expect(out).toMatchObject({
       total: 40,
-      ask: 34,
+      ask: 36,
       parks: 0,
-      skipped: { sensitive: 2, reuse: 2, key: 2, queued: 0 },
+      skipped: { sensitive: 0, reuse: 2, key: 2, queued: 0 },
     })
-    expect(out.sources).toEqual([
+    expect(out.sources.at(0)).toMatchObject({
+      name: 'Website',
+      local: true,
+      credits: 0,
+    })
+    expect(out.sources.slice(1)).toEqual([
       {
         id: source,
         name: 'Apollo',
@@ -210,13 +217,18 @@ describe('the estimate', () => {
     await receipt(old, source, 2, new Date(NOW - 3 * 86_400_000))
     const ids = await companies(3)
     const out = await at(bulkEstimateProgram('company', ids))
-    expect(out.sources.at(0)).toMatchObject({ ask: 3, credits: 6, left: 100 })
+    expect(out.sources.find((s) => s.id === source)).toMatchObject({
+      ask: 3,
+      credits: 6,
+      left: 100,
+    })
   })
 })
 
 describe('Enrich n', () => {
   it('sends one job per record asked, keyed on the record; a second press doubles none', async () => {
     const source = await installSource(100)
+    const website = (await enrichmentRow()).id
     const ids = await companies(3)
     const keyless = await company(false)
     const out = await at(bulkEnrichProgram('company', [...ids, keyless]))
@@ -227,7 +239,7 @@ describe('Enrich n', () => {
         data: {
           entityId: id,
           reason: BULK_REASON,
-          sources: [source],
+          sources: [website, source],
           bulk: true,
         },
         options: { singletonKey: id },
@@ -245,7 +257,10 @@ describe('Enrich n', () => {
     const ids = await companies(10)
     const estimate = await at(bulkEstimateProgram('company', ids))
     expect(estimate).toMatchObject({ ask: 10, parks: 4 })
-    expect(estimate.sources.at(0)).toMatchObject({ left: 6, parks: 4 })
+    expect(estimate.sources.find((s) => s.id === source)).toMatchObject({
+      left: 6,
+      parks: 4,
+    })
     const out = await at(bulkEnrichProgram('company', ids))
     expect(out).toEqual({
       queued: 6,
@@ -270,7 +285,7 @@ describe('a bulk run refused at the cap', () => {
     Layer.succeed(
       WebsiteReader,
       WebsiteReader.of({
-        fetch: () => Effect.die(new Error('no fetch expected')),
+        fetch: () => Effect.succeed({ ok: false, reason: 'offline' }),
         extractRoute: () => Effect.succeed('unrouted'),
       }),
     ),

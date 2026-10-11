@@ -250,7 +250,8 @@ describe(
 
       const doc = (await db.select().from(document)).at(0)
       if (!doc) throw new Error('no document')
-      expect(enqueued).toEqual([
+      // The sender's company is born too, and the Website enriches it.
+      expect(enqueued.filter((e) => e.name !== QUEUES.enrichmentRun)).toEqual([
         { name: QUEUES.extractDocument, data: { documentId: doc.entityId } },
       ])
 

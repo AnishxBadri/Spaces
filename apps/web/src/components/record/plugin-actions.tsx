@@ -271,8 +271,9 @@ export function enrichLine(
  * ("Website, then Apollo"), then while it runs and how it went: done with
  * counts, nothing blank, sensitive (local sources only), a source's limit
  * reached with the reset, or the failure.
- * - With only free sources on, "More sources ›" follows, in place.
- * - A company with no source at all asks for a model instead.
+ * - With only free sources on, "More sources ›" follows, in place: before
+ *   any run an admin reads "Website, then More sources ›".
+ * - A company always has the Website, with or without a model. (D80)
  */
 function EnrichAction({
   entityId,
@@ -286,20 +287,13 @@ function EnrichAction({
   dispatch: ActionDispatch<[action: Action]>
 }) {
   const [firing, setFiring] = useState(false)
-  if (enrich.sources.length === 0)
-    return enrich.kind === 'company' ? (
-      <NeedsSetup
-        needs="Enrich needs a model"
-        action="Add a model"
-        to="/settings/models"
-        thing="an AI model"
-        audience={enrich.audience}
-      />
-    ) : null
+  if (enrich.sources.length === 0) return null
 
   const figure = jobStatusFigure(status, ENRICH_QUEUE)
   const running = figure?.text === 'running…'
   const line = enrichLine(enrich, running)
+  const more = enrich.onlyFree && !running
+  const thenMore = more && line.tone === 'idle' && enrich.audience.isAdmin
 
   async function fire() {
     setFiring(true)
@@ -338,7 +332,18 @@ function EnrichAction({
         {line.square ? (
           <span aria-hidden className="size-1.5 shrink-0 bg-current" />
         ) : null}
-        <span className="truncate">{line.words}</span>
+        <span className="truncate">
+          {line.words}
+          {thenMore ? ', then ' : null}
+        </span>
+        {thenMore ? (
+          <Link
+            to="/settings/enrichment"
+            className="focus-ring shrink-0 text-primary hover:underline"
+          >
+            More sources ›
+          </Link>
+        ) : null}
       </span>
       {enrich.last?.review === true && !running ? (
         <Link
@@ -348,7 +353,7 @@ function EnrichAction({
           Review ›
         </Link>
       ) : null}
-      {enrich.onlyFree && !running ? (
+      {more && !thenMore ? (
         <NeedsSetup
           needs="Free sources only"
           action="More sources"

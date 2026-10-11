@@ -320,7 +320,9 @@ describe('the Website against a fixture site', () => {
         .from(activity)
         .where(eq(activity.subjectEntityId, id))
     ).map((r) => jsonRecord(r.meta)['line'])
-    expect(lines).toContain('Enriched · Website, Paid · 4 fields · logo')
+    expect(lines).toContain(
+      'Enriched · Website (markup + model), Paid · 4 fields · logo',
+    )
   })
 
   it('needs no credential of its own: ai_usage is the Extract lane on the host row, and no credit is counted', async () => {

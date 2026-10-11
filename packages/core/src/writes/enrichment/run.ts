@@ -49,7 +49,8 @@ import { askWebsite, websiteFor } from './website'
  * - A sensitive record asks no outside source: each is skipped, and the
  *   timeline line says "sensitive".
  * - Nothing asked — no source, nothing wanted — writes nothing at all,
- *   unless a skip carries a timeline line (the Website on a sensitive record).
+ *   unless a skip carries a timeline line (an outside source on a sensitive
+ *   record).
  * - A record with no picture that no person held is asked for one too; the
  *   first answer is fetched and stored before `applyRun` sets it.
  * - An auto or bulk run whose source refused at its daily cap re-queues
@@ -225,8 +226,8 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
   const sources =
     only === undefined ? ordered : ordered.filter((s) => only.includes(s.id))
   const asker = yield* EnrichmentSources
-  // A sensitive record never reaches an outside source: only the Website,
-  // read through a local route, may run. (D76)
+  // A sensitive record never reaches an outside source: only the Website
+  // runs, its model half through a local route. (D76)
   const sensitive =
     website?.sensitivity.sensitivity === 'sensitive' ||
     (website === null &&
@@ -272,7 +273,17 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
       })
       continue
     }
-    ran.push({ integrationId: source.id, asked: keys, credits })
+    ran.push({
+      integrationId: source.id,
+      asked: keys,
+      credits,
+      ...(result.asked && result.name !== undefined
+        ? { name: result.name }
+        : {}),
+      ...(result.asked && result.notes !== undefined
+        ? { notes: result.notes }
+        : {}),
+    })
     for (const answer of collector.answers) {
       answers.push({ integrationId: source.id, ...answer })
       for (const key of Object.keys(answer.answers)) answered.add(key)

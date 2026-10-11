@@ -31,7 +31,6 @@ import {
   enrichmentRow,
   linksForEntity,
 } from '@spaces/core/writes/enrichment/apply'
-import { isLaneRoutedProgram } from '#/lib/ai/route'
 import { EnrichmentPageFailed } from './enrichment-page'
 
 /**
@@ -172,11 +171,11 @@ const askedProgram = Effect.fn('enrichment.asked')(function* (
       id: r.id,
       name: jsonString(jsonRecord(r.manifest)['name']) ?? r.capabilityId,
     }))
-  const routed =
-    kind === 'company' && (yield* isLaneRoutedProgram('extract', null)).normal
-  const website = routed
-    ? { id: (yield* query(enrichmentRow)).id, name: WEBSITE_NAME }
-    : null
+  // The Website reads every company, with or without a model. (D80)
+  const website =
+    kind === 'company'
+      ? { id: (yield* query(enrichmentRow)).id, name: WEBSITE_NAME }
+      : null
   const ordered = withBuiltIn(settings, website, plugins)
   return {
     names: ordered.map((s) => s.name),

@@ -17,6 +17,7 @@ import { jsonRecord, jsonValue } from '@spaces/core/json'
 import type { Enqueue } from '@spaces/core/queue/enqueue'
 import { QUEUES } from '@spaces/core/queue/names'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
+import { enrichmentRow } from '@spaces/core/writes/enrichment/apply'
 import { parkedEnrichmentProgram } from '@spaces/core/writes/enrichment/parked'
 import { runEnrichment } from '@spaces/core/writes/enrichment/run'
 import { dispatchDomainEvent } from '@spaces/core/writes/events/dispatch'
@@ -154,7 +155,7 @@ const runFixtures = Layer.mergeAll(
   Layer.succeed(
     WebsiteReader,
     WebsiteReader.of({
-      fetch: () => Effect.die(new Error('no fetch expected')),
+      fetch: () => Effect.succeed({ ok: false, reason: 'offline' }),
       extractRoute: () => Effect.succeed('unrouted'),
     }),
   ),
@@ -304,11 +305,14 @@ describe('the cap parks, and the reset runs what it parked', () => {
     expect(spentToday.map((r) => r.id).sort()).toEqual([...parked].sort())
   })
 
-  it('a sensitive record never reaches the paid source', async () => {
+  it('a sensitive record never reaches the paid source: only the Website is queued', async () => {
     const now = Date.now()
     const id = await company()
     await db.update(entity).set({ sensitive: true }).where(eq(entity.id, id))
-    expect(await at(dispatchDomainEvent(joins(id, now)), now)).toEqual([])
-    expect((await jobsFor(id)).rows).toEqual([])
+    expect(await at(dispatchDomainEvent(joins(id, now)), now)).toEqual([QUEUE])
+    const rows = (await jobsFor(id)).rows
+    expect(rows.map((r) => r['data'])).toEqual([
+      expect.objectContaining({ sources: [(await enrichmentRow()).id] }),
+    ])
   })
 })
