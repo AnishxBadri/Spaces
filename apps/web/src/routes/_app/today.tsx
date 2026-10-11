@@ -1,11 +1,14 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
+import { MeetingDialog } from '#/components/meeting-dialog'
 import { KeyHint, PageHeader } from '#/components/page-header'
 import { ReadoutStrip } from '#/components/record/record-parts'
-import { DayStrip } from '#/components/today/day-strip'
+import { DayStrip, useNow } from '#/components/today/day-strip'
 import { FirstRun } from '#/components/today/first-run'
+import { MeetingsSection, useDayMeetings } from '#/components/today/meetings'
 import { NeedsYou } from '#/components/today/needs-you'
 import type { NeedsYouRow, StageBadge } from '#/components/today/needs-you'
 import { NoticesBand } from '#/components/today/notices'
@@ -23,6 +26,7 @@ import {
   countUnfiledDocuments,
   dealFunnelStats,
   getTodayAttention,
+  getTodayMeetings,
   getWorkspaceActivity,
   listHoldings,
   listRegistry,
@@ -42,6 +46,8 @@ import {
   todayStamp,
 } from '#/lib/today/needs-you'
 import { localToday } from '@spaces/core/tasks/parse-due'
+import { isoDay } from '#/lib/meetings/day'
+import { modalSearch, openModalId } from '#/lib/modal-search'
 import { GLOBAL_ACTIONS, runBinding, usePageActions } from '#/lib/page-actions'
 
 const DAY_MS = 86_400_000
@@ -53,6 +59,7 @@ const DAY_MS = 86_400_000
  * With no company yet it is the three ways in and nothing else. (D80)
  */
 export const Route = createFileRoute('/_app/today')({
+  validateSearch: modalSearch,
   loader: () => loadToday(),
   component: TodayPage,
 })
@@ -72,6 +79,7 @@ async function loadToday() {
     unfiledCount,
     stoppedPlugins,
     attention,
+    meetings,
   ] = await Promise.all([
     listTasks(),
     listHoldings(),
@@ -82,6 +90,7 @@ async function loadToday() {
     countUnfiledDocuments(),
     listStoppedPlugins(),
     getTodayAttention(),
+    getTodayMeetings(),
   ])
   const since = Date.now() - DAY_MS
   return {
@@ -94,6 +103,7 @@ async function loadToday() {
     unfiledCount,
     stoppedPlugins,
     attention,
+    meetings,
   }
 }
 
@@ -106,6 +116,12 @@ function dueFigure(due: string, today: string): string {
 }
 
 type Loaded = Awaited<ReturnType<typeof loadToday>>
+
+/** A past meeting's age in the reader's days: `today`, `2d`. */
+function meetingAge(startsAt: string, now: Date): string {
+  const ago = Math.max(0, daysBetween(isoDay(new Date(startsAt)), isoDay(now)))
+  return ago === 0 ? 'today' : `${ago}d`
+}
 
 /** The date line above the title — `Sat 10-10 · W41`, as written, not caps. */
 function DateLine({ today }: { today: string }) {
@@ -160,9 +176,42 @@ function TodayLedger({
     unfiledCount,
     stoppedPlugins,
     attention,
+    meetings,
   } = data
   // The composer row reports what it made; the wash is for arrivals only.
   const { washes, bear } = useBornRows()
+
+  // The window opens from the URL, so a row and `?modal=meeting&id=` agree.
+  const search = Route.useSearch()
+  const go = Route.useNavigate()
+  const meetingId = openModalId(search, 'meeting')
+  const [prepFor, setPrepFor] = useState<string | null>(null)
+  const openMeeting = (id: string, prep = false) => {
+    setPrepFor(prep ? id : null)
+    void go({
+      search: (prev) => ({ ...prev, modal: 'meeting', id }),
+      resetScroll: false,
+    })
+  }
+  const closeMeeting = () => {
+    setPrepFor(null)
+    void go({
+      search: (prev) => ({ ...prev, modal: undefined, id: undefined }),
+      resetScroll: false,
+    })
+  }
+
+  // The section's day moves with ‹ ›; the strip always shows today.
+  const [day, setDay] = useState(today)
+  const [version, setVersion] = useState(0)
+  const todays = useDayMeetings(meetings.calendar ? today : null, version)
+  const other = useDayMeetings(
+    meetings.calendar && day !== today ? day : null,
+    version,
+  )
+  const shown = day === today ? todays : other
+  // A meeting's day is the reader's, so its age waits for the browser clock.
+  const now = useNow()
 
   const dueTasks = tasks.open.filter((t) => t.dueDate && t.dueDate <= today)
   const overdue = dueTasks.filter((t) => t.dueDate && t.dueDate < today).length
@@ -253,6 +302,16 @@ function TodayLedger({
       weight: g.total,
       group: g,
     })),
+    ...meetings.unwritten.map((m): NeedsYouRow => ({
+      kind: 'meeting',
+      key: `meeting:${m.id}`,
+      // Oldest first, from the instant alone: the same order on server and client.
+      weight: -Date.parse(m.startsAt),
+      id: m.id,
+      title: m.title ?? 'Meeting',
+      record: m.record,
+      age: now === null ? null : meetingAge(m.startsAt, now),
+    })),
   ])
 
   async function complete(id: string) {
@@ -287,8 +346,16 @@ function TodayLedger({
           </>
         }
       />
-      {/* Meetings join the strip once a calendar feeds the day. */}
-      <DayStrip />
+      <DayStrip
+        meetings={(todays === null || todays === 'failed' ? [] : todays)
+          .filter((m) => !m.cancelled)
+          .map((m) => ({
+            id: m.id,
+            title: m.title ?? 'Meeting',
+            startsAt: m.startsAt,
+            endsAt: m.endsAt,
+          }))}
+      />
       <div className="border-y border-hairline px-8">
         <ReadoutStrip
           className="border-t-0"
@@ -303,6 +370,16 @@ function TodayLedger({
 
       <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
         <div className="flex min-w-0 flex-1 flex-col gap-6 px-8 pt-6 pb-10">
+          <MeetingsSection
+            calendar={meetings.calendar}
+            audience={meetings.audience}
+            today={today}
+            day={day}
+            onDay={setDay}
+            meetings={shown}
+            onOpen={openMeeting}
+            onRetry={() => setVersion((v) => v + 1)}
+          />
           <NoticesBand
             stopped={stoppedPlugins}
             broken={attention.broken}
@@ -312,6 +389,7 @@ function TodayLedger({
             rows={rows}
             today={today}
             onComplete={(id) => void complete(id)}
+            onOpenMeeting={(id) => openMeeting(id)}
             onCreated={bear}
             washes={washes}
           />
@@ -333,6 +411,17 @@ function TodayLedger({
           <TeamActivity entries={team} today={today} />
         </aside>
       </div>
+      <MeetingDialog
+        id={meetingId}
+        prepOnOpen={prepFor !== null && prepFor === meetingId}
+        onOpenChange={(open) => {
+          if (!open) closeMeeting()
+        }}
+        onChanged={() => {
+          setVersion((v) => v + 1)
+          void router.invalidate()
+        }}
+      />
     </div>
   )
 }

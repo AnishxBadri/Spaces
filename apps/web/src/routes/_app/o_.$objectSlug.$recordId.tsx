@@ -41,7 +41,13 @@ import { recordPath } from '#/lib/record-path'
 import { readoutDay, readoutDayAgo } from '#/lib/records/readout-format'
 import { fileInSpaceAction } from '#/lib/file-in-space'
 import { runBinding, usePageActions } from '#/lib/page-actions'
-import { recordSearch, recordTabCounts } from '#/lib/records/record-tabs'
+import {
+  linkedRecordTab,
+  recordSearch,
+  recordTabCounts,
+} from '#/lib/records/record-tabs'
+import { openModalId } from '#/lib/modal-search'
+import { MeetingDialog } from '#/components/meeting-dialog'
 import {
   countOpenSuggestions,
   createNote,
@@ -117,9 +123,10 @@ function ObjectRecordPage() {
   const navigate = useNavigate()
   const Icon = objectIcon(record.object)
   const go = Route.useNavigate()
+  const search = Route.useSearch()
   const [tab, changeTab] = useRecordTab(
     `o:${record.object.slug}`,
-    Route.useSearch().tab,
+    linkedRecordTab(search),
     (next) =>
       void go({ search: { tab: next }, replace: true, resetScroll: false }),
   )
@@ -386,6 +393,18 @@ function ObjectRecordPage() {
           }}
         />
       </RecordBody>
+      <MeetingDialog
+        id={openModalId(search, 'meeting')}
+        onOpenChange={(open) => {
+          if (!open)
+            void go({
+              search: { tab: tab },
+              replace: true,
+              resetScroll: false,
+            })
+        }}
+        onChanged={() => void router.invalidate()}
+      />
     </div>
   )
 }

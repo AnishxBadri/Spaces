@@ -258,7 +258,7 @@ export const citationLabels = Effect.fn('summarize.citationLabels')(function* (
  * requester's own private notes through (`canRead`); the note this lands as
  * is shared, so they stay out.
  */
-const sharedOnly = Effect.fn('summarize.sharedOnly')(function* (
+export const sharedOnly = Effect.fn('summarize.sharedOnly')(function* (
   items: ReadonlyArray<ContextItem>,
 ): Effect.fn.Return<Array<ContextItem>, SummarizeQueryFailed> {
   const noteIds = new Set<string>()

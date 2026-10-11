@@ -1,5 +1,6 @@
-import { Link } from '@tanstack/react-router'
+import { Link, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
+import { toast } from 'sonner'
 import type { ReactNode } from 'react'
 import {
   LedgerFigure,
@@ -10,8 +11,10 @@ import {
 import { KeyHint } from '#/components/page-header'
 import { TaskComposer } from '#/components/task-composer'
 import { Badge } from '#/components/ui/badge'
+import { Button } from '#/components/ui/button'
 import type { BadgeOption } from '#/components/ui/badge'
 import { Checkbox } from '#/components/ui/checkbox'
+import { writeUpInteraction } from '#/lib/server-fns'
 import type { ReviewGroup } from '#/lib/server-fns'
 import {
   daysBetween,
@@ -66,11 +69,23 @@ export type NeedsYouRow =
       age: number | null
     }
   | { kind: 'review'; key: string; weight: number; group: ReviewGroup }
+  | {
+      kind: 'meeting'
+      key: string
+      weight: number
+      id: string
+      title: string
+      /** The first linked record, for the mono lane. */
+      record: string | null
+      /** `today`, `2d`; null until the browser's clock is read. */
+      age: string | null
+    }
 
 type Tab = NeedsYouKind | 'all'
 
 const TAB_LABEL: Record<NeedsYouKind, string> = {
   task: 'Tasks',
+  meeting: 'Meetings',
   deal: 'Deals',
   mark: 'Marks',
   review: 'Review',
@@ -79,6 +94,7 @@ const TAB_LABEL: Record<NeedsYouKind, string> = {
 const EMPTY: Record<Tab, string> = {
   all: 'Nothing needs you.',
   task: 'No tasks due.',
+  meeting: 'No meetings to write up.',
   deal: 'No idle deals.',
   mark: 'No stale marks.',
   review: 'Nothing to review.',
@@ -127,18 +143,79 @@ function ReviewLink({
   )
 }
 
+/**
+ * A past meeting with no write-up: the title opens the meeting window, and
+ * Write writes one now and lands in the editor. (D79)
+ */
+function MeetingRow({
+  row,
+  onOpenMeeting,
+}: {
+  row: Extract<NeedsYouRow, { kind: 'meeting' }>
+  onOpenMeeting: (id: string) => void
+}) {
+  const router = useRouter()
+  const [pending, setPending] = useState(false)
+  async function write() {
+    setPending(true)
+    try {
+      const { noteId } = await writeUpInteraction({
+        data: { interactionId: row.id },
+      })
+      void router.invalidate()
+      await router.navigate({ to: '/notes/$noteId', params: { noteId } })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not write it up')
+      setPending(false)
+    }
+  }
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => onOpenMeeting(row.id)}
+        className={cn(rowLink, 'text-left')}
+      >
+        <KindLane kind="meeting" />
+        <span className="min-w-0 truncate text-body font-medium">
+          {row.title}
+        </span>
+        {row.record ? (
+          <span className="shrink-0 truncate mono text-micro text-graphite">
+            {row.record}
+          </span>
+        ) : null}
+      </button>
+      <Button
+        variant="outline"
+        size="sm"
+        pending={pending}
+        disabled={pending}
+        onClick={() => void write()}
+      >
+        Write
+      </Button>
+      <LedgerFigure tone="muted">{row.age}</LedgerFigure>
+    </>
+  )
+}
+
 function RowBody({
   row,
   today,
   dealScale,
   onComplete,
+  onOpenMeeting,
 }: {
   row: NeedsYouRow
   today: string
   dealScale: number
   onComplete: (id: string) => void
+  onOpenMeeting: (id: string) => void
 }) {
   switch (row.kind) {
+    case 'meeting':
+      return <MeetingRow row={row} onOpenMeeting={onOpenMeeting} />
     case 'task':
       return (
         <>
@@ -258,12 +335,15 @@ export function NeedsYou({
   rows,
   today,
   onComplete,
+  onOpenMeeting,
   onCreated,
   washes,
 }: {
   rows: ReadonlyArray<NeedsYouRow>
   today: string
   onComplete: (id: string) => void
+  /** Opens the meeting window over Today. */
+  onOpenMeeting: (id: string) => void
   onCreated: (id: string) => void
   washes: (id: string) => boolean
 }) {
@@ -328,6 +408,7 @@ export function NeedsYou({
               today={today}
               dealScale={dealScale}
               onComplete={onComplete}
+              onOpenMeeting={onOpenMeeting}
             />
           </LedgerRow>
         ))}

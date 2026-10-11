@@ -40,7 +40,7 @@ export function nowLabel(d: Date): string {
  * server and on the first client render, so hydration never compares two
  * clocks.
  */
-function useNow(): Date | null {
+export function useNow(): Date | null {
   const [now, setNow] = useState<Date | null>(null)
   useEffect(() => {
     setNow(new Date())

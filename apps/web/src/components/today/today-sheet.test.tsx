@@ -67,6 +67,18 @@ const loaded = {
   unfiledCount: 3,
   stoppedPlugins: [],
   attention: { review: [], moving: [], broken: [], parked: [] },
+  meetings: {
+    calendar: false,
+    audience: { isAdmin: true, admins: ['Anish'] },
+    unwritten: [
+      {
+        id: '00000000-0000-4000-8000-0000000000aa',
+        title: 'Flent intro',
+        startsAt: '2000-01-01T09:00:00.000Z',
+        record: 'Flent',
+      },
+    ],
+  },
 }
 
 async function renderToday() {
@@ -156,8 +168,17 @@ describe('Today by sheet 00', () => {
     expect(html).toMatch(/aria-pressed="false"[^>]*>Tasks 10</)
     // A kind with nothing in it has no filter.
     expect(html).not.toContain('Deals 0')
-    expect(html).toContain('+ 2 more · 2 tasks')
+    // A past meeting nobody wrote up is its own kind, after tasks.
+    expect(html).toMatch(/aria-pressed="false"[^>]*>Meetings 1</)
+    expect(html).toContain('+ 3 more · 2 tasks · 1 meeting')
     expect(html).toContain('show all ›')
+  })
+
+  it('opens Meetings on the D80 line with no calendar connected', async () => {
+    const html = await renderToday()
+    expect(html).toContain('aria-label="Meetings"')
+    expect(html).toContain('No calendar connected · ')
+    expect(html).toContain('Connect Google ›')
   })
 
   it('heads the rail PORTFOLIO with Invested, Value, MOIC and the rate to add', async () => {

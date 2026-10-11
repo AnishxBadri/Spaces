@@ -52,7 +52,13 @@ import {
 } from '#/lib/records/readout-format'
 import { useHotkey } from '#/lib/use-hotkey'
 import { runBinding, usePageActions } from '#/lib/page-actions'
-import { recordSearch, recordTabCounts } from '#/lib/records/record-tabs'
+import {
+  linkedRecordTab,
+  recordSearch,
+  recordTabCounts,
+} from '#/lib/records/record-tabs'
+import { openModalId } from '#/lib/modal-search'
+import { MeetingDialog } from '#/components/meeting-dialog'
 import {
   countOpenSuggestions,
   createNote,
@@ -134,9 +140,10 @@ function DealRecordPage() {
   const navigate = useNavigate()
   const [moveOpen, setMoveOpen] = useState(false)
   const go = Route.useNavigate()
+  const search = Route.useSearch()
   const [tab, changeTab] = useRecordTab(
     'deal',
-    Route.useSearch().tab,
+    linkedRecordTab(search),
     (next) =>
       void go({ search: { tab: next }, replace: true, resetScroll: false }),
   )
@@ -541,6 +548,18 @@ function DealRecordPage() {
           }}
         />
       </RecordBody>
+      <MeetingDialog
+        id={openModalId(search, 'meeting')}
+        onOpenChange={(open) => {
+          if (!open)
+            void go({
+              search: { tab: tab },
+              replace: true,
+              resetScroll: false,
+            })
+        }}
+        onChanged={() => void router.invalidate()}
+      />
     </div>
   )
 }

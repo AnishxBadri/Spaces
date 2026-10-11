@@ -4,9 +4,15 @@
  * Client-safe: the route and its components call these during render.
  */
 
-/** A task due today or earlier, a deal idle past its stage median, a stale
- *  mark, a group of open Review cards. `meeting` joins when a calendar does. */
-export const NEEDS_YOU_KINDS = ['task', 'deal', 'mark', 'review'] as const
+/** A task due today or earlier, a past meeting nobody wrote up, a deal idle
+ *  past its stage median, a stale mark, a group of open Review cards. */
+export const NEEDS_YOU_KINDS = [
+  'task',
+  'meeting',
+  'deal',
+  'mark',
+  'review',
+] as const
 export type NeedsYouKind = (typeof NEEDS_YOU_KINDS)[number]
 
 /** A deal with no stage change for this long is idle. */
@@ -21,7 +27,8 @@ export type Ranked = { kind: NeedsYouKind; key: string; weight: number }
 
 /**
  * The urgency order: kinds in `NEEDS_YOU_KINDS` order — tasks by days
- * overdue (due today is 0), deals by days past their stage median, marks by
+ * overdue (due today is 0), meetings by days since they happened, deals by
+ * days past their stage median, marks by
  * days since the last mark, Review groups by card count — each kind's
  * largest weight first, ties by key so the order is stable.
  */
@@ -132,6 +139,7 @@ export function todayStamp(iso: string): string {
 /** The kinds in the order the head's filters and the fold name them. */
 export const FILTER_ORDER: ReadonlyArray<NeedsYouKind> = [
   'task',
+  'meeting',
   'review',
   'deal',
   'mark',
@@ -139,6 +147,7 @@ export const FILTER_ORDER: ReadonlyArray<NeedsYouKind> = [
 
 const KIND_NOUN: Record<NeedsYouKind, readonly [string, string]> = {
   task: ['task', 'tasks'],
+  meeting: ['meeting', 'meetings'],
   review: ['review', 'review'],
   deal: ['deal', 'deals'],
   mark: ['mark', 'marks'],

@@ -45,6 +45,7 @@ async function render(rows: ReadonlyArray<NeedsYouRow>) {
         rows={rows}
         today="2026-10-10"
         onComplete={() => {}}
+        onOpenMeeting={() => {}}
         onCreated={() => {}}
         washes={() => false}
       />
@@ -87,5 +88,24 @@ describe("Today's review row", () => {
     expect(html).toContain('via Judgment · 2 to review')
     expect(html).toContain('href="/review?source=judgment"')
     expect(html).not.toContain('space=')
+  })
+
+  it('draws a past meeting nobody wrote up as a meeting row with Write', async () => {
+    const html = await render([
+      {
+        kind: 'meeting',
+        key: 'meeting:m1',
+        weight: 2,
+        id: 'm1',
+        title: 'Flent intro',
+        record: 'Flent',
+        age: '2d',
+      },
+    ])
+    expect(html).toMatch(/w-12[^>]*>meeting</)
+    expect(html).toContain('Flent intro')
+    expect(html).toMatch(/>Flent</)
+    expect(html).toMatch(/<button[^>]*>Write<\/button>/)
+    expect(html).toContain('>2d<')
   })
 })

@@ -18,6 +18,24 @@ const row = (kind: NeedsYouKind, key: string, weight: number): Ranked => ({
 })
 
 describe('byUrgency', () => {
+  it('ranks a meeting nobody wrote up after tasks and before deals', () => {
+    const rows = [
+      row('deal', 'd', 30),
+      row('meeting', 'mt-fresh', 0),
+      row('task', 't', 0),
+      row('meeting', 'mt-old', 3),
+    ]
+    expect(byUrgency(rows).map((r) => r.key)).toEqual([
+      't',
+      'mt-old',
+      'mt-fresh',
+      'd',
+    ])
+    expect(foldSummary([row('meeting', 'a', 1), row('meeting', 'b', 2)])).toBe(
+      '+ 2 more · 2 meetings',
+    )
+  })
+
   it('orders tasks, then deals, then marks, then review groups, each largest first', () => {
     const rows = [
       row('review', 'r-small', 1),
