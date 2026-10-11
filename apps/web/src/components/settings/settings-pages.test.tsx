@@ -903,7 +903,7 @@ describe('General, by sheet 01', () => {
     await mount('/settings/general')
     expect(groups().slice(0, 2)).toEqual(['Identity', 'Defaults'])
     for (const h3 of document.querySelectorAll('[data-settings-group] h3'))
-      expect(h3.className).toContain('field-label')
+      expect(h3.className).toContain('label-caps')
     const text = document.body.textContent
     expect(text.indexOf('Logo')).toBeLessThan(text.indexOf('Name'))
     expect(text.indexOf('Name')).toBeLessThan(text.indexOf('Base currency'))
@@ -969,7 +969,7 @@ describe('General, after the first run (D80)', () => {
     ).find((g) => g.textContent.includes("What's set up"))
     expect(head?.className).toContain('border-hairline')
     expect(head?.className).not.toContain('bg-bone')
-    expect(head?.querySelector('h3')?.className).toContain('field-label')
+    expect(head?.querySelector('h3')?.className).toContain('label-caps')
     for (const label of [
       'AI model',
       'Team',

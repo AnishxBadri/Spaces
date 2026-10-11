@@ -213,7 +213,7 @@ export function SettingsNav({
         >
           {chassis ? (
             <div className="flex h-6 items-center px-2.5">
-              <span className="field-label leading-4 font-medium text-graphite">
+              <span className="label-caps text-graphite">
                 {SETTINGS_CRUMBS[id]}
               </span>
             </div>

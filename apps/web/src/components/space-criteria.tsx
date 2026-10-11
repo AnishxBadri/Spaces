@@ -51,7 +51,7 @@ export function SpaceCriteria({
 
   return (
     <section aria-label="Criteria" className="flex flex-col gap-1.5 px-3 py-4">
-      <span className="field-label text-graphite">Criteria</span>
+      <span className="label-caps text-graphite">Criteria</span>
       {editing ? (
         <textarea
           autoFocus

@@ -86,7 +86,7 @@ export function RailField({
       label={
         <>
           <span
-            className="min-w-0 truncate"
+            className="min-w-0"
             {...(def.description ? { title: def.description } : {})}
           >
             {def.name}

@@ -47,6 +47,17 @@ const boxChrome = (variant: Variant) =>
     ? 'focus-ring h-8 rounded-md border border-rule bg-paper px-2.5 transition-colors'
     : 'focus-ring h-8 rounded-md border border-transparent px-2 transition-colors hover:border-rule'
 
+/**
+ * A picker trigger off the table: the box, but growing past 32px when its
+ * chips wrap — a property row or a form shows every value, where a table
+ * cell clips to its one line.
+ */
+const pickerChrome = (variant: Variant) =>
+  cn(
+    boxChrome(variant),
+    'h-auto min-h-8 w-full py-1 data-[state=open]:border-rule',
+  )
+
 export type RegistryEntry = {
   id?: string
   slug: string
@@ -547,7 +558,7 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
         className={cn(
           'group/pick flex min-w-0 items-center gap-1 text-left',
           variant !== 'cell'
-            ? cn(boxChrome(variant), 'w-full data-[state=open]:border-rule')
+            ? pickerChrome(variant)
             : 'focus-ring-inset h-full w-full rounded-md px-1',
         )}
       >
@@ -664,7 +675,7 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
         className={cn(
           'group/pick flex min-w-0 items-center gap-1 text-left',
           variant !== 'cell'
-            ? cn(boxChrome(variant), 'w-full data-[state=open]:border-rule')
+            ? pickerChrome(variant)
             : 'focus-ring-inset h-full w-full rounded-md px-1',
         )}
       >
@@ -787,7 +798,7 @@ function ActorPicker({ def, value, onSave, variant, refNames }: Props) {
         className={cn(
           'group/pick flex min-w-0 items-center gap-1 text-left',
           variant !== 'cell'
-            ? cn(boxChrome(variant), 'w-full data-[state=open]:border-rule')
+            ? pickerChrome(variant)
             : 'focus-ring-inset h-full w-full rounded-md px-1',
         )}
       >
@@ -850,7 +861,7 @@ function OptionPicker({
         className={cn(
           'group/pick flex min-w-0 items-center gap-1 text-left',
           variant !== 'cell'
-            ? cn(boxChrome(variant), 'w-full data-[state=open]:border-rule')
+            ? pickerChrome(variant)
             : 'focus-ring-inset h-full w-full rounded-md px-1',
         )}
       >

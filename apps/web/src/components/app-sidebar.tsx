@@ -920,7 +920,7 @@ function FoldGroup({
         onClick={() => setGroupFolded(id, !folded)}
         className="focus-ring flex h-6 items-center gap-1.5 rounded-md px-2.5 text-left text-graphite transition-colors hover:text-foreground"
       >
-        <span className="field-label leading-4 font-medium">{label}</span>
+        <span className="label-caps">{label}</span>
         <span aria-hidden className="mono text-micro">
           {folded ? `▸ ${count}` : '▾'}
         </span>

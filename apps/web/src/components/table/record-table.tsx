@@ -293,7 +293,7 @@ export function RecordTable<T>({
                   className="px-2 align-middle"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="label-caps font-normal text-graphite">
+                    <span className="field-label text-graphite">
                       {grouped(rows.length)} of{' '}
                       {grouped(
                         page
@@ -409,7 +409,7 @@ function HeaderCell<T>({
             : 'none'
       }
       className={cn(
-        'relative h-8 px-2 align-middle label-caps text-graphite',
+        'relative h-8 px-2 align-middle field-label text-graphite',
         numeric ? 'text-right' : 'text-left',
         sticky && 'sticky z-20 bg-paper',
         sticky && stickyLeft,
@@ -433,13 +433,9 @@ function HeaderCell<T>({
               {flexRender(column.columnDef.header, header.getContext())}
             </span>
             {sorted === 'asc' ? (
-              <span className="shrink-0 mono text-micro font-normal tracking-normal">
-                ↑
-              </span>
+              <span className="shrink-0 mono text-micro">↑</span>
             ) : sorted === 'desc' ? (
-              <span className="shrink-0 mono text-micro font-normal tracking-normal">
-                ↓
-              </span>
+              <span className="shrink-0 mono text-micro">↓</span>
             ) : null}
             <ChevronsUpDown
               className="ml-auto size-3 shrink-0 opacity-0 transition-opacity duration-150 ease-out-quart group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100 group-data-[state=open]/sort:opacity-100"
@@ -635,7 +631,7 @@ export function ColumnsMenu<T>({ table }: { table: Table<T> }) {
         className="max-h-80 w-60 overflow-y-auto p-0"
       >
         <div className="flex h-8 items-center justify-between border-b border-rule px-2.5">
-          <DropdownMenuLabel className="p-0 field-label leading-4 text-foreground">
+          <DropdownMenuLabel className="p-0 label-caps text-foreground">
             Columns · {hideable.length - hiddenCount} of {hideable.length}
           </DropdownMenuLabel>
           {hiddenCount > 0 ? (

@@ -137,7 +137,7 @@ describe('the readout strip', () => {
         ]}
       />,
     )
-    // The number over a sentence-case label, never the caps field label.
+    // The number over a sentence-case label, never the mono field label.
     expect(html).not.toContain('field-label')
     expect(html).toMatch(/text-foreground[^>]*>4</)
     expect(html).toMatch(/text-graphite[^>]*>0</)

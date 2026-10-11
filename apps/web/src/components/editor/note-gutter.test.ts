@@ -79,7 +79,7 @@ describe('the note inset', () => {
   })
 })
 
-describe('a note page: the head and the body share the inset', () => {
+describe('a note page: the body columns share the inset', () => {
   it('on /notes/$id, the back link’s bar and the title-to-body column', () => {
     const bar = between(notePage, 'border-b border-hairline pr-8', '<Link')
     expect(bar).toContain('NOTE_INSET')
@@ -100,13 +100,15 @@ describe('a note page: the head and the body share the inset', () => {
     expect(column.slice(column.indexOf('>'))).not.toMatch(LEFT_INSET)
   })
 
-  it('on /mandate, the page head, the facts and the prose', () => {
+  it('on /mandate, the facts and the prose; the head keeps the page edge', () => {
     const head = between(
       mandatePage,
       '<PageHeader\n        title="Mandate"',
       '/>',
     )
-    expect(head).toContain('className={NOTE_INSET}')
+    // The title sits at the 32px page edge like every other page's.
+    expect(head).not.toContain('NOTE_INSET')
+    expect(head).not.toContain('className={')
     const facts = between(mandatePage, 'function FactsGrid', '</div>')
     expect(facts).toContain(
       "'flex shrink-0 flex-col border-b border-hairline pr-8'",

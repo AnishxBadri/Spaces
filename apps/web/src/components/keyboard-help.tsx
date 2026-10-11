@@ -84,7 +84,7 @@ function Group({
 }) {
   return (
     <section className={top ? 'pt-3.5' : undefined}>
-      <h3 className="pb-1.5 field-label text-graphite">{label}</h3>
+      <h3 className="pb-1.5 label-caps text-graphite">{label}</h3>
       {children}
     </section>
   )

@@ -283,7 +283,7 @@ function ObjectRecordPage() {
                     objectPlural={record.object.plural}
                     onSaved={() => router.invalidate()}
                     trigger={
-                      <button className="focus-ring mono text-micro text-graphite hover:text-foreground">
+                      <button className="focus-ring self-start mono text-micro text-graphite hover:text-foreground">
                         + add attribute
                       </button>
                     }

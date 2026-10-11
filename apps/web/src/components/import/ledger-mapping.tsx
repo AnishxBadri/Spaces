@@ -260,7 +260,7 @@ function TargetTable({
   const groups = [...new Set(LEDGER_LINES.map((l) => l.group))]
   return (
     <section className="flex min-w-0 flex-1 flex-col" aria-label="Event fields">
-      <div className="flex h-8 items-center gap-3 border-b border-hairline px-2 label-caps text-graphite">
+      <div className="flex h-8 items-center gap-3 border-b border-hairline px-2 field-label text-graphite">
         <span className="w-52 shrink-0">Event field</span>
         <span className="w-55 shrink-0">Sheet column</span>
         <span className="min-w-0 flex-1">Row 1 becomes</span>

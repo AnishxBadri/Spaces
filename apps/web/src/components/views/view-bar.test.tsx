@@ -136,17 +136,34 @@ async function mount(opts: {
 const trigger = () =>
   document.querySelector('button[aria-label="View menu for Seed, India"]')
 
-/** Radix opens a menu on Enter from its trigger. */
+/** Turn the event loop inside `act` until `done` holds, or fail naming `what`. */
+async function until(what: string, done: () => boolean) {
+  for (let i = 0; i < 100; i++) {
+    if (done()) return
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    })
+  }
+  throw new Error(`never ${what}`)
+}
+
+const menu = () => document.querySelector('[role="menu"]')
+
+/**
+ * Radix opens a menu on Enter from its trigger — a toggle, so it waits for
+ * the trigger to read closed first, then for the menu to mount.
+ */
 async function openMenu() {
   const t = trigger()
   if (!(t instanceof HTMLElement)) throw new Error('no view menu')
+  await until('closed', () => t.dataset.state === 'closed' && menu() === null)
   await act(async () => {
     t.focus()
     t.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
     )
-    await new Promise((resolve) => setTimeout(resolve, 0))
   })
+  await until('opened', () => t.dataset.state === 'open' && menu() !== null)
 }
 
 const items = () =>
@@ -161,8 +178,13 @@ async function choose(label: string) {
   if (!(item instanceof HTMLElement)) throw new Error(`no ${label}`)
   await act(async () => {
     item.click()
-    await new Promise((resolve) => setTimeout(resolve, 0))
   })
+  // The close is done when focus is back on the trigger: the menu's focus
+  // scope returns it on a timer, which must not land inside the next open.
+  await until(
+    'closed',
+    () => menu() === null && document.activeElement === trigger(),
+  )
 }
 
 describe('the view menu', () => {

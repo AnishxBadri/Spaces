@@ -304,12 +304,17 @@ describe('the named type steps', () => {
     expect(css).toContain('--text-field--line-height: 0.75rem;')
   })
 
-  it('carry a field-label utility: mono, caps, tracked, 400', () => {
+  it('carry a field-label utility: lowercase mono at the micro step, 400', () => {
     const utility = /@utility field-label \{([^}]*)\}/.exec(css)?.[1] ?? ''
     expect(utility).toContain('font-family: var(--font-mono);')
-    expect(utility).toContain('font-size: var(--text-field);')
-    expect(utility).toContain('line-height: var(--text-field--line-height);')
+    expect(utility).toContain('font-size: var(--text-micro);')
+    expect(utility).toContain('line-height: var(--text-micro--line-height);')
     expect(utility).toContain('font-weight: 400;')
+    expect(utility).toContain('text-transform: lowercase;')
+  })
+
+  it('keep label-caps the CAPS tier: tracked and uppercase', () => {
+    const utility = /@utility label-caps \{([^}]*)\}/.exec(css)?.[1] ?? ''
     expect(utility).toContain('letter-spacing: 0.08em;')
     expect(utility).toContain('text-transform: uppercase;')
   })

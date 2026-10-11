@@ -264,7 +264,7 @@ export function RegistryList({
             <span className="w-3 mono text-micro text-graphite">
               {showArchived ? '⌄' : '›'}
             </span>
-            <span className="field-label leading-3.5 font-medium text-graphite">
+            <span className="label-caps leading-3.5 text-graphite">
               Archived
             </span>
             <span className="mono text-micro text-graphite">

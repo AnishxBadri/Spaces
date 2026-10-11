@@ -362,7 +362,7 @@ export function ReceiptLedger({
   const more = view.matching - view.rows.length
   return (
     <section className="flex flex-col">
-      <div className="flex h-8 items-center gap-3 border-b border-hairline px-2 label-caps text-graphite">
+      <div className="flex h-8 items-center gap-3 border-b border-hairline px-2 field-label text-graphite">
         <span className="w-9 shrink-0 text-right">{HEAD[0]}</span>
         <span className="w-50 shrink-0">{HEAD[1]}</span>
         <span className="w-22 shrink-0">{HEAD[2]}</span>

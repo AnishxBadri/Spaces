@@ -174,7 +174,7 @@ describe('the settings chassis', () => {
     expect(backButton().textContent).toBe('‹Settings')
     expect(backButton().querySelector('kbd')).toBeNull()
     const groups = Array.from(
-      settingsNav()?.querySelectorAll('.field-label') ?? [],
+      settingsNav()?.querySelectorAll('.label-caps') ?? [],
     ).map((el) => el.textContent)
     expect(groups).toEqual(['You', 'Workspace', 'AI', 'Integrations'])
     // The shell's counts reach the right lane.

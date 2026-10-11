@@ -1058,9 +1058,7 @@ function Field({
       <Label htmlFor={htmlFor} className="items-baseline">
         {label}
         {optional ? (
-          <span className="font-sans text-field tracking-normal text-graphite normal-case">
-            optional
-          </span>
+          <span className="font-sans text-field text-graphite">optional</span>
         ) : null}
       </Label>
       {children}

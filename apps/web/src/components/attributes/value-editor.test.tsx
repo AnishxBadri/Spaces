@@ -148,3 +148,46 @@ describe('ValueEditor — phone (D67)', () => {
     expect(cell).toContain('+1</span>')
   })
 })
+
+/**
+ * A multi-select in a property row shows every chip and grows past the 32px
+ * box when they wrap; a table cell keeps its one line and clips.
+ */
+describe('ValueEditor — multi-select chips', () => {
+  const tags: RegistryEntry = {
+    id: '00000000-0000-4000-8000-00000000000c',
+    slug: 'sectors',
+    name: 'Sectors',
+    type: 'multi_select',
+    isSystem: false,
+    options: {
+      options: [
+        { id: 'a', label: 'Aerospace' },
+        { id: 'b', label: 'Defence autonomy' },
+        { id: 'c', label: 'Industrial' },
+      ],
+    },
+  }
+  const trigger = (variant: 'cell' | 'field') => {
+    const html = renderToStaticMarkup(
+      <ValueEditor
+        def={tags}
+        value={['a', 'b', 'c']}
+        variant={variant}
+        onSave={() => {}}
+      />,
+    )
+    return /<button[^>]*aria-label="Sectors"[^>]*>/.exec(html)?.[0] ?? ''
+  }
+
+  it('lets a property row grow: the box has a 32px floor, not a height', () => {
+    const field = trigger('field')
+    expect(field).toContain('min-h-8')
+    expect(field).toContain('h-auto')
+    expect(field).not.toMatch(/[\s"]h-8[\s"]/)
+  })
+
+  it('keeps a table cell to its line', () => {
+    expect(trigger('cell')).toContain('h-full')
+  })
+})

@@ -225,7 +225,7 @@ export function LedgerPreviewStep({
           readouts={ledgerStripCells(counts).map(countReadout)}
         />
         <section className="flex flex-col px-8">
-          <div className="flex h-8 items-center gap-3 border-b border-hairline px-2 label-caps text-graphite">
+          <div className="flex h-8 items-center gap-3 border-b border-hairline px-2 field-label text-graphite">
             <span className="w-16 shrink-0 text-right">{HEAD[0]}</span>
             <span className="w-50 shrink-0">{HEAD[1]}</span>
             <span className="w-22 shrink-0">{HEAD[2]}</span>

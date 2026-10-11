@@ -102,7 +102,6 @@ function MandatePage() {
     <div className="flex min-h-full flex-col">
       <PageHeader
         title="Mandate"
-        className={NOTE_INSET}
         description={
           <>
             <span>updated {note.updatedAt.slice(0, 10)}</span>
@@ -125,8 +124,8 @@ function MandatePage() {
 
       <FactsGrid mandate={mandate} stageOptions={stageOptions} />
 
-      {/* The page wears the note inset on every column: the side menu
-          needs the room, and the title and the text keep one edge. */}
+      {/* The facts and the prose wear the note inset, so they keep one
+          edge; the head keeps the page's px-8 like every other page. */}
       <div className={cn('pt-6 pr-8 pb-8', NOTE_INSET)}>
         <MandateProse
           noteId={note.id}
@@ -145,7 +144,8 @@ function MandatePage() {
 
 type Mandate = NonNullable<Awaited<ReturnType<typeof getMandate>>>
 
-/** One row of the grid: 96px caps label, values, a mono note on the right. */
+/** One row of the grid: 96px lowercase mono label, values, a mono note on
+ *  the right. */
 function FactRow({
   label,
   note,

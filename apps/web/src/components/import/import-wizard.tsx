@@ -420,7 +420,7 @@ export function DefineRow({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <span className="label-caps text-graphite">Into</span>
+      <span className="field-label text-graphite">Into</span>
       <div
         role="group"
         aria-label="Import mode"

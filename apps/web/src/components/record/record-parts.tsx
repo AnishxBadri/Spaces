@@ -402,14 +402,20 @@ export function PropertyCell({
       {reject === 'rest' ? null : (
         <span aria-hidden className={rejectPaneClass(reject)} />
       )}
-      <div className="flex min-w-0 items-center gap-3">
+      {/* Both lanes are at least the 32px value box and centre on it, so a
+          value that grows (wrapped chips) keeps its label on the first line.
+          128px holds the longest system label (`business model` + the edit
+          pencil); a longer one wraps rather than truncates. */}
+      <div className="flex min-w-0 items-start gap-3">
         <div
           data-property-label
-          className="flex w-24 shrink-0 items-center gap-1 mono text-micro text-graphite lowercase"
+          className="flex min-h-8 w-32 shrink-0 items-center gap-1 mono text-micro break-words text-graphite lowercase"
         >
           {label}
         </div>
-        <div className="min-w-0 flex-1">{children}</div>
+        <div className="flex min-h-8 min-w-0 flex-1 flex-col justify-center">
+          {children}
+        </div>
       </div>
       {below}
     </div>
@@ -451,7 +457,8 @@ export function RailSection({
   )
 }
 
-/** A 36px readout row in the rail: caps label left, mono value right. */
+/** A 36px readout row in the rail: lowercase mono label left, mono value
+ *  right. */
 export function RailRow({
   label,
   value,

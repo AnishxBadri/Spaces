@@ -39,7 +39,7 @@ function Section({
 }) {
   return (
     <section className="flex flex-col gap-1.5 border-b border-rule px-4 py-3">
-      <h3 className="field-label text-graphite">
+      <h3 className="label-caps text-graphite">
         {label}
         {count === undefined ? null : ` · ${String(count)}`}
       </h3>

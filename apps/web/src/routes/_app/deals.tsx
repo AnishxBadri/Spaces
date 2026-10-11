@@ -496,7 +496,7 @@ function DealsPage() {
               {groupStages.filter((o) => !o.archived).map(stageTab)}
               {groupStages.some((o) => o.archived) ? (
                 <>
-                  <span className="mr-1 ml-3 self-center field-label text-graphite">
+                  <span className="mr-1 ml-3 self-center label-caps text-graphite">
                     Archived
                   </span>
                   {groupStages.filter((o) => o.archived).map(stageTab)}

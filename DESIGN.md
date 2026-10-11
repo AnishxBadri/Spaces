@@ -222,19 +222,19 @@ the instrument measured. Inter Variable (`cv11` + `ss01`), Source Serif 4 Variab
 JetBrains Mono Variable, all self-hosted via Fontsource — no font CDN calls from a
 privacy product.
 
-| voice | step              | size / leading | role                                             |
-| ----- | ----------------- | -------------- | ------------------------------------------------ |
-| serif | display · 600     | 28 / 32        | page titles, record names, the Today sentence    |
-| serif | section · 600     | 18 / 22–24     | dialog titles, settings sections, empty states   |
-| serif | prose · 400       | 17 / 27        | note bodies, theses, reasons                     |
-| sans  | title · 500       | 15 / 22        | a name inside a readout cell                     |
-| sans  | ui · 400 / 500    | 13 / 20        | rows, forms, buttons, the workhorse              |
-| sans  | body · 400        | 14 / 20        | composer inputs, running UI text                 |
-| mono  | readout · 500     | 18–20 / 22–24  | the readout strip                                |
-| mono  | numeral · 400     | 13 / 16        | money, counts, dates, IDs, domains in rows       |
-| mono  | label · 500 caps  | 11 / 14, .08em | column labels, section labels, field labels      |
-| mono  | field label · 400 | 10 / 12 caps   | labels inside cells and readouts — `field-label` |
-| mono  | key hint · 400    | 11 / 14        | `⌘K G T ↵ ⇧↵ M esc` — inside the control         |
+| voice | step              | size / leading | role                                                |
+| ----- | ----------------- | -------------- | --------------------------------------------------- |
+| serif | display · 600     | 28 / 32        | page titles, record names, the Today sentence       |
+| serif | section · 600     | 18 / 22–24     | dialog titles, settings sections, empty states      |
+| serif | prose · 400       | 17 / 27        | note bodies, theses, reasons                        |
+| sans  | title · 500       | 15 / 22        | a name inside a readout cell                        |
+| sans  | ui · 400 / 500    | 13 / 20        | rows, forms, buttons, the workhorse                 |
+| sans  | body · 400        | 14 / 20        | composer inputs, running UI text                    |
+| mono  | readout · 500     | 18–20 / 22–24  | the readout strip                                   |
+| mono  | numeral · 400     | 13 / 16        | money, counts, dates, IDs, domains in rows          |
+| mono  | label · 500 caps  | 11 / 14, .08em | group and section labels, tabs, stamps              |
+| mono  | field label · 400 | 11 / 16 lower  | column and lane heads, field labels — `field-label` |
+| mono  | key hint · 400    | 11 / 14        | `⌘K G T ↵ ⇧↵ M esc` — inside the control            |
 
 **Who wrote it decides the voice** (owner 2026-10-08; D78):
 
@@ -243,8 +243,8 @@ privacy product.
 - Text a model wrote that nobody chose is sans: an Ask answer, Exa's brief, an unfiled
   summary. Ask answers are sans in the panel and on `/ask`.
 
-Utilities: `title-serif`, `label-caps` (the 11/14 500 label step whole), `field-label`
-(the 10/12 400 field-label step whole — mono, caps, .08em), `mono`, `numeric` (tabular +
+Utilities: `title-serif`, `label-caps` (the 11/14 500 caps label step whole), `field-label`
+(the 11/16 400 field label whole — mono, lowercase, untracked), `mono`, `numeric` (tabular +
 right-aligned in one class), `tabular` (figures inline in a sentence). The scale steps
 stay named (`text-field … text-display`, the smallest being the field step at 10/12); if
 a size isn't on the list it does not go in the app — `instrument/vocabulary` rejects
@@ -252,17 +252,19 @@ a size isn't on the list it does not go in the app — `instrument/vocabulary` r
 A genuine one-off (optical sizing of initials inside a 16–22px square) takes an inline
 comment saying why and a scoped disable; there are four.
 
-**The Casing Rule** (2026-09-15). Three tiers, and the tier is decided by who is
-speaking, never by how small the text is:
+**The Casing Rule** (2026-09-15, tiers redrawn 2026-10-11). Three tiers, and the tier
+is decided by who is speaking, never by how small the text is:
 
-- **CAPS** (`label-caps`) — structure the instrument labels: column heads, tabs,
-  field labels, readout labels. Section heads left this tier on 2026-10-05: a section is
-  titled in sentence case at the title step (see The Separation Rule, §5).
+- **CAPS** (`label-caps`) — a group or section label (`MARKET MAP`, `IDENTITY`,
+  `PORTFOLIO`), tabs and stamps. A page section's own head is titled in sentence case at
+  the title step (see The Separation Rule, §5).
+- **lowercase mono** (`field-label`) — what the instrument labels inside a structure:
+  lane and column heads, field labels in forms and windows, readout labels, key hints
+  (`↵ add · ⇧↵ add & keep open`), units and state words (`end`, `yest`, `fetching.`,
+  `board ›`).
 - **Sentence case** — anything a person reads or clicks. Every control, every button,
-  every chip, every menu item, every empty-state invitation. `Add task`, `Due date`,
-  `Assign to`, `Keep open`, `+ Link record`.
-- **lowercase mono** — only what the instrument prints about _itself_: key hints
-  (`↵ add · ⇧↵ add & keep open`), units, `end`, `yest`, `dateless is legal`, `board ›`.
+  every chip, every menu item, every empty-state invitation, and a settings row's
+  210px label lane. `Add task`, `Due date`, `Assign to`, `Keep open`, `+ Link record`.
 
 The failure this rule was written against: the task composer's chips were controls
 dressed as annotations — `date…`, `assign to me`, `+ link record`, `create more` — sat
@@ -488,7 +490,7 @@ load-bearing rules promoted here:
   the caret in a fresh sheet is the focus, and corner marks on that box read as a frame
   around the head; a borderless input inside a bordered composer row draws the marks on
   the row (`focus-ring-within`), never on the invisible input box.
-- **Labels:** the `Label` atom is a 10px caps mono field label in graphite.
+- **Labels:** the `Label` atom is an 11px lowercase mono field label in graphite.
 - **Placeholders:** full-strength graphite — never a sub-100% opacity.
 - **Invalid:** border shifts to destructive; a required-and-empty field gets an amber
   square, not a red border.
@@ -548,7 +550,7 @@ band's edge, under its title.
   page is the page, so its groups take no band. Dialog heads and feet are bone. Rows sit on paper.
 - **Scale.** The section title is the title step (15/22, sans 500, sentence case) with a
   mono count beside it. A row's primary is body (14/20) in ink; at most one graphite
-  meta line under it. Column heads, tabs and field labels stay CAPS.
+  meta line under it. Tabs stay CAPS; column heads and field labels are lowercase mono.
 - **One line, then a second when it is content.** A ledger row leads with one 40px
   line; secondary facts go to fixed lanes. A second graphite line is right when it is
   the row's description — an email's people and summary, a meeting's participants.

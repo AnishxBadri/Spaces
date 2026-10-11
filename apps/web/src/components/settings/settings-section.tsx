@@ -150,7 +150,7 @@ export function SettingsGroupHead({
       className="flex items-end justify-between gap-4 border-b border-hairline pt-7 pb-1.5"
     >
       <div className="flex min-w-0 items-baseline gap-3">
-        <h3 className="min-w-0 truncate field-label leading-3.5 font-medium text-graphite">
+        <h3 className="min-w-0 truncate label-caps leading-3.5 text-graphite">
           {title}
         </h3>
         {count ? (

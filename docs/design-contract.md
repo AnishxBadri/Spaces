@@ -93,13 +93,16 @@ graphite (`DESIGN.md` §5 P2's `LedgerFigure` and P4's `company · check`;
 
 The tier is decided by who is speaking, never by how small the text is.
 
-- **CAPS** (`label-caps`, `field-label`) — structure the instrument labels: column
-  heads, tabs, field labels, readout labels. Section heads are not CAPS since
-  2026-10-05; they are titled in sentence case at the title step (below).
+- **CAPS** (`label-caps`) — a group or section label (`MARKET MAP`, `IDENTITY`,
+  `PORTFOLIO`, a settings group, a sidebar or palette group), tabs and stamps. A page
+  section's own head is titled in sentence case at the title step (below).
+- **lowercase mono** (`field-label`) — what the instrument labels inside a structure:
+  `RecordTable` column heads, `LabelHead` lane heads, a record's property labels, the
+  `Label` in forms and windows, readout labels, key hints (`↵ add · ⇧↵ add & keep
+open`), units and state words (`end`, `fetching.`, `board ›`).
 - **Sentence case** — anything a person reads or clicks. Every control, button, chip,
-  menu item and empty-state invitation. `Add task`, `Due date`, `Keep open`.
-- **lowercase mono** — only what the instrument prints about _itself_: key hints
-  (`↵ add · ⇧↵ add & keep open`), units, `end`, `dateless is legal`, `board ›`.
+  menu item and empty-state invitation, and `SettingsRow`'s 210px label lane. `Add
+task`, `Due date`, `Keep open`.
 
 ### The Separation Rule (`DESIGN.md` §5, 2026-10-05)
 
@@ -401,9 +404,10 @@ Twenty-one questions. A merge needs a yes to each.
 2. Is radius 2px on controls and 0 everywhere else — no pill, no circle, no blur?
 3. Is every measured thing mono, and `numeric` where figures are comparable, with names
    and sentences in serif or sans outside the row's mono end lane?
-4. Does the casing follow the three tiers — CAPS for structure, sentence case for
-   anything a person clicks, lowercase mono only for what the instrument says about
-   itself?
+4. Does the casing follow the three tiers — CAPS (`label-caps`) for a group or section
+   label, tabs and stamps; lowercase mono (`field-label`) for column and lane heads,
+   field labels, key hints and state words; sentence case for anything a person reads or
+   clicks?
 
 **The seven rules** (`DESIGN.md`, "The seven rules")
 

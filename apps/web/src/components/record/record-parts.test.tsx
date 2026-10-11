@@ -103,6 +103,10 @@ describe('the details slot', () => {
         expect.arrayContaining(['mono', 'lowercase', 'text-graphite']),
       )
       expect(classes(l)).not.toContain('field-label')
+      // The lane holds `business model` whole; a longer name wraps, never
+      // truncates.
+      expect(classes(l)).toContain('w-32')
+      expect(l.outerHTML).not.toContain('truncate')
       // The value follows in the same row, left-aligned.
       const value = l.nextElementSibling
       expect(classes(value)).not.toContain('text-right')
