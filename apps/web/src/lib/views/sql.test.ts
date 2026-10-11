@@ -144,19 +144,58 @@ describe('compileConditions agrees with matchesConditions', () => {
 })
 
 describe('the NULL traps', () => {
-  it('matches is_not for a row whose key is missing, and not contains', async () => {
+  it('never matches is_not or contains on an empty, missing or null value', async () => {
     const isNot: Array<Condition> = [
       { slug: 'stage', op: 'is_not', value: 'seed' },
     ]
     expect(await sqlKeys(isNot)).toEqual(expectedKeys(isNot))
-    expect(await sqlKeys(isNot)).toContain('absent')
-    expect(await sqlKeys(isNot)).toContain('nulls')
+    // `blank` stores '', `absent` no key, `nulls` JSON null.
+    expect(await sqlKeys(isNot)).toEqual(['negative', 'padded', 'upper'])
 
     const contains: Array<Condition> = [
       { slug: 'stage', op: 'contains', value: 'seed' },
     ]
     expect(await sqlKeys(contains)).toEqual(expectedKeys(contains))
     expect(await sqlKeys(contains)).not.toContain('absent')
+  })
+
+  it('is matches only a stored value, and is empty only an empty one', async () => {
+    const is: Array<Condition> = [{ slug: 'stage', op: 'is', value: 'seed' }]
+    expect(await sqlKeys(is)).toEqual(['full', 'strings'])
+    expect(await sqlKeys(is)).toEqual(expectedKeys(is))
+
+    // An empty target is "is empty"; "is not" an empty target is "has a value".
+    const isBlank: Array<Condition> = [{ slug: 'stage', op: 'is', value: '' }]
+    expect(await sqlKeys(isBlank)).toEqual(['absent', 'blank', 'nulls'])
+    expect(await sqlKeys(isBlank)).toEqual(expectedKeys(isBlank))
+    const isNotNull: Array<Condition> = [
+      { slug: 'stage', op: 'is_not', value: null },
+    ]
+    expect(await sqlKeys(isNotNull)).toEqual(
+      ['full', 'negative', 'padded', 'strings', 'upper'].sort(),
+    )
+    expect(await sqlKeys(isNotNull)).toEqual(expectedKeys(isNotNull))
+  })
+
+  it('reads a multi-select as membership — in and not in — and leaves empties out of not in', async () => {
+    // `[]`, a missing key and JSON null are all "no tags".
+    const inA: Array<Condition> = [{ slug: 'tags', op: 'is', value: 'a' }]
+    expect(await sqlKeys(inA)).toEqual(['full', 'padded', 'upper'])
+    expect(await sqlKeys(inA)).toEqual(expectedKeys(inA))
+
+    const notInA: Array<Condition> = [
+      { slug: 'tags', op: 'is_not', value: 'a' },
+    ]
+    expect(await sqlKeys(notInA)).toEqual(['negative', 'strings'])
+    expect(await sqlKeys(notInA)).toEqual(expectedKeys(notInA))
+  })
+
+  it('leaves a missing number out of is not', async () => {
+    const isNot: Array<Condition> = [{ slug: 'score', op: 'is_not', value: 3 }]
+    const keys = await sqlKeys(isNot)
+    expect(keys).toEqual(expectedKeys(isNot))
+    expect(keys).not.toContain('absent')
+    expect(keys).not.toContain('nulls')
   })
 
   it('counts a missing key, a JSON null, an empty string and [] as empty', async () => {

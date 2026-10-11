@@ -11,7 +11,7 @@ import {
   fusedStatement as coreFusedStatement,
 } from '@spaces/core/writes/read/search'
 import type { FusedRow } from '@spaces/core/writes/read/search'
-import { renderWikiLinks } from '@spaces/core/context/wiki-link'
+import { excerpt } from '@spaces/core/context/excerpt'
 import { queryVectorOrNullProgram } from './query-embedding'
 import type { QueryVector } from './query-embedding'
 
@@ -345,10 +345,7 @@ export const searchAllProgram = Effect.fn('searchAllProgram')(function* (
       name: h.name,
       objectSlug: h.object_slug,
       // A mention reads as its name, never as `[[Name|entity:id]]`.
-      snippet:
-        h.snippet === null
-          ? null
-          : renderWikiLinks(h.snippet).replace(/\s+/g, ' ').trim(),
+      snippet: h.snippet === null ? null : excerpt(h.snippet),
       matchedIn: h.sources.includes('name') ? 'name' : (h.sources[0] ?? 'name'),
     }
     return h.row_kind === 'task'

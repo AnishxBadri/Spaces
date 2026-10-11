@@ -1,3 +1,4 @@
+import { excerpt } from '@spaces/core/context/excerpt'
 import { createServerFn } from '@tanstack/react-start'
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
@@ -295,7 +296,7 @@ export const listRecordDocuments = createServerFn()
         filename: r.filename ?? 'Untitled file',
         createdAt: r.createdAt.toISOString(),
         uploadedByName: r.uploadedBy ? (names.get(r.uploadedBy) ?? null) : null,
-        snippet: r.snippet?.replace(/\s+/g, ' ').trim() || null,
+        snippet: excerpt(r.snippet ?? '') || null,
         lastRun: runs.get(r.id) ?? null,
         sourceClass: source.sourceClass,
         sourceCapability: source.sourceCapability,

@@ -99,7 +99,8 @@ export function matchesCondition(
       return asList(v).some((x) => String(x) === String(c.value))
     }
     case 'is_not': {
-      if (isEmpty(v)) return !isEmpty(c.value)
+      // An empty value has no answer to exclude: it never matches "is not X".
+      if (isEmpty(v)) return false
       if (NUMBER_TYPES.has(type)) return Number(v) !== Number(c.value)
       return !asList(v).some((x) => String(x) === String(c.value))
     }

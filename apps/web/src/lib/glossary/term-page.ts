@@ -1,3 +1,4 @@
+import { excerpt } from '@spaces/core/context/excerpt'
 import { Effect, Schema } from 'effect'
 import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
@@ -241,8 +242,8 @@ export const termPageProgram = Effect.fn('termPageProgram')(function* (
         subKind: r.sub_kind,
         name: r.name,
         at: r.at,
-        // The palette's normalisation, so a snippet reads the same here.
-        snippet: r.snippet?.replace(/\s+/g, ' ').trim() || null,
+        // The palette's excerpt, so a snippet reads the same here.
+        snippet: excerpt(r.snippet ?? '') || null,
         parent: parents.get(r.id) ?? null,
       })),
       total: mentionRows.rows.at(0)?.total ?? 0,

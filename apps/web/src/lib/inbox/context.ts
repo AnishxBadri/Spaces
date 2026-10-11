@@ -12,6 +12,7 @@ import type { EntityValues } from '@spaces/db/schema/entities'
 import { normalizeName } from '@spaces/core/entities/normalize'
 import { normalizeIdentityValue } from '@spaces/core/writes/entities/resolve'
 import { provenanceOf } from '@spaces/core/writes/entities/provenance'
+import { nonEmptyValueCount } from './keeper'
 
 /**
  * One side of an inbox pair, read off the record (SPA-76).
@@ -84,7 +85,7 @@ export async function entityContext(id: string) {
   ).at(0)
   if (!head) throw new Error('Record not found')
   // `objectId` and the values blob are read, not shipped: they answer the
-  // identity-domain fallback below and nothing on the card, and a whole
+  // identity-domain fallback and the value count below, and a whole
   // record's values on every side of every pair is payload for no reader.
   const { objectId, values, ...card } = head
   // Provenance is the pair now, and the pair is only half an answer on its
@@ -124,6 +125,8 @@ export async function entityContext(id: string) {
       )
       .map((a) => a.valueNorm),
     mentionCount,
+    // What `defaultKeeper` ranks first.
+    valueCount: nonEmptyValueCount(values),
     spaces: spaceRows.map((s) => s.name),
   }
 }

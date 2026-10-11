@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { SearchQueryFailed } from '@spaces/core/writes/read/search'
-import { renderWikiLinks } from '@spaces/core/context/wiki-link'
+import { excerpt } from '@spaces/core/context/excerpt'
 import { documentParentsProgram, semanticCtes } from './query'
 import type { SearchParent, SearchSeam } from './query'
 import { queryVectorOrNullProgram } from './query-embedding'
@@ -87,7 +87,7 @@ export const searchPassagesProgram = Effect.fn('searchPassagesProgram')(
       kind: r.kind,
       name: r.name,
       objectSlug: r.object_slug,
-      snippet: renderWikiLinks(r.snippet ?? ''),
+      snippet: excerpt(r.snippet ?? ''),
       page: r.page,
       parent: parents.get(r.id) ?? null,
     }))

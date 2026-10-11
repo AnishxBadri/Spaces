@@ -1,3 +1,4 @@
+import { excerpt } from '@spaces/core/context/excerpt'
 import { createServerFn } from '@tanstack/react-start'
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
@@ -71,14 +72,7 @@ export const listNotes = createServerFn().handler(async () => {
   return rows.map((r) => ({
     id: r.id,
     title: r.title || 'Untitled',
-    // The starter block's `Mentions: [[…]]` marker is a seed, not prose —
-    // strip it the way the space page already strips it, or every freshly
-    // created note reads as its own wiki-link in the list.
-    snippet: r.bodyMd
-      .replace(/Mentions:.*$/s, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 140),
+    snippet: excerpt(r.bodyMd, { noteBody: true, max: 140 }),
     kind: r.kind,
     updatedAt: r.updatedAt.toISOString(),
     isPrivate: r.visibility === 'private',

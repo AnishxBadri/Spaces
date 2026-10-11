@@ -1,3 +1,4 @@
+import { excerpt } from '@spaces/core/context/excerpt'
 import { Effect, Schema } from 'effect'
 import { and, count, desc, eq, isNull, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
@@ -221,7 +222,7 @@ export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
         uploadedByName: r.uploadedByName,
         createdAt: r.createdAt.toISOString(),
         sinceMs: now - r.createdAt.getTime(),
-        snippet: r.snippet?.replace(/\s+/g, ' ').trim() || null,
+        snippet: excerpt(r.snippet ?? '') || null,
         records,
         spaces,
       }

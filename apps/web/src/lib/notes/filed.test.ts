@@ -233,6 +233,23 @@ describe('filedNotesProgram', () => {
     expect(filed.at(0)?.snippet).toBe('The thesis in brief.')
   })
 
+  it('prints an inline mention as its name, never its markup', async () => {
+    const { filedNotesProgram } = await import('./filed')
+
+    const tag = randomUUID().slice(0, 8)
+    const me = await actorId()
+    const spaceId = await aSpace(tag)
+    await aNote({
+      title: `Mentioning ${tag}`,
+      authorId: me,
+      inSpace: spaceId,
+      bodyMd: `Call with [[Kalpana Systems|entity:${randomUUID()}]] went well.`,
+    })
+
+    const filed = await Effect.runPromise(filedNotesProgram(me, spaceId))
+    expect(filed.at(0)?.snippet).toBe('Call with Kalpana Systems went well.')
+  })
+
   it('answers an empty list for a space nothing is filed into', async () => {
     const { filedNotesProgram } = await import('./filed')
     const tag = randomUUID().slice(0, 8)

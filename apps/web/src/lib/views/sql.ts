@@ -132,22 +132,19 @@ function compileCondition(c: Condition, f: ResolvedField): SQL {
       return orEmpty(j, emptyValue(c.value), someEquals(j, String(c.value)))
     }
     case 'is_not': {
+      // An empty stored value never matches "is not X", whatever X is.
       if (isNumericType(f.type)) {
         const b = Number(c.value)
         return orEmpty(
           j,
-          !emptyValue(c.value),
+          false,
           // NaN !== anything, so an unparseable target excludes nothing.
           Number.isFinite(b)
             ? sql`(${num(j)} is distinct from ${String(b)}::numeric)`
             : sql`true`,
         )
       }
-      return orEmpty(
-        j,
-        !emptyValue(c.value),
-        sql`(not ${someEquals(j, String(c.value))})`,
-      )
+      return orEmpty(j, false, sql`(not ${someEquals(j, String(c.value))})`)
     }
     case 'contains': {
       const lit = String(c.value ?? '').toLowerCase()

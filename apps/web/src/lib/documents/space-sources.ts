@@ -1,3 +1,4 @@
+import { excerpt } from '@spaces/core/context/excerpt'
 import { Effect, Schema } from 'effect'
 import { and, asc, desc, eq, isNull, notExists, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
@@ -140,7 +141,7 @@ function toSource(r: SourceRow, now: number): SpaceSource {
     uploadedByName: r.uploadedByName,
     createdAt: r.createdAt.toISOString(),
     sinceMs: now - r.createdAt.getTime(),
-    snippet: r.snippet?.replace(/\s+/g, ' ').trim() || null,
+    snippet: excerpt(r.snippet ?? '') || null,
   }
 }
 

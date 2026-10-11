@@ -105,6 +105,8 @@ function DialogFooter({
       data-slot="dialog-footer"
       // 52px bone foot: note left, then Cancel beside the primary, which
       // carries ⌘↵. Cancel is the dialog's one close.
+      // - The note wraps, never truncates: it is a cost, privacy or
+      //   irreversibility line, and a cut one says nothing.
       className={cn(
         '-mx-5 mt-5 -mb-5 flex min-h-13 flex-row items-center justify-end gap-2 border-t border-rule bg-bone px-5 py-2.5',
         className,
@@ -112,7 +114,7 @@ function DialogFooter({
       {...props}
     >
       {note ? (
-        <span className="mr-auto min-w-0 truncate mono text-micro text-graphite">
+        <span className="mr-auto min-w-0 mono text-micro break-words text-graphite">
           {note}
         </span>
       ) : null}

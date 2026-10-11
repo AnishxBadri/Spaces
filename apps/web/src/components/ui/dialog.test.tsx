@@ -58,6 +58,19 @@ describe('DialogFooter', () => {
     expect(html).not.toMatch(ESC)
     expect(html).not.toMatch(/close/i)
   })
+
+  it('wraps its note rather than truncating it', () => {
+    const note = 'anyone with the link · one use · 7 days'
+    const html = renderToStaticMarkup(
+      <DialogFooter note={note}>
+        <button type="button">Cancel</button>
+      </DialogFooter>,
+    )
+    const span = /<span class="([^"]*)">([^<]*)<\/span>/.exec(html)
+    expect(span?.[2]).toBe(note)
+    expect(span?.[1].split(' ')).not.toContain('truncate')
+    expect(span?.[1].split(' ')).toContain('break-words')
+  })
 })
 
 describe('the printed esc', () => {

@@ -1,3 +1,4 @@
+import { excerpt } from '@spaces/core/context/excerpt'
 import { Effect, Schema } from 'effect'
 import { and, desc, eq, isNull, or } from 'drizzle-orm'
 import { db } from '@spaces/db'
@@ -41,18 +42,6 @@ export type FiledNote = {
 /** How much of the body the space page shows under each filed note. */
 const SNIPPET_CHARS = 400
 
-/**
- * The lede of a note's body: the trailing `Mentions:` block the editor
- * appends is not prose, so it is cut before the whitespace is collapsed.
- */
-function snippetOf(bodyMd: string): string {
-  return bodyMd
-    .replace(/Mentions:.*$/s, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, SNIPPET_CHARS)
-}
-
 export const filedNotesProgram = Effect.fn('filedNotesProgram')(function* (
   userId: string,
   spaceId: string,
@@ -88,7 +77,7 @@ export const filedNotesProgram = Effect.fn('filedNotesProgram')(function* (
       id: r.id,
       title: r.title,
       kind: r.kind,
-      snippet: snippetOf(r.bodyMd),
+      snippet: excerpt(r.bodyMd, { noteBody: true, max: SNIPPET_CHARS }),
       updatedAt: r.updatedAt.toISOString(),
     }))
     .sort(byMemoThenRecent)

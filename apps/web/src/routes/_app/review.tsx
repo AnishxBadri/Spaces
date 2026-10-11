@@ -27,6 +27,7 @@ import type {
   InboxSide,
   SuggestionRow,
 } from '#/lib/server-fns'
+import { defaultKeeper } from '#/lib/inbox/keeper'
 import { recordPath } from '#/lib/record-path'
 import { cn } from '#/lib/utils'
 
@@ -430,10 +431,14 @@ function PairCard({
 }) {
   const router = useRouter()
   const [pending, setPending] = useState(false)
+  // The richer record is A: the left column, pre-ticked, because a merge has
+  // no unmerge. A tie leaves the pair as it came. (defaultKeeper)
+  const [left, right] =
+    defaultKeeper(pair.a, pair.b) === 'a' ? [pair.a, pair.b] : [pair.b, pair.a]
   // Which side stays: A by default; the column head toggles it.
   const [keep, setKeep] = useState<'a' | 'b'>('a')
-  const winner = keep === 'a' ? pair.a : pair.b
-  const loser = keep === 'a' ? pair.b : pair.a
+  const winner = keep === 'a' ? left : right
+  const loser = keep === 'a' ? right : left
 
   async function act(fn: () => Promise<unknown>, message: string) {
     setPending(true)
@@ -484,7 +489,7 @@ function PairCard({
           {/* The noun is the object registry's `singular`, verbatim and
               cased as the operator wrote it — an object named "LP" must not
               read "Same lp?". Research kinds have no object row. */}
-          Same {pair.a.objectSingular ?? 'record'}?
+          Same {left.objectSingular ?? 'record'}?
         </h2>
         <span className="mono text-micro text-graphite">
           pair {index + 1} of {total} · {reasonLabel(pair).toLowerCase()}
@@ -529,7 +534,7 @@ function PairCard({
             <div className="flex w-35 shrink-0 items-center px-5 field-label text-graphite">
               {row.label}
             </div>
-            {([pair.a, pair.b] as const).map((side, si) => {
+            {[left, right].map((side, si) => {
               const isWinner = side.id === winner.id
               return (
                 <div

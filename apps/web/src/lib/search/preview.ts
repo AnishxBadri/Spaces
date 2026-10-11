@@ -4,6 +4,7 @@ import { db } from '@spaces/db'
 import { objectDef } from '@spaces/db/schema'
 import { canReadNoteSql } from '@spaces/core/writes/read/search'
 import { renderWikiLinks } from '@spaces/core/context/wiki-link'
+import { excerpt } from '@spaces/core/context/excerpt'
 import { listViewsProgram } from '@spaces/core/writes/views/store'
 import { getRecordProgram } from '#/lib/mcp/tools'
 import {
@@ -189,8 +190,7 @@ export type PassagePreview = {
 type ChunkRow = { idx: number; text: string; page: number | null }
 
 /** A chunk's text as a snippet was cut from it: marks gone, links as names. */
-const flatten = (text: string) =>
-  renderWikiLinks(text).replace(/[«»]/g, '').replace(/\s+/g, ' ').trim()
+const flatten = (text: string) => excerpt(text.replace(/[«»]/g, ''))
 
 /**
  * The page a passage sits on, its chunks in order, the one whose text the

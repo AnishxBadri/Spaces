@@ -2233,7 +2233,11 @@ const VIEWS: Array<ViewSpec> = [
     name: 'Live pipeline',
     visibility: 'shared',
     owner: 'lead',
-    filter: [],
+    // The chip counts `filter`, not `extra.group`: the conditions spell the
+    // active group out so the count is the rows the Active chip shows.
+    filter: ['early_revisit', 'invested', 'passed', 'lost'].map(
+      (value): Condition => ({ slug: 'stage', op: 'is_not', value }),
+    ),
     sort: { id: 'attr:value', desc: true },
     columns: {
       name: true,
