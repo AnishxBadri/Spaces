@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { formatBytes } from '@spaces/core/documents'
 import { DocumentPreview } from '#/components/document-preview'
+import { FileGlyph } from '#/components/files/file-glyph'
 import { LabelHead, LedgerRow } from '#/components/ledger-section'
 import { DensityRamp } from '#/components/dither'
 import { Button } from '#/components/ui/button'
@@ -21,6 +22,7 @@ import type {
   EmailDetail,
   EmailParticipant,
 } from '#/lib/server-fns'
+import { fileType } from '#/lib/documents/files-tab'
 import { openModalId } from '#/lib/modal-search'
 import { stamp } from '#/lib/timeline/stamp'
 
@@ -151,6 +153,18 @@ function remoteLine(body: EmailBody): string | null {
   return `${String(n)} remote image${n === 1 ? '' : 's'} not loaded`
 }
 
+/** An attachment's mono end lane: `1.2 MB · via gmail`. */
+export function attachmentLane(
+  a: Pick<EmailAttachment, 'sizeBytes' | 'lane'>,
+): string {
+  return [
+    formatBytes(a.sizeBytes) || null,
+    a.lane === null ? null : `via ${a.lane}`,
+  ]
+    .filter((part) => part !== null)
+    .join(' · ')
+}
+
 function EmailWindow({ id, onClose }: { id: string; onClose: () => void }) {
   const [email, setEmail] = useState<EmailDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -270,14 +284,22 @@ function EmailWindow({ id, onClose }: { id: string; onClose: () => void }) {
                     onClick={() => void openAttachment(a)}
                     className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 px-3 text-left hover:bg-bone"
                   >
+                    <FileGlyph
+                      type={fileType({
+                        filename: a.filename,
+                        mime: a.mime,
+                        externalUrl: null,
+                      })}
+                    />
                     <span className="min-w-0 flex-1 truncate text-body">
                       {a.name}
                     </span>
-                    {a.sizeBytes === null ? null : (
-                      <span className="shrink-0 mono text-micro text-graphite">
-                        {formatBytes(a.sizeBytes)}
-                      </span>
-                    )}
+                    <span
+                      data-attachment-lane
+                      className="shrink-0 mono text-micro text-graphite"
+                    >
+                      {attachmentLane(a)}
+                    </span>
                   </button>
                 </LedgerRow>
               ))}

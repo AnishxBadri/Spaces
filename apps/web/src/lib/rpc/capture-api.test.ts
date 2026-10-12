@@ -222,7 +222,7 @@ describe('POST /api/v1/capture — unfiled', () => {
         .where(eq(link.fromEntityId, answer.documentId)),
     ).toEqual([])
     const inbox = await Effect.runPromise(
-      listDocumentsProgram({ filed: 'unfiled' }),
+      listDocumentsProgram({ filed: 'unfiled', viewer: FIXTURE_ACTOR }),
     )
     expect(inbox.find((d) => d.id === answer.documentId)).toMatchObject({
       url: body.url,

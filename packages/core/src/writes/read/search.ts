@@ -2,6 +2,7 @@ import { Effect, Schema } from 'effect'
 import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { db } from '@spaces/db'
+import { attachmentHiddenSql } from './attachment-visibility'
 
 /**
  * The lexical half of unified search, in core since SPA-198 (extracted from
@@ -45,18 +46,18 @@ export const HEADLINE_OPTIONS =
 const headlineOptions = sql.raw(`'${HEADLINE_OPTIONS}'`)
 
 /**
- * canRead for a note, as a predicate over the entity aliased `e`: true
- * unless `e` is a note that is private to someone other than `userId`. It is
- * vacuous for every other kind, which is what lets the name lane apply it to
- * companies and decks alike; in the note lane `e` is the note itself (note's
- * key is its entity id), so it is exactly "shared, or mine".
+ * canRead as a predicate over the entity aliased `e`: true unless `e` is a
+ * note private to someone other than `userId`, or an email attachment
+ * private with its email's body (`attachmentHiddenSql`, D67).
+ * - Vacuous for every other kind, which is what lets the name lane apply it
+ *   to companies and decks alike; in the note lane `e` is the note itself.
  */
 export const canReadNoteSql = (userId: string): SQL => sql`not exists (
             select 1 from note pn
             where pn.entity_id = e.id
               and pn.visibility = 'private'
               and pn.author_id <> ${userId}
-          )`
+          ) and not ${attachmentHiddenSql(userId, sql`e.id`)}`
 
 /** What the fused statement takes; `semantic` is web's fifth lane, if any. */
 export type LexicalFusedInput = {

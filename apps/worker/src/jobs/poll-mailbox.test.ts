@@ -298,12 +298,15 @@ describe(
       )
       const hit = hits.find((h) => h.id === doc.entityId)
       expect(hit?.snippet).toContain(phrase.split(' ').at(-1))
-      expect(hit?.parent?.id).toBe(company?.id)
-      const edges = await db
-        .select({ to: link.toEntityId })
-        .from(link)
-        .where(eq(link.fromEntityId, doc.entityId))
-      expect(edges).toEqual([{ to: company?.id }])
+      // Filed on every participant record, the company among them.
+      const edges = (
+        await db
+          .select({ to: link.toEntityId })
+          .from(link)
+          .where(eq(link.fromEntityId, doc.entityId))
+      ).map((e) => e.to)
+      expect(edges).toContain(company?.id)
+      expect(edges).toContain(hit?.parent?.id)
 
       if (doc.blobSha) await storage().delete(doc.blobSha)
     })

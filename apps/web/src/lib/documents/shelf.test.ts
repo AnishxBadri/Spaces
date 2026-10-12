@@ -107,7 +107,9 @@ async function mergeAway(entityId: string, intoId: string) {
 async function shelf() {
   const { Effect } = await import('effect')
   const { listDocumentsProgram } = await import('./shelf')
-  return Effect.runPromise(listDocumentsProgram({ filed: 'all' }))
+  return Effect.runPromise(
+    listDocumentsProgram({ filed: 'all', viewer: { id: 'shelf-viewer' } }),
+  )
 }
 
 /**

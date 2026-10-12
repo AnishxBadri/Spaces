@@ -124,14 +124,26 @@ type Laned = Typed & {
   readonly createdAt: string
   readonly sourceCapability: string | null
   readonly sourcePath: string | null
+  /** The readable email it came attached to; omitted by lists that have none. */
+  readonly email?: { readonly subject: string | null } | null
 }
 
 /**
  * The mono end lane: `from <path> · 4.1 MB · 09-02 · via gmail`.
  * - The provider path only outside a bound folder, whose tree already says it.
  * - `via` names a plugin that filed it, unless the state lane links there.
+ * - An email attachment is `via <subject> · 4.1 MB · 09-02`: the email is
+ *   its provenance, not the mailbox.
  */
 export function endLane(doc: Laned, inFolder = false): string {
+  if (doc.email != null)
+    return [
+      `via ${doc.email.subject || 'Untitled'}`,
+      formatBytes(doc.sizeBytes) || null,
+      doc.createdAt.slice(5, 10),
+    ]
+      .filter((part) => part !== null)
+      .join(' · ')
   return [
     !inFolder && doc.sourcePath !== null ? `from ${doc.sourcePath}` : null,
     formatBytes(doc.sizeBytes) || null,

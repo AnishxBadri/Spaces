@@ -9,10 +9,13 @@ import {
   entitySpace,
   entityAlias,
   integration,
+  interaction,
+  interactionDocument,
   link,
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { QUEUES } from '@spaces/core/queue/names'
+import { normalizeEmail } from '@spaces/core/entities/normalize'
 import { FakeImapServer } from '#/test/fake-imap'
 import { minimalPdf } from '#/test/minimal-pdf'
 import { truncateAndReseed } from '#/test/reseed'
@@ -172,6 +175,17 @@ async function filedOn(documentId: string): Promise<Array<string>> {
   return rows.map((r) => r.to).sort()
 }
 
+async function joinsOf(documentId: string) {
+  return db
+    .select({ subject: interaction.subject, role: interactionDocument.role })
+    .from(interactionDocument)
+    .innerJoin(
+      interaction,
+      eq(interaction.id, interactionDocument.interactionId),
+    )
+    .where(eq(interactionDocument.documentId, documentId))
+}
+
 async function spacesOf(documentId: string): Promise<number> {
   return (
     await db
@@ -192,8 +206,8 @@ async function mailboxIntegration(): Promise<string> {
   return row.id
 }
 
-describe('forwarded attachments file themselves (SPA-115)', () => {
-  it('a founder’s deck lands on the company the thread made, as the mailbox, kind other, queued to extract', async () => {
+describe('forwarded attachments file themselves', () => {
+  it('a founder’s deck lands on every participant record, joined to its email, as the mailbox, kind other, queued to extract', async () => {
     await aMember('anish@fund.example')
     await configure()
     const deck = aDeck('Acme seed deck')
@@ -221,6 +235,7 @@ describe('forwarded attachments file themselves (SPA-115)', () => {
     expect(outcome.attachments).toEqual({
       filed: 1,
       unfiled: 0,
+      unjoined: 0,
       skipped: 1,
       refused: [],
     })
@@ -245,7 +260,11 @@ describe('forwarded attachments file themselves (SPA-115)', () => {
       },
     ])
     const doc = rows[0].id
-    expect(await filedOn(doc)).toEqual([acme])
+    const jane = await holderOf('email', 'jane@acme.io')
+    expect(await filedOn(doc)).toEqual([acme, jane].sort())
+    expect(await joinsOf(doc)).toEqual([
+      { subject: 'Acme seed deck', role: 'attachment' },
+    ])
     expect(await spacesOf(doc)).toBe(0)
     expect(await storage().exists(deck.sha)).toBe(true)
 
@@ -266,7 +285,7 @@ describe('forwarded attachments file themselves (SPA-115)', () => {
     })
   })
 
-  it('the same deck forwarded twice is one blob and one row on the company; a re-delivery files nothing', async () => {
+  it('the same deck forwarded twice is one blob and one row joined to both emails; a re-delivery files nothing', async () => {
     await configure()
     const deck = aDeck('Acme seed deck')
     server.deliver(
@@ -302,14 +321,19 @@ describe('forwarded attachments file themselves (SPA-115)', () => {
     expect(second.attachments).toMatchObject({ filed: 1, unfiled: 0 })
 
     const acme = await holderOf('domain', 'acme.io')
+    const jane = await holderOf('email', 'jane@acme.io')
     const rows = await documentsWith(deck.sha)
     expect(rows).toHaveLength(1)
-    expect(await filedOn(rows[0].id)).toEqual([acme])
+    expect(await filedOn(rows[0].id)).toEqual([acme, jane].sort())
+    expect((await joinsOf(rows[0].id)).map((j) => j.subject).sort()).toEqual([
+      'Acme seed deck',
+      'Re-sending the deck',
+    ])
     const all = await db.select({ id: document.entityId }).from(document)
     expect(all).toHaveLength(1)
   })
 
-  it('the same deck sent to two companies is one blob and two rows, one on each', async () => {
+  it('the same deck sent to two disjoint threads is one blob and two rows, one on each side', async () => {
     await configure()
     const deck = aDeck('Shared market map')
     server.deliver(
@@ -330,20 +354,25 @@ describe('forwarded attachments file themselves (SPA-115)', () => {
     )
     expect((await poll()).attachments).toMatchObject({ filed: 2 })
 
-    const acme = await holderOf('domain', 'acme.io')
-    const beta = await holderOf('domain', 'beta.dev')
+    const people = [
+      await holderOf('domain', 'acme.io'),
+      await holderOf('email', 'jane@acme.io'),
+      await holderOf('domain', 'beta.dev'),
+      await holderOf('email', 'priya@beta.dev'),
+    ]
     const rows = await documentsWith(deck.sha)
     expect(rows).toHaveLength(2)
     const filings = await Promise.all(rows.map((r) => filedOn(r.id)))
-    expect(filings.flat().sort()).toEqual([acme, beta].sort())
+    expect(filings.flat().sort()).toEqual(people.sort())
     expect(await storage().exists(deck.sha)).toBe(true)
   })
 
-  it('a thread with no company files its attachments with no edge at all — the unfiled inbox and Today’s count', async () => {
+  it('a stranger and a two-company intro file on every participant; a thread with no record files with no edge at all', async () => {
     await aMember('anish@fund.example')
     await configure()
     const deck = aDeck('Stranger deck')
-    const other = aDeck('Two-company memo')
+    const memo = aDeck('Two-company memo')
+    const note = aDeck('Internal note')
     // A stranger on a free provider: a person, no company.
     server.deliver(
       mail({
@@ -353,8 +382,7 @@ describe('forwarded attachments file themselves (SPA-115)', () => {
         parts: [deckPart('deck.pdf', deck.bytes)],
       }),
     )
-    // A member writing to two companies at once: ambiguous, so unfiled
-    // rather than filed on both.
+    // A member writing to two companies at once: on all four records.
     server.deliver(
       mail({
         messageId: 'intro-2@fund.example',
@@ -362,43 +390,58 @@ describe('forwarded attachments file themselves (SPA-115)', () => {
         to: 'Jane Founder <jane@acme.io>',
         cc: 'Priya Rao <priya@beta.dev>',
         subject: 'Intro: Acme <> Beta',
-        parts: [deckPart('memo.pdf', other.bytes)],
+        parts: [deckPart('memo.pdf', memo.bytes)],
+      }),
+    )
+    // A member writing to the mailbox alone: no record to file on.
+    server.deliver(
+      mail({
+        messageId: 'self-3@fund.example',
+        from: 'Anish <anish@fund.example>',
+        to: MAILBOX,
+        subject: 'Note to self',
+        parts: [deckPart('note.pdf', note.bytes)],
       }),
     )
     const outcome = await poll()
-    expect(outcome.attachments).toMatchObject({ filed: 0, unfiled: 2 })
+    expect(outcome.attachments).toMatchObject({ filed: 2, unfiled: 1 })
 
-    const docs = [
-      ...(await documentsWith(deck.sha)),
-      ...(await documentsWith(other.sha)),
-    ]
-    expect(docs).toHaveLength(2)
-    for (const d of docs) {
-      expect(await filedOn(d.id)).toEqual([])
-      expect(await spacesOf(d.id)).toBe(0)
-    }
-    // docsurf-7's readers, unchanged, see them.
+    const [stranger] = await documentsWith(deck.sha)
+    expect(await filedOn(stranger.id)).toEqual([
+      await holderOf('email', normalizeEmail('sam.stranger@gmail.com') ?? ''),
+    ])
+    const [intro] = await documentsWith(memo.sha)
+    expect(await filedOn(intro.id)).toEqual(
+      [
+        await holderOf('domain', 'acme.io'),
+        await holderOf('email', 'jane@acme.io'),
+        await holderOf('domain', 'beta.dev'),
+        await holderOf('email', 'priya@beta.dev'),
+      ].sort(),
+    )
+
+    const [unfiledDoc] = await documentsWith(note.sha)
+    expect(await filedOn(unfiledDoc.id)).toEqual([])
+    expect(await spacesOf(unfiledDoc.id)).toBe(0)
+    expect(await joinsOf(unfiledDoc.id)).toEqual([
+      { subject: 'Note to self', role: 'attachment' },
+    ])
+    // docsurf-7's readers, unchanged, see it.
     const unfiled = await Effect.runPromise(
-      listDocumentsProgram({ filed: 'unfiled' }),
+      listDocumentsProgram({ filed: 'unfiled', viewer: FIXTURE_ACTOR }),
     )
-    expect(unfiled.map((d) => d.id).sort()).toEqual(
-      docs.map((d) => d.id).sort(),
-    )
-    expect(await Effect.runPromise(countUnfiledProgram())).toBe(2)
+    expect(unfiled.map((d) => d.id)).toEqual([unfiledDoc.id])
+    expect(await Effect.runPromise(countUnfiledProgram(FIXTURE_ACTOR))).toBe(1)
 
     // The document entities carry the mailbox's provenance too.
     const ents = await db
       .select({ sourceClass: entity.sourceClass })
       .from(entity)
-      .where(
-        inArray(
-          entity.id,
-          docs.map((d) => d.id),
-        ),
-      )
-    expect(ents).toEqual([
-      { sourceClass: 'integration' },
-      { sourceClass: 'integration' },
+      .where(inArray(entity.id, [stranger.id, intro.id, unfiledDoc.id]))
+    expect(ents.map((e) => e.sourceClass)).toEqual([
+      'integration',
+      'integration',
+      'integration',
     ])
   })
 })

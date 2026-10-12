@@ -3,7 +3,6 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { minimalPdf } from '#/test/minimal-pdf'
 import { SIGNATURE_IMAGE_FLOOR_BYTES, referencedCids } from './attachments'
-import { chooseFilingCompany } from './file'
 import {
   MAILBOX,
   bcc,
@@ -176,21 +175,6 @@ describe('sorting a message’s parts', () => {
       ),
     ).toEqual(new Set(['a@x', 'b@x', 'c@x', 'd@x']))
     expect(referencedCids(false)).toEqual(new Set())
-  })
-})
-
-describe('the company a thread’s attachments file onto', () => {
-  it('is the one company on the thread', () => {
-    expect(chooseFilingCompany(['acme'], [])).toBe('acme')
-    expect(chooseFilingCompany(['acme', 'acme'], ['jane'])).toBe('acme')
-  })
-
-  it('among several, is the sender’s — else none', () => {
-    expect(chooseFilingCompany(['beta', 'gamma'], ['priya', 'beta'])).toBe(
-      'beta',
-    )
-    expect(chooseFilingCompany(['beta', 'gamma'], ['anish'])).toBe(null)
-    expect(chooseFilingCompany([], ['anish'])).toBe(null)
   })
 })
 

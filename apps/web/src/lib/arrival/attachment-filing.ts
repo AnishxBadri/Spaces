@@ -1,5 +1,9 @@
+import { createHash } from 'node:crypto'
 import { Readable } from 'node:stream'
 import { Effect } from 'effect'
+import { sql } from 'drizzle-orm'
+import { db } from '@spaces/db'
+import { interactionDocument } from '@spaces/db/schema'
 import {
   documentIntakeMessage,
   intakeDocumentProgram,
@@ -8,55 +12,42 @@ import { webEnqueue } from '#/lib/enqueue-live'
 import type { MailAttachment, SortedAttachments } from './attachments'
 
 /**
- * Forwarded attachments file themselves (SPA-115) — entry point 6 of
- * `docs/spec-storage-sources.md` §3.1, "attachments → matched company, else
- * unfiled".
- *
- * **This lane adds nothing to the byte path.** Every part goes through
- * `intakeDocumentProgram` (`writes/documents/intake.ts` in core) — stream → sha → blob →
- * `birthDocumentProgram` → edge → enqueue extract — which is the one writer
- * of `document` (`birth.test.ts`) and whose §3.4 rule is what makes the same
- * deck forwarded twice one row on the company, and the same deck on two
- * companies one blob and two rows. Nothing here inserts a row
- * (`one-door.test.ts`).
- *
- * - **Provenance** is the mailbox's: `source_class = 'integration'`, the one
- *   `core.mailbox` integration as `source_ref` and as the actor (the user
- *   columns stay null — a mailbox is not a person), and the message subject
- *   as `source_path`, which is the label the Files row's "via core.mailbox"
- *   sits beside. No new lane on the row.
- * - **The target** is one company or none, decided by `file.ts` inside the
- *   interaction's transaction (`chooseFilingCompany`). None is an unfiled
- *   document: no `link`, no `entity_space`, exactly the state
- *   `/files?filed=unfiled` and Today's Unfiled count already read.
- * - **`kind` stays `other`.** The classify lane (SPA-62,
- *   `onDocumentExtracted`) proposes "this looks like a deck" after
- *   extraction; proposing it here too would put two suggestions on one
- *   document.
- * - **A refusal is per part, and never the message's.** Over
- *   `MAX_UPLOAD_BYTES` the intake meter destroys the stream mid-transfer and
- *   stores nothing; that part's reason goes on the poll's `job_run.summary`
- *   line and the rest of the message — its interaction, its body, its other
- *   attachments — has already landed or still lands. A store that is down is
- *   recorded the same way rather than failing the poll: the interaction is
- *   committed and is the dedupe key, so a retried poll would read it as a
- *   duplicate and file nothing either way.
+ * Every mail attachment, forwarded or synced, is a document joined to its
+ * email on `interaction_document` as `attachment` (D67, D68).
+ * - **One byte path.** Each part goes through `intakeDocumentProgram`, the
+ *   one writer of `document`; nothing here inserts a document row.
+ * - **Filed on every participant record** the interaction edged, people and
+ *   companies alike. None is an unfiled document.
+ * - **Dedupe is the sha.** Birth answers the row already holding these bytes
+ *   at one of the records, so the same deck forwarded and synced is one
+ *   document joined to both emails.
+ * - **Provenance is the mailbox's**: `source_class = 'integration'`, the
+ *   lane's integration as `source_ref` and actor, the subject as
+ *   `source_path`. `kind` stays `other`; the classify lane proposes one.
+ * - **A refusal is per part, never the message's**: too large or a store
+ *   that is down is recorded on the poll's summary line and the rest lands.
+ *   A failed join is `unjoined`, not refused: the document exists, and the
+ *   Message-ID's re-delivery rejoins it (`rejoinAttachmentsProgram`).
  */
 
 export type AttachmentFilingContext = {
-  /** The core mailbox integration — `source_ref` and actor on every row. */
+  /** The lane's integration — `source_ref` and actor on every row. */
   integrationId: string
+  /** The email the attachments join. */
+  interactionId: string
   /** The message subject, stored verbatim as `document.source_path`. */
   subject: string | null
-  /** The company the thread files onto, or null for unfiled. */
-  companyId: string | null
+  /** The people and companies the email edged; empty is unfiled. */
+  records: ReadonlyArray<string>
 }
 
 export type AttachmentOutcome = {
-  /** Filed onto the company — a fresh row, or the one §3.4 answered. */
+  /** Filed onto its records — a fresh row, or the one §3.4 answered. */
   filed: number
   /** Written with no edge at all. */
   unfiled: number
+  /** Filed or unfiled, but the join to its email failed; a re-delivery retries. */
+  unjoined: number
   /** Inline and signature images, never handed to the pipeline. */
   skipped: number
   /** Refused, with the sentence the summary line carries. */
@@ -66,6 +57,7 @@ export type AttachmentOutcome = {
 export const NO_ATTACHMENTS: AttachmentOutcome = {
   filed: 0,
   unfiled: 0,
+  unjoined: 0,
   skipped: 0,
   refused: [],
 }
@@ -86,6 +78,20 @@ function streamOf(content: MailAttachment['content']): Readable {
   )
 }
 
+/** The email's half of a filed part: the join row, idempotent. */
+const joinAttachment = (interactionId: string, documentId: string) =>
+  Effect.tryPromise({
+    try: () =>
+      db
+        .insert(interactionDocument)
+        .values({ interactionId, documentId, role: 'attachment' })
+        .onConflictDoNothing(),
+    catch: (cause) => cause,
+  }).pipe(
+    Effect.map(() => true),
+    Effect.orElseSucceed(() => false),
+  )
+
 export const fileAttachmentsProgram = Effect.fn('fileAttachments')(function* (
   attachments: SortedAttachments,
   ctx: AttachmentFilingContext,
@@ -93,11 +99,12 @@ export const fileAttachmentsProgram = Effect.fn('fileAttachments')(function* (
   const outcome: AttachmentOutcome = {
     filed: 0,
     unfiled: 0,
+    unjoined: 0,
     skipped: attachments.skipped.length,
     refused: [],
   }
   for (const part of attachments.file) {
-    const result = yield* intakeDocumentProgram({
+    const born = yield* intakeDocumentProgram({
       stream: streamOf(part.content),
       filename: part.filename,
       mime: part.mime,
@@ -108,21 +115,88 @@ export const fileAttachmentsProgram = Effect.fn('fileAttachments')(function* (
       sourceClass: 'integration',
       sourceRef: ctx.integrationId,
       provenance: { sourcePath: ctx.subject },
-      fileAgainst:
-        ctx.companyId === null
-          ? []
-          : [{ kind: 'record', entityId: ctx.companyId }],
+      fileAgainst: ctx.records.map((entityId) => ({
+        kind: 'record' as const,
+        entityId,
+      })),
       actor: { integrationId: ctx.integrationId },
     }).pipe(
-      // Birth's extraction enqueue, through the web sender (SPA-201).
+      // Birth's extraction enqueue, through the web sender.
       Effect.provide(webEnqueue),
-      Effect.map(() => null),
-      Effect.catch((failure) => Effect.succeed(documentIntakeMessage(failure))),
+      Effect.map((doc) => ({ ok: true as const, id: doc.id })),
+      Effect.catch((failure) =>
+        Effect.succeed({
+          ok: false as const,
+          reason: documentIntakeMessage(failure),
+        }),
+      ),
     )
-    if (result !== null)
-      outcome.refused.push({ filename: part.filename, reason: result })
-    else if (ctx.companyId === null) outcome.unfiled++
+    if (!born.ok) {
+      outcome.refused.push({ filename: part.filename, reason: born.reason })
+      continue
+    }
+    if (ctx.records.length === 0) outcome.unfiled++
     else outcome.filed++
+    // The document exists either way; a re-delivery rejoins it.
+    if (!(yield* joinAttachment(ctx.interactionId, born.id))) outcome.unjoined++
   }
   return outcome
 })
+
+/**
+ * A re-delivered Message-ID's missing joins, written now: each part's sha
+ * finds the document its first filing made — born by the email's lane, or
+ * deduped onto one filed on the email's records — and joins it if it is not.
+ * Nothing is filed: a part never stored stays unstored. Answers how many.
+ */
+export const rejoinAttachmentsProgram = Effect.fn('rejoinAttachments')(
+  function* (
+    attachments: SortedAttachments,
+    messageId: string,
+  ): Effect.fn.Return<number> {
+    if (attachments.file.length === 0) return 0
+    const shas = [
+      ...new Set(
+        attachments.file.map((p) =>
+          createHash('sha256').update(p.content).digest('hex'),
+        ),
+      ),
+    ]
+    return yield* Effect.tryPromise({
+      try: () =>
+        db.execute(sql`
+          insert into interaction_document (interaction_id, document_id, role)
+          select distinct on (d.blob_sha) i.id, d.entity_id, 'attachment'
+          from interaction i
+          join document d on d.blob_sha in (${sql.join(
+            shas.map((sha) => sql`${sha}`),
+            sql`, `,
+          )})
+          where i.message_id = ${messageId}
+            and not exists (
+              select 1 from interaction_document j
+              join document jd on jd.entity_id = j.document_id
+              where j.interaction_id = i.id and j.role = 'attachment'
+                and jd.blob_sha = d.blob_sha
+            )
+            and (
+              d.source_ref = i.source_ref
+              or exists (
+                select 1 from link l
+                join interaction_entity ie on ie.entity_id = l.to_entity_id
+                where l.from_entity_id = d.entity_id
+                  and l.relation = 'tagged_in'
+                  and ie.interaction_id = i.id
+              )
+            )
+          order by d.blob_sha, d.created_at
+          on conflict do nothing
+          returning document_id
+        `),
+      catch: (cause) => cause,
+    }).pipe(
+      Effect.map((result) => result.rows.length),
+      Effect.orElseSucceed(() => 0),
+    )
+  },
+)

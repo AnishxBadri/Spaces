@@ -505,7 +505,7 @@ describe('clipDocument', () => {
       expect(await runClip(deckId)).toBe('ok')
 
       const shelf = await Effect.runPromise(
-        listDocumentsProgram({ filed: 'all' }),
+        listDocumentsProgram({ filed: 'all', viewer: { id: 'shelf-viewer' } }),
       )
       const onShelf = new Map(shelf.map((r) => [r.id, r]))
       // The article: an address and no bytes, which is what makes the row's

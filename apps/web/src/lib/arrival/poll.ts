@@ -119,6 +119,7 @@ function describeAttachments(a: AttachmentOutcome): Array<string> {
     [
       `attachments filed ${String(a.filed)}`,
       `unfiled ${String(a.unfiled)}`,
+      ...(a.unjoined > 0 ? [`unjoined ${String(a.unjoined)}`] : []),
       `skipped ${String(a.skipped)}`,
       `refused ${String(a.refused.length)}${refused ? ` (${refused})` : ''}`,
     ].join(', '),
@@ -302,6 +303,7 @@ export const pollMailboxProgram = Effect.fn('pollMailbox')(function* (
         const a = counts.attachments
         a.filed += filed.attachments.filed
         a.unfiled += filed.attachments.unfiled
+        a.unjoined += filed.attachments.unjoined
         a.skipped += filed.attachments.skipped
         a.refused.push(...filed.attachments.refused)
       } else counts.duplicate++

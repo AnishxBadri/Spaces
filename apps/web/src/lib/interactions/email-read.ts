@@ -9,6 +9,7 @@ import {
   document,
   entity,
   entityAlias,
+  integration,
   interaction,
   interactionDocument,
   note,
@@ -56,7 +57,12 @@ export type EmailBody =
 export type EmailAttachment = {
   documentId: string
   name: string
+  /** For the type glyph: the filename and mime say PDF, XLS, IMG. */
+  filename: string
+  mime: string | null
   sizeBytes: number | null
+  /** The capability of the lane that brought the file: `core.mailbox`, `gmail`. */
+  lane: string | null
 }
 
 export type EmailDetail = {
@@ -175,7 +181,10 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
           .select({
             documentId: interactionDocument.documentId,
             name: entity.canonicalName,
+            filename: document.filename,
+            mime: document.mime,
             sizeBytes: document.sizeBytes,
+            lane: integration.capabilityId,
           })
           .from(interactionDocument)
           .innerJoin(
@@ -183,13 +192,17 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
             eq(document.entityId, interactionDocument.documentId),
           )
           .innerJoin(entity, eq(entity.id, interactionDocument.documentId))
+          .leftJoin(integration, eq(integration.id, document.sourceRef))
           .where(
             and(
               eq(interactionDocument.interactionId, id),
               eq(interactionDocument.role, 'attachment'),
             ),
           )
-          .orderBy(asc(entity.canonicalName)),
+          .orderBy(asc(entity.canonicalName))
+          .then((rows) =>
+            rows.map((r) => ({ ...r, filename: r.filename ?? r.name })),
+          ),
       )
     : []
 

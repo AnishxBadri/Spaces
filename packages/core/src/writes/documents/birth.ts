@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   document,
@@ -353,6 +353,46 @@ async function clearPendingBlob(
 
 type BirthTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
+/**
+ * A dedupe is still an arrival: the first per actor writes a
+ * `document.arrived` row on the document's own stream, since the edge it
+ * asked for may already exist. An email attachment reads it to know the
+ * bytes also came from elsewhere (`attachmentHiddenSql`).
+ */
+async function recordArrival(
+  tx: BirthTx,
+  documentId: string,
+  actor: DocumentActor,
+): Promise<void> {
+  const userId = actorUserId(actor)
+  const meta = actorMeta(actor)
+  const same =
+    userId !== null
+      ? eq(activity.actorId, userId)
+      : meta.integrationId !== undefined
+        ? sql`${activity.meta} ->> 'integrationId' = ${meta.integrationId}`
+        : sql`${activity.actorId} is null and ${activity.meta} ->> 'integrationId' is null`
+  const held = await tx
+    .select({ id: activity.id })
+    .from(activity)
+    .where(
+      and(
+        eq(activity.subjectEntityId, documentId),
+        eq(activity.verb, 'document.arrived'),
+        same,
+      ),
+    )
+    .limit(1)
+  if (held.length > 0) return
+  await tx.insert(activity).values({
+    actorId: userId,
+    verb: 'document.arrived',
+    subjectEntityId: documentId,
+    objectEntityId: documentId,
+    meta: { deduped: true, ...meta },
+  })
+}
+
 /** Why a row will never be extracted, written at birth. */
 type NoExtraction = { status: 'unsupported'; reason: string }
 
@@ -499,6 +539,7 @@ export const birthDocumentProgram = Effect.fn('birthDocumentProgram')(
       yield* query(() =>
         db.transaction(async (tx) => {
           await addEdges(tx, existing, targets, actorUserId(input.actor))
+          await recordArrival(tx, existing, input.actor)
           // Deduped is still arrived: the digest is on a document row, so
           // the pending row has nothing left to describe. Skipping it here
           // would leave the sweep a row it can never act on (the reference

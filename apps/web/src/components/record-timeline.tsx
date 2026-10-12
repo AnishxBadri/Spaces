@@ -62,6 +62,7 @@ export const VERB_LABELS: Record<string, string> = {
   'note.unfiled': 'unfiled a note from this record',
   'document.filed': 'filed a document',
   'document.refiled': 'changed a document’s filing',
+  'document.arrived': 'filed a document again',
   'document.kind_changed': 'changed a document’s kind',
   'document.reextract_requested': 'asked for a document to be read again',
   'space.tagged': 'tagged into a space',
@@ -104,6 +105,7 @@ export const VERB_TYPES: Record<string, string> = {
   'note.unfiled': 'note',
   'document.filed': 'file',
   'document.refiled': 'file',
+  'document.arrived': 'file',
   'document.kind_changed': 'file',
   'document.reextract_requested': 'file',
   'space.tagged': 'space',
@@ -156,8 +158,14 @@ export function splitLedger(items: Items): {
   }
 }
 
-/** The Interactions tab's filters: every kind, or one. */
-export const INTERACTION_FILTERS = ['all', 'email', 'meeting', 'call'] as const
+/** The Interactions tab's filters: every kind, one, or those with attachments. */
+export const INTERACTION_FILTERS = [
+  'all',
+  'email',
+  'meeting',
+  'call',
+  'attachments',
+] as const
 export type InteractionFilter = (typeof INTERACTION_FILTERS)[number]
 
 const INTERACTION_FILTER_LABELS: Record<InteractionFilter, string> = {
@@ -165,18 +173,33 @@ const INTERACTION_FILTER_LABELS: Record<InteractionFilter, string> = {
   email: 'Email',
   meeting: 'Meeting',
   call: 'Call',
+  attachments: 'Has attachments',
+}
+
+type Filterable = { kind: string; hasAttachments: boolean }
+
+/** Whether a row is listed under a filter. */
+export function inInteractionFilter(
+  i: Filterable,
+  filter: InteractionFilter,
+): boolean {
+  if (filter === 'all') return true
+  if (filter === 'attachments') return i.hasAttachments
+  return i.kind === filter
 }
 
 /** How many rows each interaction filter lists. */
 export function interactionCounts(
-  interactions: ReadonlyArray<{ kind: string }>,
+  interactions: ReadonlyArray<Filterable>,
 ): Record<InteractionFilter, number> {
-  const of = (k: string) => interactions.filter((i) => i.kind === k).length
+  const of = (f: InteractionFilter) =>
+    interactions.filter((i) => inInteractionFilter(i, f)).length
   return {
     all: interactions.length,
     email: of('email'),
     meeting: of('meeting'),
     call: of('call'),
+    attachments: of('attachments'),
   }
 }
 
@@ -258,10 +281,7 @@ export function RecordInteractions({
   const [filter, setFilter] = useState<InteractionFilter>('all')
   const [unfolded, setUnfolded] = useState(false)
   const counts = interactionCounts(interactions)
-  const listed =
-    filter === 'all'
-      ? interactions
-      : interactions.filter((i) => i.kind === filter)
+  const listed = interactions.filter((i) => inInteractionFilter(i, filter))
   const shown = unfolded ? listed : listed.slice(0, INTERACTIONS_FOLD)
   return (
     <div className="flex flex-col">

@@ -130,6 +130,7 @@ function doc(over: Partial<RecordDocument>): RecordDocument {
     sourceCapability: null,
     filedIn: [here],
     replacedBy: null,
+    email: null,
     ...over,
   }
 }

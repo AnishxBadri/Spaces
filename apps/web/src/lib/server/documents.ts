@@ -178,7 +178,9 @@ export const clipUrl = createServerFn({ method: 'POST' })
 export const listRecordDocuments = createServerFn()
   .validator(z.object({ entityId: z.string().uuid() }))
   .handler(async ({ data }) => {
-    await requireUser()
+    const u = await requireUser()
+    const { attachmentHiddenSql, DOCUMENT_ID_REF } =
+      await import('@spaces/core/writes/read/attachment-visibility')
     const rows = await db
       .select({
         id: document.entityId,
@@ -220,11 +222,21 @@ export const listRecordDocuments = createServerFn()
           eq(link.toEntityId, data.entityId),
           eq(link.relation, 'tagged_in'),
           isNull(entity.mergedIntoId),
+          // An attachment private with its email's body is not listed (D67).
+          sql`not ${attachmentHiddenSql(u.id, DOCUMENT_ID_REF)}`,
         ),
       )
       .orderBy(desc(document.createdAt))
 
     if (rows.length === 0) return []
+    // A readable attaching email names the file: `via <subject>`.
+    const { attachmentEmailsProgram } =
+      await import('../documents/attachment-emails')
+    const { effectFn } = await import('./effect')
+    const attached = await effectFn(attachmentEmailsProgram)(
+      u,
+      rows.map((r) => r.id),
+    )
     const users = await db.select({ id: user.id, name: user.name }).from(user)
     const names = new Map(users.map((x) => [x.id, x.name]))
 
@@ -331,6 +343,8 @@ export const listRecordDocuments = createServerFn()
         sourceCapability: source.sourceCapability,
         filedIn: filings.get(r.id) ?? [],
         replacedBy: replacedBy.get(r.id) ?? null,
+        /** The readable email it came attached to: `via <subject>`. */
+        email: attached.get(r.id) ?? null,
       }
     })
   })
@@ -356,10 +370,10 @@ export const listDocuments = createServerFn()
       .default({ filed: 'all' }),
   )
   .handler(async ({ data }) => {
-    await requireUser()
+    const u = await requireUser()
     const { listDocumentsProgram } = await import('../documents/shelf')
     const { effectFn } = await import('./effect')
-    return effectFn(listDocumentsProgram)({ filed: data.filed })
+    return effectFn(listDocumentsProgram)({ filed: data.filed, viewer: u })
   })
 
 /**
@@ -375,11 +389,21 @@ export const listDocuments = createServerFn()
  * list it links to cannot disagree.
  */
 export const countUnfiledDocuments = createServerFn().handler(async () => {
-  await requireUser()
+  const u = await requireUser()
   const { countUnfiledProgram } = await import('../documents/shelf')
   const { effectFn } = await import('./effect')
-  return effectFn(countUnfiledProgram)()
+  return effectFn(countUnfiledProgram)(u)
 })
+
+/**
+ * Not an email attachment private to someone else (D67): the by-id reads'
+ * gate. A dynamic import, so drizzle stays out of the client bundle.
+ */
+async function readable(userId: string) {
+  const { attachmentHiddenSql, DOCUMENT_ID_REF } =
+    await import('@spaces/core/writes/read/attachment-visibility')
+  return sql`not ${attachmentHiddenSql(userId, DOCUMENT_ID_REF)}`
+}
 
 /**
  * Full extracted text for one document, fetched only when a preview opens.
@@ -389,14 +413,14 @@ export const countUnfiledDocuments = createServerFn().handler(async () => {
 export const getDocumentText = createServerFn({ method: 'POST' })
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
-    await requireUser()
+    const u = await requireUser()
     // `.at(0)` rather than destructuring: the row genuinely may not exist, and
     // a destructured element types as always-present here.
     const row = (
       await db
         .select({ text: document.extractedText })
         .from(document)
-        .where(eq(document.entityId, data.id))
+        .where(and(eq(document.entityId, data.id), await readable(u.id)))
     ).at(0)
     return { text: row?.text ?? null }
   })
@@ -416,12 +440,12 @@ export const getDocumentText = createServerFn({ method: 'POST' })
 export const getDocumentDownloadUrl = createServerFn({ method: 'POST' })
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
-    await requireUser()
+    const u = await requireUser()
     const row = (
       await db
         .select({ blobSha: document.blobSha, filename: document.filename })
         .from(document)
-        .where(eq(document.entityId, data.id))
+        .where(and(eq(document.entityId, data.id), await readable(u.id)))
     ).at(0)
     if (!row?.blobSha) throw new Error('This document has no stored file')
     return {

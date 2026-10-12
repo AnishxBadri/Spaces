@@ -6,6 +6,10 @@ import { document, entity, integration } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { documentFilingEdges } from '#/lib/server/shared'
 import { unfiledPredicate } from '#/lib/documents/unfiled'
+import {
+  DOCUMENT_ID_REF,
+  attachmentHiddenSql,
+} from '@spaces/core/writes/read/attachment-visibility'
 
 /**
  * The shelf behind `/documents` (SPA-58) — every document in the workspace
@@ -130,7 +134,10 @@ const SNIPPET_CHARS = 200
 export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
   function* (input: {
     filed: DocumentFiled
+    /** Whose shelf: an attachment private with its email is not on it (D67). */
+    viewer: { id: string }
   }): Effect.fn.Return<Array<ShelfDocument>, DocumentShelfFailed> {
+    const visible = sql`not ${attachmentHiddenSql(input.viewer.id, DOCUMENT_ID_REF)}`
     const rows = yield* Effect.tryPromise({
       try: () =>
         db
@@ -166,10 +173,12 @@ export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
           // A merged-away document stops being a document: it has a
           // survivor, and the shelf would otherwise list both. The inbox
           // rides on the same clause — one statement, two conditions.
+          // A private email attachment is off every viewer's shelf but its
+          // reader's (D67).
           .where(
             input.filed === 'unfiled'
-              ? and(isNull(entity.mergedIntoId), unfiledPredicate())
-              : isNull(entity.mergedIntoId),
+              ? and(isNull(entity.mergedIntoId), unfiledPredicate(), visible)
+              : and(isNull(entity.mergedIntoId), visible),
           )
           // Newest first by default. The table's own sort is single-column
           // and client-side; this is what it starts from.
@@ -243,14 +252,22 @@ export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
  * `unfiledPredicate()` and is written once.
  */
 export const countUnfiledProgram = Effect.fn('countUnfiledProgram')(
-  function* (): Effect.fn.Return<number, DocumentShelfFailed> {
+  function* (viewer: {
+    id: string
+  }): Effect.fn.Return<number, DocumentShelfFailed> {
     const rows = yield* Effect.tryPromise({
       try: () =>
         db
           .select({ value: count() })
           .from(document)
           .innerJoin(entity, eq(entity.id, document.entityId))
-          .where(and(isNull(entity.mergedIntoId), unfiledPredicate())),
+          .where(
+            and(
+              isNull(entity.mergedIntoId),
+              unfiledPredicate(),
+              sql`not ${attachmentHiddenSql(viewer.id, DOCUMENT_ID_REF)}`,
+            ),
+          ),
       catch: (cause) => new DocumentShelfFailed({ cause }),
     })
     // `.at(0)` rather than a destructure: an aggregate with no GROUP BY

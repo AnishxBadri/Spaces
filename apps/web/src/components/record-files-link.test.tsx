@@ -83,6 +83,18 @@ describe('a recorder’s recording', () => {
       endLane({ ...row, sourceCapability: 'gmail', externalUrl: null }),
     ).toBe('2.0 KB · 10-07 · via gmail')
   })
+
+  it('an email attachment names its email, not its mailbox or its subject path', () => {
+    expect(
+      endLane({
+        ...row,
+        sourceCapability: 'gmail',
+        sourcePath: 'Re: Seed round',
+        externalUrl: null,
+        email: { subject: 'Re: Seed round' },
+      }),
+    ).toBe('via Re: Seed round · 2.0 KB · 10-07')
+  })
 })
 
 describe('LinkFetchRow', () => {

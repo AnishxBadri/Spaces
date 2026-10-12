@@ -119,6 +119,7 @@ const interaction = (
     answer: string | null
     noteId: string | null
     privateBody: boolean
+    hasAttachments: boolean
   }> = {},
 ): Items[number] => ({
   type: 'interaction',
@@ -131,6 +132,7 @@ const interaction = (
   attendees: [],
   via: null,
   attachments: 0,
+  hasAttachments: false,
   answer: null,
   ...extra,
 })
@@ -201,7 +203,11 @@ describe('the empties fold', () => {
 
 describe('the Interactions tab', () => {
   const items: Items = [
-    interaction('a', 'email', { via: 'Anish', attachments: 2 }),
+    interaction('a', 'email', {
+      via: 'Anish',
+      attachments: 2,
+      hasAttachments: true,
+    }),
     interaction('b', 'email'),
     interaction('c', 'meeting', { answer: 'accepted', noteId: 'n1' }),
     interaction('d', 'call'),
@@ -213,11 +219,25 @@ describe('the Interactions tab', () => {
     const filters = [...el.querySelectorAll('[role="group"] button')].map(
       (b) => b.textContent,
     )
-    expect(filters).toEqual(['All 4', 'Email 2', 'Meeting 1', 'Call 1'])
+    expect(filters).toEqual([
+      'All 4',
+      'Email 2',
+      'Meeting 1',
+      'Call 1',
+      'Has attachments 1',
+    ])
     expect(el.querySelectorAll('li')).toHaveLength(4)
     await click(button(/^Email 2$/))
     expect(el.querySelectorAll('li')).toHaveLength(2)
     expect(button(/^Email 2$/).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('lists only the rows with attachments under Has attachments, on the same filter row', async () => {
+    const el = await mount(<RecordInteractions items={items} registry={[]} />)
+    expect(el.querySelectorAll('[role="group"]')).toHaveLength(1)
+    await click(button(/^Has attachments 1$/))
+    expect(el.querySelectorAll('li')).toHaveLength(1)
+    expect(el.querySelector('li')?.textContent).toContain('email a')
   })
 
   it('ends a row on its mono lane, with Write up as a row action', async () => {

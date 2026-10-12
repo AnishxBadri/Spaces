@@ -80,7 +80,16 @@ const HTML: EmailDetail = {
     srcdoc: '<!doctype html><html><body><p>Q3 closed.</p></body></html>',
     remoteImages: 2,
   },
-  attachments: [{ documentId: 'd1', name: 'acme-q3.pdf', sizeBytes: 2048 }],
+  attachments: [
+    {
+      documentId: 'd1',
+      name: 'acme-q3.pdf',
+      filename: 'acme-q3.pdf',
+      mime: 'application/pdf',
+      sizeBytes: 2048,
+      lane: 'gmail',
+    },
+  ],
 }
 
 let host: HTMLDivElement
@@ -146,6 +155,25 @@ describe('the email window', () => {
     const lines = dialog()?.querySelectorAll('[data-remote-images]') ?? []
     expect(lines).toHaveLength(1)
     expect(lines[0]?.textContent).toBe('2 remote images not loaded')
+  })
+
+  it('lists an attachment with its type glyph, size and lane, and opens it in the preview, not a download', async () => {
+    fns.getDocumentPreview.mockResolvedValue(null)
+    await open()
+    const row = [...document.querySelectorAll('button')].find((b) =>
+      b.textContent.includes('acme-q3.pdf'),
+    )
+    if (row === undefined) throw new Error('no attachment row')
+    expect(row.querySelector('[data-glyph]')?.getAttribute('data-glyph')).toBe(
+      'pdf',
+    )
+    expect(row.querySelector('[data-attachment-lane]')?.textContent).toBe(
+      '2.0 KB · via gmail',
+    )
+    act(() => row.click())
+    await settle()
+    expect(fns.getDocumentPreview).toHaveBeenCalledWith({ data: { id: 'd1' } })
+    expect(fns.getDocumentDownloadUrl).not.toHaveBeenCalled()
   })
 
   it('says a private body in one line and lists no attachment', async () => {

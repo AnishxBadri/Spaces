@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { document, entity } from '@spaces/db/schema'
@@ -21,7 +21,9 @@ import { requireUser } from './shared'
 export const getDocumentPreview = createServerFn()
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
-    await requireUser()
+    const u = await requireUser()
+    const { attachmentHiddenSql, DOCUMENT_ID_REF } =
+      await import('@spaces/core/writes/read/attachment-visibility')
     // `.at(0)` rather than destructuring: the row genuinely may not exist —
     // a mention whose document was deleted is an ordinary state — and a
     // destructured element types as always-present.
@@ -46,7 +48,13 @@ export const getDocumentPreview = createServerFn()
         })
         .from(document)
         .innerJoin(entity, eq(entity.id, document.entityId))
-        .where(eq(document.entityId, data.id))
+        .where(
+          and(
+            eq(document.entityId, data.id),
+            // A private email attachment opens for its reader only (D67).
+            sql`not ${attachmentHiddenSql(u.id, DOCUMENT_ID_REF)}`,
+          ),
+        )
     ).at(0)
     if (!row || row.mergedIntoId) return null
     return {

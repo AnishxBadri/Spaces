@@ -40,6 +40,7 @@ const PRODUCED = [
   'note.unfiled',
   'document.filed',
   'document.refiled',
+  'document.arrived',
   'document.kind_changed',
   'document.reextract_requested',
   'space.tagged',

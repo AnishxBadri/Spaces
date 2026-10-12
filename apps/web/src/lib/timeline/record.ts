@@ -1,5 +1,6 @@
 import { Effect, Schema } from 'effect'
 import { and, desc, eq, inArray, isNotNull, like, sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import { condenseBursts } from '@spaces/core/timeline/bursts'
 import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
@@ -174,6 +175,7 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           noteId: interaction.noteId,
           sourceRef: interaction.sourceRef,
           meta: interaction.meta,
+          hasAttachments: hasAttachmentsSql(),
         })
         .from(interactionEntity)
         .innerJoin(
@@ -367,22 +369,27 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
         at: b.at,
         changes: changesOf[i],
       })),
-      ...myInteractions.map((i) => ({
-        type: 'interaction' as const,
-        id: i.id,
-        kind: i.kind,
-        subject: i.subject ?? '',
-        noteId: i.noteId !== null && unreadable.has(i.noteId) ? null : i.noteId,
-        /** The write-up exists and is private to someone else. */
-        privateBody: i.noteId !== null && unreadable.has(i.noteId),
-        at: i.occurredAt.toISOString(),
-        attendees: attendeesBy.get(i.id) ?? [],
-        via: i.sourceRef
-          ? (integrationNames.get(i.sourceRef) ?? null)
-          : (loggedBy.get(i.id) ?? null),
-        attachments: attachmentsBy.get(i.id) ?? 0,
-        answer: meetingAnswer(i.meta, ownEmails),
-      })),
+      ...myInteractions.map((i) => {
+        const privateBody = i.noteId !== null && unreadable.has(i.noteId)
+        return {
+          type: 'interaction' as const,
+          id: i.id,
+          kind: i.kind,
+          subject: i.subject ?? '',
+          noteId: privateBody ? null : i.noteId,
+          /** The write-up exists and is private to someone else. */
+          privateBody,
+          at: i.occurredAt.toISOString(),
+          attendees: attendeesBy.get(i.id) ?? [],
+          via: i.sourceRef
+            ? (integrationNames.get(i.sourceRef) ?? null)
+            : (loggedBy.get(i.id) ?? null),
+          // Attachments are private with the body (D67): no count, no filter.
+          attachments: privateBody ? 0 : (attachmentsBy.get(i.id) ?? 0),
+          hasAttachments: !privateBody && i.hasAttachments,
+          answer: meetingAnswer(i.meta, ownEmails),
+        }
+      }),
       ...checks
         .filter((c) => c.reversesId === null)
         .map((c) => ({
@@ -402,6 +409,15 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
     return items.slice(0, 60)
   },
 )
+
+/**
+ * Whether an interaction carries an attachment: the "has attachments" filter,
+ * an exists over `interaction_document`.
+ */
+export const hasAttachmentsSql = (): SQL<boolean> =>
+  // Qualified by hand: drizzle drops the table name in a one-table select,
+  // and an unqualified `id` inside the subquery would bind to the wrong row.
+  sql<boolean>`exists (select 1 from interaction_document d where d.interaction_id = "interaction"."id" and d.role = 'attachment')`
 
 /**
  * The word a meeting row ends on: `cancelled`, else how this person

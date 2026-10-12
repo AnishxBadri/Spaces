@@ -112,14 +112,16 @@ async function birth(input: Birth): Promise<string> {
 async function shelf(filed: 'all' | 'unfiled', tag: string) {
   const { Effect } = await import('effect')
   const { listDocumentsProgram } = await import('./shelf')
-  const rows = await Effect.runPromise(listDocumentsProgram({ filed }))
+  const rows = await Effect.runPromise(
+    listDocumentsProgram({ filed, viewer: { id: 'shelf-viewer' } }),
+  )
   return rows.filter((r) => r.filename.includes(tag))
 }
 
 async function unfiledCount(): Promise<number> {
   const { Effect } = await import('effect')
   const { countUnfiledProgram } = await import('./shelf')
-  return Effect.runPromise(countUnfiledProgram())
+  return Effect.runPromise(countUnfiledProgram({ id: 'shelf-viewer' }))
 }
 
 describe('the unfiled predicate', () => {
