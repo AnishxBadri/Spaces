@@ -4,7 +4,16 @@ import { db } from '@spaces/db'
 import { attribute, entity, objectDef } from '@spaces/db/schema'
 import { nextBadgeColor } from '../../attributes/colors'
 import { coreKindOf, enrichmentLinkProblem } from '../../attributes/registry'
-import { buildAiConfig } from '../../ai/attribute-ai'
+import { aiModeFits, buildAiConfig } from '../../ai/attribute-ai'
+import { flipCardinality, holdsMany } from '../../attributes/relationship'
+import {
+  holdsList,
+  widenCardinality,
+  widenDefault,
+  widenedType,
+} from '../../attributes/widen'
+import { wrapStoredValues } from './values'
+import type { Actor } from './values'
 import type { AiConfigInput } from '../../ai/attribute-ai'
 import { validateDefault } from './defaults'
 import type { BadgeColor } from '../../attributes/colors'
@@ -12,6 +21,7 @@ import type { Json } from '@spaces/db/json'
 import type {
   AttributeOptions,
   AttributeType,
+  ObjectKind,
   SelectOption,
 } from '../../attributes/registry'
 
@@ -21,10 +31,10 @@ import type {
  * server-fn stays a thin wrapper).
  *
  * The config-mutability table (spec-attribute-engine §3) is the contract.
- * Type and slug are not in the patch at all — there is no code path that
- * could change them. Same for record_reference `targetKind` / `multi`: the
- * `config` patch has no such fields, so the illegal edit is unrepresentable
- * rather than validated away.
+ * - Slug and record_reference `targetKind` are not in the patch at all, so
+ *   the illegal edit is unrepresentable rather than validated away.
+ * - Type and `multi` change only through `multi`, which widens and never
+ *   narrows (D69).
  */
 
 export class AttributeNotFound extends Schema.TaggedError<AttributeNotFound>()(
@@ -52,6 +62,18 @@ export class RatingMaxBelowValues extends Schema.TaggedError<RatingMaxBelowValue
 export class IdentityKeyAttributeLocked extends Schema.TaggedError<IdentityKeyAttributeLocked>()(
   'IdentityKeyAttributeLocked',
   { key: Schema.String, object: Schema.String, message: Schema.String },
+) {}
+
+/** System attributes ship with the product: never archived, never reshaped. (D69) */
+export class SystemAttributeLocked extends Schema.TaggedError<SystemAttributeLocked>()(
+  'SystemAttributeLocked',
+  { attribute: Schema.String, message: Schema.String },
+) {}
+
+/** A multi-valued attribute asked to hold one value again. Edits widen only. (D69) */
+export class AttributeNarrowingRefused extends Schema.TaggedError<AttributeNarrowingRefused>()(
+  'AttributeNarrowingRefused',
+  { attribute: Schema.String, message: Schema.String },
 ) {}
 
 export class AttributeQueryFailed extends Schema.TaggedError<AttributeQueryFailed>()(
@@ -119,6 +141,12 @@ export type UpdateAttributePatch = {
    */
   indexed?: boolean | undefined
   archived?: boolean | undefined
+  /**
+   * true widens a single-valued attribute to a list (D69): `select` becomes
+   * `multi_select`, a reference, phone or email gains `multi`, and every
+   * stored value is wrapped. false on a multi-valued one is refused.
+   */
+  multi?: boolean | undefined
   move?: 'up' | 'down' | undefined
   /** select/multi_select/status option list */
   options?: Array<OptionEdit> | undefined
@@ -129,6 +157,8 @@ export type UpdateAttributeError =
   | AttributeNotFound
   | AttributeConfigRejected
   | IdentityKeyAttributeLocked
+  | SystemAttributeLocked
+  | AttributeNarrowingRefused
   | RatingMaxBelowValues
   | AttributeQueryFailed
 
@@ -321,9 +351,113 @@ const applyConfig = Effect.fn('applyConfig')(function* (
   return next
 })
 
+/** What one widening writes, all of it in one transaction. */
+type WidenPlan = {
+  type: AttributeType
+  options: AttributeOptions
+  /** The other half of a relationship, with its cardinality read from its side. */
+  pair: { id: string; options: AttributeOptions } | null
+  /** The object's core kind, for its rows born without an object id. */
+  core: ObjectKind | null
+}
+
+/**
+ * Widen or refuse (D69), before anything is written.
+ * - `multi: false` on a list is refused naming the attribute; on a single
+ *   value it is a no-op, as is `multi: true` on a list.
+ * - A pair widens on the side asked: that side holds many and the other
+ *   keeps its shape (a 1:1 owner becomes 1:N, its derived half N:1).
+ */
+const planWiden = Effect.fn('planWiden')(function* (
+  attr: typeof attribute.$inferSelect,
+  options: AttributeOptions,
+  multi: boolean,
+): Effect.fn.Return<
+  WidenPlan | null,
+  | AttributeNarrowingRefused
+  | SystemAttributeLocked
+  | AttributeConfigRejected
+  | AttributeQueryFailed
+> {
+  const isList = holdsList({ type: attr.type, options })
+  if (!multi) {
+    if (!isList) return null
+    return yield* new AttributeNarrowingRefused({
+      attribute: attr.name,
+      message: `${attr.name} holds a list and cannot narrow to one value`,
+    })
+  }
+  if (isList) return null
+  const type = widenedType(attr.type)
+  if (type === null)
+    return yield* new AttributeConfigRejected({
+      message: `A ${attr.type} attribute holds one value; it has no list to widen to`,
+    })
+  if (attr.isSystem)
+    return yield* new SystemAttributeLocked({
+      attribute: attr.name,
+      message: `${attr.name} ships with Spaces; its shape is fixed`,
+    })
+  if (options.ai !== undefined && !aiModeFits(options.ai.mode, type))
+    return yield* new AttributeConfigRejected({
+      message: `${attr.name} answers by AI as one value — clear its AI config before widening`,
+    })
+  const owner = yield* query(() =>
+    db
+      .select({ slug: objectDef.slug, isSystem: objectDef.isSystem })
+      .from(objectDef)
+      .where(eq(objectDef.id, attr.objectId))
+      .then((rows) => rows.at(0)),
+  )
+  const core = owner === undefined ? null : coreKindOf(owner)
+  if (typeof options.enrichmentKey === 'string') {
+    const problem = enrichmentLinkProblem(
+      type,
+      core,
+      options.enrichmentKey,
+      options.targetKind,
+    )
+    if (problem !== null)
+      return yield* new AttributeConfigRejected({
+        message: `Fill from: ${problem} — unlink it before widening`,
+      })
+  }
+
+  const next: AttributeOptions = {
+    ...options,
+    ...(type === attr.type ? { multi: true } : {}),
+    ...(options.default === undefined
+      ? {}
+      : { default: widenDefault(options.default) }),
+  }
+  let pair: WidenPlan['pair'] = null
+  if (options.inverseOf !== undefined && options.cardinality !== undefined) {
+    const pairId = options.inverseOf
+    const row = yield* query(() =>
+      db
+        .select({ id: attribute.id, name: attribute.name })
+        .from(attribute)
+        .where(eq(attribute.id, pairId))
+        .then((rows) => rows.at(0)),
+    )
+    const widened = widenCardinality(options.cardinality)
+    next.cardinality = widened
+    if (row) {
+      const flipped = flipCardinality(widened)
+      pair = {
+        id: row.id,
+        options: { cardinality: flipped, multi: holdsMany(flipped) },
+      }
+    }
+  }
+  return { type, options: next, pair, core }
+})
+
 export const updateAttributeProgram = Effect.fn('updateAttributeProgram')(
   function* (
     patch: UpdateAttributePatch,
+    /** who a widening's `attribute_event` names; the server fn passes the user */
+    actor: Actor = { type: 'system' },
   ): Effect.fn.Return<{ ok: true }, UpdateAttributeError> {
     const attr = yield* query(() =>
       db
@@ -368,6 +502,11 @@ export const updateAttributeProgram = Effect.fn('updateAttributeProgram')(
           message: `${attr.name} backs the ${identityKey} identity key of ${owner.plural} — drop the key from ${owner.plural} before archiving it`,
         })
     }
+    if (patch.archived === true && attr.isSystem)
+      return yield* new SystemAttributeLocked({
+        attribute: attr.name,
+        message: `${attr.name} ships with Spaces and cannot be archived`,
+      })
     // Either half of a relationship may be archived; that detaches the pair,
     // and a write to a derived half whose owner is archived is refused by
     // `setValues` (`PairedAttributeLocked`). (D69)
@@ -385,7 +524,49 @@ export const updateAttributeProgram = Effect.fn('updateAttributeProgram')(
       if (patch.required) next.required = true
       else delete next.required
     }
-    if (next !== current)
+    const widen =
+      patch.multi === undefined
+        ? null
+        : yield* planWiden(attr, next, patch.multi)
+    if (widen !== null) {
+      // One transaction: the attribute's shape, its pair's, and every stored
+      // value wrapped by one statement with one event on the attribute.
+      const { pair, core } = widen
+      const shape = (type: string, options: AttributeOptions) => ({
+        type,
+        multi: holdsList({ type, options }),
+        ...(options.cardinality === undefined
+          ? {}
+          : { cardinality: options.cardinality }),
+      })
+      yield* query(() =>
+        db.transaction(async (tx) => {
+          // The pair first: a write on the derived side holds its own
+          // registry, then the owner's, so this order cannot cross it.
+          if (pair !== null)
+            await tx
+              .update(attribute)
+              .set({
+                options: sql`${attribute.options} || ${JSON.stringify(pair.options)}::jsonb`,
+              })
+              .where(eq(attribute.id, pair.id))
+          await tx
+            .update(attribute)
+            .set({ type: widen.type, options: widen.options })
+            .where(eq(attribute.id, attr.id))
+          // A derived half stores nothing, so only its event is written.
+          await wrapStoredValues(tx, {
+            attributeId: attr.id,
+            objectId: attr.objectId,
+            core,
+            slug: attr.slug,
+            from: shape(attr.type, attr.options),
+            to: shape(widen.type, widen.options),
+            actor,
+          })
+        }),
+      )
+    } else if (next !== current)
       yield* query(() =>
         db
           .update(attribute)

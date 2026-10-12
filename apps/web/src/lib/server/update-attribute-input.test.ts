@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
  */
 
 describe('updateAttributeInput (zod boundary)', () => {
-  it('strips type, slug, targetKind and multi rather than carrying them', async () => {
+  it('strips type, slug, targetKind and config.multi rather than carrying them', async () => {
     const { updateAttributeInput } = await import('./attributes')
     const parsed = updateAttributeInput.parse({
       id: randomUUID(),
@@ -25,6 +25,17 @@ describe('updateAttributeInput (zod boundary)', () => {
       name: 'Renamed',
       config: { code: 'EUR' },
     })
+  })
+
+  it('carries the widening flag at the top level only (D69)', async () => {
+    const { updateAttributeInput } = await import('./attributes')
+    const parsed = updateAttributeInput.parse({
+      id: randomUUID(),
+      multi: true,
+      config: { multi: true },
+    })
+    expect(parsed.multi).toBe(true)
+    expect(parsed.config).toEqual({})
   })
 
   it('carries an option archive flag', async () => {

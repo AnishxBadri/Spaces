@@ -228,6 +228,9 @@ export const attributeEventSource = pgEnum('attribute_event_source', [
  * Per-attribute change history — one row per changed attribute, written in
  * the same transaction as the value write. Deal stage history is
  * `attr_slug = 'stage'`. Timeline condenses bursts at read time.
+ * - Exactly one of `entity_id` / `attribute_id`: a value change is on a
+ *   record; a reshape of the attribute itself (a widening, D69) is one row
+ *   on the attribute, never one per record.
  *
  * Provenance lives on the event, not only on the suggestion row: once a
  * suggestion is accepted, this row is what "from p.4 of the deck" joins to.
@@ -236,9 +239,10 @@ export const attributeEvent = pgTable(
   'attribute_event',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    entityId: uuid('entity_id')
-      .notNull()
-      .references(() => entity.id),
+    entityId: uuid('entity_id').references(() => entity.id),
+    attributeId: uuid('attribute_id').references(() => attribute.id, {
+      onDelete: 'cascade',
+    }),
     attrSlug: text('attr_slug').notNull(),
     from: jsonb('from').$type<Json>(),
     to: jsonb('to').$type<Json>(),
@@ -275,6 +279,7 @@ export const attributeEvent = pgTable(
   (t) => [
     index('attribute_event_entity_idx').on(t.entityId, t.at),
     index('attribute_event_slug_idx').on(t.entityId, t.attrSlug),
+    index('attribute_event_attribute_idx').on(t.attributeId, t.at),
     // Partial: all but imported rows carry no batch.
     index('attribute_event_batch_idx')
       .on(t.batchId)
@@ -286,6 +291,10 @@ export const attributeEvent = pgTable(
     check(
       'attribute_event_actor_invariant',
       sql`(${t.actorType} = 'user') = (${t.actorId} IS NOT NULL) AND (${t.actorType} = 'integration') = (${t.actorRef} IS NOT NULL)`,
+    ),
+    check(
+      'attribute_event_subject',
+      sql`(${t.entityId} IS NULL) <> (${t.attributeId} IS NULL)`,
     ),
   ],
 )

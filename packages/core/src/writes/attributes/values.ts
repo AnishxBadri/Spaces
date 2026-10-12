@@ -78,6 +78,19 @@ export async function getRegistryByObjectId(
   return opts.derived ? rows : rows.filter((d) => !isDerived(d))
 }
 
+/** An object's live attributes, derived halves included, held FOR SHARE until the caller's transaction ends. */
+async function lockRegistry(
+  tx: Tx,
+  objectId: string,
+): Promise<Array<AttributeDef>> {
+  return tx
+    .select()
+    .from(attribute)
+    .where(and(eq(attribute.objectId, objectId), eq(attribute.archived, false)))
+    .orderBy(asc(attribute.sortOrder), asc(attribute.createdAt))
+    .for('share')
+}
+
 export async function getRegistry(
   kind: ObjectKind,
 ): Promise<Array<AttributeDef>> {
@@ -209,17 +222,76 @@ function ofObject(objectId: string, core: ObjectKind | null): SQL {
 }
 
 /**
- * 1:1 on the owner (D69): a record may be held by one owner at a time. The
- * refusal names the record that already holds it.
+ * The widening reshape (D69): every record of the object holding a scalar
+ * under `slug` gets it back as a one-element list, in one statement, and the
+ * attribute gets one `attribute_event` — never one per record.
+ * - Absent keys, nulls and lists are left alone; reference links are
+ *   unchanged, since the targets are the same.
+ * - Merged losers are reshaped too, so every stored value has one shape.
  */
-async function checkOneToOne(
+export async function wrapStoredValues(
+  tx: Tx,
+  widen: {
+    attributeId: string
+    objectId: string
+    core: ObjectKind | null
+    slug: string
+    /** the attribute's shape before and after, as the event records it */
+    from: { [k: string]: Json }
+    to: { [k: string]: Json }
+    actor: Actor
+  },
+): Promise<number> {
+  const held = sql`${entity.values} -> ${widen.slug}::text`
+  const rows = await tx
+    .update(entity)
+    .set({
+      values: sql`jsonb_set(${entity.values}, array[${widen.slug}::text], jsonb_build_array(${held}))`,
+    })
+    .where(
+      and(
+        ofObject(widen.objectId, widen.core),
+        sql`jsonb_typeof(${held}) not in ('array', 'null')`,
+      ),
+    )
+    .returning({ id: entity.id })
+  await tx.insert(attributeEvent).values({
+    attributeId: widen.attributeId,
+    attrSlug: widen.slug,
+    from: widen.from,
+    to: { ...widen.to, records: rows.length },
+    actorType: widen.actor.type,
+    actorId: widen.actor.type === 'user' ? widen.actor.id : null,
+    actorRef: widen.actor.type === 'integration' ? widen.actor.id : null,
+  })
+  return rows.length
+}
+
+/**
+ * 1:1 and 1:N on the owner (D69): a target may be held by one owner at a
+ * time. The refusal names the record that already holds it.
+ */
+async function checkHeldOnce(
   tx: Tx,
   entityId: string,
   members: SQL,
   change: Change,
 ) {
   const { def, slug, value } = change
-  if (def.options.cardinality !== '1:1' || typeof value !== 'string') return
+  const card = def.options.cardinality
+  if (card !== '1:1' && card !== '1:N') return
+  // Sorted, so two writers claiming overlapping targets lock in one order.
+  for (const target of [...new Set(referenceIds(value))].sort())
+    await checkTargetFree(tx, entityId, members, slug, target)
+}
+
+async function checkTargetFree(
+  tx: Tx,
+  entityId: string,
+  members: SQL,
+  slug: string,
+  value: string,
+) {
   // Serializes owners claiming one target: a second writer waits here, then
   // reads the first one's committed link. Released when the transaction ends.
   await tx.execute(
@@ -673,6 +745,31 @@ export async function setValuesInTx(
   // the column's check constraint enforces rather than trusts.
   const actorRef = actor.type === 'integration' ? actor.id : null
 
+  // The registry first, FOR SHARE: a widening holds the attribute row until
+  // it commits, so a write never validates against a shape that changes
+  // under it. Attribute before entity, the order a widening locks in.
+  const head = (
+    await tx
+      .select({ kind: entity.kind, objectId: entity.objectId })
+      .from(entity)
+      .where(eq(entity.id, entityId))
+  ).at(0)
+  if (!head) throw new EntityNotFound({ entityId, message: 'Entity not found' })
+  // objectId is the registry key; kind fallback covers rows created
+  // outside the creation server-fns (tests, raw inserts) — core kinds
+  // resolve to their system object row.
+  let objectId = head.objectId
+  if (objectId === null) {
+    const core = toObjectKind(head.kind)
+    if (core === null)
+      throw new EntityNotFound({
+        entityId,
+        message: `No attribute registry for kind ${head.kind}`,
+      })
+    objectId = await objectIdForKindAsync(core)
+  }
+  const registry = await lockRegistry(tx, objectId)
+
   // FOR UPDATE: this is a read-modify-write of the whole values blob.
   // At READ COMMITTED, two partners editing different attributes of
   // the same record concurrently would both read the same starting
@@ -692,20 +789,6 @@ export async function setValuesInTx(
       .for('update')
   ).at(0)
   if (!ent) throw new EntityNotFound({ entityId, message: 'Entity not found' })
-  // objectId is the registry key; kind fallback covers rows created
-  // outside the creation server-fns (tests, raw inserts) — core kinds
-  // resolve to their system object row.
-  let objectId = ent.objectId
-  if (objectId === null) {
-    const core = toObjectKind(ent.kind)
-    if (core === null)
-      throw new EntityNotFound({
-        entityId,
-        message: `No attribute registry for kind ${ent.kind}`,
-      })
-    objectId = await objectIdForKindAsync(core)
-  }
-  const registry = await getRegistryByObjectId(objectId, { derived: true })
   const current = ent.values
   const nameParts =
     ent.kind === 'person' && registry.some((d) => isNamePart(d.slug))
@@ -816,7 +899,7 @@ export async function setValuesInTx(
   const next = { ...current }
   for (const change of changes) {
     await checkReferences(tx, change)
-    await checkOneToOne(tx, entityId, members, change)
+    await checkHeldOnce(tx, entityId, members, change)
     const { slug, def, before, value } = change
     if (value === null) delete next[slug]
     else next[slug] = value

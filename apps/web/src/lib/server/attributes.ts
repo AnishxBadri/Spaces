@@ -151,11 +151,11 @@ const optionEdit = z.object({
 })
 
 /**
- * The update boundary (spec-attribute-engine §3). `type` and `slug` are not
- * here, and neither are record_reference's `targetKind` / `multi`: zod
- * strips unknown keys, so those edits cannot reach the program at all —
- * unrepresentable, not validated away. The per-type rules for what *is*
- * here live in the program (`src/lib/attributes/update.ts`).
+ * The update boundary (spec-attribute-engine §3).
+ * - `type`, `slug`, `targetKind` and `config.multi` are not here: zod strips
+ *   unknown keys, so those edits cannot reach `updateAttributeProgram`.
+ * - The one shape change is top-level `multi`, which widens and is refused
+ *   when it would narrow. (D69)
  */
 export const updateAttributeInput = z.object({
   id: z.string().uuid(),
@@ -163,6 +163,8 @@ export const updateAttributeInput = z.object({
   description: z.string().trim().max(500).nullable().optional(),
   required: z.boolean().optional(),
   archived: z.boolean().optional(),
+  /** true widens to a list, wrapping every stored value; false is refused on a list */
+  multi: z.boolean().optional(),
   move: z.enum(['up', 'down']).optional(),
   /** "Filter and sort on this" — sets attribute.filterable and .sortable together */
   indexed: z.boolean().optional(),
@@ -195,9 +197,9 @@ export const updateAttributeInput = z.object({
 
 /**
  * Attribute maintenance. Structure fixed, content free: names, options and
- * per-type config are editable (system included); types never change;
- * options can be added, renamed and archived but not removed — stored
- * values may reference them.
+ * per-type config are editable (system included); options can be added,
+ * renamed and archived but not removed — stored values may reference them.
+ * - A user attribute widens to a list and archives; a system one does neither. (D69)
  */
 export const updateAttribute = createServerFn({ method: 'POST' })
   .validator(updateAttributeInput)
@@ -206,11 +208,14 @@ export const updateAttribute = createServerFn({ method: 'POST' })
     // shared vocabulary for everyone, so they are settings — admin-owned.
     // Creating an attribute stays member (the "+ Add column" flow): additive,
     // and a two-person fund should not need ceremony to add a field.
-    await requireAdmin()
+    const u = await requireAdmin()
     const { updateAttributeProgram } =
       await import('@spaces/core/writes/attributes/update')
     const { effectFn } = await import('./effect')
-    const result = await effectFn(updateAttributeProgram)(data)
+    const result = await effectFn(updateAttributeProgram)(data, {
+      type: 'user',
+      id: u.id,
+    })
     // After the write commits, never inside it: `CREATE INDEX CONCURRENTLY`
     // cannot run in a transaction (SPA-93). Ticking the box mints the
     // attribute's `attr_idx_<id>`, unticking it — or archiving the

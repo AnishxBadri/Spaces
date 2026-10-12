@@ -39,6 +39,16 @@ import { ConfirmDialog } from '#/components/ui/confirm-dialog'
 import { KeyHint } from '#/components/page-header'
 import { optionColor } from '@spaces/core/attributes/colors'
 import { deriveOptionIds } from '@spaces/core/attributes/options'
+import {
+  holdsList,
+  widenCardinality,
+  widenedType,
+} from '@spaces/core/attributes/widen'
+import {
+  flipCardinality,
+  holdsMany,
+} from '@spaces/core/attributes/relationship'
+import type { Cardinality } from '@spaces/core/attributes/relationship'
 import { createAttribute, listObjects, updateAttribute } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 import { OptionListEditor, newDraft } from './option-list-editor'
@@ -210,6 +220,10 @@ export type EditableAttribute = {
    * is enough to show the box.
    */
   filterable?: boolean
+  /** Ships with the product: never widened. Absent offers no widening. (D69) */
+  isSystem?: boolean
+  /** The other half of a relationship, named for the widening note. */
+  pair?: { name: string; objectPlural: string } | null
 }
 
 type ObjectChoice = {
@@ -294,6 +308,22 @@ export function AttributeDialog(props: Props) {
   )
 }
 
+/**
+ * The widening note: which side holds many once this one widens. A pair
+ * names its other half and what it keeps. (D69)
+ */
+export function widenNote(
+  objectPlural: string,
+  pair: { name: string; objectPlural: string } | null,
+  cardinality: Cardinality | undefined,
+): string {
+  const undo = 'This cannot be undone.'
+  if (pair === null || cardinality === undefined)
+    return `Every stored value becomes a one-item list. ${undo}`
+  const otherMany = holdsMany(flipCardinality(widenCardinality(cardinality)))
+  return `${objectPlural} will each hold many ${pair.objectPlural}; ${pair.name} ${otherMany ? 'already holds many' : 'still holds one'}. ${undo}`
+}
+
 function AttributeForm({
   objectKind,
   objectId,
@@ -363,6 +393,20 @@ function AttributeForm({
     ? target.slice('object:'.length)
     : ''
   const [multi, setMulti] = useState(stored.multi ?? false)
+  // Edits widen only (D69): a user attribute holding one value may become a
+  // list, once. On a pair this side holds many; the note says what the
+  // other side keeps.
+  const canWiden =
+    mode === 'edit' &&
+    attr?.isSystem === false &&
+    widenedType(attr.type) !== null &&
+    !holdsList({ type: attr.type, options: stored })
+  const widenHint = widenNote(
+    objectPlural,
+    attr?.pair ?? null,
+    stored.cardinality,
+  )
+  const [widen, setWiden] = useState(false)
   const [required, setRequired] = useState(stored.required ?? false)
   // "Filter and sort on this": one control, two columns (SPA-93). A user
   // does not distinguish filtering a list from sorting it, and both want
@@ -524,6 +568,7 @@ function AttributeForm({
               : {}),
             ...(required !== Boolean(stored.required) ? { required } : {}),
             ...(indexed !== Boolean(attr.filterable) ? { indexed } : {}),
+            ...(widen ? { multi: true } : {}),
             ...(isOptionType ? { options: optionPayload } : {}),
             config: {
               ...(type === 'currency' && code !== (stored.code ?? 'USD')
@@ -625,7 +670,7 @@ function AttributeForm({
         return mode === 'edit' ? (
           <p className="text-ui text-graphite sm:col-span-2">
             {stored.multi ? 'Several numbers' : 'One number'}, stored as + then
-            the digits. Fixed since creation.
+            the digits.
           </p>
         ) : (
           <CheckRow
@@ -647,8 +692,8 @@ function AttributeForm({
                   ]
                 : 'one of your objects'}
             </span>
-            {stored.multi ? ', several at once' : ', one at a time'}. Fixed
-            since creation — changing it would invalidate every stored link.
+            {stored.multi ? ', several at once' : ', one at a time'}. The target
+            is fixed since creation.
           </p>
         ) : (
           <>
@@ -836,6 +881,16 @@ function AttributeForm({
           </Field>
 
           {slot}
+
+          {canWiden ? (
+            <CheckRow
+              id="attr-widen"
+              checked={widen}
+              onChange={setWiden}
+              label="Multiple values"
+              hint={widenHint}
+            />
+          ) : null}
 
           {fillKeys.length > 0 || storedKey !== NOT_LINKED ? (
             <Field label="Fill from" htmlFor="attr-fill-from">

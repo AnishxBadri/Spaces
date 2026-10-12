@@ -554,6 +554,13 @@
       "when": 1791763124666,
       "tag": "0078_ask_threads",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1791835761369,
+      "tag": "0079_attribute_event_attribute",
+      "breakpoints": true
     }
   ]
 }

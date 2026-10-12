@@ -21,7 +21,7 @@ import { cn } from '#/lib/utils'
  * attribute — grip · name · type in words (`Multi-select · 6`,
  * `Record · People`) · rules (`↔ Team · N:N`, `identity · unique`,
  * `filled by Apollo`) ·
- * `···` (Edit, Move up, Move down, Archive).
+ * `···` (Edit, Move up, Move down, and Archive on a user attribute only).
  * Drag or the menu's moves persist sort_order, which every table and rail
  * reads. Archived attributes wait in a collapsed group below — never
  * deleted, values intact, one click from coming back. Keyed on the object
@@ -369,10 +369,16 @@ function AttributeRow({
             onSelect: () => onMove('down'),
           },
         ]),
-    {
-      label: 'Archive',
-      onSelect: () => void act({ archived: true }, `${attr.name} archived`),
-    },
+    // A system attribute is never archived, so its menu has no such item. (D69)
+    ...(attr.isSystem
+      ? []
+      : [
+          {
+            label: 'Archive',
+            onSelect: () =>
+              void act({ archived: true }, `${attr.name} archived`),
+          },
+        ]),
   ]
 
   return (
