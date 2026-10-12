@@ -9,6 +9,8 @@ import { ref } from './ref'
  */
 const CO = 'co-frostbyte'
 const DECK = 'doc-deck'
+/** The deck before DECK: the same kind, replaced by it (D59). */
+const OLD_DECK = 'doc-deck-v1'
 const MEMO = 'note-memo'
 const SPACE_MEMO = 'note-space-memo'
 const ASOF = '2026-09-10T00:00:00Z'
@@ -69,6 +71,16 @@ const fixture: ReadonlyArray<Candidate> = [
     at: '2026-08-20T00:00:00Z',
     hop: 1,
     edge: 'derived_from',
+  },
+  {
+    ref: ref.doc(OLD_DECK, 0),
+    kind: 'doc_chunk',
+    text: 'Deck v1 p.1: Frostbyte Cooling — pre-seed.',
+    entityIds: [CO, OLD_DECK],
+    at: '2026-08-20T00:00:00Z',
+    hop: 1,
+    edge: 'derived_from',
+    superseded: true,
   },
   {
     ref: ref.interaction('int-call'),
@@ -166,6 +178,27 @@ describe('rank', () => {
     expect(later.items.find((i) => i.ref === `doc:${DECK}#0`)!.structural).toBe(
       now.items.find((i) => i.ref === `doc:${DECK}#0`)!.structural,
     )
+  })
+
+  it('a superseded deck ranks below its successor under equal recency', () => {
+    const r = rank(fixture, { asOf: ASOF, budgetChars: 4000 })
+    const at = (target: string) => order(r).indexOf(target)
+    expect(at(ref.doc(DECK, 0))).toBeLessThan(at(ref.doc(OLD_DECK, 0)))
+    const score = (target: string) =>
+      r.items.find((i) => i.ref === target)!.structural!
+    expect(score(ref.doc(OLD_DECK, 0))).toBeCloseTo(
+      score(ref.doc(DECK, 0)) * DEFAULT_WEIGHTS.superseded,
+      9,
+    )
+    // Demoted, never dropped: both stay in the context.
+    const flat = rank(fixture, {
+      asOf: ASOF,
+      budgetChars: 4000,
+      weights: { superseded: 1 },
+    })
+    expect(
+      flat.items.find((i) => i.ref === ref.doc(OLD_DECK, 0))!.structural,
+    ).toBe(score(ref.doc(DECK, 0)))
   })
 
   it('attributes are the floor: taken before a higher-scored memo when tight', () => {

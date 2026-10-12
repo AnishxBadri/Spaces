@@ -9,10 +9,11 @@ import { describe, expect, it } from 'vitest'
  * of its own.
  *
  * The allowlist below is every production module that inserts into
- * `entity_space` today. Only `./tag.ts` *tags* a record; the other three
+ * `entity_space` today. Only `./tag.ts` *tags* a record; the other four
  * *file* something at birth or on a refile — a document filed where it was
- * dropped, a note written while standing in a space — and are not a person
- * or a model placing a record in the tree. A fourth module inserting here
+ * dropped, a note written while standing in a space, a note's new version
+ * filed where the old one is — and are not a person or a model placing a
+ * record in the tree. A fourth module inserting here
  * fails this test until it is either routed through `insertSpaceTag` or
  * added below with its reason.
  */
@@ -83,6 +84,7 @@ describe('one entity_space insert for tagging', () => {
       'core:writes/documents/birth.ts',
       'lib/documents/refile.ts',
       'lib/notes/create.ts',
+      'lib/notes/new-version.ts',
       'lib/spaces/tag.ts',
     ])
   })
@@ -101,7 +103,7 @@ describe('every filing change reaches chunk.sensitive', () => {
 
   it('each module inserting into entity_space raises in the same transaction', () => {
     const inserters = modules(INSERT)
-    expect(inserters).toHaveLength(4)
+    expect(inserters).toHaveLength(5)
     for (const f of inserters)
       expect(readFileSync(f, 'utf8'), f).toContain('raiseSensitivity(tx')
   })

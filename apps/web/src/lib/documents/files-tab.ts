@@ -151,9 +151,13 @@ export type StateWord = {
   readonly href: string | null
   /** The detail behind the word, for a failure. */
   readonly title: string | null
+  /** A word that names a file, given more of the lane than the 96px. */
+  readonly wide?: true
 }
 
 type Stated = Typed & {
+  /** The newer version that supersedes this file (D59). */
+  readonly replacedBy?: { readonly id: string; readonly name: string } | null
   readonly blobSha: string | null
   readonly url: string | null
   readonly extractionStatus: string
@@ -176,7 +180,8 @@ const word = (
 /**
  * The lowercase mono state word a filed row ends on; null when nothing is
  * happening. The first that holds wins: in-flight work, then what went
- * wrong, then where the file lives elsewhere.
+ * wrong, then the newer version that replaced it, then where the file lives
+ * elsewhere.
  */
 export function stateWord(doc: Stated, inFolder = false): StateWord | null {
   if (doc.extractionStatus === 'pending')
@@ -193,6 +198,10 @@ export function stateWord(doc: Stated, inFolder = false): StateWord | null {
         .filter((part) => part !== null)
         .join(' · '),
     )
+  if (doc.replacedBy != null) {
+    const text = `Replaced by → ${doc.replacedBy.name}`
+    return { text, tone: 'graphite', href: null, title: text, wide: true }
+  }
   if (doc.extractionStatus === 'unsupported')
     return word('no text', 'graphite', doc.extractionError)
   const native = googleNative(doc)

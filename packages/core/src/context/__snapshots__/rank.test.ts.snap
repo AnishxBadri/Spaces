@@ -142,6 +142,19 @@ exports[`rank > what the analyzer would see for Frostbyte (snapshot) 1`] = `
       "at": "2026-08-20T00:00:00Z",
       "entityIds": [
         "co-frostbyte",
+        "doc-deck-v1",
+      ],
+      "hop": 1,
+      "kind": "doc_chunk",
+      "ref": "doc:doc-deck-v1#0",
+      "score": 0.09,
+      "structural": 0.09,
+      "text": "Deck v1 p.1: Frostbyte Cooling — pre-seed.",
+    },
+    {
+      "at": "2026-08-20T00:00:00Z",
+      "entityIds": [
+        "co-frostbyte",
         "doc-deck",
       ],
       "hop": 1,
@@ -165,6 +178,6 @@ exports[`rank > what the analyzer would see for Frostbyte (snapshot) 1`] = `
       "text": "Deck p.5: Pilot at Tata Comms showed 40% PUE improvement.",
     },
   ],
-  "usedChars": 638,
+  "usedChars": 680,
 }
 `;

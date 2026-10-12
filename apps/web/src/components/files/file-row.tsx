@@ -1,6 +1,6 @@
 import { useRouter } from '@tanstack/react-router'
 import { CheckIcon } from 'lucide-react'
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import { toast } from 'sonner'
 import {
   DropdownMenu,
@@ -16,6 +16,7 @@ import { useConfirm } from '../ui/confirm-dialog'
 import type { ConfirmOptions } from '../ui/confirm-dialog'
 import { cellsFor } from '../dither'
 import { FileGlyph } from './file-glyph'
+import { NewerVersionDialog } from './newer-version-dialog'
 import type { FileAction, FilingEdge, RecordDocument } from './types'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
 import type { DocumentKind } from '@spaces/core/documents'
@@ -54,10 +55,15 @@ const TONES: Record<StateWord['tone'], string> = {
 /** The state lane: a fixed width so the end lanes align down the tab. */
 export function StateLane({ state }: { state: StateWord | null }) {
   return (
-    <span className="flex w-24 shrink-0 justify-end mono text-micro">
+    <span
+      className={cn(
+        'flex w-24 shrink-0 justify-end mono text-micro',
+        state?.wide === true && 'w-auto max-w-56 min-w-24',
+      )}
+    >
       {state === null ? null : state.href === null ? (
         <span
-          className={TONES[state.tone]}
+          className={cn('truncate', TONES[state.tone])}
           title={
             state.title === null || state.title === '' ? undefined : state.title
           }
@@ -113,6 +119,7 @@ export function FileRow({
   recordName,
   inFolder = false,
   actions = [],
+  older = [],
   className,
   onView,
 }: {
@@ -122,11 +129,14 @@ export function FileRow({
   /** A file in a bound Drive folder: Drive's tree, `Remove from record`. */
   inFolder?: boolean
   actions?: ReadonlyArray<FileAction>
+  /** Files this one may be the newer version of; none hides the item. (A7) */
+  older?: ReadonlyArray<RecordDocument>
   className?: string | undefined
   onView: () => void
 }) {
   const router = useRouter()
   const { remove, removeDialog } = useRemoveFile(recordId, recordName)
+  const [versioning, setVersioning] = useState(false)
 
   async function setKind(kind: DocumentKind) {
     if (kind === doc.kind) return
@@ -157,7 +167,10 @@ export function FileRow({
       <button
         type="button"
         onClick={() => openFile(doc, onView)}
-        className="focus-ring min-w-0 flex-1 truncate text-left text-body hover:underline"
+        className={cn(
+          'focus-ring min-w-0 flex-1 truncate text-left text-body hover:underline',
+          doc.replacedBy !== null && 'text-graphite',
+        )}
       >
         {doc.filename}
       </button>
@@ -209,8 +222,11 @@ export function FileRow({
                   ))}
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
-              {/* Supersedes arrives with document versions. */}
-              <DropdownMenuItem disabled>Newer version of…</DropdownMenuItem>
+              {older.length === 0 ? null : (
+                <DropdownMenuItem onSelect={() => setVersioning(true)}>
+                  Newer version of…
+                </DropdownMenuItem>
+              )}
             </>
           )}
           {actions.length === 0 ? null : (
@@ -237,6 +253,14 @@ export function FileRow({
         </DropdownMenuContent>
       </DropdownMenu>
       {removeDialog}
+      {older.length === 0 ? null : (
+        <NewerVersionDialog
+          doc={doc}
+          older={older}
+          open={versioning}
+          onOpenChange={setVersioning}
+        />
+      )}
     </li>
   )
 }

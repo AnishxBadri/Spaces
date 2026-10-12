@@ -284,6 +284,35 @@ export const listRecordDocuments = createServerFn()
       ]),
     )
 
+    // The newest document that supersedes each row (D59): the older row
+    // reads "Replaced by → <name>", dimmed. Nothing else changes about it.
+    const replacements = await db
+      .selectDistinctOn([link.toEntityId], {
+        olderId: link.toEntityId,
+        id: document.entityId,
+        name: document.filename,
+      })
+      .from(link)
+      .innerJoin(document, eq(document.entityId, link.fromEntityId))
+      .innerJoin(entity, eq(entity.id, document.entityId))
+      .where(
+        and(
+          eq(link.relation, 'supersedes'),
+          inArray(
+            link.toEntityId,
+            rows.map((r) => r.id),
+          ),
+          isNull(entity.mergedIntoId),
+        ),
+      )
+      .orderBy(link.toEntityId, desc(link.createdAt))
+    const replacedBy = new Map(
+      replacements.map((r) => [
+        r.olderId,
+        { id: r.id, name: r.name ?? 'Untitled file' },
+      ]),
+    )
+
     return rows.map((r) => {
       // Not `?? 'manual'`: a default here would invent a provenance for a
       // row whose own is missing, which is the lie the whole collapse is
@@ -301,6 +330,7 @@ export const listRecordDocuments = createServerFn()
         sourceClass: source.sourceClass,
         sourceCapability: source.sourceCapability,
         filedIn: filings.get(r.id) ?? [],
+        replacedBy: replacedBy.get(r.id) ?? null,
       }
     })
   })

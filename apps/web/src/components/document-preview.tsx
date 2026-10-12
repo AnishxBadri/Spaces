@@ -24,8 +24,8 @@ import { cn } from '#/lib/utils'
  * The file viewer: a window over the page, looking at a document without
  * downloading it. A window rather than a route, so Back undoes reading
  * position and not the look. (D66)
- * - Title bar: glyph, name, `deck · 4.1 MB · 14 pages`, a PDF's page nav
- *   and zoom, Download. It closes from its foot (the close-mark rule).
+ * - Title bar: glyph, name, `deck · 4.1 MB · 14 pages`, `Replaced by → …`
+ *   on an older version, a PDF's page nav and zoom, Download. It closes from its foot (the close-mark rule).
  * - A caller may pass a `sidebar` (the Files tab's KIND, FILED ON, …) and
  *   `foot` actions beside Cancel.
  *
@@ -54,6 +54,8 @@ type Doc = {
   blobSha: string | null
   /** The page a clip was read from, and null on every row that had bytes. */
   url: string | null
+  /** The newer version that supersedes this file; the head says so. (D59) */
+  replacedBy?: { id: string; name: string } | null
 }
 
 /** Raster types only — SVG can carry script and is deliberately absent. */
@@ -166,7 +168,12 @@ function PreviewBody({
           type={fileType({ ...doc, externalUrl: null })}
           className="-ml-1"
         />
-        <DialogTitle className="min-w-0 truncate text-title leading-5">
+        <DialogTitle
+          className={cn(
+            'min-w-0 truncate text-title leading-5',
+            doc.replacedBy != null && 'text-graphite',
+          )}
+        >
           {doc.filename}
         </DialogTitle>
         <DialogDescription className="shrink-0">
@@ -184,6 +191,11 @@ function PreviewBody({
             .filter(Boolean)
             .join(' · ')}
         </DialogDescription>
+        {doc.replacedBy == null ? null : (
+          <span className="min-w-0 truncate mono text-micro text-graphite">
+            Replaced by → {doc.replacedBy.name}
+          </span>
+        )}
         <span className="flex-1" />
         {isPdf && pages > 1 ? (
           <div className="flex h-[1.625rem] shrink-0 items-stretch border border-rule bg-paper mono text-micro">

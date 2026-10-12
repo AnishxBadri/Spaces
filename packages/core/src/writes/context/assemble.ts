@@ -738,6 +738,30 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
     }
   }
 
+  // ---------- supersedes: a replaced note or document ranks lower (D59) ----------
+  const versioned = new Set<string>()
+  for (const c of candidates)
+    if (c.kind === 'note' || c.kind === 'memo' || c.kind === 'doc_chunk')
+      for (const id of c.entityIds) if (id !== seedId) versioned.add(id)
+  if (versioned.size > 0) {
+    const replaced = new Set(
+      (yield* query(() =>
+        db
+          .selectDistinct({ id: link.toEntityId })
+          .from(link)
+          .where(
+            and(
+              eq(link.relation, 'supersedes'),
+              inArray(link.toEntityId, [...versioned]),
+            ),
+          ),
+      )).map((r) => r.id),
+    )
+    for (const c of candidates)
+      if (c.entityIds.some((id) => id !== seedId && replaced.has(id)))
+        c.superseded = true
+  }
+
   // ---------- rank ----------
   const result = rank(candidates, {
     asOf: opts.asOf,

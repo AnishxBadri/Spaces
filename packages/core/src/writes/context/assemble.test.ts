@@ -469,4 +469,73 @@ describe('assembleProgram', () => {
     expect(Exit.isFailure(exit)).toBe(true)
     expect(JSON.stringify(exit)).toContain('ContextLeak')
   })
+
+  it('ranks a superseded deck below its successor, and keeps both (D59)', async () => {
+    const { assembleProgram } = await import('./assemble')
+    const { markNewerVersionProgram } = await import('../links/supersedes')
+    const { SimilarLaneEmpty } = await import('../../context/similar-lane')
+    const { DEFAULT_WEIGHTS } = await import('../../context/rank')
+    const { ref } = await import('../../context/ref')
+    const { Effect } = await import('effect')
+    const { db } = await import('@spaces/db')
+    const { chunk, document, entity, link } = await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
+
+    const [me] = await db.select({ id: user.id }).from(user).limit(1)
+    const [co] = await db
+      .insert(entity)
+      .values({ kind: 'company', canonicalName: `VersionCo ${tag}` })
+      .returning({ id: entity.id })
+    const deck = async (name: string) => {
+      const [e] = await db
+        .insert(entity)
+        .values({ kind: 'document', canonicalName: name })
+        .returning({ id: entity.id })
+      // Exempt from the one-writer rule: a fixture with text already read.
+      await db.insert(document).values({
+        entityId: e.id,
+        filename: name,
+        kind: 'deck',
+        sourceClass: 'manual',
+        extractionStatus: 'done',
+        createdAt: new Date('2026-08-20T00:00:00Z'),
+      })
+      await db.insert(chunk).values({
+        entityId: e.id,
+        sourceKind: 'document',
+        idx: 0,
+        text: `${name}: the round.`,
+      })
+      await db.insert(link).values({
+        fromEntityId: e.id,
+        toEntityId: co.id,
+        relation: 'tagged_in',
+        source: 'manual',
+      })
+      return e.id
+    }
+    const v2 = await deck('deck-v2.pdf')
+    const v3 = await deck('deck-v3.pdf')
+
+    await Effect.runPromise(
+      markNewerVersionProgram({ newerId: v3, olderId: v2, actorId: me.id }),
+    )
+    const result = await Effect.runPromise(
+      assembleProgram(
+        { entityId: co.id },
+        { user: { id: me.id }, asOf: ASOF, budgetChars: 8000 },
+      ).pipe(Effect.provide(SimilarLaneEmpty)),
+    )
+    const refs = result.items.map((x) => x.ref)
+    expect(refs).toContain(ref.doc(v2, 0))
+    expect(refs.indexOf(ref.doc(v3, 0))).toBeLessThan(
+      refs.indexOf(ref.doc(v2, 0)),
+    )
+    const score = (r: string) =>
+      result.items.find((x) => x.ref === r)?.structural ?? 0
+    expect(score(ref.doc(v2, 0))).toBeCloseTo(
+      score(ref.doc(v3, 0)) * DEFAULT_WEIGHTS.superseded,
+      9,
+    )
+  })
 })

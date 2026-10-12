@@ -1,6 +1,6 @@
 import { excerpt } from '@spaces/core/context/excerpt'
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, eq, isNull } from 'drizzle-orm'
+import { and, asc, desc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { entity, link, note, objectDef } from '@spaces/db/schema'
@@ -136,6 +136,28 @@ export const getNote = createServerFn()
       )
       .orderBy(asc(entity.canonicalName))
 
+    // The newer version that replaced this note, if one the reader can see
+    // exists (D59): the page shows "Replaced by → <title>", dimmed.
+    const replacedBy =
+      (
+        await db
+          .select({
+            id: note.entityId,
+            title: note.title,
+            visibility: note.visibility,
+            authorId: note.authorId,
+          })
+          .from(link)
+          .innerJoin(note, eq(note.entityId, link.fromEntityId))
+          .where(
+            and(eq(link.toEntityId, data.id), eq(link.relation, 'supersedes')),
+          )
+          .orderBy(desc(link.createdAt))
+      )
+        .filter((r) => canRead(u, r))
+        .map((r) => ({ id: r.id, title: r.title || 'Untitled' }))
+        .at(0) ?? null
+
     return {
       id: row.id,
       title: row.title,
@@ -147,6 +169,7 @@ export const getNote = createServerFn()
       filedAgainst,
       isPrivate: row.visibility === 'private',
       isMine: row.authorId === u.id,
+      replacedBy,
     }
   })
 

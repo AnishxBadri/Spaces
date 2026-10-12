@@ -13,8 +13,8 @@ import { docOfRef } from './ref'
  * always produce the same output and "what would the analyzer see" is a
  * snapshot fixture.
  *
- * Score = hop × edge × kind prior × recency. Multiplicative, three factors,
- * all deterministic. When the task carried text, a lexical lane (tsv rank,
+ * Score = hop × edge × kind prior × recency, × `superseded` when a newer
+ * version replaces the item (D59). Multiplicative, all deterministic. When the task carried text, a lexical lane (tsv rank,
  * supplied per candidate) is fused by reciprocal rank fusion — the same
  * trick search.ts uses, and the seam an embedding lane joins later.
  *
@@ -41,11 +41,18 @@ export type Candidate = ContextItem & {
   lexicalRank?: number | undefined
   /** `1 − cosine distance` to the anchor; only a `similar` item has one. */
   similarity?: number | undefined
+  /** The target of a `supersedes` link: a newer version replaces it. (D59) */
+  superseded?: boolean | undefined
 }
 
 export type Weights = {
   hop: Record<0 | 1 | 2, number>
   edge: Record<ContextEdge, number>
+  /**
+   * Factor on a superseded item's score. Below 1 so the newer version ranks
+   * above it; above 0 because nothing is deleted and it is still true history.
+   */
+  superseded: number
   prior: Record<Exclude<ContextKind, 'mandate' | 'glossary'>, number>
   /**
    * The judgment-memory lane's prior, in place of hop × edge × kind: another
@@ -70,6 +77,7 @@ export const DEFAULT_WEIGHTS: Weights = {
     derived_from: 0.5,
     supersedes: 0.5,
   },
+  superseded: 0.5,
   prior: {
     attribute: 1,
     memo: 0.9,
@@ -151,10 +159,15 @@ function recency(
 function structural(c: Candidate, asOfMs: number, w: Weights): number {
   if (c.hop === 'standing') return 0
   if (c.kind === 'mandate' || c.kind === 'glossary') return 0
-  if (c.hop === 'similar') return w.similar * (c.similarity ?? 0)
+  const demote = c.superseded === true ? w.superseded : 1
+  if (c.hop === 'similar') return w.similar * (c.similarity ?? 0) * demote
   const edge = c.hop === 0 ? 1 : c.edge ? w.edge[c.edge] : 1
   return (
-    w.hop[c.hop] * edge * w.prior[c.kind] * recency(c.kind, c.at, asOfMs, w)
+    w.hop[c.hop] *
+    edge *
+    w.prior[c.kind] *
+    recency(c.kind, c.at, asOfMs, w) *
+    demote
   )
 }
 

@@ -347,6 +347,12 @@ export function RecordFiles({
                 recordId={entityId}
                 recordName={recordName}
                 actions={actionsFor(doc)}
+                older={g.rows.filter(
+                  (d) =>
+                    d.id !== doc.id &&
+                    d.replacedBy?.id !== doc.id &&
+                    doc.replacedBy?.id !== d.id,
+                )}
                 onView={() => setViewingId(doc.id)}
               />
             ))}

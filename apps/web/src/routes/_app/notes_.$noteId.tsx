@@ -34,6 +34,7 @@ import type { UploadPhase } from '#/lib/documents/upload'
 import type { NoteBody } from '@spaces/db/schema/kinds'
 import { SaveAsTemplateAction } from '#/components/templates'
 import { useConfirm } from '#/components/ui/confirm-dialog'
+import { Button } from '#/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +57,7 @@ import {
   listTermsForNote,
   previewNoteDeletion,
   saveNote,
+  saveNoteAsNewVersion,
   saveNoteAsTemplate,
   searchEntities,
   setNoteKind,
@@ -78,6 +80,9 @@ export const Route = createFileRoute('/_app/notes_/$noteId')({
     ])
     return { note, allSpaces: spaces, terms }
   },
+  // The page holds the title and the editor in state: another note, such as
+  // a new version, mounts fresh rather than inheriting them.
+  remountDeps: ({ params }) => params.noteId,
   component: NotePage,
 })
 
@@ -183,15 +188,6 @@ function NotePage() {
                   ? 'Unsaved changes'
                   : ''}
           </span>
-          <SaveAsTemplateAction
-            entityLabel="note"
-            defaultName={initial.title}
-            onSave={async (name) => {
-              await saveNoteAsTemplate({
-                data: { noteId: initial.id, name },
-              })
-            }}
-          />
           {initial.isMine ? (
             <VisibilityToggle
               noteId={initial.id}
@@ -199,6 +195,16 @@ function NotePage() {
             />
           ) : null}
           <DeleteNoteAction noteId={initial.id} />
+          <NoteMoreMenu
+            noteId={initial.id}
+            title={initial.title}
+            beforeVersion={async () => {
+              if (timer.current === null) return
+              clearTimeout(timer.current)
+              timer.current = null
+              await flush()
+            }}
+          />
         </span>
       </div>
 
@@ -212,8 +218,24 @@ function NotePage() {
           }}
           placeholder="Untitled"
           aria-label="Note title"
-          className="w-full bg-transparent title-serif outline-none placeholder:text-graphite"
+          className={cn(
+            'w-full bg-transparent title-serif outline-none placeholder:text-graphite',
+            initial.replacedBy !== null && 'text-graphite',
+          )}
         />
+
+        {initial.replacedBy === null ? null : (
+          <p className="mt-1 mono text-micro text-graphite">
+            Replaced by →{' '}
+            <Link
+              to="/notes/$noteId"
+              params={{ noteId: initial.replacedBy.id }}
+              className="focus-ring rounded-md hover:text-foreground hover:underline"
+            >
+              {initial.replacedBy.title}
+            </Link>
+          </p>
+        )}
 
         <SpaceFiling
           noteId={initial.id}
@@ -842,6 +864,87 @@ function DeleteNoteAction({ noteId }: { noteId: string }) {
         Delete
       </button>
       {confirmDialog}
+    </>
+  )
+}
+
+/**
+ * The note head's `···`: Save as new version and Save as template….
+ * - A new version is a copy filed where this note is, superseding it (D59).
+ *   The pending autosave lands first, so the copy carries the latest body.
+ */
+function NoteMoreMenu({
+  noteId,
+  title,
+  beforeVersion,
+}: {
+  noteId: string
+  title: string
+  beforeVersion: () => Promise<void>
+}) {
+  const navigate = useNavigate()
+  const [templating, setTemplating] = useState(false)
+  const [busy, setBusy] = useState(false)
+  // Save as template: focus goes to the window it opens, not to ···.
+  const keepFocus = useRef(false)
+
+  async function newVersion() {
+    if (busy) return
+    setBusy(true)
+    try {
+      await beforeVersion()
+      const { id } = await saveNoteAsNewVersion({ data: { id: noteId } })
+      toast.success('New version saved')
+      await navigate({ to: '/notes/$noteId', params: { noteId: id } })
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Could not save a new version',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="icon" aria-label="More for this note">
+            <span aria-hidden className="mono text-ui">
+              ···
+            </span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          className="w-48"
+          onCloseAutoFocus={(e) => {
+            if (keepFocus.current) e.preventDefault()
+            keepFocus.current = false
+          }}
+        >
+          <DropdownMenuItem onSelect={() => void newVersion()}>
+            Save as new version
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => {
+              keepFocus.current = true
+              setTemplating(true)
+            }}
+          >
+            Save as template…
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <SaveAsTemplateAction
+        entityLabel="note"
+        defaultName={title}
+        open={templating}
+        onOpenChange={setTemplating}
+        onSave={async (name) => {
+          await saveNoteAsTemplate({ data: { noteId, name } })
+        }}
+      />
     </>
   )
 }

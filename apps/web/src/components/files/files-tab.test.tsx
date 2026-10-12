@@ -71,6 +71,7 @@ const fns = vi.hoisted(() => {
     'keyTermsStatus',
     'linkFetchStatus',
     'listSpaces',
+    'markNewerVersion',
     'mintPickerToken',
     'pickerReadiness',
     'prepareDocumentUpload',
@@ -128,6 +129,7 @@ function doc(over: Partial<RecordDocument>): RecordDocument {
     sourceClass: 'manual',
     sourceCapability: null,
     filedIn: [here],
+    replacedBy: null,
     ...over,
   }
 }
@@ -138,7 +140,7 @@ const DOCS: Array<RecordDocument> = [
     id: 'a2',
     filename: 'flent-seed-deck-v2.pdf',
     kind: 'deck',
-    extractionStatus: 'pending',
+    replacedBy: { id: 'a1', name: 'flent-seed-deck-v3.pdf' },
   }),
   doc({
     id: 'a3',
@@ -148,6 +150,7 @@ const DOCS: Array<RecordDocument> = [
     createdAt: '2025-09-30T10:00:00.000Z',
     sourceClass: 'integration',
     sourceCapability: 'gmail',
+    extractionStatus: 'pending',
   }),
   doc({
     id: 'a4',
@@ -221,6 +224,20 @@ describe('the grouped tab', () => {
       html.indexOf('flent-seed-deck-v2.pdf'),
     )
     expect(v3).toContain('justify-end mono text-micro"></span>')
+  })
+
+  it('dims an older version with the pointer to its successor; the newer reads nothing extra', () => {
+    const v2 = html.slice(
+      html.indexOf('flent-seed-deck-v2.pdf'),
+      html.indexOf('flent-cap-table-sept.xlsx'),
+    )
+    expect(v2).toContain('Replaced by → flent-seed-deck-v3.pdf')
+    expect(v2).toContain('text-graphite')
+    const v3 = html.slice(
+      html.indexOf('flent-seed-deck-v3.pdf'),
+      html.indexOf('flent-seed-deck-v2.pdf'),
+    )
+    expect(v3).not.toContain('Replaced by')
   })
 
   it('reads one short line when the tab is empty', () => {
@@ -344,7 +361,10 @@ afterEach(() => {
 
 const flush = () => act(() => new Promise((r) => setTimeout(r, 0)))
 
-async function mountRow(row: RecordDocument) {
+async function mountRow(
+  row: RecordDocument,
+  older: ReadonlyArray<RecordDocument> = [],
+) {
   host = document.createElement('div')
   document.body.appendChild(host)
   const r = createRoot(host)
@@ -356,6 +376,7 @@ async function mountRow(row: RecordDocument) {
           doc={row}
           recordId={FLENT}
           recordName="Flent"
+          older={older}
           onView={() => undefined}
         />
       </ul>,
@@ -391,24 +412,37 @@ async function click(el: Element) {
 }
 
 describe('the row’s ···', () => {
-  it('holds Open, Download, Change kind, Newer version of… disabled, and Remove…', async () => {
+  it('holds Open, Download, Change kind and Remove…, and no Newer version of… with nothing to replace', async () => {
     await mountRow(doc({ filename: 'v2.pdf', kind: 'deck' }))
     await openMenu('v2.pdf')
     const items = [...document.querySelectorAll('[role="menuitem"]')].map(
       (el) => el.textContent.trim(),
     )
-    expect(items).toEqual([
-      'Open',
-      'Download',
-      'Change kind',
-      'Newer version of…',
-      'Remove…',
+    expect(items).toEqual(['Open', 'Download', 'Change kind', 'Remove…'])
+  })
+
+  it('Newer version of… picks among the same kind and writes the link', async () => {
+    fns.markNewerVersion.mockResolvedValue({ written: true })
+    const v2 = doc({ id: 'a2', filename: 'v2.pdf', kind: 'deck' })
+    await mountRow(doc({ id: 'a3', filename: 'v3.pdf', kind: 'deck' }), [v2])
+    await openMenu('v3.pdf')
+    const item = byText('[role="menuitem"]', 'Newer version of…')
+    expect(item.getAttribute('aria-disabled')).toBeNull()
+    await click(item)
+    const dialog = document.querySelector('[role="dialog"]')
+    expect(dialog?.textContent).toContain('Newer version of…')
+    expect(byText('button', 'Mark as newer').hasAttribute('disabled')).toBe(
+      true,
+    )
+    const options = [...document.querySelectorAll('[role="option"]')]
+    expect(options.map((o) => o.textContent)).toEqual([
+      expect.stringContaining('v2.pdf'),
     ])
-    expect(
-      byText('[role="menuitem"]', 'Newer version of…').getAttribute(
-        'aria-disabled',
-      ),
-    ).toBe('true')
+    await click(options[0])
+    await click(byText('button', 'Mark as newer'))
+    expect(fns.markNewerVersion).toHaveBeenCalledWith({
+      data: { newerId: 'a3', olderId: 'a2' },
+    })
   })
 
   it('confirms Remove with what leaves, and deletes a file filed only here', async () => {
