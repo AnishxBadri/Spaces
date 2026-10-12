@@ -34,12 +34,12 @@ import {
  * disclosed.
  */
 
-export type ProposeCaller = {
-  /** The token's user — whose canRead applies. */
-  id: string
-  /** The API token the request authenticated with. */
-  tokenId: string
-}
+/**
+ * Whose canRead applies (`id`), and who the proposal is labelled with: the
+ * API token over MCP, or the user and their Ask turn's run in process.
+ */
+export type ProposeCaller =
+  { id: string; tokenId: string } | { id: string; runId: string | null }
 
 export type ProposeSuggestionInput = {
   /** A record id, or a record's exact name. */
@@ -118,15 +118,15 @@ export const proposeSuggestionProgram = Effect.fn('proposeSuggestionProgram')(
       payload: input.patch,
       ...(rationale ? { rationale } : {}),
       ...(input.refs === undefined ? {} : { refs: input.refs }),
-      // The caller is the API token, recorded as an `integration` actor by
-      // the token's id. `suggestion.proposed_by_id` carries no FK (one
-      // column holds a user id or an integration id), so nothing enforces
-      // the pairing yet: the real FK lands when a token is backed by a row
-      // of clean's `integration` table (`packages/db/src/schema/
-      // integrations.ts`) — the same deferral `attribute_event.actor_id`
-      // made before `actor_ref` existed. /inbox names the token by joining
-      // `api_token` on this id (`lib/inbox/queue.ts`).
-      proposedBy: { type: 'integration', id: caller.tokenId },
+      // Over MCP the API token is the proposer, an `integration` actor by the
+      // token's id (no FK; /inbox joins `api_token` on it). In Ask the user
+      // is, with the turn's run, as every in-app AI lane proposes.
+      ...('tokenId' in caller
+        ? { proposedBy: { type: 'integration' as const, id: caller.tokenId } }
+        : {
+            proposedBy: { type: 'user' as const, id: caller.id },
+            ...(caller.runId === null ? {} : { runId: caller.runId }),
+          }),
     }).pipe(Effect.mapError(refusal))
     return {
       suggestionId: row.id,

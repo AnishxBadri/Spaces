@@ -140,6 +140,7 @@ type Mount = {
   loaders?: Partial<PreviewLoaders>
   onOpenFile?: (id: string, page: number | null) => void
   onGo?: (href: string) => void
+  onAsk?: (text: string) => void
 }
 
 const NO_LOADERS: PreviewLoaders = {
@@ -158,6 +159,7 @@ function mount({
   loaders = {},
   onOpenFile = () => {},
   onGo = () => {},
+  onAsk,
 }: Mount = {}) {
   const { Command } = cmdk
   const { PaletteBody, jumpTargets } = palette
@@ -187,6 +189,7 @@ function mount({
           onStepDone={onStepDone}
           loaders={{ ...NO_LOADERS, ...loaders }}
           onOpenFile={onOpenFile}
+          onAsk={onAsk}
         />
       </Command>,
     ),
@@ -870,5 +873,18 @@ describe('usePageActions', () => {
     act(() => root.render(<Reader />))
     expect(seen).toEqual([])
     expect(scope).toBeNull()
+  })
+})
+
+describe('Tab hands the query to Ask (D70)', () => {
+  it('passes the typed text on, prints the key in the foot, and never renders an answer', async () => {
+    const asked: Array<string> = []
+    mount({ onAsk: (text) => asked.push(text) })
+    type('which series a deals went quiet')
+    await wait(180)
+    expect(host.querySelector('[data-foot]')?.textContent).toContain('tab ask')
+    press('Tab')
+    expect(asked).toEqual(['which series a deals went quiet'])
+    expect(host.querySelector('[data-turn]')).toBeNull()
   })
 })

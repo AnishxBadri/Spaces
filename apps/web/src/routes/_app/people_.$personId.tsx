@@ -71,6 +71,7 @@ import {
   setPersonCompany,
   updateRecord,
 } from '#/lib/server-fns'
+import { RecordMoreMenu } from '#/components/record/record-more-menu'
 
 /**
  * A person's page (D74): the head and readouts, then the details column —
@@ -260,6 +261,7 @@ function PersonRecordPage() {
             <Button variant="outline" onClick={newNoteAboutThis}>
               Note about this
             </Button>
+            <RecordMoreMenu name={person.name} />
           </>
         }
         mark={

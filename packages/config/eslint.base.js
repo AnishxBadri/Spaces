@@ -79,7 +79,7 @@ const DB_SERVER_MODULES = [
   'apps/web/src/routes/api/**',
   'apps/web/src/lib/server/**',
   'apps/web/src/lib/auth.ts',
-  'apps/web/src/lib/{ai,arrival,deals,documents,glossary,import,inbox,integrations,interactions,mcp,members,notes,people,portfolio,records,rpc,search,seeds,spaces,tasks,timeline,tokens,views}/**',
+  'apps/web/src/lib/{ai,arrival,ask,deals,documents,glossary,import,inbox,integrations,interactions,mcp,members,notes,people,portfolio,records,rpc,search,seeds,spaces,tasks,timeline,tokens,views}/**',
 ]
 // Client modules inside those directories (the client build's module graph):
 // they stay fenced.
@@ -88,6 +88,7 @@ const CLIENT_MODULES_IN_SERVER_DIRS = [
   'apps/web/src/lib/ai/providers/{ids,meta}.ts',
   'apps/web/src/lib/ai/providers/embed/ids.ts',
   'apps/web/src/lib/arrival/input.ts',
+  'apps/web/src/lib/ask/{answer,dock-store,page-scope,thread-list,types}.ts',
   'apps/web/src/lib/documents/{file-against,key-terms-gate,note-drop,project,read-deck-gate,registry,upload,uri-list,vision-gate}.ts',
   'apps/web/src/lib/import/upload.ts',
   'apps/web/src/lib/inbox/to-review.ts',

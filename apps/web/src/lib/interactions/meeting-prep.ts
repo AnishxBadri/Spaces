@@ -16,7 +16,7 @@ import { assembleProgram } from '@spaces/core/writes/context/assemble'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import { completeMessage } from '#/lib/ai/complete'
 import { inlineCitations } from '#/lib/ai/inline-citations'
-import { PROVIDER_LABEL } from '#/lib/ai/providers/ids'
+import { providerLabel, refusedLine, routeLine } from '#/lib/ai/route-line'
 import type { SensitivityVia } from '#/lib/ai/sensitivity'
 import { sensitivityFor } from '#/lib/ai/sensitivity-for'
 import { SimilarLaneLive } from '#/lib/ai/similar'
@@ -57,36 +57,6 @@ const query = <T>(run: () => Promise<T>) =>
     try: run,
     catch: (cause) => new PrepQueryFailed({ cause }),
   })
-
-const providerLabel = (provider: string): string =>
-  Object.entries(PROVIDER_LABEL).find(([id]) => id === provider)?.[1] ??
-  provider
-
-/** Where a sensitive call's sensitivity came from, as a parenthesis. */
-const inherited = (via: SensitivityVia | null): string => {
-  if (via === null) return ''
-  switch (via.kind) {
-    case 'own':
-      return ''
-    case 'space':
-      return ` (inherited from ${via.name})`
-    case 'binding':
-      return ` (inherited from ${via.name ?? 'its storage binding'})`
-    case 'default':
-      return ' (the workspace default)'
-  }
-}
-
-/** The route line the window prints over a running Prep. */
-export function routeLine(
-  target: { provider: string; model: string },
-  sensitive: SensitivityVia | null,
-  isSensitive: boolean,
-): string {
-  const label = providerLabel(target.provider)
-  if (!isSensitive) return `${label} · ${target.model}`
-  return `Sensitive${inherited(sensitive)} · answered locally by ${label} · ${target.model}`
-}
 
 type Meeting = {
   id: string
@@ -234,7 +204,7 @@ export async function* prepEvents(input: PrepInput): AsyncGenerator<PrepEvent> {
         yield { type: 'failed', message: f.message }
         return
       case 'SensitiveRouteRefused':
-        yield { type: 'refused', line: `Refused · ${completeMessage(f)}` }
+        yield { type: 'refused', line: refusedLine(completeMessage(f)) }
         return
       case 'PrepQueryFailed':
       case 'SensitivityReadFailed':
@@ -260,9 +230,10 @@ export async function* prepEvents(input: PrepInput): AsyncGenerator<PrepEvent> {
       line: routeLine(opened.target, via, sensitive),
     }
     try {
-      for await (const delta of opened.deltas) {
-        text += delta
-        yield { type: 'text', text: delta }
+      for await (const part of opened.parts) {
+        if (part.type !== 'text') continue
+        text += part.text
+        yield { type: 'text', text: part.text }
       }
     } catch {
       yield {

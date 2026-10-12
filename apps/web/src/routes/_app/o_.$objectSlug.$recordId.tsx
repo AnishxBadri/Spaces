@@ -60,6 +60,7 @@ import {
   listSpaces,
   updateRecord,
 } from '#/lib/server-fns'
+import { RecordMoreMenu } from '#/components/record/record-more-menu'
 
 /**
  * The registry-generated record page for a custom object (spec §9, D74): a
@@ -204,6 +205,7 @@ function ObjectRecordPage() {
             <Button variant="outline" onClick={newNoteAboutThis}>
               Note about this
             </Button>
+            <RecordMoreMenu name={record.name} />
           </>
         }
         mark={

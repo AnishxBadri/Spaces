@@ -1,6 +1,6 @@
 import { Effect } from 'effect'
-import { streamText } from 'ai'
-import type { LanguageModel, LanguageModelUsage } from 'ai'
+import { isStepCount, streamText } from 'ai'
+import type { LanguageModel, LanguageModelUsage, ToolSet } from 'ai'
 import { db } from '@spaces/db'
 import { aiUsage } from '@spaces/db/schema'
 import { estimateTokens } from '@spaces/core/ai/caps'
@@ -23,6 +23,8 @@ import type { SensitivityVia } from './sensitivity'
  * - The policy is `laneTargetProgram`'s, so a sensitive call never reaches a
  *   cloud provider here either.
  * - `opts.model` is the test seam, as for `complete()`.
+ * - With `tools`, the model may call them for up to `maxSteps` steps; each
+ *   call and its outcome arrive as parts between the text deltas.
  */
 
 export type StreamOptions = {
@@ -34,7 +36,21 @@ export type StreamOptions = {
   model?: LanguageModel
   maxOutputTokens?: number
   abortSignal?: AbortSignal
+  /** The run this call is a step of, written to `ai_usage.run_id`. */
+  runId?: string
+  tools?: ToolSet
+  /** Model steps when tools are given; default 6. */
+  maxSteps?: number
 }
+
+/** What the stream carries: the answer's text, and each tool call's progress. */
+export type StreamPart =
+  | { type: 'text'; text: string }
+  | {
+      type: 'tool-call' | 'tool-result' | 'tool-error'
+      toolCallId: string
+      toolName: string
+    }
 
 export type StreamOpenFailure =
   | LaneNotRouted
@@ -46,8 +62,8 @@ export type StreamOpenFailure =
 
 export type OpenedStream = {
   target: AiTarget
-  /** The answer's text, delta by delta; throws `ProviderCallFailed`. */
-  deltas: AsyncIterable<string>
+  /** The answer's text delta by delta, and tool calls; throws `ProviderCallFailed`. */
+  parts: AsyncIterable<StreamPart>
   /** Writes the usage row if it is not written yet; call when done reading. */
   close: () => Promise<void>
 }
@@ -79,6 +95,9 @@ export const openStreamProgram = Effect.fn('openStream')(function* (
     ...(opts.abortSignal === undefined
       ? {}
       : { abortSignal: opts.abortSignal }),
+    ...(opts.tools === undefined
+      ? {}
+      : { tools: opts.tools, stopWhen: isStepCount(opts.maxSteps ?? 6) }),
   })
 
   // The usage row is written once, however the stream ends — drained,
@@ -101,27 +120,37 @@ export const openStreamProgram = Effect.fn('openStream')(function* (
       callerType: opts.caller.type,
       callerId: opts.caller.type === 'system' ? null : opts.caller.id,
       jobRunId: null,
-      runId: null,
+      runId: opts.runId ?? null,
     })
   }
 
-  async function* deltas(): AsyncGenerator<string, void> {
+  async function* parts(): AsyncGenerator<StreamPart, void> {
     try {
       for await (const part of result.stream) {
         if (part.type === 'text-delta') {
           streamed += part.text.length
-          yield part.text
-        } else if (part.type === 'error')
+          yield { type: 'text', text: part.text }
+        } else if (
+          part.type === 'tool-call' ||
+          part.type === 'tool-result' ||
+          part.type === 'tool-error'
+        )
+          yield {
+            type: part.type,
+            toolCallId: part.toolCallId,
+            toolName: part.toolName,
+          }
+        else if (part.type === 'error')
           throw new ProviderCallFailed({
             provider: target.provider,
             cause: part.error,
           })
       }
-      usage = await result.usage
+      usage = await result.totalUsage
     } finally {
       await close()
     }
   }
 
-  return { target, deltas: deltas(), close }
+  return { target, parts: parts(), close }
 })

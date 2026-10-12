@@ -2,46 +2,22 @@ import { Cause, Effect, Exit, Option } from 'effect'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
-import { z } from 'zod'
-import {
-  DEFAULT_BUDGET_CHARS,
-  recordContextProgram,
-} from '@spaces/core/writes/context/record'
-import { SimilarLaneLive } from '#/lib/ai/similar'
 import { authenticateBearerProgram } from '#/lib/tokens/store'
 import type { TokenUser } from '#/lib/tokens/store'
-import { getRecordProgram, resolveEntityRefProgram } from './tools'
-import { jsonValue } from '@spaces/core/json'
-import { proposeSuggestionProgram } from './tools-propose'
-import {
-  QUERY_RECORDS_MAX,
-  holdingDetailProgram,
-  holdingDetailShape,
-  listRegistryProgram,
-  portfolioSummaryProgram,
-  portfolioSummaryShape,
-  queryRecordsProgram,
-  queryRecordsShape,
-  searchRecordsProgram,
-} from './tools-read'
+import { toolRegistry } from './registry'
+import type { ToolCaller } from './registry'
 
 /**
- * The MCP server (SPA-23, `docs/spec-ai-substrate.md` §5): the four
- * contracts as a tool surface a person's own assistant connects to. This
- * half ships two read tools — `get_context`, the assembler verbatim, and
- * `get_record`, registry-shaped; ai-23b adds `search_records`,
- * `list_registry` and `propose_suggestion`.
+ * The MCP server (`docs/spec-ai-substrate.md` §5): the tool table in
+ * `toolRegistry` as a surface a person's own assistant connects to. Ask is
+ * the other client of the same table.
  *
- * Transport: the SDK's web-standard Streamable HTTP transport, stateless —
- * a fresh server and transport per request, JSON responses rather than an
- * SSE stream, because the tools answer in one shot and nothing here holds a
- * session. Authentication is a per-user bearer token from the token store
- * (`lib/tokens/store.ts`, the owner's decision recorded there); no token, a
- * bad one or a revoked one is a 401 before the MCP layer sees the request,
- * so an unauthenticated client never learns the tool list.
- *
- * Every tool runs as the token's user. canRead is theirs: a teammate's
- * assistant sees exactly what that teammate sees, and no more.
+ * - Transport: the SDK's web-standard Streamable HTTP transport, stateless —
+ *   a fresh server and transport per request, JSON responses, no session.
+ * - A per-user bearer token from the token store; no token, a bad one or a
+ *   revoked one is a 401 before the MCP layer sees the request, so an
+ *   unauthenticated client never learns the tool list.
+ * - Every tool runs as the token's user: canRead is theirs.
  */
 
 const SERVER_INFO = { name: 'spaces', version: '0.1.0' }
@@ -70,197 +46,29 @@ async function answer<TValue, TError extends { message: string }>(
 
 export function buildMcpServer(reader: TokenUser): McpServer {
   const server = new McpServer(SERVER_INFO)
-  const me = { id: reader.id }
-
-  server.registerTool(
-    'get_context',
-    {
-      title: 'Record context',
-      description:
-        'What Spaces knows about one record — its attributes, history, notes, memos, documents, spaces and tasks — ranked and trimmed to a character budget, each item with a citation. Exactly what the record page’s Context section shows the same person. Pass a record id, or a record’s exact name.',
-      inputSchema: {
-        entity: z
-          .string()
-          .min(1)
-          .describe('Record id (uuid), or the record’s exact name'),
-        task: z
-          .string()
-          .optional()
-          .describe(
-            'What you are trying to do; ranks matching document passages first',
-          ),
-        budget: z
-          .number()
-          .int()
-          .min(500)
-          .max(100_000)
-          .optional()
-          .describe(`Character budget; default ${DEFAULT_BUDGET_CHARS}`),
+  const caller: ToolCaller = {
+    userId: reader.id,
+    proposer: { kind: 'token', tokenId: reader.tokenId },
+  }
+  // Called through the registry at request time, never captured here, so
+  // the external client and Ask share one door.
+  for (const tool of toolRegistry.tools) {
+    server.registerTool(
+      tool.name,
+      {
+        title: tool.title,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        annotations: tool.annotations,
       },
-      annotations: { readOnlyHint: true, openWorldHint: false },
-    },
-    async ({ entity, task, budget }) =>
-      answer(
-        Effect.gen(function* () {
-          const entityId = yield* resolveEntityRefProgram(me, entity)
-          return yield* recordContextProgram({
-            entityId,
-            user: me,
-            asOf: new Date().toISOString(),
-            budgetChars: budget ?? DEFAULT_BUDGET_CHARS,
-            similar: false,
-            taskText: task?.trim() ? task.trim() : undefined,
-          }).pipe(Effect.provide(SimilarLaneLive))
-        }),
-      ),
-  )
-
-  server.registerTool(
-    'get_record',
-    {
-      title: 'Record',
-      description:
-        'One record, shaped by its object’s attribute registry: every attribute with its stored value and a readable rendering, then its links in both directions and the spaces it is tagged into.',
-      inputSchema: {
-        id: z.string().uuid().describe('Record id (uuid)'),
-      },
-      annotations: { readOnlyHint: true, openWorldHint: false },
-    },
-    async ({ id }) => answer(getRecordProgram(me, id)),
-  )
-
-  // SPA-31: the one write verb — a proposal into the review queue, through
-  // the same `proposeProgram` every in-app feature calls. No accept, write,
-  // delete or merge tool is registered, ever (spec §6).
-  server.registerTool(
-    'propose_suggestion',
-    {
-      title: 'Propose a suggestion',
-      description:
-        'Propose attribute values for one record. Nothing is written: the proposal lands in Review in Spaces, labelled with this token, and a person accepts or rejects it. The patch is keyed by attribute slug (see get_record), each field wrapped as {value, refs, confidence}; it is validated against the record’s live attribute registry and refused field by field.',
-      inputSchema: {
-        entity: z
-          .string()
-          .min(1)
-          .describe('Record id (uuid), or the record’s exact name'),
-        patch: z
-          .record(z.string(), jsonValue)
-          .describe(
-            '{[attribute slug]: {value, refs: string[], confidence: 0..1}}',
-          ),
-        rationale: z
-          .string()
-          .min(1)
-          .describe('Why these values — what the reviewer reads first'),
-        refs: z
-          .array(z.string())
-          .optional()
-          .describe(
-            'Citation refs for the whole proposal; default: the union of each field’s refs',
-          ),
-      },
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: false,
-        openWorldHint: false,
-      },
-    },
-    async ({ entity, patch, rationale, refs }) =>
-      answer(
-        proposeSuggestionProgram(
-          { id: reader.id, tokenId: reader.tokenId },
-          {
-            entity,
-            patch,
-            rationale,
-            ...(refs === undefined ? {} : { refs }),
-          },
+      async (input) =>
+        answer(
+          toolRegistry
+            .call(tool.name, caller, input)
+            .pipe(Effect.map((a) => a.value)),
         ),
-      ),
-  )
-
-  // ---- SPA-28: search_records and list_registry (`./tools-read.ts`) ----
-  server.registerTool(
-    'search_records',
-    {
-      title: 'Search records',
-      description:
-        'Search Spaces the way its Cmd-K box does — record names and aliases (typo-tolerant), note bodies, document text, tasks, and meaning when an embedding model is configured — fused into one ranked list of at most 20 hits. Each hit carries its id (pass it to get_record or get_context), kind, name, object, and a snippet marked «like this». Pass `object` to keep only one object’s records.',
-      inputSchema: {
-        query: z.string().min(1).max(200).describe('What to look for'),
-        object: z
-          .string()
-          .min(1)
-          .optional()
-          .describe(
-            'An object’s slug, singular or plural name (see list_registry); only its records are returned',
-          ),
-      },
-      annotations: { readOnlyHint: true, openWorldHint: false },
-    },
-    async ({ query, object }) =>
-      answer(searchRecordsProgram(me, { query, object })),
-  )
-
-  // D70: structured questions over the views compiler, never generated.
-  server.registerTool(
-    'query_records',
-    {
-      title: 'Query records',
-      description: `Records of one object that meet conditions, sorted, with the total that match — computed in the database by the same compiler as the list pages’ filters and view counts, never estimated and never summarised. Conditions are keyed by attribute slug (see list_registry) with ops is, is_not, contains, empty, not_empty, gt, lt; a bare value means "is". A space condition {id, includeDescendants} keeps records filed in that space and, by default, any space below it. The interaction columns last_interaction, first_email, last_email and next_meeting filter as days and sort by time. Each row carries its id (pass it to get_record or get_context), name, stored values and sort value; at most ${QUERY_RECORDS_MAX} rows, and total counts them all. An unknown attribute or space is refused by name.`,
-      inputSchema: queryRecordsShape,
-      annotations: { readOnlyHint: true, openWorldHint: false },
-    },
-    async (input) => answer(queryRecordsProgram(me, input)),
-  )
-
-  // D70: money over the pure portfolio libraries, never generated.
-  server.registerTool(
-    'portfolio_summary',
-    {
-      title: 'Portfolio summary',
-      description:
-        'The portfolio as the Portfolio page reads it, computed from the event ledger rather than estimated: per holding and for the whole book, invested (cost basis), value (what is still held — the latest mark, or cost when never marked), distributions (cash returned), TVPI, DPI and gross IRR (annualized; 0.15 is 15%). Money is plain numbers in the named currency: each holding in its own currency when all its events share one, else base; the total always in base. A holding missing an exchange rate has null figures, names the rates it needs, and is left out of the total. Each holding carries its id for holding_detail.',
-      inputSchema: portfolioSummaryShape,
-      annotations: { readOnlyHint: true, openWorldHint: false },
-    },
-    async ({ asOf }) => answer(portfolioSummaryProgram({ asOf })),
-  )
-
-  server.registerTool(
-    'holding_detail',
-    {
-      title: 'Holding detail',
-      description:
-        'One holding’s figures (as portfolio_summary), ownership, and its ledger — investments, marks and distributions — as it stood on the as-of day: entries dated after it are left out, a voided entry is gone once its void had happened, and correction rows never appear. An entry voided after the as-of day is shown, with reversedAt naming when it was voided. Money is plain numbers with each entry’s currency.',
-      inputSchema: holdingDetailShape,
-      annotations: { readOnlyHint: true, openWorldHint: false },
-    },
-    async ({ holdingId, asOf }) =>
-      answer(holdingDetailProgram({ holdingId, asOf })),
-  )
-
-  server.registerTool(
-    'list_registry',
-    {
-      title: 'Object registry',
-      description:
-        'The workspace’s object registry: every object (Companies, People, Deals and any custom object), each with its attributes in order — slug, name, description, type, the object a reference points at, and per-type options such as select and status choices. Always current: an object or attribute created a moment ago is listed.',
-      inputSchema: {
-        object: z
-          .string()
-          .min(1)
-          .optional()
-          .describe(
-            'Just this object — its slug, singular or plural name; omit for all',
-          ),
-      },
-      annotations: { readOnlyHint: true, openWorldHint: false },
-    },
-    async ({ object }) => answer(listRegistryProgram({ object })),
-  )
-
+    )
+  }
   return server
 }
 

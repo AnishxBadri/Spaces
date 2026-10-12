@@ -20,6 +20,7 @@ import {
   revokeApiTokenProgram,
 } from '#/lib/tokens/store'
 import { handleMcpRequest } from './server'
+import { toolRegistry } from './registry'
 import { searchAllHandler } from '#/lib/search/search-all-handler'
 import { setMemberBannedHandler } from '#/lib/members/suspend'
 import { createObjectProgram } from '@spaces/core/writes/attributes/object-registry'
@@ -321,6 +322,30 @@ describe('an MCP client with a per-user token', () => {
     const rec = tools.find((t) => t.name === 'get_record')
     expect(Object.keys(rec?.inputSchema.properties ?? {})).toEqual(['id'])
     expect(rec?.inputSchema.required).toEqual(['id'])
+  })
+
+  it('lists the registry table and calls every tool through toolRegistry.call, the door Ask uses too', async () => {
+    const created = await mint(FIXTURE_ACTOR.id, 'registry')
+    const client = await connect(created.token)
+    const { tools } = await client.listTools()
+    expect(tools.map((t) => t.name)).toEqual(
+      toolRegistry.tools.map((t) => t.name),
+    )
+    const spy = vi.spyOn(toolRegistry, 'call')
+    await client.callTool({
+      name: 'get_record',
+      arguments: { id: fixture.companyId },
+    })
+    await client.close()
+    expect(spy).toHaveBeenCalledWith(
+      'get_record',
+      {
+        userId: FIXTURE_ACTOR.id,
+        proposer: { kind: 'token', tokenId: created.id },
+      },
+      { id: fixture.companyId },
+    )
+    spy.mockRestore()
   })
 
   it('never shows a second user the first user’s private note, through either tool', async () => {

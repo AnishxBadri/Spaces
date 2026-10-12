@@ -14,6 +14,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as AppAskRouteImport } from './routes/_app/ask'
 import { Route as AppCompaniesRouteImport } from './routes/_app/companies'
 import { Route as AppDealsRouteImport } from './routes/_app/deals'
 import { Route as AppDedupeRouteImport } from './routes/_app/dedupe'
@@ -102,6 +103,11 @@ const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppAskRoute = AppAskRouteImport.update({
+  id: '/ask',
+  path: '/ask',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppCompaniesRoute = AppCompaniesRouteImport.update({
   id: '/companies',
@@ -439,6 +445,7 @@ export interface FileRoutesByFullPath {
   '/join': typeof JoinRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/ask': typeof AppAskRoute
   '/companies': typeof AppCompaniesRoute
   '/deals': typeof AppDealsRoute
   '/dedupe': typeof AppDedupeRoute
@@ -509,6 +516,7 @@ export interface FileRoutesByTo {
   '/join': typeof JoinRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/ask': typeof AppAskRoute
   '/companies': typeof AppCompaniesRoute
   '/deals': typeof AppDealsRoute
   '/dedupe': typeof AppDedupeRoute
@@ -580,6 +588,7 @@ export interface FileRoutesById {
   '/join': typeof JoinRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/_app/ask': typeof AppAskRoute
   '/_app/companies': typeof AppCompaniesRoute
   '/_app/deals': typeof AppDealsRoute
   '/_app/dedupe': typeof AppDedupeRoute
@@ -652,6 +661,7 @@ export interface FileRouteTypes {
     | '/join'
     | '/login'
     | '/setup'
+    | '/ask'
     | '/companies'
     | '/deals'
     | '/dedupe'
@@ -722,6 +732,7 @@ export interface FileRouteTypes {
     | '/join'
     | '/login'
     | '/setup'
+    | '/ask'
     | '/companies'
     | '/deals'
     | '/dedupe'
@@ -792,6 +803,7 @@ export interface FileRouteTypes {
     | '/join'
     | '/login'
     | '/setup'
+    | '/_app/ask'
     | '/_app/companies'
     | '/_app/deals'
     | '/_app/dedupe'
@@ -912,6 +924,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/setup'
       preLoaderRoute: typeof SetupRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/ask': {
+      id: '/_app/ask'
+      path: '/ask'
+      fullPath: '/ask'
+      preLoaderRoute: typeof AppAskRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/companies': {
       id: '/_app/companies'
@@ -1433,6 +1452,7 @@ const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
 )
 
 interface AppRouteChildren {
+  AppAskRoute: typeof AppAskRoute
   AppCompaniesRoute: typeof AppCompaniesRoute
   AppDealsRoute: typeof AppDealsRoute
   AppDedupeRoute: typeof AppDedupeRoute
@@ -1462,6 +1482,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAskRoute: AppAskRoute,
   AppCompaniesRoute: AppCompaniesRoute,
   AppDealsRoute: AppDealsRoute,
   AppDedupeRoute: AppDedupeRoute,

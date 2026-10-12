@@ -73,6 +73,7 @@ import {
   searchEntities,
   updateRecord,
 } from '#/lib/server-fns'
+import { RecordMoreMenu } from '#/components/record/record-more-menu'
 
 /**
  * A deal's page (D74): the head and readouts, then the details column —
@@ -308,6 +309,7 @@ function DealRecordPage() {
                 <KeyHint>M</KeyHint>
               </Button>
             ) : null}
+            <RecordMoreMenu name={deal.name} />
           </>
         }
         mark={<DitherMark />}

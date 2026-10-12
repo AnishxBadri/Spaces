@@ -75,6 +75,7 @@ import {
   updateRecord,
   saveRecordAsTemplate,
 } from '#/lib/server-fns'
+import { RecordMoreMenu } from '#/components/record/record-more-menu'
 
 /**
  * A company's page (D74): the head and readouts, then the details column —
@@ -251,6 +252,7 @@ function CompanyRecordPage() {
                 })
               }}
             />
+            <RecordMoreMenu name={company.name} />
           </>
         }
         mark={

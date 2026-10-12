@@ -13,6 +13,8 @@ import {
 } from '#/components/settings/settings-chassis'
 import { KeyboardHelp } from '#/components/keyboard-help'
 import { CommandPalette } from '#/components/command-palette'
+import { AskDock } from '#/components/ask/ask-dock'
+import { toggleAsk } from '#/lib/ask/dock-store'
 import { UploadDialog } from '#/components/upload-dialog'
 import { Wordmark } from '#/components/wordmark'
 import { Toaster } from '#/components/ui/sonner'
@@ -28,7 +30,7 @@ import { localToday } from '@spaces/core/tasks/parse-due'
 import { useHotkeys } from '#/lib/use-hotkey'
 import { cn } from '#/lib/utils'
 
-/** Authenticated shell: fixed sidebar, fluid content, Cmd-K everywhere. */
+/** Authenticated shell: fixed sidebar, fluid content, Cmd-K and Ask everywhere. */
 export const Route = createFileRoute('/_app')({
   beforeLoad: async () => {
     const session = await getSession()
@@ -68,6 +70,8 @@ function AppShell() {
     ]),
     ['g ,', () => void navigate({ to: '/settings' })],
     ['mod+\\', () => setChassisCollapsed(!collapsed)],
+    // Ask, docked: opens empty or closes, from anywhere. (D70)
+    ['mod+j', toggleAsk],
     ['?', () => setKeyboardOpen(true)],
   ])
 
@@ -153,6 +157,8 @@ function AppShell() {
       >
         <Outlet />
       </main>
+
+      <AskDock />
 
       <CommandPalette
         open={commandOpen}

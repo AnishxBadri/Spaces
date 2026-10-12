@@ -5,6 +5,7 @@ import {
   CornerDownRight,
   Layers,
   LayoutTemplate,
+  MessageSquareText,
   Pencil,
   Plus,
   Star,
@@ -58,6 +59,7 @@ import {
 import type { SpaceTab } from '#/lib/spaces/page'
 import { useHotkey } from '#/lib/use-hotkey'
 import { runBinding, usePageActions } from '#/lib/page-actions'
+import { openAsk } from '#/lib/ask/dock-store'
 
 /**
  * A space reads like a record (D73, D74): the head with its stamp, crumb
@@ -435,6 +437,10 @@ function SpaceMenu({
           afterClose.current = null
         }}
       >
+        <DropdownMenuItem onSelect={() => openAsk()}>
+          <MessageSquareText className="size-4" />
+          Ask about this
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => toggleStarredSpace({ id, name })}>
           <Star className="size-4" />
           {starred ? 'Unstar' : 'Star'}

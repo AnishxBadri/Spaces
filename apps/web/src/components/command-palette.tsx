@@ -63,6 +63,7 @@ import { PictureMark } from '#/components/record/record-parts'
 import type { Passage } from '#/lib/search/passages'
 import type { JumpView } from '#/lib/views/jump'
 import { searchWaves } from '#/lib/search/waves'
+import { openAsk } from '#/lib/ask/dock-store'
 import { cn } from '#/lib/utils'
 
 /**
@@ -436,6 +437,8 @@ export type PaletteBodyProps = {
   loaders: PreviewLoaders
   /** Open a file in the viewer, at a page when the passage knows it. */
   onOpenFile: (id: string, page: number | null) => void
+  /** Tab: hand the typed text to Ask. The palette never answers. (D70) */
+  onAsk?: ((text: string) => void) | undefined
 }
 
 /**
@@ -455,6 +458,7 @@ export function PaletteBody({
   onStepDone,
   loaders,
   onOpenFile,
+  onAsk,
 }: PaletteBodyProps) {
   const [query, setQuery] = useState('')
   const [mode, setMode] = useState<Mode>({ kind: 'find' })
@@ -706,6 +710,10 @@ export function PaletteBody({
             e.preventDefault()
             backToFind()
           }
+          if (e.key === 'Tab' && !e.shiftKey && finding && onAsk) {
+            e.preventDefault()
+            onAsk(query)
+          }
           // → at the end of the query moves into the pane's actions.
           if (
             e.key === 'ArrowRight' &&
@@ -879,7 +887,9 @@ export function PaletteBody({
         className="flex h-8 items-center justify-between gap-3 border-t border-rule bg-bone px-4 mono text-micro text-graphite"
       >
         <span>
-          {finding ? '↑↓ move · ↵ open' : '↑↓ move · ⌫ back to find'}
+          {finding
+            ? `↑↓ move · ↵ open${onAsk ? ' · tab ask' : ''}`
+            : '↑↓ move · ⌫ back to find'}
           {target ? (
             <>
               {' · '}
@@ -1079,6 +1089,10 @@ export function CommandPalette({
           onStepDone={() => void router.invalidate()}
           loaders={loaders}
           onOpenFile={openFile}
+          onAsk={(text) => {
+            onOpenChange(false)
+            setTimeout(() => openAsk({ draft: text }), 0)
+          }}
         />
       </CommandDialog>
       <DocumentPreview

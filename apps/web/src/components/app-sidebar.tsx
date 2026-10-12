@@ -8,6 +8,7 @@ import {
   Kanban,
   Layers,
   Keyboard,
+  MessageSquareText,
   LogOut,
   Paperclip,
   Settings,
@@ -370,6 +371,16 @@ export function AppSidebar({
             {isMac ? '⌘K' : 'Ctrl K'}
           </kbd>
         </button>
+        <div className="pt-1">
+          <NavLink
+            to="/ask"
+            icon={MessageSquareText}
+            hint={isMac ? '⌘J' : 'Ctrl J'}
+            onClick={onNavigate}
+          >
+            Ask
+          </NavLink>
+        </div>
       </div>
 
       <nav
@@ -752,6 +763,9 @@ function CollapsedSidebar({
         className="flex min-h-0 w-12 flex-1 flex-col items-center overflow-y-auto pt-1.5"
         aria-label="Primary"
       >
+        <CollapsedNavLink to="/ask" icon={MessageSquareText}>
+          Ask
+        </CollapsedNavLink>
         {WORK.map((item) => (
           <CollapsedNavLink key={item.to} to={item.to} icon={item.icon}>
             {item.label}
