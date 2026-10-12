@@ -160,6 +160,7 @@ function PeoplePage() {
   const vs = useViewState({
     views,
     activeId: activeId ?? null,
+    listPath: '/people',
     columnVisibility: prefs.columnVisibility,
     setColumnVisibility: prefs.setColumnVisibility,
     defaultExtra: {},

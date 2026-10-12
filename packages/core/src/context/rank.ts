@@ -4,7 +4,7 @@ import type {
   ContextItem,
   ContextKind,
 } from './types'
-import { docOfRef } from './ref'
+import { docOfRef, parseRef } from './ref'
 
 /**
  * The ranker — the pure half of the assembler (docs/spec-ai-substrate.md
@@ -29,6 +29,11 @@ import { docOfRef } from './ref'
  * hop-0 attribute floor — so it can never crowd those out, and the rest of
  * the graph can never crowd it out either. With no similar candidates the
  * slice is empty and the budget is exactly what it was before the lane.
+ *
+ * Peers (`edge: 'peer'`, D71) are graph items, capped and ordered first:
+ * nearest stage, then most recent, then ref. Only the first `peerMax`
+ * stay, each a step below the one before, so they compete for the budget
+ * rather than flood it.
  */
 
 // ---------- input ----------
@@ -43,6 +48,11 @@ export type Candidate = ContextItem & {
   similarity?: number | undefined
   /** The target of a `supersedes` link: a newer version replaces it. (D59) */
   superseded?: boolean | undefined
+  /**
+   * A peer's stage distance from the seed's (0 is the same stage); null when
+   * either has none. Only an `edge: 'peer'` item reads it. (D71)
+   */
+  stageDistance?: number | null | undefined
 }
 
 export type Weights = {
@@ -60,6 +70,8 @@ export type Weights = {
    * record's own hop-0 facts (weight 1), so it sits below them.
    */
   similar: number
+  /** Factor between one ranked peer and the next. (D71) */
+  peerStep: number
   /** Half-life in days; null = no decay. */
   halfLifeDays: Record<ContextKind, number | null>
   /** RRF constant. */
@@ -75,6 +87,7 @@ export const DEFAULT_WEIGHTS: Weights = {
     mentions: 0.7,
     co_investor: 0.6,
     derived_from: 0.5,
+    peer: 0.5,
     supersedes: 0.5,
   },
   superseded: 0.5,
@@ -99,6 +112,7 @@ export const DEFAULT_WEIGHTS: Weights = {
     glossary: null,
   },
   similar: 0.5,
+  peerStep: 0.9,
   rrfK: 60,
 }
 
@@ -114,6 +128,8 @@ export type RankOptions = {
    * {@link SIMILAR_SHARE}. Unused, it returns to the pool.
    */
   similarShare?: number
+  /** Most peers kept. Default {@link PEER_MAX}. */
+  peerMax?: number
   weights?: Partial<Weights>
 }
 
@@ -127,10 +143,14 @@ export type RankedItem = ContextItem & {
   score: number | null
 }
 
-export type DropReason = 'budget' | 'standing_budget' | 'similar_budget'
+export type DropReason =
+  'budget' | 'standing_budget' | 'similar_budget' | 'peer_cap'
 
 /** The similar lane's cap, as a share of `budgetChars` (SPA-139). */
 export const SIMILAR_SHARE = 0.15
+
+/** The peer set's cap: the leaf space's nearest companies. (D71) */
+export const PEER_MAX = 5
 
 export type RankResult = {
   /** Standing items first (mandate, then glossary), then ranked. */
@@ -181,7 +201,29 @@ function compare(a: RankedItem, b: RankedItem): number {
     if (b.at == null) return -1
     return a.at < b.at ? 1 : -1
   }
-  return a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0
+  return byRef(a.ref, b.ref)
+}
+
+/** Ref asc, except one document's chunks, which go in page order. */
+function byRef(a: string, b: string): number {
+  const pa = parseRef(a)
+  const pb = parseRef(b)
+  if (pa?.kind === 'doc' && pb?.kind === 'doc' && pa.entityId === pb.entityId)
+    return pa.idx - pb.idx
+  return a < b ? -1 : a > b ? 1 : 0
+}
+
+/** Peers in rank order: nearest stage (unknown last), newest, ref. */
+function comparePeers(a: Candidate, b: Candidate): number {
+  const da = a.stageDistance ?? Number.POSITIVE_INFINITY
+  const db = b.stageDistance ?? Number.POSITIVE_INFINITY
+  if (da !== db) return da - db
+  if (a.at !== b.at) {
+    if (a.at == null) return 1
+    if (b.at == null) return -1
+    return a.at < b.at ? 1 : -1
+  }
+  return byRef(a.ref, b.ref)
 }
 
 // ---------- rank ----------
@@ -209,8 +251,25 @@ export function rank(
   const similar = unique.filter(
     (c) => c.hop === 'similar' && !standing.includes(c),
   )
+  const dropped: Array<{ ref: string; reason: DropReason }> = []
+
+  // Peers: ranked among themselves, capped, each a step below the last.
+  const peerMax = opts.peerMax ?? PEER_MAX
+  const peerStep = new Map<string, number>()
+  unique
+    .filter(
+      (c) => c.edge === 'peer' && !standing.includes(c) && !similar.includes(c),
+    )
+    .sort(comparePeers)
+    .forEach((c, i) => {
+      if (i < peerMax) peerStep.set(c.ref, Math.pow(w.peerStep, i))
+      else dropped.push({ ref: c.ref, reason: 'peer_cap' })
+    })
   const graph = unique.filter(
-    (c) => !standing.includes(c) && !similar.includes(c),
+    (c) =>
+      !standing.includes(c) &&
+      !similar.includes(c) &&
+      (c.edge !== 'peer' || peerStep.has(c.ref)),
   )
 
   // Structural lane.
@@ -218,7 +277,7 @@ export function rank(
   for (const c of graph)
     if (c.lexicalRank != null) lexical.set(c.ref, c.lexicalRank)
   const scored: Array<RankedItem> = graph.map((c) => {
-    const s = structural(c, asOfMs, w)
+    const s = structural(c, asOfMs, w) * (peerStep.get(c.ref) ?? 1)
     return { ...strip(c), hop: c.hop, structural: s, score: s }
   })
   scored.sort(compare)
@@ -263,7 +322,6 @@ export function rank(
     )
 
   // ---------- budget ----------
-  const dropped: Array<{ ref: string; reason: DropReason }> = []
   const out: Array<RankedItem> = []
   let used = 0
 
@@ -286,14 +344,19 @@ export function rank(
     used += c.text.length
   }
 
-  // Floor 1: hop-0 attributes, in ranked order, before anything else.
+  // Floor 1: hop-0 attributes, then a seed document's own chunks, in
+  // ranked order, before anything else.
   const rest: Array<RankedItem> = []
-  for (const c of scored) {
-    if (c.hop === 0 && c.kind === 'attribute') {
-      if (c.text.length <= remaining()) take(c)
-      else dropped.push({ ref: c.ref, reason: 'budget' })
-    } else rest.push(c)
+  const floor: Array<RankedItem> = [
+    ...scored.filter((c) => c.hop === 0 && c.kind === 'attribute'),
+    ...scored.filter((c) => c.hop === 0 && c.kind === 'doc_chunk'),
+  ]
+  for (const c of floor) {
+    if (c.text.length <= remaining()) take(c)
+    else dropped.push({ ref: c.ref, reason: 'budget' })
   }
+  const inFloor = new Set(floor)
+  for (const c of scored) if (!inFloor.has(c)) rest.push(c)
 
   // The similar lane's slice, capped at its share and at what the floor
   // left. Reserved here, before the rest of the graph, so the graph cannot

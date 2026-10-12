@@ -176,6 +176,7 @@ function ObjectListPage() {
   const vs = useViewState({
     views,
     activeId: activeId ?? null,
+    listPath: `/o/${object.slug}`,
     columnVisibility: prefs.columnVisibility,
     setColumnVisibility: prefs.setColumnVisibility,
     defaultExtra: {},

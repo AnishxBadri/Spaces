@@ -136,6 +136,7 @@ function CompaniesPage() {
   const vs = useViewState({
     views,
     activeId: activeId ?? null,
+    listPath: '/companies',
     columnVisibility: prefs.columnVisibility,
     setColumnVisibility: prefs.setColumnVisibility,
     defaultExtra: {},

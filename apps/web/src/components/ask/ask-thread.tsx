@@ -1,6 +1,6 @@
 import { Link, useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
 import {
@@ -16,10 +16,12 @@ import type {
   AskThreadView,
   AskTurnView,
 } from '#/lib/server-fns'
+import { SCOPE_DROPPED } from '#/lib/ask/scope'
 import { scopeKey, scopeWords } from '#/lib/ask/types'
 import { cn } from '#/lib/utils'
 import { AskAnswer, RefChip } from './ask-answer'
 import { AskCards } from './ask-card'
+import { MentionTextarea } from './mention-popover'
 import type { AnswerVariant } from './ask-answer'
 
 /**
@@ -123,8 +125,16 @@ const CALL_WORD: Record<AskCall['state'], string> = {
   failed: 'failed',
 }
 
+/** A chip the turn could not resolve: a scope line naming it. */
+function DroppedChips({ calls }: { calls: ReadonlyArray<AskCall> }) {
+  return calls
+    .filter((c) => c.tool === SCOPE_DROPPED)
+    .map((c, i) => <Divider key={i}>Scope · {c.reason ?? c.input}</Divider>)
+}
+
 /** The tools a turn called, each with what it asked and found. */
-export function CallStrip({ calls }: { calls: ReadonlyArray<AskCall> }) {
+export function CallStrip({ calls: all }: { calls: ReadonlyArray<AskCall> }) {
+  const calls = all.filter((c) => c.tool !== SCOPE_DROPPED)
   if (calls.length === 0) return null
   return (
     <ul
@@ -216,6 +226,7 @@ export function AnswerTurn({
     )
   return (
     <div data-turn="assistant" className="flex flex-col gap-2.5">
+      <DroppedChips calls={turn.calls} />
       {turn.state === 'no_provider' ? (
         <p className="text-body">
           Ask needs a model to answer.{' '}
@@ -290,6 +301,7 @@ export function LiveAnswer({
       aria-live="polite"
       className="flex flex-col gap-2.5"
     >
+      <DroppedChips calls={live.calls.map((c) => c.call)} />
       {live.text === '' ? null : (
         <AskAnswer
           body={live.text}
@@ -622,13 +634,15 @@ export function SaveAsNote({
 
 /**
  * The composer: a field, ⌘↵ printed in its end lane as the one key, and
- * Send — or Stop while an answer streams.
+ * Send — or Stop while an answer streams. With `onMention`, `@` in the
+ * field scopes the question to a space or record.
  */
 export function AskComposer({
   value,
   onChange,
   onSend,
   onStop,
+  onMention,
   streaming,
   focus,
   className,
@@ -637,6 +651,7 @@ export function AskComposer({
   onChange: (v: string) => void
   onSend: () => void
   onStop: () => void
+  onMention?: ((chip: AskScopeChip) => void) | undefined
   streaming: boolean
   focus: number
   className?: string
@@ -645,23 +660,41 @@ export function AskComposer({
   useEffect(() => {
     if (focus > 0) field.current?.focus()
   }, [focus])
+  const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      if (!streaming && value.trim() !== '') onSend()
+    }
+  }
+  const fieldProps = {
+    'aria-label': 'Ask',
+    rows: 2,
+    placeholder: 'Ask about your deals…',
+    title:
+      onMention === undefined ? undefined : '@ scopes to a space or record',
+    className:
+      'focus-ring min-h-16 w-full resize-none rounded-md border border-rule bg-paper px-3 py-2 text-body',
+  }
   return (
     <div className={cn('flex flex-col gap-2', className)}>
-      <textarea
-        ref={field}
-        aria-label="Ask"
-        rows={2}
-        value={value}
-        placeholder="Ask about your deals…"
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault()
-            if (!streaming && value.trim() !== '') onSend()
-          }
-        }}
-        className="focus-ring min-h-16 w-full resize-none rounded-md border border-rule bg-paper px-3 py-2 text-body"
-      />
+      {onMention === undefined ? (
+        <textarea
+          {...fieldProps}
+          ref={field}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={onKeyDown}
+        />
+      ) : (
+        <MentionTextarea
+          {...fieldProps}
+          fieldRef={field}
+          value={value}
+          onChange={onChange}
+          onMention={onMention}
+          onKeyDown={onKeyDown}
+        />
+      )}
       <div className="flex items-center justify-end gap-3">
         <span className="mono text-micro text-graphite">⌘↵</span>
         {streaming ? (

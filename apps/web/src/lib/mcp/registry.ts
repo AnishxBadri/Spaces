@@ -156,7 +156,7 @@ const getContext = defineTool({
   name: 'get_context',
   title: 'Record context',
   description:
-    'What Spaces knows about one record — its attributes, history, notes, memos, documents, spaces and tasks — ranked and trimmed to a character budget, each item with a citation. Exactly what the record page’s Context section shows the same person. Pass a record id, or a record’s exact name.',
+    'What Spaces knows about one record — its attributes, history, notes, memos, documents, the full path of every space it is filed in, the other companies in its leaf space, and tasks — ranked and trimmed to a character budget, each item with a citation. Exactly what the record page’s Context section shows the same person. A space answers as a market: its path, subspace tree with counts, companies by stage, memos and terms. A document answers with its own pages first. Pass an id, or an exact name.',
   inputSchema: {
     entity: z
       .string()
@@ -190,8 +190,11 @@ const getContext = defineTool({
         taskText: task?.trim() ? task.trim() : undefined,
       }).pipe(Effect.provide(SimilarLaneLive))
     }),
+  // Everything the context is about — a space's subspaces and members too —
+  // so the egress gate reads a sensitive descendant. (D71)
   touches: (out) => [
     out.seed.id,
+    ...out.reveals,
     ...out.items.flatMap((i) => {
       const id = entityOfRef(i.ref)
       return id === null ? [] : [id]

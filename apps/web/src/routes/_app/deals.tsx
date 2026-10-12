@@ -205,6 +205,7 @@ function DealsPage() {
   const vs = useViewState<{ group: string | null; stage: string | null }>({
     views,
     activeId: activeId ?? null,
+    listPath: '/deals',
     columnVisibility: prefs.columnVisibility,
     setColumnVisibility: prefs.setColumnVisibility,
     defaultExtra: { group: 'active', stage: null },

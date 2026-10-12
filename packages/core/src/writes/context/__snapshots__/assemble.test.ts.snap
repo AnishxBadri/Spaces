@@ -25,6 +25,13 @@ exports[`assembleProgram > assembles the record for two users, deterministically
   },
   {
     "hop": 0,
+    "kind": "attribute",
+    "ref": "attr:SPACE:path",
+    "score": 1,
+    "text": "Filed in: CtxSpace TAG",
+  },
+  {
+    "hop": 0,
     "kind": "event",
     "ref": "event:UUID",
     "score": 0.6122,

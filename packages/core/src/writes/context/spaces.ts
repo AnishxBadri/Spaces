@@ -1,12 +1,19 @@
 import { Effect } from 'effect'
 import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { link, note, space } from '@spaces/db/schema'
-import { ContextQueryFailed } from '../../context/errors'
+import { link, mandate, note, space } from '@spaces/db/schema'
+import { ContextLeak, ContextQueryFailed } from '../../context/errors'
+import { rank } from '../../context/rank'
+import type { Candidate, RankResult } from '../../context/rank'
+import { ref } from '../../context/ref'
+import { truncate } from '../../context/render'
+import { fmtMoney } from '../../portfolio/format'
+import { canRead } from '../../read-policy'
 
 /**
- * The space builders the assembler and the watch brief share: the live
- * ancestor chain of some spaces, and the memos tagged into them.
+ * The builders the assembler, its space subject and the watch brief share:
+ * the live ancestor chain of some spaces, the memos tagged into them, the
+ * mandate, and the ranked, `canRead`-checked output.
  * - `canRead` is applied in SQL: a note is readable when shared or the
  *   reader's own. An integration authors no note, so it reads shared only.
  * - Every fetch is ordered, so a caller's first-wins dedupe is stable.
@@ -62,3 +69,93 @@ export const memosTaggedIn = (
           )
           .orderBy(asc(link.toEntityId), asc(note.entityId)),
   )
+
+/** A note row let through, kept for the output invariant. */
+export type NoteGate = { visibility: string; authorId: string }
+
+/**
+ * The active mandate as a standing item, when the reader may read its note.
+ * Records its note in `noteRows` for the output invariant.
+ */
+export const mandateCandidate = Effect.fn('mandateCandidate')(function* (
+  readerId: string,
+  noteRows: Map<string, NoteGate>,
+) {
+  const m = (yield* query(() =>
+    db
+      .select({
+        id: mandate.id,
+        n: note,
+        stages: mandate.stages,
+        geos: mandate.geos,
+        checkMin: mandate.checkMin,
+        checkMax: mandate.checkMax,
+        currency: mandate.currency,
+      })
+      .from(mandate)
+      .innerJoin(note, eq(note.entityId, mandate.noteEntityId))
+      .where(and(eq(mandate.status, 'active'), readableNote(readerId))),
+  )).at(0)
+  if (!m) return null
+  noteRows.set(m.n.entityId, {
+    visibility: m.n.visibility,
+    authorId: m.n.authorId,
+  })
+  const cur = m.currency ?? 'USD'
+  const check =
+    m.checkMin != null || m.checkMax != null
+      ? `Check ${m.checkMin != null ? fmtMoney(m.checkMin, cur) : '?'}–${m.checkMax != null ? fmtMoney(m.checkMax, cur) : '?'}.`
+      : ''
+  const head = [
+    m.stages.length ? `Stages: ${m.stages.join(', ')}.` : '',
+    m.geos.length ? `Geos: ${m.geos.join(', ')}.` : '',
+    check,
+  ]
+    .filter(Boolean)
+    .join(' ')
+  const c: Candidate = {
+    ref: ref.mandate(m.id),
+    kind: 'mandate',
+    text: `Mandate: ${head}\n${truncate(m.n.bodyMd, MANDATE_MAX)}`.trim(),
+    entityIds: [],
+    at: m.n.updatedAt.toISOString(),
+    hop: 'standing',
+  }
+  return c
+})
+
+const MANDATE_MAX = 2000
+
+/**
+ * Rank, then hold the output to `canRead`: a hit means a fetch lost its
+ * filter, a bug rather than a policy decision.
+ */
+export const rankChecked = Effect.fn('rankChecked')(function* (
+  candidates: ReadonlyArray<Candidate>,
+  noteRows: ReadonlyMap<string, NoteGate>,
+  opts: { user: { id: string }; asOf: string; budgetChars: number },
+): Effect.fn.Return<RankResult, ContextLeak> {
+  const result = rank(candidates, {
+    asOf: opts.asOf,
+    budgetChars: opts.budgetChars,
+  })
+  for (const item of result.items)
+    for (const id of item.entityIds) {
+      const row = noteRows.get(id)
+      if (row && !canRead(opts.user, row))
+        return yield* new ContextLeak({
+          ref: item.ref,
+          message: 'canRead refused an assembled item',
+        })
+    }
+  return result
+})
+
+/** Every entity id the ranked items are about, the seed's first. */
+export const revealed = (
+  seedId: string,
+  items: ReadonlyArray<{ entityIds: ReadonlyArray<string> }>,
+  more: ReadonlyArray<string> = [],
+): ReadonlyArray<string> => [
+  ...new Set([seedId, ...items.flatMap((i) => i.entityIds), ...more]),
+]

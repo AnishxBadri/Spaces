@@ -260,6 +260,16 @@ describe('assembleProgram', () => {
     expect(mine.items.find((x) => x.ref === `memo:${ids.spaceMemo}`)?.hop).toBe(
       1,
     )
+    // where it is filed, as a hop-0 fact (D71)
+    expect(
+      mine.items.find((x) => x.ref === `attr:${spc.id}:path`),
+    ).toMatchObject({
+      hop: 0,
+      kind: 'attribute',
+      text: `Filed in: CtxSpace ${tag}`,
+    })
+    expect(mine.sensitive).toBe(false)
+    expect(mine.reveals).toContain(spc.id)
 
     // ---- as the teammate: their private note appears, nothing else changes ----
     const theirs = await run(teammate.id)
@@ -305,7 +315,204 @@ describe('assembleProgram', () => {
         text: norm(x.text).split('\n')[0],
         score: x.score == null ? null : Number(x.score.toFixed(4)),
       }))
-    expect(shape).toMatchSnapshot()
+    // The hop-0 floor ties at score 1 and breaks ties by ref, which holds
+    // random ids: order it by the normalized ref so the fixture is stable.
+    const isFloor = (x: (typeof shape)[number]) =>
+      x.hop === 0 && x.kind === 'attribute'
+    expect(shape.findIndex((x) => !isFloor(x))).toBe(
+      shape.filter(isFloor).length,
+    )
+    expect([
+      ...shape.filter(isFloor).sort((a, b) => (a.ref < b.ref ? -1 : 1)),
+      ...shape.filter((x) => !isFloor(x)),
+    ]).toMatchSnapshot()
+  })
+
+  it('places a record by its full path and ranks the peers of its leaf space only (D71)', async () => {
+    const { assembleProgram } = await import('./assemble')
+    const { SimilarLaneEmpty } = await import('../../context/similar-lane')
+    const { PEER_MAX } = await import('../../context/rank')
+    const { Effect } = await import('effect')
+    const { db } = await import('@spaces/db')
+    const { entity, entitySpace, objectDef, space } =
+      await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
+    const { eq } = await import('drizzle-orm')
+
+    const [me] = await db.select({ id: user.id }).from(user).limit(1)
+    const companies = (
+      await db
+        .select({ id: objectDef.id })
+        .from(objectDef)
+        .where(eq(objectDef.slug, 'companies'))
+    ).at(0)
+    expect(companies).toBeTruthy()
+    const aSpace = async (
+      name: string,
+      parent?: { id: string; path: string },
+    ) => {
+      const [e] = await db
+        .insert(entity)
+        .values({ kind: 'space', canonicalName: name })
+        .returning({ id: entity.id })
+      const slug = `${name.toLowerCase().replace(/\W+/g, '_')}_${tag}`
+      const path = parent ? `${parent.path}.${slug}` : slug
+      await db
+        .insert(space)
+        .values({ entityId: e.id, parentId: parent?.id ?? null, slug, path })
+      return { id: e.id, path }
+    }
+    const tech = await aSpace('Spacetech')
+    const launch = await aSpace('Launch', tech)
+    const small = await aSpace('Small-lift', launch)
+    const other = await aSpace('Ground stations', tech)
+    const aCompany = async (
+      name: string,
+      stage: string | null,
+      filed: ReadonlyArray<string>,
+    ) => {
+      const [e] = await db
+        .insert(entity)
+        .values({
+          kind: 'company',
+          canonicalName: name,
+          objectId: companies!.id,
+          values:
+            stage === null
+              ? { location: 'Pune' }
+              : { funding_stage: stage, location: 'Pune' },
+        })
+        .returning({ id: entity.id })
+      for (const spaceId of filed)
+        await db
+          .insert(entitySpace)
+          .values({ entityId: e.id, spaceId, source: 'manual' })
+      return e.id
+    }
+    // Filed in Small-lift and its ancestor Launch: Small-lift is the leaf.
+    const seed = await aCompany(`Seedling ${tag}`, 'seed', [
+      small.id,
+      launch.id,
+      other.id,
+    ])
+    const sameStage = await aCompany(`Rival A ${tag}`, 'seed', [small.id])
+    const nextStage = await aCompany(`Rival B ${tag}`, 'series_a', [small.id])
+    const noStage = await aCompany(`Rival C ${tag}`, null, [small.id])
+    const many = await Promise.all(
+      Array.from({ length: PEER_MAX }, (_, n) =>
+        aCompany(`Far ${n} ${tag}`, 'public', [small.id]),
+      ),
+    )
+    // In Launch only, above the leaf: never a peer.
+    const above = await aCompany(`Launch only ${tag}`, 'seed', [launch.id])
+    // A peer in the other leaf space the record is filed in.
+    const ground = await aCompany(`Antenna ${tag}`, 'seed', [other.id])
+
+    const result = await Effect.runPromise(
+      assembleProgram(
+        { entityId: seed },
+        { user: { id: me.id }, asOf: ASOF, budgetChars: 20_000 },
+      ).pipe(Effect.provide(SimilarLaneEmpty)),
+    )
+    const positions = result.items.filter((x) => x.ref.endsWith(':path'))
+    expect(positions.map((x) => x.text).sort()).toEqual([
+      `Filed in: Spacetech › Ground stations`,
+      `Filed in: Spacetech › Launch`,
+      `Filed in: Spacetech › Launch › Small-lift`,
+    ])
+    expect(positions.every((x) => x.hop === 0)).toBe(true)
+
+    const peers = result.items
+      .filter((x) => x.ref.endsWith(':peer'))
+      .map((x) => x.ref)
+    expect(peers).toHaveLength(PEER_MAX)
+    // Same stage first, the next stage after; the unknown and far are cut.
+    expect(peers.slice(0, 2).sort()).toEqual(
+      [`attr:${sameStage}:peer`, `attr:${ground}:peer`].sort(),
+    )
+    expect(peers[2]).toBe(`attr:${nextStage}:peer`)
+    expect(peers).not.toContain(`attr:${above}:peer`)
+    expect(peers).not.toContain(`attr:${noStage}:peer`)
+    // The read ranks and caps as the ranker would: two of the five far
+    // peers fill the set, and nothing is left for the ranker to cut.
+    expect(
+      peers.filter((r) => many.some((id) => r === `attr:${id}:peer`)),
+    ).toHaveLength(2)
+    expect(result.dropped.some((d) => d.reason === 'peer_cap')).toBe(false)
+    expect(
+      result.items.find((x) => x.ref === `attr:${sameStage}:peer`)?.text,
+    ).toBe(
+      `Peer in Small-lift: Rival A ${tag} — Funding stage: Seed · Location: Pune`,
+    )
+  })
+
+  it('seeds a document with its own chunks first', async () => {
+    const { assembleProgram } = await import('./assemble')
+    const { SimilarLaneEmpty } = await import('../../context/similar-lane')
+    const { Effect } = await import('effect')
+    const { db } = await import('@spaces/db')
+    const { chunk, document, entity, link } = await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
+
+    const [me] = await db.select({ id: user.id }).from(user).limit(1)
+    const [co] = await db
+      .insert(entity)
+      .values({ kind: 'company', canonicalName: `DocCo ${tag}` })
+      .returning({ id: entity.id })
+    const [doc] = await db
+      .insert(entity)
+      .values({ kind: 'document', canonicalName: `memo-${tag}.pdf` })
+      .returning({ id: entity.id })
+    // Exempt from the one-writer rule: a fixture with text already read.
+    await db.insert(document).values({
+      entityId: doc.id,
+      filename: `memo-${tag}.pdf`,
+      kind: 'deck',
+      sourceClass: 'manual',
+      extractionStatus: 'done',
+      createdAt: new Date('2026-08-20T00:00:00Z'),
+    })
+    await db.insert(chunk).values(
+      Array.from({ length: 12 }, (_, idx) => ({
+        entityId: doc.id,
+        sourceKind: 'document' as const,
+        idx,
+        text: idx === 7 ? 'Hydrogen electrolyser margins.' : `Page ${idx}.`,
+      })),
+    )
+    await db.insert(link).values({
+      fromEntityId: doc.id,
+      toEntityId: co.id,
+      relation: 'tagged_in',
+      source: 'manual',
+    })
+    const assemble = (taskText?: string) =>
+      Effect.runPromise(
+        assembleProgram(
+          { entityId: doc.id },
+          { user: { id: me.id }, asOf: ASOF, budgetChars: 8000, taskText },
+        ).pipe(Effect.provide(SimilarLaneEmpty)),
+      )
+    const plain = await assemble()
+    const chunks = plain.items.filter((x) => x.kind === 'doc_chunk')
+    expect(chunks.map((x) => x.ref)).toEqual(
+      Array.from({ length: 12 }, (_, i) => `doc:${doc.id}#${i}`),
+    )
+    // Before anything the walk reached.
+    const firstOther = plain.items.findIndex(
+      (x) => x.kind !== 'doc_chunk' && x.hop !== 'standing',
+    )
+    expect(firstOther).toBeGreaterThan(
+      plain.items.findIndex((x) => x.ref === `doc:${doc.id}#11`),
+    )
+    expect(plain.items.some((x) => x.text === `company: DocCo ${tag}`)).toBe(
+      true,
+    )
+    // The task text lifts its page to the front.
+    const asked = await assemble('electrolyser margins')
+    expect(asked.items.find((x) => x.kind === 'doc_chunk')?.ref).toBe(
+      `doc:${doc.id}#7`,
+    )
   })
 
   it('takes asOf as an input: the same data at two clocks ranks by the clock it was handed', async () => {

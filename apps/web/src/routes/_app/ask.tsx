@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { openAsk } from '#/lib/ask/dock-store'
+import { chipKey, withMention } from '#/lib/ask/page-scope'
 import { scopeWords } from '#/lib/ask/types'
 import { byDay, outcomeWords } from '#/lib/ask/thread-list'
 import {
@@ -212,7 +213,8 @@ function AskPage() {
   const [listOpen, setListOpen] = useState(true)
   const [deleting, setDeleting] = useState<AskThreadRow | null>(null)
   const [draft, setDraft] = useState('')
-  const [scopeCleared, setScopeCleared] = useState(false)
+  // Chips edited since the last question; null follows the thread's own.
+  const [edited, setEdited] = useState<ReadonlyArray<AskScopeChip> | null>(null)
   const threadId = threadParam ?? null
   const onThread = useCallback(
     (id: string) => {
@@ -230,18 +232,22 @@ function AskPage() {
     void navigate({ to: '/ask', search: {}, replace: true })
   }, [error, threadId, navigate])
 
-  useEffect(() => setScopeCleared(false), [threadId])
+  useEffect(() => setEdited(null), [threadId])
 
   // A question here keeps the scope the thread was last asked in.
   const lastScope: ReadonlyArray<AskScopeChip> =
+    live?.question.scope ??
     [...(thread?.turns ?? [])].reverse().find((t) => t.role === 'user')
-      ?.scope ?? []
-  const scope = scopeCleared ? [] : lastScope
+      ?.scope ??
+    []
+  const scope = edited ?? lastScope
   const record = lastScope.find((c) => c.id !== null && c.href !== null)
 
   const send = (question: string) => {
     setDraft('')
     void ask(question, scope)
+    // The stored question now holds the scope, as the server kept it.
+    setEdited(null)
   }
 
   return (
@@ -311,8 +317,8 @@ function AskPage() {
           <div className="flex items-center gap-1.5">
             <ScopeChips
               scope={scope}
-              onClear={
-                scope.length === 0 ? undefined : () => setScopeCleared(true)
+              onRemove={(chip) =>
+                setEdited(scope.filter((c) => chipKey(c) !== chipKey(chip)))
               }
             />
           </div>
@@ -349,6 +355,7 @@ function AskPage() {
               onChange={setDraft}
               onSend={() => send(draft.trim())}
               onStop={stop}
+              onMention={(chip) => setEdited(withMention(scope, chip))}
               streaming={live?.phase === 'streaming'}
               focus={0}
             />

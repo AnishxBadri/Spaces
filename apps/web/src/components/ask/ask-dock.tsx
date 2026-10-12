@@ -5,14 +5,21 @@ import { Button } from '#/components/ui/button'
 import {
   DOCK_MAX,
   DOCK_MIN,
+  addMention,
+  clearPageChip,
   closeAsk,
+  removeMention,
   setDockThread,
   setDockWidth,
-  setScopeCleared,
   takeDraft,
   useAskDock,
 } from '#/lib/ask/dock-store'
-import { pageScope } from '#/lib/ask/page-scope'
+import {
+  chipKey,
+  dockScope,
+  pageScope,
+  usePageSubject,
+} from '#/lib/ask/page-scope'
 import type { AskScopeChip } from '#/lib/ask/types'
 import { usePageActionsList } from '#/lib/page-actions'
 import { AskComposer, AskTurns, SaveAsNote, useAskThread } from './ask-thread'
@@ -22,25 +29,33 @@ import { AskComposer, AskTurns, SaveAsNote, useAskThread } from './ask-thread'
  * (D70)
  * - 408px by default, resized from its left edge between 360 and 560px;
  *   ⌘J or × closes it completely, leaving no rail, and the thread is kept.
- * - The page you are on is the default scope chip; removing it asks the
- *   whole workspace.
+ * - The page you are on is the default scope chip — a record, a space, a
+ *   saved view or an open file; `@` adds more. Every chip is removable, and
+ *   with none the question reads the whole workspace.
  */
 
-/** The scope a question here is asked in: the page's chip, unless removed. */
-export function useDockScope(): ReadonlyArray<AskScopeChip> {
+/** The page's own chip: a view or file it published, else its record or space. */
+export function usePageChip(): AskScopeChip | null {
   const { pathname } = useLocation()
   const { scope: name } = usePageActionsList()
-  const { scopeCleared } = useAskDock()
-  const chip = pageScope(pathname, name)
-  return chip === null || scopeCleared ? [] : [chip]
+  const subject = usePageSubject()
+  return subject ?? pageScope(pathname, name)
 }
 
+/** The scope a question here is asked in. */
+export function useDockScope(): ReadonlyArray<AskScopeChip> {
+  const page = usePageChip()
+  const { cleared, mentioned } = useAskDock()
+  return dockScope(page, cleared, mentioned)
+}
+
+/** The chips a question narrows to; each one removable, none a mode. */
 export function ScopeChips({
   scope,
-  onClear,
+  onRemove,
 }: {
   scope: ReadonlyArray<AskScopeChip>
-  onClear?: (() => void) | undefined
+  onRemove?: ((chip: AskScopeChip) => void) | undefined
 }) {
   if (scope.length === 0)
     return (
@@ -52,15 +67,16 @@ export function ScopeChips({
     <>
       {scope.map((c) => (
         <span
-          key={`${c.kind}:${c.id ?? ''}`}
+          key={chipKey(c)}
           className="inline-flex h-5 max-w-48 items-center gap-1 rounded-md border border-rule bg-paper px-1.5 text-label"
         >
           <span className="truncate">{c.name}</span>
-          {onClear === undefined ? null : (
+          {onRemove === undefined ? null : (
             <button
               type="button"
               aria-label={`Ask beyond ${c.name}`}
-              onClick={onClear}
+              title={`Ask beyond ${c.name}`}
+              onClick={() => onRemove(c)}
               className="focus-ring -mr-0.5 text-graphite hover:text-foreground"
             >
               <X className="size-3" strokeWidth={1.75} />
@@ -106,6 +122,7 @@ function ResizeEdge({ width }: { width: number }) {
 export function AskDock() {
   const dock = useAskDock()
   const scope = useDockScope()
+  const page = usePageChip()
   const [draft, setDraft] = useState('')
   const { thread, live, error, ask, stop } = useAskThread(dock.threadId, (id) =>
     setDockThread(id),
@@ -171,7 +188,14 @@ export function AskDock() {
           </Button>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <ScopeChips scope={scope} onClear={() => setScopeCleared(true)} />
+          <ScopeChips
+            scope={scope}
+            onRemove={(chip) => {
+              if (page !== null && chipKey(page) === chipKey(chip))
+                clearPageChip(chip)
+              removeMention(chip)
+            }}
+          />
         </div>
       </header>
       <div ref={body} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
@@ -189,6 +213,7 @@ export function AskDock() {
           onChange={setDraft}
           onSend={() => send(draft.trim())}
           onStop={stop}
+          onMention={addMention}
           streaming={live?.phase === 'streaming'}
           focus={dock.focus}
         />

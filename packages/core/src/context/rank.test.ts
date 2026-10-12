@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_WEIGHTS, SIMILAR_SHARE, rank } from './rank'
+import { DEFAULT_WEIGHTS, PEER_MAX, SIMILAR_SHARE, rank } from './rank'
 import type { Candidate } from './rank'
 import { ref } from './ref'
 
@@ -393,6 +393,107 @@ describe('rank', () => {
       expect(r.items.some((i) => i.hop === 0 && i.kind === 'attribute')).toBe(
         true,
       )
+    })
+  })
+
+  describe('peers (D71)', () => {
+    const peer = (
+      id: string,
+      stageDistance: number | null,
+      at: string,
+    ): Candidate => ({
+      ref: ref.attr(`co-${id}`, 'peer'),
+      kind: 'attribute',
+      text: `Peer in Cooling: ${id} — Funding stage: Seed`,
+      entityIds: [CO, `co-${id}`],
+      at,
+      hop: 1,
+      edge: 'peer',
+      stageDistance,
+    })
+    // Eight peers: two at the seed's own stage, the rest further or unknown.
+    const peers: ReadonlyArray<Candidate> = [
+      peer('far-new', 3, '2026-09-09T00:00:00Z'),
+      peer('same-old', 0, '2026-06-01T00:00:00Z'),
+      peer('unknown', null, '2026-09-09T00:00:00Z'),
+      peer('near', 1, '2026-08-01T00:00:00Z'),
+      peer('same-new', 0, '2026-09-01T00:00:00Z'),
+      peer('far-old', 3, '2026-01-01T00:00:00Z'),
+      peer('near-b', 1, '2026-08-01T00:00:00Z'),
+      peer('two', 2, '2026-08-01T00:00:00Z'),
+    ]
+    const peerRefs = (r: ReturnType<typeof rank>) =>
+      r.items.filter((i) => i.ref.endsWith(':peer')).map((i) => i.ref)
+
+    it('keeps the nearest stage first, then the newest, capped', () => {
+      const r = rank([...fixture, ...peers], { asOf: ASOF, budgetChars: 8000 })
+      expect(peerRefs(r)).toEqual([
+        'attr:co-same-new:peer',
+        'attr:co-same-old:peer',
+        // equal stage and day: ref asc, and '-' sorts before ':'
+        'attr:co-near-b:peer',
+        'attr:co-near:peer',
+        'attr:co-two:peer',
+      ])
+      expect(peerRefs(r)).toHaveLength(PEER_MAX)
+      expect(
+        r.dropped.filter((d) => d.reason === 'peer_cap').map((d) => d.ref),
+      ).toEqual([
+        'attr:co-far-new:peer',
+        'attr:co-far-old:peer',
+        'attr:co-unknown:peer',
+      ])
+      // Each peer a step below the one before.
+      const scores = r.items
+        .filter((i) => i.ref.endsWith(':peer'))
+        .map((i) => i.structural!)
+      const top =
+        DEFAULT_WEIGHTS.hop[1] *
+        DEFAULT_WEIGHTS.edge.peer *
+        DEFAULT_WEIGHTS.prior.attribute
+      expect(scores[0]).toBeCloseTo(top, 9)
+      expect(scores[1]).toBeCloseTo(top * DEFAULT_WEIGHTS.peerStep, 9)
+    })
+
+    it('is independent of input order', () => {
+      const a = rank([...fixture, ...peers], { asOf: ASOF, budgetChars: 8000 })
+      const b = rank([...peers].reverse().concat(fixture), {
+        asOf: ASOF,
+        budgetChars: 8000,
+      })
+      expect(peerRefs(b)).toEqual(peerRefs(a))
+    })
+
+    it('loses to higher-ranked items under a tight budget', () => {
+      const roomy = rank([...fixture, ...peers], {
+        asOf: ASOF,
+        budgetChars: 4000,
+        standingShare: 0,
+      })
+      // The record's own memo outranks the best peer.
+      expect(order(roomy).indexOf(ref.memo(MEMO))).toBeLessThan(
+        order(roomy).indexOf('attr:co-same-new:peer'),
+      )
+      // Room for the floor and what outranks the peers, not for the peers.
+      const tight = rank([...fixture, ...peers], {
+        asOf: ASOF,
+        budgetChars: 220,
+        standingShare: 0,
+      })
+      expect(order(tight)).toContain(ref.memo(MEMO))
+      expect(peerRefs(tight)).toEqual([])
+      expect(
+        tight.dropped.filter(
+          (d) => d.reason === 'budget' && d.ref.endsWith(':peer'),
+        ),
+      ).toHaveLength(PEER_MAX)
+      // A smaller cap keeps fewer, never others.
+      const capped = rank([...fixture, ...peers], {
+        asOf: ASOF,
+        budgetChars: 4000,
+        peerMax: 3,
+      })
+      expect(peerRefs(capped)).toEqual(peerRefs(roomy).slice(0, 3))
     })
   })
 

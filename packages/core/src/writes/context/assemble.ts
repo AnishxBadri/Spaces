@@ -11,7 +11,6 @@ import {
   entitySpace,
   enrichmentRecord,
   link,
-  mandate,
   note,
   signal,
   space,
@@ -29,25 +28,39 @@ import {
 import { task, taskEntity } from '@spaces/db/schema/tasks'
 import type { AttributeDef } from '../../attributes/registry'
 import { fmtMoney } from '../../portfolio/format'
-import { canRead } from '../../read-policy'
 import {
   ContextEntityNotFound,
   ContextLeak,
   ContextQueryFailed,
 } from '../../context/errors'
-import { rank } from '../../context/rank'
 import type { Candidate, RankResult } from '../../context/rank'
 import { ref } from '../../context/ref'
 import { SIMILAR_TOP_N, SimilarLane } from '../../context/similar-lane'
 import { renderAttribute, renderEvent, truncate } from '../../context/render'
 import type { ContextEdge } from '../../context/types'
 import { recordRelationsProgram } from '../read/relations'
-import { liveChainOf, memosTaggedIn, query, readableNote } from './spaces'
+import { sensitivityFor } from '../ai/sensitivity-for'
+import { positionAndPeersProgram } from './position'
+import { assembleSpaceProgram } from './space-subject'
+import {
+  liveChainOf,
+  mandateCandidate,
+  memosTaggedIn,
+  query,
+  rankChecked,
+  readableNote,
+  revealed,
+} from './spaces'
+import type { NoteGate } from './spaces'
 
 /**
  * The assembler, fetch half (docs/spec-ai-substrate.md §1; Effect-first per
  * CONTEXT.md "Backend paradigm"). Walks the graph from one record, renders
  * every row it finds to a Candidate, and hands the list to the pure ranker.
+ *
+ * A space seed is its own subject (`assembleSpaceProgram`); a document seed
+ * puts its own chunks first; a record is placed by its filed spaces' paths
+ * and its leaf spaces' peers (D71).
  *
  * canRead is enforced in SQL (CONTEXT.md: private-note filters live in the
  * queries) — a teammate's private note never enters the ranker. The output
@@ -87,6 +100,13 @@ export type AssembleOptions = {
 export type AssembleResult = RankResult & {
   /** The record actually assembled (after any merge redirect). */
   seed: { id: string; kind: string; name: string }
+  /**
+   * Something assembled is sensitive: the seed by any input, or, for a
+   * space seed, a subspace or member below it. (D71)
+   */
+  sensitive: boolean
+  /** Every entity the context is about, for the caller's egress gate. */
+  reveals: ReadonlyArray<string>
 }
 
 const NOTE_MAX = 2000
@@ -94,6 +114,8 @@ const EVENTS_MAX = 25
 const INTERACTIONS_MAX = 25
 const TASKS_MAX = 25
 const CHUNKS_PER_DOC = 12
+/** A document seed's chunks read; the budget decides how many land. */
+const SEED_CHUNKS_MAX = 60
 
 const iso = (d: Date | string | null | undefined): string | null =>
   d == null ? null : typeof d === 'string' ? d : d.toISOString()
@@ -153,9 +175,12 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
       message: 'Record not found',
     })
   const seedId = seed.id
+  // A space is a subject of its own: its tree, members, memos and terms.
+  if (seed.kind === 'space') return yield* assembleSpaceProgram(seedId, opts)
+
   const candidates: Array<Candidate> = []
   // note visibility rows we let through, for the output invariant
-  const noteRows = new Map<string, { visibility: string; authorId: string }>()
+  const noteRows = new Map<string, NoteGate>()
 
   // ---------- hop 0: attributes ----------
   const values = seed.values
@@ -250,6 +275,47 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
       at: null,
       hop: 0,
     })
+  }
+
+  // ---------- hop 0: a document seed's own chunks, first ----------
+  if (seed.kind === 'document') {
+    const doc = (yield* query(() =>
+      db
+        .select({ filename: document.filename, kind: document.kind })
+        .from(document)
+        .where(eq(document.entityId, seedId)),
+    )).at(0)
+    const label = doc?.filename ?? seed.name
+    const own = yield* query(() =>
+      db
+        .select({
+          idx: chunk.idx,
+          text: chunk.text,
+          lex: opts.taskText
+            ? sql<number>`ts_rank(to_tsvector('english', ${chunk.text}), plainto_tsquery('english', ${opts.taskText}))`
+            : sql<number>`0`,
+        })
+        .from(chunk)
+        .where(
+          and(eq(chunk.entityId, seedId), eq(chunk.sourceKind, 'document')),
+        )
+        .orderBy(asc(chunk.idx))
+        .limit(SEED_CHUNKS_MAX),
+    )
+    const hits = own
+      .filter((c) => Number(c.lex) > 1e-9)
+      .sort((a, b) => Number(b.lex) - Number(a.lex) || a.idx - b.idx)
+    const lexical = new Map(hits.map((c, i) => [c.idx, i + 1]))
+    for (const c of own)
+      candidates.push({
+        ref: ref.doc(seedId, c.idx),
+        kind: 'doc_chunk',
+        text: `${label}${doc ? ` [${doc.kind}]` : ''} p.${c.idx + 1}: ${c.text}`,
+        entityIds: [seedId],
+        at: null,
+        hop: 0,
+        lexicalRank: lexical.get(c.idx),
+      })
   }
 
   // ---------- hop 0: history ----------
@@ -593,6 +659,10 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
       .where(eq(entitySpace.entityId, seedId))
       .orderBy(asc(space.path)),
   )
+  // Where it sits, and the companies beside it in its leaf spaces. (D71)
+  candidates.push(
+    ...(yield* positionAndPeersProgram({ id: seedId, objectId, values }, tags)),
+  )
   if (tags.length > 0) {
     const chain = yield* liveChainOf(tags.map((t) => t.path))
     const direct = new Set(tags.map((t) => t.spaceId))
@@ -663,47 +733,8 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
   }
 
   // ---------- standing: mandate + glossary ----------
-  const m = (yield* query(() =>
-    db
-      .select({
-        id: mandate.id,
-        n: note,
-        stages: mandate.stages,
-        geos: mandate.geos,
-        checkMin: mandate.checkMin,
-        checkMax: mandate.checkMax,
-        currency: mandate.currency,
-      })
-      .from(mandate)
-      .innerJoin(note, eq(note.entityId, mandate.noteEntityId))
-      .where(and(eq(mandate.status, 'active'), readable)),
-  )).at(0)
-  if (m) {
-    noteRows.set(m.n.entityId, {
-      visibility: m.n.visibility,
-      authorId: m.n.authorId,
-    })
-    const cur = m.currency ?? 'USD'
-    const check =
-      m.checkMin != null || m.checkMax != null
-        ? `Check ${m.checkMin != null ? fmtMoney(m.checkMin, cur) : '?'}–${m.checkMax != null ? fmtMoney(m.checkMax, cur) : '?'}.`
-        : ''
-    const head = [
-      m.stages.length ? `Stages: ${m.stages.join(', ')}.` : '',
-      m.geos.length ? `Geos: ${m.geos.join(', ')}.` : '',
-      check,
-    ]
-      .filter(Boolean)
-      .join(' ')
-    candidates.push({
-      ref: ref.mandate(m.id),
-      kind: 'mandate',
-      text: `Mandate: ${head}\n${truncate(m.n.bodyMd, NOTE_MAX)}`.trim(),
-      entityIds: [],
-      at: m.n.updatedAt.toISOString(),
-      hop: 'standing',
-    })
-  }
+  const standingMandate = yield* mandateCandidate(userId, noteRows)
+  if (standingMandate !== null) candidates.push(standingMandate)
   const haystack =
     `${opts.taskText ?? ''}\n${attrText.join('\n')}`.toLowerCase()
   for (const t of yield* query(() =>
@@ -777,23 +808,25 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
         c.superseded = true
   }
 
-  // ---------- rank ----------
-  const result = rank(candidates, {
-    asOf: opts.asOf,
-    budgetChars: opts.budgetChars,
-  })
-
-  // ---------- output invariant: nothing leaves that canRead would refuse ----------
-  for (const item of result.items) {
-    for (const id of item.entityIds) {
-      const row = noteRows.get(id)
-      if (row && !canRead(opts.user, row))
-        return yield* new ContextLeak({
-          ref: item.ref,
-          message: 'canRead refused an assembled item',
-        })
-    }
+  // ---------- rank, held to canRead ----------
+  const result = yield* rankChecked(candidates, noteRows, opts)
+  const sensitivity = yield* sensitivityFor(seedId).pipe(
+    Effect.catchTags({
+      SensitivityReadFailed: (e) =>
+        Effect.fail(new ContextQueryFailed({ cause: e.cause })),
+      SensitivityEntityNotFound: () =>
+        Effect.fail(
+          new ContextEntityNotFound({
+            id: seedId,
+            message: 'Record not found',
+          }),
+        ),
+    }),
+  )
+  return {
+    ...result,
+    seed: { id: seedId, kind: seed.kind, name: seed.name },
+    sensitive: sensitivity.sensitivity === 'sensitive',
+    reveals: revealed(seedId, result.items),
   }
-
-  return { ...result, seed: { id: seedId, kind: seed.kind, name: seed.name } }
 })

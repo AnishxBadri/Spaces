@@ -1,4 +1,6 @@
 import { useSyncExternalStore } from 'react'
+import { SCOPE_MAX, chipKey, withMention } from './page-scope'
+import type { AskScopeChip } from './types'
 
 /**
  * Ask's docked column, per browser: open or closed, its width, and the
@@ -21,8 +23,10 @@ export type DockState = {
   readonly draft: string | null
   /** Bumped by every door, so the composer takes focus. */
   readonly focus: number
-  /** The page's scope chip was removed: ask the whole workspace. */
-  readonly scopeCleared: boolean
+  /** The key of the page chip that was removed; another page's chip shows. */
+  readonly cleared: string | null
+  /** Chips `@` added, after the page's own. */
+  readonly mentioned: ReadonlyArray<AskScopeChip>
 }
 
 const KEY = 'spaces.ask.dock'
@@ -33,7 +37,8 @@ const INITIAL: DockState = {
   threadId: null,
   draft: null,
   focus: 0,
-  scopeCleared: false,
+  cleared: null,
+  mentioned: [],
 }
 
 export const clampWidth = (w: number): number =>
@@ -118,7 +123,7 @@ export function openAsk(opts: OpenAsk = {}) {
     open: true,
     draft: opts.draft ?? null,
     focus: state.focus + 1,
-    scopeCleared: false,
+    cleared: null,
     ...(opts.threadId === undefined ? {} : { threadId: opts.threadId }),
   })
 }
@@ -137,4 +142,20 @@ export function toggleAsk() {
 export const setDockWidth = (width: number) => set({ width: clampWidth(width) })
 export const setDockThread = (threadId: string | null) => set({ threadId })
 export const takeDraft = () => set({ draft: null })
-export const setScopeCleared = (scopeCleared: boolean) => set({ scopeCleared })
+/** Remove the page's chip: the next turn reads beyond it. */
+export const clearPageChip = (chip: AskScopeChip) =>
+  set({ cleared: chipKey(chip) })
+
+/** `@` chose a space or record: one more chip, the oldest giving way. */
+export function addMention(chip: AskScopeChip) {
+  hydrate()
+  // One place is the page chip's.
+  set({ mentioned: withMention(state.mentioned, chip, SCOPE_MAX - 1) })
+}
+
+export function removeMention(chip: AskScopeChip) {
+  hydrate()
+  set({
+    mentioned: state.mentioned.filter((c) => chipKey(c) !== chipKey(chip)),
+  })
+}

@@ -32,6 +32,8 @@ export type ContextEdge =
   | 'supersedes'
   | 'space'
   | 'co_investor'
+  /** Another company filed in the seed's leaf space. (D71) */
+  | 'peer'
 
 /** One canonical, model-agnostic shape for everything AI-visible. */
 export type ContextItem = {

@@ -33,6 +33,8 @@ import { memosTaggedIn, query, readableNote } from './spaces'
  *   ancestor) or sensitive anywhere in its path answers `SpaceBriefRefused`.
  * - Inside the subtree, a sensitive or archived subspace leaves with its
  *   whole branch, and a member sensitive by any input is left out.
+ * - `spaceSubjectProgram` reads the same brief for Ask, where sensitivity
+ *   marks the call instead of cutting the brief (`SpaceBriefMode`).
  */
 
 export class SpaceBriefRefused extends Schema.TaggedError<SpaceBriefRefused>()(
@@ -54,6 +56,23 @@ export const BRIEF_MEMBERS_MAX = 100
 const MEMO_MAX = 2000
 const TERM_MAX = 600
 
+/**
+ * How the brief is read.
+ * - `watch`: it leaves the box. A sensitive or archived subject refuses; a
+ *   sensitive subspace or member is left out.
+ * - `context`: Ask's space subject (D71). Nothing sensitive is cut; the call
+ *   is marked sensitive instead, and only archived subspaces leave.
+ */
+export type SpaceBriefMode = 'watch' | 'context'
+
+/** A brief, and whether anything in it — path, subtree, member — is sensitive. */
+export type SpaceSubject = {
+  brief: SpaceBrief
+  sensitive: boolean
+  /** Every space in the kept subtree and every member, for the egress gate. */
+  reveals: ReadonlyArray<string>
+}
+
 export const spaceBriefProgram = Effect.fn('spaceBriefProgram')(function* (
   spaceId: string,
   reader: { readonly id: string },
@@ -61,7 +80,30 @@ export const spaceBriefProgram = Effect.fn('spaceBriefProgram')(function* (
   SpaceBrief,
   SpaceBriefRefused | ContextQueryFailed | ContextLeak
 > {
+  return (yield* readBrief(spaceId, reader, 'watch')).brief
+})
+
+/** A space as Ask's subject: the brief with nothing sensitive cut. (D71) */
+export const spaceSubjectProgram = Effect.fn('spaceSubjectProgram')(function* (
+  spaceId: string,
+  reader: { readonly id: string },
+): Effect.fn.Return<
+  SpaceSubject,
+  SpaceBriefRefused | ContextQueryFailed | ContextLeak
+> {
+  return yield* readBrief(spaceId, reader, 'context')
+})
+
+const readBrief = Effect.fn('readBrief')(function* (
+  spaceId: string,
+  reader: { readonly id: string },
+  mode: SpaceBriefMode,
+): Effect.fn.Return<
+  SpaceSubject,
+  SpaceBriefRefused | ContextQueryFailed | ContextLeak
+> {
   const refuse = (reason: string) => new SpaceBriefRefused({ spaceId, reason })
+  const watch = mode === 'watch'
 
   // ---------- the subject and its path ----------
   const head = (yield* query(() =>
@@ -91,7 +133,7 @@ export const spaceBriefProgram = Effect.fn('spaceBriefProgram')(function* (
       .orderBy(asc(sql`nlevel(${space.path})`)),
   )
   const archived = path.find((p) => p.archived)
-  if (archived)
+  if (archived && watch)
     return yield* refuse(
       archived.id === head.id
         ? `${head.name} is archived`
@@ -108,7 +150,8 @@ export const spaceBriefProgram = Effect.fn('spaceBriefProgram')(function* (
         Effect.fail(refuse(`no space ${spaceId}`)),
     }),
   )
-  if (sensitivity.sensitivity === 'sensitive') {
+  let sensitive = sensitivity.sensitivity === 'sensitive'
+  if (sensitivity.sensitivity === 'sensitive' && watch) {
     const via =
       sensitivity.via.kind === 'space'
         ? ` (via ${sensitivity.via.name})`
@@ -147,7 +190,9 @@ export const spaceBriefProgram = Effect.fn('spaceBriefProgram')(function* (
   }
   const kept: Array<string> = [head.id]
   const walk = (id: string): ReadonlyArray<{ id: string; name: string }> =>
-    (childrenOf.get(id) ?? []).filter((c) => !c.archived && !c.sensitive)
+    (childrenOf.get(id) ?? []).filter(
+      (c) => !c.archived && (!watch || !c.sensitive),
+    )
   const collect = (id: string): void => {
     for (const c of walk(id)) {
       kept.push(c.id)
@@ -155,6 +200,8 @@ export const spaceBriefProgram = Effect.fn('spaceBriefProgram')(function* (
     }
   }
   collect(head.id)
+  const keptSet = new Set(kept)
+  if (below.some((s) => keptSet.has(s.id) && s.sensitive)) sensitive = true
 
   const counts = new Map(
     (yield* query(() =>
@@ -192,6 +239,13 @@ export const spaceBriefProgram = Effect.fn('spaceBriefProgram')(function* (
         name: entity.canonicalName,
         values: entity.values,
         spaceId: entitySpace.spaceId,
+        sensitive: sql<boolean>`${entity.sensitive} or exists (
+            select 1 from entity_space es
+            join space filed on filed.entity_id = es.space_id
+            join space anc on anc.path @> filed.path
+            join entity ae on ae.id = anc.entity_id
+            where es.entity_id = ${entity.id} and ae.sensitive
+          )`,
       })
       .from(entitySpace)
       .innerJoin(entity, eq(entity.id, entitySpace.entityId))
@@ -201,18 +255,23 @@ export const spaceBriefProgram = Effect.fn('spaceBriefProgram')(function* (
           inArray(entitySpace.spaceId, kept),
           eq(entity.kind, 'company'),
           isNull(entity.mergedIntoId),
-          eq(entity.sensitive, false),
-          sql`not exists (
+          watch
+            ? and(
+                eq(entity.sensitive, false),
+                sql`not exists (
             select 1 from entity_space es
             join space filed on filed.entity_id = es.space_id
             join space anc on anc.path @> filed.path
             join entity ae on ae.id = anc.entity_id
             where es.entity_id = ${entity.id} and ae.sensitive
           )`,
+              )
+            : undefined,
         ),
       )
       .orderBy(asc(entity.canonicalName), asc(entity.id), asc(space.path)),
   )
+  if (memberRows.some((m) => m.sensitive)) sensitive = true
   const shown = memberRows.slice(0, BRIEF_MEMBERS_MAX)
   const domains = new Map<string, Array<string>>()
   if (shown.length > 0)
@@ -316,12 +375,16 @@ export const spaceBriefProgram = Effect.fn('spaceBriefProgram')(function* (
   })
 
   return {
-    space: { id: head.id, name: head.name, criteria: head.criteria },
-    path: path.map((p) => ({ id: p.id, name: p.name })),
-    memos,
-    terms,
-    members,
-    memberCount: memberRows.length,
-    tree: nodeOf(head.id, head.name),
+    brief: {
+      space: { id: head.id, name: head.name, criteria: head.criteria },
+      path: path.map((p) => ({ id: p.id, name: p.name })),
+      memos,
+      terms,
+      members,
+      memberCount: memberRows.length,
+      tree: nodeOf(head.id, head.name),
+    },
+    sensitive,
+    reveals: [...kept, ...shown.map((m) => m.id)],
   }
 })

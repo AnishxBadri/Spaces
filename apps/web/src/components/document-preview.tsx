@@ -17,6 +17,9 @@ import { detectFormat } from '@spaces/core/documents/extract'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
 import type { DocumentKind } from '@spaces/core/documents'
 import { getDocumentDownloadUrl, getDocumentText } from '#/lib/server-fns'
+import { addMention, openAsk } from '#/lib/ask/dock-store'
+import { useAskSubject } from '#/lib/ask/page-scope'
+import type { AskScopeChip } from '#/lib/ask/types'
 import { fileType } from '#/lib/documents/files-tab'
 import { cn } from '#/lib/utils'
 
@@ -57,6 +60,14 @@ type Doc = {
   /** The newer version that supersedes this file; the head says so. (D59) */
   replacedBy?: { id: string; name: string } | null
 }
+
+/** A file as Ask's scope chip: its chunks seed the turn. */
+const fileChip = (doc: Doc): AskScopeChip => ({
+  kind: 'file',
+  id: doc.id,
+  name: doc.filename,
+  href: null,
+})
 
 /** Raster types only — SVG can carry script and is deliberately absent. */
 const PREVIEWABLE_IMAGES = new Set([
@@ -102,6 +113,8 @@ export function DocumentPreview({
   /** Foot actions, left of Cancel. */
   foot?: ReactNode
 }) {
+  // An open file is Ask's default chip while it is on screen. (D70)
+  useAskSubject(doc === null ? null : fileChip(doc))
   return (
     <Dialog open={Boolean(doc)} onOpenChange={onOpenChange}>
       <DialogContent
@@ -303,6 +316,19 @@ function PreviewBody({
 
       {/* The foot, breakout cancelled like the head's. */}
       <DialogFooter className="mx-0 mt-0 mb-0 shrink-0">
+        <DialogClose asChild>
+          <Button
+            variant="ghost"
+            className="mr-auto"
+            title="Ask with this file as the scope"
+            onClick={() => {
+              addMention(fileChip(doc))
+              openAsk()
+            }}
+          >
+            Ask about this
+          </Button>
+        </DialogClose>
         {foot}
         <DialogClose asChild>
           <Button variant="outline">Cancel</Button>

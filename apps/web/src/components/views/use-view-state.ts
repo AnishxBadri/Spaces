@@ -3,6 +3,7 @@ import type { SortingState, VisibilityState } from '@tanstack/react-table'
 import { matchesConditions } from '@spaces/core/views/filter'
 import type { Condition, ViewExtra } from '@spaces/core/views/filter'
 import type { ViewRow } from '@spaces/core/writes/views/store'
+import { useAskSubject } from '#/lib/ask/page-scope'
 import type { ViewSnapshot } from './view-bar'
 
 /**
@@ -23,16 +24,29 @@ export function useViewState<TExtra extends ViewExtra>({
   columnVisibility,
   setColumnVisibility,
   defaultExtra,
+  listPath,
 }: {
   views: Array<ViewRow>
   activeId: string | null
   columnVisibility: VisibilityState
   setColumnVisibility: (v: VisibilityState) => void
   defaultExtra: TExtra
+  /** The list's path; with it, the active view is Ask's default chip. (D70) */
+  listPath?: string
 }) {
   const active = useMemo(
     () => views.find((v) => v.id === activeId) ?? null,
     [views, activeId],
+  )
+  useAskSubject(
+    active === null || active.surface !== 'object' || listPath === undefined
+      ? null
+      : {
+          kind: 'view',
+          id: active.id,
+          name: active.name,
+          href: `${listPath}?view=${active.id}`,
+        },
   )
   const fromView = (
     v: ViewRow | null,

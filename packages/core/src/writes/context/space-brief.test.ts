@@ -308,3 +308,81 @@ describe('Spaces.brief', () => {
     )
   })
 })
+
+describe('a space as the assembler’s subject (D71)', () => {
+  const assemble = async (spaceId: string) => {
+    const { assembleProgram } = await import('./assemble')
+    const { SimilarLaneEmpty } = await import('../../context/similar-lane')
+    return Effect.runPromise(
+      assembleProgram(
+        { entityId: spaceId },
+        { user: { id: me }, asOf: '2026-10-10T00:00:00Z', budgetChars: 20_000 },
+      ).pipe(Effect.provide(SimilarLaneEmpty)),
+    )
+  }
+  const textOf = (
+    r: Awaited<ReturnType<typeof assemble>>,
+    ref: string,
+  ): string => r.items.find((i) => i.ref === ref)?.text ?? ''
+
+  it('returns the tree with counts, members by stage, memos and terms', async () => {
+    const r = await assemble(ids.launch)
+    expect(r.seed).toEqual({ id: ids.launch, kind: 'space', name: 'Launch' })
+    expect(textOf(r, `attr:${ids.launch}:path`)).toBe(
+      'Space: Spacetech › Launch',
+    )
+    expect(textOf(r, `attr:${ids.launch}:criteria`)).toBe(
+      'Criteria: Companies building small-lift launch vehicles.',
+    )
+    // The archived branch leaves; the sensitive one stays, and marks the call.
+    const tree = textOf(r, `attr:${ids.launch}:tree`)
+    expect(tree.split('\n').slice(1)).toEqual([
+      'Launch · 3',
+      '  Secret · 1',
+      '  Small · 1',
+    ])
+    expect(tree).not.toContain('Shelved')
+    const byStage = textOf(r, `attr:${ids.launch}:by_stage`).split('\n')
+    expect(byStage.at(0)).toMatch(/by stage \(5\)/)
+    expect(byStage).toContain('Series A: Varda')
+    expect(byStage.at(-1)).toBe('No stage: Ghost, Hidden, Rocket Lab, Twice')
+    expect(textOf(r, `attr:${ids.varda}:member`)).toMatch(
+      /^Varda — .*Funding stage: Series A/,
+    )
+    expect(textOf(r, `attr:${ids.rocketlab}:member`)).toMatch(
+      /^Rocket Lab \(in Small\)/,
+    )
+    const refs = r.items.map((i) => i.ref)
+    expect(refs).toEqual(
+      expect.arrayContaining([
+        `memo:${ids.memo}`,
+        `memo:${ids.tagged}`,
+        `memo:${ids.parentMemo}`,
+        `memo:${ids.private}`,
+        `term:${ids.term}`,
+        `term:${ids.parentTerm}`,
+      ]),
+    )
+    expect(r.items.find((i) => i.ref === `memo:${ids.memo}`)?.hop).toBe(1)
+    expect(r.items.find((i) => i.ref === `memo:${ids.parentMemo}`)?.hop).toBe(2)
+    expect(r.sensitive).toBe(true)
+    expect(r.reveals).toEqual(
+      expect.arrayContaining([ids.secret, ids.hidden, ids.ghost]),
+    )
+  })
+
+  it('is sensitive only when something under it is', async () => {
+    const small = await assemble(ids.small)
+    expect(small.sensitive).toBe(false)
+    expect(
+      textOf(small, `attr:${ids.small}:tree`).split('\n').slice(1),
+    ).toEqual(['Small · 1'])
+    // Its own path is sensitive: so is the call.
+    expect((await assemble(ids.under)).sensitive).toBe(true)
+  })
+
+  it('leaves the watch brief exactly as it was', async () => {
+    const b = await ok(ids.launch)
+    expect(b.members.map((m) => m.name)).toEqual(['Rocket Lab', 'Varda'])
+  })
+})

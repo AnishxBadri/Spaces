@@ -38,6 +38,10 @@ export type RecordContext = {
   seed: { id: string; kind: string; name: string }
   items: Array<RecordContextItem>
   usedChars: number
+  /** Something assembled is sensitive — `AssembleResult.sensitive`. */
+  sensitive: boolean
+  /** Every entity the context is about, for an egress gate. */
+  reveals: ReadonlyArray<string>
   /**
    * Whether the judgment-memory mode can say anything: an embedding model is
    * pinned. The readout shows its toggle only when this is true.
@@ -109,6 +113,8 @@ export const recordContextProgram = Effect.fn('recordContextProgram')(
     return {
       seed: result.seed,
       usedChars: result.usedChars,
+      sensitive: result.sensitive,
+      reveals: result.reveals,
       similarAvailable,
       items: result.items.map((i, n) => {
         const atMs = i.at === null ? Number.NaN : Date.parse(i.at)

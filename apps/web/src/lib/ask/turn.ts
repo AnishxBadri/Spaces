@@ -21,6 +21,14 @@ import type { ToolCaller } from '#/lib/mcp/registry'
 import { recordPath } from '#/lib/record-path'
 import { citedRefs } from './answer'
 import { storeCardsProgram } from './card-store'
+import {
+  SCOPE_DROPPED,
+  entityChips,
+  scopeQueryInput,
+  scopeSentences,
+} from './scope'
+import type { TurnScope } from './scope'
+import { resolveScopeProgram } from './scope-read'
 import type { HeldCard } from './card-store'
 import type { AskCardView } from './cards'
 import {
@@ -94,7 +102,7 @@ const beginProgram = Effect.fn('ask.begin')(function* (input: AskInput) {
     input.threadId === null
       ? null
       : yield* ownThreadProgram(input.userId, input.threadId)
-  const scoped = input.scope.find((c) => c.id !== null)
+  const scoped = entityChips(input.scope).at(0)
   const runId = yield* openRunProgram({
     task: 'Ask',
     entityId: scoped?.id ?? null,
@@ -207,14 +215,11 @@ const gateOf = Effect.fn('ask.gate')(function* (
   return { sensitive: false, via: null }
 })
 
-const TASK = (input: AskInput, history: string): string => {
-  const scope = input.scope.filter((c) => c.id !== null)
+const TASK = (input: AskInput, turn: TurnScope, history: string): string => {
   return [
     'You answer questions about the reader’s own deal-management workspace: companies, people, deals, notes, documents, spaces and the portfolio.',
     'Use the tools to look things up; never answer from memory. Counts, filters and money come from query_records and the portfolio tools, never from your own arithmetic over a sample.',
-    scope.length === 0
-      ? 'The reader is asking about the whole workspace.'
-      : `The reader is asking about ${scope.map((c) => `${c.name} (${c.kind}, id ${c.id})`).join(' and ')}; start with get_context on it.`,
+    ...scopeSentences(input.scope, turn),
     'Cite every sentence that states a fact, right after it, in square brackets: a record as [record:<id>] with the id a tool returned, and a context item by the ref it carries, exactly as written — for example [note:<id>] or [doc:<id>#3]. Several refs share one bracket, separated by commas.',
     'A sentence you cannot cite does not belong in the answer. If nothing was found, say so in one line and name what you searched.',
     'Write markdown: short paragraphs, `- ` bullets, and a pipe table for a list of records. No title line, no code fence.',
@@ -405,7 +410,14 @@ const proposedView = (held: HeldCard): AskCardView => ({
 })
 
 /** A turn as events: the rows, the route, calls and text, then the stored turn. */
-export async function* askEvents(input: AskInput): AsyncGenerator<AskEvent> {
+export async function* askEvents(asked: AskInput): AsyncGenerator<AskEvent> {
+  // Each chip resolved on its own: one that cannot be is dropped, with a
+  // line, and the turn is asked and stored in the rest.
+  const resolved = await Effect.runPromise(
+    resolveScopeProgram(asked.userId, asked.scope),
+  )
+  const input: AskInput = { ...asked, scope: resolved.kept }
+  const narrowing = resolved.narrowing
   const started = await Effect.runPromise(beginProgram(input))
   const { begun } = started
   yield {
@@ -417,9 +429,20 @@ export async function* askEvents(input: AskInput): AsyncGenerator<AskEvent> {
   }
 
   const known = new Map<string, Gate>()
-  const scopeIds = input.scope.flatMap((c) => (c.id === null ? [] : [c.id]))
+  const scopeIds = entityChips(input.scope).map((c) => c.id)
   let gate = await Effect.runPromise(gateOf(scopeIds, known))
   const calls = new Map<string, AskCall>()
+  for (const [i, d] of resolved.dropped.entries()) {
+    const call: AskCall = {
+      tool: SCOPE_DROPPED,
+      state: 'refused',
+      input: d.chip.name,
+      found: null,
+      reason: d.line,
+    }
+    calls.set(`scope-${i}`, call)
+    yield { type: 'call', id: `scope-${i}`, call }
+  }
   const touched = new Set<string>()
   const seen = new Set<string>()
   let text = ''
@@ -459,7 +482,13 @@ export async function* askEvents(input: AskInput): AsyncGenerator<AskEvent> {
           inputSchema: z.object(t.inputSchema),
           execute: async (raw, { toolCallId }) => {
             const exit = await Effect.runPromiseExit(
-              toolRegistry.call(t.name, caller, raw),
+              toolRegistry.call(
+                t.name,
+                caller,
+                t.name === 'query_records'
+                  ? scopeQueryInput(raw, narrowing)
+                  : raw,
+              ),
             )
             if (Exit.isFailure(exit)) {
               calls.set(toolCallId, {
@@ -541,7 +570,7 @@ export async function* askEvents(input: AskInput): AsyncGenerator<AskEvent> {
             sensitivity: gate.sensitive ? 'sensitive' : 'normal',
             ...(gate.via === null ? {} : { via: gate.via }),
             budgetChars: ASK_BUDGET_CHARS,
-            task: TASK(input, begun.history),
+            task: TASK(input, narrowing, begun.history),
             runId: begun.runId,
             tools,
             maxSteps: ASK_MAX_STEPS,
@@ -628,7 +657,7 @@ export async function* askEvents(input: AskInput): AsyncGenerator<AskEvent> {
         ),
       )
       const retrieval = [...calls.values()].filter(
-        (c) => c.tool !== 'list_registry',
+        (c) => c.tool !== 'list_registry' && c.tool !== SCOPE_DROPPED,
       )
       const empty =
         refs.length === 0 &&
