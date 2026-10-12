@@ -180,3 +180,20 @@ export function providersFor(
     return products.length === 0 ? [] : [{ provider, products }]
   })
 }
+
+/**
+ * Whether the provider limits this account's grant to days: Google says
+ * when a refresh token lapses only for an OAuth client in Testing mode,
+ * whose tokens last 7 days.
+ */
+export function testingModeOf(account: Account): boolean {
+  return (
+    account.provider === 'google' &&
+    account.held.some((r) => r.refreshExpiresAt !== null)
+  )
+}
+
+/** The account's mail row, when it holds one: where a mail sync's settings hang. */
+export function mailRowOf(account: Account): ConnectionListRow | null {
+  return account.rows.find((r) => r.product === 'gmail') ?? null
+}

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import type { Json } from '@spaces/core/json'
 import type { Decider } from './propose'
+import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 /**
  * The suggestion table end to end (SPA-46): propose writes a row and no
@@ -111,7 +112,9 @@ describe('propose → accept', () => {
     expect(row?.decidedAt).toBeInstanceOf(Date)
 
     // The record timeline shows the change as the accepter's, not a machine's.
-    const timeline = await Effect.runPromise(recordTimelineProgram(entityId))
+    const timeline = await Effect.runPromise(
+      recordTimelineProgram(entityId, FIXTURE_ACTOR),
+    )
     const burst = timeline.find((i) => i.type === 'attrs')
     expect(burst).toMatchObject({
       actorType: 'user',

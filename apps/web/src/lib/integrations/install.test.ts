@@ -428,7 +428,7 @@ describe('uninstall', () => {
       .from(entity)
       .where(eq(entity.id, entityId))
     expect(born).toEqual({ sourceClass: 'integration', sourceRef: row.id })
-    const timeline = await run(recordTimelineProgram(entityId))
+    const timeline = await run(recordTimelineProgram(entityId, FIXTURE_ACTOR))
     expect(timeline.find((i) => i.type === 'attrs')).toMatchObject({
       actorType: 'integration',
       integrationName: 'Echo, since removed',
@@ -442,7 +442,9 @@ describe('uninstall', () => {
     expect((await rows()).map((r) => [r.id, r.removedAt])).toEqual([
       [row.id, null],
     ])
-    const timelineAfter = await run(recordTimelineProgram(entityId))
+    const timelineAfter = await run(
+      recordTimelineProgram(entityId, FIXTURE_ACTOR),
+    )
     expect(timelineAfter.find((i) => i.type === 'attrs')).toMatchObject({
       integrationName: 'Echo',
     })

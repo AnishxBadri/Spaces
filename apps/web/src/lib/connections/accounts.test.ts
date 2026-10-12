@@ -7,6 +7,8 @@ import {
   offerFor,
   providersFor,
   syncStateOf,
+  testingModeOf,
+  mailRowOf,
   wordsOf,
 } from './accounts'
 
@@ -23,6 +25,7 @@ const row = (over: Partial<ConnectionListRow> = {}): ConnectionListRow => ({
   errorReason: null,
   lastSyncAt: null,
   connectedAt: '2026-10-01T09:00:00.000Z',
+  refreshExpiresAt: null,
   ...over,
 })
 
@@ -204,5 +207,18 @@ describe('providersFor', () => {
       { provider: 'box', products: ['box'] },
     ])
     expect(providersFor('meeting-notes')).toEqual([])
+  })
+})
+
+describe('testingModeOf', () => {
+  it('reads Google’s Testing mode off a refresh token that lapses', () => {
+    const lapsing = row({ refreshExpiresAt: '2026-10-08T09:00:00.000Z' })
+    const account = accountOf(lapsing, 'email-calendar', [lapsing])
+    expect(testingModeOf(account)).toBe(true)
+    expect(mailRowOf(account)).toBe(lapsing)
+    const lasting = row()
+    expect(testingModeOf(accountOf(lasting, 'email-calendar', [lasting]))).toBe(
+      false,
+    )
   })
 })

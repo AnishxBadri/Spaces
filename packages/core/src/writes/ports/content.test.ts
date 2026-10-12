@@ -17,6 +17,7 @@ import { activity } from '@spaces/db/schema/activity'
 import { Content } from '@spaces/sdk'
 import type {
   InteractionClaim,
+  EmailClaim,
   MeetingCancellation,
   MeetingClaim,
   SignalClaim,
@@ -24,6 +25,8 @@ import type {
 import { Enqueue } from '../../queue/enqueue'
 import { resolveEntity } from '../entities/resolve'
 import { MeetingLane } from '../interactions/meeting-lane'
+import { EmailLane } from '../interactions/email-lane'
+import type { EmailInput, EmailLaneContext } from '../interactions/email-lane'
 import type {
   MeetingInput,
   MeetingLaneContext,
@@ -66,9 +69,21 @@ const MeetingLaneTest = Layer.succeed(
     participants: () => Effect.succeed([]),
   }),
 )
+/** What `logEmail` handed the lane, in order. */
+const mailed: Array<{ ctx: EmailLaneContext; input: EmailInput }> = []
+const EmailLaneTest = Layer.succeed(
+  EmailLane,
+  EmailLane.of({
+    log: (ctx, input) =>
+      Effect.sync(() => {
+        mailed.push({ ctx, input })
+        return { outcome: 'created', interactionId: 'held-by-the-mail-lane' }
+      }),
+  }),
+)
 const live = (row: { id: string; capabilityId: string }) =>
   ContentLive(row).pipe(
-    Layer.provide(Layer.merge(EnqueueTest, MeetingLaneTest)),
+    Layer.provide(Layer.mergeAll(EnqueueTest, MeetingLaneTest, EmailLaneTest)),
   )
 
 const run = <TValue>(
@@ -619,5 +634,51 @@ describe('Content.logMeeting', () => {
     expect(handed.map((h) => h.input)).toEqual([
       { _tag: 'meeting-cancelled', eventId: 'evt-9', uid: null },
     ])
+  })
+})
+
+describe('Content.logEmail', () => {
+  const logEmail = (claim: EmailClaim) =>
+    Effect.gen(function* () {
+      return yield* (yield* Content).logEmail(claim)
+    })
+  const message = 'Message-ID: <a@acme.example>\r\nSubject: Hi\r\n\r\nHello\r\n'
+  const claim: EmailClaim = {
+    _tag: 'email',
+    providerMessageId: ' 18c2 ',
+    raw: Buffer.from(message).toString('base64url'),
+    receivedAt: '2026-10-12T10:00:00Z',
+    labels: ['INBOX', ' ', 'Promotions '],
+  }
+
+  it('hands the lane the decoded bytes and the bound row, nothing else', async () => {
+    mailed.length = 0
+    const row = await boundRow('gmail')
+    expect(await run(row, logEmail(claim))).toEqual({
+      outcome: 'created',
+      interactionId: 'held-by-the-mail-lane',
+    })
+    expect(mailed).toHaveLength(1)
+    const [call] = mailed
+    expect(call.ctx).toEqual({ integrationId: row.id })
+    expect(Buffer.from(call.input.raw).toString()).toBe(message)
+    expect(call.input).toMatchObject({
+      providerMessageId: '18c2',
+      receivedAt: new Date('2026-10-12T10:00:00Z'),
+      labels: ['INBOX', 'Promotions'],
+    })
+  })
+
+  it('refuses permanently a claim that is not base64url or not dated', async () => {
+    mailed.length = 0
+    const row = await boundRow('gmail')
+    const bad = await runExit(row, logEmail({ ...claim, raw: 'not base64!' }))
+    expect(JSON.stringify(bad)).toContain('not base64url')
+    const undated = await runExit(
+      row,
+      logEmail({ ...claim, receivedAt: 'yesterday' }),
+    )
+    expect(JSON.stringify(undated)).toContain('receivedAt')
+    expect(mailed).toEqual([])
   })
 })

@@ -372,6 +372,34 @@ export type MeetingResult =
   | { readonly outcome: 'refused'; readonly reason: string }
 
 /**
+ * `Content.logEmail(claim)` (SDK 1.5): one message from a connected mailbox,
+ * handed over whole. The host decides everything else.
+ * - The host parses `raw`, refuses noise and anything the connection's
+ *   exclude list names before a byte is stored, resolves participants, files
+ *   attachments and dedupes on the RFC Message-ID, so a thread both
+ *   forwarded and synced is one interaction.
+ * - Who may read the body is the host's (D67): the claim carries no
+ *   visibility and must not grow one.
+ */
+export type EmailClaim = {
+  readonly _tag: 'email'
+  /** The provider's own id for the message (Gmail's `id`). */
+  readonly providerMessageId: string
+  /** The message's RFC 5322 bytes, base64url, as Gmail's `format=raw` returns them. */
+  readonly raw: string
+  /** When the mailbox received it (Gmail's `internalDate`). */
+  readonly receivedAt: IsoTimestamp
+  /** The labels the message carries, by name (`Inbox`, `Promotions`, a user label). */
+  readonly labels: ReadonlyArray<string>
+}
+
+/** What `Content.logEmail` decided. `duplicate`: the Message-ID was already held. */
+export type EmailResult =
+  | { readonly outcome: 'created'; readonly interactionId: string }
+  | { readonly outcome: 'duplicate' }
+  | { readonly outcome: 'refused'; readonly reason: string }
+
+/**
  * `Content.emitSignal(claim)`: a dated observation about one entity — a web
  * mention, a funding round, a hire. Evidence, not a fact: it never touches
  * an attribute.
@@ -410,6 +438,7 @@ export type ContentClaim =
   | SignalClaim
   | MeetingClaim
   | MeetingCancellation
+  | EmailClaim
 
 /** A note the reviewer may accept onto the record. */
 export type NoteProposal = { readonly kind: 'note'; readonly body: string }
@@ -624,9 +653,24 @@ export class CursorInvalid extends Schema.TaggedError<CursorInvalid>()(
   { reason: Schema.String },
 ) {}
 
+/**
+ * The provider refused the bound connection's grant — a 401, a revoked
+ * token. The host marks the connection `error` with this reason, which the
+ * account page shows beside Reconnect, and fails the run without a retry:
+ * retrying sends the same refused token. (SDK 1.5)
+ */
+export class ConnectionRefused extends Schema.TaggedError<ConnectionRefused>()(
+  'ConnectionRefused',
+  { reason: Schema.String },
+) {}
+
 export type ScheduleJob<TServices = unknown> = (
   input: ScheduleInput,
-) => Effect.Effect<ScheduleOutput, JobError | CursorInvalid, TServices>
+) => Effect.Effect<
+  ScheduleOutput,
+  JobError | CursorInvalid | ConnectionRefused,
+  TServices
+>
 
 /** `event` — enrich-on-create and its kin. */
 export type EventInput = { readonly event: DomainEvent }

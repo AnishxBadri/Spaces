@@ -10,8 +10,12 @@ import {
   entityAlias,
   interaction,
   interactionEntity,
+  note,
 } from '@spaces/db/schema'
+import { activity } from '@spaces/db/schema/activity'
 import { writeIntegrationInteraction } from '@spaces/core/writes/interactions/write'
+import type { BodyVisibility } from '@spaces/core/writes/interactions/write'
+import type { EmailMeta } from '@spaces/db/schema'
 import type { Address } from './forwarded'
 import type { ArrivalMessage } from './message'
 import { participantRecordsProgram } from './participant-records'
@@ -63,10 +67,10 @@ import type { AttachmentOutcome } from './attachment-filing'
  * so next week's reply is on the same records without re-matching — even
  * when its only participant in common with the thread root is the root.
  *
- * **The body is a note, born shared** (D30, amended by D49). Forwarding is
- * the consent, so a forwarded body is `visibility: 'shared'` from birth; the
- * private-until-attached default is the synced mailbox's (arrival-10), not
- * this lane's. The note is claimed by `interaction.note_id` and filed
+ * **The body is a note** (D30). Forwarding is the consent, so a forwarded
+ * body is `visibility: 'shared'` from birth (D49); a synced mailbox's body is
+ * private to its owner unless the connection shares it (D67, `FileOptions`).
+ * The note is claimed by `interaction.note_id` and filed
  * against nothing: it reaches a record through the interaction's edges on
  * the timeline, not through `link(tagged_in)`, which would put every mail in
  * every participant's Notes section.
@@ -87,10 +91,38 @@ export class ArrivalWriteFailed extends Schema.TaggedError<ArrivalWriteFailed>()
 ) {}
 
 export type FileContext = {
-  /** The core mailbox integration — `source_ref` on every row written. */
+  /** The mailbox's integration — `source_ref` on every row written. */
   integrationId: string
   /** The workspace user the body note is authored by. */
   authorId: string
+}
+
+/**
+ * What differs between the two mail lanes. A forwarded body is born shared
+ * (D49); a synced one is the connection's to decide (D67), and carries the
+ * mailbox's labels so a later exclude list can find it.
+ */
+export type FileOptions = {
+  visibility: BodyVisibility
+  labels: ReadonlyArray<string> | null
+}
+
+export const FORWARDED: FileOptions = { visibility: 'shared', labels: null }
+
+/** The headers an email row keeps in `interaction.meta` (D67). */
+export function emailMetaOf(
+  message: ArrivalMessage,
+  labels: ReadonlyArray<string> | null,
+): EmailMeta {
+  return {
+    kind: 'email',
+    from: message.from?.email ?? '',
+    to: message.to.map((a) => a.email),
+    cc: message.cc.map((a) => a.email),
+    date: message.occurredAt.toISOString(),
+    mime_blob_sha: null,
+    ...(labels === null ? {} : { labels: [...labels] }),
+  }
 }
 
 export type Filed =
@@ -182,6 +214,42 @@ export function chooseFilingCompany(
   return sender.length === 1 ? sender[0] : null
 }
 
+/**
+ * The body of the interaction a Message-ID already holds, made shared when
+ * it was private, with a `note.visibility_changed` row naming the lane.
+ */
+async function widenBody(
+  tx: Tx,
+  messageId: string,
+  integrationId: string,
+): Promise<void> {
+  const widened = await tx
+    .update(note)
+    .set({ visibility: 'shared', updatedAt: new Date() })
+    .where(
+      and(
+        eq(note.visibility, 'private'),
+        eq(
+          note.entityId,
+          sql`(select ${interaction.noteId} from ${interaction} where ${interaction.messageId} = ${messageId})`,
+        ),
+      ),
+    )
+    .returning({ id: note.entityId })
+  for (const { id } of widened)
+    await tx.insert(activity).values({
+      actorId: null,
+      verb: 'note.visibility_changed',
+      subjectEntityId: id,
+      meta: {
+        from: 'private',
+        to: 'shared',
+        integrationId,
+        reason: 'forwarded',
+      },
+    })
+}
+
 /** The live companies among an edge list. */
 async function companiesOf(
   tx: Tx,
@@ -221,6 +289,7 @@ async function threadEdges(tx: Tx, threadId: string): Promise<Array<string>> {
 export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
   message: ArrivalMessage,
   ctx: FileContext,
+  options: FileOptions = FORWARDED,
 ): Effect.fn.Return<Filed, ArrivalWriteFailed> {
   // Participants → records, through the gate (SPA-86). Before the
   // transaction, and for a duplicate too: a re-read is all attaches.
@@ -237,12 +306,12 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
           threadId: message.threadId,
           subject: message.subject,
           occurredAt: message.occurredAt,
-          // Forwarding is the consent (D49): a forwarded body is born shared.
+          meta: emailMetaOf(message, options.labels),
           body: {
             title: message.subject ?? '',
             text: message.body,
             authorId: ctx.authorId,
-            visibility: 'shared',
+            visibility: options.visibility,
           },
           // Matched and inherited after the row exists, as before the
           // extraction: the writer calls this inside the same transaction.
@@ -252,7 +321,14 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
             ...(await threadEdges(tx, message.threadId)),
           ],
         })
-        if (wrote.kind === 'duplicate') return wrote
+        if (wrote.kind === 'duplicate') {
+          // Forwarding is the consent (D49): a forward of a thread a mailbox
+          // synced privately widens that body. A synced duplicate changes
+          // nothing — two private copies of one thread is mailbox #2's.
+          if (options.visibility === 'shared')
+            await widenBody(tx, message.messageId, ctx.integrationId)
+          return wrote
+        }
         if (wrote.noteId === null)
           throw new Error('the mailbox writes a body for every interaction')
         const { interactionId, noteId, edges } = wrote

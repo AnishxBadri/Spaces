@@ -1,5 +1,6 @@
 import { Effect, Redacted } from 'effect'
 import {
+  ConnectionRefused,
   Content,
   CursorInvalid,
   Http,
@@ -27,14 +28,19 @@ const QUOTA = /rateLimitExceeded|userRateLimitExceeded|quotaExceeded/
  * - 410 on a sync token is `CursorInvalid`: the host clears the cursor and
  *   the next run starts again from `connectedAt`. On the bounded first pull
  *   it is Google's hiccup, and retryable.
- * - 401 is a revoked or expired grant: permanent, in Google's words.
+ * - 401 is a revoked or expired grant: `ConnectionRefused`, which marks the
+ *   connection in error and is never retried.
  */
 const refused = (
   response: HttpResponse,
   resumed: boolean,
 ): Effect.Effect<
   never,
-  JobRetryable | JobRateLimited | JobPermanent | CursorInvalid
+  | JobRetryable
+  | JobRateLimited
+  | JobPermanent
+  | CursorInvalid
+  | ConnectionRefused
 > => {
   const { status } = response
   if (status === 410)
@@ -58,13 +64,14 @@ const refused = (
     return Effect.fail(
       new JobRetryable({ reason: `Google Calendar answered ${status}` }),
     )
+  if (status === 401)
+    return Effect.fail(
+      new ConnectionRefused({
+        reason: 'Google refused the calendar connection: reconnect it',
+      }),
+    )
   return Effect.fail(
-    new JobPermanent({
-      reason:
-        status === 401
-          ? 'Google refused the calendar connection: reconnect it'
-          : `Google Calendar answered ${status}`,
-    }),
+    new JobPermanent({ reason: `Google Calendar answered ${status}` }),
   )
 }
 

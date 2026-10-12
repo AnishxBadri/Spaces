@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { isRoleSender, meetingRefusal, refusal } from './noise'
+import {
+  DEFAULT_MAIL_EXCLUDE,
+  isRoleSender,
+  mailExclusion,
+  meetingRefusal,
+  refusal,
+  senderEntry,
+} from './noise'
 import type {
   MeetingNoiseInput,
   MeetingNoiseReason,
@@ -232,5 +239,77 @@ describe('meetingRefusal — the calendar table', () => {
     expect(meetingRefusal({ ...external, ...input })?.reason ?? null).toBe(
       verdict,
     )
+  })
+})
+
+describe("mailExclusion — a connected mailbox's exclude list", () => {
+  const founder = {
+    sender: 'jane@acme.io',
+    participants: ['anish@fund.example', 'cfo@acme.io'],
+    labels: ['INBOX'],
+  }
+  const TABLE_EXCLUDE: ReadonlyArray<{
+    name: string
+    input: Partial<typeof founder>
+    senders?: ReadonlyArray<string>
+    excluded: boolean
+  }> = [
+    { name: 'a founder, the default list', input: {}, excluded: false },
+    {
+      name: 'a Promotions label',
+      input: { labels: ['INBOX', 'promotions'] },
+      excluded: true,
+    },
+    {
+      name: 'a noreply@ sender, whatever the domain',
+      input: { sender: 'NoReply+receipts@saas.example' },
+      excluded: true,
+    },
+    {
+      name: 'a notifications@ address copied on a real thread',
+      input: { participants: ['notifications@github.com'] },
+      excluded: false,
+    },
+    {
+      name: 'a list-service bounce domain, as a subdomain',
+      input: { sender: 'bounce@mail.mcsv.net' },
+      excluded: true,
+    },
+    {
+      name: 'a domain the owner added, on the Cc line',
+      input: { participants: ['someone@family.example'] },
+      senders: ['@Family.example'],
+      excluded: true,
+    },
+    {
+      name: 'a domain the owner added does not catch a lookalike',
+      input: { sender: 'x@notfamily.example' },
+      senders: ['family.example'],
+      excluded: false,
+    },
+    {
+      name: 'an address the owner added',
+      input: { sender: 'calendar-notification@google.com' },
+      excluded: true,
+    },
+  ]
+  for (const row of TABLE_EXCLUDE)
+    it(row.name, () => {
+      const exclude =
+        row.senders === undefined
+          ? DEFAULT_MAIL_EXCLUDE
+          : { ...DEFAULT_MAIL_EXCLUDE, senders: row.senders }
+      const verdict = mailExclusion({ ...founder, ...row.input }, exclude)
+      expect(verdict?.reason ?? null).toBe(row.excluded ? 'excluded' : null)
+    })
+
+  it('reads entries as domains, addresses or local parts, and nothing else', () => {
+    expect(senderEntry(' @Acme.IO ')).toBe('acme.io')
+    expect(senderEntry('noreply@')).toBe('noreply@')
+    expect(senderEntry('jane@acme.io')).toBe('jane@acme.io')
+    expect(senderEntry('not a domain')).toBeNull()
+    expect(senderEntry('@')).toBeNull()
+    for (const entry of DEFAULT_MAIL_EXCLUDE.senders)
+      expect(senderEntry(entry)).toBe(entry)
   })
 })

@@ -73,6 +73,7 @@ describe('listConnectionsFor', () => {
       status: 'error',
       errorReason: 'invalid_grant: Token has been expired or revoked.',
       lastSyncAt: null,
+      refreshTokenExpiresAt: null,
       createdAt: expect.any(Date),
     })
     expect(Object.keys(rows[0])).not.toContain('tokensEnc')

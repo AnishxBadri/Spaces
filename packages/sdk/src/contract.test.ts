@@ -6,6 +6,7 @@ import type {
   AliasClaim,
   AttributeProposal,
   ContentClaim,
+  EmailClaim,
   DiscoverClaim,
   DocumentBytes,
   DocumentClaim,
@@ -66,6 +67,13 @@ describe('claims carry no provenance (D52)', () => {
     >().toEqualTypeOf<never>()
     expectTypeOf<
       Extract<KeysOf<InteractionClaim>, Provenance>
+    >().toEqualTypeOf<never>()
+    expectTypeOf<
+      Extract<KeysOf<EmailClaim>, Provenance>
+    >().toEqualTypeOf<never>()
+    // Who may read a synced body is the host's (D67), never the plugin's.
+    expectTypeOf<
+      Extract<KeysOf<EmailClaim>, 'visibility'>
     >().toEqualTypeOf<never>()
     expectTypeOf<
       Extract<KeysOf<SignalClaim>, Provenance>

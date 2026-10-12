@@ -188,13 +188,13 @@ const WEB_NEVER_PLUGINS_NEVER_WORKER = {
 //     embed-backfill, embed-document, embed-source, key-terms, read-deck,
 //     read-deck-summarize, run, sensitivity-for, suggest-spaces, summarize,
 //     vision}
-//   lib/arrival/{meeting, poll, schedule}
+//   lib/arrival/{meeting, poll, schedule, synced}
 //   lib/documents/{blob-refs, fetch-guard, on-extracted, refile, vision-gate}
 //   lib/glossary/link-terms · lib/import/commit · lib/queue · lib/server/env
 // and, from tests only:
 //   lib/ai/{embed-chunks, embedding-pin, propose, route, providers/embed/ids,
 //     providers/embed/settings}
-//   lib/arrival/{fixtures, settings}
+//   lib/arrival/{fixtures, noise, settings}
 //   lib/documents/{attach-link, clip, read-deck-gate, shelf, space-sources}
 //     · lib/import/{mapping, plan, stage} · lib/inbox/queue
 //     · lib/integrations/{job-status, ledger, status}

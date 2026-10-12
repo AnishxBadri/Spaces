@@ -22,6 +22,7 @@ import type { FileInput, JobError, PortService } from '@spaces/sdk'
 import { JobContext } from '../run-job'
 import { ExtractionStore, extractDocument } from '../jobs/extract-document'
 import { reconcilePlugins } from './loader'
+import { NoEmailLane } from '@spaces/core/writes/interactions/email-lane'
 
 /**
  * The importer fixture's `importDeck` job — the real bundle, loaded by the
@@ -114,7 +115,11 @@ describe('the importer importDeck job, on the live ports', () => {
             LogLive(row.capabilityId, {
               sink: (_level, line) => logged.push(line),
             }),
-          ).pipe(Layer.provide(Layer.merge(RecordingEnqueue, NoMeetingLane))),
+          ).pipe(
+            Layer.provide(
+              Layer.mergeAll(RecordingEnqueue, NoMeetingLane, NoEmailLane),
+            ),
+          ),
         ),
       ),
     )

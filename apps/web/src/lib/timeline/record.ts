@@ -11,12 +11,14 @@ import {
   interactionDocument,
   interactionEntity,
   link,
+  note,
 } from '@spaces/db/schema'
 import type { InteractionMeta } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { investment } from '@spaces/db/schema/portfolio'
 import { jsonRecord, jsonString, jsonStrings } from '@spaces/core/json'
 import { sinceRemoved } from '@spaces/core/plugins/registry'
+import { canRead } from '@spaces/core/read-policy'
 import type { Json } from '@spaces/core/json'
 import { resolveRefsProgram } from '@spaces/core/writes/context/names'
 import type { ResolvedRef } from '@spaces/core/writes/context/names'
@@ -55,7 +57,7 @@ const query = <T>(run: () => Promise<T>) =>
   })
 
 export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
-  function* (entityId: string) {
+  function* (entityId: string, viewer: { id: string }) {
     const users = yield* query(() =>
       db.select({ id: user.id, name: user.name }).from(user),
     )
@@ -248,6 +250,27 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
     const attachmentsBy = new Map(
       attachmentRows.map((r) => [r.interactionId, r.n]),
     )
+    // canRead on every write-up: a body the viewer may not read is not
+    // linked, and its row says so. Subject, participants and date stay (D67).
+    const noteIds = myInteractions.flatMap((i) =>
+      i.noteId === null ? [] : [i.noteId],
+    )
+    const bodies =
+      noteIds.length > 0
+        ? yield* query(() =>
+            db
+              .select({
+                id: note.entityId,
+                visibility: note.visibility,
+                authorId: note.authorId,
+              })
+              .from(note)
+              .where(inArray(note.entityId, noteIds)),
+          )
+        : []
+    const unreadable = new Set(
+      bodies.filter((b) => !canRead(viewer, b)).map((b) => b.id),
+    )
     // A person's own emails, so a meeting row can say how they answered.
     const ownEmails =
       kind === 'person' && self ? jsonStrings(self.values.emails) : []
@@ -349,7 +372,9 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
         id: i.id,
         kind: i.kind,
         subject: i.subject ?? '',
-        noteId: i.noteId,
+        noteId: i.noteId !== null && unreadable.has(i.noteId) ? null : i.noteId,
+        /** The write-up exists and is private to someone else. */
+        privateBody: i.noteId !== null && unreadable.has(i.noteId),
         at: i.occurredAt.toISOString(),
         attendees: attendeesBy.get(i.id) ?? [],
         via: i.sourceRef

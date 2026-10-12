@@ -1,0 +1,31 @@
+{
+  "//": "Gmail, forward-only: one `schedule` job reads the connected mailbox's history feed from the stored historyId — the first the mailbox's own historyId from its profile, the first pull bounded by the connection's date — fetches the new messages' raw bytes through the batch endpoint and hands each to Content.logEmail. The host parses, refuses noise and the connection's exclude list, files participants and attachments, dedupes on the Message-ID and decides who reads the body. An expired historyId is CursorInvalid, never a full-history import. Depends on @spaces/sdk only; effect and zod are peers the host provides.",
+  "name": "@spaces/plugin-gmail",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "pack:plugin": "spaces-plugin-pack .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10",
+    "zod": "^4.3.6"
+  }
+}

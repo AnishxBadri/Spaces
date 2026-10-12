@@ -20,6 +20,7 @@ export type ConnectionListing = {
   readonly status: 'active' | 'error' | 'revoked'
   readonly errorReason: string | null
   readonly lastSyncAt: Date | null
+  readonly refreshTokenExpiresAt: Date | null
   readonly createdAt: Date
 }
 
@@ -37,6 +38,7 @@ export async function listConnectionsFor(
       status: accountConnection.status,
       errorReason: accountConnection.errorReason,
       lastSyncAt: accountConnection.lastSyncAt,
+      refreshTokenExpiresAt: accountConnection.refreshTokenExpiresAt,
       createdAt: accountConnection.createdAt,
     })
     .from(accountConnection)

@@ -1,5 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { connectionIdInput, providerAppInput } from '../connections/input'
+import {
+  connectionIdInput,
+  mailboxSyncInput,
+  providerAppInput,
+} from '../connections/input'
 
 export type {
   AccountsView,
@@ -8,6 +12,9 @@ export type {
   ConnectionIdInput,
   ConnectionListRow,
   ConnectionRevokeResult,
+  MailboxSyncInput,
+  MailboxSyncResult,
+  MailboxSyncView,
   ProviderAppInput,
   ProviderAppRow,
 } from '../connections/input'
@@ -53,4 +60,24 @@ export const disconnectConnection = createServerFn({ method: 'POST' })
     const { disconnectConnectionHandler } =
       await import('../connections/custody')
     return disconnectConnectionHandler(data)
+  })
+
+/**
+ * A synced mailbox's settings on its account page — whether its bodies are
+ * shared and its exclude list (D67). The connection's owner only; null when
+ * no mail sync is bound to it.
+ */
+export const getMailboxSync = createServerFn()
+  .validator(connectionIdInput)
+  .handler(async ({ data }) => {
+    const { mailboxSyncHandler } = await import('../arrival/mailbox-sync')
+    return mailboxSyncHandler(data)
+  })
+
+/** Saves them; mail the list now names is taken out, and bodies follow the toggle. */
+export const saveMailboxSync = createServerFn({ method: 'POST' })
+  .validator(mailboxSyncInput)
+  .handler(async ({ data }) => {
+    const { saveMailboxSyncHandler } = await import('../arrival/mailbox-sync')
+    return saveMailboxSyncHandler(data)
   })

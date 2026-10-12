@@ -7,6 +7,7 @@ import type { InteractionClaim, MeetingClaim, SignalClaim } from '@spaces/sdk'
 import { ContentTest } from '@spaces/sdk/testing'
 import { meetingLaneLive } from '../meetings'
 import { insertRow, noEnqueue, runOn, seedCompany } from './support'
+import { NoEmailLane } from '@spaces/core/writes/interactions/email-lane'
 
 /**
  * The Content port's contract for interactions and signals, over every
@@ -28,7 +29,7 @@ const IMPLEMENTATIONS: ReadonlyArray<ContentImplementation> = [
     name: 'ContentLive',
     make: async () => ({
       layer: ContentLive(await insertRow()).pipe(
-        Layer.provide(Layer.merge(noEnqueue, meetingLaneLive)),
+        Layer.provide(Layer.mergeAll(noEnqueue, meetingLaneLive, NoEmailLane)),
       ),
       entityId: await seedCompany(
         'Content Co',

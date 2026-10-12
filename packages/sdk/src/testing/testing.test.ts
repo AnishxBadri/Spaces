@@ -27,7 +27,12 @@ import {
   ReadTest,
   SecretsTest,
   SpacesTest,
+  GMAIL_API,
+  GMAIL_BATCH,
+  base64Url,
+  fromBase64Url,
   makeFakeCalendarApi,
+  makeFakeGmailApi,
   readEntity,
   testPorts,
 } from './index.ts'
@@ -597,5 +602,86 @@ describe('makeFakeCalendarApi', () => {
     ).toBe(410)
     api.revoke()
     expect((await list(api, 'singleEvents=true')).status).toBe(401)
+  })
+})
+
+describe('makeFakeGmailApi', () => {
+  const now = Date.parse('2026-10-10T12:00:00Z')
+  const get = async (
+    api: ReturnType<typeof makeFakeGmailApi>,
+    path: string,
+  ) => {
+    const res = await api.fetch(`${GMAIL_API}${path}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${api.accessToken}` },
+    })
+    return { status: res.status, body: z.json().parse(await res.json()) }
+  }
+
+  it('bounds a list on after:, and without one lists all of history', async () => {
+    const api = makeFakeGmailApi({ now })
+    const all = await get(api, '/users/me/messages')
+    const after = Math.floor((now - 3_600_000) / 1000)
+    const bounded = await get(api, `/users/me/messages?q=after:${after}`)
+    expect(JSON.stringify(all.body)).toContain('m-old-acme')
+    expect(JSON.stringify(bounded.body)).not.toContain('m-old')
+    expect(JSON.stringify(bounded.body)).toContain('m-acme-update')
+  })
+
+  it('answers a batch of raw gets as multipart, the message intact', async () => {
+    const api = makeFakeGmailApi({ now })
+    const body = [
+      '--b1',
+      'Content-Type: application/http',
+      'Content-ID: <item-0>',
+      '',
+      'GET /gmail/v1/users/me/messages/m-acme-update?format=raw HTTP/1.1',
+      '',
+      '--b1--',
+    ].join('\r\n')
+    const res = await api.fetch(GMAIL_BATCH, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${api.accessToken}`,
+        'Content-Type': 'multipart/mixed; boundary=b1',
+      },
+      body,
+    })
+    const text = await res.text()
+    expect(res.headers.get('content-type')).toContain('multipart/mixed')
+    expect(text).toContain('HTTP/1.1 200 OK')
+    const raw = z
+      .object({ raw: z.string() })
+      .parse(
+        JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)),
+      ).raw
+    expect(fromBase64Url(raw)).toContain(
+      'Message-ID: <acme-q3@acme-robotics.example>',
+    )
+    expect(api.requests.at(-1)).toMatchObject({ batched: true })
+    expect(fromBase64Url(base64Url('héllo — ok'))).toBe('héllo — ok')
+  })
+
+  it('answers 404 to an expired history id, 429 with Retry-After, 401 once revoked', async () => {
+    const api = makeFakeGmailApi({ now })
+    const start = api.historyId()
+    expect(
+      (await get(api, `/users/me/history?startHistoryId=${start}`)).status,
+    ).toBe(200)
+    api.expireHistory()
+    expect(
+      (await get(api, `/users/me/history?startHistoryId=${start}`)).status,
+    ).toBe(404)
+    api.rateLimit(1, 7)
+    const limited = await api.fetch(`${GMAIL_API}/users/me/profile`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${api.accessToken}` },
+    })
+    expect([limited.status, limited.headers.get('retry-after')]).toEqual([
+      429,
+      '7',
+    ])
+    api.revoke()
+    expect((await get(api, '/users/me/profile')).status).toBe(401)
   })
 })

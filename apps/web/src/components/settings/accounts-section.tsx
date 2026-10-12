@@ -14,6 +14,7 @@ import {
   useSettingsPage,
 } from './settings-section'
 import { oauthClientAnchor } from './connection-apps-section'
+import { MailSyncSettings } from './mail-sync-section'
 import { pluginAnchor } from '#/components/integrations/registry-pane'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
@@ -27,6 +28,7 @@ import {
   offerFor,
   providersFor,
   syncStateOf,
+  testingModeOf,
   wordsOf,
 } from '#/lib/connections/accounts'
 import type { Account, Offer, SyncState } from '#/lib/connections/accounts'
@@ -41,6 +43,7 @@ import type {
   AccountsView,
   ConnectionDisconnectResult,
   ConnectionListRow,
+  MailboxSyncView,
 } from '#/lib/server-fns'
 import { disconnectConnection } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
@@ -365,8 +368,10 @@ function disconnectedLine(
  * The account page (`Options ›`): which products the account is used for —
  * ticking one runs that product's own consent, unticking disconnects it —
  * each product's last sync, and Disconnect for this page's products.
- * - A product's per-connection choices are drawn only when its plugin
- *   declares them; none does yet.
+ * - A product's per-connection choices are drawn only when its plugin runs
+ *   on the account: a mail sync's sharing and exclude list (D67).
+ * - Google's Testing mode, read off a refresh token that lapses, is one
+ *   graphite line under the head: state, never a control.
  * - Sync now is drawn only for a product with a per-connection sync job;
  *   none has one yet.
  */
@@ -374,10 +379,13 @@ export function AccountSection({
   job,
   connectionId,
   view,
+  mail,
 }: {
   job: AccountPageJob
   connectionId: string
   view: AccountsView
+  /** The account's mail sync and its settings; absent or null when none runs. */
+  mail?: { connectionId: string; view: MailboxSyncView } | null
 }) {
   const { isAdmin } = useSettingsPage()
   const router = useRouter()
@@ -497,6 +505,12 @@ export function AccountSection({
       <p className="px-3 pt-3 mono text-micro text-graphite">
         {provider} · {syncStateOf(account.held).text}
       </p>
+      {testingModeOf(account) ? (
+        <p className="px-3 pt-1 text-label text-graphite">
+          Google’s Testing mode ends this connection every 7 days. An Internal
+          app on Google Workspace avoids it.
+        </p>
+      ) : null}
       <div className="flex flex-col">
         <SettingsGroupHead title="Used for" />
         {productsOf(account.provider).map(({ product, entry }) => {
@@ -522,6 +536,9 @@ export function AccountSection({
           )
         })}
       </div>
+      {mail ? (
+        <MailSyncSettings connectionId={mail.connectionId} view={mail.view} />
+      ) : null}
       {confirmDialog}
     </SettingsSection>
   )

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Effect } from 'effect'
 import { describe, expect, it, vi } from 'vitest'
+import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 // The test databases carry no `pgboss` schema, and the birth of a document
 // enqueues extraction — see `#/test/queue-stub`.
@@ -198,7 +199,9 @@ describe('interaction provenance', () => {
     expect(row?.sourceClass).toBe('manual')
     expect(row?.sourceRef).toBe(null)
 
-    const items = await Effect.runPromise(recordTimelineProgram(recordId))
+    const items = await Effect.runPromise(
+      recordTimelineProgram(recordId, FIXTURE_ACTOR),
+    )
     const logged = items.find((i) => i.type === 'interaction' && i.id === id)
     expect(logged).toBeTruthy()
     expect(logged).toMatchObject({

@@ -210,7 +210,7 @@ describe('the bad days', () => {
     })
   })
 
-  it('a token revoked mid-sync fails permanently, keeping what it had written', async () => {
+  it('a token revoked mid-sync is ConnectionRefused, keeping what it had written', async () => {
     const api = makeFakeCalendarApi({ now: NOW, pageSize: 2 })
     // Revoked after the first page is answered.
     const fetch = api.fetch
@@ -225,7 +225,7 @@ describe('the bad days', () => {
     const r = harness(revoking)
     const exit = await r.run(null)
     expect(failureOf(exit)).toMatchObject({
-      _tag: 'JobPermanent',
+      _tag: 'ConnectionRefused',
       reason: 'Google refused the calendar connection: reconnect it',
     })
     // The first page's two meetings were written before the refusal.

@@ -66,6 +66,11 @@ export type ConnectionListRow = {
   lastSyncAt: string | null
   /** When the row was first made, ISO; the earliest mail account is the Default. */
   connectedAt: string
+  /**
+   * When the refresh token lapses, ISO, when the provider says. Google says
+   * so only for an OAuth client in Testing mode — its 7-day refresh tokens.
+   */
+  refreshExpiresAt: string | null
 }
 
 /**
@@ -89,4 +94,33 @@ export type AccountsView = {
   installed: string[]
   /** Plugin ids the registry offers that are not installed. */
   offered: string[]
+}
+
+/**
+ * A synced mailbox's settings as its account page saves them (D67). Entries
+ * are checked again by the server against `senderEntry`.
+ */
+export const mailboxSyncInput = z.object({
+  connectionId: z.uuid(),
+  shareBodies: z.boolean(),
+  excludeSenders: z.array(z.string().trim().min(1).max(320)).max(500),
+  excludeLabels: z.array(z.string().trim().min(1).max(256)).max(200),
+})
+
+export type MailboxSyncInput = z.infer<typeof mailboxSyncInput>
+
+/** A synced mailbox's settings as its account page draws them. */
+export type MailboxSyncView = {
+  shareBodies: boolean
+  excludeSenders: string[]
+  excludeLabels: string[]
+}
+
+/** What a save changed: bodies whose visibility moved, and mail the list now removes. */
+export type MailboxSyncResult = {
+  view: MailboxSyncView
+  /** Bodies whose visibility changed with the toggle. */
+  revisited: number
+  /** Emails already synced that the exclude list now names, taken out. */
+  removed: number
 }

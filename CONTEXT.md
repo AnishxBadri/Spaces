@@ -2252,6 +2252,38 @@ archive.
   _forwarded_ body is born `shared` — forwarding is the consent (D31).**
 - Per-connection exclude list: domains/labels never synced. Ship a default blocklist.
 - Make it a settings toggle — some funds want everything shared.
+- **Decided by D67, built by arrival-10 (`plugins/gmail`).** In D67's words:
+  "Synced mail's bodies and attachments are private to the mailbox owner by
+  default; forwarded mail stays shared (D49). A per-record override ("my
+  emails with Flent are visible to the workspace") and per-email grants to
+  named users widen it. Subject, participants, date and mailbox owner are
+  always visible. `canRead` enforces it as an extension of note visibility."
+  - **Shared:** the interaction row and its `meta` headers (from, to, cc,
+    date, labels), its edges to people and companies, and so the timeline
+    row, the graph and the interaction stats.
+  - **Not shared:** the body, a `note` born `private` to the connection's
+    owner. Read time decides: the record timeline leaves it unlinked
+    (`body private`), Cmd-K and the semantic lane drop it in
+    `canReadNoteSql`, the assembler's output invariant refuses it, and MCP's
+    `search_records`/`get_record` never return it.
+  - **Per connection, not workspace-wide:** the default and the toggle are
+    the connection's (its bound integration's config), set by its owner on
+    You → Email & calendar → the account page. "Share with the workspace"
+    moves every body already synced and those to come; off moves them back.
+  - **Exclude list:** senders (a domain and its subdomains, an address, or
+    a local part like `noreply@`) and Gmail labels, on the same page. The
+    default blocklist is the four category tabs (Promotions, Social,
+    Updates, Forums), Spam and the machine senders and list-service bounce
+    domains in `DEFAULT_MAIL_EXCLUDE`. A message it names is refused before
+    anything is stored; a save that adds to it removes what is already held.
+  - **Two lanes, one Message-ID:** a forward of a thread a mailbox synced
+    privately widens that body to shared, logged as
+    `note.visibility_changed` — forwarding is the consent (D49). A synced
+    duplicate changes nothing, so when two members sync one thread the
+    second sees `body private` until mailbox #2's per-channel table exists.
+  - **Not yet built:** attachments stay files on the company like the
+    forwarding lane's — `document` carries no visibility for D67 to extend
+    — and the per-record override and per-email grants.
 
 ## UI
 

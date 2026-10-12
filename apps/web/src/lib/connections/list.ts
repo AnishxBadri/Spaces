@@ -45,6 +45,7 @@ export const listConnectionsProgram = Effect.fn('listConnections')(function* (
       errorReason: row.errorReason,
       lastSyncAt: row.lastSyncAt?.toISOString() ?? null,
       connectedAt: row.createdAt.toISOString(),
+      refreshExpiresAt: row.refreshTokenExpiresAt?.toISOString() ?? null,
     })
   }
   return listed

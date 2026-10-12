@@ -16,6 +16,8 @@ import { Content, JobPermanent, JobRetryable } from '@spaces/sdk'
 import type {
   DocumentClaim,
   DomainEvent,
+  EmailClaim,
+  EmailResult,
   InteractionClaim,
   JobError,
   JsonObject,
@@ -39,6 +41,7 @@ import {
 } from '../interactions/write'
 import type { BodyVisibility, RecordedArtifact } from '../interactions/write'
 import { MeetingLane } from '../interactions/meeting-lane'
+import { EmailLane } from '../interactions/email-lane'
 import type {
   MeetingInput,
   ParticipantInput,
@@ -71,11 +74,10 @@ import { ReceiptNotOwned, checkReceipt, insertReceipt } from './receipts'
  *   a permanent failure, since retrying would name it again.
  * - **The body is the interaction's note, and its visibility is the
  *   port's** (D30, D49): the claim carries no visibility field and must not
- *   grow one. A synced mailbox's body is `private` to the connection's user
- *   (D30), a forwarded one `shared` (D49 — the core mailbox, which does not
- *   come through here). Until a syncer exists (arrival-10) every
- *   plugin-written body is born **`private`**, authored by the bound row's
- *   connection user, else the admin who installed it, else the first admin.
+ *   grow one. A body written through `logInteraction` is born **`private`**,
+ *   authored by the bound row's connection user, else the admin who
+ *   installed it, else the first admin. Synced mail is `logEmail`'s, whose
+ *   lane reads the connection's own setting (D67).
  * - `emitSignal` writes one `signal` row on the entity — `source` is the
  *   manifest id (display text), the claim's own fields and its `payload`
  *   kept whole in `payload`, a cited receipt (this integration's own) as
@@ -116,9 +118,13 @@ import { ReceiptNotOwned, checkReceipt, insertReceipt } from './receipts'
  * and the participants module are the arrival lane's, and a second copy of
  * either here is how a calendar attendee and a mail participant would drift
  * apart. Records it creates are created by the body author below.
+ *
+ * `logEmail` (SDK 1.5) checks and decodes the claim and hands it to the
+ * `EmailLane` the same way: the parser, noise rules, exclude list and the
+ * body's visibility are the arrival lane's, read from the bound connection.
  */
 
-/** Until arrival-10's syncer decides per connection, a plugin's body is private (D30). */
+/** A body written through `logInteraction` is private to its author (D30). */
 export const PLUGIN_BODY_VISIBILITY: BodyVisibility = 'private'
 
 const messageOf = (cause: unknown) =>
@@ -194,6 +200,17 @@ const parseTimestamp = (what: string, iso: string) => {
       )
     : Effect.succeed(at)
 }
+
+/** Gmail's own ceiling on a message, attachments included. */
+export const MAX_EMAIL_BYTES = 35 * 1024 * 1024
+
+/** A bundle is JavaScript: the claim is checked field by field. */
+const emailClaim = z.object({
+  providerMessageId: z.string().trim().min(1).max(512),
+  raw: z.string().regex(/^[A-Za-z0-9_-]+={0,2}$/, 'not base64url'),
+  receivedAt: z.iso.datetime({ offset: true }),
+  labels: z.array(z.string().trim().max(256)).max(200),
+})
 
 const text = z.string().trim().min(1).max(2000)
 const instant = z
@@ -491,7 +508,7 @@ const discard = (body: DocumentClaim['body']) =>
 
 export const ContentLive = (
   row: Pick<BoundIntegration, 'id' | 'capabilityId'>,
-): Layer.Layer<Content, never, Enqueue | MeetingLane> => {
+): Layer.Layer<Content, never, Enqueue | MeetingLane | EmailLane> => {
   const refuse = (body: DocumentClaim['body'], reason: string) =>
     discard(body).pipe(
       Effect.andThen(
@@ -835,13 +852,43 @@ export const ContentLive = (
     )
   })
 
+  const logEmail = Effect.fn('Content.logEmail')(function* (
+    claim: EmailClaim,
+  ): Effect.fn.Return<EmailResult, JobError, EmailLane> {
+    const read = emailClaim.safeParse(claim)
+    if (!read.success) {
+      return yield* new JobPermanent({
+        reason: `Content.logEmail: ${read.error.issues
+          .map(
+            (i) => `${i.path.map(String).join('.') || 'claim'}: ${i.message}`,
+          )
+          .join('; ')}`,
+      })
+    }
+    const raw = Buffer.from(read.data.raw, 'base64url')
+    if (raw.length === 0 || raw.length > MAX_EMAIL_BYTES) {
+      return yield* new JobPermanent({
+        reason: `Content.logEmail: a message of 1 byte to ${MAX_EMAIL_BYTES / 1024 / 1024} MB is required`,
+      })
+    }
+    return yield* (yield* EmailLane).log(
+      { integrationId: row.id },
+      {
+        providerMessageId: read.data.providerMessageId,
+        raw,
+        receivedAt: new Date(read.data.receivedAt),
+        labels: read.data.labels.filter((l) => l.length > 0),
+      },
+    )
+  })
+
   return Layer.effect(
     Content,
     Effect.gen(function* () {
       // The extraction enqueue at the end of birth runs on the process's
       // own `Enqueue`, captured once here as `FactsLive` captures it; the
-      // meeting lane the same way.
-      const context = yield* Effect.context<Enqueue | MeetingLane>()
+      // meeting and mail lanes the same way.
+      const context = yield* Effect.context<Enqueue | MeetingLane | EmailLane>()
       return Content.of({
         fileDocument: (claim) =>
           fileDocument(claim).pipe(Effect.provide(context)),
@@ -849,6 +896,7 @@ export const ContentLive = (
           logInteraction(claim).pipe(Effect.provide(context)),
         emitSignal,
         logMeeting: (claim) => logMeeting(claim).pipe(Effect.provide(context)),
+        logEmail: (claim) => logEmail(claim).pipe(Effect.provide(context)),
       })
     }),
   )

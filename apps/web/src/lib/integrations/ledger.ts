@@ -350,6 +350,46 @@ export const enrichesRecords = (manifest: Manifest | null): boolean =>
   enrichActionFor(manifest, 'person') !== null
 
 /**
+ * A mail syncer's settings are its connection's, drawn on the account page
+ * for the mailbox's owner and never here: they decide who reads that
+ * person's mail. (D67)
+ */
+const ACCOUNT_PAGE_KEYS: ReadonlyArray<string> = [
+  'shareBodies',
+  'excludeSenders',
+  'excludeLabels',
+]
+
+const objectSchema = z.looseObject({
+  properties: z.record(z.string(), z.unknown()).optional(),
+  required: z.array(z.string()).optional(),
+})
+
+/** The manifest's settings schema, minus what an email-calendar plugin's account page owns. */
+export const withoutAccountPageKeys = (manifest: Manifest): unknown => {
+  if (!manifest.roles?.includes('email-calendar')) return manifest.settings
+  const parsed = objectSchema.safeParse(manifest.settings)
+  if (!parsed.success || parsed.data.properties === undefined)
+    return manifest.settings
+  const properties = Object.fromEntries(
+    Object.entries(parsed.data.properties).filter(
+      ([key]) => !ACCOUNT_PAGE_KEYS.includes(key),
+    ),
+  )
+  return {
+    ...parsed.data,
+    properties,
+    ...(parsed.data.required === undefined
+      ? {}
+      : {
+          required: parsed.data.required.filter(
+            (key) => !ACCOUNT_PAGE_KEYS.includes(key),
+          ),
+        }),
+  }
+}
+
+/**
  * The host-owned settings an enrichment source's page leaves to the
  * Enrichment page: the reuse window there replaces its `cacheDays`. (D81)
  */
@@ -654,7 +694,7 @@ export const integrationDetailProgram = Effect.fn('integrationDetailProgram')(
             reason:
               'the worker has not read this plugin’s manifest yet, so its settings cannot be drawn',
           }
-        : settingsFormOf(manifest.settings)
+        : settingsFormOf(withoutAccountPageKeys(manifest))
     const scoped = hasEventJob(manifest)
     const enriches = enrichesRecords(manifest)
     // An older bundle's on/off switch is the scope's now, and an enrichment

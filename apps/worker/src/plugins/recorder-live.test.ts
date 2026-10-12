@@ -15,6 +15,7 @@ import { Content } from '@spaces/sdk'
 import type { InteractionClaim, MeetingClaim } from '@spaces/sdk'
 import { FIXTURE_ACTOR } from '../../vitest.seed'
 import { meetingLaneLive } from './meetings'
+import { NoEmailLane } from '@spaces/core/writes/interactions/email-lane'
 
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
@@ -57,7 +58,9 @@ const content = <TValue>(
     }).pipe(
       Effect.provide(
         ContentLive(row).pipe(
-          Layer.provide(Layer.merge(noEnqueue, meetingLaneLive)),
+          Layer.provide(
+            Layer.mergeAll(noEnqueue, meetingLaneLive, NoEmailLane),
+          ),
         ),
       ),
     ),

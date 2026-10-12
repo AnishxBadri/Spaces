@@ -5,6 +5,8 @@ import type { PortName, Trigger } from '@spaces/sdk'
 import type { Enqueue } from '@spaces/core/queue/enqueue'
 import { NoMeetingLane } from '@spaces/core/writes/interactions/meeting-lane'
 import type { MeetingLane } from '@spaces/core/writes/interactions/meeting-lane'
+import { NoEmailLane } from '@spaces/core/writes/interactions/email-lane'
+import type { EmailLane } from '@spaces/core/writes/interactions/email-lane'
 import { AiLive } from '@spaces/core/writes/ports/ai'
 import type { ModelCall } from '@spaces/core/writes/ports/ai'
 import { AmbientPortsLive } from '@spaces/core/writes/ports/ambient'
@@ -33,8 +35,9 @@ import { PluginDbLive } from './plugin-db'
  *   tags out of what this builds, so an ambient port the job did not name
  *   never reaches it.
  * - `Enqueue` is provided to the lanes that hand work back and is never one
- *   of the job's services; so is the `MeetingLane` Content files meetings
- *   through, which refuses every meeting when the host gives none.
+ *   of the job's services; so are the `MeetingLane` and `EmailLane` Content
+ *   files meetings and mail through, which refuse everything when the host
+ *   gives none.
  */
 
 /** A port the grant was asked for and cannot build. */
@@ -54,6 +57,8 @@ export type GrantOptions = {
   readonly enqueue: Layer.Layer<Enqueue>
   /** The arrival lane `Content.logMeeting` hands meetings to; `NoMeetingLane` when absent. */
   readonly meetings?: Layer.Layer<MeetingLane>
+  /** The arrival lane `Content.logEmail` hands mail to; `NoEmailLane` when absent. */
+  readonly mail?: Layer.Layer<EmailLane>
   readonly fetch?: FetchLike
   readonly sink?: LogSink
   /** `SPACES_FAKE_PROVIDERS`: a fake standing in for this plugin's provider wins over `fetch`. */
@@ -104,7 +109,9 @@ export const grantLayer = (
 ): Layer.Layer<never, ConfigInvalid | PortUnprovided> => {
   const standalone: Array<Layer.Layer<never, ConfigInvalid | PortUnprovided>> =
     []
-  const handsBack: Array<Layer.Layer<never, never, Enqueue | MeetingLane>> = []
+  const handsBack: Array<
+    Layer.Layer<never, never, Enqueue | MeetingLane | EmailLane>
+  > = []
 
   if (uses.some((port) => AMBIENT.includes(port))) {
     const standIn = standInFor(options.fakes, row.capabilityId)
@@ -193,7 +200,11 @@ export const grantLayer = (
     standalone.push(
       Layer.provide(
         mergeList(handsBack),
-        Layer.merge(options.enqueue, options.meetings ?? NoMeetingLane),
+        Layer.mergeAll(
+          options.enqueue,
+          options.meetings ?? NoMeetingLane,
+          options.mail ?? NoEmailLane,
+        ),
       ),
     )
   }

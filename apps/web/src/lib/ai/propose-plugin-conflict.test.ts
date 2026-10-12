@@ -1,5 +1,6 @@
 import { Effect, Layer } from 'effect'
 import { describe, expect, it } from 'vitest'
+import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 /**
  * The loop sdk-10 closes, end to end through the inbox's existing accept
@@ -150,7 +151,9 @@ describe('a Facts.fill conflict, accepted from the inbox', () => {
 
     // The timeline: a person's write, through the suggestion door, citing
     // the plugin's receipt.
-    const timeline = await Effect.runPromise(recordTimelineProgram(entityId))
+    const timeline = await Effect.runPromise(
+      recordTimelineProgram(entityId, FIXTURE_ACTOR),
+    )
     const burst = timeline.find(
       (i) => i.type === 'attrs' && i.source === 'suggestion',
     )

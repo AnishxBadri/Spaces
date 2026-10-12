@@ -42,6 +42,8 @@ export type EmailMeta = {
   /** The `Date` header, as an ISO instant. */
   date: string
   mime_blob_sha: string | null
+  /** The mailbox's labels by name, for a synced message; the exclude list reads them. */
+  labels?: Array<string>
 }
 
 export type MeetingStatus = 'scheduled' | 'cancelled'

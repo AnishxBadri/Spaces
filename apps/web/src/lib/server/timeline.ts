@@ -19,8 +19,8 @@ import { requireUser } from './shared'
 export const getRecordTimeline = createServerFn()
   .validator(z.object({ entityId: z.string().uuid() }))
   .handler(async ({ data }) => {
-    await requireUser()
-    return Effect.runPromise(recordTimelineProgram(data.entityId))
+    const viewer = await requireUser()
+    return Effect.runPromise(recordTimelineProgram(data.entityId, viewer))
   })
 
 /** Workspace-wide recent activity — the Today page's feed. */

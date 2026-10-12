@@ -7,7 +7,8 @@ import type { ParticipantDecision } from './participants'
  * the one decision in the poll that has to be provable without a database —
  * `noise.test.ts` is a fixture table.
  *
- * Four refusals, and the order is the order they are checked:
+ * Four refusals from `refusal`, in the order they are checked, and a fifth,
+ * `excluded`, from `mailExclusion` for a connected mailbox's exclude list:
  *
  * - **no Message-ID** — the dedupe key is the RFC Message-ID (CONTEXT.md
  *   "Email / calendar ingestion"). A message without one cannot be written
@@ -30,13 +31,14 @@ import type { ParticipantDecision } from './participants'
  */
 
 export type NoiseReason =
-  'no-message-id' | 'auto-submitted' | 'list-mail' | 'role-sender'
+  'no-message-id' | 'auto-submitted' | 'list-mail' | 'role-sender' | 'excluded'
 
 export const NOISE_REASONS: ReadonlyArray<NoiseReason> = [
   'no-message-id',
   'auto-submitted',
   'list-mail',
   'role-sender',
+  'excluded',
 ]
 
 export type NoiseInput = {
@@ -162,5 +164,113 @@ export function meetingRefusal(
     return { reason: 'declined', detail: 'declined by the calendar owner' }
   if (!input.decisions.some((d) => d.action === 'create'))
     return { reason: 'internal', detail: 'no attendee from outside' }
+  return null
+}
+
+/**
+ * A connected mailbox's exclude list: mail never synced. Checked before a
+ * body is stored, and again over what is already held when the list grows.
+ * - A sender entry is a domain (`acme.example`, its subdomains too), an
+ *   address, or a local part ending in `@` (`noreply@`). Domains and
+ *   addresses match any participant; a local part matches the sender only,
+ *   since a person may copy a `notifications@` address on a real thread.
+ * - A label entry matches a label name case-insensitively (`Promotions`).
+ * - `DEFAULT_MAIL_EXCLUDE` ships with the plugin's settings; the Gmail
+ *   manifest's defaults are asserted equal to it.
+ */
+export type MailExclude = {
+  senders: ReadonlyArray<string>
+  labels: ReadonlyArray<string>
+}
+
+export const DEFAULT_MAIL_EXCLUDE: MailExclude = {
+  labels: ['Promotions', 'Social', 'Updates', 'Forums', 'Spam'],
+  senders: [
+    'noreply@',
+    'no-reply@',
+    'notifications@',
+    'mailer-daemon@',
+    'calendar-notification@google.com',
+    'mcsv.net',
+    'mcdlv.net',
+    'rsgsv.net',
+    'mandrillapp.com',
+    'sendgrid.net',
+    'amazonses.com',
+    'mailgun.org',
+    'sparkpostmail.com',
+  ],
+}
+
+const DOMAIN_ENTRY = /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/
+const LOCAL_ENTRY = /^[a-z0-9._%+-]+@$/
+const ADDRESS_ENTRY = /^[a-z0-9._%+-]+@(?:[a-z0-9-]+\.)+[a-z]{2,}$/
+
+/** One sender entry as stored — lowercased, a leading `@` dropped — or null when it is none of the three. */
+export function senderEntry(raw: string): string | null {
+  const entry = raw
+    .trim()
+    .toLowerCase()
+    .replace(/^@(?=[^@]+$)/, '')
+  if (
+    DOMAIN_ENTRY.test(entry) ||
+    LOCAL_ENTRY.test(entry) ||
+    ADDRESS_ENTRY.test(entry)
+  )
+    return entry
+  return null
+}
+
+export type MailExcludeInput = {
+  /** The effective sender's address. */
+  sender: string | null
+  /** Every address on the message: sender, To and Cc. */
+  participants: ReadonlyArray<string>
+  labels: ReadonlyArray<string>
+}
+
+const domainOf = (address: string): string =>
+  address
+    .slice(address.lastIndexOf('@') + 1)
+    .trim()
+    .toLowerCase()
+
+const localOf = (address: string): string =>
+  address.slice(0, address.lastIndexOf('@')).trim().toLowerCase().split('+')[0]
+
+function senderMatch(entry: string, input: MailExcludeInput): string | null {
+  if (entry.endsWith('@')) {
+    const sender = input.sender
+    return sender !== null && `${localOf(sender)}@` === entry ? sender : null
+  }
+  const everyone = [
+    ...(input.sender === null ? [] : [input.sender]),
+    ...input.participants,
+  ].map((a) => a.trim().toLowerCase())
+  if (entry.includes('@')) return everyone.find((a) => a === entry) ?? null
+  return (
+    everyone.find((a) => {
+      const domain = domainOf(a)
+      return domain === entry || domain.endsWith(`.${entry}`)
+    }) ?? null
+  )
+}
+
+/** The `excluded` refusal for a synced message, or null when the list names nothing on it. */
+export function mailExclusion(
+  input: MailExcludeInput,
+  exclude: MailExclude,
+): Refusal | null {
+  const labels = new Set(input.labels.map((l) => l.trim().toLowerCase()))
+  const label = exclude.labels.find((l) => labels.has(l.trim().toLowerCase()))
+  if (label !== undefined)
+    return { reason: 'excluded', detail: `label ${label} is excluded` }
+  for (const raw of exclude.senders) {
+    const entry = senderEntry(raw)
+    if (entry === null) continue
+    const hit = senderMatch(entry, input)
+    if (hit !== null)
+      return { reason: 'excluded', detail: `${hit} matches ${entry}` }
+  }
   return null
 }

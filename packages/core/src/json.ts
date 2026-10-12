@@ -59,6 +59,7 @@ const emailMeta = z
     cc: z.array(z.string()),
     date: z.string(),
     mime_blob_sha: z.string().nullable(),
+    labels: z.array(z.string()).exactOptional(),
   })
   .strict()
 

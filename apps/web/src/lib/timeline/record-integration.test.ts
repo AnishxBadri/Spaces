@@ -1,5 +1,6 @@
 import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
+import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 /**
  * A record a plugin birthed (sdk-7a): IdentityLive writes its
@@ -41,7 +42,9 @@ describe('the record timeline, for a record a plugin birthed', () => {
       meta: integrationMeta(row),
     })
 
-    const items = await Effect.runPromise(recordTimelineProgram(entityId))
+    const items = await Effect.runPromise(
+      recordTimelineProgram(entityId, FIXTURE_ACTOR),
+    )
     const birth = items.find(
       (i) => i.type === 'macro' && i.verb === 'company.created',
     )
@@ -114,7 +117,9 @@ describe('the record timeline, for values a plugin filled', () => {
       meta: integrationMeta(named),
     })
 
-    const echoItems = await Effect.runPromise(recordTimelineProgram(echoed))
+    const echoItems = await Effect.runPromise(
+      recordTimelineProgram(echoed, FIXTURE_ACTOR),
+    )
     expect(echoItems.find((i) => i.type === 'attrs')).toMatchObject({
       actorType: 'integration',
       integrationName: 'Echo enrichment',
@@ -123,7 +128,9 @@ describe('the record timeline, for values a plugin filled', () => {
       echoItems.find((i) => i.type === 'macro' && i.verb === 'signal.emitted'),
     ).toMatchObject({ actorName: 'Echo enrichment' })
 
-    const plainItems = await Effect.runPromise(recordTimelineProgram(plain))
+    const plainItems = await Effect.runPromise(
+      recordTimelineProgram(plain, FIXTURE_ACTOR),
+    )
     expect(plainItems.find((i) => i.type === 'attrs')).toMatchObject({
       actorType: 'integration',
       integrationName: 'pdl',
@@ -150,6 +157,8 @@ describe('the record page, for a document a plugin filed', () => {
     const { ContentLive } = await import('@spaces/core/writes/ports/content')
     const { NoMeetingLane } =
       await import('@spaces/core/writes/interactions/meeting-lane')
+    const { NoEmailLane } =
+      await import('@spaces/core/writes/interactions/email-lane')
     const { storage } = await import('@spaces/core/writes/storage')
     const { documentProvenance } = await import('#/lib/server/shared')
     const { recordTimelineProgram } = await import('./record')
@@ -191,12 +200,13 @@ describe('the record page, for a document a plugin filed', () => {
         Effect.provide(
           ContentLive(row).pipe(
             Layer.provide(
-              Layer.merge(
+              Layer.mergeAll(
                 Layer.succeed(
                   Enqueue,
                   Enqueue.of({ enqueue: () => Effect.succeed(null) }),
                 ),
                 NoMeetingLane,
+                NoEmailLane,
               ),
             ),
           ),
@@ -230,7 +240,9 @@ describe('the record page, for a document a plugin filed', () => {
       sourceCapability: 'importer',
     })
     // The timeline: "Importer filed a document", not "System".
-    const items = await Effect.runPromise(recordTimelineProgram(acme.id))
+    const items = await Effect.runPromise(
+      recordTimelineProgram(acme.id, FIXTURE_ACTOR),
+    )
     expect(
       items.find((i) => i.type === 'macro' && i.verb === 'document.filed'),
     ).toMatchObject({ actorName: 'Importer' })
@@ -248,7 +260,6 @@ describe('the record timeline, for a deal', () => {
     const { db } = await import('@spaces/db')
     const { resolveEntity } =
       await import('@spaces/core/writes/entities/resolve')
-    const { FIXTURE_ACTOR } = await import('../../../vitest.seed')
     const { birthDealInTx } = await import('#/lib/deals/birth')
     const { addInvestmentProgram } = await import('#/lib/portfolio/write')
     const { voidLedgerEventProgram } = await import('#/lib/portfolio/reverse')
@@ -301,7 +312,9 @@ describe('the record timeline, for a deal', () => {
       }),
     )
 
-    const items = await Effect.runPromise(recordTimelineProgram(deal.id))
+    const items = await Effect.runPromise(
+      recordTimelineProgram(deal.id, FIXTURE_ACTOR),
+    )
     const ledger = items.filter((i) => i.type === 'ledger')
     expect(ledger).toHaveLength(2)
     expect(ledger.find((l) => l.id === kept.id)).toMatchObject({

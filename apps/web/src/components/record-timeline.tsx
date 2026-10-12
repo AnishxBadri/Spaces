@@ -465,7 +465,9 @@ export function interactionLane(item: {
 /**
  * One interaction on the ledger. A written-up row opens its note from the
  * subject; one that is not offers `Write up` as a row action, shown on
- * hover and focus, which writes one now and lands in the editor.
+ * hover and focus, which writes one now and lands in the editor. A body
+ * private to someone else is neither: the row keeps its subject and says
+ * `body private` (D67).
  */
 function InteractionRow({
   item,
@@ -498,7 +500,7 @@ function InteractionRow({
       last={last}
       end={
         <>
-          {item.noteId ? null : (
+          {item.noteId || item.privateBody ? null : (
             <button
               type="button"
               onClick={() => void writeUp()}
@@ -512,7 +514,13 @@ function InteractionRow({
               {pending ? 'Writing up…' : 'Write up'}
             </button>
           )}
-          <span className="min-w-0 truncate">{interactionLane(item)}</span>
+          <span className="min-w-0 truncate">
+            {item.privateBody
+              ? ['body private', interactionLane(item)]
+                  .filter((part) => part !== '')
+                  .join(' · ')
+              : interactionLane(item)}
+          </span>
         </>
       }
     >

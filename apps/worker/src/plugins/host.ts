@@ -17,6 +17,7 @@ import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
 import {
   Ai,
+  ConnectionRefused,
   CursorInvalid,
   Discover,
   JobPermanent,
@@ -39,6 +40,8 @@ import type {
 } from '@spaces/sdk'
 import type { Enqueue } from '@spaces/core/queue/enqueue'
 import type { MeetingLane } from '@spaces/core/writes/interactions/meeting-lane'
+import type { EmailLane } from '@spaces/core/writes/interactions/email-lane'
+import { markBoundConnectionRefused } from '@spaces/core/writes/connections/refused'
 import { AiBinder } from '@spaces/core/writes/ports/ai'
 import { DiscoverBinder } from '@spaces/core/writes/ports/discover'
 import type { DiscoverBinding } from '@spaces/core/writes/ports/discover'
@@ -110,6 +113,8 @@ export type PluginHostOptions = {
   readonly enqueue: LayerType.Layer<Enqueue>
   /** What `Content.logMeeting` files through; every meeting is refused without it. */
   readonly meetings?: LayerType.Layer<MeetingLane>
+  /** What `Content.logEmail` files through; every message is refused without it. */
+  readonly mail?: LayerType.Layer<EmailLane>
   /** pg-boss and the wrapper's seams; without it no queue is registered. */
   readonly queues?: PluginQueuesOptions
   readonly fetch?: FetchLike
@@ -377,6 +382,7 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
           ...(options.meetings === undefined
             ? {}
             : { meetings: options.meetings }),
+          ...(options.mail === undefined ? {} : { mail: options.mail }),
           ...(plugin.manifest.http?.rateLimit === undefined
             ? {}
             : { rpm: plugin.manifest.http.rateLimit.rpm }),
@@ -689,6 +695,7 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
         Effect.provideContext(context),
         Effect.mapError((error) =>
           isJobError(error) ||
+          error instanceof ConnectionRefused ||
           (job.trigger === 'schedule' && error instanceof CursorInvalid)
             ? error
             : new JobPermanent({
@@ -733,6 +740,19 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
             nextCursor: null,
             cursorInvalid: error.reason,
           }),
+        ),
+        // A refused grant marks the connection and is never retried: the
+        // next attempt would send the same refused token.
+        Effect.catchTag('ConnectionRefused', (error) =>
+          Effect.promise(() =>
+            markBoundConnectionRefused(integrationId, error.reason).catch(
+              () => false,
+            ),
+          ).pipe(
+            Effect.andThen(
+              Effect.fail(new JobPermanent({ reason: error.reason })),
+            ),
+          ),
         ),
       )
     })

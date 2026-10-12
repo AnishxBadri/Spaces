@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
+import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 /**
  * Manual interaction logging and its write-up (SPA-123).
@@ -284,7 +285,9 @@ describe('logInteractionProgram', () => {
     }
 
     // The ledger row carries the id the link treatment needs.
-    const items = await Effect.runPromise(recordTimelineProgram(companyId))
+    const items = await Effect.runPromise(
+      recordTimelineProgram(companyId, FIXTURE_ACTOR),
+    )
     const logged = items.find((i) => i.type === 'interaction' && i.id === id)
     expect(logged).toMatchObject({ noteId })
   })
@@ -326,7 +329,9 @@ describe('logInteractionProgram', () => {
       }),
     )
 
-    const items = await Effect.runPromise(recordTimelineProgram(rec.id))
+    const items = await Effect.runPromise(
+      recordTimelineProgram(rec.id, FIXTURE_ACTOR),
+    )
     expect(
       items.find((i) => i.type === 'interaction' && i.id === id),
     ).toMatchObject({ noteId })
@@ -352,7 +357,9 @@ describe('logInteractionProgram', () => {
       }),
     )
 
-    const items = await Effect.runPromise(recordTimelineProgram(companyId))
+    const items = await Effect.runPromise(
+      recordTimelineProgram(companyId, FIXTURE_ACTOR),
+    )
     const logged = items.find((i) => i.type === 'interaction' && i.id === id)
     expect(logged).toMatchObject({ noteId: null })
   })

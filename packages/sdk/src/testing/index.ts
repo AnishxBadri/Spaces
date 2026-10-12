@@ -7,12 +7,14 @@ import type {
   IdentityKeys,
   JobError,
   JsonObject,
+  EmailResult,
   JsonValue,
   MeetingResult,
   PortName,
   SignalClaim,
 } from '../contract.ts'
 import { landImportGrid } from '../import-grid.ts'
+import { fromBase64Url } from './fake-gmail-api.ts'
 import { vocabularyProblem } from '../vocabulary.ts'
 import type { LandedRow } from '../import-grid.ts'
 import {
@@ -266,6 +268,13 @@ export const FactsTest = (
 // Content, Judgment, Receipts
 // ---------------------------------------------------------------------------
 
+/** The Message-ID header of a base64url message, without brackets; null when absent. */
+const messageIdOfRaw = (raw: string): string | null => {
+  const text = fromBase64Url(raw)
+  const head = text.split(/\r?\n\r?\n/, 1)[0] ?? ''
+  return /^message-id:\s*<?([^>\r\n]+)>?/im.exec(head)?.[1]?.trim() ?? null
+}
+
 /**
  * Interactions dedupe on `messageId` and signals on `key` per record, as the
  * lanes do; documents never. `signals` is every signal written, a deduped
@@ -277,6 +286,8 @@ export const FactsTest = (
  *   `updated`. A cancellation finds its meeting by `uid`, else `eventId`.
  * - The fake keeps every meeting: which events are not meetings (internal,
  *   declined, cancelled before they were seen) is the host's to decide.
+ * - Emails dedupe on the Message-ID header inside `raw`, else the provider's
+ *   id; every other refusal (noise, the exclude list) is the host's.
  */
 export const ContentTest = (
   options: { readonly recorder?: Recorder } = {},
@@ -338,6 +349,15 @@ export const ContentTest = (
         if (keyed !== null) byKey.set(keyed, signalId)
         signals.push(claim)
         return record('emitSignal', claim, { signalId })
+      }),
+    logEmail: (claim) =>
+      Effect.sync((): EmailResult => {
+        const key = messageIdOfRaw(claim.raw) ?? claim.providerMessageId
+        if (byMessageId.has(key))
+          return record('logEmail', claim, { outcome: 'duplicate' })
+        const interactionId = nextInteraction()
+        byMessageId.set(key, interactionId)
+        return record('logEmail', claim, { outcome: 'created', interactionId })
       }),
     logMeeting: (claim) =>
       Effect.sync((): MeetingResult => {
@@ -947,3 +967,26 @@ export type {
   FakeCalendarTime,
   CalendarApiRequest,
 } from './fake-calendar-api.ts'
+
+// Gmail's messages, history, labels and batch endpoints over a fake mailbox
+export {
+  makeFakeGmailApi,
+  fakeGmailSeed,
+  renderMessage,
+  base64Url,
+  fromBase64Url,
+  GMAIL_API,
+  GMAIL_BATCH,
+  FAKE_GMAIL_OWNER,
+  FAKE_GMAIL_TOKEN,
+  FAKE_GMAIL_LABELS,
+  FAKE_GMAIL_DECK,
+} from './fake-gmail-api.ts'
+export type {
+  FakeGmailApi,
+  FakeGmailApiOptions,
+  FakeGmailMessage,
+  FakeGmailAttachment,
+  FakeGmailLabel,
+  GmailApiRequest,
+} from './fake-gmail-api.ts'

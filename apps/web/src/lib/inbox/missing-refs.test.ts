@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 /**
  * The one ref resolver's two app consumers (SPA-119): a suggestion whose
@@ -85,7 +86,9 @@ describe('resolveRefs — deleted targets, in the app', () => {
       missing,
     )
 
-    const timeline = await Effect.runPromise(recordTimelineProgram(company))
+    const timeline = await Effect.runPromise(
+      recordTimelineProgram(company, FIXTURE_ACTOR),
+    )
     const burst = timeline.find(
       (i) => i.type === 'attrs' && i.source === 'suggestion',
     )

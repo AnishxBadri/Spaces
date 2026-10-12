@@ -7,6 +7,7 @@ import { workerEnqueue } from './plugins/enqueue'
 import { FAKE_PROVIDERS_ENV, loadFakeProviders } from './plugins/fakes/switch'
 import { makePluginHost } from './plugins/host'
 import { meetingLaneLive } from './plugins/meetings'
+import { mailLaneLive } from './plugins/mail'
 import { storageSourcesLayer } from './plugins/storage-source'
 import {
   AUTOUPDATE_ENV,
@@ -99,6 +100,7 @@ async function main() {
   const plugins = makePluginHost({
     enqueue: workerEnqueue(requireEnv('DATABASE_URL')),
     meetings: meetingLaneLive,
+    mail: mailLaneLive,
     queues: { boss, host },
     fakes,
   })

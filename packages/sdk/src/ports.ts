@@ -7,6 +7,8 @@ import type {
   AnswerClaim,
   DiscoverClaim,
   DocumentClaim,
+  EmailClaim,
+  EmailResult,
   EntityId,
   FactClaim,
   IdentityClaim,
@@ -170,6 +172,14 @@ export class Content extends Context.Service<
     readonly logMeeting: (
       claim: MeetingClaim | MeetingCancellation,
     ) => Effect.Effect<MeetingResult, JobError>
+    /**
+     * One message from the bound connection's mailbox, judged and filed by
+     * the host; the body's visibility is the connection's, never the
+     * plugin's (SDK 1.5, D67).
+     */
+    readonly logEmail: (
+      claim: EmailClaim,
+    ) => Effect.Effect<EmailResult, JobError>
   }
 >()('spaces/sdk/Content') {}
 

@@ -115,6 +115,7 @@ const interaction = (
     attachments: number
     answer: string | null
     noteId: string | null
+    privateBody: boolean
   }> = {},
 ): Items[number] => ({
   type: 'interaction',
@@ -122,6 +123,7 @@ const interaction = (
   kind,
   subject: `${kind} ${id}`,
   noteId: null,
+  privateBody: false,
   at: '2026-10-01T10:00:00.000Z',
   attendees: [],
   via: null,
@@ -226,6 +228,21 @@ describe('the Interactions tab', () => {
     const writeUp = button(/^Write up$/)
     expect(writeUp.className).toContain('opacity-0')
     expect(writeUp.className).not.toContain('text-primary')
+  })
+
+  it('keeps a body private to someone else unlinked, with no Write up (D67)', async () => {
+    const el = await mount(
+      <RecordInteractions
+        items={[interaction('p', 'email', { via: 'Gmail', privateBody: true })]}
+        registry={[]}
+      />,
+    )
+    const lanes = [...el.querySelectorAll('[data-end-lane]')].map(
+      (l) => l.textContent,
+    )
+    expect(lanes).toEqual(['body private · via Gmail'])
+    expect(el.querySelector('a')).toBeNull()
+    expect(el.textContent).toContain('email p')
   })
 
   it('folds past twenty with an n of N foot', async () => {

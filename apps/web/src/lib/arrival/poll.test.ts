@@ -389,7 +389,9 @@ describe('the forwarding mailbox poll', () => {
     server.deliver(gmailForward())
     await poll()
 
-    const items = await Effect.runPromise(recordTimelineProgram(acme))
+    const items = await Effect.runPromise(
+      recordTimelineProgram(acme, FIXTURE_ACTOR),
+    )
     const thread = items.find((i) => i.type === 'interaction')
     expect(thread?.type === 'interaction' && thread.subject).toBe('Seed round')
     const noteId = thread?.type === 'interaction' ? thread.noteId : null
@@ -456,7 +458,9 @@ describe('the forwarding mailbox poll', () => {
     expect(dealEdges.at(0)?.n).toBe(0)
 
     for (const deal of [seed, bridge]) {
-      const items = await Effect.runPromise(recordTimelineProgram(deal))
+      const items = await Effect.runPromise(
+        recordTimelineProgram(deal, FIXTURE_ACTOR),
+      )
       const subjects = items.flatMap((i) =>
         i.type === 'interaction' ? [i.subject] : [],
       )

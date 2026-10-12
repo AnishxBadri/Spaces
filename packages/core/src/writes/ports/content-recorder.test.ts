@@ -14,6 +14,7 @@ import type { InteractionClaim, RecorderPayload } from '@spaces/sdk'
 import { Enqueue } from '../../queue/enqueue'
 import { resolveEntity } from '../entities/resolve'
 import { MeetingLane } from '../interactions/meeting-lane'
+import { NoEmailLane } from '../interactions/email-lane'
 import { ContentLive, readInteractionShape } from './content'
 
 /**
@@ -76,7 +77,7 @@ const run = (
     }).pipe(
       Effect.provide(
         ContentLive(row).pipe(
-          Layer.provide(Layer.merge(EnqueueTest, LaneTest)),
+          Layer.provide(Layer.mergeAll(EnqueueTest, LaneTest, NoEmailLane)),
         ),
       ),
     ),

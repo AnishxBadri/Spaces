@@ -1,7 +1,15 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { makeFakeCalendarApi, makeFakeDriveApi } from '@spaces/sdk/testing'
-import type { FakeCalendarApi, FakeDriveApi } from '@spaces/sdk/testing'
+import {
+  makeFakeCalendarApi,
+  makeFakeDriveApi,
+  makeFakeGmailApi,
+} from '@spaces/sdk/testing'
+import type {
+  FakeCalendarApi,
+  FakeDriveApi,
+  FakeGmailApi,
+} from '@spaces/sdk/testing'
 import { workspaceRoot } from '@spaces/core/writes/vault/key'
 import { loadCassette } from './cassette'
 import { makeFakeProvider } from './provider'
@@ -33,6 +41,11 @@ const CALENDARS: { readonly [pluginId: string]: () => FakeCalendarApi } = {
   'google-calendar': () => makeFakeCalendarApi(),
 }
 
+/** The mailbox a mail syncer reads, laid out around the moment it is first asked for. */
+const MAILBOXES: { readonly [pluginId: string]: () => FakeGmailApi } = {
+  gmail: () => makeFakeGmailApi(),
+}
+
 const PLUGIN_ID = /^[a-z0-9][a-z0-9-]*$/
 
 export const cassetteProviders = (
@@ -44,10 +57,13 @@ export const cassetteProviders = (
   readonly api: (pluginId: string) => FakeDriveApi | null
   /** The fake calendar behind a stand-in; null when there is none. */
   readonly calendar: (pluginId: string) => FakeCalendarApi | null
+  /** The fake mailbox behind a stand-in; null when there is none. */
+  readonly gmail: (pluginId: string) => FakeGmailApi | null
 } => {
   const made = new Map<string, FakeProvider | null>()
   const apis = new Map<string, FakeDriveApi | null>()
   const calendars = new Map<string, FakeCalendarApi | null>()
+  const mailboxes = new Map<string, FakeGmailApi | null>()
   const inWorkspace = (pluginId: string) =>
     root !== null && PLUGIN_ID.test(pluginId)
       ? path.join(root, 'plugins', pluginId)
@@ -89,12 +105,25 @@ export const cassetteProviders = (
     calendars.set(pluginId, fake)
     return fake
   }
+  const gmail = (pluginId: string): FakeGmailApi | null => {
+    const cached = mailboxes.get(pluginId)
+    if (cached !== undefined) return cached
+    const make = Object.hasOwn(MAILBOXES, pluginId)
+      ? MAILBOXES[pluginId]
+      : undefined
+    const dir = inWorkspace(pluginId)
+    const fake =
+      make !== undefined && dir !== null && existsSync(dir) ? make() : null
+    mailboxes.set(pluginId, fake)
+    return fake
+  }
   return {
     provider,
     api,
     calendar,
+    gmail,
     standIn: (pluginId): StandIn | null => {
-      const stateful = api(pluginId) ?? calendar(pluginId)
+      const stateful = api(pluginId) ?? calendar(pluginId) ?? gmail(pluginId)
       if (stateful !== null)
         return {
           fetch: stateful.fetch,

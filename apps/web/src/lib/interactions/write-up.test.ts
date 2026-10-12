@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
+import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 /**
  * Writing up an interaction that was logged without a body (SPA-128).
@@ -312,7 +313,7 @@ describe('writeUpInteractionProgram', () => {
     })
 
     const before = (
-      await Effect.runPromise(recordTimelineProgram(companyId))
+      await Effect.runPromise(recordTimelineProgram(companyId, FIXTURE_ACTOR))
     ).find((i) => i.type === 'interaction' && i.id === id)
     expect(before).toMatchObject({ noteId: null })
 
@@ -320,7 +321,7 @@ describe('writeUpInteractionProgram', () => {
       writeUpInteractionProgram(await actorId(), id),
     )
     const after = (
-      await Effect.runPromise(recordTimelineProgram(companyId))
+      await Effect.runPromise(recordTimelineProgram(companyId, FIXTURE_ACTOR))
     ).find((i) => i.type === 'interaction' && i.id === id)
     expect(after).toMatchObject({ noteId })
   })
