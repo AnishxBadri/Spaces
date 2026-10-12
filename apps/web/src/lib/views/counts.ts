@@ -1,10 +1,11 @@
 import { Effect, Schema } from 'effect'
 import { and, eq, inArray, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { attribute, entity, objectDef, view } from '@spaces/db/schema'
+import { entity, objectDef, view } from '@spaces/db/schema'
 import { CORE_OBJECTS } from '@spaces/core/attributes/registry'
 import { compileConditions } from './sql'
 import { entityValuesResolver } from './resolve'
+import { lensRegistry } from './inverse'
 import { listScope } from './scope'
 import type { SQL } from 'drizzle-orm'
 import type { FieldResolver } from './sql'
@@ -87,22 +88,10 @@ export const viewLensProgram = Effect.fn('viewLensProgram')(function* (
 ): Effect.fn.Return<ViewLens, ViewCountFailed> {
   // Every attribute, archived included: the live ones build the resolver
   // (exactly as the list page does), the archived ones only name a reason.
-  const attributes = yield* query(() =>
-    db
-      .select({
-        slug: attribute.slug,
-        name: attribute.name,
-        type: attribute.type,
-        archived: attribute.archived,
-      })
-      .from(attribute)
-      .where(eq(attribute.objectId, objectId)),
-  )
+  const registry = yield* query(() => lensRegistry(objectId))
   return {
-    resolve: entityValuesResolver(attributes.filter((a) => !a.archived)),
-    archivedName: new Map(
-      attributes.filter((a) => a.archived).map((a) => [a.slug, a.name]),
-    ),
+    resolve: entityValuesResolver(registry.live),
+    archivedName: new Map(registry.archived.map((a) => [a.slug, a.name])),
   }
 })
 

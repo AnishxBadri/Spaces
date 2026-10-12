@@ -59,6 +59,9 @@ import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { objectIcon } from '#/lib/object-icons'
+import { inverseColumns } from '#/components/table/inverse-columns'
+import { inverseCountFilters } from '#/lib/views/inverse-fields'
+import { isDerived } from '@spaces/core/attributes/relationship'
 import { RECORD_PAGE_SIZE } from '#/lib/views/page-size'
 import {
   countViews,
@@ -88,8 +91,9 @@ export const Route = createFileRoute('/_app/o/$objectSlug')({
     const object = await getObject({ data: { slug: params.objectSlug } })
     // An archived object hides its routes (§9 lifecycle); records persist.
     if (object.archived || object.isSystem) throw notFound()
-    const [registry, viewData, session] = await Promise.all([
-      listRegistry({ data: { objectId: object.id } }),
+    const [withInverses, viewData, session] = await Promise.all([
+      // Inverse halves come too, as columns and filters. (D69)
+      listRegistry({ data: { objectId: object.id, includeDerived: true } }),
       listViews({ data: { surface: 'object', objectId: object.id } }),
       getSession(),
     ])
@@ -135,7 +139,8 @@ export const Route = createFileRoute('/_app/o/$objectSlug')({
     ])
     return {
       object,
-      registry,
+      registry: withInverses.filter((d) => !isDerived(d)),
+      inverses: withInverses.filter(isDerived),
       conditions,
       sort,
       initial,
@@ -155,6 +160,7 @@ function ObjectListPage() {
   const {
     object,
     registry,
+    inverses,
     conditions,
     sort: loaderSort,
     initial,
@@ -329,6 +335,7 @@ function ObjectListPage() {
           ),
         }),
       ),
+      ...inverseColumns<Row>(inverses, { refNames, onSave: saveCell }),
       col.accessor((r) => r.spaces.map((s) => s.name).join(', '), {
         id: 'spaces',
         header: 'Spaces',
@@ -360,7 +367,13 @@ function ObjectListPage() {
     ]
     return defs
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registry, object.slug, refNames])
+  }, [registry, inverses, object.slug, refNames])
+
+  // The view bar filters on the inverses and their counts too.
+  const filterRegistry = useMemo(
+    () => [...registry, ...inverses, ...inverseCountFilters(inverses)],
+    [registry, inverses],
+  )
 
   /**
    * No `getSortedRowModel` and no `getFilteredRowModel` here, deliberately
@@ -436,7 +449,7 @@ function ObjectListPage() {
         <>
           <ViewBar
             objectId={object.id}
-            registry={registry}
+            registry={filterRegistry}
             views={views}
             counts={counts}
             total={allTotal}

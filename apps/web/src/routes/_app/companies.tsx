@@ -41,7 +41,11 @@ import { ImportAction } from '#/components/import/import-action'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { useListEnrich } from '#/components/table/bulk-enrich-dialog'
 import { statColumns } from '#/components/table/stat-columns'
+import { inverseColumns } from '#/components/table/inverse-columns'
 import { INTERACTION_STAT_FILTERS } from '#/lib/views/stat-fields'
+import { inverseCountFilters } from '#/lib/views/inverse-fields'
+import { isDerived } from '@spaces/core/attributes/relationship'
+import type { RefNames } from '#/components/attributes/value-editor'
 import { RECORD_PAGE_SIZE } from '#/lib/views/page-size'
 import {
   countViews,
@@ -58,8 +62,10 @@ export const Route = createFileRoute('/_app/companies')({
   // an ad-hoc condition edit refetches through the query below instead.
   loaderDeps: ({ search }) => ({ view: search.view ?? null }),
   loader: async ({ deps }) => {
-    const [registry, viewData, session] = await Promise.all([
-      listRegistry({ data: { kind: 'company' } }),
+    const [withInverses, viewData, session] = await Promise.all([
+      // Inverse halves (Team) come too: they are columns and filters, read
+      // from the links the list page fills each row with. (D69)
+      listRegistry({ data: { kind: 'company', includeDerived: true } }),
       listViews({ data: { surface: 'object', kind: 'company' } }),
       getSession(),
     ])
@@ -96,7 +102,8 @@ export const Route = createFileRoute('/_app/companies')({
       sort,
       initial,
       allTotal: (all ?? initial).total,
-      registry,
+      registry: withInverses.filter((d) => !isDerived(d)),
+      inverses: withInverses.filter(isDerived),
       views: viewData.views,
       counts,
       objectId: viewData.objectId,
@@ -119,6 +126,7 @@ function CompaniesPage() {
     initial,
     allTotal,
     registry,
+    inverses,
     views,
     counts,
     objectId,
@@ -204,6 +212,11 @@ function CompaniesPage() {
   const loaded = useMemo(() => pages ?? [initial], [pages, initial])
   const rows = useMemo(() => loaded.flatMap((p) => p.rows), [loaded])
   const total = loaded.at(-1)?.total ?? 0
+  const refNames = useMemo(() => {
+    const out: RefNames = {}
+    for (const p of loaded) Object.assign(out, p.refNames)
+    return out
+  }, [loaded])
 
   /**
    * The loader is no longer the only thing holding the rows, so a write has
@@ -247,10 +260,16 @@ function CompaniesPage() {
     }
   }
 
-  // The view bar filters on the stat columns too; a record's editors never see them.
+  // The view bar filters on the inverses, their counts and the stat
+  // columns too; a record's editors never see the last two.
   const filterRegistry = useMemo(
-    () => [...registry, ...INTERACTION_STAT_FILTERS],
-    [registry],
+    () => [
+      ...registry,
+      ...inverses,
+      ...inverseCountFilters(inverses),
+      ...INTERACTION_STAT_FILTERS,
+    ],
+    [registry, inverses],
   )
 
   const columns = useMemo(() => {
@@ -295,6 +314,7 @@ function CompaniesPage() {
           ),
         }),
       ),
+      ...inverseColumns<Row>(inverses, { refNames, onSave: saveCell }),
       col.accessor((r) => r.spaces.map((s) => s.name).join(', '), {
         id: 'spaces',
         header: 'Spaces',
@@ -326,7 +346,7 @@ function CompaniesPage() {
     ]
     return defs
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registry])
+  }, [registry, inverses, refNames])
 
   /**
    * No `getSortedRowModel` and no `getFilteredRowModel`, deliberately: both

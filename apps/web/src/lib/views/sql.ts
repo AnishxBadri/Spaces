@@ -31,12 +31,28 @@ import type { Condition } from '@spaces/core/views/filter'
  * branch per surface here.
  */
 
+/**
+ * An inverse attribute's links (D69), built by the resolver: this module
+ * still names no table.
+ */
+export type InverseLinks = {
+  /** `exists` over the row's inbound links, narrowed to one source id when given. */
+  exists: (member: string | null) => SQL
+  /** The first referenced record's name: the inverse's sort key. */
+  firstName: SQL
+}
+
 /** What one condition's slug resolves to on a given surface. */
 export type ResolvedField = {
   /** The stored value as jsonb; SQL NULL when the field is absent. */
   expr: SQL
   /** The attribute type, as `opsFor`/`matchesCondition` spell it. */
   type: string
+  /**
+   * Set on an inverse attribute: membership ops compile to an `exists` over
+   * its links rather than over `expr`, which still answers the rest.
+   */
+  inverse?: InverseLinks
 }
 
 /** null means "this surface has no such live field" → the condition is ignored. */
@@ -109,8 +125,31 @@ const orEmpty = (j: SQL, whenEmpty: boolean, otherwise: SQL) =>
     ? sql`(${empty(j)} or ${otherwise})`
     : sql`((not ${empty(j)}) and ${otherwise})`
 
+/**
+ * Membership on an inverse, without building its list: the same answers
+ * `orEmpty`/`someEquals` give over `expr`, since a source id is never `''`.
+ */
+function compileInverse(c: Condition, links: InverseLinks): SQL | null {
+  switch (c.op) {
+    case 'empty':
+      return sql`(not ${links.exists(null)})`
+    case 'not_empty':
+      return links.exists(null)
+    case 'is':
+      return emptyValue(c.value)
+        ? sql`(not ${links.exists(null)})`
+        : links.exists(String(c.value))
+    case 'is_not':
+      return sql`(${links.exists(null)} and not ${links.exists(String(c.value))})`
+    default:
+      return null
+  }
+}
+
 function compileCondition(c: Condition, f: ResolvedField): SQL {
   const j = f.expr
+  const linked = f.inverse ? compileInverse(c, f.inverse) : null
+  if (linked) return linked
   switch (c.op) {
     case 'empty':
       return empty(j)
@@ -188,6 +227,9 @@ export function compileSortKey(f: ResolvedField): {
   expr: SQL
   cast: SortCast
 } {
+  // An inverse sorts by its first referenced name; its count sorts as the
+  // `count:` field, which is numeric.
+  if (f.inverse) return { expr: f.inverse.firstName, cast: 'text' }
   return isNumericType(f.type)
     ? { expr: num(f.expr), cast: 'numeric' }
     : { expr: text(f.expr), cast: 'text' }

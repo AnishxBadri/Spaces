@@ -1,10 +1,11 @@
 import { Effect, Schema } from 'effect'
 import { and, eq, ilike, inArray, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { attribute, entity, entitySpace, link } from '@spaces/db/schema'
+import { entity, entitySpace, link } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { compileConditions } from './sql'
 import { entityValuesResolver } from './resolve'
+import { inversesOf, lensRegistry, withInverseValues } from './inverse'
 import { listScope } from './scope'
 import {
   afterCursor,
@@ -78,14 +79,7 @@ export const listRecordsProgram = Effect.fn('listRecordsProgram')(function* (
 ) {
   // Live attributes only: an archived slug resolves to null and its
   // condition is dropped, the way `matchesConditions` skips an unknown one.
-  const registry = yield* query(() =>
-    db
-      .select({ slug: attribute.slug, type: attribute.type })
-      .from(attribute)
-      .where(
-        and(eq(attribute.objectId, objectId), eq(attribute.archived, false)),
-      ),
-  )
+  const registry = (yield* query(() => lensRegistry(objectId))).live
   const resolve = entityValuesResolver(registry)
   const filter = compileConditions(conditions, resolve)
   const plan = planSort(options.sort, resolve)
@@ -129,7 +123,12 @@ export const listRecordsProgram = Effect.fn('listRecordsProgram')(function* (
   )
   const total = counted.at(0)?.total ?? 0
 
-  const { rows, nextCursor } = cutPage(page, limit)
+  const cut = cutPage(page, limit)
+  const nextCursor = cut.nextCursor
+  const inverse = yield* withInverseValues(cut.rows, inversesOf(registry)).pipe(
+    Effect.mapError((e) => new RecordQueryFailed({ cause: e })),
+  )
+  const rows = inverse.rows
 
   const ids = rows.map((r) => r.id)
   const tags =
@@ -182,6 +181,7 @@ export const listRecordsProgram = Effect.fn('listRecordsProgram')(function* (
     nextCursor,
     total,
     refNames: {
+      ...inverse.refNames,
       ...Object.fromEntries(refs.map((r) => [r.toId, { name: r.name }])),
       ...Object.fromEntries(users.map((u) => [u.id, { name: u.name }])),
     },

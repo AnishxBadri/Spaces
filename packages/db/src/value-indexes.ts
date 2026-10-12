@@ -19,6 +19,8 @@ import { attribute } from './schema/attributes.ts'
  *   because Postgres refuses a subquery in an index expression.
  * - `isNumericType` is passed in, not copied: this package imports nothing
  *   internal, and a second copy of the set would drift from the evaluator.
+ * - An inverse attribute (D69) stores nothing in `values`; flagging one wants
+ *   `LINK_INDEX_NAME` on `link` instead, shared by every inverse.
  */
 
 /** Every index this module owns starts with it, and nothing else may. */
@@ -31,6 +33,14 @@ export const VALUE_INDEX_PREFIX = 'attr_idx_'
  */
 export const valueIndexName = (attributeId: string) =>
   `${VALUE_INDEX_PREFIX}${attributeId}`
+
+/**
+ * The inverse attributes' one index (D69): `link(to_entity_id, attr_slug)`,
+ * which every inverse's link join reads, so it is minted once while any
+ * inverse attribute is flagged and dropped with the last flag.
+ */
+export const LINK_INDEX_NAME = `${VALUE_INDEX_PREFIX}links`
+const LINK_INDEX_COLUMNS = '("to_entity_id", "attr_slug")'
 
 /** Postgres identifier and string literal quoting — slugs are ours, but. */
 const ident = (name: string) => `"${name.replace(/"/g, '""')}"`
@@ -90,7 +100,9 @@ type LiveIndex = { name: string; definition: string; valid: boolean }
  * it is how "the next boot retries" stays true for the concurrent build's
  * own failure mode and not just for ours.
  */
-async function liveIndexes(): Promise<Array<LiveIndex>> {
+async function liveIndexes(
+  table: 'entity' | 'link',
+): Promise<Array<LiveIndex>> {
   const result = await db.execute<LiveIndex>(sql`
     select
       c.relname as name,
@@ -100,7 +112,7 @@ async function liveIndexes(): Promise<Array<LiveIndex>> {
     join pg_class c on c.oid = i.indexrelid
     join pg_class t on t.oid = i.indrelid
     join pg_namespace n on n.oid = c.relnamespace
-    where t.relname = 'entity'
+    where t.relname = ${table}
       and n.nspname = current_schema()
       and c.relname like ${`${VALUE_INDEX_PREFIX}%`}
   `)
@@ -121,9 +133,16 @@ export async function reconcileValueIndexes(
     options.execute ?? ((statement: string) => db.execute(sql.raw(statement)))
 
   // Flagged and live. Either flag mints the one index: filtering and
-  // sorting want the same btree.
-  const wanted = await db.execute<{ id: string; slug: string; type: string }>(
-    sql`select ${attribute.id} as id, ${attribute.slug} as slug, ${attribute.type}::text as type
+  // sorting want the same btree. An inverse stores nothing in `values`, so
+  // it wants the link index instead of one of its own.
+  const wanted = await db.execute<{
+    id: string
+    slug: string
+    type: string
+    derived: boolean
+  }>(
+    sql`select ${attribute.id} as id, ${attribute.slug} as slug, ${attribute.type}::text as type,
+          coalesce(${attribute.options}->>'derived' = 'true', false) as derived
         from ${attribute}
         where ${and(
           eq(attribute.archived, false),
@@ -132,12 +151,15 @@ export async function reconcileValueIndexes(
   )
 
   const desired = new Map(
-    wanted.rows.map((a) => [
-      valueIndexName(a.id),
-      valueIndexExpression(a.slug, options.isNumericType(a.type)),
-    ]),
+    wanted.rows
+      .filter((a) => !a.derived)
+      .map((a) => [
+        valueIndexName(a.id),
+        valueIndexExpression(a.slug, options.isNumericType(a.type)),
+      ]),
   )
-  const live = await liveIndexes()
+  const wantLinks = wanted.rows.some((a) => a.derived)
+  const live = await liveIndexes('entity')
 
   const created: Array<string> = []
   const dropped: Array<string> = []
@@ -183,9 +205,31 @@ export async function reconcileValueIndexes(
     }
   }
 
+  // The link index: one name, one definition, wanted while any inverse is.
+  const linkIndex = (await liveIndexes('link')).find(
+    (i) => i.name === LINK_INDEX_NAME,
+  )
+  const linkStands =
+    linkIndex !== undefined &&
+    linkIndex.valid &&
+    normalize(linkIndex.definition).endsWith(
+      `usingbtree${normalize(LINK_INDEX_COLUMNS)}`,
+    )
+  if (linkIndex !== undefined && (!wantLinks || !linkStands))
+    await drop(LINK_INDEX_NAME)
+  if (wantLinks && !linkStands)
+    try {
+      await run(
+        `CREATE INDEX CONCURRENTLY IF NOT EXISTS ${ident(LINK_INDEX_NAME)} ON "link" ${LINK_INDEX_COLUMNS}`,
+      )
+      created.push(LINK_INDEX_NAME)
+    } catch (cause) {
+      failed.push({ index: LINK_INDEX_NAME, error: String(cause) })
+    }
+
   if (created.length > 0 || dropped.length > 0)
     console.log(
-      `[value-indexes] +${created.length} -${dropped.length} on entity.values`,
+      `[value-indexes] +${created.length} -${dropped.length} on entity.values and link`,
     )
   for (const f of failed)
     console.error(`[value-indexes] ${f.index} failed: ${f.error}`)

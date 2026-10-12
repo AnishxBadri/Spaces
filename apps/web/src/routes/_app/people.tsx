@@ -49,7 +49,10 @@ import { ImportAction } from '#/components/import/import-action'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { useListEnrich } from '#/components/table/bulk-enrich-dialog'
 import { statColumns } from '#/components/table/stat-columns'
+import { inverseColumns } from '#/components/table/inverse-columns'
 import { INTERACTION_STAT_FILTERS } from '#/lib/views/stat-fields'
+import { inverseCountFilters } from '#/lib/views/inverse-fields'
+import { isDerived } from '@spaces/core/attributes/relationship'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
@@ -80,8 +83,9 @@ export const Route = createFileRoute('/_app/people')({
   // an ad-hoc condition edit refetches through the query below instead.
   loaderDeps: ({ search }) => ({ view: search.view ?? null }),
   loader: async ({ deps }) => {
-    const [registry, companies, viewData, session] = await Promise.all([
-      listRegistry({ data: { kind: 'person' } }),
+    const [withInverses, companies, viewData, session] = await Promise.all([
+      // Inverse halves (Deals) come too, as columns and filters. (D69)
+      listRegistry({ data: { kind: 'person', includeDerived: true } }),
       listCompanies(),
       listViews({ data: { surface: 'object', kind: 'person' } }),
       getSession(),
@@ -118,7 +122,8 @@ export const Route = createFileRoute('/_app/people')({
       sort,
       initial,
       allTotal: (all ?? initial).total,
-      registry,
+      registry: withInverses.filter((d) => !isDerived(d)),
+      inverses: withInverses.filter(isDerived),
       companies,
       views: viewData.views,
       counts,
@@ -142,6 +147,7 @@ function PeoplePage() {
     initial,
     allTotal,
     registry,
+    inverses,
     companies,
     views,
     counts,
@@ -265,10 +271,16 @@ function PeoplePage() {
     }
   }
 
-  // The view bar filters on the stat columns too; a record's editors never see them.
+  // The view bar filters on the inverses, their counts and the stat
+  // columns too; a record's editors never see the last two.
   const filterRegistry = useMemo(
-    () => [...registry, ...INTERACTION_STAT_FILTERS],
-    [registry],
+    () => [
+      ...registry,
+      ...inverses,
+      ...inverseCountFilters(inverses),
+      ...INTERACTION_STAT_FILTERS,
+    ],
+    [registry, inverses],
   )
 
   const columns = useMemo(() => {
@@ -314,6 +326,7 @@ function PeoplePage() {
           ),
         }),
       ),
+      ...inverseColumns<Row>(inverses, { refNames, onSave: saveCell }),
       // Read-only, from the interaction stats; sorted on the server. (D67)
       ...statColumns<Row>(),
       col.accessor('createdAt', {
@@ -326,7 +339,7 @@ function PeoplePage() {
     ]
     return defs
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registry, refNames])
+  }, [registry, inverses, refNames])
 
   // No `getSortedRowModel` and no `getFilteredRowModel`: both would reorder
   // and narrow the loaded page and call that the answer. `manualSorting` /

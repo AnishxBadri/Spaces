@@ -13,7 +13,6 @@ import {
 } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
-  attribute,
   entity,
   entityAlias,
   entitySpace,
@@ -23,6 +22,7 @@ import {
 import { objectIdForKind } from '@spaces/core/writes/attributes/objects'
 import { compileConditions } from './sql'
 import { entityValuesResolver } from './resolve'
+import { inversesOf, lensRegistry, withInverseValues } from './inverse'
 import { listScope } from './scope'
 import type { RowStats } from './stat-fields'
 import {
@@ -36,6 +36,7 @@ import {
   sortKeyColumn,
 } from './paging'
 import type { SQL } from 'drizzle-orm'
+import type { FieldResolver } from './sql'
 import type { ListPageOptions } from './paging'
 import type { Condition } from '@spaces/core/views/filter'
 
@@ -207,15 +208,11 @@ const resolverOf = Effect.fn('resolverOf')(function* (
   const objectId = yield* objectIdForKind(kind)
   // Live attributes only: an archived slug resolves to null and its
   // condition is dropped, the way `matchesConditions` skips an unknown one.
-  const registry = yield* query(() =>
-    db
-      .select({ slug: attribute.slug, type: attribute.type })
-      .from(attribute)
-      .where(
-        and(eq(attribute.objectId, objectId), eq(attribute.archived, false)),
-      ),
-  )
-  return entityValuesResolver(registry)
+  const registry = (yield* query(() => lensRegistry(objectId))).live
+  return {
+    resolve: entityValuesResolver(registry),
+    inverses: inversesOf(registry),
+  }
 })
 
 /**
@@ -225,7 +222,7 @@ const resolverOf = Effect.fn('resolverOf')(function* (
  */
 const matchingOf = (
   kind: 'company' | 'person' | 'deal',
-  resolve: ReturnType<typeof entityValuesResolver>,
+  resolve: FieldResolver,
   search: (q: string) => SQL | undefined,
   conditions: Array<Condition>,
   q: string,
@@ -242,7 +239,7 @@ const pageOfKind = Effect.fn('pageOfKind')(function* (
   conditions: Array<Condition>,
   options: ListPageOptions,
 ) {
-  const resolve = yield* resolverOf(kind)
+  const { resolve, inverses } = yield* resolverOf(kind)
   const plan = planSort(options.sort, resolve)
   const limit = clampLimit(options.limit)
   const q = (options.q ?? '').trim()
@@ -272,8 +269,12 @@ const pageOfKind = Effect.fn('pageOfKind')(function* (
       .where(matching),
   )
   const { rows, nextCursor } = cutPage(page, limit)
+  const filled = yield* withInverseValues(rows, inverses).pipe(
+    Effect.mapError((e) => new DirectoryQueryFailed({ cause: e })),
+  )
   return {
-    rows,
+    rows: filled.rows,
+    refNames: filled.refNames,
     nextCursor,
     total: counted.at(0)?.total ?? 0,
     ids: rows.map((r) => r.id),
@@ -291,7 +292,7 @@ export const listIdsProgram = Effect.fn('listIdsProgram')(function* (
   q: string,
   max: number,
 ) {
-  const resolve = yield* resolverOf(kind)
+  const { resolve } = yield* resolverOf(kind)
   const matching = matchingOf(
     kind,
     resolve,
@@ -348,6 +349,7 @@ export const listCompaniesPageProgram = Effect.fn('listCompaniesPageProgram')(
       })),
       nextCursor: page.nextCursor,
       total: page.total,
+      refNames: page.refNames,
     }
   },
 )
@@ -402,7 +404,7 @@ export const listPeoplePageProgram = Effect.fn('listPeoplePageProgram')(
       })),
       nextCursor: page.nextCursor,
       total: page.total,
-      refNames,
+      refNames: { ...page.refNames, ...refNames },
     }
   },
 )
