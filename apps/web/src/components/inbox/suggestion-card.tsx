@@ -23,6 +23,8 @@ import {
 } from '@spaces/core/ai/discovery'
 import type { DiscoveryEvidence } from '@spaces/core/ai/discovery'
 import { readDocumentKindPayload } from '@spaces/core/ai/document-kind'
+import { readSupersedesPayload } from '@spaces/core/ai/supersedes'
+import type { SupersedesPayload } from '@spaces/core/ai/supersedes'
 import type { DocumentKindPayload } from '@spaces/core/ai/document-kind'
 import { DOCUMENT_KIND_LABELS } from '@spaces/core/documents'
 import { formatDate, formatNumber } from '@spaces/core/format'
@@ -71,6 +73,7 @@ export const SUGGESTION_KIND_WORD: Record<SuggestionKind, string> = {
   task: 'Task',
   add_record: 'New company',
   file_record: 'File here',
+  supersedes: 'Newer version',
 }
 
 /**
@@ -159,6 +162,14 @@ const SUGGESTION_BODIES: Partial<Record<SuggestionKind, SuggestionBody>> = {
       <PayloadBody item={item} actions={actions} />
     )
   },
+  supersedes: ({ item, actions }) => {
+    const pair = readSupersedesPayload(item.payload)
+    return pair ? (
+      <SupersedesBody pair={pair} />
+    ) : (
+      <PayloadBody item={item} actions={actions} />
+    )
+  },
   file_record: ({ item, actions }) => {
     const card = readFileRecordPayload(item.payload)
     return card ? (
@@ -182,12 +193,15 @@ type DecisionWords = {
   reject: string
   /** The reject button's tooltip; null for none. */
   rejectTitle: string | null
+  /** Whether the two buttons carry their check and cross. */
+  icons: boolean
 }
 
 const DECIDE: DecisionWords = {
   accept: 'Accept',
   reject: 'Reject',
   rejectTitle: null,
+  icons: true,
 }
 
 const DISMISS_TITLE =
@@ -199,12 +213,22 @@ export function decisionWords(kind: SuggestionKind): DecisionWords {
       accept: 'Add and file here',
       reject: 'Dismiss',
       rejectTitle: DISMISS_TITLE,
+      icons: true,
     }
   if (kind === 'file_record')
     return {
       accept: 'File here',
       reject: 'Dismiss',
       rejectTitle: DISMISS_TITLE,
+      icons: true,
+    }
+  // The Action Grammar's foot: Dismiss · the verb, no icons. (D59)
+  if (kind === 'supersedes')
+    return {
+      accept: 'Mark as newer version',
+      reject: 'Dismiss',
+      rejectTitle: 'Dismiss for good: this pair is not suggested again',
+      icons: false,
     }
   return DECIDE
 }
@@ -357,6 +381,20 @@ function SpaceTagBody({ proposed }: { proposed: SpaceTagPayload }) {
         </div>
       )}
     </dl>
+  )
+}
+
+/**
+ * A newer version (D59): the document just filed and the one it would
+ * supersede, each named once. Accepting links them; neither is deleted.
+ */
+function SupersedesBody({ pair }: { pair: SupersedesPayload }) {
+  return (
+    <p className="min-w-0 text-ui break-words">
+      <span className="font-medium">{pair.newerName}</span>
+      <span className="text-graphite"> is a newer version of </span>
+      <span className="font-medium">{pair.olderName}</span>
+    </p>
   )
 }
 
@@ -560,6 +598,11 @@ export function SuggestionEntry({
 }): React.ReactNode {
   const Body = suggestionBodyFor(item.kind)
   const words = decisionWords(item.kind)
+  // A newer-version body already names both documents its refs cite.
+  const citations =
+    item.kind === 'supersedes' && readSupersedesPayload(item.payload) !== null
+      ? []
+      : item.citations
   return (
     <li className="flex flex-col gap-3 border-b border-rule px-5 py-3 last:border-b-0 sm:flex-row sm:items-start sm:gap-5">
       <div className="flex min-w-0 flex-col gap-1 sm:w-64 sm:shrink-0">
@@ -584,9 +627,9 @@ export function SuggestionEntry({
         ) : item.origin.via === 'integration' ? (
           <p className="text-label text-graphite">Proposed by an integration</p>
         ) : null}
-        {item.citations.length > 0 ? (
+        {citations.length > 0 ? (
           <ul className="flex flex-wrap gap-1" aria-label="Citations">
-            {item.citations.map((c) => (
+            {citations.map((c) => (
               <li
                 key={c.ref}
                 title={c.ref}
@@ -619,11 +662,11 @@ export function SuggestionEntry({
           onClick={onReject}
           {...(words.rejectTitle === null ? {} : { title: words.rejectTitle })}
         >
-          <X className="size-3" strokeWidth={2} />
+          {words.icons ? <X className="size-3" strokeWidth={2} /> : null}
           {words.reject}
         </Button>
         <Button size="xs" disabled={pending} onClick={onAccept}>
-          <Check className="size-3" strokeWidth={2} />
+          {words.icons ? <Check className="size-3" strokeWidth={2} /> : null}
           {words.accept}
         </Button>
       </div>
@@ -759,8 +802,10 @@ export function SuggestionCard({ card }: { card: SuggestionRow }) {
         )}
         <span className="label-caps text-graphite">Suggestions</span>
         <span className="mono text-micro text-graphite">{n}</span>
-        {/* A space's discovery cards are decided one by one. */}
-        {card.suggestions.every((s) => isDiscovery(s.kind)) ? null : (
+        {/* Discovery cards and newer versions are decided one by one. */}
+        {card.suggestions.every(
+          (s) => isDiscovery(s.kind) || s.kind === 'supersedes',
+        ) ? null : (
           <AcceptAllButton
             pending={pending !== null}
             onClick={() =>

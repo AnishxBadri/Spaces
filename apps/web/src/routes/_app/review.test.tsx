@@ -137,6 +137,60 @@ describe('the suggestion card', () => {
     }
   })
 
+  it('draws a newer version as its two documents and the one verb (D59)', async () => {
+    const { SuggestionEntry } =
+      await import('#/components/inbox/suggestion-card')
+    const v2 = '00000000-0000-4000-8000-000000000002'
+    const v3 = '00000000-0000-4000-8000-000000000003'
+    const html = renderToStaticMarkup(
+      <ul>
+        <SuggestionEntry
+          item={{
+            id: 's-supersedes',
+            kind: 'supersedes',
+            payload: {
+              newerId: v3,
+              olderId: v2,
+              newerName: 'Seed deck v3.pdf',
+              olderName: 'Seed deck v2.pdf',
+              documentKind: 'deck',
+            },
+            rationale:
+              'Deck filed Oct 13, 2026, after the one this record already holds.',
+            citations: [
+              {
+                ref: `doc:${v3}#0`,
+                entityId: v3,
+                label: 'Seed deck v3.pdf · chunk 0',
+                missing: false,
+              },
+              {
+                ref: `doc:${v2}#0`,
+                entityId: v2,
+                label: 'Seed deck v2.pdf · chunk 0',
+                missing: false,
+              },
+            ],
+            fields: null,
+            origin: { via: 'app' },
+            createdAt: '2026-10-13T00:00:00.000Z',
+            runId: null,
+          }}
+          pending={false}
+          onAccept={() => {}}
+          onReject={() => {}}
+        />
+      </ul>,
+    )
+    expect(html.split('Seed deck v3.pdf')).toHaveLength(2)
+    expect(html.split('Seed deck v2.pdf')).toHaveLength(2)
+    expect(html).toContain('is a newer version of')
+    expect(html).toContain('Oct 13, 2026')
+    expect(html).toContain('>Mark as newer version</button>')
+    expect(html).toContain('>Dismiss</button>')
+    expect(html).not.toContain('<svg')
+  })
+
   it('links a suggestion a run produced to that run (SPA-100)', async () => {
     const { SuggestionEntry, usageRunHref } =
       await import('#/components/inbox/suggestion-card')

@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { and, asc, eq, isNull, or, sql } from 'drizzle-orm'
+import { and, asc, eq, isNull, ne, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   activity,
@@ -43,6 +43,7 @@ import {
   patchAnchor,
   registryFor,
   spaceTagOf,
+  supersedesOf,
   taskOf,
 } from '@spaces/core/writes/suggestions/propose'
 import type {
@@ -53,6 +54,11 @@ import type {
 import type { CaptureObject } from '@spaces/core/writes/ai/capture-read'
 import type { DomainEvent } from '@spaces/sdk'
 import { dealLinked } from '@spaces/core/writes/events/dispatch'
+import {
+  SupersedesRefused,
+  markNewerVersionInTx,
+  supersedesMessage,
+} from '@spaces/core/writes/links/supersedes'
 import { writeSuggestedNoteInTx } from '#/lib/notes/from-suggestion'
 import { insertSpaceTag, isLiveSpace } from '#/lib/spaces/tag'
 import { liveSpaceSql } from '#/lib/spaces/live'
@@ -109,7 +115,8 @@ export type {
  * them: `attribute_patch` (a value, through the one write path), `identity`
  * (a person, through `resolveEntity`; a company record joins the person's
  * `companies`, and the person is written into the reference field the claim
- * came from) and `task` (one task, through the task writer). The discovery
+ * came from), `task` (one task, through the task writer) and `supersedes`
+ * (one link, through the supersedes writer; D59). The discovery
  * cards (`add_record`, `file_record`) sit on a space, not a record: accept
  * resolves and files, reject dismisses the domain from the space. (D72)
  *
@@ -150,6 +157,7 @@ const KIND_LABEL: Record<SuggestionKind, string> = {
   task: 'task',
   add_record: 'new company',
   file_record: 'filing',
+  supersedes: 'newer version',
 }
 
 const isKind = (k: string): k is SuggestionKind => k in KIND_LABEL
@@ -317,6 +325,12 @@ export type Accepted =
       entityId: string
       spaceId: string
       tagged: boolean
+    }
+  | {
+      kind: 'supersedes'
+      suggestion: Suggestion
+      /** False when the link was already there: the accept only closes. */
+      written: boolean
     }
 
 /**
@@ -576,6 +590,34 @@ async function acceptDocumentKindInTx(
     meta: { from: held.kind, to: kind, suggestionId: row.id },
   })
   return { from: held.kind, to: kind }
+}
+
+// ---------- supersedes (D59) ----------
+
+/**
+ * Accept a newer version: `link(supersedes)` newer → older through
+ * `markNewerVersionInTx`, the one supersedes writer, in this transaction —
+ * the link and the closed suggestion commit together. A pair the writer
+ * refuses (one side gone, the reverse already linked) refuses the accept
+ * and the row stays open.
+ */
+async function acceptSupersedesInTx(
+  tx: Tx,
+  row: Anchored,
+  actor: Decider,
+): Promise<{ written: boolean }> {
+  const pair = supersedesOf(row.payload)
+  try {
+    return await markNewerVersionInTx(
+      tx,
+      { newerId: pair.newerId, olderId: pair.olderId, actorId: actor.id },
+      row.id,
+    )
+  } catch (cause) {
+    if (cause instanceof SupersedesRefused)
+      throw invalid([{ slug: 'supersedes', message: supersedesMessage(cause) }])
+    throw cause
+  }
 }
 
 // ---------- note (SPA-66) ----------
@@ -1083,6 +1125,23 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
             taskId,
           } satisfies Accepted
         }
+        if (row.kind === 'supersedes') {
+          if (fields !== undefined)
+            throw invalid([
+              {
+                slug: 'fields',
+                message:
+                  'fields: a newer version is accepted whole, not by field',
+              },
+            ])
+          const { written } = await acceptSupersedesInTx(tx, row, actor)
+          const decided = await close(tx, id, 'accepted', actor)
+          return {
+            kind: 'supersedes',
+            suggestion: decided,
+            written,
+          } satisfies Accepted
+        }
         if (row.kind !== 'attribute_patch')
           throw new UnsupportedSuggestionKind({ id, kind: row.kind })
 
@@ -1208,7 +1267,8 @@ const read = <T>(run: () => Promise<T>) =>
   Effect.tryPromise({ try: run, catch: asFailure })
 
 /**
- * "Accept all on this record": every open suggestion on it, oldest first
+ * "Accept all on this record": every open suggestion on it but a
+ * `supersedes`, oldest first
  * (a later proposal for the same field lands last, and wins), field by
  * field for a patch — so one bad field is one failed item and the others
  * land. An identity is one item, accepted whole; a kind with no accept path
@@ -1231,6 +1291,9 @@ export const acceptRecordProgram = Effect.fn('acceptRecordProgram')(
           and(
             eq(suggestion.entityId, input.entityId),
             eq(suggestion.status, 'open'),
+            // A supersession is accepted one at a time: a wrong link hides
+            // true facts from the AI. (D59)
+            ne(suggestion.kind, 'supersedes'),
           ),
         )
         .orderBy(asc(suggestion.createdAt), asc(suggestion.id)),

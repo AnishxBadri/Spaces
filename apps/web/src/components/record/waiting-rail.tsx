@@ -27,6 +27,7 @@ const WORD: Record<SuggestionKind, [one: string, many: string]> = {
   task: ['task', 'tasks'],
   add_record: ['new company', 'new companies'],
   file_record: ['filing', 'filings'],
+  supersedes: ['newer version', 'newer versions'],
 }
 
 export function suggestionChipWord(kind: SuggestionKind, n: number): string {

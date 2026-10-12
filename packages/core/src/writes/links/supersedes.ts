@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, ne, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { entity, link, note } from '@spaces/db/schema'
+import { entity, link, note, suggestion } from '@spaces/db/schema'
 import { canRead } from '../../read-policy'
 import type { Tx } from '../attributes/values'
 
@@ -72,18 +72,80 @@ export async function insertSupersedes(
   return rows.length > 0
 }
 
-const query = <T>(run: () => Promise<T>) =>
-  Effect.tryPromise({
-    try: run,
-    catch: (cause) => new SupersedesFailed({ cause }),
-  })
-
 /**
  * "Newer version of…": checks the pair, then writes one `link` row and
- * nothing else.
+ * nothing else, inside the caller's transaction. Throws `SupersedesRefused`.
  * - Both live, both documents or both notes, a note readable by the actor.
  * - Refuses the reverse of an existing edge, so a chain never loops.
+ * - Closes every open `supersedes` suggestion for the pair as accepted by
+ *   the actor, so Review never offers a link already made. `except` is the
+ *   row an accept is closing itself.
  */
+export async function markNewerVersionInTx(
+  tx: Tx,
+  edge: SupersedesEdge,
+  except: string | null = null,
+): Promise<{ written: boolean }> {
+  if (edge.newerId === edge.olderId)
+    throw new SupersedesRefused({ reason: 'self' })
+
+  const rows = await tx
+    .select({
+      id: entity.id,
+      kind: entity.kind,
+      mergedIntoId: entity.mergedIntoId,
+      visibility: note.visibility,
+      authorId: note.authorId,
+    })
+    .from(entity)
+    .leftJoin(note, eq(note.entityId, entity.id))
+    .where(inArray(entity.id, [edge.newerId, edge.olderId]))
+  const newer = rows.find((r) => r.id === edge.newerId)
+  const older = rows.find((r) => r.id === edge.olderId)
+  const user = { id: edge.actorId }
+  if (
+    !newer ||
+    !older ||
+    newer.mergedIntoId !== null ||
+    older.mergedIntoId !== null ||
+    !canRead(user, newer) ||
+    !canRead(user, older)
+  )
+    throw new SupersedesRefused({ reason: 'not_found' })
+  if (newer.kind !== older.kind)
+    throw new SupersedesRefused({ reason: 'kind_mismatch' })
+  if (newer.kind !== 'document' && newer.kind !== 'note')
+    throw new SupersedesRefused({ reason: 'not_versionable' })
+
+  const reverse = await tx
+    .select({ id: link.id })
+    .from(link)
+    .where(
+      and(
+        eq(link.fromEntityId, edge.olderId),
+        eq(link.toEntityId, edge.newerId),
+        eq(link.relation, 'supersedes'),
+      ),
+    )
+  if (reverse.length > 0) throw new SupersedesRefused({ reason: 'reverse' })
+
+  const written = await insertSupersedes(tx, edge)
+  await tx
+    .update(suggestion)
+    .set({ status: 'accepted', decidedBy: edge.actorId, decidedAt: new Date() })
+    .where(
+      and(
+        eq(suggestion.kind, 'supersedes'),
+        eq(suggestion.status, 'open'),
+        sql`${suggestion.payload} ->> 'newerId' = ${edge.newerId}`,
+        sql`${suggestion.payload} ->> 'olderId' = ${edge.olderId}`,
+        except === null ? undefined : ne(suggestion.id, except),
+      ),
+    )
+  return { written }
+}
+
+/** `markNewerVersionInTx` in its own transaction: the manual verb's program. */
 export const markNewerVersionProgram = Effect.fn('markNewerVersionProgram')(
   function* (
     edge: SupersedesEdge,
@@ -91,57 +153,12 @@ export const markNewerVersionProgram = Effect.fn('markNewerVersionProgram')(
     { written: boolean },
     SupersedesRefused | SupersedesFailed
   > {
-    if (edge.newerId === edge.olderId)
-      return yield* new SupersedesRefused({ reason: 'self' })
-
-    const rows = yield* query(() =>
-      db
-        .select({
-          id: entity.id,
-          kind: entity.kind,
-          mergedIntoId: entity.mergedIntoId,
-          visibility: note.visibility,
-          authorId: note.authorId,
-        })
-        .from(entity)
-        .leftJoin(note, eq(note.entityId, entity.id))
-        .where(inArray(entity.id, [edge.newerId, edge.olderId])),
-    )
-    const newer = rows.find((r) => r.id === edge.newerId)
-    const older = rows.find((r) => r.id === edge.olderId)
-    const user = { id: edge.actorId }
-    if (
-      !newer ||
-      !older ||
-      newer.mergedIntoId !== null ||
-      older.mergedIntoId !== null ||
-      !canRead(user, newer) ||
-      !canRead(user, older)
-    )
-      return yield* new SupersedesRefused({ reason: 'not_found' })
-    if (newer.kind !== older.kind)
-      return yield* new SupersedesRefused({ reason: 'kind_mismatch' })
-    if (newer.kind !== 'document' && newer.kind !== 'note')
-      return yield* new SupersedesRefused({ reason: 'not_versionable' })
-
-    const reverse = yield* query(() =>
-      db
-        .select({ id: link.id })
-        .from(link)
-        .where(
-          and(
-            eq(link.fromEntityId, edge.olderId),
-            eq(link.toEntityId, edge.newerId),
-            eq(link.relation, 'supersedes'),
-          ),
-        ),
-    )
-    if (reverse.length > 0)
-      return yield* new SupersedesRefused({ reason: 'reverse' })
-
-    const written = yield* query(() =>
-      db.transaction((tx) => insertSupersedes(tx, edge)),
-    )
-    return { written }
+    return yield* Effect.tryPromise({
+      try: () => db.transaction((tx) => markNewerVersionInTx(tx, edge)),
+      catch: (cause) =>
+        cause instanceof SupersedesRefused
+          ? cause
+          : new SupersedesFailed({ cause }),
+    })
   },
 )

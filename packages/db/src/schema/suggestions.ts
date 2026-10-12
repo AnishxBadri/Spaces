@@ -49,6 +49,10 @@ export const suggestionKind = pgEnum('suggestion_kind', [
   // A company held elsewhere that a watch found for this space: accepting
   // files it here. (D72)
   'file_record',
+  // A newer version of a document already on the record: accepting writes
+  // `link(supersedes)` newer → older through the one supersedes writer.
+  // Never written without that accept. (D59)
+  'supersedes',
 ])
 
 export const suggestionStatus = pgEnum('suggestion_status', [

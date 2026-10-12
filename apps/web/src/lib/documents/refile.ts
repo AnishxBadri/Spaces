@@ -4,6 +4,7 @@ import { db } from '@spaces/db'
 import { document, entity, entitySpace, link } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { QUEUES } from '@spaces/core/queue/names'
+import { proposeNewerVersionProgram } from '@spaces/core/writes/documents/newer-version'
 import {
   raiseSensitivity,
   stampedSensitive,
@@ -143,7 +144,7 @@ export const fileDocumentProgram = Effect.fn('fileDocumentProgram')(function* (
   yield* readTarget(input.target)
   const { documentId, target } = input
 
-  return yield* query(() =>
+  const outcome = yield* query(() =>
     db.transaction(async (tx) => {
       const added =
         target.kind === 'record'
@@ -191,6 +192,10 @@ export const fileDocumentProgram = Effect.fn('fileDocumentProgram')(function* (
       return { filed: true }
     }),
   )
+  // Filed on a record after arrival: the same suggestion intake makes. (D59)
+  if (outcome.filed && target.kind === 'record')
+    yield* proposeNewerVersionProgram(documentId)
+  return outcome
 })
 
 /**

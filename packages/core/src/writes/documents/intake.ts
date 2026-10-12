@@ -11,6 +11,7 @@ import { pendingBlob } from '@spaces/db/schema'
 import { MAX_UPLOAD_BYTES, formatBytes } from '../../documents'
 import { storage } from '../storage'
 import { birthDocumentProgram, documentBirthMessage } from './birth'
+import { proposeNewerVersionProgram } from './newer-version'
 import type { Readable } from 'node:stream'
 import type { SourceClass } from '@spaces/db/schema'
 import type { DocumentKind } from '../../documents'
@@ -320,8 +321,9 @@ export const putBlobProgram = Effect.fn('putBlobProgram')(function* (
 
 /**
  * Stream → sha + size → blob (or not, when the digest is already stored) →
- * `birthDocumentProgram`. Answers exactly what birth answered, so a caller
- * can tell a fresh filing from a dedupe.
+ * `birthDocumentProgram` → the newer-version suggestion, when it files on a
+ * record. Answers exactly what birth answered, so a caller can tell a fresh
+ * filing from a dedupe.
  */
 export const intakeDocumentProgram = Effect.fn('intakeDocumentProgram')(
   function* (
@@ -339,10 +341,14 @@ export const intakeDocumentProgram = Effect.fn('intakeDocumentProgram')(
       return yield* new DocumentTooLarge({ limitBytes: MAX_UPLOAD_BYTES })
     }
 
-    return yield* Effect.acquireUseRelease(
+    const born = yield* Effect.acquireUseRelease(
       makeTempDir,
       (dir) => storeAndBirth(dir, input),
       (dir) => removeTempDir(dir),
     )
+    // Filed on a record that holds one of its kind: suggest, never link. (D59)
+    if (input.fileAgainst.some((t) => t.kind === 'record'))
+      yield* proposeNewerVersionProgram(born.id)
+    return born
   },
 )

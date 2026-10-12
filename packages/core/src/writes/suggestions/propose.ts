@@ -17,6 +17,8 @@ import { documentKindPayloadSchema } from '../../ai/document-kind'
 import { notePayloadSchema } from '../../ai/note'
 import { spaceTagPayloadSchema } from '../../ai/space-tag'
 import { taskPayloadSchema } from '../../ai/task'
+import { supersedesPayloadSchema } from '../../ai/supersedes'
+import type { SupersedesPayload } from '../../ai/supersedes'
 import type { TaskPayload } from '../../ai/task'
 import {
   MAX_EVIDENCE,
@@ -292,6 +294,18 @@ export function taskOf(payload: Json): TaskPayload {
   )
 }
 
+/** A supersedes payload, decoded — or the validator's refusal, by field. */
+export function supersedesOf(payload: Json): SupersedesPayload {
+  const parsed = supersedesPayloadSchema.safeParse(payload)
+  if (parsed.success) return parsed.data
+  throw invalid(
+    parsed.error.issues.map((i) => {
+      const slug = i.path.map(String).join('.') || 'supersedes'
+      return { slug, message: `${slug}: ${i.message}` }
+    }),
+  )
+}
+
 export type ProposeInput = {
   entityId: string
   kind: RecordKind
@@ -340,7 +354,8 @@ async function heldOpen(
  * transaction when the suggestion must commit with something else (a
  * `Facts.fill` conflict commits with the fill that refused it). Throws the
  * typed refusals `asFailure` passes through. An integration's identical
- * open proposal already held is returned rather than duplicated.
+ * open proposal already held is returned rather than duplicated, and so is
+ * a supersedes pair proposed on the record before, open or dismissed.
  */
 export async function proposeWith(
   reader: Reader,
@@ -371,6 +386,54 @@ export async function proposeWith(
   if (input.kind === 'space_tag') spaceTagOf(input.payload)
   // A task likewise: a title, a due date or none, and the record it is about.
   if (input.kind === 'task') taskOf(input.payload)
+  // A newer version is proposed once per pair on a record, ever: an open or
+  // a dismissed row for it is handed back and nothing new is written. (D59)
+  if (input.kind === 'supersedes') {
+    const pair = supersedesOf(input.payload)
+    const { entityId } = input
+    return reader.transaction(async (tx) => {
+      // Serializes two intakes of one pair; the read below is then the truth.
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`supersedes:${entityId}:${pair.newerId}:${pair.olderId}`}))`,
+      )
+      const held = await heldPair(tx, entityId, pair)
+      return held ?? (await insertSuggestion(tx, input, refs))
+    })
+  }
+  return insertSuggestion(reader, input, refs)
+}
+
+/**
+ * The supersedes row already proposed for this pair on this record, whatever
+ * its status. Per record: a deck filed on a company and its deal is offered
+ * on both.
+ */
+async function heldPair(
+  reader: Reader,
+  entityId: string,
+  pair: SupersedesPayload,
+): Promise<Suggestion | undefined> {
+  return (
+    await reader
+      .select()
+      .from(suggestion)
+      .where(
+        and(
+          eq(suggestion.kind, 'supersedes'),
+          eq(suggestion.entityId, entityId),
+          sql`${suggestion.payload} ->> 'newerId' = ${pair.newerId}`,
+          sql`${suggestion.payload} ->> 'olderId' = ${pair.olderId}`,
+        ),
+      )
+      .limit(1)
+  ).at(0)
+}
+
+async function insertSuggestion(
+  reader: Reader,
+  input: ProposeInput,
+  refs: Array<string>,
+): Promise<Suggestion> {
   const row = (
     await reader
       .insert(suggestion)
