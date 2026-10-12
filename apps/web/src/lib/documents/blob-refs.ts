@@ -5,6 +5,7 @@ import {
   entity,
   extractionCache,
   importBatch,
+  interaction,
   workspace,
 } from '@spaces/db/schema'
 import { storage } from '@spaces/core/writes/storage'
@@ -68,7 +69,15 @@ export async function blobIsReferenced(sha: string): Promise<boolean> {
       .from(workspace)
       .where(sql`${workspace.settings} ->> 'logo' = ${sha}`)
   ).at(0)
-  return (logo?.value ?? 0) > 0
+  if ((logo?.value ?? 0) > 0) return true
+  // An email keeps its raw MIME by digest in `meta` (D67).
+  const mime = (
+    await db
+      .select({ value: count() })
+      .from(interaction)
+      .where(sql`${interaction.meta} ->> 'mime_blob_sha' = ${sha}`)
+  ).at(0)
+  return (mime?.value ?? 0) > 0
 }
 
 /**

@@ -14,7 +14,15 @@ const config = defineConfig({
   // the compose files) put it. Anchored to this file rather than to cwd.
   envDir: fileURLToPath(new URL('../../', import.meta.url)),
   resolve: { tsconfigPaths: true },
-  plugins: [devtools(), nitro(), tailwindcss(), tanstackStart(), viteReact()],
+  plugins: [
+    devtools(),
+    // jsdom reads its stylesheet beside its own files at runtime, so it is
+    // traced into `.output/server/node_modules` rather than bundled.
+    nitro({ traceDeps: ['jsdom'] }),
+    tailwindcss(),
+    tanstackStart(),
+    viteReact(),
+  ],
 })
 
 export default config

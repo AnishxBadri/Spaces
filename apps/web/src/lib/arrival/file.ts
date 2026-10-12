@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream'
 import { Effect, Schema } from 'effect'
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import {
@@ -11,10 +12,13 @@ import {
   interaction,
   interactionEntity,
   note,
+  pendingBlob,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { writeIntegrationInteraction } from '@spaces/core/writes/interactions/write'
 import type { BodyVisibility } from '@spaces/core/writes/interactions/write'
+import { putBlobProgram } from '@spaces/core/writes/documents/intake'
+import { reclaimBlobIfOrphaned } from '#/lib/documents/blob-refs'
 import type { EmailMeta } from '@spaces/db/schema'
 import type { Address } from './forwarded'
 import type { ArrivalMessage } from './message'
@@ -109,10 +113,14 @@ export type FileOptions = {
 
 export const FORWARDED: FileOptions = { visibility: 'shared', labels: null }
 
-/** The headers an email row keeps in `interaction.meta` (D67). */
+/**
+ * The headers an email row keeps in `interaction.meta` (D67), with the
+ * digest of its stored MIME — null when the bytes were too large to keep.
+ */
 export function emailMetaOf(
   message: ArrivalMessage,
   labels: ReadonlyArray<string> | null,
+  mimeBlobSha: string | null,
 ): EmailMeta {
   return {
     kind: 'email',
@@ -120,7 +128,7 @@ export function emailMetaOf(
     to: message.to.map((a) => a.email),
     cc: message.cc.map((a) => a.email),
     date: message.occurredAt.toISOString(),
-    mime_blob_sha: null,
+    mime_blob_sha: mimeBlobSha,
     ...(labels === null ? {} : { labels: [...labels] }),
   }
 }
@@ -286,6 +294,58 @@ async function threadEdges(tx: Tx, threadId: string): Promise<Array<string>> {
   return rows.map((r) => r.id)
 }
 
+type StoredMime = { sha: string; stored: boolean } | null
+
+/**
+ * The raw MIME as a content-addressed blob (D67): the same bytes are one
+ * blob by construction.
+ * - Nothing is stored for a Message-ID already held: a second mailbox's copy
+ *   carries its own Received and DKIM headers, so its digest differs and it
+ *   would only ever be an orphan.
+ * - Stored before the row so `meta` never names missing bytes; a new blob
+ *   carries a `pending_blob` intent row that a written arrival clears.
+ * - Too large to keep is null, not a refusal: the body note still lands.
+ */
+const storeMimeProgram = Effect.fn('storeMime')(function* (
+  message: ArrivalMessage,
+): Effect.fn.Return<StoredMime, ArrivalWriteFailed> {
+  const held = yield* Effect.tryPromise({
+    try: () =>
+      db
+        .select({ id: interaction.id })
+        .from(interaction)
+        .where(eq(interaction.messageId, message.messageId))
+        .limit(1),
+    catch: (cause) => new ArrivalWriteFailed({ cause }),
+  })
+  if (held.length > 0) return null
+  return yield* putBlobProgram({
+    stream: Readable.from(message.mime),
+    mime: 'message/rfc822',
+    preparedBy: null,
+  }).pipe(
+    Effect.map((blob): StoredMime => ({ sha: blob.sha, stored: blob.stored })),
+    Effect.catchTag('DocumentTooLarge', () => Effect.succeed(null)),
+    Effect.mapError((e) => new ArrivalWriteFailed({ cause: e.cause })),
+  )
+})
+
+/**
+ * Bytes this arrival stored for a row a concurrent arrival wrote first: the
+ * intent row goes, and the bytes too unless something names them.
+ */
+const dropRacedMimeProgram = Effect.fn('dropRacedMime')(function* (
+  sha: string,
+): Effect.fn.Return<void, ArrivalWriteFailed> {
+  yield* Effect.tryPromise({
+    try: async () => {
+      await reclaimBlobIfOrphaned(sha)
+      await db.delete(pendingBlob).where(eq(pendingBlob.sha, sha))
+    },
+    catch: (cause) => new ArrivalWriteFailed({ cause }),
+  })
+})
+
 export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
   message: ArrivalMessage,
   ctx: FileContext,
@@ -296,6 +356,8 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
   const records = yield* participantRecordsProgram(message, ctx).pipe(
     Effect.mapError((e) => new ArrivalWriteFailed({ cause: e.cause })),
   )
+  const mime = yield* storeMimeProgram(message)
+  const mimeBlobSha = mime?.sha ?? null
   const written = yield* Effect.tryPromise({
     try: () =>
       db.transaction(async (tx): Promise<Filed> => {
@@ -306,7 +368,7 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
           threadId: message.threadId,
           subject: message.subject,
           occurredAt: message.occurredAt,
-          meta: emailMetaOf(message, options.labels),
+          meta: emailMetaOf(message, options.labels, mimeBlobSha),
           body: {
             title: message.subject ?? '',
             text: message.body,
@@ -331,6 +393,9 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
         }
         if (wrote.noteId === null)
           throw new Error('the mailbox writes a body for every interaction')
+        // The row names the bytes now; the orphan sweep must not take them.
+        if (mimeBlobSha !== null)
+          await tx.delete(pendingBlob).where(eq(pendingBlob.sha, mimeBlobSha))
         const { interactionId, noteId, edges } = wrote
 
         const companyId = chooseFilingCompany(
@@ -350,7 +415,10 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
       }),
     catch: (cause) => new ArrivalWriteFailed({ cause }),
   })
-  if (written.kind === 'duplicate') return written
+  if (written.kind === 'duplicate') {
+    if (mime?.stored === true) yield* dropRacedMimeProgram(mime.sha)
+    return written
+  }
 
   const attachments = yield* fileAttachmentsProgram(message.attachments, {
     integrationId: ctx.integrationId,

@@ -63,6 +63,8 @@ export type ArrivalMessage = {
    * attachments.
    */
   attachments: SortedAttachments
+  /** The raw RFC 5322 bytes as fetched — the wrapper's on a true forward. */
+  mime: Buffer
 }
 
 export type Arrival =
@@ -88,10 +90,18 @@ export async function arrivalFromSource(
     skipTextToHtml: true,
     skipTextLinks: true,
   })
-  return toArrival(parsed, opts)
+  return toArrival(
+    parsed,
+    opts,
+    typeof source === 'string' ? Buffer.from(source) : source,
+  )
 }
 
-export function toArrival(parsed: ParsedMail, opts: ArrivalOptions): Arrival {
+export function toArrival(
+  parsed: ParsedMail,
+  opts: ArrivalOptions,
+  mime: Buffer,
+): Arrival {
   const ownId = normalizeMessageId(parsed.messageId)
   const references = referencesOf(parsed.references)
   const inReplyTo = normalizeMessageId(
@@ -168,6 +178,7 @@ export function toArrival(parsed: ParsedMail, opts: ArrivalOptions): Arrival {
         body: text.trim(),
         forwarded: false,
         attachments,
+        mime,
       },
     }
   }
@@ -193,6 +204,7 @@ export function toArrival(parsed: ParsedMail, opts: ArrivalOptions): Arrival {
       body: text.trim(),
       forwarded: true,
       attachments,
+      mime,
     },
   }
 }

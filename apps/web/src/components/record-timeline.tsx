@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { optionLabel, refName } from './attributes/value-editor'
+import { EmailModal } from './email-dialog'
 import type { RegistryEntry, RefNames } from './attributes/value-editor'
 import { FilterCount, FilterRow, FilterTab } from './filter-row'
 import { fmtMoney } from '@spaces/core/portfolio/format'
@@ -286,6 +287,7 @@ export function RecordInteractions({
           onMore={() => setUnfolded(true)}
         />
       ) : null}
+      <EmailModal />
     </div>
   )
 }
@@ -463,11 +465,11 @@ export function interactionLane(item: {
 }
 
 /**
- * One interaction on the ledger. A written-up row opens its note from the
- * subject; one that is not offers `Write up` as a row action, shown on
- * hover and focus, which writes one now and lands in the editor. A body
- * private to someone else is neither: the row keeps its subject and says
- * `body private` (D67).
+ * One interaction on the ledger. An email opens its window from the
+ * subject (`?modal=email&id=`, D74); any other written-up row opens its
+ * note; one that is not offers `Write up` as a row action, shown on hover
+ * and focus, which writes one now and lands in the editor. A body private
+ * to someone else keeps its subject and says `body private` (D67).
  */
 function InteractionRow({
   item,
@@ -524,7 +526,16 @@ function InteractionRow({
         </>
       }
     >
-      {item.noteId ? (
+      {item.kind === 'email' ? (
+        <Link
+          to="."
+          search={(prev) => ({ ...prev, modal: 'email', id: item.id })}
+          resetScroll={false}
+          className="focus-ring hover:underline"
+        >
+          {item.subject || 'Untitled'}
+        </Link>
+      ) : item.noteId ? (
         <Link
           to="/notes/$noteId"
           params={{ noteId: item.noteId }}

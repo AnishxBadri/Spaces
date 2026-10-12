@@ -9,6 +9,7 @@ import {
 } from '@spaces/db/schema'
 import { deleteEntityProgram } from '@spaces/core/writes/entities/delete'
 import { removeInteractions } from '@spaces/core/writes/interactions/remove'
+import { reclaimBlobIfOrphaned } from '#/lib/documents/blob-refs'
 import { mailExclusion, senderEntry } from './noise'
 import { syncedMailConfig, syncedMailSettingsOf } from './synced-settings'
 import type { SyncedMailSettings } from './synced-settings'
@@ -162,6 +163,12 @@ export const saveMailboxSyncProgram = Effect.fn('saveMailboxSync')(function* (
           tx,
           excluded.map((row) => row.id),
         )
+        // Read before the rows go; reclaimed once they have.
+        const mimeShas = excluded.flatMap((row) =>
+          row.meta?.kind === 'email' && row.meta.mime_blob_sha !== null
+            ? [row.meta.mime_blob_sha]
+            : [],
+        )
 
         const visibility = settings.shareBodies ? 'shared' : 'private'
         const kept = held
@@ -184,7 +191,12 @@ export const saveMailboxSyncProgram = Effect.fn('saveMailboxSync')(function* (
                   ),
                 )
                 .returning({ id: note.entityId })
-        return { removed, noteIds, revisited: revisited.length }
+        return {
+          removed,
+          noteIds,
+          mimeShas,
+          revisited: revisited.length,
+        }
       }),
     catch: failed('Could not save the mailbox settings'),
   })
@@ -194,6 +206,14 @@ export const saveMailboxSyncProgram = Effect.fn('saveMailboxSync')(function* (
     yield* deleteEntityProgram(noteId).pipe(
       Effect.catch((cause) =>
         Effect.logWarning(`a removed email's body ${noteId} stayed`, cause),
+      ),
+    )
+
+  // A removed email's raw MIME goes with it, unless another row names it.
+  for (const sha of new Set(outcome.mimeShas))
+    yield* Effect.tryPromise(() => reclaimBlobIfOrphaned(sha)).pipe(
+      Effect.catch((cause) =>
+        Effect.logWarning(`a removed email's MIME ${sha} stayed`, cause),
       ),
     )
 

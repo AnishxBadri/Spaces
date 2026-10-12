@@ -168,7 +168,7 @@ describe('a synced message', () => {
         from: 'jane@acme-robotics.example',
         to: [],
         cc: ['cfo@acme-robotics.example'],
-        mime_blob_sha: null,
+        mime_blob_sha: expect.stringMatching(/^[a-f0-9]{64}$/),
         labels: ['Inbox', 'Primary'],
       },
     })

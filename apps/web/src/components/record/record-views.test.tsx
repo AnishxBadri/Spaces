@@ -65,6 +65,9 @@ vi.mock('#/lib/server-fns', () => ({
 }))
 vi.mock('@tanstack/react-router', () => ({
   useRouter: () => ({ invalidate: () => Promise.resolve() }),
+  // No `?modal=`: the email window stays shut.
+  useSearch: () => ({}),
+  useNavigate: () => () => Promise.resolve(),
   Link: ({ children }: { children: ReactNode }) => <a href="#">{children}</a>,
 }))
 
@@ -233,7 +236,7 @@ describe('the Interactions tab', () => {
   it('keeps a body private to someone else unlinked, with no Write up (D67)', async () => {
     const el = await mount(
       <RecordInteractions
-        items={[interaction('p', 'email', { via: 'Gmail', privateBody: true })]}
+        items={[interaction('p', 'call', { via: 'Gmail', privateBody: true })]}
         registry={[]}
       />,
     )
@@ -242,7 +245,18 @@ describe('the Interactions tab', () => {
     )
     expect(lanes).toEqual(['body private · via Gmail'])
     expect(el.querySelector('a')).toBeNull()
-    expect(el.textContent).toContain('email p')
+    expect(el.textContent).toContain('call p')
+  })
+
+  it('opens a private email’s window, which shows its headers (D67)', async () => {
+    const el = await mount(
+      <RecordInteractions
+        items={[interaction('p', 'email', { via: 'Gmail', privateBody: true })]}
+        registry={[]}
+      />,
+    )
+    expect(el.querySelectorAll('a')).toHaveLength(1)
+    expect(el.querySelector('a')?.textContent).toBe('email p')
   })
 
   it('folds past twenty with an n of N foot', async () => {
