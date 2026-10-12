@@ -89,7 +89,15 @@ describe('LinkFetchRow', () => {
   const render = (state: LinkFetch['state']) =>
     renderToStaticMarkup(
       <LinkFetchRow
-        fetch={{ key: 'k', name: LINK, label: 'Drive', link: true, state }}
+        fetch={{
+          key: 'k',
+          name: LINK,
+          label: 'Drive',
+          link: true,
+          externalUrl: null,
+          olderId: null,
+          state,
+        }}
         onDismiss={() => undefined}
         onLinkFolder={() => undefined}
       />,

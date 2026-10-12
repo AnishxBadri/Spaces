@@ -1,6 +1,7 @@
 import { useRouter } from '@tanstack/react-router'
 import { CheckIcon } from 'lucide-react'
 import { useId, useState } from 'react'
+import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import {
   DropdownMenu,
@@ -276,10 +277,15 @@ export type PendingUpload = {
   readonly progress: number
   readonly error: string | null
   readonly cancel: () => void
+  /** The born document once the upload committed; the row reads `filed.`. */
+  readonly documentId: string | null
+  /** "Newer version of": the file it replaces, null for none. */
+  readonly olderId: string | null
 }
 
 /** The upload's word: `uploading. 42%`, then `filing.`. */
 export function pendingWord(p: PendingUpload): string {
+  if (p.documentId !== null) return 'filed.'
   if (p.phase === 'filing') return 'filing.'
   if (p.phase === 'hashing') return 'uploading.'
   return `uploading. ${String(Math.round(p.progress * 100))}%`
@@ -288,13 +294,17 @@ export function pendingWord(p: PendingUpload): string {
 export function PendingRow({
   pending,
   onDismiss,
+  version = null,
 }: {
   pending: PendingUpload
   onDismiss: () => void
+  /** The "Newer version of" field, under the name; null when none applies. */
+  version?: ReactNode
 }) {
   const failed = pending.error !== null
+  const filed = pending.documentId !== null
   return (
-    <li className="flex h-ledger-row items-center gap-3 border-b border-rule bg-selected px-3">
+    <li className="flex min-h-ledger-row items-center gap-3 border-b border-rule bg-selected px-3 py-1.5">
       <FileGlyph
         type={fileType({
           filename: pending.name,
@@ -302,7 +312,10 @@ export function PendingRow({
           externalUrl: null,
         })}
       />
-      <span className="min-w-0 flex-1 truncate text-body">{pending.name}</span>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="min-w-0 truncate text-body">{pending.name}</span>
+        {version}
+      </div>
       {failed ? (
         <span
           title={pending.error}
@@ -312,9 +325,11 @@ export function PendingRow({
         </span>
       ) : (
         <>
-          <DitherBar
-            fraction={pending.phase === 'filing' ? 1 : pending.progress}
-          />
+          {filed ? null : (
+            <DitherBar
+              fraction={pending.phase === 'filing' ? 1 : pending.progress}
+            />
+          )}
           <span className="shrink-0 mono text-micro text-foreground">
             {pendingWord(pending)} · {formatBytes(pending.sizeBytes)}
           </span>
@@ -323,9 +338,9 @@ export function PendingRow({
       <button
         type="button"
         aria-label={
-          failed ? `Dismiss ${pending.name}` : `Cancel ${pending.name}`
+          failed || filed ? `Dismiss ${pending.name}` : `Cancel ${pending.name}`
         }
-        onClick={failed ? onDismiss : pending.cancel}
+        onClick={failed || filed ? onDismiss : pending.cancel}
         className="focus-ring flex size-6 shrink-0 items-center justify-center mono text-micro text-graphite hover:text-foreground"
       >
         ×

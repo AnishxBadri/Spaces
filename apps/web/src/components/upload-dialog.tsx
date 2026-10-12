@@ -14,7 +14,16 @@ import {
 import { Input } from '#/components/ui/input'
 import { Segmented } from '#/components/ui/segmented'
 import { Select } from '#/components/ui/select'
-import { formatBytes, MAX_UPLOAD_BYTES } from '@spaces/core/documents'
+import {
+  formatBytes,
+  guessDocumentKind,
+  MAX_UPLOAD_BYTES,
+} from '@spaces/core/documents'
+import type { DocumentKind } from '@spaces/core/documents'
+import {
+  NewerVersionSelect,
+  useLinkWhenFiled,
+} from '#/components/files/newer-version-select'
 import {
   fileAgainstFor,
   filingNote,
@@ -25,9 +34,19 @@ import type {
   PickedEntity,
   UploadTarget,
 } from '#/lib/documents/file-against'
+import { linkReady, versionCandidates } from '#/lib/documents/newer-version'
+import type {
+  VersionCandidate,
+  VersionPick,
+} from '#/lib/documents/newer-version'
 import { uploadDocument } from '#/lib/documents/upload'
 import type { UploadPhase } from '#/lib/documents/upload'
-import { clipUrl, listSpaces, searchEntities } from '#/lib/server-fns'
+import {
+  clipUrl,
+  listRecordDocuments,
+  listSpaces,
+  searchEntities,
+} from '#/lib/server-fns'
 import {
   setUploadDialogOpen,
   useUploadDialogOpen,
@@ -61,6 +80,10 @@ import { cn } from '#/lib/utils'
  * The hasher is `lib/documents/upload.ts` and only that (SPA-71) — the size
  * guard, the secure-context check and the already-stored short circuit all
  * live there, and this surface passes it the drop's one target per file.
+ *
+ * A file dropped on a record that already holds one of its kind gets
+ * "Newer version of" under its row (D59), optional and none by default; the
+ * link is written by a second call once the row has committed.
  */
 
 /** A file this dialog started, terminal or not. */
@@ -72,6 +95,15 @@ type Upload = {
   done?: boolean
   /** Its own failure, which never touches the other files in the drop. */
   error?: string
+  kind: DocumentKind
+  /** The record's files of this kind when it was dropped, newest first. */
+  candidates: ReadonlyArray<VersionCandidate>
+  /** The born document, once `finalizeDocumentUpload` returned. */
+  documentId: string | null
+  /** "Newer version of": the file it replaces, null for none. */
+  olderId: string | null
+  /** The pick's link is written. */
+  linked: boolean
 }
 
 const PHASE_LABELS: Record<UploadPhase, string> = {
@@ -94,9 +126,23 @@ export function UploadDialog() {
   const [mode, setMode] = useState<FilingMode>('unfiled')
   const [picked, setPicked] = useState<PickedEntity | null>(null)
   const [uploads, setUploads] = useState<Array<Upload>>([])
+  const recordDocs = useRecordDocuments(
+    mode === 'record' ? (picked?.entityId ?? null) : null,
+  )
 
   const target = uploadTarget(mode, picked)
   const working = uploads.filter((u) => !u.done && u.error === undefined)
+
+  const patchUpload = (key: string, next: Partial<Upload>) =>
+    setUploads((u) => u.map((x) => (x.key === key ? { ...x, ...next } : x)))
+  const picks: Array<VersionPick> = uploads.map((u) => ({
+    key: u.key,
+    newerId: u.linked ? null : u.documentId,
+    olderId: u.olderId,
+  }))
+  useLinkWhenFiled(picks, (key, linked) =>
+    patchUpload(key, linked ? { linked: true } : { olderId: null }),
+  )
 
   // Each opening is a new drop: the picker starts at Unfiled, as §3.1 says it
   // defaults, and last session's finished rows are history. Anything still
@@ -123,17 +169,35 @@ export function UploadDialog() {
     // picker is changed while the third is still hashing.
     const fileAgainst = fileAgainstFor(target)
     const where = target.kind === 'unfiled' ? 'Unfiled' : target.name
+    // Only a record offers "Newer version of"; its files are already asked for.
+    const onRecord =
+      target.kind === 'record' ? await recordDocs.load(target.entityId) : []
 
     for (const file of Array.from(files)) {
       const key = `${file.name}-${String(file.size)}-${String(Math.random())}`
-      setUploads((u) => [...u, { key, name: file.name, phase: 'hashing' }])
-      const setPhase = (phase: UploadPhase) =>
-        setUploads((u) => u.map((x) => (x.key === key ? { ...x, phase } : x)))
+      const kind = guessDocumentKind(file.name)
+      setUploads((u) => [
+        ...u,
+        {
+          key,
+          name: file.name,
+          phase: 'hashing',
+          kind,
+          candidates: versionCandidates(onRecord, kind),
+          documentId: null,
+          olderId: null,
+          linked: false,
+        },
+      ])
+      const setPhase = (phase: UploadPhase) => patchUpload(key, { phase })
       try {
-        await uploadDocument({ file, fileAgainst, onPhase: setPhase })
-        setUploads((u) =>
-          u.map((x) => (x.key === key ? { ...x, done: true } : x)),
-        )
+        const born = await uploadDocument({
+          file,
+          fileAgainst,
+          kind,
+          onPhase: setPhase,
+        })
+        patchUpload(key, { done: true, documentId: born.id })
         toast.success(`${file.name} · ${where}`)
         // So `/files`, a Files tab or a space's Sources shows it without
         // the reader reloading the page they uploaded from.
@@ -191,32 +255,41 @@ export function UploadDialog() {
               {uploads.map((u) => (
                 <li
                   key={u.key}
-                  className="flex h-9 items-center gap-2.5 border-b border-rule text-ui"
+                  className="flex min-h-9 flex-col justify-center gap-1 border-b border-rule py-1 text-ui"
                 >
-                  <span className="flex size-[1.375rem] shrink-0 items-center justify-center border border-hairline bg-paper">
-                    {u.error ? (
-                      <FileIcon
-                        className="size-3 text-destructive"
-                        strokeWidth={1.75}
-                      />
-                    ) : u.done ? (
-                      <Check className="size-3 text-primary" strokeWidth={2} />
-                    ) : (
-                      <Loader2
-                        className="size-3 animate-spin text-graphite motion-reduce:animate-none"
-                        strokeWidth={1.75}
-                      />
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{u.name}</span>
-                  <span
-                    className={cn(
-                      'mono text-micro',
-                      u.error ? 'text-destructive' : 'text-graphite',
-                    )}
-                  >
-                    {u.error ?? (u.done ? 'filed' : PHASE_LABELS[u.phase])}
-                  </span>
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex size-[1.375rem] shrink-0 items-center justify-center border border-hairline bg-paper">
+                      {u.error ? (
+                        <FileIcon
+                          className="size-3 text-destructive"
+                          strokeWidth={1.75}
+                        />
+                      ) : u.done ? (
+                        <Check
+                          className="size-3 text-primary"
+                          strokeWidth={2}
+                        />
+                      ) : (
+                        <Loader2
+                          className="size-3 animate-spin text-graphite motion-reduce:animate-none"
+                          strokeWidth={1.75}
+                        />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{u.name}</span>
+                    <span
+                      className={cn(
+                        'mono text-micro',
+                        u.error ? 'text-destructive' : 'text-graphite',
+                      )}
+                    >
+                      {u.error ?? (u.done ? 'filed' : PHASE_LABELS[u.phase])}
+                    </span>
+                  </div>
+                  <UploadVersion
+                    upload={u}
+                    onPick={(olderId) => patchUpload(u.key, { olderId })}
+                  />
                 </li>
               ))}
             </ul>
@@ -287,6 +360,75 @@ export function UploadDialog() {
       </DialogContent>
     </Dialog>
   )
+}
+
+/**
+ * One upload's "Newer version of": the select until its link is written,
+ * then the line saying which file it replaced. Nothing for a failed upload.
+ */
+function UploadVersion({
+  upload,
+  onPick,
+}: {
+  upload: Upload
+  onPick: (olderId: string | null) => void
+}) {
+  if (upload.error !== undefined) return null
+  const candidates = upload.candidates.filter((c) => c.id !== upload.documentId)
+  if (upload.linked) {
+    const older = candidates.find((c) => c.id === upload.olderId)
+    return older === undefined ? null : (
+      <p className="min-w-0 truncate pl-8 text-label text-graphite">
+        Newer version of {older.filename}
+      </p>
+    )
+  }
+  const pick: VersionPick = {
+    key: upload.key,
+    newerId: upload.documentId,
+    olderId: upload.olderId,
+  }
+  return (
+    <div className="pl-8">
+      <NewerVersionSelect
+        candidates={candidates}
+        value={upload.olderId}
+        onChange={onPick}
+        disabled={linkReady(pick)}
+      />
+    </div>
+  )
+}
+
+/** A record's files for "Newer version of"; a failed read offers no pick. */
+const askRecordDocuments = (
+  entityId: string,
+): Promise<Array<VersionCandidate>> =>
+  listRecordDocuments({ data: { entityId } }).then(
+    (rows) => rows,
+    () => [],
+  )
+
+/**
+ * The picked record's files, asked for when it is picked so a drop rarely
+ * waits. A drop takes the answer and leaves the next drop to ask again,
+ * since its own files are on the record by then.
+ */
+function useRecordDocuments(entityId: string | null) {
+  const asked = useRef<{
+    id: string
+    files: Promise<Array<VersionCandidate>>
+  } | null>(null)
+  useEffect(() => {
+    if (entityId !== null && asked.current?.id !== entityId)
+      asked.current = { id: entityId, files: askRecordDocuments(entityId) }
+  }, [entityId])
+  const load = (id: string): Promise<Array<VersionCandidate>> => {
+    const held = asked.current
+    asked.current = null
+    return held?.id === id ? held.files : askRecordDocuments(id)
+  }
+  return { load }
 }
 
 /**

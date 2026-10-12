@@ -16,7 +16,8 @@ import { cn } from '#/lib/utils'
  * Attach from a link on the Files tab: the add row, and the `JUST ADDED`
  * rows a pasted Drive link or a picked file shows while the worker fetches.
  * - A fetch reads `fetching.` until the job settles; then the filed row,
- *   in its kind, replaces it.
+ *   in its kind, replaces it — unless the caller holds it, as `filed.`, for
+ *   its "Newer version of" pick.
  * - A refusal stays on its row with the reason; no connection offers
  *   Connect Drive there; a folder link is refused in place, before any
  *   fetch. Each is dismissed by hand. (D66)
@@ -29,8 +30,13 @@ export type LinkFetch = {
   readonly label: string
   /** A pasted link, printed mono; false for a file picked by name. */
   readonly link: boolean
+  /** A picked file's provider link, as its document will carry it; null for a paste. */
+  readonly externalUrl: string | null
+  /** "Newer version of": the file it replaces, null for none. */
+  readonly olderId: string | null
   readonly state:
     | { readonly kind: 'sending' }
+    | { readonly kind: 'filed' }
     | { readonly kind: 'folder'; readonly url: string }
     | { readonly kind: 'fetching'; readonly fetchId: string }
     | {
@@ -48,10 +54,18 @@ const QUEUE_REFUSED = 'The worker queue is unreachable; try again'
 /** The link without its scheme, for a row's name. */
 const shown = (url: string) => url.replace(/^https?:\/\//, '')
 
-/** Pasted links and picked files on one record, polled while any is fetching. */
-export function useLinkFetches(entityId: string) {
+/**
+ * Pasted links and picked files on one record, polled while any is fetching.
+ * `hold` keeps a finished fetch on the list as `filed.`; otherwise it goes.
+ */
+export function useLinkFetches(
+  entityId: string,
+  hold: (fetch: LinkFetch) => boolean = () => false,
+) {
   const router = useRouter()
   const [fetches, setFetches] = useState<Array<LinkFetch>>([])
+  const holdRef = useRef(hold)
+  holdRef.current = hold
 
   const update = (key: string, state: LinkFetch['state']) =>
     setFetches((all) => all.map((f) => (f.key === key ? { ...f, state } : f)))
@@ -67,6 +81,8 @@ export function useLinkFetches(entityId: string) {
         name: shown(url),
         label: provider?.label ?? 'the link',
         link: true,
+        externalUrl: null,
+        olderId: null,
         state: folder ? { kind: 'folder', url } : { kind: 'sending' },
       },
     ])
@@ -108,6 +124,8 @@ export function useLinkFetches(entityId: string) {
         name: f.name,
         label: 'Drive',
         link: false,
+        externalUrl: null,
+        olderId: null,
         state: { kind: 'sending' },
       })),
     ])
@@ -128,13 +146,20 @@ export function useLinkFetches(entityId: string) {
       else if (outcome._tag === 'refused')
         settle({ kind: 'refused', reason: outcome.reason })
       else
-        for (const f of outcome.files)
+        for (const f of outcome.files) {
+          const key = keyOf(f.id)
+          setFetches((all) =>
+            all.map((x) =>
+              x.key === key ? { ...x, externalUrl: f.externalUrl } : x,
+            ),
+          )
           update(
-            keyOf(f.id),
+            key,
             f.fetchId === null
               ? { kind: 'refused', reason: QUEUE_REFUSED }
               : { kind: 'fetching', fetchId: f.fetchId },
           )
+        }
     } catch (err) {
       settle({
         kind: 'refused',
@@ -146,6 +171,9 @@ export function useLinkFetches(entityId: string) {
 
   const dismiss = (key: string) =>
     setFetches((all) => all.filter((f) => f.key !== key))
+
+  const pick = (key: string, olderId: string | null) =>
+    setFetches((all) => all.map((f) => (f.key === key ? { ...f, olderId } : f)))
 
   const fetchIds = fetches.flatMap((f) =>
     f.state.kind === 'fetching' ? [f.state.fetchId] : [],
@@ -169,7 +197,10 @@ export function useLinkFetches(entityId: string) {
               if (!Object.hasOwn(status, id)) return [f]
               const now = status[id]
               if (now.state === 'fetching') return [f]
-              if (now.state === 'done') return []
+              if (now.state === 'done')
+                return holdRef.current(f)
+                  ? [{ ...f, state: { kind: 'filed' } }]
+                  : []
               return [{ ...f, state: { kind: 'refused', reason: now.reason } }]
             }),
           )
@@ -186,7 +217,7 @@ export function useLinkFetches(entityId: string) {
     }
   }, [polling, router])
 
-  return { fetches, attach, attachPicked, dismiss }
+  return { fetches, attach, attachPicked, dismiss, pick }
 }
 
 const FOLDER_REFUSAL =
@@ -197,11 +228,14 @@ export function LinkFetchRow({
   fetch,
   onDismiss,
   onLinkFolder = null,
+  version = null,
 }: {
   fetch: LinkFetch
   onDismiss: () => void
   /** Opens Link a Drive folder for a refused folder link. */
   onLinkFolder?: ((url: string) => void) | null
+  /** The "Newer version of" field, under the name; null when none applies. */
+  version?: ReactNode
 }) {
   const { state } = fetch
   const inFlight = state.kind === 'sending' || state.kind === 'fetching'
@@ -217,11 +251,11 @@ export function LinkFetchRow({
     <li
       className={cn(
         'flex min-h-ledger-row items-center gap-3 border-b border-rule px-3 py-1.5',
-        inFlight && 'bg-selected',
+        (inFlight || state.kind === 'filed') && 'bg-selected',
       )}
     >
       <FileGlyph type="file" pending />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         <span
           className={cn(
             'min-w-0 truncate',
@@ -241,10 +275,11 @@ export function LinkFetchRow({
             {reason}
           </span>
         )}
+        {version}
       </div>
-      {inFlight ? (
+      {inFlight || state.kind === 'filed' ? (
         <span className="shrink-0 mono text-micro text-foreground">
-          fetching.
+          {inFlight ? 'fetching.' : 'filed.'}
         </span>
       ) : null}
       {state.kind === 'connect' ? (

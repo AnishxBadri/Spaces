@@ -21,6 +21,10 @@ import { FolderBand } from './files/folder-band'
 import type { BoundFolder } from './files/folder-band'
 import { LinkFolderDialog } from './files/link-folder-dialog'
 import { FileViewerFoot, FileViewerSidebar } from './files/viewer-sidebar'
+import {
+  NewerVersionSelect,
+  useLinkWhenFiled,
+} from './files/newer-version-select'
 import type { FileAction, RecordDocument } from './files/types'
 import {
   DOCUMENT_KIND_LABELS,
@@ -28,6 +32,7 @@ import {
   formatBytes,
   guessDocumentKind,
 } from '@spaces/core/documents'
+import type { DocumentKind } from '@spaces/core/documents'
 import {
   clipUrl,
   getEntitySensitivity,
@@ -41,6 +46,8 @@ import { droppedUrl } from '#/lib/documents/uri-list'
 import { storageLinkProvider } from '#/lib/documents/storage-link'
 import { offersReadDeck } from '#/lib/documents/read-deck-gate'
 import { KIND_ORDER } from '#/lib/documents/files-tab'
+import { linkReady, versionCandidates } from '#/lib/documents/newer-version'
+import type { VersionPick } from '#/lib/documents/newer-version'
 
 /**
  * A record's Files tab (D66, amended): one add row, our files grouped by
@@ -50,6 +57,9 @@ import { KIND_ORDER } from '#/lib/documents/files-tab'
  * - Upload never streams through a server function: the browser hashes the
  *   file, PUTs it at storage, then files the row. Extraction runs on the
  *   worker after, so a fresh row reads `reading text.` for a moment.
+ * - An upload or picked Drive file of a kind the record already holds offers
+ *   "Newer version of" on its row (D59), and its row stays as `filed.` until
+ *   the pick is made or dismissed; the link is written after the birth.
  */
 
 type Documents = Array<RecordDocument>
@@ -83,7 +93,15 @@ export function RecordFiles({
   const [pending, setPending] = useState<Array<PendingUpload>>([])
   const [viewingId, setViewingId] = useState<string | null>(null)
   const [linkingFolder, setLinkingFolder] = useState<string | null>(null)
-  const links = useLinkFetches(entityId)
+  // Read by the upload loop and the fetch poll after an await, so a ref.
+  const docsRef = useRef(documents)
+  docsRef.current = documents
+  const links = useLinkFetches(
+    entityId,
+    (f) =>
+      f.externalUrl !== null &&
+      versionCandidates(docsRef.current, guessDocumentKind(f.name)).length > 0,
+  )
   const [readiness, setReadiness] = usePickerReadiness()
   const { remove, removeDialog } = useRemoveFile(entityId, recordName)
 
@@ -155,29 +173,36 @@ export function RecordFiles({
         setPending((all) =>
           all.map((p) => (p.key === key ? { ...p, ...next } : p)),
         )
+      const kind = guessDocumentKind(file.name)
       setPending((all) => [
         ...all,
         {
           key,
           name: file.name,
-          kind: guessDocumentKind(file.name),
+          kind,
           sizeBytes: file.size,
           phase: 'hashing',
           progress: 0,
           error: null,
           cancel: () => controller.abort(),
+          documentId: null,
+          olderId: null,
         },
       ])
       try {
-        await uploadDocument({
+        const born = await uploadDocument({
           file,
           // A drop on a record's tab files on this record and nowhere else.
           fileAgainst: [{ kind: 'record', entityId }],
+          kind,
           onPhase: (phase) => patch({ phase }),
           onProgress: (progress) => patch({ progress }),
           signal: controller.signal,
         })
-        setPending((all) => all.filter((p) => p.key !== key))
+        // Committed. A row that could be a newer version stays for the pick.
+        if (versionCandidates(docsRef.current, kind, born.id).length > 0)
+          patch({ documentId: born.id })
+        else setPending((all) => all.filter((p) => p.key !== key))
         void router.invalidate()
       } catch (err) {
         if (controller.signal.aborted) {
@@ -213,10 +238,62 @@ export function RecordFiles({
     }
   }
 
+  // A held fetch's document, found by the provider link it was filed with.
+  const fetchedId = (externalUrl: string | null) =>
+    externalUrl === null
+      ? null
+      : (documents.find((d) => d.externalUrl === externalUrl)?.id ?? null)
+  const picks: Array<VersionPick> = [
+    ...pending.map((p) => ({
+      key: p.key,
+      newerId: p.documentId,
+      olderId: p.olderId,
+    })),
+    ...links.fetches.map((f) => ({
+      key: f.key,
+      newerId: f.state.kind === 'filed' ? fetchedId(f.externalUrl) : null,
+      olderId: f.olderId,
+    })),
+  ]
+  useLinkWhenFiled(picks, (key, linked) => {
+    // Linked: the row has done its work. Refused: back to none, row kept.
+    if (linked) {
+      setPending((all) => all.filter((p) => p.key !== key))
+      links.dismiss(key)
+    } else {
+      setPending((all) =>
+        all.map((p) => (p.key === key ? { ...p, olderId: null } : p)),
+      )
+      links.pick(key, null)
+    }
+  })
+  const pickOf = (key: string) => picks.find((p) => p.key === key)
+  /** The row's "Newer version of" field over this record's files of `kind`. */
+  const versionField = (
+    key: string,
+    kind: DocumentKind,
+    olderId: string | null,
+    onPick: (olderId: string | null) => void,
+  ) => {
+    const pick = pickOf(key)
+    return (
+      <NewerVersionSelect
+        candidates={versionCandidates(documents, kind, pick?.newerId ?? null)}
+        value={olderId}
+        onChange={onPick}
+        disabled={pick !== undefined && linkReady(pick)}
+      />
+    )
+  }
+
   const inFolders = new Set(
     folders.flatMap((f) => f.documents.map((d) => d.id)),
   )
-  const ours = documents.filter((d) => !inFolders.has(d.id))
+  // A held row stands for its document until the pick is made or dismissed.
+  const held = new Set(
+    picks.flatMap((p) => (p.newerId === null ? [] : [p.newerId])),
+  )
+  const ours = documents.filter((d) => !inFolders.has(d.id) && !held.has(d.id))
   const groups = KIND_ORDER.map((kind) => ({
     kind,
     uploads: pending.filter((p) => p.kind === kind),
@@ -319,6 +396,20 @@ export function RecordFiles({
                 fetch={f}
                 onDismiss={() => links.dismiss(f.key)}
                 onLinkFolder={setLinkingFolder}
+                version={
+                  f.externalUrl === null ||
+                  f.state.kind === 'refused' ||
+                  f.state.kind === 'connect' ||
+                  (f.state.kind === 'filed' &&
+                    fetchedId(f.externalUrl) === null)
+                    ? null
+                    : versionField(
+                        f.key,
+                        guessDocumentKind(f.name),
+                        f.olderId,
+                        (olderId) => links.pick(f.key, olderId),
+                      )
+                }
               />
             ))}
           </ul>
@@ -337,6 +428,17 @@ export function RecordFiles({
                 pending={p}
                 onDismiss={() =>
                   setPending((all) => all.filter((x) => x.key !== p.key))
+                }
+                version={
+                  p.error === null
+                    ? versionField(p.key, p.kind, p.olderId, (olderId) =>
+                        setPending((all) =>
+                          all.map((x) =>
+                            x.key === p.key ? { ...x, olderId } : x,
+                          ),
+                        ),
+                      )
+                    : null
                 }
               />
             ))}

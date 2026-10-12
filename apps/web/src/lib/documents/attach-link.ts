@@ -174,12 +174,19 @@ export type AttachFromPickerInput = {
   readonly returnTo: string
 }
 
-/** One fetch per picked file; `fetchId` null when the queue refused that one. */
+/**
+ * One fetch per picked file; `fetchId` null when the queue refused that one.
+ * `externalUrl` is the provider link its document will carry, so the Files
+ * tab can find the row the fetch filed.
+ */
 export type AttachFromPickerOutcome =
   | {
       readonly _tag: 'queued'
       readonly files: ReadonlyArray<
-        PickedFile & { readonly fetchId: string | null }
+        PickedFile & {
+          readonly fetchId: string | null
+          readonly externalUrl: string
+        }
       >
     }
   | NoConnection
@@ -224,7 +231,12 @@ export const attachFromPickerProgram = Effect.fn('attachFromPickerProgram')(
     )
     if (connection._tag !== 'active') return connection
 
-    const queued: Array<PickedFile & { readonly fetchId: string | null }> = []
+    const queued: Array<
+      PickedFile & {
+        readonly fetchId: string | null
+        readonly externalUrl: string
+      }
+    > = []
     for (const { file, url } of links) {
       const fetchId = yield* enqueueFetch({
         url,
@@ -232,7 +244,7 @@ export const attachFromPickerProgram = Effect.fn('attachFromPickerProgram')(
         attachTo: input.attachTo,
         actorUserId: userId,
       })
-      queued.push({ id: file.id, name: file.name, fetchId })
+      queued.push({ id: file.id, name: file.name, fetchId, externalUrl: url })
     }
     return { _tag: 'queued', files: queued }
   },

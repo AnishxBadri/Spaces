@@ -157,6 +157,12 @@ describe('attachFromPickerProgram', () => {
     const outcome = await pick(record, ['deck', 'captable', 'spa', 'deck'])
     if (outcome._tag !== 'queued') throw new Error(outcome._tag)
     expect(outcome.files.map((f) => f.id)).toEqual(['deck', 'captable', 'spa'])
+    // The link the fetched document carries, so the tab can find its row.
+    expect(outcome.files.map((f) => f.externalUrl)).toEqual(
+      ['deck', 'captable', 'spa'].map(
+        (id) => `https://drive.google.com/file/d/${id}/view`,
+      ),
+    )
     const { enqueued } = await import('#/test/queue-stub')
     expect(enqueued.map((e) => e.data)).toEqual(
       ['deck', 'captable', 'spa'].map((id) => ({
