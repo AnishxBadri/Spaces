@@ -1,11 +1,26 @@
 import { Effect, Schema } from 'effect'
-import { and, asc, eq, gte, inArray, isNull, lt, ne, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  ne,
+  sql,
+} from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { db } from '@spaces/db'
 import {
   accountConnection,
   document,
   entity,
   entityAlias,
+  integration,
   interaction,
   interactionDocument,
   interactionEntity,
@@ -18,20 +33,25 @@ import type {
   MeetingMeta,
 } from '@spaces/db/schema/interactions'
 import { readNotePayload } from '@spaces/core/ai/note'
+import { jsonRecord, jsonString } from '@spaces/core/json'
+import { sinceRemoved } from '@spaces/core/plugins/registry'
 import { taskPayloadSchema } from '@spaces/core/ai/task'
 import { ref } from '@spaces/core/context/ref'
 import { canRead } from '@spaces/core/read-policy'
 import { recomputeInteractionStats } from '@spaces/core/writes/interactions/stats'
+import { canReadNoteSql } from '@spaces/core/writes/read/search'
 import type {
   ArtifactRole,
   DayMeeting,
   MeetingParticipant,
   MeetingRecord,
 } from '#/lib/meetings/day'
+import { PAST_LIMIT } from '#/lib/meetings/list'
+import type { ListedMeeting, MeetingsList } from '#/lib/meetings/list'
 
 /**
- * The meeting reads behind Today's Meetings section, its Needs-you rows and
- * the meeting window, plus the one write the window owns: pinning a record.
+ * The meeting reads behind Today's Meetings section, its Needs-you rows, the
+ * Meetings page and the meeting window, plus the one write the window owns: pinning a record.
  * A meeting is an `interaction` of kind `meeting`; nothing here is stored
  * beyond what the calendar sync wrote. (D68)
  */
@@ -179,6 +199,40 @@ const artifactRolesOf = (ids: ReadonlyArray<string>) =>
         return out
       })
 
+/** The interaction columns every meeting row is built from. */
+type MeetingBase = {
+  id: string
+  subject: string | null
+  occurredAt: Date
+  meta: InteractionMeta | null
+  noteId: string | null
+}
+
+/** Rows as `DayMeeting`s: records, participants and artifact roles joined. */
+const hydrate = (rows: ReadonlyArray<MeetingBase>) =>
+  Effect.gen(function* () {
+    const ids = rows.map((r) => r.id)
+    const [records, artifacts] = yield* Effect.all([
+      recordsOf(ids),
+      artifactRolesOf(ids),
+    ])
+    return rows.map((r): DayMeeting => {
+      const meta = meetingMeta(r.meta)
+      const linked = records.get(r.id) ?? []
+      return {
+        id: r.id,
+        title: r.subject,
+        startsAt: r.occurredAt.toISOString(),
+        endsAt: endOf(r.occurredAt, meta),
+        cancelled: meta?.status === 'cancelled',
+        participants: participantsOf(meta, linked),
+        records: linked.map(stripEmails),
+        artifacts: artifacts.get(r.id) ?? [],
+        noteId: r.noteId,
+      }
+    })
+  })
+
 /**
  * The meetings that start inside `[from, to)`, earliest first. External
  * meetings only, because internal ones are never stored; a cancelled one
@@ -207,26 +261,137 @@ export const dayMeetingsProgram = Effect.fn('dayMeetingsProgram')(function* (
       )
       .orderBy(asc(interaction.occurredAt), asc(interaction.id)),
   )
-  const ids = rows.map((r) => r.id)
-  const [records, artifacts] = yield* Effect.all([
-    recordsOf(ids),
-    artifactRolesOf(ids),
+  return yield* hydrate(rows)
+})
+
+/** Who reads the list: canRead's id, and the address their invites name. */
+export type MeetingReader = { id: string; email: string }
+
+/** The write-up's entity, aliased `e` because `canReadNoteSql` reads `e`. */
+const writeUp = alias(entity, 'e')
+
+/**
+ * The Meetings page's read: what starts in `(now, until)`, earliest first,
+ * and what started by `now`, the ones still needing a write-up first, then
+ * newest first, cut at `PAST_LIMIT`. (D68 amended)
+ * - Every meeting row is visible to every member (D67); canRead decides only
+ *   whether the reader may read the write-up, which reads `private`.
+ * - `mine` matches the participants against the reader's login address and
+ *   every connected account's.
+ */
+export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
+  reader: MeetingReader,
+  now: Date,
+  until: Date,
+): Effect.fn.Return<MeetingsList, MeetingReadFailed> {
+  const columns = {
+    id: interaction.id,
+    subject: interaction.subject,
+    occurredAt: interaction.occurredAt,
+    meta: interaction.meta,
+    noteId: interaction.noteId,
+    bodyReadable: sql<boolean>`${canReadNoteSql(reader.id)}`,
+    bodySource: writeUp.sourceRef,
+  }
+  const needsWriteUpSql = sql`(${interaction.noteId} is null and coalesce(${interaction.meta} ->> 'status', '') <> 'cancelled')`
+  const [upcoming, past, accounts] = yield* Effect.all([
+    query(() =>
+      db
+        .select(columns)
+        .from(interaction)
+        .leftJoin(writeUp, eq(writeUp.id, interaction.noteId))
+        .where(
+          and(
+            eq(interaction.kind, 'meeting'),
+            gt(interaction.occurredAt, now),
+            lt(interaction.occurredAt, until),
+          ),
+        )
+        .orderBy(asc(interaction.occurredAt), asc(interaction.id)),
+    ),
+    query(() =>
+      db
+        .select(columns)
+        .from(interaction)
+        .leftJoin(writeUp, eq(writeUp.id, interaction.noteId))
+        .where(
+          and(
+            eq(interaction.kind, 'meeting'),
+            lte(interaction.occurredAt, now),
+          ),
+        )
+        .orderBy(
+          desc(needsWriteUpSql),
+          desc(interaction.occurredAt),
+          desc(interaction.id),
+        )
+        .limit(PAST_LIMIT + 1),
+    ),
+    query(() =>
+      db
+        .select({ email: accountConnection.externalEmail })
+        .from(accountConnection)
+        .where(eq(accountConnection.userId, reader.id)),
+    ),
   ])
-  return rows.map((r) => {
+  const kept = past.slice(0, PAST_LIMIT)
+  const rows = [...upcoming, ...kept]
+  const sources = [
+    ...new Set(
+      rows.flatMap((r) => (r.bodySource === null ? [] : [r.bodySource])),
+    ),
+  ]
+  const [hydrated, names] = yield* Effect.all([
+    hydrate(rows),
+    sources.length === 0
+      ? Effect.succeed([])
+      : query(() =>
+          db
+            .select({
+              id: integration.id,
+              capabilityId: integration.capabilityId,
+              manifest: integration.manifest,
+              removedAt: integration.removedAt,
+            })
+            .from(integration)
+            .where(inArray(integration.id, sources)),
+        ),
+  ])
+  const nameOf = new Map(
+    names.map((i) => [
+      i.id,
+      sinceRemoved(
+        jsonString(jsonRecord(i.manifest).name) ?? i.capabilityId,
+        i.removedAt,
+      ),
+    ]),
+  )
+  const mineSet = new Set(
+    [reader.email, ...accounts.map((a) => a.email)].map((e) => e.toLowerCase()),
+  )
+  const listed = rows.map((r, i): ListedMeeting => {
     const meta = meetingMeta(r.meta)
-    const linked = records.get(r.id) ?? []
+    const own = Object.entries(meta?.rsvp ?? {}).find(([email]) =>
+      mineSet.has(email.toLowerCase()),
+    )
+    const organizer = meta?.organizer?.toLowerCase() ?? null
     return {
-      id: r.id,
-      title: r.subject,
-      startsAt: r.occurredAt.toISOString(),
-      endsAt: endOf(r.occurredAt, meta),
-      cancelled: meta?.status === 'cancelled',
-      participants: participantsOf(meta, linked),
-      records: linked.map(stripEmails),
-      artifacts: artifacts.get(r.id) ?? [],
-      noteId: r.noteId,
+      ...hydrated[i],
+      mine: own !== undefined || (organizer !== null && mineSet.has(organizer)),
+      myRsvp: own?.[1] ?? null,
+      writeUp:
+        r.noteId === null ? 'none' : r.bodyReadable ? 'written' : 'private',
+      via:
+        r.noteId !== null && r.bodyReadable && r.bodySource !== null
+          ? (nameOf.get(r.bodySource) ?? null)
+          : null,
     }
   })
+  return {
+    upcoming: listed.slice(0, upcoming.length),
+    past: listed.slice(upcoming.length),
+    more: past.length > PAST_LIMIT,
+  }
 })
 
 /** How far back Needs you looks for a meeting nobody wrote up. */

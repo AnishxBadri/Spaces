@@ -23,6 +23,7 @@ import { Route as AppFilesRouteImport } from './routes/_app/files'
 import { Route as AppImportRouteImport } from './routes/_app/import'
 import { Route as AppInboxRouteImport } from './routes/_app/inbox'
 import { Route as AppMandateRouteImport } from './routes/_app/mandate'
+import { Route as AppMeetingsRouteImport } from './routes/_app/meetings'
 import { Route as AppNotesRouteImport } from './routes/_app/notes'
 import { Route as AppPeopleRouteImport } from './routes/_app/people'
 import { Route as AppPortfolioRouteImport } from './routes/_app/portfolio'
@@ -147,6 +148,11 @@ const AppInboxRoute = AppInboxRouteImport.update({
 const AppMandateRoute = AppMandateRouteImport.update({
   id: '/mandate',
   path: '/mandate',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMeetingsRoute = AppMeetingsRouteImport.update({
+  id: '/meetings',
+  path: '/meetings',
   getParentRoute: () => AppRoute,
 } as any)
 const AppNotesRoute = AppNotesRouteImport.update({
@@ -454,6 +460,7 @@ export interface FileRoutesByFullPath {
   '/import': typeof AppImportRoute
   '/inbox': typeof AppInboxRoute
   '/mandate': typeof AppMandateRoute
+  '/meetings': typeof AppMeetingsRoute
   '/notes': typeof AppNotesRoute
   '/people': typeof AppPeopleRoute
   '/portfolio': typeof AppPortfolioRoute
@@ -525,6 +532,7 @@ export interface FileRoutesByTo {
   '/import': typeof AppImportRoute
   '/inbox': typeof AppInboxRoute
   '/mandate': typeof AppMandateRoute
+  '/meetings': typeof AppMeetingsRoute
   '/notes': typeof AppNotesRoute
   '/people': typeof AppPeopleRoute
   '/portfolio': typeof AppPortfolioRoute
@@ -597,6 +605,7 @@ export interface FileRoutesById {
   '/_app/import': typeof AppImportRoute
   '/_app/inbox': typeof AppInboxRoute
   '/_app/mandate': typeof AppMandateRoute
+  '/_app/meetings': typeof AppMeetingsRoute
   '/_app/notes': typeof AppNotesRoute
   '/_app/people': typeof AppPeopleRoute
   '/_app/portfolio': typeof AppPortfolioRoute
@@ -670,6 +679,7 @@ export interface FileRouteTypes {
     | '/import'
     | '/inbox'
     | '/mandate'
+    | '/meetings'
     | '/notes'
     | '/people'
     | '/portfolio'
@@ -741,6 +751,7 @@ export interface FileRouteTypes {
     | '/import'
     | '/inbox'
     | '/mandate'
+    | '/meetings'
     | '/notes'
     | '/people'
     | '/portfolio'
@@ -812,6 +823,7 @@ export interface FileRouteTypes {
     | '/_app/import'
     | '/_app/inbox'
     | '/_app/mandate'
+    | '/_app/meetings'
     | '/_app/notes'
     | '/_app/people'
     | '/_app/portfolio'
@@ -986,6 +998,13 @@ declare module '@tanstack/react-router' {
       path: '/mandate'
       fullPath: '/mandate'
       preLoaderRoute: typeof AppMandateRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/meetings': {
+      id: '/_app/meetings'
+      path: '/meetings'
+      fullPath: '/meetings'
+      preLoaderRoute: typeof AppMeetingsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/notes': {
@@ -1461,6 +1480,7 @@ interface AppRouteChildren {
   AppImportRoute: typeof AppImportRoute
   AppInboxRoute: typeof AppInboxRoute
   AppMandateRoute: typeof AppMandateRoute
+  AppMeetingsRoute: typeof AppMeetingsRoute
   AppNotesRoute: typeof AppNotesRoute
   AppPeopleRoute: typeof AppPeopleRoute
   AppPortfolioRoute: typeof AppPortfolioRoute
@@ -1491,6 +1511,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppImportRoute: AppImportRoute,
   AppInboxRoute: AppInboxRoute,
   AppMandateRoute: AppMandateRoute,
+  AppMeetingsRoute: AppMeetingsRoute,
   AppNotesRoute: AppNotesRoute,
   AppPeopleRoute: AppPeopleRoute,
   AppPortfolioRoute: AppPortfolioRoute,

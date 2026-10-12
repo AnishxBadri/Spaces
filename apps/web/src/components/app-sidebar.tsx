@@ -2,6 +2,7 @@ import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import {
   Briefcase,
   Building2,
+  CalendarDays,
   CheckSquare,
   Compass,
   FileText,
@@ -106,6 +107,14 @@ export const NAV_ITEMS = [
     label: 'Notes',
     icon: FileText,
     key: 'G N',
+    group: 'library',
+  },
+  // Meetings takes E: M is Mandate. (D68 amended)
+  {
+    to: '/meetings',
+    label: 'Meetings',
+    icon: CalendarDays,
+    key: 'G E',
     group: 'library',
   },
   // Files keeps Documents' L (library): D is Deals. (D68 amended)

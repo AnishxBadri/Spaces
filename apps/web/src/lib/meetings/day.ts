@@ -64,13 +64,18 @@ export function dayWindow(day: string): { from: string; to: string } {
 
 const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
+/** A local day as `Tue 10-14`. */
+export function weekdayDate(day: string): string {
+  const [y, m, d] = day.split('-').map(Number)
+  return `${WEEKDAY[new Date(y, m - 1, d).getDay()]} ${day.slice(5)}`
+}
+
 /** The day nav's middle word: `today`, `tomorrow`, `yesterday`, else `Tue 10-14`. */
 export function dayLabel(day: string, today: string): string {
   if (day === today) return 'today'
   if (day === shiftDay(today, 1)) return 'tomorrow'
   if (day === shiftDay(today, -1)) return 'yesterday'
-  const [y, m, d] = day.split('-').map(Number)
-  return `${WEEKDAY[new Date(y, m - 1, d).getDay()]} ${day.slice(5)}`
+  return weekdayDate(day)
 }
 
 /** `HH:MM` in the reader's clock. */
@@ -86,9 +91,7 @@ export function timeSpan(startsAt: string, endsAt: string): string {
 
 /** The dialog head's context: `Tue 10-14 · 09:30–10:00`. */
 export function meetingWhen(startsAt: string, endsAt: string): string {
-  const day = isoDay(new Date(startsAt))
-  const [y, m, d] = day.split('-').map(Number)
-  return `${WEEKDAY[new Date(y, m - 1, d).getDay()]} ${day.slice(5)} · ${timeSpan(startsAt, endsAt)}`
+  return `${weekdayDate(isoDay(new Date(startsAt)))} · ${timeSpan(startsAt, endsAt)}`
 }
 
 /** The RSVP mark printed after a name. Shown, never edited. (D68) */

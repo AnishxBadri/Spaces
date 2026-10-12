@@ -15,10 +15,16 @@ export type {
   MeetingSuggestion,
   UnwrittenMeeting,
 } from '../interactions/meeting-read'
+export type {
+  ListedMeeting,
+  MeetingFilter,
+  MeetingsList,
+  WriteUpState,
+} from '../meetings/list'
 
 /**
- * The meeting surfaces' server fns: Today's Meetings section, the meeting
- * window, pinning a record and Prep. (D68, D79)
+ * The meeting surfaces' server fns: Today's Meetings section, the Meetings
+ * page, the meeting window, pinning a record and Prep. (D68, D79)
  * Programs are imported inside the handlers so their database code never
  * reaches the client bundle.
  */
@@ -51,6 +57,32 @@ export const getTodayMeetings = createServerFn().handler(async () => {
   ])
   return { calendar, audience, unwritten }
 })
+
+/**
+ * The Meetings page: what starts in `(now, until)` and the past, with
+ * whether a calendar is connected and who a member asks. The browser sends
+ * both instants, so "this week and next" is the reader's. (D68 amended)
+ */
+export const listMeetings = createServerFn()
+  .validator(z.object({ now: z.iso.datetime(), until: z.iso.datetime() }))
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    const { calendarConnectedProgram, meetingListProgram } =
+      await import('../interactions/meeting-read')
+    const { setupAudienceProgram } =
+      await import('../integrations/setup-status')
+    const { effectFn } = await import('./effect')
+    const [calendar, audience, list] = await Promise.all([
+      effectFn(calendarConnectedProgram)(),
+      effectFn(setupAudienceProgram)(user.role ?? 'member'),
+      effectFn(meetingListProgram)(
+        { id: user.id, email: user.email },
+        new Date(data.now),
+        new Date(data.until),
+      ),
+    ])
+    return { calendar, audience, ...list }
+  })
 
 const byId = z.object({ id: z.uuid() })
 

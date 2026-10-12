@@ -1,9 +1,10 @@
+import { Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { LabelHead, LedgerRow } from '#/components/ledger-section'
 import { DensityRamp } from '#/components/dither'
 import { NeedsSetup } from '#/components/needs-setup'
 import { nowLabel, useNow } from '#/components/today/day-strip'
-import { Button } from '#/components/ui/button'
+import { MeetingRow, PrepButton } from '#/components/meetings/meeting-row'
 import { listDayMeetings } from '#/lib/server-fns'
 import type { DayMeeting, SetupAudience } from '#/lib/server-fns'
 import {
@@ -12,9 +13,6 @@ import {
   dayWindow,
   isUpcoming,
   nowIndex,
-  participantName,
-  RSVP_MARK,
-  RSVP_WORD,
   shiftDay,
   timeSpan,
 } from '#/lib/meetings/day'
@@ -120,25 +118,7 @@ function NowRule({ now }: { now: Date }) {
   )
 }
 
-/** Names with their RSVP marks: `Ana Reyes ✓ · ben@flent.io ?`. */
-function Participants({ meeting }: { meeting: DayMeeting }) {
-  if (meeting.participants.length === 0) return null
-  return (
-    <span className="min-w-0 truncate text-label text-graphite">
-      {meeting.participants.map((p, i) => (
-        <span key={p.email}>
-          {i > 0 ? ' · ' : ''}
-          {participantName(p)}{' '}
-          <span className="mono" title={RSVP_WORD[p.rsvp]}>
-            {RSVP_MARK[p.rsvp]}
-          </span>
-        </span>
-      ))}
-    </span>
-  )
-}
-
-function MeetingRow({
+function TodayMeetingRow({
   meeting,
   now,
   onOpen,
@@ -148,58 +128,16 @@ function MeetingRow({
   onOpen: (id: string, prep: boolean) => void
 }) {
   const ahead = now !== null && !meeting.cancelled && isUpcoming(meeting, now)
-  const marks = meeting.cancelled
-    ? 'cancelled'
-    : artifactMarks(meeting.artifacts)
   return (
-    <LedgerRow className="group/row">
-      <button
-        type="button"
-        data-meeting-row
-        onClick={() => onOpen(meeting.id, false)}
-        className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 px-3 text-left hover:bg-bone"
-      >
-        <span
-          className={cn(
-            'w-22 shrink-0 mono text-micro text-graphite',
-            meeting.cancelled && 'line-through',
-          )}
-        >
-          {timeSpan(meeting.startsAt, meeting.endsAt)}
-        </span>
-        <span
-          className={cn(
-            'min-w-0 shrink truncate text-body font-medium',
-            meeting.cancelled && 'text-graphite line-through',
-          )}
-        >
-          {meeting.title ?? 'Meeting'}
-        </span>
-        <Participants meeting={meeting} />
-        <span className="flex-1" />
-        {meeting.records.slice(0, 2).map((r) => (
-          <span
-            key={r.id}
-            className="max-w-32 shrink-0 truncate rounded-none border border-rule px-1.5 text-label"
-          >
-            {r.name}
-          </span>
-        ))}
-      </button>
-      {ahead ? (
-        <Button
-          variant="outline"
-          size="sm"
-          title="Brief me on the linked records"
-          onClick={() => onOpen(meeting.id, true)}
-        >
-          Prep
-        </Button>
-      ) : null}
-      <span className="w-28 shrink-0 truncate text-right mono text-micro text-graphite">
-        {marks}
-      </span>
-    </LedgerRow>
+    <MeetingRow
+      meeting={meeting}
+      when={timeSpan(meeting.startsAt, meeting.endsAt)}
+      lane={meeting.cancelled ? 'cancelled' : artifactMarks(meeting.artifacts)}
+      action={
+        ahead ? <PrepButton onPrep={() => onOpen(meeting.id, true)} /> : null
+      }
+      onOpen={() => onOpen(meeting.id, false)}
+    />
   )
 }
 
@@ -265,13 +203,12 @@ export function MeetingsSection({
         }
       >
         <DayNav day={day} today={today} onDay={onDay} />
-        {/* The Meetings page is its own route; a typed Link would refuse it until it exists. */}
-        <a
-          href="/meetings"
+        <Link
+          to="/meetings"
           className="focus-ring shrink-0 mono text-micro text-foreground hover:underline"
         >
           all meetings ›
-        </a>
+        </Link>
       </LabelHead>
       <ol>
         {meetings === 'failed' ? (
@@ -333,7 +270,7 @@ function MeetingRowWithRule({
   return (
     <>
       {rule && now !== null ? <NowRule now={now} /> : null}
-      <MeetingRow meeting={meeting} now={now} onOpen={onOpen} />
+      <TodayMeetingRow meeting={meeting} now={now} onOpen={onOpen} />
     </>
   )
 }

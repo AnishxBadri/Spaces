@@ -175,6 +175,7 @@ describe('the chassis', () => {
       'Tasks',
       'Spaces',
       'Notes',
+      'Meetings',
       'Files',
       'Companies',
       'People',
@@ -204,7 +205,7 @@ describe('the chassis', () => {
     expect(rows()).toEqual(
       ['Today', 'Tasks', 'Spaces'].concat(['Companies', 'People', 'Deals']),
     )
-    expect(button(/^Library/).textContent).toContain('▸ 2')
+    expect(button(/^Library/).textContent).toContain('▸ 3')
     expect(button(/^Library/).getAttribute('aria-expanded')).toBe('false')
     expect(button(/^Capital/).textContent).toContain('▸ 2')
 
@@ -242,7 +243,7 @@ describe('the chassis', () => {
     for (const n of [1, 2, 3, 4, 5, 6])
       prefs.toggleStarredSpace({ id: `s${n}`, name: `Space ${n}` })
     await mount('/today')
-    const after = rows().slice(rows().indexOf('Spaces') + 1, -7)
+    const after = rows().slice(rows().indexOf('Spaces') + 1, -8)
     expect(after).toEqual([
       'Space 1',
       'Space 2',

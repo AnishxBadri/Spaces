@@ -10,6 +10,7 @@ import {
   interaction,
   interactionDocument,
   interactionEntity,
+  integration,
   interactionStat,
   note,
   person,
@@ -17,11 +18,13 @@ import {
 } from '@spaces/db/schema'
 import type { MeetingMeta } from '@spaces/db/schema/interactions'
 import { and, eq } from 'drizzle-orm'
+import { user } from '@spaces/db/schema/auth'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import {
   calendarConnectedProgram,
   dayMeetingsProgram,
   meetingDetailProgram,
+  meetingListProgram,
   pinMeetingRecordProgram,
   unwrittenMeetingsProgram,
 } from './meeting-read'
@@ -219,6 +222,247 @@ describe('unwrittenMeetingsProgram', () => {
         record: 'Flent',
       },
     ])
+  })
+})
+
+/** A write-up note; `source` marks it written by an integration. */
+async function aNote(input: {
+  title: string
+  authorId: string
+  visibility?: 'shared' | 'private'
+  source?: string
+}): Promise<string> {
+  const [n] = await db
+    .insert(entity)
+    .values({
+      kind: 'note',
+      canonicalName: input.title,
+      ...(input.source === undefined
+        ? {}
+        : { sourceClass: 'integration' as const, sourceRef: input.source }),
+    })
+    .returning({ id: entity.id })
+  await db.insert(note).values({
+    entityId: n.id,
+    authorId: input.authorId,
+    title: input.title,
+    visibility: input.visibility ?? 'shared',
+  })
+  return n.id
+}
+
+describe('meetingListProgram', () => {
+  const now = new Date('2027-03-15T12:00:00.000Z')
+  const until = new Date('2027-03-29T00:00:00.000Z')
+  const reader = { id: FIXTURE_ACTOR.id, email: FIXTURE_ACTOR.email }
+
+  it('splits upcoming from past: upcoming earliest first, past unwritten first then newest, cancelled in place', async () => {
+    const flent = await aCompany('Flent')
+    const at = (iso: string, over: Partial<MeetingMeta> = {}) =>
+      meta({
+        ends_at: new Date(Date.parse(iso) + 1_800_000).toISOString(),
+        ...over,
+      })
+    const later = await aMeeting({
+      subject: 'Tuesday call two',
+      at: '2027-03-16T15:00:00.000Z',
+      meta: at('2027-03-16T15:00:00.000Z'),
+      records: [flent],
+    })
+    const sooner = await aMeeting({
+      subject: 'Tuesday call one',
+      at: '2027-03-16T10:00:00.000Z',
+      meta: at('2027-03-16T10:00:00.000Z'),
+      records: [flent],
+    })
+    // Past the horizon: not this week or next.
+    await aMeeting({
+      subject: 'Next month',
+      at: '2027-04-02T10:00:00.000Z',
+      meta: at('2027-04-02T10:00:00.000Z'),
+      records: [],
+    })
+    const written = await aMeeting({
+      subject: 'Written yesterday',
+      at: '2027-03-14T10:00:00.000Z',
+      meta: at('2027-03-14T10:00:00.000Z'),
+      records: [],
+      noteId: await aNote({ title: 'Notes', authorId: FIXTURE_ACTOR.id }),
+    })
+    const cancelled = await aMeeting({
+      subject: 'Cancelled',
+      at: '2027-03-13T10:00:00.000Z',
+      meta: at('2027-03-13T10:00:00.000Z', { status: 'cancelled' }),
+      records: [],
+    })
+    const oldUnwritten = await aMeeting({
+      subject: 'Old unwritten',
+      at: '2027-03-08T10:00:00.000Z',
+      meta: at('2027-03-08T10:00:00.000Z'),
+      records: [],
+    })
+    const newUnwritten = await aMeeting({
+      subject: 'New unwritten',
+      at: '2027-03-12T10:00:00.000Z',
+      meta: at('2027-03-12T10:00:00.000Z'),
+      records: [],
+    })
+
+    const list = await run(meetingListProgram(reader, now, until))
+    // Isolation is per file: keep to this test's rows, in the order read.
+    const ours = new Set([
+      sooner,
+      later,
+      written,
+      cancelled,
+      oldUnwritten,
+      newUnwritten,
+    ])
+    const ids = (rows: ReadonlyArray<{ id: string }>) =>
+      rows.map((m) => m.id).filter((id) => ours.has(id))
+    expect(ids(list.upcoming)).toEqual([sooner, later])
+    expect(ids(list.past)).toEqual([
+      newUnwritten,
+      oldUnwritten,
+      written,
+      cancelled,
+    ])
+    expect(list.past.find((m) => m.id === cancelled)?.cancelled).toBe(true)
+    expect(list.more).toBe(false)
+    expect(
+      list.upcoming.find((m) => m.id === sooner)?.records.map((r) => r.name),
+    ).toEqual(['Flent'])
+  })
+
+  it('reads the write-up through canRead: written, via the integration that wrote it, or private', async () => {
+    const [other] = await db
+      .insert(user)
+      .values({
+        id: crypto.randomUUID(),
+        name: 'Other Partner',
+        email: `${crypto.randomUUID()}@fund.example`,
+        emailVerified: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning({ id: user.id })
+    const [granola] = await db
+      .insert(integration)
+      .values({
+        capabilityId: 'granola',
+        version: '1.0.0',
+        enabled: true,
+        manifest: { id: 'granola', name: 'Granola' },
+      })
+      .returning({ id: integration.id })
+    const mine = await aMeeting({
+      subject: 'Mine',
+      at: '2027-03-14T10:00:00.000Z',
+      meta: meta({ ends_at: '2027-03-14T10:30:00.000Z' }),
+      records: [],
+      noteId: await aNote({ title: 'A', authorId: FIXTURE_ACTOR.id }),
+    })
+    const recorded = await aMeeting({
+      subject: 'Recorded',
+      at: '2027-03-13T10:00:00.000Z',
+      meta: meta({ ends_at: '2027-03-13T10:30:00.000Z' }),
+      records: [],
+      noteId: await aNote({
+        title: 'B',
+        authorId: FIXTURE_ACTOR.id,
+        source: granola.id,
+      }),
+    })
+    const hidden = await aMeeting({
+      subject: 'Hidden',
+      at: '2027-03-12T10:00:00.000Z',
+      meta: meta({ ends_at: '2027-03-12T10:30:00.000Z' }),
+      records: [],
+      noteId: await aNote({
+        title: 'C',
+        authorId: other.id,
+        visibility: 'private',
+        source: granola.id,
+      }),
+    })
+
+    const list = await run(meetingListProgram(reader, now, until))
+    const state = (id: string) => {
+      const m = list.past.find((p) => p.id === id)
+      return m ? { writeUp: m.writeUp, via: m.via } : null
+    }
+    expect(state(mine)).toEqual({ writeUp: 'written', via: null })
+    expect(state(recorded)).toEqual({ writeUp: 'written', via: 'Granola' })
+    // The row stays: the meeting is shared, only its write-up is not. (D67)
+    expect(state(hidden)).toEqual({ writeUp: 'private', via: null })
+  })
+
+  it('marks the reader’s meetings by login address or a connected account, with their answer', async () => {
+    const login = `${crypto.randomUUID()}@fund.example`
+    const [partner] = await db
+      .insert(user)
+      .values({
+        id: crypto.randomUUID(),
+        name: 'Partner',
+        email: login,
+        emailVerified: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning({ id: user.id })
+    // Not a calendar: `calendarConnectedProgram` below reads this file's rows.
+    await db.insert(accountConnection).values({
+      userId: partner.id,
+      provider: 'google',
+      product: 'drive',
+      externalEmail: 'Partner@Elsewhere.example',
+      tokensEnc: Buffer.from('x'),
+    })
+    const byLogin = await aMeeting({
+      subject: 'By login',
+      at: '2027-03-16T10:00:00.000Z',
+      meta: meta({
+        ends_at: '2027-03-16T10:30:00.000Z',
+        rsvp: { [login.toUpperCase()]: 'tentative' },
+      }),
+      records: [],
+    })
+    const byAccount = await aMeeting({
+      subject: 'By account',
+      at: '2027-03-17T10:00:00.000Z',
+      meta: meta({
+        ends_at: '2027-03-17T10:30:00.000Z',
+        rsvp: { 'partner@elsewhere.example': 'accepted' },
+      }),
+      records: [],
+    })
+    const organized = await aMeeting({
+      subject: 'Organized',
+      at: '2027-03-18T10:00:00.000Z',
+      meta: meta({
+        ends_at: '2027-03-18T10:30:00.000Z',
+        organizer: login,
+      }),
+      records: [],
+    })
+    const theirs = await aMeeting({
+      subject: 'Theirs',
+      at: '2027-03-19T10:00:00.000Z',
+      meta: meta({ ends_at: '2027-03-19T10:30:00.000Z' }),
+      records: [],
+    })
+
+    const list = await run(
+      meetingListProgram({ id: partner.id, email: login }, now, until),
+    )
+    const of = (id: string) => {
+      const m = list.upcoming.find((u) => u.id === id)
+      return m ? { mine: m.mine, myRsvp: m.myRsvp } : null
+    }
+    expect(of(byLogin)).toEqual({ mine: true, myRsvp: 'tentative' })
+    expect(of(byAccount)).toEqual({ mine: true, myRsvp: 'accepted' })
+    expect(of(organized)).toEqual({ mine: true, myRsvp: null })
+    expect(of(theirs)).toEqual({ mine: false, myRsvp: null })
   })
 })
 

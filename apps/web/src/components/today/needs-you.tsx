@@ -1,6 +1,5 @@
-import { Link, useRouter } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
-import { toast } from 'sonner'
 import type { ReactNode } from 'react'
 import {
   LedgerFigure,
@@ -8,13 +7,12 @@ import {
   ReferenceBar,
   SectionHead,
 } from '#/components/ledger-section'
+import { WriteUpButton } from '#/components/meetings/write-up-button'
 import { KeyHint } from '#/components/page-header'
 import { TaskComposer } from '#/components/task-composer'
 import { Badge } from '#/components/ui/badge'
-import { Button } from '#/components/ui/button'
 import type { BadgeOption } from '#/components/ui/badge'
 import { Checkbox } from '#/components/ui/checkbox'
-import { writeUpInteraction } from '#/lib/server-fns'
 import type { ReviewGroup } from '#/lib/server-fns'
 import {
   daysBetween,
@@ -154,21 +152,6 @@ function MeetingRow({
   row: Extract<NeedsYouRow, { kind: 'meeting' }>
   onOpenMeeting: (id: string) => void
 }) {
-  const router = useRouter()
-  const [pending, setPending] = useState(false)
-  async function write() {
-    setPending(true)
-    try {
-      const { noteId } = await writeUpInteraction({
-        data: { interactionId: row.id },
-      })
-      void router.invalidate()
-      await router.navigate({ to: '/notes/$noteId', params: { noteId } })
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not write it up')
-      setPending(false)
-    }
-  }
   return (
     <>
       <button
@@ -186,15 +169,7 @@ function MeetingRow({
           </span>
         ) : null}
       </button>
-      <Button
-        variant="outline"
-        size="sm"
-        pending={pending}
-        disabled={pending}
-        onClick={() => void write()}
-      >
-        Write
-      </Button>
+      <WriteUpButton interactionId={row.id} />
       <LedgerFigure tone="muted">{row.age}</LedgerFigure>
     </>
   )
