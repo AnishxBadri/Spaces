@@ -19,7 +19,8 @@ import { cn } from '#/lib/utils'
  * One object's registry as a settings ledger (spec §7): `ATTRIBUTES` with
  * the live count and `drag to reorder` in its head, then one row per
  * attribute — grip · name · type in words (`Multi-select · 6`,
- * `Record · People`) · rules (`identity · unique`, `filled by Apollo`) ·
+ * `Record · People`) · rules (`↔ Team · N:N`, `identity · unique`,
+ * `filled by Apollo`) ·
  * `···` (Edit, Move up, Move down, Archive).
  * Drag or the menu's moves persist sort_order, which every table and rail
  * reads. Archived attributes wait in a collapsed group below — never
@@ -95,16 +96,26 @@ export function typeWords(
 }
 
 /**
- * An attribute's rules in words: required, an identity key (unique by
- * construction, D75), the enrichment source that fills it, an AI answer.
- * `filledBy` is the source's name, or null when none fills it.
+ * An attribute's rules in words: its relationship pair (`↔ Team · N:N`,
+ * `· pair archived` once the other half is, D69), required, an identity key (unique by construction, D75), the
+ * enrichment source that fills it, an AI answer. `filledBy` is the source's
+ * name, or null when none fills it.
  */
 export function ruleWords(
-  attr: Pick<RegistryAttr, 'type' | 'options' | 'archived'>,
+  attr: Pick<RegistryAttr, 'type' | 'options' | 'archived' | 'pair'>,
   filledBy: string | null,
 ): string {
   const stored = attr.options
   return [
+    attr.pair === null
+      ? null
+      : [
+          `↔ ${attr.pair.name}`,
+          stored.cardinality ?? null,
+          attr.pair.archived ? 'pair archived' : null,
+        ]
+          .filter((w) => w !== null)
+          .join(' · '),
     stored.required ? 'required' : null,
     stored.identityKey === undefined ? null : 'identity · unique',
     filledBy === null ? null : `filled by ${filledBy}`,

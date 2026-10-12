@@ -1,7 +1,14 @@
 import { Effect, Schema } from 'effect'
-import { and, asc, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { attribute, attributeEvent, entity, link } from '@spaces/db/schema'
+import {
+  attribute,
+  attributeEvent,
+  entity,
+  link,
+  objectDef,
+} from '@spaces/db/schema'
 import type { attributeEventSource } from '@spaces/db/schema'
 import type { EntityValues } from '@spaces/db/schema/entities'
 import type { Json } from '@spaces/db/json'
@@ -22,11 +29,13 @@ import {
 } from '../ai/chunk-sources'
 import type { EmbedSource } from '../ai/chunk-sources'
 import {
+  coreKindOf,
   identityNorm,
   isNonIdentityValue,
   toObjectKind,
   valueValidator,
 } from '../../attributes/registry'
+import { isDerived } from '../../attributes/relationship'
 import type {
   AttributeDef,
   CoreIdentityKey,
@@ -51,15 +60,22 @@ import {
  * `setValues` is the Promise seam for server-fns and tests.
  */
 
+/**
+ * An object's live attributes, in order.
+ * - The inverse half of a pair (`isDerived`) is left out unless asked for:
+ *   `values` never holds it, so a reader that wrote back what it read would
+ *   empty the relationship. `setValuesInTx` asks. (D69)
+ */
 export async function getRegistryByObjectId(
   objectId: string,
+  opts: { derived?: true } = {},
 ): Promise<Array<AttributeDef>> {
   const rows = await db
     .select()
     .from(attribute)
     .where(and(eq(attribute.objectId, objectId), eq(attribute.archived, false)))
     .orderBy(asc(attribute.sortOrder), asc(attribute.createdAt))
-  return rows
+  return opts.derived ? rows : rows.filter((d) => !isDerived(d))
 }
 
 export async function getRegistry(
@@ -80,6 +96,16 @@ export class AttributeValidationError extends Schema.TaggedError<AttributeValida
 export class EntityNotFound extends Schema.TaggedError<EntityNotFound>()(
   'EntityNotFound',
   { entityId: Schema.String, message: Schema.String },
+) {}
+
+/**
+ * A write to the derived half of a relationship whose owner is archived
+ * (D69): archiving a half detaches the pair, so the derived half stores
+ * nothing new. The refusal names the archived pair.
+ */
+export class PairedAttributeLocked extends Schema.TaggedError<PairedAttributeLocked>()(
+  'PairedAttributeLocked',
+  { slug: Schema.String, pair: Schema.String, message: Schema.String },
 ) {}
 
 export class ValuesWriteFailed extends Schema.TaggedError<ValuesWriteFailed>()(
@@ -139,6 +165,12 @@ export const planPatch = Effect.fn('planPatch')(function* (
 
     let value: Json = null
     if (raw !== undefined && raw !== null && raw !== '') {
+      if (
+        def.type === 'record_reference' &&
+        !def.options.multi &&
+        Array.isArray(raw)
+      )
+        return yield* invalid(slug, holdsOne(def))
       const parsed = valueValidator(def, current[slug]).safeParse(raw)
       if (!parsed.success) {
         return yield* invalid(
@@ -162,6 +194,66 @@ export const planPatch = Effect.fn('planPatch')(function* (
 })
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+/** The refusal of a list on a reference that holds one record. */
+const holdsOne = (def: AttributeDef) =>
+  def.options.cardinality === undefined
+    ? 'Holds one record'
+    : `Holds one record — the relationship is ${def.options.cardinality}`
+
+/** Records of one object: its row, or a core kind's rows born without one. */
+function ofObject(objectId: string, core: ObjectKind | null): SQL {
+  const own = eq(entity.objectId, objectId)
+  if (core === null) return own
+  return or(own, and(isNull(entity.objectId), eq(entity.kind, core))) ?? own
+}
+
+/**
+ * 1:1 on the owner (D69): a record may be held by one owner at a time. The
+ * refusal names the record that already holds it.
+ */
+async function checkOneToOne(
+  tx: Tx,
+  entityId: string,
+  members: SQL,
+  change: Change,
+) {
+  const { def, slug, value } = change
+  if (def.options.cardinality !== '1:1' || typeof value !== 'string') return
+  // Serializes owners claiming one target: a second writer waits here, then
+  // reads the first one's committed link. Released when the transaction ends.
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtext(${value}::text || ':' || ${slug}::text))`,
+  )
+  const holder = (
+    await tx
+      .select({ name: entity.canonicalName })
+      .from(link)
+      .innerJoin(entity, eq(entity.id, link.fromEntityId))
+      .where(
+        and(
+          eq(link.toEntityId, value),
+          eq(link.relation, 'references'),
+          eq(link.attrSlug, slug),
+          ne(link.fromEntityId, entityId),
+          isNull(entity.mergedIntoId),
+          members,
+        ),
+      )
+      .limit(1)
+  ).at(0)
+  if (!holder) return
+  const target = (
+    await tx
+      .select({ name: entity.canonicalName })
+      .from(entity)
+      .where(eq(entity.id, value))
+  ).at(0)
+  throw invalid(
+    slug,
+    `${target?.name ?? 'That record'} is already held by ${holder.name}`,
+  )
+}
 
 /** Referenced records must exist, be alive, and match the target kind. */
 async function checkReferences(tx: Tx, change: Change) {
@@ -613,17 +705,26 @@ export async function setValuesInTx(
       })
     objectId = await objectIdForKindAsync(core)
   }
-  const registry = await getRegistryByObjectId(objectId)
+  const registry = await getRegistryByObjectId(objectId, { derived: true })
   const current = ent.values
   const nameParts =
     ent.kind === 'person' && registry.some((d) => isNamePart(d.slug))
-  const patch = withNameParts(opts.patch, {
+  const named = withNameParts(opts.patch, {
     nameParts,
     current,
     canonicalName: ent.canonicalName,
     name,
     birth: fillDefaults !== undefined,
   })
+  // The inverse half of a pair stores nothing (D69): its slugs leave the
+  // patch here and are written on their owners once this record's own write
+  // is done, so a self-relationship's owner write reads this one's result.
+  const inverse = await planInverse(tx, registry, named)
+  const patch = Object.fromEntries(
+    Object.entries(named).filter(
+      ([slug]) => !inverse.some((w) => w.def.slug === slug),
+    ),
+  )
 
   // Planning is synchronous and pure; a typed failure surfaces as a
   // throw here and is passed through untouched by the catch below.
@@ -680,7 +781,7 @@ export async function setValuesInTx(
     const userId = actor.type === 'user' ? actor.id : null
     const defaultPatch: Record<string, unknown> = {}
     for (const def of registry) {
-      if (def.slug in effectivePatch) continue
+      if (def.slug in effectivePatch || isDerived(def)) continue
       // Absent and null both mean "blank" — a default fills either.
       if ((afterPatch[def.slug] ?? null) !== null) continue
       const v = resolveDefault(def, { now: fillDefaults.now, userId })
@@ -711,9 +812,11 @@ export async function setValuesInTx(
     if (summary.outcome !== 'released') identityValues[slug] = summary.value
   }
 
+  const members = ofObject(objectId, toObjectKind(ent.kind))
   const next = { ...current }
   for (const change of changes) {
     await checkReferences(tx, change)
+    await checkOneToOne(tx, entityId, members, change)
     const { slug, def, before, value } = change
     if (value === null) delete next[slug]
     else next[slug] = value
@@ -869,31 +972,236 @@ export async function setValuesInTx(
     }
   }
 
+  const owners = await writeInverse(tx, entityId, inverse, opts)
+
   return {
-    reembed,
+    reembed: [...reembed, ...owners.reembed],
     skipped,
-    dealParties,
-    identityAdded,
-    changed: changes.filter((c) => c.door !== 'default').map((c) => c.slug),
+    dealParties: [...dealParties, ...owners.dealParties],
+    identityAdded: [...identityAdded, ...owners.identityAdded],
+    changed: [
+      ...changes.filter((c) => c.door !== 'default').map((c) => c.slug),
+      ...owners.changed,
+    ],
     defaulted: changes.filter((c) => c.door === 'default').map((c) => c.slug),
     identity,
     identityValues,
     identityClaims: elements.claims,
-    conflicts,
+    conflicts: [...conflicts, ...owners.conflicts],
   }
+}
+
+/** A write to the inverse half of a pair, and the owner it lands on. (D69) */
+type InverseWrite = {
+  def: AttributeDef
+  owner: AttributeDef
+  /** the owner's object, as a filter on `entity` */
+  members: SQL
+  /** the referencing records the patch asks for; null clears them all */
+  value: Json
+}
+
+/**
+ * The patch's slugs on derived attributes, validated as the inverse's own
+ * shape (a 1:1 inverse holds one record) and joined to their owner.
+ */
+async function planInverse(
+  tx: Tx,
+  registry: Array<AttributeDef>,
+  patch: Record<string, unknown>,
+): Promise<Array<InverseWrite>> {
+  const writes: Array<InverseWrite> = []
+  for (const def of registry) {
+    if (!isDerived(def) || !(def.slug in patch)) continue
+    const raw = patch[def.slug]
+    let value: Json = null
+    if (raw !== undefined && raw !== null && raw !== '') {
+      if (!def.options.multi && Array.isArray(raw))
+        throw invalid(def.slug, holdsOne(def))
+      const parsed = valueValidator(def).safeParse(raw)
+      if (!parsed.success)
+        throw invalid(
+          def.slug,
+          parsed.error.issues[0]?.message ?? 'Invalid value',
+        )
+      value = parsed.data
+    }
+    const pairId = def.options.inverseOf
+    const owner =
+      pairId === undefined
+        ? undefined
+        : (
+            await tx.select().from(attribute).where(eq(attribute.id, pairId))
+          ).at(0)
+    if (!owner) throw invalid(def.slug, 'Its relationship has no owner')
+    if (owner.archived)
+      throw new PairedAttributeLocked({
+        slug: def.slug,
+        pair: owner.id,
+        message: `${def.slug}: its pair ${owner.name} is archived — the relationship stores nothing new`,
+      })
+    const object = (
+      await tx
+        .select({ slug: objectDef.slug, isSystem: objectDef.isSystem })
+        .from(objectDef)
+        .where(eq(objectDef.id, owner.objectId))
+    ).at(0)
+    writes.push({
+      def,
+      owner,
+      members: ofObject(owner.objectId, object ? coreKindOf(object) : null),
+      value,
+    })
+  }
+  return writes
+}
+
+type OwnerWrites = Pick<
+  SetValuesResult,
+  'changed' | 'conflicts' | 'reembed' | 'dealParties' | 'identityAdded'
+>
+
+/**
+ * Each inverse write as `setValues` on the owners it changes: removals
+ * first, so a 1:1 can move, then additions. One owner record changed is one
+ * `attribute_event` and one `references` link; this record gains neither.
+ */
+async function writeInverse(
+  tx: Tx,
+  entityId: string,
+  writes: Array<InverseWrite>,
+  door: Pick<
+    SetValuesInput,
+    'actor' | 'source' | 'suggestionId' | 'refs' | 'batchId' | 'fillBlanks'
+  >,
+): Promise<OwnerWrites> {
+  const out: OwnerWrites = {
+    changed: [],
+    conflicts: [],
+    reembed: [],
+    dealParties: [],
+    identityAdded: [],
+  }
+  for (const w of writes) {
+    const held = (
+      await tx
+        .selectDistinct({ id: entity.id })
+        .from(link)
+        .innerJoin(entity, eq(entity.id, link.fromEntityId))
+        .where(
+          and(
+            eq(link.toEntityId, entityId),
+            eq(link.relation, 'references'),
+            eq(link.attrSlug, w.owner.slug),
+            isNull(entity.mergedIntoId),
+            w.members,
+          ),
+        )
+        .orderBy(entity.id)
+    ).map((r) => r.id)
+    const want = [...new Set(referenceIds(w.value))]
+    if (held.length === want.length && held.every((id) => want.includes(id)))
+      continue
+    const conflict = (existing: Json) =>
+      out.conflicts.push({
+        slug: w.def.slug,
+        existing,
+        proposed: w.value,
+        reference: true,
+      })
+    // Fill-blanks: a relationship fills only when empty. (D72)
+    if (door.fillBlanks && held.length > 0) {
+      conflict(w.def.options.multi ? held : (held.at(0) ?? null))
+      continue
+    }
+    await checkReferences(tx, {
+      slug: w.def.slug,
+      def: w.def,
+      before: null,
+      value: want,
+    })
+
+    const many = w.owner.options.multi === true
+    const removals = held.filter((id) => !want.includes(id))
+    const additions = want.filter((id) => !held.includes(id))
+    // Every owner this write changes, locked before it is read: each owner
+    // write is a read-modify-write.
+    const current = new Map<string, Json>()
+    for (const holder of [...removals, ...additions]) {
+      const row = (
+        await tx
+          .select({ values: entity.values })
+          .from(entity)
+          .where(eq(entity.id, holder))
+          .for('update')
+      ).at(0)
+      current.set(holder, row?.values[w.owner.slug] ?? null)
+    }
+    // The inverse proved empty, so a fill is a plain addition — except on a
+    // single-value owner that holds another record, which it would replace.
+    // That refuses the whole write, naming the holders, before any step runs.
+    if (door.fillBlanks && !many) {
+      const taken = additions.flatMap((id) =>
+        referenceIds(current.get(id) ?? null),
+      )
+      if (taken.length > 0) {
+        conflict(taken)
+        continue
+      }
+    }
+
+    const steps: Array<{ holder: string; value: Json }> = [
+      ...removals.map((holder) => {
+        const kept = referenceIds(current.get(holder) ?? null).filter(
+          (id) => id !== entityId,
+        )
+        return { holder, value: many && kept.length > 0 ? kept : null }
+      }),
+      ...additions.map((holder) => ({
+        holder,
+        value: many
+          ? [...referenceIds(current.get(holder) ?? null), entityId]
+          : entityId,
+      })),
+    ]
+    // Removals first, so a 1:1 can move. A refusal throws and rolls back
+    // every step with it: an inverse write lands whole or not at all.
+    for (const { holder, value } of steps) {
+      const result = await setValuesInTx(tx, {
+        entityId: holder,
+        patch: { [w.owner.slug]: value },
+        actor: door.actor,
+        ...(door.source === undefined ? {} : { source: door.source }),
+        ...(door.suggestionId === undefined
+          ? {}
+          : { suggestionId: door.suggestionId }),
+        ...(door.refs === undefined ? {} : { refs: door.refs }),
+        ...(door.batchId === undefined ? {} : { batchId: door.batchId }),
+      })
+      out.reembed.push(...result.reembed)
+      out.dealParties.push(...result.dealParties)
+      out.identityAdded.push(...result.identityAdded)
+    }
+    out.changed.push(w.def.slug)
+  }
+  return out
 }
 
 export const setValuesEffect = Effect.fn('setValues')(function* (
   opts: SetValuesInput,
 ): Effect.fn.Return<
   SetValuesResult,
-  AttributeValidationError | EntityNotFound | ValuesWriteFailed
+  | AttributeValidationError
+  | EntityNotFound
+  | PairedAttributeLocked
+  | ValuesWriteFailed
 > {
   const result = yield* Effect.tryPromise({
     try: () => db.transaction((tx) => setValuesInTx(tx, opts)),
     catch: (cause) =>
       cause instanceof AttributeValidationError ||
-      cause instanceof EntityNotFound
+      cause instanceof EntityNotFound ||
+      cause instanceof PairedAttributeLocked
         ? cause
         : new ValuesWriteFailed({ cause }),
   })

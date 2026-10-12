@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { liveOptions } from '../attributes/options'
 import { valueValidator } from '../attributes/registry'
+import { isDerived } from '../attributes/relationship'
 import type { AttributeDef } from '../attributes/registry'
 
 /**
@@ -202,8 +203,9 @@ const envelope = (def: SchemaAttribute, value: JsonSchema): JsonSchema => ({
 })
 
 /**
- * Registry → the structured-output schema. Archived attributes and types
- * with no write shape drop out.
+ * Registry → the structured-output schema. Archived attributes, the inverse
+ * half of a relationship (`isDerived`, D69) and types with no write shape
+ * drop out.
  *
  * No property is `required`, whatever the attribute's own `required` says.
  * A required attribute means a human cannot clear it; it does not mean a
@@ -217,7 +219,7 @@ export function schemaFor(
 ): JsonSchema {
   const properties: Record<string, JsonSchema> = {}
   for (const def of registry) {
-    if (def.archived) continue
+    if (def.archived || isDerived(def)) continue
     const shape = writeShape(def)
     if (shape) properties[def.slug] = envelope(def, shape)
   }
@@ -281,7 +283,7 @@ export function validateProposal(
 
   for (const [slug, entry] of Object.entries(top.data)) {
     const def = bySlug.get(slug)
-    if (!def || def.archived) {
+    if (!def || def.archived || isDerived(def)) {
       issues.push({ slug, message: `${slug}: Unknown attribute` })
       continue
     }

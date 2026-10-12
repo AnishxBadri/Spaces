@@ -368,6 +368,9 @@ export const updateAttributeProgram = Effect.fn('updateAttributeProgram')(
           message: `${attr.name} backs the ${identityKey} identity key of ${owner.plural} — drop the key from ${owner.plural} before archiving it`,
         })
     }
+    // Either half of a relationship may be archived; that detaches the pair,
+    // and a write to a derived half whose owner is archived is refused by
+    // `setValues` (`PairedAttributeLocked`). (D69)
     const current = attr.options
 
     let next = current

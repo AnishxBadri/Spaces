@@ -78,6 +78,12 @@ export type AiAttributeConfig = {
   lane: 'classify' | 'synthesize' | 'research'
 }
 
+/**
+ * A relationship's cardinality, read from the attribute's own side: own
+ * object : target object. `N:1` holds one record, `1:N` and `N:N` many. (D69)
+ */
+export type Cardinality = '1:1' | '1:N' | 'N:1' | 'N:N'
+
 export type AttributeOptions = {
   options?: Array<SelectOption>
   /** record_reference — a core kind, or any object row (custom objects) */
@@ -114,6 +120,15 @@ export type AttributeOptions = {
    * which the boot seeder never re-links; absent is never decided.
    */
   enrichmentKey?: string | null
+  /**
+   * A relationship (D69): two `record_reference` attributes, one per object,
+   * each naming the other's id here, with the cardinality on both.
+   * - The owner stores the value; the half marked `derived` stores nothing,
+   *   and `setValues` rewrites a write to it into one on the owner.
+   */
+  inverseOf?: string
+  cardinality?: Cardinality
+  derived?: true
 }
 
 /**

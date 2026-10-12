@@ -42,6 +42,11 @@ const writes = vi.hoisted(() => ({
   revokeApiToken: vi.fn(async () => ({ ok: true })),
   updateObject: vi.fn(async () => ({ ok: true })),
   updateAttribute: vi.fn(async () => ({ ok: true })),
+  createRelationship: vi.fn(async () => ({
+    a: { id: 'a', slug: 'portfolio' },
+    b: { id: 'b', slug: 'funds' },
+    owner: 'a',
+  })),
   setMemberBanned: vi.fn(async () => ({ ok: true })),
   setMemberRole: vi.fn(async () => ({ ok: true })),
   createInvite: vi.fn(async () => ({
@@ -860,8 +865,12 @@ describe('the four acts that break something elsewhere ask first', () => {
 
   it('archiving an object', async () => {
     await mount('/settings/objects/funds')
-    await click(byText('Archive'))
-    expect(dialog()?.textContent).toContain('Archive Funds?')
+    await openMenu('More for Funds')
+    await click(menuItem('Archive'))
+    // The verb runs once the menu has handed focus back, then asks.
+    await vi.waitFor(() =>
+      expect(dialog()?.textContent).toContain('Archive Funds?'),
+    )
     expect(dialog()?.textContent).toContain('pickers skip it')
     expect(focused()).toBe('Keep')
     expect(writes.updateObject).not.toHaveBeenCalled()
@@ -1549,6 +1558,48 @@ describe('Objects, by sheet 06', () => {
     })
   })
 
+  it('New relationship is the outline beside New attribute, and its window commits both sides once', async () => {
+    const companies = objectRow(1, 'Companies', { isSystem: true })
+    shellObjects = [{ ...objectRow(3, 'Funds', {}), id: OBJECT_ID }, companies]
+    await mount('/settings/objects/funds')
+    const head = byText('New relationship')
+    expect(head?.getAttribute('data-variant')).toBe('outline')
+    // Edit and Archive wait in the head's ···, not beside the primary (A1).
+    expect(byText('Edit')).toBeUndefined()
+    expect(
+      document.querySelector('button[aria-label="More for Funds"]'),
+    ).not.toBeNull()
+
+    await click(head)
+    const dialog = document.querySelector('[role="dialog"]')
+    expect(dialog?.textContent).toContain('New relationship')
+    expect(dialog?.textContent).toContain('Funds ↔ Companies')
+    const foot = dialog?.querySelector('[data-slot="dialog-footer"]')
+    expect(
+      Array.from(foot?.querySelectorAll('button') ?? []).map((b) =>
+        b.textContent.trim(),
+      ),
+    ).toEqual(['Cancel', 'Create relationship'])
+
+    const field = (id: string) => {
+      const el = dialog?.querySelector(`#${id}`)
+      if (!(el instanceof HTMLInputElement)) throw new Error(`no ${id}`)
+      return el
+    }
+    await type(field('rel-name-a'), 'Portfolio')
+    await type(field('rel-name-b'), 'Funds')
+    await click(byText('Create relationship', dialog ?? document))
+    expect(writes.createRelationship).toHaveBeenCalledWith({
+      data: {
+        objectId: OBJECT_ID,
+        name: 'Portfolio',
+        targetObjectId: companies.id,
+        inverseName: 'Funds',
+        cardinality: 'N:N',
+      },
+    })
+  })
+
   it('prints types in words, a Rules lane and ··· per row, the count in the head, no foot caption, and AI answers only where set', async () => {
     const original = loaders['objects/$objectSlug']
     const attr = (
@@ -1558,6 +1609,12 @@ describe('Objects, by sheet 06', () => {
       kind: string,
       options: object,
       archived = false,
+      pair: {
+        id: string
+        name: string
+        objectPlural: string
+        archived: boolean
+      } | null = null,
     ) => ({
       id: `00000000-0000-4000-8000-0000000000e${n}`,
       slug,
@@ -1570,6 +1627,7 @@ describe('Objects, by sheet 06', () => {
       sortOrder: 0,
       filterable: false,
       sortable: false,
+      pair,
     })
     const option = (i: number) => ({ id: `o${i}`, label: `Option ${i}` })
     loaders['objects/$objectSlug'] = () => ({
@@ -1581,9 +1639,20 @@ describe('Objects, by sheet 06', () => {
           options: [1, 2, 3, 4, 5, 6].map(option),
           ai: { mode: 'classify', prompt: '', lane: 'classify' },
         }),
-        attr(4, 'founders', 'Founders', 'record_reference', {
-          targetKind: 'person',
-        }),
+        attr(
+          4,
+          'founders',
+          'Founders',
+          'record_reference',
+          { targetKind: 'person', multi: true, cardinality: 'N:N' },
+          false,
+          {
+            id: '00000000-0000-4000-8000-0000000000f4',
+            name: 'Backed',
+            objectPlural: 'People',
+            archived: true,
+          },
+        ),
         attr(5, 'old', 'Old', 'text', {}, true),
       ],
     })
@@ -1603,6 +1672,8 @@ describe('Objects, by sheet 06', () => {
       expect(rulesOf('domain')).toBe('identity · unique')
       expect(rulesOf('name')).toBe('required')
       expect(rulesOf('model')).toBe('AI answers')
+      // A relationship half names its pair as data. (D69)
+      expect(rulesOf('founders')).toBe('↔ Backed · N:N · pair archived')
       expect(
         document.querySelector('button[aria-label="More for Name"]'),
       ).not.toBeNull()

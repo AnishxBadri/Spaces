@@ -78,6 +78,8 @@ export const renameRecordProgram = Effect.fn('renameRecordProgram')(function* (
           Effect.fail(new RenameQueryFailed({ cause })),
         ValuesWriteFailed: (cause) =>
           Effect.fail(new RenameQueryFailed({ cause })),
+        PairedAttributeLocked: (cause) =>
+          Effect.fail(new RenameQueryFailed({ cause })),
       }),
     )
   } else {

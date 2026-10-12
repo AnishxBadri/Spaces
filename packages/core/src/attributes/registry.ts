@@ -479,6 +479,12 @@ type SeedDef = {
    */
   filterable?: boolean
   sortable?: boolean
+  /**
+   * The other half of a relationship (D69). The seeder pairs the two rows
+   * once both exist, writing `options.inverseOf` on each; the owner and the
+   * `derived` half say which is which in `options`.
+   */
+  pair?: { kind: ObjectKind; slug: string }
 }
 
 const opt = (
@@ -590,6 +596,21 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       type: 'domain',
       options: { multi: true, identityKey: 'domain' },
     },
+    {
+      // The people at this company: the inverse of a person's `companies`
+      // (D60, D69). Stores nothing — `setValues` writes a person's
+      // `companies` instead. Appended, never slotted.
+      slug: 'team',
+      name: 'Team',
+      type: 'record_reference',
+      options: {
+        targetKind: 'person',
+        multi: true,
+        cardinality: 'N:N',
+        derived: true,
+      },
+      pair: { kind: 'person', slug: 'companies' },
+    },
   ],
   person: [
     {
@@ -637,7 +658,10 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
         targetKind: 'company',
         multi: true,
         enrichmentKey: 'person.company',
+        cardinality: 'N:N',
       },
+      // The owner of the pair a company's `team` reads (D69).
+      pair: { kind: 'company', slug: 'team' },
     },
     {
       // Identity (D75), like a company's domains. Appended, never slotted.

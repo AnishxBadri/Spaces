@@ -1,9 +1,10 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { BADGE_COLORS } from '@spaces/core/attributes/colors'
 import { aiConfigInput } from '@spaces/core/ai/attribute-ai'
+import { isDerived } from '@spaces/core/attributes/relationship'
 import { requireAdmin, requireUser } from './shared'
 import { jsonValue } from '@spaces/core/json'
 
@@ -16,6 +17,12 @@ export const listRegistry = createServerFn()
         /** or the object row itself, the only key a custom object has */
         objectId: z.string().uuid().optional(),
         includeArchived: z.boolean().optional(),
+        /**
+         * The inverse half of a relationship (D69). Only the ledger asks:
+         * `values` never holds it, so a surface that edits what it reads
+         * would empty the relationship.
+         */
+        includeDerived: z.boolean().optional(),
       })
       .refine((v) => v.kind || v.objectId, {
         message: 'Give a kind or an objectId',
@@ -25,7 +32,7 @@ export const listRegistry = createServerFn()
     // Effect-first through the effectFn seam (backend-paradigm ratchet);
     // auth stays promise-land outside the program.
     await requireUser()
-    const { attribute } = await import('@spaces/db/schema')
+    const { attribute, objectDef } = await import('@spaces/db/schema')
     const { objectIdForKind } =
       await import('@spaces/core/writes/attributes/objects')
     const { effectFn } = await import('./effect')
@@ -37,6 +44,7 @@ export const listRegistry = createServerFn()
         objectId?: string | undefined
       },
       includeArchived: boolean,
+      includeDerived: boolean,
     ) {
       const objectId =
         key.objectId ?? (yield* objectIdForKind(key.kind ?? 'company'))
@@ -56,7 +64,31 @@ export const listRegistry = createServerFn()
             .orderBy(asc(attribute.sortOrder), asc(attribute.createdAt)),
         catch: (cause) => new Error(`Registry read failed: ${String(cause)}`),
       })
-      return rows.map((d) => ({
+      const listed = includeDerived ? rows : rows.filter((d) => !isDerived(d))
+      // Each relationship half's pair, named with the object it sits on.
+      const pairIds = listed.flatMap((d) =>
+        d.options.inverseOf === undefined ? [] : [d.options.inverseOf],
+      )
+      const pairs = new Map(
+        pairIds.length === 0
+          ? []
+          : (yield* Effect.tryPromise({
+              try: () =>
+                db
+                  .select({
+                    id: attribute.id,
+                    name: attribute.name,
+                    objectPlural: objectDef.plural,
+                    archived: attribute.archived,
+                  })
+                  .from(attribute)
+                  .innerJoin(objectDef, eq(objectDef.id, attribute.objectId))
+                  .where(inArray(attribute.id, pairIds)),
+              catch: (cause) =>
+                new Error(`Registry read failed: ${String(cause)}`),
+            })).map((p) => [p.id, p]),
+      )
+      return listed.map((d) => ({
         id: d.id,
         slug: d.slug,
         name: d.name,
@@ -71,12 +103,17 @@ export const listRegistry = createServerFn()
         // box as it was left.
         filterable: d.filterable,
         sortable: d.sortable,
+        pair:
+          d.options.inverseOf === undefined
+            ? null
+            : (pairs.get(d.options.inverseOf) ?? null),
       }))
     })
 
     return effectFn(listRegistryProgram)(
       { kind: data.kind, objectId: data.objectId },
       data.includeArchived ?? false,
+      data.includeDerived ?? false,
     )
   })
 
@@ -261,4 +298,27 @@ export const createAttribute = createServerFn({ method: 'POST' })
       await reconcileAttributeIndexes()
     }
     return result
+  })
+
+/**
+ * The Relationship dialog's one commit (D69): both halves in one
+ * transaction, each naming the other in `options.inverseOf`. Additive, so
+ * member-level like `createAttribute`.
+ */
+export const createRelationship = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      objectId: z.string().uuid(),
+      name: z.string().trim().min(1).max(80),
+      targetObjectId: z.string().uuid(),
+      inverseName: z.string().trim().min(1).max(80),
+      cardinality: z.enum(['1:1', '1:N', 'N:1', 'N:N']),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { createRelationshipProgram } =
+      await import('@spaces/core/writes/attributes/relationship')
+    const { effectFn } = await import('./effect')
+    return effectFn(createRelationshipProgram)({ ...data, createdBy: u.id })
   })

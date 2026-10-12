@@ -1,22 +1,28 @@
 import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
-import { Archive, ArchiveRestore, Pencil, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
 import { AiConfigSection } from '#/components/attributes/ai-config-section'
+import { RelationshipDialog } from '#/components/attributes/relationship-dialog'
 import { ObjectDialog } from '#/components/objects/object-dialog'
 import {
   RegistryList,
   TYPE_LABELS,
 } from '#/components/attributes/registry-list'
-import { KeyHint } from '#/components/page-header'
 import {
   SettingsGroupHead,
   SettingsSection,
 } from '#/components/settings/settings-section'
+import { ListMenu } from '#/components/table/list-menu'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { useConfirm } from '#/components/ui/confirm-dialog'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '#/components/ui/tooltip'
 import {
   IDENTITY_KEYS,
   IDENTITY_KEY_ATTRIBUTES,
@@ -44,7 +50,13 @@ export const Route = createFileRoute('/_app/settings/objects_/$objectSlug')({
   loader: async ({ params }) => {
     const object = await getObject({ data: { slug: params.objectSlug } })
     const [registry, filledBy] = await Promise.all([
-      listRegistry({ data: { objectId: object.id, includeArchived: true } }),
+      listRegistry({
+        data: {
+          objectId: object.id,
+          includeArchived: true,
+          includeDerived: true,
+        },
+      }),
       filledByOf(object),
     ])
     return { object, registry, filledBy }
@@ -86,8 +98,34 @@ function ObjectAttributesPage() {
   const router = useRouter()
   const live = registry.filter((a) => !a.archived).length
   const [creating, setCreating] = useState(false)
+  const [relating, setRelating] = useState(false)
+  const [editingObject, setEditingObject] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
   useHotkey('a', () => setCreating(true))
+
+  async function toggleArchived() {
+    if (!object.archived) {
+      const ok = await confirm({
+        title: `Archive ${object.plural}?`,
+        body: `The ${object.plural} list and record pages are hidden and pickers skip it. Records and their values are kept; Restore brings everything back.`,
+        action: 'Archive',
+      })
+      if (!ok) return
+    }
+    try {
+      await updateObject({
+        data: { id: object.id, archived: !object.archived },
+      })
+      toast(
+        object.archived
+          ? `${object.plural} restored`
+          : `${object.plural} archived — records kept`,
+      )
+      void router.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not update')
+    }
+  }
 
   // The identity-key declaration is live while the object is empty and read
   // only once a record exists (§9 — the slug rule). Each tick is a save:
@@ -135,62 +173,52 @@ function ObjectAttributesPage() {
       crumb="Workspace"
       action={
         <>
+          {object.archived ? null : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setRelating(true)}
+            >
+              New relationship
+            </Button>
+          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="sm" onClick={() => setCreating(true)}>
+                <Plus className="size-3" strokeWidth={2} />
+                New attribute
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>A</TooltipContent>
+          </Tooltip>
           {!object.isSystem && isAdmin ? (
             <>
+              <ListMenu
+                label={object.plural}
+                verbs={[
+                  { label: 'Edit…', onSelect: () => setEditingObject(true) },
+                  {
+                    label: object.archived ? 'Restore' : 'Archive',
+                    onSelect: () => void toggleArchived(),
+                  },
+                ]}
+              />
               <ObjectDialog
                 mode="edit"
                 object={object}
+                open={editingObject}
+                onOpenChange={setEditingObject}
                 onSaved={() => router.invalidate()}
-                trigger={
-                  <Button size="sm" variant="outline">
-                    <Pencil className="size-3.5" strokeWidth={1.75} />
-                    Edit
-                  </Button>
-                }
               />
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={async () => {
-                  if (!object.archived) {
-                    const ok = await confirm({
-                      title: `Archive ${object.plural}?`,
-                      body: `The ${object.plural} list and record pages are hidden and pickers skip it. Records and their values are kept; Restore brings everything back.`,
-                      action: 'Archive',
-                    })
-                    if (!ok) return
-                  }
-                  try {
-                    await updateObject({
-                      data: { id: object.id, archived: !object.archived },
-                    })
-                    toast(
-                      object.archived
-                        ? `${object.plural} restored`
-                        : `${object.plural} archived — records kept`,
-                    )
-                    void router.invalidate()
-                  } catch (err) {
-                    toast.error(
-                      err instanceof Error ? err.message : 'Could not update',
-                    )
-                  }
-                }}
-              >
-                {object.archived ? (
-                  <ArchiveRestore className="size-3.5" strokeWidth={1.75} />
-                ) : (
-                  <Archive className="size-3.5" strokeWidth={1.75} />
-                )}
-                {object.archived ? 'Restore' : 'Archive'}
-              </Button>
             </>
           ) : null}
-          <Button size="sm" onClick={() => setCreating(true)}>
-            <Plus className="size-3" strokeWidth={2} />
-            New attribute
-            <KeyHint>A</KeyHint>
-          </Button>
+          <RelationshipDialog
+            objectId={object.id}
+            objects={objects.filter((o) => !o.archived)}
+            open={relating}
+            onOpenChange={setRelating}
+            onCreated={() => router.invalidate()}
+          />
           <AttributeDialog
             mode="create"
             objectId={object.id}

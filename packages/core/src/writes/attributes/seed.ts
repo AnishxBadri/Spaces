@@ -83,6 +83,69 @@ export async function seedSystemAttributes() {
   const linked = await seedEnrichmentLinks(objectIds)
   if (linked > 0)
     console.log(`[attributes] linked ${linked} system attributes to enrichment`)
+
+  const paired = await seedRelationshipPairs(objectIds)
+  if (paired > 0)
+    console.log(`[attributes] paired ${paired} system relationship attributes`)
+}
+
+/**
+ * The system relationships (D69), paired insert-if-absent: each half gains
+ * `options.inverseOf` naming the other, with the cardinality (and, on the
+ * inverse, `derived`) its `SeedDef` declares. A half that already names a
+ * pair is never touched, and a user attribute holding a system slug is
+ * never paired.
+ */
+async function seedRelationshipPairs(
+  objectIds: ReadonlyMap<ObjectKind, string>,
+): Promise<number> {
+  const systemId = async (kind: ObjectKind, slug: string) => {
+    const objectId = objectIds.get(kind)
+    if (objectId === undefined) return undefined
+    const row = (
+      await db
+        .select({ id: attribute.id })
+        .from(attribute)
+        .where(
+          and(
+            eq(attribute.objectId, objectId),
+            eq(attribute.slug, slug),
+            eq(attribute.isSystem, true),
+          ),
+        )
+    ).at(0)
+    return row?.id
+  }
+  let paired = 0
+  for (const objectKind of OBJECT_KINDS) {
+    for (const def of SYSTEM_ATTRIBUTES[objectKind]) {
+      if (def.pair === undefined) continue
+      const own = await systemId(objectKind, def.slug)
+      const other = await systemId(def.pair.kind, def.pair.slug)
+      if (own === undefined || other === undefined) continue
+      const pair = {
+        inverseOf: other,
+        ...(def.options?.cardinality
+          ? { cardinality: def.options.cardinality }
+          : {}),
+        ...(def.options?.derived ? { derived: true } : {}),
+      }
+      const rows = await db
+        .update(attribute)
+        .set({
+          options: sql`${attribute.options} || ${JSON.stringify(pair)}::jsonb`,
+        })
+        .where(
+          and(
+            eq(attribute.id, own),
+            sql`not (${attribute.options} ? 'inverseOf')`,
+          ),
+        )
+        .returning({ id: attribute.id })
+      paired += rows.length
+    }
+  }
+  return paired
 }
 
 /**

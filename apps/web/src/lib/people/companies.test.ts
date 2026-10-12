@@ -90,6 +90,9 @@ describe('the companies attribute', () => {
         targetKind: 'company',
         multi: true,
         enrichmentKey: 'person.company',
+        // The owner of the pair a company's `team` reads. (D69)
+        cardinality: 'N:N',
+        inverseOf: expect.any(String),
       },
     })
   })

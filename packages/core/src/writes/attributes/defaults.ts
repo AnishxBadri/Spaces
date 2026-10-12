@@ -1,8 +1,7 @@
 import { Effect } from 'effect'
-import { setValuesEffect } from './values'
+import { AttributeValidationError, setValuesEffect } from './values'
 import type {
   Actor,
-  AttributeValidationError,
   EntityNotFound,
   EventSource,
   SetValuesResult,
@@ -75,7 +74,14 @@ export const birthValuesEffect = Effect.fn('birthValues')(function* (
       actor: opts.actor,
       ...(opts.suppliedSource ? { source: opts.suppliedSource } : {}),
       fillDefaults: { now: opts.now ?? new Date() },
-    })
+    }).pipe(
+      // A birth's refusal is a value refusal, whatever half it named.
+      Effect.catchTag('PairedAttributeLocked', (e) =>
+        Effect.fail(
+          new AttributeValidationError({ slug: e.slug, message: e.message }),
+        ),
+      ),
+    )
   return { defaulted, identity, identityValues, reembed }
 })
 

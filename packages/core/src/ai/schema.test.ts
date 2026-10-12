@@ -323,6 +323,7 @@ describe('purity', () => {
       'zod',
       '../attributes/options',
       '../attributes/registry',
+      '../attributes/relationship',
       '../attributes/registry',
     ])
   })
