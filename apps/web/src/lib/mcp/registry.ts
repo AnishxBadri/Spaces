@@ -184,7 +184,7 @@ const getRecord = defineTool({
   name: 'get_record',
   title: 'Record',
   description:
-    'One record, shaped by its object’s attribute registry: every attribute with its stored value and a readable rendering, then its links in both directions and the spaces it is tagged into.',
+    'One record, shaped by its object’s attribute registry: every attribute with its stored value and a readable rendering (the inverse half of a relationship marked derived, its value read from the other side), then its links in both directions and the spaces it is tagged into.',
   inputSchema: { id: z.string().uuid().describe('Record id (uuid)') },
   annotations: readOnly,
   run: (caller, { id }) => getRecordProgram({ id: caller.userId }, id),

@@ -23,8 +23,6 @@ import {
   DitherMark,
   InitialsMark,
   PropertyCell,
-  RailEmpty,
-  RailItem,
   RailSection,
   RecordBody,
   RecordHeader,
@@ -32,6 +30,12 @@ import {
   StageStepper,
 } from '#/components/record/record-parts'
 import { DetailsPickRow } from '#/components/record/details-add'
+import {
+  RelationSection,
+  RelationSections,
+  relationRows,
+  withDerived,
+} from '#/components/record/relation-section'
 import { PropertyFold } from '#/components/record/property-fold'
 import { RecordSpacesSection } from '#/components/record/spaces-section'
 import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
@@ -96,7 +100,8 @@ export const Route = createFileRoute('/_app/deals_/$dealId')({
     ] = await Promise.all([
       getDeal({ data: { id: params.dealId } }),
       listSpaces(),
-      listRegistry({ data: { kind: 'deal' } }),
+      // Derived halves too: their rows read the resolver's value. (D69)
+      listRegistry({ data: { kind: 'deal', includeDerived: true } }),
       getRecordTimeline({ data: { entityId: params.dealId } }),
       listRecordDocuments({ data: { entityId: params.dealId } }),
       listRecordNotes({ data: { entityId: params.dealId } }),
@@ -181,23 +186,11 @@ function DealRecordPage() {
   const closeDate =
     typeof deal.values.close_date === 'string' ? deal.values.close_date : null
   const daysInStage = readouts.daysInStage
-  const peopleIds = useMemo(
-    () =>
-      Array.isArray(deal.values.people) ? deal.values.people.map(String) : [],
-    [deal.values.people],
-  )
-  // refNames' Record index type hides misses; hasOwn is the honest test.
-  const people = peopleIds.flatMap((id) =>
-    Object.hasOwn(deal.refNames, id)
-      ? [{ id, name: deal.refNames[id].name }]
-      : [],
-  )
-  const companyId =
-    typeof deal.values.company === 'string' ? deal.values.company : null
-  const company =
-    companyId !== null && Object.hasOwn(deal.refNames, companyId)
-      ? { id: companyId, name: deal.refNames[companyId].name }
-      : null
+  // Both sides of each relationship come from the one resolver. (D69)
+  const people = relationRows(deal.relations, 'people', false)
+  const peopleIds = useMemo(() => people.map((p) => p.id), [people])
+  const company = relationRows(deal.relations, 'company', false)
+  const values = withDerived(deal.values, deal.relations)
   const searchPeople = useCallback(
     async (q: string) => {
       const rows = await searchEntities({ data: { q, kinds: ['person'] } })
@@ -390,7 +383,7 @@ function DealRecordPage() {
               <PropertyGrid>
                 <PropertyFold
                   defs={registry}
-                  valueOf={(def) => deal.values[def.slug]}
+                  valueOf={(def) => values[def.slug]}
                   render={(def) => (
                     <RailField
                       key={def.slug}
@@ -400,7 +393,7 @@ function DealRecordPage() {
                       objectLabel={'deal'}
                       objectPlural="Deals"
                       onAttributeSaved={() => router.invalidate()}
-                      value={deal.values[def.slug] ?? null}
+                      value={values[def.slug] ?? null}
                       refNames={refNames}
                       onSave={async (v) => {
                         await updateRecord({
@@ -447,49 +440,41 @@ function DealRecordPage() {
 
             <WaitingRail entityId={deal.id} counts={waiting} />
 
-            <RailSection label="Company" meta={company ? '1' : '0'}>
-              {company ? (
-                <RailItem>
-                  <DitherMark size={14} />
-                  <Link
-                    to="/companies/$companyId"
-                    params={{ companyId: company.id }}
-                    className="focus-ring min-w-0 flex-1 truncate hover:underline"
-                  >
-                    {company.name}
-                  </Link>
-                </RailItem>
-              ) : (
+            <RelationSection
+              label="Company"
+              rows={company}
+              mark={() => <DitherMark size={14} />}
+            >
+              {company.length === 0 ? (
                 <DetailsPickRow
                   label="Add the company…"
                   placeholder="Company name…"
                   search={searchCompanies}
                   onPick={(hit) => save({ company: hit.id })}
                 />
-              )}
-            </RailSection>
+              ) : null}
+            </RelationSection>
 
-            <RailSection label="People" meta={`${people.length}`}>
-              {people.length === 0 ? <RailEmpty>No one yet.</RailEmpty> : null}
-              {people.map((p) => (
-                <RailItem key={p.id}>
-                  <InitialsMark name={p.name} />
-                  <Link
-                    to="/people/$personId"
-                    params={{ personId: p.id }}
-                    className="focus-ring min-w-0 truncate hover:underline"
-                  >
-                    {p.name}
-                  </Link>
-                </RailItem>
-              ))}
+            <RelationSection
+              label="People"
+              rows={people}
+              empty="No one yet."
+              mark={(p) => <InitialsMark name={p.name} />}
+            >
               <DetailsPickRow
                 label="Add a person…"
                 placeholder="Person name…"
                 search={searchPeople}
                 onPick={(hit) => save({ people: [...peopleIds, hit.id] })}
               />
-            </RailSection>
+            </RelationSection>
+
+            <RelationSections
+              defs={registry}
+              halves={deal.relations}
+              skip={['company', 'people']}
+              onAdd={(slug, value) => save({ [slug]: value })}
+            />
 
             <RecordSpacesSection
               entityId={deal.id}

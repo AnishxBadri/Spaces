@@ -611,6 +611,20 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       },
       pair: { kind: 'person', slug: 'companies' },
     },
+    {
+      // The deals naming this company: the inverse of a deal's `company`
+      // (D69). Stores nothing. Appended, never slotted.
+      slug: 'associated_deals',
+      name: 'Associated deals',
+      type: 'record_reference',
+      options: {
+        targetKind: 'deal',
+        multi: true,
+        cardinality: '1:N',
+        derived: true,
+      },
+      pair: { kind: 'deal', slug: 'company' },
+    },
   ],
   person: [
     {
@@ -674,6 +688,20 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
     // join. Appended, never slotted — the record page draws them as one cell.
     { slug: 'first_name', name: 'First name', type: 'text' },
     { slug: 'last_name', name: 'Last name', type: 'text' },
+    {
+      // The deals this person is on: the inverse of a deal's `people`
+      // (D69). Stores nothing. Appended, never slotted.
+      slug: 'deals',
+      name: 'Deals',
+      type: 'record_reference',
+      options: {
+        targetKind: 'deal',
+        multi: true,
+        cardinality: 'N:N',
+        derived: true,
+      },
+      pair: { kind: 'deal', slug: 'people' },
+    },
   ],
   deal: [
     {
@@ -707,13 +735,22 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       slug: 'company',
       name: 'Company',
       type: 'record_reference',
-      options: { targetKind: 'company', multi: false, required: true },
+      options: {
+        targetKind: 'company',
+        multi: false,
+        required: true,
+        cardinality: 'N:1',
+      },
+      // The owner of the pair a company's `associated_deals` reads (D69).
+      pair: { kind: 'company', slug: 'associated_deals' },
     },
     {
       slug: 'people',
       name: 'People',
       type: 'record_reference',
-      options: { targetKind: 'person', multi: true },
+      options: { targetKind: 'person', multi: true, cardinality: 'N:N' },
+      // The owner of the pair a person's `deals` reads (D69).
+      pair: { kind: 'person', slug: 'deals' },
     },
     {
       // New deals arrive owned — the most repetitive click in deal capture.

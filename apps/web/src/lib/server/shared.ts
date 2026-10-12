@@ -13,6 +13,7 @@ import {
   space,
 } from '@spaces/db/schema'
 import type { SourceClass } from '@spaces/db/schema'
+import type { RelationHalf } from '@spaces/core/writes/read/relations'
 
 /** Closed JSON type — Start's serializer rejects `unknown`. */
 export type { Json } from '@spaces/core/json'
@@ -249,6 +250,22 @@ export function groupReferencedBy(
   return [...groups.values()].sort(
     (a, b) => a.label.localeCompare(b.label) || a.via.localeCompare(b.via),
   )
+}
+
+/**
+ * Backlinks less the ones a relationship's inverse half already shows: an
+ * owner's link to this record reads under the derived attribute. (D69)
+ */
+export function withoutRelations(
+  rows: Array<ReferencedByRow>,
+  halves: ReadonlyArray<RelationHalf>,
+): Array<ReferencedByRow> {
+  const shown = new Set(
+    halves
+      .filter((h) => h.derived)
+      .flatMap((h) => h.items.map((i) => `${i.id}:${h.linkSlug}`)),
+  )
+  return rows.filter((r) => !shown.has(`${r.fromId}:${r.attrSlug}`))
 }
 
 /**

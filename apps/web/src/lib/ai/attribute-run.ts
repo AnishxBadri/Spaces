@@ -26,6 +26,7 @@ import { jsonRecord, jsonValue } from '@spaces/core/json'
 import { enqueue, jobsByKey } from '#/lib/queue'
 import type { QueuedJob } from '#/lib/queue'
 import { recordContextProgram } from '@spaces/core/writes/context/record'
+import { recordRelationsProgram } from '@spaces/core/writes/read/relations'
 import { SimilarLaneLive } from './similar'
 import type { ContextItem } from '@spaces/core/context/types'
 import { updateAttributeProgram } from '@spaces/core/writes/attributes/update'
@@ -144,6 +145,8 @@ type Cell = {
   }
   def: AttributeDef
   registry: Array<AttributeDef>
+  /** Both halves of each relationship as names, by slug — `{{team}}`. (D69) */
+  related: Readonly<Record<string, string>>
   ai: AiAttributeConfig
 }
 
@@ -184,10 +187,16 @@ const readCell = Effect.fn('attributeRun.cell')(function* (
     return yield* new AttributeRunRefused({
       message: `${def.name} is not an AI attribute`,
     })
+  const halves = yield* recordRelationsProgram(record.id).pipe(
+    Effect.mapError((e) => new AttributeRunQueryFailed({ cause: e.cause })),
+  )
   return {
     record: { id: record.id, name: record.name, values: record.values },
     def,
     registry,
+    related: Object.fromEntries(
+      halves.map((h) => [h.slug, h.items.map((i) => i.name).join(', ')]),
+    ),
     ai,
   }
 })
@@ -330,7 +339,11 @@ function taskFor(cell: Cell): string {
   const values: Record<string, string> = {}
   for (const slug of ai.variables ?? []) {
     const d = cell.registry.find((r) => r.slug === slug)
-    const shown = d ? displayValue(d, record.values[slug]) : null
+    const shown = Object.hasOwn(cell.related, slug)
+      ? cell.related[slug]
+      : d
+        ? displayValue(d, record.values[slug])
+        : null
     if (shown !== null) values[slug] = shown
   }
   const guidance = renderAiPrompt(ai.prompt, values).trim()

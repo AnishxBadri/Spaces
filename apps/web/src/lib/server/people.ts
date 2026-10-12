@@ -5,7 +5,12 @@ import { db } from '@spaces/db'
 import { entity, link, person } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
-import { groupReferencedBy, referencedByRows, requireUser } from './shared'
+import {
+  groupReferencedBy,
+  referencedByRows,
+  requireUser,
+  withoutRelations,
+} from './shared'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import { emitDomainEvent } from '#/lib/events/emit'
 import { pagedListInput, pageOptions } from '#/lib/views/page-input'
@@ -117,15 +122,15 @@ export const getPerson = createServerFn()
           isNull(entity.mergedIntoId),
         ),
       )
-    const nameBy = new Map(referenced.map((r) => [r.id, r.name]))
-    const refNames = Object.fromEntries(
-      referenced.map((r) => [r.id, { name: r.name }]),
-    )
-    const { companyIdsOf } = await import('../people/companies')
-    const companies = companyIdsOf(head.values).flatMap((id) => {
-      const name = nameBy.get(id)
-      return name === undefined ? [] : [{ id, name }]
-    })
+    // Companies, Deals and every other relationship, both halves (D69).
+    const { effectFn } = await import('./effect')
+    const { recordRelationsProgram, relationNames } =
+      await import('@spaces/core/writes/read/relations')
+    const relations = await effectFn(recordRelationsProgram)(data.id)
+    const refNames = {
+      ...Object.fromEntries(referenced.map((r) => [r.id, { name: r.name }])),
+      ...relationNames(relations),
+    }
 
     // Spaces this person is tagged into (SPA-99). `entity_space` always
     // accepted any kind, but until this slice only the company and custom
@@ -137,7 +142,10 @@ export const getPerson = createServerFn()
     // Inbound record-references, grouped by the attribute that made them:
     // `deal.referred_by` (SPA-59) is the first, and any later attribute
     // pointing at a person joins it with no edit to the page.
-    const referencedBy = groupReferencedBy(await referencedByRows(data.id))
+    // A relationship's owner links read as its inverse half instead.
+    const referencedBy = groupReferencedBy(
+      withoutRelations(await referencedByRows(data.id), relations),
+    )
 
     const timeline = await db
       .select({
@@ -151,7 +159,6 @@ export const getPerson = createServerFn()
       .limit(50)
 
     const { personReadoutsProgram } = await import('../records/readouts')
-    const { effectFn } = await import('./effect')
     const readouts = await effectFn(personReadoutsProgram)(data.id, new Date())
 
     const { pictureUrl } = await import('../records/pictures')
@@ -163,7 +170,7 @@ export const getPerson = createServerFn()
       values: head.values,
       picture: await pictureUrl(head.pictureSha),
       readouts,
-      companies,
+      relations,
       refNames,
       spaces,
       referencedBy,

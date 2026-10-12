@@ -407,6 +407,8 @@ describe('assembleProgram', () => {
       (x) => x.ref === ref.attr(person, 'companies'),
     )
     expect(fromCompany).toMatchObject({ hop: 1, kind: 'attribute' })
+    // Named by the company's own inverse attribute, not the person's. (D69)
+    expect(fromCompany?.text).toBe(`Team: Worker ${tag} (person)`)
     expect(fromCompany?.structural).toBeCloseTo(
       DEFAULT_WEIGHTS.hop[1] *
         DEFAULT_WEIGHTS.edge.references *

@@ -679,6 +679,19 @@ describe('mergeEntities', () => {
     expect(repointed.map((e) => e.entityId).sort()).toEqual(
       [onlyLoser, beside, both].sort(),
     )
+
+    // The survivor's Team follows the repointed links; the loser has none,
+    // and nothing about the merge changed for the inverse half. (D69)
+    const { Effect } = await import('effect')
+    const { relationsProgram } = await import('../read/relations')
+    const halves = await Effect.runPromise(relationsProgram([winner, loser]))
+    const team = (id: string) =>
+      (halves.get(id) ?? [])
+        .find((h) => h.slug === 'team')
+        ?.items.map((i) => i.id)
+        .sort() ?? []
+    expect(team(winner)).toEqual([onlyLoser, beside, both].sort())
+    expect(team(loser)).toEqual([])
   })
 
   it("unions two companies' domains on the survivor, aliases and value alike", async () => {

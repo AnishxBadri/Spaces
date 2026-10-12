@@ -41,6 +41,7 @@ import { ref } from '../../context/ref'
 import { SIMILAR_TOP_N, SimilarLane } from '../../context/similar-lane'
 import { renderAttribute, renderEvent, truncate } from '../../context/render'
 import type { ContextEdge } from '../../context/types'
+import { recordRelationsProgram } from '../read/relations'
 import { liveChainOf, memosTaggedIn, query, readableNote } from './spaces'
 
 /**
@@ -487,6 +488,17 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
     hits.forEach((c, i) => lexRank.set(ref.doc(c.docId, c.idx), i + 1))
   }
 
+  // An inbound reference that is a relationship's owner side reads under the
+  // seed's inverse attribute: `Team: Ada (person)`. (D69)
+  const inverseName = new Map<string, string>()
+  if (links.some((l) => l.relation === 'references' && l.toEntityId === seedId))
+    for (const half of yield* recordRelationsProgram(seedId).pipe(
+      Effect.mapError((e) => new ContextQueryFailed({ cause: e.cause })),
+    ))
+      if (half.derived)
+        for (const item of half.items)
+          inverseName.set(`${item.id}:${half.linkSlug}`, half.name)
+
   const seenDocs = new Set<string>()
   for (const l of links) {
     const otherId = l.fromEntityId === seedId ? l.toEntityId : l.fromEntityId
@@ -548,10 +560,13 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
       default: {
         // a linked record: the reference line, or the mention name
         if (l.relation === 'references' && l.fromEntityId === seedId) break // already an attribute
+        const inverse = inverseName.get(`${otherId}:${l.attrSlug}`)
         const label =
-          l.relation === 'references'
-            ? `Referenced by ${other.kind}: ${other.name} (${l.attrSlug})`
-            : `${other.kind}: ${other.name}`
+          l.relation !== 'references'
+            ? `${other.kind}: ${other.name}`
+            : inverse !== undefined
+              ? `${inverse}: ${other.name} (${other.kind})`
+              : `Referenced by ${other.kind}: ${other.name} (${l.attrSlug})`
         candidates.push({
           ref: ref.attr(
             otherId,

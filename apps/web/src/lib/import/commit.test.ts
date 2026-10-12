@@ -22,6 +22,7 @@ import {
   createRecordProgram,
 } from '@spaces/core/writes/attributes/object-registry'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
+import { relationsProgram } from '@spaces/core/writes/read/relations'
 import { birthDealProgram, dealFromDialog } from '#/lib/deals/birth'
 import { beginImportMappingProgram } from './mapping'
 import { decideImportCollisionProgram, planImportProgram } from './plan'
@@ -688,5 +689,52 @@ describe('a Deals row at Invested', () => {
     expect(restB).toEqual(restA)
     expect([sa, xa]).toEqual(['manual', ['direct']])
     expect([sb, xb]).toEqual(['import', ['import']])
+  })
+})
+
+describe('a pair column', () => {
+  it("lands a People import's Company column on the person, and the company's Team reads it", async () => {
+    const co = (
+      await resolveEntity({
+        kind: 'company',
+        name: 'Pairco',
+        keys: { domain: 'pairco.example' },
+        source: { class: 'manual' },
+      })
+    ).entityId
+    const batchId = await plannedBatch(
+      ['Name', 'Company'],
+      [['Ada Pair', 'pairco.example']],
+      await objectId('people'),
+    )
+    await commit(batchId)
+    const ada = (await rowsOf(batchId)).at(0)?.entityId
+    if (!ada) throw new Error('the row landed no person')
+
+    // The owner holds the value; the inverse is read, never written. (D69)
+    const person = (
+      await db
+        .select({ values: entity.values })
+        .from(entity)
+        .where(eq(entity.id, ada))
+    ).at(0)
+    expect(person?.values.companies).toEqual([co])
+    const company = (
+      await db
+        .select({ values: entity.values })
+        .from(entity)
+        .where(eq(entity.id, co))
+    ).at(0)
+    expect(company?.values).not.toHaveProperty('team')
+    const halves = await Effect.runPromise(relationsProgram([co, ada]))
+    expect(
+      halves
+        .get(co)
+        ?.find((h) => h.slug === 'team')
+        ?.items.map((i) => i.id),
+    ).toEqual([ada])
+    expect(halves.get(ada)?.find((h) => h.slug === 'companies')?.value).toEqual(
+      [co],
+    )
   })
 })

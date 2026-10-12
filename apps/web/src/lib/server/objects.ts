@@ -5,7 +5,12 @@ import { z } from 'zod'
 import { db } from '@spaces/db'
 import { attribute, entity, link, objectDef } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
-import { groupReferencedBy, referencedByRows, requireUser } from './shared'
+import {
+  groupReferencedBy,
+  referencedByRows,
+  requireUser,
+  withoutRelations,
+} from './shared'
 import { pagedListShape, pageOptions } from '#/lib/views/page-input'
 import type { IdentityKey } from '@spaces/core/attributes/registry'
 import { recordSpaces } from '#/lib/spaces/filed-in'
@@ -266,11 +271,18 @@ export const getObjectRecord = createServerFn()
       )
     // Incoming references — backlinks both ways (§9): who points at this,
     // one details section per referring object and attribute, as on a person.
-    const referencedBy = groupReferencedBy(await referencedByRows(data.id))
+    // Every relationship this record sits on, both halves (D69); an owner's
+    // link that reads as an inverse half here leaves the backlinks.
+    const { effectFn } = await import('./effect')
+    const { recordRelationsProgram, relationNames } =
+      await import('@spaces/core/writes/read/relations')
+    const relations = await effectFn(recordRelationsProgram)(data.id)
+    const referencedBy = groupReferencedBy(
+      withoutRelations(await referencedByRows(data.id), relations),
+    )
     const users = await db.select({ id: user.id, name: user.name }).from(user)
     const userNames = Object.fromEntries(users.map((u) => [u.id, u.name]))
     const { recordReadoutsProgram } = await import('../records/readouts')
-    const { effectFn } = await import('./effect')
     const readouts = await effectFn(recordReadoutsProgram)(data.id, new Date())
 
     return {
@@ -291,9 +303,11 @@ export const getObjectRecord = createServerFn()
         archived: head.objectArchived,
       },
       spaces,
+      relations,
       referencedBy,
       readouts,
       refNames: {
+        ...relationNames(relations),
         ...Object.fromEntries(
           outRefs.map((r) => [
             r.toId,

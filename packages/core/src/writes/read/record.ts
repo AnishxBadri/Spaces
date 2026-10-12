@@ -12,8 +12,10 @@ import {
 import { user } from '@spaces/db/schema/auth'
 import type { Json } from '@spaces/db/json'
 import { getRegistryByObjectId } from '../attributes/values'
+import { isDerived } from '../../attributes/relationship'
 import { renderAttribute } from '../../context/render'
 import { canRead } from '../../read-policy'
+import { recordRelationsProgram } from './relations'
 
 /**
  * One record, read as a given reader (SPA-198 moved this here from
@@ -26,7 +28,9 @@ import { canRead } from '../../read-policy'
  * `get_record(id)` — one record, registry-shaped: its object, every live
  * attribute of that object in registry order with the stored value and the
  * line the assembler would render for it, then its links both ways and the
- * spaces it is tagged into.
+ * spaces it is tagged into. The inverse half of a relationship is listed
+ * under its own slug, marked `derived`, its value resolved from the owner's
+ * links (D69).
  *
  * canRead is the token user's, applied at every door a private note could
  * leave through: the record itself (a teammate's private note is not found,
@@ -136,6 +140,8 @@ export type RecordAttribute = {
   value: Json
   /** The assembler's rendering, `Name: value` — null when unset. */
   text: string | null
+  /** The inverse half of a relationship: read from the owner's links. (D69) */
+  derived?: true
 }
 
 export type RecordLink = {
@@ -207,14 +213,22 @@ export const getRecordProgram = Effect.fn('getRecordProgram')(function* (
       )).at(0) ?? null)
     : null
   const defs = objectId
-    ? yield* query(() => getRegistryByObjectId(objectId))
+    ? yield* query(() => getRegistryByObjectId(objectId, { derived: true }))
     : []
+  // The inverse halves resolved, so both sides of a relationship read here.
+  const relations = yield* recordRelationsProgram(seedId).pipe(
+    Effect.mapError((e) => new McpToolQueryFailed({ cause: e.cause })),
+  )
+  const valueOf = (d: (typeof defs)[number]): Json =>
+    isDerived(d)
+      ? (relations.find((h) => h.derived && h.slug === d.slug)?.value ?? null)
+      : (values[d.slug] ?? null)
 
   // names for the reference attributes' rendering — records and people
   const refIds = new Set<string>()
   for (const d of defs) {
     if (d.type !== 'record_reference' && d.type !== 'actor_reference') continue
-    const v = values[d.slug]
+    const v = valueOf(d)
     if (v == null) continue
     for (const x of Array.isArray(v) ? v : [v]) refIds.add(String(x))
   }
@@ -240,13 +254,14 @@ export const getRecordProgram = Effect.fn('getRecordProgram')(function* (
       names.set(u.id, u.name)
 
   const attributes: Array<RecordAttribute> = defs.map((d) => {
-    const value = values[d.slug] ?? null
+    const value = valueOf(d)
     return {
       slug: d.slug,
       name: d.name,
       type: d.type,
       value,
       text: renderAttribute(d, value, (x) => names.get(x)),
+      ...(isDerived(d) ? { derived: true as const } : {}),
     }
   })
 

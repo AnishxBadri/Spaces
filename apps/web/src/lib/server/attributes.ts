@@ -18,9 +18,10 @@ export const listRegistry = createServerFn()
         objectId: z.string().uuid().optional(),
         includeArchived: z.boolean().optional(),
         /**
-         * The inverse half of a relationship (D69). Only the ledger asks:
-         * `values` never holds it, so a surface that edits what it reads
-         * would empty the relationship.
+         * The inverse half of a relationship (D69). `values` never holds it,
+         * so only a surface that reads its value from the resolver asks —
+         * the ledger and the record pages; one that edited what `values`
+         * holds would empty the relationship.
          */
         includeDerived: z.boolean().optional(),
       })

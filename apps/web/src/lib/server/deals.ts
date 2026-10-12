@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, desc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
@@ -103,36 +103,6 @@ export const listDealsTable = createServerFn().handler(async () => {
   }
 })
 
-/** Deals referencing a company — the company record's Deals section. */
-export const listCompanyDeals = createServerFn()
-  .validator(z.object({ companyId: z.string().uuid() }))
-  .handler(async ({ data }) => {
-    await requireUser()
-    const rows = await db
-      .select({
-        id: entity.id,
-        name: entity.canonicalName,
-        values: entity.values,
-      })
-      .from(link)
-      .innerJoin(entity, eq(entity.id, link.fromEntityId))
-      .where(
-        and(
-          eq(link.toEntityId, data.companyId),
-          eq(link.relation, 'references'),
-          eq(link.attrSlug, 'company'),
-          eq(entity.kind, 'deal'),
-          isNull(entity.mergedIntoId),
-        ),
-      )
-      .orderBy(desc(entity.createdAt))
-    return rows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      stage: jsonString(r.values.stage),
-    }))
-  })
-
 export const getDeal = createServerFn()
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
@@ -197,6 +167,10 @@ export const getDeal = createServerFn()
     const { dealReadoutsProgram } = await import('../records/readouts')
     const { effectFn } = await import('./effect')
     const readouts = await effectFn(dealReadoutsProgram)(data.id, new Date())
+    // Company, People and every other relationship, both halves (D69).
+    const { recordRelationsProgram, relationNames } =
+      await import('@spaces/core/writes/read/relations')
+    const relations = await effectFn(recordRelationsProgram)(data.id)
 
     return {
       id: head.id,
@@ -207,9 +181,13 @@ export const getDeal = createServerFn()
       outsideMandate,
       readouts,
       spaces,
-      refNames: Object.fromEntries(
-        refs.map((r) => [r.toId, { name: r.name, kind: r.kind }]),
-      ),
+      relations,
+      refNames: {
+        ...relationNames(relations),
+        ...Object.fromEntries(
+          refs.map((r) => [r.toId, { name: r.name, kind: r.kind }]),
+        ),
+      },
       userNames: Object.fromEntries(users.map((u) => [u.id, u.name])),
     }
   })

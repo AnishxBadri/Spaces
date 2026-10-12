@@ -35,6 +35,10 @@ import {
 } from '@spaces/core/writes/attributes/object-registry'
 import { createAttributeProgram } from '@spaces/core/writes/attributes/create'
 import { updateAttributeProgram } from '@spaces/core/writes/attributes/update'
+import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
+import { createRelationshipProgram } from '@spaces/core/writes/attributes/relationship'
+import { setValues } from '@spaces/core/writes/attributes/values'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { JobPermanent } from '../run-job'
 import { runAttributeRun } from './attribute-run'
 
@@ -515,5 +519,44 @@ describe('the job', () => {
       expect(outcome.failure).toBeInstanceOf(JobPermanent)
       expect(outcome.failure.reason).toContain('synthesize')
     }
+  })
+})
+
+describe('a variable through a relationship’s inverse half', () => {
+  it('resolves to the records on the other side, by name (D69)', async () => {
+    await routeLanes()
+    const companies = await objectIdForKindAsync('company')
+    // Owned on the company side, so the fund's half is the derived one.
+    const pair = await Effect.runPromise(
+      createRelationshipProgram({
+        objectId: companies,
+        name: 'Backs',
+        targetObjectId: fundObject,
+        inverseName: 'Portfolio',
+        cardinality: 'N:N',
+        createdBy: USER,
+      }),
+    )
+    const co = await resolveEntity({
+      kind: 'company',
+      name: 'Halcyon Backed',
+      source: { class: 'manual' },
+    })
+    await setValues({
+      entityId: co.entityId,
+      patch: { [pair.a.slug]: [fund] },
+      actor: ME,
+    })
+    await configure(whyNow, {
+      mode: 'prompt',
+      prompt: `Why now, given {{${pair.b.slug}}}?`,
+    })
+    const { model } = await run(fund, whyNow, () => ({
+      why_now: { value: 'x', refs: [], confidence: 0.5 },
+      reason: 'x',
+    }))
+    expect(JSON.stringify(model.doGenerateCalls[0].prompt)).toContain(
+      'Why now, given Halcyon Backed?',
+    )
   })
 })

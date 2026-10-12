@@ -20,6 +20,10 @@ import {
   RecordHeader,
 } from '#/components/record/record-parts'
 import { PropertyFold } from '#/components/record/property-fold'
+import {
+  RelationSections,
+  withDerived,
+} from '#/components/record/relation-section'
 import { RecordSpacesSection } from '#/components/record/spaces-section'
 import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
 import { RecordNotes } from '#/components/record/record-notes'
@@ -85,7 +89,10 @@ export const Route = createFileRoute('/_app/o_/$objectSlug/$recordId')({
       })
     const [registry, timeline, documents, spaces, notes, waiting, sensitivity] =
       await Promise.all([
-        listRegistry({ data: { objectId: record.object.id } }),
+        // Derived halves too: their rows read the resolver's value. (D69)
+        listRegistry({
+          data: { objectId: record.object.id, includeDerived: true },
+        }),
         getRecordTimeline({ data: { entityId: record.id } }),
         listRecordDocuments({ data: { entityId: record.id } }),
         listSpaces(),
@@ -123,6 +130,7 @@ function ObjectRecordPage() {
   const router = useRouter()
   const navigate = useNavigate()
   const Icon = objectIcon(record.object)
+  const values = withDerived(record.values, record.relations)
   const go = Route.useNavigate()
   const search = Route.useSearch()
   const [tab, changeTab] = useRecordTab(
@@ -252,7 +260,7 @@ function ObjectRecordPage() {
               <PropertyGrid>
                 <PropertyFold
                   defs={registry}
-                  valueOf={(def) => record.values[def.slug]}
+                  valueOf={(def) => values[def.slug]}
                   render={(def) => (
                     <RailField
                       key={def.slug}
@@ -262,7 +270,7 @@ function ObjectRecordPage() {
                       objectLabel={record.object.singular}
                       objectPlural={record.object.plural}
                       onAttributeSaved={() => router.invalidate()}
-                      value={record.values[def.slug] ?? null}
+                      value={values[def.slug] ?? null}
                       refNames={record.refNames}
                       onSave={async (v) => {
                         const result = await updateRecord({
@@ -303,8 +311,20 @@ function ObjectRecordPage() {
 
             <WaitingRail entityId={record.id} counts={waiting} />
 
-            {/* The records that point here, one section per referring
-                object and attribute; the link is set on the referrer. */}
+            {/* Each relationship, either half, through the resolver. (D69) */}
+            <RelationSections
+              defs={registry}
+              halves={record.relations}
+              onAdd={async (slug, value) => {
+                await updateRecord({
+                  data: { id: record.id, patch: { [slug]: value } },
+                })
+                void router.invalidate()
+              }}
+            />
+
+            {/* The records that point here outside any relationship, one
+                section per referring object and attribute. */}
             {record.referencedBy.map((group) => (
               <RailSection
                 key={`${group.label}:${group.attrSlug}`}

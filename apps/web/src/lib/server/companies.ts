@@ -1,8 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, desc, eq, isNull } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { company, entity, entityAlias } from '@spaces/db/schema'
+import { company, entity, entityAlias, link } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { jsonString } from '@spaces/core/json'
@@ -158,10 +158,43 @@ export const getCompany = createServerFn()
 
     const spaces = await recordSpaces(data.id)
 
-    // People: everyone whose `companies` names this company.
-    const { companyPeopleProgram } = await import('../people/companies')
+    // Team, Associated deals and every other relationship, both halves,
+    // through the one resolver (D69).
     const { effectFn } = await import('./effect')
-    const people = await effectFn(companyPeopleProgram)(data.id)
+    const { recordRelationsProgram, relationNames } =
+      await import('@spaces/core/writes/read/relations')
+    const relations = await effectFn(recordRelationsProgram)(data.id)
+    // The stage chip on each associated deal.
+    const dealIds =
+      relations
+        .find((h) => h.derived && h.slug === 'associated_deals')
+        ?.items.map((i) => i.id) ?? []
+    const dealStages = Object.fromEntries(
+      dealIds.length === 0
+        ? []
+        : (
+            await db
+              .select({ id: entity.id, values: entity.values })
+              .from(entity)
+              .where(inArray(entity.id, dealIds))
+          ).map((d) => [d.id, jsonString(d.values.stage)]),
+    )
+    // Names for this company's own reference values (`founders`).
+    const referenced = await db
+      .select({ id: entity.id, name: entity.canonicalName })
+      .from(link)
+      .innerJoin(entity, eq(entity.id, link.toEntityId))
+      .where(
+        and(
+          eq(link.fromEntityId, data.id),
+          eq(link.relation, 'references'),
+          isNull(entity.mergedIntoId),
+        ),
+      )
+    const refNames = {
+      ...Object.fromEntries(referenced.map((r) => [r.id, { name: r.name }])),
+      ...relationNames(relations),
+    }
     const { companyReadoutsProgram } = await import('../records/readouts')
     const readouts = await effectFn(companyReadoutsProgram)(data.id, new Date())
 
@@ -188,7 +221,9 @@ export const getCompany = createServerFn()
       picture: await pictureUrl(head.pictureSha),
       aliases,
       spaces,
-      people,
+      relations,
+      dealStages,
+      refNames,
       readouts,
       timeline: timeline.map((t) => ({ ...t, at: t.at.toISOString() })),
     }

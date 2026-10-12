@@ -22,13 +22,16 @@ import {
   InitialsMark,
   PropertyCell,
   PropertyGrid,
-  RailEmpty,
-  RailItem,
-  RailSection,
   RecordBody,
   RecordHeader,
 } from '#/components/record/record-parts'
 import { DetailsPickRow } from '#/components/record/details-add'
+import {
+  RelationSection,
+  RelationSections,
+  relationRows,
+  withDerived,
+} from '#/components/record/relation-section'
 import { PropertyFold } from '#/components/record/property-fold'
 import { RecordSpacesSection } from '#/components/record/spaces-section'
 import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
@@ -64,7 +67,6 @@ import {
   getRecordEnrichment,
   getEntitySensitivity,
   getRecordTimeline,
-  listCompanyDeals,
   listRecordActions,
   listRecordDocuments,
   listRecordNotes,
@@ -90,7 +92,6 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       spaces,
       registry,
       dealRegistry,
-      deals,
       timeline,
       documents,
       notes,
@@ -101,9 +102,9 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
     ] = await Promise.all([
       getCompany({ data: { id: params.companyId } }),
       listSpaces(),
-      listRegistry({ data: { kind: 'company' } }),
+      // Derived halves too: their rows read the resolver's value. (D69)
+      listRegistry({ data: { kind: 'company', includeDerived: true } }),
       listRegistry({ data: { kind: 'deal' } }),
-      listCompanyDeals({ data: { companyId: params.companyId } }),
       getRecordTimeline({ data: { entityId: params.companyId } }),
       listRecordDocuments({ data: { entityId: params.companyId } }),
       listRecordNotes({ data: { entityId: params.companyId } }),
@@ -126,7 +127,6 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       allSpaces: spaces,
       registry,
       dealRegistry,
-      deals,
       timeline,
       documents,
       notes,
@@ -145,7 +145,6 @@ function CompanyRecordPage() {
     allSpaces,
     registry,
     dealRegistry,
-    deals,
     timeline,
     documents,
     notes,
@@ -171,7 +170,10 @@ function CompanyRecordPage() {
   const nameAliases = company.aliases.filter(
     (a) => a.kind === 'name' && a.value !== company.name,
   )
-  const team = company.people
+  // Both sides of each relationship come from the one resolver. (D69)
+  const team = relationRows(company.relations, 'team', true)
+  const deals = relationRows(company.relations, 'associated_deals', true)
+  const values = withDerived(company.values, company.relations)
   const searchPeople = useCallback(
     async (q: string) => {
       const on = new Set(team.map((p) => p.id))
@@ -315,7 +317,7 @@ function CompanyRecordPage() {
               <PropertyGrid>
                 <PropertyFold
                   defs={registry}
-                  valueOf={(def) => company.values[def.slug]}
+                  valueOf={(def) => values[def.slug]}
                   render={(def) => (
                     <RailField
                       key={def.slug}
@@ -327,7 +329,8 @@ function CompanyRecordPage() {
                       fillFrom="company"
                       whereFrom={enrichment.whereFrom[def.slug]}
                       onAttributeSaved={() => router.invalidate()}
-                      value={company.values[def.slug] ?? null}
+                      value={values[def.slug] ?? null}
+                      refNames={company.refNames}
                       onSave={async (v) => {
                         const result = await updateRecord({
                           data: { id: company.id, patch: { [def.slug]: v } },
@@ -359,20 +362,12 @@ function CompanyRecordPage() {
 
             <WaitingRail entityId={company.id} counts={waiting} />
 
-            <RailSection label="Team" meta={`${team.length}`}>
-              {team.length === 0 ? <RailEmpty>No one yet.</RailEmpty> : null}
-              {team.map((p) => (
-                <RailItem key={p.id}>
-                  <InitialsMark name={p.name} outline />
-                  <Link
-                    to="/people/$personId"
-                    params={{ personId: p.id }}
-                    className="focus-ring min-w-0 flex-1 truncate hover:underline"
-                  >
-                    {p.name}
-                  </Link>
-                </RailItem>
-              ))}
+            <RelationSection
+              label="Team"
+              rows={team}
+              empty="No one yet."
+              mark={(p) => <InitialsMark name={p.name} outline />}
+            >
               <DetailsPickRow
                 label="Add a person…"
                 placeholder="Person name…"
@@ -388,36 +383,37 @@ function CompanyRecordPage() {
                   void router.invalidate()
                 }}
               />
-            </RailSection>
+            </RelationSection>
 
-            <RailSection label="Associated deals" meta={`${deals.length}`}>
-              {deals.length === 0 ? (
-                <RailEmpty>Watching only.</RailEmpty>
-              ) : null}
-              {deals.map((d) => (
-                <RailItem key={d.id}>
-                  <Link
-                    to="/deals/$dealId"
-                    params={{ dealId: d.id }}
-                    className="focus-ring min-w-0 flex-1 truncate hover:underline"
-                  >
-                    {d.name}
-                  </Link>
-                  {d.stage && stageDef ? (
-                    <OptionChip
-                      def={stageDef}
-                      id={d.stage}
-                      className="shrink-0"
-                    />
-                  ) : null}
-                </RailItem>
-              ))}
+            <RelationSection
+              label="Associated deals"
+              rows={deals}
+              empty="Watching only."
+              lane={(d) => {
+                const stage = company.dealStages[d.id]
+                return stage && stageDef ? (
+                  <OptionChip def={stageDef} id={stage} className="shrink-0" />
+                ) : null
+              }}
+            >
               <CreateDealDialog
                 registry={dealRegistry}
                 presetCompany={{ id: company.id, name: company.name }}
                 trigger={<DetailsAddRow>New deal…</DetailsAddRow>}
               />
-            </RailSection>
+            </RelationSection>
+
+            <RelationSections
+              defs={registry}
+              halves={company.relations}
+              skip={['team', 'associated_deals']}
+              onAdd={async (slug, value) => {
+                await updateRecord({
+                  data: { id: company.id, patch: { [slug]: value } },
+                })
+                void router.invalidate()
+              }}
+            />
 
             <RecordSpacesSection
               entityId={company.id}

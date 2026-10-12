@@ -87,8 +87,9 @@ export const ReadLive = (
         string,
         (typeof record.attributes)[number]['value']
       > = {}
+      // Stored values only: a relationship's inverse half stays MCP's. (D69)
       for (const a of record.attributes)
-        if (a.value !== null) values[a.slug] = a.value
+        if (a.value !== null && a.derived !== true) values[a.slug] = a.value
       const result: ReadEntity = {
         id: record.id,
         kind: record.kind,
