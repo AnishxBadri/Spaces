@@ -1,9 +1,12 @@
 import { Cause, Effect, Exit, Option } from 'effect'
-import { tool } from 'ai'
+import { jsonSchema, tool } from 'ai'
 import type { LanguageModel, ToolSet } from 'ai'
 import { z } from 'zod'
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '@spaces/db'
+import { jsonRecord, jsonValue } from '@spaces/core/json'
+import type { Json } from '@spaces/core/json'
+import type { FetchLike } from '@spaces/core/writes/ports/http'
 import { askThread, askTurn, entity, objectDef } from '@spaces/db/schema'
 import { parseRef } from '@spaces/core/context/ref'
 import { addStepProgram, closeRunProgram, openRunProgram } from '#/lib/ai/run'
@@ -21,6 +24,20 @@ import type { ToolCaller } from '#/lib/mcp/registry'
 import { recordPath } from '#/lib/record-path'
 import { citedRefs } from './answer'
 import { storeCardsProgram } from './card-store'
+import {
+  SHOW_COMPANIES,
+  SHOW_COMPANIES_DESCRIPTION,
+  findTableProgram,
+  showCompaniesShape,
+  urlKey,
+} from './find'
+import {
+  PluginCallRefused,
+  mountProgram,
+  mountablesProgram,
+  toolKey,
+} from './mount'
+import type { MountedServer } from './mount'
 import {
   SCOPE_DROPPED,
   entityChips,
@@ -44,6 +61,7 @@ import type {
   AskRef,
   AskScopeChip,
   AskTurnState,
+  AskVia,
 } from './types'
 
 /**
@@ -75,6 +93,8 @@ export type AskInput = {
   scope: ReadonlyArray<AskScopeChip>
   /** The test seam: an injected model replaces the vault lookup. */
   model?: LanguageModel
+  /** The test seam: a fake network under a mounted plugin's real throttle. */
+  pluginFetch?: FetchLike
   abortSignal?: AbortSignal
 }
 
@@ -127,7 +147,11 @@ const writeTurnsProgram = Effect.fn('ask.writeTurns')(function* (
   const earlier =
     own === null
       ? []
-      : yield* turnViewsProgram(input.userId, yield* threadTurnsProgram(own.id))
+      : yield* turnViewsProgram(
+          input.userId,
+          yield* threadTurnsProgram(own.id),
+          'stored',
+        )
   const history = earlier
     .filter((t) => !t.hidden && t.body.trim() !== '')
     .slice(-HISTORY_TURNS * 2)
@@ -215,11 +239,26 @@ const gateOf = Effect.fn('ask.gate')(function* (
   return { sensitive: false, via: null }
 })
 
-const TASK = (input: AskInput, turn: TurnScope, history: string): string => {
+/** What the model is told about the mounted web tools; empty with none. */
+const webSentence = (servers: ReadonlyArray<MountedServer>): string =>
+  servers.length === 0
+    ? ''
+    : [
+        `The open web is in scope through ${servers.map((s) => s.source.name).join(' and ')}: ${servers.flatMap((s) => s.tools.map((t) => toolKey(s.source.pluginId, t.name))).join(', ')}. Use them only for what the workspace cannot answer.`,
+        `When the reader asks which companies match a description, search the web, then call ${SHOW_COMPANIES} with the companies found: the table is the answer, so never list them as prose — follow it with a sentence or two at most. A web result is not a record until the reader adds it, and needs no citation.`,
+      ].join(' ')
+
+const TASK = (
+  input: AskInput,
+  turn: TurnScope,
+  history: string,
+  web: string,
+): string => {
   return [
     'You answer questions about the reader’s own deal-management workspace: companies, people, deals, notes, documents, spaces and the portfolio.',
     'Use the tools to look things up; never answer from memory. Counts, filters and money come from query_records and the portfolio tools, never from your own arithmetic over a sample.',
     ...scopeSentences(input.scope, turn),
+    web,
     'Cite every sentence that states a fact, right after it, in square brackets: a record as [record:<id>] with the id a tool returned, and a context item by the ref it carries, exactly as written — for example [note:<id>] or [doc:<id>#3]. Several refs share one bracket, separated by commas.',
     'A sentence you cannot cite does not belong in the answer. If nothing was found, say so in one line and name what you searched.',
     'Write markdown: short paragraphs, `- ` bullets, and a pipe table for a list of records. No title line, no code fence.',
@@ -381,6 +420,22 @@ function openFailure(
 /** Raised inside a tool when a cloud attempt finds something sensitive. */
 class Escalate extends Error {}
 
+/** A web tool's arguments in a few words, for the call strip. */
+const inputWords = (args: { readonly [k: string]: Json }): string => {
+  const first = ['query', 'q', 'url', 'urls']
+    .flatMap((k) => (Object.hasOwn(args, k) ? [args[k]] : []))
+    .at(0)
+  const text =
+    typeof first === 'string'
+      ? first
+      : Array.isArray(first)
+        ? first.filter((v) => typeof v === 'string').join(', ')
+        : ''
+  return text === ''
+    ? ''
+    : `“${text.length > 60 ? `${text.slice(0, 59)}…` : text}”`
+}
+
 /** A tool failure's sentence, as the model is handed it. */
 const failureSentence = (cause: Cause.Cause<{ message: string }>): string => {
   const failure = Cause.findErrorOption(cause)
@@ -443,6 +498,76 @@ export async function* askEvents(asked: AskInput): AsyncGenerator<AskEvent> {
     calls.set(`scope-${i}`, call)
     yield { type: 'call', id: `scope-${i}`, call }
   }
+
+  // The web chip mounts each running plugin's MCP server — unless the
+  // scope is sensitive, which unmounts them all before any call. (D72)
+  const webAsked = input.scope.some((c) => c.kind === 'web')
+  const sources = webAsked
+    ? await Effect.runPromise(
+        mountablesProgram().pipe(Effect.orElseSucceed(() => [])),
+      )
+    : []
+  let servers: ReadonlyArray<MountedServer> = []
+  const unmounted = new Set<string>()
+  const unmount = (
+    via: AskVia,
+    reason = `Sensitive material never reaches ${via.name}`,
+  ): { id: string; call: AskCall } => {
+    unmounted.add(via.integrationId)
+    const call: AskCall = {
+      tool: 'web',
+      state: 'unmounted',
+      input: '',
+      found: null,
+      via,
+      reason,
+    }
+    calls.set(`mount-${via.integrationId}`, call)
+    return { id: `mount-${via.integrationId}`, call }
+  }
+  if (sources.length > 0 && gate.sensitive)
+    for (const s of sources) {
+      const { id, call } = unmount({
+        integrationId: s.integrationId,
+        name: s.name,
+      })
+      yield { type: 'call', id, call }
+    }
+  else if (sources.length > 0) {
+    // The answer row is written and the run open: nothing here may throw
+    // past the region that settles them, so even a defect means no tools.
+    const exit = await Effect.runPromiseExit(
+      mountProgram(sources, {
+        runId: begun.runId,
+        ...(input.pluginFetch === undefined
+          ? {}
+          : { fetch: input.pluginFetch }),
+      }),
+    )
+    const mounted = Exit.isSuccess(exit)
+      ? exit.value
+      : {
+          servers: [],
+          failed: sources.map((s) => ({
+            source: s,
+            reason: `${s.name} could not be mounted`,
+          })),
+        }
+    servers = mounted.servers
+    for (const f of mounted.failed) {
+      const { id, call } = unmount(
+        { integrationId: f.source.integrationId, name: f.source.name },
+        f.reason,
+      )
+      yield { type: 'call', id, call }
+    }
+  }
+  /** Pages the plugin calls returned, with the integration each came through. */
+  const seenPages = new Map<string, AskVia>()
+  /** A mounted tool's key, as the model calls it, to its name and server. */
+  const mountedTools = new Map<string, { tool: string; via: AskVia }>()
+  /** Set once a find table has rows: the table is the answer. */
+  const shown = { find: false }
   const touched = new Set<string>()
   const seen = new Set<string>()
   let text = ''
@@ -563,6 +688,101 @@ export async function* askEvents(asked: AskInput): AsyncGenerator<AskEvent> {
           },
         })
 
+      // A turn gone sensitive mid-way leaves its web tools out.
+      if (gate.sensitive)
+        for (const server of servers)
+          if (!unmounted.has(server.source.integrationId)) {
+            const { id, call } = unmount({
+              integrationId: server.source.integrationId,
+              name: server.source.name,
+            })
+            yield { type: 'call', id, call }
+          }
+      for (const server of gate.sensitive ? [] : servers) {
+        const via: AskVia = {
+          integrationId: server.source.integrationId,
+          name: server.source.name,
+        }
+        for (const t of server.tools) {
+          const key = toolKey(server.source.pluginId, t.name)
+          mountedTools.set(key, { tool: t.name, via })
+          tools[key] = tool({
+            description: `${t.description} (via ${via.name})`,
+            inputSchema: jsonSchema<{ [k: string]: Json }>(t.inputSchema),
+            execute: async (raw, { toolCallId }) => {
+              const args = jsonRecord(jsonValue.catch({}).parse(raw))
+              const words = inputWords(args)
+              if (gate.sensitive) {
+                calls.set(toolCallId, {
+                  tool: t.name,
+                  state: 'unmounted',
+                  input: words,
+                  found: null,
+                  via,
+                })
+                return {
+                  error: `${via.name} is unmounted: this turn read something sensitive`,
+                }
+              }
+              const exit = await Effect.runPromiseExit(
+                server.call(t.name, args),
+              )
+              if (Exit.isFailure(exit)) {
+                const failure = Cause.findErrorOption(exit.cause)
+                const reason = failureSentence(exit.cause)
+                calls.set(toolCallId, {
+                  tool: t.name,
+                  state:
+                    Option.isSome(failure) &&
+                    failure.value instanceof PluginCallRefused
+                      ? 'refused'
+                      : 'failed',
+                  input: words,
+                  found: null,
+                  via,
+                  reason,
+                })
+                return { error: reason }
+              }
+              const answer = exit.value
+              for (const u of answer.urls) seenPages.set(urlKey(u), via)
+              calls.set(toolCallId, {
+                tool: t.name,
+                state: answer.isError ? 'failed' : 'done',
+                input: words,
+                // A failed search found nothing, not zero: the turn is not "empty".
+                found: answer.isError ? null : answer.urls.length,
+                via,
+              })
+              return answer.isError ? { error: answer.text } : answer.text
+            },
+          })
+        }
+      }
+      if (!gate.sensitive && servers.length > 0)
+        tools[SHOW_COMPANIES] = tool({
+          description: SHOW_COMPANIES_DESCRIPTION,
+          inputSchema: z.object(showCompaniesShape),
+          execute: async ({ companies }, { toolCallId }) => {
+            const made = await Effect.runPromise(
+              findTableProgram(companies, {
+                seen: seenPages,
+                space: narrowing.space,
+              }),
+            )
+            const { table } = made
+            calls.set(toolCallId, {
+              tool: SHOW_COMPANIES,
+              state: 'done',
+              input: `${String(companies.length)} companies`,
+              found: table.rows.length,
+              ...(table.rows.length + table.hidden > 0 ? { find: table } : {}),
+            })
+            if (table.rows.length > 0) shown.find = true
+            return made.value
+          },
+        })
+
       const ready = await Effect.runPromise(
         Effect.result(
           openStreamProgram('synthesize', [], {
@@ -570,7 +790,12 @@ export async function* askEvents(asked: AskInput): AsyncGenerator<AskEvent> {
             sensitivity: gate.sensitive ? 'sensitive' : 'normal',
             ...(gate.via === null ? {} : { via: gate.via }),
             budgetChars: ASK_BUDGET_CHARS,
-            task: TASK(input, narrowing, begun.history),
+            task: TASK(
+              input,
+              narrowing,
+              begun.history,
+              webSentence(gate.sensitive ? [] : servers),
+            ),
             runId: begun.runId,
             tools,
             maxSteps: ASK_MAX_STEPS,
@@ -611,13 +836,17 @@ export async function* askEvents(asked: AskInput): AsyncGenerator<AskEvent> {
           // time a part is read here, `execute` may already have settled the
           // call. A settled entry is never overwritten by an earlier part.
           const held = calls.get(part.toolCallId)
+          const mountedTool = mountedTools.get(part.toolName)
           const call: AskCall =
             part.type === 'tool-call'
               ? (held ?? {
-                  tool: part.toolName,
+                  tool: mountedTool?.tool ?? part.toolName,
                   state: 'running',
                   input: '',
                   found: null,
+                  ...(mountedTool === undefined
+                    ? {}
+                    : { via: mountedTool.via }),
                 })
               : held === undefined
                 ? {
@@ -657,7 +886,11 @@ export async function* askEvents(asked: AskInput): AsyncGenerator<AskEvent> {
         ),
       )
       const retrieval = [...calls.values()].filter(
-        (c) => c.tool !== 'list_registry' && c.tool !== SCOPE_DROPPED,
+        (c) =>
+          c.tool !== 'list_registry' &&
+          c.tool !== SCOPE_DROPPED &&
+          // A mount cell says what was held back, not what was searched.
+          !(c.tool === 'web' && c.via !== undefined && c.input === ''),
       )
       const empty =
         refs.length === 0 &&
@@ -668,7 +901,7 @@ export async function* askEvents(asked: AskInput): AsyncGenerator<AskEvent> {
         ? 'failed'
         : empty
           ? 'empty'
-          : answerText === ''
+          : answerText === '' && !shown.find
             ? 'failed'
             : 'answered'
       // Cards stand only beside an answer: stored now, they are Review items.

@@ -450,6 +450,62 @@ describe('manifestSchema', () => {
     })
   })
 
+  describe('mcp', () => {
+    const withMcp = (mcp: unknown) => ({
+      ...base(),
+      requires: { credential: { kind: 'search', scope: 'workspace' } },
+      mcp,
+    })
+
+    it('accepts an https server keyed through a header', () => {
+      expect(
+        issues(
+          withMcp({
+            url: 'https://mcp.exa.ai/mcp?tools=web_search_exa',
+            auth: { header: 'x-api-key' },
+          }),
+        ),
+      ).toEqual([])
+      expect(
+        issues(
+          withMcp({
+            url: 'https://example.com/mcp',
+            auth: { header: 'Authorization', scheme: 'Bearer' },
+          }),
+        ),
+      ).toEqual([])
+    })
+
+    it('refuses a plain-http url and a header that is not one', () => {
+      expect(
+        issues(
+          withMcp({
+            url: 'http://example.com/mcp',
+            auth: { header: 'x-api-key' },
+          }),
+        ),
+      ).toEqual(['mcp.url: mcp.url is an https URL'])
+      expect(
+        issues(
+          withMcp({
+            url: 'https://example.com/mcp',
+            auth: { header: 'x api key' },
+          }),
+        ),
+      ).toEqual(['mcp.auth.header: mcp.auth.header is an HTTP header name'])
+    })
+
+    it('needs a workspace credential for its key', () => {
+      const m = withMcp({
+        url: 'https://example.com/mcp',
+        auth: { header: 'x-api-key' },
+      })
+      expect(issues({ ...m, requires: undefined })).toEqual([
+        'mcp: an mcp server needs requires.credential — its key comes from the vault, never the manifest',
+      ])
+    })
+  })
+
   it('carries the rest of the §3 shape', () => {
     const m = {
       ...base(),

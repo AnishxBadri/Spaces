@@ -20,7 +20,9 @@ import { SCOPE_DROPPED } from '#/lib/ask/scope'
 import { scopeKey, scopeWords } from '#/lib/ask/types'
 import { cn } from '#/lib/utils'
 import { AskAnswer, RefChip } from './ask-answer'
+import { PluginMark } from '#/components/integrations/integration-ledger'
 import { AskCards } from './ask-card'
+import { FindTable } from './find-table'
 import { MentionTextarea } from './mention-popover'
 import type { AnswerVariant } from './ask-answer'
 
@@ -123,6 +125,7 @@ const CALL_WORD: Record<AskCall['state'], string> = {
   done: '',
   refused: 'refused',
   failed: 'failed',
+  unmounted: 'unmounted',
 }
 
 /** A chip the turn could not resolve: a scope line naming it. */
@@ -142,7 +145,16 @@ export function CallStrip({ calls: all }: { calls: ReadonlyArray<AskCall> }) {
       className="flex flex-wrap gap-x-3 gap-y-1 mono text-micro text-graphite"
     >
       {calls.map((c, i) => (
-        <li key={i} className="flex gap-1.5" title={c.reason}>
+        <li key={i} className="flex items-center gap-1.5" title={c.reason}>
+          {c.via === undefined ? null : (
+            <span
+              className="flex items-center gap-1"
+              title={`via ${c.via.name}`}
+            >
+              <PluginMark name={c.via.name} />
+              <span className="sr-only">{c.via.name}</span>
+            </span>
+          )}
           <span className="text-foreground">{c.tool}</span>
           {c.input === '' ? null : (
             <span className="max-w-40 truncate">{c.input}</span>
@@ -154,6 +166,33 @@ export function CallStrip({ calls: all }: { calls: ReadonlyArray<AskCall> }) {
         </li>
       ))}
     </ul>
+  )
+}
+
+/** The find tables a turn's calls left, each drawn as its own table. (D77) */
+function FindTables({
+  calls,
+  turnId,
+  variant,
+  threadId,
+}: {
+  calls: ReadonlyArray<AskCall>
+  turnId: string | null
+  variant: AnswerVariant
+  threadId: string | null
+}) {
+  return calls.flatMap((c, i) =>
+    c.find === undefined || c.find.rows.length + c.find.hidden === 0
+      ? []
+      : [
+          <FindTable
+            key={i}
+            table={c.find}
+            turnId={turnId}
+            variant={variant}
+            threadId={threadId}
+          />,
+        ],
   )
 }
 
@@ -258,6 +297,12 @@ export function AnswerTurn({
       ) : (
         body
       )}
+      <FindTables
+        calls={turn.calls}
+        turnId={turn.id}
+        variant={variant}
+        threadId={threadId}
+      />
       <AskCards cards={turn.cards} waiting={waiting} />
       {turn.state === 'stopped' ? (
         <span className="mono text-micro text-graphite">stopped</span>
@@ -322,6 +367,12 @@ export function LiveAnswer({
           </Button>
         </div>
       ) : null}
+      <FindTables
+        calls={live.calls.map((c) => c.call)}
+        turnId={null}
+        variant={variant}
+        threadId={threadId}
+      />
       <AskCards cards={live.cards} />
       <CallStrip calls={live.calls.map((c) => c.call)} />
       {live.route === null ? null : (

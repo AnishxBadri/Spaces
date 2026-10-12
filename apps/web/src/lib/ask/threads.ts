@@ -17,8 +17,10 @@ import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import { noteBodyFromMarkdown } from '#/lib/notes/markdown-blocks'
 import { answerBlocks, answerMarkdown } from './answer'
 import { AskCardRefused, cardViewsProgram } from './card-store'
+import { liveCallsProgram } from './find'
 import { AskQueryFailed, askQuery } from './query'
 import type {
+  AskCall,
   AskCardView,
   AskRef,
   AskThreadRow,
@@ -108,13 +110,14 @@ export function turnView(
   row: TurnRow,
   hidden: boolean,
   cards: ReadonlyArray<AskCardView> = [],
+  calls: ReadonlyArray<AskCall> = row.calls,
 ): AskTurnView {
   return {
     id: row.id,
     role: row.role,
     body: hidden ? '' : row.bodyMd,
     refs: hidden ? [] : row.refs,
-    calls: row.calls,
+    calls,
     cards: hidden ? [] : cards,
     scope: row.scope,
     state: row.state,
@@ -125,10 +128,15 @@ export function turnView(
   }
 }
 
-/** Turns as views, each answer checked against what the reader can read. */
+/**
+ * Turns as views, each answer checked against what the reader can read.
+ * `finds: 'stored'` keeps find tables as asked — for a reader of the text
+ * alone, such as the next question's history.
+ */
 export const turnViewsProgram = Effect.fn('ask.turnViews')(function* (
   userId: string,
   rows: ReadonlyArray<TurnRow>,
+  finds: 'live' | 'stored' = 'live',
 ): Effect.fn.Return<Array<AskTurnView>, AskQueryFailed> {
   const evidenceOf = (r: TurnRow) =>
     r.calls.flatMap((c) => (c.card === undefined ? [] : c.card.evidence))
@@ -141,6 +149,11 @@ export const turnViewsProgram = Effect.fn('ask.turnViews')(function* (
       r.calls.flatMap((c) => (c.card === undefined ? [] : [c.card])),
     ),
   )
+  // A find table reads each row's standing as it is now. (D77)
+  const live = new Map<string, ReadonlyArray<AskCall>>()
+  for (const r of finds === 'live' ? rows : [])
+    if (r.calls.some((c) => c.find !== undefined))
+      live.set(r.id, yield* liveCallsProgram(r.calls))
   return rows.map((r) =>
     turnView(
       r,
@@ -151,6 +164,7 @@ export const turnViewsProgram = Effect.fn('ask.turnViews')(function* (
           c.card === undefined ? undefined : cards.get(c.card.suggestionId)
         return view === undefined ? [] : [view]
       }),
+      live.get(r.id) ?? r.calls,
     ),
   )
 })

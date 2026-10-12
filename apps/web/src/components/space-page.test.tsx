@@ -46,6 +46,7 @@ vi.mock('#/lib/server-fns', () => {
   const names = [
     'addSpaceWatch',
     'archiveSpace',
+    'askWebSources',
     'clipUrl',
     'createNote',
     'createSpace',
@@ -1059,6 +1060,32 @@ describe("What's moving", () => {
       's4',
       's5',
     ])
+  })
+})
+
+describe('Find companies', () => {
+  it('opens Ask docked with the web in scope and the question prefilled from the criteria', async () => {
+    const { forgetWebSources } = await import('#/lib/ask/web-sources')
+    const { readDock } = await import('#/lib/ask/dock-store')
+    forgetWebSources()
+    fns
+      .get('askWebSources')
+      .mockResolvedValue([{ integrationId: 'i', pluginId: 'exa', name: 'Exa' }])
+    await mount('notes', undefined, undefined, {
+      space: { ...spc, criteria: 'Software for landlords in India.' },
+    })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    await chooseFromMenu('Find companies')
+    const dock = readDock()
+    expect(dock.open).toBe(true)
+    expect(dock.web).toBe(true)
+    expect(dock.draft).toBe(
+      'Find companies that match: Software for landlords in India.',
+    )
+    forgetWebSources()
+    fns.get('askWebSources').mockResolvedValue([])
   })
 })
 

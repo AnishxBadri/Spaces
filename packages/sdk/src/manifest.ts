@@ -159,6 +159,29 @@ const actionSchema = z.strictObject({
     .optional(),
 })
 
+/** An HTTP header name, as `auth.header` spells the one the key goes in. */
+const HEADER_NAME = /^[A-Za-z0-9][A-Za-z0-9-]*$/
+
+/**
+ * A plugin's remote MCP server, which Ask mounts for a turn while the
+ * integration runs. (D72, SDK 1.5)
+ * - `url` is https: the workspace key travels with every call.
+ * - `auth.header` names the header the key from `requires.credential` goes
+ *   in, never the URL, so no error line can carry it; `scheme` prefixes it.
+ */
+const mcpSchema = z.strictObject({
+  url: z.url({
+    protocol: /^https$/,
+    error: 'mcp.url is an https URL',
+  }),
+  auth: z.strictObject({
+    header: z.string().regex(HEADER_NAME, {
+      error: 'mcp.auth.header is an HTTP header name',
+    }),
+    scheme: z.literal('Bearer').optional(),
+  }),
+})
+
 /** The on-disk manifest (`manifest.json`). */
 export const manifestSchema = z
   .strictObject(
@@ -221,6 +244,7 @@ export const manifestSchema = z
         })
         .optional(),
       provides: z.literal('storage-source').optional(),
+      mcp: mcpSchema.optional(),
       sensitivity: z.literal('inherit').optional(),
     },
     {
@@ -297,6 +321,14 @@ export const manifestSchema = z
         code: 'custom',
         path: ['jobs', watches[1][0]],
         message: `a plugin declares at most one watch job — a watch names its plugin, not a job — and this one declares ${watches.map(([n]) => n).join(', ')}`,
+      })
+    }
+    if (m.mcp !== undefined && m.requires?.credential === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['mcp'],
+        message:
+          'an mcp server needs requires.credential — its key comes from the vault, never the manifest',
       })
     }
     const hasWebhook = jobs.some(([, j]) => j.trigger === 'webhook')

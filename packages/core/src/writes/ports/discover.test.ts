@@ -16,7 +16,12 @@ import type { DiscoverClaim, Ref } from '@spaces/sdk'
 import { readAddRecordPayload, readFileRecordPayload } from '../../ai/discovery'
 import { previewResolve, resolveEntity } from '../entities/resolve'
 import type { PreviewResolveInput } from '../entities/resolve'
-import { DiscoverBinder, DiscoverLive, discoverWith } from './discover'
+import {
+  DiscoverBinder,
+  DiscoverLive,
+  discoverWith,
+  standingWith,
+} from './discover'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 /**
@@ -242,6 +247,56 @@ describe('Discover.candidate — the three checks', () => {
     ])
     expect(card?.watchIds).toEqual([first, second])
     expect(cards.at(0)?.refs).toEqual(['event:sig-1', 'event:sig-2'])
+  })
+})
+
+describe('standingWith — a found company read against what is held', () => {
+  it('reads filed, held, unknown and dismissed for a space, and writes nothing', async () => {
+    const launch = await aSpace('Launch')
+    const reentry = await aSpace('Re-entry', launch)
+    const elsewhere = await aSpace('Elsewhere')
+    const t = tag()
+    const varda = await aCompany('Varda', `varda${t}.com`)
+    await file(varda, reentry.id)
+    const redwire = await aCompany('Redwire', `redwire${t}.com`)
+    await file(redwire, elsewhere.id)
+    await db.insert(spaceWatchDismissal).values({
+      spaceId: launch.id,
+      domain: `gone${t}.com`,
+      dismissedBy: FIXTURE_ACTOR.id,
+    })
+    const read = (name: string, domain: string, spaceId: string | null) =>
+      standingWith({ name, domain, spaceId })
+
+    expect(
+      await read('Varda', `https://www.varda${t}.com/`, launch.id),
+    ).toEqual({ standing: 'filed', entityId: varda })
+    expect(await read('Redwire', `redwire${t}.com`, launch.id)).toEqual({
+      standing: 'held',
+      entityId: redwire,
+    })
+    expect(await read('Nova', `nova${t}.com`, launch.id)).toEqual({
+      standing: 'unknown',
+    })
+    expect(await read('Gone', `gone${t}.com`, launch.id)).toEqual({
+      standing: 'dismissed',
+    })
+    // With no space, a held company is held wherever it is filed, and a
+    // dismissal belongs to its space alone.
+    expect(await read('Varda', `varda${t}.com`, null)).toEqual({
+      standing: 'held',
+      entityId: varda,
+    })
+    expect(await read('Gone', `gone${t}.com`, null)).toEqual({
+      standing: 'unknown',
+    })
+    expect(await cardsFor(launch.id)).toEqual([])
+  })
+
+  it('refuses a domain that names no company', async () => {
+    await expect(
+      standingWith({ name: 'X', domain: 'not a domain', spaceId: null }),
+    ).rejects.toMatchObject({ _tag: 'SuggestionInvalid' })
   })
 })
 

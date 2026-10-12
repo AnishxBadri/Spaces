@@ -27,6 +27,8 @@ export type DockState = {
   readonly cleared: string | null
   /** Chips `@` added, after the page's own. */
   readonly mentioned: ReadonlyArray<AskScopeChip>
+  /** The web chip: on until the reader removes it; a door may turn it on. */
+  readonly web: boolean
 }
 
 const KEY = 'spaces.ask.dock'
@@ -39,6 +41,7 @@ const INITIAL: DockState = {
   focus: 0,
   cleared: null,
   mentioned: [],
+  web: true,
 }
 
 export const clampWidth = (w: number): number =>
@@ -114,6 +117,8 @@ export type OpenAsk = {
   draft?: string
   /** A thread to show; omitted keeps the one held. */
   threadId?: string | null
+  /** Put the web back in scope: Find companies. */
+  web?: boolean
 }
 
 /** Every door: Tab from Cmd-K, ⌘J, the sidebar row, "Ask about this". */
@@ -125,6 +130,7 @@ export function openAsk(opts: OpenAsk = {}) {
     focus: state.focus + 1,
     cleared: null,
     ...(opts.threadId === undefined ? {} : { threadId: opts.threadId }),
+    ...(opts.web === true ? { web: true } : {}),
   })
 }
 
@@ -158,4 +164,13 @@ export function removeMention(chip: AskScopeChip) {
   set({
     mentioned: state.mentioned.filter((c) => chipKey(c) !== chipKey(chip)),
   })
+}
+
+/** Remove the web chip: the next turn mounts no plugin. */
+export const clearWeb = () => set({ web: false })
+
+/** The dock as it stands, outside React. */
+export function readDock(): DockState {
+  hydrate()
+  return state
 }

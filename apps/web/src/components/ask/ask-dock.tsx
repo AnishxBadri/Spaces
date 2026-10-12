@@ -7,6 +7,7 @@ import {
   DOCK_MIN,
   addMention,
   clearPageChip,
+  clearWeb,
   closeAsk,
   removeMention,
   setDockThread,
@@ -19,7 +20,9 @@ import {
   dockScope,
   pageScope,
   usePageSubject,
+  withWeb,
 } from '#/lib/ask/page-scope'
+import { useWebSources } from '#/lib/ask/web-sources'
 import type { AskScopeChip } from '#/lib/ask/types'
 import { usePageActionsList } from '#/lib/page-actions'
 import { AskComposer, AskTurns, SaveAsNote, useAskThread } from './ask-thread'
@@ -42,11 +45,12 @@ export function usePageChip(): AskScopeChip | null {
   return subject ?? pageScope(pathname, name)
 }
 
-/** The scope a question here is asked in. */
+/** The scope a question here is asked in; the web while a plugin can mount. */
 export function useDockScope(): ReadonlyArray<AskScopeChip> {
   const page = usePageChip()
-  const { cleared, mentioned } = useAskDock()
-  return dockScope(page, cleared, mentioned)
+  const { cleared, mentioned, web } = useAskDock()
+  const sources = useWebSources()
+  return withWeb(dockScope(page, cleared, mentioned), web, sources.length > 0)
 }
 
 /** The chips a question narrows to; each one removable, none a mode. */
@@ -74,8 +78,12 @@ export function ScopeChips({
           {onRemove === undefined ? null : (
             <button
               type="button"
-              aria-label={`Ask beyond ${c.name}`}
-              title={`Ask beyond ${c.name}`}
+              aria-label={
+                c.kind === 'web' ? 'Leave the web out' : `Ask beyond ${c.name}`
+              }
+              title={
+                c.kind === 'web' ? 'Leave the web out' : `Ask beyond ${c.name}`
+              }
               onClick={() => onRemove(c)}
               className="focus-ring -mr-0.5 text-graphite hover:text-foreground"
             >
@@ -191,6 +199,7 @@ export function AskDock() {
           <ScopeChips
             scope={scope}
             onRemove={(chip) => {
+              if (chip.kind === 'web') clearWeb()
               if (page !== null && chipKey(page) === chipKey(chip))
                 clearPageChip(chip)
               removeMention(chip)

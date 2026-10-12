@@ -1,7 +1,7 @@
 import { Window } from 'happy-dom'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import type { AskCardView, AskTurnView } from '#/lib/ask/types'
+import type { AskCardView, AskFindRow, AskTurnView } from '#/lib/ask/types'
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({
@@ -26,6 +26,7 @@ vi.mock('#/lib/server-fns', () => ({
   saveAskAnswerAsNote: vi.fn(),
   applyAskCard: vi.fn(),
   skipAskCard: vi.fn(),
+  actOnFindRow: vi.fn(),
 }))
 
 const { AskTurns, AskComposer, applyAskEvent, settledThread } =
@@ -337,5 +338,78 @@ describe('action cards', () => {
     const host = withCards([card({ evidence: [] })])
     expect(host.querySelector('[data-card]')).toBeNull()
     expect(host.textContent).toContain('A card with no evidence was left out.')
+  })
+})
+
+describe('a find table', () => {
+  const via = { integrationId: 'exa', name: 'Exa' }
+  const row = (name: string, standing: AskFindRow['standing']): AskFindRow => ({
+    name,
+    domain: `${name.toLowerCase()}.example`,
+    line: `${name} does rentals`,
+    place: 'Bengaluru',
+    sources: [{ url: `https://${name.toLowerCase()}.example/` }],
+    via,
+    standing,
+    entityId: standing === 'unknown' ? null : ACME,
+  })
+  const withTable = (rows: Array<AskFindRow>, hidden: number) =>
+    render([
+      question('q1', 'Rental software startups in India'),
+      answer('a1', {
+        body: 'Fourteen operators turned up.',
+        calls: [
+          {
+            tool: 'web_search_exa',
+            state: 'done',
+            input: '“rental software”',
+            found: 14,
+            via,
+          },
+          {
+            tool: 'web',
+            state: 'unmounted',
+            input: '',
+            found: null,
+            via,
+          },
+          {
+            tool: 'show_companies',
+            state: 'done',
+            input: '16 companies',
+            found: rows.length,
+            find: { space: { id: 's', name: 'Property ops' }, rows, hidden },
+          },
+        ],
+      }),
+    ])
+
+  it('greys a filed row with no control, offers File here and Add, and folds past twelve', () => {
+    const rows = [
+      row('Leasewise', 'filed'),
+      row('Keyhold', 'held'),
+      ...Array.from({ length: 12 }, (_, i) => row(`Op${String(i)}`, 'unknown')),
+    ]
+    const host = withTable(rows, 2)
+    const trs = [...host.querySelectorAll('tbody tr')]
+    expect(trs).toHaveLength(12)
+    const filed = host.querySelector('tr[data-standing="filed"]')
+    expect(filed?.querySelectorAll('button')).toHaveLength(0)
+    expect(filed?.textContent).toContain('filed')
+    const held = host.querySelector('tr[data-standing="held"]')
+    expect(held?.textContent).toContain('File here')
+    expect(
+      host.querySelector('tr[data-standing="unknown"]')?.textContent,
+    ).toContain('Add')
+    expect(host.textContent).toContain('+2 more · 2 hidden')
+    expect(host.textContent).toContain('Exa')
+  })
+
+  it('marks a plugin call with its provider in the strip, and an unmounted cell as such', () => {
+    const host = withTable([row('Leasewise', 'filed')], 0)
+    const strip = host.querySelector('[aria-label="Tools called"]')
+    expect(strip?.textContent).toContain('web_search_exa')
+    expect(strip?.textContent).toContain('unmounted')
+    expect(strip?.querySelector('[title="via Exa"]')).not.toBeNull()
   })
 })

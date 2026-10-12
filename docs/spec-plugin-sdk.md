@@ -136,6 +136,7 @@ bundle.
   actions?: [{ id, label, on: 'company' | 'person' | 'deal', job }],  // "Enrich" button → an action-trigger job
   http?: { rateLimit?: { rpm: n } },
   provides?: 'storage-source',           // §5 — a provider interface core calls into; not a job
+  mcp?: { url: https, auth: { header, scheme?: 'Bearer' } },  // D72 — a remote MCP server Ask mounts; needs requires.credential (SDK 1.5)
   sensitivity?: 'inherit',               // storage-source bindings may override per binding
 }
 ```

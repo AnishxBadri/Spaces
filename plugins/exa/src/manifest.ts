@@ -26,6 +26,8 @@ export const watchSettings = z.object({
  *   `x-api-key` header.
  * - Without the workspace `search` key the host degrades the integration,
  *   so the Research action is absent rather than failing when pressed.
+ * - `mcp` is Exa's hosted MCP server, which Ask mounts for a turn with the
+ *   web in scope: fast search only — websets stay the watch's. (D77)
  */
 export const manifest = defineManifest({
   manifestVersion: 1,
@@ -35,7 +37,7 @@ export const manifest = defineManifest({
   name: 'Exa',
   roles: ['research'],
   description:
-    'Researches a company on the open web through Exa: each page found becomes a web signal on the record, and a short brief citing them waits in Review as a note to accept. Watches a space through an Exa webset: each company found waits in Review as a card under the space, and a page about a company already filed there becomes a web signal on it. Sends Exa the company name and domain, and for a watch the space’s criteria, its nearest memo and its companies’ domains.',
+    'Researches a company on the open web through Exa: each page found becomes a web signal on the record, and a short brief citing them waits in Review as a note to accept. Watches a space through an Exa webset: each company found waits in Review as a card under the space, and a page about a company already filed there becomes a web signal on it. Sends Exa the company name and domain, and for a watch the space’s criteria, its nearest memo and its companies’ domains. Finds companies in Ask: with the web in scope a question is searched through Exa’s MCP server, and the companies it finds come back as a table to add or file — Exa is sent the search the question becomes, never from a sensitive scope.',
   requires: { credential: { kind: 'search', scope: 'workspace' } },
   settings: z.object({
     maxResults: z
@@ -77,4 +79,8 @@ export const manifest = defineManifest({
   // A ceiling well under Exa's published search limit; HttpLive also follows
   // the rate-limit headers it answers with.
   http: { rateLimit: { rpm: 60 } },
+  mcp: {
+    url: 'https://mcp.exa.ai/mcp?tools=web_search_exa,web_search_advanced_exa',
+    auth: { header: 'x-api-key' },
+  },
 })

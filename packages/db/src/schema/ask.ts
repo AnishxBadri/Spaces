@@ -40,7 +40,45 @@ export type AskRef = {
   entityId: string | null
 }
 
-export type AskCallState = 'running' | 'done' | 'refused' | 'failed'
+/**
+ * A call's state. `unmounted`: a plugin's tool held back before any call,
+ * because the turn's scope is sensitive. (D72)
+ */
+export type AskCallState =
+  'running' | 'done' | 'refused' | 'failed' | 'unmounted'
+
+/** The integration a plugin's tool call went through, as the strip marks it. */
+export type AskVia = { integrationId: string; name: string }
+
+/** Where a found company stands, as it was read when shown. */
+export type AskFindStanding = 'filed' | 'held' | 'unknown'
+
+/** One company a find turned up: a web result until it is added. (D77) */
+export type AskFindRow = {
+  name: string
+  /** Normalized; the row's key within its table. */
+  domain: string
+  /** What it does, in a line. */
+  line: string
+  place: string | null
+  /** The pages it was found on: one to three, each one a plugin call returned. */
+  sources: ReadonlyArray<{ url: string; title?: string }>
+  via: AskVia
+  standing: AskFindStanding
+  /** The record it is held as; null while unknown. */
+  entityId: string | null
+}
+
+/**
+ * A find's results table. `space` is the turn's space chip, which Add and
+ * file, File here and Dismiss act on; null with none in scope.
+ */
+export type AskFindTable = {
+  space: { id: string; name: string } | null
+  rows: ReadonlyArray<AskFindRow>
+  /** Rows left out because their domain is dismissed from the space. */
+  hidden: number
+}
 
 /** The action cards Ask proposes; the catalogue in `ASK_CARD_CATALOGUE`. (D70) */
 export type AskCardKind =
@@ -81,6 +119,10 @@ export type AskCall = {
   card?: AskCallCard
   /** Why a refused call was refused, when the reader is owed a sentence. */
   reason?: string
+  /** A plugin's tool: the integration it went through. */
+  via?: AskVia
+  /** The results table a `show_companies` call left. */
+  find?: AskFindTable
 }
 
 export const askTurnRole = pgEnum('ask_turn_role', ['user', 'assistant'])

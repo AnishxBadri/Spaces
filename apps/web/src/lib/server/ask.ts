@@ -7,13 +7,18 @@ export type {
   AskCardKind,
   AskCardView,
   AskEvent,
+  AskFindRow,
+  AskFindTable,
   AskRef,
   AskScopeChip,
   AskThreadRow,
   AskThreadView,
   AskTurnState,
   AskTurnView,
+  AskVia,
 } from '../ask/types'
+export type { FindActed } from '../ask/find'
+export type { WebSource } from '../ask/mount'
 
 /**
  * Ask's server fns: a turn streamed as `AskEvent`s, and the thread store —
@@ -35,7 +40,8 @@ export const askQuestion = createServerFn({ method: 'POST' })
     z.object({
       threadId: z.uuid().nullable(),
       question: z.string().trim().min(1).max(4000),
-      scope: z.array(scopeChip).max(4),
+      // Four chips the reader chose, and the web.
+      scope: z.array(scopeChip).max(5),
     }),
   )
   .handler(async ({ data }) => {
@@ -139,4 +145,55 @@ export const skipAskCard = createServerFn({ method: 'POST' })
     const { skipCardProgram } = await import('../ask/card-store')
     const { effectFn } = await import('./effect')
     return run(() => effectFn(skipCardProgram)(user.id, data.suggestionId))
+  })
+
+/**
+ * The plugins whose MCP servers a turn can mount: what lights the dock's
+ * web chip and the space head's Find companies. (D72)
+ */
+export const askWebSources = createServerFn().handler(async () => {
+  await requireUser()
+  const { webSourcesProgram } = await import('../ask/mount')
+  const { effectFn } = await import('./effect')
+  return run(() => effectFn(webSourcesProgram)())
+})
+
+/**
+ * A Find row's verbs, as the reader, on a row of their own answer: Add,
+ * Add and file here / File here (`file`), or Dismiss for the space. (D77)
+ */
+export const actOnFindRow = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      turnId: z.uuid(),
+      domain: z.string().min(1).max(253),
+      act: z.enum(['add', 'file', 'dismiss']),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    const {
+      addFindRowProgram,
+      dismissFindRowProgram,
+      fileFindRowProgram,
+      findMessage,
+    } = await import('../ask/find')
+    const { effectFn } = await import('./effect')
+    try {
+      if (data.act === 'dismiss') {
+        await effectFn(dismissFindRowProgram)(user.id, data.turnId, data.domain)
+        return { act: 'dismiss' as const, acted: null }
+      }
+      const acted =
+        data.act === 'add'
+          ? await effectFn(addFindRowProgram)(user.id, data.turnId, data.domain)
+          : await effectFn(fileFindRowProgram)(
+              user.id,
+              data.turnId,
+              data.domain,
+            )
+      return { act: data.act, acted }
+    } catch (failure) {
+      throw new Error(findMessage(failure))
+    }
   })

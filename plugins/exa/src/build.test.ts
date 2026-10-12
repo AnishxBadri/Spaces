@@ -81,6 +81,10 @@ describe('the exa manifest.json', () => {
       { id: 'research', label: 'Research', on: 'company', job: 'research' },
     ])
     expect(parsed.settings).toEqual(settingsJsonSchema(manifest.settings))
+    expect(parsed.mcp).toEqual({
+      url: 'https://mcp.exa.ai/mcp?tools=web_search_exa,web_search_advanced_exa',
+      auth: { header: 'x-api-key' },
+    })
   })
 
   it('defaults to five pages from the last 90 days', () => {

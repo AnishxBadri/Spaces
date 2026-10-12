@@ -8,6 +8,7 @@ import {
   MessageSquareText,
   Pencil,
   Plus,
+  Search,
   Star,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -60,6 +61,8 @@ import type { SpaceTab } from '#/lib/spaces/page'
 import { useHotkey } from '#/lib/use-hotkey'
 import { runBinding, usePageActions } from '#/lib/page-actions'
 import { openAsk } from '#/lib/ask/dock-store'
+import { findQuestion } from '#/lib/ask/find-view'
+import { useWebSources } from '#/lib/ask/web-sources'
 
 /**
  * A space reads like a record (D73, D74): the head with its stamp, crumb
@@ -228,6 +231,7 @@ export function SpacePageView({
             <SpaceMenu
               id={spc.id}
               name={spc.name}
+              criteria={spc.criteria}
               archived={spc.archive !== null}
               onRename={() => setRenaming(true)}
               onSubspace={() => {
@@ -385,6 +389,7 @@ export function SpacePageView({
 function SpaceMenu({
   id,
   name,
+  criteria,
   archived,
   onRename,
   onSubspace,
@@ -395,6 +400,7 @@ function SpaceMenu({
 }: {
   id: string
   name: string
+  criteria: string | null
   archived: boolean
   onRename: () => void
   onSubspace: () => void
@@ -404,6 +410,8 @@ function SpaceMenu({
   onRestore: () => void
 }) {
   const starred = useStarredSpaces().some((s) => s.id === id)
+  const navigate = useNavigate()
+  const finders = useWebSources()
   useEffect(() => syncStarredSpaceName({ id, name }), [id, name])
   // Save as template: focus goes to the window it opens, not to ···.
   const keepFocus = useRef(false)
@@ -440,6 +448,22 @@ function SpaceMenu({
         <DropdownMenuItem onSelect={() => openAsk()}>
           <MessageSquareText className="size-4" />
           Ask about this
+        </DropdownMenuItem>
+        {/* Opens Ask with this space and the web in scope. (D77) */}
+        <DropdownMenuItem
+          onSelect={() =>
+            finders.length > 0
+              ? openAsk({ draft: findQuestion(name, criteria), web: true })
+              : void navigate({ to: '/settings/plugins' })
+          }
+        >
+          <Search className="size-4" />
+          Find companies
+          {finders.length > 0 ? null : (
+            <span className="ml-auto mono text-micro text-graphite">
+              Add an Exa key ›
+            </span>
+          )}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => toggleStarredSpace({ id, name })}>
           <Star className="size-4" />

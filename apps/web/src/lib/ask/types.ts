@@ -2,9 +2,13 @@ import type {
   AskCall,
   AskCallCard,
   AskCardKind,
+  AskFindRow,
+  AskFindStanding,
+  AskFindTable,
   AskRef,
   AskScopeChip,
   AskTurnState,
+  AskVia,
 } from '@spaces/db/schema/ask'
 import type { AskCardView } from './cards'
 
@@ -13,9 +17,13 @@ export type {
   AskCallCard,
   AskCardKind,
   AskCardView,
+  AskFindRow,
+  AskFindStanding,
+  AskFindTable,
   AskRef,
   AskScopeChip,
   AskTurnState,
+  AskVia,
 }
 
 /**

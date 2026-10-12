@@ -107,6 +107,69 @@ async function filedUnder(entityId: string, path: string): Promise<boolean> {
 }
 
 /**
+ * Where a candidate stands against what is held, read only — the checks a
+ * card would pass, without proposing one. Ask's Find table reads its rows
+ * through it. (D77)
+ * - With a space: dismissed from it, filed in it or below, held elsewhere,
+ *   or unknown.
+ * - Without one (`path` null): held or unknown; nothing is dismissed and
+ *   nothing filed.
+ */
+export type Standing =
+  | { standing: 'dismissed' }
+  | { standing: 'filed'; entityId: string }
+  | { standing: 'held'; entityId: string }
+  | { standing: 'unknown' }
+
+async function standingOf(
+  candidate: { name: string; domain: string },
+  within: { id: string; path: string } | null,
+  deps: DiscoverDeps,
+): Promise<Standing> {
+  if (within !== null && (await isDismissed(db, within.id, candidate.domain)))
+    return { standing: 'dismissed' }
+  const preview = await deps.preview({
+    kind: 'company',
+    name: candidate.name,
+    keys: { domain: candidate.domain },
+  })
+  if (preview.verdict === 'refused')
+    throw invalid([{ slug: 'domain', message: preview.reason }])
+  if (preview.verdict === 'create') return { standing: 'unknown' }
+  return within !== null && (await filedUnder(preview.entityId, within.path))
+    ? { standing: 'filed', entityId: preview.entityId }
+    : { standing: 'held', entityId: preview.entityId }
+}
+
+/**
+ * One found company's standing for a space, or for none. A space that is
+ * gone, merged away or archived reads as none; a domain that names no
+ * company is refused.
+ */
+export async function standingWith(
+  candidate: { name: string; domain: string; spaceId: string | null },
+  deps: DiscoverDeps = liveDeps,
+): Promise<Standing> {
+  const domain = normalizeDomain(candidate.domain)
+  if (domain === null)
+    throw invalid([
+      {
+        slug: 'domain',
+        message: `domain: ${candidate.domain} names no company`,
+      },
+    ])
+  const path =
+    candidate.spaceId === null ? null : await livePath(candidate.spaceId)
+  return standingOf(
+    { name: candidate.name, domain },
+    candidate.spaceId === null || path === null
+      ? null
+      : { id: candidate.spaceId, path },
+    deps,
+  )
+}
+
+/**
  * Run one candidate through the three checks and, when it survives them,
  * propose or merge its card. Throws the propose path's typed refusals, and
  * `DiscoverSpaceRefused` for a space that takes no cards.
@@ -127,21 +190,14 @@ export async function discoverWith(
       spaceId: claim.spaceId,
       reason: 'the space is missing, merged away or archived',
     })
-  if (await isDismissed(db, claim.spaceId, domain))
-    return { outcome: 'dismissed' }
-
-  const preview = await deps.preview({
-    kind: 'company',
-    name: claim.name,
-    keys: { domain },
-  })
-  if (preview.verdict === 'refused')
-    throw invalid([{ slug: 'domain', message: preview.reason }])
-  if (
-    preview.verdict === 'attach' &&
-    (await filedUnder(preview.entityId, path))
+  const standing = await standingOf(
+    { name: claim.name, domain },
+    { id: claim.spaceId, path },
+    deps,
   )
-    return { outcome: 'member', entityId: preview.entityId }
+  if (standing.standing === 'dismissed') return { outcome: 'dismissed' }
+  if (standing.standing === 'filed')
+    return { outcome: 'member', entityId: standing.entityId }
 
   const evidence: Array<Json> = claim.evidence.map((e) =>
     e.title === undefined ? { url: e.url } : { url: e.url, title: e.title },
@@ -154,10 +210,10 @@ export async function discoverWith(
     watchIds: input.watchId === null ? [] : [input.watchId],
   }
   const proposed = await proposeDiscoveryWith(db, {
-    ...(preview.verdict === 'attach'
+    ...(standing.standing === 'held'
       ? {
           kind: 'file_record',
-          payload: { ...common, entityId: preview.entityId },
+          payload: { ...common, entityId: standing.entityId },
         }
       : {
           kind: 'add_record',
@@ -172,6 +228,16 @@ export async function discoverWith(
   })
   return proposed
 }
+
+export const standingProgram = Effect.fn('standingProgram')(function* (
+  candidate: { name: string; domain: string; spaceId: string | null },
+  deps?: DiscoverDeps,
+): Effect.fn.Return<Standing, SuggestionFailure> {
+  return yield* Effect.tryPromise({
+    try: () => standingWith(candidate, deps),
+    catch: asFailure,
+  })
+})
 
 export const discoverProgram = Effect.fn('discoverProgram')(function* (
   input: DiscoverInput,

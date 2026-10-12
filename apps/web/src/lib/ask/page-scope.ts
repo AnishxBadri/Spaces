@@ -63,17 +63,42 @@ export function dockScope(
     .slice(0, SCOPE_MAX)
 }
 
+/** The web as a scope chip: the mounted plugins' search, removable. (D72) */
+export const WEB_CHIP: AskScopeChip = {
+  kind: 'web',
+  id: null,
+  name: 'Web',
+  href: null,
+}
+
+/**
+ * The chips with the web after them, while a plugin can mount and the
+ * reader has not removed it. It never takes one of the `SCOPE_MAX` places.
+ */
+export function withWeb(
+  chips: ReadonlyArray<AskScopeChip>,
+  on: boolean,
+  mountable: boolean,
+): ReadonlyArray<AskScopeChip> {
+  const rest = chips.filter((c) => c.kind !== 'web')
+  return on && mountable ? [...rest, WEB_CHIP] : rest
+}
+
 /**
  * The chips after an `@` pick: the pick last, once, the oldest giving way
- * past `max`. The dock and `/ask` both add through it.
+ * past `max`; a web chip is kept and never counted. The dock and `/ask` both add through it.
  */
 export function withMention(
   chips: ReadonlyArray<AskScopeChip>,
   chip: AskScopeChip,
   max: number = SCOPE_MAX,
 ): ReadonlyArray<AskScopeChip> {
-  const rest = chips.filter((c) => chipKey(c) !== chipKey(chip))
-  return [...rest, chip].slice(-max)
+  // The web chip stays outside the places, as `withWeb` keeps it.
+  const web = chips.filter((c) => c.kind === 'web')
+  const rest = chips.filter(
+    (c) => c.kind !== 'web' && chipKey(c) !== chipKey(chip),
+  )
+  return [...[...rest, chip].slice(-max), ...web]
 }
 
 // ---------------------------------------------------------------------------
