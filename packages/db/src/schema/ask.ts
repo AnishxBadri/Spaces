@@ -42,6 +42,33 @@ export type AskRef = {
 
 export type AskCallState = 'running' | 'done' | 'refused' | 'failed'
 
+/** The action cards Ask proposes; the catalogue in `ASK_CARD_CATALOGUE`. (D70) */
+export type AskCardKind =
+  | 'task'
+  | 'move_stage'
+  | 'file_into_space'
+  | 'log_signal'
+  | 'note'
+  | 'draft_email'
+  | 'add_record'
+  | 'save_as_watch'
+
+/**
+ * An action card a call proposed, frozen as proposed. The card itself is the
+ * open `suggestion` row it names; its outcome is read from that row.
+ */
+export type AskCallCard = {
+  kind: AskCardKind
+  suggestionId: string
+  record: { id: string; name: string; href: string | null }
+  /** The proposal in a line: the task title, `Diligence → Term sheet`, a space path. */
+  summary: string
+  /** The evidence the card cites, labelled as the turn read it. */
+  evidence: ReadonlyArray<AskRef>
+  /** `move_stage`: the stage id the deal held when proposed; null when none. */
+  from?: string | null
+}
+
 /** One tool call of a turn, as the call strip prints it. */
 export type AskCall = {
   tool: string
@@ -50,6 +77,10 @@ export type AskCall = {
   input: string
   /** How many things it found; null when the tool counts nothing. */
   found: number | null
+  /** The card a `propose_card` call left, once stored with the answer. */
+  card?: AskCallCard
+  /** Why a refused call was refused, when the reader is owed a sentence. */
+  reason?: string
 }
 
 export const askTurnRole = pgEnum('ask_turn_role', ['user', 'assistant'])

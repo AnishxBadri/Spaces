@@ -15,6 +15,7 @@ import type { IdentityPayload } from '@spaces/core/ai/identity'
 import { readNotePayload } from '@spaces/core/ai/note'
 import type { NotePayload } from '@spaces/core/ai/note'
 import { readSpaceTagPayload } from '@spaces/core/ai/space-tag'
+import { taskPayloadSchema } from '@spaces/core/ai/task'
 import type { SpaceTagPayload } from '@spaces/core/ai/space-tag'
 import {
   readAddRecordPayload,
@@ -134,6 +135,14 @@ const SUGGESTION_BODIES: Partial<Record<SuggestionKind, SuggestionBody>> = {
     const proposed = readSpaceTagPayload(item.payload)
     return proposed ? (
       <SpaceTagBody proposed={proposed} />
+    ) : (
+      <PayloadBody item={item} actions={actions} />
+    )
+  },
+  task: ({ item, actions }) => {
+    const proposed = taskPayloadSchema.safeParse(item.payload)
+    return proposed.success ? (
+      <TaskBody title={proposed.data.title} due={proposed.data.due} />
     ) : (
       <PayloadBody item={item} actions={actions} />
     )
@@ -301,6 +310,27 @@ function NoteDraftBody({ draft }: { draft: NotePayload }) {
         {draft.markdown}
       </div>
     </div>
+  )
+}
+
+/**
+ * An action item: what the task will read, and its due date. Accepting
+ * writes it through the task writer, by and for the accepter.
+ */
+function TaskBody({ title, due }: { title: string; due: string | null }) {
+  return (
+    <dl className="flex min-w-0 flex-col gap-2">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <dt className="truncate field-label text-graphite">Task</dt>
+        <dd className="min-w-0 text-ui">{title}</dd>
+      </div>
+      {due === null ? null : (
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <dt className="truncate field-label text-graphite">Due</dt>
+          <dd className="tabular min-w-0 truncate mono text-label">{due}</dd>
+        </div>
+      )}
+    </dl>
   )
 }
 

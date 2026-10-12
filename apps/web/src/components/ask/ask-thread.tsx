@@ -10,6 +10,7 @@ import {
 } from '#/lib/server-fns'
 import type {
   AskCall,
+  AskCardView,
   AskEvent,
   AskScopeChip,
   AskThreadView,
@@ -18,6 +19,7 @@ import type {
 import { scopeKey, scopeWords } from '#/lib/ask/types'
 import { cn } from '#/lib/utils'
 import { AskAnswer, RefChip } from './ask-answer'
+import { AskCards } from './ask-card'
 import type { AnswerVariant } from './ask-answer'
 
 /**
@@ -35,6 +37,8 @@ export type LiveTurn = {
   route: string | null
   text: string
   calls: ReadonlyArray<{ id: string; call: AskCall }>
+  /** Cards proposed so far; stored, with their verbs, when the turn ends. */
+  cards: ReadonlyArray<AskCardView>
   /** `lost`: the stream broke without a Stop; `stopped`: the reader stopped it. */
   phase: 'streaming' | 'lost' | 'stopped'
 }
@@ -45,8 +49,16 @@ export function applyAskEvent(live: LiveTurn, event: AskEvent): LiveTurn {
     case 'turn':
       return { ...live, question: event.question, answerId: event.answerId }
     case 'route':
-      // A new attempt: text from the one before is dropped.
-      return { ...live, route: event.line, text: '' }
+      // A new attempt: text and cards from the one before are dropped.
+      return { ...live, route: event.line, text: '', cards: [] }
+    case 'card':
+      return {
+        ...live,
+        cards: [
+          ...live.cards.filter((c) => c.id !== event.card.id),
+          event.card,
+        ],
+      }
     case 'call': {
       const rest = live.calls.filter((c) => c.id !== event.id)
       const at = live.calls.findIndex((c) => c.id === event.id)
@@ -120,7 +132,7 @@ export function CallStrip({ calls }: { calls: ReadonlyArray<AskCall> }) {
       className="flex flex-wrap gap-x-3 gap-y-1 mono text-micro text-graphite"
     >
       {calls.map((c, i) => (
-        <li key={i} className="flex gap-1.5">
+        <li key={i} className="flex gap-1.5" title={c.reason}>
           <span className="text-foreground">{c.tool}</span>
           {c.input === '' ? null : (
             <span className="max-w-40 truncate">{c.input}</span>
@@ -178,11 +190,14 @@ export function AnswerTurn({
   variant,
   threadId,
   onRetry,
+  waiting = false,
 }: {
   turn: AskTurnView
   variant: AnswerVariant
   threadId: string | null
   onRetry?: (() => void) | undefined
+  /** Not the latest answer: its undecided cards wait in Review. */
+  waiting?: boolean
 }) {
   if (turn.hidden)
     return (
@@ -232,6 +247,7 @@ export function AnswerTurn({
       ) : (
         body
       )}
+      <AskCards cards={turn.cards} waiting={waiting} />
       {turn.state === 'stopped' ? (
         <span className="mono text-micro text-graphite">stopped</span>
       ) : null}
@@ -294,6 +310,7 @@ export function LiveAnswer({
           </Button>
         </div>
       ) : null}
+      <AskCards cards={live.cards} />
       <CallStrip calls={live.calls.map((c) => c.call)} />
       {live.route === null ? null : (
         <span className="mono text-micro text-graphite">{live.route}</span>
@@ -317,6 +334,10 @@ export function AskTurns({
   onRetry: (question: string) => void
 }) {
   const all = live === null ? turns : [...turns, live.question]
+  const latestAnswer =
+    live === null
+      ? [...all].reverse().find((t) => t.role === 'assistant')
+      : undefined
   const out: Array<ReactNode> = []
   let scope: string | null = null
   let day: string | null = null
@@ -350,6 +371,7 @@ export function AskTurns({
         onRetry={
           question === undefined ? undefined : () => onRetry(question.body)
         }
+        waiting={t.id !== latestAnswer?.id}
       />,
     )
   }
@@ -449,6 +471,7 @@ export function useAskThread(
           body: question,
           refs: [],
           calls: [],
+          cards: [],
           scope,
           state: null,
           route: null,
@@ -460,6 +483,7 @@ export function useAskThread(
         route: null,
         text: '',
         calls: [],
+        cards: [],
         phase: 'streaming',
       }
       setLive(start)

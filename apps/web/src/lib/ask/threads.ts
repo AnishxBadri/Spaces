@@ -16,7 +16,15 @@ import { noteSource } from '@spaces/core/writes/ai/chunk-sources'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import { noteBodyFromMarkdown } from '#/lib/notes/markdown-blocks'
 import { answerBlocks, answerMarkdown } from './answer'
-import type { AskRef, AskThreadRow, AskThreadView, AskTurnView } from './types'
+import { AskCardRefused, cardViewsProgram } from './card-store'
+import { AskQueryFailed, askQuery } from './query'
+import type {
+  AskCardView,
+  AskRef,
+  AskThreadRow,
+  AskThreadView,
+  AskTurnView,
+} from './types'
 
 /**
  * Ask's thread store, read and kept: private to its author, every query
@@ -31,22 +39,14 @@ export class AskThreadNotFound extends Schema.TaggedError<AskThreadNotFound>()(
   { message: Schema.String },
 ) {}
 
-export class AskQueryFailed extends Schema.TaggedError<AskQueryFailed>()(
-  'AskQueryFailed',
-  { cause: Schema.Defect() },
-) {}
-
-export const askQuery = <T>(run: () => Promise<T>) =>
-  Effect.tryPromise({
-    try: run,
-    catch: (cause) => new AskQueryFailed({ cause }),
-  })
+export { AskQueryFailed, askQuery }
 
 const notFound = () => new AskThreadNotFound({ message: 'No such thread' })
 
 /** The sentence a failure is shown as. */
 export function askMessage(failure: unknown): string {
   if (failure instanceof AskThreadNotFound) return failure.message
+  if (failure instanceof AskCardRefused) return failure.message
   return 'Could not read Ask'
 }
 
@@ -104,13 +104,18 @@ export const unreadableRefsProgram = Effect.fn('ask.unreadableRefs')(function* (
 type TurnRow = typeof askTurn.$inferSelect
 
 /** A stored turn as the reader may see it. */
-export function turnView(row: TurnRow, hidden: boolean): AskTurnView {
+export function turnView(
+  row: TurnRow,
+  hidden: boolean,
+  cards: ReadonlyArray<AskCardView> = [],
+): AskTurnView {
   return {
     id: row.id,
     role: row.role,
     body: hidden ? '' : row.bodyMd,
     refs: hidden ? [] : row.refs,
     calls: row.calls,
+    cards: hidden ? [] : cards,
     scope: row.scope,
     state: row.state,
     route: row.route,
@@ -125,14 +130,27 @@ export const turnViewsProgram = Effect.fn('ask.turnViews')(function* (
   userId: string,
   rows: ReadonlyArray<TurnRow>,
 ): Effect.fn.Return<Array<AskTurnView>, AskQueryFailed> {
+  const evidenceOf = (r: TurnRow) =>
+    r.calls.flatMap((c) => (c.card === undefined ? [] : c.card.evidence))
   const lost = yield* unreadableRefsProgram(
     userId,
-    rows.flatMap((r) => r.refs),
+    rows.flatMap((r) => [...r.refs, ...evidenceOf(r)]),
+  )
+  const cards = yield* cardViewsProgram(
+    rows.flatMap((r) =>
+      r.calls.flatMap((c) => (c.card === undefined ? [] : [c.card])),
+    ),
   )
   return rows.map((r) =>
     turnView(
       r,
-      r.role === 'assistant' && r.refs.some((ref) => lost.has(ref.ref)),
+      r.role === 'assistant' &&
+        [...r.refs, ...evidenceOf(r)].some((ref) => lost.has(ref.ref)),
+      r.calls.flatMap((c) => {
+        const view =
+          c.card === undefined ? undefined : cards.get(c.card.suggestionId)
+        return view === undefined ? [] : [view]
+      }),
     ),
   )
 })

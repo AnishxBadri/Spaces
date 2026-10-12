@@ -1,11 +1,22 @@
 import type {
   AskCall,
+  AskCallCard,
+  AskCardKind,
   AskRef,
   AskScopeChip,
   AskTurnState,
 } from '@spaces/db/schema/ask'
+import type { AskCardView } from './cards'
 
-export type { AskCall, AskRef, AskScopeChip, AskTurnState }
+export type {
+  AskCall,
+  AskCallCard,
+  AskCardKind,
+  AskCardView,
+  AskRef,
+  AskScopeChip,
+  AskTurnState,
+}
 
 /**
  * What Ask's surfaces read: a thread, its turns, and the events a turn
@@ -20,6 +31,8 @@ export type AskTurnView = {
   body: string
   refs: ReadonlyArray<AskRef>
   calls: ReadonlyArray<AskCall>
+  /** The action cards the answer proposed; empty when hidden. */
+  cards: ReadonlyArray<AskCardView>
   scope: ReadonlyArray<AskScopeChip>
   state: AskTurnState | null
   /** The model line, or the refusal. */
@@ -64,6 +77,8 @@ export type AskEvent =
   /** A model was chosen; text streamed before it is dropped. */
   | { type: 'route'; line: string; sensitive: boolean }
   | { type: 'call'; id: string; call: AskCall }
+  /** A card proposed, not yet stored: it is stored with an answered turn. */
+  | { type: 'card'; card: AskCardView }
   | { type: 'text'; text: string }
   /** The answer as stored: final state, refs and foot. */
   | { type: 'end'; turn: AskTurnView }

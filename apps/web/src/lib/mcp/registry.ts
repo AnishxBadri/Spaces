@@ -14,6 +14,9 @@ import {
   resolveEntityRefProgram,
 } from './tools'
 import { proposeSuggestionProgram } from './tools-propose'
+import type { ProposeCaller } from './tools-propose'
+import { proposeCardProgram, proposeCardShape } from './tools-cards'
+import type { CardDraft } from './tools-cards'
 import {
   QUERY_RECORDS_MAX,
   holdingDetailProgram,
@@ -54,6 +57,13 @@ export type ToolAnswer = {
   found: number | null
   /** What was asked, in a few words, for the call strip. */
   input: string
+  /** The action card a `propose_card` call handed back; null for any other tool. */
+  card: CardDraft | null
+  /**
+   * A proposal tool: what it touches names its target, never what the turn
+   * read, so it is no evidence for a card or a citation.
+   */
+  proposal: boolean
 }
 
 /** A refusal or failure, carrying the sentence the caller is shown. */
@@ -73,6 +83,10 @@ type ToolSpec<TShape extends z.ZodRawShape, TOut> = {
   refs?: (out: TOut) => ReadonlyArray<string>
   found?: (out: TOut) => number | null
   input: (input: z.infer<z.ZodObject<TShape>>) => string
+  card?: (out: TOut) => CardDraft
+  proposal?: true
+  /** What the model is handed; default the whole output. */
+  value?: (out: TOut) => unknown
 }
 
 export type RegisteredTool = {
@@ -110,16 +124,24 @@ function defineTool<TShape extends z.ZodRawShape, TOut>(
         )
       return spec.run(caller, parsed.data).pipe(
         Effect.map((out): ToolAnswer => ({
-          value: out,
+          value: spec.value?.(out) ?? out,
           touches: [...new Set(spec.touches(out))],
           refs: spec.refs?.(out) ?? [],
           found: spec.found?.(out) ?? null,
           input: spec.input(parsed.data),
+          card: spec.card?.(out) ?? null,
+          proposal: spec.proposal === true,
         })),
       )
     },
   }
 }
+
+/** The proposer a write tool names: the API token over MCP, the user in Ask. */
+const proposerOf = (caller: ToolCaller): ProposeCaller =>
+  caller.proposer.kind === 'token'
+    ? { id: caller.userId, tokenId: caller.proposer.tokenId }
+    : { id: caller.userId, runId: caller.proposer.runId }
 
 const readOnly: ToolAnnotations = { readOnlyHint: true, openWorldHint: false }
 
@@ -228,15 +250,44 @@ const proposeSuggestion = defineTool({
     openWorldHint: false,
   },
   run: (caller, { entity, patch, rationale, refs }) =>
-    proposeSuggestionProgram(
-      caller.proposer.kind === 'token'
-        ? { id: caller.userId, tokenId: caller.proposer.tokenId }
-        : { id: caller.userId, runId: caller.proposer.runId },
-      { entity, patch, rationale, ...(refs === undefined ? {} : { refs }) },
-    ),
+    proposeSuggestionProgram(proposerOf(caller), {
+      entity,
+      patch,
+      rationale,
+      ...(refs === undefined ? {} : { refs }),
+    }),
   touches: (out) => [out.entityId],
   found: () => 1,
   input: ({ entity }) => entity,
+  proposal: true,
+})
+
+// Ask's action card: a proposal shown beside the answer, never applied by
+// the agent. Attribute values stay `propose_suggestion`'s. (D70)
+const proposeCard = defineTool({
+  name: 'propose_card',
+  title: 'Propose an action card',
+  description:
+    'Offer the reader one action beside your answer: create a task on a record, move a deal to another stage, or file a record into a space. Nothing is written: the reader applies or skips the card, and an undecided card waits in Review. Cite the evidence the card rests on as refs this turn retrieved. One card per action and record; never use a card for attribute values (propose_suggestion does that).',
+  inputSchema: proposeCardShape,
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
+  run: (caller, input) => proposeCardProgram(proposerOf(caller), input),
+  touches: (out) => [out.record.id],
+  found: () => 1,
+  input: ({ kind, record }) => `${kind} ${record}`,
+  card: (out) => out,
+  proposal: true,
+  value: (out) => ({
+    proposed: out.kind,
+    record: out.record.name,
+    summary: out.summary,
+    note: 'Shown to the reader as a card. Nothing changes until they apply it.',
+  }),
 })
 
 const searchRecords = defineTool({
@@ -336,18 +387,26 @@ export const MCP_TOOLS: ReadonlyArray<RegisteredTool> = [
   listRegistry,
 ]
 
+/** Ask's tools: the MCP table and the action card, which is Ask's alone. */
+export const ASK_TOOLS: ReadonlyArray<RegisteredTool> = [
+  ...MCP_TOOLS,
+  proposeCard,
+]
+
 /**
  * The door both clients call. A method on an object, so a test can spy on
  * it and see every call either client makes.
  */
 export const toolRegistry = {
   tools: MCP_TOOLS,
+  askTools: ASK_TOOLS,
   call(
     name: string,
     caller: ToolCaller,
     raw: unknown,
   ): Effect.Effect<ToolAnswer, ToolFailure> {
-    const tool = MCP_TOOLS.find((t) => t.name === name)
+    const table = caller.proposer.kind === 'ask' ? ASK_TOOLS : MCP_TOOLS
+    const tool = table.find((t) => t.name === name)
     return tool === undefined
       ? Effect.fail(new McpToolRefused({ message: `No tool ${name}` }))
       : tool.invoke(caller, raw)

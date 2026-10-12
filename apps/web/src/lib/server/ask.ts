@@ -4,6 +4,8 @@ import { requireUser } from './shared'
 
 export type {
   AskCall,
+  AskCardKind,
+  AskCardView,
   AskEvent,
   AskRef,
   AskScopeChip,
@@ -112,4 +114,29 @@ export const saveAskAnswerAsNote = createServerFn({ method: 'POST' })
     const { saveAnswerNoteProgram } = await import('../ask/threads')
     const { effectFn } = await import('./effect')
     return run(() => effectFn(saveAnswerNoteProgram)(user.id, data.turnId))
+  })
+
+const byCard = z.object({ suggestionId: z.uuid() })
+
+/**
+ * An action card's two verbs, as the reader. Apply runs the writer a person
+ * would — the task writer, the stage write, the one tag insert — and answers
+ * the card with its outcome; Skip closes it and writes nothing. (D70)
+ */
+export const applyAskCard = createServerFn({ method: 'POST' })
+  .validator(byCard)
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    const { applyCardProgram } = await import('../ask/card-store')
+    const { effectFn } = await import('./effect')
+    return run(() => effectFn(applyCardProgram)(user.id, data.suggestionId))
+  })
+
+export const skipAskCard = createServerFn({ method: 'POST' })
+  .validator(byCard)
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    const { skipCardProgram } = await import('../ask/card-store')
+    const { effectFn } = await import('./effect')
+    return run(() => effectFn(skipCardProgram)(user.id, data.suggestionId))
   })

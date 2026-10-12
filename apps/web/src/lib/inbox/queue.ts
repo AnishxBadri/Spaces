@@ -14,6 +14,8 @@ import { db } from '@spaces/db'
 import {
   aiRun,
   apiToken,
+  askThread,
+  askTurn,
   document,
   duplicateCandidate,
   entity,
@@ -235,12 +237,31 @@ export type DiscoveryRow = {
 }
 
 /**
+ * Action cards an Ask thread left undecided, under a head naming the thread.
+ * Shown so only to the thread's author, since threads are private (D70);
+ * anyone else sees them as ordinary record cards.
+ */
+export type AskCardsRow = {
+  kind: 'ask_cards'
+  /** The thread's id — one group per thread. */
+  id: string
+  title: string
+  /** Newest first, by each record's newest member. */
+  cards: Array<SuggestionRow>
+  latestAt: string
+}
+
+/**
  * Every row the inbox can hold. Add a lane by adding a member here and a
  * renderer in `routes/_app/inbox.tsx` — the queue, the count and the page
  * follow. Nothing else in the app switches on this union.
  */
 export type InboxRow =
-  DuplicateCandidateRow | SuggestionRow | ColumnRunRow | DiscoveryRow
+  | DuplicateCandidateRow
+  | SuggestionRow
+  | ColumnRunRow
+  | DiscoveryRow
+  | AskCardsRow
 
 export type InboxKind = InboxRow['kind']
 
@@ -263,6 +284,8 @@ export type InboxScope = {
   record: string | null
   source?: string | null
   space?: string | null
+  /** The reader: their own Ask threads' cards gather under each thread. */
+  viewer?: string | null
 }
 
 const ALL: InboxScope = { record: null }
@@ -378,7 +401,7 @@ function patchFields(
 const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
   scope: InboxScope,
 ): Effect.fn.Return<
-  Array<SuggestionRow | ColumnRunRow | DiscoveryRow>,
+  Array<SuggestionRow | ColumnRunRow | DiscoveryRow | AskCardsRow>,
   InboxQueryFailed
 > {
   const isOpen = eq(suggestion.status, 'open')
@@ -622,6 +645,38 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
   }
   const groups = new Map<string, Map<string, SuggestionRow>>()
 
+  // An Ask card names its suggestion from the answer's calls; only the
+  // thread's author is shown the thread.
+  const viewer = scope.viewer ?? null
+  const askTurns =
+    viewer === null || runIds.length === 0
+      ? []
+      : yield* query(() =>
+          db
+            .select({
+              threadId: askThread.id,
+              title: askThread.title,
+              calls: askTurn.calls,
+            })
+            .from(askTurn)
+            .innerJoin(askThread, eq(askThread.id, askTurn.threadId))
+            .where(
+              and(
+                inArray(askTurn.aiRunId, runIds),
+                eq(askThread.userId, viewer),
+              ),
+            ),
+        )
+  const threadOfCard = new Map<string, { id: string; title: string }>()
+  for (const t of askTurns)
+    for (const c of t.calls)
+      if (c.card !== undefined)
+        threadOfCard.set(c.card.suggestionId, {
+          id: t.threadId,
+          title: t.title,
+        })
+  const askGroups = new Map<string, Map<string, SuggestionRow>>()
+
   // `open` is newest first, so the first member seen for a record is its
   // newest and Map insertion order is already the queue's order.
   const cards = new Map<string, SuggestionRow>()
@@ -680,8 +735,14 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
       runId: s.runId,
     }
     const inRun = s.runId !== null && columnRuns.has(s.runId) ? s.runId : null
+    const inThread = threadOfCard.get(s.id)
     let into = cards
-    if (inRun !== null) {
+    if (inThread !== undefined) {
+      const group =
+        askGroups.get(inThread.id) ?? new Map<string, SuggestionRow>()
+      askGroups.set(inThread.id, group)
+      into = group
+    } else if (inRun !== null) {
       const group = groups.get(inRun) ?? new Map<string, SuggestionRow>()
       groups.set(inRun, group)
       into = group
@@ -732,7 +793,27 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
       },
     ]
   })
-  return [...cards.values(), ...runRows, ...discoveries.values()]
+  const titleOf = new Map(
+    [...threadOfCard.values()].map((t) => [t.id, t.title]),
+  )
+  const askRows = [...askGroups].flatMap(
+    ([threadId, group]): Array<AskCardsRow> => {
+      const members = [...group.values()]
+      const newest = members.at(0)
+      return newest === undefined
+        ? []
+        : [
+            {
+              kind: 'ask_cards',
+              id: threadId,
+              title: titleOf.get(threadId) ?? '',
+              cards: members,
+              latestAt: newest.latestAt,
+            },
+          ]
+    },
+  )
+  return [...cards.values(), ...runRows, ...discoveries.values(), ...askRows]
 })
 
 /**

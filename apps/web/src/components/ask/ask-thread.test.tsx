@@ -1,7 +1,7 @@
 import { Window } from 'happy-dom'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import type { AskTurnView } from '#/lib/ask/types'
+import type { AskCardView, AskTurnView } from '#/lib/ask/types'
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({
@@ -24,6 +24,8 @@ vi.mock('#/lib/server-fns', () => ({
   askQuestion: vi.fn(),
   getAskThread: vi.fn(),
   saveAskAnswerAsNote: vi.fn(),
+  applyAskCard: vi.fn(),
+  skipAskCard: vi.fn(),
 }))
 
 const { AskTurns, AskComposer, applyAskEvent, settledThread } =
@@ -51,6 +53,7 @@ const turn = (over: Partial<AskTurnView>): AskTurnView => ({
   body: '',
   refs: [],
   calls: [],
+  cards: [],
   scope: [],
   state: null,
   route: null,
@@ -242,6 +245,7 @@ describe('applyAskEvent', () => {
       route: 'Anthropic · m',
       text: 'half an answer',
       calls: [],
+      cards: [],
       phase: 'streaming' as const,
     }
     const next = applyAskEvent(live, {
@@ -277,5 +281,61 @@ describe('settledThread', () => {
     const settled = await settledThread(read, 'th', 'a', 10, 0)
     expect(reads).toBe(3)
     expect(settled?.turns.at(1)?.state).toBe('stopped')
+  })
+})
+
+describe('action cards', () => {
+  const card = (over: Partial<AskCardView>): AskCardView => ({
+    id: 'sg',
+    kind: 'task',
+    record: { id: ACME, name: 'Acme', href: `/companies/${ACME}` },
+    summary: 'Call Acme · due 2026-10-20',
+    rationale: 'Quiet for sixty days',
+    evidence: [
+      {
+        ref: `record:${ACME}`,
+        label: 'Acme',
+        href: `/companies/${ACME}`,
+        entityId: ACME,
+      },
+    ],
+    outcome: 'open',
+    moved: false,
+    ...over,
+  })
+  const withCards = (cards: ReadonlyArray<AskCardView>) =>
+    render([question('q1', 'Who went quiet?'), answer('a1', { cards })])
+
+  it('draws an open card with its evidence, one pine Apply and Skip as the outline secondary', () => {
+    const host = withCards([card({})])
+    const li = host.querySelector('[data-card="task"]')
+    expect(li?.textContent).toContain('Create task')
+    expect(li?.textContent).toContain('Call Acme · due 2026-10-20')
+    expect(li?.querySelector(`a[href="/companies/${ACME}"]`)).not.toBeNull()
+    const buttons = [...(li?.querySelectorAll('button') ?? [])]
+    expect(buttons.map((b) => b.textContent)).toEqual(['Skip', 'Apply'])
+    expect(buttons.map((b) => b.getAttribute('data-variant'))).toEqual([
+      'outline',
+      'default',
+    ])
+    expect(host.textContent).toContain('1 card')
+  })
+
+  it('prints a decided card as a mono state word, never a disabled button', () => {
+    const host = withCards([
+      card({ id: 'a', outcome: 'applied' }),
+      card({ id: 'b', kind: 'move_stage', outcome: 'conflict' }),
+      card({ id: 'c', outcome: 'skipped' }),
+    ])
+    expect(host.querySelectorAll('[data-card] button')).toHaveLength(0)
+    expect(host.textContent).toContain('applied')
+    expect(host.textContent).toContain('not applied · already at that stage')
+    expect(host.textContent).toContain('skipped')
+  })
+
+  it('refuses a card without evidence', () => {
+    const host = withCards([card({ evidence: [] })])
+    expect(host.querySelector('[data-card]')).toBeNull()
+    expect(host.textContent).toContain('A card with no evidence was left out.')
   })
 })

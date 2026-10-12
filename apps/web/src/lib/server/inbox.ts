@@ -21,6 +21,7 @@ import { requireUser } from './shared'
  */
 
 export type {
+  AskCardsRow,
   CapturedPage,
   ColumnRunRow,
   ColumnRunSummary,
@@ -57,7 +58,7 @@ export const listInbox = createServerFn()
     }),
   )
   .handler(async ({ data }) => {
-    await requireUser()
+    const user = await requireUser()
     const {
       listInboxProgram,
       inboxScopeRecordProgram,
@@ -67,7 +68,12 @@ export const listInbox = createServerFn()
     const source = data.source ?? null
     const space = data.space ?? null
     const [rows, scope, filter] = await Promise.all([
-      effectFn(listInboxProgram)({ record: data.record, source, space }),
+      effectFn(listInboxProgram)({
+        record: data.record,
+        source,
+        space,
+        viewer: user.id,
+      }),
       data.record === null
         ? Promise.resolve(null)
         : effectFn(inboxScopeRecordProgram)(data.record),

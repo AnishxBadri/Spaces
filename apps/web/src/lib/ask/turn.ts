@@ -20,6 +20,9 @@ import { entityOfRef, toolRegistry } from '#/lib/mcp/registry'
 import type { ToolCaller } from '#/lib/mcp/registry'
 import { recordPath } from '#/lib/record-path'
 import { citedRefs } from './answer'
+import { storeCardsProgram } from './card-store'
+import type { HeldCard } from './card-store'
+import type { AskCardView } from './cards'
 import {
   askQuery,
   ownThreadProgram,
@@ -46,6 +49,8 @@ import type {
  * - The turn is frozen as asked: scope, calls and cited sources with their
  *   labels are stored on the answer row however the stream ends.
  * - One `ai_run` per answer, under the daily cap.
+ * - Action cards stream as proposed and are stored as open suggestions only
+ *   with an answered turn; their evidence must be refs the turn retrieved.
  */
 
 /** The whole prompt's ceiling, history and question included. */
@@ -213,6 +218,7 @@ const TASK = (input: AskInput, history: string): string => {
     'Cite every sentence that states a fact, right after it, in square brackets: a record as [record:<id>] with the id a tool returned, and a context item by the ref it carries, exactly as written — for example [note:<id>] or [doc:<id>#3]. Several refs share one bracket, separated by commas.',
     'A sentence you cannot cite does not belong in the answer. If nothing was found, say so in one line and name what you searched.',
     'Write markdown: short paragraphs, `- ` bullets, and a pipe table for a list of records. No title line, no code fence.',
+    'When the reader would act on what you found — a follow-up, a stage move, a filing — offer it with propose_card, one card per action and record, citing the refs it rests on. You never apply a card; the reader does.',
     history === '' ? '' : `The conversation so far:\n\n${history}`,
     `Reader: ${input.question}`,
   ]
@@ -379,7 +385,24 @@ const failureSentence = (cause: Cause.Cause<{ message: string }>): string => {
 }
 
 /** What one attempt left behind, written from inside the tool callbacks. */
-type Attempt = { target: AiTarget | null; escalateTo: Gate | null }
+type Attempt = {
+  target: AiTarget | null
+  escalateTo: Gate | null
+  /** Cards proposed in this attempt, by tool call; an escalation drops them. */
+  cards: Map<string, HeldCard>
+}
+
+/** A held card as the stream shows it, before it is stored. */
+const proposedView = (held: HeldCard): AskCardView => ({
+  id: held.callId,
+  kind: held.draft.kind,
+  record: held.draft.record,
+  summary: held.draft.summary,
+  rationale: held.draft.rationale,
+  evidence: held.evidence,
+  outcome: 'proposed',
+  moved: false,
+})
 
 /** A turn as events: the rows, the route, calls and text, then the stored turn. */
 export async function* askEvents(input: AskInput): AsyncGenerator<AskEvent> {
@@ -404,6 +427,7 @@ export async function* askEvents(input: AskInput): AsyncGenerator<AskEvent> {
   let finished: Finish | null = null
   let opened: OpenedStream | null = null
   let lastTarget: AiTarget | null = null
+  let cards = new Map<string, HeldCard>()
   // False while the reader may still cancel mid-stream; a cancelled reader
   // reads nothing more, so the stored turn is not yielded to it.
   let reachedEnd = false
@@ -420,10 +444,16 @@ export async function* askEvents(input: AskInput): AsyncGenerator<AskEvent> {
         input.abortSignal === undefined
           ? own.signal
           : AbortSignal.any([input.abortSignal, own.signal])
-      const attempt: Attempt = { target: null, escalateTo: null }
+      const attempt: Attempt = {
+        target: null,
+        escalateTo: null,
+        cards: new Map(),
+      }
+      cards = attempt.cards
+      const announced = new Set<string>()
 
       const tools: ToolSet = {}
-      for (const t of toolRegistry.tools)
+      for (const t of toolRegistry.askTools)
         tools[t.name] = tool({
           description: t.description,
           inputSchema: z.object(t.inputSchema),
@@ -462,7 +492,37 @@ export async function* askEvents(input: AskInput): AsyncGenerator<AskEvent> {
               }
               gate = verdict
             }
-            for (const id of answer.touches) touched.add(id)
+            if (answer.card !== null) {
+              // Evidence is what the turn retrieved before this call: the
+              // card's own record is not its proof.
+              const evidence = await Effect.runPromise(
+                freezeRefsProgram(
+                  `[${answer.card.refs.join(', ')}]`,
+                  touched,
+                  seen,
+                ).pipe(Effect.orElseSucceed((): Array<AskRef> => [])),
+              )
+              if (evidence.length === 0) {
+                calls.set(toolCallId, {
+                  tool: t.name,
+                  state: 'refused',
+                  input: answer.input,
+                  found: null,
+                })
+                return {
+                  error:
+                    'A card needs evidence: cite refs or record ids this turn retrieved',
+                }
+              }
+              attempt.cards.set(toolCallId, {
+                callId: toolCallId,
+                draft: answer.card,
+                evidence,
+              })
+            }
+            // A proposal's target is not something the turn read.
+            if (!answer.proposal)
+              for (const id of answer.touches) touched.add(id)
             for (const r of answer.refs) seen.add(r)
             calls.set(toolCallId, {
               tool: t.name,
@@ -545,6 +605,11 @@ export async function* askEvents(input: AskInput): AsyncGenerator<AskEvent> {
                   : held
           calls.set(part.toolCallId, call)
           yield { type: 'call', id: part.toolCallId, call }
+          const proposed = attempt.cards.get(part.toolCallId)
+          if (proposed !== undefined && !announced.has(part.toolCallId)) {
+            announced.add(part.toolCallId)
+            yield { type: 'card', card: proposedView(proposed) }
+          }
         }
       } catch {
         providerFailed = true
@@ -577,6 +642,22 @@ export async function* askEvents(input: AskInput): AsyncGenerator<AskEvent> {
           : answerText === ''
             ? 'failed'
             : 'answered'
+      // Cards stand only beside an answer: stored now, they are Review items.
+      if (state === 'answered' && cards.size > 0) {
+        const stored = await Effect.runPromise(
+          storeCardsProgram(input.userId, begun.runId, [...cards.values()]),
+        )
+        for (const [callId, card] of stored.cards) {
+          const call = calls.get(callId)
+          if (call !== undefined) calls.set(callId, { ...call, card })
+        }
+        // A card shown as proposed that could not be stored says why.
+        for (const [callId, reason] of stored.refused) {
+          const call = calls.get(callId)
+          if (call !== undefined)
+            calls.set(callId, { ...call, state: 'refused', reason })
+        }
+      }
       // The gate may have turned sensitive on this local route mid-turn.
       route = routeLine(stream.target, gate.via, gate.sensitive)
       finished = {
@@ -617,8 +698,15 @@ export async function* askEvents(input: AskInput): AsyncGenerator<AskEvent> {
           : { target: lastTarget, tokensIn: null, tokensOut: null },
       ).pipe(Effect.orElseSucceed(() => undefined)),
     )
-    if (reachedEnd && row !== undefined)
-      yield { type: 'end', turn: turnView(row, false) }
+    if (reachedEnd && row !== undefined) {
+      const view = await Effect.runPromise(
+        turnViewsProgram(input.userId, [row]).pipe(
+          Effect.map((views) => views.at(0) ?? turnView(row, false)),
+          Effect.orElseSucceed(() => turnView(row, false)),
+        ),
+      )
+      yield { type: 'end', turn: view }
+    }
   }
 }
 

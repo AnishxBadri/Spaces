@@ -7,6 +7,7 @@ import { EmptyState } from '#/components/empty-state'
 import { SuggestionCard } from '#/components/inbox/suggestion-card'
 import { ColumnRunGroup } from '#/components/inbox/column-run-group'
 import { DiscoveryGroup } from '#/components/inbox/discovery-group'
+import { AskThreadGroup } from '#/components/inbox/ask-thread-group'
 import { PageHeader } from '#/components/page-header'
 import { PluginStatusSection } from '#/components/plugin-status-section'
 import { Button } from '#/components/ui/button'
@@ -18,6 +19,7 @@ import {
   runDedupeSweep,
 } from '#/lib/server-fns'
 import type {
+  AskCardsRow,
   ColumnRunRow,
   DiscoveryRow,
   DuplicateCandidateRow,
@@ -105,6 +107,15 @@ function isDiscoveryRow(row: QueueRow): row is DiscoveryRow {
   )
 }
 
+function isAskCardsRow(row: QueueRow): row is AskCardsRow {
+  return (
+    row.kind === 'ask_cards' &&
+    'title' in row &&
+    'cards' in row &&
+    Array.isArray(row.cards)
+  )
+}
+
 function isSuggestionRow(row: QueueRow): row is SuggestionRow {
   return (
     row.kind === 'suggestion' &&
@@ -144,6 +155,12 @@ const RENDERERS: Record<InboxKind, InboxRenderer> = {
   discovery: ({ row }) =>
     isDiscoveryRow(row) ? (
       <DiscoveryGroup group={row} />
+    ) : (
+      <PayloadFallback row={row} />
+    ),
+  ask_cards: ({ row }) =>
+    isAskCardsRow(row) ? (
+      <AskThreadGroup group={row} />
     ) : (
       <PayloadFallback row={row} />
     ),
@@ -222,7 +239,7 @@ function InboxPage() {
     (n, r) =>
       r.kind === 'suggestion' || r.kind === 'discovery'
         ? n + r.suggestions.length
-        : r.kind === 'column_run'
+        : r.kind === 'column_run' || r.kind === 'ask_cards'
           ? n + r.cards.reduce((m, c) => m + c.suggestions.length, 0)
           : n,
     0,

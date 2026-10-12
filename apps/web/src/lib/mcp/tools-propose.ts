@@ -66,7 +66,7 @@ const notFound = (ref: string) =>
  * The record a proposal lands on: the one asked for, or its merge survivor,
  * refused as not found when the caller may not read it.
  */
-const proposableEntity = Effect.fn('proposableEntity')(function* (
+export const proposableEntity = Effect.fn('proposableEntity')(function* (
   caller: ProposeCaller,
   ref: string,
 ): Effect.fn.Return<string, McpToolRefused | McpToolQueryFailed> {
