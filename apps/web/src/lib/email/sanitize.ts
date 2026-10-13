@@ -70,10 +70,13 @@ export function stripRemoteCss(css: string): string {
   return css.replace(IMPORT, '').replace(REMOTE_URL, 'none')
 }
 
-let window: JSDOM['window'] | null = null
+// Never name a module-level binding `window`: the devtools vite plugin
+// prepends code that reads the global `window` into this same module scope,
+// and a shadowing `let` puts that read in the temporal dead zone.
+let dom: JSDOM['window'] | null = null
 function domWindow(): JSDOM['window'] {
-  window ??= new JSDOM('').window
-  return window
+  dom ??= new JSDOM('').window
+  return dom
 }
 
 export function sanitizeEmailHtml(html: string): SanitizedEmail {
