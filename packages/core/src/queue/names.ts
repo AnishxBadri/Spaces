@@ -58,6 +58,13 @@ export const QUEUES = {
    */
   fetchStorageFile: 'document.fetch-storage',
   /**
+   * Link a Drive folder: the folder's ancestry read through the storage-source
+   * plugin with the binding user's grant, then the guarded bind. Sent with a
+   * per-bind `singletonKey` the bind dialog polls; a refusal is the job's
+   * permanent reason.
+   */
+  bindStorageFolder: 'storage.bind-folder',
+  /**
    * The deck reader (SPA-90): a `kind: deck` document → one `attribute_patch`
    * suggestion per record it is filed against. Created with the `exclusive`
    * policy and sent with `singletonKey = documentId`, so a second press while

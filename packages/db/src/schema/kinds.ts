@@ -19,6 +19,7 @@ import { ltree, tsvector } from './helpers'
 import { entity, sourceClass } from './entities'
 import { integration } from './integrations'
 import { accountConnection } from './vault'
+import { storageBinding } from './storage'
 import { user } from './auth'
 import type { Json } from '../json'
 
@@ -233,6 +234,15 @@ export const document = pgTable(
      * `ENTITY_REFS` entry.
      */
     connectionId: uuid('connection_id').references(() => accountConnection.id),
+    /**
+     * The binding whose sync filed it: provenance, not a key (dedupe is
+     * `document_connection_external_unique`). Survives a re-bind of the
+     * folder; null for anything a binding did not bring, and nulled when
+     * the binding is unlinked — the document stays.
+     */
+    bindingId: uuid('binding_id').references(() => storageBinding.id, {
+      onDelete: 'set null',
+    }),
     extractedText: text('extracted_text'),
     // Populated by the extraction worker alongside extracted_text.
     tsv: tsvector('tsv'),
@@ -251,6 +261,7 @@ export const document = pgTable(
   },
   (t) => [
     index('document_blob_sha_idx').on(t.blobSha),
+    index('document_binding_idx').on(t.bindingId),
     // Biconditional, as on entity/entity_alias/interaction: a document the
     // Files tab says arrived "via apollo" must carry the row that says so,
     // and no hand-uploaded deck may borrow one.

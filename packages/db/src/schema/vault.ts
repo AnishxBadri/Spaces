@@ -126,6 +126,12 @@ export const accountConnection = pgTable(
     /** The provider's reason when `status` is `error`. */
     errorReason: text('error_reason'),
     lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
+    /**
+     * The storage change poll's cursor, opaque: the plugin's own encoding
+     * (one page token per drive the connection sees). Null until the first
+     * poll asks for a starting point.
+     */
+    storageCursor: text('storage_cursor'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

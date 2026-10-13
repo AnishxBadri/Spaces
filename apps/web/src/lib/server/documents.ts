@@ -210,6 +210,9 @@ export const listRecordDocuments = createServerFn()
         externalStatus: document.externalStatus,
         // The provider's own folder path, verbatim: the row's "from …" line.
         sourcePath: document.sourcePath,
+        // The binding whose sync filed it: the Files tab puts it in that
+        // folder's band. Null for everything else.
+        bindingId: document.bindingId,
         // Enough text to prove extraction worked, without hauling a
         // 2MB column into every Files-tab render.
         snippet: sql<string | null>`left(${document.extractedText}, 200)`,

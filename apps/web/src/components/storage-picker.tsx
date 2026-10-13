@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Checkbox } from './ui/checkbox'
@@ -12,11 +13,13 @@ import {
 } from './ui/dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import { DriveMark } from './files/file-glyph'
+import { filesTabPath } from './files/use-folder-link'
 import { mintPickerToken, pickerReadiness } from '#/lib/server-fns'
 import type {
   FakePickerFile,
   MintPickerOutcome,
   PickedFile,
+  PickerMode,
   PickerView,
 } from '#/lib/server-fns'
 
@@ -35,6 +38,7 @@ type GoogleDocsView = {
   setIncludeFolders: (on: boolean) => GoogleDocsView
   setSelectFolderEnabled: (on: boolean) => GoogleDocsView
   setEnableDrives: (on: boolean) => GoogleDocsView
+  setMimeTypes: (mimeTypes: string) => GoogleDocsView
 }
 type GooglePicker = {
   setVisible: (on: boolean) => GooglePicker
@@ -59,7 +63,7 @@ export type GooglePickerKeys = {
 type GooglePickerApi = GooglePickerKeys & {
   readonly PickerBuilder: new () => GooglePickerBuilder
   readonly DocsView: new (viewId?: string) => GoogleDocsView
-  readonly ViewId: { readonly DOCS: string }
+  readonly ViewId: { readonly DOCS: string; readonly FOLDERS: string }
   readonly Feature: {
     readonly MULTISELECT_ENABLED: string
     readonly SUPPORT_DRIVES: string
@@ -139,14 +143,20 @@ function loadGooglePicker(scriptUrl: string): Promise<GooglePickerApi> {
 
 type GoogleSession = Extract<MintPickerOutcome, { readonly _tag: 'ok' }>
 
+const FOLDER_MIME = 'application/vnd.google-apps.folder'
+
 function openGooglePicker(
   api: GooglePickerApi,
   session: GoogleSession,
+  mode: PickerMode,
   onResult: (result: PickResult) => void,
 ): GooglePicker {
-  const builder = new api.PickerBuilder()
-    .enableFeature(api.Feature.MULTISELECT_ENABLED)
-    .enableFeature(api.Feature.SUPPORT_DRIVES)
+  const builder = new api.PickerBuilder().enableFeature(
+    api.Feature.SUPPORT_DRIVES,
+  )
+  // Files are picked several at a time; a folder is linked one at a time.
+  if (mode === 'files') builder.enableFeature(api.Feature.MULTISELECT_ENABLED)
+  builder
     .setOAuthToken(session.token)
     .setDeveloperKey(session.developerKey)
     .setAppId(session.appId)
@@ -160,6 +170,11 @@ function openGooglePicker(
         .setIncludeFolders(true)
         .setSelectFolderEnabled(false),
     SHARED_DRIVES: () => new api.DocsView().setEnableDrives(true),
+    FOLDERS: () =>
+      new api.DocsView(api.ViewId.FOLDERS)
+        .setIncludeFolders(true)
+        .setSelectFolderEnabled(true)
+        .setMimeTypes(FOLDER_MIME),
   }
   for (const view of session.views) builder.addView(views[view]())
   return builder.build().setVisible(true)
@@ -199,20 +214,24 @@ export function usePickerReadiness(): [
   return [readiness, setReadiness]
 }
 
-/** The Files tab's "Attach from Drive", in whatever state the user's Drive is in. */
-export function StoragePicker({
-  readiness,
-  setReadiness,
+/**
+ * One opening of the provider's picker: the mint, then Google's picker or
+ * the fake's pick list, in files or folders mode. A Connect or re-consent
+ * navigates; a refusal is a toast, and `onBlocked` hears it.
+ */
+export function usePickerSession({
+  mode,
   onPicked,
+  onBlocked = () => undefined,
 }: {
-  readiness: Readiness | null
-  setReadiness: (next: Readiness) => void
+  mode: PickerMode
   onPicked: (files: ReadonlyArray<PickedFile>) => void
-}) {
+  onBlocked?: (readiness: Readiness) => void
+}): { open: () => Promise<void>; opening: boolean; sheet: ReactNode } {
   const [opening, setOpening] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
 
-  /** The picker closed: the session and its token go, and a pick is attached. */
+  /** The picker closed: the session and its token go, and a pick is handed on. */
   const settle = (result: PickResult) => {
     setSession(null)
     if (result.kind === 'picked' && result.files.length > 0)
@@ -229,7 +248,7 @@ export function StoragePicker({
     loadGooglePicker(session.session.scriptUrl).then(
       (api) => {
         if (closed) return
-        picker = openGooglePicker(api, session.session, (result) =>
+        picker = openGooglePicker(api, session.session, mode, (result) =>
           settleRef.current(result),
         )
       },
@@ -244,13 +263,17 @@ export function StoragePicker({
       closed = true
       picker?.dispose()
     }
-  }, [session])
+  }, [session, mode])
 
   async function open() {
     setOpening(true)
     try {
       const outcome = await mintPickerToken({
-        data: { provider: 'google', returnTo: window.location.pathname },
+        data: {
+          provider: 'google',
+          returnTo: filesTabPath(window.location.href),
+          mode,
+        },
       })
       switch (outcome._tag) {
         case 'ok':
@@ -264,30 +287,54 @@ export function StoragePicker({
           window.location.assign(outcome.href)
           return
         case 'refused':
-          setReadiness(outcome)
+          onBlocked(outcome)
           toast.error(outcome.reason)
           return
         case 'unconfigured':
-          setReadiness({ ...outcome, settingsHref: null })
+          onBlocked({ ...outcome, settingsHref: null })
           toast.error(outcome.reason)
           return
       }
     } catch (err) {
       const reason =
         err instanceof Error ? err.message : 'Could not open the picker'
-      setReadiness({ _tag: 'refused', reason })
+      onBlocked({ _tag: 'refused', reason })
       toast.error(reason)
     } finally {
       setOpening(false)
     }
   }
 
+  const sheet =
+    session?.kind === 'fake' ? (
+      <FakePickList files={session.files} mode={mode} onResult={settle} />
+    ) : null
+  return { open, opening, sheet }
+}
+
+/** The Files tab's "Attach from Drive", in whatever state the user's Drive is in. */
+export function StoragePicker({
+  readiness,
+  setReadiness,
+  onPicked,
+}: {
+  readiness: Readiness | null
+  setReadiness: (next: Readiness) => void
+  onPicked: (files: ReadonlyArray<PickedFile>) => void
+}) {
+  const picker = usePickerSession({
+    mode: 'files',
+    onPicked,
+    onBlocked: setReadiness,
+  })
   return (
     <>
-      <PickerButton readiness={readiness} opening={opening} onOpen={open} />
-      {session?.kind === 'fake' ? (
-        <FakePickList files={session.files} onResult={settle} />
-      ) : null}
+      <PickerButton
+        readiness={readiness}
+        opening={picker.opening}
+        onOpen={() => void picker.open()}
+      />
+      {picker.sheet}
     </>
   )
 }
@@ -375,17 +422,21 @@ export function PickerButton({
 /** The fake picker: the fake Drive's files as a pick list, in our own sheet. */
 export function FakePickList({
   files,
+  mode = 'files',
   onResult,
 }: {
   files: ReadonlyArray<FakePickerFile>
+  /** `folders`: one folder is picked, to link. */
+  mode?: PickerMode
   onResult: (result: PickResult) => void
 }) {
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
   const chosen = files.filter((f) => picked.has(f.id))
+  const folders = mode === 'folders'
 
   const toggle = (id: string, on: boolean) =>
     setPicked((all) => {
-      const next = new Set(all)
+      const next = new Set(folders ? [] : all)
       if (on) next.add(id)
       else next.delete(id)
       return next
@@ -400,7 +451,7 @@ export function FakePickList({
     >
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{LABEL}</DialogTitle>
+          <DialogTitle>{folders ? 'Link a Drive folder' : LABEL}</DialogTitle>
           <DialogDescription>fake Drive</DialogDescription>
         </DialogHeader>
         <ul className="-mx-5 -my-5 max-h-80 overflow-y-auto">
@@ -425,9 +476,11 @@ export function FakePickList({
         </ul>
         <DialogFooter
           note={
-            chosen.length === 0
-              ? 'nothing picked'
-              : `${chosen.length} picked · copied onto this record`
+            folders
+              ? null
+              : chosen.length === 0
+                ? 'nothing picked'
+                : `${chosen.length} picked · copied onto this record`
           }
         >
           <Button
@@ -447,7 +500,11 @@ export function FakePickList({
               })
             }
           >
-            {chosen.length === 0 ? 'Attach' : `Attach ${chosen.length}`}
+            {folders
+              ? 'Choose'
+              : chosen.length === 0
+                ? 'Attach'
+                : `Attach ${chosen.length}`}
           </Button>
         </DialogFooter>
       </DialogContent>

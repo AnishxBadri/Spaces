@@ -568,6 +568,13 @@
       "when": 1791840532012,
       "tag": "0080_suggestion_supersedes",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1791842787385,
+      "tag": "0081_storage_binding",
+      "breakpoints": true
     }
   ]
 }

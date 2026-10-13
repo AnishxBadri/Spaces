@@ -11,7 +11,11 @@ import {
 import { LabelHead } from './ledger-section'
 import { DocumentPreview } from './document-preview'
 import { AddRow, LinkFetchRow, useLinkFetches } from './record-files-link'
-import { StoragePicker, usePickerReadiness } from './storage-picker'
+import {
+  StoragePicker,
+  usePickerReadiness,
+  usePickerSession,
+} from './storage-picker'
 import { useSummarizer } from './summarize'
 import { useKeyTermsExtractor } from './key-terms'
 import { useVisionReader } from './vision'
@@ -20,6 +24,7 @@ import type { PendingUpload } from './files/file-row'
 import { FolderBand } from './files/folder-band'
 import type { BoundFolder } from './files/folder-band'
 import { LinkFolderDialog } from './files/link-folder-dialog'
+import { useFolderLink } from './files/use-folder-link'
 import { FileViewerFoot, FileViewerSidebar } from './files/viewer-sidebar'
 import {
   NewerVersionSelect,
@@ -60,6 +65,9 @@ import type { VersionPick } from '#/lib/documents/newer-version'
  * - An upload or picked Drive file of a kind the record already holds offers
  *   "Newer version of" on its row (D59), and its row stays as `filed.` until
  *   the pick is made or dismissed; the link is written after the birth.
+ * - Link a Drive folder (the add row's `···`, or a pasted folder link) is
+ *   offered only with the user's own Drive connection; a bound folder is a
+ *   band under our files.
  */
 
 type Documents = Array<RecordDocument>
@@ -77,14 +85,11 @@ export function RecordFiles({
   entityId,
   recordName,
   documents,
-  folders = [],
 }: {
   entityId: string
   /** The record's name: `Drop 3 files on Flent`, the Remove confirm. */
   recordName: string
   documents: Documents
-  /** Drive folders bound to this record; none until bindings exist. */
-  folders?: ReadonlyArray<BoundFolder>
 }) {
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -92,7 +97,6 @@ export function RecordFiles({
   const [dragging, setDragging] = useState<number | null>(null)
   const [pending, setPending] = useState<Array<PendingUpload>>([])
   const [viewingId, setViewingId] = useState<string | null>(null)
-  const [linkingFolder, setLinkingFolder] = useState<string | null>(null)
   // Read by the upload loop and the fetch poll after an await, so a ref.
   const docsRef = useRef(documents)
   docsRef.current = documents
@@ -104,6 +108,23 @@ export function RecordFiles({
   )
   const [readiness, setReadiness] = usePickerReadiness()
   const { remove, removeDialog } = useRemoveFile(entityId, recordName)
+  const folderLink = useFolderLink(entityId)
+  const folderPicker = usePickerSession({
+    mode: 'folders',
+    onPicked: (picked) => {
+      const folder = picked.at(0)
+      if (folder !== undefined) folderLink.open({ id: folder.id }, folder.name)
+    },
+  })
+  const now = Date.now()
+  const folders: ReadonlyArray<BoundFolder> = folderLink.bindings.map((b) => ({
+    id: b.id,
+    path: b.folderPath,
+    syncedSinceMs:
+      b.lastSyncedAt === null ? null : now - Date.parse(b.lastSyncedAt),
+    readOnly: b.direction === 'pull',
+    documents: documents.filter((d) => d.bindingId === b.id),
+  }))
 
   useExtractionPolling(documents, router)
   const deckReaderFor = useDeckReader(entityId, documents)
@@ -362,19 +383,23 @@ export function RecordFiles({
         >
           Upload
         </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            aria-label="More ways to add files"
-            className="focus-ring flex size-[1.625rem] shrink-0 items-center justify-center rounded-md border border-hairline bg-paper mono text-ui hover:bg-bone data-[state=open]:bg-hairline data-[state=open]:text-paper"
-          >
-            <span aria-hidden>···</span>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            {/* Folder binding arrives with storage bindings. */}
-            <DropdownMenuItem disabled>Link a Drive folder…</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {folderLink.canLink ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label="More ways to add files"
+              className="focus-ring flex size-[1.625rem] shrink-0 items-center justify-center rounded-md border border-hairline bg-paper mono text-ui hover:bg-bone data-[state=open]:bg-hairline data-[state=open]:text-paper"
+            >
+              <span aria-hidden>···</span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onSelect={() => void folderPicker.open()}>
+                Link a Drive folder…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
       </AddRow>
+      {folderPicker.sheet}
       <input
         ref={inputRef}
         type="file"
@@ -395,7 +420,11 @@ export function RecordFiles({
                 key={f.key}
                 fetch={f}
                 onDismiss={() => links.dismiss(f.key)}
-                onLinkFolder={setLinkingFolder}
+                onLinkFolder={
+                  folderLink.canLink
+                    ? (url) => folderLink.open({ url }, url)
+                    : null
+                }
                 version={
                   f.externalUrl === null ||
                   f.state.kind === 'refused' ||
@@ -479,6 +508,7 @@ export function RecordFiles({
           recordId={entityId}
           recordName={recordName}
           onView={(doc) => setViewingId(doc.id)}
+          onUnlink={() => folderLink.unlink(f.id)}
         />
       ))}
 
@@ -506,12 +536,19 @@ export function RecordFiles({
         }
       />
       <LinkFolderDialog
-        path={linkingFolder}
+        key={folderLink.linking?.title ?? ''}
+        path={folderLink.linking?.title ?? null}
         recordName={recordName}
         inside={null}
         onOpenChange={(open) => {
-          if (!open) setLinkingFolder(null)
+          if (!open) folderLink.close()
         }}
+        onLink={folderLink.link}
+        linking={folderLink.linking?.busy ?? false}
+        refusal={folderLink.linking?.refusal ?? null}
+        {...(folderLink.linking === null
+          ? {}
+          : { initial: folderLink.linking.initial })}
       />
       {removeDialog}
     </div>

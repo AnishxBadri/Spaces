@@ -24,6 +24,7 @@ import {
   fetchStorageEnqueue,
   fetchStorageFile,
 } from './jobs/fetch-storage-file'
+import { bindStorageFolder } from './jobs/bind-storage-folder'
 import { dedupeSweep } from './jobs/dedupe-sweep'
 import { sweepOrphanBlobs } from './jobs/sweep-orphan-blobs'
 import { pruneIngress } from './jobs/prune-ingress'
@@ -409,6 +410,7 @@ async function main() {
     clipDocument,
     readDeck,
     fetchStorageFile,
+    bindStorageFolder,
   ]) {
     const retry = def.retry
     if (retry) {
@@ -463,6 +465,16 @@ async function main() {
         storageSourcesLayer(plugins, { fakes }),
         fetchStorageEnqueue,
       ),
+    }),
+  )
+  // Link a Drive folder: one getFolder through the binding user's grant,
+  // then the guarded bind. Batch of one, for the fetch's reason.
+  await boss.work(
+    QUEUES.bindStorageFolder,
+    { batchSize: 1, includeMetadata: true },
+    runJob(bindStorageFolder, {
+      host,
+      layer: storageSourcesLayer(plugins, { fakes }),
     }),
   )
   // The nightly dedupe sweep, on the 03:30 schedule below. One statement per

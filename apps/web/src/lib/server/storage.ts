@@ -18,6 +18,7 @@ export type {
 export type {
   FakePickerFile,
   MintPickerOutcome,
+  PickerMode,
   PickerView,
 } from '../documents/picker'
 
@@ -121,11 +122,18 @@ export const pickerReadiness = createServerFn()
 
 /**
  * The picker's token, minted for one opening and answered only here, over
- * POST: never in a URL, never logged. A connection broader than the picker
- * set is refused with the reason.
+ * POST: never in a URL, never logged. A connection holding a scope that
+ * does not read a picked file is refused with the reason.
  */
 export const mintPickerToken = createServerFn({ method: 'POST' })
-  .validator(z.object({ provider: pickerProvider, returnTo: samePath }))
+  .validator(
+    z.object({
+      provider: pickerProvider,
+      returnTo: samePath,
+      /** `folders` opens the picker on folders, for Link a Drive folder. */
+      mode: z.enum(['files', 'folders']).default('files'),
+    }),
+  )
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { mintPickerTokenProgram, pickerMessage } =
@@ -141,6 +149,7 @@ export const mintPickerToken = createServerFn({ method: 'POST' })
         u.id,
         data.provider,
         options,
+        data.mode,
       )
     } catch (failure) {
       throw new Error(pickerMessage(failure))

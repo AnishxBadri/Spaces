@@ -25,6 +25,7 @@ import {
   signal,
   spaceWatch,
   spaceWatchDismissal,
+  storageBinding,
   suggestion,
   taskEntity,
   term,
@@ -421,6 +422,20 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
     column: spaceWatchDismissal.spaceId,
     merge: { kind: 'none', why: 'space kind is not mergeable' },
     del: { kind: 'cascade' }, // "not here" means nothing once here is gone
+    context: null,
+  },
+
+  // --- storage bindings ---------------------------------------------------
+  {
+    key: 'storage_binding.target',
+    table: storageBinding,
+    column: storageBinding.targetEntityId,
+    merge: { kind: 'repoint' }, // the folder now feeds the survivor
+    // A folder bound to nothing is unbound; its documents keep their file
+    // and lose only `binding_id` (the FK nulls it).
+    del: { kind: 'cascade' },
+    // Sync configuration, never AI-visible: the documents a binding files
+    // reach the walk through their own filing edges.
     context: null,
   },
 

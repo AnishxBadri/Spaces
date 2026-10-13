@@ -1,5 +1,11 @@
 import { useState } from 'react'
 import { formatSince } from '@spaces/core/format'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu'
 import { FolderGlyph } from './file-glyph'
 import { FileRow } from './file-row'
 import type { RecordDocument } from './types'
@@ -12,6 +18,8 @@ import { cn } from '#/lib/utils'
  * tree, read-only. Subfolders fold; each file is a `FileRow` in folder mode
  * (`edited MM-DD · google ↗` for a native file, `■ gone` for a deleted one).
  * The band renders from the binding its caller hands it; it syncs nothing.
+ * - The head ends on its mono lane (`never synced · read-only`) and a `···`
+ *   holding Unlink.
  */
 
 /** A folder bound to this record, and the documents its sync filed. */
@@ -21,7 +29,18 @@ export type BoundFolder = {
   readonly path: string
   /** How long since the last sync finished; null before the first. */
   readonly syncedSinceMs: number | null
+  /** Drive → us only (`direction: pull`). */
+  readonly readOnly: boolean
   readonly documents: ReadonlyArray<RecordDocument>
+}
+
+/** The head's mono lane: what the sync has done, and which way it runs. */
+export function folderLane(folder: BoundFolder, count: number): string {
+  const synced =
+    folder.syncedSinceMs === null
+      ? 'never synced'
+      : `${String(count)} · synced ${formatSince(folder.syncedSinceMs)} ago`
+  return folder.readOnly ? `${synced} · read-only` : synced
 }
 
 export function FolderBand({
@@ -29,11 +48,14 @@ export function FolderBand({
   recordId,
   recordName,
   onView,
+  onUnlink = null,
 }: {
   folder: BoundFolder
   recordId: string
   recordName: string
   onView: (doc: RecordDocument) => void
+  /** Unlink in the head's `···`; null draws no `···`. */
+  onUnlink?: (() => void) | null
 }) {
   const tree = folderTree(folder.path, folder.documents)
   return (
@@ -41,16 +63,23 @@ export function FolderBand({
       <div className="flex h-ledger-row items-center gap-3 border-b border-rule bg-bone px-3">
         <FolderGlyph bound />
         <h3 className="min-w-0 truncate text-body font-medium">{tree.name}</h3>
-        <span className="shrink-0 mono text-micro text-graphite">
-          {String(tree.count)}
-          {folder.syncedSinceMs === null
-            ? null
-            : ` · synced ${formatSince(folder.syncedSinceMs)} ago`}
-        </span>
         <span className="flex-1" />
         <span className="shrink-0 mono text-micro text-graphite">
-          read-only
+          {folderLane(folder, tree.count)}
         </span>
+        {onUnlink === null ? null : (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label={`More for ${tree.name}`}
+              className="focus-ring flex size-6 shrink-0 items-center justify-center rounded-md mono text-ui text-graphite hover:bg-paper hover:text-foreground data-[state=open]:bg-hairline data-[state=open]:text-paper"
+            >
+              <span aria-hidden>···</span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onSelect={onUnlink}>Unlink</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
       <ul>
         <FolderContents

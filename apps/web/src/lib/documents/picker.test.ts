@@ -14,7 +14,7 @@ import type { MintPickerOutcome, PickerOptions } from './picker'
 
 /**
  * The picker's mint: Connect without a connection, a re-consent without
- * the picker scope, a refusal for a connection broader than the picker set,
+ * the picker scope, a refusal for a scope that does not read a picked file,
  * and otherwise a token for this one call with the row's key and app id.
  */
 
@@ -118,7 +118,7 @@ describe('mintPickerTokenProgram', () => {
     expect(leaks(outcome)).toBe(false)
   })
 
-  it('refuses a connection holding drive.readonly and more, and hands no token over', async () => {
+  it('refuses a connection holding a scope that does not read the picked file, and hands no token over', async () => {
     await configured()
     await aConnection([
       'openid',
@@ -134,9 +134,19 @@ describe('mintPickerTokenProgram', () => {
     expect(JSON.stringify(exit.cause)).not.toContain(TOKEN)
     await expect(mint()).rejects.toBeInstanceOf(PickerScopeTooBroad)
     await expect(mint()).rejects.toMatchObject({
-      scopes: ['drive.readonly', 'calendar.events.readonly'],
+      scopes: ['calendar.events.readonly'],
+      message:
+        'The picker opens only on a Drive connection whose scopes read the files you pick; this one also holds calendar.events.readonly. Paste a link instead.',
     })
     await expect(readiness()).rejects.toBeInstanceOf(PickerScopeTooBroad)
+  })
+
+  it('opens on a connection a folder binding grew to drive.readonly', async () => {
+    await configured()
+    await aConnection(['openid', 'email', 'drive.file', 'drive.readonly'])
+    expect(await readiness()).toEqual({ _tag: 'ready' })
+    const outcome = await mint()
+    expect(outcome).toMatchObject({ _tag: 'ok', token: TOKEN })
   })
 
   it('mints the token with the row’s key and app id for a connection holding the picker set', async () => {
@@ -200,5 +210,29 @@ describe('mintPickerTokenProgram', () => {
     expect(await readiness({ returnTo: RETURN, fake: true })).toEqual({
       _tag: 'ready',
     })
+  })
+
+  it('lists the fake Drive’s folders, roots included, for Link a Drive folder', async () => {
+    await aConnection(['openid', 'email', 'drive.file'])
+    const outcome = await Effect.runPromise(
+      mintPickerTokenProgram(
+        FIXTURE_ACTOR.id,
+        'google',
+        { returnTo: RETURN, fake: true },
+        'folders',
+      ),
+    )
+    if (outcome._tag !== 'fake') throw new Error(outcome._tag)
+    expect(outcome.files).toContainEqual({
+      id: 'root',
+      name: 'My Drive',
+      path: null,
+    })
+    expect(outcome.files).toContainEqual({
+      id: 'dataroom',
+      name: 'Acme Data Room',
+      path: 'My Drive',
+    })
+    expect(outcome.files.map((f) => f.id)).not.toContain('deck')
   })
 })

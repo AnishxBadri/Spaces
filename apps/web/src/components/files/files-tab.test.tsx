@@ -69,7 +69,10 @@ const fns = vi.hoisted(() => {
     'getEntitySensitivity',
     'isLaneRouted',
     'keyTermsStatus',
+    'linkDriveFolder',
     'linkFetchStatus',
+    'linkFolderStatus',
+    'listRecordBindings',
     'listSpaces',
     'markNewerVersion',
     'mintPickerToken',
@@ -85,6 +88,7 @@ const fns = vi.hoisted(() => {
     'summarize',
     'summarizeStatus',
     'unfileDocument',
+    'unlinkDriveFolder',
     'visionStatus',
   ] as const
   return Object.fromEntries(names.map((n) => [n, vi.fn()]))
@@ -123,6 +127,7 @@ function doc(over: Partial<RecordDocument>): RecordDocument {
     externalUrl: null,
     externalStatus: null,
     sourcePath: null,
+    bindingId: null,
     snippet: 'EXTRACTED SNIPPET TEXT',
     uploadedByName: 'Anish',
     lastRun: null,
@@ -190,7 +195,9 @@ describe('the grouped tab', () => {
     expect(html).toContain('placeholder="Drop files, or paste a Drive link…"')
     expect(html).toContain('6 · ')
     expect(html).toContain('Upload')
-    expect(html).toContain('aria-label="More ways to add files"')
+    // No Drive connection in a static render: Link a Drive folder, the
+    // `···`'s one item, is not offered, so the `···` does not render.
+    expect(html).not.toContain('aria-label="More ways to add files"')
   })
 
   it('groups our files under their kind, in sheet order, and hides an empty kind', () => {
@@ -261,6 +268,7 @@ describe('a bound folder', () => {
           id: 'b',
           path: 'My Drive / Flent — Data room',
           syncedSinceMs: 4 * 60_000,
+          readOnly: true,
           documents: [
             doc({
               id: 'f1',
@@ -277,12 +285,34 @@ describe('a bound folder', () => {
       />,
     )
     expect(html).toContain('Flent — Data room')
-    expect(html).toContain('2 · synced 4m ago')
-    expect(html).toContain('read-only')
+    expect(html).toContain('2 · synced 4m ago · read-only')
     expect(html).toContain('Financials')
     expect(html).toContain('data-glyph="bound-folder"')
     // The tree says where it sits, so the row does not repeat it.
     expect(html).not.toContain('from My Drive')
+  })
+})
+
+describe('a folder just linked', () => {
+  it('reads never synced, read-only, and ends on a ··· holding Unlink', () => {
+    const html = renderToStaticMarkup(
+      <FolderBand
+        recordId={FLENT}
+        recordName="Flent"
+        onView={() => undefined}
+        onUnlink={() => undefined}
+        folder={{
+          id: 'b',
+          path: 'My Drive / Acme Data Room',
+          syncedSinceMs: null,
+          readOnly: true,
+          documents: [],
+        }}
+      />,
+    )
+    expect(html).toContain('Acme Data Room')
+    expect(html).toContain('never synced · read-only')
+    expect(html).toContain('aria-label="More for Acme Data Room"')
   })
 })
 
@@ -394,8 +424,8 @@ const byText = (selector: string, text: string) => {
   return found
 }
 
-async function openMenu(name: string) {
-  const trigger = document.querySelector(`[aria-label="More for ${name}"]`)
+async function openMenu(name: string, label = `More for ${name}`) {
+  const trigger = document.querySelector(`[aria-label="${label}"]`)
   if (trigger === null) throw new Error('no ··· trigger')
   act(() => {
     trigger.dispatchEvent(
@@ -460,5 +490,173 @@ describe('the row’s ···', () => {
     await click(byText('button', 'Remove⌘↵'))
     expect(fns.deleteDocument).toHaveBeenCalledWith({ data: { id: 'a2' } })
     expect(fns.unfileDocument).not.toHaveBeenCalled()
+  })
+})
+
+const BOUND = {
+  id: '00000000-0000-4000-8000-0000000000b1',
+  provider: 'google',
+  folderPath: 'My Drive / Acme Data Room',
+  direction: 'pull',
+  retain: 'full',
+  mapSubfolders: true,
+  sensitivity: 'inherit',
+  status: 'active',
+  error: null,
+  lastSyncedAt: null,
+} as const
+
+async function mountTab() {
+  host = document.createElement('div')
+  document.body.appendChild(host)
+  const r = createRoot(host)
+  root = r
+  act(() =>
+    r.render(
+      <RecordFiles entityId={FLENT} recordName="Flent" documents={[]} />,
+    ),
+  )
+  await flush()
+}
+
+describe('Link a Drive folder', () => {
+  beforeEach(() => {
+    fns.pickerReadiness.mockResolvedValue({ _tag: 'ready' })
+    fns.listRecordBindings.mockResolvedValue({ bindings: [], canLink: true })
+    fns.mintPickerToken.mockResolvedValue({
+      _tag: 'fake',
+      files: [
+        { id: 'root', name: 'My Drive', path: null },
+        { id: 'dataroom', name: 'Acme Data Room', path: 'My Drive' },
+      ],
+    })
+    fns.linkDriveFolder.mockResolvedValue({ _tag: 'queued', bindId: 'bind-1' })
+  })
+
+  it('picks a folder from the add row’s ···, links it with its options, and shows a refusal in the window', async () => {
+    fns.linkFolderStatus.mockResolvedValue({
+      'bind-1': {
+        state: 'failed',
+        reason:
+          'My Drive / Acme Data Room is already linked to Acme Series A by Priya.',
+      },
+    })
+    await mountTab()
+    await openMenu('', 'More ways to add files')
+    await click(byText('[role="menuitem"]', 'Link a Drive folder…'))
+    expect(fns.mintPickerToken).toHaveBeenCalledWith({
+      data: {
+        provider: 'google',
+        returnTo: '/companies/flent?tab=files',
+        mode: 'folders',
+      },
+    })
+    const box = document.querySelector('[aria-label="Pick Acme Data Room"]')
+    if (box === null) throw new Error('no folder to pick')
+    await click(box)
+    await click(byText('button', 'Choose'))
+
+    const dialog = document.querySelector('[role="dialog"]')
+    expect(dialog?.textContent).toContain('Acme Data Room')
+    expect(dialog?.textContent).toContain('read-only · files under this folder')
+    await click(byText('button', 'Link folder'))
+    expect(fns.linkDriveFolder).toHaveBeenCalledWith({
+      data: {
+        folder: { id: 'dataroom' },
+        attachTo: FLENT,
+        options: {
+          mapSubfolders: true,
+          retain: 'full',
+          direction: 'pull',
+          sensitivity: 'inherit',
+        },
+        returnTo: '/companies/flent?tab=files',
+      },
+    })
+    await act(() => new Promise((r) => setTimeout(r, 1700)))
+    expect(document.querySelector('[role="alert"]')?.textContent).toBe(
+      'My Drive / Acme Data Room is already linked to Acme Series A by Priya.',
+    )
+  })
+
+  it('draws a binding as its band, never synced, and Unlink removes it', async () => {
+    fns.listRecordBindings.mockResolvedValue({
+      bindings: [BOUND],
+      canLink: true,
+    })
+    fns.unlinkDriveFolder.mockResolvedValue({ unlinked: true })
+    await mountTab()
+    expect(document.body.textContent).toContain('never synced · read-only')
+    expect(document.body.textContent).not.toContain('No files.')
+    await openMenu('Acme Data Room')
+    await click(byText('[role="menuitem"]', 'Unlink'))
+    expect(fns.unlinkDriveFolder).toHaveBeenCalledWith({
+      data: { bindingId: BOUND.id },
+    })
+  })
+
+  it('comes back to the Files tab after Google’s consent and reopens the window', async () => {
+    fns.linkDriveFolder.mockResolvedValue({
+      _tag: 'consent',
+      href: '/api/connections/google/start?product=drive&scopes=drive.readonly',
+    })
+    const assign = vi
+      .spyOn(window.location, 'assign')
+      .mockImplementation(() => undefined)
+    await mountTab()
+    await openMenu('', 'More ways to add files')
+    await click(byText('[role="menuitem"]', 'Link a Drive folder…'))
+    await click(
+      document.querySelector('[aria-label="Pick Acme Data Room"]') ??
+        document.body,
+    )
+    await click(byText('button', 'Choose'))
+    await click(byText('button', 'Link folder'))
+    expect(fns.linkDriveFolder.mock.calls[0]?.[0]).toMatchObject({
+      data: { returnTo: '/companies/flent?tab=files' },
+    })
+    expect(assign).toHaveBeenCalledWith(
+      '/api/connections/google/start?product=drive&scopes=drive.readonly',
+    )
+    assign.mockRestore()
+
+    // Back from Google: the Files tab mounts again and the window reopens.
+    act(() => root?.unmount())
+    host?.remove()
+    await mountTab()
+    const dialog = document.querySelector('[role="dialog"]')
+    expect(dialog?.textContent).toContain('Acme Data Room')
+    expect(window.sessionStorage.getItem('spaces.link-folder')).toBeNull()
+  })
+
+  it('shows a folder linked behind a closed window', async () => {
+    fns.linkFolderStatus.mockResolvedValue({})
+    await mountTab()
+    await openMenu('', 'More ways to add files')
+    await click(byText('[role="menuitem"]', 'Link a Drive folder…'))
+    await click(
+      document.querySelector('[aria-label="Pick Acme Data Room"]') ??
+        document.body,
+    )
+    await click(byText('button', 'Choose'))
+    await click(byText('button', 'Link folder'))
+    await click(byText('button', 'Cancel'))
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+
+    fns.linkFolderStatus.mockResolvedValue({ 'bind-1': { state: 'done' } })
+    fns.listRecordBindings.mockResolvedValue({
+      bindings: [BOUND],
+      canLink: true,
+    })
+    await act(() => new Promise((r) => setTimeout(r, 1700)))
+    expect(document.body.textContent).toContain('never synced · read-only')
+  })
+
+  it('offers nothing without a Drive connection', async () => {
+    fns.listRecordBindings.mockResolvedValue({ bindings: [], canLink: false })
+    await mountTab()
+    expect(
+      document.querySelector('[aria-label="More ways to add files"]'),
+    ).toBeNull()
   })
 })

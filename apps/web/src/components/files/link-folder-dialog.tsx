@@ -17,9 +17,25 @@ import { formatBytes } from '@spaces/core/documents'
  * Link a Drive folder (D66): a window titled with the Drive path in mono —
  * where the files land, what is inside, and the three options whose hints
  * survive the invariant-line test (cost, privacy, consequence).
- * - The binding itself is not built yet, so Link folder stays disabled; the
- *   options are the ones a binding will store.
+ * - Presentational: the caller binds and says how it went; a refusal (the
+ *   folder already has an owner) stays in the window, above the foot.
+ * - The dialog sets no direction: a binding made here reads, Drive → us.
  */
+
+/** What Link folder stores on the binding. */
+export type FolderOptions = {
+  readonly mapSubfolders: boolean
+  readonly retain: 'full' | 'text'
+  readonly direction: 'pull'
+  readonly sensitivity: 'inherit' | 'sensitive'
+}
+
+export const DEFAULT_FOLDER_OPTIONS: FolderOptions = {
+  mapSubfolders: true,
+  retain: 'full',
+  direction: 'pull',
+  sensitivity: 'inherit',
+}
 
 export type FolderInside = {
   readonly files: number
@@ -32,6 +48,10 @@ export function LinkFolderDialog({
   recordName,
   inside,
   onOpenChange,
+  onLink,
+  linking = false,
+  refusal = null,
+  initial = DEFAULT_FOLDER_OPTIONS,
 }: {
   /** The folder as Drive names it, or the link pasted; null when closed. */
   path: string | null
@@ -39,10 +59,19 @@ export function LinkFolderDialog({
   /** What the folder holds, once listed; null when not known. */
   inside: FolderInside | null
   onOpenChange: (open: boolean) => void
+  onLink: (options: FolderOptions) => void
+  /** The bind is on its way; Link folder waits. */
+  linking?: boolean
+  /** Why the last Link folder was refused; null for none. */
+  refusal?: string | null
+  /** The options to open with: a bind resumed after Google's consent. */
+  initial?: FolderOptions
 }) {
-  const [mapSubfolders, setMapSubfolders] = useState(true)
-  const [keep, setKeep] = useState<'full' | 'text'>('full')
-  const [sensitive, setSensitive] = useState(false)
+  const [mapSubfolders, setMapSubfolders] = useState(initial.mapSubfolders)
+  const [keep, setKeep] = useState<'full' | 'text'>(initial.retain)
+  const [sensitive, setSensitive] = useState(
+    initial.sensitivity === 'sensitive',
+  )
   const size = inside === null ? null : formatBytes(inside.bytes)
 
   return (
@@ -118,11 +147,28 @@ export function LinkFolderDialog({
             </span>
           </label>
         </div>
-        <DialogFooter>
+        {refusal === null ? null : (
+          <p role="alert" className="pt-3 text-label text-destructive">
+            {refusal}
+          </p>
+        )}
+        <DialogFooter note="read-only · files under this folder">
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button disabled title="Folder binding is not available yet">
+          <Button
+            type="button"
+            pending={linking}
+            disabled={linking}
+            onClick={() =>
+              onLink({
+                mapSubfolders,
+                retain: keep,
+                direction: 'pull',
+                sensitivity: sensitive ? 'sensitive' : 'inherit',
+              })
+            }
+          >
             Link folder
           </Button>
         </DialogFooter>
