@@ -14,6 +14,11 @@ const config = defineConfig({
   // the compose files) put it. Anchored to this file rather than to cwd.
   envDir: fileURLToPath(new URL('../../', import.meta.url)),
   resolve: { tsconfigPaths: true },
+  // The email sanitizer runs DOMPurify over jsdom on the server. jsdom is
+  // CommonJS; vite's dev SSR rewrite hoists a read of its `window` constant
+  // above its declaration, so Node loads it untouched instead. Production
+  // does the same through `traceDeps` below.
+  ssr: { external: ['jsdom', 'dompurify'] },
   plugins: [
     devtools(),
     // jsdom reads its stylesheet beside its own files at runtime, so it is
