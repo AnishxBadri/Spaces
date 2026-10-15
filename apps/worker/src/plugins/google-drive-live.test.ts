@@ -93,7 +93,7 @@ describe('google-drive with the fakes on', () => {
     expect(paths).toContain(
       'My Drive/Acme Data Room/02 Finance/Board/Minutes Q3.pdf',
     )
-    expect(paths).toHaveLength(8)
+    expect(paths).toHaveLength(17)
     // Every request went to the fake, with the fake's token.
     const api = fakes.api('google-drive')
     expect(api?.requests.length).toBeGreaterThan(0)

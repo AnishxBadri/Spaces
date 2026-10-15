@@ -77,8 +77,8 @@ export type FakeDriveSeedItem =
 
 /**
  * The data room. `dataroom` holds five direct children, so a page size of 2
- * takes three pages; `board` is three deep; `sd-portfolio` is a shared
- * drive's root.
+ * takes three pages, and fourteen files in its whole subtree; `board` is
+ * three deep; `sd-portfolio` is a shared drive's root.
  */
 export const FAKE_DRIVE_SEED: ReadonlyArray<FakeDriveSeedItem> = [
   { kind: 'folder', id: 'root', name: 'My Drive', parentId: null },
@@ -116,6 +116,54 @@ export const FAKE_DRIVE_SEED: ReadonlyArray<FakeDriveSeedItem> = [
     mime: 'application/pdf',
     content: '%PDF-1.7 SPA',
   },
+  {
+    kind: 'file',
+    id: 'termsheet',
+    name: 'Term sheet.pdf',
+    parentId: 'legal',
+    mime: 'application/pdf',
+    content: '%PDF-1.7 Acme term sheet',
+  },
+  {
+    kind: 'file',
+    id: 'shareholders',
+    name: 'Shareholders agreement.pdf',
+    parentId: 'legal',
+    mime: 'application/pdf',
+    content: '%PDF-1.7 SHA',
+  },
+  {
+    kind: 'file',
+    id: 'articles',
+    name: 'Articles of association.pdf',
+    parentId: 'legal',
+    mime: 'application/pdf',
+    content: '%PDF-1.7 articles',
+  },
+  {
+    kind: 'file',
+    id: 'accounts',
+    name: 'FY2025 accounts.pdf',
+    parentId: 'finance',
+    mime: 'application/pdf',
+    content: '%PDF-1.7 FY2025 accounts',
+  },
+  {
+    kind: 'file',
+    id: 'model',
+    name: 'Financial model.xlsx',
+    parentId: 'finance',
+    mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    content: 'PK financial model',
+  },
+  {
+    kind: 'file',
+    id: 'budget',
+    name: 'Budget 2026.xlsx',
+    parentId: 'finance',
+    mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    content: 'PK budget 2026',
+  },
   { kind: 'folder', id: 'board', name: 'Board', parentId: 'finance' },
   {
     kind: 'file',
@@ -124,6 +172,30 @@ export const FAKE_DRIVE_SEED: ReadonlyArray<FakeDriveSeedItem> = [
     parentId: 'board',
     mime: 'application/pdf',
     content: '%PDF-1.7 Q3 minutes',
+  },
+  {
+    kind: 'file',
+    id: 'minutes-q1',
+    name: 'Minutes Q1.pdf',
+    parentId: 'board',
+    mime: 'application/pdf',
+    content: '%PDF-1.7 Q1 minutes',
+  },
+  {
+    kind: 'file',
+    id: 'minutes-q2',
+    name: 'Minutes Q2.pdf',
+    parentId: 'board',
+    mime: 'application/pdf',
+    content: '%PDF-1.7 Q2 minutes',
+  },
+  {
+    kind: 'file',
+    id: 'boardpack',
+    name: 'Board pack Q3.pdf',
+    parentId: 'board',
+    mime: 'application/pdf',
+    content: '%PDF-1.7 Q3 board pack',
   },
   { kind: 'folder', id: 'sd-portfolio', name: 'Portfolio', parentId: null },
   {

@@ -30,12 +30,27 @@ import type { BindStorageFolderData } from '../jobs/bind-storage-folder'
 /**
  * Link a Drive folder end to end on the real google-drive bundle against the
  * fake Drive's seeded data room: `getFolder` supplies the ancestry the
- * nesting guard tests, and a refusal is the job's permanent reason.
+ * nesting guard tests, a refusal is the job's permanent reason, and a bind
+ * sends its first sync.
  */
 
 const NoEnqueue = Layer.succeed(
   Enqueue,
   Enqueue.of({ enqueue: () => Effect.succeed(null) }),
+)
+
+/** Every job the bind sent. */
+const sent: Array<{ queue: string; data: unknown; key: string | undefined }> =
+  []
+const Recording = Layer.succeed(
+  Enqueue,
+  Enqueue.of({
+    enqueue: (queue, data, options) =>
+      Effect.sync(() => {
+        sent.push({ queue, data, key: options?.singletonKey })
+        return `job-${String(sent.length)}`
+      }),
+  }),
 )
 
 const hosts: Array<PluginHost> = []
@@ -45,6 +60,7 @@ afterEach(async () => {
 })
 
 beforeEach(async () => {
+  sent.length = 0
   await db.delete(storageBinding).where(isNotNull(storageBinding.id))
   await db
     .update(integration)
@@ -122,7 +138,7 @@ const wiredDrive = async (api: FakeDriveApi) => {
 const run = (data: BindStorageFolderData, layer: Layer.Layer<StorageSources>) =>
   Effect.runPromiseExit(
     bindStorageFolder.run(data).pipe(
-      Effect.provide(layer),
+      Effect.provide(Layer.merge(layer, Recording)),
       Effect.provideService(
         JobContext,
         JobContext.of({
@@ -166,6 +182,17 @@ describe('storage.bind-folder on the google-drive bundle', () => {
       layer,
     )
     expect(Exit.isSuccess(bound)).toBe(true)
+    const binding = (
+      await db.select({ id: storageBinding.id }).from(storageBinding)
+    ).at(0)
+    // The first sync, keyed by the binding so two never overlap.
+    expect(sent).toEqual([
+      {
+        queue: QUEUES.syncStorageBinding,
+        data: { bindingId: binding?.id },
+        key: binding?.id,
+      },
+    ])
     expect(
       await db
         .select({
@@ -234,5 +261,7 @@ describe('storage.bind-folder on the google-drive bundle', () => {
     expect(
       reasonOf(await run({ ...base, folder: { id: 'never-seeded' } }, layer)),
     ).toBe(BIND_REFUSALS.notFound)
+    // A refused bind sends no sync.
+    expect(sent).toEqual([])
   })
 })

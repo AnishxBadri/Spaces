@@ -176,6 +176,8 @@ export type PluginHost = {
   ) => ReadonlyArray<string> | null
   /** The plugin as loaded for a wired integration; null when it is not wired. */
   readonly loaded: (integrationId: string) => LoadedPlugin | null
+  /** A wired integration's breaker, for a core job that ran its provider; null when not wired. */
+  readonly breakerFor: (integrationId: string) => JobBreaker | null
 }
 
 type JobRun = (input: JobInput) => unknown
@@ -767,6 +769,17 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
   const loaded = (integrationId: string) =>
     wired.get(integrationId)?.plugin ?? null
 
+  const breakerFor = (integrationId: string): JobBreaker | null => {
+    const plugin = wired.get(integrationId)
+    return plugin === undefined
+      ? null
+      : {
+          integrationId,
+          group: breakerGroup(plugin.id),
+          onTrip: () => tripLater(integrationId),
+        }
+  }
+
   return {
     wire,
     release,
@@ -776,5 +789,6 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
     invoke,
     granted,
     loaded,
+    breakerFor,
   }
 }

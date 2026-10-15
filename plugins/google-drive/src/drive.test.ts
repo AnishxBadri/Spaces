@@ -551,13 +551,22 @@ describe('the list job', () => {
       'My Drive/Acme Data Room/Acme deck.pdf',
       'My Drive/Acme Data Room/Cap table.xlsx',
       'My Drive/Acme Data Room/Investment memo',
+      'My Drive/Acme Data Room/01 Legal/Articles of association.pdf',
       'My Drive/Acme Data Room/01 Legal/Share purchase agreement.pdf',
+      'My Drive/Acme Data Room/01 Legal/Shareholders agreement.pdf',
+      'My Drive/Acme Data Room/01 Legal/Term sheet.pdf',
       'My Drive/Acme Data Room/02 Finance/Board',
+      'My Drive/Acme Data Room/02 Finance/Budget 2026.xlsx',
+      'My Drive/Acme Data Room/02 Finance/Financial model.xlsx',
+      'My Drive/Acme Data Room/02 Finance/FY2025 accounts.pdf',
+      'My Drive/Acme Data Room/02 Finance/Board/Board pack Q3.pdf',
+      'My Drive/Acme Data Room/02 Finance/Board/Minutes Q1.pdf',
+      'My Drive/Acme Data Room/02 Finance/Board/Minutes Q2.pdf',
       'My Drive/Acme Data Room/02 Finance/Board/Minutes Q3.pdf',
     ])
     expect(log.lines.at(-1)).toMatchObject({
       message: 'listed',
-      fields: { entries: 8 },
+      fields: { entries: 17 },
     })
   })
 

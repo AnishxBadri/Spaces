@@ -25,6 +25,8 @@ import {
   fetchStorageFile,
 } from './jobs/fetch-storage-file'
 import { bindStorageFolder } from './jobs/bind-storage-folder'
+import { syncStorageBinding } from './jobs/sync-storage-binding'
+import { pluginBreakerLayer } from './plugins/breaker'
 import { dedupeSweep } from './jobs/dedupe-sweep'
 import { sweepOrphanBlobs } from './jobs/sweep-orphan-blobs'
 import { pruneIngress } from './jobs/prune-ingress'
@@ -157,6 +159,35 @@ async function main() {
     QUEUES.restampSensitivity,
     { batchSize: 1, includeMetadata: true },
     runJob(restampSensitivity, { host, layer: Layer.empty }),
+  )
+  // A binding's sync: `stately` with `singletonKey = bindingId`, so two
+  // syncs of one binding never overlap and a re-sync sent meanwhile runs
+  // after. A data room's walk is many downloads, so an hour before pg-boss
+  // expires it. Created before the plain create loop below; a queue's policy
+  // is fixed at create.
+  await boss
+    .createQueue(QUEUES.syncStorageBinding, {
+      policy: 'stately',
+      expireInSeconds: 60 * 60,
+    })
+    .catch(() => {})
+  if (syncStorageBinding.retry)
+    await boss.updateQueue(QUEUES.syncStorageBinding, {
+      retryLimit: syncStorageBinding.retry.limit,
+      retryDelay: syncStorageBinding.retry.delaySeconds,
+      retryBackoff: syncStorageBinding.retry.backoff,
+    })
+  await boss.work(
+    QUEUES.syncStorageBinding,
+    { batchSize: 1, includeMetadata: true },
+    runJob(syncStorageBinding, {
+      host,
+      layer: Layer.mergeAll(
+        storageSourcesLayer(plugins, { fakes }),
+        fetchStorageEnqueue,
+        pluginBreakerLayer(plugins),
+      ),
+    }),
   )
   // An enrichment run (D76): `stately` with `singletonKey = entityId`, so a
   // burst of triggers on one record is one queued run. Its sources run in
@@ -468,13 +499,17 @@ async function main() {
     }),
   )
   // Link a Drive folder: one getFolder through the binding user's grant,
-  // then the guarded bind. Batch of one, for the fetch's reason.
+  // then the guarded bind, which sends the first sync. Batch of one, for the
+  // fetch's reason.
   await boss.work(
     QUEUES.bindStorageFolder,
     { batchSize: 1, includeMetadata: true },
     runJob(bindStorageFolder, {
       host,
-      layer: storageSourcesLayer(plugins, { fakes }),
+      layer: Layer.merge(
+        storageSourcesLayer(plugins, { fakes }),
+        fetchStorageEnqueue,
+      ),
     }),
   )
   // The nightly dedupe sweep, on the 03:30 schedule below. One statement per

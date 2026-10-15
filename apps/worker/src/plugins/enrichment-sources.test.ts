@@ -64,6 +64,7 @@ const hostFor = (plugin: LoadedPlugin | null) => {
       }),
     granted: () => null,
     loaded: () => plugin,
+    breakerFor: () => null,
   }
   return { host, invoked }
 }

@@ -1,4 +1,3 @@
-import { Readable } from 'node:stream'
 import { Effect, Schema } from 'effect'
 import type { Layer } from 'effect'
 import { and, eq } from 'drizzle-orm'
@@ -6,6 +5,7 @@ import { z } from 'zod'
 import { db } from '@spaces/db'
 import { accountConnection, document } from '@spaces/db/schema'
 import { guessDocumentKind } from '@spaces/core/documents'
+import { readableOf } from '@spaces/core/documents/web-stream'
 import { Enqueue } from '@spaces/core/queue/enqueue'
 import { QUEUES } from '@spaces/core/queue/names'
 import { canonicalFileUrl } from '@spaces/core/writes/connections/sources'
@@ -82,31 +82,6 @@ const fromSource = (error: StorageSourceError): JobFailure => {
       })
     case 'CursorExpired':
       return new JobRetryable({ reason: 'a provider cursor expired' })
-  }
-}
-
-/**
- * A web stream's chunks for `Readable.from`. A reader that stops early — the
- * size meter destroying the stream — cancels the source, so the provider
- * stops sending.
- */
-async function* chunksOf(
-  stream: ReadableStream<Uint8Array>,
-): AsyncGenerator<Uint8Array> {
-  const reader = stream.getReader()
-  let done = false
-  try {
-    for (;;) {
-      const next = await reader.read()
-      if (next.done) {
-        done = true
-        return
-      }
-      yield next.value
-    }
-  } finally {
-    if (!done) await reader.cancel().catch(() => undefined)
-    reader.releaseLock()
   }
 }
 
@@ -214,7 +189,7 @@ const program = Effect.fn('fetchStorageFile')(function* (
     ),
   )
   const born = yield* intakeDocumentProgram({
-    stream: Readable.from(chunksOf(file.stream)),
+    stream: readableOf(file.stream),
     filename: file.name,
     mime: file.mime,
     // The port reports no size, and an export has none: the meter decides.

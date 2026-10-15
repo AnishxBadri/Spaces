@@ -689,6 +689,9 @@ describe('the fake Drive', () => {
       'spa@finance',
       'nda@legal',
       'deck@dataroom',
+      '-boardpack',
+      '-minutes-q1',
+      '-minutes-q2',
       '-minutes',
       '-board',
     ])

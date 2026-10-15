@@ -65,6 +65,14 @@ export const QUEUES = {
    */
   bindStorageFolder: 'storage.bind-folder',
   /**
+   * A binding's sync: the bound folder walked through the storage-source
+   * plugin with the binder's grant, every file filed on the bound record.
+   * Sent by a successful bind; a re-sync is the same job sent again. Created
+   * `stately` and sent with `singletonKey = bindingId`, so two syncs of one
+   * binding never overlap; a re-run files nothing twice.
+   */
+  syncStorageBinding: 'storage.sync',
+  /**
    * The deck reader (SPA-90): a `kind: deck` document → one `attribute_patch`
    * suggestion per record it is filed against. Created with the `exclusive`
    * policy and sent with `singletonKey = documentId`, so a second press while

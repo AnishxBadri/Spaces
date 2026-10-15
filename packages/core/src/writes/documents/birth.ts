@@ -74,6 +74,10 @@ export type DocumentProvenance = {
   externalUrl?: string | null
   /** Whose account it came through. */
   connectionId?: string | null
+  /** Whether the provider still holds it (§8): `linked` from a sync. */
+  externalStatus?: 'linked' | 'gone' | null
+  /** The binding whose sync filed it — provenance, never the dedupe key. */
+  bindingId?: string | null
 }
 
 /**
@@ -283,7 +287,7 @@ const existingFiling = Effect.fn('birth.existingFiling')(function* (
  * and against `entity_space`'s composite primary key, the SPA-50 pattern, so
  * two drops racing produce one edge rather than one edge and one violation.
  */
-async function addEdges(
+export async function addEdges(
   tx: BirthTx,
   documentId: string,
   targets: Array<DocumentFilingTarget>,
@@ -351,7 +355,7 @@ async function clearPendingBlob(
   await tx.delete(pendingBlob).where(eq(pendingBlob.sha, blobSha))
 }
 
-type BirthTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+export type BirthTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 /**
  * A dedupe is still an arrival: the first per actor writes a
@@ -432,6 +436,8 @@ async function insertDocumentRows(
     externalId: input.provenance.externalId ?? null,
     externalUrl: input.provenance.externalUrl ?? null,
     connectionId: input.provenance.connectionId ?? null,
+    externalStatus: input.provenance.externalStatus ?? null,
+    bindingId: input.provenance.bindingId ?? null,
     uploadedBy: userId,
     ...(extraction === null
       ? {}

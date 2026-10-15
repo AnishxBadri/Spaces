@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { accountConnection } from '@spaces/db/schema'
+import { Enqueue } from '@spaces/core/queue/enqueue'
 import { QUEUES } from '@spaces/core/queue/names'
 import { bindFolderProgram } from '@spaces/core/writes/bindings/bind'
 import type { StorageSourceError } from '@spaces/sdk'
@@ -14,7 +15,8 @@ import type { JobDef, JobFailure } from '../run-job'
  * storage.bind-folder — Link a Drive folder: the folder (a pasted link, or
  * an id from the picker) is read through the storage-source plugin with the
  * binding user's grant, and its ancestry from `getFolder` is what the
- * nesting guard of `bindFolderProgram` tests. Nothing is synced here.
+ * nesting guard of `bindFolderProgram` tests. A bound folder's first sync
+ * is sent from here (`storage.sync`, keyed by the binding).
  * - Every refusal is a `JobPermanent` whose reason the bind dialog shows.
  */
 
@@ -121,16 +123,26 @@ const program = Effect.fn('bindStorageFolder')(function* (
         Effect.fail(new JobRetryable({ reason: 'binding store unavailable' })),
     }),
   )
-  return `bound ${path} as ${bound.id}`
+  const queue = yield* Enqueue
+  const sync = yield* queue.enqueue(
+    QUEUES.syncStorageBinding,
+    { bindingId: bound.id },
+    { singletonKey: bound.id },
+  )
+  return sync === null
+    ? `bound ${path} as ${bound.id}; its first sync could not be sent`
+    : `bound ${path} as ${bound.id}`
 })
 
-export const bindStorageFolder: JobDef<BindStorageFolderData, StorageSources> =
-  {
-    name: QUEUES.bindStorageFolder,
-    schema: bindStorageFolderData,
-    // The record it was linked on: the run shows in that record's history.
-    refs: (data) => ({ entityId: data.targetEntityId }),
-    // Retries are for a store that blinked; a rate limit reschedules itself.
-    retry: { limit: 2, delaySeconds: 30, backoff: true },
-    run: (data) => Effect.scoped(program(data)),
-  }
+export const bindStorageFolder: JobDef<
+  BindStorageFolderData,
+  StorageSources | Enqueue
+> = {
+  name: QUEUES.bindStorageFolder,
+  schema: bindStorageFolderData,
+  // The record it was linked on: the run shows in that record's history.
+  refs: (data) => ({ entityId: data.targetEntityId }),
+  // Retries are for a store that blinked; a rate limit reschedules itself.
+  retry: { limit: 2, delaySeconds: 30, backoff: true },
+  run: (data) => Effect.scoped(program(data)),
+}

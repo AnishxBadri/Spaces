@@ -376,6 +376,35 @@ async function chargeBreaker(
 }
 
 /**
+ * Charges one failure a core job met inside a plugin's provider — a storage
+ * sync's dead token — the way a failed attempt on the plugin's own queues is.
+ * - In its own transaction: the core job's `job_run` row is not the plugin's.
+ * - Never throws; a failed charge is logged and the job's outcome stands.
+ */
+export async function chargePluginBreaker(
+  breaker: JobBreaker,
+  error: string,
+): Promise<void> {
+  let tripped = false
+  try {
+    tripped = await db.transaction((tx) => chargeBreaker(tx, breaker, error))
+  } catch (err) {
+    console.error(
+      `[worker] ${breaker.group}: could not charge the breaker — ${messageOf(err)}`,
+    )
+    return
+  }
+  if (!tripped) return
+  try {
+    breaker.onTrip()
+  } catch (err) {
+    console.error(
+      `[worker] ${breaker.group}: the breaker tripped and its handler threw — ${messageOf(err)}`,
+    )
+  }
+}
+
+/**
  * Only a failure the plugin owns is charged: never a throttle, a skip or a
  * lost host.
  */
