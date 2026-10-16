@@ -1,30 +1,28 @@
 import { Effect } from 'effect'
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import {
-  accountConnection,
-  document,
-  entity,
-  storageBinding,
-} from '@spaces/db/schema'
+import { accountConnection, entity, storageBinding } from '@spaces/db/schema'
 import type { StorageEntry, StorageFolder, StorageSource } from '@spaces/sdk'
 import type { ItemTarget } from '../../documents/resolve-item'
 import { Enqueue } from '../../queue/enqueue'
 import { QUEUES } from '../../queue/names'
 import { BindingStoreFailed } from './bind'
+import { heldDocumentOf, reviseDocumentProgram } from './revise'
 import { bindingFiler, markBindingFailedProgram } from './sync'
+import type { HeldDocument } from './revise'
 import type { BindingFiler, SyncBinding, SyncFailure } from './sync'
 
 /**
  * The change poll: one `changes` pass per connection, fanned out to the
- * folder bindings it touches (docs/spec-storage-sources.md §8, first row).
+ * folder bindings it touches (docs/spec-storage-sources.md §8, first two rows).
  * - The cursor is the connection's (`storage_cursor`): one pass reads every
  *   drive the connection sees, so two bindings on one drive share it.
  * - The cursor advances only once the whole page is handled. A page cut
  *   short is replayed whole next time, and a file it already filed is held,
  *   so nothing is filed twice.
- * - Only a new file is acted on. A removal, or a change to a file already
- *   held, is left for the modify and remove rows.
+ * - A new file is filed; a held file a live binding brought is revised when
+ *   its token moved (`reviseDocumentProgram`). A removal, a rename or move,
+ *   and a held file no live binding brought are left alone.
  */
 
 /** A connection is polled once one of its bindings last synced this long ago. */
@@ -50,7 +48,12 @@ export type PollTally = {
   /** Filed meanwhile by a sync of the same file: claimed, not downloaded. */
   readonly held: number
   readonly attached: number
-  /** A removal, a folder, or a file already held: not this poll's to act on. */
+  /** Held files whose bytes advanced to a new revision. */
+  readonly revised: number
+  /**
+   * A removal, a folder, a held file with the token it already has, or one
+   * no live binding brought: nothing to do.
+   */
   readonly ignored: number
   /** A new file outside every bound subtree. */
   readonly outside: number
@@ -177,23 +180,6 @@ const markPolled = (bindingIds: ReadonlyArray<string>) =>
             ),
           ),
       )
-
-const isHeld = (connectionId: string, externalId: string) =>
-  query(
-    async () =>
-      (
-        await db
-          .select({ id: document.entityId })
-          .from(document)
-          .where(
-            and(
-              eq(document.connectionId, connectionId),
-              eq(document.externalId, externalId),
-            ),
-          )
-          .limit(1)
-      ).length > 0,
-  )
 
 /** A filing the binding's target refused: the binding is marked and leaves the poll. */
 type Refused = { readonly _tag: 'refused'; readonly reason: string }
@@ -323,18 +309,44 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
     let filed = 0
     let held = 0
     let attached = 0
+    let revised = 0
     let ignored = 0
     let outside = 0
     const skipped: Array<{ name: string; reason: string }> = []
     const refused: Array<{ bindingId: string; reason: string }> = []
 
-    const newFile = Effect.fn('pollStorage.newFile')(function* (
+    /** A held file: revised only for a binding still live in this poll. */
+    const heldFile = Effect.fn('pollStorage.heldFile')(function* (
+      doc: HeldDocument,
       entry: StorageEntry,
     ) {
-      if (yield* isHeld(connection.connectionId, entry.id)) {
+      const bound = [...live.values()].some((b) => b.id === doc.bindingId)
+      if (!bound) {
         ignored += 1
         return
       }
+      const outcome = yield* reviseDocumentProgram({
+        held: doc,
+        entry,
+        source,
+      })
+      switch (outcome._tag) {
+        case 'revised':
+          revised += 1
+          break
+        case 'unchanged':
+          ignored += 1
+          break
+        case 'skipped':
+          skipped.push({ name: entry.name, reason: outcome.reason })
+      }
+    })
+
+    const changedFile = Effect.fn('pollStorage.changedFile')(function* (
+      entry: StorageEntry,
+    ) {
+      const doc = yield* heldDocumentOf(connection.connectionId, entry.id)
+      if (doc !== null) return yield* heldFile(doc, entry)
       const at = entry.parentId === null ? null : yield* locate(entry.parentId)
       if (entry.parentId === null || at === null) {
         outside += 1
@@ -380,14 +392,23 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
         ignored += 1
         continue
       }
-      yield* newFile(change.entry)
+      yield* changedFile(change.entry)
     }
 
     yield* storeCursor(connection.connectionId, page.next)
     yield* markPolled([...live.values()].map((b) => b.id))
     const polled: PollOutcome = {
       _tag: 'polled',
-      tally: { filed, held, attached, ignored, outside, skipped, refused },
+      tally: {
+        filed,
+        held,
+        attached,
+        revised,
+        ignored,
+        outside,
+        skipped,
+        refused,
+      },
     }
     return polled
   },

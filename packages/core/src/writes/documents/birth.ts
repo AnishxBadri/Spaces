@@ -78,6 +78,8 @@ export type DocumentProvenance = {
   externalStatus?: 'linked' | 'gone' | null
   /** The binding whose sync filed it — provenance, never the dedupe key. */
   bindingId?: string | null
+  /** The provider's revision these bytes were read at (`changeToken`). */
+  externalRevisionId?: string | null
 }
 
 /**
@@ -442,6 +444,7 @@ async function insertDocumentRows(
     connectionId: input.provenance.connectionId ?? null,
     externalStatus: input.provenance.externalStatus ?? null,
     bindingId: input.provenance.bindingId ?? null,
+    externalRevisionId: input.provenance.externalRevisionId ?? null,
     uploadedBy: userId,
     ...(extraction === null
       ? {}

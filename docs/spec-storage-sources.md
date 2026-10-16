@@ -742,6 +742,20 @@ binding's and does not apply to a pasted file, which is always `full`.
 already `error` with the provider's reason by then. Marking the binding
 `error` from it is the binding's (§5.5).
 
+**As built — the modified row (2026-10-16, SPA-288).** The revision id is
+the port's `changeToken`, stored on the row as `document.external_revision_id`
+at birth (the token `getFile` read the bytes at). The poll compares it with
+the change's token: equal is no change and reads nothing — which covers an
+unchanged Doc whose export is never byte-stable, and our own export seen
+again. A different token downloads; the same bytes only store the token,
+new bytes advance the row (a compare-and-set on sha and token), write the
+prior `(blob_sha, external_revision_id)` to `document_revision` and re-send
+extraction. Only a document a live binding brought is revised. The prior
+bytes stay: `blobIsReferenced` counts `document_revision.blob_sha`, and
+deleting a document reclaims its revisions' bytes once nothing else names
+them. Two edits between polls are one advance — the feed reports the latest
+state and the port has no revision list.
+
 ## 9. Derived layers — the storage layer as the AI substrate sees it (decided 2026-09-15)
 
 ```

@@ -4,6 +4,7 @@ import {
   aiRun,
   attributeEvent,
   chunk,
+  documentRevision,
   duplicateCandidate,
   enrichmentRecord,
   entity,
@@ -282,6 +283,15 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
     // The write-up is already reached through its own `tagged_in` edges to
     // every attendee, which is how it lands under "Filed here"; an item entry
     // here would walk the same note a second time and double-count it.
+    context: null,
+  },
+  {
+    // A followed document's prior bytes: history of the row, not an edge.
+    key: 'document_revision.document',
+    table: documentRevision,
+    column: documentRevision.documentId,
+    merge: { kind: 'none', why: 'document kind is not mergeable' },
+    del: { kind: 'cascade' }, // the history goes with the document
     context: null,
   },
   {

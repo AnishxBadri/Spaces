@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { Readable } from 'node:stream'
 import { Cause, Effect, Exit, Layer } from 'effect'
 import { and, eq, isNotNull, sql } from 'drizzle-orm'
@@ -8,6 +8,7 @@ import {
   accountConnection,
   chunk,
   document,
+  documentRevision,
   entity,
   entitySpace,
   integration,
@@ -21,7 +22,10 @@ import { bindFolderProgram } from '@spaces/core/writes/bindings/bind'
 import { encryptBundle } from '@spaces/core/writes/connections/bundle'
 import { intakeDocumentProgram } from '@spaces/core/writes/documents/intake'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
+import { storage } from '@spaces/core/writes/storage'
 import {
+  DOCX_MIME,
+  DRIVE_API,
   FAKE_DRIVE_RESEARCH_SEED,
   FAKE_DRIVE_SEED,
   makeFakeDriveApi,
@@ -42,6 +46,7 @@ import { storageSourcesLayer } from './storage-source'
 import { JobContext } from '../run-job'
 import type { JobFailure, JobResult } from '../run-job'
 import { pollStorageChanges } from '../jobs/poll-storage-changes'
+import { syncStorageBinding } from '../jobs/sync-storage-binding'
 
 /**
  * The change poll end to end on the real google-drive bundle against the fake
@@ -155,6 +160,7 @@ const wiredDrive = async (
   integrationId: string
   sent: Array<Sent>
   poll: () => Promise<Exit.Exit<JobResult, JobFailure>>
+  sync: (bindingId: string) => Promise<Exit.Exit<JobResult, JobFailure>>
 }> => {
   const api = makeFakeDriveApi({ seed })
   const wire = counted(api)
@@ -203,22 +209,32 @@ const wiredDrive = async (
     recording,
     pluginBreakerLayer(host),
   )
+  const context = (queue: string) =>
+    JobContext.of({
+      queue,
+      jobId: `test-${randomUUID()}`,
+      attempt: 1,
+      isFinalAttempt: true,
+    })
   const poll = () =>
     Effect.runPromiseExit(
-      pollStorageChanges.run({}).pipe(
-        Effect.provide(layer),
-        Effect.provideService(
-          JobContext,
-          JobContext.of({
-            queue: QUEUES.pollStorageChanges,
-            jobId: `test-${randomUUID()}`,
-            attempt: 1,
-            isFinalAttempt: true,
-          }),
+      pollStorageChanges
+        .run({})
+        .pipe(
+          Effect.provide(layer),
+          Effect.provideService(JobContext, context(QUEUES.pollStorageChanges)),
         ),
-      ),
     )
-  return { api, wire, integrationId: row.id, sent, poll }
+  const sync = (bindingId: string) =>
+    Effect.runPromiseExit(
+      syncStorageBinding
+        .run({ bindingId })
+        .pipe(
+          Effect.provide(layer),
+          Effect.provideService(JobContext, context(QUEUES.syncStorageBinding)),
+        ),
+    )
+  return { api, wire, integrationId: row.id, sent, poll, sync }
 }
 
 const bind = async (input: {
@@ -263,6 +279,25 @@ const FINANCE = {
   path: 'My Drive / Acme Data Room / 02 Finance',
 }
 
+const ROOM = {
+  folderId: 'dataroom',
+  ancestorIds: ['root'],
+  path: 'My Drive / Acme Data Room',
+}
+
+const sha256 = (text: string) => createHash('sha256').update(text).digest('hex')
+
+/** A document's prior revisions, oldest first. */
+const revisionsOf = (documentId: string) =>
+  db
+    .select({
+      blobSha: documentRevision.blobSha,
+      externalRevisionId: documentRevision.externalRevisionId,
+    })
+    .from(documentRevision)
+    .where(eq(documentRevision.documentId, documentId))
+    .orderBy(documentRevision.at, documentRevision.id)
+
 const aFile = (
   id: string,
   parentId: string,
@@ -296,7 +331,7 @@ const age = () =>
     .set({ lastSyncedAt: sql`now() - interval '1 hour'` })
     .where(isNotNull(storageBinding.id))
 
-const byExternalId = async (externalId: string) =>
+const byExternalId = async (externalId: string, connectionId?: string) =>
   db
     .select({
       id: document.entityId,
@@ -304,10 +339,18 @@ const byExternalId = async (externalId: string) =>
       sourcePath: document.sourcePath,
       externalStatus: document.externalStatus,
       blobSha: document.blobSha,
+      externalRevisionId: document.externalRevisionId,
       kind: document.kind,
     })
     .from(document)
-    .where(eq(document.externalId, externalId))
+    .where(
+      and(
+        eq(document.externalId, externalId),
+        connectionId === undefined
+          ? undefined
+          : eq(document.connectionId, connectionId),
+      ),
+    )
 
 const taggedIn = async (documentId: string) =>
   (
@@ -350,7 +393,7 @@ describe('storage.poll on the google-drive bundle', () => {
     await age()
     const from = drive.api.requests.length
     expect(succeeded(await drive.poll())).toBe(
-      `polled 1 connections: ${connectionId}: 2 new, 0 held, 0 attached by sha, 0 ignored, 1 outside`,
+      `polled 1 connections: ${connectionId}: 2 new, 0 held, 0 attached by sha, 0 ignored, 1 outside, 0 revised`,
     )
 
     const requests = since(drive.api, from)
@@ -436,28 +479,217 @@ describe('storage.poll on the google-drive bundle', () => {
     expect(await cursorOf(connectionId)).not.toBe(cursor)
   })
 
-  it('an edit to a held file and a removal are ignored, not mishandled', async () => {
+  it('the seeded Sheet edited twice advances twice: two revisions in order, one current sha, one extraction per advance', async () => {
+    const drive = await wiredDrive()
+    const connectionId = await aConnection()
+    const deal = await aRecord('deal', 'Acme')
+    const room = await bind({ connectionId, ...ROOM, target: deal })
+    succeeded(await drive.poll())
+    succeeded(await drive.sync(room))
+    const first = (await byExternalId('captable', connectionId)).at(0)
+    if (first === undefined) throw new Error('the walk filed no Sheet')
+    const extractions = () =>
+      drive.sent.filter(
+        (s) =>
+          s.queue === QUEUES.extractDocument && s.data.documentId === first.id,
+      ).length
+    expect(extractions()).toBe(1)
+
+    drive.api.drive.edit('captable', 'PK cap table, round two')
+    await age()
+    expect(String(succeeded(await drive.poll()))).toMatch(
+      /: 0 new, 0 held, 0 attached by sha, 0 ignored, 0 outside, 1 revised$/,
+    )
+    const second = (await byExternalId('captable', connectionId)).at(0)
+    drive.api.drive.edit('captable', 'PK cap table, round three')
+    await age()
+    expect(String(succeeded(await drive.poll()))).toMatch(/, 1 revised$/)
+
+    const current = await byExternalId('captable', connectionId)
+    expect(current).toHaveLength(1)
+    expect(current.at(0)).toMatchObject({
+      id: first.id,
+      blobSha: sha256('PK cap table, round three'),
+      externalRevisionId: drive.api.drive.entry('captable')?.changeToken,
+    })
+    expect(await revisionsOf(first.id)).toEqual([
+      { blobSha: first.blobSha, externalRevisionId: first.externalRevisionId },
+      {
+        blobSha: sha256('PK cap table, round two'),
+        externalRevisionId: second?.externalRevisionId,
+      },
+    ])
+    expect(second?.externalRevisionId).not.toBe(first.externalRevisionId)
+    expect(extractions()).toBe(3)
+    // The prior bytes are history the revisions still name.
+    for (const r of await revisionsOf(first.id))
+      expect(await storage().exists(r.blobSha)).toBe(true)
+  })
+
+  it('an unchanged native Doc on the feed is no revision, though a fresh export hashes differently', async () => {
+    const drive = await wiredDrive()
+    const connectionId = await aConnection()
+    const room = await bind({
+      connectionId,
+      ...ROOM,
+      target: await aRecord('deal', 'Acme'),
+    })
+    succeeded(await drive.poll())
+    succeeded(await drive.sync(room))
+    const memo = (await byExternalId('memo', connectionId)).at(0)
+    if (memo === undefined) throw new Error('the walk filed no memo')
+
+    // The trap: two exports of the same Doc are two shas under one token.
+    const exportSha = async () => {
+      const res = await drive.api.fetch(
+        `${DRIVE_API}/files/memo/export?mimeType=${encodeURIComponent(DOCX_MIME)}`,
+        {
+          method: 'GET',
+          headers: { authorization: `Bearer ${drive.api.accessToken}` },
+        },
+      )
+      return createHash('sha256')
+        .update(new Uint8Array(await res.arrayBuffer()))
+        .digest('hex')
+    }
+    const a = await exportSha()
+    const b = await exportSha()
+    expect(a).not.toBe(b)
+    expect(memo.blobSha).not.toBe(a)
+
+    drive.api.drive.nudge('memo')
+    await age()
+    const exports = drive.api.exports()
+    expect(String(succeeded(await drive.poll()))).toMatch(
+      /: 0 new, 0 held, 0 attached by sha, 1 ignored, 0 outside, 0 revised$/,
+    )
+    expect(drive.api.exports()).toBe(exports)
+    expect(await byExternalId('memo', connectionId)).toEqual([memo])
+    expect(await revisionsOf(memo.id)).toEqual([])
+  })
+
+  it('a replayed page revises once: idempotent on the document and the revision id', async () => {
     const drive = await wiredDrive()
     const connectionId = await aConnection()
     const deal = await aRecord('deal', 'Acme legal')
     await bind({ connectionId, ...LEGAL, target: deal })
     succeeded(await drive.poll())
-    drive.api.drive.add(aFile('kept', 'legal'))
+    drive.api.drive.add(aFile('replayed', 'legal'))
     await age()
     succeeded(await drive.poll())
-    const held = (await byExternalId('kept')).at(0)
-    const downloads = drive.wire.state.downloads
-    const count = await documentCount()
+    const kept = (await byExternalId('replayed')).at(0)
+    if (kept === undefined) throw new Error('not filed')
+    const cursor = await cursorOf(connectionId)
 
-    drive.api.drive.edit('kept', '%PDF-1.7 kept, edited')
-    drive.api.drive.remove('spa')
+    // The edit is read and the row advances; the next download fails, so
+    // the page is cut short and replayed whole.
+    drive.api.drive.edit('replayed', '%PDF-1.7 kept, edited')
+    drive.api.drive.add(aFile('later', 'legal'))
+    drive.wire.state.failAfter = drive.wire.state.downloads + 1
+    await age()
+    expect(String(succeeded(await drive.poll()))).toMatch(/rate limited/)
+    expect(await cursorOf(connectionId)).toBe(cursor)
+    expect(await revisionsOf(kept.id)).toHaveLength(1)
+
+    drive.wire.state.failAfter = Number.POSITIVE_INFINITY
     await age()
     expect(String(succeeded(await drive.poll()))).toMatch(
-      /: 0 new, 0 held, 0 attached by sha, 2 ignored, 0 outside/,
+      /: 1 new, 0 held, 0 attached by sha, 1 ignored, 0 outside, 0 revised$/,
+    )
+    expect(await revisionsOf(kept.id)).toEqual([
+      { blobSha: kept.blobSha, externalRevisionId: kept.externalRevisionId },
+    ])
+    expect(
+      drive.sent.filter(
+        (s) =>
+          s.queue === QUEUES.extractDocument && s.data.documentId === kept.id,
+      ),
+    ).toHaveLength(2)
+
+    // The index refuses a second row for the same revision outright.
+    await db
+      .insert(documentRevision)
+      .values({
+        documentId: kept.id,
+        blobSha: kept.blobSha ?? '',
+        externalRevisionId: kept.externalRevisionId,
+      })
+      .onConflictDoNothing()
+    expect(await revisionsOf(kept.id)).toHaveLength(1)
+  })
+
+  it('a change to a document we exported is a no-op: no download, no revision, no re-extract', async () => {
+    const drive = await wiredDrive()
+    const connectionId = await aConnection()
+    const deal = await aRecord('deal', 'Acme legal')
+    const legal = await bind({ connectionId, ...LEGAL, target: deal })
+    succeeded(await drive.poll())
+
+    // What an exporter leaves behind: the file put in Drive, and our row
+    // holding its id and the revision the put made.
+    const bytes = '%PDF-1.7 our memo'
+    const exported = drive.api.drive.create({
+      kind: 'file',
+      name: 'Memo.pdf',
+      parentId: 'legal',
+      mime: 'application/pdf',
+      bytes: new TextEncoder().encode(bytes),
+    })
+    const ours = await Effect.runPromise(
+      intakeDocumentProgram({
+        stream: Readable.from([Buffer.from(bytes)]),
+        filename: 'Memo.pdf',
+        mime: 'application/pdf',
+        declaredSize: null,
+        kind: 'other',
+        sourceClass: 'integration',
+        sourceRef: drive.integrationId,
+        provenance: {
+          connectionId,
+          externalId: exported.id,
+          externalRevisionId: exported.changeToken,
+          externalStatus: 'linked',
+          bindingId: legal,
+          sourcePath: LEGAL.path,
+        },
+        fileAgainst: [{ kind: 'record', entityId: deal }],
+        actor: { userId: FIXTURE_ACTOR.id },
+      }).pipe(Effect.provide(NoEnqueue)),
+    )
+    const before = await byExternalId(exported.id)
+    const downloads = drive.wire.state.downloads
+
+    await age()
+    expect(String(succeeded(await drive.poll()))).toMatch(
+      /: 0 new, 0 held, 0 attached by sha, 1 ignored, 0 outside, 0 revised$/,
+    )
+    expect(drive.wire.state.downloads).toBe(downloads)
+    expect(await byExternalId(exported.id)).toEqual(before)
+    expect(await revisionsOf(ours.id)).toEqual([])
+    expect(
+      drive.sent.filter((s) => s.queue === QUEUES.extractDocument),
+    ).toEqual([])
+  })
+
+  it('a removal is ignored, not mishandled', async () => {
+    const drive = await wiredDrive()
+    const connectionId = await aConnection()
+    const deal = await aRecord('deal', 'Acme legal')
+    await bind({ connectionId, ...LEGAL, target: deal })
+    succeeded(await drive.poll())
+    drive.api.drive.add(aFile('removed-one', 'legal'))
+    await age()
+    succeeded(await drive.poll())
+    const held = (await byExternalId('removed-one')).at(0)
+    const count = await documentCount()
+
+    drive.api.drive.remove('removed-one')
+    await age()
+    expect(String(succeeded(await drive.poll()))).toMatch(
+      /: 0 new, 0 held, 0 attached by sha, 1 ignored, 0 outside, 0 revised$/,
     )
     expect(await documentCount()).toBe(count)
-    expect(drive.wire.state.downloads).toBe(downloads)
-    expect(await byExternalId('kept')).toEqual([held])
+    expect(await byExternalId('removed-one')).toEqual([held])
   })
 
   it('an expired cursor re-syncs every binding on the connection and stores a fresh cursor', async () => {

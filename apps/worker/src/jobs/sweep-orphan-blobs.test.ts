@@ -233,6 +233,45 @@ describe('a prepare followed by a finalize', () => {
     expect(await storage().exists(sha)).toBe(false)
   })
 
+  it('keeps bytes another document’s revision names, and takes a deleted document’s own history', async () => {
+    const { db } = await import('@spaces/db')
+    const { documentRevision } = await import('@spaces/db/schema')
+    const { storage } = await import('@spaces/core/writes/storage')
+    const { deleteDocumentWithBlobGc } = await import('#web/lib/server/shared')
+    const tag = randomUUID().slice(0, 8)
+    const shared = await prepareAndPut(`s-${tag}`)
+    const own = await prepareAndPut(`o-${tag}`)
+    const current = await prepareAndPut(`c-${tag}`)
+    const holder = await fileIt(
+      shared.sha,
+      `h-${tag}`,
+      await aCompany(`h-${tag}`),
+    )
+    // A followed document that advanced past both: its history names them.
+    const followed = await fileIt(
+      current.sha,
+      `f-${tag}`,
+      await aCompany(`f-${tag}`),
+    )
+    await db.insert(documentRevision).values([
+      { documentId: followed.id, blobSha: shared.sha, externalRevisionId: '1' },
+      { documentId: followed.id, blobSha: own.sha, externalRevisionId: '2' },
+    ])
+    // Its bytes were once the row's current ones: the intent was spent then.
+    const { pendingBlob } = await import('@spaces/db/schema')
+    const { eq } = await import('drizzle-orm')
+    await db.delete(pendingBlob).where(eq(pendingBlob.sha, own.sha))
+
+    // The holder's bytes are still another document's prior revision.
+    await deleteDocumentWithBlobGc(holder.id)
+    expect(await storage().exists(shared.sha)).toBe(true)
+
+    // The followed document's history goes with it, and so do its bytes.
+    await deleteDocumentWithBlobGc(followed.id)
+    for (const { sha } of [shared, own, current])
+      expect(await storage().exists(sha), sha).toBe(false)
+  })
+
   it('takes the blob’s cached extractions with the bytes, and leaves a filed blob’s alone', async () => {
     // SPA-74: answers keyed by the sha go through the same reclaim the
     // bytes do, so neither direction of GC can strand one.

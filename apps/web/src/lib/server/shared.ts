@@ -5,6 +5,7 @@ import { db } from '@spaces/db'
 import {
   attribute,
   document,
+  documentRevision,
   entity,
   entitySpace,
   integration,
@@ -433,21 +434,26 @@ export async function deleteDocumentWithBlobGc(
       .where(eq(document.entityId, id))
   ).at(0)
   if (!row) return { ok: true }
+  // Its prior revisions go with it, so their bytes are candidates too.
+  const revisions = await db
+    .select({ blobSha: documentRevision.blobSha })
+    .from(documentRevision)
+    .where(eq(documentRevision.documentId, id))
 
   const { deleteEntityProgram } =
     await import('@spaces/core/writes/entities/delete')
   const { effectFn } = await import('./effect')
   await effectFn(deleteEntityProgram)(id)
 
-  if (row.blobSha) {
-    // Content addressing means one file can back several rows: the deck sent
-    // to both partners, or the same deck filed on a company and a space. The
-    // count itself is `blobIsReferenced` since SPA-54, because the orphan
-    // sweep asks the same question from the other direction and two copies
-    // of it would be two definitions of "still referenced". The reclaim
-    // takes the blob's derived rows with it (the extraction cache, SPA-74).
+  // Content addressing means one file can back several rows: the deck sent
+  // to both partners, or the same deck filed on a company and a space.
+  // `blobIsReferenced` is the one definition of "still referenced", shared
+  // with the orphan sweep; the reclaim takes the blob's derived rows with it.
+  const shas = new Set(revisions.map((r) => r.blobSha))
+  if (row.blobSha) shas.add(row.blobSha)
+  if (shas.size > 0) {
     const { reclaimBlobIfOrphaned } = await import('#/lib/documents/blob-refs')
-    await reclaimBlobIfOrphaned(row.blobSha)
+    for (const sha of shas) await reclaimBlobIfOrphaned(sha)
   }
   return { ok: true }
 }

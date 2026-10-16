@@ -229,6 +229,7 @@ const stampAttached = (
   walk: Walk,
   documentId: string,
   entry: StorageEntry,
+  changeToken: string,
   sourcePath: string,
 ) =>
   query(() =>
@@ -241,6 +242,7 @@ const stampAttached = (
           externalId: entry.id,
           externalUrl: canonicalFileUrl(walk.binding.provider, entry.id),
           externalStatus: 'linked',
+          externalRevisionId: changeToken,
           sourcePath,
         })
         .where(
@@ -287,6 +289,8 @@ const fileEntry = Effect.fn('syncBinding.fileEntry')(function* (
       externalStatus: 'linked',
       connectionId: walk.connectionId,
       bindingId: walk.binding.id,
+      // The token the bytes were read at, which may be newer than the entry's.
+      externalRevisionId: file.changeToken,
     },
     fileAgainst: [target],
     actor: walk.actor,
@@ -313,7 +317,7 @@ const fileEntry = Effect.fn('syncBinding.fileEntry')(function* (
     return { _tag: 'held' }
   }
   if (born.deduped) {
-    yield* stampAttached(walk, born.id, entry, sourcePath)
+    yield* stampAttached(walk, born.id, entry, file.changeToken, sourcePath)
     return { _tag: 'attached' }
   }
   return { _tag: 'filed' }

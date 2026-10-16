@@ -464,6 +464,11 @@ export type FakeDrive = {
   readonly move: (id: string, parentId: string) => void
   /** New content for a file or native doc: a new `changeToken`. */
   readonly edit: (id: string, content: string) => void
+  /**
+   * A change on the feed with nothing about the item changed — the same
+   * `changeToken`, as Drive reports activity that is not an edit.
+   */
+  readonly nudge: (id: string) => void
   /** The next `calls` read calls fail `RateLimited` with this hint. */
   readonly rateLimit: (calls: number, retryAfterMs?: number) => void
   /** Every change cursor handed out so far now fails `CursorExpired` (Drive's 410). */
@@ -1045,6 +1050,10 @@ export const makeFakeDrive = (
         item,
         item.kind === 'native' ? docxBytes(content) : encoder.encode(content),
       )
+    },
+    nudge: (id) => {
+      mustGet(id)
+      log.push({ id, removed: false })
     },
     create: (spec) => entryOf(created(spec)),
     upload: (id, bytes) => {

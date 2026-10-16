@@ -20,8 +20,8 @@ import type { JobDef, JobRetryPolicy } from '../run-job'
 /**
  * storage.poll — the change poll, every quarter hour: each connection with a
  * due folder binding asked once for its changes through the storage-source
- * plugin, and every new file in a bound subtree filed by core's
- * `pollConnectionProgram`.
+ * plugin, every new file in a bound subtree filed and every held file whose
+ * revision moved advanced, by core's `pollConnectionProgram`.
  * - One connection's failure is its own line: the rest are still polled.
  * - A refused token marks that connection's bindings `error` and charges the
  *   plugin, as a sync's does; a rate limit waits for the next tick.
@@ -56,6 +56,7 @@ const outcomeLine = (outcome: PollOutcome): string => {
     `${String(tally.attached)} attached by sha`,
     `${String(tally.ignored)} ignored`,
     `${String(tally.outside)} outside`,
+    `${String(tally.revised)} revised`,
   ]
   if (tally.skipped.length > 0)
     parts.push(

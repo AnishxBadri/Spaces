@@ -2,6 +2,7 @@ import { count, eq, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   document,
+  documentRevision,
   entity,
   extractionCache,
   importBatch,
@@ -11,7 +12,8 @@ import {
 import { storage } from '@spaces/core/writes/storage'
 
 /**
- * **Is any row still on this digest?** A document, a staged import batch,
+ * **Is any row still on this digest?** A document, a document's prior
+ * revision, a staged import batch,
  * a record's picture (`entity.picture_sha`) or the workspace logo
  * (`workspace.settings.logo`) — the one question both
  * directions of blob GC ask, asked in one place (SPA-54).
@@ -43,6 +45,15 @@ export async function blobIsReferenced(sha: string): Promise<boolean> {
       .where(eq(document.blobSha, sha))
   ).at(0)
   if ((row?.value ?? 0) > 0) return true
+  // A followed document's prior bytes: deleting the document that shares
+  // the digest must not take another document's history with it.
+  const revision = (
+    await db
+      .select({ value: count() })
+      .from(documentRevision)
+      .where(eq(documentRevision.blobSha, sha))
+  ).at(0)
+  if ((revision?.value ?? 0) > 0) return true
   // A staged import names its spreadsheet by digest and has no document row
   // (SPA-164): the same file filed as a document and then deleted must not
   // take the batch's bytes with it.

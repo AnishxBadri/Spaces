@@ -237,6 +237,13 @@ export const document = pgTable(
     externalUrl: text('external_url'),
     externalStatus: externalStatus('external_status'),
     /**
+     * The provider's revision the bytes at `blob_sha` were read at — the
+     * port's `changeToken`, compared for equality only. A change whose token
+     * matches is no change: a Docs export is not byte-stable, so the sha
+     * cannot say. Null for a document no storage source filed.
+     */
+    externalRevisionId: text('external_revision_id'),
+    /**
      * Whose account the file came through. `account_connection.id` is a
      * plain uuid primary key and not an entity id, so this column takes **no**
      * `ENTITY_REFS` entry.
@@ -285,6 +292,36 @@ export const document = pgTable(
       .where(
         sql`${t.connectionId} is not null and ${t.externalId} is not null`,
       ),
+  ],
+)
+
+/**
+ * A followed document's prior bytes (`docs/spec-storage-sources.md` §5.2,
+ * §8): the sha the row held before the provider's revision advanced it.
+ * - Keyed on the provider's revision id, never the sha — an export of an
+ *   unchanged Doc hashes differently every time.
+ * - `blob_sha` keeps its bytes: `blobIsReferenced` counts this column.
+ * - `external_revision_id` is null for bytes filed before revision ids were
+ *   kept; nulls never collide on the unique index.
+ * - `at` is when the row moved past these bytes.
+ */
+export const documentRevision = pgTable(
+  'document_revision',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    documentId: uuid('document_id')
+      .notNull()
+      .references(() => document.entityId),
+    blobSha: text('blob_sha').notNull(),
+    externalRevisionId: text('external_revision_id'),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('document_revision_external_unique').on(
+      t.documentId,
+      t.externalRevisionId,
+    ),
+    index('document_revision_blob_sha_idx').on(t.blobSha),
   ],
 )
 

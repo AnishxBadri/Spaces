@@ -575,6 +575,13 @@
       "when": 1791842787385,
       "tag": "0081_storage_binding",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1792111304147,
+      "tag": "0082_document_revision",
+      "breakpoints": true
     }
   ]
 }
