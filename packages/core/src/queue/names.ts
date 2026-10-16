@@ -118,6 +118,14 @@ export const QUEUES = {
    */
   classifyDocument: 'document.classify',
   /**
+   * Live-file ledger events (spec-ai-substrate §11): a new revision of a
+   * bound cap table, filed on a company we hold, read against the holding →
+   * at most one `ledger_event` suggestion. Enqueued by `onDocumentExtracted`
+   * and nothing else. Created `exclusive` and sent with `singletonKey =
+   * <documentId>:<revision>`, so one revision is one queued job.
+   */
+  proposeLedgerEvent: 'document.ledger-event',
+  /**
    * Space-tag suggestions (SPA-103): a record → one `space_tag` suggestion
    * per space of the live tree the classify lane places it in. Enqueued by
    * the Spaces rail's "Suggest spaces" and nothing else. Created `exclusive`

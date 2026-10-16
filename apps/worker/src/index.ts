@@ -55,6 +55,7 @@ import { EnrichmentSourcesLive } from './plugins/enrichment-sources'
 import { ModelCallLive } from './plugins/model-call'
 import { embedBackfill, embedBackfillRetry } from './jobs/embed-backfill'
 import { classifyDocument } from './jobs/classify-document'
+import { proposeLedgerEvent } from './jobs/ledger-event'
 import { suggestSpaces } from './jobs/suggest-spaces'
 import { extractKeyTerms } from './jobs/extract-key-terms'
 import { visionDocument } from './jobs/vision-document'
@@ -345,6 +346,24 @@ async function main() {
     QUEUES.classifyDocument,
     { batchSize: 1, includeMetadata: true },
     runJob(classifyDocument, { host, layer: Layer.empty }),
+  )
+  // Live-file ledger events: classify's shape — enqueued only by
+  // `onDocumentExtracted`, `exclusive` on `<documentId>:<revision>`, a model
+  // call per job and never retried. No Layer — its I/O is `db` and
+  // `complete()`.
+  await boss
+    .createQueue(QUEUES.proposeLedgerEvent, { policy: 'exclusive' })
+    .catch(() => {})
+  if (proposeLedgerEvent.retry)
+    await boss.updateQueue(QUEUES.proposeLedgerEvent, {
+      retryLimit: proposeLedgerEvent.retry.limit,
+      retryDelay: proposeLedgerEvent.retry.delaySeconds,
+      retryBackoff: proposeLedgerEvent.retry.backoff,
+    })
+  await boss.work(
+    QUEUES.proposeLedgerEvent,
+    { batchSize: 1, includeMetadata: true },
+    runJob(proposeLedgerEvent, { host, layer: Layer.empty }),
   )
   // Summarize (SPA-66): the deck reader's shape — `exclusive`, so pg-boss
   // refuses a second press on one (record, source) key while one is queued

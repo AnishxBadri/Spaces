@@ -21,6 +21,8 @@ import { supersedesPayloadSchema } from '../../ai/supersedes'
 import type { SupersedesPayload } from '../../ai/supersedes'
 import type { TaskPayload } from '../../ai/task'
 import { refileDocumentPayloadSchema } from '../../documents/refile'
+import { ledgerEventPayloadSchema } from '../../ai/ledger-event'
+import type { LedgerEventPayload } from '../../ai/ledger-event'
 import type { RefileDocumentPayload } from '../../documents/refile'
 import {
   MAX_EVIDENCE,
@@ -320,6 +322,18 @@ export function refileDocumentOf(payload: Json): RefileDocumentPayload {
   )
 }
 
+/** A ledger-event payload, decoded — or the validator's refusal, by field. */
+export function ledgerEventOf(payload: Json): LedgerEventPayload {
+  const parsed = ledgerEventPayloadSchema.safeParse(payload)
+  if (parsed.success) return parsed.data
+  throw invalid(
+    parsed.error.issues.map((i) => {
+      const slug = i.path.map(String).join('.') || 'ledger_event'
+      return { slug, message: `${slug}: ${i.message}` }
+    }),
+  )
+}
+
 export type ProposeInput = {
   entityId: string
   kind: RecordKind
@@ -369,8 +383,9 @@ async function heldOpen(
  * `Facts.fill` conflict commits with the fill that refused it). Throws the
  * typed refusals `asFailure` passes through. An integration's identical
  * open proposal already held is returned rather than duplicated, and so is
- * a supersedes pair proposed on the record before, open or dismissed, and
- * a re-file of one document to one record not yet accepted.
+ * a supersedes pair proposed on the record before, open or dismissed, a
+ * re-file of one document to one record not yet accepted, and a ledger
+ * event for a revision already proposed.
  */
 export async function proposeWith(
   reader: Reader,
@@ -435,7 +450,47 @@ export async function proposeWith(
       return held ?? (await insertSuggestion(tx, input, refs))
     })
   }
+  // A ledger event is proposed once per (document, revision), whatever
+  // became of it: a replayed revision or a re-extraction writes nothing new.
+  if (input.kind === 'ledger_event') {
+    const event = ledgerEventOf(input.payload)
+    if (event.companyId !== input.entityId)
+      throw invalid([
+        {
+          slug: 'companyId',
+          message: 'companyId: a ledger event sits on the company it moves',
+        },
+      ])
+    return reader.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`ledger:${event.documentId}:${event.revisionId}`}))`,
+      )
+      const held = await heldLedgerEvent(tx, event.documentId, event.revisionId)
+      return held ?? (await insertSuggestion(tx, input, refs))
+    })
+  }
   return insertSuggestion(reader, input, refs)
+}
+
+/** The ledger event already proposed for this revision, in any status. */
+export async function heldLedgerEvent(
+  reader: Reader,
+  documentId: string,
+  revisionId: string,
+): Promise<Suggestion | undefined> {
+  return (
+    await reader
+      .select()
+      .from(suggestion)
+      .where(
+        and(
+          eq(suggestion.kind, 'ledger_event'),
+          sql`${suggestion.payload} ->> 'documentId' = ${documentId}`,
+          sql`${suggestion.payload} ->> 'revisionId' = ${revisionId}`,
+        ),
+      )
+      .limit(1)
+  ).at(0)
 }
 
 /** The open or rejected re-file of this document to this record, if any. */

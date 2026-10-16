@@ -1,5 +1,6 @@
 import { Effect } from 'effect'
-import { and, asc, eq, isNull, ne, or, sql } from 'drizzle-orm'
+import type { z } from 'zod'
+import { and, asc, eq, isNull, notInArray, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   activity,
@@ -39,6 +40,7 @@ import {
   fileRecordOf,
   identityOf,
   invalid,
+  ledgerEventOf,
   noteOf,
   patchAnchor,
   refileDocumentOf,
@@ -71,6 +73,12 @@ import { documentFilingRefusal } from '@spaces/core/documents/filing'
 import type { DocumentFilingTarget } from '@spaces/core/documents/filing'
 import { enqueueRestamp } from '#/lib/ai/enqueue-restamp'
 import { fileDocumentInTx, unfileDocumentInTx } from '#/lib/documents/refile'
+import { markInput, roundInput } from '#/lib/portfolio/inputs'
+import {
+  addMarkProgram,
+  addRoundProgram,
+  portfolioWriteMessage,
+} from '#/lib/portfolio/write'
 
 // The propose half moved into core (SPA-204): every name it exported is
 // re-exported here unchanged, so the AI lanes, MCP, capture and their tests
@@ -117,13 +125,13 @@ export type {
  * A partial accept (SPA-110) is the same transaction ending in a shrunk
  * payload rather than a flip; `acceptProgram` says the rule.
  *
- * Every kind accepts but `ledger_event`, which is refused by name. Among
- * them: `attribute_patch` (a value, through the one write path), `identity`
- * (a person, through `resolveEntity`; a company record joins the person's
- * `companies`, and the person is written into the reference field the claim
- * came from), `task` (one task, through the task writer) and `supersedes`
- * (one link, through the supersedes writer; D59). The discovery
- * cards (`add_record`, `file_record`) sit on a space, not a record: accept
+ * Among the kinds: `attribute_patch` (a value, through the one write
+ * path), `identity` (a person, through `resolveEntity`; a company record
+ * joins the person's `companies`, and the person is written into the
+ * reference field the claim came from), `task` (one task, through the task
+ * writer), `supersedes` (one link, through the supersedes writer; D59) and
+ * `ledger_event` (one `round` or `mark`, appended through the portfolio
+ * writer; D12). The discovery cards (`add_record`, `file_record`) sit on a space, not a record: accept
  * resolves and files, reject dismisses the domain from the space. (D72)
  *
  * **A captured page is an anchor too (SPA-134).** A capture names somebody
@@ -345,6 +353,13 @@ export type Accepted =
       documentId: string
       fromEntityId: string
       toEntityId: string
+    }
+  | {
+      kind: 'ledger_event'
+      suggestion: Suggestion
+      /** The table the accept appended to, and the row. */
+      event: 'round' | 'mark'
+      eventId: string
     }
 
 /**
@@ -717,6 +732,58 @@ async function acceptRefileDocumentInTx(
     toEntityId: move.toEntityId,
     after: { proposeNewer: filed && toTarget.kind === 'record', lowered },
   }
+}
+
+// ---------- ledger_event (D12) ----------
+
+/**
+ * Accept a ledger event: one `round` or `mark` appended through the
+ * portfolio writer, by the accepter, in this transaction, the suggestion
+ * named on its activity row. The numbers are held to the server fns' own
+ * validators first; a refusal carries the validator's message and the row
+ * stays open. Nothing is updated or deleted.
+ */
+async function acceptLedgerEventInTx(
+  tx: Tx,
+  row: Anchored,
+  actor: Decider,
+): Promise<{ event: 'round' | 'mark'; eventId: string }> {
+  const ledger = ledgerEventOf(row.payload)
+  const by = { suggestionId: row.id, actorId: actor.id }
+  const append =
+    ledger.event === 'round'
+      ? addRoundProgram(
+          {
+            ...portfolioChecked(roundInput, {
+              ...ledger.proposed,
+              companyId: ledger.companyId,
+            }),
+            ...by,
+          },
+          tx,
+        )
+      : addMarkProgram(
+          { ...portfolioChecked(markInput, ledger.proposed), ...by },
+          tx,
+        )
+  const written = await Effect.runPromise(Effect.result(append))
+  if (written._tag === 'Failure')
+    throw invalid([
+      { slug: ledger.event, message: portfolioWriteMessage(written.failure) },
+    ])
+  return { event: ledger.event, eventId: written.success.id }
+}
+
+/** A portfolio input through its server fn's validator, or its refusal. */
+function portfolioChecked<T>(validator: z.ZodType<T>, input: unknown): T {
+  const checked = validator.safeParse(input)
+  if (checked.success) return checked.data
+  throw invalid(
+    checked.error.issues.map((i) => {
+      const slug = i.path.map(String).join('.') || 'ledger_event'
+      return { slug, message: `${slug}: ${i.message}` }
+    }),
+  )
 }
 
 // ---------- note (SPA-66) ----------
@@ -1264,6 +1331,24 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
             ...moved,
           } satisfies Accepted
         }
+        if (row.kind === 'ledger_event') {
+          if (fields !== undefined)
+            throw invalid([
+              {
+                slug: 'fields',
+                message:
+                  'fields: a ledger event is accepted whole, not by field',
+              },
+            ])
+          const { event, eventId } = await acceptLedgerEventInTx(tx, row, actor)
+          const decided = await close(tx, id, 'accepted', actor)
+          return {
+            kind: 'ledger_event',
+            suggestion: decided,
+            event,
+            eventId,
+          } satisfies Accepted
+        }
         if (row.kind !== 'attribute_patch')
           throw new UnsupportedSuggestionKind({ id, kind: row.kind })
 
@@ -1396,7 +1481,7 @@ const read = <T>(run: () => Promise<T>) =>
 
 /**
  * "Accept all on this record": every open suggestion on it but a
- * `supersedes`, oldest first
+ * `supersedes` or a `ledger_event`, oldest first
  * (a later proposal for the same field lands last, and wins), field by
  * field for a patch — so one bad field is one failed item and the others
  * land. An identity is one item, accepted whole; a kind with no accept path
@@ -1419,9 +1504,10 @@ export const acceptRecordProgram = Effect.fn('acceptRecordProgram')(
           and(
             eq(suggestion.entityId, input.entityId),
             eq(suggestion.status, 'open'),
-            // A supersession is accepted one at a time: a wrong link hides
-            // true facts from the AI. (D59)
-            ne(suggestion.kind, 'supersedes'),
+            // Accepted one at a time, never in bulk: a wrong supersession
+            // hides true facts from the AI (D59), and a ledger event is an
+            // append a person makes alone — a round cannot be voided (D12).
+            notInArray(suggestion.kind, ['supersedes', 'ledger_event']),
           ),
         )
         .orderBy(asc(suggestion.createdAt), asc(suggestion.id)),

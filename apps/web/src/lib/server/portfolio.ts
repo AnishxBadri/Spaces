@@ -5,6 +5,7 @@ import { db } from '@spaces/db'
 import { workspace } from '@spaces/db/schema'
 import { fxRate } from '@spaces/db/schema/portfolio'
 import { baseCurrency, loadFxRates, loadPortfolio } from '../portfolio/detail'
+import { ccy, isoDate, markInput, money, roundInput } from '../portfolio/inputs'
 import { requireUser } from './shared'
 
 /**
@@ -38,30 +39,13 @@ export const getHolding = createServerFn()
     return loadHoldingDetail(data.id, data.asOf)
   })
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
-const ccy = z.string().length(3).toUpperCase()
-const money = z.number().finite().nonnegative()
-
 /**
  * The four event writers are thin callers (SPA-171): the bodies are the
  * programs in `../portfolio/write`, which the ledger import commit calls
  * too, so history has one writer.
  */
 export const addRound = createServerFn({ method: 'POST' })
-  .validator(
-    z.object({
-      companyId: z.string().uuid(),
-      date: isoDate,
-      kind: z.string().trim().min(1).max(60),
-      raised: money.optional(),
-      currency: ccy.optional(),
-      preMoney: money.optional(),
-      postMoney: money.optional(),
-      pricePerShare: money.optional(),
-      sharesOutstanding: money.optional(),
-      coInvestorIds: z.array(z.string().uuid()).max(50).optional(),
-    }),
-  )
+  .validator(roundInput)
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { addRoundProgram, portfolioWriteMessage } =
@@ -112,15 +96,7 @@ export const addInvestment = createServerFn({ method: 'POST' })
   })
 
 export const addMark = createServerFn({ method: 'POST' })
-  .validator(
-    z.object({
-      holdingId: z.string().uuid(),
-      date: isoDate,
-      fairValue: money,
-      currency: ccy,
-      basis: z.enum(['round_price', 'manual', '409a']),
-    }),
-  )
+  .validator(markInput)
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { addMarkProgram, portfolioWriteMessage } =

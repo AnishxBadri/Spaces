@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { document } from '@spaces/db/schema'
 import { QUEUES } from '@spaces/core/queue/names'
+import { ledgerTargetOf } from '#/lib/ai/ledger-event'
 import { isLaneRoutedProgram } from '#/lib/ai/route'
 import { sensitivityFor } from '#/lib/ai/sensitivity-for'
 import { enqueue } from '#/lib/queue'
@@ -23,6 +24,10 @@ import { enqueue } from '#/lib/queue'
  *     `other` **and** the classify lane is routed at the document's resolved
  *     sensitivity. A kind set at filing time — by `guessDocumentKind` off
  *     the filename, by a bound folder, by a person — is never classified.
+ *   - `document.ledger-event`, only for a cap table with a
+ *     `document_revision` (a revision, never a first filing) filed on a
+ *     company with a holding, the extract lane routed at the sensitivity of
+ *     either. Keyed on (document, revision): one revision, one job.
  *
  * It never fails: the text it follows is already committed, and an enqueue
  * or a routing read that goes wrong must not turn a good extraction into a
@@ -40,6 +45,15 @@ export const onDocumentExtracted = Effect.fn('onDocumentExtracted')(function* (
         QUEUES.classifyDocument,
         { documentId },
         { singletonKey: documentId },
+      ),
+    )
+  const revisionId = yield* wantsLedgerEvent(documentId)
+  if (revisionId !== null)
+    yield* Effect.promise(() =>
+      enqueue(
+        QUEUES.proposeLedgerEvent,
+        { documentId, revisionId },
+        { singletonKey: `${documentId}:${revisionId}` },
       ),
     )
 })
@@ -78,6 +92,44 @@ const wantsClassify = (documentId: string): Effect.Effect<boolean> =>
           cause,
         )
         return false
+      }),
+    ),
+  )
+
+/**
+ * The revision to read, or null: a revised cap table on a held company, with
+ * the extract lane routed at the stricter of the document's and the
+ * company's sensitivity. Routed first, the cheap answer on a keyless box.
+ */
+const ledgerEventGate = Effect.fn('onDocumentExtracted.ledgerEventGate')(
+  function* (documentId: string) {
+    const routed = yield* isLaneRoutedProgram('extract', null)
+    if (!routed.normal && !routed.sensitive) return null
+    const read = yield* Effect.tryPromise({
+      try: () => ledgerTargetOf(documentId),
+      catch: (cause) => cause,
+    })
+    if (!read.ok) return null
+    const ofDocument = yield* sensitivityFor(documentId)
+    const ofCompany = yield* sensitivityFor(read.target.companyId)
+    const sensitive =
+      ofDocument.sensitivity === 'sensitive' ||
+      ofCompany.sensitivity === 'sensitive'
+    return routed[sensitive ? 'sensitive' : 'normal']
+      ? read.target.revisionId
+      : null
+  },
+)
+
+const wantsLedgerEvent = (documentId: string): Effect.Effect<string | null> =>
+  ledgerEventGate(documentId).pipe(
+    Effect.catch((cause) =>
+      Effect.sync(() => {
+        console.warn(
+          `[worker] ${documentId}: ledger event not enqueued after extraction`,
+          cause,
+        )
+        return null
       }),
     ),
   )

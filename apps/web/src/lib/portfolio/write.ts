@@ -75,6 +75,13 @@ export function portfolioWriteMessage(failure: unknown): string {
 const numeric = (v: number | null | undefined): string | null =>
   v === null || v === undefined ? null : v.toString()
 
+/**
+ * The event tables carry no provenance column; an event appended by
+ * accepting a suggestion names it on its activity row.
+ */
+const provenance = (suggestionId: string | undefined) =>
+  suggestionId === undefined ? {} : { suggestionId }
+
 /** Run `body` in the caller's transaction, or in one of its own. */
 function inTx<T>(
   tx: Tx | undefined,
@@ -115,6 +122,8 @@ export type AddRoundInput = {
   pricePerShare?: number | null | undefined
   sharesOutstanding?: number | null | undefined
   coInvestorIds?: Array<string> | undefined
+  /** The accepted `ledger_event` this round came from: the activity's meta. */
+  suggestionId?: string | undefined
   actorId: string
 }
 
@@ -158,6 +167,7 @@ export const addRoundProgram = Effect.fn('addRoundProgram')(function* (
       actorId: input.actorId,
       verb: 'round.added',
       subjectEntityId: input.companyId,
+      meta: provenance(input.suggestionId),
     })
     return { id: row.id }
   })
@@ -254,6 +264,8 @@ export type AddMarkInput = {
   currency: string
   basis: MarkBasis
   batchId?: string | undefined
+  /** The accepted `ledger_event` this mark came from: the activity's meta. */
+  suggestionId?: string | undefined
   actorId: string
 }
 
@@ -282,6 +294,7 @@ export const addMarkProgram = Effect.fn('addMarkProgram')(function* (
       actorId: input.actorId,
       verb: 'mark.added',
       subjectEntityId: companyId,
+      meta: provenance(input.suggestionId),
     })
     return { id: row.id }
   })

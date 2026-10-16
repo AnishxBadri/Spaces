@@ -27,10 +27,12 @@ import { readSupersedesPayload } from '@spaces/core/ai/supersedes'
 import type { SupersedesPayload } from '@spaces/core/ai/supersedes'
 import type { DocumentKindPayload } from '@spaces/core/ai/document-kind'
 import { readRefileDocumentPayload } from '@spaces/core/documents/refile'
+import { readLedgerEventPayload } from '@spaces/core/ai/ledger-event'
+import type { LedgerEventPayload } from '@spaces/core/ai/ledger-event'
 import type { RefileDocumentPayload } from '@spaces/core/documents/refile'
 import { DOCUMENT_KIND_LABELS } from '@spaces/core/documents'
 import { formatDate, formatNumber } from '@spaces/core/format'
-import { fmtMoney } from '@spaces/core/portfolio/format'
+import { fmtMoney, fmtPct } from '@spaces/core/portfolio/format'
 import {
   acceptSuggestion,
   acceptSuggestionColumn,
@@ -56,8 +58,7 @@ import { cn } from '#/lib/utils'
  *
  * Generic over `suggestion.kind`: a kind with a body in `SUGGESTION_BODIES`
  * draws it, every other kind prints its payload in the same row shape. The
- * later lanes (note, ledger_event, document_kind) add a body here, not a
- * page; `identity` has one (SPA-105).
+ * later lanes add a body here, not a page.
  */
 
 /** Where "produced by this run" goes: the run, opened on the Usage page. */
@@ -193,6 +194,14 @@ const SUGGESTION_BODIES: Partial<Record<SuggestionKind, SuggestionBody>> = {
       <PayloadBody item={item} actions={actions} />
     )
   },
+  ledger_event: ({ item, actions }) => {
+    const ledger = readLedgerEventPayload(item.payload)
+    return ledger ? (
+      <LedgerEventBody ledger={ledger} />
+    ) : (
+      <PayloadBody item={item} actions={actions} />
+    )
+  },
 }
 
 /**
@@ -231,6 +240,13 @@ export function decisionWords(kind: SuggestionKind): DecisionWords {
       accept: 'File here',
       reject: 'Dismiss',
       rejectTitle: DISMISS_TITLE,
+      icons: true,
+    }
+  if (kind === 'ledger_event')
+    return {
+      accept: 'Accept',
+      reject: 'Dismiss',
+      rejectTitle: null,
       icons: true,
     }
   if (kind === 'refile_document')
@@ -429,6 +445,82 @@ function RefileBody({ move }: { move: RefileDocumentPayload }) {
       <span className="font-medium">{move.fromName}</span>
       <span className="text-graphite"> to </span>
       <span className="font-medium">{move.toName}</span>
+    </p>
+  )
+}
+
+/** An ISO day as the tables print it, read as a calendar day. */
+const ledgerDay = (date: string) => formatDate(`${date}T00:00:00`) || date
+
+/**
+ * The parts of a ledger event's one line: the diff against the holding
+ * first, then what would be appended. Exported for the Review test.
+ */
+export function ledgerEventParts(ledger: LedgerEventPayload): {
+  moved: string | null
+  proposed: string
+  verb: string
+} {
+  const was = ledger.before.ownershipPct
+  const now = ledger.after.ownershipPct
+  const moved =
+    now === null || was === now
+      ? null
+      : `ownership moved ${fmtPct(was)} → ${fmtPct(now)}`
+  if (ledger.event === 'round') {
+    const r = ledger.proposed
+    const currency = r.currency ?? ledger.before.currency
+    return {
+      moved,
+      proposed: [
+        r.kind,
+        r.raised === undefined ? null : ledgerMoney(r.raised, currency),
+        ledgerDay(r.date),
+      ]
+        .filter((p) => p !== null)
+        .join(' · '),
+      verb: 'propose a round',
+    }
+  }
+  const m = ledger.proposed
+  const before =
+    ledger.before.fairValue === null
+      ? '—'
+      : ledgerMoney(ledger.before.fairValue, ledger.before.currency)
+  return {
+    moved,
+    proposed: `fair value ${before} → ${ledgerMoney(m.fairValue, m.currency)} · ${ledgerDay(m.date)}`,
+    verb: 'propose a mark',
+  }
+}
+
+/**
+ * Money a model read: compact through `fmtMoney` when the currency is an
+ * ISO code, else the bare figure — the accept-time validators refuse it.
+ */
+const ledgerMoney = (amount: number, currency: string | null) =>
+  currency !== null && /^[A-Z]{3}$/.test(currency)
+    ? fmtMoney(amount, currency, { compact: true })
+    : formatNumber(amount, 0)
+
+/**
+ * A revised cap table read against the holding: what moved, what would be
+ * appended, one line. Accepting appends it; nothing on the ledger changes.
+ */
+function LedgerEventBody({ ledger }: { ledger: LedgerEventPayload }) {
+  const { moved, proposed, verb } = ledgerEventParts(ledger)
+  return (
+    <p className="min-w-0 text-ui break-words">
+      <span className="font-medium">{ledger.companyName}</span>
+      <span className="text-graphite"> · </span>
+      {moved === null ? null : (
+        <>
+          <span className="tabular">{moved}</span>
+          <span className="text-graphite"> · </span>
+        </>
+      )}
+      <span className="tabular">{proposed}</span>
+      <span className="text-graphite">, {verb}</span>
     </p>
   )
 }

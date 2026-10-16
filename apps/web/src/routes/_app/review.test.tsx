@@ -229,6 +229,84 @@ describe('the suggestion card', () => {
     expect(html).toContain('Dismiss</button>')
   })
 
+  it('draws a ledger event as the diff against the holding and what it would append', async () => {
+    const { SuggestionEntry, ledgerEventParts } =
+      await import('#/components/inbox/suggestion-card')
+    const common = {
+      companyId: '00000000-0000-4000-8000-000000000001',
+      companyName: 'Acme',
+      documentId: '00000000-0000-4000-8000-000000000002',
+      documentName: 'Cap table.xlsx',
+      revisionId: 'rev-2',
+      before: {
+        ownershipPct: 0.124,
+        fairValue: 1_200_000,
+        currency: 'USD',
+        roundKind: 'Series A',
+        roundDate: '2025-01-10',
+      },
+      after: { ownershipPct: 0.098 },
+    }
+    const markPayload = {
+      ...common,
+      event: 'mark' as const,
+      proposed: {
+        holdingId: '00000000-0000-4000-8000-000000000003',
+        date: '2026-03-01',
+        fairValue: 1_500_000,
+        currency: 'USD',
+        basis: 'round_price' as const,
+      },
+    }
+    expect(ledgerEventParts(markPayload)).toEqual({
+      moved: 'ownership moved 12.4% → 9.8%',
+      proposed: 'fair value $1.2M → $1.5M · Mar 01, 2026',
+      verb: 'propose a mark',
+    })
+    expect(
+      ledgerEventParts({
+        ...common,
+        event: 'round',
+        proposed: {
+          date: '2026-03-01',
+          kind: 'Series B',
+          raised: 4_000_000,
+          currency: 'USD',
+        },
+      }),
+    ).toEqual({
+      moved: 'ownership moved 12.4% → 9.8%',
+      proposed: 'Series B · $4M · Mar 01, 2026',
+      verb: 'propose a round',
+    })
+    const html = renderToStaticMarkup(
+      <ul>
+        <SuggestionEntry
+          item={{
+            id: 's-ledger',
+            kind: 'ledger_event',
+            payload: markPayload,
+            rationale: 'Read from a new revision of Cap table.xlsx.',
+            citations: [],
+            fields: null,
+            origin: { via: 'app' },
+            createdAt: '2026-10-16T00:00:00.000Z',
+            runId: null,
+          }}
+          pending={false}
+          onAccept={() => {}}
+          onReject={() => {}}
+        />
+      </ul>,
+    )
+    expect(html).toContain('ownership moved 12.4% → 9.8%')
+    expect(html).toContain('fair value $1.2M → $1.5M')
+    expect(html).toContain(', propose a mark')
+    expect(html).not.toContain('<pre')
+    expect(html).toContain('Accept</button>')
+    expect(html).toContain('Dismiss</button>')
+  })
+
   it('links a suggestion a run produced to that run (SPA-100)', async () => {
     const { SuggestionEntry, usageRunHref } =
       await import('#/components/inbox/suggestion-card')

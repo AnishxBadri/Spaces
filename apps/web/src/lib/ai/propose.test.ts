@@ -243,32 +243,55 @@ describe('propose → accept', () => {
     expect(events).toHaveLength(1)
   })
 
-  it('refuses kinds with no accept path, and closes on reject', async () => {
+  it('refuses a ledger event that is not one, and closes on reject', async () => {
     const { Effect } = await import('effect')
     const {
       proposeProgram,
       acceptProgram,
       rejectProgram,
-      UnsupportedSuggestionKind,
+      SuggestionInvalid,
       SuggestionNotOpen,
     } = await import('./propose')
     const { accepter, entityId } = await setup()
     const decider: Decider = { type: 'user', id: accepter.id }
 
-    // `ledger_event` has no accept path yet (`note` gained one in SPA-66).
+    // A bare number is not a ledger event: refused before any row exists.
+    const malformed = await Effect.runPromise(
+      Effect.flip(
+        proposeProgram({
+          entityId,
+          kind: 'ledger_event',
+          payload: { kind: 'mark', fairValue: 1000 },
+          proposedBy: { type: 'system' },
+        }),
+      ),
+    )
+    expect(malformed).toBeInstanceOf(SuggestionInvalid)
+
     const ledger = await Effect.runPromise(
       proposeProgram({
         entityId,
         kind: 'ledger_event',
-        payload: { kind: 'mark', fairValue: 1000 },
+        payload: {
+          event: 'round',
+          companyId: entityId,
+          companyName: 'Proposed',
+          documentId: randomUUID(),
+          documentName: 'Cap table.csv',
+          revisionId: 'rev-1',
+          before: {
+            ownershipPct: null,
+            fairValue: null,
+            currency: null,
+            roundKind: null,
+            roundDate: null,
+          },
+          after: { ownershipPct: null },
+          proposed: { date: '2026-03-01', kind: 'Series B' },
+        },
         proposedBy: { type: 'system' },
       }),
     )
-    const refused = await Effect.runPromise(
-      Effect.flip(acceptProgram(ledger.id, decider)),
-    )
-    expect(refused).toBeInstanceOf(UnsupportedSuggestionKind)
-
     const rejected = await Effect.runPromise(rejectProgram(ledger.id, decider))
     expect(rejected.status).toBe('rejected')
     expect(rejected.decidedBy).toBe(accepter.id)

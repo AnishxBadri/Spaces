@@ -14,6 +14,7 @@ import { fileDocumentProgram } from '#/lib/documents/refile'
 import {
   acceptProgram,
   acceptRecordProgram,
+  proposeProgram,
   rejectProgram,
   suggestionMessage,
 } from './propose'
@@ -161,6 +162,59 @@ describe('supersedes suggestion', () => {
     expect(outcomes.map((o) => o.suggestionId)).not.toContain(proposed.id)
     expect((await proposalsOn(acme)).at(0)?.status).toBe('open')
     expect(await supersedesFrom(v3)).toEqual([])
+  })
+
+  it('accept all on a record leaves a ledger event for its own decision (D12)', async () => {
+    const me = await accepterId()
+    const acme = await aCompany()
+    const patch = await Effect.runPromise(
+      proposeProgram({
+        entityId: acme,
+        kind: 'attribute_patch',
+        payload: { location: { value: 'Oslo', refs: [], confidence: 1 } },
+        proposedBy: { type: 'system' },
+      }),
+    )
+    const ledger = await Effect.runPromise(
+      proposeProgram({
+        entityId: acme,
+        kind: 'ledger_event',
+        payload: {
+          event: 'round',
+          companyId: acme,
+          companyName: 'Acme',
+          documentId: randomUUID(),
+          documentName: 'Cap table.csv',
+          revisionId: 'rev-2',
+          before: {
+            ownershipPct: null,
+            fairValue: null,
+            currency: null,
+            roundKind: null,
+            roundDate: null,
+          },
+          after: { ownershipPct: null },
+          proposed: { date: '2026-03-01', kind: 'Series B' },
+        },
+        proposedBy: { type: 'system' },
+      }),
+    )
+
+    const outcomes = await Effect.runPromise(
+      acceptRecordProgram({ entityId: acme, actorId: me }),
+    )
+    expect(outcomes).toEqual([
+      { suggestionId: patch.id, slug: 'location', ok: true },
+    ])
+    const statusOf = async (id: string) =>
+      (
+        await db
+          .select({ status: suggestion.status })
+          .from(suggestion)
+          .where(eq(suggestion.id, id))
+      ).at(0)?.status
+    expect(await statusOf(patch.id)).toBe('accepted')
+    expect(await statusOf(ledger.id)).toBe('open')
   })
 
   it('accepting on one record closes the same pair on the other', async () => {
