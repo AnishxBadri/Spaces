@@ -5,6 +5,7 @@ import { document, entity, entitySpace, link } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { QUEUES } from '@spaces/core/queue/names'
 import { proposeNewerVersionProgram } from '@spaces/core/writes/documents/newer-version'
+import { exportsOnRefile } from '@spaces/core/writes/bindings/export'
 import {
   raiseSensitivity,
   stampedSensitive,
@@ -151,7 +152,26 @@ export const fileDocumentProgram = Effect.fn('fileDocumentProgram')(function* (
   // Filed on a record after arrival: the same suggestion intake makes. (D59)
   if (outcome.filed && target.kind === 'record')
     yield* proposeNewerVersionProgram(documentId)
+  if (outcome.filed) yield* writeThroughRefile(documentId)
   return outcome
+})
+
+/**
+ * An upload a pushing binding holds follows its filing to the provider: the
+ * export job moves it when it left its binding's record for another pushing
+ * one. After the commit, like every enqueue here. (§6)
+ */
+const writeThroughRefile = Effect.fn('refile.writeThrough')(function* (
+  documentId: string,
+) {
+  if (!(yield* query(() => exportsOnRefile(documentId)))) return
+  yield* query(() =>
+    enqueue(
+      QUEUES.exportDocument,
+      { documentId },
+      { singletonKey: documentId },
+    ),
+  )
 })
 
 /**
@@ -237,6 +257,7 @@ export const unfileDocumentProgram = Effect.fn('unfileDocumentProgram')(
     // document sensitive, and only the live resolver can say.
     if (outcome.lowered.length > 0)
       yield* query(() => enqueueRestamp(outcome.lowered))
+    if (outcome.unfiled) yield* writeThroughRefile(input.documentId)
     return { unfiled: outcome.unfiled }
   },
 )

@@ -13,6 +13,7 @@ import { documentFilingRefusal } from '../../documents/filing'
 import { raiseSensitivity } from '../ai/stamp-sensitivity'
 import { Enqueue } from '../../queue/enqueue'
 import { QUEUES } from '../../queue/names'
+import { isUploadArrival, writeThroughBindingOf } from '../bindings/export'
 import type { DocumentKind } from '../../documents'
 import type { DocumentFilingTarget } from '../../documents/filing'
 import type { SourceClass } from '@spaces/db/schema'
@@ -563,8 +564,28 @@ export const birthDocumentProgram = Effect.fn('birthDocumentProgram')(
       return { id: existing, deduped: true }
     }
 
-    const id = yield* query(() =>
-      db.transaction((tx) => insertDocumentRows(tx, input, null)),
+    // An upload on a record whose binding pushes is that binding's to export
+    // (§6): stamped in the birth's transaction, sent after it.
+    const born = yield* query(() =>
+      db.transaction(async (tx) => {
+        const writeThrough = isUploadArrival(input)
+          ? await writeThroughBindingOf(
+              tx,
+              targets.map((t) => t.entityId),
+            )
+          : null
+        const id = await insertDocumentRows(
+          tx,
+          writeThrough === null
+            ? input
+            : {
+                ...input,
+                provenance: { ...input.provenance, bindingId: writeThrough },
+              },
+          null,
+        )
+        return { id, writeThrough }
+      }),
     )
 
     // Outside the transaction: a queue that is down must not roll back a
@@ -577,11 +598,16 @@ export const birthDocumentProgram = Effect.fn('birthDocumentProgram')(
     // attempt to write a failure, and never enqueueing leaves it 'pending'
     // forever. A caller that files bytes it does not store sets the row's own
     // `extraction_status` instead.
-    if (input.blobSha !== null) {
-      const queue = yield* Enqueue
-      yield* queue.enqueue(QUEUES.extractDocument, { documentId: id })
-    }
+    const queue = yield* Enqueue
+    if (input.blobSha !== null)
+      yield* queue.enqueue(QUEUES.extractDocument, { documentId: born.id })
+    if (born.writeThrough !== null)
+      yield* queue.enqueue(
+        QUEUES.exportDocument,
+        { documentId: born.id },
+        { singletonKey: born.id },
+      )
 
-    return { id, deduped: false }
+    return { id: born.id, deduped: false }
   },
 )

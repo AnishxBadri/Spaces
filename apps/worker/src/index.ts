@@ -27,6 +27,11 @@ import {
 import { bindStorageFolder } from './jobs/bind-storage-folder'
 import { syncStorageBinding } from './jobs/sync-storage-binding'
 import {
+  EXPORT_RETRY_DELAY_MAX_SECONDS,
+  exportDocument,
+  exportDocumentRetry,
+} from './jobs/export-document'
+import {
   pollStorageChanges,
   pollStorageChangesRetry,
 } from './jobs/poll-storage-changes'
@@ -189,6 +194,30 @@ async function main() {
       layer: Layer.mergeAll(
         storageSourcesLayer(plugins, { fakes }),
         fetchStorageEnqueue,
+        pluginBreakerLayer(plugins),
+      ),
+    }),
+  )
+  // Write-through: `stately` with `singletonKey = documentId`, so a burst of
+  // re-files is one queued export. Backoff capped at an hour, about a day of
+  // retries while no connection can write. Created before the plain create
+  // loop below; a queue's policy is fixed at create.
+  await boss
+    .createQueue(QUEUES.exportDocument, { policy: 'stately' })
+    .catch(() => {})
+  await boss.updateQueue(QUEUES.exportDocument, {
+    retryLimit: exportDocumentRetry.limit,
+    retryDelay: exportDocumentRetry.delaySeconds,
+    retryBackoff: exportDocumentRetry.backoff,
+    retryDelayMax: EXPORT_RETRY_DELAY_MAX_SECONDS,
+  })
+  await boss.work(
+    QUEUES.exportDocument,
+    { batchSize: 1, includeMetadata: true },
+    runJob(exportDocument, {
+      host,
+      layer: Layer.mergeAll(
+        storageSourcesLayer(plugins, { fakes }),
         pluginBreakerLayer(plugins),
       ),
     }),

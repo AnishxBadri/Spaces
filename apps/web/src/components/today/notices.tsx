@@ -5,6 +5,7 @@ import type {
   BrokenConnection,
   ParkedSource,
   StoppedPlugin,
+  WaitingExport,
 } from '#/lib/server-fns'
 
 const PLUGIN_STATE: Record<StoppedPlugin['state'], string> = {
@@ -50,19 +51,26 @@ const utcClock = (iso: string) => `${iso.slice(11, 16)} UTC`
 /**
  * What stops the machine, one line each with the link that fixes it: a
  * plugin switched on and not running or capped, auto-enrich parked at a
- * source's daily cap, and the reader's connections in `error`. Renders
- * nothing when all runs. (D76, D79)
+ * source's daily cap, the reader's connections in `error`, and uploads
+ * waiting to reach a bound folder. Renders nothing when all runs. (D76, D79)
  */
 export function NoticesBand({
   stopped,
   broken,
   parked,
+  waiting,
 }: {
   stopped: ReadonlyArray<StoppedPlugin>
   broken: ReadonlyArray<BrokenConnection>
   parked: ReadonlyArray<ParkedSource>
+  waiting: ReadonlyArray<WaitingExport>
 }) {
-  if (stopped.length === 0 && broken.length === 0 && parked.length === 0)
+  if (
+    stopped.length === 0 &&
+    broken.length === 0 &&
+    parked.length === 0 &&
+    waiting.length === 0
+  )
     return null
   return (
     <section aria-label="Notices" className="border border-hairline bg-paper">
@@ -75,6 +83,19 @@ export function NoticesBand({
             why={c.errorReason ?? c.externalEmail}
             fix={
               <Link to={c.fixTo} className={fixClass}>
+                reconnect ›
+              </Link>
+            }
+          />
+        ))}
+        {waiting.map((w) => (
+          <NoticeLine
+            key={`waiting:${w.provider}`}
+            lane="files"
+            what={`${String(w.count)} ${w.count === 1 ? 'file' : 'files'} waiting for a ${w.label} connection`}
+            why={null}
+            fix={
+              <Link to={w.fixTo} className={fixClass}>
                 reconnect ›
               </Link>
             }

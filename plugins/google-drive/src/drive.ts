@@ -861,7 +861,13 @@ export const driveSource = Effect.gen(function* () {
         return yield* Effect.die(
           new Error(`Google Drive named no revision for ${file.id}`),
         )
-      const result: PutFileResult = { fileId: file.id, revisionId, name }
+      const result: PutFileResult = {
+        fileId: file.id,
+        revisionId,
+        name,
+        // The listing's token is `version`, so the change feed matches it.
+        ...(file.version === undefined ? {} : { changeToken: file.version }),
+      }
       return result
     })
 

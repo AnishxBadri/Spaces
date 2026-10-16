@@ -984,6 +984,7 @@ export const makeFakeDrive = (
             fileId: item.id,
             revisionId: item.revisions.at(-1) ?? String(item.version),
             name: tried,
+            changeToken: String(item.version),
           }
       }
     })

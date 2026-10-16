@@ -149,11 +149,18 @@ export type StorageUpload = {
   readonly sha256: string
 }
 
-/** Where `putFile` landed. `name` is the one used, `(n)` suffix and all. */
+/**
+ * Where `putFile` landed. `name` is the one used, `(n)` suffix and all.
+ * `changeToken` is the file's `changeToken` as this upload left it, when the
+ * provider's answer says — what a listing or the change feed reports next,
+ * so core can read its own write as no change. Absent, the next poll that
+ * sees the file reads it once.
+ */
 export type PutFileResult = {
   readonly fileId: string
   readonly revisionId: string
   readonly name: string
+  readonly changeToken?: string
 }
 
 /** A path's folder names: split on `/`, trimmed, empty segments dropped. */

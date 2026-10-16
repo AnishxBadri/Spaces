@@ -203,6 +203,7 @@ const uploaded = z.object({
       id: z.string(),
       name: z.string(),
       file_version: z.object({ id: z.string() }),
+      etag: z.string().nullish(),
     }),
   ),
 })
@@ -889,7 +890,7 @@ export const boxSource = Effect.gen(function* () {
       const id = version ? target.fileId : target.folderId
       const url = boxUrl(
         version ? `/files/${target.fileId}/content` : '/files/content',
-        { fields: 'id,name,file_version' },
+        { fields: 'id,name,file_version,etag' },
         BOX_UPLOAD,
       )
       const boundary = `spaces-${crypto.randomUUID()}`
@@ -920,6 +921,8 @@ export const boxSource = Effect.gen(function* () {
         fileId: file.id,
         revisionId: file.file_version.id,
         name: file.name,
+        // The listing's token is `etag`, so the events stream matches it.
+        ...(typeof file.etag === 'string' ? { changeToken: file.etag } : {}),
       }
       return { _tag: 'put' as const, result }
     })

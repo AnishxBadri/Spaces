@@ -66,7 +66,7 @@ const loaded = {
   dealRegistry: [],
   unfiledCount: 3,
   stoppedPlugins: [],
-  attention: { review: [], moving: [], broken: [], parked: [] },
+  attention: { review: [], moving: [], broken: [], parked: [], waiting: [] },
   meetings: {
     calendar: false,
     audience: { isAdmin: true, admins: ['Anish'] },

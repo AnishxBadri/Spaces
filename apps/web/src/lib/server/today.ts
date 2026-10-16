@@ -7,11 +7,13 @@ export type {
   ParkedSource,
   ReviewGroup,
   TodayAttention,
+  WaitingExport,
 } from '../today/attention'
 
 /**
  * Today's own reads: Review grouped by source and space, the reader's broken
- * connections, and What's moving on the reader's companies. (D79)
+ * connections, uploads waiting to write through, and What's moving on the
+ * reader's companies. (D79)
  * The program is imported inside the handler so its database code never
  * reaches the client bundle.
  */

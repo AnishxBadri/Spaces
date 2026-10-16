@@ -81,6 +81,15 @@ export const QUEUES = {
    */
   pollStorageChanges: 'storage.poll',
   /**
+   * Write-through (§6): an in-app upload on a record whose binding pushes,
+   * put in the bound folder through the storage-source plugin with the
+   * binding's grant; an exported document re-filed or renamed here, moved or
+   * renamed there. Created `stately` and sent with `singletonKey =
+   * documentId`; retried with backoff for about a day while no connection
+   * can write, and counted on Today meanwhile.
+   */
+  exportDocument: 'storage.export',
+  /**
    * The deck reader (SPA-90): a `kind: deck` document → one `attribute_patch`
    * suggestion per record it is filed against. Created with the `exclusive`
    * policy and sent with `singletonKey = documentId`, so a second press while

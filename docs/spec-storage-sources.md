@@ -757,6 +757,27 @@ Both: our blob still holds the copy. We are the index, Drive is the archive.
 - Not mirrored: notes/memos (not documents; a memo's PDF export is a
   document and _does_ flow).
 
+**As built — bound folders (2026-10-16, SPA-294).** The mirror root is not
+built. An arrival writes through only when it is a person's upload —
+`source_class = 'manual'`, bytes, no page address, no provider copy — so an
+integration arrival, a clip or a capture on a bound record exports nothing,
+pending the ping-pong decision. Birth stamps the oldest `push`/`both` folder
+binding on the upload's targets as `binding_id`, in its own transaction, and
+sends `storage.export` keyed by the document. The job uploads into the bound
+folder itself (no kind subfolder) and records `external_id`, the URL, the
+connection, `linked`, `source_path` and the upload's `changeToken` (an
+optional member of `putFile`'s answer; Drive's `version`, Box's `etag`), so
+the next poll's change for it is the equal-token no-op and reads nothing.
+"Whose token" is the binding's connection; no usable connection is a retry
+with backoff (60 s doubling to an hour, 30 retries, about a day), and Today's
+notices band counts the uploads on a pushing binding still without a
+pointer, by provider ("3 files waiting for a Drive connection"). An exported
+upload re-filed in the app off its binding's record onto a record with a
+pushing binding on the same connection is moved there and its pointer
+follows; re-filed anywhere else it stays where it is, bound as before. Its
+provider name follows `document.filename` whenever the job runs; no in-app
+writer of a document's filename exists yet. Delete is §8's row.
+
 ## 7. Copy-in, not reference (decided 2026-09-14)
 
 Bytes are always copied for anything filed. The argument, once:
