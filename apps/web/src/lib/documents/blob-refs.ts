@@ -1,4 +1,4 @@
-import { count, eq, sql } from 'drizzle-orm'
+import { and, count, eq, ne, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   document,
@@ -12,8 +12,8 @@ import {
 import { storage } from '@spaces/core/writes/storage'
 
 /**
- * **Is any row still on this digest?** A document, a document's prior
- * revision, a staged import batch,
+ * **Is any row still holding this digest?** A `stored` document, a
+ * document's prior revision, a staged import batch,
  * a record's picture (`entity.picture_sha`) or the workspace logo
  * (`workspace.settings.logo`) — the one question both
  * directions of blob GC ask, asked in one place (SPA-54).
@@ -34,15 +34,25 @@ import { storage } from '@spaces/core/writes/storage'
  * export there ships with it (CLAUDE.md → Traps, SPA-155), while the worker
  * and the delete path both have to call this without a request.
  */
-export async function blobIsReferenced(sha: string): Promise<boolean> {
+export async function blobIsReferenced(
+  sha: string,
+  exceptDocumentId?: string,
+): Promise<boolean> {
+  // Only a `stored` row holds its bytes: a `remote` one (retain: text) keeps
+  // the sha for its derived layers and fetches the file from its provider.
+  // `exceptDocumentId` is the retain drop asking about every row but its own.
+  const held = and(
+    eq(document.blobSha, sha),
+    eq(document.bytesState, 'stored'),
+    exceptDocumentId === undefined
+      ? undefined
+      : ne(document.entityId, exceptDocumentId),
+  )
   // `.at(0)` rather than a destructure: drizzle types the element as
   // always-present, which is a claim about a result set rather than one the
   // compiler checked (CLAUDE.md gate 4).
   const row = (
-    await db
-      .select({ value: count() })
-      .from(document)
-      .where(eq(document.blobSha, sha))
+    await db.select({ value: count() }).from(document).where(held)
   ).at(0)
   if ((row?.value ?? 0) > 0) return true
   // A followed document's prior bytes: deleting the document that shares
@@ -97,9 +107,10 @@ export async function blobIsReferenced(sha: string): Promise<boolean> {
  * delete path (`deleteDocumentWithBlobGc`) and the orphan sweep — so what
  * "goes with the blob" is listed once.
  *
- * Today that is the extraction cache (SPA-74, `extraction_cache`): answers
- * keyed by the sha rather than by a document, so no entity delete reaches
- * them, and a deleted deck must leave no answers behind. The derived rows go
+ * Today that is the extraction cache (`extraction_cache`): answers keyed by
+ * the sha rather than by a document, so no entity delete reaches them, and a
+ * deleted deck must leave no answers behind — unless a `remote` document
+ * still names the sha (`reclaimDerivedIfUnnamed`). The derived rows go
  * before the bytes: a store that throws leaves the bytes for the next run,
  * and a cache emptied early costs nothing but a call.
  *
@@ -107,7 +118,26 @@ export async function blobIsReferenced(sha: string): Promise<boolean> {
  */
 export async function reclaimBlobIfOrphaned(sha: string): Promise<boolean> {
   if (await blobIsReferenced(sha)) return false
-  await db.delete(extractionCache).where(eq(extractionCache.blobSha, sha))
-  await storage().delete(sha)
+  await reclaimDerivedIfUnnamed(sha)
+  // Already remote: the bytes were dropped after extraction, so no delete
+  // is attempted. A viewer's cached fetch, or a drop that crashed half way,
+  // is still on disk and goes here.
+  if (await storage().exists(sha)) await storage().delete(sha)
   return true
+}
+
+/**
+ * The derived rows keyed by a digest, once no document of any state names
+ * it. A `remote` document holds no bytes but its derived layers are its only
+ * copy, so they outlive the blob until the last row naming the sha goes.
+ */
+async function reclaimDerivedIfUnnamed(sha: string): Promise<void> {
+  const named = (
+    await db
+      .select({ value: count() })
+      .from(document)
+      .where(eq(document.blobSha, sha))
+  ).at(0)
+  if ((named?.value ?? 0) > 0) return
+  await db.delete(extractionCache).where(eq(extractionCache.blobSha, sha))
 }

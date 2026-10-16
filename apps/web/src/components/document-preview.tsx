@@ -16,7 +16,7 @@ import { FileGlyph } from './files/file-glyph'
 import { detectFormat } from '@spaces/core/documents/extract'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
 import type { DocumentKind } from '@spaces/core/documents'
-import { getDocumentDownloadUrl, getDocumentText } from '#/lib/server-fns'
+import { getDocumentBytes, getDocumentText } from '#/lib/server-fns'
 import { addMention, openAsk } from '#/lib/ask/dock-store'
 import { useAskSubject } from '#/lib/ask/page-scope'
 import type { AskScopeChip } from '#/lib/ask/types'
@@ -42,6 +42,10 @@ import { cn } from '#/lib/utils'
  * A row with no blob (a clipped article) has no bytes: its text is shown
  * with the address linked, and Download becomes Open source, because
  * `getDocumentDownloadUrl` throws for a null `blob_sha` and should.
+ *
+ * A `remote` row (its binding keeps text only) has no local bytes either:
+ * `getDocumentBytes` fetches them through its connection while the page says
+ * where from, and a connection in error is said in the page, never blank.
  */
 
 type Doc = {
@@ -167,9 +171,27 @@ function PreviewBody({
     setPage((p) => Math.min(p, n))
   }, [])
 
+  const [downloading, setDownloading] = useState(false)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
+
   async function download() {
-    const { url } = await getDocumentDownloadUrl({ data: { id: doc.id } })
-    window.location.href = url
+    setDownloading(true)
+    setDownloadError(null)
+    try {
+      const answer = await bytesUrl(
+        doc.id,
+        () => true,
+        () => undefined,
+      )
+      if ('url' in answer) window.location.href = answer.url
+      else setDownloadError(answer.unavailable)
+    } catch (err) {
+      setDownloadError(
+        err instanceof Error ? err.message : 'Could not load file',
+      )
+    } finally {
+      setDownloading(false)
+    }
   }
 
   return (
@@ -207,6 +229,15 @@ function PreviewBody({
         {doc.replacedBy == null ? null : (
           <span className="min-w-0 truncate mono text-micro text-graphite">
             Replaced by → {doc.replacedBy.name}
+          </span>
+        )}
+        {downloadError === null ? null : (
+          <span
+            role="alert"
+            title={downloadError}
+            className="min-w-0 truncate mono text-micro text-graphite"
+          >
+            {downloadError}
           </span>
         )}
         <span className="flex-1" />
@@ -280,7 +311,13 @@ function PreviewBody({
               </Button>
             )
           ) : (
-            <Button size="sm" variant="outline" onClick={download}>
+            <Button
+              size="sm"
+              variant="outline"
+              pending={downloading}
+              disabled={downloading}
+              onClick={() => void download()}
+            >
               <Download className="size-3" strokeWidth={2} />
               Download
             </Button>
@@ -362,12 +399,52 @@ function Spinner({ label }: { label: string }) {
   )
 }
 
+const BYTES_POLL_MS = 1500
+/** About two minutes of asking before the page says the fetch did not come. */
+const BYTES_POLLS = 80
+
+/**
+ * A signed URL for the bytes, asking again while the worker fetches a
+ * `remote` file from its provider; `unavailable` is the sentence why not.
+ */
+async function bytesUrl(
+  id: string,
+  current: () => boolean,
+  onFetching: (from: string) => void,
+): Promise<{ url: string } | { unavailable: string }> {
+  let answer = await getDocumentBytes({ data: { id, poll: false } })
+  for (let n = 0; answer.state === 'fetching'; n++) {
+    if (n >= BYTES_POLLS)
+      return { unavailable: `${answer.from} did not send the file in time` }
+    onFetching(answer.from)
+    await new Promise((resolve) => setTimeout(resolve, BYTES_POLL_MS))
+    if (!current()) return { unavailable: '' }
+    answer = await getDocumentBytes({ data: { id, poll: true } })
+  }
+  return answer.state === 'ready'
+    ? { url: answer.url }
+    : { unavailable: answer.reason }
+}
+
+type BlobState = {
+  bytes: ArrayBuffer | null
+  error: string | null
+  /** Why the file cannot be shown at all: its provider is unreachable. */
+  unavailable: string | null
+  /** The provider a `remote` file is being fetched from, while it is. */
+  fetchingFrom: string | null
+}
+
+const NO_BYTES: BlobState = {
+  bytes: null,
+  error: null,
+  unavailable: null,
+  fetchingFrom: null,
+}
+
 /** Fetches the blob through the signed URL — always as opaque bytes. */
-function useBlobBytes(id: string) {
-  const [state, setState] = useState<{
-    bytes: ArrayBuffer | null
-    error: string | null
-  }>({ bytes: null, error: null })
+function useBlobBytes(id: string): BlobState {
+  const [state, setState] = useState<BlobState>(NO_BYTES)
 
   // A run token: a stale fetch resolving late must not overwrite the next
   // document's state.
@@ -375,18 +452,26 @@ function useBlobBytes(id: string) {
 
   useEffect(() => {
     const run = ++runRef.current
-    setState({ bytes: null, error: null })
+    const current = () => runRef.current === run
+    setState(NO_BYTES)
     void (async () => {
       try {
-        const { url } = await getDocumentDownloadUrl({ data: { id } })
-        const res = await fetch(url)
+        const answer = await bytesUrl(id, current, (from) => {
+          if (current()) setState({ ...NO_BYTES, fetchingFrom: from })
+        })
+        if (!current()) return
+        if ('unavailable' in answer) {
+          setState({ ...NO_BYTES, unavailable: answer.unavailable })
+          return
+        }
+        const res = await fetch(answer.url)
         if (!res.ok) throw new Error(`Storage returned ${res.status}`)
         const bytes = await res.arrayBuffer()
-        if (runRef.current === run) setState({ bytes, error: null })
+        if (current()) setState({ ...NO_BYTES, bytes })
       } catch (err) {
-        if (runRef.current === run)
+        if (current())
           setState({
-            bytes: null,
+            ...NO_BYTES,
             error: err instanceof Error ? err.message : 'Could not load file',
           })
       }
@@ -394,6 +479,22 @@ function useBlobBytes(id: string) {
   }, [id])
 
   return state
+}
+
+/** The two states a `remote` file adds, in the page's own shapes. */
+function BytesPending({
+  state,
+  label,
+}: {
+  state: BlobState
+  label: string
+}): ReactNode {
+  if (state.unavailable !== null) return <Notice>{state.unavailable}</Notice>
+  if (state.error !== null)
+    return <Notice>Could not load the file — {state.error}</Notice>
+  if (state.fetchingFrom !== null)
+    return <Spinner label={`Fetching from ${state.fetchingFrom}…`} />
+  return <Spinner label={label} />
 }
 
 /** The parsed PDF, held across pages so paging never re-parses the file. */
@@ -477,8 +578,8 @@ function PdfPreview({
   onPage: (page: number) => void
   onFitScale: (scale: number) => void
 }) {
-  const { bytes, error } = useBlobBytes(doc.id)
-  const { pdf, error: parseError } = usePdf(bytes)
+  const blob = useBlobBytes(doc.id)
+  const { pdf, error: parseError } = usePdf(blob.bytes)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const columnRef = useRef<HTMLDivElement>(null)
   const [renderError, setRenderError] = useState<string | null>(null)
@@ -525,7 +626,10 @@ function PdfPreview({
     }
   }, [pdf, page, scale, width, onFitScale])
 
-  if (error) return <Notice>Could not load the file — {error}</Notice>
+  // Terminal states replace the page; while bytes are on their way the
+  // column stays mounted, so its width is measured once it is.
+  if (blob.unavailable !== null || blob.error !== null)
+    return <BytesPending state={blob} label="Loading PDF…" />
   const failure = parseError ?? renderError
   if (failure)
     return <Notice>This PDF could not be rendered — {failure}</Notice>
@@ -536,7 +640,7 @@ function PdfPreview({
         <Thumbnails pdf={pdf} page={page} onPage={onPage} />
       ) : null}
       <div ref={columnRef} className="min-w-0 flex-1 overflow-auto p-6">
-        {pdf ? null : <Spinner label="Loading PDF…" />}
+        {pdf ? null : <BytesPending state={blob} label="Loading PDF…" />}
         <canvas
           ref={canvasRef}
           aria-label={`${doc.filename}, page ${page}`}
@@ -638,7 +742,8 @@ function Thumb({
 }
 
 function ImagePreview({ doc, type }: { doc: Doc; type: string }) {
-  const { bytes, error } = useBlobBytes(doc.id)
+  const blob = useBlobBytes(doc.id)
+  const { bytes } = blob
   const [url, setUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -649,7 +754,8 @@ function ImagePreview({ doc, type }: { doc: Doc; type: string }) {
     return () => URL.revokeObjectURL(objectUrl)
   }, [bytes, type])
 
-  if (error) return <Notice>Could not load the file — {error}</Notice>
+  if (bytes === null)
+    return <BytesPending state={blob} label="Loading image…" />
   if (!url) return <Spinner label="Loading image…" />
 
   return (

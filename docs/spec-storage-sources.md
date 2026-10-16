@@ -813,6 +813,22 @@ upload — the bytes are ours, the pointer is `external_id` + `external_url` +
 re-files the held copy and reads no bytes; the retain policy above is the
 binding's and does not apply to a pasted file, which is always `full`.
 
+**As built (SPA-272):** `document.bytes_state` (`stored | remote`, migration 0086) says whether the row holds its sha. Under `retain: text` extraction's
+success path drops the bytes (`dropBytesAfterExtraction`) when the file has a
+pointer and no other holder — a `stored` row, a revision, an import, a
+picture, a logo, a MIME — names the sha (`blobIsReferenced`, which counts
+`stored` rows only). The derived rows outlive the bytes until no document
+names the sha. The viewer and Download fetch a `remote` file through the
+row's own connection on the worker (`storage.fetch-bytes`, polled), held
+under its sha with a `pending_blob` intent so the orphan sweep is the cache's
+expiry; a connection in error is said in the viewer instead. `setBindingRetain`
+flipping to `full` sends one `storage.retain-backfill` per `remote` row;
+flipping to `text` drops nothing already held. Vision refuses a `remote` row.
+A native document's export is never byte-stable, so its live fetch never
+matches the stored sha: its viewer shows the extracted text as for any office
+file, Download says the file changed, and a backfill advances the row to the
+fetched bytes and re-extracts.
+
 ## 8. Change semantics (decided 2026-09-14)
 
 | event                                  | we do                                                                                                                   |

@@ -37,3 +37,17 @@ export const getDocumentDetails = createServerFn()
     const { effectFn } = await import('./effect')
     return effectFn(documentDetailsProgram)(u, data.id)
   })
+
+/**
+ * The viewer's bytes: a signed URL, a fetch under way from the document's
+ * provider (a `remote` row under `retain: text`), or why neither. The viewer
+ * opens with `poll: false` and asks again with `poll: true`.
+ */
+export const getDocumentBytes = createServerFn({ method: 'POST' })
+  .validator(z.object({ id: z.string().uuid(), poll: z.boolean() }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { documentBytesProgram } = await import('../documents/remote-bytes')
+    const { effectFn } = await import('./effect')
+    return effectFn(documentBytesProgram)(u.id, data.id, { poll: data.poll })
+  })

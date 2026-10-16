@@ -79,6 +79,10 @@ const messageOf = (err: unknown): string =>
 
 type Doc = { filename: string; blobSha: string }
 
+/** Why a `remote` document is not read with vision. */
+export const VISION_REMOTE_REFUSAL =
+  'Only this file’s text is kept here; vision needs the file itself'
+
 /**
  * Every page range through `complete('vision', …)`, in order, one chunk in
  * memory at a time; the sections of all of them, or the failure that stops
@@ -179,6 +183,7 @@ const program = Effect.fn('visionDocument')(function* (
       .select({
         extractionStatus: document.extractionStatus,
         blobSha: document.blobSha,
+        bytesState: document.bytesState,
         filename: document.filename,
         mime: document.mime,
       })
@@ -191,6 +196,10 @@ const program = Effect.fn('visionDocument')(function* (
     return yield* new VisionRefused({
       message: 'Only a stored PDF with no text layer is read with vision',
     })
+  // `retain: text` dropped the bytes: there is nothing to rasterize, and the
+  // file is never fetched again for it — it may be a sensitive one.
+  if (row.bytesState === 'remote')
+    return yield* new VisionRefused({ message: VISION_REMOTE_REFUSAL })
   const doc: Doc = {
     filename: row.filename ?? 'the document',
     blobSha: row.blobSha,
@@ -220,6 +229,7 @@ const program = Effect.fn('visionDocument')(function* (
   const text = visionText(sections)
   yield* store.markExtracted(documentId, text)
   yield* store.onExtracted(documentId)
+  yield* store.settleBytes(documentId)
   console.log(
     `[worker] vision read ${String(sections.length)} page(s), ${String(text.length)} chars, from ${doc.filename}`,
   )

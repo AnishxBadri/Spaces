@@ -25,6 +25,7 @@ import {
   fetchStorageFile,
 } from './jobs/fetch-storage-file'
 import { bindStorageFolder } from './jobs/bind-storage-folder'
+import { fetchRemoteBytes, retainBackfill } from './jobs/restore-bytes'
 import { syncStorageBinding } from './jobs/sync-storage-binding'
 import {
   EXPORT_RETRY_DELAY_MAX_SECONDS,
@@ -222,6 +223,31 @@ async function main() {
       ),
     }),
   )
+  // Retain per binding: a `remote` document's bytes fetched back through its
+  // connection, for the viewer (`fetchRemoteBytes`) or for a `text → full`
+  // flip (`retainBackfill`). Both `stately` with `singletonKey = documentId`,
+  // so a burst of opens or a flip sent twice is one queued fetch. Created
+  // before the plain create loop below; a queue's policy is fixed at create.
+  for (const def of [fetchRemoteBytes, retainBackfill]) {
+    await boss.createQueue(def.name, { policy: 'stately' }).catch(() => {})
+    if (def.retry)
+      await boss.updateQueue(def.name, {
+        retryLimit: def.retry.limit,
+        retryDelay: def.retry.delaySeconds,
+        retryBackoff: def.retry.backoff,
+      })
+    await boss.work(
+      def.name,
+      { batchSize: 1, includeMetadata: true },
+      runJob(def, {
+        host,
+        layer: Layer.merge(
+          storageSourcesLayer(plugins, { fakes }),
+          fetchStorageEnqueue,
+        ),
+      }),
+    )
+  }
   // The storage change poll, every quarter hour: `singleton`, so two polls
   // never share one connection's cursor, and never retried — the next tick
   // is the retry. A page of new files is many downloads, so an hour before

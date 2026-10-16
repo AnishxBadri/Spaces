@@ -13,6 +13,7 @@ import { clearAiRouteProgram, setAiRouteProgram } from '#web/lib/ai/route'
 import { JobPermanent } from '../run-job'
 import { ExtractionStore } from './extract-document'
 import {
+  VISION_REMOTE_REFUSAL,
   runVisionDocument,
   visionDocument,
   visionDocumentData,
@@ -317,6 +318,47 @@ describe('document.vision — refusals leave the row alone', () => {
     )
     expect(calls).toHaveLength(0)
     expect((await row(id))?.error).toBe('Blob integrity check failed')
+  })
+
+  it('a remote document (retain text) is refused, its bytes never fetched', async () => {
+    const id = await scan()
+    await db
+      .update(document)
+      .set({ bytesState: 'remote' })
+      .where(eq(document.entityId, id))
+    const { model, calls } = mockModel(() => pagesOf(1))
+    let read = false
+    const real = Effect.runSync(
+      Effect.provide(
+        Effect.gen(function* () {
+          return yield* ExtractionStore
+        }),
+        ExtractionStore.layer,
+      ),
+    )
+    const watched = Layer.succeed(
+      ExtractionStore,
+      ExtractionStore.of({
+        ...real,
+        bytes: () =>
+          Effect.sync(() => {
+            read = true
+            return new Uint8Array()
+          }),
+      }),
+    )
+    const failure = await Effect.runPromise(
+      Effect.flip(
+        runVisionDocument({ documentId: id, userId: USER }, { model }).pipe(
+          Effect.provide(watched),
+        ),
+      ),
+    )
+    expect(failure).toBeInstanceOf(JobPermanent)
+    expect(failure.reason).toBe(VISION_REMOTE_REFUSAL)
+    expect(read).toBe(false)
+    expect(calls).toHaveLength(0)
+    expect((await row(id))?.status).toBe('unsupported')
   })
 
   it('never retries, and carries who pressed and what', () => {

@@ -189,6 +189,19 @@ export const extractionStatus = pgEnum('extraction_status', [
 export const externalStatus = pgEnum('external_status', ['linked', 'gone'])
 
 /**
+ * Whether this row's sha is held on disk (§7, retain per binding).
+ * - `stored`: the blob is ours. `remote`: a `retain: text` binding dropped it
+ *   after extraction; the sha, the derived layers and the pointer stay, and
+ *   preview and download fetch through the file's connection.
+ * - `blob_sha` stays set either way, so this is the column GC, preview and
+ *   download read to tell held from discarded.
+ */
+export const documentBytesState = pgEnum('document_bytes_state', [
+  'stored',
+  'remote',
+])
+
+/**
  * A stored file, keyed by its own entity.
  * - No `sensitive` column, on purpose: `document.entity_id = entity.id`, so a
  *   derived flag here would sit on the same row identity as the authored
@@ -205,6 +218,8 @@ export const document = pgTable(
     // Content-addressed: sha256 of the blob. Same deck emailed twice → one
     // blob, two document rows. Null for url-origin docs with no stored blob.
     blobSha: text('blob_sha'),
+    /** Held or discarded; see `documentBytesState`. */
+    bytesState: documentBytesState('bytes_state').notNull().default('stored'),
     filename: text('filename'),
     mime: text('mime'),
     url: text('url'),

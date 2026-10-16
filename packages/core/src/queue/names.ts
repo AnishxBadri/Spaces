@@ -90,6 +90,19 @@ export const QUEUES = {
    */
   exportDocument: 'storage.export',
   /**
+   * A `remote` document's bytes fetched back through its connection for the
+   * preview or a download (§7, `retain: text`): held under the sha with a
+   * `pending_blob` intent, so the orphan sweep is the cache's expiry. Created
+   * `stately` and sent with `singletonKey = documentId`; the viewer polls it.
+   */
+  fetchRemoteBytes: 'storage.fetch-bytes',
+  /**
+   * A binding flipped `text → full`: one job per `remote` document, which
+   * fetches the bytes back and marks the row `stored`. Created `stately` and
+   * sent with `singletonKey = documentId`.
+   */
+  retainBackfill: 'storage.retain-backfill',
+  /**
    * The deck reader (SPA-90): a `kind: deck` document → one `attribute_patch`
    * suggestion per record it is filed against. Created with the `exclusive`
    * policy and sent with `singletonKey = documentId`, so a second press while

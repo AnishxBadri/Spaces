@@ -444,20 +444,19 @@ export const getDocumentDownloadUrl = createServerFn({ method: 'POST' })
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const row = (
-      await db
-        .select({ blobSha: document.blobSha, filename: document.filename })
-        .from(document)
-        .where(and(eq(document.entityId, data.id), await readable(u.id)))
-    ).at(0)
-    if (!row?.blobSha) throw new Error('This document has no stored file')
-    return {
-      url: await storage().getDownloadUrl(
-        row.blobSha,
-        300,
-        row.filename === null ? {} : { filename: row.filename },
-      ),
-    }
+    // A `remote` row (retain: text) is fetched from its provider first; the
+    // throw says so, and the viewer's Download polls `getDocumentBytes`.
+    const { documentBytesProgram } = await import('../documents/remote-bytes')
+    const { effectFn } = await import('./effect')
+    const bytes = await effectFn(documentBytesProgram)(u.id, data.id, {
+      poll: false,
+    })
+    if (bytes.state === 'ready') return { url: bytes.url }
+    throw new Error(
+      bytes.state === 'fetching'
+        ? `Fetching this file from ${bytes.from}; try again in a moment`
+        : bytes.reason,
+    )
   })
 
 /**

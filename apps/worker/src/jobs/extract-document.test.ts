@@ -97,6 +97,7 @@ function fakeStore(options: {
         Effect.sync(() => {
           writes.push({ op: 'on-extracted', documentId })
         }),
+      settleBytes: () => Effect.void,
     }),
   )
   return { layer, writes }
@@ -176,7 +177,12 @@ afterEach(() => {
 describe('extractDocument — the happy path still completes', () => {
   it('writes the extracted text, hands it to onDocumentExtracted, and completes the job', async () => {
     const store = fakeStore({
-      row: { blobSha: sha, filename: 'terms.txt', mime: 'text/plain' },
+      row: {
+        blobSha: sha,
+        bytesState: 'stored',
+        filename: 'terms.txt',
+        mime: 'text/plain',
+      },
       bytes,
     })
     const { calls, writes } = await run(store)
@@ -206,7 +212,12 @@ describe('extractDocument — the happy path still completes', () => {
 describe('extractDocument — permanent failures land on the row immediately', () => {
   it('maps a missing blob to unsupported, recorded now', async () => {
     const store = fakeStore({
-      row: { blobSha: null, filename: 'terms.txt', mime: 'text/plain' },
+      row: {
+        blobSha: null,
+        bytesState: 'stored',
+        filename: 'terms.txt',
+        mime: 'text/plain',
+      },
     })
     const { calls, writes } = await run(store)
 
@@ -227,7 +238,12 @@ describe('extractDocument — permanent failures land on the row immediately', (
   it('maps a sha mismatch to failed, recorded now', async () => {
     const wrongSha = 'f'.repeat(64)
     const store = fakeStore({
-      row: { blobSha: wrongSha, filename: 'terms.txt', mime: 'text/plain' },
+      row: {
+        blobSha: wrongSha,
+        bytesState: 'stored',
+        filename: 'terms.txt',
+        mime: 'text/plain',
+      },
       bytes,
     })
     const { calls, writes } = await run(store)
@@ -246,7 +262,12 @@ describe('extractDocument — permanent failures land on the row immediately', (
   it('maps an unsupported mime to unsupported, recorded now', async () => {
     const scanSha = createHash('sha256').update(bytes).digest('hex')
     const store = fakeStore({
-      row: { blobSha: scanSha, filename: 'scan.jpg', mime: 'image/jpeg' },
+      row: {
+        blobSha: scanSha,
+        bytesState: 'stored',
+        filename: 'scan.jpg',
+        mime: 'image/jpeg',
+      },
       bytes,
     })
     const { calls, writes } = await run(store)
@@ -266,7 +287,12 @@ describe('extractDocument — permanent failures land on the row immediately', (
 describe('extractDocument — an unreadable blob is retryable', () => {
   const unreadable = () =>
     fakeStore({
-      row: { blobSha: sha, filename: 'terms.txt', mime: 'text/plain' },
+      row: {
+        blobSha: sha,
+        bytesState: 'stored',
+        filename: 'terms.txt',
+        mime: 'text/plain',
+      },
       blobError: 'connect ECONNREFUSED 127.0.0.1:9000',
     })
   const reason = `Blob ${sha.slice(0, 12)} unreadable: connect ECONNREFUSED 127.0.0.1:9000`

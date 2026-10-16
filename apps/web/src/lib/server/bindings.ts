@@ -84,3 +84,27 @@ export const unlinkDriveFolder = createServerFn({ method: 'POST' })
     const { effectFn } = await import('./effect')
     return { unlinked: await effectFn(unlinkFolderProgram)(data.bindingId) }
   })
+
+/**
+ * Keep full copies or text only, after the bind. `text → full` sends one
+ * backfill per document whose bytes were dropped; `full → text` drops
+ * nothing held until each file is next extracted. Null when the binding is
+ * gone.
+ */
+export const setBindingRetain = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      bindingId: z.string().uuid(),
+      retain: z.enum(['full', 'text']),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { setBindingRetainProgram } =
+      await import('@spaces/core/writes/bindings/retain')
+    const { webEnqueue } = await import('../enqueue-live')
+    const { Effect } = await import('effect')
+    return Effect.runPromise(
+      setBindingRetainProgram(data).pipe(Effect.provide(webEnqueue)),
+    )
+  })

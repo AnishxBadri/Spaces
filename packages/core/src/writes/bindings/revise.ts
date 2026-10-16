@@ -164,6 +164,9 @@ export const reviseDocumentProgram = Effect.fn('reviseDocumentProgram')(
           .update(document)
           .set({
             blobSha: blob.sha,
+            // The new bytes are held, whatever the old ones were; a
+            // `retain: text` binding drops them again after extraction.
+            bytesState: 'stored',
             mime: file.mime,
             sizeBytes: blob.sizeBytes,
             externalRevisionId: file.changeToken,

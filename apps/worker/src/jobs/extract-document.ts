@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { db } from '@spaces/db'
 import { document } from '@spaces/db/schema'
 import { onDocumentExtracted } from '#web/lib/documents/on-extracted'
+import { dropBytesAfterExtraction } from '#web/lib/documents/retain'
 import { storage } from '@spaces/core/writes/storage'
 import { linkTermMentionsInTx } from '#web/lib/glossary/link-terms'
 import { extractDocumentText } from '@spaces/core/documents/extract'
@@ -44,6 +45,8 @@ export type ExtractDocumentData = z.infer<typeof extractDocumentData>
 
 export interface DocumentForExtraction {
   readonly blobSha: string | null
+  /** `remote`: a `retain: text` binding dropped the bytes; nothing to read. */
+  readonly bytesState: 'stored' | 'remote'
   readonly filename: string | null
   readonly mime: string | null
 }
@@ -99,6 +102,12 @@ export class ExtractionStore extends Context.Service<
      * so it cannot fail the extraction whose text is already committed.
      */
     readonly onExtracted: (documentId: string) => Effect.Effect<void>
+    /**
+     * The binding's retain policy, once the text is committed: under
+     * `retain: text` the bytes go and the row turns `remote`
+     * (`dropBytesAfterExtraction`). Never fails, as `onExtracted`.
+     */
+    readonly settleBytes: (documentId: string) => Effect.Effect<void>
   }
 >()('spaces/worker/ExtractionStore') {
   static readonly layer = Layer.succeed(
@@ -111,6 +120,7 @@ export class ExtractionStore extends Context.Service<
               await db
                 .select({
                   blobSha: document.blobSha,
+                  bytesState: document.bytesState,
                   filename: document.filename,
                   mime: document.mime,
                 })
@@ -184,6 +194,27 @@ export class ExtractionStore extends Context.Service<
       // The one call site of `onDocumentExtracted`; a lane that runs after
       // extraction registers there, not here.
       onExtracted: (documentId) => onDocumentExtracted(documentId),
+      settleBytes: (documentId) =>
+        dropBytesAfterExtraction(documentId).pipe(
+          Effect.tap((drop) =>
+            drop._tag === 'dropped'
+              ? Effect.sync(() =>
+                  console.log(
+                    `[worker] ${documentId}: retain text, bytes ${drop.sha.slice(0, 12)} dropped`,
+                  ),
+                )
+              : Effect.void,
+          ),
+          Effect.catch((err) =>
+            Effect.sync(() =>
+              console.warn(
+                `[worker] ${documentId}: bytes kept after extraction`,
+                err,
+              ),
+            ),
+          ),
+          Effect.asVoid,
+        ),
     }),
   )
 }
@@ -210,6 +241,14 @@ const program = Effect.fn('extractDocument')(function* (
     })
   }
   const blobSha = row.blobSha
+  // Its text was derived before the bytes went; re-deriving needs them back
+  // (the binding flipped to `full`), so the row's text and status stand.
+  if (row.bytesState === 'remote') {
+    console.warn(
+      `[worker] ${documentId}: bytes not held (retain text); extraction skipped`,
+    )
+    return
+  }
 
   const bytes = yield* store.bytes(blobSha)
 
@@ -249,6 +288,7 @@ const program = Effect.fn('extractDocument')(function* (
   // The success path's one hand-off: every follow-on lane is enqueued by
   // `onDocumentExtracted`, never from this job.
   yield* store.onExtracted(documentId)
+  yield* store.settleBytes(documentId)
 
   console.log(
     `[worker] extracted ${outcome.text.length} chars from ${row.filename ?? documentId} (${outcome.format})`,

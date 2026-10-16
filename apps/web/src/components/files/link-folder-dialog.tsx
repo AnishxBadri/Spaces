@@ -20,6 +20,9 @@ import { formatBytes } from '@spaces/core/documents'
  * - Presentational: the caller binds and says how it went; a refusal (the
  *   folder already has an owner) stays in the window, above the foot.
  * - The dialog sets no direction: a binding made here reads, Drive → us.
+ * - One owner per option's behaviour. Keep is storage-12's: `text` drops the
+ *   bytes after extraction (`dropBytesAfterExtraction`) and a flip to `full`
+ *   backfills (`setBindingRetain`). Sensitive is storage-18's.
  */
 
 /** What Link folder stores on the binding. */
