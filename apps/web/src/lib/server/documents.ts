@@ -179,8 +179,8 @@ export const listRecordDocuments = createServerFn()
   .validator(z.object({ entityId: z.string().uuid() }))
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const { attachmentHiddenSql, DOCUMENT_ID_REF } =
-      await import('@spaces/core/writes/read/attachment-visibility')
+    const { canReadDocumentSql } =
+      await import('@spaces/core/writes/read/can-read-sql')
     const rows = await db
       .select({
         id: document.entityId,
@@ -225,8 +225,8 @@ export const listRecordDocuments = createServerFn()
           eq(link.toEntityId, data.entityId),
           eq(link.relation, 'tagged_in'),
           isNull(entity.mergedIntoId),
-          // An attachment private with its email's body is not listed (D67).
-          sql`not ${attachmentHiddenSql(u.id, DOCUMENT_ID_REF)}`,
+          // A document private to someone else is not listed (D67).
+          canReadDocumentSql(u.id),
         ),
       )
       .orderBy(desc(document.createdAt))
@@ -399,13 +399,13 @@ export const countUnfiledDocuments = createServerFn().handler(async () => {
 })
 
 /**
- * Not an email attachment private to someone else (D67): the by-id reads'
- * gate. A dynamic import, so drizzle stays out of the client bundle.
+ * Not a document private to someone else (D67): the by-id reads' gate. A
+ * dynamic import, so drizzle stays out of the client bundle.
  */
 async function readable(userId: string) {
-  const { attachmentHiddenSql, DOCUMENT_ID_REF } =
-    await import('@spaces/core/writes/read/attachment-visibility')
-  return sql`not ${attachmentHiddenSql(userId, DOCUMENT_ID_REF)}`
+  const { canReadDocumentSql } =
+    await import('@spaces/core/writes/read/can-read-sql')
+  return canReadDocumentSql(userId)
 }
 
 /**

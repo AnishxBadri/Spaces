@@ -8,6 +8,7 @@ import {
   documentIntakeMessage,
   intakeDocumentProgram,
 } from '@spaces/core/writes/documents/intake'
+import type { DocumentPrivacy } from '@spaces/core/writes/documents/birth'
 import { webEnqueue } from '#/lib/enqueue-live'
 import type { MailAttachment, SortedAttachments } from './attachments'
 
@@ -24,6 +25,8 @@ import type { MailAttachment, SortedAttachments } from './attachments'
  * - **Provenance is the mailbox's**: `source_class = 'integration'`, the
  *   lane's integration as `source_ref` and actor, the subject as
  *   `source_path`. `kind` stays `other`; the classify lane proposes one.
+ * - **Private with the email's body** (D67): born with `privacy`, which a
+ *   synced mailbox sets to its owner.
  * - **A refusal is per part, never the message's**: too large or a store
  *   that is down is recorded on the poll's summary line and the rest lands.
  *   A failed join is `unjoined`, not refused: the document exists, and the
@@ -39,6 +42,8 @@ export type AttachmentFilingContext = {
   subject: string | null
   /** The people and companies the email edged; empty is unfiled. */
   records: ReadonlyArray<string>
+  /** Who may read each part: the body's visibility and the mailbox owner. */
+  privacy: DocumentPrivacy
 }
 
 export type AttachmentOutcome = {
@@ -120,6 +125,7 @@ export const fileAttachmentsProgram = Effect.fn('fileAttachments')(function* (
         entityId,
       })),
       actor: { integrationId: ctx.integrationId },
+      privacy: ctx.privacy,
     }).pipe(
       // Birth's extraction enqueue, through the web sender.
       Effect.provide(webEnqueue),

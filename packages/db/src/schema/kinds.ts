@@ -270,6 +270,14 @@ export const document = pgTable(
     extractionError: text('extraction_error'),
     extractedAt: timestamp('extracted_at', { withTimezone: true }),
     uploadedBy: text('uploaded_by').references(() => user.id),
+    /**
+     * Who may read it, read through `canRead` exactly as a note is: private
+     * means `author_id` only. A synced mailbox's attachment is born private
+     * to the mailbox owner (D67); everything else is born shared.
+     */
+    visibility: visibility('visibility').notNull().default('shared'),
+    /** The member a private document belongs to. A user id, not an entity ref. */
+    authorId: text('author_id').references(() => user.id),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

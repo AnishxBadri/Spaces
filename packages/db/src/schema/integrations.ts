@@ -89,7 +89,9 @@ export const integration = pgTable('integration', {
     () => credential.id,
   ),
   /** OAuth grant (a Gmail mailbox); null for a plugin that needs none. */
-  connectionId: uuid('connection_id').references(() => accountConnection.id),
+  connectionId: uuid('connection_id').references(() => accountConnection.id, {
+    onDelete: 'set null',
+  }),
   errorCount: integer('error_count').notNull().default(0),
   lastRunAt: timestamp('last_run_at', { withTimezone: true }),
   lastError: text('last_error'),

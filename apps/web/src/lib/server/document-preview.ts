@@ -1,8 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '@spaces/db'
-import { document, entity } from '@spaces/db/schema'
 import { requireUser } from './shared'
 
 /**
@@ -22,54 +19,8 @@ export const getDocumentPreview = createServerFn()
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const { attachmentHiddenSql, DOCUMENT_ID_REF } =
-      await import('@spaces/core/writes/read/attachment-visibility')
-    // `.at(0)` rather than destructuring: the row genuinely may not exist —
-    // a mention whose document was deleted is an ordinary state — and a
-    // destructured element types as always-present.
-    const row = (
-      await db
-        .select({
-          id: document.entityId,
-          filename: document.filename,
-          mime: document.mime,
-          sizeBytes: document.sizeBytes,
-          kind: document.kind,
-          extractionStatus: document.extractionStatus,
-          extractionError: document.extractionError,
-          // The two columns that decide whether there is a file to fetch at
-          // all (docsurf-10b). A clipped article has no blob and an address
-          // instead, and the dialog renders the extracted text with the
-          // address linked rather than asking storage for bytes it never
-          // stored — which is what `getDocumentDownloadUrl` throws about.
-          blobSha: document.blobSha,
-          url: document.url,
-          mergedIntoId: entity.mergedIntoId,
-        })
-        .from(document)
-        .innerJoin(entity, eq(entity.id, document.entityId))
-        .where(
-          and(
-            eq(document.entityId, data.id),
-            // A private email attachment opens for its reader only (D67).
-            sql`not ${attachmentHiddenSql(u.id, DOCUMENT_ID_REF)}`,
-          ),
-        )
-    ).at(0)
-    if (!row || row.mergedIntoId) return null
-    return {
-      id: row.id,
-      // Same coercion the Files tab makes: `filename` is nullable for
-      // url-origin documents, and the dialog's title is not optional.
-      filename: row.filename ?? 'Untitled file',
-      mime: row.mime,
-      sizeBytes: row.sizeBytes,
-      kind: row.kind,
-      extractionStatus: row.extractionStatus,
-      extractionError: row.extractionError,
-      blobSha: row.blobSha,
-      url: row.url,
-    }
+    const { documentPreviewCard } = await import('../documents/preview-card')
+    return documentPreviewCard(u, data.id)
   })
 
 /**

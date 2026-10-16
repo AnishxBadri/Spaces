@@ -6,10 +6,7 @@ import { document, entity, integration } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { documentFilingEdges } from '#/lib/server/shared'
 import { unfiledPredicate } from '#/lib/documents/unfiled'
-import {
-  DOCUMENT_ID_REF,
-  attachmentHiddenSql,
-} from '@spaces/core/writes/read/attachment-visibility'
+import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
 
 /**
  * The shelf behind `/documents` (SPA-58) — every document in the workspace
@@ -134,10 +131,10 @@ const SNIPPET_CHARS = 200
 export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
   function* (input: {
     filed: DocumentFiled
-    /** Whose shelf: an attachment private with its email is not on it (D67). */
+    /** Whose shelf: a document private to someone else is not on it (D67). */
     viewer: { id: string }
   }): Effect.fn.Return<Array<ShelfDocument>, DocumentShelfFailed> {
-    const visible = sql`not ${attachmentHiddenSql(input.viewer.id, DOCUMENT_ID_REF)}`
+    const visible = canReadDocumentSql(input.viewer.id)
     const rows = yield* Effect.tryPromise({
       try: () =>
         db
@@ -265,7 +262,7 @@ export const countUnfiledProgram = Effect.fn('countUnfiledProgram')(
             and(
               isNull(entity.mergedIntoId),
               unfiledPredicate(),
-              sql`not ${attachmentHiddenSql(viewer.id, DOCUMENT_ID_REF)}`,
+              canReadDocumentSql(viewer.id),
             ),
           ),
       catch: (cause) => new DocumentShelfFailed({ cause }),

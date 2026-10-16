@@ -20,6 +20,7 @@ import type { Enqueue } from '../../queue/enqueue'
 import type {
   DocumentActor,
   DocumentBirthFailure,
+  DocumentPrivacy,
   DocumentProvenance,
 } from './birth'
 
@@ -98,6 +99,8 @@ export type DocumentIntakeInput = {
   provenance: DocumentProvenance
   fileAgainst: Array<DocumentFilingTarget>
   actor: DocumentActor
+  /** Birth's `privacy`; omitted is shared. */
+  privacy?: DocumentPrivacy
 }
 
 /** The stream passed `MAX_UPLOAD_BYTES`; nothing was stored. */
@@ -280,6 +283,7 @@ const storeAndBirth = Effect.fn('documentIntake.storeAndBirth')(function* (
     provenance: input.provenance,
     fileAgainst: input.fileAgainst,
     actor: input.actor,
+    ...(input.privacy === undefined ? {} : { privacy: input.privacy }),
   })
 })
 

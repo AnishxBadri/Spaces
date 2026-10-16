@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   document,
@@ -95,6 +95,18 @@ export type DocumentProvenance = {
 export type DocumentActor =
   { userId: string } | { integrationId: string } | null
 
+/**
+ * Who may read the document, through `canRead` exactly as a note: private
+ * means `authorId` only. A synced mailbox's attachment is private to the
+ * mailbox owner (D67); omitted is shared with no author.
+ */
+export type DocumentPrivacy = {
+  visibility: 'shared' | 'private'
+  authorId: string | null
+}
+
+const SHARED: DocumentPrivacy = { visibility: 'shared', authorId: null }
+
 export type DocumentBirthInput = {
   /** Null for a document whose bytes we do not keep — see the enqueue note. */
   blobSha: string | null
@@ -125,6 +137,7 @@ export type DocumentBirthInput = {
   /** Zero, one or N places. Zero is an unfiled document, not an error. */
   fileAgainst: Array<DocumentFilingTarget>
   actor: DocumentActor
+  privacy?: DocumentPrivacy
 }
 
 /** The target will not take this filing — carries the sentence, not a code. */
@@ -367,8 +380,7 @@ export type BirthTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 /**
  * A dedupe is still an arrival: the first per actor writes a
  * `document.arrived` row on the document's own stream, since the edge it
- * asked for may already exist. An email attachment reads it to know the
- * bytes also came from elsewhere (`attachmentHiddenSql`).
+ * asked for may already exist.
  */
 async function recordArrival(
   tx: BirthTx,
@@ -402,6 +414,38 @@ async function recordArrival(
     objectEntityId: documentId,
     meta: { deduped: true, ...meta },
   })
+}
+
+/**
+ * A dedupe that arrives shared widens the row it landed on: the same bytes
+ * came from somewhere that shares them, so a private attachment is private
+ * no longer (D67).
+ * - The author stays only when it is the same one, so the mailbox's share
+ *   toggle can still narrow its own; any other arrival leaves no author.
+ * - A private arrival changes nothing: one author column holds one owner,
+ *   and the first one keeps it.
+ */
+async function widenOnArrival(
+  tx: BirthTx,
+  documentId: string,
+  privacy: DocumentPrivacy,
+): Promise<void> {
+  if (privacy.visibility === 'private') return
+  await tx
+    .update(document)
+    .set({
+      visibility: 'shared',
+      authorId: sql`case when ${document.authorId} is not distinct from ${privacy.authorId} then ${document.authorId} end`,
+    })
+    .where(
+      and(
+        eq(document.entityId, documentId),
+        or(
+          eq(document.visibility, 'private'),
+          sql`${document.authorId} is distinct from ${privacy.authorId}`,
+        ),
+      ),
+    )
 }
 
 /** Why a row will never be extracted, written at birth. */
@@ -447,6 +491,8 @@ async function insertDocumentRows(
     bindingId: input.provenance.bindingId ?? null,
     externalRevisionId: input.provenance.externalRevisionId ?? null,
     uploadedBy: userId,
+    visibility: (input.privacy ?? SHARED).visibility,
+    authorId: (input.privacy ?? SHARED).authorId,
     ...(extraction === null
       ? {}
       : {
@@ -554,6 +600,7 @@ export const birthDocumentProgram = Effect.fn('birthDocumentProgram')(
         db.transaction(async (tx) => {
           await addEdges(tx, existing, targets, actorUserId(input.actor))
           await recordArrival(tx, existing, input.actor)
+          await widenOnArrival(tx, existing, input.privacy ?? SHARED)
           // Deduped is still arrived: the digest is on a document row, so
           // the pending row has nothing left to describe. Skipping it here
           // would leave the sweep a row it can never act on (the reference

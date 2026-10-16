@@ -48,6 +48,7 @@ import {
   memosTaggedIn,
   query,
   rankChecked,
+  readableDocument,
   readableNote,
   revealed,
   sensitiveChecked,
@@ -292,10 +293,22 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
   if (seed.kind === 'document') {
     const doc = (yield* query(() =>
       db
-        .select({ filename: document.filename, kind: document.kind })
+        .select({
+          filename: document.filename,
+          kind: document.kind,
+          visibility: document.visibility,
+          authorId: document.authorId,
+        })
         .from(document)
         .where(eq(document.entityId, seedId)),
     )).at(0)
+    // The seed's gate is the caller's (`recordContextProgram`); kept here so
+    // the output invariant refuses a private seed that slipped past it.
+    if (doc)
+      noteRows.set(seedId, {
+        visibility: doc.visibility,
+        authorId: doc.authorId,
+      })
     const label = doc?.filename ?? seed.name
     const own = yield* query(() =>
       db
@@ -513,10 +526,17 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
     ))
       notesById.set(n.entityId, n)
 
-  // documents + chunks
+  // documents + chunks — canRead in SQL, so a private attachment's chunks
+  // are never read for anyone but its author
   const docsById = new Map<
     string,
-    { filename: string | null; kind: string; createdAt: Date }
+    {
+      filename: string | null
+      kind: string
+      createdAt: Date
+      visibility: string
+      authorId: string | null
+    }
   >()
   if (docIds.length > 0)
     for (const d of yield* query(() =>
@@ -526,12 +546,17 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
           filename: document.filename,
           kind: document.kind,
           createdAt: document.createdAt,
+          visibility: document.visibility,
+          authorId: document.authorId,
         })
         .from(document)
-        .where(inArray(document.entityId, docIds)),
+        .where(
+          and(inArray(document.entityId, docIds), readableDocument(userId)),
+        ),
     ))
       docsById.set(d.id, d)
-  const chunks = docIds.length
+  const readableDocIds = docIds.filter((id) => docsById.has(id))
+  const chunks = readableDocIds.length
     ? yield* query(() =>
         db
           .select({
@@ -547,7 +572,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
           // are the semantic lane's, and render as their own kinds.
           .where(
             and(
-              inArray(chunk.entityId, docIds),
+              inArray(chunk.entityId, readableDocIds),
               eq(chunk.sourceKind, 'document'),
               noSensitive,
             ),
@@ -612,7 +637,11 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
         if (seenDocs.has(otherId)) break
         seenDocs.add(otherId)
         const d = docsById.get(otherId)
-        if (!d) break
+        if (!d) break // private-and-not-mine, or gone
+        noteRows.set(otherId, {
+          visibility: d.visibility,
+          authorId: d.authorId,
+        })
         const label = d.filename ?? other.name
         const mine = chunks.filter((c) => c.docId === otherId)
         const pick = opts.taskText

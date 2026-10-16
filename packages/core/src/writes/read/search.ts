@@ -2,7 +2,7 @@ import { Effect, Schema } from 'effect'
 import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { attachmentHiddenSql } from './attachment-visibility'
+import { canReadNoteSql } from './can-read-sql'
 
 /**
  * The lexical half of unified search, in core since SPA-198 (extracted from
@@ -14,9 +14,9 @@ import { attachmentHiddenSql } from './attachment-visibility'
  * SDK's `Read.search` (`../ports/read.ts`) runs the lexical statement alone,
  * which embeds nothing (D56).
  *
- * canRead is enforced in SQL on every lane that can reach a note — a
- * private note never enters the fusion for anyone but its author. The
- * task lane takes no such clause: tasks carry no visibility flag.
+ * canRead is enforced in SQL on every lane that can reach a note or a
+ * document — a private one never enters the fusion for anyone but its
+ * author. The task lane takes no such clause: tasks carry no visibility flag.
  */
 
 export class SearchQueryFailed extends Schema.TaggedError<SearchQueryFailed>()(
@@ -45,19 +45,13 @@ export const HEADLINE_OPTIONS =
 // reaches `sql.raw`.
 const headlineOptions = sql.raw(`'${HEADLINE_OPTIONS}'`)
 
-/**
- * canRead as a predicate over the entity aliased `e`: true unless `e` is a
- * note private to someone other than `userId`, or an email attachment
- * private with its email's body (`attachmentHiddenSql`, D67).
- * - Vacuous for every other kind, which is what lets the name lane apply it
- *   to companies and decks alike; in the note lane `e` is the note itself.
- */
-export const canReadNoteSql = (userId: string): SQL => sql`not exists (
-            select 1 from note pn
-            where pn.entity_id = e.id
-              and pn.visibility = 'private'
-              and pn.author_id <> ${userId}
-          ) and not ${attachmentHiddenSql(userId, sql`e.id`)}`
+// canRead's SQL twins live beside it, free of `db`, so a server fn's dynamic
+// import of them pulls no driver into a chunk.
+export {
+  DOCUMENT_ID_REF,
+  canReadDocumentSql,
+  canReadNoteSql,
+} from './can-read-sql'
 
 /** What the fused statement takes; `semantic` is web's fifth lane, if any. */
 export type LexicalFusedInput = {
@@ -164,12 +158,13 @@ export function fusedStatement({
         from document d
         join entity e on e.id = d.entity_id and e.merged_into_id is null
         where d.tsv @@ (select tsq from q)
+          and ${canReadNoteSql(userId)}
         limit 40
       ),
 
       -- Tasks: a plain table, not an entity (CONTEXT.md 15b), so this lane
       -- ranks task ids, not entity ids. No canRead clause, unlike the
-      -- private-note carve-out in the two lanes above, and on purpose: a
+      -- private carve-out in the three lanes above, and on purpose: a
       -- task carries no visibility flag — any member sees any task, the
       -- rule /tasks already enforces — so there is nothing to carve out.
       -- Nor does it filter on done_at: a finished task is still a thing you

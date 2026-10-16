@@ -1,7 +1,7 @@
 import { Effect } from 'effect'
 import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { note } from '@spaces/db/schema'
+import { document, note } from '@spaces/db/schema'
 import { canRead } from '../../read-policy'
 import { ContextEntityNotFound, ContextQueryFailed } from '../../context/errors'
 import type { ContextLeak } from '../../context/errors'
@@ -77,19 +77,28 @@ export const recordContextProgram = Effect.fn('recordContextProgram')(
     ContextQueryFailed | ContextEntityNotFound | ContextLeak,
     SimilarLane
   > {
-    // A private note is its author's: asked for as the seed by anyone else,
-    // it does not exist — not even its title leaves as the seed's name. The
-    // assembler filters notes it reaches over a link; this is the one door
-    // it does not walk through (SPA-23: a token asks by id).
-    const seedNote = (yield* Effect.tryPromise({
+    // A private note or document is its author's: asked for as the seed by
+    // anyone else, it does not exist — not even its title leaves as the
+    // seed's name. The assembler filters what it reaches over a link; this
+    // is the one door it does not walk through (a token asks by id).
+    const gates = yield* Effect.tryPromise({
       try: () =>
-        db
-          .select({ visibility: note.visibility, authorId: note.authorId })
-          .from(note)
-          .where(eq(note.entityId, input.entityId)),
+        Promise.all([
+          db
+            .select({ visibility: note.visibility, authorId: note.authorId })
+            .from(note)
+            .where(eq(note.entityId, input.entityId)),
+          db
+            .select({
+              visibility: document.visibility,
+              authorId: document.authorId,
+            })
+            .from(document)
+            .where(eq(document.entityId, input.entityId)),
+        ]),
       catch: (cause) => new ContextQueryFailed({ cause }),
-    })).at(0)
-    if (seedNote && !canRead(input.user, seedNote))
+    })
+    if (gates.flat().some((row) => !canRead(input.user, row)))
       return yield* new ContextEntityNotFound({
         id: input.entityId,
         message: 'Record not found',

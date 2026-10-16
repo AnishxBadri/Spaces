@@ -3,8 +3,10 @@ import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   accountConnection,
+  document,
   integration,
   interaction,
+  interactionDocument,
   note,
 } from '@spaces/db/schema'
 import { deleteEntityProgram } from '@spaces/core/writes/entities/delete'
@@ -26,8 +28,9 @@ import { PRODUCTS } from '#/lib/connections/products'
  * A synced mailbox's settings on its account page: whether its bodies are
  * shared, and its exclude list (D67). Only the connection's owner reads or
  * saves them — not an admin — because they decide who reads the owner's mail.
- * - The toggle moves the visibility of every body already synced; `canRead`
- *   enforces it on each read path, so nothing is copied or redacted.
+ * - The toggle moves the visibility of every body already synced, and of the
+ *   attachments the owner still authors; `canRead` enforces it on each read
+ *   path, so nothing is copied or redacted.
  * - A save whose list now names mail already synced takes that mail out: its
  *   interactions, edges and body notes. Files that arrived on it stay.
  */
@@ -171,9 +174,36 @@ export const saveMailboxSyncProgram = Effect.fn('saveMailboxSync')(function* (
         )
 
         const visibility = settings.shareBodies ? 'shared' : 'private'
-        const kept = held
-          .filter((row) => !excluded.includes(row))
-          .flatMap((row) => (row.noteId === null ? [] : [row.noteId]))
+        const keptRows = held.filter((row) => !excluded.includes(row))
+        const kept = keptRows.flatMap((row) =>
+          row.noteId === null ? [] : [row.noteId],
+        )
+        // An attachment another arrival shared has no author left, so it
+        // stays shared.
+        if (keptRows.length > 0)
+          await tx
+            .update(document)
+            .set({ visibility })
+            .where(
+              and(
+                eq(document.authorId, userId),
+                inArray(
+                  document.entityId,
+                  tx
+                    .select({ id: interactionDocument.documentId })
+                    .from(interactionDocument)
+                    .where(
+                      and(
+                        inArray(
+                          interactionDocument.interactionId,
+                          keptRows.map((row) => row.id),
+                        ),
+                        eq(interactionDocument.role, 'attachment'),
+                      ),
+                    ),
+                ),
+              ),
+            )
         const revisited =
           kept.length === 0
             ? []

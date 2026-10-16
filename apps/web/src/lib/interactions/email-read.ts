@@ -3,6 +3,7 @@ import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import { simpleParser } from 'mailparser'
 import { normalizeEmail } from '@spaces/core/entities/normalize'
 import { canRead } from '@spaces/core/read-policy'
+import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
 import { storage } from '@spaces/core/writes/storage'
 import { db } from '@spaces/db'
 import {
@@ -197,6 +198,7 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
             and(
               eq(interactionDocument.interactionId, id),
               eq(interactionDocument.role, 'attachment'),
+              canReadDocumentSql(viewer.id),
             ),
           )
           .orderBy(asc(entity.canonicalName))

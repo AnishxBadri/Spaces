@@ -36,6 +36,7 @@ import {
   text,
 } from './start'
 import type { ConnectUnauthorized, ProviderTable } from './start'
+import { productOf } from './products'
 
 /**
  * The return leg of a connect dance: `/api/connections/$provider/callback`
@@ -45,6 +46,8 @@ import type { ConnectUnauthorized, ProviderTable } from './start'
  * - Order: state, then the provider's `error`, then the cookie, then the
  *   exchange. Nothing is written before the account is known.
  * - The verifier cookie is cleared on every answer, success or refusal.
+ * - A product with a plugin binds that plugin's `integration` row to the
+ *   connection in the grant's transaction, so its jobs read this grant.
  */
 
 export type ConnectCallbackError =
@@ -147,6 +150,7 @@ export const connectCallbackProgram = Effect.fn('connectCallback')(function* (
   const now = Date.now()
   const after = (seconds: number | null) =>
     seconds === null ? null : new Date(now + seconds * 1000)
+  const plugin = productOf(provider, state.product)?.plugin
   yield* upsertConnection({
     userId: input.userId,
     provider,
@@ -157,6 +161,7 @@ export const connectCallbackProgram = Effect.fn('connectCallback')(function* (
     bundle: grant.bundle,
     expiresAt: after(grant.expiresIn),
     refreshTokenExpiresAt: after(grant.refreshTokenExpiresIn),
+    ...(plugin === undefined ? {} : { plugin }),
   }).pipe(
     Effect.mapError(
       (e) => new ConnectFailed({ message: e.message, cause: e.cause }),

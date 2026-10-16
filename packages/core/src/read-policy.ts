@@ -1,16 +1,10 @@
 /**
- * canRead, as a predicate. Policy is deliberately trivial (2026-08): shared
- * unless private-and-not-yours. Private applies to note bodies (and later
- * interaction bodies) only. The point of the choke point is that it exists
- * — every read path routes through it before any richer policy needs it.
- *
- * It lives in @spaces/core (`read-policy`, SPA-179; `lib/notes/visibility.ts`
- * in the app before that — the SDK's Read port is where it is headed) rather
- * than in `lib/server/shared.ts` because it is pure and every read path
- * outside `lib/server/` needs it: `shared.ts` imports `getRequest`, so a
- * module the client barrel can reach must not import it (SPA-155).
- * `shared.ts` re-exports this, so the server-fn modules keep importing
- * `canRead` from where they always did.
+ * canRead, as a predicate: shared unless private-and-not-yours.
+ * - Applies to notes and documents alike; `row` is either one's
+ *   `visibility` and `author_id`. A private row with no author is nobody's.
+ * - The SQL twins are `canReadNoteSql` and `canReadDocumentSql`; the shared
+ *   table-driven test holds the three to one answer.
+ * - Pure, so every read path outside `lib/server/` can import it.
  */
 export function canRead(
   user: { id: string },

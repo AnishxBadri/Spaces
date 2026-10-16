@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { Effect } from 'effect'
 import { and, eq, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,10 +18,7 @@ import { renderMessage } from '@spaces/sdk/testing'
 import type { FakeGmailMessage } from '@spaces/sdk/testing'
 import { storage } from '@spaces/core/writes/storage'
 import { birthDocumentProgram } from '@spaces/core/writes/documents/birth'
-import {
-  DOCUMENT_ID_REF,
-  attachmentHiddenSql,
-} from '@spaces/core/writes/read/attachment-visibility'
+import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
 import { webEnqueue } from '#/lib/enqueue-live'
 import {
   countUnfiledProgram,
@@ -31,9 +29,11 @@ import { truncateAndReseed } from '#/test/reseed'
 import { attachmentEmailsProgram } from '#/lib/documents/attachment-emails'
 import { emailDetailProgram } from '#/lib/interactions/email-read'
 import { hasAttachmentsSql, recordTimelineProgram } from '#/lib/timeline/record'
+import { documentPreviewCard } from '#/lib/documents/preview-card'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { fileAttachmentsProgram } from './attachment-filing'
-import { fileArrivalProgram } from './file'
+import { FORWARDED, fileArrivalProgram } from './file'
+import { saveMailboxSyncProgram } from './mailbox-sync'
 import { withParts } from './fixtures'
 import { arrivalFromSource } from './message'
 import { logSyncedEmailProgram } from './synced'
@@ -57,6 +57,7 @@ const TEAMMATE = {
 const OTHER = { id: 'member-other' }
 const shas = new Set<string>()
 let gmail = ''
+let connectionId = ''
 
 beforeEach(async () => {
   await truncateAndReseed()
@@ -82,6 +83,7 @@ beforeEach(async () => {
       .returning({ id: accountConnection.id })
   ).at(0)
   if (!connection) throw new Error('no connection')
+  connectionId = connection.id
   const row = (
     await db
       .insert(integration)
@@ -237,13 +239,16 @@ const visibleTo = async (viewer: { id: string }, doc: string) =>
     await db
       .select({ id: document.entityId })
       .from(document)
-      .where(
-        and(
-          eq(document.entityId, doc),
-          sql`not ${attachmentHiddenSql(viewer.id, DOCUMENT_ID_REF)}`,
-        ),
-      )
+      .where(and(eq(document.entityId, doc), canReadDocumentSql(viewer.id)))
   ).length > 0
+
+const privacyOf = async (doc: string) =>
+  (
+    await db
+      .select({ visibility: document.visibility, authorId: document.authorId })
+      .from(document)
+      .where(eq(document.entityId, doc))
+  ).at(0)
 
 const shelf = async (viewer: { id: string }) =>
   (await Effect.runPromise(listDocumentsProgram({ filed: 'all', viewer }))).map(
@@ -449,6 +454,92 @@ describe('an attachment is private with its email’s body (D67)', () => {
       )?.subject,
     ).toBe('Re: Seed round')
   })
+
+  it('is born private to the mailbox owner on the synced lane, and shared on the forwarded one', async () => {
+    const { doc } = await syncDeck('born private deck')
+    expect(await privacyOf(doc)).toEqual({
+      visibility: 'private',
+      authorId: FIXTURE_ACTOR.id,
+    })
+
+    const forwarded = await forward(content('forwarded deck'))
+    if (forwarded.kind !== 'written') throw new Error('not written')
+    const other = (
+      await db
+        .select({ id: interactionDocument.documentId })
+        .from(interactionDocument)
+        .where(eq(interactionDocument.interactionId, forwarded.interactionId))
+    ).at(0)
+    if (!other) throw new Error('no forwarded attachment')
+    expect(await privacyOf(other.id)).toEqual({
+      visibility: 'shared',
+      authorId: null,
+    })
+  })
+
+  it('refuses a teammate the private attachment in the preview, and opens it for the owner', async () => {
+    const { doc } = await syncDeck('preview deck')
+    expect(await documentPreviewCard(FIXTURE_ACTOR, doc)).toMatchObject({
+      id: doc,
+      filename: 'Quokkaplan.pdf',
+    })
+    expect(await documentPreviewCard(TEAMMATE, doc)).toBeNull()
+  })
+
+  it('shares it when the same Message-ID is forwarded, with no author left', async () => {
+    const m = message({
+      attachments: [
+        {
+          filename: 'Quokkaplan.pdf',
+          mime: 'application/pdf',
+          content: content('re-forwarded deck'),
+        },
+      ],
+    })
+    expect((await sync(m)).outcome).toBe('created')
+    const doc = (await db.select({ id: document.entityId }).from(document)).at(
+      0,
+    )?.id
+    if (doc === undefined) throw new Error('no document')
+    expect(await visibleTo(TEAMMATE, doc)).toBe(false)
+
+    const arrival = await arrivalFromSource(Buffer.from(renderMessage(m)), {
+      mailboxAddress: 'deals@fund.example',
+      receivedAt: new Date(),
+    })
+    if (arrival.kind !== 'message') throw new Error('refused')
+    const again = await Effect.runPromise(
+      fileArrivalProgram(
+        arrival.message,
+        { integrationId: await coreMailbox(), authorId: FIXTURE_ACTOR.id },
+        FORWARDED,
+      ),
+    )
+    expect(again).toEqual({ kind: 'duplicate' })
+    expect(await privacyOf(doc)).toEqual({
+      visibility: 'shared',
+      authorId: null,
+    })
+    expect(await visibleTo(TEAMMATE, doc)).toBe(true)
+  })
+
+  it('moves with the mailbox’s share toggle while the owner still authors it', async () => {
+    const { doc } = await syncDeck('toggled deck')
+    const save = (shareBodies: boolean) =>
+      Effect.runPromise(
+        saveMailboxSyncProgram(FIXTURE_ACTOR.id, {
+          connectionId,
+          shareBodies,
+          excludeSenders: [],
+          excludeLabels: [],
+        }),
+      )
+    await save(true)
+    expect(await visibleTo(TEAMMATE, doc)).toBe(true)
+    await save(false)
+    expect(await visibleTo(TEAMMATE, doc)).toBe(false)
+    expect(await visibleTo(FIXTURE_ACTOR, doc)).toBe(true)
+  })
 })
 
 describe('a failed join', () => {
@@ -472,6 +563,7 @@ describe('a failed join', () => {
           interactionId: randomUUID(),
           subject: 'Re: Seed round',
           records: [],
+          privacy: { visibility: 'shared', authorId: null },
         },
       ),
     )
@@ -549,6 +641,70 @@ describe('the has-attachments filter', () => {
     expect(await flag(withDeck.messageId)).toMatchObject({
       attachments: 1,
       hasAttachments: true,
+    })
+  })
+})
+
+describe('the migration’s backfill', () => {
+  /** The hand-added statement at the end of the migration that adds the columns. */
+  const backfill = readFileSync(
+    new URL(
+      '../../../../../packages/db/drizzle/0085_document_visibility.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  )
+    .split('--> statement-breakpoint')
+    .at(-1)
+
+  const run = async () => {
+    if (backfill === undefined) throw new Error('no backfill statement')
+    await db.execute(sql.raw(backfill))
+  }
+
+  /** A synced attachment as it stood before the columns: shared, no author. */
+  const before = async (phrase: string) => {
+    const m = message({
+      attachments: [
+        {
+          filename: 'Quokkaplan.pdf',
+          mime: 'application/pdf',
+          content: content(phrase),
+        },
+      ],
+    })
+    expect((await sync(m)).outcome).toBe('created')
+    const doc = (await db.select({ id: document.entityId }).from(document)).at(
+      0,
+    )?.id
+    if (doc === undefined) throw new Error('no document')
+    await db
+      .update(document)
+      .set({ visibility: 'shared', authorId: null })
+      .where(eq(document.entityId, doc))
+    return doc
+  }
+
+  it('makes an attachment only a private mail filing brought in private to that body’s author', async () => {
+    const doc = await before('backfilled deck')
+    await run()
+    expect(await privacyOf(doc)).toEqual({
+      visibility: 'private',
+      authorId: FIXTURE_ACTOR.id,
+    })
+  })
+
+  it('leaves one a person also filed shared', async () => {
+    const doc = await before('person-filed deck')
+    const target = await holderOf('domain', 'acme.io')
+    await db
+      .update(link)
+      .set({ createdBy: TEAMMATE.id })
+      .where(and(eq(link.fromEntityId, doc), eq(link.toEntityId, target)))
+    await run()
+    expect(await privacyOf(doc)).toEqual({
+      visibility: 'shared',
+      authorId: null,
     })
   })
 })

@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { chunk, link, mandate, note, space } from '@spaces/db/schema'
+import { chunk, document, link, mandate, note, space } from '@spaces/db/schema'
 import { ContextLeak, ContextQueryFailed } from '../../context/errors'
 import { rank } from '../../context/rank'
 import type { Candidate, RankResult } from '../../context/rank'
@@ -15,8 +15,9 @@ import { canRead } from '../../read-policy'
  * The builders the assembler, its space subject and the watch brief share:
  * the live ancestor chain of some spaces, the memos tagged into them, the
  * mandate, and the ranked, `canRead`-checked output.
- * - `canRead` is applied in SQL: a note is readable when shared or the
- *   reader's own. An integration authors no note, so it reads shared only.
+ * - `canRead` is applied in SQL: a note or a document is readable when
+ *   shared or the reader's own. An integration authors neither, so it reads
+ *   shared only.
  * - Every fetch is ordered, so a caller's first-wins dedupe is stable.
  */
 
@@ -29,6 +30,10 @@ export const query = <T>(run: () => Promise<T>) =>
 /** `canRead` as a SQL predicate over `note`, for one reader. */
 export const readableNote = (readerId: string) =>
   or(eq(note.visibility, 'shared'), eq(note.authorId, readerId))
+
+/** `canRead` as a SQL predicate over `document`, for one reader. */
+export const readableDocument = (readerId: string) =>
+  or(eq(document.visibility, 'shared'), eq(document.authorId, readerId))
 
 /**
  * Every live space at or above any of `paths`, root first. An archived
@@ -71,8 +76,8 @@ export const memosTaggedIn = (
           .orderBy(asc(link.toEntityId), asc(note.entityId)),
   )
 
-/** A note row let through, kept for the output invariant. */
-export type NoteGate = { visibility: string; authorId: string }
+/** A note or document row let through, kept for the output invariant. */
+export type NoteGate = { visibility: string; authorId: string | null }
 
 /**
  * The active mandate as a standing item, when the reader may read its note.

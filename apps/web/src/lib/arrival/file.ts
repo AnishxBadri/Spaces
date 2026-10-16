@@ -7,9 +7,11 @@ import {
 } from '@spaces/core/entities/normalize'
 import { db } from '@spaces/db'
 import {
+  document,
   entity,
   entityAlias,
   interaction,
+  interactionDocument,
   interactionEntity,
   note,
   pendingBlob,
@@ -108,13 +110,21 @@ export type FileContext = {
  * What differs between the two mail lanes. A forwarded body is born shared
  * (D49); a synced one is the connection's to decide (D67), and carries the
  * mailbox's labels so a later exclude list can find it.
+ * - The attachments are born with the body's visibility; a synced mailbox's
+ *   are authored by its owner, so a private one is theirs alone.
  */
 export type FileOptions = {
   visibility: BodyVisibility
   labels: ReadonlyArray<string> | null
+  /** The synced mailbox's owner; null on the forwarded lane. */
+  mailboxOwner: string | null
 }
 
-export const FORWARDED: FileOptions = { visibility: 'shared', labels: null }
+export const FORWARDED: FileOptions = {
+  visibility: 'shared',
+  labels: null,
+  mailboxOwner: null,
+}
 
 /**
  * The headers an email row keeps in `interaction.meta` (D67), with the
@@ -206,7 +216,9 @@ export async function matchParticipants(
 
 /**
  * The body of the interaction a Message-ID already holds, made shared when
- * it was private, with a `note.visibility_changed` row naming the lane.
+ * it was private, with a `note.visibility_changed` row naming the lane. Its
+ * private attachments are shared with it, and keep no author: forwarding is
+ * the consent, and the mailbox's toggle no longer narrows them.
  */
 async function widenBody(
   tx: Tx,
@@ -226,6 +238,30 @@ async function widenBody(
       ),
     )
     .returning({ id: note.entityId })
+  await tx
+    .update(document)
+    .set({ visibility: 'shared', authorId: null })
+    .where(
+      and(
+        eq(document.visibility, 'private'),
+        inArray(
+          document.entityId,
+          tx
+            .select({ id: interactionDocument.documentId })
+            .from(interactionDocument)
+            .innerJoin(
+              interaction,
+              eq(interaction.id, interactionDocument.interactionId),
+            )
+            .where(
+              and(
+                eq(interaction.messageId, messageId),
+                eq(interactionDocument.role, 'attachment'),
+              ),
+            ),
+        ),
+      ),
+    )
   for (const { id } of widened)
     await tx.insert(activity).values({
       actorId: null,
@@ -402,6 +438,10 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
     interactionId: written.interactionId,
     subject: message.subject,
     records: written.records,
+    privacy: {
+      visibility: options.visibility,
+      authorId: options.mailboxOwner,
+    },
   })
   return { ...written, attachments }
 })

@@ -6,6 +6,7 @@ import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
 import {
   attributeEvent,
+  document,
   entity,
   integration,
   interaction,
@@ -20,6 +21,7 @@ import { investment } from '@spaces/db/schema/portfolio'
 import { jsonRecord, jsonString, jsonStrings } from '@spaces/core/json'
 import { sinceRemoved } from '@spaces/core/plugins/registry'
 import { canRead } from '@spaces/core/read-policy'
+import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
 import type { Json } from '@spaces/core/json'
 import { resolveRefsProgram } from '@spaces/core/writes/context/names'
 import type { ResolvedRef } from '@spaces/core/writes/context/names'
@@ -240,10 +242,16 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
                 n: sql<number>`count(*)::int`,
               })
               .from(interactionDocument)
+              .innerJoin(
+                document,
+                eq(document.entityId, interactionDocument.documentId),
+              )
               .where(
                 and(
                   inArray(interactionDocument.interactionId, interactionIds),
                   eq(interactionDocument.role, 'attachment'),
+                  // Only the attachments the viewer may read are counted.
+                  canReadDocumentSql(viewer.id),
                 ),
               )
               .groupBy(interactionDocument.interactionId),
