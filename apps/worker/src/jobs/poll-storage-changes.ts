@@ -21,7 +21,8 @@ import type { JobDef, JobRetryPolicy } from '../run-job'
  * storage.poll — the change poll, every quarter hour: each connection with a
  * due folder binding asked once for its changes through the storage-source
  * plugin, every new file in a bound subtree filed, every held file whose
- * revision moved advanced and every renamed or moved one's path advanced, by
+ * revision moved advanced, every renamed or moved one's path advanced and
+ * every deleted one, or one moved out of every bound subtree, marked gone, by
  * core's `pollConnectionProgram`.
  * - One connection's failure is its own line: the rest are still polled.
  * - A refused token marks that connection's bindings `error` and charges the
@@ -62,6 +63,7 @@ const outcomeLine = (outcome: PollOutcome): string => {
   if (tally.moved > 0) parts.push(`${String(tally.moved)} moved`)
   if (tally.proposed > 0)
     parts.push(`${String(tally.proposed)} moved to re-file`)
+  if (tally.gone > 0) parts.push(`${String(tally.gone)} gone`)
   if (tally.skipped.length > 0)
     parts.push(
       `${String(tally.skipped.length)} skipped (${tally.skipped

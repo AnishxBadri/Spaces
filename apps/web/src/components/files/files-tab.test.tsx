@@ -291,6 +291,44 @@ describe('a bound folder', () => {
     // The tree says where it sits, so the row does not repeat it.
     expect(html).not.toContain('from My Drive')
   })
+
+  it('marks a file deleted at the source, or moved out of the folder, gone', () => {
+    const html = renderToStaticMarkup(
+      <FolderBand
+        recordId={FLENT}
+        recordName="Flent"
+        onView={() => undefined}
+        folder={{
+          id: 'b',
+          path: 'My Drive / Flent — Data room',
+          syncedSinceMs: 60_000,
+          readOnly: true,
+          documents: [
+            doc({
+              id: 'g1',
+              filename: 'Old cap table.xlsx',
+              sourcePath: 'My Drive / Flent — Data room',
+              externalStatus: 'gone',
+              bindingId: 'b',
+            }),
+            doc({
+              id: 'g2',
+              filename: 'Live deck.pdf',
+              sourcePath: 'My Drive / Flent — Data room',
+              externalStatus: 'linked',
+              bindingId: 'b',
+            }),
+          ],
+        }}
+      />,
+    )
+    const gone = html.slice(
+      html.indexOf('Old cap table.xlsx'),
+      html.indexOf('Live deck.pdf'),
+    )
+    expect(gone).toContain('■ gone')
+    expect(html.slice(html.indexOf('Live deck.pdf'))).not.toContain('■ gone')
+  })
 })
 
 describe('a folder just linked', () => {

@@ -13,6 +13,7 @@ import {
   putBlobProgram,
 } from '../documents/intake'
 import { BindingStoreFailed } from './bind'
+import { goneNot } from './gone'
 import type { MovableDocument } from './move'
 import type { SyncFailure } from './sync'
 
@@ -27,6 +28,7 @@ import type { SyncFailure } from './sync'
  *   replayed page or a racing poll advances once; the unique
  *   (document_id, external_revision_id) index is the backstop.
  * - The prior blob is kept: the revision row references it.
+ * - A `gone` row is never revised: it stopped tracking (`markGoneProgram`).
  */
 
 /** A document held for a connection, as the change poll compares it. */
@@ -34,6 +36,7 @@ export type HeldDocument = MovableDocument & {
   readonly bindingId: string | null
   readonly blobSha: string | null
   readonly externalRevisionId: string | null
+  readonly externalStatus: 'linked' | 'gone' | null
 }
 
 export type ReviseOutcome =
@@ -60,6 +63,7 @@ export const heldDocumentOf = (connectionId: string, externalId: string) =>
             bindingId: document.bindingId,
             blobSha: document.blobSha,
             externalRevisionId: document.externalRevisionId,
+            externalStatus: document.externalStatus,
             sourcePath: document.sourcePath,
             filename: document.filename,
             mime: document.mime,
@@ -94,6 +98,7 @@ export const keepTokenProgram = Effect.fn('keepTokenProgram')(function* (
         and(
           eq(document.entityId, held.id),
           sql`${document.externalRevisionId} is not distinct from ${held.externalRevisionId}`,
+          goneNot,
         ),
       ),
   )
@@ -144,6 +149,7 @@ export const reviseDocumentProgram = Effect.fn('reviseDocumentProgram')(
       eq(document.entityId, held.id),
       sql`${document.blobSha} is not distinct from ${held.blobSha}`,
       sql`${document.externalRevisionId} is not distinct from ${held.externalRevisionId}`,
+      goneNot,
     )
     const revised = yield* query(() =>
       db.transaction(async (tx) => {

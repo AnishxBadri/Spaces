@@ -842,6 +842,20 @@ company through the same kind. Not handled: a folder rename or move (the
 feed reports the folder, not its files, so their paths go stale until each
 changes), and a move between two bindings or out of every binding.
 
+**As built — the deleted row, and a move out of every binding (2026-10-16,
+SPA-293).** A removal on the feed (deleted, trashed or unshared) marks the
+document held for `(connection, external_id)` `external_status: gone`; so
+does a live binding's held file whose new folder chain reaches no bound
+folder on the connection — the row this table left open, decided the same
+way, since a file that silently stopped tracking while its row still read
+synced would be worse. Ours is kept whole: the row, `binding_id`, the blob,
+chunks and edges, so it previews and searches from our copy and the Files
+row shows `■ gone`. Nothing is deleted at the provider and nothing is
+proposed. Gone is one way: every held-file write (claim, attach-stamp, move,
+revise) skips a gone row, so a later page or a re-sync walk naming the same
+file — even moved back into the folder — files nothing and flips nothing. A
+move into another binding's subtree is still only revised.
+
 ## 9. Derived layers — the storage layer as the AI substrate sees it (decided 2026-09-15)
 
 ```

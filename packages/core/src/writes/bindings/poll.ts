@@ -7,6 +7,7 @@ import type { ItemTarget } from '../../documents/resolve-item'
 import { Enqueue } from '../../queue/enqueue'
 import { QUEUES } from '../../queue/names'
 import { BindingStoreFailed } from './bind'
+import { markGoneProgram } from './gone'
 import { isExport, moveHeldProgram } from './move'
 import type { MoveOutcome } from './move'
 import {
@@ -30,8 +31,11 @@ import type { BindingFiler, SyncBinding, SyncFailure } from './sync'
  *   its token moved (`reviseDocumentProgram`), and when it was renamed or
  *   moved inside its binding's subtree its path advances, with a re-file
  *   suggestion if the move crossed to another record (`moveHeldProgram`).
- * - A removal, a move out of the binding's subtree and a held file no live
- *   binding brought are left alone.
+ * - A removal marks the held copy `gone`, and so does a move of a live
+ *   binding's file out of every bound subtree: ours is kept, nothing is
+ *   proposed (`markGoneProgram`). A `gone` file is never tracked again.
+ * - A move into another binding's subtree is only revised, and a held file
+ *   no live binding brought is left alone.
  */
 
 /** A connection is polled once one of its bindings last synced this long ago. */
@@ -63,9 +67,12 @@ export type PollTally = {
   readonly moved: number
   /** Moves that crossed to another record: a re-file suggestion each. */
   readonly proposed: number
+  /** Held files deleted at the provider or moved out of every bound subtree. */
+  readonly gone: number
   /**
-   * A removal, a folder, a held file with the token it already has, or one
-   * no live binding brought: nothing to do.
+   * A removal of nothing held, a folder, a held file with the token it
+   * already has, one already `gone`, or one no live binding brought:
+   * nothing to do.
    */
   readonly ignored: number
   /** A new file outside every bound subtree. */
@@ -255,9 +262,12 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
       .pipe(Effect.catchTag('CursorExpired', () => Effect.succeed(null)))
     if (page === null) return yield* relist(connection, source)
 
-    const live = new Map<string, PollBinding>(
+    // `bound` places folders and never shrinks; `live` loses a binding
+    // refused mid-page, so a file under it is neither filed nor called gone.
+    const bound = new Map<string, PollBinding>(
       connection.bindings.map((b) => [b.folderId, b]),
     )
+    const live = new Map(bound)
     const located = new Map<string, Located | null>()
     const targets = new Map<string, ItemTarget>()
     const filers = new Map<string, BindingFiler>()
@@ -278,8 +288,8 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
     const remember = (chain: ReadonlyArray<{ id: string; name: string }>) => {
       let at: Located | null = null
       for (const folder of chain) {
-        const bound = live.get(folder.id)
-        if (bound !== undefined) at = { binding: bound, names: [] }
+        const binding = bound.get(folder.id)
+        if (binding !== undefined) at = { binding, names: [] }
         else if (at !== null)
           at = { binding: at.binding, names: [...at.names, folder.name] }
         located.set(folder.id, at)
@@ -289,8 +299,8 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
     const locate = Effect.fn('pollStorage.locate')(function* (
       folderId: string,
     ) {
-      const bound = live.get(folderId)
-      if (bound !== undefined) return { binding: bound, names: [] }
+      const binding = bound.get(folderId)
+      if (binding !== undefined) return { binding, names: [] }
       const known = located.get(folderId)
       if (known !== undefined) return known
       const folder = yield* source
@@ -325,6 +335,7 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
     let revised = 0
     let moved = 0
     let proposed = 0
+    let gone = 0
     let ignored = 0
     let outside = 0
     const skipped: Array<{ name: string; reason: string }> = []
@@ -335,15 +346,16 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
       doc: HeldDocument,
       entry: StorageEntry,
       binding: PollBinding,
+      parentId: string,
+      at: Located,
     ) {
-      const at = entry.parentId === null ? null : yield* locate(entry.parentId)
-      if (entry.parentId === null || at?.binding !== binding) return null
+      if (at.binding !== binding) return null
       const outcome: MoveOutcome = yield* moveHeldProgram({
         held: doc,
         entry,
         boundPath: binding.folderPath,
         targetOf: filerOf(binding).targetOf,
-        target: yield* targetOf(entry.parentId, at),
+        target: yield* targetOf(parentId, at),
         sourcePath: [binding.folderPath, ...at.names].join(' / '),
         integrationId: input.integrationId,
       })
@@ -356,11 +368,19 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
       entry: StorageEntry,
     ) {
       const binding = [...live.values()].find((b) => b.id === doc.bindingId)
-      if (binding === undefined) {
+      if (doc.externalStatus === 'gone' || binding === undefined) {
         ignored += 1
         return
       }
-      const move = yield* moveOf(doc, entry, binding)
+      const parentId = entry.parentId
+      const at = parentId === null ? null : yield* locate(parentId)
+      // Out of every bound subtree: no new home to offer, so it is gone.
+      if (parentId === null || at === null) {
+        if (yield* markGoneProgram(connection.connectionId, entry.id)) gone += 1
+        else ignored += 1
+        return
+      }
+      const move = yield* moveOf(doc, entry, binding, parentId, at)
       if (move?._tag === 'moved') moved += 1
       if (move?._tag === 'proposed') proposed += 1
       // A renamed native document's new token is not an edit: its export
@@ -418,6 +438,9 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
         case 'attached':
           attached += 1
           break
+        case 'gone':
+          ignored += 1
+          break
         case 'skipped':
           skipped.push({ name: entry.name, reason: outcome.reason })
           break
@@ -428,7 +451,13 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
     })
 
     for (const change of page.changes) {
-      if (change._tag === 'removed' || change.entry.kind === 'folder') {
+      if (change._tag === 'removed') {
+        if (yield* markGoneProgram(connection.connectionId, change.id))
+          gone += 1
+        else ignored += 1
+        continue
+      }
+      if (change.entry.kind === 'folder') {
         ignored += 1
         continue
       }
@@ -446,6 +475,7 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
         revised,
         moved,
         proposed,
+        gone,
         ignored,
         outside,
         skipped,

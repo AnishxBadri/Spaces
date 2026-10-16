@@ -8,6 +8,7 @@ import type { FolderCandidate, ItemTarget } from '../../documents/resolve-item'
 import { proposeWith } from '../suggestions/propose'
 import type { Reader } from '../suggestions/propose'
 import { BindingStoreFailed } from './bind'
+import { goneNot } from './gone'
 
 /**
  * A held file renamed or moved inside its bound subtree (§8, third row).
@@ -19,6 +20,7 @@ import { BindingStoreFailed } from './bind'
  * - The old target is the stored `source_path` folded through the same
  *   `resolveItem` steps as the new one, so a move between two folders of
  *   one company proposes nothing.
+ * - A `gone` row is left alone: it stopped tracking (`markGoneProgram`).
  */
 
 /** A held document as a move compares it. */
@@ -235,6 +237,7 @@ export const moveHeldProgram = Effect.fn('moveHeldProgram')(function* (input: {
             eq(document.entityId, held.id),
             sql`${document.sourcePath} is not distinct from ${held.sourcePath}`,
             sql`${document.filename} is not distinct from ${held.filename}`,
+            goneNot,
           ),
         )
         .returning({ id: document.entityId })

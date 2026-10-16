@@ -671,27 +671,6 @@ describe('storage.poll on the google-drive bundle', () => {
     ).toEqual([])
   })
 
-  it('a removal is ignored, not mishandled', async () => {
-    const drive = await wiredDrive()
-    const connectionId = await aConnection()
-    const deal = await aRecord('deal', 'Acme legal')
-    await bind({ connectionId, ...LEGAL, target: deal })
-    succeeded(await drive.poll())
-    drive.api.drive.add(aFile('removed-one', 'legal'))
-    await age()
-    succeeded(await drive.poll())
-    const held = (await byExternalId('removed-one')).at(0)
-    const count = await documentCount()
-
-    drive.api.drive.remove('removed-one')
-    await age()
-    expect(String(succeeded(await drive.poll()))).toMatch(
-      /: 0 new, 0 held, 0 attached by sha, 1 ignored, 0 outside, 0 revised$/,
-    )
-    expect(await documentCount()).toBe(count)
-    expect(await byExternalId('removed-one')).toEqual([held])
-  })
-
   it('an expired cursor re-syncs every binding on the connection and stores a fresh cursor', async () => {
     const drive = await wiredDrive()
     const connectionId = await aConnection()
