@@ -492,6 +492,42 @@ revisionId, name }`** — `sha256` is core's hash of the bytes, which the
   atomic; the fake API's folder create never looks for a namesake, so the
   plugin meets the trap for real (`FakeDrive.tree` shows the one chain).
 
+**As built — the Box plugin, read side (2026-10-16, SPA-295).**
+`plugins/box` implements the read half over Box's content API through the
+same port; core is unchanged.
+
+- **Shapes.** Ids are digits under the root `0` ("All Files"); `getFolder`
+  reads `path_collection`. Box sends no mime type, so a file's is read from
+  its extension (a folder lists as `application/vnd.box.folder`, a Box Note
+  as `application/vnd.box.boxnote`). `changeToken` is Box's `etag`; `sha1`
+  is never surfaced.
+- **Listing.** `folders/:id/items` with marker paging and explicit `fields`.
+  Box lists folders, then files, then web links: a web link is skipped and
+  the first one ends the listing.
+- **Bytes.** A file streams through `files/:id/content`'s redirect to a
+  pre-signed download, which is fetched without the token. A Box Note is
+  read as its `extracted_text` representation, `text/plain`, named
+  `<note>.txt` — stable text, so it hashes the same every read. A
+  representation still rendering after one status check is `RateLimited`
+  at 5 s; one Box cannot extract is `NotFound`.
+- **`changes` is the events stream** (`stream_type=changes`; Box has no
+  per-folder delta). The cursor is Box's `next_stream_position`, read from
+  the response text because it is a 64-bit integer `JSON.parse` would round.
+  A trash is a removal; the latest event per item wins. A position Box no
+  longer holds (400/404/410) is `CursorExpired`, and the poll's re-list path
+  runs as it does for Drive.
+- **Tokens.** Box's refresh token is single-use; `accessTokenFor` already
+  stores the rotated one inside its row lock, so two concurrent calls make
+  one refresh. The fake's token response carries no
+  `refresh_token_expires_in`, as Box's API reference lists none, so there the
+  60-day inactivity lapse shows only as an `invalid_grant` that marks the
+  row `error`.
+- **Fake and demo.** `makeFakeBoxApi()` in `@spaces/sdk/testing` answers the
+  content API, events, downloads and OAuth (authorize, a rotating token
+  endpoint, revoke, `users/me`); the plugin passes `storageSourceConformance`
+  and `storageSourceChaos` against it. `SPACES_FAKE_PROVIDERS=1` stands it in
+  for `box`.
+
 ## 5. Bindings — pointing a folder or file at a node (decided 2026-09-14)
 
 ### 5.1 The table

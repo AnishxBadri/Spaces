@@ -40,6 +40,7 @@
     "@spaces/config": "workspace:*",
     "@spaces/plugin-airtable": "workspace:*",
     "@spaces/plugin-apollo": "workspace:*",
+    "@spaces/plugin-box": "workspace:*",
     "@spaces/plugin-discover": "workspace:*",
     "@spaces/plugin-echo": "workspace:*",
     "@spaces/plugin-gatecrasher": "workspace:*",

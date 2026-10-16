@@ -991,3 +991,26 @@ export type {
   FakeGmailLabel,
   GmailApiRequest,
 } from './fake-gmail-api.ts'
+
+// Box's content API, events stream and OAuth over a fake Box — the second storage source
+export {
+  makeFakeBoxApi,
+  BOX_API,
+  BOX_OAUTH,
+  BOX_AUTHORIZE_URL,
+  BOX_DOWNLOAD,
+  BOX_ROOT_ID,
+  FAKE_BOX_SEED,
+  FAKE_BOX_FIXTURE,
+  FAKE_BOX_SCAN,
+  FAKE_BOX_CHAOS_FIXTURE,
+  FAKE_BOX_CREDENTIALS,
+} from './fake-box-api.ts'
+export type {
+  FakeBoxApi,
+  FakeBoxApiOptions,
+  FakeBoxCredentials,
+  FakeBoxOAuth,
+  FakeBoxSeedItem,
+  BoxApiRequest,
+} from './fake-box-api.ts'
