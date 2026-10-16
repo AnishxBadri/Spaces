@@ -7,26 +7,32 @@ import {
   NotFound,
   RateLimited,
   Secrets,
+  collisionName,
+  pathSegments,
 } from '@spaces/sdk'
 import type {
   ChangePage,
   FolderPage,
+  HttpMethod,
   HttpResponse,
   HttpStreamResponse,
   JobError,
+  JsonObject,
   LinkTarget,
   ListFolderOptions,
   PickerConfig,
+  PutFileResult,
   StorageChange,
   StorageEntry,
   StorageFile,
   StorageFolder,
-  StorageSource,
+  StorageUpload,
+  WritableStorageSource,
 } from '@spaces/sdk'
 import { parseBoxLink } from './links.ts'
 
 /**
- * The storage-source port's read half over Box's content API: every
+ * The storage-source port over Box's content API: every
  * request through the Http port, with a bearer token from
  * `Secrets.accessToken()` fetched per call so a refreshed token is the one
  * sent. Box's refresh token is single-use; the host's row lock is what
@@ -41,9 +47,19 @@ import { parseBoxLink } from './links.ts'
  *   stream position Box no longer holds is `CursorExpired`.
  * - A failure the port's types cannot name — Box answering a request this
  *   code built wrong, or JSON that is not Box's — is a defect, not a guess.
+ * - Writes lean on Box's unique names: a create that loses a race is a 409
+ *   naming the winner, so nothing is looked up first and nothing forks.
+ *   The collision check compares Box's `sha1` with our SHA-1 of the bytes.
+ * - An upload is one multipart request, so a `putFile` holds the whole file,
+ *   up to `UPLOAD_MAX_BYTES` — Box's chunked sessions need the size first,
+ *   and a stream does not say it.
  */
 
 export const BOX_API = 'https://api.box.com/2.0'
+export const BOX_UPLOAD = 'https://upload.box.com/api/2.0'
+
+/** Box's ceiling for a single-request upload. */
+export const UPLOAD_MAX_BYTES = 50 * 1024 * 1024
 
 /** What a folder and a Box Note list as: Box gives neither a mime type. */
 export const BOX_FOLDER_MIME = 'application/vnd.box.folder'
@@ -117,6 +133,8 @@ const boxItem = z.object({
   size: z.number().nullable().optional(),
   modified_at: z.string().nullable().optional(),
   etag: z.string().nullable().optional(),
+  /** Read only by `putFile`'s collision check; never surfaced. */
+  sha1: z.string().nullable().optional(),
   parent: z.object({ id: z.string() }).nullable().optional(),
   item_status: z.string().optional(),
   extension: z.string().optional(),
@@ -159,6 +177,36 @@ const errorBody = z.object({
   message: z.string().optional(),
 })
 
+const conflictItem = z.object({
+  type: z.string(),
+  id: z.string(),
+  name: z.string().optional(),
+  sha1: z.string().nullable().optional(),
+})
+type Conflict = z.output<typeof conflictItem>
+
+/** Box's 409: a folder create lists its conflicts, an upload names one. */
+const nameInUse = z.object({
+  code: z.literal('item_name_in_use'),
+  context_info: z
+    .object({
+      conflicts: z.union([conflictItem, z.array(conflictItem)]),
+    })
+    .optional(),
+})
+
+const created = z.object({ id: z.string() })
+
+const uploaded = z.object({
+  entries: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      file_version: z.object({ id: z.string() }),
+    }),
+  ),
+})
+
 /** Events that change the tree: the item as it now is, or gone. */
 const CHANGED_EVENTS = new Set([
   'ITEM_CREATE',
@@ -177,12 +225,16 @@ const REMOVED_EVENTS = new Set(['ITEM_TRASH'])
 
 type Params = { readonly [name: string]: string | number | boolean | undefined }
 
-export const boxUrl = (path: string, params: Params = {}): string => {
+export const boxUrl = (
+  path: string,
+  params: Params = {},
+  base: string = BOX_API,
+): string => {
   const search = new URLSearchParams()
   for (const [name, value] of Object.entries(params))
     if (value !== undefined) search.set(name, String(value))
   const query = search.toString()
-  return `${BOX_API}${path}${query === '' ? '' : `?${query}`}`
+  return `${base}${path}${query === '' ? '' : `?${query}`}`
 }
 
 /** Box's ids are digits; anything else names nothing and is never sent. */
@@ -308,6 +360,84 @@ const isRedirect = (status: number) =>
 /** A Box Note's export name: `Memo.boxnote` → `Memo.txt`. */
 const textName = (name: string) => `${name.replace(/\.boxnote$/i, '')}.txt`
 
+/** Box compares names ignoring case. */
+const nameKey = (name: string) => name.toLowerCase()
+
+const sha1Of = (bytes: Uint8Array<ArrayBuffer>) =>
+  Effect.promise(async () =>
+    Array.from(
+      new Uint8Array(await crypto.subtle.digest('SHA-1', bytes)),
+      (b) => b.toString(16).padStart(2, '0'),
+    ).join(''),
+  )
+
+/** The conflict a 409 names, or null when the body says no name was in use. */
+const conflictOf = (body: string): Conflict | null | 'unnamed' => {
+  try {
+    const parsed = nameInUse.safeParse(JSON.parse(body))
+    if (!parsed.success) return null
+    const conflicts = parsed.data.context_info?.conflicts
+    if (conflicts === undefined) return 'unnamed'
+    return (Array.isArray(conflicts) ? conflicts.at(0) : conflicts) ?? 'unnamed'
+  } catch {
+    return null
+  }
+}
+
+/** `attributes` then `file`, the order Box requires. */
+const multipartOf = (
+  boundary: string,
+  attributes: JsonObject,
+  mime: string,
+  bytes: Uint8Array<ArrayBuffer>,
+): Uint8Array<ArrayBuffer> => {
+  const encoder = new TextEncoder()
+  const head = encoder.encode(
+    `--${boundary}\r\ncontent-disposition: form-data; name="attributes"\r\ncontent-type: application/json\r\n\r\n${JSON.stringify(attributes)}\r\n--${boundary}\r\ncontent-disposition: form-data; name="file"; filename="upload"\r\ncontent-type: ${mime}\r\n\r\n`,
+  )
+  const tail = encoder.encode(`\r\n--${boundary}--\r\n`)
+  const body = new Uint8Array(
+    head.byteLength + bytes.byteLength + tail.byteLength,
+  )
+  body.set(head, 0)
+  body.set(bytes, head.byteLength)
+  body.set(tail, head.byteLength + bytes.byteLength)
+  return body
+}
+
+/** An upload's bytes, whole: past `UPLOAD_MAX_BYTES` the stream is cancelled and the call dies. */
+const readUpload = (stream: ReadableStream<Uint8Array>) =>
+  Effect.suspend(() => {
+    const reader = stream.getReader()
+    return Effect.gen(function* () {
+      const chunks: Array<Uint8Array> = []
+      let size = 0
+      for (;;) {
+        const read = yield* Effect.promise(() => reader.read())
+        if (read.done) break
+        size += read.value.byteLength
+        if (size > UPLOAD_MAX_BYTES)
+          return yield* Effect.die(
+            new Error(
+              `Box takes at most ${UPLOAD_MAX_BYTES} bytes in one upload`,
+            ),
+          )
+        chunks.push(read.value)
+      }
+      const bytes = new Uint8Array(size)
+      let at = 0
+      for (const chunk of chunks) {
+        bytes.set(chunk, at)
+        at += chunk.byteLength
+      }
+      return bytes
+    }).pipe(
+      Effect.onError(() =>
+        Effect.ignore(Effect.tryPromise(() => reader.cancel())),
+      ),
+    )
+  })
+
 // ---------------------------------------------------------------------------
 // The provider
 // ---------------------------------------------------------------------------
@@ -337,6 +467,32 @@ export const boxSource = Effect.gen(function* () {
           method: 'GET',
           url,
           headers: { authorization, accept: 'application/json', ...headers },
+        }),
+      )
+    })
+
+  /** A write: a JSON or byte body, the response whatever its status. */
+  const send = (
+    method: HttpMethod,
+    url: string,
+    body: JsonObject | Uint8Array<ArrayBuffer>,
+    headers: { readonly [name: string]: string } = {},
+  ) =>
+    Effect.gen(function* () {
+      const authorization = yield* bearer
+      return yield* fromPort(
+        http.request({
+          method,
+          url,
+          headers: {
+            authorization,
+            accept: 'application/json',
+            ...(body instanceof Uint8Array
+              ? {}
+              : { 'content-type': 'application/json' }),
+            ...headers,
+          },
+          body,
         }),
       )
     })
@@ -405,10 +561,15 @@ export const boxSource = Effect.gen(function* () {
   })
 
   /** One page of `folders/:id/items`: Box's own entries and its next marker. */
-  const itemsPage = (folderId: string, limit: number, marker?: string) =>
+  const itemsPage = (
+    folderId: string,
+    limit: number,
+    marker?: string,
+    fields: string = ENTRY_FIELDS,
+  ) =>
     Effect.gen(function* () {
       const url = boxUrl(`/folders/${folderId}/items`, {
-        fields: ENTRY_FIELDS,
+        fields,
         usemarker: true,
         limit,
         marker,
@@ -643,13 +804,209 @@ export const boxSource = Effect.gen(function* () {
     return config
   })
 
-  const source: StorageSource = {
+  // -------------------------------------------------------------------------
+  // The write half
+  // -------------------------------------------------------------------------
+
+  /** Every item in a folder by name, ignoring case: what the collision check reads. */
+  const namesIn = (folderId: string) =>
+    Effect.gen(function* () {
+      const taken = new Map<string, Conflict>()
+      let marker: string | undefined
+      do {
+        const page = yield* itemsPage(
+          folderId,
+          PAGE_MAX,
+          marker,
+          'id,type,name,sha1',
+        ).pipe(
+          // A marker from this very walk cannot be stale; Box changed under it.
+          Effect.catchTag('CursorExpired', () =>
+            Effect.fail(new RateLimited({ retryAfterMs: TRANSIENT_RETRY_MS })),
+          ),
+        )
+        for (const entry of page.entries)
+          taken.set(nameKey(entry.name ?? ''), {
+            type: entry.type,
+            id: entry.id,
+            sha1: entry.sha1 ?? null,
+          })
+        marker = page.next
+      } while (marker !== undefined)
+      return taken
+    })
+
+  /**
+   * The child folder `name`, made when absent. Box refuses a second folder
+   * under one name, so a create that loses a race answers 409 naming the
+   * winner, and every caller ends with the same id.
+   */
+  const ensureChild = (parentId: string, name: string) =>
+    Effect.gen(function* () {
+      const url = boxUrl('/folders', { fields: 'id' })
+      const response = yield* send('POST', url, {
+        name,
+        parent: { id: parentId },
+      })
+      if (response.status === 201 || response.status === 200)
+        return (yield* parse(created, response.body, url)).id
+      if (response.status !== 409)
+        return yield* failure(response, parentId, url)
+      const conflict = conflictOf(response.body)
+      if (conflict === null) return yield* failure(response, parentId, url)
+      const holder =
+        conflict === 'unnamed'
+          ? (yield* namesIn(parentId)).get(nameKey(name))
+          : conflict
+      if (holder?.type !== 'folder')
+        return yield* Effect.die(
+          new Error(
+            `Box holds a ${holder?.type ?? 'missing item'} named ${name} in ${parentId}, not a folder`,
+          ),
+        )
+      return holder.id
+    })
+
+  const ensureFolder = Effect.fn('box.ensureFolder')(function* (
+    rootId: string,
+    path: string,
+  ) {
+    yield* item('folders', rootId, 'id')
+    let at = rootId
+    for (const name of pathSegments(path)) at = yield* ensureChild(at, name)
+    return at
+  })
+
+  /** One upload: a new file in a folder, or a new version of a file. 409 hands back what holds the name. */
+  const upload = (
+    target: { readonly folderId: string } | { readonly fileId: string },
+    name: string,
+    content: { readonly mime: string; readonly sha1: string },
+    bytes: Uint8Array<ArrayBuffer>,
+  ) =>
+    Effect.gen(function* () {
+      const version = 'fileId' in target
+      const id = version ? target.fileId : target.folderId
+      const url = boxUrl(
+        version ? `/files/${target.fileId}/content` : '/files/content',
+        { fields: 'id,name,file_version' },
+        BOX_UPLOAD,
+      )
+      const boundary = `spaces-${crypto.randomUUID()}`
+      const attributes: JsonObject = version
+        ? {}
+        : { name, parent: { id: target.folderId } }
+      const response = yield* send(
+        'POST',
+        url,
+        multipartOf(boundary, attributes, content.mime, bytes),
+        {
+          'content-type': `multipart/form-data; boundary=${boundary}`,
+          // Box checks the bytes it stored against this SHA-1.
+          'content-md5': content.sha1,
+        },
+      )
+      if (response.status === 409) {
+        const conflict = conflictOf(response.body)
+        if (conflict !== null && conflict !== 'unnamed')
+          return { _tag: 'taken' as const, conflict }
+      }
+      if (response.status !== 201 && response.status !== 200)
+        return yield* failure(response, id, url)
+      const file = (yield* parse(uploaded, response.body, url)).entries.at(0)
+      if (file === undefined)
+        return yield* Effect.die(new Error(`Box answered ${url} with no file`))
+      const result: PutFileResult = {
+        fileId: file.id,
+        revisionId: file.file_version.id,
+        name: file.name,
+      }
+      return { _tag: 'put' as const, result }
+    })
+
+  /** Past this many names taken, the folder is not one a person keeps. */
+  const COLLISION_LIMIT = 1000
+
+  const putFile = Effect.fn('box.putFile')(function* (
+    folderId: string,
+    name: string,
+    content: StorageUpload,
+  ) {
+    if (!BOX_ID.test(folderId)) return yield* new NotFound({ id: folderId })
+    const bytes = yield* readUpload(content.stream)
+    const sha1 = yield* sha1Of(bytes)
+    yield* item('folders', folderId, 'id')
+    const taken = yield* namesIn(folderId)
+    const into = { mime: content.mime, sha1 }
+    for (let n = 1; n <= COLLISION_LIMIT;) {
+      const tried = collisionName(name, n)
+      const holder = taken.get(nameKey(tried))
+      // Same bytes: a version of that file. Anything else: the next name.
+      if (
+        holder !== undefined &&
+        (holder.type !== 'file' || holder.sha1 !== sha1)
+      ) {
+        n++
+        continue
+      }
+      const landed = yield* upload(
+        holder === undefined ? { folderId } : { fileId: holder.id },
+        tried,
+        into,
+        bytes,
+      )
+      if (landed._tag === 'put') return landed.result
+      // A racing upload took the name first: judge the same name again.
+      taken.set(nameKey(tried), landed.conflict)
+    }
+    return yield* Effect.die(
+      new Error(`${folderId} holds ${COLLISION_LIMIT} files named ${name}`),
+    )
+  })
+
+  /** A file or a folder by id: Box keeps the two apart, so a file is asked for first. */
+  const either = (id: string) =>
+    item('files', id, 'id,name,parent').pipe(
+      Effect.map((found) => ({ kind: 'files' as const, found })),
+      Effect.catchTag('NotFound', () =>
+        item('folders', id, 'id,name,parent').pipe(
+          Effect.map((found) => ({ kind: 'folders' as const, found })),
+        ),
+      ),
+    )
+
+  /** A `PUT` of a file or folder's `name` or `parent`. */
+  const change = (kind: 'files' | 'folders', id: string, body: JsonObject) =>
+    Effect.gen(function* () {
+      const url = boxUrl(`/${kind}/${id}`, { fields: 'id' })
+      const response = yield* send('PUT', url, body)
+      if (response.status !== 200) return yield* failure(response, id, url)
+    })
+
+  const move = Effect.fn('box.move')(function* (id: string, folderId: string) {
+    const { kind, found } = yield* either(id)
+    if (found.parent?.id === folderId) return
+    yield* item('folders', folderId, 'id')
+    yield* change(kind, id, { parent: { id: folderId } })
+  })
+
+  const rename = Effect.fn('box.rename')(function* (id: string, name: string) {
+    const { kind, found } = yield* either(id)
+    if (found.name === name) return
+    yield* change(kind, id, { name })
+  })
+
+  const source: WritableStorageSource = {
     resolveLink,
     listFolder,
     getFolder,
     getFile,
     changes,
     pickerConfig,
+    ensureFolder,
+    putFile,
+    move,
+    rename,
   }
   return source
 })

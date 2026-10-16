@@ -6,6 +6,7 @@ import type {
   StorageSourceChaos,
   StorageSourceChaosFixture,
   StorageSourceFixture,
+  StorageSourceWriteFixture,
 } from './storage-source-conformance.ts'
 
 /**
@@ -26,12 +27,18 @@ import type {
  *   position older than the retained window (`evictCursors`) is a 400.
  * - OAuth: a refresh token is single-use — spent, it is `invalid_grant` —
  *   and `lapse()` expires every live one, Box's 60 days of inactivity.
+ * - Writes: `POST folders`, a multipart upload (a new file, or a new version
+ *   of one), and `PUT files/:id` or `folders/:id` to move or rename. Names
+ *   are unique in a folder, ignoring case: a namesake is a 409
+ *   `item_name_in_use` naming the item in the way, as Box's is. Requests are
+ *   answered one at a time, so racing creates leave one winner.
  */
 
 export const BOX_API = 'https://api.box.com/2.0'
 export const BOX_OAUTH = 'https://api.box.com/oauth2'
 export const BOX_AUTHORIZE_URL = 'https://account.box.com/api/oauth2/authorize'
 export const BOX_DOWNLOAD = 'https://dl.boxcloud.com'
+export const BOX_UPLOAD = 'https://upload.box.com/api/2.0'
 
 /** Every Box account's root folder. */
 export const BOX_ROOT_ID = '0'
@@ -76,8 +83,10 @@ export type FakeBoxSeedItem =
     }
 
 /**
- * The data room, as Box holds it. `1001` has five file and folder children
- * plus a web link; `1004` is three deep; `2001` is a Box Note.
+ * The data room, as Box holds it: the fake Drive's fourteen files under the
+ * same folders, with the memo a Box Note (`2001`) in place of a native Doc.
+ * `1001` has five file and folder children plus a web link; `1004` is
+ * three deep.
  */
 export const FAKE_BOX_SEED: ReadonlyArray<FakeBoxSeedItem> = [
   {
@@ -142,6 +151,27 @@ export const FAKE_BOX_SEED: ReadonlyArray<FakeBoxSeedItem> = [
   },
   {
     kind: 'file',
+    id: '2009',
+    name: 'Shareholders agreement.pdf',
+    parentId: '1002',
+    content: '%PDF-1.7 SHA',
+  },
+  {
+    kind: 'file',
+    id: '2010',
+    name: 'Articles of association.pdf',
+    parentId: '1002',
+    content: '%PDF-1.7 articles',
+  },
+  {
+    kind: 'file',
+    id: '2011',
+    name: 'FY2025 accounts.pdf',
+    parentId: '1003',
+    content: '%PDF-1.7 FY2025 accounts',
+  },
+  {
+    kind: 'file',
     id: '2006',
     name: 'Financial model.xlsx',
     parentId: '1003',
@@ -149,10 +179,38 @@ export const FAKE_BOX_SEED: ReadonlyArray<FakeBoxSeedItem> = [
   },
   {
     kind: 'file',
+    id: '2012',
+    name: 'Budget 2026.xlsx',
+    parentId: '1003',
+    content: 'PK budget 2026',
+  },
+  {
+    kind: 'file',
     id: '2007',
     name: 'Minutes Q3.pdf',
     parentId: '1004',
     content: '%PDF-1.7 Q3 minutes',
+  },
+  {
+    kind: 'file',
+    id: '2013',
+    name: 'Minutes Q1.pdf',
+    parentId: '1004',
+    content: '%PDF-1.7 Q1 minutes',
+  },
+  {
+    kind: 'file',
+    id: '2014',
+    name: 'Minutes Q2.pdf',
+    parentId: '1004',
+    content: '%PDF-1.7 Q2 minutes',
+  },
+  {
+    kind: 'file',
+    id: '2015',
+    name: 'Board pack Q3.pdf',
+    parentId: '1004',
+    content: '%PDF-1.7 Q3 board pack',
   },
   {
     kind: 'file',
@@ -205,6 +263,12 @@ export const FAKE_BOX_CHAOS_FIXTURE: StorageSourceChaosFixture = {
   },
 }
 
+/** Where the write suite writes: All Files, which holds no `A`, `Puts`, `Moves` or `Renames`. */
+export const FAKE_BOX_WRITE_FIXTURE: StorageSourceWriteFixture = {
+  rootId: BOX_ROOT_ID,
+  missingId: '9999999',
+}
+
 /** The OAuth client and the connection the fake starts with. The secret and refresh token must never leave it. */
 export type FakeBoxCredentials = {
   readonly clientId: string
@@ -228,7 +292,7 @@ export const FAKE_BOX_CREDENTIALS: FakeBoxCredentials = {
 export type BoxApiRequest = {
   readonly method: string
   readonly url: string
-  readonly endpoint: 'api' | 'oauth' | 'authorize' | 'download'
+  readonly endpoint: 'api' | 'upload' | 'oauth' | 'authorize' | 'download'
   readonly path: string
   readonly query: { readonly [name: string]: string | undefined }
 }
@@ -322,7 +386,49 @@ const BASE_MS = Date.UTC(2026, 0, 1)
 const pacific = (ms: number) =>
   `${new Date(ms - 8 * 3_600_000).toISOString().slice(0, 19)}-08:00`
 
-/** A stand-in for Box's `sha1`: stable per content, and not our SHA-256. */
+/** SHA-1, lowercase hex: Box's `sha1` of held bytes, which a plugin's collision check compares. */
+export const sha1Hex = (bytes: Uint8Array): string => {
+  const length = bytes.byteLength
+  const padded = new Uint8Array(Math.ceil((length + 9) / 64) * 64)
+  padded.set(bytes)
+  padded[length] = 0x80
+  const view = new DataView(padded.buffer)
+  view.setUint32(padded.byteLength - 8, Math.floor(length / 0x20000000))
+  view.setUint32(padded.byteLength - 4, (length * 8) >>> 0)
+  const h = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0]
+  const w = new Uint32Array(80)
+  const rotl = (x: number, n: number) => ((x << n) | (x >>> (32 - n))) >>> 0
+  for (let block = 0; block < padded.byteLength; block += 64) {
+    for (let i = 0; i < 16; i++) w[i] = view.getUint32(block + i * 4)
+    for (let i = 16; i < 80; i++)
+      w[i] = rotl(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1)
+    let [a, b, c, d, e] = h
+    for (let i = 0; i < 80; i++) {
+      const f =
+        i < 20
+          ? ((b & c) | (~b & d)) + 0x5a827999
+          : i < 40
+            ? (b ^ c ^ d) + 0x6ed9eba1
+            : i < 60
+              ? ((b & c) | (b & d) | (c & d)) + 0x8f1bbcdc
+              : (b ^ c ^ d) + 0xca62c1d6
+      const t = (rotl(a, 5) + f + e + w[i]) >>> 0
+      e = d
+      d = c
+      c = rotl(b, 30)
+      b = a
+      a = t
+    }
+    h[0] = (h[0] + a) >>> 0
+    h[1] = (h[1] + b) >>> 0
+    h[2] = (h[2] + c) >>> 0
+    h[3] = (h[3] + d) >>> 0
+    h[4] = (h[4] + e) >>> 0
+  }
+  return h.map((x) => x.toString(16).padStart(8, '0')).join('')
+}
+
+/** A stand-in `sha1` for a generated file, whose bytes are never held. */
 const fakeSha1 = (text: string): string => {
   let h = 0x811c9dc5
   for (const b of encoder.encode(text)) h = Math.imul(h ^ b, 0x01000193) >>> 0
@@ -603,10 +709,18 @@ export const makeFakeBoxApi = (options: FakeBoxApiOptions = {}): FakeBoxApi => {
     name: item.name,
   })
 
-  const sha1Of = (item: Item) =>
-    item.body._tag === 'lazy'
-      ? fakeSha1(`${item.id}:${item.body.file.size}`)
-      : fakeSha1(`${item.id}:${item.version}:${sizeOf(item.body)}`)
+  const sha1Of = (item: Item) => {
+    switch (item.body._tag) {
+      case 'lazy':
+        return fakeSha1(`${item.id}:${item.body.file.size}`)
+      case 'bytes':
+        return sha1Hex(item.body.bytes)
+      case 'note':
+        return sha1Hex(encoder.encode(noteJson(item.body.paragraphs)))
+      case 'none':
+        return sha1Hex(new Uint8Array())
+    }
+  }
 
   const versionIdOf = (item: Item) =>
     `${item.id}${String(item.version).padStart(3, '0')}`
@@ -1007,15 +1121,265 @@ export const makeFakeBoxApi = (options: FakeBoxApiOptions = {}): FakeBoxApi => {
     return json(200, out)
   }
 
+  // -------------------------------------------------------------------------
+  // Writes
+  // -------------------------------------------------------------------------
+
+  let lastId = 7_000_000
+
+  /** A fresh id, numeric like Box's and clear of every seeded one. */
+  const newId = () => {
+    do lastId += 1
+    while (items.has(String(lastId)))
+    return String(lastId)
+  }
+
+  /** The live item already named `name` in a folder, ignoring case, as Box compares. */
+  const namesake = (folderId: string, name: string, except?: string) =>
+    children(folderId).find(
+      (i) => i.id !== except && i.name.toLowerCase() === name.toLowerCase(),
+    )
+
+  /** Box's 409: a folder create names its conflicts as a list, an upload as one object. */
+  const nameInUse = (conflict: Item, asList: boolean) =>
+    json(409, {
+      type: 'error',
+      status: 409,
+      code: 'item_name_in_use',
+      message: 'Item with the same name already exists',
+      context_info: {
+        conflicts: asList
+          ? [mini(conflict)]
+          : conflict.type === 'file'
+            ? {
+                ...mini(conflict),
+                sha1: sha1Of(conflict),
+                file_version: fileVersionOf(conflict),
+              }
+            : mini(conflict),
+      },
+      help_url: 'http://developers.box.com/docs/#errors',
+      request_id: 'fake-request',
+    })
+
+  const jsonBody = (body: string | Uint8Array | undefined): unknown => {
+    try {
+      return JSON.parse(
+        body === undefined
+          ? ''
+          : typeof body === 'string'
+            ? body
+            : new TextDecoder().decode(body),
+      )
+    } catch {
+      return null
+    }
+  }
+
+  const isRecord = (value: unknown): value is { [key: string]: unknown } =>
+    typeof value === 'object' && value !== null && !Array.isArray(value)
+
+  const stringAt = (value: unknown, key: string): string | undefined => {
+    if (!isRecord(value)) return undefined
+    const found = value[key]
+    return typeof found === 'string' ? found : undefined
+  }
+
+  const parentIdOf = (value: unknown): string | undefined =>
+    isRecord(value) ? stringAt(value.parent, 'id') : undefined
+
+  /** Box refuses an empty name, one with a slash, and `.` or `..`. */
+  const badName = (name: string) =>
+    name.trim() === '' ||
+    name.includes('/') ||
+    name.includes('\\') ||
+    name === '.' ||
+    name === '..'
+
+  const createFolder = (body: unknown, query: Query) => {
+    const name = stringAt(body, 'name')
+    const parentId = parentIdOf(body)
+    if (name === undefined || parentId === undefined || badName(name))
+      return boxError(400, 'bad_request', 'name and parent.id are required')
+    const parent = reach(parentId, 'folder')
+    if (parent === null) return notFound(parentId, items.get(parentId))
+    const conflict = namesake(parentId, name)
+    if (conflict !== undefined) return nameInUse(conflict, true)
+    const folder = put({
+      id: newId(),
+      type: 'folder',
+      name,
+      parentId,
+      body: { _tag: 'none' },
+    })
+    record('ITEM_CREATE', folder)
+    return json(
+      201,
+      withFields(folder, query.fields, full(folder), { repHints: undefined }),
+    )
+  }
+
+  /** `PUT files/:id` or `folders/:id`: `parent.id` moves it, `name` renames it. */
+  const update = (id: string, type: Item['type'], body: unknown) => {
+    const item = reach(id, type)
+    if (item === null) return notFound(id, items.get(id))
+    const name = stringAt(body, 'name') ?? item.name
+    const parentId = parentIdOf(body) ?? item.parentId
+    if (badName(name) || parentId === null)
+      return boxError(400, 'bad_request', 'Invalid name or parent')
+    const parent = reach(parentId, 'folder')
+    if (parent === null) return notFound(parentId, items.get(parentId))
+    if (ancestors(parent).some((a) => a.id === id) || parent.id === id)
+      return boxError(400, 'bad_request', 'A folder cannot go inside itself')
+    const conflict = namesake(parentId, name, id)
+    if (conflict !== undefined) return nameInUse(conflict, false)
+    if (parentId !== item.parentId) {
+      item.parentId = parentId
+      touch(item)
+      record('ITEM_MOVE', item)
+    }
+    if (name !== item.name) {
+      item.name = name
+      touch(item)
+      record('ITEM_RENAME', item)
+    }
+    return json(200, full(item))
+  }
+
+  /** A multipart body's parts, in order; null when it is not one. */
+  const multipart = (
+    contentType: string | undefined,
+    body: string | Uint8Array | undefined,
+  ): Array<{ readonly name: string; readonly bytes: Uint8Array }> | null => {
+    const match = /boundary=(?:"([^"]+)"|([^;\s]+))/.exec(contentType ?? '')
+    const boundary = match?.[1] ?? match?.[2]
+    if (boundary === undefined || body === undefined) return null
+    const bytes = typeof body === 'string' ? encoder.encode(body) : body
+    const find = (needle: Uint8Array, from: number) => {
+      outer: for (let i = from; i <= bytes.length - needle.length; i++) {
+        for (let j = 0; j < needle.length; j++)
+          if (bytes[i + j] !== needle[j]) continue outer
+        return i
+      }
+      return -1
+    }
+    const delimiter = encoder.encode(`--${boundary}`)
+    const next = encoder.encode(`\r\n--${boundary}`)
+    const blank = encoder.encode('\r\n\r\n')
+    const parts: Array<{ name: string; bytes: Uint8Array }> = []
+    let at = find(delimiter, 0)
+    if (at === -1) return null
+    at += delimiter.length
+    for (;;) {
+      if (bytes[at] === 0x2d && bytes[at + 1] === 0x2d) return parts
+      const headEnd = find(blank, at)
+      if (headEnd === -1) return null
+      const head = new TextDecoder().decode(bytes.subarray(at, headEnd))
+      const name = /content-disposition:[^\r\n]*\bname="([^"]*)"/i.exec(
+        head,
+      )?.[1]
+      const end = find(next, headEnd + blank.length)
+      if (name === undefined || end === -1) return null
+      parts.push({ name, bytes: bytes.slice(headEnd + blank.length, end) })
+      at = end + next.length
+    }
+  }
+
+  /**
+   * `POST files/content` (a new file) or `files/:id/content` (a new version).
+   * `attributes` must come before `file`, as Box requires; a `content-md5`
+   * header is Box's check of the bytes' SHA-1.
+   */
+  const upload = (
+    fileId: string | null,
+    headers: Record<string, string>,
+    body: string | Uint8Array | undefined,
+  ) => {
+    const parts = multipart(headers['content-type'], body)
+    const attributesAt = parts?.findIndex((p) => p.name === 'attributes') ?? -1
+    const fileAt = parts?.findIndex((p) => p.name === 'file') ?? -1
+    if (parts === null || fileAt === -1)
+      return boxError(400, 'bad_request', 'A multipart file part is required')
+    if (attributesAt > fileAt)
+      return boxError(
+        400,
+        'bad_request',
+        'The attributes part must come before the file part',
+      )
+    const attributes =
+      attributesAt === -1
+        ? {}
+        : jsonBody(new TextDecoder().decode(parts[attributesAt].bytes))
+    const bytes = parts[fileAt].bytes
+    if (
+      Object.hasOwn(headers, 'content-md5') &&
+      headers['content-md5'].toLowerCase() !== sha1Hex(bytes)
+    )
+      return boxError(
+        412,
+        'sha1_mismatch',
+        'The content-md5 header does not match the uploaded bytes',
+      )
+    if (fileId !== null) {
+      const file = reach(fileId, 'file')
+      if (file === null) return notFound(fileId, items.get(fileId))
+      file.body = { _tag: 'bytes', bytes }
+      file.version += 1
+      touch(file)
+      record('ITEM_UPLOAD', file)
+      return json(200, { total_count: 1, entries: [full(file)] })
+    }
+    const name = stringAt(attributes, 'name')
+    const parentId = parentIdOf(attributes)
+    if (name === undefined || parentId === undefined || badName(name))
+      return boxError(400, 'bad_request', 'attributes need name and parent.id')
+    const parent = reach(parentId, 'folder')
+    if (parent === null) return notFound(parentId, items.get(parentId))
+    const conflict = namesake(parentId, name)
+    if (conflict !== undefined) return nameInUse(conflict, false)
+    const file = put({
+      id: newId(),
+      type: 'file',
+      name,
+      parentId,
+      body: { _tag: 'bytes', bytes },
+    })
+    record('ITEM_UPLOAD', file)
+    return json(201, { total_count: 1, entries: [full(file)] })
+  }
+
+  const routeUpload = (
+    method: string,
+    path: string,
+    headers: Record<string, string>,
+    body: string | Uint8Array | undefined,
+  ): Response => {
+    if (method !== 'POST')
+      return boxError(405, 'method_not_allowed', `${method} ${path}`)
+    if (path === '/files/content') return upload(null, headers, body)
+    const version = /^\/files\/(\d+)\/content$/.exec(path)?.[1]
+    if (version !== undefined) return upload(version, headers, body)
+    return boxError(404, 'not_found', `The fake Box upload API has no ${path}`)
+  }
+
   const routeApi = (
     method: string,
     path: string,
     query: Query,
     headers: Record<string, string>,
+    body: string | Uint8Array | undefined,
   ): Response => {
+    const id = (pattern: RegExp) => pattern.exec(path)?.[1]
+    if (method === 'POST' && path === '/folders')
+      return createFolder(jsonBody(body), query)
+    if (method === 'PUT') {
+      const file = id(/^\/files\/(\d+)$/)
+      if (file !== undefined) return update(file, 'file', jsonBody(body))
+      const folder = id(/^\/folders\/(\d+)$/)
+      if (folder !== undefined) return update(folder, 'folder', jsonBody(body))
+    }
     if (method !== 'GET')
       return boxError(405, 'method_not_allowed', `${method} ${path}`)
-    const id = (pattern: RegExp) => pattern.exec(path)?.[1]
     const folderItemsOf = id(/^\/folders\/(\d+)\/items$/)
     if (folderItemsOf !== undefined) return folderItems(folderItemsOf, query)
     const folderOf = id(/^\/folders\/(\d+)$/)
@@ -1156,6 +1520,7 @@ export const makeFakeBoxApi = (options: FakeBoxApiOptions = {}): FakeBoxApi => {
       ['oauth', BOX_OAUTH],
       ['authorize', BOX_AUTHORIZE_URL],
       ['api', BOX_API],
+      ['upload', BOX_UPLOAD],
       ['download', BOX_DOWNLOAD],
     ]
 
@@ -1224,7 +1589,12 @@ export const makeFakeBoxApi = (options: FakeBoxApiOptions = {}): FakeBoxApi => {
         case 'api':
           return (
             gate(headers.authorization) ??
-            routeApi(init.method, path, query, headers)
+            routeApi(init.method, path, query, headers, init.body)
+          )
+        case 'upload':
+          return (
+            gate(headers.authorization) ??
+            routeUpload(init.method, path, headers, init.body)
           )
       }
     }

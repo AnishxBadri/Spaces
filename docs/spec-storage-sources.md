@@ -528,6 +528,38 @@ same port; core is unchanged.
   and `storageSourceChaos` against it. `SPACES_FAKE_PROVIDERS=1` stands it in
   for `box`.
 
+**As built — the Box plugin, write half (2026-10-16, SPA-299).**
+`plugins/box` implements `ensureFolder`, `putFile`, `move` and `rename`
+and passes `storageSourceWriteConformance` on the fake Box; nothing under
+core's sync walk, `resolveItem`, the change poll or the exporter changed.
+
+- **Names are unique in a Box folder, ignoring case.** So `ensureFolder`
+  never looks first: it `POST`s `folders`, and a 409 `item_name_in_use`
+  names the folder already there — the one a racing call made — so four
+  concurrent calls end with one folder and one id. A file in the way of a
+  folder is a defect.
+- **`putFile` is one multipart upload** to `upload.box.com` (`attributes`,
+  then `file`), holding the whole file, at most 50 MB: Box's chunked
+  sessions need the size up front, and a `StorageUpload` stream does not
+  carry it. The collision check (§5.6) reads the folder once and compares
+  Box's `sha1` with the plugin's own SHA-1 of the bytes — Box keeps no
+  SHA-256 — which also goes up as `content-md5` for Box to verify. Same
+  bytes are a new version (`files/:id/content`); anything else tries
+  `name (2).ext`. An upload that loses the name to a racing one is judged
+  again against the winner the 409 names.
+- **`move` and `rename`** are `PUT files/:id` or `folders/:id`, sent only
+  when the parent or name differs; a replay sends nothing.
+- **Scope.** The manifest still asks `root_readonly` at install;
+  `root_readwrite` (already in the registry) is for a binding that pushes,
+  asked for then — as Drive asks `drive.readonly` only at bind.
+- **The proof.** `FAKE_BOX_SEED` holds the fake Drive's fourteen data-room
+  files under the same folders (the memo a Box Note), and
+  `sync-box-live.test.ts` binds that room to a deal: the same fourteen
+  documents, with `source_path`, `external_id` and `binding_id`, and a
+  re-run files none. The enterprise-SSO admin consent a Box-first fund
+  needs before its first Connect is in §1, beside Google's Internal vs
+  Testing.
+
 ## 5. Bindings — pointing a folder or file at a node (decided 2026-09-14)
 
 ### 5.1 The table

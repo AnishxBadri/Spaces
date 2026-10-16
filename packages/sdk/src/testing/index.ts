@@ -999,12 +999,15 @@ export {
   BOX_OAUTH,
   BOX_AUTHORIZE_URL,
   BOX_DOWNLOAD,
+  BOX_UPLOAD,
   BOX_ROOT_ID,
   FAKE_BOX_SEED,
   FAKE_BOX_FIXTURE,
   FAKE_BOX_SCAN,
   FAKE_BOX_CHAOS_FIXTURE,
+  FAKE_BOX_WRITE_FIXTURE,
   FAKE_BOX_CREDENTIALS,
+  sha1Hex,
 } from './fake-box-api.ts'
 export type {
   FakeBoxApi,

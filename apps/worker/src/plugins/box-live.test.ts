@@ -108,8 +108,8 @@ describe('box with the fakes on', () => {
       'All Files/Acme Data Room/02 Finance/Board/Minutes Q3.pdf',
     )
     expect(paths).toContain('All Files/Acme Data Room/Investment memo.boxnote')
-    // Ten files and folders; the web link is not one.
-    expect(paths).toHaveLength(10)
+    // Seventeen files and folders; the web link is not one.
+    expect(paths).toHaveLength(17)
     const api = fakes.box('box')
     expect(api?.requests.length).toBeGreaterThan(0)
     expect(api?.requests.every((r) => r.url.startsWith(BOX_API))).toBe(true)

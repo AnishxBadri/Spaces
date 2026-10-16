@@ -1,11 +1,16 @@
+import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import {
   BOX_API,
   BOX_AUTHORIZE_URL,
   BOX_OAUTH,
+  BOX_UPLOAD,
   FAKE_BOX_CREDENTIALS,
+  FAKE_BOX_SEED,
   makeFakeBoxApi,
+  sha1Hex,
 } from './fake-box-api.ts'
+import { FAKE_DRIVE_SEED } from './fake-drive.ts'
 import type { FakeBoxApi } from './fake-box-api.ts'
 
 /** The fake Box on its own: the traps a Box plugin and the connect dance must meet. */
@@ -145,5 +150,201 @@ describe('the fake Box’s events stream', () => {
       `${BOX_API}/events?stream_position=${position}&stream_type=changes`,
     )
     expect(stale.status).toBe(400)
+  })
+})
+
+const send = (
+  api: FakeBoxApi,
+  method: string,
+  url: string,
+  body: string | Uint8Array<ArrayBuffer>,
+  headers: Record<string, string> = {},
+) =>
+  api.fetch(url, {
+    method,
+    headers: { authorization: `Bearer ${api.accessToken}`, ...headers },
+    body,
+  })
+
+const encoder = new TextEncoder()
+
+/** A multipart body in the order given. */
+const multipart = (parts: ReadonlyArray<readonly [string, string]>) => ({
+  body: `${parts.map(([name, value]) => `--b\r\ncontent-disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`).join('')}--b--\r\n`,
+  headers: { 'content-type': 'multipart/form-data; boundary=b' },
+})
+
+describe('the fake Box’s seed', () => {
+  it('holds the fake Drive’s fourteen data-room files under the same folder names', () => {
+    const named = (
+      seed: ReadonlyArray<{
+        kind: string
+        name: string
+        parentId: string | null
+        id: string
+      }>,
+      root: string,
+    ) => {
+      const folders = new Map(
+        seed.filter((i) => i.kind === 'folder').map((i) => [i.id, i]),
+      )
+      const pathOf = (id: string | null): string | null => {
+        if (id === root) return ''
+        const folder = id === null ? undefined : folders.get(id)
+        if (folder === undefined) return null
+        const up = pathOf(folder.parentId)
+        return up === null ? null : `${up}/${folder.name}`
+      }
+      return seed
+        .filter((i) => i.kind !== 'folder' && i.kind !== 'web_link')
+        .flatMap((i) => {
+          const at = pathOf(i.parentId)
+          return at === null
+            ? []
+            : [`${at}/${i.name.replace(/\.boxnote$/, '')}`]
+        })
+        .sort()
+    }
+    expect(named(FAKE_BOX_SEED, '1001')).toEqual(
+      named(FAKE_DRIVE_SEED, 'dataroom'),
+    )
+    expect(named(FAKE_BOX_SEED, '1001')).toHaveLength(14)
+  })
+})
+
+describe('the fake Box’s writes', () => {
+  it('sha1Hex is SHA-1', () => {
+    for (const text of [
+      '',
+      'abc',
+      'x'.repeat(55),
+      'y'.repeat(64),
+      'z'.repeat(1000),
+    ])
+      expect(sha1Hex(encoder.encode(text))).toBe(
+        createHash('sha1').update(text).digest('hex'),
+      )
+  })
+
+  it('a folder create under a taken name is a 409 listing the item in the way, case ignored', async () => {
+    const api = makeFakeBoxApi()
+    const made = await send(
+      api,
+      'POST',
+      `${BOX_API}/folders`,
+      JSON.stringify({ name: 'Diligence', parent: { id: '1001' } }),
+    )
+    expect(made.status).toBe(201)
+    const again = await send(
+      api,
+      'POST',
+      `${BOX_API}/folders`,
+      JSON.stringify({ name: 'diligence', parent: { id: '1001' } }),
+    )
+    expect(again.status).toBe(409)
+    expect(await again.json()).toMatchObject({
+      code: 'item_name_in_use',
+      context_info: { conflicts: [{ type: 'folder', name: 'Diligence' }] },
+    })
+  })
+
+  it('an upload under a taken name is a 409 naming one file with its sha1', async () => {
+    const api = makeFakeBoxApi()
+    const { body, headers } = multipart([
+      [
+        'attributes',
+        JSON.stringify({ name: 'Term sheet.pdf', parent: { id: '1002' } }),
+      ],
+      ['file', 'other bytes'],
+    ])
+    const answer = await send(
+      api,
+      'POST',
+      `${BOX_UPLOAD}/files/content`,
+      body,
+      headers,
+    )
+    expect(answer.status).toBe(409)
+    expect(await answer.json()).toMatchObject({
+      context_info: {
+        conflicts: {
+          type: 'file',
+          id: '2005',
+          sha1: sha1Hex(encoder.encode('%PDF-1.7 Acme term sheet')),
+        },
+      },
+    })
+  })
+
+  it('refuses a file part before attributes, and a content-md5 that is not the bytes’ SHA-1', async () => {
+    const api = makeFakeBoxApi()
+    const attributes = JSON.stringify({
+      name: 'New.pdf',
+      parent: { id: '1002' },
+    })
+    const backwards = multipart([
+      ['file', 'bytes'],
+      ['attributes', attributes],
+    ])
+    expect(
+      (
+        await send(
+          api,
+          'POST',
+          `${BOX_UPLOAD}/files/content`,
+          backwards.body,
+          backwards.headers,
+        )
+      ).status,
+    ).toBe(400)
+    const right = multipart([
+      ['attributes', attributes],
+      ['file', 'bytes'],
+    ])
+    expect(
+      (
+        await send(api, 'POST', `${BOX_UPLOAD}/files/content`, right.body, {
+          ...right.headers,
+          'content-md5': sha1Hex(encoder.encode('other')),
+        })
+      ).status,
+    ).toBe(412)
+    const landed = await send(
+      api,
+      'POST',
+      `${BOX_UPLOAD}/files/content`,
+      right.body,
+      {
+        ...right.headers,
+        'content-md5': sha1Hex(encoder.encode('bytes')),
+      },
+    )
+    expect(landed.status).toBe(201)
+  })
+
+  it('a move or rename is one event; a PUT that changes nothing is none', async () => {
+    const api = makeFakeBoxApi()
+    const text = await (
+      await get(api, `${BOX_API}/events?stream_position=now`)
+    ).text()
+    const position = /"next_stream_position":(\d+)/.exec(text)?.[1] ?? ''
+    const put = (body: object) =>
+      send(api, 'PUT', `${BOX_API}/files/2005`, JSON.stringify(body))
+    expect((await put({ parent: { id: '1003' } })).status).toBe(200)
+    expect((await put({ name: 'Term sheet v2.pdf' })).status).toBe(200)
+    expect(
+      (await put({ name: 'Term sheet v2.pdf', parent: { id: '1003' } })).status,
+    ).toBe(200)
+    const page: unknown = await (
+      await get(
+        api,
+        `${BOX_API}/events?stream_position=${position}&stream_type=changes`,
+      )
+    ).json()
+    expect(page).toMatchObject({
+      chunk_size: 2,
+      entries: [{ event_type: 'ITEM_MOVE' }, { event_type: 'ITEM_RENAME' }],
+    })
+    expect((await put({ parent: { id: '9999999' } })).status).toBe(404)
   })
 })

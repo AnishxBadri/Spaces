@@ -1,21 +1,25 @@
 import { Effect, Layer } from 'effect'
 import {
   BOX_DOWNLOAD,
+  BOX_UPLOAD,
   FAKE_BOX_CHAOS_FIXTURE,
   FAKE_BOX_CREDENTIALS,
   FAKE_BOX_FIXTURE,
   FAKE_BOX_SCAN,
+  FAKE_BOX_WRITE_FIXTURE,
   HttpFetchTest,
   SecretsTest,
   makeFakeBoxApi,
+  sha1Hex,
   sha256Hex,
   storageSourceChaos,
   storageSourceConformance,
+  storageSourceWriteConformance,
 } from '@spaces/sdk/testing'
-import type { FakeBoxApi } from '@spaces/sdk/testing'
+import type { FakeBoxApi, FetchLike } from '@spaces/sdk/testing'
 import type { StorageSource } from '@spaces/sdk'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { BOX_NOTE_MIME, boxSource } from './box.ts'
+import { BOX_NOTE_MIME, UPLOAD_MAX_BYTES, boxSource } from './box.ts'
 
 /**
  * The plugin's real HTTP code against the SDK's fake Box: the fake answers
@@ -32,15 +36,20 @@ afterAll(() => {
   vi.unstubAllGlobals()
 })
 
-const portsFor = (api: FakeBoxApi, accessToken = api.accessToken) =>
-  Layer.merge(
-    HttpFetchTest(api.fetch).layer,
-    SecretsTest({ accessToken }).layer,
-  )
+const portsFor = (
+  api: FakeBoxApi,
+  accessToken = api.accessToken,
+  fetch: FetchLike = api.fetch,
+) => Layer.merge(HttpFetchTest(fetch).layer, SecretsTest({ accessToken }).layer)
 
-const subject = (api: FakeBoxApi = makeFakeBoxApi()) => ({
+const subject = (
+  api: FakeBoxApi = makeFakeBoxApi(),
+  fetch: FetchLike = api.fetch,
+) => ({
   api,
-  source: Effect.runSync(Effect.provide(boxSource, portsFor(api))),
+  source: Effect.runSync(
+    Effect.provide(boxSource, portsFor(api, api.accessToken, fetch)),
+  ),
 })
 
 const run = <TValue, TError>(effect: Effect.Effect<TValue, TError>) =>
@@ -386,5 +395,201 @@ describe('pickerConfig', () => {
     const config = await run(source.pickerConfig())
     expect(config).toMatchObject({ provider: 'box', picker: 'ContentPicker' })
     expect(JSON.stringify(config)).not.toContain(api.accessToken)
+  })
+})
+
+/**
+ * The write half over HTTP. Box refuses a second item under one name, so a
+ * create that loses a race is a 409 naming the winner: the plugin takes it
+ * rather than looking first.
+ */
+describe('the storage-source write suite, against the fake Box', () => {
+  it.each(
+    storageSourceWriteConformance({
+      make: () => subject().source,
+      fixture: FAKE_BOX_WRITE_FIXTURE,
+    }),
+  )('$name', ({ run: conform }) => Effect.runPromise(conform))
+})
+
+const uploadOf = (content: string | Uint8Array, mime = 'application/pdf') => {
+  const bytes =
+    typeof content === 'string' ? encoder.encode(content) : content.slice()
+  return Effect.map(sha256Hex(bytes), (sha256) => ({
+    mime,
+    sha256,
+    stream: new Blob([bytes]).stream(),
+  }))
+}
+
+const writes = (api: FakeBoxApi) =>
+  api.requests.filter((r) => r.method !== 'GET')
+
+describe('ensureFolder', () => {
+  it('four racing creates of one path end in one folder: the losers take the winner Box names in its 409', async () => {
+    const { api, source } = subject()
+    const ids = await run(
+      Effect.all(
+        Array.from({ length: 4 }, () =>
+          source.ensureFolder('1005', 'Acme/Legal'),
+        ),
+        { concurrency: 'unbounded' },
+      ),
+    )
+    expect(new Set(ids).size).toBe(1)
+    const creates = api.requests.filter(
+      (r) => r.method === 'POST' && r.path === '/folders',
+    )
+    // `Acme` exists already: four 409s; `Legal` is one create and three 409s.
+    expect(creates).toHaveLength(8)
+    const legal = (await run(source.listFolder('1006'))).entries.filter(
+      (e) => e.name === 'Legal',
+    )
+    expect(legal.map((e) => e.id)).toEqual([ids[0]])
+  })
+
+  it('a file in the way of a folder is a defect, not a guess', async () => {
+    const { source } = subject()
+    const exit = await Effect.runPromiseExit(
+      source.ensureFolder('1001', 'Acme deck.pdf/Inner'),
+    )
+    expect(exit._tag).toBe('Failure')
+    expect(String(exit)).toMatch(/holds a file named Acme deck\.pdf/)
+  })
+})
+
+describe('putFile', () => {
+  it('uploads one multipart request, attributes first, with the bytes’ SHA-1 for Box to check', async () => {
+    const { api, source } = subject()
+    const bytes = encoder.encode('%PDF-1.7 side letter')
+    const put = await run(
+      Effect.flatMap(uploadOf(bytes), (u) =>
+        source.putFile('1002', 'Side letter.pdf', u),
+      ),
+    )
+    expect(put.name).toBe('Side letter.pdf')
+    const uploads = api.requests.filter((r) => r.endpoint === 'upload')
+    expect(uploads.map((r) => [r.method, r.url.split('?')[0]])).toEqual([
+      ['POST', `${BOX_UPLOAD}/files/content`],
+    ])
+    const back = await read(source, put.fileId)
+    expect(back.sha).toBe(await run(sha256Hex(bytes)))
+    expect(back.file.parentId).toBe('1002')
+    // The fake refuses a content-md5 that is not the bytes' SHA-1 (412).
+    expect(sha1Hex(encoder.encode('abc'))).toBe(
+      'a9993e364706816aba3e25717850c26c9cd0d89d',
+    )
+  })
+
+  it('a namesake differing only in case is the same name to Box', async () => {
+    const { source } = subject()
+    const same = await run(
+      Effect.flatMap(uploadOf('%PDF-1.7 Acme term sheet'), (u) =>
+        source.putFile('1002', 'TERM SHEET.pdf', u),
+      ),
+    )
+    expect(same).toMatchObject({ fileId: '2005', name: 'Term sheet.pdf' })
+    const other = await run(
+      Effect.flatMap(uploadOf('%PDF-1.7 another'), (u) =>
+        source.putFile('1002', 'TERM SHEET.pdf', u),
+      ),
+    )
+    expect(other.name).toBe('TERM SHEET (2).pdf')
+  })
+
+  it('a folder holding the name moves the upload on to (2)', async () => {
+    const { source } = subject()
+    const put = await run(
+      Effect.flatMap(uploadOf('%PDF-1.7 board'), (u) =>
+        source.putFile('1003', 'Board', u),
+      ),
+    )
+    expect(put.name).toBe('Board (2)')
+  })
+
+  it('an upload that loses the name to a racing one is judged again against the winner', async () => {
+    const api = makeFakeBoxApi()
+    let raced = false
+    const fetch: FetchLike = (url, init) => {
+      if (!raced && url.startsWith(`${BOX_UPLOAD}/files/content`)) {
+        raced = true
+        api.add({
+          kind: 'file',
+          id: '2400',
+          name: 'Notes.pdf',
+          parentId: '1002',
+          content: '%PDF-1.7 someone else’s notes',
+        })
+      }
+      return api.fetch(url, init)
+    }
+    const { source } = subject(api, fetch)
+    const put = await run(
+      Effect.flatMap(uploadOf('%PDF-1.7 our notes'), (u) =>
+        source.putFile('1002', 'Notes.pdf', u),
+      ),
+    )
+    expect(put.name).toBe('Notes (2).pdf')
+    expect(
+      api.requests.filter((r) => r.endpoint === 'upload').map((r) => r.path),
+    ).toEqual(['/files/content', '/files/content'])
+  })
+
+  it('past Box’s single-request ceiling the upload is cancelled, not held', async () => {
+    const { api, source } = subject()
+    let cancelled = false
+    let sent = 0
+    const chunk = new Uint8Array(1024 * 1024)
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        sent += chunk.byteLength
+        controller.enqueue(chunk.slice())
+      },
+      cancel() {
+        cancelled = true
+      },
+    })
+    const exit = await Effect.runPromiseExit(
+      source.putFile('1002', 'Huge.pdf', {
+        mime: 'application/pdf',
+        sha256: '0'.repeat(64),
+        stream,
+      }),
+    )
+    expect(exit._tag).toBe('Failure')
+    expect(cancelled).toBe(true)
+    expect(sent).toBeLessThanOrEqual(UPLOAD_MAX_BYTES + 2 * chunk.byteLength)
+    expect(writes(api)).toEqual([])
+  })
+})
+
+describe('move and rename', () => {
+  it('send nothing when the item is already there or so named', async () => {
+    const { api, source } = subject()
+    await run(source.move('2005', '1002'))
+    await run(source.rename('2005', 'Term sheet.pdf'))
+    await run(source.move('1004', '1003'))
+    expect(writes(api)).toEqual([])
+  })
+
+  it('move a folder with its contents, and rename one', async () => {
+    const { api, source } = subject()
+    await run(source.move('1004', '1001'))
+    await run(source.rename('1004', 'Board minutes'))
+    const folder = await run(source.getFolder('1004'))
+    expect(folder.name).toBe('Board minutes')
+    expect(folder.parents.map((p) => p.id)).toEqual(['0', '1001'])
+    expect(writes(api).map((r) => [r.method, r.path])).toEqual([
+      ['PUT', '/folders/1004'],
+      ['PUT', '/folders/1004'],
+    ])
+  })
+
+  it('a move into a folder Box does not have is NotFound naming that folder', async () => {
+    const { source } = subject()
+    expect(await failureOf(source.move('2005', '9999998'))).toMatchObject({
+      _tag: 'NotFound',
+      id: '9999998',
+    })
   })
 })

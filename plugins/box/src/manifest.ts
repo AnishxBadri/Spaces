@@ -8,8 +8,10 @@ export const BOX_ID = /^\d+$/
  * Box's manifest: a storage source.
  * - `provides: 'storage-source'`, so `definePlugin` requires the provider
  *   and no job may use Facts or Ai — it delivers bytes and never files them.
- * - The connection asks `root_readonly`: Box has no per-file grant, so the
- *   read half reads what the account can see.
+ * - The connection asks `root_readonly` at install: Box has no per-file
+ *   grant, so the read half reads what the account can see. The write half
+ *   needs `root_readwrite`, asked for when a binding pushes, never at
+ *   install — as Drive asks `drive.readonly` only at bind time. (D66)
  * - `list` is the demo job: one row is one folder, walked and logged.
  * - `sdk: '^1.4'`: `roles` arrived in SDK 1.4.
  */
@@ -21,7 +23,7 @@ export const manifest = defineManifest({
   name: 'Box',
   roles: ['files'],
   description:
-    'Reads Box: resolves pasted links, lists folders and fetches files, reading Box Notes as text; reports what changed from Box’s events stream, by Box’s own etag, never by a hash.',
+    'Reads and writes Box: resolves pasted links, lists folders and fetches files, reading Box Notes as text; reports what changed from Box’s events stream, by Box’s own etag, never by a hash; creates folders, uploads files and moves or renames them for a binding that pushes.',
   requires: { connection: { provider: 'box', scopes: ['root_readonly'] } },
   provides: 'storage-source',
   settings: z.object({
