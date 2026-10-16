@@ -4,6 +4,7 @@ import {
   index,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -109,4 +110,23 @@ export const storageBinding = pgTable(
       sql`(${t.grain} = 'folder' and ${t.folderId} is not null and ${t.fileId} is null) or (${t.grain} = 'file' and ${t.fileId} is not null and ${t.folderId} is null)`,
     ),
   ],
+)
+
+/**
+ * A bound file deleted in the app (§8, "deleted in app"): the walk and the
+ * poll never file this external id for this binding again.
+ * - Written in the document delete's transaction; the provider is untouched.
+ * - Unlinking the binding cascades its tombstones away, so a re-bind of the
+ *   same folder (a new binding id) brings the file back as new.
+ */
+export const storageTombstone = pgTable(
+  'storage_tombstone',
+  {
+    bindingId: uuid('binding_id')
+      .notNull()
+      .references(() => storageBinding.id, { onDelete: 'cascade' }),
+    externalId: text('external_id').notNull(),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.bindingId, t.externalId] })],
 )

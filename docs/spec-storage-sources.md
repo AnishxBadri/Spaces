@@ -856,6 +856,20 @@ revise) skips a gone row, so a later page or a re-sync walk naming the same
 file — even moved back into the folder — files nothing and flips nothing. A
 move into another binding's subtree is still only revised.
 
+**As built — the deleted-in-app row, and the cursor expired row (2026-10-16,
+SPA-296).** §6's "marks the pointer stale" is superseded by this table's
+"delete ours": deleting a bound document removes our row and writes
+`storage_tombstone(binding_id, external_id, at)` in the delete's own
+transaction (the entity delete executor, so every delete of a document
+does it). Nothing is sent to the provider. The filer — the walk's and the
+poll's one new-file path — skips an external id tombstoned for its binding,
+so neither a later change on the feed nor a re-list brings it back. The 410
+re-list is one `storage.sync` per binding: idempotent on
+`document_connection_external_unique` for rows that exist, on the tombstone
+for rows deleted here, and on `gone` for rows that stopped tracking.
+Tombstones reference the binding and cascade with it, so unlinking and
+re-binding the folder is the deliberate way back: the file is filed as new.
+
 ## 9. Derived layers — the storage layer as the AI substrate sees it (decided 2026-09-15)
 
 ```

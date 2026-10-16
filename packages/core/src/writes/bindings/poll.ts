@@ -36,6 +36,8 @@ import type { BindingFiler, SyncBinding, SyncFailure } from './sync'
  *   proposed (`markGoneProgram`). A `gone` file is never tracked again.
  * - A move into another binding's subtree is only revised, and a held file
  *   no live binding brought is left alone.
+ * - A file deleted in the app is tombstoned for its binding: the filer skips
+ *   it, here and in the re-list an expired cursor sends.
  */
 
 /** A connection is polled once one of its bindings last synced this long ago. */
@@ -71,8 +73,8 @@ export type PollTally = {
   readonly gone: number
   /**
    * A removal of nothing held, a folder, a held file with the token it
-   * already has, one already `gone`, or one no live binding brought:
-   * nothing to do.
+   * already has, one already `gone`, one no live binding brought, or a file
+   * deleted in the app (tombstoned): nothing to do.
    */
   readonly ignored: number
   /** A new file outside every bound subtree. */
@@ -439,6 +441,7 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
           attached += 1
           break
         case 'gone':
+        case 'tombstoned':
           ignored += 1
           break
         case 'skipped':

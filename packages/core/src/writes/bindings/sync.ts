@@ -39,6 +39,7 @@ import { previewResolveByName } from '../entities/resolve'
 import { BindingStoreFailed } from './bind'
 import { goneNot } from './gone'
 import { filingTarget, moveHeldProgram } from './move'
+import { isTombstoned } from './tombstone'
 import type { MovableDocument, UnmappedFolder } from './move'
 
 /**
@@ -52,6 +53,8 @@ import type { MovableDocument, UnmappedFolder } from './move'
  *   and a crossing move is a suggestion (`moveHeldProgram`), as in the poll.
  * - A held file marked `gone` is never claimed, moved or flipped back to
  *   `linked`: it stopped tracking for good (`markGoneProgram`).
+ * - A file deleted in the app is tombstoned for its binding and never
+ *   filed again by it (`tombstoneDocument`), so a re-list resurrects nothing.
  * - Bytes go through intake, so a sha already filed on the target attaches.
  * - With `map_subfolders` on, each folder's target is `resolveItem`'s answer
  *   to the lookups made here; off, every file lands on the bound record.
@@ -81,6 +84,8 @@ export type SyncTally = {
   readonly attached: number
   /** Held, but `gone`: listed again, left untracked. */
   readonly gone: number
+  /** Deleted in the app: tombstoned for this binding, not filed again. */
+  readonly tombstoned: number
   /** Refused one by one (too large, vanished): the walk went on. */
   readonly skipped: ReadonlyArray<{
     readonly name: string
@@ -176,13 +181,15 @@ type Walk = {
 
 /**
  * One file's filing: born, claimed from a held copy, attached by sha, left
- * alone because its held copy is `gone`, or refused.
+ * alone because its held copy is `gone` or it was deleted in the app, or
+ * refused.
  */
 export type FileOutcome =
   | {
       readonly _tag: 'filed' | 'held' | 'attached' | 'gone'
       readonly documentId: string
     }
+  | { readonly _tag: 'tombstoned' }
   | { readonly _tag: 'skipped'; readonly reason: string }
 
 type HeldRow = MovableDocument & {
@@ -314,6 +321,9 @@ const fileEntry = Effect.fn('syncBinding.fileEntry')(function* (
     yield* claimHeld(walk, target, held.id, sourcePath)
     return { _tag: 'held', documentId: held.id }
   }
+
+  if (yield* query(() => isTombstoned(walk.binding.id, entry.id)))
+    return { _tag: 'tombstoned' }
 
   const file = yield* walk.source
     .getFile(entry.id)
@@ -557,6 +567,7 @@ export const syncBindingProgram = Effect.fn('syncBindingProgram')(
     let held = 0
     let attached = 0
     let gone = 0
+    let tombstoned = 0
     const skipped: Array<{ name: string; reason: string }> = []
     const unmapped: Array<Unmapped> = []
 
@@ -606,8 +617,9 @@ export const syncBindingProgram = Effect.fn('syncBindingProgram')(
         }
         const outcome = yield* filer.file(folder.target, entry, folder.path)
         if (
-          outcome._tag !== 'skipped' &&
-          outcome._tag !== 'gone' &&
+          (outcome._tag === 'filed' ||
+            outcome._tag === 'held' ||
+            outcome._tag === 'attached') &&
           folder.unmapped !== null
         )
           folder.unmapped.documentIds.push(outcome.documentId)
@@ -624,6 +636,9 @@ export const syncBindingProgram = Effect.fn('syncBindingProgram')(
           case 'gone':
             gone += 1
             break
+          case 'tombstoned':
+            tombstoned += 1
+            break
           case 'skipped':
             skipped.push({ name: entry.name, reason: outcome.reason })
         }
@@ -634,6 +649,7 @@ export const syncBindingProgram = Effect.fn('syncBindingProgram')(
       held,
       attached,
       gone,
+      tombstoned,
       skipped,
       unmapped: unmapped.map(({ reported: _, ...u }) => u),
     }

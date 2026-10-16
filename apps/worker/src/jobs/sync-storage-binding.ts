@@ -60,6 +60,8 @@ const summaryOf = (tally: SyncTally, refiles: number): string => {
     `${String(tally.attached)} attached by sha`,
   ]
   if (tally.gone > 0) parts.push(`${String(tally.gone)} gone, left untracked`)
+  if (tally.tombstoned > 0)
+    parts.push(`${String(tally.tombstoned)} deleted here, left out`)
   if (tally.skipped.length > 0)
     parts.push(
       `${String(tally.skipped.length)} skipped (${tally.skipped

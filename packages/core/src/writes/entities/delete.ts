@@ -13,6 +13,7 @@ import {
   space,
   term,
 } from '@spaces/db/schema'
+import { tombstoneDocument } from '../bindings/tombstone'
 
 /**
  * Delete executor (SPA-77). The third consumer of ENTITY_REFS, beside the
@@ -170,7 +171,9 @@ async function runDelete(id: string): Promise<{ deleted: boolean }> {
       }
     }
 
-    // Phase 3 — the row that *is* the entity, then the entity.
+    // Phase 3 — the row that *is* the entity, then the entity. A bound
+    // document leaves a tombstone so the next poll does not re-import it.
+    if (target.kind === 'document') await tombstoneDocument(tx, id)
     const side = SIDE_TABLES[target.kind]
     if (side) await tx.delete(side.table).where(eq(side.column, id))
     await tx.delete(entity).where(eq(entity.id, id))
