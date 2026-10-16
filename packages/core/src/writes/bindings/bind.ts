@@ -7,6 +7,7 @@ import {
   bindingConflictMessage,
   isBindableKind,
 } from '../../documents/bindings'
+import { raiseSensitivity } from '../ai/stamp-sensitivity'
 import type { BindingFolder } from '../../documents/bindings'
 
 /**
@@ -149,6 +150,8 @@ export const bindFolderProgram = Effect.fn('bindFolderProgram')(function* (
       ).at(0)
       if (row === undefined)
         throw new Error('storage_binding insert returned no row')
+      // A sensitive binding raises whatever it already reaches, in the bind.
+      await raiseSensitivity(tx, { kind: 'binding', bindingId: row.id })
       return { _tag: 'bound', id: row.id }
     }),
   )

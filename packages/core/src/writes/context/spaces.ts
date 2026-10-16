@@ -1,11 +1,12 @@
 import { Effect } from 'effect'
 import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { link, mandate, note, space } from '@spaces/db/schema'
+import { chunk, link, mandate, note, space } from '@spaces/db/schema'
 import { ContextLeak, ContextQueryFailed } from '../../context/errors'
 import { rank } from '../../context/rank'
 import type { Candidate, RankResult } from '../../context/rank'
-import { ref } from '../../context/ref'
+import { parseRef, ref } from '../../context/ref'
 import { truncate } from '../../context/render'
 import { fmtMoney } from '../../portfolio/format'
 import { canRead } from '../../read-policy'
@@ -149,6 +150,57 @@ export const rankChecked = Effect.fn('rankChecked')(function* (
         })
     }
   return result
+})
+
+/**
+ * The output invariant of `excludeSensitive`: no item cut from a chunk
+ * stamped `sensitive` may leave — a document chunk, or a judgment-memory
+ * note or close_reason. Re-reads the stamps rather than trusting the
+ * fetch; a hit means a fetch lost its filter, a bug like `rankChecked`'s.
+ */
+export const sensitiveChecked = Effect.fn('sensitiveChecked')(function* (
+  items: ReadonlyArray<Pick<Candidate, 'ref' | 'hop'>>,
+): Effect.fn.Return<void, ContextQueryFailed | ContextLeak> {
+  const cut: Array<SQL> = []
+  for (const item of items) {
+    const p = parseRef(item.ref)
+    if (p?.kind === 'doc')
+      cut.push(
+        sql`(${chunk.entityId} = ${p.entityId}::uuid and ${chunk.sourceKind} = 'document' and ${chunk.idx} = ${p.idx})`,
+      )
+    else if (item.hop === 'similar' && p?.kind === 'note')
+      cut.push(
+        sql`(${chunk.entityId} = ${p.entityId}::uuid and ${chunk.sourceKind} = 'note')`,
+      )
+    else if (item.hop === 'similar' && p?.kind === 'attr')
+      cut.push(
+        sql`(${chunk.entityId} = ${p.entityId}::uuid and ${chunk.sourceKind} = 'attribute' and ${chunk.sourceKey} = ${p.slug})`,
+      )
+  }
+  if (cut.length === 0) return
+  const hit = (yield* query(() =>
+    db
+      .select({
+        entityId: chunk.entityId,
+        sourceKind: chunk.sourceKind,
+        sourceKey: chunk.sourceKey,
+        idx: chunk.idx,
+      })
+      .from(chunk)
+      .where(and(eq(chunk.sensitive, true), or(...cut)))
+      .orderBy(asc(chunk.entityId), asc(chunk.idx))
+      .limit(1),
+  )).at(0)
+  if (hit === undefined) return
+  return yield* new ContextLeak({
+    ref:
+      hit.sourceKind === 'document'
+        ? ref.doc(hit.entityId, hit.idx)
+        : hit.sourceKind === 'note'
+          ? ref.note(hit.entityId)
+          : ref.attr(hit.entityId, hit.sourceKey),
+    message: 'A chunk stamped sensitive reached an excludeSensitive assembly',
+  })
 })
 
 /** Every entity id the ranked items are about, the seed's first. */

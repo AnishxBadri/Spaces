@@ -3,10 +3,12 @@ import { and, asc, eq, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { aiRoute, credential, workspace } from '@spaces/db/schema'
 import { workspaceDefaultOf } from '@spaces/core/ai/sensitivity'
+import { raiseSensitivity } from '@spaces/core/writes/ai/stamp-sensitivity'
 import { effectFn } from '#/lib/server/effect'
 import { requireAdmin, requireUser } from '#/lib/server/shared'
 import { LLM_PROVIDERS, isLocalProvider } from './providers/ids'
 import type { LlmProvider } from './providers/ids'
+import { enqueueRestampAll } from './enqueue-restamp'
 import { AI_SENSITIVITIES } from './lanes'
 import type {
   AiLane,
@@ -70,6 +72,25 @@ export const aiRouteProgram = Effect.fn('aiRoute')(function* (
       cause: new Error(`ai_route names an unknown provider: ${provider}`),
     })
   return { provider, model: row.model }
+})
+
+/**
+ * Whether an assembly for `lane` at this sensitivity leaves sensitive chunks
+ * out (`AssembleOptions.excludeSensitive`): true unless the route is local.
+ * - Never fails: an unrouted lane or an unreadable route answers true —
+ *   `complete()` refuses that call anyway, and leaving chunks out only
+ *   over-protects.
+ * - Not the subject's gate: that is `complete()`'s sensitive-to-cloud
+ *   refusal. This keeps a neighbour's sensitive chunks out of a normal one.
+ */
+export const excludeSensitiveProgram = Effect.fn('excludeSensitive')(function* (
+  lane: AiLane,
+  sensitivity: AiSensitivity,
+): Effect.fn.Return<boolean> {
+  return yield* aiRouteProgram(lane, sensitivity).pipe(
+    Effect.map((target) => !isLocalProvider(target.provider)),
+    Effect.orElseSucceed(() => true),
+  )
 })
 
 /**
@@ -292,6 +313,9 @@ export const readSensitivityDefaultProgram = Effect.fn(
  * Writes the floor, merged into `settings` in one statement so a concurrent
  * write to another key is not lost. Refuses before first-run setup has made
  * the workspace row.
+ * - To `sensitive`: every chunk is raised in the same transaction.
+ * - Back to `normal`: one `sensitivity.restamp` over every stamped entity,
+ *   after the commit.
  */
 export const setSensitivityDefaultProgram = Effect.fn('setSensitivityDefault')(
   function* (
@@ -299,25 +323,43 @@ export const setSensitivityDefaultProgram = Effect.fn('setSensitivityDefault')(
   ): Effect.fn.Return<AiSensitivity, SensitivityDefaultWriteFailed> {
     const written = yield* Effect.tryPromise({
       try: () =>
-        db
-          .update(workspace)
-          .set({
-            settings: sql`${workspace.settings} || jsonb_build_object('sensitivity_default', ${input.sensitivity}::text)`,
-            updatedAt: new Date(),
-          })
-          .where(eq(workspace.id, 1))
-          .returning({ id: workspace.id }),
+        db.transaction(async (tx) => {
+          const before = (
+            await tx
+              .select({
+                value: sql<
+                  string | null
+                >`${workspace.settings} ->> 'sensitivity_default'`,
+              })
+              .from(workspace)
+              .where(eq(workspace.id, 1))
+              .for('update')
+          ).at(0)
+          if (before === undefined) return null
+          await tx
+            .update(workspace)
+            .set({
+              settings: sql`${workspace.settings} || jsonb_build_object('sensitivity_default', ${input.sensitivity}::text)`,
+              updatedAt: new Date(),
+            })
+            .where(eq(workspace.id, 1))
+          if (input.sensitivity === 'sensitive')
+            await raiseSensitivity(tx, { kind: 'workspace' })
+          return workspaceDefaultOf(before.value)
+        }),
       catch: (cause) =>
         new SensitivityDefaultWriteFailed({
           message: 'Could not save the default sensitivity',
           cause,
         }),
     })
-    if (written.length === 0)
+    if (written === null)
       return yield* new SensitivityDefaultWriteFailed({
         message: 'The workspace is not set up yet',
         cause: null,
       })
+    if (written === 'sensitive' && input.sensitivity === 'normal')
+      yield* Effect.promise(() => enqueueRestampAll())
     return input.sensitivity
   },
 )

@@ -73,6 +73,15 @@ describe('sensitivity.restamp', () => {
     expect(await stampOf(id)).toEqual([true])
   })
 
+  it('{ all: true } restamps every entity still stamped, with no ledger entity', async () => {
+    expect(restampSensitivity.refs?.({ all: true })).toEqual({})
+    const stale = await aDocWithChunk(false, true)
+    const held = await aDocWithChunk(true, true)
+    await Effect.runPromise(runRestampSensitivity({ all: true }))
+    expect(await stampOf(stale)).toEqual([false])
+    expect(await stampOf(held)).toEqual([true])
+  })
+
   it('completes when the entity is gone', async () => {
     await expect(
       Effect.runPromise(runRestampSensitivity({ entityId: randomUUID() })),

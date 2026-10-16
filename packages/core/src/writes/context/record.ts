@@ -62,6 +62,8 @@ export type RecordContextInput = {
    * never sends one; the MCP `get_context` tool passes its `task` (SPA-23).
    */
   taskText?: string | undefined
+  /** `AssembleOptions.excludeSensitive`: set by an AI caller on a non-local route. */
+  excludeSensitive?: boolean | undefined
 }
 
 /** The Context section's default budget; the MCP tool's too (SPA-23). */
@@ -100,6 +102,7 @@ export const recordContextProgram = Effect.fn('recordContextProgram')(
         budgetChars: input.budgetChars,
         similar: input.similar,
         taskText: input.taskText,
+        excludeSensitive: input.excludeSensitive,
       },
     )
     // A pin that cannot be read only hides the toggle; the mode itself,

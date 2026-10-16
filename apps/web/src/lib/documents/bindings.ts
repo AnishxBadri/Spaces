@@ -17,7 +17,9 @@ import type {
   BindingOptions,
   RecordBinding,
 } from '@spaces/core/writes/bindings/bind'
+import { stampedSensitive } from '@spaces/core/writes/ai/stamp-sensitivity'
 import { connectHref } from '#/lib/connections/products'
+import { enqueueRestamp } from '#/lib/ai/enqueue-restamp'
 import { enqueue, jobsByKey } from '#/lib/queue'
 import { activeConnectionFor, linkFetchStatusOf } from './attach-link'
 import type { LinkFetchStatus, NoConnection } from './attach-link'
@@ -186,11 +188,22 @@ export const recordBindingsForProgram = Effect.fn('recordBindingsForProgram')(
   },
 )
 
-/** Unlink: the binding goes; the documents it filed stay. */
+/**
+ * Unlink: the binding goes; the documents it filed stay. Their binding input
+ * goes with it, so each one still stamped sensitive gets a
+ * `sensitivity.restamp` after the unlink.
+ */
 export const unlinkFolderProgram = Effect.fn('unlinkFolderProgram')(function* (
   bindingId: string,
 ): Effect.fn.Return<boolean, LinkFolderFailed> {
-  return yield* unlinkBindingProgram(bindingId).pipe(
+  const stamped = yield* Effect.tryPromise({
+    try: () => stampedSensitive(db, { kind: 'binding', bindingId }),
+    catch: (cause) => new LinkFolderFailed({ cause }),
+  })
+  const unlinked = yield* unlinkBindingProgram(bindingId).pipe(
     Effect.mapError((e) => new LinkFolderFailed({ cause: e.cause })),
   )
+  if (unlinked && stamped.length > 0)
+    yield* Effect.promise(() => enqueueRestamp(stamped))
+  return unlinked
 })

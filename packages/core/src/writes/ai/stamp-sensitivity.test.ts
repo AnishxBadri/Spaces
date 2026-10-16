@@ -6,9 +6,10 @@ import { describe, expect, it } from 'vitest'
 /**
  * `chunk.sensitive` has one writing module, `stamp-sensitivity.ts`, across
  * the whole workspace — apps, packages and plugins, seeds included, tests
- * excluded (a test may insert a stamped fixture row). The behaviour of the
+ * excluded (a test may insert a stamped fixture row) — and every write of a
+ * binding or the workspace default names its raise. The behaviour of the
  * raise and the lowering job is asserted beside the write paths that call
- * them, in apps/web's `restamp.test.ts`.
+ * them, in apps/web's `restamp.test.ts` and `restamp-inputs.test.ts`.
  */
 
 const root = resolve(
@@ -52,6 +53,23 @@ describe('one writer of chunk.sensitive', () => {
     expect(writers).toEqual([
       'packages/core/src/writes/ai/stamp-sensitivity.ts',
     ])
+  })
+
+  it('every write of the binding and workspace inputs raises in its transaction', () => {
+    const inputs = [
+      // A binding born with a sensitivity.
+      { write: /\.insert\(\s*storageBinding\s*\)/, raise: "kind: 'binding'" },
+      // The workspace floor.
+      {
+        write: /jsonb_build_object\('sensitivity_default'/,
+        raise: "kind: 'workspace'",
+      },
+    ]
+    for (const input of inputs) {
+      const writers = sources.filter((s) => input.write.test(s.text))
+      expect(writers.length, String(input.write)).toBeGreaterThan(0)
+      for (const s of writers) expect(s.text, s.path).toContain(input.raise)
+    }
   })
 
   it('the one chunk insert leaves the column at its default for the stamp to correct', () => {

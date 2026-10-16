@@ -188,6 +188,14 @@ export const extractionStatus = pgEnum('extraction_status', [
  */
 export const externalStatus = pgEnum('external_status', ['linked', 'gone'])
 
+/**
+ * A stored file, keyed by its own entity.
+ * - No `sensitive` column, on purpose: `document.entity_id = entity.id`, so a
+ *   derived flag here would sit on the same row identity as the authored
+ *   `entity.sensitive` and a call site could not tell them apart. The
+ *   per-document answer is `sensitivityFor`; the retrieval cache is
+ *   `chunk.sensitive`.
+ */
 export const document = pgTable(
   'document',
   {
@@ -321,16 +329,19 @@ export const chunk = pgTable(
     /**
      * A derived cache of the sensitivity resolver, so retrieval filters in
      * SQL before scoring.
-     * - One writing module, two functions: `stampSensitivity` (the embed job,
-     *   in the transaction that inserts the chunks, and the
-     *   `sensitivity.restamp` job that lowers) and `raiseSensitivity` (the
-     *   set-based raise, in the transaction that flags a record or files it
-     *   into a sensitive space). No second author may appoint themselves; an
-     *   insert leaves the default for them to correct.
-     * - Binding changes do not restamp yet, so the column can lag them.
+     * - One writing module: `stampSensitivity` (the embed job, in the
+     *   transaction that inserts the chunks, and the `sensitivity.restamp`
+     *   job that lowers) and `raiseSensitivity` (the set-based raise, in the
+     *   transaction that writes any input — a record's flag, a filing, a
+     *   binding, a document's binding, the workspace default). No second
+     *   author may appoint themselves; an insert leaves the default for them
+     *   to correct.
+     * - Raising is synchronous, lowering is a job: the column may say `true`
+     *   late, never `false` late.
      * - The routing boundary never reads this column — it resolves live
      *   (`resolveSensitivity`): a stale cache where bytes leave the box is a
-     *   leak.
+     *   leak. The assembler reads it to leave neighbours' sensitive chunks
+     *   out of a cloud-routed prompt (`excludeSensitive`).
      */
     sensitive: boolean('sensitive').notNull().default(false),
   },

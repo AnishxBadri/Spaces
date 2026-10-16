@@ -36,6 +36,8 @@ export type SimilarInput = {
   userId: string
   /** The seed and, for a company, the deals linked to it. */
   anchorIds: ReadonlyArray<string>
+  /** Leave out chunks stamped sensitive — `AssembleOptions.excludeSensitive`. */
+  excludeSensitive?: boolean
 }
 
 export type SimilarCandidate = Candidate & {

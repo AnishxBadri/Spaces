@@ -40,6 +40,7 @@ import {
 } from './propose'
 import type { Suggestion, SuggestionFailure } from './propose'
 import { providerFailure } from './providers/test-call'
+import { excludeSensitiveProgram } from './route'
 import type { LaneNotRouted, RouteReadFailed } from './route'
 import { callStep, suggestionOutputRef, withRun } from './run'
 import type { RunScope } from './run'
@@ -488,11 +489,16 @@ const attributeRunInRun = Effect.fn('attributeRun.inRun')(function* (
       message: `${def.name} already has a proposal waiting in Review`,
     })
 
+  const sensitivity = yield* sensitivityFor(record.id)
   const context = yield* recordContextProgram({
     entityId: record.id,
     user: { id: input.userId },
     asOf: input.asOf ?? new Date().toISOString(),
     budgetChars: ATTRIBUTE_RUN_CONTEXT_CHARS,
+    excludeSensitive: yield* excludeSensitiveProgram(
+      ai.lane,
+      sensitivity.sensitivity,
+    ),
   }).pipe(
     Effect.provide(SimilarLaneLive),
     Effect.mapError((cause) => new AttributeRunQueryFailed({ cause })),
@@ -507,7 +513,6 @@ const attributeRunInRun = Effect.fn('attributeRun.inRun')(function* (
   const contextRefs = context.items.map((i) => i.ref)
 
   const task = taskFor(cell)
-  const sensitivity = yield* sensitivityFor(record.id)
   const runId = yield* run.id
   const answered = yield* completeProgram(ai.lane, items, outputSchema(cell), {
     caller: { type: 'user', id: input.userId },

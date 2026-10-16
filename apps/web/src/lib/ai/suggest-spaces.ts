@@ -22,6 +22,7 @@ import type { CompleteFailure, SensitiveRouteRefused } from './complete'
 import { proposeProgram, suggestionMessage } from './propose'
 import type { Suggestion, SuggestionFailure } from './propose'
 import { providerFailure } from './providers/test-call'
+import { excludeSensitiveProgram } from './route'
 import type { LaneNotRouted, RouteReadFailed } from './route'
 import { sensitivityFor } from './sensitivity-for'
 import type {
@@ -341,11 +342,16 @@ const suggestSpacesInRun = Effect.fn('suggestSpaces.inRun')(function* (
           : `${record.name} is in, or has been offered, every space already`,
     }
 
+  const sensitivity = yield* sensitivityFor(record.id)
   const context = yield* recordContextProgram({
     entityId: record.id,
     user: { id: input.userId },
     asOf: input.asOf ?? new Date().toISOString(),
     budgetChars: SUGGEST_SPACES_CONTEXT_CHARS,
+    excludeSensitive: yield* excludeSensitiveProgram(
+      'classify',
+      sensitivity.sensitivity,
+    ),
   }).pipe(
     Effect.provide(SimilarLaneLive),
     Effect.mapError((cause) => new SuggestSpacesQueryFailed({ cause })),
@@ -359,7 +365,6 @@ const suggestSpacesInRun = Effect.fn('suggestSpaces.inRun')(function* (
   }))
 
   const task = TASK(record.name, options)
-  const sensitivity = yield* sensitivityFor(record.id)
   const runId = yield* run.id
   const answered = yield* completeProgram(
     'classify',

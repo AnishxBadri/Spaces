@@ -3,17 +3,19 @@ import { eq, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity, workspace } from '@spaces/db/schema'
 import { resolveSensitivity, workspaceDefaultOf } from '../../ai/sensitivity'
-import type { ResolvedSensitivity } from '../../ai/sensitivity'
+import type {
+  BindingSensitivity,
+  ResolvedSensitivity,
+} from '../../ai/sensitivity'
 
 /**
  * `sensitivityFor(entityId)` — the live read `resolveSensitivity` answers
  * over, one query per job: the record's own `entity.sensitive`, the spaces it
  * is filed in (`entity_space → space`) with every ltree ancestor of one — and,
- * for a space, its own ancestors — and the workspace default from
+ * for a space, its own ancestors — the storage binding that brought a
+ * document (`document.binding_id`), and the workspace default from
  * `workspace.settings`.
  *
- * - The binding input is not read yet: `storage_binding` does not exist, so
- *   `null` is passed until it does.
  * - Every egress boundary calls this live — never a cached column.
  */
 
@@ -28,6 +30,7 @@ export class SensitivityEntityNotFound extends Schema.TaggedError<SensitivityEnt
 ) {}
 
 type SpaceInput = { name: string; sensitive: boolean }
+type BindingInput = { sensitivity: BindingSensitivity; name: string }
 
 export type SensitivityRead = ResolvedSensitivity & { own: boolean }
 
@@ -66,6 +69,13 @@ export const sensitivityFor = Effect.fn('sensitivityFor')(function* (
                   )
               )
           ), '[]'::json)`,
+          // Only a document has a binding; the folder path names it.
+          binding: sql<BindingInput | null>`(
+            select json_build_object('sensitivity', sb.sensitivity, 'name', sb.folder_path)
+            from document d
+            join storage_binding sb on sb.id = d.binding_id
+            where d.entity_id = ${entityId}::uuid
+          )`,
         })
         .from(entity)
         .where(eq(entity.id, entityId))
@@ -78,7 +88,7 @@ export const sensitivityFor = Effect.fn('sensitivityFor')(function* (
     ...resolveSensitivity({
       own: row.own,
       spaces: row.spaces,
-      binding: null, // storage-8a: storage_binding does not exist yet
+      binding: row.binding,
       workspaceDefault: workspaceDefaultOf(row.workspaceDefault),
     }),
   }

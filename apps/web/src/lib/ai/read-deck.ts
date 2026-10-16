@@ -36,7 +36,7 @@ import { cachedExtractProgram } from './extraction-cache'
 import { proposeProgram, registryFor, suggestionMessage } from './propose'
 import type { Suggestion, SuggestionFailure } from './propose'
 import { providerFailure } from './providers/test-call'
-import { isLaneRoutedProgram } from './route'
+import { excludeSensitiveProgram, isLaneRoutedProgram } from './route'
 import { callStep, suggestionOutputRef, withRun } from './run'
 import type { RunScope, RunStepInput } from './run'
 import { sensitivityFor } from './sensitivity-for'
@@ -513,6 +513,7 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
         : against.object.kind === 'person'
           ? [PAGE_SUBJECT, ...against.registry]
           : against.registry
+    const sensitivity = yield* sensitivityFor(target.id)
     // A captured page has no record to bring context from: the page is all.
     const context =
       against !== null
@@ -522,6 +523,10 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
             user: { id: input.userId },
             asOf,
             budgetChars: READ_DECK_CONTEXT_CHARS,
+            excludeSensitive: yield* excludeSensitiveProgram(
+              'extract',
+              sensitivity.sensitivity,
+            ),
           }).pipe(
             Effect.provide(SimilarLaneLive),
             Effect.mapError((cause) => new ReadDeckQueryFailed({ cause })),
@@ -536,7 +541,6 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
         at: i.at,
       })),
     ]
-    const sensitivity = yield* sensitivityFor(target.id)
     const answered = yield* cachedExtractProgram(
       {
         blobSha: doc.blobSha,

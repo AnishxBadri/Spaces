@@ -44,6 +44,11 @@ export type ToolCaller = {
   userId: string
   proposer:
     { kind: 'token'; tokenId: string } | { kind: 'ask'; runId: string | null }
+  /**
+   * Ask's turn on a non-local route: `get_context` leaves sensitive chunks
+   * out (`AssembleOptions.excludeSensitive`).
+   */
+  excludeSensitive?: boolean
 }
 
 /** A tool's answer, with what Ask reads off it. */
@@ -188,6 +193,7 @@ const getContext = defineTool({
         budgetChars: budget ?? DEFAULT_BUDGET_CHARS,
         similar: false,
         taskText: task?.trim() ? task.trim() : undefined,
+        excludeSensitive: caller.excludeSensitive === true,
       }).pipe(Effect.provide(SimilarLaneLive))
     }),
   // Everything the context is about — a space's subspaces and members too —

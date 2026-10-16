@@ -747,4 +747,164 @@ describe('assembleProgram', () => {
       9,
     )
   })
+
+  it('excludeSensitive leaves stamped chunks out in SQL, the seed’s and a neighbour’s alike', async () => {
+    const { assembleProgram } = await import('./assemble')
+    const { SimilarLane } = await import('../../context/similar-lane')
+    const { ref } = await import('../../context/ref')
+    const { Effect, Layer } = await import('effect')
+    const { db } = await import('@spaces/db')
+    const { chunk, document, entity, link } = await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
+
+    const [me] = await db.select({ id: user.id }).from(user).limit(1)
+    const [co] = await db
+      .insert(entity)
+      .values({ kind: 'company', canonicalName: `PlainCo ${tag}` })
+      .returning({ id: entity.id })
+    const deck = async (name: string, stamped: boolean) => {
+      const [e] = await db
+        .insert(entity)
+        .values({ kind: 'document', canonicalName: name })
+        .returning({ id: entity.id })
+      // Exempt from the one-writer rule: a fixture with text already read.
+      await db.insert(document).values({
+        entityId: e.id,
+        filename: name,
+        kind: 'deck',
+        sourceClass: 'manual',
+        extractionStatus: 'done',
+        createdAt: new Date('2026-08-20T00:00:00Z'),
+      })
+      // A stamped fixture row: what the raise leaves behind.
+      await db.insert(chunk).values(
+        [0, 1].map((idx) => ({
+          entityId: e.id,
+          sourceKind: 'document' as const,
+          idx,
+          text: `${name} page ${String(idx)}.`,
+          sensitive: stamped,
+        })),
+      )
+      await db.insert(link).values({
+        fromEntityId: e.id,
+        toEntityId: co.id,
+        relation: 'tagged_in',
+        source: 'manual',
+      })
+      return e.id
+    }
+    const plain = await deck(`plain-${tag}.pdf`, false)
+    const secret = await deck(`dataroom-${tag}.pdf`, true)
+
+    const asked: Array<boolean | undefined> = []
+    const lane = Layer.succeed(
+      SimilarLane,
+      SimilarLane.of({
+        candidates: (input) => {
+          asked.push(input.excludeSensitive)
+          return Effect.succeed([])
+        },
+        pinned: () => Effect.succeed(true),
+      }),
+    )
+    const run = (entityId: string, excludeSensitive?: boolean) =>
+      Effect.runPromise(
+        assembleProgram(
+          { entityId },
+          {
+            user: { id: me.id },
+            asOf: ASOF,
+            budgetChars: 8000,
+            similar: true,
+            ...(excludeSensitive === undefined ? {} : { excludeSensitive }),
+          },
+        ).pipe(Effect.provide(lane)),
+      )
+
+    const all = await run(co.id)
+    const allRefs = all.items.map((x) => x.ref)
+    expect(allRefs).toContain(ref.doc(secret, 0))
+    expect(allRefs).toContain(ref.doc(plain, 0))
+
+    const cloud = await run(co.id, true)
+    const cloudRefs = cloud.items.map((x) => x.ref)
+    expect(cloudRefs).toContain(ref.doc(plain, 0))
+    expect(cloudRefs.filter((r) => r.includes(secret))).toEqual([])
+    expect(cloud.reveals).not.toContain(secret)
+    // The judgment-memory lane is asked to leave them out too.
+    expect(asked).toEqual([undefined, true])
+
+    // Off, the option changes nothing.
+    expect(await run(co.id, false)).toEqual(all)
+
+    // A document seed's own stamped chunks go the same way.
+    const seeded = await run(secret, true)
+    expect(seeded.items.filter((x) => x.kind === 'doc_chunk')).toEqual([])
+  })
+
+  it('refuses with ContextLeak when a chunk stamped sensitive reaches an excludeSensitive output', async () => {
+    const { sensitiveChecked } = await import('./spaces')
+    const { ref } = await import('../../context/ref')
+    const { Effect, Exit } = await import('effect')
+    const { db } = await import('@spaces/db')
+    const { chunk, entity } = await import('@spaces/db/schema')
+
+    const [doc] = await db
+      .insert(entity)
+      .values({ kind: 'document', canonicalName: `leak-${tag}.pdf` })
+      .returning({ id: entity.id })
+    const [deal] = await db
+      .insert(entity)
+      .values({ kind: 'deal', canonicalName: `LeakDeal ${tag}` })
+      .returning({ id: entity.id })
+    // Stamped fixture rows: a fetch that lost its filter would hand them on.
+    await db.insert(chunk).values([
+      {
+        entityId: doc.id,
+        sourceKind: 'document',
+        idx: 0,
+        text: 'plain',
+        sensitive: false,
+      },
+      {
+        entityId: doc.id,
+        sourceKind: 'document',
+        idx: 1,
+        text: 'secret',
+        sensitive: true,
+      },
+      {
+        entityId: deal.id,
+        sourceKind: 'attribute',
+        sourceKey: 'close_reason',
+        idx: 0,
+        text: 'passed: secret',
+        sensitive: true,
+      },
+    ])
+    const check = (items: Array<{ ref: string; hop: 0 | 'similar' }>) =>
+      Effect.runPromiseExit(sensitiveChecked(items))
+
+    expect(
+      Exit.isSuccess(await check([{ ref: ref.doc(doc.id, 0), hop: 0 }])),
+    ).toBe(true)
+    const leak = await check([
+      { ref: ref.doc(doc.id, 0), hop: 0 },
+      { ref: ref.doc(doc.id, 1), hop: 0 },
+    ])
+    expect(Exit.isFailure(leak)).toBe(true)
+    expect(JSON.stringify(leak)).toContain('ContextLeak')
+    expect(JSON.stringify(leak)).toContain(ref.doc(doc.id, 1))
+    const similar = await check([
+      { ref: ref.attr(deal.id, 'close_reason'), hop: 'similar' },
+    ])
+    expect(JSON.stringify(similar)).toContain('ContextLeak')
+    // The same attribute reached by the walk is not a chunk.
+    expect(
+      Exit.isSuccess(
+        await check([{ ref: ref.attr(deal.id, 'close_reason'), hop: 0 }]),
+      ),
+    ).toBe(true)
+  })
 })

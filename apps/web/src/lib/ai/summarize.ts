@@ -20,6 +20,7 @@ import type { Suggestion, SuggestionFailure } from './propose'
 import { providerFailure } from './providers/test-call'
 import { callStep, suggestionOutputRef, withRun } from './run'
 import type { RunScope } from './run'
+import { excludeSensitiveProgram } from './route'
 import { sensitivityFor } from './sensitivity-for'
 import type {
   SensitivityEntityNotFound,
@@ -329,6 +330,19 @@ const summarizeInRun = Effect.fn('summarize.inRun')(function* (
 
   const asOf = input.asOf ?? new Date().toISOString()
   const user = { id: input.userId }
+  // Sensitivity first: the route it picks decides whether a neighbour's
+  // sensitive chunks may enter the context.
+  const recordSensitivity = yield* sensitivityFor(record.id)
+  const docSensitivity =
+    input.documentId === null ? null : yield* sensitivityFor(input.documentId)
+  const sensitive =
+    docSensitivity?.sensitivity === 'sensitive'
+      ? docSensitivity
+      : recordSensitivity
+  const excludeSensitive = yield* excludeSensitiveProgram(
+    'synthesize',
+    sensitive.sensitivity,
+  )
   let source: Source
   let items: Array<ContextItem>
 
@@ -371,7 +385,7 @@ const summarizeInRun = Effect.fn('summarize.inRun')(function* (
       })
     const around = yield* assembleProgram(
       { entityId: documentId },
-      { user, asOf, budgetChars: SUMMARIZE_CONTEXT_CHARS },
+      { user, asOf, budgetChars: SUMMARIZE_CONTEXT_CHARS, excludeSensitive },
     ).pipe(
       Effect.provide(SimilarLaneLive),
       Effect.mapError((cause) => new SummarizeQueryFailed({ cause })),
@@ -385,7 +399,7 @@ const summarizeInRun = Effect.fn('summarize.inRun')(function* (
     }
     const assembled = yield* assembleProgram(
       { entityId: record.id },
-      { user, asOf, budgetChars: SUMMARIZE_CONTEXT_CHARS },
+      { user, asOf, budgetChars: SUMMARIZE_CONTEXT_CHARS, excludeSensitive },
     ).pipe(
       Effect.provide(SimilarLaneLive),
       Effect.mapError((cause) => new SummarizeQueryFailed({ cause })),
@@ -408,13 +422,6 @@ const summarizeInRun = Effect.fn('summarize.inRun')(function* (
       })
   }
 
-  const recordSensitivity = yield* sensitivityFor(record.id)
-  const docSensitivity =
-    input.documentId === null ? null : yield* sensitivityFor(input.documentId)
-  const sensitive =
-    docSensitivity?.sensitivity === 'sensitive'
-      ? docSensitivity
-      : recordSensitivity
   const runId = yield* run.id
   const answered = yield* completeProgram('synthesize', items, undefined, {
     caller: { type: 'user', id: input.userId },

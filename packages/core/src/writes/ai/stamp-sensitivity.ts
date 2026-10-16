@@ -2,13 +2,12 @@ import { Effect, Schema } from 'effect'
 import { and, eq, ne, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { chunk } from '@spaces/db/schema'
-import { sensitivityFor } from './sensitivity-for'
+import { SensitivityReadFailed, sensitivityFor } from './sensitivity-for'
 import type { SQL } from 'drizzle-orm'
 import type { Tx } from '../attributes/values'
 import type {
   SensitivityEntityNotFound,
   SensitivityRead,
-  SensitivityReadFailed,
 } from './sensitivity-for'
 
 /**
@@ -21,7 +20,10 @@ import type {
  *   for the chunks it has just written; the `sensitivity.restamp` job calls
  *   it after a flag is cleared or a filing removed.
  * - `raiseSensitivity(tx, scope)` is the set-based raise, run inside the
- *   transaction that flags a record or files one into a sensitive space.
+ *   transaction that writes a sensitivity input: a record's flag, a filing,
+ *   a binding, a document's binding, the workspace default.
+ * - `restampStampedProgram()` is the lowering after the workspace default
+ *   goes back to normal: every entity still stamped, restamped live.
  *
  * Raising is synchronous and lowering is a job: the cautious OR means a new
  * sensitive input can only raise, so the raise needs no resolver; a removed
@@ -89,6 +91,12 @@ export type StampScope =
    * ancestor at its current path is sensitive.
    */
   | { kind: 'moved'; spaceId: string }
+  /** Every document a storage binding brought, raised when it is sensitive. */
+  | { kind: 'binding'; bindingId: string }
+  /** One document, raised when the binding that brought it is sensitive. */
+  | { kind: 'bound'; entityId: string }
+  /** Every chunk, raised when the workspace default is sensitive. */
+  | { kind: 'workspace' }
 
 /** The entity ids a `flagged` scope reaches. */
 const flaggedReach = (entityId: string): SQL => sql`(
@@ -123,6 +131,24 @@ const inputSensitive = (scope: StampScope): SQL => {
         join entity ae on ae.id = anc.entity_id
         where filed.entity_id = ${scope.spaceId}::uuid and ae.sensitive
       )`
+    case 'binding':
+      return sql`exists (
+        select 1 from storage_binding sb
+        where sb.id = ${scope.bindingId}::uuid and sb.sensitivity = 'sensitive'
+      )`
+    case 'bound':
+      return sql`exists (
+        select 1
+        from document d
+        join storage_binding sb on sb.id = d.binding_id
+        where d.entity_id = ${scope.entityId}::uuid
+          and sb.sensitivity = 'sensitive'
+      )`
+    case 'workspace':
+      return sql`exists (
+        select 1 from workspace w
+        where w.settings ->> 'sensitivity_default' = 'sensitive'
+      )`
   }
 }
 
@@ -133,15 +159,24 @@ const reach = (scope: StampScope): SQL => {
     case 'moved':
       return sql`${chunk.entityId} in ${flaggedReach(scope.spaceId)}`
     case 'filed':
+    case 'bound':
       return sql`${chunk.entityId} = ${scope.entityId}::uuid`
+    case 'binding':
+      return sql`${chunk.entityId} in (
+        select d.entity_id from document d
+        where d.binding_id = ${scope.bindingId}::uuid
+      )`
+    case 'workspace':
+      return sql`true`
   }
 }
 
 /**
  * The set-based raise: every chunk in the scope goes `sensitive = true`, in
  * one statement, when the scope's input is sensitive — a record's own flag
- * for `flagged`, the space or one of its ancestors for `filed` and `moved`. A no-op
- * otherwise, so a caller runs it after every flag-set and every filing.
+ * for `flagged`, the space or one of its ancestors for `filed` and `moved`,
+ * the binding for `binding` and `bound`, the default for `workspace`. A
+ * no-op otherwise, so a caller runs it after every write of an input.
  * Answers the rows it changed.
  */
 export async function raiseSensitivity(
@@ -171,3 +206,31 @@ export async function stampedSensitive(
     .where(and(eq(chunk.sensitive, true), reach(scope)))
   return rows.map((r) => r.entityId)
 }
+
+/**
+ * The lowering after the workspace default goes back to normal: every
+ * entity still stamped sensitive, restamped from the live resolver one by
+ * one. An entity gone meanwhile is skipped. Answers how many entities it
+ * read and how many chunk rows changed.
+ */
+export const restampStampedProgram = Effect.fn('restampStamped')(
+  function* (): Effect.fn.Return<
+    { entities: number; stamped: number },
+    SensitivityReadFailed | StampWriteFailed
+  > {
+    const ids = yield* Effect.tryPromise({
+      try: () => stampedSensitive(db, { kind: 'workspace' }),
+      catch: (cause) => new SensitivityReadFailed({ cause }),
+    })
+    let stamped = 0
+    for (const id of ids) {
+      const r = yield* stampSensitivity(id).pipe(
+        Effect.catchTag('SensitivityEntityNotFound', () =>
+          Effect.succeed(null),
+        ),
+      )
+      if (r !== null) stamped += r.stamped
+    }
+    return { entities: ids.length, stamped }
+  },
+)

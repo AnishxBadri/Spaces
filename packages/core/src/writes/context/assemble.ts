@@ -50,6 +50,7 @@ import {
   rankChecked,
   readableNote,
   revealed,
+  sensitiveChecked,
 } from './spaces'
 import type { NoteGate } from './spaces'
 
@@ -95,6 +96,14 @@ export type AssembleOptions = {
    * returns the same items it always did.
    */
   similar?: boolean | undefined
+  /**
+   * Leave out every chunk stamped `chunk.sensitive` — set by an AI caller
+   * whose lane routes to a non-local provider, so a normal subject never
+   * carries a neighbour's sensitive chunks into a cloud prompt. Filtered in
+   * SQL and re-checked on the output (`sensitiveChecked`). Off, the
+   * assembly is unchanged.
+   */
+  excludeSensitive?: boolean | undefined
 }
 
 export type AssembleResult = RankResult & {
@@ -139,6 +148,8 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
 > {
   const userId = opts.user.id
   const readable = readableNote(userId)
+  const excludeSensitive = opts.excludeSensitive === true
+  const noSensitive = excludeSensitive ? eq(chunk.sensitive, false) : undefined
 
   // ---------- seed (follow a merge redirect, one hop) ----------
   let seed = (yield* query(() =>
@@ -297,7 +308,11 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
         })
         .from(chunk)
         .where(
-          and(eq(chunk.entityId, seedId), eq(chunk.sourceKind, 'document')),
+          and(
+            eq(chunk.entityId, seedId),
+            eq(chunk.sourceKind, 'document'),
+            noSensitive,
+          ),
         )
         .orderBy(asc(chunk.idx))
         .limit(SEED_CHUNKS_MAX),
@@ -534,6 +549,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
             and(
               inArray(chunk.entityId, docIds),
               eq(chunk.sourceKind, 'document'),
+              noSensitive,
             ),
           )
           .orderBy(asc(chunk.entityId), asc(chunk.idx)),
@@ -768,6 +784,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
     for (const { noteRow, ...c } of yield* lane.candidates({
       userId,
       anchorIds,
+      ...(excludeSensitive ? { excludeSensitive } : {}),
     })) {
       if (taken >= SIMILAR_TOP_N) break
       // Dedupe by ref against the lanes above: a note the walk already
@@ -810,6 +827,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
 
   // ---------- rank, held to canRead ----------
   const result = yield* rankChecked(candidates, noteRows, opts)
+  if (excludeSensitive) yield* sensitiveChecked(result.items)
   const sensitivity = yield* sensitivityFor(seedId).pipe(
     Effect.catchTags({
       SensitivityReadFailed: (e) =>

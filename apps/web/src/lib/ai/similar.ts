@@ -42,6 +42,8 @@ import type {
  *   visibility flag, so the predicate is vacuous for it.
  * - **Stale rows** (another model's `embedding_model`) are skipped, exactly
  *   as SPA-129's lane skips them: garbage in this vector space.
+ * - **Sensitive chunks** are skipped when the assembly asks
+ *   (`excludeSensitive`): a cloud-routed prompt takes no neighbour's.
  *
  * **No pin, no lane — and no lexical fallback.** A lexical "similar company"
  * matches words, not judgment: two decks that both say "AI platform" or
@@ -171,7 +173,7 @@ const anchorStatement = (
  * so the relaxed order never reaches the ranking.
  */
 const neighboursStatement = (
-  { userId, anchorIds }: SimilarInput,
+  { userId, anchorIds, excludeSensitive }: SimilarInput,
   model: string,
   anchor: string,
 ) => sql`
@@ -187,6 +189,7 @@ const neighboursStatement = (
         (ch.source_kind = 'attribute' and ch.source_key = 'close_reason')
         or ch.source_kind = 'note'
       )
+      ${excludeSensitive === true ? sql`and not ch.sensitive` : sql``}
     order by ch.embedding <=> (select v from qv)
     limit ${INNER_LIMIT}
   ),

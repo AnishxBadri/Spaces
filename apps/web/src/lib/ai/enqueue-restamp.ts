@@ -24,3 +24,17 @@ export async function enqueueRestamp(
   }
   return sent
 }
+
+/**
+ * The lowering after the workspace default goes back to normal: one
+ * `sensitivity.restamp` job over every entity still stamped, not one per
+ * entity. Never throws; answers whether it was sent.
+ */
+export async function enqueueRestampAll(): Promise<boolean> {
+  const id = await enqueue(
+    QUEUES.restampSensitivity,
+    { all: true },
+    { singletonKey: 'all' },
+  )
+  return id !== null
+}

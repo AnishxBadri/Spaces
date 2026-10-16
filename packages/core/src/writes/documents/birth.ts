@@ -328,6 +328,10 @@ export async function addEdges(
       })
     }
   }
+  // The binding that brought it: set at birth, or claimed in this
+  // transaction just before its edges. A no-op unless that binding is
+  // sensitive and the document already carries chunks.
+  await raiseSensitivity(tx, { kind: 'bound', entityId: documentId })
 }
 
 /**

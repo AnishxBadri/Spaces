@@ -606,10 +606,14 @@ export async function* askEvents(asked: AskInput): AsyncGenerator<AskEvent> {
           description: t.description,
           inputSchema: z.object(t.inputSchema),
           execute: async (raw, { toolCallId }) => {
+            // A cloud route takes no neighbour's sensitive chunks.
+            const local =
+              attempt.target !== null &&
+              isLocalProvider(attempt.target.provider)
             const exit = await Effect.runPromiseExit(
               toolRegistry.call(
                 t.name,
-                caller,
+                { ...caller, excludeSensitive: !local },
                 t.name === 'query_records'
                   ? scopeQueryInput(raw, narrowing)
                   : raw,
@@ -629,9 +633,6 @@ export async function* askEvents(asked: AskInput): AsyncGenerator<AskEvent> {
               gateOf(answer.touches, known),
             )
             if (verdict.sensitive && !gate.sensitive) {
-              const local =
-                attempt.target !== null &&
-                isLocalProvider(attempt.target.provider)
               if (!local) {
                 // The cloud model never sees this answer.
                 attempt.escalateTo = verdict

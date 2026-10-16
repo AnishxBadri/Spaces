@@ -16,6 +16,7 @@ import { assembleProgram } from '@spaces/core/writes/context/assemble'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import { completeMessage } from '#/lib/ai/complete'
 import { inlineCitations } from '#/lib/ai/inline-citations'
+import { excludeSensitiveProgram } from '#/lib/ai/route'
 import { providerLabel, refusedLine, routeLine } from '#/lib/ai/route-line'
 import type { SensitivityVia } from '#/lib/ai/sensitivity'
 import { sensitivityFor } from '#/lib/ai/sensitivity-for'
@@ -145,12 +146,30 @@ export const preparePrepProgram = Effect.fn('preparePrep')(function* (
     4000,
     Math.floor(PREP_CONTEXT_CHARS / meeting.records.length),
   )
+  // Per call: the first linked record that resolves sensitive decides —
+  // read first, because its route decides whether a neighbour's sensitive
+  // chunks may enter the context.
+  let via: SensitivityVia | null = null
+  let sensitive = false
+  for (const r of meeting.records) {
+    const read = yield* sensitivityFor(r.id)
+    if (read.sensitivity === 'sensitive') {
+      sensitive = true
+      via = read.via
+      break
+    }
+  }
+  const excludeSensitive = yield* excludeSensitiveProgram(
+    'synthesize',
+    sensitive ? 'sensitive' : 'normal',
+  )
+
   const seen = new Set<string>()
   const items: Array<ContextItem> = []
   for (const r of meeting.records) {
     const assembled = yield* assembleProgram(
       { entityId: r.id },
-      { user: { id: input.userId }, asOf, budgetChars: per },
+      { user: { id: input.userId }, asOf, budgetChars: per, excludeSensitive },
     ).pipe(
       Effect.provide(SimilarLaneLive),
       Effect.mapError((cause) => new PrepQueryFailed({ cause })),
@@ -164,18 +183,6 @@ export const preparePrepProgram = Effect.fn('preparePrep')(function* (
   const shared = yield* sharedOnly(items).pipe(
     Effect.mapError((cause) => new PrepQueryFailed({ cause })),
   )
-
-  // Per call: the first linked record that resolves sensitive decides.
-  let via: SensitivityVia | null = null
-  let sensitive = false
-  for (const r of meeting.records) {
-    const read = yield* sensitivityFor(r.id)
-    if (read.sensitivity === 'sensitive') {
-      sensitive = true
-      via = read.via
-      break
-    }
-  }
 
   const opened = yield* openStreamProgram('synthesize', shared, {
     caller: { type: 'user', id: input.userId },
