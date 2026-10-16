@@ -792,6 +792,24 @@ deleting a document reclaims its revisions' bytes once nothing else names
 them. Two edits between polls are one advance — the feed reports the latest
 state and the port has no revision list.
 
+**As built — the renamed / moved row (2026-10-16, SPA-290).** A held file
+whose folder or name differs from its row, inside its own binding's
+subtree, advances `source_path` and `filename` in place (the record's name
+follows unless a person renamed it): no edge, no new row, no extraction. The
+old folder target is the stored `source_path` folded through the same
+`resolveItem` steps as the new one; when the two differ, a
+`refile_document` suggestion names the document and both records, proposed
+in the same transaction as the advance and once per (document,
+destination) unless accepted. Accept moves the edge by the accepter; a
+document no longer on the old record refuses and the row stays open. A
+binary's new token is still compared by sha; a renamed native document
+stores its token without reading an export. The walk treats its own held
+files the same way, so a re-sync never re-files what a person moved. A
+near-missed folder (§5.3) proposes each file it filed to the closest
+company through the same kind. Not handled: a folder rename or move (the
+feed reports the folder, not its files, so their paths go stale until each
+changes), and a move between two bindings or out of every binding.
+
 ## 9. Derived layers — the storage layer as the AI substrate sees it (decided 2026-09-15)
 
 ```

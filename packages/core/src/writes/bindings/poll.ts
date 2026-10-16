@@ -7,7 +7,13 @@ import type { ItemTarget } from '../../documents/resolve-item'
 import { Enqueue } from '../../queue/enqueue'
 import { QUEUES } from '../../queue/names'
 import { BindingStoreFailed } from './bind'
-import { heldDocumentOf, reviseDocumentProgram } from './revise'
+import { isExport, moveHeldProgram } from './move'
+import type { MoveOutcome } from './move'
+import {
+  heldDocumentOf,
+  keepTokenProgram,
+  reviseDocumentProgram,
+} from './revise'
 import { bindingFiler, markBindingFailedProgram } from './sync'
 import type { HeldDocument } from './revise'
 import type { BindingFiler, SyncBinding, SyncFailure } from './sync'
@@ -21,8 +27,11 @@ import type { BindingFiler, SyncBinding, SyncFailure } from './sync'
  *   short is replayed whole next time, and a file it already filed is held,
  *   so nothing is filed twice.
  * - A new file is filed; a held file a live binding brought is revised when
- *   its token moved (`reviseDocumentProgram`). A removal, a rename or move,
- *   and a held file no live binding brought are left alone.
+ *   its token moved (`reviseDocumentProgram`), and when it was renamed or
+ *   moved inside its binding's subtree its path advances, with a re-file
+ *   suggestion if the move crossed to another record (`moveHeldProgram`).
+ * - A removal, a move out of the binding's subtree and a held file no live
+ *   binding brought are left alone.
  */
 
 /** A connection is polled once one of its bindings last synced this long ago. */
@@ -50,6 +59,10 @@ export type PollTally = {
   readonly attached: number
   /** Held files whose bytes advanced to a new revision. */
   readonly revised: number
+  /** Held files renamed or moved inside their subtree: the path advanced. */
+  readonly moved: number
+  /** Moves that crossed to another record: a re-file suggestion each. */
+  readonly proposed: number
   /**
    * A removal, a folder, a held file with the token it already has, or one
    * no live binding brought: nothing to do.
@@ -310,26 +323,53 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
     let held = 0
     let attached = 0
     let revised = 0
+    let moved = 0
+    let proposed = 0
     let ignored = 0
     let outside = 0
     const skipped: Array<{ name: string; reason: string }> = []
     const refused: Array<{ bindingId: string; reason: string }> = []
 
-    /** A held file: revised only for a binding still live in this poll. */
+    /** Where a held file now sits, when that is inside its own binding. */
+    const moveOf = Effect.fn('pollStorage.moveOf')(function* (
+      doc: HeldDocument,
+      entry: StorageEntry,
+      binding: PollBinding,
+    ) {
+      const at = entry.parentId === null ? null : yield* locate(entry.parentId)
+      if (entry.parentId === null || at?.binding !== binding) return null
+      const outcome: MoveOutcome = yield* moveHeldProgram({
+        held: doc,
+        entry,
+        boundPath: binding.folderPath,
+        targetOf: filerOf(binding).targetOf,
+        target: yield* targetOf(entry.parentId, at),
+        sourcePath: [binding.folderPath, ...at.names].join(' / '),
+        integrationId: input.integrationId,
+      })
+      return outcome
+    })
+
+    /** A held file: moved and revised only for a binding still live in this poll. */
     const heldFile = Effect.fn('pollStorage.heldFile')(function* (
       doc: HeldDocument,
       entry: StorageEntry,
     ) {
-      const bound = [...live.values()].some((b) => b.id === doc.bindingId)
-      if (!bound) {
+      const binding = [...live.values()].find((b) => b.id === doc.bindingId)
+      if (binding === undefined) {
         ignored += 1
         return
       }
-      const outcome = yield* reviseDocumentProgram({
-        held: doc,
-        entry,
-        source,
-      })
+      const move = yield* moveOf(doc, entry, binding)
+      if (move?._tag === 'moved') moved += 1
+      if (move?._tag === 'proposed') proposed += 1
+      // A renamed native document's new token is not an edit: its export
+      // is never byte-stable, so reading it would mint a revision.
+      const advanced = move !== null && move._tag !== 'unmoved'
+      const outcome =
+        advanced && isExport(doc, entry)
+          ? yield* keepTokenProgram(doc, entry.changeToken)
+          : yield* reviseDocumentProgram({ held: doc, entry, source })
       switch (outcome._tag) {
         case 'revised':
           revised += 1
@@ -404,6 +444,8 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
         held,
         attached,
         revised,
+        moved,
+        proposed,
         ignored,
         outside,
         skipped,

@@ -53,6 +53,10 @@ export const suggestionKind = pgEnum('suggestion_kind', [
   // `link(supersedes)` newer → older through the one supersedes writer.
   // Never written without that accept. (D59)
   'supersedes',
+  // A storage-source document whose Drive folder now resolves to another
+  // record: accepting moves its filing edge from one to the other, by the
+  // accepter. Never a silent re-file (§5.6).
+  'refile_document',
 ])
 
 export const suggestionStatus = pgEnum('suggestion_status', [

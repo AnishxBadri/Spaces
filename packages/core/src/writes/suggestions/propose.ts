@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, ne, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
@@ -20,6 +20,8 @@ import { taskPayloadSchema } from '../../ai/task'
 import { supersedesPayloadSchema } from '../../ai/supersedes'
 import type { SupersedesPayload } from '../../ai/supersedes'
 import type { TaskPayload } from '../../ai/task'
+import { refileDocumentPayloadSchema } from '../../documents/refile'
+import type { RefileDocumentPayload } from '../../documents/refile'
 import {
   MAX_EVIDENCE,
   MAX_WATCHES,
@@ -306,6 +308,18 @@ export function supersedesOf(payload: Json): SupersedesPayload {
   )
 }
 
+/** A re-file payload, decoded — or the validator's refusal, by field. */
+export function refileDocumentOf(payload: Json): RefileDocumentPayload {
+  const parsed = refileDocumentPayloadSchema.safeParse(payload)
+  if (parsed.success) return parsed.data
+  throw invalid(
+    parsed.error.issues.map((i) => {
+      const slug = i.path.map(String).join('.') || 'refile_document'
+      return { slug, message: `${slug}: ${i.message}` }
+    }),
+  )
+}
+
 export type ProposeInput = {
   entityId: string
   kind: RecordKind
@@ -355,7 +369,8 @@ async function heldOpen(
  * `Facts.fill` conflict commits with the fill that refused it). Throws the
  * typed refusals `asFailure` passes through. An integration's identical
  * open proposal already held is returned rather than duplicated, and so is
- * a supersedes pair proposed on the record before, open or dismissed.
+ * a supersedes pair proposed on the record before, open or dismissed, and
+ * a re-file of one document to one record not yet accepted.
  */
 export async function proposeWith(
   reader: Reader,
@@ -400,7 +415,48 @@ export async function proposeWith(
       return held ?? (await insertSuggestion(tx, input, refs))
     })
   }
+  // A re-file is proposed once per (document, destination) unless it was
+  // accepted: an open or a rejected row is handed back, so a re-sync or a
+  // replayed poll page writes nothing new.
+  if (input.kind === 'refile_document') {
+    const move = refileDocumentOf(input.payload)
+    if (move.documentId !== input.entityId)
+      throw invalid([
+        {
+          slug: 'documentId',
+          message: 'documentId: a re-file sits on the document it moves',
+        },
+      ])
+    return reader.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`refile:${move.documentId}:${move.toEntityId}`}))`,
+      )
+      const held = await heldRefile(tx, move)
+      return held ?? (await insertSuggestion(tx, input, refs))
+    })
+  }
   return insertSuggestion(reader, input, refs)
+}
+
+/** The open or rejected re-file of this document to this record, if any. */
+async function heldRefile(
+  reader: Reader,
+  move: RefileDocumentPayload,
+): Promise<Suggestion | undefined> {
+  return (
+    await reader
+      .select()
+      .from(suggestion)
+      .where(
+        and(
+          eq(suggestion.kind, 'refile_document'),
+          eq(suggestion.entityId, move.documentId),
+          ne(suggestion.status, 'accepted'),
+          sql`${suggestion.payload} ->> 'toEntityId' = ${move.toEntityId}`,
+        ),
+      )
+      .limit(1)
+  ).at(0)
 }
 
 /**

@@ -191,6 +191,44 @@ describe('the suggestion card', () => {
     expect(html).not.toContain('<svg')
   })
 
+  it('draws a re-file as one line naming the document and both records', async () => {
+    const { SuggestionEntry } =
+      await import('#/components/inbox/suggestion-card')
+    const html = renderToStaticMarkup(
+      <ul>
+        <SuggestionEntry
+          item={{
+            id: 's-refile',
+            kind: 'refile_document',
+            payload: {
+              documentId: '00000000-0000-4000-8000-000000000001',
+              fromEntityId: '00000000-0000-4000-8000-000000000002',
+              toEntityId: '00000000-0000-4000-8000-000000000003',
+              sourcePath: 'My Drive / Research / Hydrogen / Ohium',
+              documentName: 'deck.pdf',
+              fromName: 'Ohmium',
+              toName: 'Ohium',
+            },
+            rationale: 'Moved in the source',
+            citations: [],
+            fields: null,
+            origin: { via: 'integration' },
+            createdAt: '2026-10-16T00:00:00.000Z',
+            runId: null,
+          }}
+          pending={false}
+          onAccept={() => {}}
+          onReject={() => {}}
+        />
+      </ul>,
+    )
+    expect(html).toMatch(
+      /Re-file <\/span><span[^>]*>deck\.pdf<\/span><span[^>]*> from <\/span><span[^>]*>Ohmium<\/span><span[^>]*> to <\/span><span[^>]*>Ohium<\/span>/,
+    )
+    expect(html).toContain('Re-file</button>')
+    expect(html).toContain('Dismiss</button>')
+  })
+
   it('links a suggestion a run produced to that run (SPA-100)', async () => {
     const { SuggestionEntry, usageRunHref } =
       await import('#/components/inbox/suggestion-card')

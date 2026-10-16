@@ -12,6 +12,7 @@ import {
   link,
   space,
   storageBinding,
+  suggestion,
 } from '@spaces/db/schema'
 import { Enqueue } from '@spaces/core/queue/enqueue'
 import { QUEUES } from '@spaces/core/queue/names'
@@ -272,7 +273,8 @@ describe('storage.sync with map_subfolders on', () => {
 
     expect(succeeded(await room.sync())).toBe(
       'synced 7 files, 7 new, 0 held, 0 attached by sha, ' +
-        '1 unmapped (My Drive / Research / Hydrogen / Ohium ~ Ohmium)',
+        '1 unmapped (My Drive / Research / Hydrogen / Ohium ~ Ohmium), ' +
+        '1 to re-file',
     )
     expect(await filings(room.bindingId)).toEqual({
       'h2-map': { kind: 'other', on: [hydrogen] },
@@ -292,13 +294,53 @@ describe('storage.sync with map_subfolders on', () => {
     expect(ohium).toEqual([])
     expect(await aiRuns()).toBe(0)
 
-    // A re-run claims what it filed, where it filed it.
+    // The near-missed folder's file is proposed to the close company, and
+    // stays on the space until a person accepts.
+    const intro = (
+      await db
+        .select({ id: document.entityId })
+        .from(document)
+        .where(eq(document.externalId, 'ohium-intro'))
+    ).at(0)?.id
+    const proposals = () =>
+      db
+        .select({
+          entityId: suggestion.entityId,
+          status: suggestion.status,
+          payload: suggestion.payload,
+          rationale: suggestion.rationale,
+        })
+        .from(suggestion)
+        .where(eq(suggestion.kind, 'refile_document'))
+    const proposed = await proposals()
+    expect(proposed).toEqual([
+      {
+        entityId: intro,
+        status: 'open',
+        payload: {
+          documentId: intro,
+          fromEntityId: hydrogen,
+          toEntityId: company,
+          sourcePath: 'My Drive / Research / Hydrogen / Ohium',
+          documentName: 'Ohium intro.pdf',
+          fromName: 'Hydrogen',
+          toName: 'Ohmium',
+        },
+        rationale:
+          'The source folder “Ohium” is close to Ohmium, not an exact match',
+      },
+    ])
+
+    // A re-run claims what it filed, where it filed it, and proposes
+    // nothing twice.
     expect(succeeded(await room.sync())).toBe(
       'synced 7 files, 0 new, 7 held, 0 attached by sha, ' +
-        '1 unmapped (My Drive / Research / Hydrogen / Ohium ~ Ohmium)',
+        '1 unmapped (My Drive / Research / Hydrogen / Ohium ~ Ohmium), ' +
+        '1 to re-file',
     )
     expect(Object.keys(await filings(room.bindingId))).toHaveLength(7)
     expect(await records()).toBe(recordsBefore)
+    expect(await proposals()).toEqual(proposed)
   })
 
   it('with map_subfolders off files the same tree on the space, kinds by filename', async () => {

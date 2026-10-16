@@ -37,6 +37,8 @@ import {
 import type { DocumentIntakeFailed } from '../documents/intake'
 import { previewResolveByName } from '../entities/resolve'
 import { BindingStoreFailed } from './bind'
+import { filingTarget, moveHeldProgram } from './move'
+import type { MovableDocument, UnmappedFolder } from './move'
 
 /**
  * A binding's sync: the bound folder's whole subtree walked through the
@@ -45,6 +47,8 @@ import { BindingStoreFailed } from './bind'
  * - Idempotent on (connection, external id), the unique index: a held file
  *   is claimed for the binding and filed, never downloaded again. Bindings
  *   cannot nest, so that key is (binding, external id) too.
+ * - A file this binding already brought is never re-filed: its path advances
+ *   and a crossing move is a suggestion (`moveHeldProgram`), as in the poll.
  * - Bytes go through intake, so a sha already filed on the target attaches.
  * - With `map_subfolders` on, each folder's target is `resolveItem`'s answer
  *   to the lookups made here; off, every file lands on the bound record.
@@ -81,10 +85,7 @@ export type SyncTally = {
    * Folders whose name came close to a company and matched none exactly:
    * their files stayed on the parent target. Only folders that held a file.
    */
-  readonly unmapped: ReadonlyArray<{
-    readonly folderPath: string
-    readonly candidates: ReadonlyArray<FolderCandidate>
-  }>
+  readonly unmapped: ReadonlyArray<UnmappedFolder>
 }
 
 /** Fails the whole walk: the provider's, or ours. */
@@ -163,19 +164,33 @@ type Walk = {
   readonly source: StorageSource
   readonly actor: DocumentActor
   readonly userId: string | null
+  readonly targetOf: (
+    names: ReadonlyArray<string>,
+  ) => Effect.Effect<ItemTarget, BindingStoreFailed>
 }
 
 /** One file's filing: born, claimed from a held copy, attached by sha, or refused. */
 export type FileOutcome =
-  | { readonly _tag: 'filed' | 'held' | 'attached' }
+  | {
+      readonly _tag: 'filed' | 'held' | 'attached'
+      readonly documentId: string
+    }
   | { readonly _tag: 'skipped'; readonly reason: string }
+
+type HeldRow = MovableDocument & { readonly bindingId: string | null }
 
 const heldDocument = (connectionId: string, externalId: string) =>
   query(
-    async () =>
+    async (): Promise<HeldRow | null> =>
       (
         await db
-          .select({ id: document.entityId })
+          .select({
+            id: document.entityId,
+            bindingId: document.bindingId,
+            sourcePath: document.sourcePath,
+            filename: document.filename,
+            mime: document.mime,
+          })
           .from(document)
           .where(
             and(
@@ -183,7 +198,7 @@ const heldDocument = (connectionId: string, externalId: string) =>
               eq(document.externalId, externalId),
             ),
           )
-      ).at(0)?.id ?? null,
+      ).at(0) ?? null,
   )
 
 /**
@@ -262,9 +277,23 @@ const fileEntry = Effect.fn('syncBinding.fileEntry')(function* (
 ): Effect.fn.Return<FileOutcome, SyncFailure, Enqueue> {
   const target = filingTarget(folder)
   const held = yield* heldDocument(walk.connectionId, entry.id)
+  // This binding's own file is never re-filed by a walk: a move is the
+  // poll's rule, a path that advances and at most a suggestion.
+  if (held?.bindingId === walk.binding.id) {
+    yield* moveHeldProgram({
+      held,
+      entry,
+      boundPath: walk.binding.folderPath,
+      targetOf: walk.targetOf,
+      target: folder,
+      sourcePath,
+      integrationId: walk.integrationId,
+    })
+    return { _tag: 'held', documentId: held.id }
+  }
   if (held !== null) {
-    yield* claimHeld(walk, target, held, sourcePath)
-    return { _tag: 'held' }
+    yield* claimHeld(walk, target, held.id, sourcePath)
+    return { _tag: 'held', documentId: held.id }
   }
 
   const file = yield* walk.source
@@ -306,7 +335,7 @@ const fileEntry = Effect.fn('syncBinding.fileEntry')(function* (
         Effect.flatMap((winner) =>
           winner === null
             ? Effect.fail(e)
-            : Effect.succeed({ id: winner, deduped: false, raced: true }),
+            : Effect.succeed({ id: winner.id, deduped: false, raced: true }),
         ),
       ),
     ),
@@ -314,13 +343,13 @@ const fileEntry = Effect.fn('syncBinding.fileEntry')(function* (
   if ('skipped' in born) return { _tag: 'skipped', reason: born.skipped }
   if (born.raced) {
     yield* claimHeld(walk, target, born.id, sourcePath)
-    return { _tag: 'held' }
+    return { _tag: 'held', documentId: born.id }
   }
   if (born.deduped) {
     yield* stampAttached(walk, born.id, entry, file.changeToken, sourcePath)
-    return { _tag: 'attached' }
+    return { _tag: 'attached', documentId: born.id }
   }
-  return { _tag: 'filed' }
+  return { _tag: 'filed', documentId: born.id }
 })
 
 /** Every page of one folder's direct children. */
@@ -339,12 +368,6 @@ const listAll = Effect.fn('syncBinding.listAll')(function* (
     cursor = page.next
   } while (cursor !== undefined)
   return entries
-})
-
-/** Where a target's documents are filed: a space by `entity_space`, else `tagged_in`. */
-const filingTarget = (target: ItemTarget): DocumentFilingTarget => ({
-  kind: target.entityKind === 'space' ? 'space' : 'record',
-  entityId: target.entityId,
 })
 
 /** The bound record as `resolveItem` reads it. */
@@ -422,14 +445,6 @@ export const bindingFiler = (input: {
   readonly source: StorageSource
 }): BindingFiler => {
   const { binding } = input
-  const walk: Walk = {
-    ...input,
-    actor:
-      binding.boundBy === null
-        ? { integrationId: input.integrationId }
-        : { userId: binding.boundBy },
-    userId: binding.boundBy,
-  }
   const deals = new Map<string, ReadonlyArray<CompanyDeal>>()
 
   const lookups = Effect.fn('syncBinding.lookups')(function* (
@@ -466,6 +481,15 @@ export const bindingFiler = (input: {
     for (const name of names) target = (yield* descend(target, name)).target
     return target
   })
+  const walk: Walk = {
+    ...input,
+    actor:
+      binding.boundBy === null
+        ? { integrationId: input.integrationId }
+        : { userId: binding.boundBy },
+    userId: binding.boundBy,
+    targetOf,
+  }
 
   return {
     binding,
@@ -480,7 +504,9 @@ export const bindingFiler = (input: {
 /** A folder left on its parent with close companies, reported once it holds a file. */
 type Unmapped = {
   readonly folderPath: string
+  readonly from: ItemTarget
   readonly candidates: ReadonlyArray<FolderCandidate>
+  readonly documentIds: Array<string>
   reported: boolean
 }
 
@@ -512,10 +538,7 @@ export const syncBindingProgram = Effect.fn('syncBindingProgram')(
     let held = 0
     let attached = 0
     const skipped: Array<{ name: string; reason: string }> = []
-    const unmapped: Array<{
-      folderPath: string
-      candidates: ReadonlyArray<FolderCandidate>
-    }> = []
+    const unmapped: Array<Unmapped> = []
 
     const queue: Array<Queued> = [
       {
@@ -546,7 +569,9 @@ export const syncBindingProgram = Effect.fn('syncBindingProgram')(
               decided.candidates.length > 0
                 ? {
                     folderPath: path,
+                    from: decided.target,
                     candidates: decided.candidates,
+                    documentIds: [],
                     reported: false,
                   }
                 : decided.target.entityId === folder.target.entityId
@@ -557,12 +582,11 @@ export const syncBindingProgram = Effect.fn('syncBindingProgram')(
         }
         if (folder.unmapped !== null && !folder.unmapped.reported) {
           folder.unmapped.reported = true
-          unmapped.push({
-            folderPath: folder.unmapped.folderPath,
-            candidates: folder.unmapped.candidates,
-          })
+          unmapped.push(folder.unmapped)
         }
         const outcome = yield* filer.file(folder.target, entry, folder.path)
+        if (outcome._tag !== 'skipped' && folder.unmapped !== null)
+          folder.unmapped.documentIds.push(outcome.documentId)
         switch (outcome._tag) {
           case 'filed':
             filed += 1
@@ -578,6 +602,12 @@ export const syncBindingProgram = Effect.fn('syncBindingProgram')(
         }
       }
     }
-    return { filed, held, attached, skipped, unmapped }
+    return {
+      filed,
+      held,
+      attached,
+      skipped,
+      unmapped: unmapped.map(({ reported: _, ...u }) => u),
+    }
   },
 )

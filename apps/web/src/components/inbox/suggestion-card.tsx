@@ -26,6 +26,8 @@ import { readDocumentKindPayload } from '@spaces/core/ai/document-kind'
 import { readSupersedesPayload } from '@spaces/core/ai/supersedes'
 import type { SupersedesPayload } from '@spaces/core/ai/supersedes'
 import type { DocumentKindPayload } from '@spaces/core/ai/document-kind'
+import { readRefileDocumentPayload } from '@spaces/core/documents/refile'
+import type { RefileDocumentPayload } from '@spaces/core/documents/refile'
 import { DOCUMENT_KIND_LABELS } from '@spaces/core/documents'
 import { formatDate, formatNumber } from '@spaces/core/format'
 import { fmtMoney } from '@spaces/core/portfolio/format'
@@ -74,6 +76,7 @@ export const SUGGESTION_KIND_WORD: Record<SuggestionKind, string> = {
   add_record: 'New company',
   file_record: 'File here',
   supersedes: 'Newer version',
+  refile_document: 'Re-file',
 }
 
 /**
@@ -182,6 +185,14 @@ const SUGGESTION_BODIES: Partial<Record<SuggestionKind, SuggestionBody>> = {
       <PayloadBody item={item} actions={actions} />
     )
   },
+  refile_document: ({ item, actions }) => {
+    const move = readRefileDocumentPayload(item.payload)
+    return move ? (
+      <RefileBody move={move} />
+    ) : (
+      <PayloadBody item={item} actions={actions} />
+    )
+  },
 }
 
 /**
@@ -220,6 +231,13 @@ export function decisionWords(kind: SuggestionKind): DecisionWords {
       accept: 'File here',
       reject: 'Dismiss',
       rejectTitle: DISMISS_TITLE,
+      icons: true,
+    }
+  if (kind === 'refile_document')
+    return {
+      accept: 'Re-file',
+      reject: 'Dismiss',
+      rejectTitle: null,
       icons: true,
     }
   // The Action Grammar's foot: Dismiss · the verb, no icons. (D59)
@@ -394,6 +412,23 @@ function SupersedesBody({ pair }: { pair: SupersedesPayload }) {
       <span className="font-medium">{pair.newerName}</span>
       <span className="text-graphite"> is a newer version of </span>
       <span className="font-medium">{pair.olderName}</span>
+    </p>
+  )
+}
+
+/**
+ * A storage-source document whose folder now points at another record: the
+ * document and both records, each named once. Accepting moves the filing.
+ */
+function RefileBody({ move }: { move: RefileDocumentPayload }) {
+  return (
+    <p className="min-w-0 text-ui break-words">
+      <span className="text-graphite">Re-file </span>
+      <span className="font-medium">{move.documentName}</span>
+      <span className="text-graphite"> from </span>
+      <span className="font-medium">{move.fromName}</span>
+      <span className="text-graphite"> to </span>
+      <span className="font-medium">{move.toName}</span>
     </p>
   )
 }

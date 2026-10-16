@@ -13,6 +13,7 @@ import {
   putBlobProgram,
 } from '../documents/intake'
 import { BindingStoreFailed } from './bind'
+import type { MovableDocument } from './move'
 import type { SyncFailure } from './sync'
 
 /**
@@ -29,8 +30,7 @@ import type { SyncFailure } from './sync'
  */
 
 /** A document held for a connection, as the change poll compares it. */
-export type HeldDocument = {
-  readonly id: string
+export type HeldDocument = MovableDocument & {
   readonly bindingId: string | null
   readonly blobSha: string | null
   readonly externalRevisionId: string | null
@@ -60,6 +60,9 @@ export const heldDocumentOf = (connectionId: string, externalId: string) =>
             bindingId: document.bindingId,
             blobSha: document.blobSha,
             externalRevisionId: document.externalRevisionId,
+            sourcePath: document.sourcePath,
+            filename: document.filename,
+            mime: document.mime,
           })
           .from(document)
           .where(
@@ -72,6 +75,30 @@ export const heldDocumentOf = (connectionId: string, externalId: string) =>
   )
 
 const unchanged: ReviseOutcome = { _tag: 'unchanged' }
+
+/**
+ * The token moved and the bytes are known not to have: only the token is
+ * stored, by compare-and-set on the one read. A rename of a native document
+ * takes this path, since its export is never byte-stable.
+ */
+export const keepTokenProgram = Effect.fn('keepTokenProgram')(function* (
+  held: HeldDocument,
+  changeToken: string,
+): Effect.fn.Return<ReviseOutcome, BindingStoreFailed> {
+  if (held.externalRevisionId === changeToken) return unchanged
+  yield* query(() =>
+    db
+      .update(document)
+      .set({ externalRevisionId: changeToken })
+      .where(
+        and(
+          eq(document.entityId, held.id),
+          sql`${document.externalRevisionId} is not distinct from ${held.externalRevisionId}`,
+        ),
+      ),
+  )
+  return unchanged
+})
 
 /**
  * One changed entry against the document that holds it: compare tokens,

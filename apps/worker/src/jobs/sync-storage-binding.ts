@@ -10,6 +10,7 @@ import {
   syncBindingProgram,
 } from '@spaces/core/writes/bindings/sync'
 import type { SyncTally } from '@spaces/core/writes/bindings/sync'
+import { proposeUnmappedProgram } from '@spaces/core/writes/bindings/move'
 import type { StorageSourceError } from '@spaces/sdk'
 import { PluginBreaker } from './plugin-breaker'
 import { StorageSources } from './storage-sources'
@@ -24,6 +25,9 @@ import type { JobDef } from '../run-job'
  * - A provider failure marks the binding `error` with the provider's
  *   sentence and charges the plugin's breaker; what was filed stays.
  * - A rate limit reschedules the job and marks nothing.
+ * - A folder that came close to a company and matched none exactly leaves
+ *   its files on the parent and proposes each one's re-file to the closest
+ *   company; a re-sync proposes nothing twice.
  */
 
 export const syncStorageBindingData = z.object({
@@ -47,7 +51,7 @@ const store = <TValue, TError>(effect: Effect.Effect<TValue, TError>) =>
     ),
   )
 
-const summaryOf = (tally: SyncTally): string => {
+const summaryOf = (tally: SyncTally, refiles: number): string => {
   const total = tally.filed + tally.held + tally.attached
   const parts = [
     `${String(total)} files`,
@@ -70,6 +74,7 @@ const summaryOf = (tally: SyncTally): string => {
         )
         .join('; ')})`,
     )
+  if (refiles > 0) parts.push(`${String(refiles)} to re-file`)
   return `synced ${parts.join(', ')}`
 }
 
@@ -142,8 +147,11 @@ const program = Effect.fn('syncStorageBinding')(function* (
         Effect.fail(new JobRetryable({ reason: 'document store unavailable' })),
     }),
   )
+  const refiles = yield* store(
+    proposeUnmappedProgram(tally.unmapped, opened.integrationId),
+  )
   yield* store(markBindingSyncedProgram(binding.id))
-  return summaryOf(tally)
+  return summaryOf(tally, refiles)
 })
 
 export const syncStorageBinding: JobDef<

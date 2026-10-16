@@ -18,6 +18,7 @@ const FILES = [
   'documents/index.ts',
   'writes/bindings/sync.ts',
   'writes/bindings/poll.ts',
+  'writes/bindings/move.ts',
 ]
 
 /** Under `ai`, and allowed: a stamp, not a model. */

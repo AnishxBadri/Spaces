@@ -41,6 +41,7 @@ import {
   invalid,
   noteOf,
   patchAnchor,
+  refileDocumentOf,
   registryFor,
   spaceTagOf,
   supersedesOf,
@@ -65,6 +66,11 @@ import { liveSpaceSql } from '#/lib/spaces/live'
 import { emitDomainEvent } from '#/lib/events/emit'
 import { setPersonCompanyInTx } from '#/lib/people/companies'
 import { insertTaskInTx } from '#/lib/tasks/create'
+import { proposeNewerVersionProgram } from '@spaces/core/writes/documents/newer-version'
+import { documentFilingRefusal } from '@spaces/core/documents/filing'
+import type { DocumentFilingTarget } from '@spaces/core/documents/filing'
+import { enqueueRestamp } from '#/lib/ai/enqueue-restamp'
+import { fileDocumentInTx, unfileDocumentInTx } from '#/lib/documents/refile'
 
 // The propose half moved into core (SPA-204): every name it exported is
 // re-exported here unchanged, so the AI lanes, MCP, capture and their tests
@@ -158,6 +164,7 @@ const KIND_LABEL: Record<SuggestionKind, string> = {
   add_record: 'new company',
   file_record: 'filing',
   supersedes: 'newer version',
+  refile_document: 're-file',
 }
 
 const isKind = (k: string): k is SuggestionKind => k in KIND_LABEL
@@ -331,6 +338,13 @@ export type Accepted =
       suggestion: Suggestion
       /** False when the link was already there: the accept only closes. */
       written: boolean
+    }
+  | {
+      kind: 'refile_document'
+      suggestion: Suggestion
+      documentId: string
+      fromEntityId: string
+      toEntityId: string
     }
 
 /**
@@ -617,6 +631,91 @@ async function acceptSupersedesInTx(
     if (cause instanceof SupersedesRefused)
       throw invalid([{ slug: 'supersedes', message: supersedesMessage(cause) }])
     throw cause
+  }
+}
+
+// ---------- refile_document ----------
+
+/** What a re-file owes once its transaction commits. */
+type RefileAfter = { proposeNewer: boolean; lowered: Array<string> }
+
+/**
+ * Accept a re-file: the document's edge on `from` is removed and one on
+ * `to` written, by the accepter, through the re-file writers, in this
+ * transaction. A document no longer filed on `from` refuses — a person or
+ * an earlier accept already moved it — and the row stays open.
+ */
+async function acceptRefileDocumentInTx(
+  tx: Tx,
+  row: Anchored,
+  actor: Decider,
+): Promise<{
+  documentId: string
+  fromEntityId: string
+  toEntityId: string
+  after: RefileAfter
+}> {
+  const move = refileDocumentOf(row.payload)
+  const { documentId } = move
+  const held = (
+    await tx
+      .select({ id: document.entityId })
+      .from(document)
+      .where(eq(document.entityId, documentId))
+      .for('update')
+  ).at(0)
+  if (!held)
+    throw new EntityNotFound({
+      entityId: documentId,
+      message: 'That document no longer exists',
+    })
+  const ends = await tx
+    .select({
+      id: entity.id,
+      kind: entity.kind,
+      mergedIntoId: entity.mergedIntoId,
+    })
+    .from(entity)
+    .where(sql`${entity.id} in (${move.fromEntityId}, ${move.toEntityId})`)
+  const end = (id: string) => ends.find((e) => e.id === id)
+  const filing = (id: string, kind: string): DocumentFilingTarget => ({
+    kind: kind === 'space' ? 'space' : 'record',
+    entityId: id,
+  })
+  const to = end(move.toEntityId)
+  if (!to || to.mergedIntoId !== null)
+    throw new EntityNotFound({
+      entityId: move.toEntityId,
+      message: `${move.toName} no longer exists`,
+    })
+  const toTarget = filing(to.id, to.kind)
+  const refusal = documentFilingRefusal(toTarget, to.kind)
+  if (refusal !== null)
+    throw invalid([{ slug: 'toEntityId', message: refusal }])
+  const fromTarget = filing(
+    move.fromEntityId,
+    end(move.fromEntityId)?.kind ?? 'record',
+  )
+  const { unfiled, lowered } = await unfileDocumentInTx(tx, actor.id, {
+    documentId,
+    target: fromTarget,
+  })
+  if (!unfiled)
+    throw invalid([
+      {
+        slug: 'fromEntityId',
+        message: `${move.documentName} is no longer filed on ${move.fromName}`,
+      },
+    ])
+  const { filed } = await fileDocumentInTx(tx, actor.id, {
+    documentId,
+    target: toTarget,
+  })
+  return {
+    documentId,
+    fromEntityId: move.fromEntityId,
+    toEntityId: move.toEntityId,
+    after: { proposeNewer: filed && toTarget.kind === 'record', lowered },
   }
 }
 
@@ -986,6 +1085,8 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
   // The events an accept owes — a space tag's `filed`, a deal party's
   // `deal.linked` — dispatched once the commit lands.
   const owed: Array<DomainEvent | null> = []
+  // A re-file's follow-ups, also after the commit.
+  const refiled: Array<{ documentId: string; after: RefileAfter }> = []
   const accepted = yield* Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
@@ -1142,6 +1243,27 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
             written,
           } satisfies Accepted
         }
+        if (row.kind === 'refile_document') {
+          if (fields !== undefined)
+            throw invalid([
+              {
+                slug: 'fields',
+                message: 'fields: a re-file is accepted whole, not by field',
+              },
+            ])
+          const { after, ...moved } = await acceptRefileDocumentInTx(
+            tx,
+            row,
+            actor,
+          )
+          refiled.push({ documentId: moved.documentId, after })
+          const decided = await close(tx, id, 'accepted', actor)
+          return {
+            kind: 'refile_document',
+            suggestion: decided,
+            ...moved,
+          } satisfies Accepted
+        }
         if (row.kind !== 'attribute_patch')
           throw new UnsupportedSuggestionKind({ id, kind: row.kind })
 
@@ -1211,6 +1333,12 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
     catch: asFailure,
   })
   for (const event of owed) yield* Effect.promise(() => emitDomainEvent(event))
+  for (const { documentId, after } of refiled) {
+    // Filed on a record after arrival: the same suggestion intake makes. (D59)
+    if (after.proposeNewer) yield* proposeNewerVersionProgram(documentId)
+    if (after.lowered.length > 0)
+      yield* Effect.promise(() => enqueueRestamp(after.lowered))
+  }
   return accepted
 })
 

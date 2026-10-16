@@ -13,6 +13,7 @@ import { enqueueRestamp } from '#/lib/ai/enqueue-restamp'
 import { enqueue } from '#/lib/queue'
 import { documentFilingRefusal } from '#/lib/server/shared'
 import type { DocumentKind } from '@spaces/core/documents'
+import type { Tx } from '@spaces/core/writes/attributes/values'
 import type { DocumentFilingTarget } from '#/lib/server/shared'
 
 /**
@@ -145,58 +146,70 @@ export const fileDocumentProgram = Effect.fn('fileDocumentProgram')(function* (
   const { documentId, target } = input
 
   const outcome = yield* query(() =>
-    db.transaction(async (tx) => {
-      const added =
-        target.kind === 'record'
-          ? await tx
-              .insert(link)
-              .values({
-                fromEntityId: documentId,
-                toEntityId: target.entityId,
-                relation: 'tagged_in',
-                source: 'manual',
-                createdBy: userId,
-              })
-              .onConflictDoNothing()
-              .returning({ id: link.id })
-          : await tx
-              .insert(entitySpace)
-              .values({
-                entityId: documentId,
-                spaceId: target.entityId,
-                source: 'manual',
-                createdBy: userId,
-              })
-              .onConflictDoNothing()
-              .returning({ id: entitySpace.entityId })
-      if (added.length === 0) return { filed: false }
-      if (target.kind === 'space')
-        await raiseSensitivity(tx, {
-          kind: 'filed',
-          entityId: documentId,
-          spaceId: target.entityId,
-        })
-
-      // Subject is the target, object is the document — the shape
-      // `document.filed` already writes, so the record's timeline and the
-      // space's read a re-file without a second join rule. One verb covers
-      // both directions and the meta says which: a reader scanning for "what
-      // happened to this document's filing" wants one verb, not two.
-      await tx.insert(activity).values({
-        actorId: userId,
-        verb: 'document.refiled',
-        subjectEntityId: target.entityId,
-        objectEntityId: documentId,
-        meta: { action: 'filed', target: target.kind },
-      })
-      return { filed: true }
-    }),
+    db.transaction((tx) => fileDocumentInTx(tx, userId, input)),
   )
   // Filed on a record after arrival: the same suggestion intake makes. (D59)
   if (outcome.filed && target.kind === 'record')
     yield* proposeNewerVersionProgram(documentId)
   return outcome
 })
+
+/**
+ * The edge and its activity row, in the caller's transaction. The caller
+ * checked the target, and owes the newer-version proposal after its commit
+ * when a record was filed.
+ */
+export async function fileDocumentInTx(
+  tx: Tx,
+  userId: string,
+  input: { documentId: string; target: DocumentFilingTarget },
+): Promise<{ filed: boolean }> {
+  const { documentId, target } = input
+  const added =
+    target.kind === 'record'
+      ? await tx
+          .insert(link)
+          .values({
+            fromEntityId: documentId,
+            toEntityId: target.entityId,
+            relation: 'tagged_in',
+            source: 'manual',
+            createdBy: userId,
+          })
+          .onConflictDoNothing()
+          .returning({ id: link.id })
+      : await tx
+          .insert(entitySpace)
+          .values({
+            entityId: documentId,
+            spaceId: target.entityId,
+            source: 'manual',
+            createdBy: userId,
+          })
+          .onConflictDoNothing()
+          .returning({ id: entitySpace.entityId })
+  if (added.length === 0) return { filed: false }
+  if (target.kind === 'space')
+    await raiseSensitivity(tx, {
+      kind: 'filed',
+      entityId: documentId,
+      spaceId: target.entityId,
+    })
+
+  // Subject is the target, object is the document — the shape
+  // `document.filed` already writes, so the record's timeline and the
+  // space's read a re-file without a second join rule. One verb covers
+  // both directions and the meta says which: a reader scanning for "what
+  // happened to this document's filing" wants one verb, not two.
+  await tx.insert(activity).values({
+    actorId: userId,
+    verb: 'document.refiled',
+    subjectEntityId: target.entityId,
+    objectEntityId: documentId,
+    meta: { action: 'filed', target: target.kind },
+  })
+  return { filed: true }
+}
 
 /**
  * Remove exactly one edge, of the kind named. The other edge table is not
@@ -216,50 +229,9 @@ export const unfileDocumentProgram = Effect.fn('unfileDocumentProgram')(
     input: { documentId: string; target: DocumentFilingTarget },
   ): Effect.fn.Return<{ unfiled: boolean }, DocumentRefileFailure> {
     yield* readDocument(input.documentId)
-    const { documentId, target } = input
 
     const outcome = yield* query(() =>
-      db.transaction(async (tx) => {
-        const removed =
-          target.kind === 'record'
-            ? await tx
-                .delete(link)
-                .where(
-                  and(
-                    eq(link.fromEntityId, documentId),
-                    eq(link.toEntityId, target.entityId),
-                    eq(link.relation, 'tagged_in'),
-                  ),
-                )
-                .returning({ id: link.id })
-            : await tx
-                .delete(entitySpace)
-                .where(
-                  and(
-                    eq(entitySpace.entityId, documentId),
-                    eq(entitySpace.spaceId, target.entityId),
-                  ),
-                )
-                .returning({ id: entitySpace.entityId })
-        if (removed.length === 0) return { unfiled: false, lowered: [] }
-
-        await tx.insert(activity).values({
-          actorId: userId,
-          verb: 'document.refiled',
-          subjectEntityId: target.entityId,
-          objectEntityId: documentId,
-          meta: { action: 'unfiled', target: target.kind },
-        })
-        const lowered =
-          target.kind === 'space'
-            ? await stampedSensitive(tx, {
-                kind: 'filed',
-                entityId: documentId,
-                spaceId: target.entityId,
-              })
-            : []
-        return { unfiled: true, lowered }
-      }),
+      db.transaction((tx) => unfileDocumentInTx(tx, userId, input)),
     )
     // Lowering is a job, after the commit: another space may still hold the
     // document sensitive, and only the live resolver can say.
@@ -268,6 +240,57 @@ export const unfileDocumentProgram = Effect.fn('unfileDocumentProgram')(
     return { unfiled: outcome.unfiled }
   },
 )
+
+/**
+ * The edge's removal and its activity row, in the caller's transaction.
+ * `lowered` is what the caller restamps after its commit.
+ */
+export async function unfileDocumentInTx(
+  tx: Tx,
+  userId: string,
+  input: { documentId: string; target: DocumentFilingTarget },
+): Promise<{ unfiled: boolean; lowered: Array<string> }> {
+  const { documentId, target } = input
+  const removed =
+    target.kind === 'record'
+      ? await tx
+          .delete(link)
+          .where(
+            and(
+              eq(link.fromEntityId, documentId),
+              eq(link.toEntityId, target.entityId),
+              eq(link.relation, 'tagged_in'),
+            ),
+          )
+          .returning({ id: link.id })
+      : await tx
+          .delete(entitySpace)
+          .where(
+            and(
+              eq(entitySpace.entityId, documentId),
+              eq(entitySpace.spaceId, target.entityId),
+            ),
+          )
+          .returning({ id: entitySpace.entityId })
+  if (removed.length === 0) return { unfiled: false, lowered: [] }
+
+  await tx.insert(activity).values({
+    actorId: userId,
+    verb: 'document.refiled',
+    subjectEntityId: target.entityId,
+    objectEntityId: documentId,
+    meta: { action: 'unfiled', target: target.kind },
+  })
+  const lowered =
+    target.kind === 'space'
+      ? await stampedSensitive(tx, {
+          kind: 'filed',
+          entityId: documentId,
+          spaceId: target.entityId,
+        })
+      : []
+  return { unfiled: true, lowered }
+}
 
 /**
  * Kind is a genre, not a folder (§3.4), and a genre read off a filename at
