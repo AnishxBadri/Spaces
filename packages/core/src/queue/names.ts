@@ -73,6 +73,14 @@ export const QUEUES = {
    */
   syncStorageBinding: 'storage.sync',
   /**
+   * The change poll: every quarter hour, one `changes` pass per connection
+   * with an active folder binding, a new file in a bound subtree filed on its
+   * binding's record. `singleton`, so two polls never share one cursor; never
+   * retried — the next tick is the retry, and the cursor only advances once
+   * a page is handled.
+   */
+  pollStorageChanges: 'storage.poll',
+  /**
    * The deck reader (SPA-90): a `kind: deck` document → one `attribute_patch`
    * suggestion per record it is filed against. Created with the `exclusive`
    * policy and sent with `singletonKey = documentId`, so a second press while

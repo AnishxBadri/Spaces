@@ -16,11 +16,13 @@ import type {
   CompanyDeal,
   CompanyMatch,
   FolderCandidate,
+  FolderDecision,
   FolderLookups,
   ItemTarget,
 } from '../../documents/resolve-item'
 import { readableOf } from '../../documents/web-stream'
 import type { Enqueue } from '../../queue/enqueue'
+import { raiseSensitivity } from '../ai/stamp-sensitivity'
 import { canonicalFileUrl } from '../connections/sources'
 import { addEdges } from '../documents/birth'
 import type {
@@ -163,7 +165,8 @@ type Walk = {
   readonly userId: string | null
 }
 
-type FileOutcome =
+/** One file's filing: born, claimed from a held copy, attached by sha, or refused. */
+export type FileOutcome =
   | { readonly _tag: 'filed' | 'held' | 'attached' }
   | { readonly _tag: 'skipped'; readonly reason: string }
 
@@ -219,7 +222,8 @@ const claimHeld = (
 
 /**
  * Same bytes were already on the target: that document is this file's copy,
- * unless it already came from somewhere else.
+ * unless it already came from somewhere else. A sensitive binding stamps it
+ * in the same transaction, as a claim does.
  */
 const stampAttached = (
   walk: Walk,
@@ -228,19 +232,24 @@ const stampAttached = (
   sourcePath: string,
 ) =>
   query(() =>
-    db
-      .update(document)
-      .set({
-        bindingId: walk.binding.id,
-        connectionId: walk.connectionId,
-        externalId: entry.id,
-        externalUrl: canonicalFileUrl(walk.binding.provider, entry.id),
-        externalStatus: 'linked',
-        sourcePath,
-      })
-      .where(
-        and(eq(document.entityId, documentId), isNull(document.externalId)),
-      ),
+    db.transaction(async (tx) => {
+      const stamped = await tx
+        .update(document)
+        .set({
+          bindingId: walk.binding.id,
+          connectionId: walk.connectionId,
+          externalId: entry.id,
+          externalUrl: canonicalFileUrl(walk.binding.provider, entry.id),
+          externalStatus: 'linked',
+          sourcePath,
+        })
+        .where(
+          and(eq(document.entityId, documentId), isNull(document.externalId)),
+        )
+        .returning({ id: document.entityId })
+      if (stamped.length > 0)
+        await raiseSensitivity(tx, { kind: 'bound', entityId: documentId })
+    }),
   )
 
 const fileEntry = Effect.fn('syncBinding.fileEntry')(function* (
@@ -376,6 +385,94 @@ const dealsOf = (companyId: string) =>
       ),
   )
 
+/**
+ * One binding's filing, shared by the walk and the change poll: where a
+ * folder under the bound one files, and one file filed there.
+ * - `descend` is one `resolveItem` step; `targetOf` folds it over the folder
+ *   names from the bound folder down, so a file the poll finds deep in the
+ *   subtree lands where the walk would have put it.
+ * - A company's deals are read once per filer.
+ */
+export type BindingFiler = {
+  readonly binding: SyncBinding
+  /** The bound record as `resolveItem` reads it. */
+  readonly root: ItemTarget
+  readonly descend: (
+    parent: ItemTarget,
+    name: string,
+  ) => Effect.Effect<FolderDecision, BindingStoreFailed>
+  readonly targetOf: (
+    names: ReadonlyArray<string>,
+  ) => Effect.Effect<ItemTarget, BindingStoreFailed>
+  readonly file: (
+    folder: ItemTarget,
+    entry: StorageEntry,
+    sourcePath: string,
+  ) => Effect.Effect<FileOutcome, SyncFailure, Enqueue>
+}
+
+export const bindingFiler = (input: {
+  readonly binding: SyncBinding
+  readonly connectionId: string
+  readonly integrationId: string
+  readonly source: StorageSource
+}): BindingFiler => {
+  const { binding } = input
+  const walk: Walk = {
+    ...input,
+    actor:
+      binding.boundBy === null
+        ? { integrationId: input.integrationId }
+        : { userId: binding.boundBy },
+    userId: binding.boundBy,
+  }
+  const deals = new Map<string, ReadonlyArray<CompanyDeal>>()
+
+  const lookups = Effect.fn('syncBinding.lookups')(function* (
+    parent: ItemTarget,
+    name: string,
+  ): Effect.fn.Return<FolderLookups, BindingStoreFailed> {
+    const needed = lookupFor(parent, binding.mapSubfolders)
+    if (needed === 'company')
+      return { lookup: 'company', company: yield* companyMatch(name) }
+    if (needed === 'deals') {
+      const known =
+        deals.get(parent.entityId) ?? (yield* dealsOf(parent.entityId))
+      deals.set(parent.entityId, known)
+      return { lookup: 'deals', deals: known }
+    }
+    return { lookup: 'none' }
+  })
+
+  const descend = Effect.fn('syncBinding.descend')(function* (
+    parent: ItemTarget,
+    name: string,
+  ): Effect.fn.Return<FolderDecision, BindingStoreFailed> {
+    return resolveItem({ kind: 'folder', name }, parent, {
+      mapSubfolders: binding.mapSubfolders,
+      lookups: yield* lookups(parent, name),
+    })
+  })
+
+  const root = rootTarget(binding)
+  const targetOf = Effect.fn('syncBinding.targetOf')(function* (
+    names: ReadonlyArray<string>,
+  ): Effect.fn.Return<ItemTarget, BindingStoreFailed> {
+    let target = root
+    for (const name of names) target = (yield* descend(target, name)).target
+    return target
+  })
+
+  return {
+    binding,
+    root,
+    descend,
+    targetOf,
+    file: (folder, entry, sourcePath) =>
+      fileEntry(walk, folder, entry, sourcePath),
+  }
+}
+
 /** A folder left on its parent with close companies, reported once it holds a file. */
 type Unmapped = {
   readonly folderPath: string
@@ -406,14 +503,7 @@ export const syncBindingProgram = Effect.fn('syncBindingProgram')(
     readonly source: StorageSource
   }): Effect.fn.Return<SyncTally, SyncFailure, Enqueue> {
     const { binding } = input
-    const walk: Walk = {
-      ...input,
-      actor:
-        binding.boundBy === null
-          ? { integrationId: input.integrationId }
-          : { userId: binding.boundBy },
-      userId: binding.boundBy,
-    }
+    const filer = bindingFiler(input)
     let filed = 0
     let held = 0
     let attached = 0
@@ -422,29 +512,12 @@ export const syncBindingProgram = Effect.fn('syncBindingProgram')(
       folderPath: string
       candidates: ReadonlyArray<FolderCandidate>
     }> = []
-    const deals = new Map<string, ReadonlyArray<CompanyDeal>>()
-
-    const lookups = Effect.fn('syncBinding.lookups')(function* (
-      parent: ItemTarget,
-      name: string,
-    ): Effect.fn.Return<FolderLookups, BindingStoreFailed> {
-      const needed = lookupFor(parent, binding.mapSubfolders)
-      if (needed === 'company')
-        return { lookup: 'company', company: yield* companyMatch(name) }
-      if (needed === 'deals') {
-        const known =
-          deals.get(parent.entityId) ?? (yield* dealsOf(parent.entityId))
-        deals.set(parent.entityId, known)
-        return { lookup: 'deals', deals: known }
-      }
-      return { lookup: 'none' }
-    })
 
     const queue: Array<Queued> = [
       {
         id: input.folderId,
         path: binding.folderPath,
-        target: rootTarget(binding),
+        target: filer.root,
         unmapped: null,
       },
     ]
@@ -460,14 +533,7 @@ export const syncBindingProgram = Effect.fn('syncBindingProgram')(
       for (const entry of entries) {
         if (entry.kind === 'folder') {
           const path = `${folder.path} / ${entry.name}`
-          const decided = resolveItem(
-            { kind: 'folder', name: entry.name },
-            folder.target,
-            {
-              mapSubfolders: binding.mapSubfolders,
-              lookups: yield* lookups(folder.target, entry.name),
-            },
-          )
+          const decided = yield* filer.descend(folder.target, entry.name)
           queue.push({
             id: entry.id,
             path,
@@ -492,12 +558,7 @@ export const syncBindingProgram = Effect.fn('syncBindingProgram')(
             candidates: folder.unmapped.candidates,
           })
         }
-        const outcome = yield* fileEntry(
-          walk,
-          folder.target,
-          entry,
-          folder.path,
-        )
+        const outcome = yield* filer.file(folder.target, entry, folder.path)
         switch (outcome._tag) {
           case 'filed':
             filed += 1

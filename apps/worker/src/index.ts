@@ -17,7 +17,7 @@ import {
 import { listenPluginChanged } from './plugins/listen'
 import { makePluginReloader } from './plugins/reload'
 import { pgBossHost, runJob } from './run-job'
-import { CORE_SCHEDULES } from './schedules'
+import { scheduleCoreJobs } from './schedules'
 import { ExtractionStore, extractDocument } from './jobs/extract-document'
 import { clipDocument } from './jobs/clip-document'
 import {
@@ -26,6 +26,10 @@ import {
 } from './jobs/fetch-storage-file'
 import { bindStorageFolder } from './jobs/bind-storage-folder'
 import { syncStorageBinding } from './jobs/sync-storage-binding'
+import {
+  pollStorageChanges,
+  pollStorageChangesRetry,
+} from './jobs/poll-storage-changes'
 import { pluginBreakerLayer } from './plugins/breaker'
 import { dedupeSweep } from './jobs/dedupe-sweep'
 import { sweepOrphanBlobs } from './jobs/sweep-orphan-blobs'
@@ -181,6 +185,34 @@ async function main() {
     QUEUES.syncStorageBinding,
     { batchSize: 1, includeMetadata: true },
     runJob(syncStorageBinding, {
+      host,
+      layer: Layer.mergeAll(
+        storageSourcesLayer(plugins, { fakes }),
+        fetchStorageEnqueue,
+        pluginBreakerLayer(plugins),
+      ),
+    }),
+  )
+  // The storage change poll, every quarter hour: `singleton`, so two polls
+  // never share one connection's cursor, and never retried — the next tick
+  // is the retry. A page of new files is many downloads, so an hour before
+  // pg-boss expires it. Created before the plain create loop below.
+  await boss
+    .createQueue(QUEUES.pollStorageChanges, {
+      policy: 'singleton',
+      expireInSeconds: 60 * 60,
+      retryLimit: pollStorageChangesRetry.limit,
+    })
+    .catch(() => {})
+  await boss.updateQueue(QUEUES.pollStorageChanges, {
+    retryLimit: pollStorageChangesRetry.limit,
+    retryDelay: pollStorageChangesRetry.delaySeconds,
+    retryBackoff: pollStorageChangesRetry.backoff,
+  })
+  await boss.work(
+    QUEUES.pollStorageChanges,
+    { batchSize: 1, includeMetadata: true },
+    runJob(pollStorageChanges, {
       host,
       layer: Layer.mergeAll(
         storageSourcesLayer(plugins, { fakes }),
@@ -550,9 +582,9 @@ async function main() {
     runJob(rollInteractionStats, { host, layer: Layer.empty }),
   )
 
-  // The clock's jobs (`CORE_SCHEDULES`): dedupe, orphan blobs, ingress prune, stats roll.
-  for (const { queue, cron } of CORE_SCHEDULES)
-    await boss.schedule(queue, cron, undefined, { tz: 'Etc/UTC' })
+  // The clock's jobs (`CORE_SCHEDULES`): dedupe, orphan blobs, ingress
+  // prune, stats roll, storage change poll.
+  await scheduleCoreJobs(boss)
 
   // The heartbeat (SPA-57). Last, so the row only appears once this process
   // is actually working queues — a row written before `boss.work` would claim
