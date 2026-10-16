@@ -24,19 +24,15 @@ import { readableOf } from '../../documents/web-stream'
 import type { Enqueue } from '../../queue/enqueue'
 import { raiseSensitivity } from '../ai/stamp-sensitivity'
 import { canonicalFileUrl } from '../connections/sources'
-import { addEdges } from '../documents/birth'
-import type {
-  DocumentActor,
-  DocumentBirthFailed,
-  DocumentBirthRejected,
-} from '../documents/birth'
+import { addEdges, DocumentBirthRejected } from '../documents/birth'
+import type { DocumentActor, DocumentBirthFailed } from '../documents/birth'
 import {
   documentIntakeMessage,
   intakeDocumentProgram,
 } from '../documents/intake'
 import type { DocumentIntakeFailed } from '../documents/intake'
 import { previewResolveByName } from '../entities/resolve'
-import { BindingStoreFailed } from './bind'
+import { BindingStoreFailed, bindingTargetRefusalProgram } from './bind'
 import { goneNot } from './gone'
 import { filingTarget, moveHeldProgram } from './move'
 import { isTombstoned } from './tombstone'
@@ -86,7 +82,10 @@ export type SyncTally = {
   readonly gone: number
   /** Deleted in the app: tombstoned for this binding, not filed again. */
   readonly tombstoned: number
-  /** Refused one by one (too large, vanished): the walk went on. */
+  /**
+   * Refused one by one (too large, vanished, a record the folder maps to
+   * would not take it): the walk went on.
+   */
   readonly skipped: ReadonlyArray<{
     readonly name: string
     readonly reason: string
@@ -98,7 +97,11 @@ export type SyncTally = {
   readonly unmapped: ReadonlyArray<UnmappedFolder>
 }
 
-/** Fails the whole walk: the provider's, or ours. */
+/**
+ * Fails the whole walk: the provider's, or ours. A `DocumentBirthRejected`
+ * here is the bound record itself gone or not bindable; one file's refusal
+ * is a skip.
+ */
 export type SyncFailure =
   | NotFound
   | AuthExpired
@@ -139,6 +142,19 @@ export const syncBindingOf = Effect.fn('syncBindingOf')(function* (
   )).at(0)
   return row ?? null
 })
+
+/** The record a binding files on, or null once it is unlinked: where its runs show. */
+export async function bindingTargetOf(
+  bindingId: string,
+): Promise<string | null> {
+  const row = (
+    await db
+      .select({ id: storageBinding.targetEntityId })
+      .from(storageBinding)
+      .where(eq(storageBinding.id, bindingId))
+  ).at(0)
+  return row?.id ?? null
+}
 
 /** A finished sync: active, no error, synced now. */
 export const markBindingSyncedProgram = Effect.fn('markBindingSyncedProgram')(
@@ -520,14 +536,27 @@ export const bindingFiler = (input: {
     targetOf,
   }
 
-  return {
-    binding,
-    root,
-    descend,
-    targetOf,
-    file: (folder, entry, sourcePath) =>
-      fileEntry(walk, folder, entry, sourcePath),
-  }
+  /**
+   * A refused filing skips the file, unless the bound record itself is gone
+   * or not bindable: then the refusal is that sentence and fails the walk.
+   */
+  const file = (folder: ItemTarget, entry: StorageEntry, sourcePath: string) =>
+    fileEntry(walk, folder, entry, sourcePath).pipe(
+      Effect.catchTag('DocumentBirthRejected', (rejected) =>
+        bindingTargetRefusalProgram(binding.targetEntityId).pipe(
+          Effect.flatMap((refusal) =>
+            refusal === null
+              ? Effect.succeed<FileOutcome>({
+                  _tag: 'skipped',
+                  reason: rejected.reason,
+                })
+              : Effect.fail(new DocumentBirthRejected({ reason: refusal })),
+          ),
+        ),
+      ),
+    )
+
+  return { binding, root, descend, targetOf, file }
 }
 
 /** A folder left on its parent with close companies, reported once it holds a file. */

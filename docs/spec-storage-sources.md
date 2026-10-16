@@ -891,6 +891,23 @@ for rows deleted here, and on `gone` for rows that stopped tracking.
 Tombstones reference the binding and cascade with it, so unlinking and
 re-binding the folder is the deliberate way back: the file is filed as new.
 
+**As built — the lane's loose ends (2026-10-16, SPA-358).**
+
+- A bind on a connection with no change cursor reads `changes(null)` before
+  the bind and stores it with the binding, so a file added while the first
+  sync walks is the first poll's. A connection that has a cursor keeps it;
+  the poll's "cursor started" stays for connections bound before.
+- A held file moved under another active binding on the same connection
+  is the renamed / moved row across bindings, superseding "still only
+  revised" above: the old target folds through the binding that brought
+  it, the new one through the binding it is under, `binding_id` follows the
+  folder, and a different record is a `refile_document` suggestion.
+- A filing the target refuses (a mapped folder's company merged meanwhile)
+  skips that file with its reason, in the walk and the poll. Only the bound
+  record itself gone or not bindable marks the binding `error`.
+- `storage.sync` and `storage.export` runs are ledgered on the bound record,
+  looked up at the run's start; a gone binding or document runs with none.
+
 ## 9. Derived layers — the storage layer as the AI substrate sees it (decided 2026-09-15)
 
 ```

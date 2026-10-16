@@ -4,6 +4,7 @@ import type { Enqueue } from '@spaces/core/queue/enqueue'
 import { QUEUES } from '@spaces/core/queue/names'
 import { documentIntakeMessage } from '@spaces/core/writes/documents/intake'
 import {
+  bindingTargetOf,
   markBindingFailedProgram,
   markBindingSyncedProgram,
   syncBindingOf,
@@ -25,6 +26,8 @@ import type { JobDef } from '../run-job'
  * - A provider failure marks the binding `error` with the provider's
  *   sentence and charges the plugin's breaker; what was filed stays.
  * - A rate limit reschedules the job and marks nothing.
+ * - A file the record refuses is skipped with its reason and the walk goes
+ *   on; the bound record gone or not bindable marks the binding `error`.
  * - A folder that came close to a company and matched none exactly leaves
  *   its files on the parent and proposes each one's re-file to the closest
  *   company; a re-sync proposes nothing twice.
@@ -163,6 +166,10 @@ export const syncStorageBinding: JobDef<
 > = {
   name: QUEUES.syncStorageBinding,
   schema: syncStorageBindingData,
+  // The bound record: the run shows in its history. An unlinked binding has none.
+  lookupRefs: async (data) => ({
+    entityId: await bindingTargetOf(data.bindingId),
+  }),
   // Retries are for a store that blinked; a rate limit reschedules itself,
   // and a re-run files nothing twice.
   retry: { limit: 2, delaySeconds: 30, backoff: true },

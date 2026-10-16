@@ -159,6 +159,50 @@ describe('runJob — the job_run ledger', () => {
   })
 })
 
+describe('runJob — refs looked up', () => {
+  it('writes what `lookupRefs` found, and a lookup that rejects costs the ids, not the job', async () => {
+    const { runJob } = await import('./run-job')
+    const { db } = await import('@spaces/db')
+    const { entity, jobRun } = await import('@spaces/db/schema')
+    const { asc, eq } = await import('drizzle-orm')
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const record = (
+      await db
+        .insert(entity)
+        .values({ kind: 'company', canonicalName: 'Lookup Co' })
+        .returning({ id: entity.id })
+    ).at(0)
+    if (record === undefined) throw new Error('no record')
+
+    const queue = `test.lookup-${randomUUID().slice(0, 8)}`
+    const handler = runJob(
+      {
+        name: queue,
+        schema: z.object({ found: z.boolean() }),
+        lookupRefs: (data) =>
+          data.found
+            ? Promise.resolve({ entityId: record.id })
+            : Promise.reject(new Error('store blinked')),
+        run: () => Effect.succeed('ran'),
+      },
+      { host: silentHost(), layer: Layer.empty },
+    )
+    await handler([fakeJob(queue, { found: true }, { count: 0, limit: 0 })])
+    await handler([fakeJob(queue, { found: false }, { count: 0, limit: 0 })])
+
+    const rows = await db
+      .select({ entityId: jobRun.entityId, status: jobRun.status })
+      .from(jobRun)
+      .where(eq(jobRun.queue, queue))
+      .orderBy(asc(jobRun.startedAt))
+    expect(rows).toEqual([
+      { entityId: record.id, status: 'succeeded' },
+      { entityId: null, status: 'succeeded' },
+    ])
+    vi.restoreAllMocks()
+  })
+})
+
 describe('runJob — a JobClose commits with the row that closes the run', () => {
   const setup = async () => {
     const { JobRetryable, runJob } = await import('./run-job')

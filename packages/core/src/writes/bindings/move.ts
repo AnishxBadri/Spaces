@@ -5,15 +5,17 @@ import { document, entity, entitySpace, link } from '@spaces/db/schema'
 import type { StorageEntry } from '@spaces/sdk'
 import type { DocumentFilingTarget } from '../../documents/filing'
 import type { FolderCandidate, ItemTarget } from '../../documents/resolve-item'
+import { raiseSensitivity } from '../ai/stamp-sensitivity'
 import { proposeWith } from '../suggestions/propose'
 import type { Reader } from '../suggestions/propose'
 import { BindingStoreFailed } from './bind'
 import { goneNot } from './gone'
 
 /**
- * A held file renamed or moved inside its bound subtree (§8, third row).
+ * A held file renamed or moved inside its bound subtree (§8, third row), or
+ * into another binding's subtree on the same connection.
  * - The path and the name advance in place: no edge, no new document, no
- *   extraction.
+ *   extraction. Moved under another binding, `binding_id` follows the folder.
  * - When the new folder resolves to another record than the old one did,
  *   the outcome is a `refile_document` suggestion naming both, never a
  *   silent re-file (§5.6). A person's accept moves the edge.
@@ -205,10 +207,16 @@ export const moveHeldProgram = Effect.fn('moveHeldProgram')(function* (input: {
   readonly target: ItemTarget
   readonly sourcePath: string
   readonly integrationId: string
+  /**
+   * The file now sits under another binding: `boundPath` and `targetOf` are
+   * still the one that brought it, so the old target folds as before, and
+   * `target` is the new binding's.
+   */
+  readonly rebind?: { readonly from: string; readonly to: string }
 }): Effect.fn.Return<MoveOutcome, BindingStoreFailed> {
-  const { held, sourcePath } = input
+  const { held, sourcePath, rebind } = input
   const name = renamedTo(held, input.entry)
-  const moved = held.sourcePath !== sourcePath
+  const moved = held.sourcePath !== sourcePath || rebind !== undefined
   if (!moved && name === null) return { _tag: 'unmoved' }
 
   const before = moved
@@ -231,17 +239,27 @@ export const moveHeldProgram = Effect.fn('moveHeldProgram')(function* (input: {
     db.transaction(async (tx): Promise<MoveOutcome> => {
       const advanced = await tx
         .update(document)
-        .set(name === null ? { sourcePath } : { sourcePath, filename: name })
+        .set({
+          sourcePath,
+          ...(name === null ? {} : { filename: name }),
+          ...(rebind === undefined ? {} : { bindingId: rebind.to }),
+        })
         .where(
           and(
             eq(document.entityId, held.id),
             sql`${document.sourcePath} is not distinct from ${held.sourcePath}`,
             sql`${document.filename} is not distinct from ${held.filename}`,
+            rebind === undefined
+              ? undefined
+              : eq(document.bindingId, rebind.from),
             goneNot,
           ),
         )
         .returning({ id: document.entityId })
       if (advanced.length === 0) return { _tag: 'unmoved' }
+      // A sensitive new binding raises the file's chunks, as a claim does.
+      if (rebind !== undefined)
+        await raiseSensitivity(tx, { kind: 'bound', entityId: held.id })
       // The record's name follows the file's unless a person renamed it.
       if (name !== null && held.filename !== null)
         await tx

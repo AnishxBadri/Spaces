@@ -163,6 +163,11 @@ export interface JobDef<TData, TServices = never> {
   readonly concurrency?: number
   /** Pure: read ids out of the parsed data, touch nothing. */
   readonly refs?: (data: TData) => JobRunRefs
+  /**
+   * The ids the data does not carry, looked up before the run opens; wins
+   * over `refs`. A rejection loses the ids, never the job.
+   */
+  readonly lookupRefs?: (data: TData) => Promise<JobRunRefs>
 }
 
 // ---------------------------------------------------------------------------
@@ -732,7 +737,7 @@ async function settle<TData, TServices>(
   // through none of them — still leaves the ledger a finished row.
   const startedAt = new Date()
   const parsed = def.schema.safeParse(job.data)
-  const refs = parsed.success ? refsOf(def, parsed.data) : {}
+  const refs = parsed.success ? await refsOf(def, parsed.data) : {}
   const ledger = options.ledger ?? postgresLedger
   const runId = await beginRun(ledger, {
     queue,
@@ -839,15 +844,15 @@ async function settle<TData, TServices>(
   }
 }
 
-/** `def.refs` is a tenant's function; a throw in it must not cost a job. */
-function refsOf<TData, TServices>(
+/** `def.refs` and `def.lookupRefs` are a tenant's; a throw or rejection must not cost a job. */
+async function refsOf<TData, TServices>(
   def: JobDef<TData, TServices>,
   data: TData,
-): JobRunRefs {
-  const read = def.refs
+): Promise<JobRunRefs> {
+  const read = def.lookupRefs ?? def.refs
   if (read === undefined) return {}
   try {
-    return read(data)
+    return await read(data)
   } catch (err) {
     console.error(
       `[worker] ${def.name}: refs() threw — the job_run row loses its ids: ${messageOf(err)}`,

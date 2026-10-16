@@ -882,7 +882,7 @@ export const boxSource = Effect.gen(function* () {
   const upload = (
     target: { readonly folderId: string } | { readonly fileId: string },
     name: string,
-    content: { readonly mime: string; readonly sha1: string },
+    meta: { readonly mime: string; readonly sha1: string },
     bytes: Uint8Array<ArrayBuffer>,
   ) =>
     Effect.gen(function* () {
@@ -900,11 +900,11 @@ export const boxSource = Effect.gen(function* () {
       const response = yield* send(
         'POST',
         url,
-        multipartOf(boundary, attributes, content.mime, bytes),
+        multipartOf(boundary, attributes, meta.mime, bytes),
         {
           'content-type': `multipart/form-data; boundary=${boundary}`,
           // Box checks the bytes it stored against this SHA-1.
-          'content-md5': content.sha1,
+          'content-md5': meta.sha1,
         },
       )
       if (response.status === 409) {
@@ -933,14 +933,14 @@ export const boxSource = Effect.gen(function* () {
   const putFile = Effect.fn('box.putFile')(function* (
     folderId: string,
     name: string,
-    content: StorageUpload,
+    file: StorageUpload,
   ) {
     if (!BOX_ID.test(folderId)) return yield* new NotFound({ id: folderId })
-    const bytes = yield* readUpload(content.stream)
+    const bytes = yield* readUpload(file.stream)
     const sha1 = yield* sha1Of(bytes)
     yield* item('folders', folderId, 'id')
     const taken = yield* namesIn(folderId)
-    const into = { mime: content.mime, sha1 }
+    const into = { mime: file.mime, sha1 }
     for (let n = 1; n <= COLLISION_LIMIT;) {
       const tried = collisionName(name, n)
       const holder = taken.get(nameKey(tried))

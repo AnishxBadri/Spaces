@@ -17,6 +17,9 @@ import type { JobDef, JobFailure } from '../run-job'
  * binding user's grant, and its ancestry from `getFolder` is what the
  * nesting guard of `bindFolderProgram` tests. A bound folder's first sync
  * is sent from here (`storage.sync`, keyed by the binding).
+ * - A connection with no change cursor gets one read before the bind and
+ *   stored with it, so a file added while the first sync walks is the first
+ *   poll's.
  * - Every refusal is a `JobPermanent` whose reason the bind dialog shows.
  */
 
@@ -72,7 +75,10 @@ const program = Effect.fn('bindStorageFolder')(function* (
 ) {
   const connection = (yield* store(() =>
     db
-      .select({ provider: accountConnection.provider })
+      .select({
+        provider: accountConnection.provider,
+        cursor: accountConnection.storageCursor,
+      })
       .from(accountConnection)
       .where(
         and(
@@ -103,6 +109,10 @@ const program = Effect.fn('bindStorageFolder')(function* (
     .getFolder(folderId)
     .pipe(Effect.mapError(fromSource))
   const path = [...folder.parents.map((p) => p.name), folder.name].join(' / ')
+  const start =
+    connection.cursor === null
+      ? yield* source.changes(null).pipe(Effect.mapError(fromSource))
+      : null
 
   const bound = yield* bindFolderProgram({
     connectionId: data.connectionId,
@@ -115,6 +125,7 @@ const program = Effect.fn('bindStorageFolder')(function* (
     targetEntityId: data.targetEntityId,
     boundBy: data.actorUserId,
     options: data.options,
+    ...(start === null ? {} : { startCursor: start.next }),
   }).pipe(
     Effect.catchTags({
       BindingRefused: (e) =>

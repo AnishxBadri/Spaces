@@ -51,7 +51,8 @@ vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
  * google-drive bundle against the mutable fake Drive: a rename or a move
  * inside the bound subtree advances the path in place, and a move that
  * crosses to another record's folder is a re-file suggestion a person
- * accepts, never a silent re-file (§5.6).
+ * accepts, never a silent re-file (§5.6). A move under another binding of
+ * the same connection is the same rule, and the file's binding follows.
  * - Its own file: each case seeds companies by name, and two cases' names
  *   in one database would no longer match exactly.
  */
@@ -630,5 +631,97 @@ describe('storage.poll: renamed / moved inside the subtree (§8)', () => {
     }
     expect(await edges()).toEqual(snapshot)
     expect(await refiles()).toEqual([])
+  })
+})
+
+describe('storage.poll: moved into another binding’s subtree (§8)', () => {
+  /** The data room bound to `room`, Research to `research`, one connection, both synced. */
+  const twoBindings = async (room: string, research: string) => {
+    const drive = await wiredDrive([
+      ...FAKE_DRIVE_SEED,
+      ...FAKE_DRIVE_RESEARCH_SEED,
+    ])
+    const connectionId = await aConnection()
+    const roomBinding = await bind({ connectionId, ...ROOM, target: room })
+    const researchBinding = await bind({
+      connectionId,
+      folderId: 'research',
+      ancestorIds: ['root'],
+      path: 'My Drive / Research',
+      target: research,
+    })
+    succeeded(await drive.poll())
+    succeeded(await drive.sync(roomBinding))
+    succeeded(await drive.sync(researchBinding))
+    return { drive, connectionId, roomBinding, researchBinding }
+  }
+
+  it('§8 moved under another binding, same owner: source_path and binding_id advance, nothing proposed', async () => {
+    const acme = await aRecord('company', 'Acme Two Folders')
+    const { drive, connectionId, roomBinding, researchBinding } =
+      await twoBindings(acme, acme)
+    const deck = (await byExternalId('deck', connectionId)).at(0)
+    if (deck === undefined) throw new Error('the walk filed no deck')
+    expect(deck.bindingId).toBe(roomBinding)
+    const snapshot = await edges()
+    const count = await documentCount()
+
+    drive.api.drive.move('deck', 'research')
+    await age()
+    expect(String(succeeded(await drive.poll()))).toMatch(
+      /, 0 revised, 1 moved$/,
+    )
+
+    expect((await byExternalId('deck', connectionId)).at(0)).toEqual({
+      ...deck,
+      bindingId: researchBinding,
+      sourcePath: 'My Drive / Research',
+      externalRevisionId: drive.api.drive.entry('deck')?.changeToken,
+    })
+    expect(await taggedIn(deck.id)).toEqual([acme])
+    expect(await edges()).toEqual(snapshot)
+    expect(await documentCount()).toBe(count)
+    expect(await refiles()).toEqual([])
+  })
+
+  it('§8 moved under another binding, owner changed: binding_id follows and a re-file names both records', async () => {
+    const deal = await aRecord('deal', 'Acme Seed')
+    const other = await aRecord('company', 'Research Holdings')
+    const { drive, connectionId, researchBinding } = await twoBindings(
+      deal,
+      other,
+    )
+    const deck = (await byExternalId('deck', connectionId)).at(0)
+    if (deck === undefined) throw new Error('the walk filed no deck')
+    const snapshot = await edges()
+
+    drive.api.drive.move('deck', 'research')
+    await age()
+    expect(String(succeeded(await drive.poll()))).toMatch(
+      /, 0 revised, 1 moved to re-file$/,
+    )
+
+    const after = (await byExternalId('deck', connectionId)).at(0)
+    expect(after?.bindingId).toBe(researchBinding)
+    expect(after?.sourcePath).toBe('My Drive / Research')
+    // Proposed, never re-filed: the edge stays on the deal.
+    expect(await taggedIn(deck.id)).toEqual([deal])
+    expect(await edges()).toEqual(snapshot)
+    expect(await refiles()).toEqual([
+      {
+        entityId: deck.id,
+        status: 'open',
+        proposedByType: 'integration',
+        payload: {
+          documentId: deck.id,
+          fromEntityId: deal,
+          toEntityId: other,
+          sourcePath: 'My Drive / Research',
+          documentName: 'Acme deck.pdf',
+          fromName: 'Acme Seed',
+          toName: 'Research Holdings',
+        },
+      },
+    ])
   })
 })

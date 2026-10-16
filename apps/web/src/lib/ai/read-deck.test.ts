@@ -12,6 +12,7 @@ import {
   entity,
   entityAlias,
   link,
+  storageBinding,
   suggestion,
 } from '@spaces/db/schema'
 import { QUEUES } from '@spaces/core/queue/names'
@@ -499,6 +500,45 @@ describe('readDeck', () => {
     expect(readDeckMessage(failure)).toContain('ECONNREFUSED')
     expect(await suggestionsOn(companyId)).toHaveLength(0)
     expect(await suggestionsOn(dealId)).toHaveLength(0)
+  })
+
+  it('refuses a cloud route to a deck sensitive through its binding alone, filed on a normal company', async () => {
+    await routeExtract()
+    await Effect.runPromise(
+      setAiRouteProgram({
+        lane: 'extract',
+        sensitivity: 'sensitive',
+        provider: 'anthropic',
+        model: 'claude-haiku-4-5',
+      }),
+    )
+    const { companyId, documentId, tag } = await deckOnCompany()
+    const [binding] = await db
+      .insert(storageBinding)
+      .values({
+        provider: 'google',
+        folderId: `secret-${tag}`,
+        folderPath: 'My Drive / Secret room',
+        targetEntityId: companyId,
+        sensitivity: 'sensitive',
+      })
+      .returning({ id: storageBinding.id })
+    await db
+      .update(document)
+      .set({ bindingId: binding.id })
+      .where(eq(document.entityId, documentId))
+    const model = mockModel(() => COMPANY_ANSWER(documentId))
+
+    const failure = await Effect.runPromise(
+      Effect.flip(readDeckProgram({ documentId, userId: USER, model })),
+    )
+    expect(failure._tag).toBe('SensitiveRouteRefused')
+    expect(readDeckMessage(failure)).toContain(
+      'sensitivity inherited from My Drive / Secret room',
+    )
+    expect(model.doGenerateCalls).toHaveLength(0)
+    expect(await suggestionsOn(companyId)).toHaveLength(0)
+    await Effect.runPromise(clearAiRouteProgram('extract', 'sensitive'))
   })
 
   it('fails permanently when the extract lane is not routed', async () => {

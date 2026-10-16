@@ -1,7 +1,12 @@
 import { Effect, Schema } from 'effect'
-import { and, asc, eq, or, sql } from 'drizzle-orm'
+import { and, asc, eq, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { entity, storageBinding, user } from '@spaces/db/schema'
+import {
+  accountConnection,
+  entity,
+  storageBinding,
+  user,
+} from '@spaces/db/schema'
 import {
   bindingConflict,
   bindingConflictMessage,
@@ -34,6 +39,12 @@ export type BindFolderInput = {
   readonly targetEntityId: string
   readonly boundBy: string
   readonly options: BindingOptions
+  /**
+   * The provider's change cursor read before the bind (`changes(null).next`),
+   * stored on a connection that has none, so the first poll picks up what
+   * the first sync's walk passed by. A connection's own cursor is kept.
+   */
+  readonly startCursor?: string
 }
 
 /** The bind was refused; `reason` is the sentence the dialog shows. */
@@ -59,6 +70,33 @@ export const NOT_BINDABLE =
   'A folder links to a company, a deal, a space or a custom record.'
 export const RECORD_GONE = 'That record no longer exists.'
 
+/** Why a record cannot hold a binding's files, or null when it can. */
+const targetRefusal = (
+  target:
+    { readonly kind: string; readonly mergedIntoId: string | null } | undefined,
+): string | null => {
+  if (target === undefined || target.mergedIntoId !== null) return RECORD_GONE
+  return isBindableKind(target.kind) ? null : NOT_BINDABLE
+}
+
+/**
+ * The bound record's refusal, read now: `RECORD_GONE`, `NOT_BINDABLE`, or
+ * null when it still takes the binding's files.
+ */
+export const bindingTargetRefusalProgram = Effect.fn(
+  'bindingTargetRefusalProgram',
+)(function* (
+  targetEntityId: string,
+): Effect.fn.Return<string | null, BindingStoreFailed> {
+  const rows = yield* query(() =>
+    db
+      .select({ kind: entity.kind, mergedIntoId: entity.mergedIntoId })
+      .from(entity)
+      .where(eq(entity.id, targetEntityId)),
+  )
+  return targetRefusal(rows.at(0))
+})
+
 type Outcome =
   | { readonly _tag: 'bound'; readonly id: string }
   | { readonly _tag: 'refused'; readonly reason: string }
@@ -76,16 +114,15 @@ export const bindFolderProgram = Effect.fn('bindFolderProgram')(function* (
         sql`select pg_advisory_xact_lock(hashtext(${BIND_LOCK}))`,
       )
 
-      const target = (
-        await tx
-          .select({ kind: entity.kind, mergedIntoId: entity.mergedIntoId })
-          .from(entity)
-          .where(eq(entity.id, input.targetEntityId))
-      ).at(0)
-      if (target === undefined || target.mergedIntoId !== null)
-        return { _tag: 'refused', reason: RECORD_GONE }
-      if (!isBindableKind(target.kind))
-        return { _tag: 'refused', reason: NOT_BINDABLE }
+      const refusal = targetRefusal(
+        (
+          await tx
+            .select({ kind: entity.kind, mergedIntoId: entity.mergedIntoId })
+            .from(entity)
+            .where(eq(entity.id, input.targetEntityId))
+        ).at(0),
+      )
+      if (refusal !== null) return { _tag: 'refused', reason: refusal }
 
       const { folder } = input
       const ancestors =
@@ -152,6 +189,16 @@ export const bindFolderProgram = Effect.fn('bindFolderProgram')(function* (
         throw new Error('storage_binding insert returned no row')
       // A sensitive binding raises whatever it already reaches, in the bind.
       await raiseSensitivity(tx, { kind: 'binding', bindingId: row.id })
+      if (input.startCursor !== undefined)
+        await tx
+          .update(accountConnection)
+          .set({ storageCursor: input.startCursor })
+          .where(
+            and(
+              eq(accountConnection.id, input.connectionId),
+              isNull(accountConnection.storageCursor),
+            ),
+          )
       return { _tag: 'bound', id: row.id }
     }),
   )

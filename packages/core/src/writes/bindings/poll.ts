@@ -29,13 +29,13 @@ import type { BindingFiler, SyncBinding, SyncFailure } from './sync'
  *   so nothing is filed twice.
  * - A new file is filed; a held file a live binding brought is revised when
  *   its token moved (`reviseDocumentProgram`), and when it was renamed or
- *   moved inside its binding's subtree its path advances, with a re-file
+ *   moved inside any live binding's subtree its path advances, with a re-file
  *   suggestion if the move crossed to another record (`moveHeldProgram`).
+ *   Moved under another binding, its `binding_id` follows the folder.
  * - A removal marks the held copy `gone`, and so does a move of a live
  *   binding's file out of every bound subtree: ours is kept, nothing is
  *   proposed (`markGoneProgram`). A `gone` file is never tracked again.
- * - A move into another binding's subtree is only revised, and a held file
- *   no live binding brought is left alone.
+ * - A held file no live binding brought is left alone.
  * - A file deleted in the app is tombstoned for its binding: the filer skips
  *   it, here and in the re-list an expired cursor sends.
  */
@@ -65,7 +65,7 @@ export type PollTally = {
   readonly attached: number
   /** Held files whose bytes advanced to a new revision. */
   readonly revised: number
-  /** Held files renamed or moved inside their subtree: the path advanced. */
+  /** Held files renamed or moved inside a bound subtree: the path advanced. */
   readonly moved: number
   /** Moves that crossed to another record: a re-file suggestion each. */
   readonly proposed: number
@@ -83,7 +83,10 @@ export type PollTally = {
     readonly name: string
     readonly reason: string
   }>
-  /** Bindings whose target refused a filing: marked `error`, out of this poll. */
+  /**
+   * Bindings whose record is gone or not bindable: marked `error`, out of
+   * this poll. A file the record refuses is only skipped.
+   */
   readonly refused: ReadonlyArray<{
     readonly bindingId: string
     readonly reason: string
@@ -91,7 +94,10 @@ export type PollTally = {
 }
 
 export type PollOutcome =
-  /** No cursor yet: a starting one stored. The first sync did the backfill. */
+  /**
+   * No cursor yet: a starting one stored. The first sync did the backfill.
+   * Only a connection bound before binds stored one.
+   */
   | { readonly _tag: 'started' }
   /**
    * The cursor expired: every binding re-synced and a fresh cursor stored,
@@ -203,7 +209,7 @@ const markPolled = (bindingIds: ReadonlyArray<string>) =>
           ),
       )
 
-/** A filing the binding's target refused: the binding is marked and leaves the poll. */
+/** The binding's record is gone or not bindable: the binding is marked and leaves the poll. */
 type Refused = { readonly _tag: 'refused'; readonly reason: string }
 
 /** A folder inside a bound subtree: its binding and the folder names below the bound one. */
@@ -343,7 +349,11 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
     const skipped: Array<{ name: string; reason: string }> = []
     const refused: Array<{ bindingId: string; reason: string }> = []
 
-    /** Where a held file now sits, when that is inside its own binding. */
+    /**
+     * Where a held file now sits, inside its own binding or another live one.
+     * The old target folds through the binding that brought it, the new one
+     * through the binding it is under now.
+     */
     const moveOf = Effect.fn('pollStorage.moveOf')(function* (
       doc: HeldDocument,
       entry: StorageEntry,
@@ -351,15 +361,17 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
       parentId: string,
       at: Located,
     ) {
-      if (at.binding !== binding) return null
+      const crossed = at.binding !== binding
+      if (crossed && live.get(at.binding.folderId) !== at.binding) return null
       const outcome: MoveOutcome = yield* moveHeldProgram({
         held: doc,
         entry,
         boundPath: binding.folderPath,
         targetOf: filerOf(binding).targetOf,
         target: yield* targetOf(parentId, at),
-        sourcePath: [binding.folderPath, ...at.names].join(' / '),
+        sourcePath: [at.binding.folderPath, ...at.names].join(' / '),
         integrationId: input.integrationId,
+        ...(crossed ? { rebind: { from: binding.id, to: at.binding.id } } : {}),
       })
       return outcome
     })

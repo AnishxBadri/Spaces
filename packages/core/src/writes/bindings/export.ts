@@ -119,6 +119,23 @@ export async function exportsOnRefile(documentId: string): Promise<boolean> {
   return rows.length > 0
 }
 
+/**
+ * The record the document's binding files on, or null when the document or
+ * its binding is gone: where its export runs show.
+ */
+export async function exportTargetOf(
+  documentId: string,
+): Promise<string | null> {
+  const row = (
+    await db
+      .select({ id: storageBinding.targetEntityId })
+      .from(document)
+      .innerJoin(storageBinding, eq(storageBinding.id, document.bindingId))
+      .where(eq(document.entityId, documentId))
+  ).at(0)
+  return row?.id ?? null
+}
+
 /** A binding as the export reads it. */
 export type ExportBinding = {
   readonly id: string

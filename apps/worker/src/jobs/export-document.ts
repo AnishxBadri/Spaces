@@ -4,6 +4,7 @@ import { QUEUES } from '@spaces/core/queue/names'
 import {
   exportDocumentProgram,
   exportPlanOf,
+  exportTargetOf,
   writableOf,
   writesThrough,
 } from '@spaces/core/writes/bindings/export'
@@ -149,6 +150,10 @@ export const exportDocument: JobDef<
 > = {
   name: QUEUES.exportDocument,
   schema: exportDocumentData,
+  // The bound record: the run shows in its history. A gone document has none.
+  lookupRefs: async (data) => ({
+    entityId: await exportTargetOf(data.documentId),
+  }),
   retry: exportDocumentRetry,
   run: (data) => Effect.scoped(program(data)),
 }

@@ -57,7 +57,9 @@ import type {
  *      `chunk` rows of `source_kind: document` exist, else the extracted text whole as
  *      `doc:<id>#0`), then `recordContextProgram` on the record, which brings
  *      the space memos, the mandate and the glossary for free;
- *   2. `sensitivityFor(record)` — live, never cached — spread into the call;
+ *   2. `sensitivityFor` of the record and of the deck — live, never cached —
+ *      spread into the call, sensitive when either is (a deck can be
+ *      sensitive through its storage binding alone);
  *   3. `cachedExtractProgram` (`./extraction-cache.ts`, SPA-74) — the
  *      extraction cache keyed on (blob, compiled schema, routed model), which
  *      answers a re-read or a second document over the same bytes from disk
@@ -502,6 +504,8 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
   // Every refusal is behind us: the run opens here, at its first call.
   const runId = yield* run.id
   const reads: Array<Read> = []
+  // The deck's own read counts its binding, which the record's never sees.
+  const ofDeck = yield* sensitivityFor(input.documentId)
   // Sequential on purpose: each call is its own `ai_usage` row and its own
   // provider request, and nothing is written until every one has answered.
   // Sequential also lets a second record over the same schema hit the cache
@@ -513,7 +517,8 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
         : against.object.kind === 'person'
           ? [PAGE_SUBJECT, ...against.registry]
           : against.registry
-    const sensitivity = yield* sensitivityFor(target.id)
+    const ofTarget = yield* sensitivityFor(target.id)
+    const sensitivity = ofTarget.sensitivity === 'sensitive' ? ofTarget : ofDeck
     // A captured page has no record to bring context from: the page is all.
     const context =
       against !== null
