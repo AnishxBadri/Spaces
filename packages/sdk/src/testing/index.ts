@@ -887,6 +887,7 @@ export const testPorts = (options: TestPortsOptions = {}) => {
 export {
   makeFakeDrive,
   FAKE_DRIVE_SEED,
+  FAKE_DRIVE_RESEARCH_SEED,
   FAKE_DRIVE_FIXTURE,
   FAKE_DRIVE_CREDENTIALS,
   GOOGLE_DOC_MIME,

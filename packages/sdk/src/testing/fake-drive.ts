@@ -215,6 +215,100 @@ export const FAKE_DRIVE_SEED: ReadonlyArray<FakeDriveSeedItem> = [
 ]
 
 /**
+ * A research tree to bind to a space with `map_subfolders` on, added to
+ * `FAKE_DRIVE_SEED` by the cases that want it: `My Drive / Research /
+ * Hydrogen` holds a company folder (`Ohmium`, with a kind folder, a plain
+ * one and a deal folder under it), a typo of it (`Ohium`), an empty folder
+ * and a loose file.
+ */
+export const FAKE_DRIVE_RESEARCH_SEED: ReadonlyArray<FakeDriveSeedItem> = [
+  { kind: 'folder', id: 'research', name: 'Research', parentId: 'root' },
+  { kind: 'folder', id: 'hydrogen', name: 'Hydrogen', parentId: 'research' },
+  {
+    kind: 'file',
+    id: 'h2-map',
+    name: 'Hydrogen market map.pdf',
+    parentId: 'hydrogen',
+    mime: 'application/pdf',
+    content: '%PDF-1.7 hydrogen market map',
+  },
+  { kind: 'folder', id: 'ohmium', name: 'Ohmium', parentId: 'hydrogen' },
+  {
+    kind: 'file',
+    id: 'ohmium-overview',
+    name: 'Ohmium overview.pdf',
+    parentId: 'ohmium',
+    mime: 'application/pdf',
+    content: '%PDF-1.7 Ohmium overview',
+  },
+  {
+    kind: 'folder',
+    id: 'ohmium-dataroom',
+    name: 'Data room',
+    parentId: 'ohmium',
+  },
+  {
+    kind: 'file',
+    id: 'ohmium-notes',
+    name: 'notes.txt',
+    parentId: 'ohmium-dataroom',
+    mime: 'text/plain',
+    content: 'Ohmium data room notes',
+  },
+  {
+    kind: 'file',
+    id: 'ohmium-model',
+    name: 'Ohmium model.xlsx',
+    parentId: 'ohmium-dataroom',
+    mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    content: 'PK Ohmium model',
+  },
+  {
+    kind: 'folder',
+    id: 'ohmium-documents',
+    name: 'Documents',
+    parentId: 'ohmium',
+  },
+  {
+    kind: 'file',
+    id: 'ohmium-deck',
+    name: 'Ohmium Deck.pdf',
+    parentId: 'ohmium-documents',
+    mime: 'application/pdf',
+    content: '%PDF-1.7 Ohmium deck',
+  },
+  {
+    kind: 'folder',
+    id: 'ohmium-series-b',
+    name: 'Ohmium Series B',
+    parentId: 'ohmium',
+  },
+  {
+    kind: 'file',
+    id: 'ohmium-term-sheet',
+    name: 'Series B term sheet.pdf',
+    parentId: 'ohmium-series-b',
+    mime: 'application/pdf',
+    content: '%PDF-1.7 Ohmium Series B term sheet',
+  },
+  { kind: 'folder', id: 'ohium', name: 'Ohium', parentId: 'hydrogen' },
+  {
+    kind: 'file',
+    id: 'ohium-intro',
+    name: 'Ohium intro.pdf',
+    parentId: 'ohium',
+    mime: 'application/pdf',
+    content: '%PDF-1.7 Ohium intro',
+  },
+  {
+    kind: 'folder',
+    id: 'electrolysers',
+    name: 'Electrolysers',
+    parentId: 'hydrogen',
+  },
+]
+
+/**
  * What the conformance suite expects of `FAKE_DRIVE_SEED`, written out
  * separately on purpose: an entry deleted from the seed fails the suite.
  */

@@ -542,7 +542,8 @@ at)`. Cap tables, MIS sheets, models. Drive already versions; we mirror
 resolveItem(item, parentTarget):
   folder:
     map_subfolders off              → same target as parent
-    parent is a space               → resolveEntity(company, {name: folder.name})
+    parent is a space               → match-only resolve (company, {name: folder.name}),
+                                      never a create
                                         identity/exact match → that company
                                         fuzzy only           → suggestion; files stay on the space
                                         no match             → stays on the space
@@ -552,7 +553,7 @@ resolveItem(item, parentTarget):
     parent is a deal                → kind folder → deal + kind; else deal
   file:
     hash → blob (sha already filed on target → attach, never duplicate)
-    document row { kind: folder rule → else classify lane → else 'other',
+    document row { kind: folder rule → else filename → else 'other',
                    source_class: integration, source_ref: integration.id,
                    connection_id: binding.connection_id,
                    external_id, external_url, source_path }
@@ -571,8 +572,19 @@ references `integration.id`, FK enforced, null unless `source_class =
 `entity_alias`; `document.origin` follows (§11, item 2).
 
 **Folder names are hints, never identity.** A folder called "Ohmium" goes
-through the same `resolveEntity` every creator uses; a typo lands as a
-suggestion, not a company. An empty folder creates nothing — only files
+through `resolveEntity`'s match-only twin, `previewResolveByName`: the same
+identity lookup, then an exact normalised name, then the dedupe sweep's
+similarity read for candidates — and nothing written, since `resolveEntity`
+itself creates on no match. A typo lands as a suggestion, not a company. A
+deal under a company matches on its exact normalised name only; a near miss
+falls through to the kind rules.
+
+**The kind is decided at filing time and never by a model.** `resolveItem`
+is pure: the nearest kind folder (§5.4), else the filename
+(`guessDocumentKind`), else `other`. A storage source never calls `Ai`
+(spec-ai-substrate §11): whatever is still `other` after extraction gets the
+classify lane's `document_kind` suggestion from `document.extracted`, as a
+browser upload does. An empty folder creates nothing — only files
 trigger. `source_path` is kept verbatim so the UI can say "from Data room /
 Legal" and the mirror can write back to the same place. Retrieval scopes by
 `entity_space` and ltree, **never by path** — the tree is a projection, the
@@ -580,11 +592,15 @@ graph is the meaning.
 
 ### 5.4 Kind folders
 
-A small dictionary, case-insensitive, matched on the folder name:
-`deck · pitch → deck` · `legal · contracts · docs → legal` ·
-`financials · dd · diligence · data room → dd` · `cap table · captable →
-cap_table` · `press · articles → article`. Fallback: the `classify` lane
-on the first 2k chars, gated on an LLM key; else `other`.
+A small dictionary, case-insensitive, matched on the folder's whole name
+(`guessKindFromFolder`, beside `guessDocumentKind`, its vocabulary
+`DOCUMENT_KINDS`): `deck · pitch → deck` · `legal · contracts · docs →
+legal` · `financials · dd · diligence · data room → dd` · `cap table ·
+captable → cap_table` · `press · articles → article`. "Data room" is `dd`;
+"Ohmium Data Room" is not a kind folder. Fallback: the filename's kind, else
+`other` — then, after extraction, the classify lane's `document_kind`
+suggestion on `document.extracted` (spec-ai-substrate §11), never a model
+call at filing time.
 
 ### 5.5 Whose token, and failure
 

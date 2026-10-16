@@ -1,5 +1,6 @@
 import { Effect, Schema } from 'effect'
 import { and, eq, ne, sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { duplicateCandidate, entity, entityAlias } from '@spaces/db/schema'
 import type { DuplicateReason } from '@spaces/db/schema/entities'
@@ -87,6 +88,37 @@ export async function suggestDuplicate(
     .onConflictDoNothing()
 }
 
+/**
+ * The name aliases in `scope` whose pg_trgm similarity to `nameNorm` is at
+ * least `threshold`, one row per (record, score), at most
+ * `MAX_SUGGESTIONS`. Reads only; the one copy of the similarity SQL.
+ */
+export function similarNames(
+  nameNorm: string,
+  scope: SQL,
+  options: { readonly excludeId: string | null; readonly threshold: number },
+): Promise<Array<{ otherId: string; score: number }>> {
+  return db
+    .selectDistinct({
+      otherId: entityAlias.entityId,
+      score: sql<number>`similarity(${entityAlias.valueNorm}, ${nameNorm})`,
+    })
+    .from(entityAlias)
+    .innerJoin(entity, eq(entity.id, entityAlias.entityId))
+    .where(
+      and(
+        eq(entityAlias.kind, 'name'),
+        options.excludeId === null
+          ? undefined
+          : ne(entityAlias.entityId, options.excludeId),
+        sql`${entityAlias.valueNorm} % ${nameNorm}`,
+        sql`similarity(${entityAlias.valueNorm}, ${nameNorm}) >= ${options.threshold}`,
+        scope,
+      ),
+    )
+    .limit(MAX_SUGGESTIONS)
+}
+
 export const sweepNameSimilarityEffect = Effect.fn('sweepNameSimilarity')(
   function* (
     entityId: string,
@@ -124,23 +156,10 @@ export const sweepNameSimilarityEffect = Effect.fn('sweepNameSimilarity')(
         : eq(entity.objectId, self.objectId)
 
     const matches = yield* query(() =>
-      db
-        .selectDistinct({
-          otherId: entityAlias.entityId,
-          score: sql<number>`similarity(${entityAlias.valueNorm}, ${nameNorm})`,
-        })
-        .from(entityAlias)
-        .innerJoin(entity, eq(entity.id, entityAlias.entityId))
-        .where(
-          and(
-            eq(entityAlias.kind, 'name'),
-            ne(entityAlias.entityId, entityId),
-            sql`${entityAlias.valueNorm} % ${nameNorm}`,
-            sql`similarity(${entityAlias.valueNorm}, ${nameNorm}) >= ${SIMILARITY_THRESHOLD}`,
-            scope,
-          ),
-        )
-        .limit(MAX_SUGGESTIONS),
+      similarNames(nameNorm, scope, {
+        excludeId: entityId,
+        threshold: SIMILARITY_THRESHOLD,
+      }),
     )
 
     let suggested = 0

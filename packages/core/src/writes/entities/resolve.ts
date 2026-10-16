@@ -14,7 +14,12 @@ import type { Actor, EventSource } from '../attributes/values'
 import type { EmbedSource } from '../ai/chunk-sources'
 import { entityCreated } from '../events/dispatch'
 import type { DomainEvent } from '@spaces/sdk'
-import { canonicalId, suggestDuplicate, sweepNameSimilarity } from './sweep'
+import {
+  canonicalId,
+  similarNames,
+  suggestDuplicate,
+  sweepNameSimilarity,
+} from './sweep'
 import {
   domainHost,
   isRoleEmail,
@@ -347,6 +352,90 @@ export async function previewResolve(
     entityId: match.entityId,
     matchedOn: { kind: match.key.kind, value: match.key.valueNorm },
   }
+}
+
+/**
+ * The name lane's cut: lower than the sweep's `SIMILARITY_THRESHOLD`
+ * because nothing here writes — a candidate is shown to a person, never
+ * merged or attached. One dropped letter in a short name ("Ohium" for
+ * "Ohmium") scores 0.44.
+ */
+export const NAME_LANE_THRESHOLD = 0.4
+
+export type NameCandidate = { entityId: string; name: string; score: number }
+
+export type PreviewByNameResult =
+  | {
+      verdict: 'attach'
+      entityId: string
+      matchedOn: { kind: CoreIdentityKey | 'name'; value: string }
+    }
+  | { verdict: 'fuzzy'; candidates: Array<NameCandidate> }
+  | { verdict: 'no_match' }
+  | { verdict: 'refused'; reason: typeof RESOLVE_NEEDS_NAME_OR_KEY }
+
+/**
+ * **`previewResolve` with a name lane**: what a match-only caller (a bound
+ * folder's name) may do with no identity key, and nothing written.
+ * - An identity key match → `attach`, exactly as `previewResolve`.
+ * - Else one live record of the kind holding the exact normalised name →
+ *   `attach`; two or more → `fuzzy` with all of them, never a guess.
+ * - Else names scoring `NAME_LANE_THRESHOLD` or more by the sweep's own
+ *   similarity (`similarNames`) → `fuzzy`, best first; else `no_match`.
+ */
+export async function previewResolveByName(
+  input: PreviewResolveInput,
+): Promise<PreviewByNameResult> {
+  const keyed = await previewResolve(input)
+  if (keyed.verdict !== 'create') return keyed
+  const nameNorm = normalizeName(input.name ?? '')
+  if (nameNorm === '') return { verdict: 'no_match' }
+  const { objectIdForKindAsync } = await import('../attributes/objects')
+  const scope = eq(entity.objectId, await objectIdForKindAsync(input.kind))
+
+  const exactRows = await db
+    .selectDistinct({ id: entityAlias.entityId })
+    .from(entityAlias)
+    .innerJoin(entity, eq(entity.id, entityAlias.entityId))
+    .where(
+      and(
+        eq(entityAlias.kind, 'name'),
+        eq(entityAlias.valueNorm, nameNorm),
+        scope,
+      ),
+    )
+  const exact = [
+    ...new Set(await Promise.all(exactRows.map((r) => canonicalId(r.id)))),
+  ]
+  const only = exact.length === 1 ? exact.at(0) : undefined
+  if (only !== undefined)
+    return {
+      verdict: 'attach',
+      entityId: only,
+      matchedOn: { kind: 'name', value: nameNorm },
+    }
+
+  const scores = new Map<string, number>(exact.map((id) => [id, 1]))
+  for (const row of await similarNames(nameNorm, scope, {
+    excludeId: null,
+    threshold: NAME_LANE_THRESHOLD,
+  })) {
+    const id = await canonicalId(row.otherId)
+    scores.set(id, Math.max(scores.get(id) ?? 0, Number(row.score)))
+  }
+  if (scores.size === 0) return { verdict: 'no_match' }
+  const names = await db
+    .select({ id: entity.id, name: entity.canonicalName })
+    .from(entity)
+    .where(inArray(entity.id, [...scores.keys()]))
+  const candidates = names
+    .map((n) => ({
+      entityId: n.id,
+      name: n.name,
+      score: scores.get(n.id) ?? 0,
+    }))
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+  return { verdict: 'fuzzy', candidates }
 }
 
 export async function resolveEntity(

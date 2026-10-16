@@ -60,6 +60,43 @@ export function guessDocumentKind(filename: string): DocumentKind {
   return 'other'
 }
 
+/**
+ * The kind folders: a folder's whole name → the kind its files are filed
+ * under. Keyed by every kind but `other`, so the vocabulary is
+ * `DOCUMENT_KINDS` and nothing else.
+ */
+export const KIND_FOLDER_NAMES: Record<
+  Exclude<DocumentKind, 'other'>,
+  ReadonlyArray<string>
+> = {
+  deck: ['deck', 'pitch'],
+  legal: ['legal', 'contracts', 'docs'],
+  dd: ['financials', 'dd', 'diligence', 'data room'],
+  cap_table: ['cap table', 'captable'],
+  article: ['press', 'articles'],
+}
+
+const KIND_BY_FOLDER: ReadonlyMap<string, DocumentKind> = new Map(
+  DOCUMENT_KINDS.flatMap((kind) =>
+    kind === 'other'
+      ? []
+      : KIND_FOLDER_NAMES[kind].map((n): [string, DocumentKind] => [n, kind]),
+  ),
+)
+
+/**
+ * Folder name → the kind its files are, or null. The whole name, any case,
+ * separators read as spaces: "DATA ROOM" and "data_room" are `dd`, "Ohmium
+ * Data Room" is not.
+ */
+export function guessKindFromFolder(folderName: string): DocumentKind | null {
+  const name = folderName
+    .toLowerCase()
+    .replace(/[\s_-]+/g, ' ')
+    .trim()
+  return KIND_BY_FOLDER.get(name) ?? null
+}
+
 export function formatBytes(bytes: number | null): string {
   if (bytes == null) return ''
   if (bytes < 1024) return `${bytes} B`

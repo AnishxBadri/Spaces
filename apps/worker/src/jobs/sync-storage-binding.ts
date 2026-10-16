@@ -61,6 +61,15 @@ const summaryOf = (tally: SyncTally): string => {
         .map((s) => `${s.name}: ${s.reason}`)
         .join('; ')})`,
     )
+  if (tally.unmapped.length > 0)
+    parts.push(
+      `${String(tally.unmapped.length)} unmapped (${tally.unmapped
+        .map(
+          (u) =>
+            `${u.folderPath} ~ ${u.candidates.map((c) => c.name).join(' | ')}`,
+        )
+        .join('; ')})`,
+    )
   return `synced ${parts.join(', ')}`
 }
 
