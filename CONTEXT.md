@@ -2038,7 +2038,7 @@ suggestions). No category needs a new lane; that's the design check.
    rooms already live, picked/synced into the document pipeline. (S3/MinIO
    is our blob backend, not an integration.)
 2. **Email + calendar** — forwarding lane first, full sync later
-   (survey-twenty-email-sync.md is the map; Attio's forward/BCC address is
+   (docs/archive/survey-twenty-email-sync.md is the map; Attio's forward/BCC address is
    the consent model).
 3. **Call recordings** — Fathom/tl;dv/Granola webhooks → transcript as
    document on participant-matched people; summary as suggestion.

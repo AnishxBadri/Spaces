@@ -2357,7 +2357,7 @@ Attendees run through arrival-2's participant module so a calendar attendee and 
 
 **Demo** — Connect Google Calendar from Settings → Connections against the fake IdP and let the schedule fire: this week's external meetings appear on the right companies' timelines with their attendees, last week's do not, and the internal standup never appears at all. Expire the sync token at the fake and the next run recovers without re-importing five years of history.
 
-**Spec** — docs/spec-plugin-sdk.md §5 (syncer kind) and §14 build order step 5; docs/survey-twenty-calendar-sync.md §1 (per-channel dedup, iCalUid never matched) and §3 (no timeMin; HTTP 410 swallowed); CONTEXT.md — Email / calendar ingestion (forward-only; sync starts at connection date); docs/ARCHITECTURE.md §12 (integrations: Calendar → Gmail forward-only → Apollo/Exa); src/db/schema/interactions.ts (interaction_message_id_unique)
+**Spec** — docs/spec-plugin-sdk.md §5 (syncer kind) and §14 build order step 5; docs/archive/survey-twenty-calendar-sync.md §1 (per-channel dedup, iCalUid never matched) and §3 (no timeMin; HTTP 410 swallowed); CONTEXT.md — Email / calendar ingestion (forward-only; sync starts at connection date); docs/ARCHITECTURE.md §12 (integrations: Calendar → Gmail forward-only → Apollo/Exa); src/db/schema/interactions.ts (interaction_message_id_unique)
 
 ### ▸ The first ingress
 
@@ -2465,7 +2465,7 @@ L, and it cannot split: the redaction layer cannot merge before the sync that ma
 
 **Demo** — Connect a mailbox against the fake and let the schedule fire: threads from after the connect time appear on the right companies with their participants and attachments, nothing older does, and a second user opening the same record sees exactly what the recorded privacy default says they should — no more, no less.
 
-**Spec** — CONTEXT.md — Email / calendar ingestion (forward-only, BYO GCP client, Google verification avoidable); CONTEXT.md — Privacy default (metadata shared, bodies restricted, per-connection exclude list, settings toggle); docs/survey-twenty-email-sync.md §5 (visibility enforced at read time) and §7.3, §7.5; docs/spec-plugin-sdk.md §14 build order step 5 (Calendar, then Gmail forward-only); docs/ARCHITECTURE.md §12
+**Spec** — CONTEXT.md — Email / calendar ingestion (forward-only, BYO GCP client, Google verification avoidable); CONTEXT.md — Privacy default (metadata shared, bodies restricted, per-connection exclude list, settings toggle); docs/archive/survey-twenty-email-sync.md §5 (visibility enforced at read time) and §7.3, §7.5; docs/spec-plugin-sdk.md §14 build order step 5 (Calendar, then Gmail forward-only); docs/ARCHITECTURE.md §12
 
 ### ▸ Struck 2026-10-06
 

@@ -10,7 +10,7 @@ SPA-156…SPA-213 across 2026-09-28 to 2026-10-02) and every one of them has shi
 file carries their structure. **Projects 19–26 are not published**, and their slice bodies live in
 `docs/roadmap-backlog.md`. The "publish when reached" rule is retired for them: the decisions they carry closed with
 D59–D73 (`docs/decisions-2026-09.md`), so the remaining projects are published together, after the canvas pass
-described in `docs/design-brief-first-ship.md` has fixed the surfaces and the slice bodies have been written against
+described in `docs/archive/design-brief-first-ship.md` has fixed the surfaces and the slice bodies have been written against
 it. Archive projects 1–18 in Linear at the same upload: the free plan counts unarchived issues. All 73 decisions are
 closed.
 
