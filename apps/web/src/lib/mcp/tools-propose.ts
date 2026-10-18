@@ -4,15 +4,18 @@ import { db } from '@spaces/db'
 import { entity, note } from '@spaces/db/schema'
 import { jsonRecord } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
-import { proposeProgram, SuggestionInvalid } from '#/lib/ai/propose'
-import type { SuggestionFailure } from '#/lib/ai/propose'
+import {
+  proposeProgram,
+  SuggestionInvalid,
+} from '@spaces/core/writes/suggestions/propose'
+import type { SuggestionFailure } from '@spaces/core/writes/suggestions/propose'
 import { EntityNotFound } from '@spaces/core/writes/attributes/values'
 import { canRead } from '@spaces/core/read-policy'
 import {
   McpToolQueryFailed,
   McpToolRefused,
   resolveEntityRefProgram,
-} from './tools'
+} from '@spaces/core/writes/read/record'
 
 /**
  * The write half of the MCP surface (SPA-31, `docs/spec-ai-substrate.md`

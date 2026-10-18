@@ -1,5 +1,4 @@
-import { PROVIDERS } from '@spaces/core/providers/registry'
-import type { ProviderId, ProviderScope } from '@spaces/core/providers/registry'
+import type { ProviderId } from '@spaces/core/providers/registry'
 
 /**
  * A connection is per product (D66): Drive, Calendar and Gmail each carry
@@ -85,16 +84,6 @@ export function productOf(
 ): ProductEntry | null {
   const products: Readonly<Record<string, ProductEntry>> = PRODUCTS[provider]
   return Object.hasOwn(products, product) ? products[product] : null
-}
-
-/** The product's own scopes in its base set — what its row prints. */
-export function productScopes(provider: ProviderId, product: string): string[] {
-  const entry = productOf(provider, product)
-  if (entry === null) return []
-  const vocabulary: ReadonlyArray<ProviderScope> = PROVIDERS[provider].scopes
-  return entry.base.filter((value) =>
-    vocabulary.some((s) => s.value === value && s.plugin !== null),
-  )
 }
 
 /** A provider's products in registry order, with their ids. */

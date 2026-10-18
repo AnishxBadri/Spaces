@@ -96,6 +96,7 @@ export const invite = pgTable('invite', {
   usedBy: text('used_by').references(() => user.id),
 })
 
+/** better-auth's own table, read by name through the schema. @public */
 export const verification = pgTable('verification', {
   id: text('id').primaryKey(),
   identifier: text('identifier').notNull(),

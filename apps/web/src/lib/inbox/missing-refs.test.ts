@@ -21,7 +21,9 @@ describe('resolveRefs — deleted targets, in the app', () => {
     const { ref } = await import('@spaces/core/context/ref')
     const { resolveEntity } =
       await import('@spaces/core/writes/entities/resolve')
-    const { proposeProgram, acceptProgram } = await import('#/lib/ai/propose')
+    const { proposeProgram } =
+      await import('@spaces/core/writes/suggestions/propose')
+    const { acceptProgram } = await import('#/lib/ai/propose')
     const { listInboxProgram } = await import('#/lib/inbox/queue')
     const { recordTimelineProgram } = await import('#/lib/timeline/record')
 

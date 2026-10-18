@@ -126,7 +126,6 @@ export type AskCall = {
 }
 
 export const askTurnRole = pgEnum('ask_turn_role', ['user', 'assistant'])
-export type AskTurnRole = (typeof askTurnRole.enumValues)[number]
 
 /**
  * Where an answer ended. `streaming` is the birth state; the rest are final.

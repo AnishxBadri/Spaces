@@ -9,7 +9,7 @@ import {
   objectDef,
 } from '@spaces/db/schema'
 import type { EntityValues } from '@spaces/db/schema/entities'
-import { normalizeName } from '@spaces/core/entities/normalize'
+import { normalizeName } from '@spaces/sdk/identity'
 import { normalizeIdentityValue } from '@spaces/core/writes/entities/resolve'
 import { provenanceOf } from '@spaces/core/writes/entities/provenance'
 import { nonEmptyValueCount } from './keeper'

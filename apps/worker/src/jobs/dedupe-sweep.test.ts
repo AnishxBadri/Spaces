@@ -75,7 +75,7 @@ async function born(
 ): Promise<string> {
   const { db } = await import('@spaces/db')
   const { entity, entityAlias } = await import('@spaces/db/schema')
-  const { normalizeName } = await import('@spaces/core/entities/normalize')
+  const { normalizeName } = await import('@spaces/sdk/identity')
   const [row] = await db
     .insert(entity)
     .values({ kind, objectId, canonicalName: name })
@@ -129,7 +129,7 @@ describe('dedupe sweep job', () => {
     const { Effect } = await import('effect')
     const { renameRecordProgram } =
       await import('@spaces/core/writes/entities/rename')
-    const { normalizeName } = await import('@spaces/core/entities/normalize')
+    const { normalizeName } = await import('@spaces/sdk/identity')
 
     const me = await actorId()
     const tag = randomUUID().slice(0, 8)
@@ -225,7 +225,7 @@ describe('dedupe sweep job', () => {
     // and the self-pair the `a < b` join can never emit.
     const { db } = await import('@spaces/db')
     const { entityAlias } = await import('@spaces/db/schema')
-    const { normalizeName } = await import('@spaces/core/entities/normalize')
+    const { normalizeName } = await import('@spaces/sdk/identity')
     const solo = await born(left.id, 'Bramble Ventures')
     await db.insert(entityAlias).values({
       entityId: solo,

@@ -8,7 +8,7 @@ import { document, entity, note } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { apiToken } from '@spaces/db/schema/tokens'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
-import { getRecordProgram } from '#/lib/mcp/tools'
+import { getRecordProgram } from '@spaces/core/writes/read/record'
 import {
   createApiTokenProgram,
   hashApiToken,

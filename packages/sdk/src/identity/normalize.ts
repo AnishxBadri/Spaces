@@ -5,11 +5,9 @@ import { getDomain } from 'tldts'
  * are the ONLY place normalization happens — every alias write and every
  * lookup goes through them, or matching silently rots.
  *
- * In `@spaces/sdk` since SPA-195 (sdk-4b), moved whole from
- * `packages/core/src/entities/normalize.ts`, which now re-exports this file:
- * a plugin normalizes an identity claim's keys exactly as the choke point
- * (`resolveEntity`) does, because it is the same code. Its one import is
- * `tldts`, the SDK's third dependency (D55).
+ * In the SDK so a plugin normalizes an identity claim's keys exactly as the
+ * choke point (`resolveEntity`) does, because it is the same code. Its one
+ * import is `tldts`, the SDK's third dependency (D55).
  */
 
 /** Free-mail domains never create or match a company. */

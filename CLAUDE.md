@@ -98,8 +98,8 @@ propose.ts`, SPA-204, with migration 0057's partial unique index making an
   `plugins/verify.ts` is the other half, and `registry.json` and
   `plugin-keys/` at the root are copied into the image), the port tags and
   `@spaces/sdk/testing` (SPA-196), and the identity-key normalizers
-  (`@spaces/sdk/identity`, SPA-195 — `@spaces/core/entities/normalize` is a
-  re-export of it, so core imports the sdk at runtime). It
+  (`@spaces/sdk/identity`, SPA-195 — core and apps/web import it directly,
+  so core imports the sdk at runtime). It
   depends on effect, zod and tldts (D55) and nothing internal,
   and — unlike db and core — its `exports` point at `dist/` (ESM + d.ts,
   `tsc -p tsconfig.build.json`), because a plugin bundle leaves it as a bare
@@ -282,7 +282,9 @@ has one — `@spaces/web`, `@spaces/worker`, `@spaces/db`, `@spaces/core`,
 typechecked by nobody.
 CI (`.github/workflows/ci.yml`) runs the same root commands, **one named step
 per gate** against a real Postgres: prettier, `pnpm run lint` (which carries
-gate 5, since it is an eslint rule), `pnpm run typecheck`, `boot.ts` against
+gate 5, since it is an eslint rule), `pnpm run knip` (unused files, exports
+and dependencies, configured by the root `knip.json`; run it before pushing
+a deletion or a new `#web/*` crossing), `pnpm run typecheck`, `boot.ts` against
 the empty service database, `pnpm run test`, then `turbo run build` — a red
 run names the gate that broke. CI writes no `.env.local`: `DATABASE_URL` comes
 from the job's `env:`, every loader falls back to the environment, and the

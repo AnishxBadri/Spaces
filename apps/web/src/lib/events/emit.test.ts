@@ -108,7 +108,7 @@ const eventsSent = () => enqueued.filter((e) => e.name === QUEUE)
 
 describe('createCompany', () => {
   it('a company on no deal and in no space is outside the deal scope: nothing runs', async () => {
-    await installApollo({ autoEnrich: true })
+    await installApollo({ autoEnrichScopes: ['deal'] })
     await createCompany({ domain: domain() })
     expect(eventsSent()).toEqual([])
   })
@@ -129,7 +129,6 @@ describe('createCompany', () => {
 
 describe('createDeal', () => {
   it.each([
-    ['the legacy switch on', { autoEnrich: true }],
     ['the default', {}],
     ['the deal scope', { autoEnrichScopes: ['deal'] }],
   ])(
@@ -153,7 +152,7 @@ describe('createDeal', () => {
   )
 
   it('outside the deal scope, a new deal runs nothing', async () => {
-    await installApollo({ autoEnrich: false })
+    await installApollo({ autoEnrichScopes: ['space'] })
     const company = await createCompany({ domain: domain() })
     await createDeal(company.entityId)
     expect(eventsSent()).toEqual([])

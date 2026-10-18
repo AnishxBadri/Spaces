@@ -3,7 +3,7 @@ import type { VocabularyKey } from '@spaces/sdk/vocabulary'
 import type { Json } from '@spaces/db/json'
 import { valueValidator } from '../attributes/registry'
 import type { AttributeDef } from '../attributes/registry'
-import { normalizeDomain } from '../entities/normalize'
+import { normalizeDomain } from '@spaces/sdk/identity'
 import { toE164 } from '../attributes/phone'
 
 /**

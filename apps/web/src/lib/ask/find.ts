@@ -8,7 +8,7 @@ import {
   spaceWatchDismissal,
   suggestion,
 } from '@spaces/db/schema'
-import { normalizeDomain } from '@spaces/core/entities/normalize'
+import { normalizeDomain } from '@spaces/sdk/identity'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import {
   DiscoverSpaceRefused,

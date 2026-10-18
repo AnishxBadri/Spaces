@@ -39,8 +39,6 @@ export const FILING_TARGET_KINDS = [
   'custom',
 ] as const
 
-export type FilingTargetKind = (typeof FILING_TARGET_KINDS)[number]
-
 export function isFilingTargetKind(kind: string): boolean {
   return FILING_TARGET_KINDS.some((k) => k === kind)
 }

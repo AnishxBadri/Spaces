@@ -6,7 +6,7 @@ import { canReadNoteSql } from '@spaces/core/writes/read/search'
 import { renderWikiLinks } from '@spaces/core/context/wiki-link'
 import { excerpt } from '@spaces/core/context/excerpt'
 import { listViewsProgram } from '@spaces/core/writes/views/store'
-import { getRecordProgram } from '#/lib/mcp/tools'
+import { getRecordProgram } from '@spaces/core/writes/read/record'
 import {
   companyReadoutsProgram,
   dealReadoutsProgram,

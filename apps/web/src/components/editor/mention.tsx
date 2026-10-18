@@ -30,14 +30,6 @@ export const KIND_ICONS: Record<string, LucideIcon | undefined> = {
   custom: Boxes,
 }
 
-/** Index routes, by kind — the backlinks list on a note page uses it. */
-export const KIND_ROUTES: Record<string, string> = {
-  company: '/companies',
-  person: '/people',
-  space: '/spaces',
-  note: '/notes',
-}
-
 export const Mention = createReactInlineContentSpec(
   {
     type: 'mention',

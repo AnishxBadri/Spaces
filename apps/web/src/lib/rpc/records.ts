@@ -1,8 +1,8 @@
 import { Effect, Schema } from 'effect'
 import { CORE_OBJECTS } from '@spaces/core/attributes/registry'
 import type { EntityValues } from '@spaces/db/schema'
-import { getRecordProgram } from '#/lib/mcp/tools'
-import type { McpRecord } from '#/lib/mcp/tools'
+import { getRecordProgram } from '@spaces/core/writes/read/record'
+import type { McpRecord } from '@spaces/core/writes/read/record'
 import { listRegistryProgram } from '#/lib/mcp/tools-read'
 import type { RegistryObject } from '#/lib/mcp/tools-read'
 import {

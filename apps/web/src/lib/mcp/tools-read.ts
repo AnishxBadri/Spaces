@@ -37,7 +37,10 @@ import type { FieldResolver } from '#/lib/views/sql'
 import { interactionStatField } from '#/lib/views/stat-fields'
 import type { InteractionStatField } from '#/lib/views/stat-fields'
 import type { SQL } from 'drizzle-orm'
-import { McpToolQueryFailed, McpToolRefused } from './tools'
+import {
+  McpToolQueryFailed,
+  McpToolRefused,
+} from '@spaces/core/writes/read/record'
 
 /**
  * The MCP surface's read tools beyond `get_record` (spec §5):

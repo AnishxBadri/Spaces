@@ -28,7 +28,7 @@ import {
   normalizeLinkedin,
   normalizeName,
   normalizeUrl,
-} from '../../entities/normalize'
+} from '@spaces/sdk/identity'
 
 /**
  * THE choke point. Every creator of a person or a company — manual, deck,

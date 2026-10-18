@@ -3,7 +3,7 @@ import {
   normalizeDomain,
   normalizeEmail,
   registrableDomain,
-} from '@spaces/core/entities/normalize'
+} from '@spaces/sdk/identity'
 import type { Address } from './forwarded'
 import { isFreeEmailDomain } from './free-email-domains'
 import { isRoleSender } from './noise'

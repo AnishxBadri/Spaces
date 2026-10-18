@@ -10,7 +10,10 @@ import { liveSpaceSql } from '#/lib/spaces/live'
 import { recordPath } from '#/lib/record-path'
 import { cardEntry, isCalendarDate } from '#/lib/ask/cards'
 import type { AskCardKind } from '#/lib/ask/types'
-import { McpToolQueryFailed, McpToolRefused } from './tools'
+import {
+  McpToolQueryFailed,
+  McpToolRefused,
+} from '@spaces/core/writes/read/record'
 import { proposableEntity } from './tools-propose'
 import type { ProposeCaller } from './tools-propose'
 

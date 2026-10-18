@@ -21,7 +21,7 @@ import type { ParticipantDecision } from './participants'
  *   | junk`. A newsletter is signal for a later lane, never a conversation.
  * - **role sender** — mail *from* a machine: `noreply@`, `mailer-daemon@`,
  *   `notifications@`, `calendar-notification@`, and the rest of `ROLE_SENDERS`.
- *   Deliberately not `isRoleEmail` from `@spaces/core/entities/normalize`:
+ *   Deliberately not `isRoleEmail` from `@spaces/sdk/identity`:
  *   that list answers "does this address identify a person", and `hello@` or
  *   `founders@` fails it while being exactly the address a founder writes a
  *   fund from. This list answers "can a human have written this".
@@ -32,14 +32,6 @@ import type { ParticipantDecision } from './participants'
 
 export type NoiseReason =
   'no-message-id' | 'auto-submitted' | 'list-mail' | 'role-sender' | 'excluded'
-
-export const NOISE_REASONS: ReadonlyArray<NoiseReason> = [
-  'no-message-id',
-  'auto-submitted',
-  'list-mail',
-  'role-sender',
-  'excluded',
-]
 
 export type NoiseInput = {
   /** The message's own Message-ID header, or null when it has none. */

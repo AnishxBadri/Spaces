@@ -33,12 +33,14 @@ import { updateAttributeProgram } from '@spaces/core/writes/attributes/update'
 import { completeMessage, completeProgram, laneTargetProgram } from './complete'
 import type { CompleteFailure, SensitiveRouteRefused } from './complete'
 import {
-  acceptProgram,
   proposeProgram,
   registryFor,
-  suggestionMessage,
-} from './propose'
-import type { Suggestion, SuggestionFailure } from './propose'
+} from '@spaces/core/writes/suggestions/propose'
+import { acceptProgram, suggestionMessage } from './propose'
+import type {
+  Suggestion,
+  SuggestionFailure,
+} from '@spaces/core/writes/suggestions/propose'
 import { providerFailure } from './providers/test-call'
 import { excludeSensitiveProgram } from './route'
 import type { LaneNotRouted, RouteReadFailed } from './route'

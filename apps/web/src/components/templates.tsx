@@ -123,14 +123,12 @@ export function SaveAsTemplateAction({
   entityLabel,
   defaultName,
   onSave,
-  trigger,
   open: controlled,
   onOpenChange,
 }: {
   entityLabel: 'note' | 'space' | 'company' | 'person' | 'deal'
   defaultName?: string
   onSave: (name: string) => Promise<void>
-  trigger?: React.ReactNode
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => void) | undefined
 }) {
@@ -162,9 +160,7 @@ export function SaveAsTemplateAction({
 
   return (
     <>
-      {controlled !== undefined ? null : trigger ? (
-        <span onClick={() => setOpen(true)}>{trigger}</span>
-      ) : (
+      {controlled !== undefined ? null : (
         <button
           type="button"
           onClick={() => setOpen(true)}

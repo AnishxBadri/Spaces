@@ -37,7 +37,6 @@ function localNow(): string {
 
 export function LogInteractionDialog({
   seed,
-  onLogged,
   trigger,
   hotkey,
 }: {
@@ -46,7 +45,6 @@ export function LogInteractionDialog({
    * Omitted where no record is in view (Today): the room starts empty.
    */
   seed?: Attendee
-  onLogged?: () => void
   /** custom trigger element — must forward props (plain DOM elements do) */
   trigger?: React.ReactNode
   /** bare key that opens the dialog from the page — printed in the trigger */
@@ -94,7 +92,6 @@ export function LogInteractionDialog({
       setOccurredAt(localNow())
       setAttendees(seed ? [seed] : [])
       toast(`${kind === 'meeting' ? 'Meeting' : 'Call'} logged`)
-      onLogged?.()
       void router.invalidate()
       if (logged.noteId) {
         await router.navigate({

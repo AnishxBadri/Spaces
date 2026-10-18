@@ -2,7 +2,7 @@ import {
   normalizeDomain,
   normalizeEmail,
   normalizeLinkedin,
-} from '../entities/normalize'
+} from '@spaces/sdk/identity'
 import type { CoreIdentityKey, ObjectKind } from '../attributes/registry'
 import type {
   ImportCellIssue,

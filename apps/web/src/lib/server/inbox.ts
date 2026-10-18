@@ -41,7 +41,7 @@ export type {
 } from '../inbox/queue'
 /** One side of a pair: the record plus everything the card compares. */
 export type { InboxSide } from '../inbox/context'
-export type { SuggestionKind } from '../ai/propose'
+export type { SuggestionKind } from '@spaces/core/writes/suggestions/propose'
 
 /**
  * The queue, optionally scoped to one record (the record rail's "Waiting"

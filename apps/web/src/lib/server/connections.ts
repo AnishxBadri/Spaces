@@ -7,11 +7,9 @@ import {
 
 export type {
   AccountsView,
-  ConnectionCustodyRow,
   ConnectionDisconnectResult,
   ConnectionIdInput,
   ConnectionListRow,
-  ConnectionRevokeResult,
   MailboxSyncInput,
   MailboxSyncResult,
   MailboxSyncView,

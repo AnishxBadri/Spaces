@@ -32,7 +32,7 @@ import {
   fileRecordPayloadSchema,
 } from '../../ai/discovery'
 import type { AddRecordPayload, FileRecordPayload } from '../../ai/discovery'
-import { normalizeDomain } from '../../entities/normalize'
+import { normalizeDomain } from '@spaces/sdk/identity'
 import { toObjectKind } from '../../attributes/registry'
 import type { AttributeDef } from '../../attributes/registry'
 import { objectIdForKindAsync } from '../attributes/objects'

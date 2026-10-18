@@ -6,9 +6,10 @@ import { db } from '@spaces/db'
 import {
   HEADLINE_OPTIONS,
   canReadNoteSql,
-  documentParentsProgram,
-} from '#/lib/search/query'
-import type { SearchParent, SearchQueryFailed } from '#/lib/search/query'
+} from '@spaces/core/writes/read/search'
+import { documentParentsProgram } from '#/lib/search/query'
+import type { SearchQueryFailed } from '@spaces/core/writes/read/search'
+import type { SearchParent } from '#/lib/search/query'
 
 /**
  * The term page (SPA-75; CONTEXT.md → Glossary, "Concept node"). A term is

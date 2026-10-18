@@ -313,23 +313,21 @@ export function RecordBody({
 }
 
 /** A section of the page: the bone head band (sentence-case title, mono
- *  meta beside it, the one action right), then its content on paper. */
+ *  meta beside it), then its content on paper. */
 export function RecordSection({
   label,
   meta,
-  action,
   children,
   className,
 }: {
   label: ReactNode
   meta?: ReactNode
-  action?: ReactNode
   children: ReactNode
   className?: string
 }) {
   return (
     <section className={cn('flex flex-col', className)}>
-      <SectionHead title={label} count={meta} action={action} />
+      <SectionHead title={label} count={meta} />
       {children}
     </section>
   )

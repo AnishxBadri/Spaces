@@ -25,11 +25,7 @@ import {
   space,
 } from '@spaces/db/schema'
 import type { credentialKind } from '@spaces/db/schema'
-import {
-  LEGACY_KEY,
-  autoEnrichScopeOf,
-  scopeWords,
-} from '@spaces/core/plugins/auto-enrich'
+import { autoEnrichScopeOf, scopeWords } from '@spaces/core/plugins/auto-enrich'
 import type { AutoEnrichScopeName } from '@spaces/core/plugins/auto-enrich'
 import { updateFor } from '@spaces/core/plugins/registry'
 import { answersOf, fillableCount } from '@spaces/core/enrichment/page'
@@ -697,15 +693,13 @@ export const integrationDetailProgram = Effect.fn('integrationDetailProgram')(
         : settingsFormOf(withoutAccountPageKeys(manifest))
     const scoped = hasEventJob(manifest)
     const enriches = enrichesRecords(manifest)
-    // An older bundle's on/off switch is the scope's now, and an enrichment
-    // source's reuse window and scope are the Enrichment page's: not drawn twice.
+    // An enrichment source's reuse window and scope are the Enrichment
+    // page's: not drawn twice.
     const form: SettingsForm = drawn.ok
       ? {
           ok: true,
           fields: drawn.fields.filter(
-            (f) =>
-              !(scoped && f.key === LEGACY_KEY) &&
-              !(enriches && ENRICHMENT_PAGE_KEYS.has(f.key)),
+            (f) => !(enriches && ENRICHMENT_PAGE_KEYS.has(f.key)),
           ),
         }
       : drawn

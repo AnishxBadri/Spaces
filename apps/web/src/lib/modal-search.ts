@@ -14,7 +14,6 @@ export const modalSearchShape = {
 }
 
 export const modalSearch = z.object(modalSearchShape)
-export type ModalSearch = z.infer<typeof modalSearch>
 
 /** The id of the `modal` window the search opens, else null. */
 export function openModalId(

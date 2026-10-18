@@ -11,10 +11,10 @@ import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { intakeDocumentProgram } from '@spaces/core/writes/documents/intake'
 import { insertSupersedes } from '@spaces/core/writes/links/supersedes'
 import { fileDocumentProgram } from '#/lib/documents/refile'
+import { proposeProgram } from '@spaces/core/writes/suggestions/propose'
 import {
   acceptProgram,
   acceptRecordProgram,
-  proposeProgram,
   rejectProgram,
   suggestionMessage,
 } from './propose'

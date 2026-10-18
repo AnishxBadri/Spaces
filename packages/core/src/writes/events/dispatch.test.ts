@@ -321,8 +321,6 @@ describe('dispatchDomainEvent', () => {
   })
 
   it.each([
-    ['legacy autoEnrich: true', { autoEnrich: true }, 1],
-    ['legacy autoEnrich: false', { autoEnrich: false }, 0],
     ['no scope keys (the default)', {}, 1],
     ['the space scope only', { autoEnrichScopes: ['space'] }, 0],
     ['the meeting scope only', { autoEnrichScopes: ['meeting'] }, 0],
@@ -388,11 +386,11 @@ describe('dispatchDomainEvent', () => {
       },
     }
     expect(
-      subscribedQueues(
-        event(),
-        [{ config: { autoEnrich: true }, manifest: interactive }],
-        { dealParty: false, filedPaths: [], chosenPaths: new Map() },
-      ),
+      subscribedQueues(event(), [{ config: {}, manifest: interactive }], {
+        dealParty: false,
+        filedPaths: [],
+        chosenPaths: new Map(),
+      }),
     ).toEqual(['plugin.apollo.onCompanyCreated.interactive'])
   })
 

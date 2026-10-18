@@ -1,4 +1,4 @@
-import { registrableDomain } from '@spaces/core/entities/normalize'
+import { registrableDomain } from '@spaces/sdk/identity'
 
 /**
  * Free email providers (D34): a participant on one of these becomes a person
@@ -10,7 +10,7 @@ import { registrableDomain } from '@spaces/core/entities/normalize'
  * every entry is lowercase and is its own registrable domain, so the lookup
  * below — which reduces an address's host to its registrable domain first —
  * can reach it; and the list is a superset of the one
- * `@spaces/core/entities/normalize` refuses to key a company on, so arrival
+ * `@spaces/sdk/identity` refuses to key a company on, so arrival
  * never treats as a work domain what that module would not match.
  *
  * Adding a provider is adding a line. A company that really does work out of

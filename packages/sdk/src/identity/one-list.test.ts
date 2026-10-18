@@ -32,7 +32,7 @@ describe('the role-prefix list', () => {
 
   it('scans both packages', () => {
     expect(sources).toContain(HOME)
-    expect(sources).toContain('core/src/entities/normalize.ts')
+    expect(sources).toContain('core/src/writes/entities/resolve.ts')
   })
 
   it('exists once in packages/core and packages/sdk', () => {

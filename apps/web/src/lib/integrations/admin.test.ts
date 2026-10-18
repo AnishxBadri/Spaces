@@ -755,7 +755,7 @@ describe('the webhook secret field', () => {
 })
 
 describe('auto-enrich scope', () => {
-  /** Apollo as an older bundle stored it: the on/off switch and an event job. */
+  /** Apollo with an event job, so it carries a scope. */
   const SCOPED: IntegrationManifest = {
     ...APOLLO,
     jobs: {
@@ -768,12 +768,9 @@ describe('auto-enrich scope', () => {
     },
   }
 
-  it('reads the legacy switch as the deal scope, on the ledger row and the card', async () => {
+  it('reads no scope keys as the deal scope, on the ledger row and the card', async () => {
     asAdmin()
-    const apollo = await install({
-      manifest: SCOPED,
-      config: { autoEnrich: true },
-    })
+    const apollo = await install({ manifest: SCOPED, config: {} })
     const row = (await listIntegrationsHandler()).find(
       (r) => r.id === apollo.id,
     )
@@ -781,10 +778,6 @@ describe('auto-enrich scope', () => {
     const detail = await getIntegrationHandler({ id: apollo.id })
     // An enrichment source's scope is set on the Enrichment page, not here.
     expect(detail.autoEnrichForm).toBeNull()
-    // The switch is the scope's now: the form does not draw it twice.
-    expect(
-      detail.form.ok ? detail.form.fields.map((f) => f.key) : [],
-    ).not.toContain('autoEnrich')
   })
 
   it('a plugin with no event job has no scope', async () => {
@@ -801,11 +794,11 @@ describe('auto-enrich scope', () => {
     ).rejects.toThrow(/no auto-enrich scope/)
   })
 
-  it('a save writes the scope keys, drops the legacy switch and keeps the rest', async () => {
+  it('a save writes the scope keys and keeps the rest', async () => {
     asAdmin()
     const apollo = await install({
       manifest: SCOPED,
-      config: { autoEnrich: true, cacheDays: 30 },
+      config: { cacheDays: 30 },
     })
     await saveIntegrationAutoEnrichHandler({
       id: apollo.id,

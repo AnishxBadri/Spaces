@@ -17,11 +17,9 @@ import { listInboxProgram } from '#/lib/inbox/queue'
 import type { Json } from '@spaces/core/json'
 import {
   SuggestionInvalid,
-  acceptProgram,
-  acceptRecordProgram,
   proposeProgram,
-  rejectProgram,
-} from './propose'
+} from '@spaces/core/writes/suggestions/propose'
+import { acceptProgram, acceptRecordProgram, rejectProgram } from './propose'
 import type { Decider } from './propose'
 
 /**

@@ -33,9 +33,6 @@ export const mailboxInput = mailboxFields.extend({
 
 export type MailboxInput = z.infer<typeof mailboxInput>
 
-/** Test connection: the same shape, so an unsaved form can be tried first. */
-export const mailboxTestInput = mailboxInput
-
 export const MAILBOX_DEFAULTS = {
   port: 993,
   useTls: true,

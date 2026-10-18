@@ -82,7 +82,6 @@ type Props = {
   value: unknown
   onSave: (value: unknown) => void
   variant: Variant
-  autoFocus?: boolean | undefined
   /** display names for record/actor reference ids */
   refNames?: RefNames | undefined
 }
@@ -136,14 +135,7 @@ export function OptionChip({
   )
 }
 
-export function ValueEditor({
-  def,
-  value,
-  onSave,
-  variant,
-  autoFocus,
-  refNames,
-}: Props) {
+export function ValueEditor({ def, value, onSave, variant, refNames }: Props) {
   switch (def.type) {
     case 'record_reference':
       return (
@@ -233,7 +225,6 @@ export function ValueEditor({
           value={value}
           onSave={onSave}
           variant={variant}
-          autoFocus={autoFocus}
         />
       )
     case 'checkbox':
@@ -303,7 +294,6 @@ export function ValueEditor({
           value={value}
           onSave={onSave}
           variant={variant}
-          autoFocus={autoFocus}
         />
       )
     default:
@@ -313,7 +303,6 @@ export function ValueEditor({
           value={value}
           onSave={onSave}
           variant={variant}
-          autoFocus={autoFocus}
         />
       )
   }
@@ -387,7 +376,7 @@ function DateCellEditor({ def, value, onSave, variant }: Props) {
   )
 }
 
-function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
+function TextLikeEditor({ def, value, onSave, variant }: Props) {
   const display = value == null ? '' : String(value)
   const [draft, setDraft] = useState(display)
   const [focused, setFocused] = useState(false)
@@ -457,7 +446,6 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
       inputMode={def.type === 'number' ? 'decimal' : phone ? 'tel' : undefined}
       {...(phone ? codes.inputProps : {})}
       value={formatted ? atRest(draft) : draft}
-      autoFocus={autoFocus}
       aria-label={def.name}
       placeholder="—"
       onFocus={() => setFocused(true)}

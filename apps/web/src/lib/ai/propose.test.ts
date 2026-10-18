@@ -33,7 +33,9 @@ async function setup() {
 describe('propose → accept', () => {
   it('writes the value as the accepter, with the suggestion as the receipt', async () => {
     const { Effect } = await import('effect')
-    const { proposeProgram, acceptProgram } = await import('./propose')
+    const { proposeProgram } =
+      await import('@spaces/core/writes/suggestions/propose')
+    const { acceptProgram } = await import('./propose')
     const { recordTimelineProgram } = await import('#/lib/timeline/record')
     const { db } = await import('@spaces/db')
     const { attributeEvent, entity, suggestion } =
@@ -125,12 +127,9 @@ describe('propose → accept', () => {
 
   it('leaves the row open and says why when the payload no longer validates', async () => {
     const { Effect } = await import('effect')
-    const {
-      proposeProgram,
-      acceptProgram,
-      SuggestionInvalid,
-      suggestionMessage,
-    } = await import('./propose')
+    const { proposeProgram, SuggestionInvalid } =
+      await import('@spaces/core/writes/suggestions/propose')
+    const { acceptProgram, suggestionMessage } = await import('./propose')
     const { db } = await import('@spaces/db')
     const { attribute, attributeEvent, suggestion } =
       await import('@spaces/db/schema')
@@ -185,7 +184,9 @@ describe('propose → accept', () => {
 
   it('refuses an invalid payload at propose with the validator message', async () => {
     const { Effect } = await import('effect')
-    const { proposeProgram, suggestionMessage } = await import('./propose')
+    const { proposeProgram } =
+      await import('@spaces/core/writes/suggestions/propose')
+    const { suggestionMessage } = await import('./propose')
     const { entityId } = await setup()
 
     const failure = await Effect.runPromise(
@@ -205,8 +206,9 @@ describe('propose → accept', () => {
 
   it('writes once when two accepts race', async () => {
     const { Effect } = await import('effect')
-    const { proposeProgram, acceptProgram, SuggestionNotOpen } =
-      await import('./propose')
+    const { proposeProgram, SuggestionNotOpen } =
+      await import('@spaces/core/writes/suggestions/propose')
+    const { acceptProgram } = await import('./propose')
     const { db } = await import('@spaces/db')
     const { attributeEvent } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
@@ -245,13 +247,9 @@ describe('propose → accept', () => {
 
   it('refuses a ledger event that is not one, and closes on reject', async () => {
     const { Effect } = await import('effect')
-    const {
-      proposeProgram,
-      acceptProgram,
-      rejectProgram,
-      SuggestionInvalid,
-      SuggestionNotOpen,
-    } = await import('./propose')
+    const { proposeProgram, SuggestionInvalid, SuggestionNotOpen } =
+      await import('@spaces/core/writes/suggestions/propose')
+    const { acceptProgram, rejectProgram } = await import('./propose')
     const { accepter, entityId } = await setup()
     const decider: Decider = { type: 'user', id: accepter.id }
 
@@ -347,7 +345,8 @@ describe('bulk accept', () => {
 
   async function propose(entityId: string, payload: Json) {
     const { Effect } = await import('effect')
-    const { proposeProgram } = await import('./propose')
+    const { proposeProgram } =
+      await import('@spaces/core/writes/suggestions/propose')
     return Effect.runPromise(
       proposeProgram({
         entityId,

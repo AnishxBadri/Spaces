@@ -80,29 +80,6 @@ import {
   portfolioWriteMessage,
 } from '#/lib/portfolio/write'
 
-// The propose half moved into core (SPA-204): every name it exported is
-// re-exported here unchanged, so the AI lanes, MCP, capture and their tests
-// import it from where they always did.
-export {
-  SuggestionInvalid,
-  SuggestionNotFound,
-  SuggestionNotOpen,
-  SuggestionWriteFailed,
-  UnsupportedSuggestionKind,
-  proposeProgram,
-  registryFor,
-} from '@spaces/core/writes/suggestions/propose'
-export type {
-  DiscoveryKind,
-  DiscoveryProposeInput,
-  DiscoveryProposed,
-  ProposeInput,
-  Reader,
-  Suggestion,
-  SuggestionFailure,
-  SuggestionKind,
-} from '@spaces/core/writes/suggestions/propose'
-
 /**
  * The AI layer's one mutating verb (docs/spec-ai-substrate.md §3, §10).
  *

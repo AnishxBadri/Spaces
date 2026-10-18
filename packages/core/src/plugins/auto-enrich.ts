@@ -11,8 +11,7 @@ import type { DomainEvent } from '@spaces/sdk'
  * - `autoEnrichSpaces` empty with `space` ticked means every space.
  * - A birth or a new identity is in scope when the record already stands in
  *   one: a party of a live deal, or filed in a chosen space.
- * - The legacy `autoEnrich` boolean reads as `deal` for true and none for
- *   false; with neither key, the default is `deal` alone.
+ * - With no `autoEnrichScopes` key, the default is `deal` alone.
  */
 
 export const AUTO_ENRICH_SCOPES = ['deal', 'space', 'meeting'] as const
@@ -21,9 +20,6 @@ export type AutoEnrichScopeName = (typeof AUTO_ENRICH_SCOPES)[number]
 /** The config keys the host writes; the plugin never reads them. */
 export const SCOPES_KEY = 'autoEnrichScopes'
 export const SPACES_KEY = 'autoEnrichSpaces'
-/** Read, never written: the on/off switch the scopes replaced. */
-export const LEGACY_KEY = 'autoEnrich'
-
 export const DEFAULT_SCOPES: ReadonlyArray<AutoEnrichScopeName> = ['deal']
 
 export type AutoEnrichScope = {
@@ -43,24 +39,19 @@ export const autoEnrichScopeOf = (config: {
   const spaces = spaceList.safeParse(config[SPACES_KEY])
   const chosen: ReadonlyArray<unknown> = listed.success
     ? listed.data
-    : config[LEGACY_KEY] === true
-      ? ['deal']
-      : config[LEGACY_KEY] === false
-        ? []
-        : DEFAULT_SCOPES
+    : DEFAULT_SCOPES
   return {
     scopes: AUTO_ENRICH_SCOPES.filter((s) => chosen.includes(s)),
     spaces: spaces.success ? spaces.data : [],
   }
 }
 
-/** The scope as config keys, the legacy switch dropped. */
+/** The scope as config keys. */
 export const autoEnrichConfig = <T>(
   config: { readonly [key: string]: T },
   scope: AutoEnrichScope,
 ): { [key: string]: T | Array<string> } => {
   const next: { [key: string]: T | Array<string> } = { ...config }
-  delete next[LEGACY_KEY]
   next[SCOPES_KEY] = [...scope.scopes]
   next[SPACES_KEY] = [...scope.spaces]
   return next

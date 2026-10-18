@@ -1,4 +1,4 @@
-import { normalizeName } from '../entities/normalize'
+import { normalizeName } from '@spaces/sdk/identity'
 import { guessDocumentKind, guessKindFromFolder } from './index'
 import type { DocumentKind } from './index'
 

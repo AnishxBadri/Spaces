@@ -292,9 +292,6 @@ export const ollamaNotPulledMessage = (model: string): string =>
 export const needsRepinNote = (model: EmbeddingModelInfo): string =>
   `needs re-pin — emits ${model.nativeDims}, this workspace stores ${PIN_DIMS}`
 
-export const NO_PIN_HEADLINE =
-  'No embedding model — search matches words, not meaning.'
-
 export type EmbeddingPinView = {
   provider: EmbeddingProvider
   model: string
@@ -341,9 +338,6 @@ export const storedDims = (model: EmbeddingModelInfo): number =>
 
 export const NO_SLOT_HEADLINE =
   'No sensitive slot — sensitive records are left unembedded.'
-
-export const LOCAL_PIN_HEADLINE =
-  'The pin runs locally — sensitive records embed through it.'
 
 export const slotHeadline = (slot: EmbeddingSlotView): string =>
   `Sensitive records embed through ${EMBEDDING_PROVIDER_INFO[slot.provider].label} ${slot.model} at ${slot.dims} dimensions.`
@@ -423,10 +417,6 @@ export const backfillProgressLine = (embedded: number, total: number): string =>
   `embedded ${formatNumber(embedded, 0)} of ${formatNumber(total, 0)}`
 
 // The server fns' inputs.
-
-export const embeddingProviderInput = z.object({
-  provider: z.enum(EMBEDDING_PROVIDERS),
-})
 
 export const embeddingKeyInput = z.object({
   provider: z.enum(KEYED_EMBEDDING_PROVIDERS),

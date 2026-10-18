@@ -33,6 +33,7 @@
     "release:tag": "tsx scripts/release-tags.ts --push",
     "format": "prettier --write . && eslint --fix",
     "check": "prettier --check .",
+    "knip": "pnpm dlx knip@5",
     "prepare": "lefthook install"
   },
   "devDependencies": {

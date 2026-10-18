@@ -8,7 +8,7 @@ import type { ReadDeckResult } from './read-deck'
 import { withRun } from './run'
 import type { RunWriteFailed } from './run'
 import { summarizeMessage, summarizeProgram } from './summarize'
-import type { Suggestion } from './propose'
+import type { Suggestion } from '@spaces/core/writes/suggestions/propose'
 
 /**
  * Read deck and summarize (SPA-100; docs/spec-ai-substrate.md §6, §14 step

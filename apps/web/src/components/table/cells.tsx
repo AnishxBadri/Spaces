@@ -84,22 +84,6 @@ export const ChipLink = createLink(function ChipAnchor({
   )
 })
 
-/** Secondary identity data — domains, emails. Icon + one truncated line. */
-export function MetaCell({
-  icon: Icon,
-  children,
-}: {
-  icon: LucideIcon
-  children: ReactNode
-}) {
-  return (
-    <span className="flex items-center gap-1.5 truncate px-1 text-graphite">
-      <Icon className="size-3 shrink-0" strokeWidth={1.75} />
-      <span className="truncate">{children}</span>
-    </span>
-  )
-}
-
 /**
  * A registry column's meta: figures and dates right-align their head over
  * the `numeric` cell the value editor draws for them.

@@ -50,6 +50,11 @@ jobs:
       # vocabulary is the `instrument/vocabulary` eslint rule, not a grep.
       - name: Gates 4 and 5 — eslint (carries instrument/vocabulary)
         run: pnpm run lint
+      # Unused files, exports and dependencies (knip.json). After lint, whose
+      # ^build edge leaves packages/sdk/dist for knip to resolve. A new
+      # `#web/*` crossing goes into knip.json's apps/web entries.
+      - name: Dead code — knip
+        run: pnpm run knip
       - name: Gate 1 — typecheck
         run: pnpm run typecheck
       # The one thing that proves the journal applies to an *empty* database:

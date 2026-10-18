@@ -293,32 +293,6 @@ export function OptionListEditor({
   )
 }
 
-/** A 24px mark button for editor rows: graphite until hover, bone behind. */
-export function IconBtn({
-  label,
-  disabled,
-  onClick,
-  children,
-}: {
-  label: string
-  disabled?: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-      className="focus-ring flex size-6 shrink-0 touch-manipulation items-center justify-center rounded-md text-graphite transition-colors duration-150 ease-out-quart hover:bg-bone hover:text-foreground disabled:pointer-events-none disabled:text-rule"
-    >
-      {children}
-    </button>
-  )
-}
-
 /**
  * Swatch picker for one option's badge colour: a fixed grid of the shipped
  * palette as 16px squares rather than a colour input — every swatch already

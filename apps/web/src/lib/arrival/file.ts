@@ -1,10 +1,7 @@
 import { Readable } from 'node:stream'
 import { Effect, Schema } from 'effect'
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
-import {
-  normalizeDomain,
-  normalizeEmail,
-} from '@spaces/core/entities/normalize'
+import { normalizeDomain, normalizeEmail } from '@spaces/sdk/identity'
 import { db } from '@spaces/db'
 import {
   document,

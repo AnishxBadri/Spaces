@@ -18,10 +18,8 @@ import { canRead } from '../../read-policy'
 import { recordRelationsProgram } from './relations'
 
 /**
- * One record, read as a given reader (SPA-198 moved this here from
- * `apps/web/src/lib/mcp/tools.ts`, which re-exports it): the MCP surface's
- * `get_record` and the plugin SDK's `Read.entity` (`../ports/read.ts`) are
- * this one read, so a merged-away id, an unreadable note and the registry
+ * One record, read as a given reader: the MCP surface's `get_record` and
+ * the plugin SDK's `Read.entity` are this one read, so a merged-away id, an unreadable note and the registry
  * shape mean the same thing to an assistant and to a plugin.
  *
  * The read half of the MCP surface's record tool (SPA-23, spec §5):

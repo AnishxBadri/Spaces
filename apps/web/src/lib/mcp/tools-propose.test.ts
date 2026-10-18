@@ -11,10 +11,10 @@ import { user } from '@spaces/db/schema/auth'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import {
-  acceptProgram,
   proposeProgram,
   SuggestionInvalid,
-} from '#/lib/ai/propose'
+} from '@spaces/core/writes/suggestions/propose'
+import { acceptProgram } from '#/lib/ai/propose'
 import type { Decider } from '#/lib/ai/propose'
 import type { Actor } from '@spaces/core/writes/attributes/values'
 import { listInboxProgram } from '#/lib/inbox/queue'

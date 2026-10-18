@@ -15,8 +15,12 @@ import type { QueuedJob } from '#/lib/queue'
 import { completeMessage, completeProgram } from './complete'
 import type { CompleteFailure } from './complete'
 import { inlineCitations } from './inline-citations'
-import { proposeProgram, suggestionMessage } from './propose'
-import type { Suggestion, SuggestionFailure } from './propose'
+import { proposeProgram } from '@spaces/core/writes/suggestions/propose'
+import { suggestionMessage } from './propose'
+import type {
+  Suggestion,
+  SuggestionFailure,
+} from '@spaces/core/writes/suggestions/propose'
 import { providerFailure } from './providers/test-call'
 import { callStep, suggestionOutputRef, withRun } from './run'
 import type { RunScope } from './run'

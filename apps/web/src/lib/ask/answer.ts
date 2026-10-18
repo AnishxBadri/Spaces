@@ -185,10 +185,6 @@ export function answerBlocks(
   return blocks
 }
 
-/** Whether any block was withheld: the turn foot says so once. */
-export const refusedCount = (blocks: ReadonlyArray<AnswerBlock>): number =>
-  blocks.filter((b) => b.kind === 'refused').length
-
 const escapeWords = (s: string): string => s.replace(/[\\`*_[\]|]/g, '\\$&')
 
 function segmentsMarkdown(segments: ReadonlyArray<AnswerSegment>): string {

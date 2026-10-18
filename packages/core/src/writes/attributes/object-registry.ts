@@ -13,7 +13,7 @@ import {
 } from '../../attributes/registry'
 import { recordNameAlias } from '../entities/resolve'
 import { sweepNameSimilarityEffect } from '../entities/sweep'
-import { normalizeName } from '../../entities/normalize'
+import { normalizeName } from '@spaces/sdk/identity'
 import { slugifyNoun, suggestPlural } from '../../attributes/object-nouns'
 import type { AttributeCreateRejected, Tx } from './create'
 import type { AttributeQueryFailed } from './update'

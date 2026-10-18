@@ -88,13 +88,6 @@ export function versionNoteOf(row: IntegrationRow): string | null {
   return parts.length === 0 ? null : parts.join(' · ')
 }
 
-/** `12 / 100 cr`, `3 cr`, or a dash when nothing was spent and nothing is capped. */
-export function creditsOf(row: IntegrationRow): string {
-  const { used, cap } = row.credits
-  if (cap !== null) return `${used} / ${cap} cr`
-  return used > 0 ? `${used} cr` : '—'
-}
-
 /** A plugin's mark: its initial on a square, ink when installed, rule when offered. */
 export function PluginMark({
   name,

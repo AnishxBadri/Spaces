@@ -19,8 +19,12 @@ import { completeMessage, completeProgram, laneTargetProgram } from './complete'
 import { callStep, suggestionOutputRef, withRun } from './run'
 import type { RunScope } from './run'
 import type { CompleteFailure, SensitiveRouteRefused } from './complete'
-import { proposeProgram, suggestionMessage } from './propose'
-import type { Suggestion, SuggestionFailure } from './propose'
+import { proposeProgram } from '@spaces/core/writes/suggestions/propose'
+import { suggestionMessage } from './propose'
+import type {
+  Suggestion,
+  SuggestionFailure,
+} from '@spaces/core/writes/suggestions/propose'
 import { providerFailure } from './providers/test-call'
 import { excludeSensitiveProgram } from './route'
 import type { LaneNotRouted, RouteReadFailed } from './route'

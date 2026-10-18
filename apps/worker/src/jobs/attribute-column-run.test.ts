@@ -27,7 +27,8 @@ import {
   isColumnRunTask,
   pressColumnRunProgram,
 } from '#web/lib/ai/column-run'
-import { acceptColumnProgram, proposeProgram } from '#web/lib/ai/propose'
+import { proposeProgram } from '@spaces/core/writes/suggestions/propose'
+import { acceptColumnProgram } from '#web/lib/ai/propose'
 import { setAiRouteProgram } from '#web/lib/ai/route'
 import {
   createObjectProgram,

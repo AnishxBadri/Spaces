@@ -15,16 +15,6 @@ import { excerpt } from '@spaces/core/context/excerpt'
 import { queryVectorOrNullProgram } from './query-embedding'
 import type { QueryVector } from './query-embedding'
 
-// The lexical lanes, `canReadNoteSql`, the snippet options and the row
-// types live in core since SPA-198 (the plugin SDK's Read.search runs them);
-// re-exported so every importer of this module is unchanged.
-export {
-  HEADLINE_OPTIONS,
-  SearchQueryFailed,
-  canReadNoteSql,
-} from '@spaces/core/writes/read/search'
-export type { FusedRow, SearchRowKind } from '@spaces/core/writes/read/search'
-
 const query = <T>(run: () => Promise<T>) =>
   Effect.tryPromise({
     try: run,

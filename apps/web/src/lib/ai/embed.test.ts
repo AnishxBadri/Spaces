@@ -12,7 +12,6 @@ import { embedMessage, embedProgram } from './embed'
 import type { EmbedOptions } from './embed'
 import { pinEmbeddingProgram, readEmbeddingPinProgram } from './embedding-pin'
 import {
-  NO_PIN_HEADLINE,
   PIN_DIMS,
   modelsFor,
   needsRepinNote,
@@ -266,11 +265,8 @@ describe('embed()', () => {
 })
 
 describe('the embedding pin', () => {
-  it('reads no pin, and the section head says search matches words', async () => {
+  it('reads no pin', async () => {
     expect(await Effect.runPromise(readEmbeddingPinProgram())).toBeNull()
-    expect(NO_PIN_HEADLINE).toBe(
-      'No embedding model — search matches words, not meaning.',
-    )
   })
 
   it('pins OpenAI text-embedding-3-small at 768', async () => {

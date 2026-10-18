@@ -14,9 +14,11 @@ import { jsonRecord, jsonString } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
 import {
   SuggestionNotOpen,
-  acceptProgram,
   proposeProgram,
   registryFor,
+} from '@spaces/core/writes/suggestions/propose'
+import {
+  acceptProgram,
   rejectProgram,
   suggestionMessage,
 } from '#/lib/ai/propose'

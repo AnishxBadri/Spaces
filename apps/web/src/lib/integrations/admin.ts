@@ -153,9 +153,9 @@ export const saveIntegrationSettingsProgram = Effect.fn(
 })
 
 /**
- * Write the auto-enrich scope onto `integration.config`, the retired
- * `autoEnrich` switch dropped. Refused for a plugin with no event job. The
- * dispatcher reads the row on every event, so nothing reloads. (D76)
+ * Write the auto-enrich scope onto `integration.config`. Refused for a
+ * plugin with no event job. The dispatcher reads the row on every event, so
+ * nothing reloads. (D76)
  */
 export const saveIntegrationAutoEnrichProgram = Effect.fn(
   'saveIntegrationAutoEnrichProgram',

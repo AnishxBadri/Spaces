@@ -36,20 +36,6 @@ export const connectionIdInput = z.object({ connectionId: z.uuid() })
 
 export type ConnectionIdInput = z.infer<typeof connectionIdInput>
 
-/** A connection after a refresh, as an account page draws it. Never a token. */
-export type ConnectionCustodyRow = {
-  connectionId: string
-  status: 'active' | 'error' | 'revoked'
-  /** When the access token lapses, ISO; null when the provider did not say. */
-  expiresAt: string | null
-}
-
-/** What a revoke did at the provider: `already-revoked` when it no longer knew the token. */
-export type ConnectionRevokeResult = {
-  connectionId: string
-  outcome: 'revoked' | 'already-revoked'
-}
-
 /** One of the session user's connections as the accounts pages list it. Never a token. */
 export type ConnectionListRow = {
   connectionId: string

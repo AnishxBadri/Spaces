@@ -90,6 +90,7 @@ export const unlinkDriveFolder = createServerFn({ method: 'POST' })
  * backfill per document whose bytes were dropped; `full → text` drops
  * nothing held until each file is next extracted. Null when the binding is
  * gone.
+ * No surface calls it yet. @public
  */
 export const setBindingRetain = createServerFn({ method: 'POST' })
   .validator(

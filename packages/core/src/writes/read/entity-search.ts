@@ -8,10 +8,9 @@ import type { EntitySearchInput } from '../../search/entity-search-input'
  * be exercised without a session — which is how SPA-63 pins that a renamed
  * record is still reachable by its previous name.
  *
- * In core since SPA-198 (`apps/web/src/lib/search/rows.ts` re-exports it),
- * with its input schema in the pure half (`../../search/entity-search-input`)
- * so the server fn's `.validator()` — which survives into the client bundle
- * — imports a module that imports no `db` (SPA-155).
+ * Its input schema lives in the pure half (`entitySearchInput`) so the
+ * server fn's `.validator()` — which survives into the client bundle —
+ * imports a module that imports no `db`.
  */
 export async function entitySearchRows(
   userId: string,

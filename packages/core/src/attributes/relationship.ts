@@ -7,16 +7,6 @@ import type { Cardinality } from '@spaces/db/schema/attributes'
  */
 export type { Cardinality }
 
-export const CARDINALITIES: ReadonlyArray<Cardinality> = [
-  '1:1',
-  '1:N',
-  'N:1',
-  'N:N',
-]
-
-export const isCardinality = (raw: string): raw is Cardinality =>
-  CARDINALITIES.some((c) => c === raw)
-
 /** The same relationship read from the other side. */
 export function flipCardinality(card: Cardinality): Cardinality {
   return card === '1:N' ? 'N:1' : card === 'N:1' ? '1:N' : card

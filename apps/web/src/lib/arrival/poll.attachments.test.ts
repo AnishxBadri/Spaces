@@ -15,7 +15,7 @@ import {
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { QUEUES } from '@spaces/core/queue/names'
-import { normalizeEmail } from '@spaces/core/entities/normalize'
+import { normalizeEmail } from '@spaces/sdk/identity'
 import { FakeImapServer } from '#/test/fake-imap'
 import { minimalPdf } from '#/test/minimal-pdf'
 import { truncateAndReseed } from '#/test/reseed'

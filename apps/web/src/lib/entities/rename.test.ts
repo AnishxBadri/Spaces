@@ -44,8 +44,9 @@ describe('renaming a record', () => {
       await import('@spaces/core/writes/entities/rename')
     const { resolveEntity } =
       await import('@spaces/core/writes/entities/resolve')
-    const { entitySearchRows } = await import('../search/rows')
-    const { normalizeName } = await import('@spaces/core/entities/normalize')
+    const { entitySearchRows } =
+      await import('@spaces/core/writes/read/entity-search')
+    const { normalizeName } = await import('@spaces/sdk/identity')
     const { Effect } = await import('effect')
     const tag = randomUUID().slice(0, 8)
     const actor = await actorId()
@@ -91,8 +92,9 @@ describe('renaming a record', () => {
       await import('@spaces/core/writes/entities/rename')
     const { createObjectProgram, createRecordProgram } =
       await import('@spaces/core/writes/attributes/object-registry')
-    const { entitySearchRows } = await import('../search/rows')
-    const { normalizeName } = await import('@spaces/core/entities/normalize')
+    const { entitySearchRows } =
+      await import('@spaces/core/writes/read/entity-search')
+    const { normalizeName } = await import('@spaces/sdk/identity')
     const { Effect } = await import('effect')
     const tag = randomUUID().slice(0, 8)
     const actor = await actorId()
@@ -172,7 +174,7 @@ describe('the dedupe card — "Also seen as"', () => {
       await import('@spaces/core/writes/entities/resolve')
     const { renameRecordProgram } =
       await import('@spaces/core/writes/entities/rename')
-    const { normalizeName } = await import('@spaces/core/entities/normalize')
+    const { normalizeName } = await import('@spaces/sdk/identity')
     const { Effect } = await import('effect')
     const tag = randomUUID().slice(0, 8)
     const actor = await actorId()

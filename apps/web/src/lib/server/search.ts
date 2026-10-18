@@ -16,7 +16,8 @@ export const searchEntities = createServerFn()
   .validator(entitySearchInput)
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const { entitySearchRows } = await import('#/lib/search/rows')
+    const { entitySearchRows } =
+      await import('@spaces/core/writes/read/entity-search')
     return entitySearchRows(u.id, data)
   })
 

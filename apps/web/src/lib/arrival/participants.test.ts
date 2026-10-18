@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { isNonIdentityValue } from '@spaces/core/attributes/registry'
-import { ROLE_PREFIXES } from '@spaces/core/entities/normalize'
+import { ROLE_PREFIXES } from '@spaces/sdk/identity'
 import type { Address } from './forwarded'
 import { companyName, decideParticipants } from './participants'
 import type { ParticipantDecision, ParticipantsInput } from './participants'

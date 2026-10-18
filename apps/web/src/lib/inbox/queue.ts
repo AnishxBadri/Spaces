@@ -29,7 +29,7 @@ import type { DuplicateReason } from '@spaces/db/schema/entities'
 import { toObjectKind } from '@spaces/core/attributes/registry'
 import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
 import { getRegistryByObjectId } from '@spaces/core/writes/attributes/values'
-import type { SuggestionKind } from '#/lib/ai/propose'
+import type { SuggestionKind } from '@spaces/core/writes/suggestions/propose'
 import {
   DISCOVERY_KINDS,
   isDiscoveryKind,

@@ -1,0 +1,208 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "ignoreExportsUsedInFile": true,
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/**/*.ts!"],
+      "project": ["scripts/**/*.ts!"]
+    },
+    "apps/web": {
+      "entry": [
+        "src/routes/**/*.{ts,tsx}!",
+        "src/router.tsx!",
+        "src/db/{boot,seed,seed-big}.ts!",
+        "scripts/*.ts!",
+        "vitest.*.ts",
+        "src/test/*.ts",
+        "src/lib/ai/route.ts!",
+        "src/lib/queue.ts!",
+        "src/test/queue-stub.ts",
+        "src/lib/documents/refile.ts!",
+        "src/lib/server/shared.ts!",
+        "src/lib/ai/complete.ts!",
+        "src/lib/integrations/job-status.ts!",
+        "src/test/minimal-pdf.ts",
+        "src/lib/documents/attach-link.ts!",
+        "src/lib/ai/propose.ts!",
+        "src/lib/import/mapping.ts!",
+        "src/lib/import/plan.ts!",
+        "src/lib/import/commit.ts!",
+        "src/lib/import/stage.ts!",
+        "src/lib/portfolio/write.ts!",
+        "src/lib/arrival/meeting.ts!",
+        "src/lib/arrival/noise.ts!",
+        "src/test/reseed.ts",
+        "src/lib/documents/blob-refs.ts!",
+        "src/lib/documents/remote-bytes.ts!",
+        "src/lib/search/query.ts!",
+        "src/lib/integrations/status.ts!",
+        "src/lib/integrations/ledger.ts!",
+        "src/lib/arrival/synced.ts!",
+        "src/lib/server/env.ts!",
+        "src/lib/arrival/schedule.ts!",
+        "src/lib/ai/embed-backfill.ts!",
+        "src/lib/inbox/queue.ts!",
+        "src/lib/rpc/api.ts!",
+        "src/lib/rpc/versions.ts!",
+        "src/lib/tokens/store.ts!",
+        "src/lib/ai/embed-document.ts!",
+        "src/lib/ai/providers/embed/ids.ts!",
+        "src/test/fake-ollama.ts",
+        "src/lib/documents/fetch-guard.ts!",
+        "src/lib/search/query-embedding.ts!",
+        "src/lib/ai/embed-chunks.ts!",
+        "src/lib/ai/embedding-pin.ts!",
+        "src/lib/ai/providers/embed/settings.ts!",
+        "src/lib/ai/ledger-event.ts!",
+        "src/lib/ai/suggest-spaces.ts!",
+        "src/lib/ai/column-run.ts!",
+        "src/lib/ai/attribute-run.ts!",
+        "src/lib/ai/summarize.ts!",
+        "src/lib/ai/key-terms.ts!",
+        "src/lib/documents/on-extracted.ts!",
+        "src/lib/documents/retain.ts!",
+        "src/lib/glossary/link-terms.ts!",
+        "src/lib/ai/sensitivity-for.ts!",
+        "src/lib/ai/classify-document.ts!",
+        "src/lib/documents/read-deck-gate.ts!",
+        "src/lib/arrival/poll.ts!",
+        "src/lib/ai/embed-source.ts!",
+        "src/test/fake-imap.ts",
+        "src/lib/arrival/fixtures.ts!",
+        "src/lib/arrival/settings.ts!",
+        "src/lib/ai/read-deck.ts!",
+        "src/lib/ai/read-deck-summarize.ts!",
+        "src/lib/documents/clip.ts!",
+        "src/lib/documents/shelf.ts!",
+        "src/lib/documents/space-sources.ts!",
+        "src/lib/ai/run.ts!",
+        "src/lib/ai/vision.ts!",
+        "src/lib/documents/vision-gate.ts!"
+      ],
+      "project": ["src/**/*.{ts,tsx}!", "scripts/**/*.ts!"],
+      "paths": {
+        "#/*": ["./src/*"]
+      },
+      "ignoreDependencies": ["@spaces/config"]
+    },
+    "apps/worker": {
+      "entry": ["src/health.ts!", "vitest.*.ts"],
+      "project": ["src/**/*.ts!"],
+      "paths": {
+        "#web/*": ["../web/src/*"],
+        "#/*": ["../web/src/*"]
+      },
+      "ignoreDependencies": [
+        "@spaces/config",
+        "@ai-sdk/anthropic",
+        "@ai-sdk/google",
+        "@ai-sdk/openai",
+        "@openrouter/ai-sdk-provider",
+        "ollama-ai-provider-v2",
+        "@tanstack/react-start",
+        "better-auth",
+        "imapflow",
+        "mailparser",
+        "@spaces/plugin-airtable",
+        "@spaces/plugin-apollo",
+        "@spaces/plugin-box",
+        "@spaces/plugin-discover",
+        "@spaces/plugin-echo",
+        "@spaces/plugin-gatecrasher",
+        "@spaces/plugin-gmail",
+        "@spaces/plugin-google-calendar",
+        "@spaces/plugin-google-drive",
+        "@spaces/plugin-hooked",
+        "@spaces/plugin-importer",
+        "@spaces/plugin-needs-key",
+        "@spaces/plugin-old-sdk",
+        "@spaces/plugin-overreach",
+        "@spaces/plugin-poller",
+        "@spaces/plugin-researcher",
+        "@spaces/plugin-rss",
+        "@spaces/plugin-syncer",
+        "@spaces/plugin-tabled",
+        "@spaces/plugin-tampered",
+        "@spaces/plugin-throws",
+        "@spaces/plugin-trespass",
+        "@spaces/plugin-versioned",
+        "@spaces/plugin-watcher"
+      ]
+    },
+    "apps/e2e": {
+      "entry": [
+        "specs/**/*.ts",
+        "screenshots/**/*.ts",
+        "harness/**/*.ts",
+        "playwright*.ts"
+      ],
+      "project": ["**/*.ts"],
+      "ignoreDependencies": ["@spaces/config"]
+    },
+    "apps/site": {
+      "entry": [
+        "src/pages/**/*.{astro,ts,md,mdx}!",
+        "src/layouts/**/*.astro!",
+        "src/components/**/*.astro!",
+        "src/integrations/*.ts!"
+      ],
+      "project": ["src/**/*.{ts,astro,tsx}!"],
+      "ignoreDependencies": ["@spaces/config"]
+    },
+    "packages/db": {
+      "includeEntryExports": true,
+      "entry": [
+        "src/{index,entity-refs,heartbeat,plugin-health,migrate,downgrade-guard,json,value-indexes}.ts!",
+        "src/bin/*.ts!",
+        "vitest.*.ts"
+      ],
+      "project": ["src/**/*.ts!"],
+      "ignoreDependencies": ["@spaces/config"]
+    },
+    "packages/core": {
+      "includeEntryExports": true,
+      "entry": ["vitest.*.ts"],
+      "project": ["src/**/*.ts!"],
+      "ignoreDependencies": ["@spaces/config"]
+    },
+    "packages/sdk": {
+      "entry": [
+        "src/index.ts!",
+        "src/identity/normalize.ts!",
+        "src/vocabulary.ts!",
+        "src/import-grid.ts!",
+        "src/testing/index.ts!",
+        "src/plugin-build/index.ts!",
+        "src/pack/index.ts!",
+        "bin/*.js!",
+        "src/pack/cli.ts!"
+      ],
+      "project": ["src/**/*.ts!", "bin/*.js!"],
+      "ignoreDependencies": ["@spaces/config"]
+    },
+    "packages/config": {
+      "entry": ["eslint-rules/*.js!"],
+      "project": ["**/*.js!"]
+    },
+    "plugins/*": {
+      "entry": ["src/index.ts!", "src/manifest.ts!"],
+      "project": ["src/**/*.ts!"],
+      "ignoreDependencies": ["@spaces/config"]
+    },
+    "plugins/_fixtures/versioned": {
+      "entry": [
+        "src/manifest.ts!",
+        "src/v1.ts!",
+        "src/v2.ts!",
+        "src/plugin.ts!"
+      ],
+      "project": ["src/**/*.ts!"],
+      "ignoreDependencies": ["@spaces/config"]
+    },
+    "plugins/_fixtures/*": {
+      "entry": ["src/index.ts!", "src/manifest.ts!"],
+      "project": ["src/**/*.ts!"],
+      "ignoreDependencies": ["@spaces/config"]
+    }
+  }
+}

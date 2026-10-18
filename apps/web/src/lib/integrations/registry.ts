@@ -1,8 +1,5 @@
 import { Effect, Schema } from 'effect'
-import {
-  bundledRegistryFile,
-  readRegistryFile,
-} from '@spaces/core/plugins/source'
+import { readRegistryFile } from '@spaces/core/plugins/source'
 import type { RegistryEntry } from '@spaces/sdk/pack'
 
 /**
@@ -27,8 +24,6 @@ export class RegistryUnreadable extends Schema.TaggedError<RegistryUnreadable>()
   'RegistryUnreadable',
   { message: Schema.String },
 ) {}
-
-export const registryFile = bundledRegistryFile
 
 /** Every entry in the registry, or why it could not be read. */
 export const readRegistryProgram = Effect.fn('readRegistryProgram')(function* (

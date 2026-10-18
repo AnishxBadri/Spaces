@@ -21,14 +21,20 @@ import { JSON_SCHEMA_DRAFT } from '@spaces/core/ai/schema'
 import type { JsonSchema } from '@spaces/core/ai/schema'
 import { ref } from '@spaces/core/context/ref'
 import { jsonValue } from '@spaces/core/json'
-import { heldLedgerEvent } from '@spaces/core/writes/suggestions/propose'
+import {
+  heldLedgerEvent,
+  proposeProgram,
+} from '@spaces/core/writes/suggestions/propose'
 import { fmtPct } from '@spaces/core/portfolio/format'
 import { loadHoldingDetail } from '#/lib/portfolio/detail'
 import { completeMessage } from './complete'
 import type { CompleteFailure } from './complete'
 import { cachedExtractProgram } from './extraction-cache'
-import { proposeProgram, suggestionMessage } from './propose'
-import type { Suggestion, SuggestionFailure } from './propose'
+import { suggestionMessage } from './propose'
+import type {
+  Suggestion,
+  SuggestionFailure,
+} from '@spaces/core/writes/suggestions/propose'
 import { providerFailure } from './providers/test-call'
 import { callStep, suggestionOutputRef, withRun } from './run'
 import type { RunScope } from './run'

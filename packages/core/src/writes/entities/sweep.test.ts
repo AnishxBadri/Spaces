@@ -72,7 +72,7 @@ describe('createRecordProgram birth alias', () => {
     const { db } = await import('@spaces/db')
     const { entityAlias } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
-    const { normalizeName } = await import('../../entities/normalize')
+    const { normalizeName } = await import('@spaces/sdk/identity')
 
     const me = await actorId()
     const tag = randomUUID().slice(0, 8)
@@ -209,7 +209,7 @@ describe('sweepNameSimilarity', () => {
     const { renameRecordProgram } = await import('./rename')
     const { sweepNameSimilarity } = await import('./sweep')
     const { objectIdForKindAsync } = await import('../attributes/objects')
-    const { normalizeName } = await import('../../entities/normalize')
+    const { normalizeName } = await import('@spaces/sdk/identity')
     const { MERGEABLE } = await import('./merge')
 
     const me = await actorId()

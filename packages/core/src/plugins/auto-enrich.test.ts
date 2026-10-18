@@ -11,14 +11,8 @@ const SPACE = '00000000-0000-4000-8000-0000000000aa'
 
 describe('autoEnrichScopeOf', () => {
   it.each([
-    ['autoEnrich: true reads as deal', { autoEnrich: true }, ['deal']],
-    ['autoEnrich: false reads as none', { autoEnrich: false }, []],
-    ['neither key is the default, deal alone', {}, ['deal']],
-    [
-      'the scopes win over the legacy switch',
-      { autoEnrich: true, autoEnrichScopes: ['space'] },
-      ['space'],
-    ],
+    ['no scopes key is the default, deal alone', {}, ['deal']],
+    ['an empty list is none', { autoEnrichScopes: [] }, []],
     [
       'unknown words drop and the order is fixed',
       { autoEnrichScopes: ['meeting', 'nonsense', 'deal'] },
@@ -40,10 +34,10 @@ describe('autoEnrichScopeOf', () => {
 })
 
 describe('autoEnrichConfig', () => {
-  it('writes the scope keys, drops the legacy switch and keeps plugin settings', () => {
+  it('writes the scope keys and keeps plugin settings', () => {
     expect(
       autoEnrichConfig(
-        { autoEnrich: true, cacheDays: 30 },
+        { cacheDays: 30 },
         { scopes: ['deal', 'space'], spaces: [SPACE] },
       ),
     ).toEqual({

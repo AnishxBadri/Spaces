@@ -84,7 +84,6 @@ export type ViewSnapshot = {
 export function ViewBar({
   objectId,
   registry,
-  filterUnavailable,
   views,
   counts,
   total,
@@ -104,13 +103,6 @@ export function ViewBar({
    */
   objectId: string | null
   registry: Array<RegistryEntry>
-  /**
-   * Why this surface cannot build conditions yet, when it cannot: the Filter
-   * control then renders disabled and titled with the reason rather than
-   * vanishing. No surface passes it today; it stays for the next shelf
-   * admitted before its field list is declared.
-   */
-  filterUnavailable?: string
   views: Array<ViewRow>
   /**
    * Each saved view's record count, from `countViews` in the page's loader
@@ -327,25 +319,11 @@ export function ViewBar({
           </button>
           <span className="flex-1" />
 
-          {filterUnavailable === undefined ? (
-            <FilterPopover
-              registry={registry}
-              conditions={snapshot.filter}
-              onChange={onFilterChange}
-            />
-          ) : (
-            /*
-              The control stays in place, disabled, rather than vanishing: one
-              bar across every surface. The title is on the wrapper because a
-              disabled Button takes `pointer-events-none`.
-            */
-            <span title={filterUnavailable} className="inline-flex">
-              <Button size="xs" variant="ghost" disabled>
-                <Filter className="size-3" strokeWidth={2} />
-                Filter
-              </Button>
-            </span>
-          )}
+          <FilterPopover
+            registry={registry}
+            conditions={snapshot.filter}
+            onChange={onFilterChange}
+          />
           {tools}
 
           <SaveViewDialog

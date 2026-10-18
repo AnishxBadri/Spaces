@@ -32,7 +32,9 @@ async function tasksTitled(title: string) {
 describe('task suggestion', () => {
   it('accepts into one task row by the accepter, linked to the record, and closes', async () => {
     const { Effect } = await import('effect')
-    const { proposeProgram, acceptProgram } = await import('./propose')
+    const { proposeProgram } =
+      await import('@spaces/core/writes/suggestions/propose')
+    const { acceptProgram } = await import('./propose')
     const { db } = await import('@spaces/db')
     const { taskEntity } = await import('@spaces/db/schema/tasks')
     const { eq } = await import('drizzle-orm')
@@ -75,7 +77,9 @@ describe('task suggestion', () => {
 
   it('rejects without writing a task', async () => {
     const { Effect } = await import('effect')
-    const { proposeProgram, rejectProgram } = await import('./propose')
+    const { proposeProgram } =
+      await import('@spaces/core/writes/suggestions/propose')
+    const { rejectProgram } = await import('./propose')
     const { accepter, entityId, tag } = await setup()
     const title = `Chase the cap table ${tag}`
 
@@ -96,7 +100,8 @@ describe('task suggestion', () => {
 
   it('refuses a payload with no title at propose', async () => {
     const { Effect } = await import('effect')
-    const { proposeProgram, SuggestionInvalid } = await import('./propose')
+    const { proposeProgram, SuggestionInvalid } =
+      await import('@spaces/core/writes/suggestions/propose')
     const { entityId } = await setup()
 
     const failure = await Effect.runPromise(

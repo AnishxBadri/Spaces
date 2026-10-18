@@ -13,7 +13,8 @@ describe('mergeEntities and open suggestions', () => {
     const { resolveEntity } =
       await import('@spaces/core/writes/entities/resolve')
     const { mergeEntities } = await import('@spaces/core/writes/entities/merge')
-    const { proposeProgram } = await import('#/lib/ai/propose')
+    const { proposeProgram } =
+      await import('@spaces/core/writes/suggestions/propose')
     const { db } = await import('@spaces/db')
     const { mergeEvent, suggestion } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')

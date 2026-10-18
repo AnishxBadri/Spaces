@@ -69,12 +69,6 @@ describe('the apollo manifest.json', () => {
     })
   })
 
-  it('still reads a config that holds the retired autoEnrich switch', () => {
-    expect(
-      z.parse(manifest.settings, { autoEnrich: true, cacheDays: 30 }),
-    ).toEqual({ cacheDays: 30, dailyCreditCap: 100, phone: false })
-  })
-
   it('has the version the package declares', () => {
     const pkg = z
       .object({ version: z.string() })

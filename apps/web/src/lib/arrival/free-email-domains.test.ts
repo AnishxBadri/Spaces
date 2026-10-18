@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  FREE_MAIL_DOMAINS,
-  registrableDomain,
-} from '@spaces/core/entities/normalize'
+import { FREE_MAIL_DOMAINS, registrableDomain } from '@spaces/sdk/identity'
 import { FREE_EMAIL_DOMAINS, isFreeEmailDomain } from './free-email-domains'
 
 /**

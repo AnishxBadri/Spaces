@@ -70,7 +70,8 @@ const aNote = async (title: string, visibility: 'shared' | 'private') => {
 
 describe('the mention menu over documents', () => {
   it('offers a document to the lane that names no kinds', async () => {
-    const { entitySearchRows } = await import('./rows')
+    const { entitySearchRows } =
+      await import('@spaces/core/writes/read/entity-search')
     const tag = randomUUID().slice(0, 8)
     const docId = await aDocument(`Ohmium Series B deck ${tag}.pdf`)
 
@@ -85,7 +86,8 @@ describe('the mention menu over documents', () => {
   })
 
   it('still leaves a document out when the caller names its kinds', async () => {
-    const { entitySearchRows } = await import('./rows')
+    const { entitySearchRows } =
+      await import('@spaces/core/writes/read/entity-search')
     const tag = randomUUID().slice(0, 8)
     const docId = await aDocument(`Ohmium cap table ${tag}.xlsx`)
 
@@ -99,7 +101,8 @@ describe('the mention menu over documents', () => {
   })
 
   it('keeps another author private note out of the widened lane', async () => {
-    const { entitySearchRows } = await import('./rows')
+    const { entitySearchRows } =
+      await import('@spaces/core/writes/read/entity-search')
     const tag = randomUUID().slice(0, 8)
     const hidden = await aNote(`Ohmium diligence ${tag}`, 'private')
     const shared = await aNote(`Ohmium diligence ${tag} shared`, 'shared')

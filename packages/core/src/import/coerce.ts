@@ -13,7 +13,7 @@ import {
   normalizePhone,
   normalizeUrl,
   registrableDomain,
-} from '../entities/normalize'
+} from '@spaces/sdk/identity'
 
 /**
  * One spreadsheet cell → one attribute value, or the reason it is not one

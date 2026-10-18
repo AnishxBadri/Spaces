@@ -21,7 +21,8 @@ import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { deleteDocumentWithBlobGc } from '#/lib/server/shared'
 import { storage } from '@spaces/core/writes/storage'
 import { extractionSchemaKey } from './extraction-cache'
-import { registryFor, rejectProgram } from './propose'
+import { registryFor } from '@spaces/core/writes/suggestions/propose'
+import { rejectProgram } from './propose'
 import {
   READ_DECK_PURPOSE,
   readDeckMessage,

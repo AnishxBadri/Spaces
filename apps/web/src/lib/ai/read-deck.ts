@@ -33,8 +33,15 @@ import type { CaptureObject } from '@spaces/core/writes/ai/capture-read'
 import { completeMessage } from './complete'
 import type { CompleteFailure } from './complete'
 import { cachedExtractProgram } from './extraction-cache'
-import { proposeProgram, registryFor, suggestionMessage } from './propose'
-import type { Suggestion, SuggestionFailure } from './propose'
+import {
+  proposeProgram,
+  registryFor,
+} from '@spaces/core/writes/suggestions/propose'
+import { suggestionMessage } from './propose'
+import type {
+  Suggestion,
+  SuggestionFailure,
+} from '@spaces/core/writes/suggestions/propose'
 import { providerFailure } from './providers/test-call'
 import { excludeSensitiveProgram, isLaneRoutedProgram } from './route'
 import { callStep, suggestionOutputRef, withRun } from './run'

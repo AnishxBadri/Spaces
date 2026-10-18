@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { mailbox } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
-import { registrableDomain } from '@spaces/core/entities/normalize'
+import { registrableDomain } from '@spaces/sdk/identity'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { dispatchDomainEvent } from '@spaces/core/writes/events/dispatch'
 import type {

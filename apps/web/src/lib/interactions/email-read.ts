@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import { simpleParser } from 'mailparser'
-import { normalizeEmail } from '@spaces/core/entities/normalize'
+import { normalizeEmail } from '@spaces/sdk/identity'
 import { canRead } from '@spaces/core/read-policy'
 import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
 import { storage } from '@spaces/core/writes/storage'

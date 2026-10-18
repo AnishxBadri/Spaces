@@ -14,7 +14,7 @@ import {
   normalizeDomain,
   normalizeEmail,
   normalizeLinkedin,
-} from '../entities/normalize'
+} from '@spaces/sdk/identity'
 import type { BadgeColor } from './colors'
 import { phoneProblem, toE164 } from './phone'
 

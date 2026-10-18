@@ -36,11 +36,9 @@ import {
 } from '#/lib/portfolio/write'
 import {
   SuggestionInvalid,
-  acceptProgram,
   proposeProgram,
-  rejectProgram,
-  suggestionMessage,
-} from './propose'
+} from '@spaces/core/writes/suggestions/propose'
+import { acceptProgram, rejectProgram, suggestionMessage } from './propose'
 import { setAiRouteProgram } from './route'
 import {
   chooseLedgerEvent,

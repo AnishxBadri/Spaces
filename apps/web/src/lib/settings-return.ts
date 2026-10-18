@@ -25,7 +25,7 @@ export function settingsReturnHref(): string {
   return last ?? SETTINGS_FALLBACK
 }
 
-/** Forget the remembered page — for tests. */
+/** Forget the remembered page — for tests. @public */
 export function forgetAppPage(): void {
   last = null
 }

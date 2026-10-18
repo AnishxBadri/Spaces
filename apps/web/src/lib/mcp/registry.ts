@@ -12,7 +12,7 @@ import {
   McpToolRefused,
   getRecordProgram,
   resolveEntityRefProgram,
-} from './tools'
+} from '@spaces/core/writes/read/record'
 import { proposeSuggestionProgram } from './tools-propose'
 import type { ProposeCaller } from './tools-propose'
 import { proposeCardProgram, proposeCardShape } from './tools-cards'

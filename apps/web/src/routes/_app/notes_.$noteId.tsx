@@ -279,10 +279,8 @@ function NotePage() {
                 const className =
                   'flex items-center gap-2 rounded-md px-1 py-0.5 text-ui text-graphite hover:text-foreground'
                 // One route table for the whole app, as the chip row below
-                // already uses: `KIND_ROUTES` covers four kinds, so every
-                // other one rendered `<Link to={undefined}>` — a focusable
-                // row that goes nowhere. A document has no page at all, and
-                // opens the same preview its chip does.
+                // uses. A document has no page at all, and opens the same
+                // preview its chip does.
                 const href = recordPath({ kind: b.kind, id: b.fromId })
                 return (
                   <li key={b.fromId}>

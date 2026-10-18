@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { mailboxInput, mailboxTestInput } from '../arrival/input'
+import { mailboxInput } from '../arrival/input'
 
 /**
  * Settings → Email forwarding: the forwarding mailbox. The writes are
@@ -22,9 +22,12 @@ export const saveMailbox = createServerFn({ method: 'POST' })
     return saveMailboxHandler(data)
   })
 
-/** Logs in and opens the folder; `{ok: false, message}` carries the server's words. */
+/**
+ * Logs in and opens the folder; `{ok: false, message}` carries the server's
+ * words. Takes the save's shape, so an unsaved form can be tried first.
+ */
 export const testMailbox = createServerFn({ method: 'POST' })
-  .validator(mailboxTestInput)
+  .validator(mailboxInput)
   .handler(async ({ data }) => {
     const { testMailboxHandler } = await import('../arrival/settings')
     return testMailboxHandler(data)

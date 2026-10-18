@@ -13,8 +13,6 @@ import type { AdapterInput } from './adapter'
 
 export const ANTHROPIC_DEFAULT_MODEL = PROVIDERS.anthropic.defaultModel
 
-export type AnthropicAdapterInput = AdapterInput
-
 export function anthropicLanguageModel(input: AdapterInput): LanguageModel {
   const settings: AnthropicProviderSettings = {
     apiKey: input.secret,

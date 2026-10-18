@@ -3,7 +3,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity, entityAlias, term } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
-import { normalizeName } from '@spaces/core/entities/normalize'
+import { normalizeName } from '@spaces/sdk/identity'
 
 /**
  * Writing a term (SPA-75). The body of `createTerm` / `updateTerm`, moved out

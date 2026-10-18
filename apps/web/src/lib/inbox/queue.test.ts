@@ -14,7 +14,8 @@ async function world() {
   const { duplicateCandidate, suggestion } = await import('@spaces/db/schema')
   const { eq } = await import('drizzle-orm')
   const { resolveEntity } = await import('@spaces/core/writes/entities/resolve')
-  const { proposeProgram } = await import('#/lib/ai/propose')
+  const { proposeProgram } =
+    await import('@spaces/core/writes/suggestions/propose')
 
   const me = (await db.select({ id: user.id }).from(user).limit(1)).at(0)
   if (!me) throw new Error('the test seed has no user')
