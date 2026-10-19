@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Condition } from '@spaces/core/views/filter'
+
+// The CONCURRENTLY index mint takes ~11 s under full-suite load; the default
+// 10 s hook timeout made this file the suite's one recurring flake.
+vi.setConfig({ hookTimeout: 90_000 })
 
 /**
  * The half of SPA-93 that cannot be argued, only measured: does the planner
