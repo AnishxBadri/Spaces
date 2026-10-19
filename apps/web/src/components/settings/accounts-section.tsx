@@ -55,7 +55,7 @@ import { cn } from '#/lib/utils'
  * products it is used for and Disconnect.
  */
 
-/** The jobs with an account page; meeting notes has no connection rows yet. */
+/** The jobs with an OAuth account page; meeting notes are keyed recorders (`MeetingNotesSection`). */
 export type AccountPageJob = Exclude<AccountJob, 'meeting-notes'>
 
 const TITLE = {
@@ -356,6 +356,8 @@ function disconnectedLine(
   switch (result) {
     case 'kept':
       return `${word} disconnected · ${account.email} stays connected for the rest`
+    case 'none':
+      return `${word} disconnected`
     case 'unreachable':
       return `${word} disconnected; ${provider} could not be reached to revoke access`
     case 'revoked':
@@ -708,18 +710,4 @@ const MARKS: Record<string, ReactNode> = {
       <path d="m17.8 10.3 4.6 6.4m0-6.4-4.6 6.4" />
     </g>
   ),
-}
-
-/** Meeting notes: recorders such as Granola, once a recorder's connection lands. */
-export function MeetingNotesSection() {
-  return (
-    <SettingsSection title="Meeting notes" crumb="You">
-      <div className="flex flex-col">
-        <SettingsGroupHead title="Recorders" count={0} />
-        <p className="border-b border-rule px-3 py-3 text-label text-graphite">
-          No recorders connected.
-        </p>
-      </div>
-    </SettingsSection>
-  )
 }

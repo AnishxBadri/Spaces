@@ -221,11 +221,20 @@ export const manifestSchema = z
               scope: z.literal('workspace'),
             })
             .optional(),
+          // An OAuth grant with its scopes, or a key each member pastes for
+          // their own account (`key: true`, SDK 1.5, D78): then every
+          // schedule job runs once per member's connection.
           connection: z
-            .strictObject({
-              provider: z.string().min(1),
-              scopes: z.array(z.string().min(1)).min(1),
-            })
+            .union([
+              z.strictObject({
+                provider: z.string().min(1),
+                scopes: z.array(z.string().min(1)).min(1),
+              }),
+              z.strictObject({
+                provider: z.string().min(1),
+                key: z.literal(true),
+              }),
+            ])
             .optional(),
         })
         .optional(),
@@ -434,3 +443,15 @@ export const toManifestJson = (manifest: AuthoredManifest): Manifest =>
       ]),
     ),
   })
+
+/**
+ * The provider whose members each paste their own key (`requires.connection.key`,
+ * SDK 1.5): the host runs this plugin's schedule jobs once per such connection.
+ * Null for a plugin bound to one OAuth grant, or to none.
+ */
+export const keyedProviderOf = (manifest: Manifest): string | null => {
+  const connection = manifest.requires?.connection
+  return connection !== undefined && 'key' in connection
+    ? connection.provider
+    : null
+}

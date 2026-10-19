@@ -1,0 +1,90 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`a fathom.json delivery > becomes one recorded note under the shared contract 1`] = `
+{
+  "_tag": "recorded-note",
+  "attendees": [
+    {
+      "email": "priya@ohmium-live.example",
+      "name": "Priya Raman",
+    },
+    {
+      "email": "anish@fund.example",
+      "name": "Anish",
+    },
+  ],
+  "endedAt": "2026-10-08T10:31:00.000Z",
+  "providerNoteId": "fathom:88213",
+  "raw": {
+    "calendar_invitees": [
+      {
+        "email": "priya@ohmium-live.example",
+        "is_external": true,
+        "name": "Priya Raman",
+      },
+      {
+        "email": "anish@fund.example",
+        "is_external": false,
+        "name": "Anish",
+      },
+    ],
+    "default_summary": {
+      "markdown_formatted": "## Ohmium
+- Electrolyser stacks, 3 pilots
+- Raising a Series A",
+    },
+    "recording_end_time": "2026-10-08T10:31:00Z",
+    "recording_id": 88213,
+    "recording_start_time": "2026-10-08T10:04:00Z",
+    "share_url": "https://fathom.video/share/88213",
+    "title": "Ohmium intro",
+    "url": "https://fathom.video/calls/88213",
+  },
+  "recordingUrl": "https://fathom.video/calls/88213",
+  "startedAt": "2026-10-08T10:04:00.000Z",
+  "summary": "## Ohmium
+- Electrolyser stacks, 3 pilots
+- Raising a Series A",
+  "title": "Ohmium intro",
+  "webUrl": "https://fathom.video/share/88213",
+}
+`;
+
+exports[`a tldv.json delivery > becomes one recorded note under the shared contract 1`] = `
+{
+  "_tag": "recorded-note",
+  "attendees": [
+    {
+      "email": "lee@quietco.example",
+      "name": "Lee Park",
+    },
+  ],
+  "endedAt": "2026-10-09T16:30:00.000Z",
+  "providerNoteId": "tldv:mtg_tldv_7731",
+  "raw": {
+    "data": {
+      "duration": 1800,
+      "happenedAt": "2026-10-09T16:00:00Z",
+      "id": "mtg_tldv_7731",
+      "invitees": [
+        {
+          "email": "lee@quietco.example",
+          "name": "Lee Park",
+        },
+      ],
+      "name": "Coffee with a founder",
+      "notes": "## Quietco
+- Pre-seed, design partners",
+      "url": "https://tldv.io/app/meetings/mtg_tldv_7731",
+    },
+    "event": "MeetingReady",
+    "id": "evt_5f1c",
+  },
+  "recordingUrl": "https://tldv.io/app/meetings/mtg_tldv_7731",
+  "startedAt": "2026-10-09T16:00:00.000Z",
+  "summary": "## Quietco
+- Pre-seed, design partners",
+  "title": "Coffee with a founder",
+  "webUrl": "https://tldv.io/app/meetings/mtg_tldv_7731",
+}
+`;

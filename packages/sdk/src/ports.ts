@@ -22,6 +22,9 @@ import type {
   MeetingCancellation,
   MeetingClaim,
   MeetingResult,
+  RecordedNote,
+  RecordedNoteGone,
+  RecordedNoteResult,
   PortName,
   ReceiptClaim,
   Ref,
@@ -180,6 +183,13 @@ export class Content extends Context.Service<
     readonly logEmail: (
       claim: EmailClaim,
     ) => Effect.Effect<EmailResult, JobError>
+    /**
+     * One recorder note, matched to its meeting by the host, or its removal
+     * (SDK 1.5, D78).
+     */
+    readonly logRecordedNote: (
+      note: RecordedNote | RecordedNoteGone,
+    ) => Effect.Effect<RecordedNoteResult, JobError>
   }
 >()('spaces/sdk/Content') {}
 

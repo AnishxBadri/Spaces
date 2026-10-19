@@ -1,0 +1,19 @@
+{
+  "recording_id": 88213,
+  "title": "Ohmium intro",
+  "url": "https://fathom.video/calls/88213",
+  "share_url": "https://fathom.video/share/88213",
+  "recording_start_time": "2026-10-08T10:04:00Z",
+  "recording_end_time": "2026-10-08T10:31:00Z",
+  "calendar_invitees": [
+    {
+      "name": "Priya Raman",
+      "email": "priya@ohmium-live.example",
+      "is_external": true
+    },
+    { "name": "Anish", "email": "anish@fund.example", "is_external": false }
+  ],
+  "default_summary": {
+    "markdown_formatted": "## Ohmium\n- Electrolyser stacks, 3 pilots\n- Raising a Series A"
+  }
+}

@@ -372,6 +372,74 @@ export type MeetingResult =
   | { readonly outcome: 'refused'; readonly reason: string }
 
 /**
+ * `Content.logRecordedNote(note)` (SDK 1.5, D78): one note a recorder took of
+ * a meeting — Granola's from a `schedule` job, Fathom's or tl;dv's from a
+ * webhook. The host does the rest.
+ * - It attaches to the calendar meeting `calendarEventId` (or `icalUid`)
+ *   names, else to the one starting within 30 minutes of `startedAt` whose
+ *   attendees include every attendee email, else births a `call`. One
+ *   meeting, one row.
+ * - Keyed by `providerNoteId` per connection: the same note delivered twice
+ *   is one interaction and one set of artifacts.
+ * - `deletedAt` set removes what the note became, as `recorded-note-gone`
+ *   does.
+ * - Hand only what the person chose to share: a note outside their ticked
+ *   folders is never fetched, and `typedNotes` and `transcript` only when
+ *   the connection opted into them.
+ * - `raw` is stored whole as a receipt before anything is applied.
+ */
+export type RecordedNote = {
+  readonly _tag: 'recorded-note'
+  readonly providerNoteId: string
+  readonly title?: string
+  /** When the meeting started. */
+  readonly startedAt: IsoTimestamp
+  readonly endedAt?: IsoTimestamp
+  readonly attendees: ReadonlyArray<InteractionParticipant>
+  /** The calendar's own id for the event, when the recorder knows it. */
+  readonly calendarEventId?: string
+  readonly icalUid?: string
+  /** The provider's enhanced notes, as Markdown. */
+  readonly summary?: string
+  /** What the person typed themselves; private to them. */
+  readonly typedNotes?: string
+  /** The transcript as plain text; private to them. */
+  readonly transcript?: string
+  /** The note at the provider: "Open in <provider>". */
+  readonly webUrl?: string
+  /** A recording, kept as a link and never copied (D68). */
+  readonly recordingUrl?: string
+  /** The provider folders the note sits in. */
+  readonly folderIds?: ReadonlyArray<string>
+  readonly deletedAt?: IsoTimestamp
+  readonly raw: JsonValue
+}
+
+/**
+ * A note that left every folder the person ticked, or that the provider
+ * deleted: the host removes Spaces' copy of it — what it became, its open
+ * task suggestions and its private artifacts. Unknown ids are a no-op.
+ */
+export type RecordedNoteGone = {
+  readonly _tag: 'recorded-note-gone'
+  readonly providerNoteId: string
+}
+
+/**
+ * What `Content.logRecordedNote` decided.
+ * - `attached`: on a calendar meeting; `born`: a new call; `duplicate`: this
+ *   note was already applied.
+ * - `removed`: Spaces' copy is gone; `interactionId` is the row it hung off,
+ *   null when nothing was held.
+ */
+export type RecordedNoteResult =
+  | {
+      readonly outcome: 'attached' | 'born' | 'duplicate'
+      readonly interactionId: string
+    }
+  | { readonly outcome: 'removed'; readonly interactionId: string | null }
+
+/**
  * `Content.logEmail(claim)` (SDK 1.5): one message from a connected mailbox,
  * handed over whole. The host decides everything else.
  * - The host parses `raw`, refuses noise and anything the connection's
@@ -637,10 +705,15 @@ export type ActionJob<TServices = unknown> =
  * - `connectedAt` (SDK 1.5) is the forward-only floor: the bound
  *   connection's `created_at`, else the integration's. A syncer fetches
  *   nothing older.
+ * - `connection` (SDK 1.5) is the bound connection's own settings, the
+ *   choices its person made — for a recorder, `folder_ids`, `typed_notes`
+ *   and `transcript` (D78). A keyed plugin's job runs once per member's
+ *   connection, each with its own cursor.
  */
 export type ScheduleInput = {
   readonly cursor: string | null
   readonly connectedAt?: IsoTimestamp
+  readonly connection?: { readonly settings: JsonObject }
 }
 export type ScheduleOutput = { readonly nextCursor: string | null }
 

@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { KEYED_PROVIDER_IDS } from '@spaces/core/providers/keyed'
+import type { KeyedProviderId } from '@spaces/core/providers/keyed'
 import { PROVIDER_IDS } from '@spaces/core/providers/registry'
 import type { ProviderId } from '@spaces/core/providers/registry'
 
@@ -67,7 +69,8 @@ export type ConnectionListRow = {
  */
 export type ConnectionDisconnectResult = {
   connectionId: string
-  revoke: 'revoked' | 'already-revoked' | 'unreachable' | 'kept'
+  /** `none`: a pasted key, which has no grant at the provider to revoke (D78). */
+  revoke: 'revoked' | 'already-revoked' | 'unreachable' | 'kept' | 'none'
 }
 
 /** What the accounts pages under You draw. Never a token, never a client secret. */
@@ -109,4 +112,53 @@ export type MailboxSyncResult = {
   revisited: number
   /** Emails already synced that the exclude list now names, taken out. */
   removed: number
+}
+
+/** A member's own key for a recorder, pasted on You → Meeting notes (D78). */
+export const recorderKeyInput = z.object({
+  provider: z.enum(KEYED_PROVIDER_IDS),
+  key: z.string().trim().min(1, 'Paste the key').max(512),
+})
+
+export type RecorderKeyInput = z.infer<typeof recorderKeyInput>
+
+/** A recorder connection's ticks and opt-ins, applied at once (D81). */
+export const recorderSettingsInput = z.object({
+  connectionId: z.uuid(),
+  folderIds: z.array(z.string().trim().min(1).max(256)).max(500),
+  typedNotes: z.boolean(),
+  transcript: z.boolean(),
+})
+
+export type RecorderSettingsInput = z.infer<typeof recorderSettingsInput>
+
+/** One of the reader's recorder connections as Meeting notes draws it. Never the key. */
+export type RecorderAccountView = {
+  connectionId: string
+  provider: KeyedProviderId
+  email: string
+  status: 'active' | 'error' | 'revoked'
+  errorReason: string | null
+  /** ISO; null until a run has synced it. */
+  lastSyncAt: string | null
+  /** The member's folders with their ticks; null when they could not be listed. */
+  folders: Array<{ id: string; name: string; ticked: boolean }> | null
+  foldersError: string | null
+  typedNotes: boolean
+  transcript: boolean
+}
+
+/** What a reader can do about a recorder provider. */
+export type RecorderOffer = 'connect' | 'install' | 'ask' | 'unavailable'
+
+/** You → Meeting notes: the reader's recorders and the providers they can add. */
+export type MeetingNotesView = {
+  accounts: RecorderAccountView[]
+  providers: Array<{
+    provider: KeyedProviderId
+    label: string
+    keyHint: string
+    plugin: string
+    offer: RecorderOffer
+  }>
 }

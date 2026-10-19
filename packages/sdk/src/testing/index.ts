@@ -10,6 +10,7 @@ import type {
   EmailResult,
   JsonValue,
   MeetingResult,
+  RecordedNoteResult,
   PortName,
   SignalClaim,
 } from '../contract.ts'
@@ -288,6 +289,9 @@ const messageIdOfRaw = (raw: string): string | null => {
  *   declined, cancelled before they were seen) is the host's to decide.
  * - Emails dedupe on the Message-ID header inside `raw`, else the provider's
  *   id; every other refusal (noise, the exclude list) is the host's.
+ * - A recorded note keys on `providerNoteId`: attached to the meeting its
+ *   `calendarEventId` names, else a call; a second delivery is `duplicate`,
+ *   and a `deletedAt` or a gone note is `removed`.
  */
 export const ContentTest = (
   options: { readonly recorder?: Recorder } = {},
@@ -300,6 +304,7 @@ export const ContentTest = (
   const byUid = new Map<string, string>()
   const byEventId = new Map<string, string>()
   const byKey = new Map<string, string>()
+  const recordedNotes = new Map<string, string>()
   const signals: Array<SignalClaim> = []
   const layer = Layer.succeed(Content, {
     fileDocument: (claim) =>
@@ -377,6 +382,37 @@ export const ContentTest = (
         byEventId.set(claim.eventId, interactionId)
         return record('logMeeting', claim, {
           outcome: held === undefined ? 'created' : 'updated',
+          interactionId,
+        })
+      }),
+    logRecordedNote: (note) =>
+      Effect.sync((): RecordedNoteResult => {
+        const key = `recorded ${note.providerNoteId}`
+        const held = recordedNotes.get(key)
+        if (
+          note._tag === 'recorded-note-gone' ||
+          note.deletedAt !== undefined
+        ) {
+          recordedNotes.delete(key)
+          return record('logRecordedNote', note, {
+            outcome: 'removed',
+            interactionId: held ?? null,
+          })
+        }
+        if (held !== undefined)
+          return record('logRecordedNote', note, {
+            outcome: 'duplicate',
+            interactionId: held,
+          })
+        // Attached to the meeting its calendar event names, else a call.
+        const meeting =
+          note.calendarEventId === undefined
+            ? undefined
+            : byEventId.get(note.calendarEventId)
+        const interactionId = meeting ?? nextInteraction()
+        recordedNotes.set(key, interactionId)
+        return record('logRecordedNote', note, {
+          outcome: meeting === undefined ? 'born' : 'attached',
           interactionId,
         })
       }),
@@ -968,6 +1004,23 @@ export type {
   FakeCalendarTime,
   CalendarApiRequest,
 } from './fake-calendar-api.ts'
+
+// Granola's read-only notes API over a fake member's folders — a keyed recorder (D78)
+export {
+  makeFakeGranolaApi,
+  fakeGranolaSeed,
+  GRANOLA_API,
+  FAKE_GRANOLA_KEY,
+  FAKE_GRANOLA_OWNER,
+  FAKE_GRANOLA_FOLDERS,
+} from './fake-granola-api.ts'
+export type {
+  FakeGranolaApi,
+  FakeGranolaApiOptions,
+  FakeGranolaFolder,
+  FakeGranolaNote,
+  GranolaApiRequest,
+} from './fake-granola-api.ts'
 
 // Gmail's messages, history, labels and batch endpoints over a fake mailbox
 export {

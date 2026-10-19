@@ -3,6 +3,8 @@ import {
   connectionIdInput,
   mailboxSyncInput,
   providerAppInput,
+  recorderKeyInput,
+  recorderSettingsInput,
 } from '../connections/input'
 
 export type {
@@ -15,6 +17,11 @@ export type {
   MailboxSyncView,
   ProviderAppInput,
   ProviderAppRow,
+  MeetingNotesView,
+  RecorderAccountView,
+  RecorderKeyInput,
+  RecorderOffer,
+  RecorderSettingsInput,
 } from '../connections/input'
 
 /**
@@ -78,4 +85,28 @@ export const saveMailboxSync = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { saveMailboxSyncHandler } = await import('../arrival/mailbox-sync')
     return saveMailboxSyncHandler(data)
+  })
+
+/** You → Meeting notes: the reader's recorder keys with their folders, and what they can add (D78). */
+export const getMeetingNotes = createServerFn().handler(async () => {
+  const { meetingNotesHandler } = await import('../connections/recorders')
+  return meetingNotesHandler()
+})
+
+/** A key the reader pasted: checked with the provider, then one connection row. */
+export const connectRecorderKey = createServerFn({ method: 'POST' })
+  .validator(recorderKeyInput)
+  .handler(async ({ data }) => {
+    const { connectRecorderKeyHandler } =
+      await import('../connections/recorders')
+    return connectRecorderKeyHandler(data)
+  })
+
+/** The reader's folder ticks and private opt-ins, applied at once. */
+export const saveRecorderSettings = createServerFn({ method: 'POST' })
+  .validator(recorderSettingsInput)
+  .handler(async ({ data }) => {
+    const { saveRecorderSettingsHandler } =
+      await import('../connections/recorders')
+    return saveRecorderSettingsHandler(data)
   })

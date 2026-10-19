@@ -1,0 +1,92 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`a member who ticked Deals and Portfolio > hands over the two notes in those folders, and never asks for the 1:1 in Personal 1`] = `
+[
+  {
+    "_tag": "recorded-note",
+    "attendees": [
+      {
+        "email": "anish@fund.example",
+        "name": "Anish",
+      },
+      {
+        "email": "maya@flent.example",
+        "name": "Maya Rao",
+      },
+    ],
+    "calendarEventId": "gcal-flent-first",
+    "endedAt": "2026-10-09T10:30:00.000Z",
+    "folderIds": [
+      "fld_deals",
+    ],
+    "providerNoteId": "not_flent_first",
+    "raw": {
+      "attendees": [
+        "anish@fund.example",
+        "maya@flent.example",
+      ],
+      "calendar_event_id": "gcal-flent-first",
+      "created_at": "2026-10-09T10:00:00.000Z",
+      "folder_ids": [
+        "fld_deals",
+      ],
+      "id": "not_flent_first",
+      "summary_markdown": "## Flent
+- Raising a $4M seed
+- 40% month-on-month growth
+- Send the data room by Friday",
+      "title": "Flent — first call",
+      "updated_at": "2026-10-09T11:00:00.000Z",
+      "web_url": "https://notes.granola.ai/d/not_flent_first",
+    },
+    "startedAt": "2026-10-09T10:00:00.000Z",
+    "summary": "## Flent
+- Raising a $4M seed
+- 40% month-on-month growth
+- Send the data room by Friday",
+    "title": "Flent — first call",
+    "webUrl": "https://notes.granola.ai/d/not_flent_first",
+  },
+  {
+    "_tag": "recorded-note",
+    "attendees": [
+      {
+        "email": "anish@fund.example",
+        "name": "Anish",
+      },
+      {
+        "email": "jane@acme-robotics.example",
+        "name": "Jane Founder",
+      },
+    ],
+    "folderIds": [
+      "fld_portfolio",
+    ],
+    "providerNoteId": "not_acme_board",
+    "raw": {
+      "attendees": [
+        "anish@fund.example",
+        "jane@acme-robotics.example",
+      ],
+      "calendar_event_id": null,
+      "created_at": "2026-10-09T15:00:00.000Z",
+      "folder_ids": [
+        "fld_portfolio",
+      ],
+      "id": "not_acme_board",
+      "summary_markdown": "## Acme
+- Runway to Q3
+- Hire a CFO",
+      "title": "Acme Robotics — board prep",
+      "updated_at": "2026-10-09T16:00:00.000Z",
+      "web_url": "https://notes.granola.ai/d/not_acme_board",
+    },
+    "startedAt": "2026-10-09T15:00:00.000Z",
+    "summary": "## Acme
+- Runway to Q3
+- Hire a CFO",
+    "title": "Acme Robotics — board prep",
+    "webUrl": "https://notes.granola.ai/d/not_acme_board",
+  },
+]
+`;

@@ -148,7 +148,9 @@ export function sendsOf(manifest: Manifest | null): ReadonlyArray<string> {
   if (credential?.kind === 'search') return ['the search text']
   if (credential?.kind === 'llm') return ['the record text a job is given']
   if (connection !== undefined)
-    return [`nothing out · reads ${connection.scopes.join(', ')}`]
+    return 'key' in connection
+      ? ['nothing out · reads the notes each member shares']
+      : [`nothing out · reads ${connection.scopes.join(', ')}`]
   const calls = Object.values(manifest.jobs).some((j) =>
     j.uses.includes('Http'),
   )

@@ -18,6 +18,7 @@ export {
   defineManifest,
   toManifestJson,
   settingsJsonSchema,
+  keyedProviderOf,
 } from './manifest.ts'
 export type {
   Trigger,
@@ -78,6 +79,9 @@ export type {
   MeetingClaim,
   MeetingCancellation,
   MeetingResult,
+  RecordedNote,
+  RecordedNoteGone,
+  RecordedNoteResult,
   EmailClaim,
   EmailResult,
   SignalClaim,

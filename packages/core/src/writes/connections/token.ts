@@ -8,7 +8,7 @@ import { jsonString } from '../../json'
 import { PROVIDERS, isProviderId } from '../../providers/registry'
 import type { ProviderEntry, ProviderId } from '../../providers/registry'
 import { readWorkspaceCredential, resolveSecret } from '../vault/index'
-import { decryptBundle, encryptBundle } from './bundle'
+import { decryptBundle, decryptConnectionBundle, encryptBundle } from './bundle'
 import type { TokenBundle } from './bundle'
 import { refreshGrant } from './exchange'
 
@@ -21,6 +21,7 @@ import { refreshGrant } from './exchange'
  * - A refused refresh marks the row `error` with the provider's reason and
  *   keeps its scopes and bundle; an `error` or `revoked` row never yields a
  *   token and never reaches the provider.
+ * - A pasted key (D78) is returned as it is: it has no expiry and no refresh.
  */
 
 export class AuthExpired extends Schema.TaggedError<AuthExpired>()(
@@ -141,6 +142,12 @@ export const accessTokenFor = Effect.fn('accessTokenFor')(function* (
               ? 'The connection was revoked; connect again'
               : `The connection needs reconnecting (${row.errorReason ?? 'no reason given'})`,
         }
+      const stored = decryptConnectionBundle(row.tokensEnc, {
+        userId: row.userId,
+        provider: row.provider,
+      })
+      if (stored.type === 'api_key')
+        return { kind: 'token', accessToken: stored.key }
       if (!isProviderId(row.provider))
         return {
           kind: 'expired',

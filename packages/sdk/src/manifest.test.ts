@@ -5,6 +5,7 @@ import { DOMAIN_EVENTS, PORT_NAMES } from './contract.ts'
 import {
   ROLES,
   STORAGE_SOURCE_WITHHELD,
+  keyedProviderOf,
   manifestSchema,
   settingsJsonSchema,
   toManifestJson,
@@ -45,6 +46,26 @@ const issues = (input: unknown): Array<string> => {
 describe('manifestSchema', () => {
   it('accepts the minimal manifest', () => {
     expect(issues(base())).toEqual([])
+  })
+
+  it('takes a connection each member keys for themselves (SDK 1.5, D78)', () => {
+    const keyed = {
+      ...base(),
+      requires: { connection: { provider: 'granola', key: true } },
+    }
+    expect(issues(keyed)).toEqual([])
+    expect(keyedProviderOf(manifestSchema.parse(keyed))).toBe('granola')
+    const granted = {
+      ...base(),
+      requires: { connection: { provider: 'google', scopes: ['email'] } },
+    }
+    expect(keyedProviderOf(manifestSchema.parse(granted))).toBeNull()
+    expect(
+      issues({
+        ...base(),
+        requires: { connection: { provider: 'granola', key: false } },
+      }),
+    ).not.toEqual([])
   })
 
   it('rejects a manifest that still says kind, naming the field (D51)', () => {

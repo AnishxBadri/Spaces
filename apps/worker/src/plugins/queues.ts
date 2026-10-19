@@ -1,5 +1,5 @@
 import { Duration, Effect, Layer } from 'effect'
-import { eq, sql } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import type { PgBoss } from 'pg-boss'
 import { z } from 'zod'
 import { db } from '@spaces/db'
@@ -12,7 +12,8 @@ import {
 import { runLinePrefix } from '@spaces/core/import/commit'
 import { fileJobData } from '@spaces/core/import/dialect'
 import type { FileJobData } from '@spaces/core/import/dialect'
-import { jsonValue } from '@spaces/core/json'
+import { jsonRecord, jsonValue } from '@spaces/core/json'
+import type { Json } from '@spaces/core/json'
 import { pluginQueueName } from '@spaces/core/queue/names'
 import type { PluginQueueName } from '@spaces/core/queue/names'
 import {
@@ -34,6 +35,7 @@ import {
   JobPermanent,
   JobRateLimited,
   JobRetryable,
+  keyedProviderOf,
 } from '@spaces/sdk'
 import type {
   CostHook,
@@ -101,13 +103,22 @@ export type PluginQueue = {
   readonly cost: CostHook | null
   /** The manifest's defaults for the credit guard's two settings. */
   readonly credit: CreditPolicy
+  /**
+   * The provider whose members each key their own connection (D78): a
+   * schedule job then runs once per such connection. Null for every other.
+   */
+  readonly keyed: string | null
 }
 
-/** Runs a wired job: the host's `invoke`. */
+/**
+ * Runs a wired job: the host's `invoke`. With `connectionId`, on ports bound
+ * to that member's connection instead of the row's.
+ */
 export type Invoke = (
   integrationId: string,
   jobName: string,
   input: JobInput,
+  connectionId?: string,
 ) => Effect.Effect<JobOutput, JobError>
 
 /** The prefix every plugin queue and schedule carries. */
@@ -161,6 +172,7 @@ export const pluginQueues = (
   jobs: { readonly [name: string]: unknown } = {},
 ): ReadonlyArray<PluginQueue> => {
   const credit = creditDefaults(manifest)
+  const keyed = keyedProviderOf(manifest)
   return Object.entries(manifest.jobs).map(([job, declared]) => ({
     queue: pluginQueueName(manifest.id, job, declared.interactive === true),
     job,
@@ -170,6 +182,7 @@ export const pluginQueues = (
         ? costOf(jobs[job])
         : null,
     credit,
+    keyed,
   }))
 }
 
@@ -273,6 +286,117 @@ const writeCursor = async (
     })
     .where(eq(integration.id, integrationId))
 }
+
+/** One member's keyed connection a run serves. */
+type MemberConnection = {
+  readonly id: string
+  readonly createdAt: Date
+  readonly settings: { readonly [key: string]: Json } | null
+}
+
+/** The cursor key of one member's run: each connection resumes on its own. */
+export const memberCursorKey = (job: string, connectionId: string): string =>
+  `${job}@${connectionId}`
+
+const memberConnections = (provider: string, job: string) =>
+  Effect.tryPromise({
+    try: (): Promise<Array<MemberConnection>> =>
+      db
+        .select({
+          id: accountConnection.id,
+          createdAt: accountConnection.createdAt,
+          settings: accountConnection.settings,
+        })
+        .from(accountConnection)
+        .where(
+          and(
+            eq(accountConnection.provider, provider),
+            eq(accountConnection.status, 'active'),
+          ),
+        )
+        .orderBy(asc(accountConnection.createdAt)),
+    catch: (error) =>
+      new JobRetryable({
+        reason: `could not list the ${job} connections: ${messageOf(error)}`,
+      }),
+  })
+
+const readCursors = (integrationId: string, job: string) =>
+  Effect.tryPromise({
+    try: async () =>
+      (
+        await db
+          .select({ cursors: integration.cursors })
+          .from(integration)
+          .where(eq(integration.id, integrationId))
+      ).at(0)?.cursors ?? {},
+    catch: (error) =>
+      new JobRetryable({
+        reason: `could not read the ${job} cursors: ${messageOf(error)}`,
+      }),
+  })
+
+/**
+ * A keyed plugin's schedule run (D78): the job once per member's active
+ * connection, on ports bound to it, each from its own cursor and with its own
+ * settings and `connectedAt`.
+ * - A member whose run fails for good — their key refused, which the host
+ *   marks on their connection — is named in the summary; the others run,
+ *   and only the members that succeeded advance.
+ * - A retryable failure fails the whole run: the queue retries it, and every
+ *   lane the job writes through is keyed, so a member already done is a
+ *   no-op the second time.
+ */
+export const runKeyedSchedule = (
+  integrationId: string,
+  plan: PluginQueue,
+  provider: string,
+  invoke: Invoke,
+) =>
+  Effect.gen(function* () {
+    const members = yield* memberConnections(provider, plan.job)
+    const cursors = yield* readCursors(integrationId, plan.job)
+    const next: Array<{ key: string; cursor: string | null }> = []
+    const lines: Array<string> = []
+    for (const member of members) {
+      const key = memberCursorKey(plan.job, member.id)
+      const cursor = Object.hasOwn(cursors, key) ? cursors[key] : null
+      const out = yield* invoke(
+        integrationId,
+        plan.job,
+        {
+          cursor,
+          connectedAt: member.createdAt.toISOString(),
+          connection: { settings: jsonRecord(member.settings) },
+        },
+        member.id,
+      ).pipe(
+        Effect.map((value) => ({ ok: true as const, value })),
+        Effect.catchTag('JobPermanent', (error) =>
+          Effect.succeed({ ok: false as const, reason: error.reason }),
+        ),
+      )
+      if (!out.ok) {
+        lines.push(`${member.id}: ${out.reason}`)
+        continue
+      }
+      if (out.value === undefined || !('nextCursor' in out.value)) {
+        lines.push(`${member.id}: ${plan.queue} returned no { nextCursor }`)
+        continue
+      }
+      next.push({ key, cursor: out.value.nextCursor })
+    }
+    const result: JobClose = {
+      summary: `${next.length} of ${members.length} connections synced${
+        lines.length === 0 ? '' : `; ${lines.join('; ')}`
+      }`,
+      close: async (tx) => {
+        for (const n of next)
+          await writeCursor(tx, integrationId, n.key, n.cursor)
+      },
+    }
+    return result
+  })
 
 // ---------------------------------------------------------------------------
 // JobDefs, by trigger
@@ -622,24 +746,30 @@ const workPlan = (
           ...common(plan),
           schema: scheduleData,
           run: () =>
-            Effect.gen(function* () {
-              const input = yield* readScheduleInput(integrationId, plan.job)
-              const out = yield* invoke(integrationId, plan.job, input)
-              if (out === undefined || !('nextCursor' in out)) {
-                return yield* new JobPermanent({
-                  reason: `${plan.queue} returned no { nextCursor }`,
-                })
-              }
-              const next = out.nextCursor
-              const result: JobClose = {
-                summary:
-                  'cursorInvalid' in out
-                    ? `cursor invalid, cleared: ${out.cursorInvalid}`
-                    : `nextCursor ${next ?? 'null'}`,
-                close: (tx) => writeCursor(tx, integrationId, plan.job, next),
-              }
-              return result
-            }),
+            plan.keyed !== null
+              ? runKeyedSchedule(integrationId, plan, plan.keyed, invoke)
+              : Effect.gen(function* () {
+                  const input = yield* readScheduleInput(
+                    integrationId,
+                    plan.job,
+                  )
+                  const out = yield* invoke(integrationId, plan.job, input)
+                  if (out === undefined || !('nextCursor' in out)) {
+                    return yield* new JobPermanent({
+                      reason: `${plan.queue} returned no { nextCursor }`,
+                    })
+                  }
+                  const next = out.nextCursor
+                  const result: JobClose = {
+                    summary:
+                      'cursorInvalid' in out
+                        ? `cursor invalid, cleared: ${out.cursorInvalid}`
+                        : `nextCursor ${next ?? 'null'}`,
+                    close: (tx) =>
+                      writeCursor(tx, integrationId, plan.job, next),
+                  }
+                  return result
+                }),
           refs: () => integrationRef,
         },
         concurrency,

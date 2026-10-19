@@ -1,0 +1,31 @@
+{
+  "//": "Granola, the first keyed recorder (D78): one `schedule` job runs once per member who pasted their own Granola key, lists only the folders that member ticked, and hands each note to Content.logRecordedNote — the host matches it to the calendar meeting or births a call. A note that left every ticked folder, or that Granola deleted, is handed back as gone. Typed notes and the transcript are fetched only when the member opted in. Depends on @spaces/sdk only; effect and zod are peers the host provides.",
+  "name": "@spaces/plugin-granola",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "pack:plugin": "spaces-plugin-pack .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10",
+    "zod": "^4.3.6"
+  }
+}

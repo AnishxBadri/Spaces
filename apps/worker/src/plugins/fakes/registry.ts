@@ -5,12 +5,14 @@ import {
   makeFakeCalendarApi,
   makeFakeDriveApi,
   makeFakeGmailApi,
+  makeFakeGranolaApi,
 } from '@spaces/sdk/testing'
 import type {
   FakeBoxApi,
   FakeCalendarApi,
   FakeDriveApi,
   FakeGmailApi,
+  FakeGranolaApi,
 } from '@spaces/sdk/testing'
 import { workspaceRoot } from '@spaces/core/writes/vault/key'
 import { loadCassette } from './cassette'
@@ -22,7 +24,8 @@ import type { FakeProviders, StandIn } from './switch'
  * The fakes `SPACES_FAKE_PROVIDERS=1` stands in with, found in the
  * workspace: a cassette for each plugin that commits
  * `plugins/<id>/fixtures/cassette/cassette.json`, and a stateful fake API
- * for each plugin in `STATEFUL`, `BOXES`, `CALENDARS` or `MAILBOXES` whose
+ * for each plugin in `STATEFUL`, `BOXES`, `CALENDARS`, `MAILBOXES` or
+ * `RECORDERS` whose
  * package is there. Outside a
  * workspace (the image) there are none, so every plugin runs live.
  */
@@ -54,6 +57,11 @@ const MAILBOXES: { readonly [pluginId: string]: () => FakeGmailApi } = {
   gmail: () => makeFakeGmailApi(),
 }
 
+/** A keyed recorder's notes and folders, laid out around the moment it is first asked for (D78). */
+const RECORDERS: { readonly [pluginId: string]: () => FakeGranolaApi } = {
+  granola: () => makeFakeGranolaApi(),
+}
+
 const PLUGIN_ID = /^[a-z0-9][a-z0-9-]*$/
 
 export const cassetteProviders = (
@@ -69,12 +77,15 @@ export const cassetteProviders = (
   readonly calendar: (pluginId: string) => FakeCalendarApi | null
   /** The fake mailbox behind a stand-in; null when there is none. */
   readonly gmail: (pluginId: string) => FakeGmailApi | null
+  /** The fake recorder behind a stand-in; null when there is none. */
+  readonly granola: (pluginId: string) => FakeGranolaApi | null
 } => {
   const made = new Map<string, FakeProvider | null>()
   const apis = new Map<string, FakeDriveApi | null>()
   const boxes = new Map<string, FakeBoxApi | null>()
   const calendars = new Map<string, FakeCalendarApi | null>()
   const mailboxes = new Map<string, FakeGmailApi | null>()
+  const recorders = new Map<string, FakeGranolaApi | null>()
   const inWorkspace = (pluginId: string) =>
     root !== null && PLUGIN_ID.test(pluginId)
       ? path.join(root, 'plugins', pluginId)
@@ -138,15 +149,32 @@ export const cassetteProviders = (
     mailboxes.set(pluginId, fake)
     return fake
   }
+  const granola = (pluginId: string): FakeGranolaApi | null => {
+    const cached = recorders.get(pluginId)
+    if (cached !== undefined) return cached
+    const make = Object.hasOwn(RECORDERS, pluginId)
+      ? RECORDERS[pluginId]
+      : undefined
+    const dir = inWorkspace(pluginId)
+    const fake =
+      make !== undefined && dir !== null && existsSync(dir) ? make() : null
+    recorders.set(pluginId, fake)
+    return fake
+  }
   return {
     provider,
     api,
     box,
     calendar,
     gmail,
+    granola,
     standIn: (pluginId): StandIn | null => {
       const stateful =
-        api(pluginId) ?? box(pluginId) ?? calendar(pluginId) ?? gmail(pluginId)
+        api(pluginId) ??
+        box(pluginId) ??
+        calendar(pluginId) ??
+        gmail(pluginId) ??
+        granola(pluginId)
       if (stateful !== null)
         return {
           fetch: stateful.fetch,

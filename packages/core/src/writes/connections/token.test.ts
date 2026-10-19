@@ -244,4 +244,26 @@ describe('accessTokenFor', () => {
     )
     expect(error._tag).toBe('ConnectionNotFound')
   })
+
+  it('returns a pasted key unchanged, with no expiry and no refresh call (D78)', async () => {
+    const owner = { userId: FIXTURE_ACTOR.id, provider: 'granola' }
+    const [row] = await db
+      .insert(accountConnection)
+      .values({
+        userId: FIXTURE_ACTOR.id,
+        provider: 'granola',
+        product: 'notes',
+        externalEmail: 'anish@fund.example',
+        tokensEnc: encryptBundle(
+          { type: 'api_key', key: 'grn_live_key' },
+          owner,
+        ),
+        expiresAt: null,
+      })
+      .returning()
+    const value = await Effect.runPromise(token(row.id, { force: true }))
+    expect(Redacted.value(value)).toBe('grn_live_key')
+    expect(idp.tokenRequests).toHaveLength(0)
+    expect((await readRow(row.id)).status).toBe('active')
+  })
 })

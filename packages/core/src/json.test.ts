@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { CallMeta, EmailMeta } from '@spaces/db/schema/interactions'
-import { readInteractionMeta } from './json'
+import {
+  readInteractionMeta,
+  readRecorderSettings,
+  recorderSettingsJson,
+} from './json'
 
 /** `readInteractionMeta`: the boundary every `interaction.meta` read crosses. */
 
@@ -75,5 +79,35 @@ describe('readInteractionMeta', () => {
     expect(maybe.ok).toBe(false)
     const stray = readInteractionMeta('email', { ...email, bcc: [] })
     expect(stray.ok).toBe(false)
+  })
+})
+
+describe('readRecorderSettings', () => {
+  it('reads nothing ticked and both opt-ins off until chosen', () => {
+    expect(readRecorderSettings(null)).toEqual({
+      folderIds: [],
+      typedNotes: false,
+      transcript: false,
+    })
+  })
+
+  it('round-trips the stored form, and a malformed key reads as its default', () => {
+    const stored = recorderSettingsJson({
+      folderIds: ['fld_deals', 'fld_portfolio', 'fld_deals'],
+      typedNotes: true,
+      transcript: false,
+    })
+    expect(stored).toEqual({
+      folder_ids: ['fld_deals', 'fld_portfolio'],
+      typed_notes: true,
+      transcript: false,
+    })
+    expect(readRecorderSettings(stored).folderIds).toEqual([
+      'fld_deals',
+      'fld_portfolio',
+    ])
+    expect(
+      readRecorderSettings({ folder_ids: 'fld_deals', transcript: 'yes' }),
+    ).toEqual({ folderIds: [], typedNotes: false, transcript: false })
   })
 })

@@ -70,6 +70,17 @@ const writes = vi.hoisted(() => ({
   saveEnrichmentOrder: vi.fn(async () => undefined),
   saveEnrichmentAuto: vi.fn(async () => undefined),
   saveEnrichmentReuse: vi.fn(async () => undefined),
+  saveRecorderSettings: vi.fn(
+    async ({ data }: { data: { folderIds: Array<string> } }) => ({
+      folderIds: data.folderIds,
+      typedNotes: false,
+      transcript: false,
+    }),
+  ),
+  connectRecorderKey: vi.fn(async () => ({
+    connectionId: GRANOLA,
+    email: 'anish@fund.example',
+  })),
 }))
 
 vi.mock('#/lib/server-fns', async (importOriginal) => ({
@@ -191,6 +202,38 @@ const MAIL = '00000000-0000-4000-8000-0000000000c1'
 const CALENDAR = '00000000-0000-4000-8000-0000000000c2'
 const DRIVE = '00000000-0000-4000-8000-0000000000c3'
 const DEALS_MAIL = '00000000-0000-4000-8000-0000000000c4'
+const GRANOLA = '00000000-0000-4000-8000-0000000000c5'
+
+/** One Granola key with Deals ticked; Granola installed. */
+const meetingNotes = {
+  accounts: [
+    {
+      connectionId: GRANOLA,
+      provider: 'granola' as const,
+      email: 'anish@fund.example',
+      status: 'active' as const,
+      errorReason: null,
+      lastSyncAt: null,
+      folders: [
+        { id: 'fld_deals', name: 'Deals', ticked: true },
+        { id: 'fld_portfolio', name: 'Portfolio', ticked: false },
+        { id: 'fld_personal', name: 'Personal', ticked: false },
+      ],
+      foldersError: null,
+      typedNotes: false,
+      transcript: false,
+    },
+  ],
+  providers: [
+    {
+      provider: 'granola' as const,
+      label: 'Granola',
+      keyHint: 'grn_…',
+      plugin: 'granola',
+      offer: 'connect' as const,
+    },
+  ],
+}
 
 const connection = (
   connectionId: string,
@@ -455,6 +498,7 @@ const loaders: Record<string, () => object> = {
     address: 'deals@in.fund.example',
   }),
   'email-calendar/$connectionId': () => ({ view: accounts }),
+  'meeting-notes': () => meetingNotes,
   files: () => ({ view: accounts }),
   'files/$connectionId': () => ({ view: accounts }),
   tokens: () => ({
@@ -585,7 +629,6 @@ const PATHS = [
   'objects',
   'templates',
   'currency',
-  'meeting-notes',
 ]
   .map(
     (p) =>
@@ -1817,5 +1860,45 @@ describe('Enrichment, by p-L-0 01', () => {
     const picker = document.querySelector('button[aria-label="Object"]')
     expect(picker?.getAttribute('role')).toBe('combobox')
     expect(picker?.textContent).toContain('Companies')
+  })
+})
+
+describe('Meeting notes, by p-M-0 05', () => {
+  it("lists the member's folders with a tick each, and a tick writes the folder ids", async () => {
+    await mount('/settings/meeting-notes')
+    const ticks = Array.from(
+      document.querySelectorAll('button[role="checkbox"]'),
+    ).map((b) => [b.getAttribute('aria-label'), b.getAttribute('aria-checked')])
+    expect(ticks).toEqual([
+      ['Deals', 'true'],
+      ['Portfolio', 'false'],
+      ['Personal', 'false'],
+      ['Typed notes', 'false'],
+      ['Transcript', 'false'],
+    ])
+    const portfolio = document.querySelector<HTMLElement>(
+      'button[aria-label="Portfolio"]',
+    )
+    await act(async () => {
+      portfolio?.click()
+      await Promise.resolve()
+    })
+    expect(writes.saveRecorderSettings).toHaveBeenCalledWith({
+      data: {
+        connectionId: GRANOLA,
+        folderIds: ['fld_deals', 'fld_portfolio'],
+        typedNotes: false,
+        transcript: false,
+      },
+    })
+  })
+
+  it('takes the key write-only, in a password field', async () => {
+    await mount('/settings/meeting-notes')
+    const field = document.querySelector('input[aria-label="Granola API key"]')
+    expect(field?.getAttribute('type')).toBe('password')
+    expect(document.body.textContent).toContain(
+      'Notes in a ticked folder are shared with the workspace.',
+    )
   })
 })

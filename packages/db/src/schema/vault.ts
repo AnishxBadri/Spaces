@@ -94,10 +94,17 @@ export const connectionStatus = pgEnum('connection_status', [
 ])
 
 /**
+ * The per-connection choices a person makes: a recorder's ticked folders and
+ * opt-ins (D78), a mail account's calendars and skipped labels (D81). Open at
+ * the column; `readRecorderSettings` in `@spaces/core/json` is the decoder.
+ */
+export type ConnectionSettings = { [k: string]: Json }
+
+/**
  * One grant per user, provider, product (D66) and provider account.
- * - `tokens_enc` is one encrypted JSON bundle (access, refresh, type), AAD
- *   `connection:<user_id>:<provider>` — `encryptBundle`, never the
- *   credential AAD.
+ * - `tokens_enc` is one encrypted JSON bundle — an OAuth grant, or a key a
+ *   member pasted (D78) — under AAD `connection:<user_id>:<provider>`
+ *   (`encryptBundle`), never the credential AAD.
  * - `scopes` holds registry `value`s the provider granted, never the ones
  *   asked for.
  */
@@ -132,6 +139,8 @@ export const accountConnection = pgTable(
      * poll asks for a starting point.
      */
     storageCursor: text('storage_cursor'),
+    /** The person's own choices for this connection; null until they make one. */
+    settings: jsonb('settings').$type<ConnectionSettings>(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

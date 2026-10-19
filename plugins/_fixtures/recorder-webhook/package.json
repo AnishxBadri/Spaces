@@ -1,0 +1,30 @@
+{
+  "//": "A fixture, not a product: a webhook recorder (D78). One `webhook` job, `ingest`, reads a Fathom or a tl;dv delivery — the two shapes in fixtures/ — and hands it to Content.logRecordedNote under the same contract Granola's schedule job uses. Its manifest declares `ingress: { signature: 'hmac-sha256' }`, so web verifies a delivery before the worker ever sees it. The worker's recorder live test drives it through the ingress.",
+  "name": "@spaces/plugin-recorder-webhook",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10",
+    "zod": "^4.3.6"
+  }
+}

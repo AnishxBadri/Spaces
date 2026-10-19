@@ -1,0 +1,13 @@
+{
+  "id": "evt_5f1c",
+  "event": "MeetingReady",
+  "data": {
+    "id": "mtg_tldv_7731",
+    "name": "Coffee with a founder",
+    "happenedAt": "2026-10-09T16:00:00Z",
+    "duration": 1800,
+    "url": "https://tldv.io/app/meetings/mtg_tldv_7731",
+    "invitees": [{ "name": "Lee Park", "email": "lee@quietco.example" }],
+    "notes": "## Quietco\n- Pre-seed, design partners"
+  }
+}

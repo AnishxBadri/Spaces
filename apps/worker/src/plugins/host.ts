@@ -31,6 +31,7 @@ import type {
   EventInput,
   FileInput,
   JobError,
+  PortName,
   ScheduleInput,
   ScheduleOutput,
   Trigger,
@@ -41,7 +42,10 @@ import type {
 import type { Enqueue } from '@spaces/core/queue/enqueue'
 import type { MeetingLane } from '@spaces/core/writes/interactions/meeting-lane'
 import type { EmailLane } from '@spaces/core/writes/interactions/email-lane'
-import { markBoundConnectionRefused } from '@spaces/core/writes/connections/refused'
+import {
+  markBoundConnectionRefused,
+  markConnectionRefused,
+} from '@spaces/core/writes/connections/refused'
 import { AiBinder } from '@spaces/core/writes/ports/ai'
 import { DiscoverBinder } from '@spaces/core/writes/ports/discover'
 import type { DiscoverBinding } from '@spaces/core/writes/ports/discover'
@@ -52,6 +56,7 @@ import { BREAKER_REASON } from '../run-job'
 import type { JobBreaker } from '../run-job'
 import type { FakeProviders } from './fakes/switch'
 import { grantLayer } from './grant'
+import type { GrantOptions } from './grant'
 import { messageOf, truncate } from './loader'
 import type { LoadedHook, LoadedPlugin } from './loader'
 import { ModelCallLive } from './model-call'
@@ -182,16 +187,37 @@ export type PluginHost = {
 
 type JobRun = (input: JobInput) => unknown
 
-type WiredJob = {
+type WiredJob = JobContext & {
   readonly trigger: Trigger
+  readonly uses: ReadonlyArray<PortName>
   readonly run: JobRun
   readonly scope: Scope.Closeable
+}
+
+/** A built grant as a job reaches it. */
+type JobContext = {
   readonly context: Context.Context<never>
   /** Binds `Ai` to one invocation's subject; null when the job has no Ai. */
   readonly bindAi: AiBinder['Service']['bind'] | null
   /** Binds `Discover` to one watch run; null when the job has no Discover. */
   readonly bindDiscover: DiscoverBinder['Service']['bind'] | null
 }
+
+/** Exactly the declared tags: an ambient port built alongside a declared one never reaches the job. */
+const jobContext = (
+  built: Context.Context<never>,
+  uses: ReadonlyArray<PortName>,
+): JobContext => ({
+  context: Context.pick(...uses.map((port) => PORTS[port]))(built),
+  bindAi: Option.match(Context.getOption(built, AiBinder), {
+    onNone: () => null,
+    onSome: (binder) => binder.bind,
+  }),
+  bindDiscover: Option.match(Context.getOption(built, DiscoverBinder), {
+    onNone: () => null,
+    onSome: (binder) => binder.bind,
+  }),
+})
 
 type Wired = {
   readonly id: string
@@ -345,6 +371,24 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
     return open === null ? Effect.void : Scope.close(open.scope, Exit.void)
   })
 
+  /** What every grant of this plugin's job is built with. */
+  const grantOptions = (
+    plugin: LoadedPlugin,
+    declared: { readonly trigger: Trigger },
+  ): GrantOptions => ({
+    settings: plugin.settings,
+    enqueue: sharedEnqueue,
+    ...(options.meetings === undefined ? {} : { meetings: options.meetings }),
+    ...(options.mail === undefined ? {} : { mail: options.mail }),
+    ...(plugin.manifest.http?.rateLimit === undefined
+      ? {}
+      : { rpm: plugin.manifest.http.rateLimit.rpm }),
+    ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+    ...(options.sink === undefined ? {} : { sink: options.sink }),
+    ...(options.fakes === undefined ? {} : { fakes: options.fakes }),
+    ai: { trigger: declared.trigger, modelCall },
+  })
+
   const logFailure = (what: string) => (cause: Cause.Cause<unknown>) =>
     Effect.sync(() => {
       console.error(`[plugins] ${what}: ${describeCause(cause)}`)
@@ -378,21 +422,7 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
       }
       const scope = yield* Scope.make()
       const built = yield* Layer.buildWithScope(
-        grantLayer(plugin.row, declared.uses, {
-          settings: plugin.settings,
-          enqueue: sharedEnqueue,
-          ...(options.meetings === undefined
-            ? {}
-            : { meetings: options.meetings }),
-          ...(options.mail === undefined ? {} : { mail: options.mail }),
-          ...(plugin.manifest.http?.rateLimit === undefined
-            ? {}
-            : { rpm: plugin.manifest.http.rateLimit.rpm }),
-          ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
-          ...(options.sink === undefined ? {} : { sink: options.sink }),
-          ...(options.fakes === undefined ? {} : { fakes: options.fakes }),
-          ai: { trigger: declared.trigger, modelCall },
-        }),
+        grantLayer(plugin.row, declared.uses, grantOptions(plugin, declared)),
         scope,
       ).pipe(Effect.exit)
       if (Exit.isFailure(built)) {
@@ -402,24 +432,10 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
       }
       jobs.set(name, {
         trigger: declared.trigger,
+        uses: declared.uses,
         run,
         scope,
-        // Exactly the declared tags: an ambient port built alongside a
-        // declared one never reaches the job.
-        context: Context.pick(...declared.uses.map((port) => PORTS[port]))(
-          built.value,
-        ),
-        bindAi: Option.match(Context.getOption(built.value, AiBinder), {
-          onNone: () => null,
-          onSome: (binder) => binder.bind,
-        }),
-        bindDiscover: Option.match(
-          Context.getOption(built.value, DiscoverBinder),
-          {
-            onNone: () => null,
-            onSome: (binder) => binder.bind,
-          },
-        ),
+        ...jobContext(built.value, declared.uses),
       })
     }
     const plans =
@@ -655,6 +671,7 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
     integrationId: string,
     jobName: string,
     input: JobInput,
+    connectionId?: string,
   ): Effect.Effect<JobOutput, JobError> =>
     Effect.suspend(() => {
       const plugin = wired.get(integrationId)
@@ -669,24 +686,67 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
           }),
         )
       }
+      if (connectionId === undefined)
+        return runJobOn(integrationId, plugin, jobName, job, job, input, null)
+      // One member's run (D78): the same grant, bound to their connection,
+      // built for this invocation and closed with it.
+      return Effect.scoped(
+        Layer.build(
+          grantLayer(
+            { ...plugin.plugin.row, connectionId },
+            job.uses,
+            grantOptions(plugin.plugin, job),
+          ),
+        ).pipe(
+          Effect.mapError(
+            (error) =>
+              new JobPermanent({
+                reason: `${plugin.id}.${jobName}: ${messageOf(error)}`,
+              }),
+          ),
+          Effect.flatMap((built) =>
+            runJobOn(
+              integrationId,
+              plugin,
+              jobName,
+              job,
+              jobContext(built, job.uses),
+              input,
+              connectionId,
+            ),
+          ),
+        ),
+      )
+    })
+
+  const runJobOn = (
+    integrationId: string,
+    plugin: Wired,
+    jobName: string,
+    job: WiredJob,
+    on: JobContext,
+    input: JobInput,
+    connectionId: string | null,
+  ): Effect.Effect<JobOutput, JobError> =>
+    Effect.suspend(() => {
       const label = `${plugin.id}.${jobName}`
       // Ai is bound here, per invocation, to the entity the job runs on;
       // Discover to the watch run.
       const withAi =
-        job.bindAi === null
-          ? job.context
+        on.bindAi === null
+          ? on.context
           : Context.add(
-              job.context,
+              on.context,
               Ai,
-              job.bindAi(subjectOf(job.trigger, input)),
+              on.bindAi(subjectOf(job.trigger, input)),
             )
       const context =
-        job.bindDiscover === null
+        on.bindDiscover === null
           ? withAi
           : Context.add(
               withAi,
               Discover,
-              job.bindDiscover(watchOf(job.trigger, input)),
+              on.bindDiscover(watchOf(job.trigger, input)),
             )
       return Effect.suspend(() => {
         const out = job.run(input)
@@ -747,9 +807,10 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
         // next attempt would send the same refused token.
         Effect.catchTag('ConnectionRefused', (error) =>
           Effect.promise(() =>
-            markBoundConnectionRefused(integrationId, error.reason).catch(
-              () => false,
-            ),
+            (connectionId === null
+              ? markBoundConnectionRefused(integrationId, error.reason)
+              : markConnectionRefused(connectionId, error.reason)
+            ).catch(() => false),
           ).pipe(
             Effect.andThen(
               Effect.fail(new JobPermanent({ reason: error.reason })),

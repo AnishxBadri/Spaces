@@ -1,5 +1,7 @@
 import { Effect, Schema } from 'effect'
+import { isKeyedProvider } from '@spaces/core/providers/keyed'
 import { PROVIDERS } from '@spaces/core/providers/registry'
+import { disconnectKeyedProgram } from '@spaces/core/writes/connections/keyed'
 import { connectionState } from '@spaces/core/writes/connections/token'
 import type { ProviderEndpoints } from '@spaces/core/writes/connections/token'
 import { revokeConnection as revokeAtProvider } from '@spaces/core/writes/connections/revoke'
@@ -53,6 +55,16 @@ const sharesGrant = Effect.fn('connectionSharesGrant')(function* (
   )
 })
 
+/** Whether the connection is a key the member pasted rather than an OAuth grant. */
+const keyed = Effect.fn('connectionIsKeyed')(function* (
+  userId: string,
+  connectionId: string,
+) {
+  const rows = yield* Effect.promise(() => listConnectionsFor(userId))
+  const self = rows.find((r) => r.id === connectionId)
+  return self !== undefined && isKeyedProvider(self.provider)
+})
+
 /**
  * Disconnect one product: delete its row, and revoke at the provider only
  * when it was the account's last live product row. (D81)
@@ -64,6 +76,7 @@ const sharesGrant = Effect.fn('connectionSharesGrant')(function* (
  *   the grant cannot strand it.
  * - `forgetConnection` unlinks the documents and integrations that pointed
  *   at the row in the same transaction; the files stay.
+ * - A pasted key asks no provider; the recorded notes it synced are removed.
  */
 export const disconnectConnectionProgram = Effect.fn('disconnectConnection')(
   function* (
@@ -72,6 +85,22 @@ export const disconnectConnectionProgram = Effect.fn('disconnectConnection')(
     providers: ProviderEndpoints = PROVIDERS,
   ) {
     yield* ownedBy(userId, connectionId)
+    // A pasted key (D78): no grant at the provider, and the notes its runs
+    // synced go with it.
+    if (yield* keyed(userId, connectionId)) {
+      yield* disconnectKeyedProgram(userId, connectionId).pipe(
+        Effect.catchTag('KeyedConnectionNotFound', () =>
+          Effect.fail(
+            new NotYourConnection({ message: 'Not your connection' }),
+          ),
+        ),
+      )
+      const result: ConnectionDisconnectResult = {
+        connectionId,
+        revoke: 'none',
+      }
+      return result
+    }
     const shared = yield* sharesGrant(userId, connectionId)
     const revoke: RevokeStep = shared
       ? 'kept'

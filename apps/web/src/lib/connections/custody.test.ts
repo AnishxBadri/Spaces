@@ -271,3 +271,34 @@ describe('disconnecting one product of an account', () => {
     expect(idp.revokeRequests).toHaveLength(1)
   })
 })
+
+describe('Disconnect of a pasted key (D78)', () => {
+  it('deletes the row and asks no provider', async () => {
+    const row = (
+      await db
+        .insert(accountConnection)
+        .values({
+          userId: FIXTURE_ACTOR.id,
+          provider: 'granola',
+          product: 'notes',
+          externalEmail: 'anish@fund.example',
+          tokensEnc: encryptBundle(
+            { type: 'api_key', key: 'grn_key' },
+            { userId: FIXTURE_ACTOR.id, provider: 'granola' },
+          ),
+        })
+        .returning({ id: accountConnection.id })
+    ).at(0)
+    if (!row) throw new Error('no row')
+    expect(
+      await disconnectConnectionHandler({ connectionId: row.id }, providers),
+    ).toEqual({ connectionId: row.id, revoke: 'none' })
+    expect(idp.revokeRequests).toHaveLength(0)
+    expect(
+      await db
+        .select({ id: accountConnection.id })
+        .from(accountConnection)
+        .where(eq(accountConnection.id, row.id)),
+    ).toEqual([])
+  })
+})

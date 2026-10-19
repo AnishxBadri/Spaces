@@ -16,8 +16,12 @@ const connectionOf = z.looseObject({
     id: z.string(),
     requires: z
       .looseObject({
+        // A keyed connection (a member's pasted key) asks for no scopes.
         connection: z
-          .object({ provider: z.string(), scopes: z.array(z.string()) })
+          .object({
+            provider: z.string(),
+            scopes: z.array(z.string()).default([]),
+          })
           .optional(),
       })
       .optional(),

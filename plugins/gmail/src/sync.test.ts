@@ -390,6 +390,7 @@ describe('a run that cannot file everything', () => {
         logInteraction: () => Effect.die('unused'),
         emitSignal: () => Effect.die('unused'),
         logMeeting: () => Effect.die('unused'),
+        logRecordedNote: () => Effect.die('unused'),
         logEmail: (claim) =>
           claim.providerMessageId === 'm-gamma-intro'
             ? Effect.fail(new JobRetryable({ reason: 'the parser threw' }))

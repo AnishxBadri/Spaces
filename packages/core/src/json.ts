@@ -126,3 +126,43 @@ export function readInteractionMeta(
     }
   return { ok: true, meta: parsed.data }
 }
+
+/** A recorder connection's choices (D78): the ticked folders and two opt-ins. */
+export type RecorderSettings = {
+  folderIds: Array<string>
+  /** Fetch the member's typed notes, private to them. */
+  typedNotes: boolean
+  /** Fetch the transcript, private to them. */
+  transcript: boolean
+}
+
+const recorderSettings = z.object({
+  folder_ids: z.array(z.string().min(1)).catch([]),
+  typed_notes: z.boolean().catch(false),
+  transcript: z.boolean().catch(false),
+})
+
+/**
+ * `account_connection.settings` read as a recorder's: nothing ticked and
+ * both opt-ins off until the person chooses, and a malformed key reads as
+ * its default rather than failing the page.
+ */
+export function readRecorderSettings(raw: Json): RecorderSettings {
+  const parsed = recorderSettings.parse(jsonRecord(raw))
+  return {
+    folderIds: [...new Set(parsed.folder_ids)],
+    typedNotes: parsed.typed_notes,
+    transcript: parsed.transcript,
+  }
+}
+
+/** The stored form `readRecorderSettings` reads, which the plugin is handed. */
+export function recorderSettingsJson(settings: RecorderSettings): {
+  [k: string]: Json
+} {
+  return {
+    folder_ids: [...new Set(settings.folderIds)],
+    typed_notes: settings.typedNotes,
+    transcript: settings.transcript,
+  }
+}

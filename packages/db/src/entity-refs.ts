@@ -16,6 +16,7 @@ import {
   interaction,
   interactionDocument,
   interactionEntity,
+  interactionNote,
   interactionStat,
   investment,
   jobRun,
@@ -323,6 +324,21 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
     del: { kind: 'cascade' }, // the interaction outlives its artifact
     // The document reached through the interaction's participants.
     context: { role: 'item', kind: 'doc_chunk', hop: 1 },
+  },
+  {
+    // A meeting's note beyond its write-up: a recorder's, or typed notes (D78).
+    key: 'interaction_note.note',
+    table: interactionNote,
+    column: interactionNote.noteId,
+    // Notes are not mergeable, so a repoint never meets a collision; the
+    // pair key is still declared, as the artifact join does.
+    merge: {
+      kind: 'repoint-or-drop',
+      uniqueWith: [interactionNote.interactionId],
+    },
+    del: { kind: 'cascade' }, // the meeting outlives its second note
+    // The note reached through the interaction's participants.
+    context: { role: 'item', kind: 'note', hop: 1 },
   },
   {
     key: 'interaction_stat.entity',

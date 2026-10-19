@@ -25,6 +25,9 @@ import type {
   MeetingCancellation,
   MeetingClaim,
   MeetingResult,
+  RecordedNote,
+  RecordedNoteGone,
+  RecordedNoteResult,
   SignalClaim,
 } from '@spaces/sdk'
 import { ref } from '../../context/ref'
@@ -41,6 +44,15 @@ import {
 } from '../interactions/write'
 import type { BodyVisibility, RecordedArtifact } from '../interactions/write'
 import { MeetingLane } from '../interactions/meeting-lane'
+import {
+  recorderKey,
+  removeRecordedNotesProgram,
+  writeRecordedNote,
+} from '../interactions/recorded-note'
+import type {
+  RecordedNoteInput,
+  RecordedNoteOwner,
+} from '../interactions/recorded-note'
 import { EmailLane } from '../interactions/email-lane'
 import type {
   MeetingInput,
@@ -108,6 +120,10 @@ import { ReceiptNotOwned, checkReceipt, insertReceipt } from './receipts'
  *   `writeRecordedInteraction`, which attaches it to the calendar meeting or
  *   births a call. It writes no note: what the notes become is the host's
  *   landing rules' (D78).
+ * - `logRecordedNote` (D78) is the recorder contract: a checked note, its
+ *   attendees through the participants module, and `writeRecordedNote` —
+ *   keyed per bound connection, its author that connection's member. A gone
+ *   note, or one with `deletedAt`, is `removeRecordedNotesProgram`.
  * - Every interaction write's `interaction.logged` events are dispatched
  *   once it commits.
  */
@@ -425,6 +441,119 @@ export const readInteractionShape = (
   }
 }
 
+const longText = z.string().max(1_000_000)
+
+/** What a recorded note must be, read at runtime; an unknown field is refused. */
+const recordedNoteShape = z.discriminatedUnion('_tag', [
+  z
+    .object({
+      _tag: z.literal('recorded-note'),
+      providerNoteId: text,
+      title: z.string().max(2000).optional(),
+      startedAt: instant,
+      endedAt: instant.optional(),
+      attendees: z.array(participantShape).max(1000),
+      calendarEventId: text.optional(),
+      icalUid: text.optional(),
+      summary: longText.optional(),
+      typedNotes: longText.optional(),
+      transcript: longText.optional(),
+      webUrl: z
+        .url({ protocol: /^https?$/ })
+        .max(2000)
+        .optional(),
+      recordingUrl: z
+        .url({ protocol: /^https?$/ })
+        .max(2000)
+        .optional(),
+      folderIds: z.array(text).max(1000).optional(),
+      deletedAt: instant.optional(),
+      raw: jsonValue,
+    })
+    .strict(),
+  z
+    .object({ _tag: z.literal('recorded-note-gone'), providerNoteId: text })
+    .strict(),
+])
+
+/** The note, checked: gone, or the writer's input with its participants. */
+export const readRecordedNote = (
+  claim: RecordedNote | RecordedNoteGone,
+):
+  | { ok: true; gone: string }
+  | {
+      ok: true
+      gone: null
+      input: RecordedNoteInput
+      participants: Array<ParticipantInput>
+    }
+  | { ok: false; reason: string } => {
+  const parsed = recordedNoteShape.safeParse(claim)
+  if (!parsed.success)
+    return { ok: false, reason: issuesOf(parsed.error, 'note') }
+  const c = parsed.data
+  if (c._tag === 'recorded-note-gone' || c.deletedAt !== undefined)
+    return { ok: true, gone: c.providerNoteId }
+  if (c.endedAt !== undefined && c.endedAt.getTime() < c.startedAt.getTime())
+    return { ok: false, reason: 'note.endedAt: before startedAt' }
+  const participants = [
+    ...new Map(
+      c.attendees.map((p) => {
+        const email = p.email.toLowerCase()
+        return [email, { email, name: blankToNull(p.name) }]
+      }),
+    ).values(),
+  ]
+  const blank = (v: string | undefined) =>
+    v === undefined || v.trim() === '' ? null : v
+  return {
+    ok: true,
+    gone: null,
+    participants,
+    input: {
+      providerNoteId: c.providerNoteId,
+      title: blankToNull(c.title),
+      startedAt: c.startedAt,
+      durationSeconds:
+        c.endedAt === undefined
+          ? null
+          : Math.round((c.endedAt.getTime() - c.startedAt.getTime()) / 1000),
+      emails: participants.map((p) => p.email),
+      calendarEventId: c.calendarEventId ?? null,
+      icalUid: c.icalUid ?? null,
+      summary: blank(c.summary),
+      typedNotes: blank(c.typedNotes),
+      transcript: blank(c.transcript),
+      webUrl: c.webUrl ?? null,
+      recordingUrl: c.recordingUrl ?? null,
+      raw: c.raw,
+    },
+  }
+}
+
+/** Who a recorded note is by: the bound connection's member, else the body author. */
+const recordedNoteOwner = async (row: {
+  id: string
+  connectionId?: string | null
+}): Promise<RecordedNoteOwner | null> => {
+  const connectionId = row.connectionId ?? null
+  if (connectionId !== null) {
+    const held = (
+      await db
+        .select({ userId: accountConnection.userId })
+        .from(accountConnection)
+        .where(eq(accountConnection.id, connectionId))
+    ).at(0)
+    return held === undefined
+      ? null
+      : { integrationId: row.id, connectionId, authorId: held.userId }
+  }
+  const authorId = await bodyAuthor(row.id)
+  return authorId === null
+    ? null
+    : { integrationId: row.id, connectionId: null, authorId }
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const FILING_KINDS: ReadonlySet<string> = new Set(['record', 'space'])
@@ -508,7 +637,8 @@ const discard = (body: DocumentClaim['body']) =>
     : Effect.void
 
 export const ContentLive = (
-  row: Pick<BoundIntegration, 'id' | 'capabilityId'>,
+  row: Pick<BoundIntegration, 'id' | 'capabilityId'> &
+    Partial<Pick<BoundIntegration, 'connectionId'>>,
 ): Layer.Layer<Content, never, Enqueue | MeetingLane | EmailLane> => {
   const refuse = (body: DocumentClaim['body'], reason: string) =>
     discard(body).pipe(
@@ -884,6 +1014,51 @@ export const ContentLive = (
     )
   })
 
+  const logRecordedNote = Effect.fn('Content.logRecordedNote')(function* (
+    claim: RecordedNote | RecordedNoteGone,
+  ): Effect.fn.Return<RecordedNoteResult, JobError, Enqueue | MeetingLane> {
+    const read = readRecordedNote(claim)
+    if (!read.ok) {
+      return yield* new JobPermanent({
+        reason: `Content.logRecordedNote: ${read.reason}`,
+      })
+    }
+    const owner = yield* Effect.tryPromise({
+      try: () => recordedNoteOwner(row),
+      catch: retryable('logRecordedNote'),
+    })
+    if (owner === null) {
+      return yield* new JobPermanent({
+        reason:
+          'Content.logRecordedNote: the bound connection is gone, or no workspace user can author the note',
+      })
+    }
+    if (read.gone !== null) {
+      const [interactionId] = yield* removeRecordedNotesProgram(owner, [
+        recorderKey(owner.integrationId, owner.connectionId, read.gone),
+      ]).pipe(Effect.mapError(retryable('logRecordedNote')))
+      return { outcome: 'removed', interactionId: interactionId ?? null }
+    }
+    const edges =
+      read.participants.length === 0
+        ? []
+        : yield* (yield* MeetingLane).participants(
+            { integrationId: row.id, authorId: owner.authorId },
+            read.participants,
+          )
+    const written = yield* Effect.tryPromise({
+      try: () => writeRecordedNote(owner, read.input, edges),
+      catch: (cause) =>
+        cause instanceof ArtifactNotOwned
+          ? new JobPermanent({
+              reason: `Content.logRecordedNote: ${cause.message}`,
+            })
+          : retryable('logRecordedNote')(cause),
+    })
+    yield* dispatchAll(written.events)
+    return { outcome: written.outcome, interactionId: written.interactionId }
+  })
+
   return Layer.effect(
     Content,
     Effect.gen(function* () {
@@ -899,6 +1074,8 @@ export const ContentLive = (
         emitSignal,
         logMeeting: (claim) => logMeeting(claim).pipe(Effect.provide(context)),
         logEmail: (claim) => logEmail(claim).pipe(Effect.provide(context)),
+        logRecordedNote: (claim) =>
+          logRecordedNote(claim).pipe(Effect.provide(context)),
       })
     }),
   )

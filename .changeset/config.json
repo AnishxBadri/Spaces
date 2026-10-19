@@ -34,6 +34,7 @@
     "@spaces/plugin-poller",
     "@spaces/plugin-gatecrasher",
     "@spaces/plugin-discover",
-    "@spaces/plugin-watcher"
+    "@spaces/plugin-watcher",
+    "@spaces/plugin-recorder-webhook"
   ]
 }

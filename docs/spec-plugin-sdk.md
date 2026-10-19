@@ -454,6 +454,14 @@ Import.stage(grid: {
 - **`CursorInvalid`** is a schedule job's typed outcome for an expired cursor (Google's 410). The host closes the run `succeeded` with `cursor invalid, cleared: <reason>` in `job_run.summary` and writes the cursor null; the next run starts as the first did, from `connectedAt`.
 - The testing kit's `makeFakeCalendarApi` is `events.list` over a fake calendar (`timeMin`, `syncToken`, `showDeleted`, `singleEvents`, paging), with `expireSyncTokens`, `rateLimit` and `revoke`; `SPACES_FAKE_PROVIDERS=1` stands it in for `google-calendar`.
 
+### 5.5 The recorder contract — keyed connections, `logRecordedNote` (SDK 1.5, D78)
+
+- **`Content.logRecordedNote(RecordedNote | RecordedNoteGone) → { outcome: attached | born | duplicate, interactionId } | { outcome: removed, interactionId | null }`.** One contract for every recorder, whatever its transport: Granola from a `schedule` job, Fathom and tl;dv from a `webhook` job through §11's ingress. The note carries the provider note id, title, start and end, attendees, `calendarEventId`/`icalUid`, the summary, the opted-in `typedNotes`/`transcript`, `webUrl`, `recordingUrl`, `folderIds`, `deletedAt` and `raw`.
+- **The host decides, in core's `writeRecordedNote`**: the receipt first (only on a first delivery), the participants through the `MeetingLane`, then `writeRecordedInteraction` — the calendar meeting by event id, else start plus attendee emails within 30 minutes, else a `call`. The key is `rec:<integration>:<connection or workspace>:<note id>`, the call's `message_id` or the meeting's `recorder_events` id, so a replay is one row and one receipt and two members' notes of one meeting are two copies. What a note becomes beyond that is `landRecordedNote`'s (arrival-7).
+- **Removal** (`recorded-note-gone`, `deletedAt`, Disconnect) is `removeRecordedNotesProgram`: the notes and documents the integration wrote for the note's author on that interaction, open `task` suggestions citing the receipt or those notes, the receipt, then the recorder event — or the whole call it had born.
+- **A keyed connection** is `requires.connection: { provider, key: true }`: each member pastes their own key (`account_connection`, an `api_key` bundle, no expiry; `accessTokenFor` returns it). The admin's row binds no connection; the worker runs each schedule job once per member's active connection on ports bound to it, with `ScheduleInput.connection.settings` (the ticked `folder_ids`, `typed_notes`, `transcript`) and a cursor keyed `<job>@<connection>`. A member's refused key marks only their connection.
+- The testing kit's `makeFakeGranolaApi` is `/me`, `/folders`, a folder's notes and one note, with a request log, `move`, `remove` and `finish`; `SPACES_FAKE_PROVIDERS=1` stands it in for `granola`, in the worker and on You → Meeting notes.
+
 ## 6. `definePlugin()` and the testing kit
 
 The one export a bundle has:

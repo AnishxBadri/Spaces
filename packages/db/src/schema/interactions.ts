@@ -366,3 +366,30 @@ export const enrichmentRecord = pgTable(
   },
   (t) => [index('enrichment_entity_idx').on(t.entityId)],
 )
+
+/** What a note is to the meeting it hangs off, beyond its one write-up (D78). */
+export const interactionNoteRole = pgEnum('interaction_note_role', [
+  'recorder_note',
+  'typed_notes',
+])
+
+/**
+ * The notes a meeting carries beyond its one write-up (`interaction.note_id`):
+ * a recorder's shared second note, a member's private typed notes. (D78)
+ */
+export const interactionNote = pgTable(
+  'interaction_note',
+  {
+    interactionId: uuid('interaction_id')
+      .notNull()
+      .references(() => interaction.id),
+    noteId: uuid('note_id')
+      .notNull()
+      .references(() => note.entityId),
+    role: interactionNoteRole('role').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.interactionId, t.noteId] }),
+    index('interaction_note_note_idx').on(t.noteId),
+  ],
+)

@@ -12,7 +12,12 @@ import { LOCK_FILE, bundleSha256, lockSchema } from '@spaces/core/plugins/lock'
 import type { Lock } from '@spaces/core/plugins/lock'
 import type { BoundIntegration } from '@spaces/core/writes/ports/binding'
 import { dataDir } from '@spaces/core/writes/vault/key'
-import { SDK_VERSION, manifestSchema, satisfiesSdk } from '@spaces/sdk'
+import {
+  SDK_VERSION,
+  keyedProviderOf,
+  manifestSchema,
+  satisfiesSdk,
+} from '@spaces/sdk'
 import type { Manifest } from '@spaces/sdk'
 import { standInFor } from './fakes/switch'
 import type { FakeProviders } from './fakes/switch'
@@ -261,7 +266,13 @@ const check = (
     if (manifest.requires?.credential && row.credentialId === null && !faked) {
       return yield* new Degraded({ reason: 'missing credential' })
     }
-    if (manifest.requires?.connection && row.connectionId === null && !faked) {
+    // A keyed connection is each member's own (D78): the row binds none.
+    if (
+      manifest.requires?.connection &&
+      keyedProviderOf(manifest) === null &&
+      row.connectionId === null &&
+      !faked
+    ) {
       return yield* new Degraded({ reason: 'missing connection' })
     }
 

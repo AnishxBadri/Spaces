@@ -28,6 +28,15 @@ export async function markBoundConnectionRefused(
   ).at(0)
   const connectionId = bound?.connectionId ?? null
   if (connectionId === null) return false
+  return markConnectionRefused(connectionId, reason, handle)
+}
+
+/** One connection refused by its provider — a member's key a keyed run was refused on (D78). */
+export async function markConnectionRefused(
+  connectionId: string,
+  reason: string,
+  handle: ConnectionDb = db,
+): Promise<boolean> {
   const marked = await handle
     .update(accountConnection)
     .set({ status: 'error', errorReason: reason })
