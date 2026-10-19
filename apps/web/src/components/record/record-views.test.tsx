@@ -11,6 +11,7 @@ import {
   historyCounts,
   interactionLane,
 } from '#/components/record-timeline'
+import { stamp } from '#/lib/timeline/stamp'
 import { PropertyFold } from './property-fold'
 import { RecordNotes } from './record-notes'
 
@@ -63,10 +64,17 @@ vi.mock('#/lib/server-fns', () => ({
   listUsers: vi.fn(),
   searchEntities: vi.fn(),
 }))
+/** The page's search; empty, so the email window stays shut, unless a test sets it. */
+const routerSearch = vi.hoisted(() => {
+  const current: { modal?: 'email'; id?: string } = {}
+  return { current }
+})
+
+// The window is its own suite's (`email-dialog.test.tsx`); here only the row.
+vi.mock('#/components/email-dialog', () => ({ EmailModal: () => null }))
 vi.mock('@tanstack/react-router', () => ({
   useRouter: () => ({ invalidate: () => Promise.resolve() }),
-  // No `?modal=`: the email window stays shut.
-  useSearch: () => ({}),
+  useSearch: () => routerSearch.current,
   useNavigate: () => () => Promise.resolve(),
   Link: ({ children }: { children: ReactNode }) => <a href="#">{children}</a>,
 }))
@@ -75,6 +83,7 @@ let root: Root | null = null
 let host: HTMLElement | null = null
 
 afterEach(() => {
+  routerSearch.current = {}
   act(() => root?.unmount())
   host?.remove()
   root = null
@@ -121,6 +130,10 @@ const interaction = (
     privateBody: boolean
     ownPrivate: boolean
     hasAttachments: boolean
+    summary: string | null
+    snippet: string | null
+    categories: Array<'intro' | 'pitch' | 'update'>
+    attendees: Array<{ id: string; name: string; kind: string }>
   }> = {},
 ): Items[number] => ({
   type: 'interaction',
@@ -136,6 +149,9 @@ const interaction = (
   attachments: 0,
   hasAttachments: false,
   answer: null,
+  summary: null,
+  snippet: null,
+  categories: [],
   ...extra,
 })
 
@@ -247,9 +263,10 @@ describe('the Interactions tab', () => {
     const lanes = [...el.querySelectorAll('[data-end-lane]')].map(
       (l) => l.textContent,
     )
-    expect(lanes.at(0)).toBe('Write upvia Anish · ⧉ 2')
+    const date = stamp('2026-10-01T10:00:00.000Z')
+    expect(lanes.at(0)).toBe(`Write upvia Anish · ⧉ 2${date}`)
     // A written-up row opens its note from the subject, so has no action.
-    expect(lanes.at(2)).toBe('accepted')
+    expect(lanes.at(2)).toBe(`accepted${date}`)
     const writeUp = button(/^Write up$/)
     expect(writeUp.className).toContain('opacity-0')
     expect(writeUp.className).not.toContain('text-primary')
@@ -265,7 +282,9 @@ describe('the Interactions tab', () => {
     const lanes = [...el.querySelectorAll('[data-end-lane]')].map(
       (l) => l.textContent,
     )
-    expect(lanes).toEqual(['body private · via Gmail'])
+    expect(lanes).toEqual([
+      `body private · via Gmail${stamp('2026-10-01T10:00:00.000Z')}`,
+    ])
     expect(el.querySelector('a')).toBeNull()
     expect(el.textContent).toContain('call p')
   })
@@ -303,6 +322,111 @@ describe('the Interactions tab', () => {
       />,
     )
     expect(el.querySelector('[aria-label="More for interactions"]')).toBeNull()
+  })
+
+  it('draws a 40px row: glyph, subject, participants, the summary clamped at two lines, chips', async () => {
+    const el = await mount(
+      <RecordInteractions
+        items={[
+          interaction('s', 'email', {
+            summary: 'Sends the Q3 deck ahead of Thursday.',
+            snippet: 'Hi all, attached is',
+            categories: ['update', 'pitch'],
+            attendees: [
+              { id: 'p1', name: 'Ada Lovelace', kind: 'person' },
+              { id: 'c1', name: 'Acme', kind: 'company' },
+            ],
+          }),
+        ]}
+        registry={[]}
+      />,
+    )
+    const row = el.querySelector('li')
+    expect(row?.className).toContain('min-h-ledger-row')
+    expect(row?.querySelector('svg[aria-label="email"]')).not.toBeNull()
+    expect(row?.querySelector('a')?.textContent).toBe('email s')
+    expect(row?.querySelector('[data-participants]')?.textContent).toBe(
+      'Ada Lovelace · Acme',
+    )
+    const line = row?.querySelector('[data-line]')
+    expect(line?.getAttribute('data-line')).toBe('summary')
+    expect(line?.textContent).toBe('Sends the Q3 deck ahead of Thursday.')
+    expect(line?.className).toContain('line-clamp-2')
+    expect(
+      [...(row?.querySelectorAll('[data-category]') ?? [])].map(
+        (c) => c.textContent,
+      ),
+    ).toEqual(['update', 'pitch'])
+    const end = row?.querySelector('[data-end-lane]')
+    expect(end?.className).toContain('mono')
+    expect(end?.querySelector('[data-date]')?.textContent).toBe(
+      stamp('2026-10-01T10:00:00.000Z'),
+    )
+  })
+
+  it('shows the snippet, unmarked, when no summary is written', async () => {
+    const el = await mount(
+      <RecordInteractions
+        items={[
+          interaction('n', 'email', {
+            snippet: 'Hi all, attached is the deck',
+          }),
+          interaction('w', 'email', { summary: 'Sends the deck.' }),
+        ]}
+        registry={[]}
+      />,
+    )
+    const lines = [...el.querySelectorAll('[data-line]')]
+    const snippet = lines.at(0)
+    const summary = lines.at(1)
+    expect(snippet?.textContent).toBe('Hi all, attached is the deck')
+    // Same type, same ink as a summary: nothing marks it as a fallback.
+    expect(snippet?.className).toBe(summary?.className)
+    expect(snippet?.parentElement?.textContent).toBe(
+      'email nHi all, attached is the deck',
+    )
+  })
+
+  it('draws no line under a row with neither', async () => {
+    const el = await mount(
+      <RecordInteractions items={[interaction('z', 'call')]} registry={[]} />,
+    )
+    expect(el.querySelector('[data-line]')).toBeNull()
+  })
+
+  it('tells the page when the filter changes, so the tab head’s count follows', async () => {
+    const changes: Array<string> = []
+    await mount(
+      <RecordInteractions
+        items={items}
+        registry={[]}
+        filter="all"
+        onFilterChange={(f) => changes.push(f)}
+      />,
+    )
+    await click(button(/^Has attachments 1$/))
+    expect(changes).toEqual(['attachments'])
+  })
+
+  it('highlights the row ?modal=email&id= opens, behind its window (D74)', async () => {
+    routerSearch.current = { modal: 'email', id: 'b' }
+    const el = await mount(<RecordInteractions items={items} registry={[]} />)
+    const lit = [...el.querySelectorAll('li[data-highlighted]')]
+    expect(lit).toHaveLength(1)
+    expect(lit.at(0)?.className).toContain('bg-bone')
+    expect(lit.at(0)?.textContent).toContain('email b')
+  })
+
+  it('unfolds to the opened row when it sits past the fold', async () => {
+    const many: Items = Array.from({ length: 23 }, (_, i) =>
+      interaction(`m${i}`, 'email'),
+    )
+    routerSearch.current = { modal: 'email', id: 'm22' }
+    const el = await mount(<RecordInteractions items={many} registry={[]} />)
+    expect(el.querySelectorAll('li')).toHaveLength(23)
+    expect(el.querySelector('li[data-highlighted]')?.textContent).toContain(
+      'email m22',
+    )
   })
 
   it('folds past twenty with an n of N foot', async () => {

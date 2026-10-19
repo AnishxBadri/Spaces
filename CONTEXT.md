@@ -2261,6 +2261,10 @@ archive.
   - **Shared:** the interaction row and its `meta` headers (from, to, cc,
     date, labels), its edges to people and companies, and so the timeline
     row, the graph and the interaction stats.
+  - **Hidden with the body:** what `meta` carries that is read off it —
+    Gmail's `snippet`, and the `summary` and `categories` the summarize and
+    classify lanes cache under the sensitivity gate (D67's list rows). The
+    row keeps its subject, participants and date and lists none of them.
   - **Not shared:** the body, a `note` born `private` to the connection's
     owner. Read time decides: the record timeline leaves it unlinked
     (`body private`), Cmd-K and the semantic lane drop it in

@@ -14,11 +14,12 @@ import { CORE_SCHEDULES, CORE_SCHEDULE_TZ, scheduleCoreJobs } from './schedules'
 const ENRICHMENT_QUEUES: ReadonlyArray<string> = [QUEUES.enrichmentRun]
 
 describe('the worker’s schedule list', () => {
-  it('schedules the three nightly scans, the stats roll, the storage poll and no enrichment queue', () => {
+  it('schedules the four nightly scans, the stats roll, the storage poll and no enrichment queue', () => {
     expect(CORE_SCHEDULES.map((s) => s.queue)).toEqual([
       QUEUES.dedupeSweep,
       QUEUES.sweepOrphanBlobs,
       QUEUES.pruneIngress,
+      QUEUES.summarizeEmailBackfill,
       QUEUES.rollInteractionStats,
       QUEUES.pollStorageChanges,
     ])

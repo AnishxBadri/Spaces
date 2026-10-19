@@ -42,6 +42,7 @@ import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordHistory, RecordInteractions } from '#/components/record-timeline'
+import type { InteractionFilter } from '#/lib/timeline/interaction-filter'
 import { WaitingRail } from '#/components/record/waiting-rail'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { SummarizeRecordButton } from '#/components/summarize'
@@ -153,6 +154,9 @@ function DealRecordPage() {
     (next) =>
       void go({ search: { tab: next }, replace: true, resetScroll: false }),
   )
+  // The Interactions filter, held here so the tab head's count follows it.
+  const [interactionFilter, setInteractionFilter] =
+    useState<InteractionFilter>('all')
   useHotkey(
     'm',
     useCallback(() => setMoveOpen(true), []),
@@ -495,7 +499,12 @@ function DealRecordPage() {
           label={deal.name}
           tab={tab}
           onTabChange={changeTab}
-          counts={recordTabCounts({ notes, timeline, documents })}
+          counts={recordTabCounts({
+            notes,
+            timeline,
+            documents,
+            interactionFilter,
+          })}
           panels={{
             notes: (
               <RecordNotes
@@ -506,6 +515,8 @@ function DealRecordPage() {
             ),
             interactions: (
               <RecordInteractions
+                filter={interactionFilter}
+                onFilterChange={setInteractionFilter}
                 items={timeline}
                 registry={registry}
                 recordId={deal.id}

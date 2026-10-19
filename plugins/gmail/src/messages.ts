@@ -54,6 +54,7 @@ export const rawMessage = z.object({
   labelIds: z.array(z.string()).default([]),
   internalDate: z.string().regex(/^\d+$/),
   raw: z.string().min(1),
+  snippet: z.string().optional(),
 })
 
 export type RawMessage = z.output<typeof rawMessage>
@@ -81,6 +82,38 @@ const SYSTEM_NAMES: { readonly [id: string]: string } = {
   CATEGORY_SOCIAL: 'Social',
   CATEGORY_UPDATES: 'Updates',
   CATEGORY_FORUMS: 'Forums',
+}
+
+const ENTITIES: { readonly [name: string]: string } = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  nbsp: ' ',
+}
+
+/**
+ * Gmail's `snippet` as plain text: it arrives HTML-escaped (`&#39;`,
+ * `&amp;`). Undefined when nothing is left, so the claim carries no field.
+ */
+export const snippetText = (
+  snippet: string | undefined,
+): string | undefined => {
+  const text = (snippet ?? '')
+    .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n: string) =>
+      String.fromCodePoint(parseInt(n, 16)),
+    )
+    .replace(/&([a-z]+);/gi, (whole, name: string) =>
+      Object.hasOwn(ENTITIES, name.toLowerCase())
+        ? ENTITIES[name.toLowerCase()]
+        : whole,
+    )
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 1000)
+  return text === '' ? undefined : text
 }
 
 /** Label ids → names: the system ones by `SYSTEM_NAMES`, a user label by `labels.list`. */

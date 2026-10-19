@@ -1,9 +1,16 @@
-import { Link, useRouter } from '@tanstack/react-router'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { Link, useRouter, useSearch } from '@tanstack/react-router'
+import {
+  CalendarDays,
+  ChevronDown,
+  ChevronRight,
+  Mail,
+  Phone,
+} from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { optionLabel, refName } from './attributes/value-editor'
 import { EmailModal } from './email-dialog'
+import { badgeClasses } from './ui/badge'
 import { Button } from './ui/button'
 import {
   DropdownMenu,
@@ -20,6 +27,13 @@ import {
   writeUpInteraction,
 } from '#/lib/server-fns'
 import { stamp } from '#/lib/timeline/stamp'
+import {
+  INTERACTION_FILTERS,
+  inInteractionFilter,
+  interactionCounts,
+} from '#/lib/timeline/interaction-filter'
+import type { InteractionFilter } from '#/lib/timeline/interaction-filter'
+import { openModalId } from '#/lib/modal-search'
 import { cn } from '#/lib/utils'
 import type { getRecordTimeline } from '#/lib/server-fns'
 
@@ -169,49 +183,12 @@ export function splitLedger(items: Items): {
   }
 }
 
-/** The Interactions tab's filters: every kind, one, or those with attachments. */
-export const INTERACTION_FILTERS = [
-  'all',
-  'email',
-  'meeting',
-  'call',
-  'attachments',
-] as const
-export type InteractionFilter = (typeof INTERACTION_FILTERS)[number]
-
 const INTERACTION_FILTER_LABELS: Record<InteractionFilter, string> = {
   all: 'All',
   email: 'Email',
   meeting: 'Meeting',
   call: 'Call',
   attachments: 'Has attachments',
-}
-
-type Filterable = { kind: string; hasAttachments: boolean }
-
-/** Whether a row is listed under a filter. */
-export function inInteractionFilter(
-  i: Filterable,
-  filter: InteractionFilter,
-): boolean {
-  if (filter === 'all') return true
-  if (filter === 'attachments') return i.hasAttachments
-  return i.kind === filter
-}
-
-/** How many rows each interaction filter lists. */
-export function interactionCounts(
-  interactions: ReadonlyArray<Filterable>,
-): Record<InteractionFilter, number> {
-  const of = (f: InteractionFilter) =>
-    interactions.filter((i) => inInteractionFilter(i, f)).length
-  return {
-    all: interactions.length,
-    email: of('email'),
-    meeting: of('meeting'),
-    call: of('call'),
-    attachments: of('attachments'),
-  }
 }
 
 /** The History tab's filters on a deal. */
@@ -330,9 +307,11 @@ function EmailVisibilityMenu({ recordId }: { recordId: string }) {
  * The Interactions tab: the kind filters, the composer row (DESIGN.md P7,
  * the Composer Row), then calls, emails and meetings, folded past
  * `INTERACTIONS_FOLD`. The filter is the view's own state, as the space
- * page's Notes filter is.
+ * page's Notes filter is, unless the page holds it for the tab head's count.
  * - `recordId` lets the email window widen for this record, and puts the
  *   override in the head's `···` once the viewer has private emails here.
+ * - The email `?modal=email&id=` opens stays highlighted behind its window,
+ *   unfolded to when it sits past the fold.
  */
 export function RecordInteractions({
   items,
@@ -340,6 +319,8 @@ export function RecordInteractions({
   refNames,
   composer,
   recordId,
+  filter: held,
+  onFilterChange,
 }: {
   items: Items
   registry: Array<RegistryEntry>
@@ -348,13 +329,26 @@ export function RecordInteractions({
   composer?: React.ReactNode
   /** The record the tab is on. */
   recordId?: string
+  /** The filter, when the page holds it. */
+  filter?: InteractionFilter
+  onFilterChange?: (filter: InteractionFilter) => void
 }) {
   const { interactions } = splitLedger(items)
-  const [filter, setFilter] = useState<InteractionFilter>('all')
+  const [own, setOwn] = useState<InteractionFilter>('all')
+  const filter = held ?? own
+  const setFilter = (next: InteractionFilter) => {
+    setOwn(next)
+    onFilterChange?.(next)
+  }
   const [unfolded, setUnfolded] = useState(false)
+  const opened = openModalId(useSearch({ strict: false }), 'email')
   const counts = interactionCounts(interactions)
   const listed = interactions.filter((i) => inInteractionFilter(i, filter))
-  const shown = unfolded ? listed : listed.slice(0, INTERACTIONS_FOLD)
+  const openedAt = listed.findIndex((i) => i.id === opened)
+  const shown =
+    unfolded || openedAt >= INTERACTIONS_FOLD
+      ? listed
+      : listed.slice(0, INTERACTIONS_FOLD)
   return (
     <div className="flex flex-col">
       <FilterRow
@@ -379,6 +373,7 @@ export function RecordInteractions({
         refNames={refNames}
         empty={composer ? null : 'None logged.'}
         last={shown.length === listed.length}
+        highlight={opened}
       />
       {shown.length < listed.length ? (
         <FoldFoot
@@ -498,6 +493,7 @@ export function RecordTimeline({
   refNames,
   empty = 'Nothing yet.',
   last: lastRow = true,
+  highlight = null,
 }: {
   items: Items
   registry: Array<RegistryEntry>
@@ -506,6 +502,8 @@ export function RecordTimeline({
   empty?: string | null
   /** False when a fold row follows, so the last entry keeps its rule. */
   last?: boolean
+  /** The interaction whose window is open over the list. */
+  highlight?: string | null
 }) {
   if (items.length === 0) {
     return empty === null ? null : (
@@ -530,7 +528,14 @@ export function RecordTimeline({
           )
         }
         if (item.type === 'interaction') {
-          return <InteractionRow key={item.id} item={item} last={last} />
+          return (
+            <InteractionRow
+              key={item.id}
+              item={item}
+              last={last}
+              highlighted={item.id === highlight}
+            />
+          )
         }
         if (item.type === 'ledger') {
           return <LedgerEntry key={item.id} item={item} last={last} />
@@ -564,19 +569,41 @@ export function interactionLane(item: {
     .join(' · ')
 }
 
+const KIND_GLYPHS: Record<string, typeof Mail> = {
+  email: Mail,
+  meeting: CalendarDays,
+  call: Phone,
+}
+
+/** The line under an email's subject: its summary, else the snippet, unmarked. */
+export function interactionLine(item: {
+  summary: string | null
+  snippet: string | null
+}): { text: string; from: 'summary' | 'snippet' } | null {
+  if (item.summary !== null) return { text: item.summary, from: 'summary' }
+  if (item.snippet !== null) return { text: item.snippet, from: 'snippet' }
+  return null
+}
+
 /**
- * One interaction on the ledger. An email opens its window from the
- * subject (`?modal=email&id=`, D74); any other written-up row opens its
- * note; one that is not offers `Write up` as a row action, shown on hover
- * and focus, which writes one now and lands in the editor. A body private
- * to someone else keeps its subject and says `body private` (D67).
+ * One interaction on the ledger (D67's list row): kind glyph, subject in ink
+ * and participants in graphite, the summary clamped at two lines with the
+ * snippet as its unmarked fallback and the category chips, then the mono end
+ * lane — `via`, attachments, the answer and the date.
+ * - An email opens its window from the subject (`?modal=email&id=`, D74);
+ *   any other written-up row opens its note; one that is not offers
+ *   `Write up` as a row action, shown on hover and focus.
+ * - A body private to someone else keeps its subject and says
+ *   `body private`; its summary, snippet and chips are never sent (D67).
  */
 function InteractionRow({
   item,
   last,
+  highlighted,
 }: {
   item: InteractionItem
   last: boolean
+  highlighted: boolean
 }) {
   const router = useRouter()
   const [pending, setPending] = useState(false)
@@ -595,65 +622,111 @@ function InteractionRow({
     }
   }
 
+  const Glyph = KIND_GLYPHS[item.kind] ?? Mail
+  const line = interactionLine(item)
+  const lane = item.privateBody
+    ? ['body private', interactionLane(item)]
+        .filter((part) => part !== '')
+        .join(' · ')
+    : interactionLane(item)
+
   return (
-    <Row
-      at={item.at}
-      type={item.kind}
-      last={last}
-      end={
-        <>
-          {item.noteId || item.privateBody ? null : (
-            <button
-              type="button"
-              onClick={() => void writeUp()}
-              disabled={pending}
-              className={cn(
-                'focus-ring shrink-0 font-sans text-label text-foreground hover:underline',
-                !pending &&
-                  'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100',
-              )}
-            >
-              {pending ? 'Writing up…' : 'Write up'}
-            </button>
-          )}
-          <span className="min-w-0 truncate">
-            {item.privateBody
-              ? ['body private', interactionLane(item)]
-                  .filter((part) => part !== '')
-                  .join(' · ')
-              : interactionLane(item)}
-          </span>
-        </>
-      }
-    >
-      {item.kind === 'email' ? (
-        <Link
-          to="."
-          search={(prev) => ({ ...prev, modal: 'email', id: item.id })}
-          resetScroll={false}
-          className="focus-ring hover:underline"
-        >
-          {item.subject || 'Untitled'}
-        </Link>
-      ) : item.noteId ? (
-        <Link
-          to="/notes/$noteId"
-          params={{ noteId: item.noteId }}
-          className="focus-ring hover:underline"
-        >
-          {item.subject || 'Untitled'}
-        </Link>
-      ) : item.subject ? (
-        <span>{item.subject}</span>
-      ) : (
-        <span className="text-graphite">Untitled</span>
+    <li
+      data-highlighted={highlighted ? '' : undefined}
+      className={cn(
+        'group/row flex min-h-ledger-row items-start gap-3 px-3 py-2.5',
+        !last && 'border-b border-rule',
+        highlighted && 'bg-bone',
       )}
-      {item.attendees.length > 0 ? (
-        <span className="block mono text-micro text-graphite">
-          {item.attendees.map((a) => a.name).join(' · ')}
-        </span>
-      ) : null}
-    </Row>
+    >
+      <Glyph
+        role="img"
+        aria-label={item.kind}
+        className="mt-0.75 size-3.5 shrink-0 text-graphite"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-baseline gap-2">
+          {item.kind === 'email' ? (
+            <Link
+              to="."
+              search={(prev) => ({ ...prev, modal: 'email', id: item.id })}
+              resetScroll={false}
+              className="focus-ring min-w-0 shrink truncate text-ui text-foreground hover:underline"
+            >
+              {item.subject || 'Untitled'}
+            </Link>
+          ) : item.noteId ? (
+            <Link
+              to="/notes/$noteId"
+              params={{ noteId: item.noteId }}
+              className="focus-ring min-w-0 shrink truncate text-ui text-foreground hover:underline"
+            >
+              {item.subject || 'Untitled'}
+            </Link>
+          ) : item.subject ? (
+            <span className="min-w-0 shrink truncate text-ui text-foreground">
+              {item.subject}
+            </span>
+          ) : (
+            <span className="shrink-0 text-ui text-graphite">Untitled</span>
+          )}
+          {item.attendees.length > 0 ? (
+            <span
+              data-participants
+              className="min-w-0 flex-1 truncate text-label text-graphite"
+            >
+              {item.attendees.map((a) => a.name).join(' · ')}
+            </span>
+          ) : null}
+          {item.categories.length > 0 ? (
+            <span className="ml-auto flex shrink-0 gap-1">
+              {item.categories.map((c) => (
+                <span
+                  key={c}
+                  data-category
+                  className={badgeClasses({
+                    className: 'bg-bone text-graphite',
+                  })}
+                >
+                  {c}
+                </span>
+              ))}
+            </span>
+          ) : null}
+        </div>
+        {line === null ? null : (
+          <p
+            data-line={line.from}
+            className="mt-0.5 line-clamp-2 text-label text-foreground"
+          >
+            {line.text}
+          </p>
+        )}
+      </div>
+      <span
+        data-end-lane
+        className="flex w-60 shrink-0 items-center justify-end gap-2 mono text-micro leading-5 text-graphite"
+      >
+        {item.noteId || item.privateBody ? null : (
+          <button
+            type="button"
+            onClick={() => void writeUp()}
+            disabled={pending}
+            className={cn(
+              'focus-ring shrink-0 font-sans text-label text-foreground hover:underline',
+              !pending &&
+                'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100',
+            )}
+          >
+            {pending ? 'Writing up…' : 'Write up'}
+          </button>
+        )}
+        {lane === '' ? null : <span className="min-w-0 truncate">{lane}</span>}
+        <time dateTime={item.at} data-date className="tabular shrink-0">
+          {stamp(item.at)}
+        </time>
+      </span>
+    </li>
   )
 }
 

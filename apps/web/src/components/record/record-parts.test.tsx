@@ -178,13 +178,34 @@ describe('which tab opens', () => {
       recordTabCounts({
         notes: { filed: [1], mentions: [2, 3] },
         timeline: [
-          { type: 'interaction' },
+          { type: 'interaction', kind: 'email', hasAttachments: false },
           { type: 'macro' },
           { type: 'attrs' },
         ],
         documents: [],
       }),
     ).toEqual({ notes: 3, interactions: 1, files: 0, history: 2 })
+  })
+
+  it('counts the Interactions tab under its filter', () => {
+    const timeline = [
+      { type: 'interaction', kind: 'email', hasAttachments: true },
+      { type: 'interaction', kind: 'email', hasAttachments: false },
+      { type: 'interaction', kind: 'meeting', hasAttachments: false },
+      { type: 'macro' },
+    ] as const
+    const under = (interactionFilter: 'all' | 'email' | 'attachments') =>
+      recordTabCounts({
+        notes: { filed: [], mentions: [] },
+        timeline,
+        documents: [],
+        interactionFilter,
+      })
+    expect(under('all').interactions).toBe(3)
+    expect(under('email').interactions).toBe(2)
+    expect(under('attachments').interactions).toBe(1)
+    // History counts what is not an interaction, whatever the filter.
+    expect(under('email').history).toBe(1)
   })
 })
 

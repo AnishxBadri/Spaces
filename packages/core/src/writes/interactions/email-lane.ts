@@ -21,6 +21,8 @@ export type EmailInput = {
   receivedAt: Date
   /** Label names, trimmed; empties dropped. */
   labels: ReadonlyArray<string>
+  /** The provider's preview of the body, trimmed; absent when empty. */
+  snippet?: string
 }
 
 export type EmailLaneContext = {

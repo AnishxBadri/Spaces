@@ -250,9 +250,18 @@ describe(
 
       const doc = (await db.select().from(document)).at(0)
       if (!doc) throw new Error('no document')
-      // The sender's company is born too, and the Website enriches it.
+      // The sender's company is born too, and the Website enriches it; the
+      // email queues its summary.
+      const email = (
+        await db.select({ id: interaction.id }).from(interaction)
+      ).at(0)?.id
       expect(enqueued.filter((e) => e.name !== QUEUES.enrichmentRun)).toEqual([
         { name: QUEUES.extractDocument, data: { documentId: doc.entityId } },
+        {
+          name: QUEUES.summarizeEmail,
+          data: { interactionId: email },
+          options: { singletonKey: email },
+        },
       ])
 
       // Exactly what `runJob` would run, with no change to extract-document.

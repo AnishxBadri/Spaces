@@ -42,6 +42,20 @@ describe('readInteractionMeta', () => {
     })
   })
 
+  it('reads an email’s snippet, summary and categories (D67)', () => {
+    const derived: EmailMeta = {
+      ...email,
+      labels: ['Inbox'],
+      snippet: 'Hi — the deck is attached',
+      summary: 'Sends the deck ahead of Thursday.',
+      categories: ['pitch'],
+    }
+    expect(readInteractionMeta('email', derived)).toEqual({
+      ok: true,
+      meta: derived,
+    })
+  })
+
   it('reads null as no metadata', () => {
     expect(readInteractionMeta('email', null)).toEqual({ ok: true, meta: null })
   })

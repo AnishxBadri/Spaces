@@ -20,6 +20,7 @@ export const CORE_SCHEDULES: ReadonlyArray<{
   { queue: QUEUES.dedupeSweep, cron: '30 3 * * *' },
   { queue: QUEUES.sweepOrphanBlobs, cron: '10 4 * * *' },
   { queue: QUEUES.pruneIngress, cron: '40 4 * * *' },
+  { queue: QUEUES.summarizeEmailBackfill, cron: '50 4 * * *' },
   // Not nightly: a meeting that started is last contact within the quarter hour.
   { queue: QUEUES.rollInteractionStats, cron: '*/15 * * * *' },
   { queue: QUEUES.pollStorageChanges, cron: '*/15 * * * *' },

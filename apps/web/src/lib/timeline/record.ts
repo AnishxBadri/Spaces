@@ -21,6 +21,7 @@ import { investment } from '@spaces/db/schema/portfolio'
 import { jsonRecord, jsonString, jsonStrings } from '@spaces/core/json'
 import { sinceRemoved } from '@spaces/core/plugins/registry'
 import { canRead } from '@spaces/core/read-policy'
+import { emailListing } from '@spaces/core/interactions/email-listing'
 import {
   canReadDocumentSql,
   noteWidenedSql,
@@ -390,6 +391,8 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
       })),
       ...myInteractions.map((i) => {
         const privateBody = i.noteId !== null && unreadable.has(i.noteId)
+        // Body-derived, so private with the body (D67).
+        const listing = emailListing(i.meta, !privateBody)
         return {
           type: 'interaction' as const,
           id: i.id,
@@ -409,6 +412,11 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           attachments: privateBody ? 0 : (attachmentsBy.get(i.id) ?? 0),
           hasAttachments: !privateBody && i.hasAttachments,
           answer: meetingAnswer(i.meta, ownEmails),
+          /** The cached one-line summary; null until a lane writes one. */
+          summary: listing.summary,
+          /** The mailbox's preview, shown unmarked when there is no summary. */
+          snippet: listing.snippet,
+          categories: listing.categories,
         }
       }),
       ...checks

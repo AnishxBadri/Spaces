@@ -18,6 +18,7 @@ import { writeIntegrationInteraction } from '@spaces/core/writes/interactions/wr
 import type { BodyVisibility } from '@spaces/core/writes/interactions/write'
 import { putBlobProgram } from '@spaces/core/writes/documents/intake'
 import { reclaimBlobIfOrphaned } from '#/lib/documents/blob-refs'
+import { enqueueSummarizeEmail } from '#/lib/ai/summarize-email'
 import type { EmailMeta } from '@spaces/db/schema'
 import type { Address } from './forwarded'
 import type { ArrivalMessage } from './message'
@@ -113,6 +114,8 @@ export type FileContext = {
 export type FileOptions = {
   visibility: BodyVisibility
   labels: ReadonlyArray<string> | null
+  /** The mailbox's preview of the body (Gmail's `snippet`), when it sent one. */
+  snippet?: string
   /** The synced mailbox's owner; null on the forwarded lane. */
   mailboxOwner: string | null
 }
@@ -131,6 +134,7 @@ export function emailMetaOf(
   message: ArrivalMessage,
   labels: ReadonlyArray<string> | null,
   mimeBlobSha: string | null,
+  snippet?: string,
 ): EmailMeta {
   return {
     kind: 'email',
@@ -140,6 +144,7 @@ export function emailMetaOf(
     date: message.occurredAt.toISOString(),
     mime_blob_sha: mimeBlobSha,
     ...(labels === null ? {} : { labels: [...labels] }),
+    ...(snippet === undefined ? {} : { snippet }),
   }
 }
 
@@ -383,7 +388,12 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
           threadId: message.threadId,
           subject: message.subject,
           occurredAt: message.occurredAt,
-          meta: emailMetaOf(message, options.labels, mimeBlobSha),
+          meta: emailMetaOf(
+            message,
+            options.labels,
+            mimeBlobSha,
+            options.snippet,
+          ),
           body: {
             title: message.subject ?? '',
             text: message.body,
@@ -440,5 +450,7 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
       authorId: options.mailboxOwner,
     },
   })
+  // Its summary and categories, after the commit. (D67)
+  yield* Effect.promise(() => enqueueSummarizeEmail(written.interactionId))
   return { ...written, attachments }
 })

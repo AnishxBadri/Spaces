@@ -24,6 +24,7 @@
     "./json": "./src/json.ts",
     "./queue/*": "./src/queue/*.ts",
     "./timeline/*": "./src/timeline/*.ts",
+    "./interactions/*": "./src/interactions/*.ts",
     "./ai/*": "./src/ai/*.ts",
     "./import/*": "./src/import/*.ts",
     "./plugins/*": "./src/plugins/*.ts",

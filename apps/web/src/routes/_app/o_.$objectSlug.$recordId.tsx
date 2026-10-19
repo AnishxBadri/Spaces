@@ -29,6 +29,7 @@ import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordHistory, RecordInteractions } from '#/components/record-timeline'
+import type { InteractionFilter } from '#/lib/timeline/interaction-filter'
 import { WaitingRail } from '#/components/record/waiting-rail'
 import {
   LogComposerRow,
@@ -139,6 +140,9 @@ function ObjectRecordPage() {
     (next) =>
       void go({ search: { tab: next }, replace: true, resetScroll: false }),
   )
+  // The Interactions filter, held here so the tab head's count follows it.
+  const [interactionFilter, setInteractionFilter] =
+    useState<InteractionFilter>('all')
 
   async function newNoteAboutThis() {
     try {
@@ -376,7 +380,12 @@ function ObjectRecordPage() {
           label={record.name}
           tab={tab}
           onTabChange={changeTab}
-          counts={recordTabCounts({ notes, timeline, documents })}
+          counts={recordTabCounts({
+            notes,
+            timeline,
+            documents,
+            interactionFilter,
+          })}
           panels={{
             notes: (
               <RecordNotes
@@ -387,6 +396,8 @@ function ObjectRecordPage() {
             ),
             interactions: (
               <RecordInteractions
+                filter={interactionFilter}
+                onFilterChange={setInteractionFilter}
                 items={timeline}
                 registry={registry}
                 recordId={record.id}

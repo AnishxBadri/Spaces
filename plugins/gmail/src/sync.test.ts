@@ -17,7 +17,7 @@ import type {
 } from '@spaces/sdk/testing'
 import { describe, expect, it } from 'vitest'
 import plugin from './index.ts'
-import { batchBody, parseBatch } from './messages.ts'
+import { batchBody, parseBatch, snippetText } from './messages.ts'
 
 /**
  * The sync job against the in-repo fake of Gmail: no network, no Google
@@ -113,7 +113,18 @@ describe('the first run', () => {
       'providerMessageId',
       'raw',
       'receivedAt',
+      'snippet',
     ])
+    // Gmail's preview of the body, the row's fallback line under the subject.
+    expect(acme?.snippet?.length).toBeGreaterThan(0)
+  })
+
+  it('reads Gmail’s escaped snippet as plain text, and an empty one as none', () => {
+    expect(snippetText('Tom&#39;s deck &amp; the   model')).toBe(
+      "Tom's deck & the model",
+    )
+    expect(snippetText('  ')).toBeUndefined()
+    expect(snippetText(undefined)).toBeUndefined()
   })
 
   it('names a user label through labels.list, asked once', async () => {

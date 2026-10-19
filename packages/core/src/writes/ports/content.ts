@@ -210,6 +210,7 @@ const emailClaim = z.object({
   raw: z.string().regex(/^[A-Za-z0-9_-]+={0,2}$/, 'not base64url'),
   receivedAt: z.iso.datetime({ offset: true }),
   labels: z.array(z.string().trim().max(256)).max(200),
+  snippet: z.string().trim().max(1000).optional(),
 })
 
 const text = z.string().trim().min(1).max(2000)
@@ -878,6 +879,7 @@ export const ContentLive = (
         raw,
         receivedAt: new Date(read.data.receivedAt),
         labels: read.data.labels.filter((l) => l.length > 0),
+        ...(read.data.snippet ? { snippet: read.data.snippet } : {}),
       },
     )
   })

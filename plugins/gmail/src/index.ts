@@ -34,6 +34,7 @@ import {
   parseBatch,
   profile,
   rawMessage,
+  snippetText,
   url,
 } from './messages.ts'
 import type { RawMessage } from './messages.ts'
@@ -323,6 +324,7 @@ export const sync = Effect.fn('gmail.sync')(function* (input: ScheduleInput) {
       return
     }
     const labels = yield* namesOf(message.data)
+    const snippet = snippetText(message.data.snippet)
     // One message the lane cannot file is skipped, in words, and the run
     // goes on: a message that always fails must not hold every later one.
     const result = yield* content
@@ -332,6 +334,7 @@ export const sync = Effect.fn('gmail.sync')(function* (input: ScheduleInput) {
         raw: message.data.raw,
         receivedAt: new Date(receivedAt).toISOString(),
         labels,
+        ...(snippet === undefined ? {} : { snippet }),
       })
       .pipe(
         Effect.catch((error) =>

@@ -114,6 +114,7 @@ export const logSyncedEmailProgram = Effect.fn('logSyncedEmail')(function* (
       visibility: box.settings.shareBodies ? 'shared' : 'private',
       labels: input.labels,
       mailboxOwner: box.ownerId,
+      ...(input.snippet === undefined ? {} : { snippet: input.snippet }),
     },
   ).pipe(Effect.mapError((e) => new SyncedMailFailed({ cause: e.cause })))
   return filed.kind === 'duplicate'

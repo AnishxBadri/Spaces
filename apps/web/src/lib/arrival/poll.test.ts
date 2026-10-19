@@ -233,8 +233,11 @@ describe('the forwarding mailbox poll', () => {
 
     // The schedule followed the row.
     expect(syncs.at(-1)).toMatchObject({ cadenceMinutes: 5 })
-    // Saving sent one poll at once.
-    expect(enqueued.map((e) => e.name)).toEqual(['mail.poll'])
+    // Saving sent one poll at once; the email written queued its summary.
+    expect(enqueued.map((e) => e.name)).toEqual([
+      'mail.poll',
+      'interaction.summarize-email',
+    ])
   })
 
   it('forwarding the same message twice leaves one interaction — the unique index is the dedupe', async () => {

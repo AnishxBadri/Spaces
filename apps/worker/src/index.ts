@@ -43,6 +43,7 @@ import { pruneIngress } from './jobs/prune-ingress'
 import { rollInteractionStats } from './jobs/roll-interaction-stats'
 import { readDeck } from './jobs/read-deck'
 import { summarize } from './jobs/summarize'
+import { summarizeEmail, summarizeEmailBackfill } from './jobs/summarize-email'
 import { embedDocument } from './jobs/embed-document'
 import { embedSource } from './jobs/embed-source'
 import { restampSensitivity } from './jobs/restamp-sensitivity'
@@ -385,6 +386,39 @@ async function main() {
     QUEUES.summarize,
     { batchSize: 1, includeMetadata: true },
     runJob(summarize, { host, layer: Layer.empty }),
+  )
+  // An email's summary and categories (D67): `stately` with
+  // `singletonKey = interactionId`, so one email is one queued job; created
+  // before the plain create loop below, which would make it `standard`. A
+  // model call or two per email, so a batch of one. No Layer.
+  await boss
+    .createQueue(QUEUES.summarizeEmail, { policy: 'stately' })
+    .catch(() => {})
+  if (summarizeEmail.retry)
+    await boss.updateQueue(QUEUES.summarizeEmail, {
+      retryLimit: summarizeEmail.retry.limit,
+      retryDelay: summarizeEmail.retry.delaySeconds,
+      retryBackoff: summarizeEmail.retry.backoff,
+    })
+  await boss.work(
+    QUEUES.summarizeEmail,
+    { batchSize: 1, includeMetadata: true },
+    runJob(summarizeEmail, { host, layer: Layer.empty }),
+  )
+  // Its nightly backfill: `singleton`, so two runs never walk one page; a
+  // run can take a while, so the expiry is a heartbeat, as the embed
+  // backfill's is. Never retried — the next night is the retry.
+  await boss
+    .createQueue(QUEUES.summarizeEmailBackfill, {
+      policy: 'singleton',
+      expireInSeconds: 6 * 60 * 60,
+      heartbeatSeconds: 60,
+    })
+    .catch(() => {})
+  await boss.work(
+    QUEUES.summarizeEmailBackfill,
+    { batchSize: 1, includeMetadata: true },
+    runJob(summarizeEmailBackfill, { host, layer: Layer.empty }),
   )
   // Space-tag suggestions (SPA-103): pressed on a record's Spaces rail,
   // with `singletonKey = entityId` — `exclusive`, so a second press while

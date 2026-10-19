@@ -269,11 +269,13 @@ describe('forwarded attachments file themselves', () => {
     expect(await storage().exists(deck.sha)).toBe(true)
 
     // Extraction queued, and no classify call from this lane; the company
-    // the thread made is enriched by the Website besides.
+    // the thread made is enriched by the Website besides, and the email
+    // queues its summary.
     const queued = enqueued.filter((e) => e.name !== QUEUES.enrichmentRun)
     expect(queued.map((e) => e.name)).toEqual([
       QUEUES.pollMailbox,
       QUEUES.extractDocument,
+      QUEUES.summarizeEmail,
     ])
     expect(queued.at(1)?.data).toEqual({ documentId: doc })
 

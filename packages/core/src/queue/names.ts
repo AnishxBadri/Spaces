@@ -225,6 +225,20 @@ export const QUEUES = {
    * it becomes their last. Retried, since a recompute is idempotent.
    */
   rollInteractionStats: 'interaction-stats.roll',
+  /**
+   * An email's display text (D67): its one-line summary and category labels,
+   * through the synthesize and classify lanes under the sensitivity gate,
+   * written once into `interaction.meta`. Sent by the mail lanes when an
+   * email is written. Created `stately` and sent with `singletonKey =
+   * interactionId`, so one email is one queued job.
+   */
+  summarizeEmail: 'interaction.summarize-email',
+  /**
+   * Nightly: every mailed email still missing its summary or categories, a
+   * page at a time, through the same program — never rewriting one a lane
+   * wrote. `singleton`, so two runs never walk the same pages.
+   */
+  summarizeEmailBackfill: 'interaction.summarize-backfill',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

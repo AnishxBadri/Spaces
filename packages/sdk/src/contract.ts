@@ -391,6 +391,8 @@ export type EmailClaim = {
   readonly receivedAt: IsoTimestamp
   /** The labels the message carries, by name (`Inbox`, `Promotions`, a user label). */
   readonly labels: ReadonlyArray<string>
+  /** The provider's plain-text preview of the body (Gmail's `snippet`), if it has one. */
+  readonly snippet?: string
 }
 
 /** What `Content.logEmail` decided. `duplicate`: the Message-ID was already held. */

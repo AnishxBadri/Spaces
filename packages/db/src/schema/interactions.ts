@@ -45,6 +45,15 @@ export type EmailMeta = {
   mime_blob_sha: string | null
   /** The mailbox's labels by name, for a synced message; the exclude list reads them. */
   labels?: Array<string>
+  /** The mailbox's own preview of the body (Gmail's `snippet`), when it sent one. */
+  snippet?: string
+  /**
+   * Derived display text (D67), written once by the summarize and classify
+   * lanes under the sensitivity gate and never rewritten: a one-line summary
+   * and category labels. Absent until a lane answers.
+   */
+  summary?: string
+  categories?: Array<string>
 }
 
 export type MeetingStatus = 'scheduled' | 'cancelled'
