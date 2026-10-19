@@ -78,8 +78,10 @@ export async function createSpaceRow(
   name: string,
   parentId: string | null,
   userId: string,
+  /** An open transaction to create it inside; its own otherwise. */
+  within: Pick<typeof db, 'transaction'> = db,
 ): Promise<string> {
-  return db.transaction(async (tx) => {
+  return within.transaction(async (tx) => {
     let parentPath: string | null = null
     if (parentId) {
       const parent = (

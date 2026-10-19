@@ -24,7 +24,12 @@ import { SpaceCriteria } from './space-criteria'
 import { SpaceGlossary } from './space-glossary'
 import { SpaceMoveDialog } from './space-move-dialog'
 import { SpaceTabs, spaceReadouts } from './space-tabs'
-import { AddWatchDialog, WatchingLane, WhatsMovingLane } from './space-watching'
+import {
+  AddWatchDialog,
+  WatchingLane,
+  WhatsMovingLane,
+  useAddWatch,
+} from './space-watching'
 import type { Space } from './space-tabs'
 import { TasksRail } from './tasks-rail'
 import { SaveAsTemplateAction } from './templates'
@@ -81,6 +86,7 @@ export function SpacePageView({
   watching,
   tab,
   into,
+  markedWatch = null,
   onTabChange,
 }: {
   spc: Space
@@ -89,6 +95,8 @@ export function SpacePageView({
   watching: SpaceWatching
   tab: SpaceTab
   into: string | null
+  /** A watch to mark in the Watching lane. */
+  markedWatch?: string | null
   onTabChange: (tab: SpaceTab) => void
 }) {
   const navigate = useNavigate()
@@ -100,6 +108,7 @@ export function SpacePageView({
   const [splitting, setSplitting] = useState(false)
   const [templating, setTemplating] = useState(false)
   const [addingWatch, setAddingWatch] = useState(false)
+  const saveWatch = useAddWatch(spc.id)
   const archived = spc.archive !== null || spc.archivedUnder !== null
 
   /** Archive asks nothing: Restore, on the notice it leaves, undoes it. */
@@ -290,9 +299,9 @@ export function SpacePageView({
       <AddWatchDialog
         open={addingWatch}
         onOpenChange={setAddingWatch}
-        spaceId={spc.id}
-        spaceName={spc.name}
+        space={{ id: spc.id, name: spc.name, criteria: spc.criteria }}
         engines={watching.engines}
+        onSave={saveWatch}
       />
 
       <RecordBody
@@ -303,7 +312,11 @@ export function SpacePageView({
               <SpaceCriteria spaceId={spc.id} criteria={spc.criteria} />
             </div>
 
-            <WatchingLane spaceId={spc.id} watching={watching} />
+            <WatchingLane
+              spaceId={spc.id}
+              watching={watching}
+              marked={markedWatch}
+            />
             <WhatsMovingLane signals={watching.moving} />
 
             <RailSection label="Map" meta={`${spc.children.length} sub`}>

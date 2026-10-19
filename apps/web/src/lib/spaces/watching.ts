@@ -352,24 +352,37 @@ export const spaceWatchingProgram = Effect.fn('spaceWatchingProgram')(
         stopped: engine === undefined ? 'Removed' : engine.stopped,
       }
     })
-    return {
-      watches,
-      engines: engines.flatMap((e) =>
-        e.schema !== null && e.stopped === null
-          ? [
-              {
-                integrationId: e.id,
-                name: e.name,
-                form: settingsFormOf(e.schema),
-              },
-            ]
-          : [],
-      ),
-      installed: engines.flatMap((e) =>
-        e.schema !== null && !e.removed ? [e.name] : [],
-      ),
-      moving,
-    }
+    return { watches, ...offeredOf(engines), moving }
+  },
+)
+
+/** The engines a watch can be added with, and the installed ones' names. */
+const offeredOf = (
+  engines: ReadonlyArray<{
+    id: string
+    name: string
+    schema: unknown
+    removed: boolean
+    stopped: string | null
+  }>,
+): Pick<SpaceWatching, 'engines' | 'installed'> => ({
+  engines: engines.flatMap((e) =>
+    e.schema !== null && e.stopped === null
+      ? [{ integrationId: e.id, name: e.name, form: settingsFormOf(e.schema) }]
+      : [],
+  ),
+  installed: engines.flatMap((e) =>
+    e.schema !== null && !e.removed ? [e.name] : [],
+  ),
+})
+
+/** The watch engines alone, for a window opened away from a space page. */
+export const watchEnginesProgram = Effect.fn('watchEnginesProgram')(
+  function* (): Effect.fn.Return<
+    Pick<SpaceWatching, 'engines' | 'installed'>,
+    WatchingFailed
+  > {
+    return offeredOf(yield* watchEngines())
   },
 )
 
@@ -401,22 +414,37 @@ const refuse = (message: string, errors: { [key: string]: string } = {}) =>
   new WatchRefused({ message, errors })
 
 /**
- * Save a watch from the Add watch window: the engine must be running and
- * declare a watch; the settings pass its schema. A text setting equal to
+ * Refused: the same space, engine and settings is already a watch. (D72)
+ * `watchId` is null when a racing save took the lens at the insert.
+ */
+export class AlreadyWatching extends Schema.TaggedError<AlreadyWatching>()(
+  'AlreadyWatching',
+  { message: Schema.String, watchId: Schema.NullOr(Schema.String) },
+) {}
+
+const alreadyWatching = (watchId: string | null) =>
+  new AlreadyWatching({ message: 'Already watching this', watchId })
+
+/** A watch as it will be written: the lens checked, not yet a row. */
+export type WatchLens = {
+  spaceId: string
+  integrationId: string
+  settings: SpaceWatchSettings
+  cadenceMinutes: number | null
+}
+
+/**
+ * A watch's settings as they will be saved: the engine must be running and
+ * declare a watch, and the values pass its schema. A text setting equal to
  * the space's criteria is saved blank — the brief already carries it.
  */
-export const addSpaceWatchProgram = Effect.fn('addSpaceWatchProgram')(
-  function* (
-    userId: string,
-    input: AddWatchInput,
-  ): Effect.fn.Return<{ id: string }, WatchRefused | WatchingFailed> {
-    const target = (yield* query(() =>
-      db
-        .select({ criteria: space.criteria })
-        .from(space)
-        .where(eq(space.entityId, input.spaceId)),
-    )).at(0)
-    if (target === undefined) return yield* refuse('That space is gone')
+export const watchSettingsProgram = Effect.fn('watchSettingsProgram')(
+  function* (input: {
+    integrationId: string
+    values: FormValues
+    /** The target space's criteria; null for none, or a space not yet made. */
+    criteria: string | null
+  }): Effect.fn.Return<SpaceWatchSettings, WatchRefused | WatchingFailed> {
     const engine = (yield* watchEngines()).find(
       (e) => e.id === input.integrationId,
     )
@@ -429,7 +457,7 @@ export const addSpaceWatchProgram = Effect.fn('addSpaceWatchProgram')(
     const checked = checkSettings(form.fields, input.values)
     if (!checked.ok)
       return yield* refuse('Some settings were refused', checked.errors)
-    const criteria = target.criteria?.trim() ?? ''
+    const criteria = input.criteria?.trim() ?? ''
     const settings: SpaceWatchSettings = {}
     for (const [key, value] of Object.entries(checked.values)) {
       if (value === undefined) continue
@@ -441,32 +469,102 @@ export const addSpaceWatchProgram = Effect.fn('addSpaceWatchProgram')(
         continue
       settings[key] = value
     }
-    const inserted = yield* Effect.tryPromise({
-      try: () =>
-        db
-          .insert(spaceWatch)
-          .values({
-            spaceId: input.spaceId,
-            integrationId: input.integrationId,
-            settings,
-            cadenceMinutes: input.cadenceMinutes,
-            createdBy: userId,
-          })
-          .returning({ id: spaceWatch.id }),
-      catch: (cause) =>
-        sameLens(cause)
-          ? refuse('Already watching this')
-          : new WatchingFailed({ cause }),
+    return settings
+  },
+)
+
+/** The watch already holding this lens; null when none does. */
+export const sameLensWatchProgram = Effect.fn('sameLensWatchProgram')(
+  function* (lens: Omit<WatchLens, 'cadenceMinutes'>) {
+    const row = (yield* query(() =>
+      db
+        .select({ id: spaceWatch.id })
+        .from(spaceWatch)
+        .where(
+          and(
+            eq(spaceWatch.spaceId, lens.spaceId),
+            eq(spaceWatch.integrationId, lens.integrationId),
+            sql`${spaceWatch.settingsHash} = md5(${JSON.stringify(lens.settings)}::jsonb::text)`,
+          ),
+        ),
+    )).at(0)
+    return row?.id ?? null
+  },
+)
+
+type WatchWriter = Pick<typeof db, 'insert'>
+
+/** Insert the watch through `writer` — a transaction, or `db`. Throws. */
+export async function insertWatchRow(
+  writer: WatchWriter,
+  userId: string,
+  lens: WatchLens,
+): Promise<{ id: string }> {
+  const row = (
+    await writer
+      .insert(spaceWatch)
+      .values({ ...lens, createdBy: userId })
+      .returning({ id: spaceWatch.id })
+  ).at(0)
+  if (row === undefined) throw new Error('The watch was not saved')
+  return row
+}
+
+/**
+ * A watch write's failure, typed. The lens index refusing it is
+ * `AlreadyWatching` with no id: inside a transaction the holder is read
+ * after the rollback.
+ */
+export const watchWriteFailure = (
+  cause: unknown,
+): AlreadyWatching | WatchingFailed =>
+  sameLens(cause) ? alreadyWatching(null) : new WatchingFailed({ cause })
+
+/**
+ * Save a watch from the Add watch window. The same space, engine and
+ * settings again is `AlreadyWatching` and writes nothing.
+ */
+export const addSpaceWatchProgram = Effect.fn('addSpaceWatchProgram')(
+  function* (
+    userId: string,
+    input: AddWatchInput,
+  ): Effect.fn.Return<
+    { id: string },
+    WatchRefused | AlreadyWatching | WatchingFailed
+  > {
+    const target = (yield* query(() =>
+      db
+        .select({ criteria: space.criteria })
+        .from(space)
+        .where(eq(space.entityId, input.spaceId)),
+    )).at(0)
+    if (target === undefined) return yield* refuse('That space is gone')
+    const settings = yield* watchSettingsProgram({
+      integrationId: input.integrationId,
+      values: input.values,
+      criteria: target.criteria,
     })
-    const row = inserted.at(0)
-    if (row === undefined) return yield* refuse('The watch was not saved')
-    return { id: row.id }
+    const lens = {
+      spaceId: input.spaceId,
+      integrationId: input.integrationId,
+      settings,
+    }
+    const held = yield* sameLensWatchProgram(lens)
+    if (held !== null) return yield* alreadyWatching(held)
+    return yield* Effect.tryPromise({
+      try: () =>
+        insertWatchRow(db, userId, {
+          ...lens,
+          cadenceMinutes: input.cadenceMinutes,
+        }),
+      catch: watchWriteFailure,
+    })
   },
 )
 
 /** The sentence a failed save shows. */
 export function addWatchMessage(failure: unknown): string {
-  return failure instanceof WatchRefused
+  return failure instanceof WatchRefused || failure instanceof AlreadyWatching
     ? failure.message
     : 'Could not save the watch'
 }

@@ -78,6 +78,17 @@ export type AskFindTable = {
   rows: ReadonlyArray<AskFindRow>
   /** Rows left out because their domain is dismissed from the space. */
   hidden: number
+  /** The watch this table was saved as; absent until Save as watch. (D77) */
+  savedWatch?: AskSavedWatch
+}
+
+/** The watch a find table was saved as, for the thread's line. */
+export type AskSavedWatch = {
+  id: string
+  spaceId: string
+  spaceName: string
+  /** Set when read back and the watch row is gone; never stored. */
+  deleted?: boolean
 }
 
 /** The action cards Ask proposes; the catalogue in `ASK_CARD_CATALOGUE`. (D70) */

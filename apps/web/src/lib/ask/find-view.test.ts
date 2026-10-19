@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
   FIND_FOLD,
+  engineFor,
   findQuestion,
   foldLine,
+  lookForFrom,
   restWord,
   rowAction,
   rowMenu,
+  savedWatchLine,
   shownRows,
+  spaceNameFrom,
 } from './find-view'
 import { WEB_CHIP, withMention, withWeb } from './page-scope'
 import { rpcMessages, toolKey, urlsIn } from './mount'
@@ -135,5 +139,44 @@ describe('the MCP wire', () => {
   it('keys a tool by its plugin within the model’s name rules', () => {
     expect(toolKey('exa', 'web_search_exa')).toBe('exa__web_search_exa')
     expect(toolKey('exa', 'search.v2')).toBe('exa__search_v2')
+  })
+})
+
+describe('Save as watch', () => {
+  it('names a space from the question: one line, no closing stop, cut at a word', () => {
+    expect(spaceNameFrom('  Property ops\nin Pune? ')).toBe(
+      'Property ops in Pune',
+    )
+    const long =
+      'Find property management operators and rental platforms across Pune and Mumbai'
+    const name = spaceNameFrom(long)
+    expect(name.length).toBeLessThanOrEqual(60)
+    expect(long.startsWith(name)).toBe(true)
+    expect(long.charAt(name.length)).toBe(' ')
+  })
+
+  it('prefills Look for with the question, blank when it is the criteria', () => {
+    expect(lookForFrom('Rental software', null)).toBe('Rental software')
+    expect(lookForFrom('Rental software', ' Rental software ')).toBe('')
+    expect(lookForFrom('Rental software', 'Something else')).toBe(
+      'Rental software',
+    )
+  })
+
+  it('opens on the engine the rows came through when it can watch, else the first', () => {
+    const t = table([row('a.in', 'unknown')])
+    expect(engineFor(t, [{ integrationId: 'x' }, { integrationId: 'i' }])).toBe(
+      'i',
+    )
+    expect(engineFor(t, [{ integrationId: 'x' }])).toBe('x')
+    expect(engineFor(t, [])).toBeNull()
+  })
+
+  it('says the saved watch is gone once it is', () => {
+    const saved = { id: 'w', spaceId: 's', spaceName: 'Property ops' }
+    expect(savedWatchLine(saved)).toBe('Saved as a watch on Property ops')
+    expect(savedWatchLine({ ...saved, deleted: true })).toBe(
+      'Saved as a watch on Property ops · watch deleted',
+    )
   })
 })

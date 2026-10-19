@@ -14,6 +14,7 @@ import type { SpaceTab } from '#/lib/spaces/page'
  * A space's page. `?tab=` deep-links a tab; without one the space opens on
  * the tab last used on any space, else Notes. (D74) `?into=` opens
  * Companies selecting into that subspace, where a split lands. (D73)
+ * `?watch=` marks a watch in the Watching lane.
  */
 export const Route = createFileRoute('/_app/spaces_/$spaceId')({
   validateSearch: spaceSearch,
@@ -57,6 +58,7 @@ function SpacePage() {
       watching={watching}
       tab={tab}
       into={search.into ?? null}
+      markedWatch={search.watch ?? null}
       onTabChange={changeTab}
     />
   )

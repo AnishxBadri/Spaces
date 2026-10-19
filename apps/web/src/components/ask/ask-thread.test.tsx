@@ -1,7 +1,12 @@
 import { Window } from 'happy-dom'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import type { AskCardView, AskFindRow, AskTurnView } from '#/lib/ask/types'
+import type {
+  AskCardView,
+  AskFindRow,
+  AskSavedWatch,
+  AskTurnView,
+} from '#/lib/ask/types'
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({
@@ -27,6 +32,8 @@ vi.mock('#/lib/server-fns', () => ({
   applyAskCard: vi.fn(),
   skipAskCard: vi.fn(),
   actOnFindRow: vi.fn(),
+  getSaveWatchSetup: vi.fn(),
+  saveFindAsWatch: vi.fn(),
 }))
 
 const { AskTurns, AskComposer, applyAskEvent, settledThread } =
@@ -353,7 +360,11 @@ describe('a find table', () => {
     standing,
     entityId: standing === 'unknown' ? null : ACME,
   })
-  const withTable = (rows: Array<AskFindRow>, hidden: number) =>
+  const withTable = (
+    rows: Array<AskFindRow>,
+    hidden: number,
+    savedWatch?: AskSavedWatch,
+  ) =>
     render([
       question('q1', 'Rental software startups in India'),
       answer('a1', {
@@ -378,7 +389,12 @@ describe('a find table', () => {
             state: 'done',
             input: '16 companies',
             found: rows.length,
-            find: { space: { id: 's', name: 'Property ops' }, rows, hidden },
+            find: {
+              space: { id: 's', name: 'Property ops' },
+              rows,
+              hidden,
+              ...(savedWatch === undefined ? {} : { savedWatch }),
+            },
           },
         ],
       }),
@@ -411,5 +427,30 @@ describe('a find table', () => {
     expect(strip?.textContent).toContain('web_search_exa')
     expect(strip?.textContent).toContain('unmounted')
     expect(strip?.querySelector('[title="via Exa"]')).not.toBeNull()
+  })
+
+  it('keeps the line to the watch it was saved as, and says so once the watch is deleted', () => {
+    const saved = { id: 'w1', spaceId: 's', spaceName: 'Property ops' }
+    const live = withTable([row('Keyhold', 'unknown')], 0, saved)
+    const line = live.querySelector('[data-saved-watch="live"]')
+    expect(line?.textContent).toBe('Saved as a watch on Property ops')
+    expect(line?.querySelector('a')?.getAttribute('href')).toBe(
+      '/spaces/$spaceId',
+    )
+    const gone = withTable([row('Keyhold', 'unknown')], 0, {
+      ...saved,
+      deleted: true,
+    })
+    expect(gone.querySelector('[data-saved-watch="live"]')).toBeNull()
+    expect(
+      gone.querySelector('[data-saved-watch="deleted"]')?.textContent,
+    ).toBe('Saved as a watch on Property ops · watch deleted')
+    expect(gone.querySelector('[data-saved-watch="deleted"] a')).toBeNull()
+  })
+
+  it('has no head until a table is saved or an engine can watch it', () => {
+    const host = withTable([row('Keyhold', 'unknown')], 0)
+    expect(host.querySelector('[data-saved-watch]')).toBeNull()
+    expect(host.textContent).not.toContain('Save as watch')
   })
 })

@@ -166,7 +166,10 @@ describe('Add watch', () => {
         cadenceMinutes: 1440,
       }),
     )
-    expect(failureOf(again)).toMatchObject({ message: 'Already watching this' })
+    expect(failureOf(again)).toMatchObject({
+      message: 'Already watching this',
+      watchId: saved.id,
+    })
   })
 
   it('refuses an engine that is not running, one with no watch, and a setting its schema refuses', async () => {

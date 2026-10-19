@@ -1,4 +1,4 @@
-import type { AskFindRow, AskFindTable } from './types'
+import type { AskFindRow, AskFindTable, AskSavedWatch } from './types'
 
 /**
  * A Find table as the thread draws it, pure so the table and its tests read
@@ -76,4 +76,47 @@ export function findQuestion(space: string, criteria: string | null): string {
   return rule === ''
     ? `Find companies that belong in ${space}.`
     : `Find companies that match: ${rule}`
+}
+
+/** The longest name Save as watch offers to create a space with. */
+const SPACE_NAME_MAX = 60
+
+/**
+ * The space Save as watch offers to create from a question: its words on
+ * one line, cut at a word under 60 characters, the closing stop dropped.
+ */
+export function spaceNameFrom(question: string): string {
+  const line = question
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[.?!]+$/, '')
+  if (line.length <= SPACE_NAME_MAX) return line
+  const cut = line.slice(0, SPACE_NAME_MAX)
+  const at = cut.lastIndexOf(' ')
+  return (at > 20 ? cut.slice(0, at) : cut).trim()
+}
+
+/** Look for, prefilled: the question, blank when it is the space's criteria. (D77) */
+export function lookForFrom(question: string, criteria: string | null): string {
+  const q = question.trim()
+  return criteria !== null && criteria.trim() !== '' && q === criteria.trim()
+    ? ''
+    : q
+}
+
+/** The engine a table was found through, when it can watch; else the first. */
+export function engineFor(
+  table: AskFindTable,
+  engines: ReadonlyArray<{ integrationId: string }>,
+): string | null {
+  const offered = new Set(engines.map((e) => e.integrationId))
+  const via = table.rows.find((r) => offered.has(r.via.integrationId))
+  return via?.via.integrationId ?? engines.at(0)?.integrationId ?? null
+}
+
+/** The thread's line for a saved table. */
+export function savedWatchLine(saved: AskSavedWatch): string {
+  return saved.deleted === true
+    ? `Saved as a watch on ${saved.spaceName} · watch deleted`
+    : `Saved as a watch on ${saved.spaceName}`
 }

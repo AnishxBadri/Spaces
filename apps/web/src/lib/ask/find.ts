@@ -5,6 +5,7 @@ import { db } from '@spaces/db'
 import {
   askThread,
   askTurn,
+  spaceWatch,
   spaceWatchDismissal,
   suggestion,
 } from '@spaces/db/schema'
@@ -171,8 +172,8 @@ export const findTableProgram = Effect.fn('ask.findTable')(function* (
 
 /**
  * A stored table read again: each row's standing as it is now, a row
- * dismissed since hidden and counted. A row that cannot be read stays as
- * it was.
+ * dismissed since hidden and counted, and whether the watch it was saved as
+ * still exists. A row that cannot be read stays as it was.
  */
 export const liveFindProgram = Effect.fn('ask.liveFind')(function* (
   table: AskFindTable,
@@ -202,7 +203,23 @@ export const liveFindProgram = Effect.fn('ask.liveFind')(function* (
       entityId: standing.standing === 'unknown' ? null : standing.entityId,
     })
   }
-  return { ...table, rows, hidden }
+  const saved = table.savedWatch
+  if (saved === undefined) return { ...table, rows, hidden }
+  const watch = yield* Effect.result(
+    askQuery(() =>
+      db
+        .select({ id: spaceWatch.id })
+        .from(spaceWatch)
+        .where(eq(spaceWatch.id, saved.id)),
+    ),
+  )
+  const deleted = watch._tag === 'Success' && watch.success.length === 0
+  return {
+    ...table,
+    rows,
+    hidden,
+    savedWatch: deleted ? { ...saved, deleted } : saved,
+  }
 })
 
 /** Every call's find table read again; other calls as stored. */

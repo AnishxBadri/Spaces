@@ -173,11 +173,13 @@ export function CallStrip({ calls: all }: { calls: ReadonlyArray<AskCall> }) {
 function FindTables({
   calls,
   turnId,
+  question,
   variant,
   threadId,
 }: {
   calls: ReadonlyArray<AskCall>
   turnId: string | null
+  question: string | null
   variant: AnswerVariant
   threadId: string | null
 }) {
@@ -189,6 +191,8 @@ function FindTables({
             key={i}
             table={c.find}
             turnId={turnId}
+            callIndex={i}
+            question={question}
             variant={variant}
             threadId={threadId}
           />,
@@ -240,6 +244,7 @@ export function AnswerTurn({
   threadId,
   onRetry,
   waiting = false,
+  question = null,
 }: {
   turn: AskTurnView
   variant: AnswerVariant
@@ -247,6 +252,8 @@ export function AnswerTurn({
   onRetry?: (() => void) | undefined
   /** Not the latest answer: its undecided cards wait in Review. */
   waiting?: boolean
+  /** The question this answers. */
+  question?: string | null
 }) {
   if (turn.hidden)
     return (
@@ -300,6 +307,7 @@ export function AnswerTurn({
       <FindTables
         calls={turn.calls}
         turnId={turn.id}
+        question={question}
         variant={variant}
         threadId={threadId}
       />
@@ -370,6 +378,7 @@ export function LiveAnswer({
       <FindTables
         calls={live.calls.map((c) => c.call)}
         turnId={null}
+        question={live.question.body}
         variant={variant}
         threadId={threadId}
       />
@@ -435,6 +444,7 @@ export function AskTurns({
           question === undefined ? undefined : () => onRetry(question.body)
         }
         waiting={t.id !== latestAnswer?.id}
+        question={question?.body ?? null}
       />,
     )
   }

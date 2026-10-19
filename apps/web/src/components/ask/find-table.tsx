@@ -34,6 +34,7 @@ import type { JobStatusRow } from '#/lib/integrations/job-status'
 import type { JobStatusEvent } from '@spaces/core/queue/job-status'
 import { cn } from '#/lib/utils'
 import type { AnswerVariant } from './ask-answer'
+import { FindTableHead } from './save-as-watch'
 
 /**
  * A find's results as a table, never prose: name, domain, one line, place,
@@ -42,6 +43,7 @@ import type { AnswerVariant } from './ask-answer'
  *   Add and file here and Dismiss live in its `···`.
  * - A filed row is greyed and has no control.
  * - Rows act only once the answer is stored; while it streams they read.
+ * - Its head holds Save as watch, and the saved watch's line.
  */
 
 /** How long a new record's stream may stay silent before "added" stands alone. */
@@ -260,11 +262,17 @@ function FindRow({
 export function FindTable({
   table,
   turnId,
+  callIndex,
+  question,
   variant,
   threadId,
 }: {
   table: AskFindTable
   turnId: string | null
+  /** The call of the turn that left this table. */
+  callIndex: number
+  /** The question it answered, which Save as watch is made from. */
+  question: string | null
   variant: AnswerVariant
   threadId: string | null
 }) {
@@ -316,6 +324,14 @@ export function FindTable({
         )}
       </div>
     )
+  const head = (
+    <FindTableHead
+      table={table}
+      turnId={turnId}
+      callIndex={callIndex}
+      question={question}
+    />
+  )
   if (variant === 'page')
     return (
       <section
@@ -323,6 +339,7 @@ export function FindTable({
         data-breakout
         className="relative left-1/2 flex w-[calc(100cqw-4rem)] -translate-x-1/2 flex-col border-y border-rule"
       >
+        {head}
         <div className="overflow-x-auto">{grid}</div>
         {footRow}
       </section>
@@ -332,6 +349,7 @@ export function FindTable({
       aria-label="Companies found"
       className="flex flex-col border border-rule"
     >
+      {head}
       <div className="overflow-x-auto">{grid}</div>
       {footRow}
       <div className="flex h-7 items-center justify-end border-t border-rule px-2">

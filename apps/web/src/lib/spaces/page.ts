@@ -20,10 +20,13 @@ export const DEFAULT_SPACE_TAB: SpaceTab = 'notes'
 /**
  * `?tab=` deep-links a tab; anything else reads as no tab. `?into=` is the
  * subspace a split moves companies into: the Companies tab opens selecting.
+ * `?watch=` marks one watch in the Watching lane.
  */
 export const spaceSearch = z.object({
   tab: z.enum(SPACE_TABS).optional().catch(undefined),
   into: z.string().uuid().optional().catch(undefined),
+  /** A watch the Watching lane marks: where "Already watching this" lands. */
+  watch: z.string().uuid().optional().catch(undefined),
 })
 
 /** The subspace Move here targets: the picked one, else the link's. */

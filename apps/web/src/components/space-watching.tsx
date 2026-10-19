@@ -1,6 +1,6 @@
 import { Link, useRouter } from '@tanstack/react-router'
 import { Play } from 'lucide-react'
-import { useEffect, useReducer, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { PluginMark } from './integrations/integration-ledger'
@@ -29,6 +29,7 @@ import type {
   WatchRow,
 } from '#/lib/server-fns'
 import { checkSettings, formValuesOf } from '#/lib/integrations/settings-form'
+import { lookForFrom } from '#/lib/ask/find-view'
 import { decodeInit, decodeStatus } from '#/lib/integrations/job-status-view'
 import {
   CADENCES,
@@ -136,9 +137,12 @@ const dayOf = (iso: string | null) => (iso === null ? '—' : iso.slice(5, 10))
 export function WatchingLane({
   spaceId,
   watching,
+  marked = null,
 }: {
   spaceId: string
   watching: Pick<SpaceWatching, 'watches' | 'installed'>
+  /** A watch to mark and scroll to: "Already watching this" lands here. */
+  marked?: string | null
 }) {
   const { state, dispatch } = useWatchStatus(spaceId, watching.watches)
 
@@ -180,6 +184,7 @@ export function WatchingLane({
               key={w.id}
               watch={w}
               state={state}
+              marked={w.id === marked}
               onRun={() => void runNow(w)}
             />
           ))}
@@ -193,16 +198,25 @@ export function WatchingLane({
 function LaneRow({
   children,
   className,
+  marked = false,
   ...rest
 }: {
   children: ReactNode
   className?: string
+  marked?: boolean
   'data-watch'?: string
 }) {
+  const ref = useRef<HTMLLIElement>(null)
+  useEffect(() => {
+    if (marked) ref.current?.scrollIntoView({ block: 'nearest' })
+  }, [marked])
   return (
     <li
+      ref={ref}
+      data-marked={marked || undefined}
       className={cn(
         'flex h-8 items-center gap-2 border-b border-rule px-3 text-ui',
+        marked && 'bg-bone',
         className,
       )}
       {...rest}
@@ -215,17 +229,19 @@ function LaneRow({
 function WatchLine({
   watch,
   state,
+  marked,
   onRun,
 }: {
   watch: WatchRow
   state: WatchStatusState
+  marked: boolean
   onRun: () => void
 }) {
   const cell = watchCell(state, watch.id)
   const lastRun = lastRunOf(state, watch.id, watch.lastRunAt)
   const meta = [cadenceWord(watch.cadenceMinutes), dayOf(lastRun)].join(' · ')
   return (
-    <LaneRow data-watch={watch.id}>
+    <LaneRow data-watch={watch.id} marked={marked}>
       <span
         className={cn('flex shrink-0', watch.stopped !== null && 'opacity-40')}
         title={watch.engine}
@@ -429,52 +445,148 @@ const valuesFor = (engine: WatchEngine | undefined): FormValues =>
     ? formValuesOf(engine.form.fields, {})
     : {}
 
+/** The space picker's last row: create one named from the question. */
+const NEW_SPACE = '__new__'
+
+/** A space the window can watch, with the criteria Look for blanks against. */
+export type WatchWindowSpace = {
+  id: string
+  name: string
+  criteria: string | null
+}
+
+/** What Save watch hands its caller. */
+export type WatchDraft = {
+  /** The space chosen, or the name of one to create. */
+  space: { id: string } | { create: string }
+  integrationId: string
+  values: FormValues
+  cadenceMinutes: number | null
+}
+
+/** A window opened from a Find turn: prefilled from it. (D77) */
+export type WatchPrefill = {
+  integrationId: string | null
+  /** The question, which Look for holds unless it is the space's criteria. */
+  question: string
+  cadence: string
+}
+
+/** The engine's first text Look for field: the one a question fills. */
+const questionKey = (engine: WatchEngine | undefined): string | null => {
+  if (engine === undefined || !engine.form.ok) return null
+  const { lookFor } = splitWatchFields(engine.form.fields)
+  return lookFor.find((f) => f.kind === 'string')?.key ?? null
+}
+
 /**
- * Add watch — a window: Engine, Look for (the engine's watch settings),
- * How often (Manual first and the default, D77), At most per run, then
- * Save watch. A text setting equal to the space's criteria saves blank.
+ * The watch window: Engine, Look for (the engine's watch settings), How
+ * often (Manual first and the space page's default, D77), At most per run,
+ * then Save watch. With no `space` its first row picks one, its last row
+ * creating `newSpaceName`. A text setting equal to the criteria saves blank.
  */
 export function AddWatchDialog({
   open,
   onOpenChange,
-  spaceId,
-  spaceName,
+  title = 'Add watch',
+  space,
+  spaces = [],
+  newSpaceName = null,
   engines,
+  prefill = null,
+  onSave,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  spaceId: string
-  spaceName: string
+  title?: string
+  /** The space watched; null asks for one. */
+  space: WatchWindowSpace | null
+  /** The picker's spaces, in tree order, when `space` is null. */
+  spaces?: ReadonlyArray<WatchWindowSpace & { depth: number }>
+  newSpaceName?: string | null
   engines: ReadonlyArray<WatchEngine>
+  prefill?: WatchPrefill | null
+  /** Throws to refuse; the window stays open and says why. */
+  onSave: (draft: WatchDraft) => Promise<void>
 }) {
-  const router = useRouter()
   const [engineId, setEngineId] = useState(engines.at(0)?.integrationId ?? '')
   const engine = engines.find((e) => e.integrationId === engineId)
   const [values, setValues] = useState<FormValues>(() => valuesFor(engine))
   const [cadence, setCadence] = useState('manual')
+  const [picked, setPicked] = useState('')
   const [errors, setErrors] = useState<{ readonly [key: string]: string }>({})
   const [busy, setBusy] = useState(false)
 
+  const criteriaOf = (id: string): string | null =>
+    space?.criteria ?? spaces.find((s) => s.id === id)?.criteria ?? null
+
+  /** An engine's defaults, Look for holding the question when there is one. */
+  const filled = (next: WatchEngine | undefined, spaceId: string) => {
+    const base = valuesFor(next)
+    const key = questionKey(next)
+    return prefill === null || key === null
+      ? base
+      : { ...base, [key]: lookForFrom(prefill.question, criteriaOf(spaceId)) }
+  }
+
   useEffect(() => {
     if (!open) return
-    const first = engines.at(0)
+    const first =
+      engines.find((e) => e.integrationId === prefill?.integrationId) ??
+      engines.at(0)
     setEngineId(first?.integrationId ?? '')
-    setValues(valuesFor(first))
-    setCadence('manual')
+    setPicked('')
+    setValues(filled(first, space?.id ?? ''))
+    setCadence(prefill?.cadence ?? 'manual')
     setErrors({})
-  }, [open, engines])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refills on opening and on what it is opened for, never on a re-render's fresh objects
+  }, [
+    open,
+    engines,
+    space?.id,
+    prefill?.integrationId,
+    prefill?.question,
+    prefill?.cadence,
+  ])
 
   function pickEngine(id: string) {
     setEngineId(id)
-    setValues(valuesFor(engines.find((e) => e.integrationId === id)))
+    setValues(
+      filled(
+        engines.find((e) => e.integrationId === id),
+        space?.id ?? picked,
+      ),
+    )
     setErrors({})
+  }
+
+  function pickSpace(id: string) {
+    setPicked(id)
+    const key = questionKey(engine)
+    if (prefill === null || key === null) return
+    // Look for follows the space only while the reader has not edited it.
+    const now = Object.hasOwn(values, key) ? values[key] : ''
+    if (now === '' || now === prefill.question.trim())
+      setValues((prev) => ({
+        ...prev,
+        [key]: lookForFrom(prefill.question, criteriaOf(id)),
+      }))
   }
 
   const fields = engine?.form.ok === true ? engine.form.fields : []
   const { lookFor, atMost } = splitWatchFields(fields)
+  const target: WatchDraft['space'] | null =
+    space !== null
+      ? { id: space.id }
+      : picked === NEW_SPACE && newSpaceName !== null
+        ? { create: newSpaceName }
+        : picked !== ''
+          ? { id: picked }
+          : null
 
   async function save() {
-    if (engine === undefined || !engine.form.ok || busy) return
+    if (engine === undefined || !engine.form.ok || target === null || busy)
+      return
     const checked = checkSettings(engine.form.fields, values)
     if (!checked.ok) {
       setErrors(checked.errors)
@@ -482,17 +594,14 @@ export function AddWatchDialog({
     }
     setBusy(true)
     try {
-      await addSpaceWatch({
-        data: {
-          spaceId,
-          integrationId: engine.integrationId,
-          values,
-          cadenceMinutes:
-            CADENCES.find((c) => c.value === cadence)?.minutes ?? null,
-        },
+      await onSave({
+        space: target,
+        integrationId: engine.integrationId,
+        values,
+        cadenceMinutes:
+          CADENCES.find((c) => c.value === cadence)?.minutes ?? null,
       })
       onOpenChange(false)
-      void router.invalidate()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not save')
     } finally {
@@ -524,10 +633,38 @@ export function AddWatchDialog({
         }}
       >
         <DialogHeader>
-          <DialogTitle>Add watch</DialogTitle>
-          <span className="mono text-micro text-graphite">{spaceName}</span>
+          <DialogTitle>{title}</DialogTitle>
+          {space !== null ? (
+            <span className="mono text-micro text-graphite">{space.name}</span>
+          ) : null}
         </DialogHeader>
         <div className="flex flex-col border-t border-rule">
+          {space === null ? (
+            <WindowRow label="Space" htmlFor="watch-space">
+              <Select
+                id="watch-space"
+                aria-label="Space"
+                width="content"
+                value={picked}
+                items={[
+                  ...spaces.map((s) => ({
+                    value: s.id,
+                    label: s.name,
+                    depth: s.depth,
+                  })),
+                  ...(newSpaceName === null
+                    ? []
+                    : [
+                        { value: NEW_SPACE, label: `Create “${newSpaceName}”` },
+                      ]),
+                ]}
+                onChange={pickSpace}
+                placeholder="Choose a space…"
+                searchPlaceholder="Search spaces…"
+                emptyLabel="No space matches."
+              />
+            </WindowRow>
+          ) : null}
           <WindowRow label="Engine" htmlFor="watch-engine">
             <Select
               id="watch-engine"
@@ -589,7 +726,7 @@ export function AddWatchDialog({
             <Button variant="outline">Cancel</Button>
           </DialogClose>
           <Button
-            disabled={engine === undefined || busy}
+            disabled={engine === undefined || target === null || busy}
             onClick={() => void save()}
           >
             Save watch
@@ -599,4 +736,20 @@ export function AddWatchDialog({
       </DialogContent>
     </Dialog>
   )
+}
+
+/** The space page's Save watch: Add watch's server fn, then the lanes reread. */
+export function useAddWatch(spaceId: string): (d: WatchDraft) => Promise<void> {
+  const router = useRouter()
+  return async (draft) => {
+    await addSpaceWatch({
+      data: {
+        spaceId,
+        integrationId: draft.integrationId,
+        values: draft.values,
+        cadenceMinutes: draft.cadenceMinutes,
+      },
+    })
+    void router.invalidate()
+  }
 }

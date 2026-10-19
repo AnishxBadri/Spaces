@@ -10,6 +10,7 @@ export type {
   AskFindRow,
   AskFindTable,
   AskRef,
+  AskSavedWatch,
   AskScopeChip,
   AskThreadRow,
   AskThreadView,
@@ -18,6 +19,7 @@ export type {
   AskVia,
 } from '../ask/types'
 export type { FindActed } from '../ask/find'
+export type { SaveWatchResult, WatchSpace } from '../ask/save-watch'
 export type { WebSource } from '../ask/mount'
 
 /**
@@ -195,5 +197,44 @@ export const actOnFindRow = createServerFn({ method: 'POST' })
       return { act: data.act, acted }
     } catch (failure) {
       throw new Error(findMessage(failure))
+    }
+  })
+
+/** What a Find table's Save as watch window offers: engines and spaces. */
+export const getSaveWatchSetup = createServerFn().handler(async () => {
+  await requireUser()
+  const { saveWatchSetupProgram } = await import('../ask/save-watch')
+  const { effectFn } = await import('./effect')
+  return effectFn(saveWatchSetupProgram)()
+})
+
+/**
+ * Save as watch on a Find table: one `space_watch`, the table's untouched
+ * rows as cards under the space, and the thread's link. The same lens again
+ * comes back as `exists`, naming the watch, and writes nothing. (D77)
+ */
+export const saveFindAsWatch = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      turnId: z.uuid(),
+      callIndex: z.int().min(0),
+      space: z.union([
+        z.object({ id: z.uuid() }),
+        z.object({ create: z.string().trim().min(1).max(300) }),
+      ]),
+      integrationId: z.uuid(),
+      values: z.record(z.string(), z.union([z.string(), z.boolean()])),
+      cadenceMinutes: z.int().positive().nullable(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    const { saveFindAsWatchProgram, saveWatchMessage } =
+      await import('../ask/save-watch')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(saveFindAsWatchProgram)(user.id, data)
+    } catch (failure) {
+      throw new Error(saveWatchMessage(failure))
     }
   })
