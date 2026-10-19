@@ -7,6 +7,7 @@ import { FileGlyph } from '#/components/files/file-glyph'
 import { LabelHead, LedgerRow } from '#/components/ledger-section'
 import { DensityRamp } from '#/components/dither'
 import { Button } from '#/components/ui/button'
+import { Checkbox } from '#/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -15,12 +16,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '#/components/ui/dialog'
-import { getDocumentPreview, getEmail } from '#/lib/server-fns'
+import {
+  getDocumentPreview,
+  getEmail,
+  listMembers,
+  setEmailAudience,
+} from '#/lib/server-fns'
 import type {
   EmailAttachment,
   EmailBody,
   EmailDetail,
   EmailParticipant,
+  EmailPrivacy,
 } from '#/lib/server-fns'
 import { fileType } from '#/lib/documents/files-tab'
 import { openModalId } from '#/lib/modal-search'
@@ -34,19 +41,28 @@ import { stamp } from '#/lib/timeline/stamp'
  * - Same-origin lets the window size the frame to its content; with no
  *   scripts in the frame and a CSP refusing every load, it grants nothing.
  * - A body private to someone else is one line, never fetched. (D67)
+ * - A body private by default carries its privacy row; its owner widens it
+ *   from there, for `recordId` (the record it was opened from) or members.
  */
 export function EmailDialog({
   id,
+  recordId = null,
   onOpenChange,
 }: {
   id: string | null
+  recordId?: string | null
   onOpenChange: (open: boolean) => void
 }) {
   return (
     <Dialog open={id !== null} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-[48rem]">
         {id === null ? null : (
-          <EmailWindow key={id} id={id} onClose={() => onOpenChange(false)} />
+          <EmailWindow
+            key={id}
+            id={id}
+            recordId={recordId}
+            onClose={() => onOpenChange(false)}
+          />
         )}
       </DialogContent>
     </Dialog>
@@ -57,12 +73,13 @@ export function EmailDialog({
  * The window opened from the page's own URL: `?modal=email&id=` (D74).
  * Closing drops the two params and keeps the rest.
  */
-export function EmailModal() {
+export function EmailModal({ recordId = null }: { recordId?: string | null }) {
   const search = useSearch({ strict: false })
   const navigate = useNavigate()
   return (
     <EmailDialog
       id={openModalId(search, 'email')}
+      recordId={recordId}
       onOpenChange={(open) => {
         if (!open)
           void navigate({
@@ -165,16 +182,215 @@ export function attachmentLane(
     .join(' · ')
 }
 
-function EmailWindow({ id, onClose }: { id: string; onClose: () => void }) {
+/**
+ * Who reads the body: `you`, the owner's name, granted members, or
+ * `workspace` once the owner's override on a record it is on covers it.
+ */
+export function audienceLine(p: EmailPrivacy): string {
+  if (p.workspace) return 'workspace'
+  return [
+    p.mine ? 'you' : p.owner.name,
+    ...p.grantees.map((g) => (g.you ? 'you' : g.name)),
+  ].join(', ')
+}
+
+/** `visible to: you · widen` — the widen control is the owner's alone. */
+function PrivacyRow({
+  privacy,
+  onWiden,
+}: {
+  privacy: EmailPrivacy
+  onWiden: () => void
+}) {
+  return (
+    <p data-privacy className="mono text-micro text-graphite">
+      visible to: {audienceLine(privacy)}
+      {privacy.mine ? (
+        <>
+          {' · '}
+          <button
+            type="button"
+            onClick={onWiden}
+            className="focus-ring text-foreground hover:underline"
+          >
+            widen
+          </button>
+        </>
+      ) : null}
+    </p>
+  )
+}
+
+type Member = { id: string; name: string }
+
+/**
+ * The widen window: the record it was opened from (the owner's override
+ * there) and the members granted this one email. Ticked is open, unticked
+ * is closed; Cancel is the one close.
+ */
+export function WidenDialog({
+  emailId,
+  privacy,
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  emailId: string
+  privacy: EmailPrivacy
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSaved: () => void
+}) {
+  const [members, setMembers] = useState<Array<Member> | null>(null)
+  const [record, setRecord] = useState(privacy.record?.on ?? false)
+  const [ticked, setTicked] = useState(
+    () => new Set(privacy.grantees.map((g) => g.id)),
+  )
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    setRecord(privacy.record?.on ?? false)
+    setTicked(new Set(privacy.grantees.map((g) => g.id)))
+    setError(null)
+    let live = true
+    listMembers()
+      .then((rows) => {
+        if (live)
+          setMembers(rows.filter((m) => !m.banned && m.id !== privacy.owner.id))
+      })
+      .catch(() => {
+        if (live) setMembers([])
+      })
+    return () => {
+      live = false
+    }
+  }, [open, privacy])
+
+  function toggle(id: string, on: boolean) {
+    setTicked((prev) => {
+      const next = new Set(prev)
+      if (on) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }
+
+  async function save() {
+    setSaving(true)
+    try {
+      await setEmailAudience({
+        data: {
+          interactionId: emailId,
+          userIds: [...ticked],
+          record:
+            privacy.record === null
+              ? null
+              : { id: privacy.record.id, workspace: record },
+        },
+      })
+      onSaved()
+      onOpenChange(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[70vh] flex-col sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Visible to</DialogTitle>
+        </DialogHeader>
+        <DialogDescription className="sr-only">
+          Who reads this email
+        </DialogDescription>
+        <div className="-mx-5 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5">
+          {privacy.record === null ? null : (
+            <section aria-label="Record" className="flex flex-col">
+              <LabelHead label="Record" />
+              <ol>
+                <LedgerRow last>
+                  <label className="flex min-w-0 flex-1 items-center gap-3">
+                    <Checkbox
+                      checked={record}
+                      onCheckedChange={setRecord}
+                      aria-label={privacy.record.name}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-body">
+                      {privacy.record.name}
+                    </span>
+                    <span className="shrink-0 mono text-micro text-graphite">
+                      workspace
+                    </span>
+                  </label>
+                </LedgerRow>
+              </ol>
+            </section>
+          )}
+          <section aria-label="Members" className="flex flex-col">
+            <LabelHead label="Members" />
+            {members === null ? (
+              <DensityRamp width={120} />
+            ) : (
+              <ol>
+                {members.map((m, i) => (
+                  <LedgerRow key={m.id} last={i === members.length - 1}>
+                    <label className="flex min-w-0 flex-1 items-center gap-3">
+                      <Checkbox
+                        checked={ticked.has(m.id)}
+                        onCheckedChange={(on) => toggle(m.id, on)}
+                        aria-label={m.name}
+                      />
+                      <span className="min-w-0 flex-1 truncate text-body">
+                        {m.name}
+                      </span>
+                    </label>
+                  </LedgerRow>
+                ))}
+              </ol>
+            )}
+          </section>
+          {error === null ? null : (
+            <p className="text-ui text-destructive">{error}</p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={() => void save()} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function EmailWindow({
+  id,
+  recordId,
+  onClose,
+}: {
+  id: string
+  recordId: string | null
+  onClose: () => void
+}) {
   const [email, setEmail] = useState<EmailDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [viewer, setViewer] = useState<Awaited<
     ReturnType<typeof getDocumentPreview>
   > | null>(null)
+  const [widening, setWidening] = useState(false)
+  const [reads, setReads] = useState(0)
 
   useEffect(() => {
     let live = true
-    getEmail({ data: { id } })
+    getEmail({ data: { id, recordId } })
       .then((e) => {
         if (live) setEmail(e)
       })
@@ -187,7 +403,7 @@ function EmailWindow({ id, onClose }: { id: string; onClose: () => void }) {
     return () => {
       live = false
     }
-  }, [id])
+  }, [id, recordId, reads])
 
   async function openAttachment(a: EmailAttachment) {
     const doc = await getDocumentPreview({ data: { id: a.documentId } })
@@ -254,6 +470,12 @@ function EmailWindow({ id, onClose }: { id: string; onClose: () => void }) {
               <span className="text-ui">{email.via}</span>
             </Line>
           )}
+          {email.privacy === null ? null : (
+            <PrivacyRow
+              privacy={email.privacy}
+              onWiden={() => setWidening(true)}
+            />
+          )}
         </section>
 
         <section aria-label="Message" className="flex flex-col gap-3">
@@ -316,6 +538,15 @@ function EmailWindow({ id, onClose }: { id: string; onClose: () => void }) {
           if (!open) setViewer(null)
         }}
       />
+      {email.privacy?.mine ? (
+        <WidenDialog
+          emailId={email.id}
+          privacy={email.privacy}
+          open={widening}
+          onOpenChange={setWidening}
+          onSaved={() => setReads((n) => n + 1)}
+        />
+      ) : null}
     </>
   )
 }

@@ -6,6 +6,7 @@ import {
   chunk,
   documentRevision,
   duplicateCandidate,
+  emailVisibility,
   enrichmentRecord,
   entity,
   entityAlias,
@@ -284,6 +285,20 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
     // every attendee, which is how it lands under "Filed here"; an item entry
     // here would walk the same note a second time and double-count it.
     context: null,
+  },
+  {
+    // An owner's emails with this record, opened to the workspace (D67).
+    key: 'email_visibility.entity',
+    table: emailVisibility,
+    column: emailVisibility.entityId,
+    // The pair is the primary key: an owner who opened both records keeps
+    // the winner's row and the loser's is dropped.
+    merge: {
+      kind: 'repoint-or-drop',
+      uniqueWith: [emailVisibility.userId],
+    },
+    del: { kind: 'cascade' }, // a widening of nothing widens nothing
+    context: null, // read-policy state, never AI-visible
   },
   {
     // A followed document's prior bytes: history of the row, not an edge.

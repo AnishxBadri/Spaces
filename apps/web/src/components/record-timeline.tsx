@@ -4,10 +4,21 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { optionLabel, refName } from './attributes/value-editor'
 import { EmailModal } from './email-dialog'
+import { Button } from './ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu'
 import type { RegistryEntry, RefNames } from './attributes/value-editor'
 import { FilterCount, FilterRow, FilterTab } from './filter-row'
 import { fmtMoney } from '@spaces/core/portfolio/format'
-import { writeUpInteraction } from '#/lib/server-fns'
+import {
+  getRecordEmailVisibility,
+  setRecordEmailVisibility,
+  writeUpInteraction,
+} from '#/lib/server-fns'
 import { stamp } from '#/lib/timeline/stamp'
 import { cn } from '#/lib/utils'
 import type { getRecordTimeline } from '#/lib/server-fns'
@@ -260,22 +271,83 @@ function FoldFoot({
 }
 
 /**
+ * The head's `···` for a viewer with private emails here: their emails with
+ * this record, opened to the workspace or not (D67's record override). The
+ * state is read when the menu opens.
+ */
+function EmailVisibilityMenu({ recordId }: { recordId: string }) {
+  const router = useRouter()
+  const [workspace, setWorkspace] = useState<boolean | null>(null)
+
+  async function load(open: boolean) {
+    if (!open) return
+    try {
+      setWorkspace(
+        (await getRecordEmailVisibility({ data: { entityId: recordId } }))
+          .workspace,
+      )
+    } catch {
+      setWorkspace(null)
+    }
+  }
+
+  async function toggle(next: boolean) {
+    setWorkspace(next)
+    try {
+      await setRecordEmailVisibility({
+        data: { entityId: recordId, workspace: next },
+      })
+      void router.invalidate()
+    } catch (err) {
+      setWorkspace(!next)
+      toast(err instanceof Error ? err.message : 'Could not save who sees it')
+    }
+  }
+
+  return (
+    <DropdownMenu onOpenChange={(open) => void load(open)}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="More for interactions">
+          <span aria-hidden className="mono text-ui">
+            ···
+          </span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuCheckboxItem
+          checked={workspace === true}
+          disabled={workspace === null}
+          onCheckedChange={(next) => void toggle(next)}
+        >
+          My emails visible to the workspace
+        </DropdownMenuCheckboxItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+/**
  * The Interactions tab: the kind filters, the composer row (DESIGN.md P7,
  * the Composer Row), then calls, emails and meetings, folded past
  * `INTERACTIONS_FOLD`. The filter is the view's own state, as the space
  * page's Notes filter is.
+ * - `recordId` lets the email window widen for this record, and puts the
+ *   override in the head's `···` once the viewer has private emails here.
  */
 export function RecordInteractions({
   items,
   registry,
   refNames,
   composer,
+  recordId,
 }: {
   items: Items
   registry: Array<RegistryEntry>
   refNames?: RefNames | undefined
   /** The composer row — a `LogInteractionDialog` trigger. */
   composer?: React.ReactNode
+  /** The record the tab is on. */
+  recordId?: string
 }) {
   const { interactions } = splitLedger(items)
   const [filter, setFilter] = useState<InteractionFilter>('all')
@@ -285,7 +357,15 @@ export function RecordInteractions({
   const shown = unfolded ? listed : listed.slice(0, INTERACTIONS_FOLD)
   return (
     <div className="flex flex-col">
-      <FilterRow label="Show interactions">
+      <FilterRow
+        label="Show interactions"
+        end={
+          recordId !== undefined &&
+          interactions.some((i) => i.kind === 'email' && i.ownPrivate) ? (
+            <EmailVisibilityMenu recordId={recordId} />
+          ) : undefined
+        }
+      >
         {INTERACTION_FILTERS.map((f) => (
           <FilterTab key={f} active={filter === f} onClick={() => setFilter(f)}>
             {INTERACTION_FILTER_LABELS[f]} <FilterCount n={counts[f]} />
@@ -307,7 +387,7 @@ export function RecordInteractions({
           onMore={() => setUnfolded(true)}
         />
       ) : null}
-      <EmailModal />
+      <EmailModal recordId={recordId ?? null} />
     </div>
   )
 }

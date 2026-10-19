@@ -660,6 +660,7 @@ describe('assembleProgram', () => {
         entityId: privateId,
         visibility: 'private',
         authorId: `someone-else-${tag}`,
+        widened: false,
       },
     }
     const leaky = Layer.succeed(

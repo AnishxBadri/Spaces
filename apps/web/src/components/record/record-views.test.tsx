@@ -119,6 +119,7 @@ const interaction = (
     answer: string | null
     noteId: string | null
     privateBody: boolean
+    ownPrivate: boolean
     hasAttachments: boolean
   }> = {},
 ): Items[number] => ({
@@ -128,6 +129,7 @@ const interaction = (
   subject: `${kind} ${id}`,
   noteId: null,
   privateBody: false,
+  ownPrivate: false,
   at: '2026-10-01T10:00:00.000Z',
   attendees: [],
   via: null,
@@ -277,6 +279,30 @@ describe('the Interactions tab', () => {
     )
     expect(el.querySelectorAll('a')).toHaveLength(1)
     expect(el.querySelector('a')?.textContent).toBe('email p')
+  })
+
+  it('offers the record override in the head’s ··· to a viewer with private emails here (D67)', async () => {
+    const el = await mount(
+      <RecordInteractions
+        items={[interaction('m', 'email', { ownPrivate: true })]}
+        registry={[]}
+        recordId="00000000-0000-4000-8000-0000000000aa"
+      />,
+    )
+    expect(
+      el.querySelector('[aria-label="More for interactions"]'),
+    ).not.toBeNull()
+  })
+
+  it('offers no ··· to a viewer whose emails here are none of theirs', async () => {
+    const el = await mount(
+      <RecordInteractions
+        items={[interaction('t', 'email', { privateBody: true })]}
+        registry={[]}
+        recordId="00000000-0000-4000-8000-0000000000aa"
+      />,
+    )
+    expect(el.querySelector('[aria-label="More for interactions"]')).toBeNull()
   })
 
   it('folds past twenty with an n of N foot', async () => {

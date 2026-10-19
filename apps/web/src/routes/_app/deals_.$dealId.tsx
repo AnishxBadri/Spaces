@@ -508,6 +508,7 @@ function DealRecordPage() {
               <RecordInteractions
                 items={timeline}
                 registry={registry}
+                recordId={deal.id}
                 refNames={refNames}
                 composer={
                   <LogInteractionDialog

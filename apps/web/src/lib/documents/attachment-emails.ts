@@ -1,6 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { canRead } from '@spaces/core/read-policy'
+import { noteWidenedSql } from '@spaces/core/writes/read/can-read-sql'
 import { db } from '@spaces/db'
 import { interaction, interactionDocument, note } from '@spaces/db/schema'
 
@@ -35,6 +36,7 @@ export const attachmentEmailsProgram = Effect.fn('attachmentEmails')(function* (
           subject: interaction.subject,
           visibility: note.visibility,
           authorId: note.authorId,
+          widened: noteWidenedSql(viewer.id),
         })
         .from(interactionDocument)
         .innerJoin(

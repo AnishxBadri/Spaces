@@ -3,7 +3,10 @@ import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import { simpleParser } from 'mailparser'
 import { normalizeEmail } from '@spaces/sdk/identity'
 import { canRead } from '@spaces/core/read-policy'
-import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
+import {
+  canReadDocumentSql,
+  noteWidenedSql,
+} from '@spaces/core/writes/read/can-read-sql'
 import { storage } from '@spaces/core/writes/storage'
 import { db } from '@spaces/db'
 import {
@@ -17,12 +20,15 @@ import {
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { sanitizeEmailHtml } from '#/lib/email/sanitize'
+import { emailPrivacyProgram } from './email-privacy'
+import type { EmailPrivacy } from './email-privacy'
 
 /**
  * The email window's read (D67): headers always, the body only through
  * `canRead` on the body note — the gate the record timeline applies.
  * - A body private to someone else returns `private`: no blob is read and
- *   no attachment is listed. Subject, participants and date stay.
+ *   no attachment is listed. Subject, participants and date stay — and
+ *   who it is visible to, unless its owner widened it to the reader.
  * - The body is the stored MIME's HTML, sanitized; else its text part; else
  *   the body note's text when the bytes were never kept.
  */
@@ -78,6 +84,8 @@ export type EmailDetail = {
   via: string | null
   body: EmailBody
   attachments: Array<EmailAttachment>
+  /** Who reads a body private by default; null for a shared one. */
+  privacy: EmailPrivacy | null
 }
 
 const query = <T>(run: () => Promise<T>) =>
@@ -133,6 +141,8 @@ const renderMime = Effect.fn('renderMime')(function* (sha: string) {
 export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
   viewer: { id: string },
   id: string,
+  /** The record the window was opened from, for the widen dialog. */
+  recordId: string | null = null,
 ): Effect.fn.Return<EmailDetail, EmailReadFailed | EmailNotFound> {
   const row = (yield* query(() =>
     db
@@ -145,6 +155,7 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
         bodyMd: note.bodyMd,
         visibility: note.visibility,
         authorId: note.authorId,
+        widened: noteWidenedSql(viewer.id),
         authorName: user.name,
       })
       .from(interaction)
@@ -168,6 +179,7 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
   const readable = canRead(viewer, {
     visibility: row.visibility,
     authorId: row.authorId,
+    widened: row.widened,
   })
   const body: EmailBody = !readable
     ? { kind: 'private' }
@@ -208,6 +220,18 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
       )
     : []
 
+  const privacy =
+    row.visibility === 'private' && row.authorId !== null
+      ? yield* emailPrivacyProgram(
+          viewer,
+          {
+            id: row.id,
+            owner: { id: row.authorId, name: row.authorName ?? 'Someone' },
+          },
+          recordId,
+        ).pipe(Effect.mapError((e) => new EmailReadFailed({ cause: e.cause })))
+      : null
+
   return {
     id: row.id,
     subject: row.subject,
@@ -218,5 +242,6 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
     via: row.authorName,
     body,
     attachments,
+    privacy,
   }
 })

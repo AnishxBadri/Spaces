@@ -10,14 +10,15 @@ import { parseRef, ref } from '../../context/ref'
 import { truncate } from '../../context/render'
 import { fmtMoney } from '../../portfolio/format'
 import { canRead } from '../../read-policy'
+import { documentWidenedSql, noteWidenedSql } from '../read/can-read-sql'
 
 /**
  * The builders the assembler, its space subject and the watch brief share:
  * the live ancestor chain of some spaces, the memos tagged into them, the
  * mandate, and the ranked, `canRead`-checked output.
  * - `canRead` is applied in SQL: a note or a document is readable when
- *   shared or the reader's own. An integration authors neither, so it reads
- *   shared only.
+ *   shared, the reader's own, or an email widened to them (D67). An
+ *   integration authors neither, so it reads shared only.
  * - Every fetch is ordered, so a caller's first-wins dedupe is stable.
  */
 
@@ -29,11 +30,19 @@ export const query = <T>(run: () => Promise<T>) =>
 
 /** `canRead` as a SQL predicate over `note`, for one reader. */
 export const readableNote = (readerId: string) =>
-  or(eq(note.visibility, 'shared'), eq(note.authorId, readerId))
+  or(
+    eq(note.visibility, 'shared'),
+    eq(note.authorId, readerId),
+    noteWidenedSql(readerId),
+  )
 
 /** `canRead` as a SQL predicate over `document`, for one reader. */
 export const readableDocument = (readerId: string) =>
-  or(eq(document.visibility, 'shared'), eq(document.authorId, readerId))
+  or(
+    eq(document.visibility, 'shared'),
+    eq(document.authorId, readerId),
+    documentWidenedSql(readerId),
+  )
 
 /**
  * Every live space at or above any of `paths`, root first. An archived
@@ -76,8 +85,15 @@ export const memosTaggedIn = (
           .orderBy(asc(link.toEntityId), asc(note.entityId)),
   )
 
-/** A note or document row let through, kept for the output invariant. */
-export type NoteGate = { visibility: string; authorId: string | null }
+/**
+ * A note or document row let through, kept for the output invariant;
+ * `widened` as `canRead` takes it.
+ */
+export type NoteGate = {
+  visibility: string
+  authorId: string | null
+  widened?: boolean
+}
 
 /**
  * The active mandate as a standing item, when the reader may read its note.

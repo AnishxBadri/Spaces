@@ -474,6 +474,7 @@ function PersonRecordPage() {
               <RecordInteractions
                 items={timeline}
                 registry={registry}
+                recordId={person.id}
                 composer={
                   <LogInteractionDialog
                     seed={{ id: person.id, name: person.name, kind: 'person' }}

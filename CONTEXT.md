@@ -2281,9 +2281,23 @@ archive.
     `note.visibility_changed` — forwarding is the consent (D49). A synced
     duplicate changes nothing, so when two members sync one thread the
     second sees `body private` until mailbox #2's per-channel table exists.
-  - **Not yet built:** attachments stay files on the company like the
-    forwarding lane's — `document` carries no visibility for D67 to extend
-    — and the per-record override and per-email grants.
+  - **Attachments** carry `visibility` and `author_id` like the body: a
+    synced one is born `private` to the mailbox owner, and filing it onto a
+    record does not widen it (D67, amended 2026-10-16).
+  - **The two override tables** (D67's layers two and three), read at read
+    time as widening clauses of `canRead`, `canReadNoteSql` and
+    `canReadDocumentSql` — never a fourth predicate, never a copy:
+    - `email_visibility(entity_id, user_id, scope: workspace)` — "my
+      emails with Flent are visible to the workspace": every email of the
+      owner's edged to the record (on a deal, the threads it derives, D49)
+      opens its body and attachments to everyone. Set from the record's
+      Interactions `···` or the widen dialog; removing it restores privacy
+      and touches no grant.
+    - `email_grant(interaction_id, user_id, granted_by)` — one email's body
+      and attachments, opened to one named member.
+    - Only the owner (the body's author) writes either. The email window's
+      privacy row reads "visible to: you · widen"; widened, it names the
+      workspace or the members.
 
 ## UI
 

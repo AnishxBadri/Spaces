@@ -389,6 +389,7 @@ function ObjectRecordPage() {
               <RecordInteractions
                 items={timeline}
                 registry={registry}
+                recordId={record.id}
                 refNames={record.refNames}
                 composer={
                   <LogInteractionDialog

@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { readEmbeddingPinProgram } from '#/lib/ai/embedding-pin'
 import { canReadNoteSql } from '@spaces/core/writes/read/search'
+import { noteWidenedSql } from '@spaces/core/writes/read/can-read-sql'
 import { ContextQueryFailed } from '@spaces/core/context/errors'
 import { ref } from '@spaces/core/context/ref'
 import { truncate } from '@spaces/core/context/render'
@@ -88,6 +89,7 @@ type SimilarRow = {
   note_visibility: string | null
   note_author_id: string | null
   note_updated_at: string | null
+  note_widened: boolean | null
 }
 
 const query = <T>(run: () => Promise<T>) =>
@@ -199,7 +201,8 @@ const neighboursStatement = (
            e.id as deal_id, e.canonical_name as deal_name,
            ${terminalStageLabel('e')} as stage_label,
            null::text as note_title, null::text as note_visibility,
-           null::text as note_author_id, null::timestamptz as note_updated_at
+           null::text as note_author_id, null::timestamptz as note_updated_at,
+           null::boolean as note_widened
     from near c
     join entity e on e.id = c.entity_id and e.merged_into_id is null
     where c.source_kind = 'attribute'
@@ -210,7 +213,8 @@ const neighboursStatement = (
     -- a readable note filed on another deal that was passed or lost
     select c.entity_id, c.source_kind, c.idx, c.text, c.distance,
            d.id, d.canonical_name, ${terminalStageLabel('d', true)},
-           n.title, n.visibility::text, n.author_id, n.updated_at
+           n.title, n.visibility::text, n.author_id, n.updated_at,
+           ${noteWidenedSql(userId, 'n')}
     from near c
     join entity e on e.id = c.entity_id and e.merged_into_id is null
     join note n on n.entity_id = e.id
@@ -237,7 +241,7 @@ const neighboursStatement = (
   select distinct on (entity_id, source_kind)
          entity_id, source_kind, distance, text, deal_id, deal_name,
          stage_label, note_title, note_visibility, note_author_id,
-         note_updated_at
+         note_updated_at, note_widened
   from hits
   order by entity_id, source_kind, distance, idx
 `
@@ -279,6 +283,7 @@ function toCandidate(r: SimilarRow): SimilarCandidate {
             entityId: r.entity_id,
             visibility: r.note_visibility,
             authorId: r.note_author_id,
+            widened: r.note_widened === true,
           }
         : null,
   }

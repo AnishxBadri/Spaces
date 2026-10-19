@@ -438,7 +438,7 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
   // a convenience, not a claim of filing. The two run concurrently: they
   // share nothing but the space id.
   const [sources, inheritedSources] = yield* Effect.all(
-    [spaceSourcesProgram(id), spaceInheritedSourcesProgram(id)],
+    [spaceSourcesProgram(id, userId), spaceInheritedSourcesProgram(id, userId)],
     { concurrency: 'unbounded' },
   )
 

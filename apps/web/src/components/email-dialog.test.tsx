@@ -2,13 +2,14 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EmailDetail } from '#/lib/server-fns'
+import type { EmailDetail, EmailPrivacy } from '#/lib/server-fns'
 import { EmailModal } from './email-dialog'
 
 /**
  * The email window (D67, E2) opened from `?modal=email&id=` (D74): the
  * sandboxed frame, the remote-image count printed once, a private body as
- * one line, and one close in the foot that drops the two params.
+ * one line, one close in the foot that drops the two params, and the
+ * privacy row with its widen window.
  */
 
 await vi.hoisted(async () => {
@@ -55,6 +56,8 @@ const fns = vi.hoisted(() => ({
   getDocumentPreview: vi.fn(),
   getDocumentDownloadUrl: vi.fn(),
   getDocumentText: vi.fn(),
+  listMembers: vi.fn(),
+  setEmailAudience: vi.fn(),
 }))
 const router = vi.hoisted(() => ({
   navigate: vi.fn(),
@@ -90,7 +93,21 @@ const HTML: EmailDetail = {
       lane: 'gmail',
     },
   ],
+  privacy: null,
 }
+
+const RECORD = '00000000-0000-4000-8000-0000000000aa'
+
+const MINE: EmailPrivacy = {
+  owner: { id: 'u-anish', name: 'Anish' },
+  mine: true,
+  workspace: false,
+  grantees: [],
+  record: { id: RECORD, name: 'Flent', on: false },
+}
+
+/** The owner's own synced email, opened from Flent, widened to nobody. */
+const OWN: EmailDetail = { ...HTML, privacy: MINE }
 
 let host: HTMLDivElement
 let root: Root
@@ -117,8 +134,8 @@ const settle = async () => {
     })
 }
 
-async function open() {
-  act(() => root.render(<EmailModal />))
+async function open(recordId: string | null = null) {
+  act(() => root.render(<EmailModal recordId={recordId} />))
   await settle()
 }
 
@@ -131,7 +148,9 @@ const buttons = (label: string) =>
 describe('the email window', () => {
   it('opens from ?modal=email&id= with the subject, the date and the participants', async () => {
     await open()
-    expect(fns.getEmail).toHaveBeenCalledWith({ data: { id: ID } })
+    expect(fns.getEmail).toHaveBeenCalledWith({
+      data: { id: ID, recordId: null },
+    })
     const text = dialog()?.textContent ?? ''
     expect(text).toContain('Acme Robotics — Q3 update')
     expect(text).toContain('Jane Founder')
@@ -206,5 +225,121 @@ describe('the email window', () => {
       modal: undefined,
       id: undefined,
     })
+  })
+})
+
+describe('the privacy row', () => {
+  const privacyRow = () =>
+    dialog()?.querySelector('[data-privacy]')?.textContent ?? null
+
+  it('is absent on a shared body', async () => {
+    await open()
+    expect(privacyRow()).toBeNull()
+  })
+
+  it('reads "visible to: you · widen" to the owner', async () => {
+    fns.getEmail.mockResolvedValue(OWN)
+    await open(RECORD)
+    expect(fns.getEmail).toHaveBeenCalledWith({
+      data: { id: ID, recordId: RECORD },
+    })
+    expect(privacyRow()).toBe('visible to: you · widen')
+  })
+
+  it('names the owner and offers no widen to anyone else', async () => {
+    fns.getEmail.mockResolvedValue({
+      ...OWN,
+      body: { kind: 'private' },
+      attachments: [],
+      privacy: {
+        owner: { id: 'u-anish', name: 'Anish' },
+        mine: false,
+        workspace: false,
+        grantees: [],
+        record: null,
+      },
+    })
+    await open(RECORD)
+    expect(privacyRow()).toBe('visible to: Anish')
+    expect(buttons('widen')).toHaveLength(0)
+  })
+
+  it('reads the grantees, and the workspace once an override covers it', async () => {
+    fns.getEmail.mockResolvedValue({
+      ...OWN,
+      privacy: {
+        ...MINE,
+        grantees: [{ id: 'u-maya', name: 'Maya', you: false }],
+      },
+    })
+    await open(RECORD)
+    expect(privacyRow()).toBe('visible to: you, Maya · widen')
+    act(() => root.unmount())
+    root = createRoot(host)
+    fns.getEmail.mockResolvedValue({
+      ...OWN,
+      privacy: { ...MINE, workspace: true },
+    })
+    await open(RECORD)
+    expect(privacyRow()).toBe('visible to: workspace · widen')
+  })
+
+  it('widens in a window with one close and no sentence, for the record and named members', async () => {
+    fns.getEmail.mockResolvedValue(OWN)
+    fns.listMembers.mockResolvedValue([
+      { id: 'u-anish', name: 'Anish', banned: false },
+      { id: 'u-maya', name: 'Maya', banned: false },
+      { id: 'u-gone', name: 'Gone', banned: true },
+    ])
+    fns.setEmailAudience.mockResolvedValue({ ok: true })
+    await open(RECORD)
+    act(() => buttons('widen')[0]?.click())
+    await settle()
+    const widen = [...document.querySelectorAll('[role="dialog"]')].at(-1)
+    if (widen === undefined) throw new Error('no widen window')
+    expect(widen.querySelector('[data-slot="dialog-title"]')?.textContent).toBe(
+      'Visible to',
+    )
+    const cancel = [...widen.querySelectorAll('button')].filter(
+      (b) => b.textContent.trim() === 'Cancel',
+    )
+    expect(cancel).toHaveLength(1)
+    expect(cancel[0]?.closest('[data-slot="dialog-footer"]')).not.toBeNull()
+    // Labels, names and the two buttons — nothing that explains privacy.
+    const visible = [...widen.querySelectorAll('*')]
+      .filter((el) => el.children.length === 0 && !el.closest('.sr-only'))
+      .map((el) => el.textContent.trim())
+      .filter((t) => t !== '')
+    expect(visible).toEqual([
+      'Visible to',
+      'Record',
+      'Flent',
+      'workspace',
+      'Members',
+      'Maya',
+      'Cancel',
+      'Save',
+    ])
+    const tick = (name: string) => {
+      const box = widen.querySelector(`[role="checkbox"][aria-label="${name}"]`)
+      if (!(box instanceof HTMLElement)) throw new Error(`no box ${name}`)
+      act(() => box.click())
+    }
+    tick('Flent')
+    tick('Maya')
+    const save = [...widen.querySelectorAll('button')].find(
+      (b) => b.textContent.trim() === 'Save',
+    )
+    act(() => save?.click())
+    await settle()
+    expect(fns.setEmailAudience).toHaveBeenCalledWith({
+      data: {
+        interactionId: ID,
+        userIds: ['u-maya'],
+        record: { id: RECORD, workspace: true },
+      },
+    })
+    // Saved, the window reads the email again.
+    expect(fns.getEmail).toHaveBeenCalledTimes(2)
   })
 })

@@ -38,6 +38,7 @@ import { ref } from '../../context/ref'
 import { SIMILAR_TOP_N, SimilarLane } from '../../context/similar-lane'
 import { renderAttribute, renderEvent, truncate } from '../../context/render'
 import type { ContextEdge } from '../../context/types'
+import { documentWidenedSql, noteWidenedSql } from '../read/can-read-sql'
 import { recordRelationsProgram } from '../read/relations'
 import { sensitivityFor } from '../ai/sensitivity-for'
 import { positionAndPeersProgram } from './position'
@@ -298,6 +299,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
           kind: document.kind,
           visibility: document.visibility,
           authorId: document.authorId,
+          widened: documentWidenedSql(userId),
         })
         .from(document)
         .where(eq(document.entityId, seedId)),
@@ -308,6 +310,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
       noteRows.set(seedId, {
         visibility: doc.visibility,
         authorId: doc.authorId,
+        widened: doc.widened,
       })
     const label = doc?.filename ?? seed.name
     const own = yield* query(() =>
@@ -517,14 +520,18 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
 
   // notes + memos — canRead in SQL
   const notesById = new Map<string, typeof note.$inferSelect>()
+  // rows let through only because an email was widened to the reader (D67)
+  const widenedIds = new Set<string>()
   if (noteIds.length > 0)
-    for (const n of yield* query(() =>
+    for (const { n, widened } of yield* query(() =>
       db
-        .select()
+        .select({ n: note, widened: noteWidenedSql(userId) })
         .from(note)
         .where(and(inArray(note.entityId, noteIds), readable)),
-    ))
+    )) {
       notesById.set(n.entityId, n)
+      if (widened) widenedIds.add(n.entityId)
+    }
 
   // documents + chunks — canRead in SQL, so a private attachment's chunks
   // are never read for anyone but its author
@@ -536,6 +543,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
       createdAt: Date
       visibility: string
       authorId: string | null
+      widened: boolean
     }
   >()
   if (docIds.length > 0)
@@ -548,6 +556,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
           createdAt: document.createdAt,
           visibility: document.visibility,
           authorId: document.authorId,
+          widened: documentWidenedSql(userId),
         })
         .from(document)
         .where(
@@ -619,6 +628,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
         noteRows.set(otherId, {
           visibility: n.visibility,
           authorId: n.authorId,
+          widened: widenedIds.has(otherId),
         })
         const isMemo = n.kind === 'memo'
         const body = truncate(n.bodyMd, NOTE_MAX)
@@ -641,6 +651,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
         noteRows.set(otherId, {
           visibility: d.visibility,
           authorId: d.authorId,
+          widened: d.widened,
         })
         const label = d.filename ?? other.name
         const mine = chunks.filter((c) => c.docId === otherId)
@@ -824,6 +835,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
         noteRows.set(noteRow.entityId, {
           visibility: noteRow.visibility,
           authorId: noteRow.authorId,
+          widened: noteRow.widened,
         })
       candidates.push(c)
       taken += 1

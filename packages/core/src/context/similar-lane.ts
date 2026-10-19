@@ -42,7 +42,13 @@ export type SimilarInput = {
 
 export type SimilarCandidate = Candidate & {
   /** The note row behind a note item, for the assembler's output invariant. */
-  noteRow: { entityId: string; visibility: string; authorId: string } | null
+  noteRow: {
+    entityId: string
+    visibility: string
+    authorId: string
+    /** As `canRead` takes it: an email body widened to the asker (D67). */
+    widened: boolean
+  } | null
 }
 
 export class SimilarLane extends Context.Service<

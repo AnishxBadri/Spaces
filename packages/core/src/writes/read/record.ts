@@ -2,6 +2,7 @@ import { Effect, Schema } from 'effect'
 import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
+  document,
   entity,
   entitySpace,
   link,
@@ -15,6 +16,7 @@ import { getRegistryByObjectId } from '../attributes/values'
 import { isDerived } from '../../attributes/relationship'
 import { renderAttribute } from '../../context/render'
 import { canRead } from '../../read-policy'
+import { documentWidenedSql, noteWidenedSql } from './can-read-sql'
 import { recordRelationsProgram } from './relations'
 
 /**
@@ -61,24 +63,46 @@ const NAME_MATCHES_SHOWN = 5
 
 type Reader = { id: string }
 
-/** Note visibility rows for the given ids that `reader` may not read. */
-const unreadableNotes = Effect.fn('unreadableNotes')(function* (
+/**
+ * The ids among `ids` that `reader` may not read: a note or a document
+ * private to someone else and not widened to them (D67).
+ */
+const unreadableIds = Effect.fn('unreadableIds')(function* (
   reader: Reader,
   ids: ReadonlyArray<string>,
 ): Effect.fn.Return<Set<string>, McpToolQueryFailed> {
   if (ids.length === 0) return new Set()
-  const rows = yield* query(() =>
-    db
-      .select({
-        id: note.entityId,
-        visibility: note.visibility,
-        authorId: note.authorId,
-      })
-      .from(note)
-      .where(inArray(note.entityId, [...ids])),
+  const [notes, documents] = yield* query(() =>
+    Promise.all([
+      db
+        .select({
+          id: note.entityId,
+          visibility: note.visibility,
+          authorId: note.authorId,
+          widened: noteWidenedSql(reader.id),
+        })
+        .from(note)
+        .where(inArray(note.entityId, [...ids])),
+      db
+        .select({
+          id: document.entityId,
+          visibility: document.visibility,
+          authorId: document.authorId,
+          widened: documentWidenedSql(reader.id),
+        })
+        .from(document)
+        .where(inArray(document.entityId, [...ids])),
+    ]),
   )
-  return new Set(rows.filter((r) => !canRead(reader, r)).map((r) => r.id))
+  return new Set(
+    [...notes, ...documents]
+      .filter((r) => !canRead(reader, r))
+      .map((r) => r.id),
+  )
 })
+
+/** The kinds `unreadableIds` can hide. */
+const GATED = new Set(['note', 'document'])
 
 const notFound = (ref: string) =>
   new McpToolRefused({ message: `No record ${ref}` })
@@ -112,9 +136,9 @@ export const resolveEntityRefProgram = Effect.fn('resolveEntityRefProgram')(
         )
         .orderBy(asc(entity.kind), asc(entity.id)),
     )
-    const hidden = yield* unreadableNotes(
+    const hidden = yield* unreadableIds(
       reader,
-      rows.filter((r) => r.kind === 'note').map((r) => r.id),
+      rows.filter((r) => GATED.has(r.kind)).map((r) => r.id),
     )
     const visible = rows.filter((r) => !hidden.has(r.id))
     const only = visible.at(0)
@@ -190,7 +214,7 @@ export const getRecordProgram = Effect.fn('getRecordProgram')(function* (
     head = yield* load(head.mergedIntoId)
   }
   if (!head) return yield* notFound(id)
-  if ((yield* unreadableNotes(reader, [head.id])).has(head.id))
+  if ((yield* unreadableIds(reader, [head.id])).has(head.id))
     return yield* notFound(id)
   const seedId = head.id
   const values = head.values
@@ -233,7 +257,7 @@ export const getRecordProgram = Effect.fn('getRecordProgram')(function* (
   const names = new Map<string, string>()
   const recordIds = [...refIds].filter((x) => UUID.test(x))
   if (recordIds.length > 0) {
-    const hiddenRefs = yield* unreadableNotes(reader, recordIds)
+    const hiddenRefs = yield* unreadableIds(reader, recordIds)
     for (const r of yield* query(() =>
       db
         .select({ id: entity.id, name: entity.canonicalName })
@@ -293,9 +317,9 @@ export const getRecordProgram = Effect.fn('getRecordProgram')(function* (
         .where(inArray(entity.id, otherIds)),
     ))
       others.set(o.id, { kind: o.kind, name: o.name })
-  const hidden = yield* unreadableNotes(
+  const hidden = yield* unreadableIds(
     reader,
-    otherIds.filter((x) => others.get(x)?.kind === 'note'),
+    otherIds.filter((x) => GATED.has(others.get(x)?.kind ?? '')),
   )
   const links: Array<RecordLink> = []
   for (const e of edges) {

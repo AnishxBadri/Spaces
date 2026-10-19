@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { document, note } from '@spaces/db/schema'
 import { canRead } from '../../read-policy'
+import { documentWidenedSql, noteWidenedSql } from '../read/can-read-sql'
 import { ContextEntityNotFound, ContextQueryFailed } from '../../context/errors'
 import type { ContextLeak } from '../../context/errors'
 import { SimilarLane } from '../../context/similar-lane'
@@ -85,13 +86,18 @@ export const recordContextProgram = Effect.fn('recordContextProgram')(
       try: () =>
         Promise.all([
           db
-            .select({ visibility: note.visibility, authorId: note.authorId })
+            .select({
+              visibility: note.visibility,
+              authorId: note.authorId,
+              widened: noteWidenedSql(input.user.id),
+            })
             .from(note)
             .where(eq(note.entityId, input.entityId)),
           db
             .select({
               visibility: document.visibility,
               authorId: document.authorId,
+              widened: documentWidenedSql(input.user.id),
             })
             .from(document)
             .where(eq(document.entityId, input.entityId)),

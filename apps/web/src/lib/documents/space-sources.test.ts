@@ -72,13 +72,15 @@ async function fileIntoSpace(
 async function sourcesOf(spaceId: string) {
   const { Effect } = await import('effect')
   const { spaceSourcesProgram } = await import('./space-sources')
-  return Effect.runPromise(spaceSourcesProgram(spaceId))
+  return Effect.runPromise(spaceSourcesProgram(spaceId, await actorId()))
 }
 
 async function inheritedOf(spaceId: string) {
   const { Effect } = await import('effect')
   const { spaceInheritedSourcesProgram } = await import('./space-sources')
-  return Effect.runPromise(spaceInheritedSourcesProgram(spaceId))
+  return Effect.runPromise(
+    spaceInheritedSourcesProgram(spaceId, await actorId()),
+  )
 }
 
 /** A live company, optionally tagged into a space. */

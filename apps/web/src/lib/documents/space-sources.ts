@@ -5,6 +5,7 @@ import { alias } from 'drizzle-orm/pg-core'
 import { db } from '@spaces/db'
 import { document, entity, entitySpace, link } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
+import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
 
 /**
  * The documents filed **into** one space (SPA-44) — the space-page twin of
@@ -147,6 +148,8 @@ function toSource(r: SourceRow, now: number): SpaceSource {
 
 export const spaceSourcesProgram = Effect.fn('spaceSourcesProgram')(function* (
   spaceId: string,
+  /** Whose canRead applies: a private attachment is its author's (D67). */
+  viewerId: string,
 ): Effect.fn.Return<Array<SpaceSource>, SpaceSourcesFailed> {
   const rows = yield* Effect.tryPromise({
     try: () =>
@@ -159,7 +162,11 @@ export const spaceSourcesProgram = Effect.fn('spaceSourcesProgram')(function* (
         // connector filed with no user behind it must still be a source.
         .leftJoin(user, eq(user.id, document.uploadedBy))
         .where(
-          and(eq(entitySpace.spaceId, spaceId), isNull(entity.mergedIntoId)),
+          and(
+            eq(entitySpace.spaceId, spaceId),
+            isNull(entity.mergedIntoId),
+            canReadDocumentSql(viewerId),
+          ),
         )
         .orderBy(desc(document.createdAt)),
     catch: (cause) => new SpaceSourcesFailed({ cause }),
@@ -190,12 +197,15 @@ export const spaceSourcesProgram = Effect.fn('spaceSourcesProgram')(function* (
  *   is what stops the same pair arriving twice.
  *
  * Inheritance is never folded into the section's headline count. The
- * headline says what was filed here; this is a convenience lane.
+ * headline says what was filed here; this is a convenience lane. Both lanes
+ * hold to `canReadDocumentSql`: a filed private attachment stays its
+ * author's until its email is widened (D67).
  */
 export const spaceInheritedSourcesProgram = Effect.fn(
   'spaceInheritedSourcesProgram',
 )(function* (
   spaceId: string,
+  viewerId: string,
 ): Effect.fn.Return<Array<InheritedSource>, SpaceSourcesFailed> {
   const companyEntity = alias(entity, 'company_entity')
   const documentEntity = alias(entity, 'document_entity')
@@ -227,6 +237,7 @@ export const spaceInheritedSourcesProgram = Effect.fn(
             eq(companyEntity.kind, 'company'),
             isNull(companyEntity.mergedIntoId),
             isNull(documentEntity.mergedIntoId),
+            canReadDocumentSql(viewerId),
             notExists(
               db
                 .select({ filed: sql`1` })

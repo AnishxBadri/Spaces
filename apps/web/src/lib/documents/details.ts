@@ -3,12 +3,17 @@ import { and, count, desc, eq, isNull, max, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { chunk, document, entity, link, note } from '@spaces/db/schema'
 import { canRead } from '@spaces/core/read-policy'
+import {
+  canReadDocumentSql,
+  noteWidenedSql,
+} from '@spaces/core/writes/read/can-read-sql'
 
 /**
  * What the file viewer's sidebar and the Remove confirm say about one
  * document beyond its Files-tab row: what leaves with it (chunks), what was
  * read (words, pages) and which notes mention it.
- * - Private notes the viewer cannot read are left out, not counted.
+ * - A document the viewer cannot read answers null; private notes they
+ *   cannot read are left out, not counted.
  * - Outside `lib/server/` so it never reaches the client barrel.
  */
 
@@ -54,8 +59,11 @@ export const documentDetailsProgram = Effect.fn('documentDetailsProgram')(
           end`,
         })
         .from(document)
-        .where(eq(document.entityId, documentId)),
+        .where(
+          and(eq(document.entityId, documentId), canReadDocumentSql(viewer.id)),
+        ),
     )).at(0)
+    // A document the viewer may not read has no details, as one that is gone.
     if (row === undefined) return null
 
     const cut = (yield* query(() =>
@@ -73,6 +81,7 @@ export const documentDetailsProgram = Effect.fn('documentDetailsProgram')(
           name: entity.canonicalName,
           visibility: note.visibility,
           authorId: note.authorId,
+          widened: noteWidenedSql(viewer.id),
           at: link.createdAt,
         })
         .from(link)

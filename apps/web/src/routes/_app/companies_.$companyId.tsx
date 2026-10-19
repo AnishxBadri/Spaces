@@ -447,6 +447,7 @@ function CompanyRecordPage() {
               <RecordInteractions
                 items={timeline}
                 registry={registry}
+                recordId={company.id}
                 composer={
                   <LogInteractionDialog
                     seed={{

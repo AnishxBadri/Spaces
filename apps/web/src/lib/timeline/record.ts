@@ -21,7 +21,10 @@ import { investment } from '@spaces/db/schema/portfolio'
 import { jsonRecord, jsonString, jsonStrings } from '@spaces/core/json'
 import { sinceRemoved } from '@spaces/core/plugins/registry'
 import { canRead } from '@spaces/core/read-policy'
-import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
+import {
+  canReadDocumentSql,
+  noteWidenedSql,
+} from '@spaces/core/writes/read/can-read-sql'
 import type { Json } from '@spaces/core/json'
 import { resolveRefsProgram } from '@spaces/core/writes/context/names'
 import type { ResolvedRef } from '@spaces/core/writes/context/names'
@@ -261,7 +264,8 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
       attachmentRows.map((r) => [r.interactionId, r.n]),
     )
     // canRead on every write-up: a body the viewer may not read is not
-    // linked, and its row says so. Subject, participants and date stay (D67).
+    // linked, and its row says so. Subject, participants and date stay; an
+    // email its owner widened to the viewer reads like their own (D67).
     const noteIds = myInteractions.flatMap((i) =>
       i.noteId === null ? [] : [i.noteId],
     )
@@ -273,6 +277,7 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
                 id: note.entityId,
                 visibility: note.visibility,
                 authorId: note.authorId,
+                widened: noteWidenedSql(viewer.id),
               })
               .from(note)
               .where(inArray(note.entityId, noteIds)),
@@ -280,6 +285,12 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
         : []
     const unreadable = new Set(
       bodies.filter((b) => !canRead(viewer, b)).map((b) => b.id),
+    )
+    // The viewer's own private bodies: what their Interactions `···` widens.
+    const ownPrivate = new Set(
+      bodies
+        .filter((b) => b.visibility === 'private' && b.authorId === viewer.id)
+        .map((b) => b.id),
     )
     // A person's own emails, so a meeting row can say how they answered.
     const ownEmails =
@@ -387,6 +398,8 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           noteId: privateBody ? null : i.noteId,
           /** The write-up exists and is private to someone else. */
           privateBody,
+          /** The write-up is the viewer's own and private by default. */
+          ownPrivate: i.noteId !== null && ownPrivate.has(i.noteId),
           at: i.occurredAt.toISOString(),
           attendees: attendeesBy.get(i.id) ?? [],
           via: i.sourceRef

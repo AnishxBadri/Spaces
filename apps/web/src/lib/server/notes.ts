@@ -4,6 +4,7 @@ import { and, asc, desc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { entity, link, note, objectDef } from '@spaces/db/schema'
+import { noteWidenedSql } from '@spaces/core/writes/read/can-read-sql'
 import { canRead, requireUser } from './shared'
 import { recordSpaces } from '#/lib/spaces/filed-in'
 import { jsonValue } from '@spaces/core/json'
@@ -93,6 +94,8 @@ export const getNote = createServerFn()
           updatedAt: note.updatedAt,
           authorId: note.authorId,
           visibility: note.visibility,
+          // An email body its owner widened to the reader (D67).
+          widened: noteWidenedSql(u.id),
         })
         .from(note)
         .where(eq(note.entityId, data.id))

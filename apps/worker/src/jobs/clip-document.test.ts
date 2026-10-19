@@ -517,7 +517,9 @@ describe('clipDocument', () => {
       // The PDF: a digest, so the same row renders exactly as an upload.
       expect(onShelf.get(deckId)).toMatchObject({ blobSha: sha, url: deckUrl })
 
-      const sources = await Effect.runPromise(spaceSourcesProgram(spaceId))
+      const sources = await Effect.runPromise(
+        spaceSourcesProgram(spaceId, await actorId()),
+      )
       const inSpace = new Map(sources.map((r) => [r.id, r]))
       expect(inSpace.get(articleId)).toMatchObject({
         blobSha: null,

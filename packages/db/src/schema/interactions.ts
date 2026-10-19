@@ -12,6 +12,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
+import { user } from './auth'
 import { entity, sourceClass } from './entities'
 import { integration } from './integrations'
 import { document, note } from './kinds'
@@ -237,6 +238,59 @@ export const interactionDocument = pgTable(
     primaryKey({ columns: [t.interactionId, t.documentId] }),
     index('interaction_document_document_idx').on(t.documentId),
   ],
+)
+
+/**
+ * Layer two of D67's email privacy: the owner's emails with one record,
+ * opened to the workspace ("my emails with Flent are visible to the
+ * workspace"). Read by `emailWidenedSql`; removing the row restores privacy
+ * and leaves `email_grant` alone.
+ * - Covers the emails edged to the record, and on a deal the threads it
+ *   derives from its company and contacts (D49).
+ * - `scope` has one value today; the check keeps it honest.
+ */
+export const emailVisibility = pgTable(
+  'email_visibility',
+  {
+    entityId: uuid('entity_id')
+      .notNull()
+      .references(() => entity.id),
+    /** Whose emails: the owner, who alone may set or remove it. */
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    scope: text('scope').$type<'workspace'>().notNull().default('workspace'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.entityId, t.userId] }),
+    check('email_visibility_scope_check', sql`${t.scope} = 'workspace'`),
+  ],
+)
+
+/**
+ * Layer three of D67's email privacy: one email's body and attachments
+ * opened to one named member, by its owner. Read by `emailWidenedSql`.
+ */
+export const emailGrant = pgTable(
+  'email_grant',
+  {
+    interactionId: uuid('interaction_id')
+      .notNull()
+      .references(() => interaction.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    grantedBy: text('granted_by')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.interactionId, t.userId] })],
 )
 
 /** Funding news, patents, hiring — provider-shaped payloads. */
