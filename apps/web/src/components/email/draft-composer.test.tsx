@@ -11,7 +11,9 @@ import { DraftComposer } from './draft-composer'
  * The composer (D67, E3/E4): Cc and Bcc closed until asked for, a Bcc chip
  * that reads as hidden, the recipient search with the alias pick on the
  * chip, one save per pause rather than per keystroke, the save a close
- * leaves behind, Trash, and ⌘↵ as the one printed key.
+ * leaves behind, Trash, ⌘↵ as the one printed key, and Review: a draft with
+ * variables shows recipients × variables with blanks flagged, and Send is
+ * absent until each blank is filled or accepted.
  */
 
 await vi.hoisted(async () => {
@@ -59,6 +61,10 @@ const fns = vi.hoisted(() => ({
   searchEmailRecipients: vi.fn(),
   finalizeDocumentUpload: vi.fn(),
   prepareDocumentUpload: vi.fn(),
+  reviewEmailVariables: vi.fn(),
+  getEmailTemplate: vi.fn(),
+  saveEmailAsTemplate: vi.fn(),
+  listTemplates: vi.fn(),
 }))
 vi.mock('#/lib/server-fns', () => fns)
 
@@ -289,5 +295,153 @@ describe('the foot', () => {
       vi.advanceTimersByTime(5000)
     })
     expect(fns.saveEmailDraft).not.toHaveBeenCalled()
+  })
+})
+
+describe('Review', () => {
+  const DANA = {
+    email: 'dana@flent.example',
+    entityId: '00000000-0000-4000-8000-0000000000e2',
+    name: 'Dana Moreau',
+  }
+  const ARJUN = {
+    email: 'arjun@northgate.example',
+    entityId: '00000000-0000-4000-8000-0000000000e3',
+    name: 'Arjun Rao',
+  }
+  const withVariables: DraftState = {
+    ...blankDraft(ID),
+    to: [DANA, ARJUN],
+    subject: 'Intro: {{company.name}}',
+    bodyMd: 'Hi {{name.first}},',
+  }
+  const review = {
+    paths: ['company.name', 'name.first'],
+    rows: [
+      {
+        email: DANA.email,
+        name: 'Dana Moreau',
+        values: { 'company.name': 'Flent', 'name.first': 'Dana' },
+        blanks: [],
+      },
+      {
+        email: ARJUN.email,
+        name: 'Arjun Rao',
+        values: { 'company.name': 'Northgate', 'name.first': null },
+        blanks: ['name.first'],
+      },
+    ],
+  }
+  const row = (email: string) =>
+    document.querySelector(`[data-review-row="${email}"]`)
+  const sendButton = () => button('Send⌘↵')
+
+  it('sends a draft with no variables without a Review', async () => {
+    mount({ ...blankDraft(ID), to: [DANA], bodyMd: 'Thanks Dana' })
+    expect(button('Review⌘↵')).toBeUndefined()
+    act(() => sendButton()?.click())
+    await settle()
+    expect(fns.reviewEmailVariables).not.toHaveBeenCalled()
+    expect(fns.saveEmailDraft).toHaveBeenCalledTimes(1)
+  })
+
+  it('reviews a draft with variables and flags the blank row; Send is absent', async () => {
+    fns.reviewEmailVariables.mockResolvedValue(review)
+    mount(withVariables)
+    expect(sendButton()).toBeUndefined()
+    act(() => button('Review⌘↵')?.click())
+    await settle()
+    expect(fns.reviewEmailVariables).toHaveBeenCalledWith({
+      data: {
+        to: [DANA, ARJUN],
+        cc: [],
+        bcc: [],
+        subject: 'Intro: {{company.name}}',
+        bodyMd: 'Hi {{name.first}},',
+      },
+    })
+    const heads = [...document.querySelectorAll('[data-variable]')].map(
+      (h) => h.textContent,
+    )
+    expect(heads).toContain('{{company.name}}')
+    expect(heads).toContain('{{name.first}}')
+    expect(row(DANA.email)?.hasAttribute('data-flagged')).toBe(false)
+    expect(row(ARJUN.email)?.hasAttribute('data-flagged')).toBe(true)
+    expect(row(ARJUN.email)?.textContent).toContain('1 blank')
+    expect(sendButton()).toBeUndefined()
+    expect(document.querySelector('[data-open-blanks]')?.textContent).toBe(
+      '1 blank to fill',
+    )
+  })
+
+  it('shows Send once the blank is filled', async () => {
+    fns.reviewEmailVariables.mockResolvedValue(review)
+    mount(withVariables)
+    act(() => button('Review⌘↵')?.click())
+    await settle()
+    const cell = document.querySelector(
+      'input[aria-label="name.first for Arjun Rao"]',
+    )
+    type(cell, 'Arjun')
+    expect(row(ARJUN.email)?.hasAttribute('data-flagged')).toBe(false)
+    expect(sendButton()).not.toBeUndefined()
+    type(cell, '  ')
+    expect(sendButton()).toBeUndefined()
+  })
+
+  it('shows Send once the blank is accepted, and ⌘↵ sends then', async () => {
+    fns.reviewEmailVariables.mockResolvedValue(review)
+    mount(withVariables)
+    act(() => button('Review⌘↵')?.click())
+    await settle()
+    const tick = document.querySelector(
+      '[aria-label="Leave the blanks for Arjun Rao empty"]',
+    )
+    if (!(tick instanceof HTMLElement)) throw new Error('no tick')
+    act(() => tick.click())
+    expect(row(ARJUN.email)?.hasAttribute('data-flagged')).toBe(false)
+    expect(sendButton()).not.toBeUndefined()
+    act(() => {
+      body()?.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Enter',
+          metaKey: true,
+          bubbles: true,
+        }),
+      )
+    })
+    await settle()
+    expect(fns.saveEmailDraft).toHaveBeenCalled()
+    expect(closed).toHaveBeenCalledTimes(1)
+  })
+
+  it('names a variable no attribute matches and stays on the draft', async () => {
+    fns.reviewEmailVariables.mockRejectedValue(
+      new Error('No attribute matches {{favourite_colour}}'),
+    )
+    mount({ ...withVariables, bodyMd: 'Hi {{favourite_colour}}' })
+    act(() => button('Review⌘↵')?.click())
+    await settle()
+    expect(document.querySelector('[role="alert"]')?.textContent).toBe(
+      'No attribute matches {{favourite_colour}}',
+    )
+    expect(document.querySelector('section[aria-label="Review"]')).toBeNull()
+    expect(sendButton()).toBeUndefined()
+  })
+
+  it('Back returns to the draft and keeps the fills', async () => {
+    fns.reviewEmailVariables.mockResolvedValue(review)
+    mount(withVariables)
+    act(() => button('Review⌘↵')?.click())
+    await settle()
+    type(
+      document.querySelector('input[aria-label="name.first for Arjun Rao"]'),
+      'Arjun',
+    )
+    act(() => button('Back')?.click())
+    expect(document.querySelector('section[aria-label="Review"]')).toBeNull()
+    act(() => button('Review⌘↵')?.click())
+    await settle()
+    expect(sendButton()).not.toBeUndefined()
   })
 })

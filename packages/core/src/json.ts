@@ -189,3 +189,24 @@ export const draftRecipientsSchema = z.array(draftRecipientSchema).max(100)
 export const draftAttachmentsSchema = z
   .array(z.object({ documentId: z.uuid() }).strict())
   .max(50)
+
+/** An `email` template's body (D67): what applying it copies into a draft. */
+export type EmailTemplateBody = {
+  subject: string
+  body_md: string
+  attachments: Array<{ documentId: string }>
+}
+
+const emailTemplateBodySchema = z
+  .object({
+    subject: z.string().max(998),
+    body_md: z.string().max(200_000),
+    attachments: draftAttachmentsSchema,
+  })
+  .strict()
+
+/** A stored `email` template body, or null when the row holds another shape. */
+export function readEmailTemplateBody(raw: Json): EmailTemplateBody | null {
+  const parsed = emailTemplateBodySchema.safeParse(raw)
+  return parsed.success ? parsed.data : null
+}

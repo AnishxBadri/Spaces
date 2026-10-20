@@ -6,6 +6,7 @@ import { entity, space, term } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { template } from '@spaces/db/schema/templates'
 import { toObjectKind } from '@spaces/core/attributes/registry'
+import { draftAttachmentsSchema } from '@spaces/core/json'
 import { requireUser } from './shared'
 import type { Json } from './shared'
 
@@ -17,7 +18,7 @@ import type { Json } from './shared'
 
 // ---------- shared ----------
 
-const KINDS = ['note', 'space', 'record'] as const
+const KINDS = ['note', 'space', 'record', 'email'] as const
 
 export const listTemplates = createServerFn()
   .validator(
@@ -167,6 +168,41 @@ export const saveRecordAsTemplate = createServerFn({ method: 'POST' })
 
 // Record templates have no apply fn: the create modal fetches the body and
 // PRE-FILLS its fields, visibly and editably. Nothing writes silently.
+
+// ---------- email templates ----------
+
+/** Save as template from the composer: its subject, body and files. (D67) */
+export const saveEmailAsTemplate = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      name: z.string().trim().min(1).max(120),
+      subject: z.string().max(998),
+      bodyMd: z.string().max(200_000),
+      attachments: draftAttachmentsSchema,
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { saveEmailTemplateProgram } =
+      await import('../interactions/email-templates')
+    const { effectFn } = await import('./effect')
+    return effectFn(saveEmailTemplateProgram)({ id: u.id }, data)
+  })
+
+/** What applying a template copies into the open draft. */
+export const getEmailTemplate = createServerFn()
+  .validator(z.object({ id: z.uuid() }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { emailTemplateProgram, emailTemplateMessage } =
+      await import('../interactions/email-templates')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(emailTemplateProgram)({ id: u.id }, data.id)
+    } catch (failure) {
+      throw new Error(emailTemplateMessage(failure))
+    }
+  })
 
 // ---------- space templates ----------
 

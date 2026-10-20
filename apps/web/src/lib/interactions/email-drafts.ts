@@ -128,7 +128,7 @@ const query = <T>(run: () => Promise<T>) =>
   Effect.tryPromise({ try: run, catch: (cause) => new DraftFailed({ cause }) })
 
 /** The documents among `ids` the viewer may read, named, in the order given. */
-const namedDocuments = Effect.fn('draftDocuments')(function* (
+export const namedDocuments = Effect.fn('draftDocuments')(function* (
   viewerId: string,
   ids: ReadonlyArray<string>,
 ) {

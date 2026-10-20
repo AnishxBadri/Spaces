@@ -631,6 +631,13 @@
       "when": 1792431069924,
       "tag": "0089_email_draft",
       "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1792504626474,
+      "tag": "0090_template_kind_email",
+      "breakpoints": true
     }
   ]
 }

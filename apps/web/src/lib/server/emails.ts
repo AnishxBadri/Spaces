@@ -22,6 +22,7 @@ export type {
   ReplyOpening,
 } from '../interactions/email-drafts'
 export type { DraftRecipient, EmailDraftMode } from '@spaces/db/schema/drafts'
+export type { VariableReview } from '../interactions/email-variables'
 
 /**
  * The email window's read and its privacy writes. (D67)
@@ -201,4 +202,27 @@ export const searchEmailRecipients = createServerFn()
       await import('../interactions/email-drafts')
     const { effectFn } = await import('./effect')
     return effectFn(searchRecipientsProgram)(data.q)
+  })
+
+/** Review: every variable the draft uses, resolved per recipient. (D67) */
+export const reviewEmailVariables = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      to: draftRecipientsSchema,
+      cc: draftRecipientsSchema,
+      bcc: draftRecipientsSchema,
+      subject: z.string().max(998),
+      bodyMd: z.string().max(200_000),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { reviewVariablesProgram, variableMessage } =
+      await import('../interactions/email-variables')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(reviewVariablesProgram)(data)
+    } catch (failure) {
+      throw new Error(variableMessage(failure))
+    }
   })

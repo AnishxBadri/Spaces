@@ -2,9 +2,19 @@ import { Paperclip, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
+import { parseVariables } from '@spaces/core/templates/variables'
 import { KeyHint } from '#/components/page-header'
+import { SaveAsTemplateAction, TemplatePicker } from '#/components/templates'
+import type { TemplateRow } from '#/components/templates'
 import { Button } from '#/components/ui/button'
+import { useConfirm } from '#/components/ui/confirm-dialog'
 import { DialogFooter } from '#/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu'
 import {
   Popover,
   PopoverContent,
@@ -13,27 +23,41 @@ import {
 import { Tabs } from '#/components/ui/tabs'
 import { uploadDocument } from '#/lib/documents/upload'
 import {
+  NO_CHOICES,
+  openBlanks,
   recipientCount,
   saveInput,
   switchMode,
   useDraftAutosave,
 } from '#/lib/email/compose'
-import type { DraftState } from '#/lib/email/compose'
+import type { DraftState, ReviewChoices } from '#/lib/email/compose'
 import {
   deleteEmailDraft,
+  getEmailTemplate,
   listRecordDocuments,
+  reviewEmailVariables,
+  saveEmailAsTemplate,
   saveEmailDraft,
 } from '#/lib/server-fns'
-import type { DraftDocument, ReplyOpening } from '#/lib/server-fns'
+import type {
+  DraftDocument,
+  ReplyOpening,
+  VariableReview,
+} from '#/lib/server-fns'
 import { AddressRow, RecipientLine } from './recipient-line'
+import { VariableReviewTable } from './variable-review'
 
 /**
  * The composer (D67; E3 inline under a message, E4 in its own window): the
  * address block, the subject, the body and the files, then the foot.
  * - Cc and Bcc open from the address block and are closed when empty.
  * - Autosaved after `AUTOSAVE_MS` of quiet; Cancel and closing keep the row.
- * - Trash deletes it. ⌘↵ anywhere in the composer is Send, the one printed key.
- * - Send saves the draft until the Gmail send lane exists to hand it to.
+ * - Trash deletes it. ⌘↵ anywhere in the composer is the primary, the one
+ *   printed key.
+ * - A draft with `{{variables}}` reviews before it sends: the primary is
+ *   Review, and Send appears once no recipient's row has an open blank.
+ * - Send saves the draft until the Gmail send lane exists to hand it, and
+ *   the Review's fills, to.
  */
 
 type ReplyMode = keyof ReplyOpening['modes']
@@ -83,6 +107,11 @@ export function DraftComposer({
   const [bccOpen, setBccOpen] = useState(initial.bcc.length > 0)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [review, setReview] = useState<VariableReview | null>(null)
+  const [choices, setChoices] = useState<ReviewChoices>(NO_CHOICES)
+  const [reviewing, setReviewing] = useState(false)
+  const [templating, setTemplating] = useState(false)
+  const { confirm, confirmDialog } = useConfirm()
   const inflight = useRef<Promise<void>>(Promise.resolve())
 
   const save = (d: DraftState): Promise<void> => {
@@ -110,6 +139,7 @@ export function DraftComposer({
     const from = modes[draft.mode]
     setDraft((d) => switchMode(d, from, modes[mode]))
     setDirty(true)
+    setReview(null)
   }
 
   async function cancel() {
@@ -127,6 +157,53 @@ export function DraftComposer({
     onClose()
   }
 
+  async function startReview() {
+    setReviewing(true)
+    await autosave.flush()
+    try {
+      const result = await reviewEmailVariables({
+        data: {
+          to: draft.to,
+          cc: draft.cc,
+          bcc: draft.bcc,
+          subject: draft.subject,
+          bodyMd: draft.bodyMd,
+        },
+      })
+      setError(null)
+      setReview(result)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not review')
+    } finally {
+      setReviewing(false)
+    }
+  }
+
+  /** Applying copies the template's subject, body and files; the recipients stay. */
+  async function applyTemplate(t: TemplateRow) {
+    const written =
+      draft.subject.trim() !== '' ||
+      draft.bodyMd.trim() !== '' ||
+      draft.attachments.length > 0
+    if (
+      written &&
+      !(await confirm({
+        title: `Replace this draft with ${t.name}?`,
+        body: 'The subject, the message and the files are replaced. The recipients stay.',
+        action: 'Replace',
+        kind: 'primary',
+      }))
+    )
+      return
+    try {
+      const fill = await getEmailTemplate({ data: { id: t.id } })
+      edit(fill)
+      setReview(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not apply it')
+    }
+  }
+
   async function trash() {
     autosave.cancel()
     await inflight.current
@@ -141,6 +218,54 @@ export function DraftComposer({
   const n = recipientCount(draft)
   const files = draft.attachments.length
   const saved = savedLine(savedAt)
+  const variables =
+    parseVariables(`${draft.subject}\n${draft.bodyMd}`).length > 0
+  const open =
+    review === null
+      ? 0
+      : review.rows.reduce((sum, r) => sum + openBlanks(r, choices).length, 0)
+  const sendable = review === null ? !variables : open === 0
+  const busy = sending || reviewing
+
+  function primary() {
+    if (busy) return
+    if (sendable) void send()
+    else if (review === null) void startReview()
+  }
+
+  const tools = (
+    <span className="flex shrink-0 items-center gap-1">
+      <TemplatePicker
+        kind="email"
+        context="email"
+        onPick={(t) => void applyTemplate(t)}
+      />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="More for this draft"
+          >
+            <span aria-hidden className="mono text-ui">
+              ···
+            </span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          className="w-48"
+          onCloseAutoFocus={(e) => {
+            if (templating) e.preventDefault()
+          }}
+        >
+          <DropdownMenuItem onSelect={() => setTemplating(true)}>
+            Save as template…
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </span>
+  )
 
   return (
     <>
@@ -149,12 +274,16 @@ export function DraftComposer({
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
             e.preventDefault()
-            if (!sending) void send()
+            primary()
           }
         }}
       >
-        {above}
-        {modes === null || draft.mode === 'new' ? null : (
+        {review === null ? above : null}
+        {modes === null || draft.mode === 'new' ? (
+          <div className="flex h-9 shrink-0 items-center justify-end border-b border-rule px-3">
+            {tools}
+          </div>
+        ) : (
           <Tabs
             items={MODE_TABS}
             value={draft.mode}
@@ -162,85 +291,101 @@ export function DraftComposer({
             label="Reply mode"
             size="head"
             trail={
-              saved === null ? undefined : (
-                <span
-                  data-saved
-                  className="ml-auto pr-2 mono text-micro text-graphite"
-                >
-                  {saved}
-                </span>
-              )
+              <span className="ml-auto flex items-center gap-1">
+                {saved === null ? null : (
+                  <span
+                    data-saved
+                    className="pr-2 mono text-micro text-graphite"
+                  >
+                    {saved}
+                  </span>
+                )}
+                {tools}
+              </span>
             }
           />
         )}
-        <section aria-label="Addresses" className="flex flex-col">
-          <RecipientLine
-            label="To"
-            value={draft.to}
-            onChange={(to) => edit({ to })}
-            autoFocus={draft.to.length === 0}
-            trail={
-              ccOpen && bccOpen ? undefined : (
-                <span className="flex shrink-0 items-center gap-1 mono text-micro text-graphite">
-                  {ccOpen ? null : (
-                    <button
-                      type="button"
-                      onClick={() => setCcOpen(true)}
-                      className="focus-ring hover:text-foreground"
-                    >
-                      cc
-                    </button>
-                  )}
-                  {ccOpen || bccOpen ? null : <span aria-hidden>·</span>}
-                  {bccOpen ? null : (
-                    <button
-                      type="button"
-                      onClick={() => setBccOpen(true)}
-                      className="focus-ring hover:text-foreground"
-                    >
-                      bcc
-                    </button>
-                  )}
-                </span>
-              )
-            }
+        {review === null ? null : (
+          <VariableReviewTable
+            review={review}
+            choices={choices}
+            onChange={setChoices}
           />
-          {ccOpen ? (
+        )}
+        <div
+          className={
+            review === null ? 'flex min-h-0 flex-1 flex-col' : 'hidden'
+          }
+        >
+          <section aria-label="Addresses" className="flex flex-col">
             <RecipientLine
-              label="Cc"
-              value={draft.cc}
-              onChange={(cc) => edit({ cc })}
+              label="To"
+              value={draft.to}
+              onChange={(to) => edit({ to })}
+              autoFocus={draft.to.length === 0}
+              trail={
+                ccOpen && bccOpen ? undefined : (
+                  <span className="flex shrink-0 items-center gap-1 mono text-micro text-graphite">
+                    {ccOpen ? null : (
+                      <button
+                        type="button"
+                        onClick={() => setCcOpen(true)}
+                        className="focus-ring hover:text-foreground"
+                      >
+                        cc
+                      </button>
+                    )}
+                    {ccOpen || bccOpen ? null : <span aria-hidden>·</span>}
+                    {bccOpen ? null : (
+                      <button
+                        type="button"
+                        onClick={() => setBccOpen(true)}
+                        className="focus-ring hover:text-foreground"
+                      >
+                        bcc
+                      </button>
+                    )}
+                  </span>
+                )
+              }
             />
-          ) : null}
-          {bccOpen ? (
-            <RecipientLine
-              label="Bcc"
-              value={draft.bcc}
-              onChange={(bcc) => edit({ bcc })}
-              blind
-            />
-          ) : null}
-          <AddressRow label="Subject" htmlFor={`subject-${draft.id}`}>
-            <input
-              id={`subject-${draft.id}`}
-              value={draft.subject}
-              onChange={(e) => edit({ subject: e.target.value })}
-              className="h-6 w-full bg-transparent text-ui outline-none"
-            />
-          </AddressRow>
-        </section>
-        <textarea
-          aria-label="Message"
-          value={draft.bodyMd}
-          autoFocus={draft.to.length > 0}
-          onChange={(e) => edit({ bodyMd: e.target.value })}
-          className="text-prose min-h-48 w-full flex-1 resize-none bg-paper px-5 py-4 font-serif leading-6.75 outline-none"
-        />
-        <Attachments
-          files={draft.attachments}
-          recordId={recordId}
-          onChange={(attachments) => edit({ attachments })}
-        />
+            {ccOpen ? (
+              <RecipientLine
+                label="Cc"
+                value={draft.cc}
+                onChange={(cc) => edit({ cc })}
+              />
+            ) : null}
+            {bccOpen ? (
+              <RecipientLine
+                label="Bcc"
+                value={draft.bcc}
+                onChange={(bcc) => edit({ bcc })}
+                blind
+              />
+            ) : null}
+            <AddressRow label="Subject" htmlFor={`subject-${draft.id}`}>
+              <input
+                id={`subject-${draft.id}`}
+                value={draft.subject}
+                onChange={(e) => edit({ subject: e.target.value })}
+                className="h-6 w-full bg-transparent text-ui outline-none"
+              />
+            </AddressRow>
+          </section>
+          <textarea
+            aria-label="Message"
+            value={draft.bodyMd}
+            autoFocus={draft.to.length > 0}
+            onChange={(e) => edit({ bodyMd: e.target.value })}
+            className="text-prose min-h-48 w-full flex-1 resize-none bg-paper px-5 py-4 font-serif leading-6.75 outline-none"
+          />
+          <Attachments
+            files={draft.attachments}
+            recordId={recordId}
+            onChange={(attachments) => edit({ attachments })}
+          />
+        </div>
         {error === null ? null : (
           <p role="alert" className="px-5 pb-3 text-ui text-destructive">
             {error}
@@ -260,19 +405,64 @@ export function DraftComposer({
           {plural(n, 'recipient')}
           {files > 0 ? ` · ${plural(files, 'file')}` : ''}
         </span>
-        <Button type="button" variant="outline" onClick={() => void cancel()}>
-          Cancel
-        </Button>
-        <Button
-          type="button"
-          pending={sending}
-          disabled={sending}
-          onClick={() => void send()}
-        >
-          {sending ? 'Saving…' : 'Send'}
-          <KeyHint>⌘↵</KeyHint>
-        </Button>
+        {review === null ? (
+          <Button type="button" variant="outline" onClick={() => void cancel()}>
+            Cancel
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setReview(null)}
+          >
+            Back
+          </Button>
+        )}
+        {sendable ? (
+          <Button
+            type="button"
+            pending={sending}
+            disabled={busy}
+            onClick={primary}
+          >
+            {sending ? 'Saving…' : 'Send'}
+            <KeyHint>⌘↵</KeyHint>
+          </Button>
+        ) : review === null ? (
+          <Button
+            type="button"
+            pending={reviewing}
+            disabled={busy}
+            onClick={primary}
+          >
+            Review
+            <KeyHint>⌘↵</KeyHint>
+          </Button>
+        ) : (
+          <span data-open-blanks className="mono text-micro text-destructive">
+            {open === 1 ? '1 blank to fill' : `${String(open)} blanks to fill`}
+          </span>
+        )}
       </DialogFooter>
+      {templating ? (
+        <SaveAsTemplateAction
+          entityLabel="email"
+          defaultName={draft.subject}
+          open
+          onOpenChange={setTemplating}
+          onSave={async (name) => {
+            await saveEmailAsTemplate({
+              data: {
+                name,
+                subject: draft.subject,
+                bodyMd: draft.bodyMd,
+                attachments: saveInput(draft).attachments,
+              },
+            })
+          }}
+        />
+      ) : null}
+      {confirmDialog}
     </>
   )
 }

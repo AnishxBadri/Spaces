@@ -19,7 +19,7 @@ import type { listTemplates } from '#/lib/server-fns'
 
 const shell = getRouteApi('/_app/settings')
 
-/** Saved patterns for notes, records and space breakdowns. */
+/** Saved patterns for notes, records, space breakdowns and emails. */
 export const Route = createFileRoute('/_app/settings/templates')({
   component: TemplatesRoute,
 })
@@ -31,16 +31,27 @@ function TemplatesRoute() {
 
 type TemplateRow = Awaited<ReturnType<typeof listTemplates>>[number]
 
+type Offered = { value: string; label: string }
+
 /** Where a template can be offered first, as the chip names it. */
-const OFFERED_ON = [
+const OFFERED_ON: ReadonlyArray<Offered> = [
   { value: 'company', label: 'Companies' },
   { value: 'person', label: 'People' },
   { value: 'deal', label: 'Deals' },
   { value: 'space', label: 'Spaces' },
-] as const
+]
+
+/** An email template is offered first in the composer: its favourite. (D67) */
+const OFFERED_IN_EMAIL: ReadonlyArray<Offered> = [
+  { value: 'email', label: 'Email' },
+]
+
+const offeredFor = (kind: string) =>
+  kind === 'email' ? OFFERED_IN_EMAIL : OFFERED_ON
 
 const offeredLabel = (value: string) =>
-  OFFERED_ON.find((o) => o.value === value)?.label ?? value
+  [...OFFERED_ON, ...OFFERED_IN_EMAIL].find((o) => o.value === value)?.label ??
+  value
 
 const RECORD_KIND: Record<string, string> = {
   company: 'Company record',
@@ -55,6 +66,7 @@ function templateKindLabel(t: {
 }): string {
   if (t.kind === 'note') return 'Note'
   if (t.kind === 'space') return 'Space breakdown'
+  if (t.kind === 'email') return 'Email'
   return RECORD_KIND[t.objectKind ?? ''] ?? 'Record'
 }
 
@@ -191,7 +203,7 @@ function OfferedOnMenu({
         </Badge>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-40">
-        {OFFERED_ON.map((o) => {
+        {offeredFor(template.kind).map((o) => {
           const on = template.suggestOn.includes(o.value)
           return (
             <DropdownMenuCheckboxItem

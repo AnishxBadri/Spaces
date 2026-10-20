@@ -28,7 +28,7 @@ import { listTemplates } from '#/lib/server-fns'
  * auto-creates.
  */
 
-type TemplateRow = Awaited<ReturnType<typeof listTemplates>>[number]
+export type TemplateRow = Awaited<ReturnType<typeof listTemplates>>[number]
 
 export function TemplatePicker({
   kind,
@@ -39,7 +39,7 @@ export function TemplatePicker({
   align = 'end',
   onPick,
 }: {
-  kind: 'note' | 'space' | 'record'
+  kind: 'note' | 'space' | 'record' | 'email'
   objectKind?: 'company' | 'person' | 'deal'
   /** Entity kind of the surface this picker sits on — the suggest_on hint. */
   context?: string
@@ -126,7 +126,7 @@ export function SaveAsTemplateAction({
   open: controlled,
   onOpenChange,
 }: {
-  entityLabel: 'note' | 'space' | 'company' | 'person' | 'deal'
+  entityLabel: 'note' | 'space' | 'company' | 'person' | 'deal' | 'email'
   defaultName?: string
   onSave: (name: string) => Promise<void>
   open?: boolean | undefined
@@ -188,7 +188,9 @@ export function SaveAsTemplateAction({
                     ? 'Call debrief'
                     : entityLabel === 'space'
                       ? 'Market breakdown'
-                      : 'Inbound deal defaults'
+                      : entityLabel === 'email'
+                        ? 'Founder intro'
+                        : 'Inbound deal defaults'
                 }
               />
             </div>

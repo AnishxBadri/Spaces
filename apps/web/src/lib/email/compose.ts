@@ -220,3 +220,22 @@ export function useComposeState(): ComposeState {
 
 /** The account menu's query key for the drafts count. */
 export const EMAIL_DRAFTS_QUERY = 'email-drafts-count'
+
+/** What Review holds per recipient: the blanks typed in, and a blank accepted. */
+export type ReviewChoices = {
+  fills: Readonly<Partial<Record<string, Partial<Record<string, string>>>>>
+  /** Recipients whose remaining blanks go out empty. */
+  accepted: ReadonlyArray<string>
+}
+
+export const NO_CHOICES: ReviewChoices = { fills: {}, accepted: [] }
+
+/** The blanks in `row` not yet filled, unless the row's blanks are accepted. */
+export function openBlanks(
+  row: { email: string; blanks: ReadonlyArray<string> },
+  choices: ReviewChoices,
+): Array<string> {
+  if (choices.accepted.includes(row.email)) return []
+  const filled = choices.fills[row.email] ?? {}
+  return row.blanks.filter((p) => (filled[p] ?? '').trim() === '')
+}

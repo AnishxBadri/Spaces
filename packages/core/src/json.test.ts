@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CallMeta, EmailMeta } from '@spaces/db/schema/interactions'
 import {
+  readEmailTemplateBody,
   readInteractionMeta,
   readRecorderSettings,
   recorderSettingsJson,
@@ -120,5 +121,25 @@ describe('readRecorderSettings', () => {
     expect(
       readRecorderSettings({ folder_ids: 'fld_deals', transcript: 'yes' }),
     ).toEqual({ folderIds: [], typedNotes: false, transcript: false })
+  })
+})
+
+describe('readEmailTemplateBody', () => {
+  const body = {
+    subject: 'Intro: {{company.name}}',
+    body_md: 'Hi {{name.first}},',
+    attachments: [{ documentId: '00000000-0000-4000-8000-0000000000a1' }],
+  }
+
+  it('reads the subject, the body and the files', () => {
+    expect(readEmailTemplateBody(body)).toEqual(body)
+  })
+
+  it('refuses another kind of body, and a stray key', () => {
+    expect(readEmailTemplateBody({ values: {} })).toBeNull()
+    expect(readEmailTemplateBody({ ...body, cc: [] })).toBeNull()
+    expect(
+      readEmailTemplateBody({ ...body, attachments: [{ documentId: 'x' }] }),
+    ).toBeNull()
   })
 })

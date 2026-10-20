@@ -12,10 +12,15 @@ import { user } from './auth'
 import { noteKind } from './kinds'
 import type { Json } from '../json'
 
-export const templateKind = pgEnum('template_kind', ['note', 'space', 'record'])
+export const templateKind = pgEnum('template_kind', [
+  'note',
+  'space',
+  'record',
+  'email',
+])
 
 /**
- * Templates — one mechanism, three kinds (CONTEXT.md "Templates").
+ * Templates — one mechanism, four kinds (CONTEXT.md "Templates").
  * - Standardized *capture*, never automation. Config, not entities: no
  *   mentions, no search hits, no graph rows.
  * - User-created, workspace-shared; we ship none — a shipped template
@@ -30,6 +35,9 @@ export const templateKind = pgEnum('template_kind', ['note', 'space', 'record'])
  *  - space  — { terms: [{name, definition}], children: [recursive] } —
  *             names and skeletons only, captured by example from a real
  *             space, stamped skip-existing
+ *  - email  — { subject, body_md, attachments: [{documentId}] }, read by
+ *             `readEmailTemplateBody`; attachments are re-read through
+ *             `canReadDocumentSql` when applied (D67)
  */
 export const template = pgTable('template', {
   id: uuid('id').primaryKey().defaultRandom(),
