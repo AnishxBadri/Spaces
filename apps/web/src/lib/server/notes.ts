@@ -52,9 +52,9 @@ export const createNote = createServerFn({ method: 'POST' })
   })
 
 /**
- * The two lanes of a record's Notes section — filed against it, and merely
- * mentioning it. Visibility and merge state are filtered in SQL; see
- * `lib/notes/list-record.ts`.
+ * The three lanes of a record's Notes tab — filed against it, from its
+ * meetings, and merely mentioning it. Visibility and merge state are
+ * filtered in SQL; see `listRecordNotesProgram`.
  */
 export const listRecordNotes = createServerFn()
   .validator(z.object({ entityId: z.string().uuid() }))
@@ -166,6 +166,9 @@ export const getNote = createServerFn()
       await import('../interactions/recorder-links')
     const { effectFn } = await import('./effect')
     const openIn = await effectFn(noteRecorderLinkProgram)(data.id)
+    // …and is marked with the tool it was filed from.
+    const { noteViaProgram } = await import('../notes/via')
+    const via = await effectFn(noteViaProgram)(data.id)
 
     return {
       id: row.id,
@@ -180,6 +183,7 @@ export const getNote = createServerFn()
       isMine: row.authorId === u.id,
       replacedBy,
       openIn,
+      via,
     }
   })
 

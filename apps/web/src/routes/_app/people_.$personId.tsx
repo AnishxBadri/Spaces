@@ -44,6 +44,7 @@ import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordHistory, RecordInteractions } from '#/components/record-timeline'
 import type { InteractionFilter } from '#/lib/timeline/interaction-filter'
+import type { NotesFilter } from '#/lib/notes/notes-filter'
 import { TasksRail } from '#/components/tasks-rail'
 import { WaitingRail } from '#/components/record/waiting-rail'
 import { PluginActions } from '#/components/record/plugin-actions'
@@ -157,7 +158,9 @@ function PersonRecordPage() {
     (next) =>
       void go({ search: { tab: next }, replace: true, resetScroll: false }),
   )
-  // The Interactions filter, held here so the tab head's count follows it.
+  // The Notes and Interactions filters, held here so the tab head's counts
+  // follow them.
+  const [notesFilter, setNotesFilter] = useState<NotesFilter>('all')
   const [interactionFilter, setInteractionFilter] =
     useState<InteractionFilter>('all')
 
@@ -469,13 +472,15 @@ function PersonRecordPage() {
             notes,
             timeline,
             documents,
+            notesFilter,
             interactionFilter,
           })}
           panels={{
             notes: (
               <RecordNotes
-                filed={notes.filed}
-                mentions={notes.mentions}
+                notes={notes}
+                filter={notesFilter}
+                onFilterChange={setNotesFilter}
                 onNewNote={newNoteAboutThis}
               />
             ),

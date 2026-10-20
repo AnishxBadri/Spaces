@@ -51,6 +51,8 @@ import type {
 import { PAST_LIMIT } from '#/lib/meetings/list'
 import type { ListedMeeting, MeetingsList } from '#/lib/meetings/list'
 import { recorderLinksProgram } from './recorder-links'
+import { notesViaProgram } from '../notes/via'
+import type { NoteVia } from '../notes/via-mark'
 import type { RecorderLink } from './recorder-links'
 
 /**
@@ -501,6 +503,8 @@ export type MeetingCarriedNote = {
   private: boolean
   /** "Open in <provider>": the note at the recorder that filed it. */
   openIn: RecorderLink | null
+  /** "via <tool> · <author>" (D78). */
+  via: NoteVia | null
 }
 
 export type MeetingDetail = {
@@ -518,6 +522,7 @@ export type MeetingDetail = {
     id: string
     title: string | null
     openIn: RecorderLink | null
+    via: NoteVia | null
   } | null
   /** Second notes and the viewer's typed notes, oldest first. */
   notes: Array<MeetingCarriedNote>
@@ -686,6 +691,10 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
       ...(noteId !== null && readableBody ? [{ id: noteId, ...body }] : []),
       ...readableNotes,
     ]).pipe(Effect.mapError((cause) => new MeetingReadFailed({ cause })))
+    const via = yield* notesViaProgram([
+      ...(noteId !== null && readableBody ? [noteId] : []),
+      ...readableNotes.map((n) => n.id),
+    ]).pipe(Effect.mapError((cause) => new MeetingReadFailed({ cause })))
     return {
       id: row.id,
       title: row.subject,
@@ -705,6 +714,7 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
               id: noteId,
               title: readableBody ? body.title || 'Untitled' : null,
               openIn: links.get(noteId) ?? null,
+              via: via.get(noteId) ?? null,
             },
       notes: readableNotes.map((n) => ({
         id: n.id,
@@ -712,6 +722,7 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
         role: n.role,
         private: n.visibility === 'private',
         openIn: links.get(n.id) ?? null,
+        via: via.get(n.id) ?? null,
       })),
       // A transcript private to its member is theirs alone (D78).
       artifacts: artifacts

@@ -2,6 +2,8 @@ import { z } from 'zod'
 import { modalSearchShape } from '#/lib/modal-search'
 import { inInteractionFilter } from '#/lib/timeline/interaction-filter'
 import type { InteractionFilter } from '#/lib/timeline/interaction-filter'
+import { notesCounts } from '#/lib/notes/notes-filter'
+import type { NoteLanes, NotesFilter } from '#/lib/notes/notes-filter'
 
 /**
  * A record body's tabs (D74): Notes · Interactions · Files · History. There
@@ -54,23 +56,25 @@ type TimelineRow =
   | { type: 'macro' | 'attrs' | 'ledger' }
 
 /**
- * Each tab's count: what the tab lists, so an empty one reads 0. The
- * Interactions count follows the tab's filter.
+ * Each tab's count: what the tab lists, so an empty one reads 0. The Notes
+ * and Interactions counts follow their tab's filter.
  */
 export function recordTabCounts({
   notes,
   timeline,
   documents,
+  notesFilter = 'all',
   interactionFilter = 'all',
 }: {
-  notes: { filed: ReadonlyArray<unknown>; mentions: ReadonlyArray<unknown> }
+  notes: NoteLanes<{ id: string }>
   timeline: ReadonlyArray<TimelineRow>
   documents: ReadonlyArray<unknown>
+  notesFilter?: NotesFilter
   interactionFilter?: InteractionFilter
 }): Record<RecordTab, number> {
   const interactions = timeline.filter((i) => i.type === 'interaction')
   return {
-    notes: notes.filed.length + notes.mentions.length,
+    notes: notesCounts(notes)[notesFilter],
     interactions: interactions.filter((i) =>
       inInteractionFilter(i, interactionFilter),
     ).length,

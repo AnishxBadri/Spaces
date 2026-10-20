@@ -218,6 +218,7 @@ describe('the meeting window', () => {
       id: f.writeUp,
       title: 'Flent — founder call',
       openIn: { provider: 'Granola', url: GRANOLA_URL },
+      via: { tool: 'Granola', author: OWNER.name },
     })
     expect(mine.notes).toEqual([
       {
@@ -226,6 +227,7 @@ describe('the meeting window', () => {
         role: 'typed_notes',
         private: true,
         openIn: { provider: 'Granola', url: GRANOLA_URL },
+        via: { tool: 'Granola', author: OWNER.name },
       },
     ])
     expect(mine.artifacts.map((a) => [a.role, a.documentId])).toEqual([

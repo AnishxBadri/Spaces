@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { DocumentPreview } from '#/components/document-preview'
 import { LabelHead, LedgerRow } from '#/components/ledger-section'
-import { OpenIn } from '#/components/open-in'
+import { OpenIn, ViaMark } from '#/components/open-in'
 import { DensityRamp } from '#/components/dither'
 import { DetailsPickRow } from '#/components/record/details-add'
 import type { PickHit } from '#/components/record/details-add'
@@ -529,6 +529,7 @@ function MeetingWindow({
                   {meeting.note.title ?? 'Open note'}
                 </span>
               </Link>
+              <ViaMark via={meeting.note.via} />
               <OpenIn link={meeting.note.openIn} />
             </LedgerRow>
           )}
@@ -546,6 +547,7 @@ function MeetingWindow({
                   private
                 </span>
               ) : null}
+              <ViaMark via={n.via} />
               <OpenIn link={n.openIn} />
             </LedgerRow>
           ))}

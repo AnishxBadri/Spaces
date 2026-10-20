@@ -176,7 +176,11 @@ describe('which tab opens', () => {
   it('counts what each tab lists', () => {
     expect(
       recordTabCounts({
-        notes: { filed: [1], mentions: [2, 3] },
+        notes: {
+          filed: [{ id: 'a' }],
+          fromMeetings: [],
+          mentions: [{ id: 'b' }, { id: 'c' }],
+        },
         timeline: [
           { type: 'interaction', kind: 'email', hasAttachments: false },
           { type: 'macro' },
@@ -196,7 +200,7 @@ describe('which tab opens', () => {
     ] as const
     const under = (interactionFilter: 'all' | 'email' | 'attachments') =>
       recordTabCounts({
-        notes: { filed: [], mentions: [] },
+        notes: { filed: [], fromMeetings: [], mentions: [] },
         timeline,
         documents: [],
         interactionFilter,
@@ -206,6 +210,22 @@ describe('which tab opens', () => {
     expect(under('attachments').interactions).toBe(1)
     // History counts what is not an interaction, whatever the filter.
     expect(under('email').history).toBe(1)
+  })
+
+  it('counts the Notes tab under its filter, a filed meeting note once under All', () => {
+    const notes = {
+      filed: [{ id: 'memo' }, { id: 'granola' }],
+      fromMeetings: [{ id: 'granola' }, { id: 'write-up' }],
+      mentions: [{ id: 'aside' }],
+    }
+    const under = (
+      notesFilter: 'all' | 'filed' | 'meetings' | 'mentions',
+    ): number =>
+      recordTabCounts({ notes, timeline: [], documents: [], notesFilter }).notes
+    expect(under('all')).toBe(4)
+    expect(under('filed')).toBe(2)
+    expect(under('meetings')).toBe(2)
+    expect(under('mentions')).toBe(1)
   })
 })
 

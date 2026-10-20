@@ -1,4 +1,6 @@
 import type { RecorderLink } from '#/lib/server-fns'
+import { viaLabel } from '#/lib/notes/via-mark'
+import type { NoteVia } from '#/lib/notes/via-mark'
 
 /** "Open in <provider>": a recorder's note where it was taken (D78). */
 export function OpenIn({ link }: { link: RecorderLink | null }) {
@@ -12,5 +14,15 @@ export function OpenIn({ link }: { link: RecorderLink | null }) {
     >
       Open in {link.provider} ›
     </a>
+  )
+}
+
+/** "via <tool> · <author>": a note filed from a recorder (D78). */
+export function ViaMark({ via }: { via: NoteVia | null }) {
+  if (via === null) return null
+  return (
+    <span className="shrink-0 mono text-micro text-graphite">
+      {viaLabel(via)}
+    </span>
   )
 }

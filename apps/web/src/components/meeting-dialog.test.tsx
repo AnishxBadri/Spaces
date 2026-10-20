@@ -214,13 +214,14 @@ describe('the meeting window', () => {
     expect(fns.getDocumentPreview).toHaveBeenCalledWith({ data: { id: 'd1' } })
   })
 
-  it("offers Open note and Open in Granola for a recorder's write-up, and its second note", async () => {
+  it("offers Open note and Open in Granola for a recorder's write-up, and its second note, each marked via Granola", async () => {
     fns.getMeeting.mockResolvedValue({
       ...DETAIL,
       note: {
         id: NOTE,
         title: 'Flent intro',
         openIn: { provider: 'Granola', url: 'https://notes.granola.ai/d/n1' },
+        via: { tool: 'Granola', author: 'Anish' },
       },
       notes: [
         {
@@ -229,6 +230,7 @@ describe('the meeting window', () => {
           role: 'recorder_note',
           private: false,
           openIn: { provider: 'Granola', url: 'https://notes.granola.ai/d/n2' },
+          via: { tool: 'Granola', author: 'Priya' },
         },
       ],
     } satisfies MeetingDetail)
@@ -247,6 +249,8 @@ describe('the meeting window', () => {
     const writeUp = dialog()?.querySelector('[aria-label="Write-up"]')
     expect(writeUp?.textContent).toContain('Flent intro')
     expect(writeUp?.textContent).toContain('Granola notes · Priya')
+    expect(writeUp?.textContent).toContain('via Granola · Anish')
+    expect(writeUp?.textContent).toContain('via Granola · Priya')
   })
 
   it('streams Prep on demand, keeps nothing, and saves the brief it showed as a note', async () => {

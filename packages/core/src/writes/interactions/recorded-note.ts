@@ -34,9 +34,10 @@ import type { DomainEvent } from '@spaces/sdk'
 import { ref } from '../../context/ref'
 import type { DocumentFilingTarget } from '../../documents/filing'
 import { writeUpTitle } from '../../interactions/write-up-title'
-import { jsonRecord, jsonString, readRecorderSettings } from '../../json'
+import { readRecorderSettings } from '../../json'
 import type { RecorderSettings } from '../../json'
 import { noteBodyFromMarkdown } from '../../notes/markdown-blocks'
+import { integrationName } from '@spaces/core/plugins/name'
 import type { Enqueue } from '../../queue/enqueue'
 import { birthDocumentProgram } from '../documents/birth'
 import type { DocumentBirthRejected } from '../documents/birth'
@@ -148,8 +149,7 @@ async function providerName(tx: Tx, integrationId: string): Promise<string> {
       .from(integration)
       .where(eq(integration.id, integrationId))
   ).at(0)
-  if (row === undefined) return 'Recorder'
-  return jsonString(jsonRecord(row.manifest).name) ?? row.capabilityId
+  return row === undefined ? 'Recorder' : integrationName(row)
 }
 
 /** The connection's opt-ins; a webhook recorder has none, so both are off. */

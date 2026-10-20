@@ -497,10 +497,19 @@ describe('the Notes tab', () => {
     const onNewNote = vi.fn()
     const el = await mount(
       <RecordNotes
-        filed={[
-          { id: 'n', title: 'IC memo', kind: 'memo', updatedAt: '2026-10-01' },
-        ]}
-        mentions={[]}
+        notes={{
+          filed: [
+            {
+              id: 'n',
+              title: 'IC memo',
+              kind: 'memo',
+              updatedAt: '2026-10-01',
+              via: null,
+            },
+          ],
+          fromMeetings: [],
+          mentions: [],
+        }}
         onNewNote={onNewNote}
       />,
     )
@@ -509,6 +518,81 @@ describe('the Notes tab', () => {
     expect(el.querySelector('.bg-bone')).toBeNull()
     await click(button(/^\+Write a note…N$/))
     expect(onNewNote).toHaveBeenCalledOnce()
+  })
+
+  it('filters All · Filed here · From meetings · Mentions, a recorder note serif and marked via its tool', async () => {
+    const row = (
+      id: string,
+      title: string,
+      via: { tool: string; author: string } | null = null,
+    ) => ({ id, title, kind: 'note' as const, updatedAt: '2026-10-19', via })
+    const granola = row('g', 'Granola notes · Maya', {
+      tool: 'Granola',
+      author: 'Maya',
+    })
+    const onFilterChange = vi.fn()
+    const el = await mount(
+      <RecordNotes
+        notes={{
+          filed: [row('m', 'IC memo'), granola],
+          fromMeetings: [
+            row('w', 'Flent — founder call'),
+            granola,
+            row('t', 'Typed notes · Granola', {
+              tool: 'Granola',
+              author: 'Anish',
+            }),
+          ],
+          mentions: [row('x', 'Aside')],
+        }}
+        onFilterChange={onFilterChange}
+        onNewNote={() => undefined}
+      />,
+    )
+    const filters = [
+      ...el.querySelectorAll('[role="group"][aria-label="Show notes"] button'),
+    ].map((b) => b.textContent)
+    expect(filters).toEqual([
+      'All 5',
+      'Filed here 2',
+      'From meetings 3',
+      'Mentions 1',
+    ])
+    const titles = () =>
+      [...el.querySelectorAll('li a .font-serif')].map((t) => t.textContent)
+    // All lists a filed meeting note once, under filed.
+    expect(titles()).toEqual([
+      'IC memo',
+      'Granola notes · Maya',
+      'Flent — founder call',
+      'Typed notes · Granola',
+      'Aside',
+    ])
+    const lane = (title: string) =>
+      [...el.querySelectorAll('li a')]
+        .find((a) => a.textContent.startsWith(title))
+        ?.querySelector('.mono')?.textContent
+    expect(lane('Granola notes · Maya')).toBe(
+      'via Granola · Maya · note · 10-19',
+    )
+    expect(lane('IC memo')).toBe('note · 10-19')
+    expect(lane('Typed notes · Granola')).toBe(
+      'meeting · via Granola · Anish · note · 10-19',
+    )
+    expect(lane('Aside')).toBe('mention · note · 10-19')
+
+    await click(button(/^From meetings 3$/))
+    expect(onFilterChange).toHaveBeenLastCalledWith('meetings')
+    expect(titles()).toEqual([
+      'Flent — founder call',
+      'Granola notes · Maya',
+      'Typed notes · Granola',
+    ])
+    // A hand-typed write-up carries no mark.
+    expect(lane('Flent — founder call')).toBe('note · 10-19')
+
+    await click(button(/^Mentions 1$/))
+    expect(titles()).toEqual(['Aside'])
   })
 })
 

@@ -28,6 +28,7 @@ import {
   saveAnswerNoteProgram,
 } from './threads'
 import type { AskEvent } from './types'
+import { noteViaProgram } from '#/lib/notes/via'
 
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
@@ -706,6 +707,8 @@ describe('the thread store', () => {
       .from(link)
       .where(and(eq(link.fromEntityId, noteId), eq(link.relation, 'tagged_in')))
     expect(filed.map((l) => l.toEntityId)).toEqual([acme])
+    // The user's own note: its provenance is theirs, so no via mark (D78).
+    expect(await run(noteViaProgram(noteId))).toBeNull()
     const rows = await run(listThreadsProgram(FIXTURE_ACTOR.id))
     expect(rows.find((r) => r.id === threadOf(events))?.saved).toBe(1)
   })

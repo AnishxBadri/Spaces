@@ -223,13 +223,13 @@ describe('listRecordNotesProgram', () => {
     expect(lanes.mentions).toEqual([])
   })
 
-  it('answers two empty lanes for a record nothing points at', async () => {
+  it('answers three empty lanes for a record nothing points at', async () => {
     const { listRecordNotesProgram } = await import('./list-record')
     const tag = randomUUID().slice(0, 8)
     const lanes = await Effect.runPromise(
       listRecordNotesProgram(await actorId(), await aCompany(tag)),
     )
-    expect(lanes).toEqual({ filed: [], mentions: [] })
+    expect(lanes).toEqual({ filed: [], fromMeetings: [], mentions: [] })
   })
 })
 

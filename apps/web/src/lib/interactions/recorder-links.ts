@@ -9,7 +9,7 @@ import {
   interactionNote,
   note,
 } from '@spaces/db/schema'
-import { jsonRecord, jsonString } from '@spaces/core/json'
+import { integrationName } from '@spaces/core/plugins/name'
 import { parseRecorderKey } from '@spaces/core/writes/interactions/recorded-note'
 
 /**
@@ -95,10 +95,7 @@ export const recorderLinksProgram = Effect.fn('recorderLinks')(function* (
             ...new Set(linked.map((l) => l.integrationId)),
           ]),
         ),
-    )).map((i) => [
-      i.id,
-      jsonString(jsonRecord(i.manifest).name) ?? i.capabilityId,
-    ]),
+    )).map((i) => [i.id, integrationName(i)]),
   )
   for (const n of notes) {
     const hit = linked.find(
