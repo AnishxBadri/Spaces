@@ -1,5 +1,5 @@
 import type { PartialBlock } from '@blocknote/core'
-import type { NoteBlock } from '#/lib/notes/markdown-blocks'
+import type { NoteBlock } from '@spaces/core/notes/markdown-blocks'
 
 /**
  * The server renderer's blocks, as BlockNote's in-memory type spells them

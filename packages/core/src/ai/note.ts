@@ -11,7 +11,7 @@ import { z } from 'zod'
  * words ("(DD pack.pdf, p.4)"), so it reads on the inbox card as it will
  * read in the note. The accept path renders it into BlockNote blocks and
  * serializes `body_md` back from those blocks
- * (`apps/web/src/lib/notes/markdown-blocks.ts`).
+ * (`noteBodyFromMarkdown`).
  *
  * One decoder, three readers — the identity payload's shape
  * (`./identity.ts`): `proposeProgram` holds a new row to it, the accept path

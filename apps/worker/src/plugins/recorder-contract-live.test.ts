@@ -17,9 +17,11 @@ import { db } from '@spaces/db'
 import {
   accountConnection,
   enrichmentRecord,
+  entity,
   integration,
   interaction,
   jobRun,
+  note,
 } from '@spaces/db/schema'
 import { Enqueue } from '@spaces/core/queue/enqueue'
 import { encryptBundle } from '@spaces/core/writes/connections/bundle'
@@ -198,6 +200,21 @@ const recorderEvents = async (interactionId: string) => {
     : null
 }
 
+/** The meeting's write-up, with who wrote it and from where. */
+const writeUpOf = async (interactionId: string) =>
+  (
+    await db
+      .select({
+        authorId: note.authorId,
+        visibility: note.visibility,
+        sourceRef: entity.sourceRef,
+      })
+      .from(interaction)
+      .innerJoin(note, eq(note.entityId, interaction.noteId))
+      .innerJoin(entity, eq(entity.id, note.entityId))
+      .where(eq(interaction.id, interactionId))
+  ).at(0) ?? null
+
 const callsOf = (integrationId: string) =>
   db
     .select({ id: interaction.id, subject: interaction.subject })
@@ -319,10 +336,16 @@ describe('granola, one run per member key', () => {
       status: 'succeeded',
       summary: '1 of 1 connections synced',
     })
-    const key = (note: string) => `rec:${row.id}:${connectionId}:${note}`
+    const key = (id: string) => `rec:${row.id}:${connectionId}:${id}`
     expect(await recorderEvents(flent)).toEqual([key('not_flent_first')])
     expect(await recorderEvents(acme)).toEqual([key('not_acme_board')])
     expect(await callsOf(row.id)).toEqual([])
+    // Each enhanced note is its meeting's write-up, the member's and shared.
+    expect(await writeUpOf(flent)).toEqual({
+      authorId: FIXTURE_ACTOR.id,
+      visibility: 'shared',
+      sourceRef: row.id,
+    })
     // The 1:1 in Personal was never asked for, by folder or by id.
     expect(api.requests.filter((r) => r.url.includes('personal'))).toEqual([])
     expect(api.requests.map((r) => r.query.folder_id ?? r.path).sort()).toEqual(
@@ -338,6 +361,7 @@ describe('granola, one run per member key', () => {
     api.move('not_flent_first', ['fld_personal'])
     await sync(row.id)
     expect(await recorderEvents(flent)).toEqual([])
+    expect(await writeUpOf(flent)).toBeNull()
     expect(await recorderEvents(acme)).toEqual([key('not_acme_board')])
     expect(await receiptsOf(row.id)).toBe(1)
   })

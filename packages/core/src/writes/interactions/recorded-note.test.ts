@@ -1,6 +1,6 @@
 import { Effect, Exit, Layer } from 'effect'
 import { and, count, eq, like } from 'drizzle-orm'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
 import {
   accountConnection,
@@ -16,16 +16,20 @@ import {
 } from '@spaces/db/schema'
 import { Content } from '@spaces/sdk'
 import type { RecordedNote, RecordedNoteGone } from '@spaces/sdk'
+import { user } from '@spaces/db/schema/auth'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { ref } from '../../context/ref'
+import { blocksToMarkdown } from '../../notes/markdown-blocks'
 import { Enqueue } from '../../queue/enqueue'
+import { QUEUES } from '../../queue/names'
+import { storage } from '../storage'
 import { encryptBundle } from '../connections/bundle'
 import { resolveEntity } from '../entities/resolve'
 import { ContentLive } from '../ports/content'
 import { NoEmailLane } from './email-lane'
 import { MeetingLane } from './meeting-lane'
 import { removeConnectionRecordings } from './recorded-note'
-import { insertBodyNote, writeIntegrationInteraction } from './write'
+import { writeIntegrationInteraction } from './write'
 
 /**
  * The recorder contract's host half (D78) through `Content.logRecordedNote`:
@@ -34,10 +38,29 @@ import { insertBodyNote, writeIntegrationInteraction } from './write'
  * twice it is one row and one receipt; gone, it takes with it what it became.
  */
 
+/** Every job the port sent, in order. */
+const sent: Array<{ queue: string; data: unknown; key: string | undefined }> =
+  []
+
 const EnqueueTest = Layer.succeed(
   Enqueue,
-  Enqueue.of({ enqueue: () => Effect.succeed(null) }),
+  Enqueue.of({
+    enqueue: (queue, data, options) =>
+      Effect.sync(() => {
+        sent.push({ queue, data, key: options?.singletonKey })
+        return null
+      }),
+  }),
 )
+
+/** The blobs a case stored, deleted after it. */
+const shas = new Set<string>()
+
+afterEach(async () => {
+  sent.length = 0
+  for (const sha of shas) await storage().delete(sha)
+  shas.clear()
+})
 
 /** A person per address, as the arrival lane's participants module would. */
 const LaneTest = Layer.succeed(
@@ -220,7 +243,11 @@ const tasksOf = (integrationId: string) =>
     .from(suggestion)
     .where(eq(suggestion.proposedById, integrationId))
 
-/** What arrival-7 would write for a delivered note, by hand. */
+/**
+ * What a delivered note became, with the extras removal must also take:
+ * the real write-up and typed notes, and by hand a private transcript and
+ * two open tasks — one citing the receipt, one only the meeting.
+ */
 const landed = async (row: Bound, interactionId: string) => {
   const receipt = (
     await db
@@ -229,24 +256,19 @@ const landed = async (row: Bound, interactionId: string) => {
       .where(eq(enrichmentRecord.integrationId, row.id))
   ).at(0)
   if (!receipt) throw new Error('no receipt')
-  const body = (title: string, visibility: 'shared' | 'private') =>
-    db.transaction((tx) =>
-      insertBodyNote(tx, row.id, {
-        title,
-        text: title,
-        authorId: FIXTURE_ACTOR.id,
-        visibility,
-      }),
-    )
-  const writeUp = await body('Granola notes', 'shared')
-  await db
-    .update(interaction)
-    .set({ noteId: writeUp })
-    .where(eq(interaction.id, interactionId))
-  const typed = await body('Typed notes', 'private')
-  await db
-    .insert(interactionNote)
-    .values({ interactionId, noteId: typed, role: 'typed_notes' })
+  const writeUp = (await metaOf(interactionId))?.noteId
+  const typed = (
+    await db
+      .select({ id: interactionNote.noteId })
+      .from(interactionNote)
+      .where(
+        and(
+          eq(interactionNote.interactionId, interactionId),
+          eq(interactionNote.role, 'typed_notes'),
+        ),
+      )
+  ).at(0)?.id
+  if (!writeUp || !typed) throw new Error('the landing wrote no notes')
   const docEntity = (
     await db
       .insert(entity)
@@ -301,6 +323,18 @@ const landed = async (row: Bound, interactionId: string) => {
     cited,
     other,
   }
+}
+
+/** A member's opt-ins on their recorder connection. */
+const optIn = async (
+  row: Bound,
+  choices: { typed_notes?: boolean; transcript?: boolean },
+) => {
+  if (row.connectionId === null) throw new Error('keyed')
+  await db
+    .update(accountConnection)
+    .set({ settings: { folder_ids: ['fld_deals'], ...choices } })
+    .where(eq(accountConnection.id, row.connectionId))
 }
 
 const gone = (row: Bound) =>
@@ -415,10 +449,223 @@ describe('the same note delivered twice', () => {
   })
 })
 
-describe('what a note becomes today', () => {
-  it('is the row and its receipt only: the landing rules are arrival-7', async () => {
+const SUMMARY = [
+  '## Flent',
+  '- Raising a **seed** of $2M',
+  '',
+  '### Action items',
+  '- Send the data room',
+  '- Intro to Priya',
+].join('\n')
+
+/** A shared note this integration filed: its row and body. */
+const noteRow = async (id: string) =>
+  (
+    await db
+      .select({
+        title: note.title,
+        authorId: note.authorId,
+        visibility: note.visibility,
+        bodyJson: note.bodyJson,
+        bodyMd: note.bodyMd,
+      })
+      .from(note)
+      .where(eq(note.entityId, id))
+  ).at(0)
+
+const carriedOf = (interactionId: string | null) => {
+  if (interactionId === null) throw new Error('no interaction')
+  return db
+    .select({ noteId: interactionNote.noteId, role: interactionNote.role })
+    .from(interactionNote)
+    .where(eq(interactionNote.interactionId, interactionId))
+}
+
+/** A second workspace member. */
+const member = async (name: string) => {
+  const id = `member-${crypto.randomUUID()}`
+  await db
+    .insert(user)
+    .values({ id, name, email: `${id}@fund.example`, emailVerified: true })
+  return id
+}
+
+const calendarMeeting = async (start: string) => {
+  const cal = await calendar()
+  return meeting(
+    cal,
+    `land-${start}`,
+    start,
+    ['maya@flent.example'],
+    `gcal-${start}`,
+  )
+}
+
+describe('what a recorded note becomes (D78)', () => {
+  it('fills an empty write-up: one shared note by the member, rendered from the summary, its action items queued', async () => {
+    const start = nextDay()
+    const held = await calendarMeeting(start)
     const row = await recorder('granola', true)
     valueOf(
+      await log(
+        row,
+        note1(start, {
+          calendarEventId: `gcal-${start}`,
+          summary: SUMMARY,
+          webUrl: 'https://notes.granola.ai/d/not_flent_first',
+        }),
+      ),
+    )
+    const noteId = (await metaOf(held))?.noteId
+    if (!noteId) throw new Error('no write-up')
+    const body = await noteRow(noteId)
+    expect(body).toMatchObject({
+      title: 'Flent — first call',
+      authorId: FIXTURE_ACTOR.id,
+      visibility: 'shared',
+    })
+    expect(body?.bodyJson?.length).toBeGreaterThan(0)
+    expect(body?.bodyMd).toBe(blocksToMarkdown(body?.bodyJson ?? []))
+    expect(body?.bodyMd).toContain('Send the data room')
+    expect(await carriedOf(held)).toEqual([])
+    expect(await tasksOf(row.id)).toEqual([])
+    const receipt = (
+      await db
+        .select({ id: enrichmentRecord.id })
+        .from(enrichmentRecord)
+        .where(eq(enrichmentRecord.integrationId, row.id))
+    ).at(0)?.id
+    expect(sent).toEqual([
+      {
+        queue: QUEUES.recordedNoteTasks,
+        data: {
+          interactionId: held,
+          noteId,
+          integrationId: row.id,
+          receiptId: receipt,
+        },
+        key: noteId,
+      },
+    ])
+    // Open in Granola: kept on the member's recorder event.
+    const meta = (await metaOf(held))?.meta
+    expect(meta?.kind === 'meeting' ? meta.recorder_events : null).toEqual([
+      {
+        provider_event_id: `rec:${row.id}:${row.connectionId}:not_flent_first`,
+        receipt_id: receipt,
+        web_url: 'https://notes.granola.ai/d/not_flent_first',
+      },
+    ])
+
+    // Delivered again: nothing more, and no second job.
+    sent.length = 0
+    valueOf(await log(row, note1(start, { calendarEventId: `gcal-${start}` })))
+    expect(await written(row.id, 'note')).toBe(1)
+    expect(sent).toEqual([])
+  })
+
+  it('after a hand-written write-up, lands as a second shared note and leaves the write-up as it was', async () => {
+    const start = nextDay()
+    const held = await calendarMeeting(start)
+    const mine = (
+      await db
+        .insert(entity)
+        .values({
+          kind: 'note',
+          canonicalName: 'My notes',
+          createdBy: FIXTURE_ACTOR.id,
+          sourceClass: 'manual',
+        })
+        .returning({ id: entity.id })
+    ).at(0)
+    if (!mine) throw new Error('no note')
+    await db.insert(note).values({
+      entityId: mine.id,
+      authorId: FIXTURE_ACTOR.id,
+      title: 'My notes',
+      bodyMd: 'Typed by hand.',
+    })
+    await db
+      .update(interaction)
+      .set({ noteId: mine.id })
+      .where(eq(interaction.id, held))
+
+    const row = await recorder('granola', true)
+    valueOf(
+      await log(
+        row,
+        note1(start, { calendarEventId: `gcal-${start}`, summary: SUMMARY }),
+      ),
+    )
+    expect((await metaOf(held))?.noteId).toBe(mine.id)
+    expect(await noteRow(mine.id)).toMatchObject({
+      title: 'My notes',
+      bodyMd: 'Typed by hand.',
+    })
+    const carried = await carriedOf(held)
+    expect(carried).toEqual([
+      { noteId: expect.any(String), role: 'recorder_note' },
+    ])
+    expect(await noteRow(carried[0].noteId)).toMatchObject({
+      title: `granola notes · ${FIXTURE_ACTOR.name}`,
+      visibility: 'shared',
+    })
+    expect(await tasksOf(row.id)).toEqual([])
+    expect(
+      await db
+        .select({ id: suggestion.id })
+        .from(suggestion)
+        .where(eq(suggestion.kind, 'note')),
+    ).toEqual([])
+  })
+
+  it("from a second member, lands beside the first member's write-up", async () => {
+    const start = nextDay()
+    const held = await calendarMeeting(start)
+    const a = await recorder('granola', true)
+    const priya = await member('Priya')
+    const conn = (
+      await db
+        .insert(accountConnection)
+        .values({
+          userId: priya,
+          provider: 'granola',
+          product: 'notes',
+          externalEmail: `${priya}@granola.example`,
+          tokensEnc: encryptBundle(
+            { type: 'api_key', key: 'grn_priya' },
+            { userId: priya, provider: 'granola' },
+          ),
+        })
+        .returning({ id: accountConnection.id })
+    ).at(0)
+    if (!conn) throw new Error('no connection')
+    const b = { ...a, connectionId: conn.id }
+    await db
+      .update(integration)
+      .set({ manifest: { name: 'Granola' } })
+      .where(eq(integration.id, a.id))
+    const claim = note1(start, {
+      calendarEventId: `gcal-${start}`,
+      summary: SUMMARY,
+    })
+    valueOf(await log(a, claim))
+    const writeUp = (await metaOf(held))?.noteId
+    valueOf(await log(b, claim))
+    expect((await metaOf(held))?.noteId).toBe(writeUp)
+    const carried = await carriedOf(held)
+    expect(carried.map((c) => c.role)).toEqual(['recorder_note'])
+    expect(await noteRow(carried[0].noteId)).toMatchObject({
+      title: 'Granola notes · Priya',
+      authorId: priya,
+      visibility: 'shared',
+    })
+    expect(await tasksOf(a.id)).toEqual([])
+  })
+
+  it('with both opt-ins off, stores no typed notes and no transcript', async () => {
+    const row = await recorder('granola', true)
+    const out = valueOf(
       await log(
         row,
         note1(nextDay(), {
@@ -427,10 +674,109 @@ describe('what a note becomes today', () => {
         }),
       ),
     )
-    expect(await written(row.id, 'note')).toBe(0)
+    expect(await written(row.id, 'note')).toBe(1)
     expect(await written(row.id, 'document')).toBe(0)
-    expect(await tasksOf(row.id)).toEqual([])
-    expect(await receipts(row.id)).toBe(1)
+    expect(await carriedOf(out.interactionId)).toEqual([])
+  })
+
+  it('with both on, keeps the typed notes as a private note and the transcript as a private document', async () => {
+    const start = nextDay()
+    const held = await calendarMeeting(start)
+    const row = await recorder('granola', true)
+    await optIn(row, { typed_notes: true, transcript: true })
+    valueOf(
+      await log(
+        row,
+        note1(start, {
+          calendarEventId: `gcal-${start}`,
+          typedNotes: 'Strong founder.',
+          transcript: 'Maya: we close in March.',
+        }),
+      ),
+    )
+    const carried = await carriedOf(held)
+    expect(carried.map((c) => c.role)).toEqual(['typed_notes'])
+    expect(await noteRow(carried[0].noteId)).toMatchObject({
+      authorId: FIXTURE_ACTOR.id,
+      visibility: 'private',
+      bodyMd: 'Strong founder.\n',
+    })
+    const docs = await db
+      .select({
+        id: document.entityId,
+        visibility: document.visibility,
+        authorId: document.authorId,
+        mime: document.mime,
+        sha: document.blobSha,
+        role: interactionDocument.role,
+      })
+      .from(interactionDocument)
+      .innerJoin(
+        document,
+        eq(document.entityId, interactionDocument.documentId),
+      )
+      .where(eq(interactionDocument.interactionId, held))
+    expect(docs).toEqual([
+      {
+        id: expect.any(String),
+        visibility: 'private',
+        authorId: FIXTURE_ACTOR.id,
+        mime: 'text/plain',
+        sha: expect.any(String),
+        role: 'transcript',
+      },
+    ])
+    const sha = docs[0].sha
+    if (sha === null) throw new Error('no blob')
+    shas.add(sha)
+    expect(await storage().exists(sha)).toBe(true)
+    // The extraction is queued like any document's.
+    expect(sent.map((j) => j.queue)).toContain(QUEUES.extractDocument)
+
+    // Again: one of each.
+    valueOf(
+      await log(
+        row,
+        note1(start, {
+          calendarEventId: `gcal-${start}`,
+          typedNotes: 'Strong founder.',
+          transcript: 'Maya: we close in March.',
+        }),
+      ),
+    )
+    expect(await carriedOf(held)).toHaveLength(1)
+    expect(await written(row.id, 'note')).toBe(2)
+    expect(await written(row.id, 'document')).toBe(1)
+  })
+
+  it('an opt-in turned on later lands on the next delivery', async () => {
+    const start = nextDay()
+    const row = await recorder('granola', true)
+    const claim = note1(start, { typedNotes: 'Strong founder.' })
+    const first = valueOf(await log(row, claim))
+    expect(await carriedOf(first.interactionId)).toEqual([])
+    await optIn(row, { typed_notes: true })
+    valueOf(await log(row, claim))
+    expect((await carriedOf(first.interactionId)).map((c) => c.role)).toEqual([
+      'typed_notes',
+    ])
+    expect(await written(row.id, 'note')).toBe(2)
+  })
+
+  it('from a webhook recorder, with no connection, stores no private extras', async () => {
+    const row = await recorder('fathom', false)
+    const out = valueOf(
+      await log(
+        row,
+        note1(nextDay(), {
+          typedNotes: 'Strong founder.',
+          transcript: 'Maya: hello',
+        }),
+      ),
+    )
+    expect(out.outcome).toBe('born')
+    expect(await written(row.id, 'note')).toBe(1)
+    expect(await written(row.id, 'document')).toBe(0)
   })
 })
 
@@ -446,7 +792,16 @@ describe('a note gone from every ticked folder, or deleted', () => {
       `gcal-${start}`,
     )
     const row = await recorder('granola', true)
-    valueOf(await log(row, note1(start, { calendarEventId: `gcal-${start}` })))
+    await optIn(row, { typed_notes: true })
+    valueOf(
+      await log(
+        row,
+        note1(start, {
+          calendarEventId: `gcal-${start}`,
+          typedNotes: 'Strong founder.',
+        }),
+      ),
+    )
     const made = await landed(row, held)
 
     const out = valueOf(await gone(row))
@@ -465,7 +820,10 @@ describe('a note gone from every ticked folder, or deleted', () => {
   it('returned with deletedAt does the same, and a born call goes whole', async () => {
     const start = nextDay()
     const row = await recorder('granola', true)
-    const born = valueOf(await log(row, note1(start)))
+    await optIn(row, { typed_notes: true })
+    const born = valueOf(
+      await log(row, note1(start, { typedNotes: 'Strong founder.' })),
+    )
     if (born.outcome !== 'born') throw new Error(`not born: ${born.outcome}`)
     await landed(row, born.interactionId)
     const out = valueOf(

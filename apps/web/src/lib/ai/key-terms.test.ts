@@ -25,7 +25,7 @@ import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import {
   blocksToMarkdown,
   noteBodyFromMarkdown,
-} from '#/lib/notes/markdown-blocks'
+} from '@spaces/core/notes/markdown-blocks'
 import { editorBlocks } from '#/test/note-blocks'
 import {
   NO_DEAL,

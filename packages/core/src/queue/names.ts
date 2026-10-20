@@ -239,6 +239,14 @@ export const QUEUES = {
    * wrote. `singleton`, so two runs never walk the same pages.
    */
   summarizeEmailBackfill: 'interaction.summarize-backfill',
+  /**
+   * A recorded note's action items (D78): the Extract lane reads the shared
+   * note's summary and proposes one `task` suggestion per item, under the
+   * sensitivity gate. Sent by `Content.logRecordedNote` once the note is
+   * filed. Created `stately` and sent with `singletonKey = noteId`, so one
+   * note is one queued job.
+   */
+  recordedNoteTasks: 'interaction.recorded-note-tasks',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

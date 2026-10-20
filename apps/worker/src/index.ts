@@ -44,6 +44,7 @@ import { rollInteractionStats } from './jobs/roll-interaction-stats'
 import { readDeck } from './jobs/read-deck'
 import { summarize } from './jobs/summarize'
 import { summarizeEmail, summarizeEmailBackfill } from './jobs/summarize-email'
+import { recordedNoteTasks } from './jobs/recorded-note-tasks'
 import { embedDocument } from './jobs/embed-document'
 import { embedSource } from './jobs/embed-source'
 import { restampSensitivity } from './jobs/restamp-sensitivity'
@@ -404,6 +405,23 @@ async function main() {
     QUEUES.summarizeEmail,
     { batchSize: 1, includeMetadata: true },
     runJob(summarizeEmail, { host, layer: Layer.empty }),
+  )
+  // A recorded note's action items (D78): `stately` with
+  // `singletonKey = noteId`, so one note is one queued job; created before
+  // the plain create loop below. One model call per note. No Layer.
+  await boss
+    .createQueue(QUEUES.recordedNoteTasks, { policy: 'stately' })
+    .catch(() => {})
+  if (recordedNoteTasks.retry)
+    await boss.updateQueue(QUEUES.recordedNoteTasks, {
+      retryLimit: recordedNoteTasks.retry.limit,
+      retryDelay: recordedNoteTasks.retry.delaySeconds,
+      retryBackoff: recordedNoteTasks.retry.backoff,
+    })
+  await boss.work(
+    QUEUES.recordedNoteTasks,
+    { batchSize: 1, includeMetadata: true },
+    runJob(recordedNoteTasks, { host, layer: Layer.empty }),
   )
   // Its nightly backfill: `singleton`, so two runs never walk one page; a
   // run can take a while, so the expiry is a heartbeat, as the embed

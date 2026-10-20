@@ -30,7 +30,8 @@
     "./plugins/*": "./src/plugins/*.ts",
     "./enrichment/*": "./src/enrichment/*.ts",
     "./providers/*": "./src/providers/*.ts",
-    "./search/*": "./src/search/*.ts"
+    "./search/*": "./src/search/*.ts",
+    "./notes/*": "./src/notes/*.ts"
   },
   "scripts": {
     "test": "vitest run",

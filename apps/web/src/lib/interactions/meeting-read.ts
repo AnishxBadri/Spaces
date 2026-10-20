@@ -24,6 +24,8 @@ import {
   interaction,
   interactionDocument,
   interactionEntity,
+  interactionNote,
+  link,
   note,
   objectDef,
   suggestion,
@@ -48,6 +50,8 @@ import type {
 } from '#/lib/meetings/day'
 import { PAST_LIMIT } from '#/lib/meetings/list'
 import type { ListedMeeting, MeetingsList } from '#/lib/meetings/list'
+import { recorderLinksProgram } from './recorder-links'
+import type { RecorderLink } from './recorder-links'
 
 /**
  * The meeting reads behind Today's Meetings section, its Needs-you rows, the
@@ -488,6 +492,17 @@ export type MeetingSuggestion = {
   summary: string
 }
 
+/** A note the meeting carries beyond its write-up, readable by the viewer (D78). */
+export type MeetingCarriedNote = {
+  id: string
+  title: string
+  role: 'recorder_note' | 'typed_notes'
+  /** Private to the viewer: their own typed notes. */
+  private: boolean
+  /** "Open in <provider>": the note at the recorder that filed it. */
+  openIn: RecorderLink | null
+}
+
 export type MeetingDetail = {
   id: string
   title: string | null
@@ -496,12 +511,57 @@ export type MeetingDetail = {
   cancelled: boolean
   conferenceUrl: string | null
   participants: Array<MeetingParticipant>
+  /** The edged records, then each edged company's open deals (D49). */
   records: Array<MeetingRecord>
   /** The write-up; `title` is null when the reader may not see it. */
-  note: { id: string; title: string | null } | null
+  note: {
+    id: string
+    title: string | null
+    openIn: RecorderLink | null
+  } | null
+  /** Second notes and the viewer's typed notes, oldest first. */
+  notes: Array<MeetingCarriedNote>
   artifacts: Array<MeetingArtifact>
   suggestions: Array<MeetingSuggestion>
 }
+
+/**
+ * The open deals of `companyIds`: a deal reaches a meeting by derivation
+ * from its company, never by an edge (D49). A deal whose stage sits in the
+ * `closed` option group is not open.
+ */
+const openDealsOf = (companyIds: ReadonlyArray<string>) =>
+  companyIds.length === 0
+    ? Effect.succeed<Array<MeetingRecord>>([])
+    : query(() =>
+        db
+          .selectDistinct({
+            id: entity.id,
+            kind: entity.kind,
+            name: entity.canonicalName,
+            objectSlug: objectDef.slug,
+          })
+          .from(link)
+          .innerJoin(entity, eq(entity.id, link.fromEntityId))
+          .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
+          .where(
+            and(
+              inArray(link.toEntityId, [...companyIds]),
+              eq(link.relation, 'references'),
+              eq(link.attrSlug, 'company'),
+              eq(entity.kind, 'deal'),
+              isNull(entity.mergedIntoId),
+              sql`not exists (
+                select 1 from attribute a, jsonb_array_elements(a.options -> 'options') o
+                 where a.object_id = ${entity.objectId}
+                   and a.slug = 'stage'
+                   and o ->> 'group' = 'closed'
+                   and o ->> 'id' = ${entity.values} ->> 'stage'
+              )`,
+            ),
+          )
+          .orderBy(asc(entity.canonicalName)),
+      )
 
 const SUGGESTION_WORD: Record<string, string> = {
   attribute_patch: 'Field update',
@@ -545,7 +605,7 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
     if (!row) return yield* new MeetingNotFound({ id })
     const meta = meetingMeta(row.meta)
     const noteId = row.noteId
-    const [records, artifacts, written, open] = yield* Effect.all([
+    const [records, artifacts, written, open, carried] = yield* Effect.all([
       recordsOf([id]),
       query(() =>
         db
@@ -556,6 +616,8 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
             name: entity.canonicalName,
             url: document.url,
             externalUrl: document.externalUrl,
+            visibility: document.visibility,
+            authorId: document.authorId,
           })
           .from(interactionDocument)
           .innerJoin(
@@ -574,8 +636,10 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
                 title: note.title,
                 visibility: note.visibility,
                 authorId: note.authorId,
+                sourceRef: entity.sourceRef,
               })
               .from(note)
+              .innerJoin(entity, eq(entity.id, note.entityId))
               .where(eq(note.entityId, noteId)),
           ),
       query(() =>
@@ -594,9 +658,34 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
           )
           .orderBy(asc(suggestion.createdAt)),
       ),
+      query(() =>
+        db
+          .select({
+            id: note.entityId,
+            title: note.title,
+            role: interactionNote.role,
+            visibility: note.visibility,
+            authorId: note.authorId,
+            sourceRef: entity.sourceRef,
+          })
+          .from(interactionNote)
+          .innerJoin(note, eq(note.entityId, interactionNote.noteId))
+          .innerJoin(entity, eq(entity.id, note.entityId))
+          .where(eq(interactionNote.interactionId, id))
+          .orderBy(asc(entity.createdAt)),
+      ),
     ])
     const linked = records.get(id) ?? []
     const body = written.at(0)
+    const readableBody = body !== undefined && canRead(user, body)
+    const readableNotes = carried.filter((n) => canRead(user, n))
+    const deals = yield* openDealsOf(
+      linked.filter((r) => r.kind === 'company').map((r) => r.id),
+    )
+    const links = yield* recorderLinksProgram(id, [
+      ...(noteId !== null && readableBody ? [{ id: noteId, ...body }] : []),
+      ...readableNotes,
+    ]).pipe(Effect.mapError((cause) => new MeetingReadFailed({ cause })))
     return {
       id: row.id,
       title: row.subject,
@@ -605,21 +694,34 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
       cancelled: meta?.status === 'cancelled',
       conferenceUrl: meta?.conference_url ?? null,
       participants: participantsOf(meta, linked),
-      records: linked.map(stripEmails),
+      records: [
+        ...linked.map(stripEmails),
+        ...deals.filter((d) => !linked.some((r) => r.id === d.id)),
+      ],
       note:
         noteId === null
           ? null
           : {
               id: noteId,
-              title:
-                body && canRead(user, body) ? body.title || 'Untitled' : null,
+              title: readableBody ? body.title || 'Untitled' : null,
+              openIn: links.get(noteId) ?? null,
             },
-      artifacts: artifacts.map((a) => ({
-        documentId: a.documentId,
-        role: a.role,
-        name: a.filename ?? a.name,
-        url: a.url ?? a.externalUrl,
+      notes: readableNotes.map((n) => ({
+        id: n.id,
+        title: n.title || 'Untitled',
+        role: n.role,
+        private: n.visibility === 'private',
+        openIn: links.get(n.id) ?? null,
       })),
+      // A transcript private to its member is theirs alone (D78).
+      artifacts: artifacts
+        .filter((a) => canRead(user, a))
+        .map((a) => ({
+          documentId: a.documentId,
+          role: a.role,
+          name: a.filename ?? a.name,
+          url: a.url ?? a.externalUrl,
+        })),
       suggestions: open.map((s) => ({
         id: s.id,
         kind: s.kind,

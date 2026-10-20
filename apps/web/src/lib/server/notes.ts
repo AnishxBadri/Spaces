@@ -161,6 +161,12 @@ export const getNote = createServerFn()
         .map((r) => ({ id: r.id, title: r.title || 'Untitled' }))
         .at(0) ?? null
 
+    // A recorder's note opens at the recorder too (D78).
+    const { noteRecorderLinkProgram } =
+      await import('../interactions/recorder-links')
+    const { effectFn } = await import('./effect')
+    const openIn = await effectFn(noteRecorderLinkProgram)(data.id)
+
     return {
       id: row.id,
       title: row.title,
@@ -173,6 +179,7 @@ export const getNote = createServerFn()
       isPrivate: row.visibility === 'private',
       isMine: row.authorId === u.id,
       replacedBy,
+      openIn,
     }
   })
 

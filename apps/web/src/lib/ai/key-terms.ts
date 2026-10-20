@@ -45,7 +45,7 @@ import { citationLabels, documentItems } from './summarize'
  * extract that proves not every extract is an attribute patch: nothing here
  * writes a value, and the accept path is the summary's (`acceptProgram` →
  * `lib/notes/from-suggestion.ts`), which renders the table into a BlockNote
- * `table` block (`lib/notes/markdown-blocks.ts`).
+ * `table` block (`markdownToBlocks`).
  *
  * 1. **The deal.** The document's filing — its `tagged_in` links — must
  *    reach a deal, or the run refuses before any model call: the terms have

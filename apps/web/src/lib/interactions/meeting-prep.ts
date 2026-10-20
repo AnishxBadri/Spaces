@@ -25,7 +25,7 @@ import { openStreamProgram } from '#/lib/ai/stream'
 import type { OpenedStream } from '#/lib/ai/stream'
 import { citationLabels, sharedOnly } from '#/lib/ai/summarize'
 import { writeUpTitle } from '#/lib/interactions/write-up'
-import { noteBodyFromMarkdown } from '#/lib/notes/markdown-blocks'
+import { noteBodyFromMarkdown } from '@spaces/core/notes/markdown-blocks'
 import type { PrepEvent } from '#/lib/meetings/day'
 
 /**

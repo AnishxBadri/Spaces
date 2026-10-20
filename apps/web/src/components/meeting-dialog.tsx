@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { DocumentPreview } from '#/components/document-preview'
 import { LabelHead, LedgerRow } from '#/components/ledger-section'
+import { OpenIn } from '#/components/open-in'
 import { DensityRamp } from '#/components/dither'
 import { DetailsPickRow } from '#/components/record/details-add'
 import type { PickHit } from '#/components/record/details-add'
@@ -503,7 +504,7 @@ function MeetingWindow({
 
         <Group label="Write-up">
           {meeting.note === null ? (
-            <LedgerRow last>
+            <LedgerRow last={meeting.notes.length === 0}>
               <span className="min-w-0 flex-1 text-ui text-graphite">
                 Not written up.
               </span>
@@ -518,7 +519,7 @@ function MeetingWindow({
               </Button>
             </LedgerRow>
           ) : (
-            <LedgerRow last>
+            <LedgerRow last={meeting.notes.length === 0}>
               <Link
                 to="/notes/$noteId"
                 params={{ noteId: meeting.note.id }}
@@ -528,8 +529,26 @@ function MeetingWindow({
                   {meeting.note.title ?? 'Open note'}
                 </span>
               </Link>
+              <OpenIn link={meeting.note.openIn} />
             </LedgerRow>
           )}
+          {meeting.notes.map((n, i) => (
+            <LedgerRow key={n.id} last={i === meeting.notes.length - 1}>
+              <Link
+                to="/notes/$noteId"
+                params={{ noteId: n.id }}
+                className={rowLink}
+              >
+                <span className="min-w-0 truncate text-body">{n.title}</span>
+              </Link>
+              {n.private ? (
+                <span className="shrink-0 mono text-micro text-graphite">
+                  private
+                </span>
+              ) : null}
+              <OpenIn link={n.openIn} />
+            </LedgerRow>
+          ))}
         </Group>
 
         <Group label="Artifacts">

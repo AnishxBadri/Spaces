@@ -3,8 +3,8 @@ import { and, asc, eq, isNull } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { interaction, interactionEntity, link } from '@spaces/db/schema'
 import { deleteEntityProgram } from '@spaces/core/writes/entities/delete'
+import { writeUpTitle } from '@spaces/core/interactions/write-up-title'
 import { NoteCreateFailed } from '#/lib/notes/create'
-import { stamp } from '#/lib/timeline/stamp'
 import { AttendeeNotFound, InteractionLogFailed, writeUpNote } from './log'
 
 /**
@@ -49,30 +49,7 @@ export function writeUpMessage(failure: unknown): string {
   return 'Could not write it up'
 }
 
-const KIND_LABEL: Record<(typeof interaction.kind.enumValues)[number], string> =
-  {
-    email: 'Email',
-    meeting: 'Meeting',
-    call: 'Call',
-  }
-
-/**
- * The note's name at birth. `interaction.subject` is nullable — a synced row
- * may carry no subject at all, and "Untitled" for a meeting whose kind and
- * hour are both known is a worse answer than saying them. The date format is
- * the ledger's own `stamp`, so the note's name and the timeline row it was
- * written from print the same instant the same way.
- */
-export function writeUpTitle(
-  kind: (typeof interaction.kind.enumValues)[number],
-  subject: string | null,
-  occurredAt: Date,
-): string {
-  const named = subject?.trim()
-  return named
-    ? named
-    : `${KIND_LABEL[kind]} · ${stamp(occurredAt.toISOString())}`
-}
+export { writeUpTitle }
 
 const query = <T>(run: () => Promise<T>) =>
   Effect.tryPromise({

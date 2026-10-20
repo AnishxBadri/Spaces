@@ -89,6 +89,8 @@ export type RecorderEvent = {
   provider_event_id: string
   /** The `enrichment_record` holding the payload whole. */
   receipt_id: string
+  /** The note at the provider: "Open in <provider>". */
+  web_url?: string
 }
 
 /** `interaction.meta` for a call a recorder births (D68). */
@@ -98,6 +100,8 @@ export type CallMeta = {
   duration_seconds: number | null
   /** The `enrichment_record` holding the payload whole. */
   receipt_id?: string
+  /** The note at the provider: "Open in <provider>". */
+  web_url?: string
 }
 
 /**

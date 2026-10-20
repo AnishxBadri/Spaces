@@ -45,6 +45,7 @@ import {
 import type { BodyVisibility, RecordedArtifact } from '../interactions/write'
 import { MeetingLane } from '../interactions/meeting-lane'
 import {
+  fileRecordedTranscriptProgram,
   recorderKey,
   removeRecordedNotesProgram,
   writeRecordedNote,
@@ -60,7 +61,8 @@ import type {
 } from '../interactions/meeting-lane'
 import { dispatchDomainEvent } from '../events/dispatch'
 import type { DocumentFilingTarget } from '../../documents/filing'
-import type { Enqueue } from '../../queue/enqueue'
+import { Enqueue } from '../../queue/enqueue'
+import { QUEUES } from '../../queue/names'
 import type { Json } from '@spaces/db/json'
 import type { DocumentIntakeFailure } from '../documents/intake'
 import type { Tx } from '../attributes/values'
@@ -123,7 +125,9 @@ import { ReceiptNotOwned, checkReceipt, insertReceipt } from './receipts'
  * - `logRecordedNote` (D78) is the recorder contract: a checked note, its
  *   attendees through the participants module, and `writeRecordedNote` —
  *   keyed per bound connection, its author that connection's member. A gone
- *   note, or one with `deletedAt`, is `removeRecordedNotesProgram`.
+ *   note, or one with `deletedAt`, is `removeRecordedNotesProgram`. Once the
+ *   write commits it queues the note's action items and files the opted-in
+ *   transcript.
  * - Every interaction write's `interaction.logged` events are dispatched
  *   once it commits.
  */
@@ -1056,6 +1060,32 @@ export const ContentLive = (
           : retryable('logRecordedNote')(cause),
     })
     yield* dispatchAll(written.events)
+    const transcript = written.followUp?.transcript ?? null
+    const tasks = written.followUp?.tasks ?? null
+    // Before the transcript: a retry finds the note held and queues nothing.
+    if (tasks !== null)
+      yield* (yield* Enqueue).enqueue(
+        QUEUES.recordedNoteTasks,
+        { ...tasks },
+        { singletonKey: tasks.noteId },
+      )
+    if (transcript !== null)
+      yield* fileRecordedTranscriptProgram(
+        owner,
+        written.interactionId,
+        transcript,
+      ).pipe(
+        Effect.catchTags({
+          // Refused for good: the note stands without it.
+          DocumentTooLarge: () =>
+            Effect.logWarning(
+              'logRecordedNote: transcript over the size limit',
+            ),
+          DocumentBirthRejected: (refused) =>
+            Effect.logWarning(`logRecordedNote: ${refused.reason}`),
+        }),
+        Effect.mapError(retryable('logRecordedNote')),
+      )
     return { outcome: written.outcome, interactionId: written.interactionId }
   })
 

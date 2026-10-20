@@ -1,5 +1,15 @@
+import { Readable } from 'node:stream'
 import { Effect, Schema } from 'effect'
-import { and, arrayOverlaps, eq, like, or, sql } from 'drizzle-orm'
+import {
+  and,
+  arrayOverlaps,
+  eq,
+  inArray,
+  isNull,
+  like,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   accountConnection,
@@ -10,17 +20,33 @@ import {
   interaction,
   interactionDocument,
   interactionNote,
+  link,
   note,
   suggestion,
 } from '@spaces/db/schema'
-import type { MeetingMeta } from '@spaces/db/schema/interactions'
+import { user } from '@spaces/db/schema/auth'
+import type {
+  InteractionMeta,
+  MeetingMeta,
+} from '@spaces/db/schema/interactions'
 import type { Json } from '@spaces/db/json'
 import type { DomainEvent } from '@spaces/sdk'
 import { ref } from '../../context/ref'
+import type { DocumentFilingTarget } from '../../documents/filing'
+import { writeUpTitle } from '../../interactions/write-up-title'
+import { jsonRecord, jsonString, readRecorderSettings } from '../../json'
+import type { RecorderSettings } from '../../json'
+import { noteBodyFromMarkdown } from '../../notes/markdown-blocks'
+import type { Enqueue } from '../../queue/enqueue'
+import { birthDocumentProgram } from '../documents/birth'
+import type { DocumentBirthRejected } from '../documents/birth'
+import { putBlobProgram } from '../documents/intake'
+import type { DocumentTooLarge } from '../documents/intake'
 import { deleteEntityProgram } from '../entities/delete'
 import type { Tx } from '../entities/resolve'
 import { removeInteractions } from './remove'
-import { writeRecordedInteraction } from './write'
+import { interactionParticipants } from './stats'
+import { MAX_BODY_CHARS, writeRecordedInteraction } from './write'
 import type { RecordedArtifact } from './write'
 
 /**
@@ -43,6 +69,18 @@ export const recorderKey = (
   providerNoteId: string,
 ): string =>
   `rec:${integrationId}:${connectionId ?? 'workspace'}:${providerNoteId}`
+
+/** A key read back: its integration and connection, `null` for a webhook recorder's. */
+export function parseRecorderKey(
+  key: string,
+): { integrationId: string; connectionId: string | null } | null {
+  const [tag, integrationId, connection] = key.split(':')
+  if (tag !== 'rec' || !integrationId || !connection) return null
+  return {
+    integrationId,
+    connectionId: connection === 'workspace' ? null : connection,
+  }
+}
 
 /** Every key one connection's notes are held under. */
 const connectionKeys = (connectionId: string) => `rec:%:${connectionId}:%`
@@ -83,18 +121,314 @@ export type RecordedNoteLanding = RecordedNoteOwner & {
   note: RecordedNoteInput
 }
 
+/** What the caller does once the write commits. */
+export type RecordedNoteFollowUp = {
+  /** The shared note just filed, whose summary the Extract lane reads for action items. */
+  tasks: RecordedNoteTasks | null
+  /** The opted-in transcript, when the member holds none on the row yet. */
+  transcript: string | null
+}
+
+/** One shared note's action items, to propose as `task` suggestions. */
+export type RecordedNoteTasks = {
+  interactionId: string
+  noteId: string
+  integrationId: string
+  receiptId: string
+}
+
+/** A recorder's display name: the manifest's, else its id. */
+async function providerName(tx: Tx, integrationId: string): Promise<string> {
+  const row = (
+    await tx
+      .select({
+        capabilityId: integration.capabilityId,
+        manifest: integration.manifest,
+      })
+      .from(integration)
+      .where(eq(integration.id, integrationId))
+  ).at(0)
+  if (row === undefined) return 'Recorder'
+  return jsonString(jsonRecord(row.manifest).name) ?? row.capabilityId
+}
+
+/** The connection's opt-ins; a webhook recorder has none, so both are off. */
+async function settingsOf(
+  tx: Tx,
+  connectionId: string | null,
+): Promise<RecorderSettings> {
+  if (connectionId === null) return readRecorderSettings(null)
+  const row = (
+    await tx
+      .select({ settings: accountConnection.settings })
+      .from(accountConnection)
+      .where(eq(accountConnection.id, connectionId))
+  ).at(0)
+  return readRecorderSettings(row?.settings ?? null)
+}
+
+/** The live company, person and deal records a meeting's notes file against. */
+async function filingRecordIds(
+  tx: Tx,
+  interactionId: string,
+): Promise<Array<string>> {
+  const ids = await interactionParticipants(tx, interactionId)
+  if (ids.length === 0) return []
+  const rows = await tx
+    .select({ id: entity.id, kind: entity.kind })
+    .from(entity)
+    .where(and(inArray(entity.id, ids), isNull(entity.mergedIntoId)))
+  return rows
+    .filter(
+      (r) => r.kind === 'company' || r.kind === 'person' || r.kind === 'deal',
+    )
+    .map((r) => r.id)
+}
+
+/** What this member's note already became on the row, by provenance. */
+type Landed = {
+  shared: string | null
+  typed: string | null
+  transcript: string | null
+}
+
+async function landedOf(
+  tx: Tx,
+  owner: RecordedNoteOwner,
+  interactionId: string,
+): Promise<Landed> {
+  const mine = and(
+    eq(note.authorId, owner.authorId),
+    eq(entity.sourceClass, 'integration'),
+    eq(entity.sourceRef, owner.integrationId),
+  )
+  const writeUp = await tx
+    .select({ id: note.entityId })
+    .from(interaction)
+    .innerJoin(note, eq(note.entityId, interaction.noteId))
+    .innerJoin(entity, eq(entity.id, note.entityId))
+    .where(and(eq(interaction.id, interactionId), mine))
+  const carried = await tx
+    .select({ id: note.entityId, role: interactionNote.role })
+    .from(interactionNote)
+    .innerJoin(note, eq(note.entityId, interactionNote.noteId))
+    .innerJoin(entity, eq(entity.id, note.entityId))
+    .where(and(eq(interactionNote.interactionId, interactionId), mine))
+  const transcript = await tx
+    .select({ id: document.entityId })
+    .from(interactionDocument)
+    .innerJoin(document, eq(document.entityId, interactionDocument.documentId))
+    .where(
+      and(
+        eq(interactionDocument.interactionId, interactionId),
+        eq(interactionDocument.role, 'transcript'),
+        eq(document.sourceRef, owner.integrationId),
+        eq(document.authorId, owner.authorId),
+      ),
+    )
+  return {
+    shared:
+      writeUp.at(0)?.id ??
+      carried.find((c) => c.role === 'recorder_note')?.id ??
+      null,
+    typed: carried.find((c) => c.role === 'typed_notes')?.id ?? null,
+    transcript: transcript.at(0)?.id ?? null,
+  }
+}
+
 /**
- * The landing rules (D78, arrival-7): what a fetched note becomes — the
- * write-up when the meeting has none, else a second shared note
- * (`interaction_note`, `recorder_note`), task suggestions citing the receipt,
- * the opted-in typed notes and transcript private to the author. Called once
- * per delivery, a duplicate included. Today it lands nothing beyond the row
- * and its receipt.
+ * A recorder's note born for its member: rendered from markdown to blocks,
+ * `body_md` serialized back from them, filed against the meeting's records.
  */
-export const landRecordedNote: (
+async function insertRecordedNote(
+  tx: Tx,
+  owner: RecordedNoteOwner,
+  body: { title: string; markdown: string; visibility: 'shared' | 'private' },
+  records: ReadonlyArray<string>,
+): Promise<string> {
+  const born = (
+    await tx
+      .insert(entity)
+      .values({
+        kind: 'note',
+        canonicalName: body.title,
+        createdBy: owner.authorId,
+        sourceClass: 'integration',
+        sourceRef: owner.integrationId,
+      })
+      .returning({ id: entity.id })
+  ).at(0)
+  if (born === undefined) throw new Error('note entity insert returned no row')
+  const { bodyJson, bodyMd } = noteBodyFromMarkdown(
+    body.markdown.slice(0, MAX_BODY_CHARS),
+  )
+  await tx.insert(note).values({
+    entityId: born.id,
+    authorId: owner.authorId,
+    title: body.title,
+    kind: 'note',
+    bodyJson,
+    bodyMd,
+    visibility: body.visibility,
+  })
+  for (const toEntityId of records)
+    await tx
+      .insert(link)
+      .values({
+        fromEntityId: born.id,
+        toEntityId,
+        relation: 'tagged_in',
+        source: 'manual',
+        createdBy: owner.authorId,
+      })
+      .onConflictDoNothing()
+  return born.id
+}
+
+/** The note's `web_url` kept on its recorder event: "Open in <provider>". */
+async function keepWebUrl(
   tx: Tx,
   landing: RecordedNoteLanding,
-) => Promise<void> = async () => {}
+  meta: InteractionMeta | null,
+): Promise<void> {
+  const url = landing.note.webUrl
+  if (url === null || meta === null) return
+  let next: InteractionMeta | null = null
+  if (meta.kind === 'call' && meta.provider_event_id === landing.key) {
+    if (meta.web_url !== url) next = { ...meta, web_url: url }
+  } else if (meta.kind === 'meeting') {
+    const events = meta.recorder_events ?? []
+    if (
+      events.some(
+        (e) => e.provider_event_id === landing.key && e.web_url !== url,
+      )
+    )
+      next = {
+        ...meta,
+        recorder_events: events.map((e) =>
+          e.provider_event_id === landing.key ? { ...e, web_url: url } : e,
+        ),
+      }
+  }
+  if (next !== null)
+    await tx
+      .update(interaction)
+      .set({ meta: next })
+      .where(eq(interaction.id, landing.interactionId))
+}
+
+/**
+ * The landing rules (D78): what a fetched note becomes.
+ * - The summary is the meeting's write-up when it has none, else a second
+ *   shared note (`interaction_note`, `recorder_note`) — never a suggestion,
+ *   and a write-up already there is never rewritten.
+ * - The typed notes, when the connection opts in, are a private note
+ *   (`typed_notes`); the transcript is handed back for the caller to file.
+ * - Idempotent: what the member's note already became is left as it is, so
+ *   a duplicate delivery only adds an opt-in turned on since.
+ */
+export async function landRecordedNote(
+  tx: Tx,
+  landing: RecordedNoteLanding,
+): Promise<RecordedNoteFollowUp> {
+  const row = (
+    await tx
+      .select({
+        kind: interaction.kind,
+        subject: interaction.subject,
+        occurredAt: interaction.occurredAt,
+        noteId: interaction.noteId,
+        meta: interaction.meta,
+      })
+      .from(interaction)
+      .where(eq(interaction.id, landing.interactionId))
+      .for('update')
+  ).at(0)
+  if (row === undefined)
+    throw new Error(`interaction ${landing.interactionId} vanished`)
+  await keepWebUrl(tx, landing, row.meta)
+
+  const settings = await settingsOf(tx, landing.connectionId)
+  const held = await landedOf(tx, landing, landing.interactionId)
+  const { note: input } = landing
+  const wantsShared = held.shared === null && input.summary !== null
+  const wantsTyped =
+    settings.typedNotes && input.typedNotes !== null && held.typed === null
+  if (!wantsShared && !wantsTyped)
+    return {
+      tasks: null,
+      transcript:
+        settings.transcript && held.transcript === null
+          ? input.transcript
+          : null,
+    }
+
+  const provider = await providerName(tx, landing.integrationId)
+  const member =
+    (
+      await tx
+        .select({ name: user.name })
+        .from(user)
+        .where(eq(user.id, landing.authorId))
+    ).at(0)?.name ?? 'a member'
+  const records = await filingRecordIds(tx, landing.interactionId)
+
+  let tasks: RecordedNoteTasks | null = null
+  if (wantsShared && input.summary !== null) {
+    const writeUp = row.noteId === null
+    const noteId = await insertRecordedNote(
+      tx,
+      landing,
+      {
+        title: writeUp
+          ? writeUpTitle(row.kind, row.subject ?? input.title, row.occurredAt)
+          : `${provider} notes · ${member}`,
+        markdown: input.summary,
+        visibility: 'shared',
+      },
+      records,
+    )
+    if (writeUp)
+      await tx
+        .update(interaction)
+        .set({ noteId })
+        .where(eq(interaction.id, landing.interactionId))
+    else
+      await tx.insert(interactionNote).values({
+        interactionId: landing.interactionId,
+        noteId,
+        role: 'recorder_note',
+      })
+    tasks = {
+      interactionId: landing.interactionId,
+      noteId,
+      integrationId: landing.integrationId,
+      receiptId: landing.receiptId,
+    }
+  }
+  if (wantsTyped && input.typedNotes !== null) {
+    const noteId = await insertRecordedNote(
+      tx,
+      landing,
+      {
+        title: `Typed notes · ${provider}`,
+        markdown: input.typedNotes,
+        visibility: 'private',
+      },
+      records,
+    )
+    await tx.insert(interactionNote).values({
+      interactionId: landing.interactionId,
+      noteId,
+      role: 'typed_notes',
+    })
+  }
+  return {
+    tasks,
+    transcript:
+      settings.transcript && held.transcript === null ? input.transcript : null,
+  }
+}
 
 type Held = {
   interactionId: string
@@ -151,6 +485,8 @@ export type RecordedNoteWritten = {
   interactionId: string
   /** To dispatch once the transaction commits. */
   events: Array<DomainEvent>
+  /** What the landing hands back for after the commit; null when nothing was held. */
+  followUp: RecordedNoteFollowUp | null
 }
 
 /**
@@ -173,19 +509,22 @@ export async function writeRecordedNote(
     await lockKey(tx, owner, key)
     const held = await heldRecording(tx, key)
     if (held !== null) {
-      if (held.receiptId !== null)
-        await landRecordedNote(tx, {
-          ...owner,
-          outcome: 'duplicate',
-          interactionId: held.interactionId,
-          receiptId: held.receiptId,
-          key,
-          note: input,
-        })
+      const followUp =
+        held.receiptId === null
+          ? null
+          : await landRecordedNote(tx, {
+              ...owner,
+              outcome: 'duplicate',
+              interactionId: held.interactionId,
+              receiptId: held.receiptId,
+              key,
+              note: input,
+            })
       return {
         outcome: 'duplicate',
         interactionId: held.interactionId,
         events: [],
+        followUp,
       }
     }
     const receipt = (
@@ -224,7 +563,7 @@ export async function writeRecordedNote(
       edges,
       artifacts,
     })
-    await landRecordedNote(tx, {
+    const followUp = await landRecordedNote(tx, {
       ...owner,
       outcome: written.outcome,
       interactionId: written.interactionId,
@@ -232,9 +571,113 @@ export async function writeRecordedNote(
       key,
       note: input,
     })
-    return written
+    return { ...written, followUp }
   })
 }
+
+/** The transcript's bytes as stored: a head naming whose it is, then the text. */
+const transcriptText = (
+  title: string | null,
+  member: string,
+  transcript: string,
+): string =>
+  `${title?.trim() || 'Meeting'} — transcript, ${member}\n\n${transcript}\n`
+
+/** Filing the opted-in transcript failed; the next delivery tries again. */
+export class RecordedTranscriptFailed extends Schema.TaggedError<RecordedTranscriptFailed>()(
+  'RecordedTranscriptFailed',
+  { cause: Schema.Defect() },
+) {}
+
+/**
+ * The opted-in transcript, filed after the note's write commits: a text
+ * document private to the member, on the meeting's records and on
+ * `interaction_document` as `transcript`, extracted and chunked like any
+ * document under the sensitivity gate.
+ * - Its head names the member, so two members' transcripts of one meeting
+ *   are two blobs and never dedupe onto one private row.
+ * - Run again on a delivery that finds none held: a filing cut short here
+ *   is finished by the next sync.
+ */
+export const fileRecordedTranscriptProgram = Effect.fn(
+  'fileRecordedTranscript',
+)(function* (
+  owner: RecordedNoteOwner,
+  interactionId: string,
+  transcript: string,
+): Effect.fn.Return<
+  string,
+  RecordedTranscriptFailed | DocumentTooLarge | DocumentBirthRejected,
+  Enqueue
+> {
+  const query = <T>(run: () => Promise<T>) =>
+    Effect.tryPromise({
+      try: run,
+      catch: (cause) => new RecordedTranscriptFailed({ cause }),
+    })
+  const facts = yield* query(async () => {
+    const row = (
+      await db
+        .select({ subject: interaction.subject })
+        .from(interaction)
+        .where(eq(interaction.id, interactionId))
+    ).at(0)
+    const member = (
+      await db
+        .select({ name: user.name })
+        .from(user)
+        .where(eq(user.id, owner.authorId))
+    ).at(0)
+    const records = await db.transaction((tx) =>
+      filingRecordIds(tx, interactionId),
+    )
+    return {
+      subject: row?.subject ?? null,
+      member: member?.name ?? 'a member',
+      records,
+    }
+  })
+  const bytes = Buffer.from(
+    transcriptText(facts.subject, facts.member, transcript),
+    'utf8',
+  )
+  const put = yield* putBlobProgram({
+    stream: Readable.from([bytes]),
+    mime: 'text/plain',
+    preparedBy: owner.authorId,
+  }).pipe(
+    Effect.catchTag('DocumentIntakeFailed', (failure) =>
+      Effect.fail(new RecordedTranscriptFailed({ cause: failure })),
+    ),
+  )
+  const born = yield* birthDocumentProgram({
+    blobSha: put.sha,
+    filename: `Transcript · ${facts.subject?.trim() || 'Meeting'}.txt`,
+    mime: 'text/plain',
+    sizeBytes: put.sizeBytes,
+    kind: 'other',
+    sourceClass: 'integration',
+    sourceRef: owner.integrationId,
+    provenance: { connectionId: owner.connectionId },
+    fileAgainst: facts.records.map((entityId): DocumentFilingTarget => ({
+      kind: 'record',
+      entityId,
+    })),
+    actor: { integrationId: owner.integrationId },
+    privacy: { visibility: 'private', authorId: owner.authorId },
+  }).pipe(
+    Effect.catchTag('DocumentBirthFailed', (failure) =>
+      Effect.fail(new RecordedTranscriptFailed({ cause: failure })),
+    ),
+  )
+  yield* query(() =>
+    db
+      .insert(interactionDocument)
+      .values({ interactionId, documentId: born.id, role: 'transcript' })
+      .onConflictDoNothing(),
+  )
+  return born.id
+})
 
 /** The receipt's display text: the plugin's manifest id. */
 async function capabilityOf(tx: Tx, integrationId: string): Promise<string> {

@@ -11,10 +11,12 @@ export type {
 } from '../meetings/day'
 export type {
   MeetingArtifact,
+  MeetingCarriedNote,
   MeetingDetail,
   MeetingSuggestion,
   UnwrittenMeeting,
 } from '../interactions/meeting-read'
+export type { RecorderLink } from '../interactions/recorder-links'
 export type {
   ListedMeeting,
   MeetingFilter,

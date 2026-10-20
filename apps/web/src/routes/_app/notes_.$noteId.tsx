@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { DocumentPreview } from '#/components/document-preview'
 import { FilingRow } from '#/components/filing-row'
+import { OpenIn } from '#/components/open-in'
 import {
   deriveMarkdown,
   extractMentionIds,
@@ -174,6 +175,7 @@ function NotePage() {
           Notes
         </Link>
         <span className="flex items-center gap-3">
+          <OpenIn link={initial.openIn} />
           <KindToggle noteId={initial.id} kind={initial.kind} />
           <span
             className="text-label text-graphite"

@@ -7,7 +7,7 @@ import {
   markdownToBlocks,
   noteBodyFromMarkdown,
   parseInline,
-} from './markdown-blocks'
+} from '@spaces/core/notes/markdown-blocks'
 import { editorBlocks } from '#/test/note-blocks'
 
 /**

@@ -187,8 +187,8 @@ const WEB_NEVER_PLUGINS_NEVER_WORKER = {
 // shipping code first:
 //   lib/ai/{attribute-run, classify-document, column-run, complete,
 //     embed-backfill, embed-document, embed-source, key-terms, read-deck,
-//     read-deck-summarize, run, sensitivity-for, suggest-spaces, summarize,
-//     summarize-email, vision}
+//     read-deck-summarize, recorded-note-tasks, run, sensitivity-for,
+//     suggest-spaces, summarize, summarize-email, vision}
 //   lib/arrival/{meeting, poll, schedule, synced}
 //   lib/documents/{blob-refs, fetch-guard, on-extracted, refile, retain,
 //     vision-gate}

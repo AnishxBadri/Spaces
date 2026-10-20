@@ -67,7 +67,11 @@ const emailMeta = z
   .strict()
 
 const recorderEvent = z
-  .object({ provider_event_id: z.string(), receipt_id: z.string() })
+  .object({
+    provider_event_id: z.string(),
+    receipt_id: z.string(),
+    web_url: z.string().exactOptional(),
+  })
   .strict()
 
 const meetingMeta = z
@@ -90,6 +94,7 @@ const callMeta = z
     provider_event_id: z.string(),
     duration_seconds: z.number().int().nonnegative().nullable(),
     receipt_id: z.string().exactOptional(),
+    web_url: z.string().exactOptional(),
   })
   .strict()
 

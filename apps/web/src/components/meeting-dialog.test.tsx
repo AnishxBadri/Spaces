@@ -103,6 +103,7 @@ const DETAIL: MeetingDetail = {
   ],
   records: [{ id: 'c1', kind: 'company', name: 'Flent', objectSlug: null }],
   note: null,
+  notes: [],
   artifacts: [
     {
       documentId: 'd1',
@@ -211,6 +212,41 @@ describe('the meeting window', () => {
     const transcript = buttons('intro transcript.txt')[0]
     await act(async () => transcript.click())
     expect(fns.getDocumentPreview).toHaveBeenCalledWith({ data: { id: 'd1' } })
+  })
+
+  it("offers Open note and Open in Granola for a recorder's write-up, and its second note", async () => {
+    fns.getMeeting.mockResolvedValue({
+      ...DETAIL,
+      note: {
+        id: NOTE,
+        title: 'Flent intro',
+        openIn: { provider: 'Granola', url: 'https://notes.granola.ai/d/n1' },
+      },
+      notes: [
+        {
+          id: 'n2',
+          title: 'Granola notes · Priya',
+          role: 'recorder_note',
+          private: false,
+          openIn: { provider: 'Granola', url: 'https://notes.granola.ai/d/n2' },
+        },
+      ],
+    } satisfies MeetingDetail)
+    await open()
+    expect(buttons('Write up')).toHaveLength(0)
+    const granola = [...document.querySelectorAll('a')].filter(
+      (a) => a.textContent === 'Open in Granola ›',
+    )
+    expect(granola.map((a) => a.getAttribute('href'))).toEqual([
+      'https://notes.granola.ai/d/n1',
+      'https://notes.granola.ai/d/n2',
+    ])
+    expect(granola.every((a) => a.getAttribute('target') === '_blank')).toBe(
+      true,
+    )
+    const writeUp = dialog()?.querySelector('[aria-label="Write-up"]')
+    expect(writeUp?.textContent).toContain('Flent intro')
+    expect(writeUp?.textContent).toContain('Granola notes · Priya')
   })
 
   it('streams Prep on demand, keeps nothing, and saves the brief it showed as a note', async () => {
