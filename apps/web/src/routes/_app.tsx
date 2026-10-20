@@ -16,6 +16,7 @@ import { CommandPalette } from '#/components/command-palette'
 import { AskDock } from '#/components/ask/ask-dock'
 import { toggleAsk } from '#/lib/ask/dock-store'
 import { UploadDialog } from '#/components/upload-dialog'
+import { ComposeWindows } from '#/components/email/compose-windows'
 import { Wordmark } from '#/components/wordmark'
 import { Toaster } from '#/components/ui/sonner'
 import { setChassisCollapsed, useChassisCollapsed } from '#/lib/chassis-store'
@@ -170,6 +171,7 @@ function AppShell() {
           the sheet it was started from: this component never unmounts, so
           closing the dialog leaves the in-flight files running. */}
       <UploadDialog />
+      <ComposeWindows />
       <KeyboardHelp open={keyboardOpen} onOpenChange={setKeyboardOpen} />
       <Toaster position="bottom-right" />
     </div>

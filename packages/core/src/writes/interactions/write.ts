@@ -1,8 +1,10 @@
 import { Schema } from 'effect'
 import { and, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
+import { normalizeEmail } from '@spaces/sdk/identity'
 import {
   document,
   entity,
+  entityAlias,
   interaction,
   interactionDocument,
   interactionEntity,
@@ -183,6 +185,44 @@ async function loggedEvents(
   })
 }
 
+/**
+ * The edges minus every person reached only through a Bcc: a blind copy is
+ * never edged and never counted in the stats, so it stays hidden. (D67)
+ * - A person also named in From, To or Cc keeps the edge.
+ */
+async function withoutBlindCopies(
+  tx: Tx,
+  meta: InteractionMeta | null,
+  entityIds: ReadonlyArray<string>,
+): Promise<Array<string>> {
+  const ids = [...new Set(entityIds)]
+  if (meta?.kind !== 'email' || !meta.bcc?.length || ids.length === 0)
+    return ids
+  const keys = (emails: ReadonlyArray<string>) =>
+    emails.map((e) => normalizeEmail(e)).filter((e) => e !== null)
+  const visible = keys([meta.from, ...meta.to, ...meta.cc])
+  const blind = keys(meta.bcc).filter((k) => !visible.includes(k))
+  if (blind.length === 0) return ids
+  const owners = await tx
+    .select({ entityId: entityAlias.entityId, key: entityAlias.valueNorm })
+    .from(entityAlias)
+    .where(
+      and(
+        eq(entityAlias.kind, 'email'),
+        inArray(entityAlias.valueNorm, [...blind, ...visible]),
+      ),
+    )
+  const seen = new Set(
+    owners.filter((o) => visible.includes(o.key)).map((o) => o.entityId),
+  )
+  const hidden = new Set(
+    owners
+      .filter((o) => blind.includes(o.key) && !seen.has(o.entityId))
+      .map((o) => o.entityId),
+  )
+  return ids.filter((id) => !hidden.has(id))
+}
+
 export type IntegrationInteraction = {
   /** The integration row that wrote it — `source_ref` on every row. */
   integrationId: string
@@ -252,7 +292,7 @@ export async function writeIntegrationInteraction(
 
   const given =
     typeof input.edges === 'function' ? await input.edges(tx) : input.edges
-  const edges = [...new Set(given)]
+  const edges = await withoutBlindCopies(tx, meta.meta, given)
   await insertEdges(tx, row.id, edges)
   await recomputeInteractionStats(tx, edges)
   const events = await loggedEvents(tx, row.id, input.kind, edges)

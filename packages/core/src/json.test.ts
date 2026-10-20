@@ -77,8 +77,19 @@ describe('readInteractionMeta', () => {
       rsvp: { 'priya@ohmium.example': 'maybe' },
     })
     expect(maybe.ok).toBe(false)
-    const stray = readInteractionMeta('email', { ...email, bcc: [] })
+    const stray = readInteractionMeta('email', { ...email, reply_to: [] })
     expect(stray.ok).toBe(false)
+  })
+
+  it('reads a sent message’s Bcc', () => {
+    const sent = readInteractionMeta('email', {
+      ...email,
+      bcc: ['priya@fund.example'],
+    })
+    expect(sent).toMatchObject({
+      ok: true,
+      meta: { bcc: ['priya@fund.example'] },
+    })
   })
 })
 

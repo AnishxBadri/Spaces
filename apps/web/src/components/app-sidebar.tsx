@@ -9,6 +9,7 @@ import {
   Kanban,
   Layers,
   Keyboard,
+  Mail,
   MessageSquareText,
   LogOut,
   Paperclip,
@@ -45,7 +46,8 @@ import {
 } from '#/lib/chassis-prefs'
 import type { FoldableGroup } from '#/lib/chassis-prefs'
 import { objectIcon } from '#/lib/object-icons'
-import { listPinnedViews } from '#/lib/server-fns'
+import { EMAIL_DRAFTS_QUERY, openDrafts } from '#/lib/email/compose'
+import { countEmailDrafts, listPinnedViews } from '#/lib/server-fns'
 import { openUploadDialog } from '#/lib/upload-dialog-store'
 import { cn } from '#/lib/utils'
 
@@ -691,6 +693,7 @@ function AccountMenu({
         Signed in as {email}
       </DropdownMenuLabel>
       <DropdownMenuSeparator />
+      <DraftsItem />
       {onKeyboard ? (
         <DropdownMenuItem onSelect={onKeyboard}>
           <Keyboard className="size-4" />
@@ -703,6 +706,33 @@ function AccountMenu({
         Sign out
       </DropdownMenuItem>
     </DropdownMenuContent>
+  )
+}
+
+/**
+ * Drafts (E5), with the count read each time the menu opens — so a draft
+ * saved or trashed since is already counted.
+ */
+function DraftsItem() {
+  const { data } = useQuery({
+    queryKey: [EMAIL_DRAFTS_QUERY],
+    queryFn: () => countEmailDrafts(),
+    staleTime: 0,
+    refetchOnMount: 'always',
+  })
+  return (
+    <DropdownMenuItem onSelect={openDrafts}>
+      <Mail className="size-4" />
+      Drafts
+      {data === undefined ? null : (
+        <span
+          data-drafts-count
+          className="tabular ml-auto mono text-micro text-graphite"
+        >
+          {data}
+        </span>
+      )}
+    </DropdownMenuItem>
   )
 }
 

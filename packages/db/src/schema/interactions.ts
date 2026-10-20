@@ -40,6 +40,11 @@ export type EmailMeta = {
   from: string
   to: Array<string>
   cc: Array<string>
+  /**
+   * Blind copies, on a message this workspace sent. Never edged, never in
+   * the stats: a Bcc stays hidden everywhere. (D67)
+   */
+  bcc?: Array<string>
   /** The `Date` header, as an ISO instant. */
   date: string
   mime_blob_sha: string | null

@@ -39,13 +39,14 @@ type PinnedAnswer = {
 /** What the server answers for pinned ids: these, when asked about. */
 const served = vi.hoisted(() => {
   const views: Array<PinnedAnswer> = []
-  return { views }
+  return { views, drafts: 0 }
 })
 
 vi.mock('#/lib/server-fns', () => ({
   listPinnedViews: vi.fn(async ({ data }: { data: { ids: Array<string> } }) =>
     served.views.filter((v) => data.ids.includes(v.id)),
   ),
+  countEmailDrafts: vi.fn(async () => served.drafts),
 }))
 
 const win = new Window({ url: 'http://localhost/' })
@@ -64,6 +65,19 @@ beforeAll(async () => {
   vi.stubGlobal('Element', win.Element)
   vi.stubGlobal('Node', win.Node)
   vi.stubGlobal('MouseEvent', win.MouseEvent)
+  // The account menu's Radix content measures and observes when it opens.
+  vi.stubGlobal('Event', win.Event)
+  vi.stubGlobal('CustomEvent', win.CustomEvent)
+  vi.stubGlobal('UIEvent', win.UIEvent)
+  vi.stubGlobal('FocusEvent', win.FocusEvent)
+  vi.stubGlobal('PointerEvent', win.PointerEvent)
+  vi.stubGlobal('KeyboardEvent', win.KeyboardEvent)
+  vi.stubGlobal('getComputedStyle', win.getComputedStyle.bind(win))
+  vi.stubGlobal('MutationObserver', win.MutationObserver)
+  vi.stubGlobal('ResizeObserver', win.ResizeObserver)
+  vi.stubGlobal('DOMRect', win.DOMRect)
+  vi.stubGlobal('requestAnimationFrame', win.requestAnimationFrame.bind(win))
+  vi.stubGlobal('cancelAnimationFrame', win.cancelAnimationFrame.bind(win))
   // The router restores scroll after a navigation.
   vi.stubGlobal('scrollTo', () => {})
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -84,6 +98,7 @@ let root: Root
 beforeEach(() => {
   localStorage.clear()
   served.views.length = 0
+  served.drafts = 0
   const host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -269,6 +284,35 @@ describe('the chassis', () => {
     const settings = document.querySelector('a[aria-label="Settings"]')
     expect(settings?.getAttribute('href')).toBe('/settings')
     expect(nav().querySelector('a[href="/settings"]')).toBeNull()
+  })
+
+  it('counts the drafts in the account menu, read again each time it opens', async () => {
+    served.drafts = 1
+    await mount('/today')
+    const trigger = button(/Anish Badri/)
+    const openMenu = async () => {
+      act(() => {
+        trigger.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+        )
+      })
+      await settle()
+      await settle()
+    }
+    const count = () =>
+      document.querySelector('[data-drafts-count]')?.textContent ?? null
+    await openMenu()
+    expect(count()).toBe('1')
+    // A draft trashed elsewhere: the next opening reads the new number.
+    served.drafts = 0
+    act(() => {
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      )
+    })
+    await settle()
+    await openMenu()
+    expect(count()).toBe('0')
   })
 
   it('marks the current row by colour only — the same box as every row', async () => {

@@ -1,5 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
+import {
+  draftAttachmentsSchema,
+  draftRecipientsSchema,
+} from '@spaces/core/json'
 import { requireUser } from './shared'
 
 export type {
@@ -9,6 +13,15 @@ export type {
   EmailParticipant,
 } from '../interactions/email-read'
 export type { EmailPrivacy } from '../interactions/email-privacy'
+export type {
+  DraftDocument,
+  DraftFields,
+  DraftRow,
+  EmailDraft,
+  RecipientMatch,
+  ReplyOpening,
+} from '../interactions/email-drafts'
+export type { DraftRecipient, EmailDraftMode } from '@spaces/db/schema/drafts'
 
 /**
  * The email window's read and its privacy writes. (D67)
@@ -91,4 +104,101 @@ export const setRecordEmailVisibility = createServerFn({ method: 'POST' })
     } catch (failure) {
       throw new Error(emailPrivacyMessage(failure))
     }
+  })
+
+/**
+ * Drafts (D67): author-private, so every fn reads the caller and nothing
+ * else. Programs are imported inside the handlers, as above.
+ */
+export const listEmailDrafts = createServerFn().handler(async () => {
+  const user = await requireUser()
+  const { listDraftsProgram } = await import('../interactions/email-drafts')
+  const { effectFn } = await import('./effect')
+  return effectFn(listDraftsProgram)({ id: user.id })
+})
+
+/** The account menu's count. */
+export const countEmailDrafts = createServerFn().handler(async () => {
+  const user = await requireUser()
+  const { countDraftsProgram } = await import('../interactions/email-drafts')
+  const { effectFn } = await import('./effect')
+  return effectFn(countDraftsProgram)({ id: user.id })
+})
+
+export const getEmailDraft = createServerFn()
+  .validator(z.object({ id: z.uuid() }))
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    const { getDraftProgram, draftMessage } =
+      await import('../interactions/email-drafts')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(getDraftProgram)({ id: user.id }, data.id)
+    } catch (failure) {
+      throw new Error(draftMessage(failure))
+    }
+  })
+
+/** The autosave: one upsert by the id the composer minted. */
+export const saveEmailDraft = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      id: z.uuid(),
+      mode: z.enum(['new', 'reply', 'reply_all', 'forward']),
+      inReplyToId: z.uuid().nullable(),
+      to: draftRecipientsSchema,
+      cc: draftRecipientsSchema,
+      bcc: draftRecipientsSchema,
+      subject: z.string().max(998),
+      bodyMd: z.string().max(200_000),
+      attachments: draftAttachmentsSchema,
+    }),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    const { saveDraftProgram, draftMessage } =
+      await import('../interactions/email-drafts')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(saveDraftProgram)({ id: user.id }, data)
+    } catch (failure) {
+      throw new Error(draftMessage(failure))
+    }
+  })
+
+/** Trash. */
+export const deleteEmailDraft = createServerFn({ method: 'POST' })
+  .validator(z.object({ id: z.uuid() }))
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    const { deleteDraftProgram } = await import('../interactions/email-drafts')
+    const { effectFn } = await import('./effect')
+    await effectFn(deleteDraftProgram)({ id: user.id }, data.id)
+    return { ok: true }
+  })
+
+/** Reply, reply all or forward from the email window. */
+export const openEmailReply = createServerFn()
+  .validator(z.object({ parentId: z.uuid() }))
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    const { openReplyProgram, draftMessage } =
+      await import('../interactions/email-drafts')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(openReplyProgram)({ id: user.id }, data.parentId)
+    } catch (failure) {
+      throw new Error(draftMessage(failure))
+    }
+  })
+
+/** The recipient chips' search: people by name or email alias. */
+export const searchEmailRecipients = createServerFn()
+  .validator(z.object({ q: z.string().max(200) }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { searchRecipientsProgram } =
+      await import('../interactions/email-drafts')
+    const { effectFn } = await import('./effect')
+    return effectFn(searchRecipientsProgram)(data.q)
   })

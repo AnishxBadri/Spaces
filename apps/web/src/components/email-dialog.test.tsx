@@ -2,7 +2,12 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EmailDetail, EmailPrivacy } from '#/lib/server-fns'
+import type {
+  DraftFields,
+  EmailDetail,
+  EmailPrivacy,
+  ReplyOpening,
+} from '#/lib/server-fns'
 import { EmailModal } from './email-dialog'
 
 /**
@@ -27,6 +32,7 @@ await vi.hoisted(async () => {
     'HTMLElement',
     'HTMLButtonElement',
     'HTMLInputElement',
+    'HTMLTextAreaElement',
     'HTMLIFrameElement',
     'Text',
     'DocumentFragment',
@@ -58,6 +64,10 @@ const fns = vi.hoisted(() => ({
   getDocumentText: vi.fn(),
   listMembers: vi.fn(),
   setEmailAudience: vi.fn(),
+  openEmailReply: vi.fn(),
+  saveEmailDraft: vi.fn(),
+  deleteEmailDraft: vi.fn(),
+  searchEmailRecipients: vi.fn(),
 }))
 const router = vi.hoisted(() => ({
   navigate: vi.fn(),
@@ -341,5 +351,132 @@ describe('the privacy row', () => {
     })
     // Saved, the window reads the email again.
     expect(fns.getEmail).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('a reply (E3)', () => {
+  beforeEach(() => {
+    fns.saveEmailDraft.mockResolvedValue({
+      id: 'saved',
+      updatedAt: '2026-10-19T09:16:00.000Z',
+    })
+  })
+  const start = (over: Partial<DraftFields>): DraftFields => ({
+    mode: 'reply',
+    inReplyToId: ID,
+    to: [],
+    cc: [],
+    bcc: [],
+    subject: 'Re: Acme Robotics — Q3 update',
+    bodyMd: '',
+    attachments: [],
+    ...over,
+  })
+  const OPENING: ReplyOpening = {
+    draft: null,
+    modes: {
+      reply: start({
+        to: [
+          {
+            email: 'jane@acme-robotics.example',
+            entityId: '00000000-0000-4000-8000-0000000000f1',
+            name: 'Jane Founder',
+          },
+        ],
+      }),
+      reply_all: start({
+        mode: 'reply_all',
+        to: [{ email: 'jane@acme-robotics.example', name: 'Jane Founder' }],
+        cc: [{ email: 'cfo@acme-robotics.example' }],
+      }),
+      forward: start({
+        mode: 'forward',
+        subject: 'Fwd: Acme Robotics — Q3 update',
+        bodyMd: '---------- Forwarded message ----------',
+        attachments: [{ documentId: 'd1', name: 'acme-q3.pdf' }],
+      }),
+    },
+  }
+
+  const typeBody = (value: string) => {
+    const el = document.querySelector('textarea[aria-label="Message"]')
+    if (!(el instanceof HTMLTextAreaElement)) throw new Error('no body')
+    Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      'value',
+    )?.set?.call(el, value)
+    act(() => {
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+  }
+  const body = () =>
+    document.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Message"]',
+    )?.value
+
+  it('grows under the folded message with the sender prefilled', async () => {
+    fns.getEmail.mockResolvedValue({
+      ...HTML,
+      body: { kind: 'text', text: 'Q3 closed ahead of plan.' },
+    })
+    fns.openEmailReply.mockResolvedValue(OPENING)
+    await open(RECORD)
+    act(() => buttons('Reply')[0]?.click())
+    await settle()
+    expect(fns.openEmailReply).toHaveBeenCalledWith({
+      data: { parentId: ID },
+    })
+    const folded = dialog()?.querySelector('[data-folded-message]')
+    expect(folded?.textContent).toContain('Jane Founder')
+    expect(folded?.textContent).toContain('Q3 closed ahead of plan.')
+    expect(dialog()?.querySelector('iframe')).toBeNull()
+    expect(
+      dialog()?.querySelector('[data-chip="jane@acme-robotics.example"]'),
+    ).not.toBeNull()
+    const tabs = [...document.querySelectorAll('[role="tab"]')].map(
+      (t) => t.textContent,
+    )
+    expect(tabs).toEqual(['Reply', 'Reply all', 'Forward'])
+    // Still one close.
+    expect(buttons('Cancel')).toHaveLength(1)
+  })
+
+  it('switching to Forward keeps what was written and brings the files', async () => {
+    fns.openEmailReply.mockResolvedValue(OPENING)
+    await open()
+    act(() => buttons('Reply')[0]?.click())
+    await settle()
+    typeBody('Priya — can you check the ESOP math?')
+    const forward = [...document.querySelectorAll('[role="tab"]')].find(
+      (t) => t.textContent === 'Forward',
+    )
+    if (!(forward instanceof HTMLElement)) throw new Error('no tab')
+    act(() => forward.click())
+    expect(body()).toBe(
+      'Priya — can you check the ESOP math?\n\n---------- Forwarded message ----------',
+    )
+    expect(
+      dialog()?.querySelector('[data-chip="jane@acme-robotics.example"]'),
+    ).toBeNull()
+    expect(dialog()?.querySelector('[data-attachment="d1"]')).not.toBeNull()
+  })
+
+  it('reopens the draft held on the email', async () => {
+    fns.openEmailReply.mockResolvedValue({
+      ...OPENING,
+      draft: {
+        ...OPENING.modes.reply,
+        id: '00000000-0000-4000-8000-0000000000d9',
+        bodyMd: 'Thanks Jane',
+        updatedAt: '2026-10-19T09:16:00.000Z',
+      },
+    })
+    await open()
+    act(() => buttons('Reply')[0]?.click())
+    await settle()
+    expect(body()).toBe('Thanks Jane')
+    expect(dialog()?.querySelector('[data-saved]')?.textContent).toMatch(
+      /^saved \d\d:\d\d$/,
+    )
   })
 })

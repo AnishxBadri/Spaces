@@ -5,6 +5,7 @@ import { db } from '@spaces/db'
 import {
   document,
   entity,
+  entityAlias,
   integration,
   interaction,
   interactionDocument,
@@ -276,5 +277,113 @@ describe('updateInteraction', () => {
         .where(eq(interaction.id, written.interactionId))
     ).at(0)
     expect(row?.occurredAt.toISOString()).toBe('2026-10-09T10:00:00.000Z')
+  })
+})
+
+describe('a blind copy', () => {
+  const aPerson = async (name: string, email: string) => {
+    const ent = (
+      await db
+        .insert(entity)
+        .values({ kind: 'person', canonicalName: name })
+        .returning({ id: entity.id })
+    ).at(0)
+    if (!ent) throw new Error('no person')
+    await db.insert(entityAlias).values({
+      entityId: ent.id,
+      kind: 'email',
+      value: email,
+      valueNorm: email.toLowerCase(),
+      isIdentity: true,
+    })
+    return ent.id
+  }
+
+  it('is never edged and never counted, while To and Cc are', async () => {
+    const integrationId = await anIntegration()
+    const dana = await aPerson('Dana Moreau', 'dana@flent.example')
+    const kiran = await aPerson('Kiran Shah', 'kiran@flent.example')
+    const priya = await aPerson('Priya Nair', 'Priya@Fund.example')
+    const written = await db.transaction((tx) =>
+      writeIntegrationInteraction(tx, {
+        integrationId,
+        kind: 'email',
+        messageId: `<${randomUUID()}@fund.example>`,
+        threadId: null,
+        subject: 'Flent diligence — next steps',
+        occurredAt: new Date('2026-10-08T10:44:00.000Z'),
+        meta: {
+          kind: 'email',
+          from: 'anish@fund.example',
+          to: ['dana@flent.example'],
+          cc: ['kiran@flent.example'],
+          bcc: ['priya@fund.example'],
+          date: '2026-10-08T10:44:00.000Z',
+          mime_blob_sha: null,
+        },
+        body: null,
+        // A caller that matched every address still leaves the Bcc out.
+        edges: [dana, kiran, priya],
+      }),
+    )
+    if (written.kind !== 'written') throw new Error('not written')
+    expect(written.edges.sort()).toEqual([dana, kiran].sort())
+
+    const edged = await db
+      .select({ entityId: interactionEntity.entityId })
+      .from(interactionEntity)
+      .where(eq(interactionEntity.interactionId, written.interactionId))
+    expect(edged.map((e) => e.entityId).sort()).toEqual([dana, kiran].sort())
+
+    const statsOf = (entityId: string) =>
+      db
+        .select({ kind: interactionStat.kind })
+        .from(interactionStat)
+        .where(eq(interactionStat.entityId, entityId))
+    expect(await statsOf(priya)).toEqual([])
+    expect((await statsOf(dana)).map((s) => s.kind).sort()).toEqual([
+      'any',
+      'email',
+    ])
+
+    const row = (
+      await db
+        .select({ kind: interaction.kind, meta: interaction.meta })
+        .from(interaction)
+        .where(eq(interaction.id, written.interactionId))
+    ).at(0)
+    if (!row || row.meta === null) throw new Error('no meta')
+    expect(readInteractionMeta(row.kind, row.meta)).toMatchObject({
+      ok: true,
+      meta: { bcc: ['priya@fund.example'] },
+    })
+  })
+
+  it('keeps the edge of a person also named in To', async () => {
+    const integrationId = await anIntegration()
+    const dana = await aPerson('Sam Ortiz', 'sam@flent.example')
+    const written = await db.transaction((tx) =>
+      writeIntegrationInteraction(tx, {
+        integrationId,
+        kind: 'email',
+        messageId: `<${randomUUID()}@fund.example>`,
+        threadId: null,
+        subject: null,
+        occurredAt: new Date('2026-10-08T10:44:00.000Z'),
+        meta: {
+          kind: 'email',
+          from: 'anish@fund.example',
+          to: ['sam@flent.example'],
+          cc: [],
+          bcc: ['SAM@flent.example'],
+          date: '2026-10-08T10:44:00.000Z',
+          mime_blob_sha: null,
+        },
+        body: null,
+        edges: [dana],
+      }),
+    )
+    if (written.kind !== 'written') throw new Error('not written')
+    expect(written.edges).toEqual([dana])
   })
 })

@@ -57,6 +57,7 @@ const emailMeta = z
     from: z.string(),
     to: z.array(z.string()),
     cc: z.array(z.string()),
+    bcc: z.array(z.string()).exactOptional(),
     date: z.string(),
     mime_blob_sha: z.string().nullable(),
     labels: z.array(z.string()).exactOptional(),
@@ -171,3 +172,20 @@ export function recorderSettingsJson(settings: RecorderSettings): {
     transcript: settings.transcript,
   }
 }
+
+/** One recipient chip on an `email_draft`, as the composer sends it. (D67) */
+const draftRecipientSchema = z
+  .object({
+    email: z.email().max(320),
+    entityId: z.uuid().exactOptional(),
+    name: z.string().max(400).exactOptional(),
+  })
+  .strict()
+
+/** A draft's recipients: one line of chips, at most 100. */
+export const draftRecipientsSchema = z.array(draftRecipientSchema).max(100)
+
+/** A draft's attachments: the documents it carries, at most 50. */
+export const draftAttachmentsSchema = z
+  .array(z.object({ documentId: z.uuid() }).strict())
+  .max(50)

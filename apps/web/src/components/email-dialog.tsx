@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { formatBytes } from '@spaces/core/documents'
 import { DocumentPreview } from '#/components/document-preview'
+import { DraftComposer } from '#/components/email/draft-composer'
 import { FileGlyph } from '#/components/files/file-glyph'
 import { LabelHead, LedgerRow } from '#/components/ledger-section'
 import { DensityRamp } from '#/components/dither'
@@ -20,6 +21,7 @@ import {
   getDocumentPreview,
   getEmail,
   listMembers,
+  openEmailReply,
   setEmailAudience,
 } from '#/lib/server-fns'
 import type {
@@ -28,7 +30,10 @@ import type {
   EmailDetail,
   EmailParticipant,
   EmailPrivacy,
+  ReplyOpening,
 } from '#/lib/server-fns'
+import { draftStateOf } from '#/lib/email/compose'
+import type { DraftState } from '#/lib/email/compose'
 import { fileType } from '#/lib/documents/files-tab'
 import { openModalId } from '#/lib/modal-search'
 import { stamp } from '#/lib/timeline/stamp'
@@ -43,6 +48,8 @@ import { stamp } from '#/lib/timeline/stamp'
  * - A body private to someone else is one line, never fetched. (D67)
  * - A body private by default carries its privacy row; its owner widens it
  *   from there, for `recordId` (the record it was opened from) or members.
+ * - Reply is the foot's primary: the draft grows under the message (E3),
+ *   which folds to one line, and the mode is a row of tabs.
  */
 export function EmailDialog({
   id,
@@ -387,6 +394,13 @@ function EmailWindow({
   > | null>(null)
   const [widening, setWidening] = useState(false)
   const [reads, setReads] = useState(0)
+  const [reply, setReply] = useState<{
+    modes: ReplyOpening['modes']
+    draft: DraftState
+    savedAt: string | null
+  } | null>(null)
+  const [replyError, setReplyError] = useState<string | null>(null)
+  const [unfolded, setUnfolded] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -410,11 +424,37 @@ function EmailWindow({
     if (doc) setViewer(doc)
   }
 
+  async function startReply() {
+    setReplyError(null)
+    try {
+      const opened = await openEmailReply({ data: { parentId: id } })
+      setUnfolded(false)
+      setReply(
+        opened.draft === null
+          ? {
+              modes: opened.modes,
+              draft: { ...opened.modes.reply, id: crypto.randomUUID() },
+              savedAt: null,
+            }
+          : {
+              modes: opened.modes,
+              draft: draftStateOf(opened.draft),
+              savedAt: opened.draft.updatedAt,
+            },
+      )
+    } catch (err) {
+      setReplyError(err instanceof Error ? err.message : 'Could not reply')
+    }
+  }
+
   const foot = (
-    <DialogFooter>
+    <DialogFooter {...(replyError === null ? {} : { note: replyError })}>
       <Button variant="outline" onClick={onClose}>
         Cancel
       </Button>
+      {email === null ? null : (
+        <Button onClick={() => void startReply()}>Reply</Button>
+      )}
     </DialogFooter>
   )
 
@@ -437,101 +477,95 @@ function EmailWindow({
     )
 
   const remote = remoteLine(email.body)
-  return (
+  const message = (
     <>
-      <DialogHeader>
-        <DialogTitle>{email.subject || 'Untitled'}</DialogTitle>
-        <DialogDescription>{stamp(email.occurredAt)}</DialogDescription>
-      </DialogHeader>
-
-      <div className="-mx-5 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-5">
-        <section aria-label="Participants" className="flex flex-col gap-1 px-3">
-          {email.from === null ? null : (
-            <Line label="from">
-              <Who p={email.from} />
-            </Line>
-          )}
-          {email.to.length === 0 ? null : (
-            <Line label="to">
-              {email.to.map((p) => (
-                <Who key={p.email} p={p} />
-              ))}
-            </Line>
-          )}
-          {email.cc.length === 0 ? null : (
-            <Line label="cc">
-              {email.cc.map((p) => (
-                <Who key={p.email} p={p} />
-              ))}
-            </Line>
-          )}
-          {email.via === null ? null : (
-            <Line label="via">
-              <span className="text-ui">{email.via}</span>
-            </Line>
-          )}
-          {email.privacy === null ? null : (
-            <PrivacyRow
-              privacy={email.privacy}
-              onWiden={() => setWidening(true)}
-            />
-          )}
-        </section>
-
-        <section aria-label="Message" className="flex flex-col gap-3">
-          <LabelHead label="Message">
-            {remote === null ? null : (
-              <span
-                data-remote-images
-                className="shrink-0 mono text-micro text-graphite"
-              >
-                {remote}
-              </span>
-            )}
-          </LabelHead>
-          <Body body={email.body} />
-        </section>
-
-        {email.attachments.length === 0 ? null : (
-          <section aria-label="Attachments" className="flex flex-col">
-            <LabelHead label="Attachments" />
-            <ol>
-              {email.attachments.map((a, i) => (
-                <LedgerRow
-                  key={a.documentId}
-                  last={i === email.attachments.length - 1}
-                >
-                  <button
-                    type="button"
-                    onClick={() => void openAttachment(a)}
-                    className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 px-3 text-left hover:bg-bone"
-                  >
-                    <FileGlyph
-                      type={fileType({
-                        filename: a.filename,
-                        mime: a.mime,
-                        externalUrl: null,
-                      })}
-                    />
-                    <span className="min-w-0 flex-1 truncate text-body">
-                      {a.name}
-                    </span>
-                    <span
-                      data-attachment-lane
-                      className="shrink-0 mono text-micro text-graphite"
-                    >
-                      {attachmentLane(a)}
-                    </span>
-                  </button>
-                </LedgerRow>
-              ))}
-            </ol>
-          </section>
+      <section aria-label="Participants" className="flex flex-col gap-1 px-3">
+        {email.from === null ? null : (
+          <Line label="from">
+            <Who p={email.from} />
+          </Line>
         )}
-      </div>
+        {email.to.length === 0 ? null : (
+          <Line label="to">
+            {email.to.map((p) => (
+              <Who key={p.email} p={p} />
+            ))}
+          </Line>
+        )}
+        {email.cc.length === 0 ? null : (
+          <Line label="cc">
+            {email.cc.map((p) => (
+              <Who key={p.email} p={p} />
+            ))}
+          </Line>
+        )}
+        {email.via === null ? null : (
+          <Line label="via">
+            <span className="text-ui">{email.via}</span>
+          </Line>
+        )}
+        {email.privacy === null ? null : (
+          <PrivacyRow
+            privacy={email.privacy}
+            onWiden={() => setWidening(true)}
+          />
+        )}
+      </section>
 
-      {foot}
+      <section aria-label="Message" className="flex flex-col gap-3">
+        <LabelHead label="Message">
+          {remote === null ? null : (
+            <span
+              data-remote-images
+              className="shrink-0 mono text-micro text-graphite"
+            >
+              {remote}
+            </span>
+          )}
+        </LabelHead>
+        <Body body={email.body} />
+      </section>
 
+      {email.attachments.length === 0 ? null : (
+        <section aria-label="Attachments" className="flex flex-col">
+          <LabelHead label="Attachments" />
+          <ol>
+            {email.attachments.map((a, i) => (
+              <LedgerRow
+                key={a.documentId}
+                last={i === email.attachments.length - 1}
+              >
+                <button
+                  type="button"
+                  onClick={() => void openAttachment(a)}
+                  className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 px-3 text-left hover:bg-bone"
+                >
+                  <FileGlyph
+                    type={fileType({
+                      filename: a.filename,
+                      mime: a.mime,
+                      externalUrl: null,
+                    })}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-body">
+                    {a.name}
+                  </span>
+                  <span
+                    data-attachment-lane
+                    className="shrink-0 mono text-micro text-graphite"
+                  >
+                    {attachmentLane(a)}
+                  </span>
+                </button>
+              </LedgerRow>
+            ))}
+          </ol>
+        </section>
+      )}
+    </>
+  )
+  const extras = (
+    <>
       <DocumentPreview
         doc={viewer}
         onOpenChange={(open) => {
@@ -548,5 +582,79 @@ function EmailWindow({
         />
       ) : null}
     </>
+  )
+  const head = (
+    <DialogHeader>
+      <DialogTitle>{email.subject || 'Untitled'}</DialogTitle>
+      <DialogDescription>{stamp(email.occurredAt)}</DialogDescription>
+    </DialogHeader>
+  )
+
+  if (reply !== null)
+    return (
+      <>
+        {head}
+        <DraftComposer
+          key={reply.draft.id}
+          initial={reply.draft}
+          savedAt={reply.savedAt}
+          modes={reply.modes}
+          recordId={recordId}
+          onClose={() => setReply(null)}
+          above={
+            unfolded ? (
+              <div className="flex flex-col gap-6 border-b border-rule px-5 py-4">
+                {message}
+              </div>
+            ) : (
+              <FoldedMessage email={email} onShow={() => setUnfolded(true)} />
+            )
+          }
+        />
+        {extras}
+      </>
+    )
+
+  return (
+    <>
+      {head}
+      <div className="-mx-5 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-5">
+        {message}
+      </div>
+      {foot}
+      {extras}
+    </>
+  )
+}
+
+/** The message folded to one line over a reply: sender, a preview, `show ›`. */
+function FoldedMessage({
+  email,
+  onShow,
+}: {
+  email: EmailDetail
+  onShow: () => void
+}) {
+  const files = email.attachments.length
+  const preview =
+    email.body.kind === 'text' ? email.body.text.replace(/\s+/g, ' ') : ''
+  return (
+    <button
+      type="button"
+      data-folded-message
+      onClick={onShow}
+      className="focus-ring-inset flex min-h-10 w-full shrink-0 items-center gap-3 border-b border-rule px-5 text-left hover:bg-bone"
+    >
+      <span className="shrink-0 text-ui">
+        {email.from?.name ?? email.from?.email ?? 'Unknown'}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-ui text-graphite">
+        {preview}
+      </span>
+      <span className="shrink-0 mono text-micro text-graphite">
+        {files > 0 ? `${String(files)} file${files === 1 ? '' : 's'} · ` : ''}
+        show ›
+      </span>
+    </button>
   )
 }
