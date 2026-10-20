@@ -18,14 +18,15 @@ import type {
   JobError,
   ScheduleInput,
 } from '@spaces/sdk'
-import { z } from 'zod'
 import { manifest } from './manifest.ts'
 import {
   BATCH_SIZE,
   BOUNDARY,
   GMAIL_BATCH,
   PAGE_SIZE,
+  QUOTA_REASONS,
   batchBody,
+  googleError,
   historyPage,
   isUserLabel,
   labelNames,
@@ -38,17 +39,10 @@ import {
   url,
 } from './messages.ts'
 import type { RawMessage } from './messages.ts'
+import { send } from './send.ts'
 
 /** A run that pages further than this is a provider bug, not a mailbox. */
 export const MAX_PAGES = 200
-
-/** A 403 reason that is a quota: back off and try again. */
-const QUOTA = new Set([
-  'rateLimitExceeded',
-  'userRateLimitExceeded',
-  'dailyLimitExceeded',
-  'quotaExceeded',
-])
 
 /** A 403 reason that is the grant itself: no retry will change it. */
 const REFUSAL = new Set([
@@ -64,31 +58,6 @@ type Failure =
   | JobPermanent
   | CursorInvalid
   | ConnectionRefused
-
-const envelope = z.object({
-  error: z.object({
-    message: z.string().optional(),
-    errors: z.array(z.object({ reason: z.string().optional() })).optional(),
-  }),
-})
-
-/** Google's error envelope: its words and its reasons; null when the body is not one. */
-const googleError = (
-  body: string,
-): { words: string | null; reasons: Array<string> } | null => {
-  try {
-    const parsed = envelope.safeParse(JSON.parse(body))
-    if (!parsed.success) return null
-    return {
-      words: parsed.data.error.message ?? null,
-      reasons: (parsed.data.error.errors ?? []).flatMap((e) =>
-        e.reason === undefined ? [] : [e.reason],
-      ),
-    }
-  } catch {
-    return null
-  }
-}
 
 /**
  * A non-200 answer as the job's outcome — the taxonomy google-calendar
@@ -114,7 +83,10 @@ const refused = (
     )
   const google = googleError(body)
   const reasons = google?.reasons ?? []
-  if (status === 429 || (status === 403 && reasons.some((r) => QUOTA.has(r)))) {
+  if (
+    status === 429 ||
+    (status === 403 && reasons.some((r) => QUOTA_REASONS.has(r)))
+  ) {
     const seconds = Number(headers['retry-after'] ?? '60')
     return Effect.fail(
       new JobRateLimited({
@@ -412,6 +384,6 @@ export const sync = Effect.fn('gmail.sync')(function* (input: ScheduleInput) {
   return { nextCursor }
 })
 
-export const jobs = { sync }
+export const jobs = { sync, send }
 
 export default definePlugin({ manifest, jobs })

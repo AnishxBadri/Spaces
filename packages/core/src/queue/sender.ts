@@ -1,6 +1,6 @@
 import { PgBoss } from 'pg-boss'
 import type { ConstructorOptions } from 'pg-boss'
-import type { EnqueueTarget, QueueName } from './names'
+import type { EnqueueTarget } from './names'
 
 /**
  * The sending half of the web→worker seam. A sender only ever *sends*: it
@@ -102,7 +102,10 @@ export type Sender = {
    * The jobs on `queue` carrying `singletonKey = key`, any state; `null` when
    * the queue is unreachable — the same non-fatal answer `enqueue` gives.
    */
-  jobsByKey: (queue: QueueName, key: string) => Promise<Array<QueuedJob> | null>
+  jobsByKey: (
+    queue: EnqueueTarget,
+    key: string,
+  ) => Promise<Array<QueuedJob> | null>
   /**
    * Stops the client if one was started, closing its pool; the next enqueue
    * connects again. Never rejects. A process-lifetime sender never calls it;

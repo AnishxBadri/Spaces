@@ -23,6 +23,7 @@ export type {
 } from '../interactions/email-drafts'
 export type { DraftRecipient, EmailDraftMode } from '@spaces/db/schema/drafts'
 export type { VariableReview } from '../interactions/email-variables'
+export type { EmailSender, Sent } from '../interactions/email-send'
 
 /**
  * The email window's read and its privacy writes. (D67)
@@ -224,5 +225,44 @@ export const reviewEmailVariables = createServerFn({ method: 'POST' })
       return await effectFn(reviewVariablesProgram)(data)
     } catch (failure) {
       throw new Error(variableMessage(failure))
+    }
+  })
+
+/** Whether the composer may send: the viewer's Gmail, or the account to reconnect. */
+export const getEmailSender = createServerFn()
+  .validator(z.object({ parentId: z.uuid().nullable().default(null) }))
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    const { emailSenderProgram } = await import('../interactions/email-send')
+    const { effectFn } = await import('./effect')
+    return effectFn(emailSenderProgram)({ id: user.id }, data.parentId)
+  })
+
+/**
+ * Send: the draft through the Gmail plugin, awaited. Review's fills come
+ * with it; the server resolves every variable again. (D67)
+ */
+export const sendEmailDraft = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      draftId: z.uuid(),
+      fills: z
+        .record(
+          z.string().max(320),
+          z.record(z.string().max(200), z.string().max(2000)),
+        )
+        .default({}),
+      accepted: z.array(z.string().max(320)).max(500).default([]),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    const { sendDraftLive, sendMessage } =
+      await import('../interactions/email-send')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(sendDraftLive)({ id: user.id }, data)
+    } catch (failure) {
+      throw new Error(sendMessage(failure))
     }
   })

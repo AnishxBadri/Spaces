@@ -33,19 +33,30 @@ describe('the gmail bundle', () => {
 })
 
 describe('the gmail manifest.json', () => {
-  it('is a syncer: one schedule job over a read-only mail connection', () => {
+  it('is a syncer and a sender over one mail connection', () => {
     const parsed = manifestSchema.parse(emitted)
     expect(parsed.id).toBe('gmail')
     expect(parsed.roles).toEqual(['email-calendar'])
     expect(satisfiesSdk(parsed.sdk)).toEqual({ ok: true })
     expect(parsed.provides).toBeUndefined()
     expect(parsed.requires).toEqual({
-      connection: { provider: 'google', scopes: ['gmail.readonly'] },
+      connection: {
+        provider: 'google',
+        scopes: ['gmail.readonly', 'gmail.send'],
+      },
     })
     expect(parsed.jobs).toEqual({
       sync: {
         trigger: 'schedule',
         schedule: '*/5 * * * *',
+        uses: ['Secrets', 'Http', 'Content', 'Log'],
+      },
+      send: {
+        trigger: 'action',
+        input: 'payload',
+        interactive: true,
+        retry: 0,
+        timeout: '120s',
         uses: ['Secrets', 'Http', 'Content', 'Log'],
       },
     })

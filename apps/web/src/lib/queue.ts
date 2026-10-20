@@ -1,6 +1,6 @@
 import { createSender } from '@spaces/core/queue/sender'
 import { requireEnv } from './server/env'
-import type { EnqueueTarget, QueueName } from '@spaces/core/queue/names'
+import type { EnqueueTarget } from '@spaces/core/queue/names'
 import type {
   EnqueueOptions,
   QueuedJob,
@@ -55,7 +55,7 @@ export async function enqueue(
  * be read (SPA-90's `readDeckStatus`).
  */
 export async function jobsByKey(
-  queue: QueueName,
+  queue: EnqueueTarget,
   key: string,
 ): Promise<Array<QueuedJob> | null> {
   const s = senderOrNull(queue)

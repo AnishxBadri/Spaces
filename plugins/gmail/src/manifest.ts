@@ -2,11 +2,15 @@ import { z } from 'zod'
 import { defineManifest } from '@spaces/sdk'
 
 /**
- * Gmail's manifest: a syncer.
- * - One `schedule` job. `uses` is a syncer's grant: the connection's token
- *   (Secrets), the provider (Http), the mail lane (Content) and Log — never
- *   Facts, Identity or Ai. Participants become records host-side.
- * - The connection asks `gmail.readonly` only; sending is a later job's.
+ * Gmail's manifest: a syncer and a sender.
+ * - `sync` is a `schedule` job. `uses` is a syncer's grant: the connection's
+ *   token (Secrets), the provider (Http), the mail lane (Content) and Log —
+ *   never Facts, Identity or Ai. Participants become records host-side.
+ * - `send` is an interactive payload action on the same four ports, never
+ *   retried: a retry could send twice. The host awaits it.
+ * - The connection asks `gmail.readonly` and `gmail.send` (D66, D67). A
+ *   connection made before `gmail.send` still syncs; the host checks the
+ *   scope before it sends, and the account page reconnects for it.
  * - The settings are the connection's, edited on its account page, and read
  *   by the host: whether bodies are shared (D67) and the exclude list. The
  *   defaults are the host's `DEFAULT_MAIL_EXCLUDE`, asserted equal.
@@ -48,7 +52,10 @@ export const manifest = defineManifest({
   description:
     'Adds your mail to the timelines of the people and companies in it, from the day you connect, with its attachments. Bodies stay visible to you alone unless you share them; subject, participants and date are visible to the workspace. Promotions, machine senders and anything you exclude are never synced.',
   requires: {
-    connection: { provider: 'google', scopes: ['gmail.readonly'] },
+    connection: {
+      provider: 'google',
+      scopes: ['gmail.readonly', 'gmail.send'],
+    },
   },
   settings: z.object({
     shareBodies: z
@@ -68,6 +75,14 @@ export const manifest = defineManifest({
     sync: {
       trigger: 'schedule',
       schedule: '*/5 * * * *',
+      uses: ['Secrets', 'Http', 'Content', 'Log'],
+    },
+    send: {
+      trigger: 'action',
+      input: 'payload',
+      interactive: true,
+      retry: 0,
+      timeout: '120s',
       uses: ['Secrets', 'Http', 'Content', 'Log'],
     },
   },

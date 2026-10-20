@@ -463,6 +463,45 @@ export type EmailClaim = {
   readonly snippet?: string
 }
 
+/**
+ * One message a mail plugin's send action is handed as `payload` (SDK 1.5):
+ * written and checked by the host — recipients, resolved variables,
+ * threading headers and files — so the plugin builds, sends and hands the
+ * sent copy to `Content.logEmail`.
+ * - `messageId` is minted by the host before the call, the dedupe key the
+ *   sent copy and a later sync both land on. Without angle brackets, as are
+ *   `inReplyTo` and `references`.
+ * - Each file is a short-lived URL to the host's blob backend, read through
+ *   `Http`; `sizeBytes` is what the host measured, and the files together
+ *   never exceed `OUTGOING_EMAIL_LIMIT_BYTES`.
+ */
+export type OutgoingEmail = {
+  readonly messageId: string
+  readonly from: EmailAddress
+  readonly to: ReadonlyArray<EmailAddress>
+  readonly cc: ReadonlyArray<EmailAddress>
+  readonly bcc: ReadonlyArray<EmailAddress>
+  readonly subject: string
+  /** The body as the author wrote it, markdown. */
+  readonly bodyMd: string
+  readonly inReplyTo: string | null
+  /** The thread's chain, oldest first; empty for a new email. */
+  readonly references: ReadonlyArray<string>
+  readonly attachments: ReadonlyArray<OutgoingAttachment>
+}
+
+export type EmailAddress = { readonly email: string; readonly name?: string }
+
+export type OutgoingAttachment = {
+  readonly filename: string
+  readonly mime: string
+  readonly url: string
+  readonly sizeBytes: number
+}
+
+/** The most an outgoing email's files may come to: Gmail's own limit. */
+export const OUTGOING_EMAIL_LIMIT_BYTES = 25 * 1024 * 1024
+
 /** What `Content.logEmail` decided. `duplicate`: the Message-ID was already held. */
 export type EmailResult =
   | { readonly outcome: 'created'; readonly interactionId: string }
@@ -685,6 +724,19 @@ export type ActionRun<TServices = unknown> = (
 ) => Effect.Effect<void, JobError, TServices>
 
 /**
+ * An action the host prepares and sends on no record — Send on an email
+ * draft (SDK 1.5). Its manifest entry says `input: 'payload'`, and the job
+ * is handed what the host's own caller built instead of `{ entityId }`.
+ * - The job decodes `payload` with its own schema and fails `JobPermanent`
+ *   on one it cannot read.
+ * - No credit guard and no record: no manifest `actions` entry may name it.
+ */
+export type PayloadActionInput = { readonly payload: JsonObject }
+export type PayloadActionRun<TServices = unknown> = (
+  input: PayloadActionInput,
+) => Effect.Effect<void, JobError, TServices>
+
+/**
  * The cost hook (D53): pure, in the provider's own unit. The host drops
  * entities with a fresh receipt, asks this about the rest, and refuses
  * before any API call when the estimate does not fit the daily cap.
@@ -807,9 +859,15 @@ export type WatchJob<TServices = unknown> = (
   input: WatchInput,
 ) => Effect.Effect<WatchOutput, JobError, TServices>
 
-/** A job's function (or object), by its trigger. */
-export type JobFor<TTrigger, TServices = unknown> = TTrigger extends 'action'
-  ? ActionJob<TServices>
+/** A job's function (or object), by its trigger and, for an action, its `input`. */
+export type JobFor<
+  TTrigger,
+  TServices = unknown,
+  TInput = undefined,
+> = TTrigger extends 'action'
+  ? TInput extends 'payload'
+    ? PayloadActionRun<TServices>
+    : ActionJob<TServices>
   : TTrigger extends 'schedule'
     ? ScheduleJob<TServices>
     : TTrigger extends 'event'

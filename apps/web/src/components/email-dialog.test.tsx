@@ -68,6 +68,7 @@ const fns = vi.hoisted(() => ({
   saveEmailDraft: vi.fn(),
   deleteEmailDraft: vi.fn(),
   searchEmailRecipients: vi.fn(),
+  getEmailSender: vi.fn(),
 }))
 const router = vi.hoisted(() => ({
   navigate: vi.fn(),
@@ -87,6 +88,7 @@ const HTML: EmailDetail = {
   from: { email: 'jane@acme-robotics.example', name: 'Jane Founder' },
   to: [{ email: 'anish@fund.example', name: null }],
   cc: [],
+  bcc: [],
   via: 'Anish',
   body: {
     kind: 'html',
@@ -126,6 +128,10 @@ beforeEach(() => {
   for (const f of Object.values(fns)) f.mockReset()
   router.navigate.mockReset()
   fns.getEmail.mockResolvedValue(HTML)
+  fns.getEmailSender.mockResolvedValue({
+    _tag: 'ready',
+    from: 'anish@fund.example',
+  })
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -166,6 +172,17 @@ describe('the email window', () => {
     expect(text).toContain('Jane Founder')
     expect(text).toContain('anish@fund.example')
     expect(text).toContain('acme-q3.pdf')
+  })
+
+  it('shows the sender their Bcc, each chip read as hidden', async () => {
+    fns.getEmail.mockResolvedValue({
+      ...HTML,
+      bcc: [{ email: 'priya@fund.example', name: 'Priya Nair' }],
+    })
+    await open()
+    const chip = dialog()?.querySelector('[data-bcc="priya@fund.example"]')
+    expect(chip?.textContent).toContain('Priya Nair')
+    expect(chip?.textContent).toContain('hidden')
   })
 
   it('renders the body in a frame sandboxed with no scripts and no forms', async () => {

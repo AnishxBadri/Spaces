@@ -370,6 +370,34 @@ describe('manifestSchema', () => {
       ])
     })
 
+    it('takes a payload action, on an action job only and never as a record’s button (SDK 1.5)', () => {
+      const m = base()
+      m.jobs.send = {
+        trigger: 'action',
+        input: 'payload',
+        interactive: true,
+        uses: ['Http'],
+      }
+      expect(issues(m)).toEqual([])
+      expect(
+        issues({
+          ...m,
+          actions: [{ id: 'send', label: 'Send', on: 'person', job: 'send' }],
+        }),
+      ).toEqual([
+        "actions.0.job: action send names job send, which takes the host's payload and runs on no record",
+      ])
+      m.jobs.send = {
+        trigger: 'schedule',
+        input: 'payload',
+        schedule: '0 * * * *',
+        uses: ['Http'],
+      }
+      expect(issues(m)).toEqual([
+        'jobs.send.input: input is only for an action job, and send is schedule',
+      ])
+    })
+
     it('takes the vocabulary keys an enrich action answers (SDK 1.5)', () => {
       const m = {
         ...base(),

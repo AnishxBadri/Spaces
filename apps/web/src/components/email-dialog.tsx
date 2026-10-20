@@ -499,6 +499,20 @@ function EmailWindow({
             ))}
           </Line>
         )}
+        {email.bcc.length === 0 ? null : (
+          <Line label="bcc">
+            {email.bcc.map((p) => (
+              <span
+                key={p.email}
+                data-bcc={p.email}
+                className="inline-flex items-baseline gap-1.5"
+              >
+                <Who p={p} />
+                <span className="mono text-micro text-graphite">hidden</span>
+              </span>
+            ))}
+          </Line>
+        )}
         {email.via === null ? null : (
           <Line label="via">
             <span className="text-ui">{email.via}</span>

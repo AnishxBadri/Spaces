@@ -108,6 +108,8 @@ export type PluginQueue = {
    * schedule job then runs once per such connection. Null for every other.
    */
   readonly keyed: string | null
+  /** An action declaring `input: 'payload'`: handed the host's payload, never credit-guarded. */
+  readonly payload: boolean
 }
 
 /**
@@ -183,6 +185,7 @@ export const pluginQueues = (
         : null,
     credit,
     keyed,
+    payload: declared.trigger === 'action' && declared.input === 'payload',
   }))
 }
 
@@ -403,6 +406,10 @@ export const runKeyedSchedule = (
 // ---------------------------------------------------------------------------
 
 const actionData = z.object({ entityId: z.uuid() })
+/** What the host sends a payload action: its own caller's prepared input. */
+const payloadActionData = z.object({
+  payload: z.record(z.string(), z.json()),
+})
 const scheduleData = z.object({})
 /** What core's dispatcher sends, one shape per `DOMAIN_EVENTS` name. */
 const eventBase = {
@@ -718,6 +725,20 @@ const workPlan = (
   const integrationRef = { integrationId }
   switch (plan.declared.trigger) {
     case 'action':
+      // Send on a draft: no record, so no credit guard and no entity ref.
+      if (plan.payload)
+        return work(
+          options,
+          {
+            ...common(plan),
+            schema: payloadActionData,
+            run: (data) =>
+              invoke(integrationId, plan.job, data).pipe(Effect.asVoid),
+            refs: () => integrationRef,
+          },
+          concurrency,
+          breaker,
+        )
       return work(
         options,
         {

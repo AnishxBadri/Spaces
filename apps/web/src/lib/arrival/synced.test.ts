@@ -200,6 +200,50 @@ describe('a synced message', () => {
     ])
   })
 
+  it('keeps a sent message’s Bcc in meta alone: no record, no edge (D67)', async () => {
+    const priya = (
+      await db
+        .insert(entity)
+        .values({ kind: 'person', canonicalName: 'Priya Nair' })
+        .returning({ id: entity.id })
+    ).at(0)
+    if (!priya) throw new Error('no person')
+    await db.insert(entityAlias).values({
+      entityId: priya.id,
+      kind: 'email',
+      value: 'priya@fund.example',
+      valueNorm: 'priya@fund.example',
+      isIdentity: true,
+    })
+    const m = message({
+      labelIds: ['SENT'],
+      from: `Anish <${OWNER_ADDRESS}>`,
+      to: ['Jane Founder <jane@acme-robotics.example>'],
+      cc: [],
+      headers: { Bcc: 'Priya Nair <priya@fund.example>, ops@new.example' },
+      subject: 'Re: Acme Robotics — Q3 update',
+      body: 'Thanks Jane.',
+    })
+    expect((await sync(m, ['Sent'])).outcome).toBe('created')
+    const row = await rowOf(m.messageId ?? '')
+    expect(row?.meta).toMatchObject({
+      kind: 'email',
+      from: OWNER_ADDRESS,
+      to: ['jane@acme-robotics.example'],
+      bcc: ['priya@fund.example', 'ops@new.example'],
+    })
+    const edged = await db
+      .select({ id: interactionEntity.entityId })
+      .from(interactionEntity)
+      .where(eq(interactionEntity.interactionId, row?.id ?? ''))
+    expect(edged.map((e) => e.id)).not.toContain(priya.id)
+    expect(edged.map((e) => e.id)).toContain(
+      await companyOf('acme-robotics.example'),
+    )
+    // A Bcc address no record holds is never made into one.
+    expect(await companyOf('new.example')).toBeNull()
+  })
+
   it('is refused when it was received before the mailbox was connected', async () => {
     const m = message({ receivedAt: Date.now() - 30 * 24 * HOUR })
     expect(await sync(m)).toEqual({

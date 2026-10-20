@@ -53,6 +53,11 @@ export type ArrivalMessage = {
    */
   to: Array<Address>
   cc: Array<Address>
+  /**
+   * Blind copies, on a message this mailbox sent: never participants, kept
+   * only in `meta.bcc` (D67). Empty on a true forward.
+   */
+  bcc: Array<Address>
   /** The plain-text body, stored as the interaction's note (D30). */
   body: string
   forwarded: boolean
@@ -175,6 +180,7 @@ export function toArrival(
         participants,
         to,
         cc,
+        bcc: addresses(parsed.bcc).filter(notMailbox),
         body: text.trim(),
         forwarded: false,
         attachments,
@@ -201,6 +207,7 @@ export function toArrival(
       participants,
       to,
       cc,
+      bcc: [],
       body: text.trim(),
       forwarded: true,
       attachments,

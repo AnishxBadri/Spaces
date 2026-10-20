@@ -8,6 +8,7 @@ import {
   resolveVariables,
 } from '@spaces/core/templates/variables'
 import type {
+  VariableContext,
   VariablePath,
   VariableRecord,
   VariableStats,
@@ -59,23 +60,26 @@ export function variableMessage(failure: unknown): string {
 const query = <T>(run: () => Promise<T>) =>
   Effect.tryPromise({ try: run, catch: (cause) => new DraftFailed({ cause }) })
 
-export const reviewVariablesProgram = Effect.fn('reviewVariablesProgram')(
-  function* (
-    input: ReviewInput,
-  ): Effect.fn.Return<VariableReview, DraftFailed | UnknownVariable> {
-    const text = `${input.subject}\n${input.bodyMd}`
-    const paths = parseVariables(text)
-    const attributes = yield* query(() => getRegistry('person'))
-    const unknown = checkVariables(paths, attributes)
-    if (unknown !== null) return yield* Effect.fail(unknown)
+/** What each recipient's variables resolve against, the paths checked first. */
+export type RecipientContexts = {
+  /** The record a recipient is, or null for an address no record holds. */
+  recordOf: (r: DraftRecipient) => VariableRecord | null
+  contextOf: (r: DraftRecipient) => VariableContext
+}
 
-    const seen = new Set<string>()
-    const recipients = [...input.to, ...input.cc, ...input.bcc].filter((r) => {
-      const key = r.email.toLowerCase()
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
+/**
+ * The records `recipients` resolve against: each person's values, their
+ * current company and their interaction stats. A path in `text` no
+ * attribute matches refuses, naming it.
+ */
+export const recipientContextsProgram = Effect.fn('recipientContexts')(
+  function* (
+    text: string,
+    recipients: ReadonlyArray<DraftRecipient>,
+  ): Effect.fn.Return<RecipientContexts, DraftFailed | UnknownVariable> {
+    const attributes = yield* query(() => getRegistry('person'))
+    const unknown = checkVariables(parseVariables(text), attributes)
+    if (unknown !== null) return yield* Effect.fail(unknown)
     const ids = [...new Set(recipients.flatMap((r) => r.entityId ?? []))]
     const people =
       ids.length === 0
@@ -187,20 +191,48 @@ export const reviewVariablesProgram = Effect.fn('reviewVariablesProgram')(
       }),
     )
 
+    const recordOf = (r: DraftRecipient) =>
+      r.entityId === undefined ? null : (records.get(r.entityId) ?? null)
+    return {
+      recordOf,
+      contextOf: (r) => ({
+        attributes,
+        record: recordOf(r),
+        names: (id) => names.get(id),
+      }),
+    }
+  },
+)
+
+/** Each address once, the first spelling kept: To, then Cc, then Bcc. */
+export function distinctRecipients(
+  lines: ReadonlyArray<ReadonlyArray<DraftRecipient>>,
+): Array<DraftRecipient> {
+  const seen = new Set<string>()
+  return lines.flat().filter((r) => {
+    const key = r.email.toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+export const reviewVariablesProgram = Effect.fn('reviewVariablesProgram')(
+  function* (
+    input: ReviewInput,
+  ): Effect.fn.Return<VariableReview, DraftFailed | UnknownVariable> {
+    const text = `${input.subject}\n${input.bodyMd}`
+    const paths = parseVariables(text)
+    const recipients = distinctRecipients([input.to, input.cc, input.bcc])
+    const contexts = yield* recipientContextsProgram(text, recipients)
     const rows: Array<ReviewRow> = []
     for (const r of recipients) {
-      const record =
-        r.entityId === undefined ? null : (records.get(r.entityId) ?? null)
-      const resolved = resolveVariables(text, {
-        attributes,
-        record,
-        names: (id) => names.get(id),
-      })
+      const resolved = resolveVariables(text, contexts.contextOf(r))
       if (resolved instanceof UnknownVariable)
         return yield* Effect.fail(resolved)
       rows.push({
         email: r.email,
-        name: record?.canonicalName ?? r.name ?? null,
+        name: contexts.recordOf(r)?.canonicalName ?? r.name ?? null,
         values: resolved.values,
         blanks: resolved.blanks,
       })

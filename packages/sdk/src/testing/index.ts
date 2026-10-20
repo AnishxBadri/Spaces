@@ -1022,15 +1022,17 @@ export type {
   GranolaApiRequest,
 } from './fake-granola-api.ts'
 
-// Gmail's messages, history, labels and batch endpoints over a fake mailbox
+// Gmail's messages, history, labels, batch and send endpoints over a fake mailbox
 export {
   makeFakeGmailApi,
   fakeGmailSeed,
   renderMessage,
   base64Url,
   fromBase64Url,
+  readSentMessage,
   GMAIL_API,
   GMAIL_BATCH,
+  GMAIL_UPLOAD,
   FAKE_GMAIL_OWNER,
   FAKE_GMAIL_TOKEN,
   FAKE_GMAIL_LABELS,
@@ -1042,6 +1044,8 @@ export type {
   FakeGmailMessage,
   FakeGmailAttachment,
   FakeGmailLabel,
+  FakeGmailSent,
+  FakeGmailSentPart,
   GmailApiRequest,
 } from './fake-gmail-api.ts'
 

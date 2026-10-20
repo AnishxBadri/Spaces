@@ -262,6 +262,7 @@ semver-frozen with the SDK; a new trigger is a minor.
 action:   run | { run, cost? }                                        // manifest actions[] — the "Enrich" button
             run:  (input: { entityId }) → Effect<void, JobError, R>
             cost: (input: { entityIds, fields? }) → { credits: number }   // D53, pure, action jobs only
+          with `input: 'payload'`: (input: { payload: JsonObject }) → Effect<void, JobError, R>   // host-prepared, no record: Send (D67, SDK 1.5)
 schedule: (input: { cursor: string | null }) → Effect<{ nextCursor: string | null }, JobError, R>   // Gmail, Calendar
 event:    (input: { event: DomainEvent }) → Effect<void, JobError, R>  // on: ['entity.created'] — enrich-on-create
 webhook:  (input: { payload, receivedAt }) → Effect<void, JobError, R>  // call recorders; §11 ingress

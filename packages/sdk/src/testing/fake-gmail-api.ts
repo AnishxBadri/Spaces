@@ -16,12 +16,21 @@ import type { FetchLike } from './fake-drive-api.ts'
  * - A history id older than the oldest kept answers 404, as Gmail's does.
  * - `deliver` is mail arriving after the connection; it reads as added to
  *   every older history id.
+ * - `messages.send` (the multipart upload) stores the client's bytes as
+ *   sent, Message-ID and Bcc kept as Gmail keeps them in the sender's copy,
+ *   and logs the parsed headers and parts; `rfc822msgid:` finds a message
+ *   by its Message-ID. `failNext` makes the next request a Google error.
+ * - A URL that is not Gmail's goes to `others` when given — the host's own
+ *   blob URLs an attachment is read from — and is a 404 otherwise.
  */
 
 export const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1'
 
 /** The batch endpoint: one multipart/mixed POST, up to 100 GETs inside. */
 export const GMAIL_BATCH = 'https://gmail.googleapis.com/batch/gmail/v1'
+
+/** The media upload root: `messages.send` with the message as bytes. */
+export const GMAIL_UPLOAD = 'https://gmail.googleapis.com/upload/gmail/v1'
 
 /** The connected mailbox's owner: the demo workspace's own address. */
 export const FAKE_GMAIL_OWNER = 'anish@fund.example'
@@ -64,7 +73,30 @@ export type FakeGmailLabel = {
   readonly type: 'system' | 'user'
 }
 
-/** One request the fake received. `path` is relative to `GMAIL_API`. */
+/** One leaf part of a sent message: a body or a file. */
+export type FakeGmailSentPart = {
+  /** The part's media type, lower-cased, without parameters. */
+  readonly contentType: string
+  /** The attachment's name; null for a body part. */
+  readonly filename: string | null
+  /** The decoded bytes. */
+  readonly bytes: Uint8Array
+}
+
+/** A message `messages.send` took, as the fake read it. */
+export type FakeGmailSent = {
+  /** The id the fake gave it. */
+  readonly id: string
+  /** The thread the request asked for; null when it named none. */
+  readonly threadId: string | null
+  /** Each header once, by lower-cased name, unfolded and decoded. */
+  readonly headers: Headers
+  readonly parts: ReadonlyArray<FakeGmailSentPart>
+  /** The RFC 5322 text as sent. */
+  readonly raw: string
+}
+
+/** One request the fake received. `path` is relative to `GMAIL_API`, or to `GMAIL_UPLOAD` for an upload. */
 export type GmailApiRequest = {
   readonly method: string
   readonly path: string
@@ -72,6 +104,8 @@ export type GmailApiRequest = {
   readonly query: { readonly [name: string]: string | undefined }
   /** True for a GET that arrived inside a batch. */
   readonly batched: boolean
+  /** The message, on a `messages.send` the fake accepted. */
+  readonly sent?: FakeGmailSent
 }
 
 export type FakeGmailApi = {
@@ -89,6 +123,13 @@ export type FakeGmailApi = {
   readonly rateLimit: (times: number, retryAfterSeconds: number) => void
   /** The token is revoked: every later request is a 401. */
   readonly revoke: () => void
+  /**
+   * The next request — the next to `path` when given — answers `status`
+   * with Google's envelope carrying `message`.
+   */
+  readonly failNext: (status: number, message: string, path?: string) => void
+  /** Every message `messages.send` took, in order. */
+  readonly sent: () => ReadonlyArray<FakeGmailSent>
 }
 
 export type FakeGmailApiOptions = {
@@ -98,6 +139,8 @@ export type FakeGmailApiOptions = {
   readonly now?: number
   readonly accessToken?: string
   readonly labels?: ReadonlyArray<FakeGmailLabel>
+  /** Where a request for any other URL goes; a 404 when absent. */
+  readonly others?: FetchLike
 }
 
 const MINUTE = 60 * 1000
@@ -319,6 +362,138 @@ export const renderMessage = (message: FakeGmailMessage): string => {
 }
 
 // ---------------------------------------------------------------------------
+// Reading a sent message
+// ---------------------------------------------------------------------------
+
+const ENCODED_WORD = /=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g
+
+/** RFC 2047 words (`=?UTF-8?B?…?=`) as text; anything else as written. */
+const decodeWords = (value: string): string =>
+  value
+    .replace(/\?=\s+=\?/g, '?==?')
+    .replace(
+      ENCODED_WORD,
+      (_, _charset: string, kind: string, text: string) => {
+        const bytes =
+          kind.toUpperCase() === 'B'
+            ? Uint8Array.from(atob(text), (c) => c.charCodeAt(0))
+            : Uint8Array.from(
+                text
+                  .replaceAll('_', ' ')
+                  .replace(/=([0-9A-F]{2})/gi, (__, h: string) =>
+                    String.fromCharCode(parseInt(h, 16)),
+                  ),
+                (c) => c.charCodeAt(0),
+              )
+        return new TextDecoder().decode(bytes)
+      },
+    )
+
+/** A message's headers by lower-cased name; a header it lacks reads as undefined. */
+type Headers = { readonly [name: string]: string | undefined }
+
+/** Head and body at the first blank line. */
+const splitAtBlank = (text: string): { head: string; body: string } => {
+  const blank = /\r?\n\r?\n/.exec(text)
+  return blank === null
+    ? { head: text, body: '' }
+    : {
+        head: text.slice(0, blank.index),
+        body: text.slice(blank.index + blank[0].length),
+      }
+}
+
+/** Header lines, unfolded, by lower-cased name; the first of a repeated name wins. */
+const headersOf = (head: string): Headers => {
+  const out: { [name: string]: string } = {}
+  for (const line of head.replace(/\r?\n[ \t]+/g, ' ').split(/\r?\n/)) {
+    const colon = line.indexOf(':')
+    if (colon <= 0) continue
+    const name = line.slice(0, colon).trim().toLowerCase()
+    if (!Object.hasOwn(out, name))
+      out[name] = decodeWords(line.slice(colon + 1).trim())
+  }
+  return out
+}
+
+/** A header parameter, an RFC 2231 `name*=UTF-8''…` one decoded. */
+const paramOf = (value: string, name: string): string | null => {
+  const extended = new RegExp(
+    `(?:^|;)\\s*${name}\\*=[^']*'[^']*'([^;\\s]+)`,
+    'i',
+  ).exec(value)
+  if (extended !== null) return decodeURIComponent(extended[1])
+  return (
+    new RegExp(`(?:^|;)\\s*${name}="?([^";]+)"?`, 'i').exec(value)?.[1] ?? null
+  )
+}
+
+const decodeBody = (body: string, encoding: string): Uint8Array => {
+  const kind = encoding.trim().toLowerCase()
+  if (kind === 'base64')
+    return Uint8Array.from(atob(body.replace(/\s+/g, '')), (c) =>
+      c.charCodeAt(0),
+    )
+  if (kind === 'quoted-printable')
+    return Uint8Array.from(
+      body
+        .replace(/=\r?\n/g, '')
+        .replace(/=([0-9A-F]{2})/gi, (_, h: string) =>
+          String.fromCharCode(parseInt(h, 16)),
+        ),
+      (c) => c.charCodeAt(0),
+    )
+  return new TextEncoder().encode(body)
+}
+
+/** Every leaf part, a multipart's children walked in order. */
+const leafParts = (
+  headers: Headers,
+  body: string,
+): Array<FakeGmailSentPart> => {
+  const type = headers['content-type'] ?? 'text/plain'
+  const media = type.split(';')[0].trim().toLowerCase()
+  if (media.startsWith('multipart/')) {
+    const boundary = paramOf(type, 'boundary')
+    if (boundary === null) return []
+    return body
+      .split(`--${boundary}`)
+      .slice(1)
+      .filter((chunk) => !chunk.startsWith('--'))
+      .flatMap((chunk) => {
+        const part = splitAtBlank(chunk.replace(/^\r?\n/, ''))
+        return leafParts(headersOf(part.head), part.body.replace(/\r?\n$/, ''))
+      })
+  }
+  const disposition = headers['content-disposition'] ?? ''
+  return [
+    {
+      contentType: media,
+      filename: paramOf(disposition, 'filename') ?? paramOf(type, 'name'),
+      bytes: decodeBody(body, headers['content-transfer-encoding'] ?? '7bit'),
+    },
+  ]
+}
+
+/** One RFC 5322 message → its headers and leaf parts. */
+export const readSentMessage = (
+  raw: string,
+): { headers: Headers; parts: Array<FakeGmailSentPart> } => {
+  const { head, body } = splitAtBlank(raw)
+  const headers = headersOf(head)
+  return { headers, parts: leafParts(headers, body) }
+}
+
+/** `a <x@y>, "B" <z@w>` → each address as written, split on top-level commas. */
+const addressList = (value: string | undefined): Array<string> =>
+  (value ?? '')
+    .split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)
+    .map((a) => a.trim())
+    .filter((a) => a !== '')
+
+const bare = (id: string): string => id.trim().replace(/^<|>$/g, '')
+
+// ---------------------------------------------------------------------------
 // The API
 // ---------------------------------------------------------------------------
 
@@ -353,11 +528,13 @@ const STATUS_TEXT: { readonly [status: number]: string } = {
   429: 'Too Many Requests',
 }
 
-type Stored = { message: FakeGmailMessage; historyId: number }
+/** `raw` is the client's own bytes, for a message `messages.send` took. */
+type Stored = { message: FakeGmailMessage; historyId: number; raw?: string }
 
 type Routed = { status: number; body: JsonValue }
 
 const AFTER = /^after:(\d+)$/
+const RFC822_ID = /^rfc822msgid:\s*<?([^<>\s]+)>?$/
 const MESSAGE = /^\/users\/me\/messages\/([^/]+)$/
 const PAGE_TOKEN = /^page-(\d+)$/
 
@@ -372,6 +549,9 @@ export const makeFakeGmailApi = (
   let floor = 0
   let revoked = false
   let limited = { times: 0, retryAfter: 1 }
+  let failing: { status: number; message: string; path: string | null } | null =
+    null
+  const sent: Array<FakeGmailSent> = []
 
   const deliver = (message: FakeGmailMessage) => {
     stored.set(message.id, { message, historyId: ++history })
@@ -382,7 +562,7 @@ export const makeFakeGmailApi = (
     deliver(message)
 
   const resource = (s: Stored, format: string): JsonValue => {
-    const raw = renderMessage(s.message)
+    const raw = s.raw ?? renderMessage(s.message)
     return {
       id: s.message.id,
       threadId: s.message.threadId ?? s.message.id,
@@ -418,23 +598,28 @@ export const makeFakeGmailApi = (
       }
     if (path === '/users/me/messages') {
       let after: number | null = null
+      let byId: string | null = null
       if (query.q !== undefined) {
         const parsed = AFTER.exec(query.q.trim())
-        if (parsed === null)
+        const rfc822 = RFC822_ID.exec(query.q.trim())
+        if (parsed === null && rfc822 === null)
           return {
             status: 400,
             body: {
               error: {
                 code: 400,
-                message: 'The fake reads after:<seconds> only.',
+                message:
+                  'The fake reads after:<seconds> and rfc822msgid:<id> only.',
               },
             },
           }
-        after = Number(parsed[1]) * 1000
+        if (parsed !== null) after = Number(parsed[1]) * 1000
+        if (rfc822 !== null) byId = rfc822[1]
       }
       const bins = query.includeSpamTrash === 'true' ? [] : ['SPAM', 'TRASH']
       const matching = [...stored.values()]
         .filter((s) => after === null || s.message.receivedAt > after)
+        .filter((s) => byId === null || s.message.messageId === byId)
         .filter((s) => !s.message.labelIds.some((id) => bins.includes(id)))
         .sort((a, b) => b.message.receivedAt - a.message.receivedAt)
       const offset = offsetOf(query.pageToken)
@@ -595,11 +780,112 @@ export const makeFakeGmailApi = (
     })
   }
 
+  /** `messages.send` as a multipart upload: the metadata, then the message. */
+  const send = (
+    query: { readonly [name: string]: string | undefined },
+    contentType: string,
+    body: string,
+  ): Response => {
+    if (query.uploadType !== 'multipart')
+      return gmailError(
+        400,
+        'badRequest',
+        'The fake takes uploadType=multipart.',
+      )
+    const boundary = paramOf(contentType, 'boundary')
+    if (boundary === null || !contentType.startsWith('multipart/related'))
+      return gmailError(400, 'badRequest', 'A send is multipart/related.')
+    const parts = body
+      .split(`--${boundary}`)
+      .slice(1)
+      .filter((p) => !p.startsWith('--'))
+      .map((chunk) => splitAtBlank(chunk.replace(/^\r?\n/, '')))
+    const metadata = parts.at(0)
+    const message = parts.at(1)
+    if (metadata === undefined || message === undefined)
+      return gmailError(
+        400,
+        'badRequest',
+        'A send carries metadata and a message.',
+      )
+    let threadId: string | null = null
+    try {
+      const meta: unknown = JSON.parse(metadata.body.trim() || '{}')
+      if (
+        typeof meta === 'object' &&
+        meta !== null &&
+        'threadId' in meta &&
+        typeof meta.threadId === 'string'
+      )
+        threadId = meta.threadId
+    } catch {
+      return gmailError(400, 'badRequest', 'The metadata part is not JSON.')
+    }
+    const raw = message.body.replace(/\r?\n$/, '')
+    const read = readSentMessage(raw)
+    const id = `m-sent-${String(sent.length + 1)}`
+    const thread =
+      threadId ??
+      [...stored.values()].find(
+        (s) =>
+          s.message.messageId !== undefined &&
+          (read.headers['in-reply-to'] ?? '').includes(s.message.messageId),
+      )?.message.threadId ??
+      id
+    const entry: FakeGmailSent = {
+      id,
+      threadId,
+      headers: read.headers,
+      parts: read.parts,
+      raw,
+    }
+    sent.push(entry)
+    const last = requests.at(-1)
+    if (last !== undefined)
+      requests[requests.length - 1] = { ...last, sent: entry }
+    const messageId = read.headers['message-id']
+    stored.set(id, {
+      message: {
+        id,
+        threadId: thread,
+        labelIds: ['SENT'],
+        receivedAt: Date.now(),
+        ...(messageId === undefined ? {} : { messageId: bare(messageId) }),
+        from: read.headers.from ?? '',
+        to: addressList(read.headers.to),
+        cc: addressList(read.headers.cc),
+        subject: read.headers.subject ?? '',
+        body: new TextDecoder().decode(
+          read.parts.find((p) => p.contentType === 'text/plain')?.bytes ??
+            new Uint8Array(),
+        ),
+      },
+      historyId: ++history,
+      raw,
+    })
+    return json(200, { id, threadId: thread, labelIds: ['SENT'] })
+  }
+
   const fetch: FetchLike = (url, init) => {
     const parsed = new URL(url)
-    const isBatch = `${parsed.origin}${parsed.pathname}` === GMAIL_BATCH
-    const isApi = `${parsed.origin}${parsed.pathname}`.startsWith(GMAIL_API)
-    if (!isBatch) record(init.method, parsed, false)
+    const at = `${parsed.origin}${parsed.pathname}`
+    const isBatch = at === GMAIL_BATCH
+    const isUpload = at.startsWith(GMAIL_UPLOAD)
+    const isApi = at.startsWith(GMAIL_API)
+    if (!isBatch && !isApi && !isUpload && options.others !== undefined)
+      return options.others(url, init)
+    if (isUpload) {
+      const query: { [name: string]: string } = {}
+      parsed.searchParams.forEach((value, name) => {
+        query[name] = value
+      })
+      requests.push({
+        method: init.method,
+        path: parsed.pathname.slice('/upload/gmail/v1'.length),
+        query,
+        batched: false,
+      })
+    } else if (!isBatch) record(init.method, parsed, false)
     else
       requests.push({
         method: init.method,
@@ -607,7 +893,7 @@ export const makeFakeGmailApi = (
         query: {},
         batched: false,
       })
-    if (!isBatch && !isApi)
+    if (!isBatch && !isApi && !isUpload)
       return Promise.resolve(
         gmailError(404, 'notFound', `${url} is not the Gmail API`),
       )
@@ -619,6 +905,14 @@ export const makeFakeGmailApi = (
       return Promise.resolve(
         gmailError(401, 'authError', 'Invalid Credentials'),
       )
+    const asked = requests.at(-1)?.path
+    if (failing !== null && (failing.path === null || failing.path === asked)) {
+      const { status, message } = failing
+      failing = null
+      return Promise.resolve(
+        gmailError(status, status >= 500 ? 'backendError' : 'failed', message),
+      )
+    }
     if (limited.times > 0) {
       limited = { ...limited, times: limited.times - 1 }
       return Promise.resolve(
@@ -633,6 +927,20 @@ export const makeFakeGmailApi = (
           gmailError(400, 'badRequest', 'A batch is a POST with a text body.'),
         )
       return Promise.resolve(batch(header('content-type') ?? '', init.body))
+    }
+    if (isUpload) {
+      const last = requests.at(-1)
+      if (init.method !== 'POST' || last?.path !== '/users/me/messages/send')
+        return Promise.resolve(
+          gmailError(404, 'notFound', `${url} is not served`),
+        )
+      const body =
+        typeof init.body === 'string'
+          ? init.body
+          : new TextDecoder().decode(init.body ?? new Uint8Array())
+      return Promise.resolve(
+        send(last.query, header('content-type') ?? '', body),
+      )
     }
     if (init.method !== 'GET')
       return Promise.resolve(
@@ -659,5 +967,9 @@ export const makeFakeGmailApi = (
     revoke: () => {
       revoked = true
     },
+    failNext: (status, message, path) => {
+      failing = { status, message, path: path ?? null }
+    },
+    sent: () => [...sent],
   }
 }

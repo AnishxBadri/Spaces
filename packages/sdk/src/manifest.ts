@@ -111,6 +111,9 @@ const jobSchema = z.strictObject({
     .optional(),
   retry: z.int().nonnegative().optional(),
   interactive: z.boolean().optional(),
+  // An action the host prepares and sends on no record — Send on a draft:
+  // its job is handed `{ payload }`, never `{ entityId }`. (SDK 1.5)
+  input: z.literal('payload').optional(),
   // A file job's claim on dropped files: a pattern, matched
   // case-insensitively against the filename, that web reads from the stored
   // manifest to route a drop without running plugin code. (SDK 1.1)
@@ -284,6 +287,13 @@ export const manifestSchema = z
               : `schedule is only for a schedule job, and ${name} is ${job.trigger}`,
         })
       }
+      if (job.input !== undefined && job.trigger !== 'action') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['jobs', name, 'input'],
+          message: `input is only for an action job, and ${name} is ${job.trigger}`,
+        })
+      }
       if (job.accepts !== undefined && job.trigger !== 'file') {
         ctx.addIssue({
           code: 'custom',
@@ -370,6 +380,12 @@ export const manifestSchema = z
           message: job
             ? `action ${action.id} names job ${action.job}, whose trigger is ${job.trigger}, not action`
             : `action ${action.id} names job ${action.job}, which the manifest does not declare`,
+        })
+      } else if (job.input === 'payload') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['actions', i, 'job'],
+          message: `action ${action.id} names job ${action.job}, which takes the host's payload and runs on no record`,
         })
       }
     })

@@ -141,6 +141,9 @@ export function emailMetaOf(
     from: message.from?.email ?? '',
     to: message.to.map((a) => a.email),
     cc: message.cc.map((a) => a.email),
+    ...(message.bcc.length === 0
+      ? {}
+      : { bcc: message.bcc.map((a) => a.email) }),
     date: message.occurredAt.toISOString(),
     mime_blob_sha: mimeBlobSha,
     ...(labels === null ? {} : { labels: [...labels] }),

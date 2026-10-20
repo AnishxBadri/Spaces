@@ -10,8 +10,9 @@ export type LifecycleHook = () => Effect.Effect<void, unknown, unknown>
 /**
  * One job per name the manifest declares — no more, no fewer — each typed by
  * the trigger its manifest entry declares (D51; the shapes are
- * `contract.ts`'s). A `schedule` job must hand back `{ nextCursor }`, and
- * only an `action` job may carry `cost` (D53).
+ * `contract.ts`'s). A `schedule` job must hand back `{ nextCursor }`, only
+ * an `action` job may carry `cost` (D53), and an action declaring `input:
+ * 'payload'` is handed `{ payload }` (SDK 1.5).
  *
  * And each job's `R` is bounded by its `uses` (D51, sdk-5): the services it
  * may require are exactly the ports it declared, so a job that yields `Facts`
@@ -21,7 +22,10 @@ export type LifecycleHook = () => Effect.Effect<void, unknown, unknown>
 export type PluginJobs<TManifest extends AuthoredManifest> = {
   readonly [K in keyof TManifest['jobs']]: JobFor<
     TManifest['jobs'][K]['trigger'],
-    PortService<TManifest['jobs'][K]['uses'][number]>
+    PortService<TManifest['jobs'][K]['uses'][number]>,
+    TManifest['jobs'][K] extends { readonly input: 'payload' }
+      ? 'payload'
+      : undefined
   >
 }
 

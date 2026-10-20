@@ -33,14 +33,17 @@ import {
 import type { DraftState, ReviewChoices } from '#/lib/email/compose'
 import {
   deleteEmailDraft,
+  getEmailSender,
   getEmailTemplate,
   listRecordDocuments,
   reviewEmailVariables,
   saveEmailAsTemplate,
   saveEmailDraft,
+  sendEmailDraft,
 } from '#/lib/server-fns'
 import type {
   DraftDocument,
+  EmailSender,
   ReplyOpening,
   VariableReview,
 } from '#/lib/server-fns'
@@ -56,8 +59,10 @@ import { VariableReviewTable } from './variable-review'
  *   printed key.
  * - A draft with `{{variables}}` reviews before it sends: the primary is
  *   Review, and Send appears once no recipient's row has an open blank.
- * - Send saves the draft until the Gmail send lane exists to hand it, and
- *   the Review's fills, to.
+ * - Send saves the draft, then hands its id and Review's fills to the
+ *   Gmail plugin and waits; a failure keeps the draft and shows Gmail's
+ *   words. Without a mailbox that may send, the primary is the line that
+ *   says which account to reconnect.
  */
 
 type ReplyMode = keyof ReplyOpening['modes']
@@ -78,6 +83,48 @@ export function savedLine(iso: string | null): string | null {
 
 const plural = (n: number, noun: string) =>
   `${String(n)} ${noun}${n === 1 ? '' : 's'}`
+
+/** Review's fills as the send takes them: typed cells only. */
+function typedFills(choices: ReviewChoices) {
+  const out: Record<string, Record<string, string>> = {}
+  for (const [email, row] of Object.entries(choices.fills)) {
+    const cells: Record<string, string> = {}
+    for (const [path, value] of Object.entries(row ?? {}))
+      if (value !== undefined && value.trim() !== '') cells[path] = value
+    out[email] = cells
+  }
+  return out
+}
+
+const COULD_NOT_READ: EmailSender = {
+  _tag: 'unavailable',
+  reason: 'Could not read your mailbox',
+  href: null,
+}
+
+/** In the primary's place when there is nothing to send with. */
+function SendBlocked({ sender }: { sender: EmailSender }) {
+  if (sender._tag === 'ready') return null
+  const href =
+    sender._tag === 'reconnect'
+      ? `/settings/email-calendar/${sender.connectionId}`
+      : sender.href
+  const words =
+    sender._tag === 'reconnect' ? 'Reconnect Gmail to send' : sender.reason
+  return href === null ? (
+    <span data-send-blocked className="mono text-micro text-graphite">
+      {words}
+    </span>
+  ) : (
+    <a
+      data-send-blocked
+      href={href}
+      className="focus-ring mono text-micro text-primary hover:underline"
+    >
+      {words} ›
+    </a>
+  )
+}
 
 export function DraftComposer({
   initial,
@@ -111,6 +158,7 @@ export function DraftComposer({
   const [choices, setChoices] = useState<ReviewChoices>(NO_CHOICES)
   const [reviewing, setReviewing] = useState(false)
   const [templating, setTemplating] = useState(false)
+  const [sender, setSender] = useState<EmailSender | null>(null)
   const { confirm, confirmDialog } = useConfirm()
   const inflight = useRef<Promise<void>>(Promise.resolve())
 
@@ -128,6 +176,21 @@ export function DraftComposer({
     return run
   }
   const autosave = useDraftAutosave(draft, dirty, save)
+
+  const parentId = initial.inReplyToId
+  useEffect(() => {
+    let live = true
+    getEmailSender({ data: { parentId } })
+      .then((s) => {
+        if (live) setSender(s)
+      })
+      .catch(() => {
+        if (live) setSender(COULD_NOT_READ)
+      })
+    return () => {
+      live = false
+    }
+  }, [parentId])
 
   function edit(next: Partial<DraftState>) {
     setDraft((d) => ({ ...d, ...next }))
@@ -151,10 +214,23 @@ export function DraftComposer({
     setSending(true)
     autosave.cancel()
     await inflight.current
-    await save(draft)
-    setSending(false)
-    toast('Saved to Drafts')
-    onClose()
+    try {
+      const saved = await saveEmailDraft({ data: saveInput(draft) })
+      setSavedAt(saved.updatedAt)
+      onSaved?.(saved.updatedAt)
+      const sent = await sendEmailDraft({
+        data: {
+          draftId: draft.id,
+          fills: typedFills(choices),
+          accepted: [...choices.accepted],
+        },
+      })
+      toast(sent.sent === 1 ? 'Sent' : `Sent ${plural(sent.sent, 'email')}`)
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send')
+      setSending(false)
+    }
   }
 
   async function startReview() {
@@ -226,9 +302,10 @@ export function DraftComposer({
       : review.rows.reduce((sum, r) => sum + openBlanks(r, choices).length, 0)
   const sendable = review === null ? !variables : open === 0
   const busy = sending || reviewing
+  const blocked = sender !== null && sender._tag !== 'ready'
 
   function primary() {
-    if (busy) return
+    if (busy || blocked || sender === null) return
     if (sendable) void send()
     else if (review === null) void startReview()
   }
@@ -418,21 +495,23 @@ export function DraftComposer({
             Back
           </Button>
         )}
-        {sendable ? (
+        {sender !== null && blocked ? (
+          <SendBlocked sender={sender} />
+        ) : sendable ? (
           <Button
             type="button"
             pending={sending}
-            disabled={busy}
+            disabled={busy || sender === null}
             onClick={primary}
           >
-            {sending ? 'Saving…' : 'Send'}
+            {sending ? 'Sending…' : 'Send'}
             <KeyHint>⌘↵</KeyHint>
           </Button>
         ) : review === null ? (
           <Button
             type="button"
             pending={reviewing}
-            disabled={busy}
+            disabled={busy || sender === null}
             onClick={primary}
           >
             Review

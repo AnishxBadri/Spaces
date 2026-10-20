@@ -13,7 +13,9 @@ import { DraftComposer } from './draft-composer'
  * chip, one save per pause rather than per keystroke, the save a close
  * leaves behind, Trash, ⌘↵ as the one printed key, and Review: a draft with
  * variables shows recipients × variables with blanks flagged, and Send is
- * absent until each blank is filled or accepted.
+ * absent until each blank is filled or accepted. Send hands the draft's id
+ * and Review's fills over; a mailbox without `gmail.send` has no Send and
+ * names the account to reconnect; a failure keeps the composer open.
  */
 
 await vi.hoisted(async () => {
@@ -65,6 +67,8 @@ const fns = vi.hoisted(() => ({
   getEmailTemplate: vi.fn(),
   saveEmailAsTemplate: vi.fn(),
   listTemplates: vi.fn(),
+  getEmailSender: vi.fn(),
+  sendEmailDraft: vi.fn(),
 }))
 vi.mock('#/lib/server-fns', () => fns)
 
@@ -82,6 +86,11 @@ beforeEach(() => {
   })
   fns.deleteEmailDraft.mockResolvedValue({ ok: true })
   fns.searchEmailRecipients.mockResolvedValue([])
+  fns.getEmailSender.mockResolvedValue({
+    _tag: 'ready',
+    from: 'anish@fund.example',
+  })
+  fns.sendEmailDraft.mockResolvedValue({ sent: 1, interactionIds: ['i1'] })
   closed = vi.fn<() => void>()
   host = document.createElement('div')
   document.body.append(host)
@@ -338,16 +347,22 @@ describe('Review', () => {
 
   it('sends a draft with no variables without a Review', async () => {
     mount({ ...blankDraft(ID), to: [DANA], bodyMd: 'Thanks Dana' })
+    await settle()
     expect(button('Review⌘↵')).toBeUndefined()
     act(() => sendButton()?.click())
     await settle()
     expect(fns.reviewEmailVariables).not.toHaveBeenCalled()
     expect(fns.saveEmailDraft).toHaveBeenCalledTimes(1)
+    expect(fns.sendEmailDraft).toHaveBeenCalledWith({
+      data: { draftId: ID, fills: {}, accepted: [] },
+    })
+    expect(closed).toHaveBeenCalledTimes(1)
   })
 
   it('reviews a draft with variables and flags the blank row; Send is absent', async () => {
     fns.reviewEmailVariables.mockResolvedValue(review)
     mount(withVariables)
+    await settle()
     expect(sendButton()).toBeUndefined()
     act(() => button('Review⌘↵')?.click())
     await settle()
@@ -374,9 +389,10 @@ describe('Review', () => {
     )
   })
 
-  it('shows Send once the blank is filled', async () => {
+  it('shows Send once the blank is filled, and sends the fill with the draft', async () => {
     fns.reviewEmailVariables.mockResolvedValue(review)
     mount(withVariables)
+    await settle()
     act(() => button('Review⌘↵')?.click())
     await settle()
     const cell = document.querySelector(
@@ -387,11 +403,22 @@ describe('Review', () => {
     expect(sendButton()).not.toBeUndefined()
     type(cell, '  ')
     expect(sendButton()).toBeUndefined()
+    type(cell, 'Arjun')
+    act(() => sendButton()?.click())
+    await settle()
+    expect(fns.sendEmailDraft).toHaveBeenCalledWith({
+      data: {
+        draftId: ID,
+        fills: { [ARJUN.email]: { 'name.first': 'Arjun' } },
+        accepted: [],
+      },
+    })
   })
 
   it('shows Send once the blank is accepted, and ⌘↵ sends then', async () => {
     fns.reviewEmailVariables.mockResolvedValue(review)
     mount(withVariables)
+    await settle()
     act(() => button('Review⌘↵')?.click())
     await settle()
     const tick = document.querySelector(
@@ -412,6 +439,9 @@ describe('Review', () => {
     })
     await settle()
     expect(fns.saveEmailDraft).toHaveBeenCalled()
+    expect(fns.sendEmailDraft).toHaveBeenCalledWith({
+      data: { draftId: ID, fills: {}, accepted: [ARJUN.email] },
+    })
     expect(closed).toHaveBeenCalledTimes(1)
   })
 
@@ -420,6 +450,7 @@ describe('Review', () => {
       new Error('No attribute matches {{favourite_colour}}'),
     )
     mount({ ...withVariables, bodyMd: 'Hi {{favourite_colour}}' })
+    await settle()
     act(() => button('Review⌘↵')?.click())
     await settle()
     expect(document.querySelector('[role="alert"]')?.textContent).toBe(
@@ -432,6 +463,7 @@ describe('Review', () => {
   it('Back returns to the draft and keeps the fills', async () => {
     fns.reviewEmailVariables.mockResolvedValue(review)
     mount(withVariables)
+    await settle()
     act(() => button('Review⌘↵')?.click())
     await settle()
     type(
@@ -443,5 +475,71 @@ describe('Review', () => {
     act(() => button('Review⌘↵')?.click())
     await settle()
     expect(sendButton()).not.toBeUndefined()
+  })
+})
+
+describe('Send', () => {
+  const DANA = {
+    email: 'dana@flent.example',
+    entityId: '00000000-0000-4000-8000-0000000000e2',
+    name: 'Dana Moreau',
+  }
+  const CONNECTION = '00000000-0000-4000-8000-0000000000c1'
+
+  it('is absent when the mailbox lacks gmail.send, and the line names Gmail and its account page', async () => {
+    fns.getEmailSender.mockResolvedValue({
+      _tag: 'reconnect',
+      from: 'anish@fund.example',
+      connectionId: CONNECTION,
+    })
+    mount({ ...blankDraft(ID), to: [DANA], bodyMd: 'Thanks Dana' })
+    await settle()
+    expect(button('Send⌘↵')).toBeUndefined()
+    const line = document.querySelector('[data-send-blocked]')
+    expect(line?.textContent).toBe('Reconnect Gmail to send ›')
+    expect(line?.getAttribute('href')).toBe(
+      `/settings/email-calendar/${CONNECTION}`,
+    )
+    act(() => {
+      body()?.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Enter',
+          metaKey: true,
+          bubbles: true,
+        }),
+      )
+    })
+    await settle()
+    expect(fns.sendEmailDraft).not.toHaveBeenCalled()
+  })
+
+  it('says to connect Gmail when there is no mailbox at all', async () => {
+    fns.getEmailSender.mockResolvedValue({
+      _tag: 'unavailable',
+      reason: 'Connect Gmail to send',
+      href: '/settings/email-calendar',
+    })
+    mount({ ...blankDraft(ID), to: [DANA] })
+    await settle()
+    expect(button('Send⌘↵')).toBeUndefined()
+    expect(
+      document.querySelector('[data-send-blocked]')?.getAttribute('href'),
+    ).toBe('/settings/email-calendar')
+  })
+
+  it('keeps the composer open with Gmail’s words when the send fails', async () => {
+    fns.sendEmailDraft.mockRejectedValue(
+      new Error('Gmail answered 503: Backend Error. The draft is kept'),
+    )
+    mount({ ...blankDraft(ID), to: [DANA], bodyMd: 'Thanks Dana' })
+    await settle()
+    act(() => button('Send⌘↵')?.click())
+    await settle()
+    expect(document.querySelector('[role="alert"]')?.textContent).toBe(
+      'Gmail answered 503: Backend Error. The draft is kept',
+    )
+    expect(closed).not.toHaveBeenCalled()
+    expect(fns.deleteEmailDraft).not.toHaveBeenCalled()
+    expect(button('Send⌘↵')).not.toBeUndefined()
   })
 })

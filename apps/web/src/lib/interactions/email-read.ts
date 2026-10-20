@@ -80,6 +80,8 @@ export type EmailDetail = {
   from: EmailParticipant | null
   to: Array<EmailParticipant>
   cc: Array<EmailParticipant>
+  /** Blind copies: the sender's alone, empty for anyone else. (D67) */
+  bcc: Array<EmailParticipant>
   /** Whose mailbox it came through: the body note's author. */
   via: string | null
   body: EmailBody
@@ -166,10 +168,13 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
   if (!row) return yield* new EmailNotFound({ id })
 
   const meta = row.meta?.kind === 'email' ? row.meta : null
+  // A Bcc is the sending mailbox's own: nobody else sees it.
+  const bcc = row.authorId === viewer.id ? (meta?.bcc ?? []) : []
   const names = yield* namesOf([
     ...(meta?.from ? [meta.from] : []),
     ...(meta?.to ?? []),
     ...(meta?.cc ?? []),
+    ...bcc,
   ])
   const participant = (email: string): EmailParticipant => ({
     email,
@@ -239,6 +244,7 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
     from: meta?.from ? participant(meta.from) : null,
     to: (meta?.to ?? []).map(participant),
     cc: (meta?.cc ?? []).map(participant),
+    bcc: bcc.map(participant),
     via: row.authorName,
     body,
     attachments,

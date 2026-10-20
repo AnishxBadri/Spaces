@@ -8,6 +8,16 @@ import { z } from 'zod'
 export const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1'
 export const GMAIL_BATCH = 'https://gmail.googleapis.com/batch/gmail/v1'
 
+/** `messages.send` as a multipart upload: room for 25 MB of files. */
+export const GMAIL_SEND =
+  'https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=multipart'
+
+/** What `messages.send` answers: the mailbox's id for the message and its thread. */
+export const sentRef = z.object({
+  id: z.string().min(1),
+  threadId: z.string().min(1).optional(),
+})
+
 /** Gets per batch: Gmail allows 100 and throttles above 50. */
 export const BATCH_SIZE = 50
 
@@ -195,4 +205,37 @@ export const parseBatch = (
     })
   }
   return parts
+}
+
+/** A 403 reason that is a quota: back off and try again. */
+export const QUOTA_REASONS: ReadonlySet<string> = new Set([
+  'rateLimitExceeded',
+  'userRateLimitExceeded',
+  'dailyLimitExceeded',
+  'quotaExceeded',
+])
+
+const envelope = z.object({
+  error: z.object({
+    message: z.string().optional(),
+    errors: z.array(z.object({ reason: z.string().optional() })).optional(),
+  }),
+})
+
+/** Google's error envelope: its words and its reasons; null when the body is not one. */
+export const googleError = (
+  body: string,
+): { words: string | null; reasons: Array<string> } | null => {
+  try {
+    const parsed = envelope.safeParse(JSON.parse(body))
+    if (!parsed.success) return null
+    return {
+      words: parsed.data.error.message ?? null,
+      reasons: (parsed.data.error.errors ?? []).flatMap((e) =>
+        e.reason === undefined ? [] : [e.reason],
+      ),
+    }
+  } catch {
+    return null
+  }
 }

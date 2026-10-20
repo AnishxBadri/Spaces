@@ -23,17 +23,20 @@ type Services<T> =
   T extends Effect.Effect<unknown, unknown, infer R> ? R : never
 
 type Sync = Services<ReturnType<typeof jobs.sync>>
+type Send = Services<ReturnType<typeof jobs.send>>
 
 const SYNCER = ['Secrets', 'Http', 'Content', 'Log']
 
-describe('the ports the sync job needs', () => {
+describe('the ports the sync and send jobs need', () => {
   it('are exactly the four a syncer is granted', () => {
     expectTypeOf<Sync>().toEqualTypeOf<Secrets | Http | Content | Log>()
     expectTypeOf<Extract<Sync, Facts | Identity | Ai>>().toBeNever()
+    expectTypeOf<Send>().toEqualTypeOf<Secrets | Http | Content | Log>()
   })
 
   it('are what the job declares, and Facts, Identity and Ai are not', () => {
     expect([...manifest.jobs.sync.uses].sort()).toEqual([...SYNCER].sort())
+    expect([...manifest.jobs.send.uses].sort()).toEqual([...SYNCER].sort())
     for (const withheld of ['Facts', 'Identity', 'Ai'])
       expect(manifest.jobs.sync.uses).not.toContain(withheld)
   })
@@ -47,6 +50,7 @@ describe('the ports the sync job needs', () => {
           schedule: '*/5 * * * *',
           uses: ['Secrets', 'Http', 'Log'],
         },
+        send: manifest.jobs.send,
       },
     })
     // @ts-expect-error — sync yields Content, which these uses do not grant

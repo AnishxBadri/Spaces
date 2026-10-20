@@ -52,9 +52,13 @@ const CALENDARS: { readonly [pluginId: string]: () => FakeCalendarApi } = {
   'google-calendar': () => makeFakeCalendarApi(),
 }
 
-/** The mailbox a mail syncer reads, laid out around the moment it is first asked for. */
+/**
+ * The mailbox a mail syncer reads, laid out around the moment it is first
+ * asked for. A send's files are the host's own blob URLs, which the fake
+ * hands to the real `fetch`: they never leave this deployment.
+ */
 const MAILBOXES: { readonly [pluginId: string]: () => FakeGmailApi } = {
-  gmail: () => makeFakeGmailApi(),
+  gmail: () => makeFakeGmailApi({ others: (url, init) => fetch(url, init) }),
 }
 
 /** A keyed recorder's notes and folders, laid out around the moment it is first asked for (D78). */

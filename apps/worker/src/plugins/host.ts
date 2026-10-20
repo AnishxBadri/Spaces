@@ -29,6 +29,7 @@ import {
 import type {
   ActionInput,
   EventInput,
+  PayloadActionInput,
   FileInput,
   JobError,
   PortName,
@@ -98,6 +99,7 @@ import type { PluginQueue, PluginQueuesOptions } from './queues'
 /** What a job is handed, by its trigger. */
 export type JobInput =
   | ActionInput
+  | PayloadActionInput
   | ScheduleInput
   | EventInput
   | WebhookInput

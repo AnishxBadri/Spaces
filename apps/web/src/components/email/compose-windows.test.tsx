@@ -50,6 +50,7 @@ await vi.hoisted(async () => {
 
 const fns = vi.hoisted(() => ({
   listEmailDrafts: vi.fn(),
+  getEmailSender: vi.fn(),
   deleteEmailDraft: vi.fn(),
   getEmailDraft: vi.fn(),
   saveEmailDraft: vi.fn(),
@@ -88,6 +89,10 @@ beforeEach(() => {
   for (const f of Object.values(fns)) f.mockReset()
   fns.listEmailDrafts.mockResolvedValue(ROWS)
   fns.deleteEmailDraft.mockResolvedValue({ ok: true })
+  fns.getEmailSender.mockResolvedValue({
+    _tag: 'ready',
+    from: 'anish@fund.example',
+  })
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
