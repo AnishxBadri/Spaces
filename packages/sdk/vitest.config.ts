@@ -8,5 +8,8 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     environment: 'node',
+    // fence.test's first lintText loads the workspace eslint config; on a
+    // cold CI runner beside turbo's other test tasks that passes 5 s.
+    testTimeout: 60_000,
   },
 })
