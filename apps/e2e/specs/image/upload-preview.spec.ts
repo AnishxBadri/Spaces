@@ -104,7 +104,8 @@ test('a PDF previews on a canvas, never as a navigation, and downloads as an opa
 }) => {
   const external = offOrigin(page, imageUrl)
   await openCompany(page, imageUrl)
-  const here = page.url()
+  // The path, not the URL: `upload` opens the Files tab, which `?tab=` names.
+  const here = new URL(page.url()).pathname
 
   // Every request that touches a blob, and whether the browser treated it
   // as a navigation — the preview must only ever fetch() the bytes.
@@ -122,7 +123,7 @@ test('a PDF previews on a canvas, never as a navigation, and downloads as an opa
   await expect
     .poll(() => canvas.evaluate((c: HTMLCanvasElement) => c.width))
     .toBeGreaterThan(0)
-  expect(page.url()).toBe(here)
+  expect(new URL(page.url()).pathname).toBe(here)
   expect(blobRequests.length).toBeGreaterThan(0)
   expect(blobRequests.filter((r) => r.isNavigationRequest())).toEqual([])
   await page.keyboard.press('Escape')
@@ -139,6 +140,6 @@ test('a PDF previews on a canvas, never as a navigation, and downloads as an opa
   expect(res.headers()['content-type']).toBe('application/octet-stream')
   expect(res.headers()['content-disposition']).toMatch(/^attachment;/)
   expect((await download).suggestedFilename()).toBe(PDF.file)
-  expect(page.url()).toBe(here)
+  expect(new URL(page.url()).pathname).toBe(here)
   expect(external).toEqual([])
 })

@@ -478,15 +478,21 @@ jobs:
           docker restart plugboot
           # Not wait_worker: the heartbeat from before the restart is still
           # fresh. The verdicts are the signal — printed before any queue.
+          # Distinct verdicts only: `docker logs` spans both boots, a boot
+          # reconciles twice (at start, then as the plugin_changed listener
+          # connects) and prints `wired` and `listening` lines beside them.
+          verdicts() { docker logs plugboot 2>&1 | grep -E '^\[plugins\] [^ ]+( [^ ]+)?: (enabled|degraded)' | sort -u; }
           for _ in $(seq 1 90); do
-            [ "$(docker logs plugboot 2>&1 | grep -cF '[plugins]')" -ge 4 ] && break
+            [ "$(verdicts | wc -l)" -ge 4 ] && break
             sleep 2
           done
-          docker logs plugboot 2>&1 | grep -F '[plugins]' | tee verdicts.txt
+          verdicts | tee verdicts.txt
           wait_worker
+          SDK="$(sed -n "s/^export const SDK_VERSION = '\([^']*\)'.*/\1/p" packages/sdk/src/version.ts)"
+          [ -n "$SDK" ]
           grep -xF '[plugins] echo 0.1.0: enabled (unpinned: no lock.json entry)' verdicts.txt
           grep -xF '[plugins] needs-key: degraded — missing credential' verdicts.txt
-          grep -xF '[plugins] old-sdk: degraded — requires sdk ^2.0, host provides 1.0.0' verdicts.txt
+          grep -xF "[plugins] old-sdk: degraded — requires sdk ^2.0, host provides $SDK" verdicts.txt
           grep -xF '[plugins] tampered: degraded — bundle sha does not match lock.json' verdicts.txt
           [ "$(wc -l < verdicts.txt)" -eq 4 ]
           H="$(health)"
