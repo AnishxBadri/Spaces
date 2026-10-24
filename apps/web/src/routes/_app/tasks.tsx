@@ -22,7 +22,7 @@ import { localToday } from '@spaces/core/tasks/parse-due'
 import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/tasks')({
-  // `?task=` is the row a Cmd-K hit lands on (CONTEXT.md 15b). A malformed
+  // `?task=` is the row a Cmd-K hit lands on. A malformed
   // id catches to undefined: the page renders unfocused, with no error.
   validateSearch: z.object({
     task: z.string().uuid().optional().catch(undefined),
@@ -308,7 +308,7 @@ function TasksPage() {
       />
 
       {/* The one way to add things, everywhere: the composer band under the
-          header (P6), not a corner button. Hidden when empty — the empty
+          header, not a corner button. Hidden when empty — the empty
           state carries its own composer action. Adding from the Done log
           returns to Open, where the new task actually is. */}
       {empty ? null : (

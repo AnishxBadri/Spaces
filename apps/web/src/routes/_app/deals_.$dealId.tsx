@@ -82,7 +82,7 @@ import {
 import { RecordMoreMenu } from '#/components/record/record-more-menu'
 
 /**
- * A deal's page (D74): the head and readouts, then the details column —
+ * A deal's page: the head and readouts, then the details column —
  * the property grid, Pipeline, Company, People, Spaces, Tasks — and the
  * tabbed view. `?tab=` deep-links a tab.
  */
@@ -102,7 +102,7 @@ export const Route = createFileRoute('/_app/deals_/$dealId')({
     ] = await Promise.all([
       getDeal({ data: { id: params.dealId } }),
       listSpaces(),
-      // Derived halves too: their rows read the resolver's value. (D69)
+      // Derived halves too: their rows read the resolver's value.
       listRegistry({ data: { kind: 'deal', includeDerived: true } }),
       getRecordTimeline({ data: { entityId: params.dealId } }),
       listRecordDocuments({ data: { entityId: params.dealId } }),
@@ -179,7 +179,7 @@ function DealRecordPage() {
 
   // The readouts: our check, the company's round, the close, days in stage
   // against the stage's median, and the last contact through the company
-  // and people (D49).
+  // and people.
   const { readouts } = deal
   const valueCode =
     registry.find((d) => d.slug === 'value')?.options.code ?? 'USD'
@@ -193,7 +193,7 @@ function DealRecordPage() {
   const closeDate =
     typeof deal.values.close_date === 'string' ? deal.values.close_date : null
   const daysInStage = readouts.daysInStage
-  // Both sides of each relationship come from the one resolver. (D69)
+  // Both sides of each relationship come from the one resolver.
   const people = relationRows(deal.relations, 'people', false)
   const peopleIds = useMemo(() => people.map((p) => p.id), [people])
   const company = relationRows(deal.relations, 'company', false)

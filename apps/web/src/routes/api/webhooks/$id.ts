@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 /**
- * Webhook ingress (spec-plugin-sdk §11). `$id` is the integration row's id,
+ * Webhook ingress. `$id` is the integration row's id,
  * not the plugin id: unguessable, and one per install. Answers only for an
  * enabled, running row whose stored manifest declares `ingress`; anything
  * else is the same 404 an unknown id gets.

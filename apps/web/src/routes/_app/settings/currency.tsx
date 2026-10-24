@@ -13,7 +13,7 @@ import { cn } from '#/lib/utils'
 
 const shell = getRouteApi('/_app/settings')
 
-/** The manual FX rate ledger. The base currency is set in General. (D81) */
+/** The manual FX rate ledger. The base currency is set in General. */
 export const Route = createFileRoute('/_app/settings/currency')({
   component: CurrencyRoute,
 })

@@ -36,7 +36,6 @@ const shell = getRouteApi('/_app/settings')
 /**
  * The workspace singleton: Identity (logo, then name), Defaults (the currency
  * it prices in), the demo while it is loaded, and What's set up at the foot.
- * (D80, D81)
  * - Name and currency are drafts: they collect into the page's Save bar.
  * - The logo's Upload and Remove write at once, with a toast.
  * - Only an admin changes them; a member reads them disabled.
@@ -85,7 +84,7 @@ function demoCounts(demo: DemoSummary): Array<string> {
   })
 }
 
-/** The demo, removable in one step; absent once removed. (D80) */
+/** The demo, removable in one step; absent once removed. */
 function DemoDataRow({ demo }: { demo: DemoSummary }) {
   const router = useRouter()
   const { confirm, confirmDialog } = useConfirm()
@@ -138,7 +137,7 @@ function DemoDataRow({ demo }: { demo: DemoSummary }) {
   )
 }
 
-/** The seven pieces a workspace can bring, passive: state, what it unlocks, a link. (D80) */
+/** The seven pieces a workspace can bring, passive: state, what it unlocks, a link. */
 function WhatsSetUp({ state }: { state: SetupState }) {
   const set = SETUP_ITEMS.filter((item) => state[item.id]).length
   return (
@@ -147,7 +146,7 @@ function WhatsSetUp({ state }: { state: SetupState }) {
         title="What's set up"
         count={`${set} of ${SETUP_ITEMS.length}`}
       />
-      {/* The one line each item unlocks is D80's list itself, not a hint. */}
+      {/* The one line each item unlocks is the item itself, not a hint. */}
       {SETUP_ITEMS.map((item) => (
         <SettingsRow key={item.id} label={item.label} hint={item.unlocks}>
           <span className="mono text-micro text-graphite">

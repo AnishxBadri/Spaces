@@ -5,7 +5,7 @@ import { getMyAccounts } from '#/lib/server-fns'
 /**
  * Settings → You → Files: the reader's storage accounts, several allowed,
  * each with its sync state. Which folder belongs to which space stays on
- * the space. (D81)
+ * the space.
  */
 export const Route = createFileRoute('/_app/settings/files')({
   loader: async () => ({ view: await getMyAccounts() }),

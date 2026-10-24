@@ -26,7 +26,7 @@ type RunStep = RunDetail['steps'][number]
 
 /**
  * Settings → AI → Usage & limits: one page — today's readouts, Limits, then
- * the run log. (D81)
+ * the run log.
  * - Every AI action is one `ai_run`, newest first; `?run=<id>` (which the
  *   inbox's "produced by this run" links to) opens its steps in order, refs
  *   resolved to names server-side. Calls no run owns list apart.

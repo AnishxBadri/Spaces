@@ -37,7 +37,7 @@ export type FragmentSize = { readonly width: number; readonly height: number }
 
 const LOGOS = ['logo.svg', 'logo-dark.svg', 'mark.svg'] as const
 
-/** The captures' device scale factor (apps/e2e/playwright.screenshots.config.ts). */
+/** The captures' device scale factor, as the screenshots config sets it. */
 const SCALE = 2
 
 export function syncAssets(): AstroIntegration {

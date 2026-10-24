@@ -1,14 +1,8 @@
 /**
  * A one-page uncompressed PDF with a real text layer, built by hand.
  *
- * Three test files want PDF bytes for three different reasons — intake
- * measuring a digest, `document.extract` running pdf.js over a text layer,
- * and (docsurf-10b) the clip job hashing a PDF response — and an extraction
- * assertion is only worth making against bytes pdf.js actually parses. A
- * checked-in binary fixture would answer none of those questions any better
- * and could not be read in a diff; a one-page PDF with a correct xref table
- * is small enough to write out, so it is written out here **once** rather
- * than copied into each file that needs it.
+ * Shared by the tests that need PDF bytes pdf.js actually parses; readable in
+ * a diff, unlike a checked-in binary.
  *
  * `latin1`, not utf-8: the xref table stores byte offsets, and a multi-byte
  * character anywhere in `phrase` would make every offset after it wrong.

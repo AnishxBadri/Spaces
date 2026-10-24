@@ -4,8 +4,8 @@ import type { Page, Request } from '@playwright/test'
 
 /**
  * Upload → preview, in a real browser, against the image built for this
- * commit (SPA-186). CONTEXT.md named this test two phases ago; it is also
- * the image smoke, because the app under test is the composed container.
+ * commit. It is also the image smoke, because the app under test is the
+ * composed container.
  *
  * It leans on a property the preview surface already has:
  *

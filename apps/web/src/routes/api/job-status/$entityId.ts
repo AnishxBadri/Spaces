@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 
 /**
  * A record's plugin job status, as server-sent events: the record page's
- * pending and outcome without polling. (D64)
+ * pending and outcome without polling.
  * - The viewer's session decides, never an integration's: a record the
  *   viewer could not open is 403.
  * - The handler is imported inside the request, so neither it, the pg client

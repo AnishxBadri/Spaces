@@ -15,10 +15,9 @@ import {
 } from '#/lib/server-fns'
 
 /**
- * First-run wizard — deliberately minimal (CONTEXT.md, 2026-08): setup
- * token → admin + workspace name → optional demo data. Under a minute.
- * AI-key and Gmail steps join only when their features ship; the mandate is
- * written from its own page, not here.
+ * First-run wizard — deliberately minimal: setup token → admin + workspace
+ * name → optional demo data. Under a minute. The mandate is written from its
+ * own page, not here.
  *
  * The token is enforced in the Better Auth database hook, not this route —
  * the public signup endpoint would bypass anything checked here. This form
@@ -169,7 +168,7 @@ function AdminStep({ onDone }: { onDone: () => void }) {
 
 /**
  * Demo data, offered rather than assumed: Start empty is the primary, and
- * an empty Today is where a new workspace starts (D80). The demo records its
+ * an empty Today is where a new workspace starts. The demo records its
  * ids, so General can remove it in one step.
  */
 function DemoStep() {

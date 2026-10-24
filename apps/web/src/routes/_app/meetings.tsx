@@ -21,7 +21,7 @@ import { modalSearchShape, openModalId } from '#/lib/modal-search'
 /**
  * Meetings: what is coming this week and next, by day with Prep, and the
  * past with the meetings nobody wrote up first. A read over meeting
- * interactions; a meeting is an activity, never a record. (D68 amended)
+ * interactions; a meeting is an activity, never a record.
  */
 export const Route = createFileRoute('/_app/meetings')({
   validateSearch: z.object({

@@ -4,7 +4,7 @@ import { SETTINGS_LANDING } from '#/components/settings/settings-nav'
 /**
  * `/settings` is the shell, and a shell with no section in it is an empty
  * page: the index redirects to General, so `G ,` and the ⌘K palette land
- * with the nav already on it. (D81)
+ * with the nav already on it.
  */
 export const Route = createFileRoute('/_app/settings/')({
   beforeLoad: () => {

@@ -41,7 +41,7 @@ const OFFERED_ON: ReadonlyArray<Offered> = [
   { value: 'space', label: 'Spaces' },
 ]
 
-/** An email template is offered first in the composer: its favourite. (D67) */
+/** An email template is offered first in the composer: its favourite. */
 const OFFERED_IN_EMAIL: ReadonlyArray<Offered> = [
   { value: 'email', label: 'Email' },
 ]

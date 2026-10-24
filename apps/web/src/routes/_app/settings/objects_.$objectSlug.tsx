@@ -39,7 +39,7 @@ import type { IdentityKey } from '@spaces/core/attributes/registry'
 const shell = getRouteApi('/_app/settings')
 
 /**
- * One object's attributes (spec §7, §9): the registry as a settings page,
+ * One object's attributes: the registry as a settings page,
  * keyed on the object row so companies, people, deals, and every custom
  * object get the same surface. This page is most of a custom object's
  * admin UI — creation lands here.
@@ -66,7 +66,7 @@ export const Route = createFileRoute('/_app/settings/objects_/$objectSlug')({
 
 /**
  * Attribute id → the enrichment source that fills it, from the Enrichment
- * page's grid. Only Companies and People fill from enrichment (D76); a
+ * page's grid. Only Companies and People fill from enrichment; a
  * failed read leaves the Rules lane without it rather than failing the page.
  */
 async function filledByOf(object: {
@@ -128,7 +128,7 @@ function ObjectAttributesPage() {
   }
 
   // The identity-key declaration is live while the object is empty and read
-  // only once a record exists (§9 — the slug rule). Each tick is a save:
+  // only once a record exists (the slug rule). Each tick is a save:
   // ticking materializes the backing attribute, unticking deletes it — which
   // is why an untick asks first, and the registry is re-read after every one.
   const [saving, setSaving] = useState<IdentityKey | null>(null)
@@ -253,7 +253,7 @@ function ObjectAttributesPage() {
         canReshape={isAdmin}
       />
 
-      {/* Identity keys (spec §9) — each backed by an attribute above, and
+      {/* Identity keys — each backed by an attribute above, and
             revisable only while the object has no records (the slug rule).
             Core objects are not listed: their identity is core-owned and
             lives in entity_alias, not in this column. */}

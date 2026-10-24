@@ -3,7 +3,7 @@ import type { AddressInfo, Server, Socket } from 'node:net'
 
 /**
  * An in-repo IMAP server, just enough of RFC 3501 for imapflow to log in,
- * open a folder and `UID FETCH` it (SPA-56). imapflow ships no test
+ * open a folder and `UID FETCH` it. imapflow ships no test
  * utilities, and the poll's two load-bearing claims — a re-poll writes
  * nothing twice, and a changed UIDVALIDITY restarts from UID 1 — are claims
  * about what a *server* says, so they want a server, on loopback, with no

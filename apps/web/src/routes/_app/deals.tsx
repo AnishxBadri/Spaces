@@ -70,23 +70,12 @@ import { jsonRecord, jsonString } from '@spaces/core/json'
 import type { EntityValues } from '@spaces/db/schema/entities'
 
 /**
- * **This board does not page, and that is a decision, not an omission
- * (SPA-96).**
- *
- * The company, people and custom-object lists all take views-3's keyset
- * contract: the server cuts a page, counts the matching set, and the grid
- * holds only what it asked for. This board cannot. It groups by stage on the
- * client and draws a chip per group whose count is over **every** deal — and
- * the stage narrowing itself moves rows between those groups. A page would
- * make every chip a claim about the fifty rows that happened to load while
- * reading as a claim about the pipeline, which is the one number a partner
- * looks at first. `matchesConditions` therefore stays here, filtering rows
- * this loader really does hold.
- *
- * The exit, when the pipeline outgrows one fetch, is a grouped server read —
- * counts per stage in SQL plus a page per group — not this loader with a
- * `limit` bolted on. (Portfolio stays whole for the sibling reason: its
- * metrics are summed across all holdings.)
+ * **This board does not page, deliberately.** It groups by stage on the
+ * client and each group chip counts **every** deal; a page would make every
+ * chip a claim about the rows that happened to load. So `matchesConditions`
+ * filters rows this loader really holds.
+ * When the pipeline outgrows one fetch, the exit is a grouped server read
+ * (counts per stage plus a page per group), not a `limit` bolted on here.
  */
 export const Route = createFileRoute('/_app/deals')({
   validateSearch: z.object({ view: z.string().optional() }),
@@ -98,7 +87,7 @@ export const Route = createFileRoute('/_app/deals')({
       listViews({ data: { surface: 'object', kind: 'deal' } }),
       getSession(),
     ])
-    // Every chip's count (SPA-162): the view's conditions, in SQL, over the
+    // Every chip's count: the view's conditions, in SQL, over the
     // same set `listDealsTable` loads. The group/stage chips a view keeps in
     // `extra` are this board's own narrowing and are not a view condition,
     // so the chip counts what the view's filter holds, as on every list.
@@ -197,7 +186,7 @@ function DealsPage() {
   const [globalFilter, setGlobalFilter] = useState('')
   const prefs = useTablePrefs(PREFS_KEY)
   const { view: activeId } = Route.useSearch()
-  // SPA-122: "Run on this view" in an AI attribute's column header.
+  // "Run on this view" in an AI attribute's column header.
   const columnRun = useColumnRun({
     viewId: views.find((v) => v.id === activeId)?.id ?? null,
     registry,

@@ -195,7 +195,7 @@ function FactsGrid({
     }
   }
 
-  // Archived stages leave the picker (spec §3: writes never assert them)
+  // Archived stages leave the picker (writes never assert them)
   // but a mandate that already names one keeps it, greyed.
   const stages = stageOptions.filter(
     (opt) => !opt.archived || mandate.stages.includes(opt.id),

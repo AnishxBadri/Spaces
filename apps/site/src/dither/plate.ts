@@ -2,7 +2,7 @@ import sharp from 'sharp'
 
 /**
  * The dither plates: every textured surface on the page is one of these,
- * printed once at build time (src/pages/dither/[name].png.ts serves them)
+ * printed once at build time (served at /dither/<name>.png)
  * and never at runtime. A plate is 1-bit: a dot or no dot. Tone is only dot
  * density, and density is only an 8×8 ordered (Bayer) threshold against a
  * field, so there is no alpha ramp and no grey anywhere in the file.

@@ -61,13 +61,12 @@ import type { CollisionDecision } from '@spaces/core/import/plan'
 import { landingRows } from '@spaces/core/import/plan'
 
 /**
- * `/import/$batchId` — a staged batch. Step 1 (SPA-164): the define row
- * (records into an object from the registry, or the portfolio ledger), the
- * workbook's tabs, and the detected header over the first 20 rows. Step 2
- * (SPA-165): the same grid with the mapping in its heads. Step 3 (SPA-167):
- * the resolve preview — the verdict sentence, the readout strip and the
- * ledger of stored plans. Step 4 (SPA-169): the commit's receipt — the
- * strip, the rows filling with their outcomes as the job passes them.
+ * `/import/$batchId` — a staged batch.
+ * 1. The define row (records into an object, or the portfolio ledger), the
+ *    workbook's tabs, and the detected header over the first 20 rows.
+ * 2. The same grid with the mapping in its heads.
+ * 3. The resolve preview: verdict sentence, readout strip, stored plans.
+ * 4. The commit's receipt: rows filling with outcomes as the job passes them.
  *
  * The step is read off the batch — a mapping on the row is step 2, a
  * planned batch step 3 — so a reload resumes exactly where the operator
@@ -80,7 +79,7 @@ const importSearch = z.object({
     .enum(['all', 'create', 'attach', 'decide', 'noland'])
     .catch('all')
     .default('all'),
-  /** Step 4's filter (SPA-169): every row, or the ones that failed. */
+  /** Step 4's filter: every row, or the ones that failed. */
   outcome: z.enum(['all', 'failed']).catch('all').default('all'),
 })
 
@@ -285,7 +284,7 @@ function ImportBatchPage() {
       ledgerLanding > 0)
 
   /**
-   * Void a committed ledger batch through the shipped reversal path (D12):
+   * Void a committed ledger batch through the reversal path:
    * every investment, mark and distribution it appended gets its
    * compensating event; its rounds stay.
    */
@@ -322,8 +321,6 @@ function ImportBatchPage() {
    * Progress by polling, deliberately: while a run is live the receipt is
    * re-read every 1.5 s, and every read comes from `import_row`, `job_run`
    * and the queue, so a reopened page recovers exactly where the commit is.
-   * sdk-18's SSE stream is the upgrade this does not build — when it lands,
-   * the interval becomes a subscription and nothing else changes.
    */
   const live = receipt?.running ?? false
   useEffect(() => {
@@ -385,7 +382,7 @@ function ImportBatchPage() {
       : null
 
   // Step 4 comes first: a ledger batch is still `planned` while its commit
-  // runs, and its receipt (SPA-171) is the page from the first row on.
+  // runs, and its receipt is the page from the first row on.
   if (receipt) {
     return (
       <div className="flex h-full flex-col">
@@ -432,7 +429,7 @@ function ImportBatchPage() {
     )
   }
 
-  // Ledger mode (SPA-170): steps 2 and 3 are the ledger's own components.
+  // Ledger mode: steps 2 and 3 are the ledger's own components.
   if (batch.mode === 'ledger' && ledger?.preview)
     return (
       <LedgerPreviewStep

@@ -44,7 +44,7 @@ import { cn } from '#/lib/utils'
 
 /**
  * `/ask`: every thread of yours by day, and one thread read full width —
- * a 760px column whose tables break out to the content width. (D70)
+ * a 760px column whose tables break out to the content width.
  */
 export const Route = createFileRoute('/_app/ask')({
   validateSearch: z.object({
@@ -246,7 +246,7 @@ function AskPage() {
   const send = (question: string) => {
     setDraft('')
     void ask(question, scope)
-    // The stored question now holds the scope, as the server kept it.
+    // The stored question holds the scope, as the server kept it.
     setEdited(null)
   }
 

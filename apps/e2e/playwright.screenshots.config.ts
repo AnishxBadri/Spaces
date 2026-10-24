@@ -4,7 +4,7 @@ import { SHOTS_STORAGE } from './harness/screenshots-setup.ts'
 
 /**
  * `pnpm screenshots` — the README and marketing captures, from the built app
- * seeded with the developer bench (harness/screenshots-setup.ts). A config of
+ * seeded with the developer bench. A config of
  * its own, not a project of playwright.config.ts, so `pnpm e2e` never boots
  * the extra instance and never picks up screenshots/: that config's testDir
  * is specs/, this one's is screenshots/.

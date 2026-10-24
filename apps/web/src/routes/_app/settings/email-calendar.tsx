@@ -5,7 +5,7 @@ import { getMailboxSettings, getMyAccounts } from '#/lib/server-fns'
 /**
  * Settings → You → Email & calendar: the reader's mail and calendar
  * accounts, the Default one new email sends from, Connect per provider, and
- * the workspace's Bcc address. (D81)
+ * the workspace's Bcc address.
  */
 export const Route = createFileRoute('/_app/settings/email-calendar')({
   loader: async () => {

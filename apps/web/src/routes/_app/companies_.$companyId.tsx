@@ -82,7 +82,7 @@ import {
 import { RecordMoreMenu } from '#/components/record/record-more-menu'
 
 /**
- * A company's page (D74): the head and readouts, then the details column —
+ * A company's page: the head and readouts, then the details column —
  * the property grid, Waiting, Team, Associated deals, Spaces, Tasks — and
  * the tabbed view. `?tab=` deep-links a tab.
  */
@@ -104,7 +104,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
     ] = await Promise.all([
       getCompany({ data: { id: params.companyId } }),
       listSpaces(),
-      // Derived halves too: their rows read the resolver's value. (D69)
+      // Derived halves too: their rows read the resolver's value.
       listRegistry({ data: { kind: 'company', includeDerived: true } }),
       listRegistry({ data: { kind: 'deal' } }),
       getRecordTimeline({ data: { entityId: params.companyId } }),
@@ -172,12 +172,12 @@ function CompanyRecordPage() {
   const [interactionFilter, setInteractionFilter] =
     useState<InteractionFilter>('all')
 
-  // Identity is an attribute (D75): the first domain names the record.
+  // Identity is an attribute: the first domain names the record.
   const firstDomain = jsonStrings(company.values.domains).at(0)
   const nameAliases = company.aliases.filter(
     (a) => a.kind === 'name' && a.value !== company.name,
   )
-  // Both sides of each relationship come from the one resolver. (D69)
+  // Both sides of each relationship come from the one resolver.
   const team = relationRows(company.relations, 'team', true)
   const deals = relationRows(company.relations, 'associated_deals', true)
   const values = withDerived(company.values, company.relations)

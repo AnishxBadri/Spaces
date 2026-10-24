@@ -7,7 +7,7 @@ import { ENV, fromEnv } from './shared.ts'
 import type { FullConfig } from '@playwright/test'
 
 /**
- * Global setup for the image smoke (SPA-186): nothing is booted here. The
+ * Global setup for the image smoke: nothing is booted here. The
  * app under test is the container CI composed from the image built for this
  * commit, at E2E_IMAGE_URL; this only waits for it and signs in.
  *

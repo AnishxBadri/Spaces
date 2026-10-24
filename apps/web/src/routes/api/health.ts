@@ -9,8 +9,8 @@ import {
 import { readDegradedPlugins } from '@spaces/db/plugin-health'
 
 /**
- * The compose/Docker healthcheck for `ROLE=web` and `ROLE=all` (CONTEXT.md
- * hostability contract 4). Unauthenticated, so the payload is deliberately
+ * The compose/Docker healthcheck for `ROLE=web` and `ROLE=all`.
+ * Unauthenticated, so the payload is deliberately
  * thin: a status, whether the database answers, and how long ago the worker
  * last beat. No pid, no instance, no version — those live in the
  * `worker_heartbeat` row for the operator who can read the table.
@@ -18,10 +18,10 @@ import { readDegradedPlugins } from '@spaces/db/plugin-health'
  * The overall status and the HTTP code are driven by the database alone.
  * A stale or absent worker is still 200/'ok', because a worker-only outage
  * must never fail a healthy web container's HEALTHCHECK and restart it; the
- * worker's own container answers for the worker (apps/worker/src/health.ts).
- * Postgres being down is the only 503.
+ * worker's own container answers for the worker. Postgres being down is the
+ * only 503.
  *
- * `degradedPlugins` (sdk-11) is `[{ id, version, reason }]` from the
+ * `degradedPlugins` is `[{ id, version, reason }]` from the
  * `integration` rows the worker's loader marked — read from the database,
  * not from `/data`, so a `ROLE=web` container answers it too. A degraded
  * plugin is not an unhealthy box: it never moves the status or the code.

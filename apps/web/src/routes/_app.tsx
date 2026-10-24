@@ -60,7 +60,7 @@ function AppShell() {
   const collapsed = useChassisCollapsed()
   const [keyboardOpen, setKeyboardOpen] = useState(false)
   const navigate = useNavigate()
-  // Settings takes the chassis over; it never folds to marks. (D81)
+  // Settings takes the chassis over; it never folds to marks.
   const onSettings = useSettingsTakeover()
   const narrow = collapsed && !onSettings
   // The keys printed on the chassis: G-chords go, ⌘\ folds it, ? explains.
@@ -71,7 +71,7 @@ function AppShell() {
     ]),
     ['g ,', () => void navigate({ to: '/settings' })],
     ['mod+\\', () => setChassisCollapsed(!collapsed)],
-    // Ask, docked: opens empty or closes, from anywhere. (D70)
+    // Ask, docked: opens empty or closes, from anywhere.
     ['mod+j', toggleAsk],
     ['?', () => setKeyboardOpen(true)],
   ])
@@ -166,10 +166,9 @@ function AppShell() {
         onOpenChange={setCommandOpen}
         objects={objects}
       />
-      {/* Mounted once, for all three of §3.1 entry point 3's doors (SPA-108).
-          Here rather than in each surface because an upload has to outlive
-          the sheet it was started from: this component never unmounts, so
-          closing the dialog leaves the in-flight files running. */}
+      {/* Mounted once, here: an upload has to outlive the sheet it was
+          started from, so closing the dialog leaves in-flight files
+          running. */}
       <UploadDialog />
       <ComposeWindows />
       <KeyboardHelp open={keyboardOpen} onOpenChange={setKeyboardOpen} />

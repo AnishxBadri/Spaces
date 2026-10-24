@@ -77,7 +77,7 @@ import { cn } from '#/lib/utils'
 import { useHotkey } from '#/lib/use-hotkey'
 
 /**
- * The registry-generated list page for a custom object (spec §9): if this
+ * The registry-generated list page for a custom object: if this
  * page can't render an object, it was never registry-generated. Name is
  * the one core-owned column; everything else is the object's attributes,
  * spaces, and when it was added.
@@ -89,22 +89,21 @@ export const Route = createFileRoute('/_app/o/$objectSlug')({
   loaderDeps: ({ search }) => ({ view: search.view ?? null }),
   loader: async ({ params, deps }) => {
     const object = await getObject({ data: { slug: params.objectSlug } })
-    // An archived object hides its routes (§9 lifecycle); records persist.
+    // An archived object hides its routes; records persist.
     if (object.archived || object.isSystem) throw notFound()
     const [withInverses, viewData, session] = await Promise.all([
-      // Inverse halves come too, as columns and filters. (D69)
+      // Inverse halves come too, as columns and filters.
       listRegistry({ data: { objectId: object.id, includeDerived: true } }),
       listViews({ data: { surface: 'object', objectId: object.id } }),
       getSession(),
     ])
-    // The view's conditions and its sort go down with the request (SPA-40,
-    // SPA-64), so the first paint is already the filtered, ordered first
-    // page — no flash of the rows the view hides, and no client sort of a
-    // set the client does not hold.
+    // The view's conditions and its sort go down with the request, so the
+    // first paint is already the filtered, ordered first page — no flash of
+    // the rows the view hides, and no client sort of a set it does not hold.
     const view = viewData.views.find((v) => v.id === deps.view) ?? null
     const conditions = view?.filter ?? []
     const sort = view?.sort ?? null
-    // Every chip's count rides the same load (SPA-162), so the bar paints
+    // Every chip's count rides the same load, so the bar paints
     // with its numbers — the inactive views' included — beside page one.
     const [initial, counts, all] = await Promise.all([
       listObjectRecords({
@@ -174,7 +173,7 @@ function ObjectListPage() {
   // FROZEN: renaming resets saved column layouts with no recovery path.
   const prefs = useTablePrefs(`dealos.o-${object.slug}-table.v1`)
   const { view: activeId } = Route.useSearch()
-  // SPA-122: "Run on this view" in an AI attribute's column header.
+  // "Run on this view" in an AI attribute's column header.
   const columnRun = useColumnRun({
     viewId: views.find((v) => v.id === activeId)?.id ?? null,
     registry,
@@ -189,14 +188,10 @@ function ObjectListPage() {
   })
   const { sorting, setSorting } = vs
   /**
-   * The text box is a **server** `ILIKE` on `canonical_name` now, debounced
-   * (SPA-64). It used to be a client `globalFilter` over every loaded row,
-   * which stopped being able to tell the truth the moment the table stopped
-   * loading every row. The alternative was to delete it and let ⌘K take the
-   * job — rejected: ⌘K is fused search across kinds, one hit at a time, and
-   * "narrow this table" is a different question. It keeps the grid, the
-   * columns and the sort, and it composes with the view's conditions. The
-   * fused CTE in `lib/server/search.ts` is untouched.
+   * The text box is a debounced **server** `ILIKE` on `canonical_name`: the
+   * table holds one page, so a client filter would lie. It composes with the
+   * view's conditions. Not ⌘K's job: that is fused search across kinds, and
+   * "narrow this table" is a different question.
    */
   const [globalFilter, setGlobalFilter] = useState('')
   const [q, setQ] = useState('')
@@ -214,8 +209,8 @@ function ObjectListPage() {
   const sortKey = JSON.stringify(sort)
 
   /**
-   * Filtering, sorting, counting and paging all happen in Postgres (SPA-40,
-   * SPA-64). The loader already asked for page one of the `?view=`
+   * Filtering, sorting, counting and paging all happen in Postgres. The
+   * loader already asked for page one of the `?view=`
    * conditions in the view's order, so the first paint — server-rendered
    * included — is that page; this query seeds itself from that answer and is
    * keyed on the conditions, the sort and the text box, so any of the three
@@ -266,9 +261,9 @@ function ObjectListPage() {
     return out
   }, [loaded])
   const total = loaded.at(-1)?.total ?? 0
-  // The loader is no longer the only thing holding the rows, so a write has
-  // to reach both: the loader for the registry and the views, the query for
-  // whichever condition set is on screen.
+  // A write has to reach both holders of the rows: the loader for the
+  // registry and the views, the query for whichever condition set is on
+  // screen.
   const queryClient = useQueryClient()
   const refresh = useCallback(() => {
     void router.invalidate()
@@ -340,8 +335,8 @@ function ObjectListPage() {
         id: 'spaces',
         header: 'Spaces',
         size: 180,
-        // The sort is a SQL order by over `entity` now, and spaces are a
-        // join; offering the menu would promise an order nobody can serve.
+        // The sort is a SQL order by over `entity`, and spaces are a join;
+        // offering the menu would promise an order nobody can serve.
         enableSorting: false,
         cell: (info) => (
           <span className="flex flex-wrap items-center gap-1 px-1">
@@ -376,8 +371,8 @@ function ObjectListPage() {
   )
 
   /**
-   * No `getSortedRowModel` and no `getFilteredRowModel` here, deliberately
-   * (SPA-64): both would reorder and narrow the fifty rows that happen to be
+   * No `getSortedRowModel` and no `getFilteredRowModel` here, deliberately:
+   * both would reorder and narrow the fifty rows that happen to be
    * loaded and call that the answer. `manualSorting`/`manualFiltering` say
    * so out loud — `sorting` is still the table's state, so the header menu
    * and the `aria-sort` on each `th` keep working, but toggling it changes
@@ -561,7 +556,7 @@ function CreateRecordDialog({
         toast(collision.title, { description: collision.description })
       else toast(`${name.trim()} added`)
       void router.invalidate()
-      // The rows come from a keyed query now, not from the loader alone.
+      // The rows come from a keyed query, not from the loader alone.
       void queryClient.invalidateQueries({ queryKey: ['object-records'] })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not add it.')

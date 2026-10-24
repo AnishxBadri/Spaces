@@ -1,11 +1,7 @@
 /**
- * The queue, stood in for (SPA-113). `#/lib/queue`'s `enqueue` builds a
- * pg-boss sender from `DATABASE_URL` on first use, and the test databases
- * carry no `pgboss` schema — the harness migrates `public` and nothing else —
- * so every enqueue a test triggers spends a connection attempt to log a stack
- * trace and answer `null`. That was tolerable while only `reExtractDocument`
- * enqueued; since the birth of a document does it, every document fixture in
- * the suite would print one.
+ * The queue, stood in for. The test databases carry no `pgboss` schema, so a
+ * real `enqueue` spends a connection attempt to log a stack trace and answer
+ * `null`.
  *
  * A test file opts in with one line:
  *
@@ -13,13 +9,11 @@
  * vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
  * ```
  *
- * and `enqueued` is then the record of what was sent — which is the only way
- * to observe the decision at all, since `enqueue` swallows its own failures
- * by design and answers `null` whether it was called or not.
+ * and `enqueued` is then the record of what was sent: the only way to observe
+ * it, since `enqueue` answers `null` whether it was called or not.
  *
- * It is module state, so it survives the file it is mocked into and nothing
- * else: each vitest worker is its own process and each file its own module
- * graph. Clear it in a `beforeEach` when the count matters.
+ * Module state, scoped to the file it is mocked into. Clear it in a
+ * `beforeEach` when the count matters.
  */
 
 export const enqueued = new Array<{
@@ -29,7 +23,7 @@ export const enqueued = new Array<{
 }>()
 
 /**
- * The `exclusive` policy, stood in for (SPA-90): a stub job never runs, so
+ * The `exclusive` policy, stood in for: a stub job never runs, so
  * one sent with a `singletonKey` stays queued for the life of the file, and
  * a second send with the same key on the same queue is refused exactly as
  * pg-boss refuses it — `null`, nothing recorded. Only a send that asks for a

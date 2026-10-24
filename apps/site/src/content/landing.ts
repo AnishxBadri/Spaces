@@ -11,10 +11,9 @@
 
 /**
  * The product pieces the page shows: tight crops of the real app, taken by
- * `pnpm screenshots` (apps/e2e/screenshots/capture.spec.ts, the FRAGMENTS
- * list) into docs/assets/screenshots/fragments/ and synced here by
- * src/integrations/sync-assets.ts. The names are shared with that list; the
- * page uses these six.
+ * `pnpm screenshots` (its `FRAGMENTS` list) into
+ * docs/assets/screenshots/fragments/ and synced here by `syncAssets`. The
+ * names are shared with that list; the page uses these six.
  */
 export const FRAGMENT_NAMES = [
   'today-main',
@@ -53,7 +52,7 @@ export type Rect = {
 
 /**
  * A fixed-size composition in the design's pixels: a dither plate and what
- * sits on it. The plate is printed from these numbers (src/dither/stages.ts):
+ * sits on it. The plate is printed from these numbers (`PLATES`):
  * the dots gather toward `corner` and thin to nothing under every rect in
  * `clear`, so each card sits in its own light.
  */
@@ -128,7 +127,7 @@ export const ORBIT_HEAD = {
   body: 'A space is a market you follow: something you’d write a memo about and track companies in. The AI inside Spaces thinks with it. Your mail, calls, files and data sources file into it. All of it runs on a machine you own.',
 }
 
-/** The orbit's plate and size (src/dither/stages.ts prints the rings). */
+/** The orbit's plate and size (`PLATES` prints the rings). */
 export const ORBIT = { name: 'orbit', width: 1200, height: 840 } as const
 
 export const SPACE_CARD = {
@@ -535,7 +534,7 @@ export const CLOSING_COPY = {
   secondary: 'Read the guide',
 }
 
-/** Every plate-bearing stage on the landing page, for src/dither/stages.ts. */
+/** Every plate-bearing stage on the landing page, for `PLATES`. */
 export const STAGES: ReadonlyArray<Stage> = [
   HERO,
   ...CHAPTERS.map((c) => c.stage),

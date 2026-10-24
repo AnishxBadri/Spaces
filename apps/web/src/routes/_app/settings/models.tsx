@@ -40,7 +40,7 @@ type EmbeddingPin = Awaited<ReturnType<typeof getEmbeddingSettings>>['pin']
 /**
  * Settings → AI → Models: the workspace sensitivity floor, the vault's LLM
  * keys (Providers) and who does each job (the lane × sensitivity grid),
- * admin-only. (D81)
+ * admin-only.
  * - One provider opens in place at a time; its typed fields join the page's
  *   Save bar while it is open. What differs between providers is data in
  *   `PROVIDERS`, never a branch on the id.
@@ -494,7 +494,7 @@ const UNSET = 'unset'
 type CellValue = LlmProvider | typeof UNSET
 
 /**
- * Who does what — the lane × sensitivity grid as a settings ledger (D20):
+ * Who does what — the lane × sensitivity grid as a settings ledger:
  * one row per job, then one `Select` per sensitivity. Everyday cells list
  * every provider holding an active credential; sensitive cells list the
  * local ones only. A cell saves when it is chosen. The sensitivities are

@@ -7,33 +7,19 @@ import {
 } from '@spaces/db/test-db'
 
 /**
- * The app's half of the harness, run once before any file: build the
- * databases this suite's workers will use, and put in the reference one
- * everything the suite assumes a database already has.
- *
- * `spaces_test` is the reference database — migrated, seeded, and the one to
- * point `pnpm db:migrate:run` at to check that a run left the journal alone.
- * The workers do not use it. Each worker gets `spaces_test_web<poolId>`,
- * because since SPA-145 isolation is per *file*: `vitest.setup.ts` truncates
- * every table in `public` before each file it runs, and a truncate must not
- * be able to reach a file running at the same moment in another worker. Files
- * inside one worker are sequential, so one database per worker is exactly the
- * grain the truncate needs.
- *
- * Creating them here rather than lazily per file is what keeps the per-file
- * cost to a truncate and a reseed: `create database` and the journal check
- * happen once each, not twenty-four times.
- *
- * Every import of app code is dynamic and below `prepareTestDatabase`,
- * because `@spaces/db`'s `db` builds its pool from `process.env.DATABASE_URL`
- * at import time — a static import here would open a pool on the *dev*
- * database and seed it.
+ * Runs once before any file: migrates and seeds the reference database
+ * (`spaces_test`, which the workers never use) and builds one database per
+ * worker (`spaces_test_web<poolId>`).
+ * - One database per worker: the per-file truncate must not reach a file
+ *   running at the same moment in another worker.
+ * - Every app import is dynamic and below `prepareTestDatabase`: `@spaces/db`
+ *   builds its pool from `DATABASE_URL` at import time, and a static import
+ *   would open it on the *dev* database.
  */
 export default async function setup() {
   const env = loadWorkspaceEnv()
-  // The seed runs inside the harness lock (SPA-181 review): apps/worker and
-  // packages/core seed the same reference database from their own setups,
-  // and turbo runs the four `test` tasks at once.
+  // Seeded inside the harness lock: other packages seed the same reference
+  // database from their own setups, and turbo runs them at once.
   const { url } = await prepareTestDatabase(env, async () => {
     const { seedTestDatabase } = await import('./vitest.seed.ts')
     await seedTestDatabase()
