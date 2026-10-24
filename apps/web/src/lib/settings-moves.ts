@@ -2,7 +2,7 @@ import { redirect } from '@tanstack/react-router'
 
 /**
  * The `beforeLoad` of each settings path that moved when the sections were
- * regrouped by whose they are (D81): one permanent redirect to its new home,
+ * regrouped by whose they are: one permanent redirect to its new home,
  * query intact, so bookmarks and old links land where the section went.
  *
  * - 301, not the 307 default: the move is a decision, not a condition.

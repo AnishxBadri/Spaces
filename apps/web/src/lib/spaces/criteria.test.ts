@@ -10,7 +10,7 @@ import { getSpaceProgram } from './read'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 /**
- * A space's criteria (D72): edited in place, one activity line per save
+ * A space's criteria: edited in place, one activity line per save
  * that changes it, and blank stays blank — never a placeholder stored.
  */
 

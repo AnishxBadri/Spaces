@@ -26,7 +26,7 @@ import type {
 } from './input'
 
 /**
- * You → Meeting notes (D78, D81): the reader's recorder keys, their folders
+ * You → Meeting notes: the reader's recorder keys, their folders
  * with a tick each and the two private opt-ins.
  * - The user is always the session's; another member's key is never read.
  * - `SPACES_FAKE_PROVIDERS=1` is the only switch to the fake Granola, as it

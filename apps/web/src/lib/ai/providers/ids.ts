@@ -4,9 +4,7 @@ import { z } from 'zod'
  * Provider ids, their descriptors and the settings inputs, with nothing
  * server-side imported — the server-fn module's validators are evaluated in
  * the client bundle too, so what they read has to be safe to ship there.
- *
- * Five providers, each one file under `llm/` and one arm in
- * `languageModelFor` (SPA-29 built Anthropic, SPA-39 the other four).
+ * Each provider is one adapter and one arm in `languageModelFor`.
  */
 export const LLM_PROVIDERS = [
   'anthropic',
@@ -28,8 +26,7 @@ export type LlmProvider = (typeof LLM_PROVIDERS)[number]
  *   base URL. Passed to the SDK explicitly, so an SDK's own environment
  *   fallback (`OPENAI_BASE_URL`) never decides where a prompt goes.
  * - `defaultModel` — the model the Test call and any caller that names none
- *   gets. The one place each id is spelled; routing (`ai-4b`) picks per lane
- *   later.
+ *   gets. The one place each id is spelled; routing picks per lane.
  */
 export type ProviderDescriptor = {
   id: LlmProvider

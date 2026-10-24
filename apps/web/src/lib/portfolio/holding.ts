@@ -7,16 +7,13 @@ import { holding } from '@spaces/db/schema/portfolio'
 export type HoldingExecutor = Pick<typeof db, 'select' | 'insert'>
 
 /**
- * The pipeline→portfolio seam: a deal reaching Invested births a holding
- * (CONTEXT.md phase 15). Idempotent — one holding per company, follow-ons
- * land on the existing row.
- *
- * Outside `lib/server/` since SPA-169, which needed it inside a deal birth's
- * transaction (`#/lib/deals/birth`) and from the import worker, neither of
- * which may reach `lib/server/shared.ts` and its request context; that module
- * re-exports it, so the server fns keep importing it from where they did.
- * `on` is the executor — `db` by default, the caller's transaction when the
- * holding must land or fail with the deal that births it.
+ * The pipeline→portfolio seam: a deal reaching Invested births a holding.
+ * Idempotent — one holding per company, follow-ons land on the existing row.
+ * - Outside the server modules: deal birth's transaction and the import
+ *   worker call it without a request context (the server's shared module
+ *   re-exports it).
+ * - `on` is `db` by default, or the caller's transaction when the holding
+ *   must land or fail with the deal that births it.
  */
 export async function birthHolding(
   opts: {

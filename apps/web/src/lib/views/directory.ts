@@ -41,30 +41,13 @@ import type { ListPageOptions } from './paging'
 import type { Condition } from '@spaces/core/views/filter'
 
 /**
- * `/companies` and `/people`, on views-3's contract (SPA-96).
- *
- * These two are the registry-generated list read with a different `where`:
- * the rows are `entity` rows, the conditions are over the same `values`
- * jsonb, and the sort key, the cursor and the count come from the same
- * `./paging` helpers `/o/$objectSlug` uses. Nothing here is a second pager.
- *
- * What is different is what a row carries beyond its values — a company's
- * domains, a person's emails, and their interaction stats. Those were whole-table side queries: three `select`s
- * with no `where` that built a map of every alias in the database so fifty
- * rows could read fifty entries out of it. **They run over the page's ids
- * now**, which is the only shape that survives twenty thousand companies.
- *
- * It lives outside `lib/server/` for the reason `records.ts` does:
- * `lib/server-fns.ts` is a client-imported barrel and re-exports
- * `server/companies.ts`, so a plain export from there ships to the browser —
- * only `createServerFn().handler()` bodies are stripped (CLAUDE.md, traps).
- * The server fns import this inside their handlers; a test calls it directly.
- *
- * **Why /deals and /portfolio are not here.** Both compute a number over
- * every row before they draw one: the board's stage chips count the whole
- * pipeline, and portfolio's metrics sum every holding. A page would make
- * those numbers lie about a set the reader cannot see. Their routes say so
- * at the loader.
+ * `/companies` and `/people` pages: the registry list with a different `where`,
+ * on the same `./paging` helpers as `/o/$objectSlug` (not a second pager).
+ * - Side reads (domains, emails, interaction stats) run over the page's ids
+ *   only, never the whole table.
+ * - Kept out of the client-imported server-fns barrel: a plain export there
+ *   ships to the browser. Server fns import this inside their handlers.
+ * - /deals and /portfolio are not paged: their chips and metrics sum every row.
  */
 
 export class DirectoryQueryFailed extends Schema.TaggedError<DirectoryQueryFailed>()(
@@ -198,7 +181,7 @@ async function spacesFor(
  * and count the whole matching set beside it.
  *
  * The surface's own `where` — the subtype guard, the kind, not merged — is
- * `listScope(kind)`, shared with the view chips' counts (SPA-162); `search`
+ * `listScope(kind)`, shared with the view chips' counts; `search`
  * is how its text box narrows. Everything else is the pager.
  */
 /** The kind's live registry, as the conditions and the sort resolve against it. */
@@ -410,12 +393,9 @@ export const listPeoplePageProgram = Effect.fn('listPeoplePageProgram')(
 )
 
 /**
- * Deals, one keyset page at a time (SPA-80). `/deals` itself still loads
- * the whole set (`listDealsTable`, and see the module header for why), so
- * this is not what the board reads: it is the same set — `listScope('deal')`
- * — in the same newest-first order, cut by the same pager, for the one
- * caller that must page it, the external API's `records.list`. No side
- * queries: a deal row is its core and its values.
+ * Deals, one keyset page at a time, for the external API's `records.list`.
+ * Not what the board reads: `/deals` loads the whole set (`listDealsTable`).
+ * Same set (`listScope('deal')`) and newest-first order; no side queries.
  */
 export const listDealsPageProgram = Effect.fn('listDealsPageProgram')(
   function* (conditions: Array<Condition>, options: ListPageOptions = {}) {

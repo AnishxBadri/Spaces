@@ -35,41 +35,20 @@ import type {
 } from './sensitivity-for'
 
 /**
- * Space-tag suggestions (SPA-103) — the first `entity_space` writer that is
- * not a person, and even so it writes none: "Suggest spaces" on a record's
- * Spaces rail asks `complete('classify')` which spaces of the live tree the
- * record belongs in, and each answer becomes one `suggestion(kind:
- * 'space_tag')` carrying the model's confidence. Accepting one in /inbox is
- * what tags the record (`acceptProgram` → `insertSpaceTag`, `source: 'ai'`,
- * `created_by` the accepter). CONTEXT.md: AI tags land in a review queue,
- * never silently written.
+ * Space-tag suggestions: "Suggest spaces" asks `complete('classify')` which
+ * live spaces a record belongs in; each answer becomes a `space_tag`
+ * suggestion. Only accepting one tags the record — AI tags are never
+ * silently written.
  *
- * **The vocabulary is the `space` table's**, as kind classify's is the
- * `document_kind` enum's: the JSON schema's enum is the live tree's space
- * ids — minus the spaces the record already carries and the ones a
- * suggestion has already been made for — read at run time, never a list in
- * a prompt string. The task names each id with its path so the model can
- * read the tree.
- *
- * **Validate, don't trust.** An answer naming an id absent from the tree, a
- * space the record already carries, one already proposed or rejected, or the
- * same space twice is dropped and counted in the rationale — never written,
- * never failing the run. When nothing is left, no row is written and the
- * run ends without raising.
- *
- * **One proposal per (record, space), ever.** A `space_tag` suggestion that
- * exists for the pair in any status is the answer: a rejection keeps that
- * space out of every later run for this record, as a dismissed duplicate
- * pair or a rejected document kind does.
- *
- * **Manual and pull-based** (spec §4). The run is a worker job, as Read
- * deck's is: a model call is a provider's latency, which must not be
- * somebody's request (`@spaces/core/queue/names`). The press is checked
- * first, though — the record's sensitivity against the classify lane's
- * target, through `complete()`'s own policy half (`laneTargetProgram`) — so
- * a record under a sensitive space on a cloud-routed lane is refused at the
- * button, naming the space, rather than a job later. The job's `complete()`
- * applies the same policy again at run time.
+ * - The vocabulary is the live `space` table, read at run time into the
+ *   schema's enum, minus spaces already carried or already proposed.
+ * - Validate, don't trust: an unknown, carried, proposed or repeated id is
+ *   dropped and counted in the rationale, never written, never a failure.
+ * - One proposal per (record, space), ever: a rejection keeps that space out
+ *   of every later run for the record.
+ * - The run is a worker job (a model call must not be somebody's request);
+ *   the press checks sensitivity against the lane first (`laneTargetProgram`)
+ *   and `complete()` checks it again at run time.
  */
 
 /** The record's context the model reads beside the tree. */
@@ -220,7 +199,7 @@ export type SuggestSpacesInput = {
   /** ISO 8601; defaults to now. */
   asOf?: string
   jobRunId?: string
-  /** A run this is a step of (SPA-100); absent, it opens its own. */
+  /** A run this is a step of; absent, it opens its own. */
   runId?: string
 }
 

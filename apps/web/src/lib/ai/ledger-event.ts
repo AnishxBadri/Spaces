@@ -45,12 +45,12 @@ import type {
 } from './sensitivity-for'
 
 /**
- * Live-file ledger events (spec-ai-substrate §11, the cap_table row): a new
- * revision of a bound cap table, filed on a company we hold, is read
- * against the holding and becomes at most one `suggestion(kind:
- * 'ledger_event')` on the company — a round the ledger does not have yet,
- * else a mark at the round's price. Never an event: accepting it is what
- * appends one (`acceptProgram`), and nothing is ever edited (D12).
+ * Live-file ledger events: a new revision of a bound cap table, filed on a
+ * company we hold, is read against the holding and becomes at most one
+ * `suggestion(kind: 'ledger_event')` on the company — a round the ledger does
+ * not have yet, else a mark at the round's price. Never an event: accepting
+ * it is what appends one (`acceptProgram`); portfolio history is append-only,
+ * nothing is ever edited.
  *
  * - Only a revision: a cap table with no `document_revision` row is a first
  *   filing, and this lane leaves it alone.

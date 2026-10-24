@@ -53,7 +53,7 @@ export const seedDemo = createServerFn({ method: 'POST' }).handler(async () => {
 
 /**
  * The workspace logo set or removed from General: written at once, admin
- * only. The bytes it replaced are reclaimed once no row names them. (D81)
+ * only. The bytes it replaced are reclaimed once no row names them.
  */
 export const setWorkspaceLogo = createServerFn({ method: 'POST' })
   .validator((data: FormData) => {

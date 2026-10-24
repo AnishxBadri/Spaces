@@ -7,11 +7,11 @@ import {
 } from './store'
 
 /**
- * The bodies of the Settings → API tokens server fns (SPA-23). Every one
+ * The bodies of the Settings → API tokens server fns. Every one
  * opens with `requireUser()` and acts on the session user's own tokens only
  * — a token is a person's, never the workspace's, so there is no admin lane.
- * The server fns in `lib/server/tokens.ts` import this module inside their
- * handlers, which keeps `node:crypto` out of the client bundle.
+ * The server fns import this module inside their handlers, which keeps
+ * `node:crypto` out of the client bundle.
  */
 
 export async function listApiTokensHandler() {

@@ -13,12 +13,12 @@ import { localDay } from './readout-format'
 /**
  * The record head's readout strip: numbers and dates, never a word, never a
  * section's count.
- * - Interaction dates come from `interaction_stat` (D67), the rows the People
+ * - Interaction dates come from `interaction_stat`, the rows the People
  *   and Companies lists sort on; one aggregate over the record's ids.
  * - Days are the server's local calendar days, with `today` beside them, so
  *   the server and the browser print the same string.
  *
- * Outside `lib/server/` so tests can call it without a request.
+ * Outside the server-fn barrel so tests can call it without a request.
  */
 
 /** A local calendar day, `YYYY-MM-DD`; null when there is none. */
@@ -218,7 +218,7 @@ export const companyReadoutsProgram = Effect.fn('companyReadoutsProgram')(
 
 /**
  * A deal's last contact is derived through its company and its people,
- * plus anything pinned to the deal itself. (D49)
+ * plus anything pinned to the deal itself.
  * Days in stage is crimson past twice the stage's median — the median
  * Today's "Idle in stage" reads.
  */
@@ -265,7 +265,7 @@ export const dealReadoutsProgram = Effect.fn('dealReadoutsProgram')(function* (
 
 /**
  * A company's latest round: a dated event, written by the ledger or by
- * enrichment (D76). One with neither a size nor a post-money reads as none.
+ * enrichment. One with neither a size nor a post-money reads as none.
  */
 const latestRound = Effect.fn('latestRound')(function* (companyId: string) {
   const row = yield* query(async () =>

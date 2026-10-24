@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { offersKeyTerms } from './key-terms-gate'
 
-/** SPA-91: which Files-tab rows offer Extract key terms. */
+/** Which Files-tab rows offer Extract key terms. */
 
 const onDeal = [{ kind: 'record' as const, entityKind: 'deal' }]
 

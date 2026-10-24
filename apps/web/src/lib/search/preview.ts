@@ -22,14 +22,14 @@ import type {
 import { countViewsProgram } from '#/lib/views/counts'
 
 /**
- * Cmd-K's preview pane: what a highlighted result shows. (D70)
+ * Cmd-K's preview pane: what a highlighted result shows.
  * - A record is `get_record`'s read as the user (canRead included) plus the
  *   readouts its head prints; the fields are its first six filled attributes.
  * - An object is its saved views with their counts: the views directory and
  *   the chips' count program, never a second count.
  * - A passage is its page's text with the nearest chunk set off, behind the
  *   same note predicate the semantic lane filters by.
- * Outside `lib/server/` so a test can call it without a request.
+ * Outside the server-fn module so a test can call it without a request.
  */
 
 /** How many filled attributes the pane lists. */

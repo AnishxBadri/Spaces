@@ -22,7 +22,7 @@ import type { SensitivityReadFailed } from './sensitivity-for'
 import type { SensitivityVia } from './sensitivity'
 
 /**
- * A recorded note's action items (D78): the Extract lane reads the shared
+ * A recorded note's action items: the Extract lane reads the shared
  * note a recorder filed and proposes one `task` suggestion per item, each
  * citing the note, the meeting and the receipt.
  * - Under the sensitivity gate: a meeting whose records or note resolve

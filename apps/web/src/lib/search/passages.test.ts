@@ -13,7 +13,7 @@ import { searchAllProgram } from './query'
 import { clearQueryEmbeddingCache } from './query-embedding'
 
 /**
- * Cmd-K's Records and Passages are two lanes, never one list. (D70) The
+ * Cmd-K's Records and Passages are two lanes, never one list. The
  * fixture is built so the semantic lane would outrank the record by score:
  * a deck that mentions "halcyon" in its text and whose chunk sits nearest
  * the query. The statement's name tier still puts the record typed by name

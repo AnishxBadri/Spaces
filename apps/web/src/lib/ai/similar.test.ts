@@ -22,15 +22,11 @@ import { ref } from '@spaces/core/context/ref'
 import { SIMILAR_MAX_DISTANCE, SimilarLaneLive } from './similar'
 
 /**
- * The judgment-memory lane (SPA-139). Chunks are written by hand with chosen
- * vectors, as `semantic-lane.test.ts` writes them: the company's own chunks
- * sit on axis 0, so the anchor (their mean) is axis 0, and every other
- * record's chunk sits at a chosen cosine distance from it — "nearest" is
- * decided by the fixture, not by a model. The pin is written straight into
- * `workspace.settings`; nothing here embeds.
- *
- * The file's database was truncated and reseeded before it was imported
- * (SPA-145), so these fixtures are the whole corpus.
+ * The judgment-memory lane. Chunks are written by hand with chosen vectors:
+ * the company's own chunks sit on axis 0, so the anchor is axis 0, and every
+ * other chunk sits at a chosen cosine distance from it — "nearest" is decided
+ * by the fixture, not a model. The pin is written straight into
+ * `workspace.settings`; nothing here embeds. These fixtures are the whole corpus.
  */
 
 const ASOF = '2026-09-20T00:00:00Z'

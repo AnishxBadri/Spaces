@@ -19,13 +19,11 @@ import type {
 } from './lanes'
 
 /**
- * The router (docs/spec-ai-substrate.md §4, §9): lane × sensitivity →
- * `{provider, model}`, read from the `ai_route` settings table. Features name
- * a lane, never a model; this module is the one place a lane becomes one.
- *
- * It does not decide sensitivity — the caller supplies it (ai-26 resolves
- * it) — and it does not refuse a sensitive route to the cloud: that is
- * `complete()`'s check, made against whatever target it ends up with.
+ * The router: lane × sensitivity → `{provider, model}`, from the `ai_route`
+ * table. Features name a lane, never a model; this is the one place a lane
+ * becomes one.
+ * - It does not decide sensitivity (the caller supplies it) and does not
+ *   refuse a sensitive route to the cloud; that is `complete()`'s check.
  */
 
 export type AiTarget = { provider: LlmProvider; model: string }
@@ -134,7 +132,7 @@ export const setAiRouteProgram = Effect.fn('setAiRoute')(function* (
 
 /**
  * The `setAiRoute` server fn's body. `requireAdmin()` first. A `null`
- * provider clears the cell (SPA-69).
+ * provider clears the cell.
  */
 export async function setAiRouteHandler(
   input: AiRouteInput,
@@ -152,7 +150,7 @@ export async function setAiRouteHandler(
   }
 }
 
-// SPA-69: the Routing ledger and the trigger gate.
+// The Routing ledger and the trigger gate.
 
 /** One cell of the routing grid as the Routing ledger reads it. */
 export type AiRouteCell = {
@@ -241,7 +239,7 @@ const hasActiveCredential = (provider: LlmProvider, userId: string | null) =>
 export type LaneRouted = Record<AiSensitivity, boolean>
 
 /**
- * The gate every AI trigger hides itself on (SPA-69): per sensitivity, true
+ * The gate every AI trigger hides itself on: per sensitivity, true
  * only when the lane has a route, the routed provider has an active
  * credential, and — for `sensitive` — the provider is local; the three things
  * `complete()` would otherwise refuse on. It never fails: a read error reads
@@ -277,13 +275,13 @@ export async function isLaneRoutedHandler(input: {
   return effectFn(isLaneRoutedProgram)(input.lane, user.id)
 }
 
-/** The `listAiRoutes` server fn's body. Any member reads the grid; it holds no secret. (D81) */
+/** The `listAiRoutes` server fn's body. Any member reads the grid; it holds no secret. */
 export async function listAiRoutesHandler(): Promise<AiRouteCell[]> {
   await requireUser()
   return effectFn(listAiRoutesProgram)()
 }
 
-// The workspace floor (D81): `workspace.settings.sensitivity_default`, which
+// The workspace floor: `workspace.settings.sensitivity_default`, which
 // `sensitivityFor` ORs under every record's own inputs.
 
 /** The floor could not be saved; `message` is what Models shows. */
@@ -364,7 +362,7 @@ export const setSensitivityDefaultProgram = Effect.fn('setSensitivityDefault')(
   },
 )
 
-/** The `getSensitivityDefault` server fn's body. Any member reads it. (D81) */
+/** The `getSensitivityDefault` server fn's body. Any member reads it. */
 export async function getSensitivityDefaultHandler(): Promise<AiSensitivity> {
   await requireUser()
   return effectFn(readSensitivityDefaultProgram)()

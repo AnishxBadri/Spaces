@@ -16,54 +16,18 @@ import type {
 } from './sensitivity-for'
 
 /**
- * The vision lane (SPA-94; docs/spec-ai-substrate.md §9, §11's last-but-one
- * row, §14 step 8): the upgrade path for `extraction_status: 'unsupported'` —
- * a scanned PDF whose pages carry no text layer. It is **the one place the
- * AI writes to a document** rather than proposing, because it _is_
- * extraction: the answer lands in `extracted_text` and `tsv` through the
- * extraction job's own statement (`ExtractionStore.markExtracted`) and hands
- * on through the extraction job's own seam (`ExtractionStore.onExtracted`),
- * so chunking, embedding and classify follow exactly as they follow a text
- * layer. `lib/documents/ai-document-write.test.ts` holds that exception to
- * its one tenant.
+ * The vision lane: the upgrade path for a scanned PDF with no text layer
+ * (`extraction_status: 'unsupported'`).
  *
- * **No rasterizer (owner decision, 2026-09-27).** The PDF bytes themselves
- * go to the routed vision provider as a `file` part, and the provider
- * renders the pages. Considered and rejected:
- *
- *   - `@napi-rs/canvas` behind unpdf's `renderPageAsImage` — pdf.js is
- *     already here, but rendering needs a canvas backend, and that is a
- *     prebuilt native binary per platform in a two-container image;
- *   - poppler (`pdftoppm`) — a system package in the image and a child
- *     process per page;
- *   - pdfium compiled to wasm — no native binary, but tens of megabytes of
- *     wasm and a page bitmap in memory per render.
- *
- * Each would be a dependency doing work the provider does anyway: every
- * vision-capable provider we route to (Anthropic, OpenAI, Google, and
- * Ollama through `ollama-ai-provider-v2`, which declares `application/pdf`)
- * accepts a PDF and rasterizes it on its side. So there are no page images
- * here at all, and no image-size bound to keep — the bound is on PDF bytes.
- *
- * **The memory bound is the chunk.** The source PDF is held once (as the
- * extraction job already holds it), parsed once by `pdf-lib` (pure JS, no
- * native code), and cut into page ranges of `VISION_PAGES_PER_CHUNK`; each
- * range is written out as its own small PDF, sent, and dropped before the
- * next is made — `visionChunks` yields one `Uint8Array` at a time and the
- * caller awaits the model before asking for the next, so a 200-page scan is
- * ten 20-page requests, never ten buffers at once. Twenty pages also sits
- * well under every provider's per-request page ceiling (Anthropic's is 100).
- *
- * **Usage.** One `complete('vision', …)` call per chunk, so one `ai_usage`
- * row per chunk under lane `vision`. Providers report tokens per request,
- * not per page, so a per-chunk row is the honest grain; the chunk's page
- * range is fixed by `VISION_PAGES_PER_CHUNK` and the row's order within the
- * job run, and the job's log line names each range.
- *
- * **Sensitivity** is routed exactly as every other call: `complete()`
- * refuses a sensitive document to the cloud (`SensitiveRouteRefused`), so
- * a sensitive scan goes to a local model or is refused, never rasterized
- * here as a fallback.
+ * - The one place AI writes to a document rather than proposing, because it
+ *   is extraction: `ExtractionStore.markExtracted` then `onExtracted`, so
+ *   chunking, embedding and classify follow as for a text layer.
+ * - No rasterizer: the PDF bytes go to the vision provider as a `file` part
+ *   and the provider renders the pages (no native canvas, poppler or wasm).
+ * - The memory bound is the chunk: `visionChunks` yields one
+ *   `VISION_PAGES_PER_CHUNK`-page PDF at a time, never all at once.
+ * - One `complete('vision', …)` call, so one `ai_usage` row, per chunk.
+ * - A sensitive scan goes to a local model or is refused by `complete()`.
  */
 
 /** Pages per request, and so the most PDF bytes in flight at once. */

@@ -19,7 +19,7 @@ import {
 } from './preview'
 
 /**
- * Cmd-K's preview pane reads. (D70) A record's fields are its filled
+ * Cmd-K's preview pane reads. A record's fields are its filled
  * attributes only, at most six; an object's views carry the chips' counts;
  * a passage's page holds its chunks with the matched one marked, and a
  * note the reader may not read answers nothing.

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { requireUser } from './shared'
 
 /**
- * Versions (D59): the two manual `supersedes` writers. Nothing is deleted;
+ * Versions: the two manual `supersedes` writers. Nothing is deleted;
  * the older item stays readable and searchable, and ranks lower.
  */
 

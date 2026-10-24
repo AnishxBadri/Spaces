@@ -13,7 +13,7 @@ import { manifestSchema } from '@spaces/sdk'
 import type { SetupState } from '#/lib/setup/whats-set-up'
 
 /**
- * The first-run reads (D80): whether the workspace holds a company yet, who
+ * The first-run reads: whether the workspace holds a company yet, who
  * a member asks, and What's set up. Each is read live;
  * nothing about setup is stored.
  */
@@ -67,7 +67,7 @@ export const setupAudienceProgram = Effect.fn('setupAudienceProgram')(
  * - AI model: an active `llm` credential in the vault (Ollama is one too).
  * - Team: more than one user.
  * - Enrichment: a runnable plugin with the `enrichment` role. The Website
- *   source needs nothing, so it never counts. (D80)
+ *   source needs nothing, so it never counts.
  * - Email forwarding: a `mailbox` row.
  * - Google: an `account_connection` with provider google, not revoked.
  * - Granola, Exa: an enabled `integration` row with that capability id.

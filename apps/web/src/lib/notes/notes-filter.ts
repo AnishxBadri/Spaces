@@ -1,5 +1,5 @@
 /**
- * A record's Notes tab filters (D78): All · Filed here · From meetings ·
+ * A record's Notes tab filters: All · Filed here · From meetings ·
  * Mentions. The tab head's count reads the same filter, so the two agree.
  * Client-safe.
  * - From meetings may overlap Filed here (a recorder files its note on the

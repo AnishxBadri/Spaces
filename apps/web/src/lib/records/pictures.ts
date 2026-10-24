@@ -5,9 +5,9 @@ import { storage } from '@spaces/core/writes/storage'
 
 /**
  * A record's picture as the page draws it: a short-lived URL on the blob
- * store, never the remote address it was fetched from (D67).
- * - Server-only: the store signs the URL. Lives outside `lib/server/` so the
- *   loaders' programs and tests can call it without a request.
+ * store, never the remote address it was fetched from.
+ * - Server-only: the store signs the URL. Outside the server-fn barrel so
+ *   the loaders' programs and tests can call it without a request.
  */
 
 /** Long enough to outlast a page left open; the blob itself never changes. */

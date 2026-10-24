@@ -1,6 +1,5 @@
 /**
- * The "via <tool> · <author>" mark a note filed from a recorder carries
- * (D78). Client-safe; `notesViaProgram` reads it.
+ * The "via <tool> · <author>" mark a note filed from a recorder carries. Client-safe; `notesViaProgram` reads it.
  */
 export type NoteVia = { tool: string; author: string }
 

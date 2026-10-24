@@ -38,13 +38,11 @@ import {
   spaceInheritedContactsProgram,
 } from '#/lib/people/space-contacts'
 
-// Space reads as Effect programs (CONTEXT.md "Backend paradigm"). They live
-// outside lib/server/ on purpose: `server-fns.ts` is a client-imported barrel
-// and only `createServerFn().handler()` bodies are stripped from the browser
-// bundle, so a plain export there ships — and this one reaches `db`, which
-// drags `pg` into the client and kills hydration (the SPA-155 trap). The
-// server fns in lib/server/spaces.ts are the only production callers; the
-// test that pins the lanes' contents (SPA-109) imports from here.
+// Space reads as Effect programs, outside the server-fn module on purpose:
+// that barrel is client-imported and only `createServerFn().handler()` bodies
+// are stripped, so a plain export there ships — and this reaches `db`, which
+// drags `pg` into the client and kills hydration. The spaces server fns are
+// the only production callers.
 
 class SpaceNotFound extends Schema.TaggedError<SpaceNotFound>()(
   'SpaceNotFound',
@@ -169,7 +167,7 @@ const lastFiledBySpace = Effect.fn('lastFiledBySpace')(function* () {
 
 /**
  * The archive heads: archived spaces with no archived ancestor, newest first.
- * Restore on a head brings back every space archived with it. (D73)
+ * Restore on a head brings back every space archived with it.
  */
 const archivedHeads = Effect.fn('archivedHeads')(function* () {
   const rows = yield* query(() =>
@@ -240,9 +238,9 @@ export const spacesIndexProgram = Effect.fn('spacesIndexProgram')(function* (
 })
 
 /**
- * Exported for the test that pins the lanes' contents — in particular that
- * the `filed` lane carries a scratch note like any other (SPA-109). The
- * server fn below is the only production caller.
+ * Exported for the test that pins the lanes' contents (the `filed` lane
+ * carries a scratch note like any other). The server fn is the only
+ * production caller.
  */
 export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
   id: string,
@@ -314,10 +312,9 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
       .orderBy(asc(entity.canonicalName)),
   )
 
-  // Tracking vs evaluating is a first-class distinction (CONTEXT.md "Space
-  // membership is orthogonal to pipeline membership"): each company carries
-  // how many live deals reference it, so the page can say which are in the
-  // pipeline and which are only watched.
+  // Space membership is orthogonal to pipeline membership: each company
+  // carries how many live deals reference it, so the page can say which are
+  // in the pipeline and which are only watched.
   const dealCounts =
     companyRows.length === 0
       ? new Map<string, number>()
@@ -395,9 +392,8 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
       }
     : null
 
-  // Custom-object records tagged here (spec §9: customs live in the
-  // research graph). Grouped by object on the page; each links through
-  // its object's slug.
+  // Custom-object records tagged here, grouped by object on the page; each
+  // links through its object's slug.
   const records = yield* query(() =>
     db
       .select({
@@ -423,31 +419,23 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
 
   // Filed: notes the user deliberately put in this space. No singleton —
   // a space holds as many as its owner wants, and which one leads is the
-  // ordering's answer, not the schema's (see `lib/notes/filed`).
+  // ordering's answer, not the schema's.
   const filed = yield* filedNotesProgram(userId, id)
   const filedIds = new Set(filed.map((f) => f.id))
 
-  // Sources: the documents filed into this space (spec-storage-sources §3.2).
-  // A space's sources arrive through `entity_space`, not `link(tagged_in)`,
-  // so the query is its own — `lib/documents/space-sources`, outside
-  // `lib/server/` for the reason `filedNotesProgram` is.
-  //
-  // And the inherited lane (SPA-67): documents on the companies tagged in
-  // here. It is deliberately a *second* field and not more `sources` — the
-  // headline count says what was filed here on purpose, and inheritance is
-  // a convenience, not a claim of filing. The two run concurrently: they
-  // share nothing but the space id.
+  // Sources: documents filed here, through `entity_space` rather than
+  // `link(tagged_in)`, so the query is its own.
+  // The inherited lane (documents on the companies tagged here) is a
+  // separate field on purpose: the headline count is what was filed here,
+  // and inheritance is a convenience, not a claim of filing.
   const [sources, inheritedSources] = yield* Effect.all(
     [spaceSourcesProgram(id, userId), spaceInheritedSourcesProgram(id, userId)],
     { concurrency: 'unbounded' },
   )
 
-  // Contacts: the people of this space (SPA-99), the other half of CONTEXT's
-  // "sources and contacts sections" question and the same two lanes for the
-  // same reasons — `contacts` is who was tagged in here and is the only
-  // thing counted, `inheritedContacts` is who the companies here bring with
-  // them and is a convenience. `lib/people/space-contacts` for the same
-  // reason the sources lane is outside `lib/server/`.
+  // Contacts: the same two lanes for the same reasons. `contacts` is who was
+  // tagged here and is the only thing counted; `inheritedContacts` is who
+  // the companies here bring with them.
   const [contacts, inheritedContacts] = yield* Effect.all(
     [spaceContactsProgram(id), spaceInheritedContactsProgram(id)],
     { concurrency: 'unbounded' },

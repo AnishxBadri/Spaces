@@ -51,7 +51,7 @@ const deleteKey = z.discriminatedUnion('surface', [
  * Key → target: the object surface resolves its kind to an object row; every
  * other surface names none. There is no default kind — a key that supplies
  * neither kind nor objectId never reaches here, because the validators above
- * refuse it (D2, views-1).
+ * refuse it.
  */
 const resolveTarget = async (key: SurfaceKey): Promise<ViewTarget> => {
   if (key.surface === 'document') return { surface: 'document' }
@@ -73,7 +73,7 @@ export const listViews = createServerFn()
     const views = await Effect.runPromise(listViewsProgram(target, u.id))
     // Null on a surface with no object row — the same equivalence the
     // `view_surface_object_id` CHECK asserts, so the page rebuilds the target
-    // from it with `viewTarget` (lib/views/target.ts).
+    // from it with `viewTarget`.
     return {
       objectId: target.surface === 'object' ? target.objectId : null,
       views,
@@ -138,7 +138,7 @@ export const listJumpViews = createServerFn().handler(async () => {
 })
 
 /**
- * The view chips' counts (SPA-162): one call per page for every chip on the
+ * The view chips' counts: one call per page for every chip on the
  * bar. `live` carries the conditions the page is showing for its active view
  * when they differ from the saved ones, so that chip moves with the table.
  *

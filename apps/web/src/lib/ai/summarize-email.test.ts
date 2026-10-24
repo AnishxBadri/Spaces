@@ -28,7 +28,7 @@ import {
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * An email's summary and categories (D67) through an injected model: the
+ * An email's summary and categories through an injected model: the
  * mail lane, the routes, the live sensitivity read and the meta write are
  * real; nothing reaches a network. What a reader sees is read off the
  * record timeline, the Interactions tab's loader.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { offersVision } from './vision-gate'
 
-/** SPA-94: which Files-tab rows offer Read with vision. */
+/** Which Files-tab rows offer Read with vision. */
 
 const scan = {
   extractionStatus: 'unsupported',

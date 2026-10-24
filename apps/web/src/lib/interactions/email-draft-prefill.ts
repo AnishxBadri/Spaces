@@ -4,7 +4,7 @@ import type { EmailMeta } from '@spaces/db/schema/interactions'
 
 /**
  * What a reply, a reply-all and a forward start from, computed from the
- * parent's headers (D67). Pure: the program hands it the parent and the
+ * parent's headers. Pure: the program hands it the parent and the
  * viewer's own addresses and resolves the names after.
  * - Reply goes to the sender; replying to your own message goes to its To.
  * - Reply-all adds To and Cc, minus every address that is the viewer's.

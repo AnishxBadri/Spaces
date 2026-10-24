@@ -12,9 +12,9 @@ import {
 } from './vision'
 
 /**
- * SPA-94, the pure half of the vision lane: the chunk bound, the page-range
- * cut, and the answer read back into extraction's `[Page N]` shape. The job
- * that calls the model is `worker/jobs/vision-document.test.ts`.
+ * The pure half of the vision lane: the chunk bound, the page-range cut, and
+ * the answer read back into extraction's `[Page N]` shape. The job that calls
+ * the model is tested with the worker.
  */
 
 describe('the chunk bound', () => {

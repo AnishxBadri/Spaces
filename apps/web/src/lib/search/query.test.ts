@@ -4,15 +4,12 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { recordPath } from '../record-path'
 
 /**
- * Cmd-K's fused query (SPA-148). Three slices rewrote it — a parent lane, a
- * task lane (SPA-55), a vector lane (SPA-129) — and each kept these four
- * invariants; the next must too. A rewrite that drops one fails here, not
- * in the palette:
+ * Cmd-K's fused query. Every rewrite must keep these four invariants:
  *
  *   1. One RRF, with k = 60, in one place. The final select sums
  *      1 / (60 + rank) per fused key, and nothing else scores. A second k,
  *      or a lane fused in Node, is a regression. The key is
- *      `(row_kind, id)` since the task lane (SPA-55): name, note, document
+ *      `(row_kind, id)`: name, note, document
  *      and semantic lanes rank entity ids, the task lane ranks task ids,
  *      and the two id spaces never sum into one row.
  *   2. Snippets are marked «like this» (`HEADLINE_OPTIONS`) and the palette
@@ -28,10 +25,10 @@ import { recordPath } from '../record-path'
  *      reach a note and tasks carry no visibility flag, so it takes none.
  *
  * The semantic lane's own behaviour — pin, stale models, the query-embedding
- * cache, EXPLAIN on the HNSW index — is `semantic-lane.test.ts`.
+ * cache, EXPLAIN on the HNSW index — is its own suite.
  *
- * The file's database was truncated and reseeded before it was imported
- * (SPA-145), so the fixtures below are the whole corpus the words they use
+ * The file's database was truncated and reseeded before it was imported,
+ * so the fixtures below are the whole corpus the words they use
  * can reach — and nothing here cleans up after itself, `task` rows
  * included: the next file starts from the same truncate. Imports are
  * dynamic: `@spaces/db` builds its pool from `DATABASE_URL`, which
@@ -138,7 +135,7 @@ async function deps() {
     return id
   }
 
-  /** The row docsurf-1a's `{ kind: 'space' }` filing branch writes. */
+  /** The row the `{ kind: 'space' }` filing branch writes. */
   const fileInSpace = async (documentId: string, spaceId: string) => {
     await db
       .insert(schema.entitySpace)
@@ -187,10 +184,8 @@ async function deps() {
 }
 
 describe('searchAllProgram', () => {
-  // The first `deps()` pays for transforming and loading effect, drizzle and
-  // the whole search module graph — on a loaded CI runner that alone crept
-  // from ~2.5s to over the 5s test timeout (SPA-184 found it red twice), so
-  // the typo test was failing for its imports, not its search. Paying it
+  // The first `deps()` loads effect, drizzle and the search module graph,
+  // which on a loaded CI runner can exceed the 5s test timeout. Paying it
   // here, under its own budget, leaves each test timing only what it tests.
   beforeAll(async () => {
     await deps()
@@ -267,7 +262,7 @@ describe('searchAllProgram', () => {
       objectSlug: null,
     })
     // The palette's destination is `recordPath` over the parent — `hrefFor`
-    // (command-palette.tsx) builds exactly this target for a document hit
+    // builds exactly this target for a document hit
     // and adds no branch of its own, so a non-null path is an enabled row.
     // Its meta lane is `in ${parent.name}`.
     if (!hit?.parent) throw new Error('the deck resolved no parent')
@@ -446,12 +441,10 @@ describe('searchAllProgram', () => {
 })
 
 /**
- * The statement's source, as these source-reading assertions mean it: since
- * SPA-198 the four lexical lanes and the fusion live in core
- * (`@spaces/core/writes/read/search`, which the plugin SDK's Read.search
- * runs) and the semantic lane in this directory's `query.ts`, which hands
- * its fragment to core's builder. Read in that order — the fragment's CTEs
- * come first in the emitted statement — they are the one statement.
+ * The statement's source for the source-reading assertions: the semantic
+ * fragment here, then core's lexical lanes and fusion
+ * (`@spaces/core/writes/read/search`). In that order, the fragment's CTEs
+ * first, they are the one emitted statement.
  */
 const statementSource = () =>
   readFileSync(new URL('./query.ts', import.meta.url), 'utf8') +
@@ -655,7 +648,7 @@ describe('terms are findable (SPA-75)', () => {
   })
 
   it('needed no new lane: terms ride name_hits, and the statement keeps one fusion', () => {
-    // The semantic lane (SPA-129) and the query vector it reads are the
+    // The semantic lane and the query vector it reads are the
     // only CTEs outside the four-lane statement, spelled in their own
     // fragment; the union below gains exactly its one arm.
     const source = statementSource()

@@ -1,22 +1,11 @@
 import type { IdentityOutcome } from '@spaces/core/writes/entities/resolve'
 
 /**
- * The one sentence a losing identity write owes the operator (SPA-97).
- *
- * objects-7 made the collision correct and invisible: the value lands, the
- * claim goes to whoever held it, and the only evidence is a row in a queue
- * nobody was looking at. This is the other half — "a conflict is never
- * silent" (CONTEXT.md, Machine-write design).
- *
- * It copies the precedent exactly rather than inventing an interaction: a
- * toast is title plus `description`, prose only. **No action button** — `DESIGN.md` §5's
- * Micro-interactions sheet carries four proposals and a toast action is not
- * among them, so the conservative reading is the shipped one: the inbox is
- * named in the sentence and reached the way every other surface reaches it.
- *
- * Pure on purpose: the two editing surfaces call it with what their server
- * fn just returned, and the whole "which toast, if any" decision is one
- * testable function instead of two copies of a condition.
+ * The one sentence a losing identity write owes the operator: the value
+ * lands, the claim stays with its holder, and a conflict is never silent.
+ * - Title plus `description`, prose only. No action button: the inbox is
+ *   named in the sentence and reached the usual way.
+ * - Pure, so both editing surfaces share one testable "which toast" decision.
  */
 export type CollisionToast = { title: string; description: string }
 
@@ -27,15 +16,10 @@ export type IdentityReport = {
 }
 
 /**
- * `suggested_duplicate` is the only outcome anyone is told about: `added` is
- * the write working, `already_own` is a no-op re-assertion of a claim this
- * record already holds, and `released` is a clear the operator just made on
- * purpose. Announcing any of those three would be the instrument narrating
- * itself.
- *
- * `singular` is the object's noun verbatim, cased as the operator wrote it —
- * an object named "LP" must not read "another lp", the same reason the pair
- * card's heading does not lowercase it.
+ * Only `suggested_duplicate` is announced; `added`, `already_own` and
+ * `released` are the write working as asked.
+ * `singular` is the object's noun verbatim, as the operator cased it — an
+ * object named "LP" must not read "another lp".
  */
 export function collisionToast(
   report: IdentityReport,

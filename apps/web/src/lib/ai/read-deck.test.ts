@@ -34,8 +34,8 @@ import { clearAiRouteProgram, setAiRouteProgram } from './route'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * SPA-90. The deck reader through an injected model (`MockLanguageModelV4`,
- * as `complete.test.ts`): the route, the sensitivity read, the context
+ * The deck reader through an injected model (`MockLanguageModelV4`): the
+ * route, the sensitivity read, the context
  * assembly, the validator and the suggestion row are all real; nothing
  * reaches a network. Per-file truncation gives each file a clean database.
  */
@@ -346,9 +346,9 @@ describe('readDeck', () => {
   })
 
   it('turns the founders the deck names into identity suggestions on the deal, after its patch', async () => {
-    // SPA-105: a claim on a person reference (`people`) is no longer held
-    // back — each person becomes one `identity` row on the same record,
-    // citing the field's refs, and nothing is resolved until accepted.
+    // A claim on a person reference (`people`) becomes one `identity` row
+    // per person on the same record, citing the field's refs; nothing is
+    // resolved until accepted.
     await routeExtract()
     const { documentId, tag } = await deckOnCompany()
     const dealId = await fileOnDeal(documentId, tag)
@@ -388,7 +388,7 @@ describe('readDeck', () => {
     const patch = onDeal.filter((r) => r.kind === 'attribute_patch')
     const identities = onDeal.filter((r) => r.kind === 'identity')
     expect(patch).toHaveLength(1)
-    // The claim is not a field of the patch, and not held back any more.
+    // The claim is not a field of the patch, and not held back.
     expect(Object.keys(jsonRecord(patch[0].payload))).toEqual(['stage'])
     expect(patch[0].rationale).toMatch(/2 people named in the deck/)
     expect(patch[0].rationale).not.toMatch(/Held back/)
@@ -417,7 +417,7 @@ describe('readDeck', () => {
   })
 
   it('turns the founders a deck names into identity suggestions on a company filed alone', async () => {
-    // SPA-160: `founders` is a person reference on the company registry, so
+    // `founders` is a person reference on the company registry, so
     // a deck filed on a bare company — no deal — proposes its founders too,
     // each naming the field accepting will write them into.
     await routeExtract()
@@ -557,7 +557,7 @@ describe('readDeck', () => {
 })
 
 describe('a company LinkedIn read from a deck', () => {
-  // A plain `url` attribute (D75): the reader's schema carries it because the
+  // A plain `url` attribute: the reader's schema carries it because the
   // registry does, and it goes through the normal value path — never an alias.
   const LINKEDIN = 'https://www.linkedin.com/company/acme'
 

@@ -1,8 +1,8 @@
 /**
  * Where a record lives, by entity kind. Custom records need their object's
  * slug — every list that links to records carries it. Null means "no page"
- * (documents), never a broken link. A term's page is its concept node
- * (SPA-75): definition, mentions, and what they reach.
+ * (documents), never a broken link. A term's page is its concept node:
+ * definition, mentions, and what they reach.
  */
 export function recordPath(row: {
   kind: string

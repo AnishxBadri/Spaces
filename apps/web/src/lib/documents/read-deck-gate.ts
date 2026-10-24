@@ -1,5 +1,5 @@
 /**
- * Whether a Files-tab row offers Read deck (SPA-90). Client-safe and pure,
+ * Whether a Files-tab row offers Read deck. Client-safe and pure,
  * so the rule is one function the row calls and a test can hold.
  *
  * It reads `kind` and `extractionStatus` and nothing else — **kind is

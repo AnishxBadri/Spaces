@@ -22,7 +22,7 @@ import {
 import { reopenImportMappingProgram } from './plan'
 
 /**
- * Ledger mapping (SPA-170) against the database: the company column goes
+ * Ledger mapping against the database: the company column goes
  * through the reference matcher, holdings already held are read, plans are
  * stored — and nothing reaches `round`, `investment`, `mark`,
  * `distribution`, `holding` or `entity`.

@@ -1,7 +1,7 @@
 import type { DocumentKind } from '@spaces/core/documents'
 
 /**
- * "Newer version of" at upload (D59), as pure functions: which of a record's
+ * "Newer version of" at upload, as pure functions: which of a record's
  * files a new arrival may replace, and when the link may be written.
  * Client-safe: the three adding surfaces and their tests share one copy.
  */

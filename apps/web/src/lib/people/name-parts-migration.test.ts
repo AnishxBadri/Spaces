@@ -10,7 +10,7 @@ import { splitName } from '@spaces/core/attributes/person-name'
 
 /**
  * The data migration that split every person's name into `first_name` and
- * `last_name` and made phone a multi-valued E.164 list (D67). The test
+ * `last_name` and made phone a multi-valued E.164 list. The test
  * database is already past it, so pre-migration rows are inserted raw and
  * its statements run again over them.
  */

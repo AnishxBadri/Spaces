@@ -5,7 +5,6 @@ import { SearchQueryFailed } from '@spaces/core/writes/read/search'
 
 /**
  * A Records row's kind lane: `company · seed · Proptech › Property ops`.
- * (D70)
  * - `singular` is the object's singular; null for a space or a term, which
  *   belong to no object.
  * - `stage` is the stage word the record carries: a company's funding

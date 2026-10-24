@@ -7,7 +7,7 @@ import { settingsFormOf } from './settings-form'
 /**
  * A mail syncer's sharing switch and exclude list are its connection's, on
  * the account page for the mailbox's owner — never on the plugin page, where
- * an admin would decide who reads someone else's mail. (D67)
+ * an admin would decide who reads someone else's mail.
  */
 const manifestWith = (roles: Array<'email-calendar' | 'enrichment'>) =>
   manifestSchema.parse({

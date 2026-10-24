@@ -1,5 +1,5 @@
 /**
- * What's set up (D80): the seven pieces a workspace can bring, each with the
+ * What's set up: the seven pieces a workspace can bring, each with the
  * one line it unlocks and where it is set up. Client-safe — the state comes
  * from `whatsSetUpProgram`.
  */

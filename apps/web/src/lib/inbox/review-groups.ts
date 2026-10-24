@@ -13,7 +13,7 @@ import { discoverySpaceOf } from '@spaces/core/ai/discovery'
 import { jsonRecord, jsonString } from '@spaces/core/json'
 import { isDiscoveryKind } from '@spaces/core/writes/suggestions/propose'
 
-/** Today's Review rows: the open queue counted by source and space. (D79) */
+/** Today's Review rows: the open queue counted by source and space. */
 
 export class ReviewGroupsFailed extends Schema.TaggedError<ReviewGroupsFailed>()(
   'ReviewGroupsFailed',

@@ -17,12 +17,11 @@ import { pagedListInput, pageOptions } from '#/lib/views/page-input'
 import { recordSpaces } from '#/lib/spaces/filed-in'
 
 /**
- * The `/people` table, on views-3's paging contract: values, identity emails
- * and the names its reference cells show, read over the page's ids.
+ * The `/people` table, paged like every list: values, identity emails and the
+ * names its reference cells show, read over the page's ids.
  *
- * The read is `listPeoplePageProgram` in `lib/views/directory.ts`, outside
- * `lib/server/` because this module is re-exported by the client-imported
- * barrel.
+ * `listPeoplePageProgram` lives outside the server-fn modules because this
+ * module is re-exported by the client-imported barrel.
  */
 export const listPeopleTable = createServerFn()
   .validator(pagedListInput)
@@ -59,9 +58,9 @@ export const createPerson = createServerFn({ method: 'POST' })
       values: data.values,
     })
     // The birth's embeddable values, queued once the resolve has returned —
-    // core hands them back rather than reaching the queue (SPA-174/175).
+    // core hands them back rather than reaching the queue.
     for (const s of reembed) await enqueueSourceEmbed(s)
-    // A manual birth's `entity.created`; null on an attach. (D65)
+    // A manual birth's `entity.created`; null on an attach.
     await emitDomainEvent(emit)
     // The picked company joins the person's `companies` through the one
     // write path — on an attach too, where birth values are not written.
@@ -122,7 +121,7 @@ export const getPerson = createServerFn()
           isNull(entity.mergedIntoId),
         ),
       )
-    // Companies, Deals and every other relationship, both halves (D69).
+    // Companies, Deals and every other relationship, both halves.
     const { effectFn } = await import('./effect')
     const { recordRelationsProgram, relationNames } =
       await import('@spaces/core/writes/read/relations')
@@ -132,15 +131,13 @@ export const getPerson = createServerFn()
       ...relationNames(relations),
     }
 
-    // Spaces this person is tagged into (SPA-99). `entity_space` always
-    // accepted any kind, but until this slice only the company and custom
-    // record pages had a rail to write one — so the space page's Contacts
-    // section had no writer and its direct lane could never fill. Same
-    // query as `getCompany`'s, same two server fns on the rail.
+    // Spaces this person is tagged into, which fills the space page's
+    // Contacts lane. Same query as `getCompany`'s, same two server fns on
+    // the rail.
     const spaces = await recordSpaces(data.id)
 
     // Inbound record-references, grouped by the attribute that made them:
-    // `deal.referred_by` (SPA-59) is the first, and any later attribute
+    // `deal.referred_by` is one, and any later attribute
     // pointing at a person joins it with no edit to the page.
     // A relationship's owner links read as its inverse half instead.
     const referencedBy = groupReferencedBy(

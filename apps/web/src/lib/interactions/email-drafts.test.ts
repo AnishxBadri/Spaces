@@ -29,7 +29,7 @@ import {
 import type { DraftSave } from './email-drafts'
 
 /**
- * Drafts (D67): author-private rows, the reply and forward prefills from the
+ * Drafts: author-private rows, the reply and forward prefills from the
  * parent's headers, the recipient search over names and aliases, and Trash.
  */
 

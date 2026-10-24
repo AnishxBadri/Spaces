@@ -3,10 +3,9 @@ import { mailboxInput } from '../arrival/input'
 
 /**
  * Settings → Email forwarding: the forwarding mailbox. The writes are
- * admin-only and the read is any member's, the password redacted (D81); the
- * bodies live in `lib/arrival/settings.ts` and are imported inside the handler so the vault and
- * imapflow never reach the client bundle — this module is re-exported by the
- * client-imported `server-fns` barrel.
+ * admin-only and the read is any member's, the password redacted. The bodies
+ * are imported inside the handler so the vault and imapflow never reach the
+ * client bundle: this module is re-exported by the `server-fns` barrel.
  */
 
 export const getMailboxSettings = createServerFn().handler(async () => {

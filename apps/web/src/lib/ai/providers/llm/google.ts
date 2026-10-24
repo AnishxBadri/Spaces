@@ -5,7 +5,7 @@ import { PROVIDERS } from '../ids'
 import type { AdapterInput } from './adapter'
 
 /**
- * The Google (Gemini API) LLM adapter (SPA-39). The key rides the
+ * The Google (Gemini API) LLM adapter. The key rides the
  * `x-goog-api-key` header, never the query string, so a gateway's request
  * log does not capture it in a URL.
  */

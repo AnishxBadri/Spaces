@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * `contact_at` is retired: a person's companies are the `companies`
- * attribute, written through the one write path. (D60) The enum value stays,
+ * attribute, written through the one write path. The enum value stays,
  * so the database would still take one — this is what keeps any code path,
  * seeds included, from writing it.
  * - Reads every non-test module of every workspace package and plugin.
@@ -55,7 +55,7 @@ describe('nothing writes link(contact_at)', () => {
     const sources = ROOTS.map((r) => join(repoRoot, r))
       .filter((dir) => existsSync(dir))
       .flatMap(walk)
-    // The seeds are where the last two writers lived.
+    // The seeds write the most links, so they must be in the walk.
     expect(sources.some((f) => f.endsWith('lib/seeds/dev.ts'))).toBe(true)
     expect(sources.some((f) => f.endsWith('lib/seeds/demo.ts'))).toBe(true)
 

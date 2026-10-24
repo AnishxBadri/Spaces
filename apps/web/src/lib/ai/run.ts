@@ -8,28 +8,13 @@ import type { Caller } from './complete'
 import type { AiLane } from './lanes'
 
 /**
- * The run log's one writer (SPA-100; docs/spec-ai-substrate.md §6). A run is
- * one logical AI action — "Read deck", "Read deck and summarize" — and its
- * ordered steps, one per lane call. `schema/ai.ts` carries the reason it is
- * its own table beside `job_run`, naming both specs it reconciles.
- *
- * Three programs, each a single row write:
- *
- * - `openRunProgram` inserts the row at `running` and answers its id, which
- *   the caller threads into every `complete()` (→ `ai_usage.run_id`) and
- *   every `propose()` (→ `suggestion.run_id`) the action makes;
- * - `addStepProgram` appends one step and rolls its tokens into the run's
- *   totals in the same `update`;
- * - `closeRunProgram` settles a `running` row to `done` or `failed`.
- *
- * A run whose process dies between open and close is left `running`, and the
- * Usage page shows it so — nothing here guesses that it failed.
- *
- * `withRun` is how a feature holds a run without owning its lifecycle twice:
- * handed an id, it only threads it (a step of somebody else's run — the
- * chain); handed none, it opens a run lazily, at the first call that needs
- * the id, so a refusal before any model call leaves no row, and closes it
- * when the body settles.
+ * The run log's one writer. A run is one logical AI action ("Read deck") and
+ * its ordered steps, one per lane call. Each program is a single row write:
+ * - `openRunProgram` inserts at `running`; its id is threaded into every
+ *   `complete()` (`ai_usage.run_id`) and `propose()` (`suggestion.run_id`).
+ * - `addStepProgram` appends a step and rolls its tokens into the totals.
+ * - `closeRunProgram` settles a `running` row. A process that dies first
+ *   leaves it `running`; nothing here guesses that it failed.
  */
 
 /** A run-log write that did not land. The action fails rather than go unrecorded. */

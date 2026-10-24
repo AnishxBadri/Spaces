@@ -16,7 +16,7 @@ import {
 } from './llm/openrouter'
 import { TEST_PROMPT, providerFailure, runTestCall } from './test-call'
 
-// The Test call records under a lane and a caller (SPA-42); these adapter
+// The Test call records under a lane and a caller; these adapter
 // tests assert the wire, not the usage row, so one fixture serves them all.
 const VIA = {
   provider: 'openai',
@@ -25,7 +25,7 @@ const VIA = {
 } as const
 
 /**
- * SPA-39. The four adapters after Anthropic, each asserted against the
+ * The four adapters after Anthropic, each asserted against the
  * client it constructs: a stub transport records the one request and answers
  * with a canned body in that provider's wire format, so the base URL, the
  * extra headers, the key and the model id are read off the request with no

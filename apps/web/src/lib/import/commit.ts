@@ -72,36 +72,25 @@ import type { ImportFailure } from './stage'
 import type { MappingObject } from './mapping'
 
 /**
- * **Idempotent commit** (SPA-169, import-7; CONTEXT.md phase 15 item 9 —
- * per-row errors, never all-or-nothing). The `import.commit` job replays the
- * stored plan row by row, **each row in its own transaction**: its secondary
- * creates first (`alsoCreates`), then its own record through the creator the
- * plan named — `resolveEntity` for people and companies, `birthDealProgram`
- * for deals, `createRecordProgram` for a custom record — then its references,
- * then its values through `setValues`, with the source `import`, the
- * importing human as actor and the batch id on every `attribute_event`. A
- * failure anywhere rolls that row back alone and leaves its reason on
- * `import_row.error`; the next row carries on.
- *
- * **Re-run writes nothing.** A row that holds an `entity_id` is passed over,
- * so committing a batch twice changes no row count anywhere, and a failed
- * row can be re-run on its own once its cause is fixed (`onlyFailed`).
- *
- * **The plan is intent; the creators are truth.** Each row is resolved again
- * inside its transaction — someone may have created the record since the
- * preview — and when the creator's answer differs from the stored verdict
- * both are kept on the plan (`committedAs`).
- *
- * Near-identical names reach the review inbox through the creators' own
- * sweeps (`resolveEntity`'s for people and companies, the object-scoped one
- * for a custom record), run once the row has committed. An import is a human
- * write: it writes values directly and never proposes.
- *
- * A ledger batch (SPA-171) goes through the same request, job, refusals and
- * receipt, and its rows through `./ledger-commit` — portfolio events
- * appended through the portfolio write path, not records.
- *
- * Outside `lib/server/` for the barrel's reason (CLAUDE.md → Traps).
+ * Idempotent commit: the `import.commit` job replays the stored plan row by
+ * row, each row in its own transaction — secondary creates, then the record
+ * through the creator the plan named, then references, then values through
+ * `setValues` (source `import`, the importing human as actor, the batch id on
+ * every `attribute_event`).
+ * - Per-row errors, never all-or-nothing: a failure rolls back that row alone
+ *   and leaves its reason on `import_row.error`; the next row carries on.
+ * - Re-run writes nothing: a row holding an `entity_id` is passed over, so a
+ *   failed row can be re-run alone (`onlyFailed`).
+ * - The plan is intent; the creators are truth. Each row is resolved again in
+ *   its transaction, and a differing answer is kept beside the verdict
+ *   (`committedAs`).
+ * - An import is a human write: it writes values directly and never proposes.
+ *   Near-identical names reach review through the creators' own sweeps, run
+ *   after the row commits.
+ * - A ledger batch shares the request, job, refusals and receipt; its rows go
+ *   through `commitLedgerProgram` as portfolio events, not records.
+ * - Outside the server-fns barrel's modules: a plain export there ships to
+ *   the browser.
  */
 
 const query = <T>(run: () => Promise<T>) =>
@@ -292,7 +281,7 @@ const recordSweep =
 const IMPORT_SOURCE = { class: 'import' } as const
 
 /**
- * A secondary create (SPA-168's `alsoCreates`): a record of the referenced
+ * A secondary create (`alsoCreates`): a record of the referenced
  * object, through that object's own creator, inside the row's transaction.
  */
 async function makeSecondary(
@@ -527,9 +516,8 @@ const loadRows = (batchId: string) =>
       .where(eq(importRow.batchId, batchId))
       .orderBy(asc(importRow.rowNum))
       .then((rows) =>
-        // A ledger plan (SPA-170) is not this path's: its events commit
-        // through `commitLedgerProgram` (SPA-171), and a records batch
-        // holds none.
+        // A ledger plan is not this path's: its events commit through
+        // `commitLedgerProgram`, and a records batch holds none.
         rows.flatMap((r): Array<LoadedRow> =>
           r.plan && !('kind' in r.plan) ? [{ ...r, plan: r.plan }] : [],
         ),
@@ -562,7 +550,7 @@ export const commitImportProgram = Effect.fn('commitImportProgram')(function* (
   input: CommitRequest,
 ): Effect.fn.Return<CommitRun, ImportFailure> {
   const batch = yield* committableBatch(input.batchId, input.onlyFailed)
-  // A ledger batch's rows are portfolio events (SPA-171).
+  // A ledger batch's rows are portfolio events.
   if (batch.mode === 'ledger') return yield* commitLedgerProgram(batch, input)
   if (batch.targetObjectId === null)
     return yield* new ImportRefused({
@@ -770,7 +758,7 @@ export type ImportReceiptView = {
   matching: number
   filter: ReceiptFilter
   object: { kind: ObjectKind | null; plural: string }
-  /** A ledger batch's half (SPA-171): its strip, missing rates and void note. */
+  /** A ledger batch's half: its strip, missing rates and void note. */
   ledger: LedgerReceipt | null
 }
 

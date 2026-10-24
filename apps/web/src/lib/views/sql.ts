@@ -4,37 +4,18 @@ import type { SQL } from 'drizzle-orm'
 import type { Condition } from '@spaces/core/views/filter'
 
 /**
- * The second evaluator (SPA-40). `@spaces/core/views/filter` decides what a
- * view condition means over a loaded row in the browser; this module decides
- * the same thing in Postgres, so a list can be filtered before it is sent.
- * The semantics are not re-invented here — `filter.ts` owns them, including
- * the traps SQL gets wrong by default, and `sql.test.ts` walks every op
- * against every type over one shared fixture list to prove the two agree.
- *
- * It imports `sql` and `and` from drizzle and nothing else: no `db`, no
- * schema, no server module. That is what lets it travel with `views/store.ts`
- * in mono-8b while `filter.ts` and the fixtures go to core in mono-7, and it
- * is what makes `resolve` — one function argument — the whole surface seam.
- * An entity-backed list resolves a slug to its `values` member; a list whose
- * fields are real columns passes a resolver of its own and this file gains no
- * branch. `resolve` returning null (an unknown or archived attribute) drops
- * the condition rather than excluding every row, exactly as
- * `matchesConditions` skips a slug `typeOf` does not know.
- *
- * `expr` is the value as **jsonb**, not as text. `values->>'tags'` would hand
- * back `["a", "b"]` for a multi-select and "is a" would stop meaning "a is
- * among the values"; and a missing key, a stored JSON null and `''` would all
- * collapse into one another. Keeping it jsonb lets this module reproduce the
- * three JS coercions `filter.ts` leans on — `isEmpty`, `String(v)`,
- * `Number(v)` — rather than approximate them. A column-backed resolver wraps
- * its column in `to_jsonb(...)`; that is one call at the resolver, against a
- * branch per surface here.
+ * View conditions compiled to Postgres, so a list is filtered before it is sent.
+ * - Semantics belong to `@spaces/core/views/filter`; the sql tests run every op
+ *   against every type over one fixture list to prove the two agree.
+ * - Imports only `sql`/`and` from drizzle: no `db`, no schema. The `resolve`
+ *   argument is the whole surface seam; a column-backed list passes its own.
+ * - `resolve` returning null drops the condition rather than excluding every
+ *   row, as `matchesConditions` skips an unknown slug.
+ * - `expr` is jsonb, not text: `->>` would flatten a multi-select and merge a
+ *   missing key, JSON null and `''`. Column resolvers wrap in `to_jsonb(...)`.
  */
 
-/**
- * An inverse attribute's links (D69), built by the resolver: this module
- * still names no table.
- */
+/** An inverse attribute's links, built by the resolver so this module names no table. */
 export type InverseLinks = {
   /** `exists` over the row's inbound links, narrowed to one source id when given. */
   exists: (member: string | null) => SQL
@@ -58,40 +39,31 @@ export type ResolvedField = {
 /** null means "this surface has no such live field" → the condition is ignored. */
 export type FieldResolver = (slug: string) => ResolvedField | null
 
-/** `filter.ts`'s `isEmpty`: null, undefined, `''`, `[]`. */
+/** The filter's `isEmpty`: null, undefined, `''`, `[]`. */
 const empty = (j: SQL) => sql`(${j} is null
   or jsonb_typeof(${j}) = 'null'
   or ${j} = '""'::jsonb
   or ${j} = '[]'::jsonb)`
 
 /**
- * JS `String(v)` — `spaces_json_text(jsonb)`, declared in migration 0041.
- * Scalars print themselves; an array prints its elements joined by commas,
- * with null printing as the empty string — that is `Array.prototype.join`,
- * and `contains` on a multi-select depends on it.
- *
- * **Why a function and not the CASE it used to be** (SPA-93). The array
- * branch needs `jsonb_array_elements`, which is a subquery, and Postgres
- * refuses a subquery in an index expression — so as long as this was
- * written inline, no per-attribute index could match what the sort key
- * emitted, and views-4's whole premise (`filterable`/`sortable` mints an
- * expression index) was unreachable. An IMMUTABLE function is one node in
- * both the query and the index definition, so the planner matches them.
- * The body is this comment's old CASE, character for character.
+ * JS `String(v)` as the IMMUTABLE SQL function `spaces_json_text(jsonb)`.
+ * - An array prints its elements comma-joined, null as `''`
+ *   (`Array.prototype.join`); `contains` on a multi-select depends on it.
+ * - A function, not an inline CASE: the array branch is a subquery, which an
+ *   index expression refuses, so only a function lets `attr_idx_*` match.
  */
 const text = (j: SQL) => sql`spaces_json_text(${j})`
 
 /**
- * JS `Number(v)` — `spaces_json_number(jsonb)`, same migration, same
- * reason — and never a cast that can throw: a non-numeric string is NaN in
- * the browser and SQL NULL here, so the row simply does not match.
- * `Number(null)` is 0, `Number(true)` is 1, `Number('  ')` is 0, and
- * `Number(v)` for anything else is `Number(String(v))`, which is why the
- * function's last two branches read `spaces_json_text` back.
+ * JS `Number(v)` as `spaces_json_number(jsonb)`, for the same index reason.
+ * - Never a cast that can throw: non-numeric is NaN in the browser, SQL NULL
+ *   here, so the row does not match.
+ * - `Number(null)` 0, `Number(true)` 1, `Number('  ')` 0; otherwise
+ *   `Number(String(v))`, hence the function reads `spaces_json_text` back.
  */
 const num = (j: SQL) => sql`spaces_json_number(${j})`
 
-/** `filter.ts`'s `asList(v).some((x) => String(x) === lit)`. */
+/** The filter's `asList(v).some((x) => String(x) === lit)`. */
 const someEquals = (j: SQL, lit: string) => sql`(case
   when jsonb_typeof(${j}) = 'array' then exists (
     select 1 from jsonb_array_elements(${j}) as e(value)
@@ -116,7 +88,7 @@ const emptyValue = (v: Condition['value']) =>
   (Array.isArray(v) && v.length === 0)
 
 /**
- * `filter.ts` answers "is the stored value empty?" first and returns a
+ * The filter answers "is the stored value empty?" first and returns a
  * constant when it is. That constant is known here, so the two branches
  * collapse into one predicate rather than a CASE.
  */
@@ -210,18 +182,12 @@ function compileCondition(c: Condition, f: ResolvedField): SQL {
 export type SortCast = 'text' | 'numeric'
 
 /**
- * The same two coercions, in `order by` position instead of in a predicate
- * (SPA-64). A paged list cannot sort in the browser — the browser only holds
- * the pages it asked for — so the sort key is compiled here, from the same
- * `resolve` seam and the same `String(v)` / `Number(v)` readings that
- * `gt`/`lt` use, rather than by a second set of rules that would order a
- * column differently than "greater than" filters it.
- *
- * Dates are ISO strings, so lexical order is chronological order and `text`
- * is right for them; `gt`/`lt` already compare them that way.
- *
- * The expression is SQL NULL exactly when the key is absent — `text`/`num`
- * both pass a NULL through — which is what `nulls last` then sorts on.
+ * The sort key for a paged list: the same `String(v)`/`Number(v)` coercions
+ * `gt`/`lt` use, so a column sorts the way "greater than" filters it.
+ * - The `attr_idx_*` expression indexes must match this output exactly, or
+ *   they sit unused with no error; the value-index-plan test is the EXPLAIN check.
+ * - Dates are ISO strings, so `text` order is chronological.
+ * - SQL NULL exactly when the key is absent, which `nulls last` sorts on.
  */
 export function compileSortKey(f: ResolvedField): {
   expr: SQL
@@ -240,7 +206,7 @@ export function compileSortKey(f: ResolvedField): {
  * nothing survived, which is the caller's signal to add no `where` at all.
  *
  * Every condition is wrapped in `coalesce(…, false)` so SQL's third truth
- * value never leaks: `filter.ts` returns a boolean, and a row whose value did
+ * value never leaks: the filter returns a boolean, and a row whose value did
  * not parse must be excluded rather than left undecided.
  */
 export function compileConditions(

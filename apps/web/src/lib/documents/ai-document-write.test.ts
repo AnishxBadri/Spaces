@@ -4,26 +4,17 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * SPA-94: **vision is the only sanctioned direct AI write to a document.**
- *
- * Everything else the AI does ends in a `suggestion` row a person accepts
- * (docs/spec-ai-substrate.md §10, §11; CONTEXT.md, D41). The exception is
- * the vision lane, because it _is_ extraction: a scanned PDF's pages read by
- * a model become `extracted_text` and `tsv` exactly as a text layer would.
- * This grep holds the exception to that one tenant, so the next reader who
- * wants a model to write a document's text finds this test first:
- *
- *   - the statements that write `document.extracted_text` are extraction's
- *     own — the extract job, the URL clip, and the dev seed — and none of
- *     those files calls a model;
- *   - the one file that both calls a model and writes a document's text is
- *     `apps/worker/src/jobs/vision-document.ts`, and it writes it through
- *     extraction's statement (`ExtractionStore.markExtracted`), naming no
- *     column of `document` itself.
+ * **Vision is the only sanctioned direct AI write to a document.**
+ * Every other AI write ends in a `suggestion` a person accepts; vision is
+ * extraction, so a scanned page read by a model becomes `extracted_text`.
+ * - The statements writing `document.extracted_text` are extraction's own
+ *   (extract job, URL clip, dev seed), and none of those files calls a model.
+ * - The vision job writes through `ExtractionStore.markExtracted`, naming no
+ *   column of `document` itself.
  */
 
-// Both source trees (SPA-181): the writers are split between apps/web (the
-// dev seed) and apps/worker (the jobs). Paths are repo-relative.
+// Both source trees: the dev seed is in apps/web, the jobs in apps/worker.
+// Paths are repo-relative.
 const ROOT = resolve(
   fileURLToPath(new URL('.', import.meta.url)),
   '../../../../..',

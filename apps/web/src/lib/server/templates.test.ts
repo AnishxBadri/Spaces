@@ -3,26 +3,17 @@ import { describe, expect, it } from 'vitest'
 import type { NoteBody } from '@spaces/db/schema/kinds'
 
 /**
- * Note templates carry a kind (SPA-131), against the test database.
- *
- * CONTEXT.md freezes `note.kind` at three on the grounds that "Teardown",
- * "post-mortem" and "IC memo" are *templates that set title/structure/kind*.
- * Templates set two of those three: `template` had no note kind, so
- * stamping an IC-memo template produced a plain note. The first two blocks
- * pin capture and stamp; the third pins the path that has no column value to
- * read, because the migration deliberately backfills nothing and a template
- * saved before it must still stamp rather than crash.
- *
- * The last block is the one that would catch a regression nobody is looking
- * for: a template is config, not an entity (CONTEXT.md → Templates), so
- * stamping one must materialise no `link` row at all. The body is stripped
- * of its mentions at capture, and this asserts both halves of that.
+ * Note templates carry a kind, against the test database.
+ * - `note.kind` stays at three because genres like "IC memo" are templates
+ *   that set title, structure and kind; capture and stamp must carry the kind.
+ * - A template with no stored kind (nothing was backfilled) must still stamp.
+ * - A template is config, not an entity: stamping one materialises no `link`
+ *   row, because mentions are stripped at capture.
  *
  * `captureNoteTemplate` / `stampNoteTemplate` rather than the server fns:
- * `requireUser` reads a request the suite has no way to build — the same
- * split `inbox.ts` makes for `entityContext`. Imports are dynamic like the
- * rest of the DB-coupled suite: `@spaces/db` builds its pool from
- * `DATABASE_URL` at import time and `vitest.setup.ts` rewrites it per file.
+ * `requireUser` reads a request the suite cannot build. Imports are dynamic:
+ * `@spaces/db` builds its pool from `DATABASE_URL` at import time and
+ * `vitest.setup.ts` rewrites it per file.
  */
 
 async function actorId(): Promise<string> {
@@ -113,8 +104,8 @@ describe('note template kind', () => {
     const { id: stampedId } = await stampNoteTemplate(me, { templateId })
     const stamped = await readNote(stampedId)
     expect(stamped?.kind).toBe('memo')
-    // The template's name is the new note's title — the third of the three
-    // things CONTEXT.md says a genre template sets.
+    // The template's name is the new note's title: the third thing a genre
+    // template sets.
     expect(stamped?.title).toBe(`IC memo ${tag}`)
   })
 
@@ -142,8 +133,8 @@ describe('note template kind', () => {
     const tag = randomUUID().slice(0, 8)
     const me = await actorId()
 
-    // A legacy row: inserted without note_kind, exactly as every template
-    // saved before migration 0035 sits in the database. No backfill ran.
+    // A row inserted without note_kind, as a template saved before the
+    // column existed sits in the database. No backfill ran.
     const [legacy] = await db
       .insert(template)
       .values({

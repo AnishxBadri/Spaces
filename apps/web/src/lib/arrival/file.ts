@@ -31,65 +31,28 @@ import {
 import type { AttachmentOutcome } from './attachment-filing'
 
 /**
- * One arrival → one interaction, its body note and its edges (SPA-56; D30,
- * D49). The write half of the poll, and the only place this lane touches the
- * graph.
- *
- * **The dedupe is the index.** `interaction_message_id_unique` is what makes a
- * re-poll, a second forward of one message and a partner forwarding the same
- * thread all land on one row: the insert is `on conflict (message_id) do
- * nothing`, and an empty `returning` is the duplicate. Nothing checks first —
- * a pre-check would race a concurrent poll, and the index cannot.
- *
- * **Everything in one transaction**, the interaction first: a duplicate
- * leaves no orphan body note behind, and a failed edge insert leaves no
- * bodyless interaction that the next poll would then skip as a duplicate.
- *
- * **The row, its body and its edges are core's writer** (SPA-200, sdk-7b):
- * `writeIntegrationInteraction` (`@spaces/core/writes/interactions/write`)
- * is the integration interaction lane, shared with the plugin SDK's
- * `Content.logInteraction`. This module keeps what is the mailbox's own —
- * who the participants are, which thread edges a reply inherits, and where
- * the attachments file — and hands the writer the rest.
- *
- * **Participants become records first, then are matched** (SPA-86,
- * arrival-2). Before the transaction, `participantRecordsProgram` decides
- * create / attach / ignore per address (`participants.ts`, pure) and sends
- * every survivor through `resolveEntity` — the one entry gate, which commits
- * on its own and is why this step cannot sit inside the transaction. The
- * match below then runs as before over aliases that now exist: an address
- * resolves through `entity_alias` — the person whose `email` alias it is, the
- * company whose `domain` alias its domain is — which is also how a member or
- * an own-domain address, never created, is still named when its record
- * exists. The records the gate returned are edged too, so a company that
- * lost its domain claim to another kind of record (a `duplicate_candidate`)
- * is still on the thread. Nothing here inserts into `entity` or
- * `entity_alias` itself (`one-door.test.ts`).
- *
- * **Edges go to people and companies only** (D49). A deal's threads are
- * derived — every thread on its company or one of its contacts — so nothing
- * here ever edges a deal, not even by inheritance.
- *
- * **A reply inherits its thread's edges.** Every person and company already
- * edged to an interaction on the same `thread_id` is edged to this one too,
- * so next week's reply is on the same records without re-matching — even
- * when its only participant in common with the thread root is the root.
- *
- * **The body is a note** (D30). Forwarding is the consent, so a forwarded
- * body is `visibility: 'shared'` from birth (D49); a synced mailbox's body is
- * private to its owner unless the connection shares it (D67, `FileOptions`).
- * The note is claimed by `interaction.note_id` and filed
- * against nothing: it reaches a record through the interaction's edges on
- * the timeline, not through `link(tagged_in)`, which would put every mail in
- * every participant's Notes section.
- *
- * **Attachments follow the interaction, and only a written one**
- * (`fileAttachmentsProgram`). They file on every live person and company the
- * transaction edged, and join the row on `interaction_document` as
- * `attachment` (D67, D68). The parts go through the documents intake after
- * the commit, because intake commits on its own. A duplicate files nothing:
- * the Message-ID already brought its attachments in, and only a missing join
- * is written (`rejoinAttachmentsProgram`).
+ * One arrival → one interaction, its body note and its edges. The write half
+ * of the poll, and the only place this lane touches the graph.
+ * - The dedupe is `interaction_message_id_unique`: the insert is `on conflict
+ *   (message_id) do nothing`. Nothing checks first — a pre-check would race a
+ *   concurrent poll, and the index cannot.
+ * - One transaction, the interaction first: a duplicate leaves no orphan body
+ *   note, and a failed edge insert leaves no bodyless interaction that the
+ *   next poll would skip as a duplicate.
+ * - Participants become records first, through `resolveEntity`, which commits
+ *   on its own and so sits before the transaction. Nothing here inserts into
+ *   `entity` or `entity_alias` itself. The records the gate returned are
+ *   edged too, so a company that lost its domain claim is still on the thread.
+ * - The row, body and edges are `writeIntegrationInteraction`'s; this module
+ *   owns who the participants are, thread inheritance and attachment filing.
+ * - Edges go to people and companies only, never a deal: a deal's threads are
+ *   derived from its company and contacts. A reply inherits every person and
+ *   company already edged on its `thread_id`.
+ * - The body is a note filed against nothing (not `tagged_in`, which would
+ *   put every mail in every participant's Notes). A forwarded body is born
+ *   shared — forwarding is the consent; a synced one follows `FileOptions`.
+ * - Attachments file only for a written interaction, after the commit,
+ *   because intake commits on its own. A duplicate only rejoins missing links.
  */
 
 export class ArrivalWriteFailed extends Schema.TaggedError<ArrivalWriteFailed>()(
@@ -105,9 +68,9 @@ export type FileContext = {
 }
 
 /**
- * What differs between the two mail lanes. A forwarded body is born shared
- * (D49); a synced one is the connection's to decide (D67), and carries the
- * mailbox's labels so a later exclude list can find it.
+ * What differs between the two mail lanes. A forwarded body is born shared;
+ * a synced one is the connection's to decide, and carries the mailbox's
+ * labels so an exclude list can find it.
  * - The attachments are born with the body's visibility; a synced mailbox's
  *   are authored by its owner, so a private one is theirs alone.
  */
@@ -127,7 +90,7 @@ export const FORWARDED: FileOptions = {
 }
 
 /**
- * The headers an email row keeps in `interaction.meta` (D67), with the
+ * The headers an email row keeps in `interaction.meta`, with the
  * digest of its stored MIME — null when the bytes were too large to keep.
  */
 export function emailMetaOf(
@@ -223,7 +186,7 @@ export async function matchParticipants(
  * The body of the interaction a Message-ID already holds, made shared when
  * it was private, with a `note.visibility_changed` row naming the lane. Its
  * private attachments are shared with it, and keep no author: forwarding is
- * the consent, and the mailbox's toggle no longer narrows them.
+ * the consent, and the mailbox's toggle does not narrow them.
  */
 async function widenBody(
   tx: Tx,
@@ -320,7 +283,7 @@ async function threadEdges(tx: Tx, threadId: string): Promise<Array<string>> {
 type StoredMime = { sha: string; stored: boolean } | null
 
 /**
- * The raw MIME as a content-addressed blob (D67): the same bytes are one
+ * The raw MIME as a content-addressed blob: the same bytes are one
  * blob by construction.
  * - Nothing is stored for a Message-ID already held: a second mailbox's copy
  *   carries its own Received and DKIM headers, so its digest differs and it
@@ -374,8 +337,8 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
   ctx: FileContext,
   options: FileOptions = FORWARDED,
 ): Effect.fn.Return<Filed, ArrivalWriteFailed> {
-  // Participants → records, through the gate (SPA-86). Before the
-  // transaction, and for a duplicate too: a re-read is all attaches.
+  // Participants → records, through the gate. Before the transaction, and
+  // for a duplicate too: a re-read is all attaches.
   const records = yield* participantRecordsProgram(message, ctx).pipe(
     Effect.mapError((e) => new ArrivalWriteFailed({ cause: e.cause })),
   )
@@ -403,8 +366,8 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
             authorId: ctx.authorId,
             visibility: options.visibility,
           },
-          // Matched and inherited after the row exists, as before the
-          // extraction: the writer calls this inside the same transaction.
+          // Matched and inherited after the row exists; the writer calls
+          // this inside the same transaction.
           edges: async () => [
             ...records.entityIds,
             ...(await matchParticipants(tx, message.participants)),
@@ -412,7 +375,7 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
           ],
         })
         if (wrote.kind === 'duplicate') {
-          // Forwarding is the consent (D49): a forward of a thread a mailbox
+          // Forwarding is the consent: a forward of a thread a mailbox
           // synced privately widens that body. A synced duplicate changes
           // nothing — two private copies of one thread is mailbox #2's.
           if (options.visibility === 'shared')
@@ -453,7 +416,7 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
       authorId: options.mailboxOwner,
     },
   })
-  // Its summary and categories, after the commit. (D67)
+  // Its summary and categories, after the commit.
   yield* Effect.promise(() => enqueueSummarizeEmail(written.interactionId))
   return { ...written, attachments }
 })

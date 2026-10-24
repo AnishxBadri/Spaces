@@ -27,28 +27,17 @@ import type {
 } from './sensitivity-for'
 
 /**
- * Kind classify (SPA-62; docs/spec-ai-substrate.md §11's first row, §14
- * step 5) — the cheapest lane: a document whose kind is still `other` once
- * its text is extracted becomes at most one `suggestion(kind:
- * 'document_kind')` on the document itself. Never a value: accepting it is
- * what writes `document.kind` (`acceptProgram`).
- *
- * The options are the schema's, not a list written here: drizzle's
- * `documentKind.enumValues` minus `other` — "unknown" is never proposed.
- * An answer outside them (a model that ignored the enum, a kind the schema
- * has since dropped) is dropped and named in the rationale; when nothing is
- * left, no suggestion is written and the run ends without raising.
- *
- * It never competes with the deterministic guessers: a document that
- * arrived carrying a kind — from its filename (`guessDocumentKind`) or a
- * bound folder — is not `other`, and is skipped here as well as at the
- * enqueue (`onDocumentExtracted`). And it never chains: accepting a `deck`
- * writes the kind and the Read deck button appears; a person presses it.
- *
- * One classification per document, ever: a `document_kind` suggestion that
- * exists in any status — open, accepted or rejected — is the answer, and a
- * re-extraction does not ask again. A rejection is a negative assertion the
- * person made once, as a dismissed duplicate pair is.
+ * Kind classify: a document still `other` after extraction gets at most one
+ * `suggestion(kind: 'document_kind')`. Never a value — accepting it writes
+ * `document.kind` (`acceptProgram`).
+ * - Options are `documentKind.enumValues` minus `other`; an answer outside
+ *   them is dropped and named in the rationale, and if none is left no
+ *   suggestion is written and the run ends without raising.
+ * - Never competes with `guessDocumentKind` or a bound folder: a document
+ *   that arrived with a kind is skipped here and at `onDocumentExtracted`.
+ * - Never chains: accepting `deck` shows Read deck; a person presses it.
+ * - One classification per document, ever: an existing `document_kind`
+ *   suggestion in any status (rejected included) is the answer.
  */
 
 /** The head of the extracted text the model reads. A kind is on page one. */
@@ -113,7 +102,7 @@ export type ClassifyInput = {
   /** The test seam: an injected model replaces the vault lookup. */
   model?: LanguageModel
   jobRunId?: string
-  /** A run this is a step of (SPA-100); absent, it opens its own. */
+  /** A run this is a step of; absent, it opens its own. */
   runId?: string
 }
 

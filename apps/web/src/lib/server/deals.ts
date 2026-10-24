@@ -19,9 +19,9 @@ const createDealInput = z.object({
 })
 
 /**
- * A deal from the create dialog. The birth — entity, values, activity, and
- * the Invested → holding seam — is `birthDealProgram` (SPA-169), the same
- * program an imported Deals row goes through; this is its thin caller.
+ * A deal from the create dialog. The birth (entity, values, activity, and the
+ * Invested → holding seam) is `birthDealProgram`, the same program an
+ * imported Deals row goes through; this is its thin caller.
  */
 export const createDeal = createServerFn({ method: 'POST' })
   .validator(createDealInput)
@@ -47,7 +47,7 @@ type DealTableRow = {
  */
 export const listDealsTable = createServerFn().handler(async () => {
   await requireUser()
-  // The same set the view chips count over (SPA-162, `views/scope.ts`).
+  // The same set the view chips count over.
   const { listScope } = await import('../views/scope')
   const rows = await db
     .select({
@@ -136,7 +136,7 @@ export const getDeal = createServerFn()
       )
     const users = await db.select({ id: user.id, name: user.name }).from(user)
 
-    // Outside-mandate hint (CONTEXT.md, 2026-08): rendered on the deal
+    // Outside-mandate hint: rendered on the deal
     // record only — where the invest/pass judgment happens. A hint, never a
     // block; null when there is no mandate, no stages, or no company stage.
     let outsideMandate: boolean | null = null
@@ -167,7 +167,7 @@ export const getDeal = createServerFn()
     const { dealReadoutsProgram } = await import('../records/readouts')
     const { effectFn } = await import('./effect')
     const readouts = await effectFn(dealReadoutsProgram)(data.id, new Date())
-    // Company, People and every other relationship, both halves (D69).
+    // Company, People and every other relationship, both halves.
     const { recordRelationsProgram, relationNames } =
       await import('@spaces/core/writes/read/relations')
     const relations = await effectFn(recordRelationsProgram)(data.id)

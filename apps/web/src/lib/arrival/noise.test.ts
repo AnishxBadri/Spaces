@@ -16,7 +16,7 @@ import type {
 import { decideParticipants } from './participants'
 
 /**
- * SPA-56: the noise refusals, as a fixture table and nothing else — no
+ * The noise refusals, as a fixture table and nothing else — no
  * database, no parser. Each row is one header shape a mailbox really sees and
  * the verdict it must get; `null` is "write it".
  */

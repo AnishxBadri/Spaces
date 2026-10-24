@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * Writing a term diff-syncs its aliases into `entity_alias(kind: 'name',
- * source_class: 'manual')` (SPA-75), the table Cmd-K's `name_hits` lane
+ * source_class: 'manual')`, the table Cmd-K's `name_hits` lane
  * already reads — so an abbreviation finds its term without the fused query
  * changing. Run through the programs `createTerm` / `updateTerm` call, not a
  * helper beside them. Imports are dynamic: `@spaces/db` builds its pool from
- * `DATABASE_URL`, which `vitest.setup.ts` rewrites per file.
+ * `DATABASE_URL`, which the setup file rewrites per file.
  */
 
 async function deps() {

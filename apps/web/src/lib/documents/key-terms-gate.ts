@@ -1,7 +1,7 @@
 import { isKeyTermKind } from '@spaces/core/ai/key-terms'
 
 /**
- * Whether a Files-tab row offers Extract key terms (SPA-91). Client-safe and
+ * Whether a Files-tab row offers Extract key terms. Client-safe and
  * pure, as `offersReadDeck` is, so the rule is one function the row calls
  * and a test can hold.
  *

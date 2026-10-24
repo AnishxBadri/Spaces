@@ -442,7 +442,7 @@ describe('the settings form', () => {
     const detail = await getIntegrationHandler({ id: apollo.id })
     expect(detail.form.ok).toBe(true)
     // `cacheDays` is the Enrichment page's reuse window on an enrichment
-    // source, so its page does not draw it. (D81)
+    // source, so its page does not draw it.
     expect(detail.values).toEqual({
       dailyCreditCap: '100',
       autoEnrich: false,

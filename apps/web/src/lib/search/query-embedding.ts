@@ -6,23 +6,12 @@ import { readEmbeddingPinProgram } from '#/lib/ai/embedding-pin'
 import type { Caller } from '#/lib/ai/complete'
 
 /**
- * The query half of Cmd-K's semantic lane (SPA-129). The palette's second
- * wave — the fused query plus the vector lane, 600ms after the last
- * keystroke — embeds what the user typed; this module is where that embed
- * happens and where it is remembered.
- *
- * **Cached by (text, model)** in a small in-process LRU: a phrase the user
- * pauses on twice, or retypes, is billed once. The key carries the pinned
- * provider and model, so a vector can never answer for a model it did not
- * come from. The cache lives outside `lib/server/` so a test can reach it
- * without a request (SPA-155), and in the process because a query vector is
- * cheap to lose — a restart costs one provider call per phrase, nothing more.
- *
- * `sensitivity: 'normal'`: the text is what the user typed into a search
- * box, not record content, so no record's sensitivity applies to it.
- *
- * `model` is the test seam, passed straight through to `embed()`: the pin,
- * the cap and the `ai_usage` row are all still real.
+ * The query embed for Cmd-K's semantic wave.
+ * - Cached by (text, model) in an in-process LRU, so a retyped phrase is
+ *   billed once; the key carries provider and model, so a vector never
+ *   answers for another model. Losing it on restart costs one call per phrase.
+ * - `sensitivity: 'normal'`: typed search text is not record content.
+ * - `model` is the test seam into `embed()`; pin, cap and `ai_usage` stay real.
  */
 
 /** Distinct (text, model) pairs held — a session's worth of pauses. */

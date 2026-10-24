@@ -15,13 +15,12 @@ import { decodeCursor } from '#/lib/views/paging'
 import { listRecordsProgram } from '#/lib/views/records'
 
 /**
- * The read half of integration map #11 (SPA-80): what `records.list` and
- * `records.get` in `api.ts` run, with no HttpApi import so the door stays
- * one file (`one-door.test.ts`).
+ * What `records.list` and `records.get` run, with no HttpApi import so the
+ * API door stays one file.
  *
  * Nothing here is a query. Each procedure calls the program the app already
- * calls for the same question (decision 4: the server fn and the procedure
- * share the program, neither is a copy):
+ * calls for the same question; the server fn and the procedure share the
+ * program, neither is a copy:
  *
  * - `registry.list` is `listRegistryProgram`, the MCP `list_registry` read —
  *   live on every call, so an object created a minute ago is listed.

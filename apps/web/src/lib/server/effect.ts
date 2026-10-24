@@ -1,8 +1,7 @@
 import { Effect } from 'effect'
 
 /**
- * The one Effect → TanStack seam (CONTEXT.md "Backend paradigm", ratchet
- * step zero). Server-fn handlers stay async functions; Effect programs run
+ * The one Effect → TanStack seam. Server-fn handlers stay async functions; Effect programs run
  * inside them through this adapter. Effect never crosses into React — typed
  * failures reject the promise and surface through the existing server-fn
  * error path.

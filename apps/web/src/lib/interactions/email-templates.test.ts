@@ -15,7 +15,7 @@ import {
 } from './email-templates'
 
 /**
- * Email templates (D67): saved from a draft, listed by kind, applied into a
+ * Email templates: saved from a draft, listed by kind, applied into a
  * draft with subject, body and files — a file the member may not read is
  * left off.
  */

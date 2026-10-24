@@ -4,7 +4,6 @@ import type { Manifest, PluginRole } from '@spaces/sdk'
  * The Plugins catalogue and the plugin page, the pure half: role words and
  * tabs, the ledger's one number, what a plugin sends out of the box and what
  * it switches on elsewhere. Client-safe — no database, no server import.
- * (D81)
  */
 
 /** Each role as the catalogue prints it, in the order its tabs run. */

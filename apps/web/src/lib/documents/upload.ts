@@ -1,27 +1,13 @@
 /**
- * The **browser lane** of document intake, and the only one that runs in the
- * page: the browser takes the SHA-256 itself through WebCrypto, asks for a
- * URL, and PUTs the bytes straight at storage, so a 200 MB deck never streams
- * through Node (CONTEXT.md → Storage). Only the row is filed through a server
- * fn.
- *
- * The other lane is core's `writes/documents/intake.ts` (SPA-130, moved by
- * SPA-201): bytes that arrive server-side already — the URL clip's PDF
- * response, a plugin filing a document, the Drive walker — where Node holds
- * the buffer and hashes it itself. Two lanes, one writer: both end at
+ * The **browser lane** of document intake: the browser hashes with
+ * WebCrypto, asks for a URL and PUTs the bytes straight at storage, so a
+ * large deck never streams through Node. Only the row goes through a server
+ * fn. Bytes already on the server go through core's intake; both end at
  * `finalizeDocumentUpload`.
- *
- * So this is the one browser hasher — one grep for the WebCrypto digest call
- * lands here and nowhere else; a second copy is a second place to get the
- * secure-context check, the `MAX_UPLOAD_BYTES` guard or the already-stored
- * short circuit subtly wrong (it was two copies until SPA-71 — the Files tab's
- * and the space Sources drop target's).
- *
- * It is also the only **client** module under `lib/documents/` — its
- * neighbours (`space-sources.ts`, `refile.ts`) are server-side Effect modules.
- * It therefore imports from `@spaces/core/documents` and the server-fns barrel
- * and nothing else: no `node:`, no drizzle, no Effect, and it stays outside
- * `lib/server/`.
+ * - The one browser hasher: never add a second copy of the secure-context
+ *   check, the `MAX_UPLOAD_BYTES` guard or the already-stored short circuit.
+ * - A client module: imports `@spaces/core/documents` and the server-fns
+ *   barrel only — no `node:`, no drizzle, no Effect.
  */
 
 import {
@@ -35,12 +21,10 @@ import { finalizeDocumentUpload, prepareDocumentUpload } from '#/lib/server-fns'
 type FinalizeInput = Parameters<typeof finalizeDocumentUpload>[0]['data']
 
 /**
- * Where the document is filed — **an array** of targets since SPA-113. A
- * record files through `link(tagged_in)`, a space through `entity_space`; the
- * union is what stops a space ever being a link target again (SPA-19), and
- * the array is what lets one row be filed in N places without copying (§3.4).
- * Both browser surfaces pass one element; the empty array is the unfiled
- * document the global upload dialog will offer.
+ * Where the document is filed: **an array** of targets. A record files
+ * through `link(tagged_in)`, a space through `entity_space` (never a link
+ * target), and the array files one row in N places without copying. The
+ * empty array is unfiled.
  *
  * Read off the server fn rather than re-declared, so the two cannot drift.
  */

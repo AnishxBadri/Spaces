@@ -31,7 +31,7 @@ import {
 
 /**
  * The one tool table: every tool the external MCP server registers and Ask
- * calls in process. (D70, spec-ai-substrate §5–6)
+ * calls in process.
  * - Both clients go through `toolRegistry.call`, so one canRead, one
  *   sensitivity rule and one set of refusals apply to both.
  * - A tool answers its value plus what Ask's gate and call strip read: the
@@ -197,7 +197,7 @@ const getContext = defineTool({
       }).pipe(Effect.provide(SimilarLaneLive))
     }),
   // Everything the context is about — a space's subspaces and members too —
-  // so the egress gate reads a sensitive descendant. (D71)
+  // so the egress gate reads a sensitive descendant.
   touches: (out) => [
     out.seed.id,
     ...out.reveals,
@@ -225,7 +225,7 @@ const getRecord = defineTool({
 })
 
 // The one write verb — a proposal into Review through `proposeProgram`. No
-// accept, write, delete or merge tool is registered, ever (spec §6).
+// accept, write, delete or merge tool is registered, ever.
 const proposeSuggestion = defineTool({
   name: 'propose_suggestion',
   title: 'Propose a suggestion',
@@ -272,7 +272,7 @@ const proposeSuggestion = defineTool({
 })
 
 // Ask's action card: a proposal shown beside the answer, never applied by
-// the agent. Attribute values stay `propose_suggestion`'s. (D70)
+// the agent. Attribute values stay `propose_suggestion`'s.
 const proposeCard = defineTool({
   name: 'propose_card',
   title: 'Propose an action card',
@@ -324,7 +324,7 @@ const searchRecords = defineTool({
     object === undefined ? `“${query}”` : `“${query}” in ${object}`,
 })
 
-// D70: structured questions over the views compiler, never generated.
+// Structured questions over the views compiler, never generated SQL.
 const queryRecords = defineTool({
   name: 'query_records',
   title: 'Query records',
@@ -337,7 +337,7 @@ const queryRecords = defineTool({
   input: ({ object }) => object,
 })
 
-// D70: money over the pure portfolio libraries, never generated.
+// Money over the pure portfolio libraries, never generated.
 const portfolioSummary = defineTool({
   name: 'portfolio_summary',
   title: 'Portfolio summary',

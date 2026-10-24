@@ -17,16 +17,11 @@ import { requireAdmin, requireUser } from '#/lib/server/shared'
 import type { AiCapsInput } from './caps-input'
 
 /**
- * The AI cap's database half (SPA-73). `@spaces/core/ai/caps` is the pure
- * predicate — tokens per workspace per UTC day, read from `ai_usage` — and
- * this module reads its two inputs (the caps from `workspace.settings.ai_caps`,
- * today's usage as one aggregate) and holds the admin fns behind
- * Settings → AI · Caps.
- *
- * This is the workspace **token** cap. sdk-16's enrichment **credit** cap is
- * the other counter — per integration, from `enrichment_record`, enforced in
- * the worker — and the two are not merged: different units, ledgers and
- * scopes (the reasoning is on `@spaces/core/ai/caps`).
+ * The AI cap's database half: reads the caps from `workspace.settings.ai_caps`
+ * and today's `ai_usage` for the pure predicate in `@spaces/core/ai/caps`, and
+ * holds the admin fns behind Settings → AI · Caps.
+ * - This is the workspace **token** cap. The enrichment **credit** cap
+ *   (per integration, from `enrichment_record`) is a separate counter, never merged.
  */
 
 /** A call refused by the cap, before any provider was called. */
@@ -107,12 +102,11 @@ export const usageTodayProgram = Effect.fn('usageToday')(function* (
 })
 
 /**
- * The check every model call makes before it spends (`complete()` today,
- * `embed()` when ai-9a lands it). No cap configured → it reads nothing more
- * and never refuses. It is per call and made **before** the call: a call that
- * starts under the ceiling runs to completion and its `ai_usage` row is
- * written even if it carries the day over — the cap is never enforced
- * mid-stream, so the day can overshoot by at most the calls in flight.
+ * The check every model call makes before it spends. No cap configured → it
+ * reads nothing more and never refuses.
+ * - Per call and **before** the call: a call that starts under the ceiling
+ *   runs to completion and writes its `ai_usage` row. Never enforced
+ *   mid-stream, so the day can overshoot by at most the calls in flight.
  */
 export const checkCapProgram = Effect.fn('checkCap')(function* (
   budgetChars: number,
@@ -185,7 +179,7 @@ export const setAiCapsProgram = Effect.fn('setAiCaps')(function* (
 })
 
 // The server fns' bodies. `requireAdmin()` first on the write; the ceilings
-// and today's count are any member's to read (D81).
+// and today's count are any member's to read.
 
 export async function getAiCapsHandler(): Promise<AiCapsView> {
   await requireUser()

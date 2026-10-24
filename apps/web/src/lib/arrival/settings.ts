@@ -19,13 +19,12 @@ import { probe } from './imap'
 import type { MailboxInput } from './input'
 
 /**
- * Settings → Arrival (SPA-56): the forwarding mailbox's four operations —
- * read, save, test, and the core integration row they hang off. Save and
- * test open with `requireAdmin()`; the read is any member's, the password
- * redacted (D81). The programs
- * above them take no request so the suite can drive them. They live here,
- * not in `lib/server/mailbox.ts`, because that module is re-exported by the
- * client barrel and this one imports the vault and imapflow.
+ * Settings → Arrival: the forwarding mailbox's four operations — read, save,
+ * test, and the core integration row they hang off. Save and test open with
+ * `requireAdmin()`; the read is any member's, the password redacted. The
+ * programs take no request so the suite can drive them. Kept out of the
+ * mailbox server fns module, which the client barrel re-exports, because
+ * this one imports the vault and imapflow.
  *
  * The app password goes in through `storeCredential` (`kind: 'mailbox'`) and
  * never comes back out: the section reads `redact()`'s display, kept in the
@@ -43,7 +42,7 @@ export const MAILBOX_PROVIDER = 'mailbox'
 /**
  * The capability id of the core channel's `integration` row. `core.` because
  * no plugin manifest will ever claim it; `source_ref` on every interaction and
- * note the lane writes names this row (D1).
+ * note the lane writes names this row.
  */
 export const MAILBOX_CAPABILITY = 'core.mailbox'
 
@@ -328,10 +327,10 @@ export const testMailboxProgram = Effect.fn('testMailbox')(function* (
 })
 
 // ---------------------------------------------------------------------------
-// Handlers — what the server fns in `lib/server/mailbox.ts` delegate to.
+// Handlers — what the mailbox server fns delegate to.
 // ---------------------------------------------------------------------------
 
-/** Any member reads the mailbox; the app password's display is redacted for them. (D81) */
+/** Any member reads the mailbox; the app password's display is redacted for them. */
 export async function getMailboxSettingsHandler(): Promise<MailboxSettingsView> {
   const { isAdmin } = await requireSettingsReader()
   const view = await effectFn(readMailboxSettingsProgram)()

@@ -18,7 +18,7 @@ import {
 import { sensitivityFor } from './sensitivity-for'
 
 /**
- * SPA-69. The Routing ledger's server half: a cell set and cleared reads back
+ * The Routing ledger's server half: a cell set and cleared reads back
  * through `aiRoute` with no restart, and `isLaneRouted` — the gate every AI
  * trigger hides on — is false with nothing configured, false once the routed
  * provider's credential is gone, and never fails. The file's tables start

@@ -30,7 +30,7 @@ import type {
 
 /**
  * Ask's thread store, read and kept: private to its author, every query
- * keyed on the reader. (D70)
+ * keyed on the reader.
  * - Another user's thread is not found, never refused by name.
  * - An answer citing a source the reader can no longer read is hidden: its
  *   text and refs never leave the server, and the turn says so.
@@ -149,7 +149,7 @@ export const turnViewsProgram = Effect.fn('ask.turnViews')(function* (
       r.calls.flatMap((c) => (c.card === undefined ? [] : [c.card])),
     ),
   )
-  // A find table reads each row's standing as it is now. (D77)
+  // A find table reads each row's standing as it is now.
   const live = new Map<string, ReadonlyArray<AskCall>>()
   for (const r of finds === 'live' ? rows : [])
     if (r.calls.some((c) => c.find !== undefined))

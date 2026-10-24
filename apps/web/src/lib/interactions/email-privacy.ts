@@ -12,7 +12,7 @@ import {
 import { user } from '@spaces/db/schema/auth'
 
 /**
- * Who reads a synced email past its owner (D67): the owner's override on a
+ * Who reads a synced email past its owner: the owner's override on a
  * record (`email_visibility`) and their grants on one email (`email_grant`).
  * `canRead` and its SQL twins enforce both at read time; this module only
  * reads them for the privacy row and writes them for the owner.

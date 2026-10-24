@@ -31,7 +31,7 @@ import type { StorageLinkProvider } from './storage-link'
  * folder), then a `storage.bind-folder` job — the plugin's `getFolder` runs
  * on the worker, and the nesting guard with it.
  * - `drive.readonly` is asked for here, through the incremental-scope start
- *   route, only when the connection holds just `drive.file`. (D66)
+ *   route, only when the connection holds just `drive.file`.
  */
 
 /** What a folder binding needs: Drive, and the scope that reads a whole folder. */

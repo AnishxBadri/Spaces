@@ -24,7 +24,7 @@ import { fusedStatement, searchAllProgram } from './query'
 import { clearQueryEmbeddingCache } from './query-embedding'
 
 /**
- * The semantic lane (SPA-129) — the fifth CTE of Cmd-K's fused query, and
+ * The semantic lane — the fifth CTE of Cmd-K's fused query, and
  * the palette's second wave. The embedding wire is a counting fake
  * (`MockEmbeddingModelV4` through `embed()`'s `model` seam), so the pin, the
  * cap and the `ai_usage` row are real and every provider call is counted.
@@ -32,8 +32,8 @@ import { clearQueryEmbeddingCache } from './query-embedding'
  * in racks" embeds to one axis, and each fixture chunk sits at a chosen
  * distance from it, so "nearest" is decided by the fixture, not by a model.
  *
- * The file's database was truncated and reseeded before it was imported
- * (SPA-145), so these fixtures are the whole corpus and the pin set here
+ * The file's database was truncated and reseeded before it was imported,
+ * so these fixtures are the whole corpus and the pin set here
  * reaches no other file.
  */
 

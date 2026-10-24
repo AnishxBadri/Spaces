@@ -10,9 +10,8 @@ import {
 import { TEST_PROMPT, runTestCall } from './test-call'
 
 /**
- * SPA-29. The Anthropic adapter carries a credential's `meta` — base URL and
- * extra headers, the gateway passthrough of `docs/spec-ai-substrate.md` §9 —
- * onto the AI SDK client it constructs. Asserted on the wire: a stub `fetch`
+ * The Anthropic adapter carries a credential's `meta` — base URL and extra
+ * headers, the gateway passthrough — onto the AI SDK client it constructs. Asserted on the wire: a stub `fetch`
  * records the one request the client makes and answers it with a canned
  * Messages API body, so nothing leaves the process.
  */

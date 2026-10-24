@@ -7,18 +7,12 @@ import {
 } from '#/components/portfolio-headline'
 
 /**
- * Today and Portfolio disagreed about the book (2026-09-30): the dev bench
- * read VALUE $7,048,100 on Today's rail and Current value $5.9M on
- * Portfolio. Both came from the same roll-up — Today had added the realized
- * $1,130,000 to the unrealized $5,918,100 in its own route and called the
- * sum "Value". Since then both surfaces print `portfolioHeadline()` from the
- * one `loadPortfolio()` read, and this pins it on a book with every hazard
- * the bench has: three currencies, one of them with no rate, and a voided
- * mark.
- *
- * Imports of the DB-coupled modules are dynamic like the rest of the suite:
- * `@spaces/db` builds its pool from `DATABASE_URL` at import time and
- * `vitest.setup.ts` rewrites it per file.
+ * Today and Portfolio print the same book: both print `portfolioHeadline()`
+ * from the one `loadPortfolio()` read, never a sum of their own (realized
+ * must not be folded into "Value"). Pinned on a book with three currencies,
+ * one with no rate, and a voided mark.
+ * Dynamic imports: `@spaces/db` builds its pool from `DATABASE_URL` at import
+ * time, and the setup file rewrites it per file.
  */
 
 async function actorId(): Promise<string> {
@@ -209,7 +203,7 @@ describe('loadPortfolio — the one book Today and Portfolio read', () => {
     // Portfolio's strip closes on the book's XIRR; Today's rail does not.
     expect(portfolio.at(4)?.[0]).toBe('XIRR')
     expect(portfolio).toHaveLength(5)
-    // The old Today rail: realized folded into "Value".
+    // The wrong sum: realized folded into "Value".
     expect(today.map(([, v]) => v)).not.toContain('$770,000')
   })
 

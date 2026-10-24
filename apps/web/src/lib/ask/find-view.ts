@@ -2,7 +2,7 @@ import type { AskFindRow, AskFindTable, AskSavedWatch } from './types'
 
 /**
  * A Find table as the thread draws it, pure so the table and its tests read
- * one set of rules. (D77)
+ * one set of rules.
  * - Past `FIND_FOLD` rows the table folds; its foot prints what is folded
  *   and what is hidden once.
  * - A row ends on its state word and at most one action: Add for an
@@ -96,7 +96,7 @@ export function spaceNameFrom(question: string): string {
   return (at > 20 ? cut.slice(0, at) : cut).trim()
 }
 
-/** Look for, prefilled: the question, blank when it is the space's criteria. (D77) */
+/** Look for, prefilled: the question, blank when it is the space's criteria. */
 export function lookForFrom(question: string, criteria: string | null): string {
   const q = question.trim()
   return criteria !== null && criteria.trim() !== '' && q === criteria.trim()

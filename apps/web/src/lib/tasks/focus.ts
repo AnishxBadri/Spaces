@@ -1,6 +1,5 @@
 /**
- * `/tasks?task=<id>` — the row a Cmd-K hit lands on (CONTEXT.md 15b, "hits
- * route to /tasks with the row focused"). Open and Done are exclusive tabs,
+ * `/tasks?task=<id>` — the row a Cmd-K hit lands on, focused. Open and Done are exclusive tabs,
  * so a focused task decides which one the page shows: a closed task opens
  * Done rather than rendering nothing. `null` — no param, or an id the
  * payload does not carry — leaves the tab alone and the page unfocused.

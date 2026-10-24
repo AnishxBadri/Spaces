@@ -13,7 +13,7 @@ import {
 } from './job-status-view'
 
 /**
- * The record head's reducer over the status stream (D64): pending the moment
+ * The record head's reducer over the status stream: pending the moment
  * an action fires, the outcome when its row closes, state on reopen from
  * `init` alone, and no stale event undoing a newer one.
  */

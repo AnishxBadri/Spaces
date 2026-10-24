@@ -40,7 +40,7 @@ const ADAPTERS: Record<
 /**
  * The credential an embedding call uses, in the vault's order (user key →
  * workspace key): the provider's own embedding key, else the Models key it
- * may reuse (`reusableModelsKey`). Null when neither is stored. (D81)
+ * may reuse (`reusableModelsKey`). Null when neither is stored.
  */
 export async function resolveEmbeddingCredential(
   provider: EmbeddingProvider,

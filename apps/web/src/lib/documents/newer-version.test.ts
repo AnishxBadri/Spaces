@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { linkReady, versionCandidates } from './newer-version'
 
 /**
- * "Newer version of" at upload (D59): which files a new arrival may replace,
+ * "Newer version of" at upload: which files a new arrival may replace,
  * and the rule that the link waits for the committed row.
  */
 

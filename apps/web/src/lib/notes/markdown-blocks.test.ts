@@ -11,7 +11,7 @@ import {
 import { editorBlocks } from '#/test/note-blocks'
 
 /**
- * SPA-66. The server's markdown → BlockNote renderer, pure: nothing here
+ * The server's markdown → BlockNote renderer, pure: nothing here
  * reads a database or a clock. The editor round trip at the bottom loads the
  * blocks into a real (headless) BlockNote editor — the same schema check the
  * note page runs when it opens a note — and reads its document back.
@@ -224,7 +224,7 @@ describe('noteBodyFromMarkdown → the editor', () => {
   })
 })
 
-/** SPA-91: the key-terms note is a term / value / citation table. */
+/** The key-terms note is a term / value / citation table. */
 const TERMS = [
   'Read from the term sheet.',
   '',

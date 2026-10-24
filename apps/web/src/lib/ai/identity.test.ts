@@ -23,7 +23,7 @@ import { acceptProgram, acceptRecordProgram, rejectProgram } from './propose'
 import type { Decider } from './propose'
 
 /**
- * SPA-105 — `suggestion(kind: 'identity')`. Accepting walks the claim
+ * `suggestion(kind: 'identity')`. Accepting walks the claim
  * through `resolveEntity` (attach on an exact email match, else
  * create and sweep names inline) and, on a company, adds it to the person's
  * `companies`; rejecting writes nothing. Everything here is the real database —
@@ -317,7 +317,7 @@ async function eventsOn(entityId: string, slug: string) {
 }
 
 /**
- * SPA-160 — the field the claim was read off. Accepting writes the resolved
+ * The field the claim was read off. Accepting writes the resolved
  * person into it, through the one write path, beside the person's companies.
  */
 describe('accepting an identity into its field', () => {

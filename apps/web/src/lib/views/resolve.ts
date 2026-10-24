@@ -8,37 +8,21 @@ import type { FieldResolver, ResolvedField } from './sql'
 import type { InteractionStatField } from './stat-fields'
 
 /**
- * The entity-backed half of the compiler's seam (SPA-40). Every
- * registry-generated list stores its fields in one `values` jsonb column, so
- * one resolver serves all of them: a slug becomes `values -> 'slug'` and the
- * type comes from the registry row.
- *
- * A slug the registry does not carry — never declared, or archived and so
- * absent from the live registry read — resolves to null, and
- * `compileConditions` drops that condition. A stale saved view therefore
- * widens rather than empties, which is what `matchesConditions` already does
- * when `typeOf` returns undefined.
- *
- * `-> `, not `->>`: the compiler wants the jsonb value so an array stays an
- * array and a missing key stays distinguishable from `''`. See `sql.ts`.
- *
- * **The slug is a literal, not a bind parameter** (SPA-93). It used to be
- * `${slug}::text`, which drizzle sends as `$n` — and `values -> $n` is not
- * the same expression as the `values -> 'stage'::text` that
- * `attr_idx_<attribute id>` is built on, so the per-attribute index matched
- * only when the planner happened to fold the parameter in (an unnamed
- * statement's custom plan). A generic plan, a `PREPARE`, or a pooler that
- * names statements would have silently gone back to sorting the object, with
- * no error anywhere. The slug is not user input in the first place: it is
- * derived by `slugify` and immutable, `[a-z0-9_]` only. The quote-doubling
- * is belt and braces, not the argument.
+ * The entity-backed resolver: a slug becomes `values -> 'slug'`, typed from
+ * the registry row.
+ * - An undeclared or archived slug resolves to null, so `compileConditions`
+ *   drops it and a stale saved view widens rather than empties.
+ * - `->`, not `->>`: the compiler wants jsonb (see `compileConditions`).
+ * - The slug is a literal, never a bind parameter: `values -> $n` is not the
+ *   expression `attr_idx_*` is built on, so a generic plan would silently sort
+ *   unindexed. Slugs are `slugify`'d `[a-z0-9_]`; the quote-doubling is backup.
  */
 const slugLiteral = (slug: string) => `'${slug.replaceAll("'", "''")}'::text`
 
 /**
  * A stat's timestamp for the listed row: a correlated lookup on
  * `interaction_stat`'s primary key `(entity_id, kind)`, the kind a literal.
- * SQL NULL when the record has no such interaction. (D67)
+ * SQL NULL when the record has no such interaction.
  */
 export function interactionStatAt(
   f: Pick<InteractionStatField, 'kind' | 'at'>,
@@ -59,7 +43,7 @@ export const interactionStatDay = (
   sql`to_jsonb(to_char(${interactionStatAt(f)} at time zone 'UTC', 'YYYY-MM-DD'))`
 
 /**
- * Where an inverse attribute's value lives (D69): the `references` links
+ * Where an inverse attribute's value lives: the `references` links
  * its owner writes, pointing at the listed row.
  */
 export type InverseSource = {

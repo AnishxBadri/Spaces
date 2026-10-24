@@ -34,10 +34,9 @@ import { setEntitySensitiveProgram } from './sensitivity-for'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * SPA-74. The extraction cache under the deck reader, through an injected
- * model (`MockLanguageModelV4`, as `read-deck.test.ts`): the route, the
- * sensitivity read, the context, the validator, the suggestion row and the
- * cache table are all real. "One provider call" is `doGenerateCalls`, and
+ * The extraction cache under the deck reader, through an injected
+ * `MockLanguageModelV4`: route, sensitivity, context, validator, suggestion
+ * row and cache table are real. "One provider call" is `doGenerateCalls`, and
  * "no usage" is the `ai_usage` count.
  */
 

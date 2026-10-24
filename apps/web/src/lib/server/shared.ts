@@ -28,9 +28,9 @@ export async function requireUser() {
 }
 
 /**
- * canWrite's admin gate. Admin owns: settings, integrations, keys, user
- * management (CONTEXT.md). Everything else any member writes — a two-person
- * fund has no ceremony.
+ * canWrite's admin gate. Admin owns settings, integrations, keys and user
+ * management. Everything else any member writes; a two-person fund has no
+ * ceremony.
  */
 export async function requireAdmin() {
   const u = await requireUser()
@@ -41,7 +41,7 @@ export async function requireAdmin() {
 /**
  * A settings page's read: any signed-in member may read an admin page, and
  * `isAdmin` says whether its secrets are shown or redacted. Its writes keep
- * `requireAdmin()`. (D81)
+ * `requireAdmin()`.
  */
 export async function requireSettingsReader(): Promise<{ isAdmin: boolean }> {
   const u = await requireUser()
@@ -50,9 +50,8 @@ export async function requireSettingsReader(): Promise<{ isAdmin: boolean }> {
 
 /**
  * `canRead` and `provenanceOf` take no request context, so they live outside
- * `lib/server/` where the helpers that need them can import them without
- * dragging `getRequest` into the client bundle (SPA-155). Re-exported here so
- * the server-fn modules keep importing them from where they always did.
+ * the server-fn modules, where helpers can import them without dragging
+ * `getRequest` into the client bundle. Re-exported for the server fns.
  */
 export { canRead } from '@spaces/core/read-policy'
 export { provenanceOf } from '@spaces/core/writes/entities/provenance'
@@ -126,10 +125,9 @@ export async function createSpaceRow(
 }
 
 /**
- * The pipeline→portfolio seam lives in `#/lib/portfolio/holding` since
- * SPA-169 (a deal birth needs it inside its transaction, and the import
- * worker cannot reach this module); re-exported so the server fns keep
- * importing it from here.
+ * The pipeline→portfolio seam. It lives outside this module because a deal
+ * birth needs it inside its transaction and the import worker cannot reach
+ * this module; re-exported for the server fns.
  */
 export { birthHolding } from '#/lib/portfolio/holding'
 
@@ -146,15 +144,11 @@ export type ReferencedByRow = {
 }
 
 /**
- * Backlinks both ways (§9), the incoming half: every record whose
- * record-reference attribute points at this entity. One query for every
- * entity kind — `getObjectRecord` renders it flat as "Referenced by", the
- * person page groups it by attribute (`groupReferencedBy`). It lives here
- * rather than beside either caller because `src/lib/server-fns.ts`
- * re-exports the domain files wholesale to the client (CLAUDE.md) and this
- * is a server helper, not a serverFn — which is also what makes it directly
- * testable. Merged-away referrers are excluded: a backlink to a tombstone
- * is noise, and the survivor already carries the repointed link.
+ * Backlinks, the incoming half: every record whose record-reference attribute
+ * points at this entity, for every entity kind. `getObjectRecord` renders it
+ * flat; the person page groups it with `groupReferencedBy`.
+ * - A server helper, not a serverFn, so it is testable without a request.
+ * - Merged-away referrers are excluded: the survivor carries the link.
  */
 export async function referencedByRows(
   entityId: string,
@@ -257,7 +251,7 @@ export function groupReferencedBy(
 
 /**
  * Backlinks less the ones a relationship's inverse half already shows: an
- * owner's link to this record reads under the derived attribute. (D69)
+ * owner's link to this record reads under the derived attribute.
  */
 export function withoutRelations(
   rows: Array<ReferencedByRow>,
@@ -272,18 +266,11 @@ export function withoutRelations(
 }
 
 /**
- * The same question for documents, asked in bulk (SPA-137).
- *
- * A document carries its own provenance pair rather than borrowing its
- * entity row's: the bytes and the record are two different arrivals — a deck
- * a connector filed against a company a human created — and
- * `docs/spec-storage-sources.md` §2 lists provenance as an axis of the
- * document, not of its entity.
- *
- * Bulk because the Files tab reads a list, and one row at a time would be
- * one query per file. Left join for the same reason `provenanceOf` uses one:
- * every non-integration document's ref is null, and
- * `document_source_ref_invariant` is what makes that a fact.
+ * `provenanceOf` for documents, in bulk (the Files tab reads a list).
+ * - A document carries its own provenance pair, not its entity row's: the
+ *   bytes and the record can be two different arrivals.
+ * - Left join: every non-integration document's ref is null, which
+ *   `document_source_ref_invariant` guarantees.
  */
 export async function documentProvenance(
   documentIds: Array<string>,
@@ -309,16 +296,9 @@ export async function documentProvenance(
 }
 
 /**
- * Every edge one document is filed by — the two tables together (SPA-50).
- *
- * The Files tab's filing control renders chips for both kinds, so the list
- * has to arrive with the row rather than behind a second round trip per
- * document: a tab with twelve files would otherwise open twelve requests to
- * draw twelve popovers nobody has clicked yet.
- *
- * `objectSlug` rides along for the same reason every other record list
- * carries it — `recordPath` needs a custom record's object to route, and the
- * client has nowhere else to get it.
+ * Every edge one document is filed by, from both tables. It arrives with the
+ * row so the Files tab's chips need no round trip per document.
+ * `objectSlug` is there because `recordPath` needs it to route a custom record.
  */
 export type DocumentFilingEdge =
   | {
@@ -394,37 +374,17 @@ export async function documentFilingEdges(
 }
 
 /**
- * Where a document is filed (SPA-19), and why a target refuses a filing —
- * pure, and in `@spaces/core/documents/filing` since SPA-201 (sdk-8a), where
- * document birth now lives. Re-exported here so the server fns, §3.3's
- * re-file and the upload dialog keep importing them from where they always
- * did.
+ * Where a document is filed, and why a target refuses a filing. Pure;
+ * re-exported for the server fns, re-file and the upload dialog.
  */
 export { documentFilingRefusal } from '@spaces/core/documents/filing'
 export type { DocumentFilingTarget } from '@spaces/core/documents/filing'
 
 /**
- * The dedupe guard and the writer both moved to `#/lib/documents/birth.ts`
- * (SPA-113), and from there to `@spaces/core/writes/documents/birth`
- * (SPA-201). §3.1's one server path owns them together — the read has to
- * mirror the writer's table choice, and both had to widen to an **array** of
- * targets at once — and birth lives outside `lib/server/` so the barrel
- * cannot drag it into the browser. What stays here is the re-export of
- * `documentFilingRefusal` above, which is pure and shared with §3.3's
- * re-file.
- */
-
-/**
  * Delete one document and, if nothing else points at its bytes, the blob.
- *
- * The rows are the registry's answer, not this file's: `deleteEntityProgram`
- * walks `ENTITY_REFS`, which is what already clears `entity_space` alongside
- * `chunk`, `link` and `activity` — the hand-list that used to live
- * in `deleteDocument` missed exactly that table, which is why a
- * space-filed document could not be deleted before SPA-77.
- *
- * It lives here rather than in the server fn so a test can delete without a
- * request (SPA-155): the server fn is the auth check and nothing else.
+ * - The rows are `deleteEntityProgram`'s answer, which walks `ENTITY_REFS`;
+ *   never hand-list tables here.
+ * - Outside the server fn so a test can delete without a request.
  */
 export async function deleteDocumentWithBlobGc(
   id: string,

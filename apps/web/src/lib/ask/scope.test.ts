@@ -25,7 +25,7 @@ vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 /**
  * Scope chips narrow a turn: a space chip is query_records' default
  * condition with descendants, a view chip adds the view's conditions on its
- * object, and no chip reads the whole workspace. (D70, D71)
+ * object, and no chip reads the whole workspace.
  */
 
 const SPACE: TurnScope = {

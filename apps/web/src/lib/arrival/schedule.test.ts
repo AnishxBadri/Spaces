@@ -3,9 +3,9 @@ import { nextAttemptAt } from './poll'
 import { cadenceCron } from './schedule'
 
 /**
- * SPA-56: the two timing rules of the mailbox, pure. `cadenceCron` is what
- * the worker schedules `mail.poll` with (the sync itself is asserted in
- * `worker/jobs/poll-mailbox.test.ts`); `nextAttemptAt` is the backoff a
+ * The two timing rules of the mailbox, pure. `cadenceCron` is what
+ * the worker schedules `mail.poll` with (the sync itself is asserted on the
+ * worker side); `nextAttemptAt` is the backoff a
  * refused login earns instead of a tight retry loop.
  */
 

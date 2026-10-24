@@ -7,17 +7,14 @@ import { mergeEntities } from '@spaces/core/writes/entities/merge'
 import { requireUser } from './shared'
 
 /**
- * The review inbox (SPA-76, SPA-98) — one queue over typed rows:
- * `duplicate_candidate` pairs and `suggestion` cards. `/inbox` is the
- * surface; `/dedupe` is a permanent redirect to it. Later lanes join by
- * adding a member to `InboxRow` (`lib/inbox/queue.ts`) and a renderer to the
+ * The review inbox: one queue over typed rows (`duplicate_candidate` pairs
+ * and `suggestion` cards). `/dedupe` is a permanent redirect to `/inbox`.
+ * A new lane joins by adding a member to `InboxRow` and a renderer to the
  * page's `RENDERERS` map — never a second page.
  *
- * Reads are Effect programs through the `effectFn()` seam (CONTEXT.md
- * "Backend paradigm"): the handler checks the session, the program does the
- * work, nothing Effect-shaped escapes this file. The programs are imported
- * inside the handlers so their database code never reaches the client
- * bundle this barrel is part of (SPA-155).
+ * Reads are Effect programs through `effectFn()`; nothing Effect-shaped
+ * escapes this file. The programs are imported inside the handlers so their
+ * database code never reaches the client bundle.
  */
 
 export type {

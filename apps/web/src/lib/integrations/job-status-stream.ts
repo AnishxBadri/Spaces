@@ -9,7 +9,7 @@ import { jobStatusListener } from '#/lib/server/job-status-listener'
 import type { JobStatusListener } from '#/lib/server/job-status-listener'
 
 /**
- * A record's plugin job status as server-sent events. (D64)
+ * A record's plugin job status as server-sent events.
  * - `init` carries the latest `job_run` row per plugin queue, on open and on
  *   every resync; `status` carries one live notification. A client replaces
  *   its state on `init` and applies `status` on top.

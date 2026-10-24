@@ -22,51 +22,32 @@ const query = <T>(run: () => Promise<T>) =>
   })
 
 /**
- * Unified search — one box over names, note bodies, and extracted document
- * text, fused in Postgres rather than merged in Node (SPA-148 moved it here
- * from `lib/server/search.ts`, Effect-first per CONTEXT.md "Backend
- * paradigm", so a test can call it without a request).
- *
- * Names, notes and documents are entities, so those three sources rank the
- * *same* id space and reciprocal rank fusion is the honest way to combine
- * them: scores from trigram similarity and ts_rank are not comparable, but
- * ranks are. Tasks are the exception (SPA-55): deliberately not entities
- * (CONTEXT.md 15b), so the fourth lane ranks a second id space. Every fused
- * row therefore carries a `row_kind` discriminator — 'entity' | 'task' — and
- * the fusion keys on `(row_kind, id)`, so a task can never fuse with an
- * entity that happens to share its uuid. The pgvector half (CONTEXT.md →
- * Search is hybrid, SPA-129) is the fifth lane, `sem_hits`, under the same
- * key: it ranks entity ids by their nearest `chunk`, and `SearchHit` gains
- * one `matchedIn` value, 'semantic', rather than a new shape. It is emitted
- * only when the caller hands the builder a query vector — the palette's
- * second wave, with a model pinned — so the per-keystroke statement is the
- * four-lane one whether or not a model is pinned, and embeds nothing.
- *
- * k = 60 is the standard RRF constant: large enough that a top hit in one
- * source doesn't automatically beat two decent hits across two sources. It
- * is the same constant the assembler ranks with (`rrfK` in
- * `lib/context/rank.ts`), and it appears once, in the final select.
- *
- * canRead is enforced in SQL on every lane that can reach a note — a
- * teammate's private note never enters the fusion. The task lane takes no
- * such clause: tasks carry no visibility flag, and any member sees any task
- * (the rule /tasks enforces). `query.test.ts` pins the invariants a rewrite
- * of this module must keep.
+ * Unified search: one box over names, note bodies and document text, fused
+ * in Postgres by reciprocal rank fusion (trigram and ts_rank scores are not
+ * comparable; ranks are).
+ * - Tasks are not entities, so every row carries `row_kind` and the fusion
+ *   keys on `(row_kind, id)`: a task never fuses with an entity sharing its uuid.
+ * - The vector lane (`sem_hits`) is emitted only when the caller hands a query
+ *   vector, so the per-keystroke statement embeds nothing.
+ * - k = 60, the standard RRF constant and the assembler's `rrfK`; it appears
+ *   once, in the final select.
+ * - canRead is enforced in SQL on every lane that can reach a note. The task
+ *   lane takes none: any member sees any task.
+ * The tests pin the invariants a rewrite must keep.
  */
 
 /**
- * `semantic` is the palette's second wave (SPA-129): the same fused query
- * plus the vector lane, asked for 600ms after the last keystroke. Omitted,
- * the statement is lexical and nothing is embedded.
+ * `semantic` is the palette's second wave: the same fused query plus the
+ * vector lane. Omitted, the statement is lexical and nothing is embedded.
  */
 export type SearchAllInput = {
   userId: string
   q: string
   semantic?: boolean
   /**
-   * Narrow the answer to one object's records (SPA-28, the MCP
-   * `search_records(query, object?)`). Cmd-K never passes it, and without it
-   * the statement is exactly the palette's.
+   * Narrow the answer to one object's records (MCP's
+   * `search_records(query, object?)`). Without it the statement is exactly
+   * the palette's.
    */
   objectId?: string
 }
@@ -80,7 +61,7 @@ export type FusedRowsInput = {
   objectId?: string
 }
 
-/** `model` replaces the embedding wire in tests; see `query-embedding.ts`. */
+/** `model` replaces the embedding wire in tests; see `queryVector`. */
 export type SearchSeam = { model?: EmbeddingModel }
 
 /** A document's destination: the record or space it is filed against. */
@@ -95,9 +76,9 @@ export type SearchParent = {
 export type SearchTask = { dueDate: string | null; done: boolean }
 
 /**
- * The hit contract (SPA-55) — one shape for every lane, pinned here so a
- * later lane extends it instead of reshaping it. `task` is non-null exactly
- * when `rowKind` is 'task'; `parent` is only ever set on a document.
+ * One hit shape for every lane; a new lane extends it rather than reshaping
+ * it. `task` is non-null exactly when `rowKind` is 'task'; `parent` is only
+ * ever set on a document.
  */
 type SearchHitFields = {
   id: string
@@ -114,45 +95,15 @@ export type SearchHit =
   | (SearchHitFields & { rowKind: 'task'; task: SearchTask })
 
 /**
- * The semantic lane (SPA-129) — the fifth CTE, and the only one that exists
- * conditionally: no query vector, no fragment, so a workspace with no pin
- * (or a keystroke that has not paused) sends exactly the four-lane
- * statement.
- *
- * It joins `chunk` on `entity_id` and **never filters `source_kind`**: a
- * document's chunks, a note's and an attribute's (a deal's close_reason) all
- * rank here the moment something writes them, with no further search edit.
- * What it does filter:
- *
- * - `embedding_model` must be the pin's. A row embedded by another model is
- *   garbage in this vector space (the dimension trap's quieter cousin), so
- *   it is skipped even when it is the closest — search never mixes models
- *   mid-migration (spec-ai-substrate §9).
- * - canRead, the same predicate the lexical note lane takes. For a
- *   note-sourced chunk `e` is the note itself (a note chunk's entity is the
- *   note), so `canReadNoteSql` joins `note` and holds a teammate's private
- *   note out by meaning exactly as it is held out by words. An
- *   attribute-sourced chunk joins nothing extra: its entity is the record
- *   the attribute belongs to, and records carry no visibility flag — any
- *   member reads any record's attributes on its page — so the predicate is
- *   vacuous for it, as it is for a document.
- *
- * The shape is for the HNSW index (`chunk_embedding_hnsw_idx`, 0045):
- * pgvector only walks it for a bare `order by embedding <=> <constant>
- * limit n`, so the inner subquery is exactly that, and the model and canRead
- * filters apply to its answer. The query vector sits in its own CTE, `qv`,
- * so it is sent once and reaches the index as an init-plan constant. The
- * inner limit is above 40 because several chunks of one record collapse into
- * one row; pgvector's `hnsw.ef_search` (40 by default) still bounds how many
- * the index hands back, which is plenty for a palette of 20.
- *
- * The snippet is the nearest chunk's text, whitespace-collapsed, cut to 160
- * characters, with any « » removed: nothing matched a word, so nothing is
- * marked, and `Highlighted` renders it as plain text. `page` is that chunk's
- * page, when extraction knew it.
- *
- * Cmd-K's Passages run these CTEs alone (`passagesStatement`); the fused
- * statement takes them as its fifth lane for MCP's `search_records`.
+ * The semantic lane's CTEs; absent without a query vector. Passages run them
+ * alone, and the fused statement takes them as its fifth lane.
+ * - Never filters `source_kind`: any chunk ranks the moment it is written.
+ * - `embedding_model` must be the pin's: another model's vector is garbage
+ *   here, so search never mixes models mid-migration.
+ * - canRead via `canReadNoteSql`, the predicate the lexical note lane takes.
+ * - The inner subquery is a bare `order by embedding <=> <constant> limit n`,
+ *   the only shape pgvector walks the HNSW index for; filters apply to its
+ *   answer, and `qv` makes the vector an init-plan constant.
  */
 export function semanticCtes(
   userId: string,
@@ -216,21 +167,12 @@ export const fusedRowsProgram = Effect.fn('fusedRowsProgram')(function* (
 })
 
 /**
- * Where each document hit sends you. Documents have no page of their own —
- * they are filed against a record (`link(tagged_in)`) or into a space
- * (`entity_space`, spec-storage-sources §2), so a result has to send you to
- * one of those or it is a dead end.
- *
- * Both edge kinds come back in one statement, and the winner is chosen in
- * SQL rather than by whichever row the driver happened to return first:
- *
- *   1. a record parent always beats a space parent;
- *   2. among edges of one kind the earliest wins — `created_at` asc, then
- *      the edge's own id asc (`link.id`; `entity_space` has no id of its
- *      own, so its `space_id`).
- *
- * A space parent comes back as `{ kind: 'space' }`, which `recordPath`
- * already routes to `/spaces/<id>`, so the palette needs no branch for it.
+ * Where each document hit sends you: documents have no page, so the record
+ * (`link(tagged_in)`) or space (`entity_space`) it is filed against.
+ * The winner is chosen in SQL, not by driver row order:
+ * - a record parent always beats a space parent;
+ * - within a kind the earliest wins: `created_at`, then the edge id
+ *   (`link.id`, or `space_id` for `entity_space`).
  */
 export const documentParentsProgram = Effect.fn('documentParentsProgram')(
   function* (
@@ -291,14 +233,11 @@ export const documentParentsProgram = Effect.fn('documentParentsProgram')(
 )
 
 /**
- * What Cmd-K shows: the fused rows, each document carrying where it is
- * filed and each task its due date and done state.
- *
- * The second wave (`semantic: true`) embeds the query — once per (text,
- * model), `query-embedding.ts` — and adds the vector lane. No pin, or an
- * embed that fails (a cap reached, a provider down), and the wave is the
- * lexical statement again: the user's list stays as it was, and the failure
- * is one log line, never an error per pause.
+ * What Cmd-K shows: the fused rows, each document with where it is filed
+ * and each task with its due date and done state.
+ * With `semantic: true` the query is embedded and the vector lane added. No
+ * pin, or a failed embed, falls back to the lexical statement with one log
+ * line, never an error per pause.
  */
 export const searchAllProgram = Effect.fn('searchAllProgram')(function* (
   { userId, q: raw, semantic = false, objectId }: SearchAllInput,

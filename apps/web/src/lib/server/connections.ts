@@ -26,7 +26,7 @@ export type {
 
 /**
  * Settings → Connection apps: the providers' OAuth apps — written by an
- * admin, read by any member with the secret redacted (D81) — and the
+ * admin, read by any member with the secret redacted — and the
  * reader's own accounts under You.
  * Bodies are imported inside the handler so the vault never reaches the
  * client bundle.
@@ -69,7 +69,7 @@ export const disconnectConnection = createServerFn({ method: 'POST' })
 
 /**
  * A synced mailbox's settings on its account page — whether its bodies are
- * shared and its exclude list (D67). The connection's owner only; null when
+ * shared and its exclude list. The connection's owner only; null when
  * no mail sync is bound to it.
  */
 export const getMailboxSync = createServerFn()
@@ -87,7 +87,7 @@ export const saveMailboxSync = createServerFn({ method: 'POST' })
     return saveMailboxSyncHandler(data)
   })
 
-/** You → Meeting notes: the reader's recorder keys with their folders, and what they can add (D78). */
+/** You → Meeting notes: the reader's recorder keys with their folders, and what they can add. */
 export const getMeetingNotes = createServerFn().handler(async () => {
   const { meetingNotesHandler } = await import('../connections/recorders')
   return meetingNotesHandler()

@@ -6,7 +6,7 @@ import { canRead } from '@spaces/core/read-policy'
 
 /**
  * Cmd-K's Jump to reads every saved view the user may open, with the list it
- * opens on. (D70)
+ * opens on.
  * - Object surfaces only, on live objects; a view private to someone else
  *   is left out by `canRead`, as the sidebar's pins are.
  * - Outside `lib/server/` so a test can call it without a request.

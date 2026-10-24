@@ -1,18 +1,16 @@
 import type { ParticipantDecision } from './participants'
 
 /**
- * The arrival lane's noise judgement (SPA-56), pure: which mail is refused
- * before anything is written. Pure and on its own because the calendar lane
- * needs exactly the same judgement over invitations, and because a refusal is
- * the one decision in the poll that has to be provable without a database —
- * `noise.test.ts` is a fixture table.
+ * The arrival lane's noise judgement, pure: which mail is refused before
+ * anything is written. On its own because the calendar lane needs the same
+ * judgement over invitations, and because a refusal has to be provable
+ * without a database.
  *
  * Four refusals from `refusal`, in the order they are checked, and a fifth,
  * `excluded`, from `mailExclusion` for a connected mailbox's exclude list:
  *
- * - **no Message-ID** — the dedupe key is the RFC Message-ID (CONTEXT.md
- *   "Email / calendar ingestion"). A message without one cannot be written
- *   idempotently, so it is not written at all.
+ * - **no Message-ID** — the RFC Message-ID is the dedupe key. A message
+ *   without one cannot be written idempotently, so it is not written at all.
  * - **auto-submitted** — `Auto-Submitted` with any value but `no` (RFC 3834),
  *   and the older `X-Autoreply` / `X-Autorespond` spellings. A forwarded
  *   out-of-office has lost its headers by the time it is forwarded, so its
@@ -125,7 +123,7 @@ export function refusal(input: NoiseInput): Refusal | null {
 /**
  * The calendar's refusals: which events are not meetings the workspace keeps.
  * Checked in this order, and only before a meeting is first written — one
- * already held follows its event, a cancellation included (D68).
+ * already held follows its event, a cancellation included.
  *
  * - **cancelled** — an event cancelled before it was ever seen did not happen.
  * - **declined** — the calendar's owner said no; it is not their meeting.

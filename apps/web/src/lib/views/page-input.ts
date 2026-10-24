@@ -2,16 +2,9 @@ import { z } from 'zod'
 import type { ListPageOptions } from './paging'
 
 /**
- * What a paged list surface accepts over the wire (SPA-64, shared SPA-96).
- *
- * The three list server fns — `listObjectRecords`, `listCompaniesTable`,
- * `listPeopleTable` — validate against this one shape, so "the paging
- * contract" is a thing the compiler knows about rather than three hand-kept
- * copies of the same twenty lines. Only the surface key differs, and that
- * stays with each fn.
- *
- * Type-only import of `ListPageOptions`, so this module carries zod and
- * nothing else: it is reachable from the client-imported barrel's graph.
+ * What a paged list surface accepts over the wire; `listObjectRecords`,
+ * `listCompaniesTable` and `listPeopleTable` all validate against it.
+ * Imports zod and types only: it is reachable from the client-imported barrel.
  */
 export const pagedListShape = {
   conditions: z

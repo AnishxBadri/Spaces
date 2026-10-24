@@ -14,56 +14,26 @@ import type {
 } from '@spaces/core/context/similar-lane'
 
 /**
- * The judgment-memory lane (SPA-139; docs/spec-ai-substrate.md §1 — "rank
- * close_reasons, pass/lost notes … of _similar_ records"). Every other lane
- * of the assembler walks outward from the seed; this one reaches sideways,
- * to what the fund decided about records that read like this one. The
- * mandate says what you claim to want; close_reasons say what you do.
+ * The judgment-memory lane: reaches sideways to what the fund decided about
+ * records that read like this one, not outward from the seed.
  *
- * - **Anchor.** The centroid (`avg(embedding)`, computed in SQL — pgvector
- *   defines `avg` over `vector`) of the record's own embedded chunks under
- *   the pinned model: chunks on the record itself (its attribute chunks),
- *   and the chunks of the documents and notes filed (`tagged_in`) on it. For
- *   a company, the deals linked to it join the anchor set, so their
- *   close_reasons and notes shape it too. canRead holds here as well: a
- *   teammate's private note does not steer the anchor, or its content would
- *   leak through what ranks. No chunks, no anchor, no lane.
- * - **Candidates.** Other records only: a deal's `close_reason` attribute
- *   chunk, whatever the deal's stage, and the chunks of notes filed on a deal
- *   that was **passed or lost** — the spec's "pass/lost notes". Keyed on the
- *   registry's option ids for those two stages ({@link PASS_LOST_STAGES};
- *   `deal.stage` in `packages/core/src/attributes/registry.ts`), not on a
- *   label a user can rename. `invested` shares their `closed` group but is
- *   left out: a note on a deal the fund backed is not a pass reason, and it
- *   would dilute the lane. The anchor set is excluded, and so is any note
- *   filed on it.
- * - **canRead in SQL**, the same `canReadNoteSql` predicate search takes: a
- *   note chunk's entity is the note, so a teammate's private pass note never
- *   ranks. A close_reason chunk's entity is the deal, which carries no
- *   visibility flag, so the predicate is vacuous for it.
- * - **Stale rows** (another model's `embedding_model`) are skipped, exactly
- *   as SPA-129's lane skips them: garbage in this vector space.
- * - **Sensitive chunks** are skipped when the assembly asks
- *   (`excludeSensitive`): a cloud-routed prompt takes no neighbour's.
- *
- * **No pin, no lane — and no lexical fallback.** A lexical "similar company"
- * matches words, not judgment: two decks that both say "AI platform" or
- * "B2B SaaS" share every buzzword and nothing a partner decided on, so a
- * word-overlap neighbour would hand the model a confident-looking but
- * arbitrary pass reason and the answer would cite it as precedent. An empty
- * lane says "no memory here"; a wrong neighbour says "you passed on this
- * before" when you did not. Nothing is better than that.
+ * - Anchor: `avg(embedding)` of the record's own readable chunks (plus those
+ *   of notes and documents filed on it; for a company, its deals'). canRead
+ *   holds: a private note must not steer the anchor, or it leaks via ranking.
+ * - Candidates: other records' deal `close_reason` chunks (any stage) and
+ *   notes filed on deals passed or lost, keyed on `PASS_LOST_STAGES` option
+ *   ids, never labels. `invested` is left out. The anchor set is excluded.
+ * - `canReadNoteSql` in SQL; stale-model rows skipped; sensitive chunks
+ *   skipped when the assembly asks (`excludeSensitive`).
+ * - No pin, no lane, and no lexical fallback: a word-overlap neighbour would
+ *   be cited as a precedent nobody set. An empty lane beats a wrong one.
  */
 
 /**
- * How far sideways is far enough. A **first guess to tune on real data**
- * (the hitl half of SPA-139), like its sibling `SIMILAR_TOP_N` (five items,
- * a paragraph of precedent — the assembler's cut, so it lives with the
- * service tag in core): cosine distance 0.35 is "clearly about the same kind
- * of thing" for the 768-wide models the pin allows — loose enough that a
- * reworded pass reason still lands, tight enough that an unrelated deal's
- * does not. The budget slice (`SIMILAR_SHARE`, `rank.ts`) bounds the lane's
- * cost; these bound its reach, which the slice cannot.
+ * How far sideways is far enough: cosine distance 0.35, a first guess to
+ * tune on real data. Loose enough that a reworded pass reason lands, tight
+ * enough that an unrelated deal's does not. `SIMILAR_SHARE` bounds the
+ * lane's cost; this bounds its reach.
  */
 export const SIMILAR_MAX_DISTANCE = 0.35
 
@@ -165,14 +135,11 @@ const anchorStatement = (
 `
 
 /**
- * The neighbours. The inner subquery is SPA-129's shape — a bare
- * `order by embedding <=> <constant> limit n` the HNSW index can walk —
- * with the source filter inside it and `hnsw.iterative_scan` on for the
- * statement (`relaxed_order`, pgvector ≥ 0.8), so the index keeps walking
- * past document chunks until it has found `INNER_LIMIT` close_reason and
- * note chunks, instead of handing back its first `ef_search` rows and
- * leaving the filter nothing. The outer query re-sorts by exact distance,
- * so the relaxed order never reaches the ranking.
+ * The neighbours. The inner subquery is a bare `order by embedding <=>
+ * <constant> limit n` the HNSW index can walk, with `hnsw.iterative_scan`
+ * (`relaxed_order`, pgvector ≥ 0.8) so the index walks past filtered-out
+ * chunks until it has `INNER_LIMIT`. The outer query re-sorts by exact
+ * distance, so the relaxed order never reaches the ranking.
  */
 const neighboursStatement = (
   { userId, anchorIds, excludeSensitive }: SimilarInput,

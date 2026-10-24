@@ -28,7 +28,7 @@ vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
  * Save as watch against the test database: one `space_watch`, the turn's
  * untouched rows as `add_record` cards under the space, the added and
  * dismissed rows left as they are, the thread's link and its deleted
- * state, and the same lens refused with nothing written. (D72, D77)
+ * state, and the same lens refused with nothing written.
  */
 
 const run = <TValue, TError>(e: Effect.Effect<TValue, TError>) =>

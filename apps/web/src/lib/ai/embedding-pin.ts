@@ -27,41 +27,20 @@ import type {
 } from './providers/embed/ids'
 
 /**
- * The embedding pin (SPA-51, `docs/spec-ai-substrate.md` §9):
- * `workspace.settings.embedding = {provider, model, dims, pinned_at}`.
- * Absent is "no embedding model", and then nothing anywhere changes —
- * search stays lexical + trigram, and `embed()` refuses `EmbeddingNotPinned`.
- *
- * **The width does not move; the model may (SPA-136).** Every stored vector
- * is `vector(768)`, and another model's vectors in the same column are
- * silently garbage to a query embedded by this one (CONTEXT.md, "the
- * dimension trap"). A swap to another model that also emits 768 needs no
- * DDL, only a re-embed, so it is allowed: the new pin is written and every
- * stored chunk is stale **by construction** — the semantic lane
- * (`lib/search/query.ts`) keeps only rows whose `embedding_model` is the
- * pin's, so no column is touched and search stops using the old vectors the
- * moment the pin changes. The backfill job (`./embed-backfill.ts`) is what
- * re-embeds them, and it is offered, not started: it costs money and asks
- * first.
- *
- * A change of **width** stays refused `PinLocked`. The unbuilt half of
- * re-pin is `ALTER TABLE chunk ALTER COLUMN embedding TYPE vector(N)` (every
- * stored vector nulled or dropped first, since no cast between widths
- * exists) plus rebuilding the HNSW index over the new column — DDL on the
- * largest table, one explicit job, not a settings click.
- *
- * Every write is conditional on the pin it replaces — absent for a first
- * pin, the model it read for a swap — so two admins pinning at once cannot
- * both win.
- *
- * **The sensitive slot** (SPA-83, D11, `docs/spec-ai-substrate.md` §9) is
- * `embedding.sensitive = {provider, model, dims, set_at}`: a local provider
- * beside a cloud pin, at the pin's width, so a sensitive record is embedded
- * on the operator's box instead of being left without vectors. It is
- * refused unless the provider is `local`, the model's width is the pin's
- * (the refusal names both numbers), the provider's credential exists, and
- * that model's last embed Test came back green. A pin swap merges into
- * `embedding` and so keeps it; `embed()` is what routes to it.
+ * The embedding pin: `workspace.settings.embedding`. Absent means no
+ * embedding model: search stays lexical + trigram, `embed()` refuses
+ * `EmbeddingNotPinned`.
+ * - The width never moves; the model may. A same-width swap needs no DDL:
+ *   the semantic lane keeps only rows whose `embedding_model` is the pin's,
+ *   so every stored chunk is stale the moment the pin changes. The backfill
+ *   re-embeds them, offered, not started — it costs money.
+ * - A change of width is refused `PinLocked` (re-pin is column DDL plus an
+ *   HNSW rebuild, not a settings click).
+ * - Every write is conditional on the pin it replaces, so two admins
+ *   pinning at once cannot both win.
+ * - The sensitive slot (`embedding.sensitive`) is a local provider at the
+ *   pin's width; refused unless local, same width, credentialed and its last
+ *   embed Test green. A pin swap keeps it.
  */
 
 export class EmbeddingPinReadFailed extends Schema.TaggedError<EmbeddingPinReadFailed>()(
@@ -205,7 +184,7 @@ const requireKey = Effect.fn('pinEmbedding.requireKey')(function* (
 /**
  * Pins the workspace to one model at `PIN_DIMS`. Idempotent for the model
  * already pinned (it answers the stored pin, unchanged). With another model
- * pinned, a target that also emits `PIN_DIMS` **swaps** the pin (SPA-136) and
+ * pinned, a target that also emits `PIN_DIMS` **swaps** the pin and
  * one that cannot is `PinLocked`; with none pinned, a model the catalogue
  * greys is `PinRefused`, as is any target whose provider has no embedding
  * key saved yet. Nothing here enqueues the backfill — the swap only offers
@@ -295,7 +274,7 @@ export const pinEmbeddingProgram = Effect.fn('pinEmbedding')(function* (
   })
 })
 
-// ---------- the sensitive slot (SPA-83) ----------
+// ---------- the sensitive slot ----------
 
 /** The slot cannot be set to that model; the message says why. */
 export class SlotRefused extends Schema.TaggedError<SlotRefused>()(

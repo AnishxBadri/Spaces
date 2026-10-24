@@ -20,33 +20,24 @@ import {
 } from '@spaces/core/writes/events/dispatch'
 
 /**
- * **Deal birth** (SPA-169) — the one program a deal is born through. It was
- * the body of `createDeal`'s handler, where the stage=`invested` →
- * `birthHolding` hook lived inline in a server fn with no reusable program;
- * the importer needs exactly that pipeline→portfolio seam and must not own a
- * second copy of it, so the body moved here and `createDeal` became a thin
- * caller through `effectFn`.
- *
- * Outside `lib/server/` for the barrel's reason (CLAUDE.md → Traps): the
- * import worker and the tests call it without a request.
- *
- * One transaction: the entity, its birth values (supplied, then defaults),
- * the `deal.created` activity and — at Invested — the holding land together
- * or not at all. Given a transaction (`tx`), the birth runs inside it, which
- * is how an import row's deal lands or fails with the rest of that row.
+ * **Deal birth** — the one program a deal is born through; `createDeal` and
+ * the importer both call it, so the Invested → `birthHolding` seam has one copy.
+ * - Kept out of the client-imported server-fn barrel: the import worker and
+ *   tests call it without a request.
+ * - One transaction: entity, birth values, `deal.created` and (at Invested)
+ *   the holding land together or not at all. Given `tx`, it runs inside it.
  */
 
 /**
  * Which door the deal came through. `manual` is a person at the create
- * dialog — `source_class` `manual`, events `direct`, as `createDeal` has
- * always stamped; `import` is a committed spreadsheet row.
+ * dialog — `source_class` `manual`, events `direct`; `import` is a committed spreadsheet row.
  */
 export type DealSource = 'manual' | 'import'
 
 export type BirthDealInput = {
   name: string
   companyId: string
-  /** Defaults to `pre_lead`, as the create dialog always has. */
+  /** Defaults to `pre_lead`, as the create dialog does. */
   stage?: string | undefined
   /** Further supplied values by attribute slug — `value`, `source`, anything an import maps. */
   values?: Record<string, unknown> | undefined
@@ -144,7 +135,7 @@ export async function birthDealInTx(
   ).at(0)
   if (!born) throw new Error('Deal insert returned no row')
 
-  // Birth = supplied values, then defaults (spec §4). Owner is not stamped
+  // Birth = supplied values, then defaults. Owner is not stamped
   // here: `deal.owner` defaults to current-user, so the dialog, an import
   // and any other path with a human present agree on who owns it.
   const { reembed, dealParties } = await setValuesInTx(tx, {
@@ -163,7 +154,7 @@ export async function birthDealInTx(
   })
   // The pipeline→portfolio seam applies at birth too: a deal *born* at
   // Invested (an import, direct entry) births its holding just like one
-  // moved there (companies.ts updateRecord has the twin hook).
+  // moved there (`updateRecord` has the twin hook).
   const holdingId =
     input.stage === 'invested'
       ? (
@@ -180,8 +171,7 @@ export async function birthDealInTx(
  * The program. Without `tx` it opens its own transaction and, once that
  * commits, queues the embeddable values it set and dispatches the birth's
  * `entity.created` and each party's `deal.linked` (none for an `import`
- * birth, D65); with one, it runs
- * inside the caller's and leaves those steps to whoever commits it.
+ * birth); with one, it runs inside the caller's and leaves those steps to whoever commits it.
  */
 export const birthDealProgram = Effect.fn('birthDealProgram')(function* (
   input: BirthDealInput,

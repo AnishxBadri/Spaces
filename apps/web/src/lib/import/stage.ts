@@ -25,18 +25,13 @@ import type { ImportBatchStatus, ImportMode } from '@spaces/db/schema'
 import type { Mapping } from '@spaces/core/import/mapping'
 
 /**
- * **Staged import** (SPA-164, import-2) — the wizard's first step, folded
- * together with its define step: a spreadsheet arrives, is read by
- * `readGrid`, stored as a blob, and becomes one `import_batch` plus one
- * `import_row` per data row. Nothing reaches the graph. The bytes go through
- * `putBlobProgram`, the blob half of the server lane, and stop there: no
- * `document` row, so no extraction, no chunk, no embedding — a portfolio
- * spreadsheet never becomes AI context.
- *
- * It lives in `lib/import/` and not in `lib/server/` for birth's reason: a
- * plain export from a module the server-fns barrel re-exports ships to the
- * browser (CLAUDE.md → Traps, SPA-155), and the tests call these programs
- * without a request. `lib/server/imports.ts` reaches it by dynamic import.
+ * Staged import, the wizard's first and define steps: a spreadsheet is read
+ * by `readGrid`, stored as a blob, and becomes one `import_batch` plus one
+ * `import_row` per data row. Nothing reaches the graph.
+ * - The bytes go through `putBlobProgram` only: no `document` row, so a
+ *   portfolio spreadsheet never becomes AI context.
+ * - Not in the server-fns barrel's modules: a plain export there ships to the
+ *   browser, and tests call these programs without a request.
  */
 
 /** Rows the wizard draws under the header before the mapping step. */
@@ -233,7 +228,7 @@ export const previousImportOf = Effect.fn('previousImportOf')(function* (
 /**
  * The runnable integration whose file job reads a dropped file of this
  * name into an import batch, or null — from the stored manifests, in plugin
- * order. Web never loads a bundle. (D39 as amended)
+ * order. Web never loads a bundle.
  */
 export const importReaderFor = Effect.fn('importReaderFor')(function* (
   filename: string,
@@ -505,9 +500,9 @@ export const stagedBatch = Effect.fn('stagedBatch')(function* (
 })
 
 /**
- * A batch the wizard may still change: staged, or planned (SPA-167) — a
- * planned batch's mapping can still move, and the change throws its plan
- * away (`mapping.ts`'s `writeMapping`). Committed and failed batches are
+ * A batch the wizard may still change: staged, or planned — a planned
+ * batch's mapping can still move, and the change throws its plan away
+ * (`writeMapping`). Committed and failed batches are
  * the record of what an import did.
  */
 export const editableBatch = Effect.fn('editableBatch')(function* (
@@ -533,13 +528,13 @@ export const editableBatch = Effect.fn('editableBatch')(function* (
   return batch
 })
 
-/** A planned batch's refusal once its commit has written a row (SPA-169). */
+/** A planned batch's refusal once its commit has written a row. */
 export const COMMITTING =
   'This import is being committed and can no longer change'
 
 /**
  * Whether a commit has reached any row of the batch — written it or failed
- * it (SPA-169). A plan the commit is replaying must not move under it, so a
+ * it. A plan the commit is replaying must not move under it, so a
  * mapping change or a decision is refused from then on.
  */
 export const commitStarted = (batchId: string) =>
@@ -583,7 +578,7 @@ export type ImportBatchView = {
   header: Array<string> | null
   mode: ImportMode
   targetObjectId: string | null
-  /** Column → target; null until the mapping step is entered (SPA-165). */
+  /** Column → target; null until the mapping step is entered. */
   mapping: Mapping | null
   status: ImportBatchStatus
   rowCount: number

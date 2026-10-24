@@ -8,8 +8,8 @@ import { FIXTURE_ACTOR } from '../../../vitest.seed'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * `interaction.source` and `document.origin` as `source_class` + `source_ref`
- * (SPA-137) — the last two vendor-named enums, against the test database.
+ * Interaction and document provenance as `source_class` + `source_ref`,
+ * against the test database.
  *
  * The two write sites are one literal each, and both literals are `manual`:
  * a person logging a meeting and a person dropping a file on the Files tab
@@ -20,8 +20,8 @@ vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
  * word "integration", exactly as the dedupe card does for an entity.
  *
  * The server fns themselves need a request context no test has, so these call
- * the helpers they delegate to (`server/shared.ts`, which the client barrel
- * does not re-export). The render is unproven without a browser; the string
+ * the shared helpers they delegate to, which the client barrel does not
+ * re-export. The render is unproven without a browser; the string
  * the Files tab joins is `sourceCapability`, and that is what is checked here.
  *
  * Imports are dynamic like the rest of the DB-coupled suite: `@spaces/db`

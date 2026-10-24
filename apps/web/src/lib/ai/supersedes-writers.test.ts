@@ -3,7 +3,7 @@ import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * "Never written automatically" (D59), held by grep: a `supersedes` link is
+ * "Never written automatically", held by grep: a `supersedes` link is
  * written only behind a verb a person chose. Every module that reaches the
  * writer is listed with the act that calls it; a new caller fails this test
  * until it is added below with its reason. A model, intake or a plugin may

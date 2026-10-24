@@ -19,7 +19,7 @@ import type { StorageLinkProvider } from './storage-link'
  * Attach from a link: a pasted storage-source URL becomes a fetch job on the
  * worker, which is where the plugin resolves it (web imports no plugin code).
  * - The pasting user's own connection for the provider's product fetches it
- *   (D66); none offers Connect, one in error says why.
+ *   none offers Connect, one in error says why.
  * - The answer is immediate; the fetch is polled by its `fetchId`, which is
  *   the job's `singletonKey`.
  */
@@ -116,7 +116,7 @@ export type NoConnection = Exclude<
 >
 
 /**
- * The user's own active connection for the product (D66), or what to say
+ * The user's own active connection for the product, or what to say
  * instead: none held offers Connect back to `returnTo`, one in error says
  * the provider's reason.
  */

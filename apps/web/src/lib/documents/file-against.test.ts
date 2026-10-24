@@ -4,19 +4,11 @@ import { fileAgainstFor, filingNote, uploadTarget } from './file-against'
 import type { FilingMode, PickedEntity } from './file-against'
 
 /**
- * The global upload dialog's file-against control, end to end (SPA-108).
- *
- * The dialog is a `.tsx` and the suite runs on `environment: 'node'`, so what
- * is asserted here is the **value** that leaves the control and what the
- * writer does with it — `uploadTarget` → `fileAgainstFor` →
- * `birthDocumentProgram`, which is exactly the path `uploadDocument` takes
- * through `finalizeDocumentUpload` (the server fn hands `data.fileAgainst`
- * straight to the same program). The three states of the control are the
- * three cases §3.1 entry point 3 names, and this file runs all three against
- * a real database in one test so a fourth state cannot be added without one.
- *
- * The queue is stubbed the way every document fixture file stubs it —
- * `enqueue` is the one side effect birth has outside the transaction.
+ * The global upload dialog's file-against control, end to end. The dialog is
+ * a `.tsx` the node suite cannot render, so this asserts the value it emits
+ * and what the writer does with it: `uploadTarget` → `fileAgainstFor` →
+ * `birthDocumentProgram`, the path `finalizeDocumentUpload` takes. All three
+ * states run in one test, so a fourth cannot be added without one.
  */
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
@@ -135,8 +127,7 @@ describe('the upload dialog’s three filing states', () => {
     })
     expect(await subjectOf(onRecord.id)).toBe(company.entityId)
 
-    // A space: `entity_space`, never a link — SPA-19's union is what stops a
-    // space being a link target again.
+    // A space: `entity_space`, never a link — a space is never a link target.
     const inSpace = await drop('space', space, aSha('space'))
     expect(await edgesOf(inSpace.id)).toEqual({
       links: [],
@@ -153,7 +144,7 @@ describe('the upload dialog’s three filing states', () => {
   })
 
   it('does not dedupe the same sha dropped twice unfiled — two rows, one blob', async () => {
-    // §3.4's rule is "the same bytes already filed *here*", and an unfiled
+    // Dedupe is "the same bytes already filed *here*", and an unfiled
     // drop has no here. Two copies of one deck in the inbox are two rows to
     // file, not one row nobody filed twice.
     const sha = aSha('twice')

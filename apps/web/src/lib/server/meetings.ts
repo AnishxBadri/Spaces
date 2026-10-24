@@ -26,7 +26,7 @@ export type {
 
 /**
  * The meeting surfaces' server fns: Today's Meetings section, the Meetings
- * page, the meeting window, pinning a record and Prep. (D68, D79)
+ * page, the meeting window, pinning a record and Prep.
  * Programs are imported inside the handlers so their database code never
  * reaches the client bundle.
  */
@@ -63,7 +63,7 @@ export const getTodayMeetings = createServerFn().handler(async () => {
 /**
  * The Meetings page: what starts in `(now, until)` and the past, with
  * whether a calendar is connected and who a member asks. The browser sends
- * both instants, so "this week and next" is the reader's. (D68 amended)
+ * both instants, so "this week and next" is the reader's.
  */
 export const listMeetings = createServerFn()
   .validator(z.object({ now: z.iso.datetime(), until: z.iso.datetime() }))
@@ -103,7 +103,7 @@ export const getMeeting = createServerFn()
     }
   })
 
-/** Pin a record to a meeting: the one manual edge. (D49) */
+/** Pin a record to a meeting: the one manual edge. */
 export const pinMeetingRecord = createServerFn({ method: 'POST' })
   .validator(z.object({ interactionId: z.uuid(), entityId: z.uuid() }))
   .handler(async ({ data }) => {
@@ -121,7 +121,7 @@ export const pinMeetingRecord = createServerFn({ method: 'POST' })
     }
   })
 
-/** Prep, streamed as `PrepEvent`s; nothing is stored. (D68) */
+/** Prep, streamed as `PrepEvent`s; nothing is stored. */
 export const prepMeeting = createServerFn({ method: 'POST' })
   .validator(z.object({ interactionId: z.uuid() }))
   .handler(async ({ data }) => {

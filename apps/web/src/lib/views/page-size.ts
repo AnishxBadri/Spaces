@@ -1,10 +1,7 @@
 /**
- * One page of a paged list surface (SPA-64), and the step the foot's
- * "load N more" offers.
- *
- * Its own module because both halves need it and they may not share one:
- * `records.ts` reaches for `@spaces/db`, and the route that draws the foot
- * must not pull that into the client bundle. This file imports nothing.
+ * One page of a paged list surface, and the step the foot's "load N more" offers.
+ * Imports nothing: the client route that draws the foot must not pull
+ * `@spaces/db` into the bundle.
  */
 export const RECORD_PAGE_SIZE = 50
 

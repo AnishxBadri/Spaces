@@ -3,7 +3,7 @@ import { answerBlocks, answerMarkdown, citedRefs } from './answer'
 import type { AskRef } from './types'
 
 /**
- * The answer renderer's citation rule (D70): every claim block carries a
+ * The answer renderer's citation rule: every claim block carries a
  * ref the turn stored, or it is withheld.
  */
 

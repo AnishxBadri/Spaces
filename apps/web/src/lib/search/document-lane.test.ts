@@ -2,20 +2,12 @@ import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The note body's @ menu can reach a document (SPA-27).
- *
- * `entitySearchRows`' default lane used to end `ne(entity.kind, 'document')`,
- * which is what made the mention chip the spec calls built impossible to
- * insert. The note editor is the only caller that omits `kinds`, so this is
- * the one lane that widened; the callers that name their kinds are pinned
- * here too, because "documents are now offered everywhere" would be the
- * regression that matters.
- *
- * `searchEntities` itself needs a request context no test has, so these drive
- * the query it is a thin wrapper around — the same seam `rename.test.ts`
- * uses. Imports are dynamic like the rest of the DB-coupled suite:
- * `@spaces/db` builds its pool from `DATABASE_URL` at import time and
- * `vitest.setup.ts` rewrites it per file.
+ * The note body's @ menu can reach a document.
+ * - The note editor is the only caller that omits `kinds`; callers that name
+ *   their kinds are pinned too, so documents are not offered everywhere.
+ * - `searchEntities` needs a request context, so these drive `entitySearchRows`.
+ * - Imports are dynamic: `@spaces/db` builds its pool from `DATABASE_URL` at
+ *   import time, and the setup rewrites it per file.
  */
 
 const actorId = async () => {

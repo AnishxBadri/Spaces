@@ -8,14 +8,12 @@ import { API_SCOPES, isApiScope } from './scopes'
 import type { ApiScope } from './scopes'
 
 /**
- * The token store (SPA-23, `docs/spec-ai-substrate.md` §5): mint, list,
- * revoke, and the one question the MCP endpoint asks — whose token is this?
+ * The token store: mint, list, revoke, and the one question the MCP endpoint
+ * asks — whose token is this?
  *
- * DECISION (owner, 2026-09-27, SPA-23 hitl resolved): per-user bearer tokens
- * in our own `api_token` table. No OAuth, and not better-auth's `mcp` or
- * `bearer` plugin. canRead is per user, so the credential is per user; the
- * required-env set is frozen at DATABASE_URL + APP_URL, so the store is a
- * table and no identity provider appears.
+ * Per-user bearer tokens in our own `api_token` table — not OAuth, not
+ * better-auth's `mcp` or `bearer` plugin. canRead is per user, so the
+ * credential is per user; the required env is only DATABASE_URL + APP_URL.
  *
  * The plaintext is 32 random bytes, base64url, behind `spk_` so a leaked one
  * is recognisable in a log or a paste. It is returned exactly once, from
@@ -23,9 +21,9 @@ import type { ApiScope } from './scopes'
  * display prefix. A random 256-bit secret needs no salt or slow hash — there
  * is nothing to brute-force — so the lookup is one indexed equality.
  *
- * One store, two doors (SPA-48): the same rows open the MCP endpoint and the
- * external HttpApi door at `/api/v1`, and `createApiTokenProgram` is the one
- * insert into `api_token` (`store.test.ts` greps for a second). What differs
+ * One store, two doors: the same rows open the MCP endpoint and the external
+ * HttpApi door at `/api/v1`, and `createApiTokenProgram` is the one insert
+ * into `api_token` (a test greps for a second). What differs
  * is only what each door asks of the answer: the API door also checks the
  * token's `scopes` against the procedure's, the MCP server does not (see
  * `handleMcpRequest`).
@@ -34,9 +32,8 @@ import type { ApiScope } from './scopes'
  * writes it anywhere, and a failure carries the fixed message
  * "Unauthorized", never the header it was given.
  *
- * It lives outside `lib/server/` so a test can drive it without a request
- * (CLAUDE.md, SPA-155), and it imports `node:crypto`, so the server fns in
- * `lib/server/tokens.ts` import it inside their handlers.
+ * Outside the server-fn barrel so a test can drive it without a request; it
+ * imports `node:crypto`, so the server fns import it inside their handlers.
  */
 
 export const TOKEN_PREFIX = 'spk_'

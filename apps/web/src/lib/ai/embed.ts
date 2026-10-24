@@ -21,36 +21,19 @@ import {
 import type { EmbeddingTarget } from './providers/embed/ids'
 
 /**
- * `embed(texts, {sensitivity, caller})` — the other half of the provider
- * contract (`docs/spec-ai-substrate.md` §4, §9; SPA-51). It reads the
- * workspace's embedding pin (none → `EmbeddingNotPinned`), refuses a
- * `sensitive` call to a cloud embedder, checks the AI cap, resolves the
- * `kind: 'embedding'` credential, calls the model once, writes one
- * `ai_usage` row for what the provider billed, and asserts that **every**
- * vector is exactly the pin's width — one wrong-width vector fails the whole
- * call `DimensionMismatch` and no vector is returned to be stored. The usage
- * row is written either way: the tokens were spent, and the cap counts
- * them. A vector of the wrong width in `chunk.embedding` is not an error
- * Postgres would always raise; it is the dimension trap, and this is where
- * it is sprung.
- *
- * The signature carries `sensitivity` (D11) so the local slot is additive.
- * A `sensitive` call goes to a local provider or nowhere: the pin itself
- * when it is local (Ollama), else the **sensitive slot** beside a cloud pin
- * (SPA-83, `./embedding-pin.ts`), else it is refused `SensitiveRouteRefused`
- * and the record is left unembedded — skip, never leak
- * (`./sensitivity.ts`). There is no cloud fallback, by construction: a
- * refused sensitive embed is never downgraded to the pin. What comes back
- * names the target that made the vectors, so a caller stores the slot's
- * model as `embedding_model`, and the semantic lane — which reads the pin's
- * model only — does not mistake them for the pin's.
- *
- * `opts.model` is the test seam, as `complete()`'s is: an injected AI SDK
- * `EmbeddingModel` (`MockEmbeddingModelV4` from `ai/test`) replaces the vault
- * lookup and the transport. The pin is still read and every check still
- * applies — the seam replaces the wire, not the policy. `opts.target`
- * replaces the pin with an explicit model; only the settings Test call, which
- * tests a model before it is pinned, uses it.
+ * `embed(texts, {sensitivity, caller})`: reads the pin (none →
+ * `EmbeddingNotPinned`), checks the AI cap, resolves the `kind: 'embedding'`
+ * credential, calls the model once and writes one `ai_usage` row.
+ * - Every vector must be exactly the pin's width; one wrong-width vector
+ *   fails the call `DimensionMismatch` and nothing is returned to store. The
+ *   usage row is written either way: the tokens were spent.
+ * - A `sensitive` call goes to a local provider or nowhere: a local pin, else
+ *   the sensitive slot, else `SensitiveRouteRefused` (skip, never leak).
+ *   Never downgraded to a cloud pin.
+ * - The answer names the target that made the vectors, so a caller stores
+ *   the slot's model as `embedding_model` and the semantic lane skips them.
+ * - `opts.model` is the test seam: it replaces the wire, not the policy.
+ *   `opts.target` replaces the pin; only the settings Test call uses it.
  */
 
 export type EmbedOptions = {
@@ -155,7 +138,7 @@ export const embedProgram = Effect.fn('embed')(function* (
   if (pinTarget === null) return yield* new EmbeddingNotPinned()
 
   // A sensitive call to a cloud pin goes to the local slot beside it, or is
-  // refused. Never the pin: that would be the downgrade D11 forbids.
+  // refused. Never the pin: a sensitive call is never downgraded to the cloud.
   let target = pinTarget
   if (
     opts.sensitivity === 'sensitive' &&

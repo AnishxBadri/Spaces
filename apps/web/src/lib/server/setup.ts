@@ -6,7 +6,7 @@ export type { DemoSummary } from '../seeds/demo'
 export type { SetupAudience } from '../integrations/setup-status'
 
 /**
- * The first run without a checklist (D80): What's set up and the demo's
+ * The first run without a checklist: What's set up and the demo's
  * removal on General, and Enrich pressed on a record.
  * Programs are imported inside the handlers so their database code never
  * reaches the client bundle.

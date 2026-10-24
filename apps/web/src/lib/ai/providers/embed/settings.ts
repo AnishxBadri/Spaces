@@ -35,22 +35,15 @@ import type {
 } from './ids'
 
 /**
- * Settings → AI · Embeddings (SPA-51): the four operations behind the
- * section — read, save a key, test a model, pin. The writes open with
- * `requireAdmin()`; the read is any member's, keys redacted (D81). They live here,
- * not in `lib/server/ai-settings.ts`, so a test can drive them without a
- * request and so the AI SDK never reaches the client bundle; the server fns
- * there are one-line delegations.
- *
- * An embedding key is its own vault row — `kind: 'embedding'`, provider
- * `embed:<id>` (`embeddingCredentialProvider`) — never the LLM key of the
- * same vendor, which it would otherwise overwrite. As with the LLM keys, the
- * secret goes in and never comes back out: the section reads the redacted
- * `display`. Ollama (SPA-83) has no key and no row of its own: its row here
- * is the LLM provider's keyless credential, read for its base URL, and the
- * embed Test writes only its own verdict keys onto it (`embedTest*`).
- * A keyed provider with no embedding key reuses its Models key the same
- * way (`reusableModelsKey`, D81) until one is saved.
+ * The operations behind Settings → Embeddings: read, save a key, test, pin.
+ * - Writes open with `requireAdmin()`; the read is any member's, keys redacted.
+ * - Kept outside the server-fn module so a test can drive them without a
+ *   request and the AI SDK never reaches the client bundle.
+ * - An embedding key is its own vault row (`embeddingCredentialProvider`),
+ *   never the same vendor's LLM key, which it would otherwise overwrite.
+ * - The secret goes in and never comes back out; the section reads `display`.
+ * - Ollama has no row of its own: it reads the LLM keyless credential, and
+ *   the embed Test writes only its `embedTest*` keys onto it.
  */
 
 /** A read or write behind the section failed; `message` is what it is shown. */
@@ -76,7 +69,7 @@ export type EmbeddingKeyRow = {
 
 export type EmbeddingSettingsView = {
   pin: EmbeddingPinView | null
-  /** The sensitive slot beside the pin (SPA-83); null when unset. */
+  /** The sensitive slot beside the pin; null when unset. */
   slot: EmbeddingSlotView | null
   keys: EmbeddingKeyRow[]
 }
@@ -197,7 +190,7 @@ export const testEmbeddingProgram = Effect.fn('testEmbedding')(function* (
 
   const result = yield* embedProgram([EMBED_TEST_TEXT], {
     caller: { type: 'user', id: actorId },
-    // An admin checking a key, not record bytes: nothing to resolve (SPA-61).
+    // An admin checking a key, not record bytes: nothing to resolve.
     sensitivity: 'normal',
     target,
     maxRetries: 0,
@@ -236,7 +229,7 @@ export const testEmbeddingProgram = Effect.fn('testEmbedding')(function* (
 })
 
 // The server fns' bodies. `requireAdmin()` first on every write; the read is
-// a member's too, with the keys redacted (D81).
+// a member's too, with the keys redacted.
 
 export async function getEmbeddingSettingsHandler(): Promise<EmbeddingSettingsView> {
   const { isAdmin } = await requireSettingsReader()
@@ -281,7 +274,7 @@ export async function pinEmbeddingHandler(
   )(data)
 }
 
-// The sensitive slot (SPA-83). `requireAdmin()` first, like the rest.
+// The sensitive slot. `requireAdmin()` first, like the rest.
 
 /**
  * Sets the slot, or refuses: `SlotRefused` carries the sentence the section

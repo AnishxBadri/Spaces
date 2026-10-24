@@ -23,10 +23,10 @@ import type { ProviderAppInput, ProviderAppRow } from './input'
  * The operator half of a provider: one OAuth app per provider, a workspace
  * `oauth_client` credential — client id in `meta`, secret encrypted.
  * - The write opens with `requireAdmin()`; the read is any member's, the
- *   secret's display redacted for them (D81).
+ *   secret's display redacted for them.
  * - The secret goes in and never comes back: rows carry `redact()` of it.
- * - Handlers live outside `lib/server/` so a test drives them without a
- *   request; the server fns are one-line delegations.
+ * - Handlers live outside the server-fn barrel so a test drives them
+ *   without a request; the server fns are one-line delegations.
  */
 
 export class ProviderAppRefused extends Schema.TaggedError<ProviderAppRefused>()(
@@ -138,7 +138,7 @@ export const setProviderAppProgram = Effect.fn('setProviderApp')(function* (
 
 // The server fns' bodies. `requireAdmin()` first on the write.
 
-/** Any member reads the clients; each secret's display is redacted for them. (D81) */
+/** Any member reads the clients; each secret's display is redacted for them. */
 export async function getProviderAppsHandler(): Promise<ProviderAppRow[]> {
   const { isAdmin } = await requireSettingsReader()
   const apps = await effectFn(getProviderAppsProgram)()

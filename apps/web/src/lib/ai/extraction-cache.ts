@@ -16,41 +16,16 @@ import type {
 import type { AiTarget } from './route'
 
 /**
- * The extraction cache's read-through (SPA-74; docs/spec-storage-sources.md
- * §9, docs/spec-ai-substrate.md §11). An extract-lane call over a document's
- * bytes goes through here instead of straight to `complete()`: a hit returns
- * the answer stored for (blob, schema, model) and makes no provider call —
- * so no `ai_usage` row either — and a miss calls, stores and returns.
- *
- * **The seam sits beside the extract call, not inside `complete()`.**
- * `complete()` knows a lane and a list of context items; it does not know
- * that those items are one blob's text, which is the whole of what makes an
- * answer reusable. The classify and synthesize lanes never pass through
- * here, and a caller that is not reading a blob (a document with no
- * `blob_sha`) goes straight through to `complete()` unchanged.
- *
- * The key is `extraction_cache`'s primary key, and each part answers one way
- * a stored answer could go stale:
- *
- *  - `blob_sha` — the bytes, not the `document` row, so the same deck filed
- *    twice (two rows, one blob) is read once;
- *  - `schema_key` — `extractionSchemaKey`, a digest of the compiled registry
- *    schema, so an attribute added to the object (or an option added to an
- *    enum) misses rather than replaying a shape that no longer fits;
- *  - `model_id` — the target the lane is routed to *now*, read before the
- *    lookup, so re-routing the lane re-asks.
- *
- * The routing policy runs on a hit too: a record that turned sensitive while
- * its lane still points at the cloud is refused exactly as a miss would be,
- * so emptying the table changes cost and nothing else. The spend cap does
- * not — a hit spends nothing.
- *
- * **Not the query-embedding cache.** `lib/search/query-embedding.ts` (ai-11,
- * SPA-129) caches a search phrase's vector by (text, model) in process, for
- * the life of the process, because a query vector is cheap to lose. This is
- * keyed by bytes and schema, lives in Postgres, and lives exactly as long as
- * the blob does. Different key, different lifetime: neither is a special case
- * of the other, and neither should be generalised into it.
+ * The extraction cache's read-through for extract-lane calls over a
+ * document's bytes: a hit returns the stored answer with no provider call (so
+ * no `ai_usage` row); a miss calls, stores and returns. It sits beside the
+ * extract call, not inside `complete()`, which cannot know its items are one
+ * blob's text. Key parts, each guarding one kind of staleness:
+ * - `blob_sha`: the bytes, not the `document` row, so one blob filed twice is read once.
+ * - `schema_key`: `extractionSchemaKey`, so a registry change misses.
+ * - `model_id`: the lane's current route, so re-routing re-asks.
+ * - The routing policy runs on a hit too (a now-sensitive record is refused);
+ *   the spend cap does not. Not the in-process query-embedding cache; never merge them.
  */
 
 /** Stands in for the reading document's id inside a stored answer. */

@@ -13,10 +13,9 @@ const logInteractionInput = z.object({
 })
 
 /**
- * The write itself is `logInteractionProgram` in `lib/interactions/log.ts`:
- * this file is re-exported to the client by the server-fns barrel, so an
- * Effect program living beside it would reach the browser bundle
- * (CLAUDE.md → Traps), and out there it is what the suite calls directly.
+ * The write itself is `logInteractionProgram`, kept out of this file: it is
+ * re-exported to the client by the server-fns barrel, so an Effect program
+ * beside it would reach the browser bundle. Tests call the program directly.
  */
 export const logInteraction = createServerFn({ method: 'POST' })
   .validator(logInteractionInput)
@@ -43,7 +42,7 @@ const writeUpInteractionInput = z.object({
 })
 
 /**
- * Write up an interaction that was logged without a body (SPA-128) — the
+ * Write up an interaction that was logged without a body — the
  * timeline row's "Write up" affordance. Idempotent: an interaction that
  * already has a note answers with that note's id, so a double click lands
  * in one editor rather than forking a second body.

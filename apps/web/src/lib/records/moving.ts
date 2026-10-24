@@ -4,7 +4,7 @@ import { db } from '@spaces/db'
 import { activity, entity, entitySpace, signal } from '@spaces/db/schema'
 import { jsonRecord, jsonString } from '@spaces/core/json'
 
-/** Today's What's moving: recent signals on the reader's companies. (D79) */
+/** Today's What's moving: recent signals on the reader's companies. */
 
 export class MovingFailed extends Schema.TaggedError<MovingFailed>()(
   'MovingFailed',

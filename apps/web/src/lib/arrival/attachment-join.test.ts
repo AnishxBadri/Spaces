@@ -41,9 +41,9 @@ import { logSyncedEmailProgram } from './synced'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * Every mail attachment is a document joined to its email as `attachment`
- * (D67, D68): filed on each participant record, one row for one sha across
- * the forwarded and the synced lane, and private with the email's body.
+ * Every mail attachment is a document joined to its email as `attachment`:
+ * filed on each participant record, one row for one sha across the
+ * forwarded and the synced lane, and private with the email's body.
  */
 
 const HOUR = 3_600_000

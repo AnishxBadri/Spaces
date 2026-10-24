@@ -12,9 +12,8 @@ import type { SearchQueryFailed } from '@spaces/core/writes/read/search'
 import type { SearchParent } from '#/lib/search/query'
 
 /**
- * The term page (SPA-75; CONTEXT.md → Glossary, "Concept node"). A term is
- * the third way into the graph, after space and record, and its page is
- * everything the graph learned by matching it — and nothing it holds:
+ * The term page: everything the graph learned by matching a term, and
+ * nothing it holds:
  *
  *   - **Mentions** — the notes and documents with a `link(→ term, mentions)`
  *     of any source, newest first, each with a `ts_headline` snippet cut by
@@ -31,8 +30,8 @@ import type { SearchParent } from '#/lib/search/query'
  * teammate's private note neither lists, nor reaches a company, nor counts
  * towards a co-mention. The component is handed rows it may show.
  *
- * Every list is bounded server-side (design contract, checklist 17); the
- * totals ride along so the page can say how many there are.
+ * Every list is bounded server-side; the totals ride along so the page can
+ * say how many there are.
  */
 
 export class TermPageFailed extends Schema.TaggedError<TermPageFailed>()(

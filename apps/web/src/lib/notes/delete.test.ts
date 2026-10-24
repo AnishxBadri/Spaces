@@ -3,15 +3,11 @@ import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 /**
- * Note deletion (SPA-125), against the test database. The demo, proven
- * server-side: a note filed in two spaces, tagged against a company and
- * mentioning a person goes, and everything it fed stays — including the
- * document `derived_from` it, which keeps its blob, its `extracted_text` and
- * its `tsv` and loses only the edge.
- *
- * Imports are dynamic like the rest of the DB-coupled suite: `@spaces/db`
- * builds its pool from `DATABASE_URL` at import time and `vitest.setup.ts`
- * rewrites it per file.
+ * Note deletion: a note filed in two spaces, tagged against a company and
+ * mentioning a person goes, and everything it fed stays, including the
+ * document `derived_from` it, which keeps its blob, `extracted_text` and `tsv`.
+ * Imports are dynamic: `@spaces/db` builds its pool from `DATABASE_URL` at
+ * import time, and the test setup rewrites it per file.
  */
 
 /** The distinctive word the search assertions look for. */
@@ -80,18 +76,15 @@ async function buildDemoNote(tag: string) {
     authorId: author,
   })
 
-  // Filed in both spaces — entity_space, the one filing mechanism for every
-  // kind (CONTEXT.md → Filed vs referenced).
+  // Filed in both spaces through entity_space, the one space filing mechanism.
   for (const spaceId of spaceIds) {
     await db
       .insert(entitySpace)
       .values({ entityId: noteEnt.id, spaceId, source: 'manual' })
   }
 
-  // Tagged against the company *and* mentioning it: the company page's Notes
-  // section reads `mentions` today and `tagged_in` is what the filing decision
-  // says it will read, so both must be gone afterwards for the criterion to
-  // hold either way.
+  // Tagged against the company and mentioning it: the Notes section reads
+  // both `mentions` and `tagged_in`, so both must be gone afterwards.
   await db.insert(link).values([
     {
       fromEntityId: noteEnt.id,
@@ -114,8 +107,8 @@ async function buildDemoNote(tag: string) {
   ])
 
   // The exported-memo PDF: a document whose only tie to the note is the edge.
-  // `other` and not a `memo` kind — document_kind lost that label (SPA-25);
-  // the `derived_from` edge below is what says this PDF is the memo.
+  // `other`, since document_kind has no `memo`; the `derived_from` edge says
+  // this PDF is the memo.
   const [doc] = await db
     .insert(entity)
     .values({ kind: 'document', canonicalName: `teardown-${tag}.pdf` })
@@ -236,9 +229,8 @@ describe('deleteNote', () => {
         ),
     )
 
-    // The company's Notes section — the query companies.ts runs — no longer
-    // lists it, and neither would the `tagged_in` read the filing decision
-    // calls for.
+    // The company's Notes section no longer lists it, through either the
+    // `mentions` or the `tagged_in` read.
     await empty(
       db
         .select()

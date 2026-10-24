@@ -5,7 +5,7 @@ import { z } from 'zod'
  * The chassis' per-browser memory: which groups are folded, which spaces are
  * starred and which saved views are pinned. Local to the browser like
  * `useTablePrefs` — no table, so a star or a pin does not follow the user to
- * another device (accepted for now).
+ * another device.
  *
  * - Read through useSyncExternalStore: the server render and the first client
  *   render agree (nothing folded, nothing starred), and the stored state snaps

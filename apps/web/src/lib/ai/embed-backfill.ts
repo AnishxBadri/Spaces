@@ -30,58 +30,23 @@ import type {
 } from './providers/embed/ids'
 
 /**
- * The corpus backfill (SPA-136, ai-13; `docs/spec-ai-substrate.md` §9) —
- * the one recorded exception to "never forced, automatic once enabled": it
- * embeds every chunk that does not yet carry the pinned model's vector, and
- * it **asks first**, with a token and cost estimate read from the database
- * alone. Nothing here calls a provider until the admin has confirmed and
- * the worker has picked the job up.
- *
- * **What it embeds.** Every `chunk` whose `embedding_model` is null or is
- * not the pin's — a keyless install's lexical-only chunks, a sensitive
- * record's chunks once a local model can take them, and after a same-width
- * swap (`./embedding-pin.ts`) every chunk the old model embedded. Rows whose
- * `sensitive` stamp is set are left out of the pin's count and run (see
- * below for where they go once a local route exists), and every
- * batch still resolves sensitivity **live** per record before a byte leaves
- * (`sensitivityFor`): the column is a cache, and a cache is not an egress
- * decision.
- *
- * **Sensitive chunks, once a local route exists (SPA-83).** With the
- * sensitive slot set beside a cloud pin — or the pin itself local — the
- * chunks stamped `sensitive` are no longer skipped: a second pass embeds
- * every one not yet on the local route's model, through `embed()` with
- * `sensitivity: 'sensitive'`, which routes them to that model and nowhere
- * else. That pass needs no live check — its only destination is local,
- * the stricter route. The estimate counts them apart and prices them by the
- * route provider's `local` flag: "free — local model", never a zero price.
- *
- * **Resumable by construction.** The run walks the pending set in `id`
- * order, `EMBED_BATCH` at a time (SPA-121's 96), and commits each batch's
- * vectors before it asks for the next. Nothing records progress but the
- * rows themselves: a re-queued run — after a worker restart, an expiry, or
- * the cap's reset — selects what is still pending and so never re-embeds a
- * chunk already carrying the pinned model.
- *
- * **It sets vectors in place; it does not re-cut.** SPA-132's
- * `replaceChunks` (`./embed-chunks.ts`) is the writer for a source whose
- * *text* changed: it cuts, embeds the whole source all or nothing, and
- * replaces its rows. The backfill's text has not changed — only which model
- * embedded it — so it updates `embedding` and `embedding_model` on the rows
- * that exist, by id, and commits per batch across sources. Going through
- * `replaceChunks` would make a cap hit halfway through a large document
- * discard the batches of that document already paid for, and rewrite its
- * rows with no vectors at all. Sensitivity is not restamped: the backfill
- * never changes it.
- *
- * **The cap is the shared one.** Every batch goes through `embed()`, which
- * calls `checkCapProgram` — `workspace.settings.ai_caps` read by the one
- * helper, `ai_usage` counted by the one aggregate (SPA-73). The day's cap
- * stops the run mid-corpus with `BackfillCapped`, the batches before it
- * intact; the job re-sends itself for the next UTC midnight
- * (`worker/jobs/embed-backfill.ts`). The per-run cap is honoured by sizing
- * batches under it, so it only stops a run on a single chunk larger than
- * the cap itself.
+ * The corpus backfill: embeds every chunk not yet carrying the pinned
+ * model's vector. The one exception to "automatic once enabled" — it asks
+ * first, with an estimate read from the database alone.
+ * - Normal pass: chunks not stamped sensitive go to the pin, and each batch
+ *   still resolves sensitivity live (`sensitivityFor`) before a byte leaves:
+ *   the stamp is a cache, not an egress decision.
+ * - Sensitive pass: with a local route (a local pin or the slot), stamped
+ *   chunks go through `embed()` with `sensitivity: 'sensitive'`, local only.
+ * - Resumable: walks pending rows in `id` order, `EMBED_BATCH` at a time,
+ *   committing each batch; progress is the rows themselves.
+ * - Sets vectors in place by id, never re-cuts through `replaceChunks`: that
+ *   is all-or-nothing per source and would discard paid-for batches on a cap
+ *   hit. Sensitivity is never restamped here.
+ * - The cap is the shared one (`embed()` → `checkCapProgram`): the day's cap
+ *   stops the run with `BackfillCapped`, earlier batches intact, and the job
+ *   re-sends itself for the next UTC midnight. Batches are sized under the
+ *   per-run cap.
  */
 
 /** The one run: the backfill queue is `exclusive` and every send carries this key. */
@@ -506,9 +471,9 @@ export type EmbedBackfillView =
       embedded: number
       estimate: BackfillEstimate
       /**
-       * The chunks stamped sensitive, once a local route can take them
-       * (SPA-83): counted apart and priced by the route's `local` flag.
-       * Null while there is no local route — they are skipped, as before.
+       * The chunks stamped sensitive, once a local route can take them:
+       * counted apart and priced by the route's `local` flag. Null while
+       * there is no local route — they are skipped.
        */
       sensitive: BackfillSensitiveView | null
       run: BackfillRun
@@ -557,7 +522,7 @@ export const embedBackfillStatusProgram = Effect.fn('embedBackfillStatus')(
 )
 
 // The server fns' bodies. `requireAdmin()` first on the write; the status is
-// counts and a queue read, so any member reads it (D81).
+// counts and a queue read, so any member reads it.
 
 export async function getEmbedBackfillHandler(): Promise<EmbedBackfillView> {
   await requireUser()

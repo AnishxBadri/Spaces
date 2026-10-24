@@ -35,7 +35,7 @@ vi.mock('#/lib/events/emit', () => ({
 }))
 
 /**
- * The two discovery cards a space's watch hands back (D72, D77): one open
+ * The two discovery cards a space's watch hands back: one open
  * card per (space, domain), held by the database; a dismissal that makes
  * every later card for the domain a no-op; and the accepts that resolve and
  * file.

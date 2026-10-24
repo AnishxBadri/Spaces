@@ -6,7 +6,7 @@ import { storage } from '@spaces/core/writes/storage'
 import { blobIsReferenced } from './blob-refs'
 
 /**
- * `retain: text` (docs/spec-storage-sources.md §7): once a bound file's text
+ * `retain: text`: once a bound file's text
  * is stored, its bytes go and the row turns `remote` — the sha, the derived
  * layers and the pointer stay. Called from extraction's success path.
  * - Only a file whose binding says `text`, extracted `done`, still `stored`,

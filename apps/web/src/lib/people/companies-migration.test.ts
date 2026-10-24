@@ -14,7 +14,7 @@ import { companyPeopleProgram } from './companies'
 
 /**
  * The data migration that turned `link(contact_at)` into the `companies`
- * attribute (D60). The test database is already past it, so the legacy rows
+ * attribute. The test database is already past it, so the legacy rows
  * are written here by hand and the migration's statements are run again over
  * them — they touch `contact_at` rows and nothing else.
  */
@@ -56,7 +56,7 @@ async function aPerson(name: string) {
   ).entityId
 }
 
-/** The legacy edge, as `setPersonCompany` used to write it. */
+/** The legacy edge, as written before the migration. */
 async function contactAt(personId: string, toId: string, at: string) {
   await db.insert(link).values({
     fromEntityId: personId,

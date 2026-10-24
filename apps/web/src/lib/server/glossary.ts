@@ -61,7 +61,7 @@ export const listTerms = createServerFn()
  * in and their ancestors, plus global terms. Filing a note into Aerospace is
  * what opts it into the aerospace vocabulary — the same act that puts it on
  * the space page. The query is `termsVisibleFrom`, the one the server-side
- * link sync matches against (SPA-34), so what the editor highlights and what
+ * link sync matches against, so what the editor highlights and what
  * the graph links are drawn from the same set.
  */
 export const listTermsForNote = createServerFn()
@@ -73,9 +73,8 @@ export const listTermsForNote = createServerFn()
   })
 
 /**
- * Create and update run through `lib/glossary/write-term.ts` (SPA-75), which
- * also diff-syncs the aliases into `entity_alias` so search finds a term by
- * its abbreviation. This is the request half only.
+ * Create and update run through the term writer, which also diff-syncs the
+ * aliases into `entity_alias` so search finds a term by its abbreviation. This is the request half only.
  */
 export const createTerm = createServerFn({ method: 'POST' })
   .validator(termInput)
@@ -107,10 +106,8 @@ export const updateTerm = createServerFn({ method: 'POST' })
   })
 
 /**
- * The term row and its entity, through the one delete executor — what dies
- * with an entity is ENTITY_REFS' answer, not a list kept here (SPA-77). The
- * list that used to live here cleared links and activity and missed the four
- * join tables that had shipped since.
+ * The term row and its entity, through the one delete executor: what dies
+ * with an entity is ENTITY_REFS' answer. Never keep a hand list here.
  */
 export const deleteTerm = createServerFn({ method: 'POST' })
   .validator(z.object({ id: z.string().uuid() }))
@@ -125,8 +122,8 @@ export const deleteTerm = createServerFn({ method: 'POST' })
 
 /**
  * The term page's load — definition, mentions with snippets, companies
- * reached and co-mentioned terms, canRead applied in SQL. The query lives in
- * `lib/glossary/term-page.ts` (SPA-75); null means no such term.
+ * reached and co-mentioned terms, canRead applied in SQL. Null means no such
+ * term.
  */
 export const getTermPage = createServerFn()
   .validator(z.object({ termId: z.string().uuid() }))

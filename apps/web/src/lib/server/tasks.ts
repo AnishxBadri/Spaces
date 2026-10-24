@@ -7,7 +7,7 @@ import { user } from '@spaces/db/schema/auth'
 import { requireUser } from './shared'
 
 /**
- * Tasks (CONTEXT.md 15b). Any member sees and completes any task — a
+ * Tasks. Any member sees and completes any task — a
  * two-person fund has no private to-do lists; personal filtering is the
  * client's "mine" scope, not a permission.
  */
@@ -40,8 +40,8 @@ export const createTask = createServerFn({ method: 'POST' })
 /**
  * Open tasks, and — with `includeDone` — the Done window. `focus` is the
  * task a `/tasks?task=<id>` link lands on; the payload carries it even when
- * it closed too long ago to sit in the window. The read and its invariants
- * live in `lib/tasks/list.ts`, outside `lib/server/` so a test can call it
+ * it closed too long ago to sit in the window. The read states its own
+ * invariants and lives outside the server-fn modules so a test can call it
  * without a request; this is the request half only.
  */
 export const listTasks = createServerFn()

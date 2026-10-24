@@ -39,44 +39,32 @@ import type { LedgerRoundEvent, LedgerRowPlan } from '@spaces/db/schema/import'
 import type { ImportFailure } from './stage'
 
 /**
- * **Ledger commit** (SPA-171, import-9; CONTEXT.md phase 15 item 9). The
- * `import.commit` job's body for a ledger batch: the stored plan executed
- * through the portfolio write path (`#/lib/portfolio/write`) — the same four
- * programs the server fns call, so the importer is not a second writer into
- * append-only history. **Each row in its own transaction**: the company
- * (attached, or created as the plan said), then its round, then our cheque —
- * which births the company's holding if it has none, dated the earliest
- * cheque the batch plans for that company — then its mark and proceeds. A
- * failure anywhere rolls that row back alone, leaves `error` naming the
- * company, and the next row carries on.
- *
- * **Nothing is overwritten, and nothing is appended twice.** Every write is
- * an INSERT; this module holds no UPDATE and no DELETE against `round`,
- * `investment`, `mark` or `distribution` (asserted by
- * `ledger-commit.test.ts`), and the correction for a wrong batch is the
- * shipped batch void (D12). Idempotence is two layers:
- *
- * 1. A row whose plan holds `ledger.committed` (written in the row's own
- *    transaction) is passed over by every later run.
- * 2. Before appending an event, a live row with its natural key is looked
- *    for — same holding, date, amount, currency and instrument / basis /
- *    kind, `reverses_id` null and not itself reversed — and reused if found.
- *    For a cheque or proceeds, rows this same batch appended are not
- *    candidates: two equal cheques in one sheet are two cheques, and a crashed
- *    row never leaves its own events behind (they share its transaction). A
- *    mark is a statement of value, so an equal one is the same statement
- *    wherever it came from. A round is reused by company, kind and date.
- *    So cheques and proceeds never dedupe against rows of their own batch —
- *    two equal cheques in one sheet stay two, because each is money that
- *    moved and the cost basis sums them — while marks dedupe everywhere,
- *    because a mark states a value rather than moving money, and the same
- *    statement made twice is still one.
- *
- * Every investment, mark and distribution appended carries
- * `batch_id = import_batch.id`, the handle `voidLedgerBatchProgram` grabs; a
- * round carries none (D12 excluded it), so its id is recorded on the plan.
- *
- * Outside `lib/server/` for the barrel's reason (CLAUDE.md → Traps).
+ * Ledger commit: the `import.commit` job's body for a ledger batch, executed
+ * through the same four portfolio programs the server fns call, so the
+ * importer is not a second writer into append-only history.
+ * - Each row in its own transaction: the company (attached or created), its
+ *   round, our cheque (birthing the holding if none, dated the earliest cheque
+ *   the batch plans for that company), then mark and proceeds. A failure
+ *   rolls back that row alone, names the company in `error`, and the next row
+ *   carries on.
+ * - Nothing is overwritten: every write is an INSERT, with no UPDATE or DELETE
+ *   against `round`, `investment`, `mark` or `distribution` (the test asserts
+ *   it). A wrong batch is corrected by the batch void.
+ * - Nothing is appended twice:
+ *   1. A row whose plan holds `ledger.committed` (written in the row's own
+ *      transaction) is passed over by every later run.
+ *   2. Before appending, a live event with the same natural key (holding,
+ *      date, amount, currency, instrument / basis / kind, `reverses_id` null,
+ *      not itself reversed) is reused. Cheques and proceeds never match rows
+ *      of their own batch: two equal cheques in one sheet are two cheques, as
+ *      money moved twice. Marks match everywhere: a mark states a value, and
+ *      the same statement twice is one. A round is reused by company, kind
+ *      and date.
+ * - Every investment, mark and distribution carries `batch_id`, the handle
+ *   `voidLedgerBatchProgram` grabs. A round carries none (the void never
+ *   reverses rounds), so its id is recorded on the plan.
+ * - Outside the server-fns barrel's modules: a plain export there ships to
+ *   the browser.
  */
 
 const query = <T>(run: () => Promise<T>) =>
@@ -580,7 +568,7 @@ export type LedgerReceipt = {
   voidLine: string | null
   /** A batch void would still reverse something. */
   voidable: boolean
-  /** Every event the batch appended has been reversed (SPA-173). */
+  /** Every event the batch appended has been reversed. */
   voided: boolean
 }
 

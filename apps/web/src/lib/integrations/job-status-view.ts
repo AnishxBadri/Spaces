@@ -4,7 +4,7 @@ import type { JobStatusRow } from './job-status'
 
 /**
  * The record head's view of its plugin jobs, from the status stream: pure,
- * so the page and its tests share one reducer. (D64)
+ * so the page and its tests share one reducer.
  * - `init` replaces everything known; `status` applies one row on top, and
  *   an older row never overwrites a newer one.
  * - A fired action reads pending at once and stays pending until a row it

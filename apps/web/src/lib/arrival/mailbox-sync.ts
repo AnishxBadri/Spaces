@@ -26,7 +26,7 @@ import { PRODUCTS } from '#/lib/connections/products'
 
 /**
  * A synced mailbox's settings on its account page: whether its bodies are
- * shared, and its exclude list (D67). Only the connection's owner reads or
+ * shared, and its exclude list. Only the connection's owner reads or
  * saves them — not an admin — because they decide who reads the owner's mail.
  * - The toggle moves the visibility of every body already synced, and of the
  *   attachments the owner still authors; `canRead` enforces it on each read

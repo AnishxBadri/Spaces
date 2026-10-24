@@ -1,17 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
 /**
- * SPA-76. What the pair card reads off each side, and the two hardcodings it
- * replaced: the heading's noun and the link.
+ * What the pair card reads off each side: the heading's noun and the link.
  *
  * `entityContext` left-joins the object registry rather than switching on
  * `entity.kind`, so a custom pair reads "Same Fund?" and links into
- * `/o/funds/<id>` through the same `recordPath` every other list uses. Core
- * rows carry an object row too (`CORE_OBJECTS`), which is why one join
- * answers for both and no ternary survives in the component.
+ * `/o/funds/<id>` through `recordPath`. Core rows carry an object row too
+ * (`CORE_OBJECTS`), so one join answers for both.
  *
  * Integration against this worker's test database, truncated and reseeded
- * before the file was imported (SPA-145) — no cleanup here.
+ * per file, so no cleanup here.
  */
 
 async function actorId(): Promise<string> {
@@ -89,15 +87,15 @@ describe('entityContext — the noun and the link', () => {
 
     expect(side.objectSingular).toBeNull()
     expect(side.objectSlug).toBeNull()
-    // No object row, but a page since SPA-75: a term is a concept node.
+    // No object row, but a page: a term is a concept node.
     expect(recordPath(side)).toBe(`/terms/${term.id}`)
   })
 })
 
 /**
- * SPA-97. The Domain row's fallback. The side that *caused* an identity pair
- * is the side that lost the claim, so it holds no domain alias — the card
- * printed "—" for the record under discussion. `identityDomain` is that
+ * The Domain row's fallback. The side that *caused* an identity pair is the
+ * side that lost the claim, so it holds no domain alias, and the card would
+ * print "—" for the record under discussion. `identityDomain` is that
  * side's own value for its object's `domain` identity key.
  */
 describe('entityContext — the colliding side still shows its domain', () => {

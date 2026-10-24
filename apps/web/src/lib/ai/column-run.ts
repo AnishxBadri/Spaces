@@ -36,46 +36,21 @@ import { closeRunProgram, openRunProgram } from './run'
 import type { RunWriteFailed } from './run'
 
 /**
- * Column run (SPA-122; docs/spec-ai-substrate.md §13, "bulk = job with
- * estimate + per-day cap"). One AI-configured attribute over every record a
- * saved view names, as one worker job — the per-cell program
- * (`./attribute-run.ts`) once per row, never a fork of it.
+ * Column run: one AI attribute over every record a saved view names, as one
+ * worker job that runs the per-cell program once per row (never a fork of it).
  *
- * **The view's rows, server-side.** The set is `listScope` plus the view's
- * stored conditions compiled by `compileConditions` — the `where` the list
- * page filters by and the chip counts over (`views/counts.ts`), never the
- * rows on screen and never the object's total. Every slug is resolved before
- * compiling: a view whose conditions the compiler cannot express (an
- * archived or unknown attribute) is **refused**, at the estimate, at the
- * press and again in the job, rather than run over a partial `where` that
- * names more records than the view does.
- *
- * **Skipped, not re-proposed.** A row that already carries an open
- * `attribute_patch` naming the attribute — a value or a registry proposal,
- * the same test the cell's "proposed" state reads (`suggestionNames`) — is
- * outside the walk: the estimate subtracts it and the page query excludes
- * it, so a second run over the same view proposes only what is missing.
- *
- * **A page at a time.** The walk is the list pages' keyset pager
- * (`views/paging.ts`) over entity ids — oldest first, `COLUMN_RUN_PAGE` rows
- * per query — so the job never holds the view, and a record born mid-run
- * cannot shift a row out of the walk.
- *
- * **One run, one step per row.** The job opens one `ai_run`; every row's
- * cell threads it (`runId`), so each lane call is one step whose
- * `output_ref` is the suggestion it wrote, and every suggestion carries the
- * run's id — which is how /inbox groups them under one header
- * (`isColumnRunTask`) with "Accept all".
- *
- * **The daily cap stops it.** `complete()` refuses a call once the day's
- * tokens reach the workspace ceiling (`./caps.ts`); the run catches that
- * refusal, proposes nothing more, and closes `failed` with the summary —
- * rows done and rows left — in `ai_run.error`, which is where the inbox's
- * run header and Settings → Usage read it. A run that walks to the end
- * closes `done`. A row that fails on its own (a sensitive record on a cloud
- * route, a record merged mid-run, a provider error on that one call) is
- * counted and the walk goes on; a failure that would fail every row (no
- * route, no key, the run log unwritable) stops it like the cap does.
+ * - The rows are `listScope` plus the view's conditions via
+ *   `compileConditions`. A view the compiler cannot fully express is refused
+ *   (estimate, press and job), never run over a wider partial `where`.
+ * - Rows with an open proposal for the attribute (`suggestionNames`'s test)
+ *   are skipped, so a rerun proposes only what is missing.
+ * - Keyset paging, oldest first, `COLUMN_RUN_PAGE` rows per query: a record
+ *   born mid-run cannot shift a row out of the walk.
+ * - One `ai_run`, one step per row; every suggestion carries the run id,
+ *   which is how the inbox groups them (`isColumnRunTask`).
+ * - The daily cap stops the run `failed`, with rows done and left in
+ *   `ai_run.error`. A per-row failure is counted and the walk goes on; one
+ *   that would fail every row (no route, no key) stops it like the cap.
  */
 
 /** Rows per page of the walk. */

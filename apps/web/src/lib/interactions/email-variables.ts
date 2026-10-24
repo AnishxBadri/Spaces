@@ -21,7 +21,7 @@ import type { DraftRecipient } from '@spaces/db/schema/drafts'
 import { DraftFailed } from './email-drafts'
 
 /**
- * The composer's Review (D67): every variable resolved per recipient, the
+ * The composer's Review: every variable resolved per recipient, the
  * blanks named per row. The resolver is `resolveVariables`; this reads the
  * records it resolves against — the person's values, their current company
  * and their interaction stats.
@@ -176,7 +176,7 @@ export const recipientContextsProgram = Effect.fn('recipientContexts')(
 
     const records = new Map(
       people.map((p): [string, VariableRecord] => {
-        // The current company is the first of the person's `companies`. (D60)
+        // The current company is the first of the person's `companies`.
         const companyId = jsonStrings(p.values.companies).at(0)
         return [
           p.id,

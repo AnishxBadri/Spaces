@@ -24,14 +24,14 @@ import { askQuery } from './query'
 import type { AskVia } from './types'
 
 /**
- * A plugin's MCP server, mounted for one Ask turn. (D72, D77)
+ * A plugin's MCP server, mounted for one Ask turn.
  * - Mounted only from a runnable row whose stored manifest declares `mcp`:
  *   a disabled, degraded or breaker-tripped integration offers no tools.
  * - The key comes from the vault by the row's credential and goes in the
  *   manifest's header; it is never handed to the browser or the model.
  * - Every request goes through `HttpLive`, the plugin's own throttle; each
  *   tool call is charged first — the daily credit cap checked and a receipt
- *   (spend is only receipts, D53) and an `ai_usage` row written, as the
+ *   (spend is only receipts) and an `ai_usage` row written, as the
  *   integration's, under the turn's run — and refused when it cannot be.
  * - The caller decides whether to mount at all: a sensitive scope never
  *   reaches this module.

@@ -8,10 +8,9 @@ import { API_SCOPES } from './scopes'
 import { createApiTokenProgram } from './store'
 
 /**
- * SPA-48 — one personal-token store, not a second. The MCP server and the
+ * One personal-token store, not a second. The MCP server and the
  * `/api/v1` door authenticate against the same `api_token` rows, and those
- * rows have one way in: `createApiTokenProgram`. Text scans in the shape of
- * `one-door.test.ts` — no import of what they guard, and a failure names the
+ * rows have one way in: `createApiTokenProgram`. Text scans — no import of what they guard, and a failure names the
  * file.
  */
 

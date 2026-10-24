@@ -14,7 +14,7 @@ export const SPACE_TABS = [
 ] as const
 export type SpaceTab = (typeof SPACE_TABS)[number]
 
-/** A space opens on Notes, as a record does. (D74) */
+/** A space opens on Notes, as a record does. */
 export const DEFAULT_SPACE_TAB: SpaceTab = 'notes'
 
 /**

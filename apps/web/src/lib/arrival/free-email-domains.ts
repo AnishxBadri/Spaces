@@ -1,12 +1,12 @@
 import { registrableDomain } from '@spaces/sdk/identity'
 
 /**
- * Free email providers (D34): a participant on one of these becomes a person
+ * Free email providers: a participant on one of these becomes a person
  * and never a company. The one cheap guard against the characteristic
  * failure of create-all — a company called "gmail.com", and a dedupe inbox
  * full of its siblings.
  *
- * Data, owned by the arrival area, and tested (`free-email-domains.test.ts`):
+ * Data, owned by the arrival area, and tested:
  * every entry is lowercase and is its own registrable domain, so the lookup
  * below — which reduces an address's host to its registrable domain first —
  * can reach it; and the list is a superset of the one

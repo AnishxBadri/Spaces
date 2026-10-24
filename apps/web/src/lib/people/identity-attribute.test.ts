@@ -11,7 +11,7 @@ import * as resolveModule from '@spaces/core/writes/entities/resolve'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 /**
- * Identity is a unique attribute (D75): a person's `emails` and a company's
+ * Identity is a unique attribute: a person's `emails` and a company's
  * `domains` live in `entity.values`, and `setValues` is the only door that
  * writes their `is_identity` aliases. Three locks:
  * - the registry seeds both as multi-valued identity attributes, and
@@ -40,7 +40,7 @@ const walk = (dir: string): Array<string> =>
 
 /**
  * Who may write an alias row: the identity writer behind
- * `claimIdentityAlias` and `recordNameAlias` share `resolve.ts`; a term's
+ * `claimIdentityAlias` and `recordNameAlias` share one module; a term's
  * names are `kind: 'name'`, never identity.
  */
 const ALIAS_INSERTERS = new Set([
@@ -95,7 +95,7 @@ describe('identity is a unique attribute (D75)', () => {
       type: 'domain',
       options: { multi: true, identityKey: 'domain' },
     })
-    // A plain url: linked to enrichment (D76), never an identity key.
+    // A plain url: linked to enrichment, never an identity key.
     for (const kind of ['person', 'company'] as const)
       expect(
         SYSTEM_ATTRIBUTES[kind].find((a) => a.slug === 'linkedin'),
@@ -126,7 +126,7 @@ describe('identity is a unique attribute (D75)', () => {
 
   it('has no other alias writer in any package, plugin or seed', () => {
     const all = sources()
-    // The seeds and Apollo are where alias writers used to live.
+    // The seeds and Apollo write records, so they must be in the walk.
     expect(all.some((s) => s.file.endsWith('lib/seeds/dev.ts'))).toBe(true)
     expect(all.some((s) => s.file.endsWith('plugins/apollo/src/map.ts'))).toBe(
       true,

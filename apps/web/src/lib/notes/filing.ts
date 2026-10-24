@@ -7,28 +7,12 @@ import { NoteNotFound, NoteQueryFailed } from '#/lib/notes/delete'
 import { canRead } from '#/lib/server/shared'
 
 /**
- * Filing a note against a record (SPA-116), from the note's own end.
- *
- * Two filing mechanisms, never mixed (CONTEXT.md → The note model): a space
- * files through `entity_space`, a record files through `link(tagged_in)`.
- * This file is the second one, and it writes exactly the stamp
- * `createNoteProgram` writes when "Note about this" starts a note on a
- * record — `relation: 'tagged_in'`, `source: 'manual'` — so a note filed
- * from the editor and a note filed at birth are the same row.
- *
- * **Unfiling removes the filing and nothing else.** The edge table's unique
- * index is `(from, to, relation, attr_slug)`, so a `mentions` row to the
- * same record is a different row: deleting the `tagged_in` one leaves the
- * body's mention alone, and the note moves from "Filed here" to "Mentions
- * this" on that record rather than disappearing from it. `filing.test.ts`
- * pins that.
- *
- * The target allowlist lives **here**, not in the picker. The client filters
- * so the user is never offered a target that would be refused; the server
- * refuses anyway, because a client allowlist is a convenience and never a
- * rule. `mandate` is deliberately absent from both: it is a workspace row,
- * not an entity, so it has no id the `link` table could point at — the
- * picker cannot offer it and this program could not accept it.
+ * Filing a note against a record, from the note's end: `link(tagged_in,
+ * manual)`, the same stamp `createNoteProgram` writes, so both are one row.
+ * - Unfiling removes the `tagged_in` row only; a `mentions` row to the same
+ *   record survives, moving the note to "Mentions this".
+ * - The target allowlist is enforced here; the picker's filter is a
+ *   convenience, never the rule. `mandate` is not an entity, so never a target.
  */
 
 /** The kinds a note may be filed against. `space` files the other way. */
@@ -80,11 +64,9 @@ const query = <T>(run: () => Promise<T>) =>
   })
 
 /**
- * `delete.ts`'s read, applied here for the same reason: a note that is not
- * there and a note that is not yours answer alike, because a distinct error
- * would confirm that someone else's private note exists. Filing is not
- * author-only — a shared note is team-editable, the rule `saveNote` and
- * `setNoteKind` already apply.
+ * A missing note and one you cannot read answer alike: a distinct error would
+ * confirm someone else's private note exists. Not author-only; a shared note
+ * is team-editable, as in `saveNote` and `setNoteKind`.
  */
 const readNote = Effect.fn('filing.readNote')(function* (
   userId: string,
@@ -145,8 +127,7 @@ const readTarget = Effect.fn('filing.readTarget')(function* (
 
 /**
  * File one note against one record. `{ filed: false }` means the edge was
- * already there — a second click is the same outcome, not an error, and it
- * writes no activity row, the rule `setNoteKind` set for non-events.
+ * already there: not an error, and no activity row for a non-event.
  */
 export const fileNoteAgainstProgram = Effect.fn('fileNoteAgainstProgram')(
   function* (
@@ -187,15 +168,9 @@ export const fileNoteAgainstProgram = Effect.fn('fileNoteAgainstProgram')(
 )
 
 /**
- * Remove one filing. Deletes the `tagged_in` row alone: a `mentions` row to
- * the same record is a separate edge and survives, which is what moves the
- * note to "Mentions this" instead of off the record's page.
- *
- * No target check here, deliberately: the allowlist guards what may be
- * *created*, and a filing that already exists must stay removable whatever
- * its target has since become — a record merged away after the fact would
- * otherwise leave a chip that refuses to go.
- *
+ * Remove one filing: the `tagged_in` row only; a `mentions` row survives.
+ * No target check: an existing filing must stay removable whatever its target
+ * has become (a target merged away would otherwise leave a stuck chip).
  * `{ unfiled: false }` means there was no filing to remove.
  */
 export const unfileNoteFromProgram = Effect.fn('unfileNoteFromProgram')(

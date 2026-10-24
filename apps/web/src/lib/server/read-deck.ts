@@ -3,11 +3,10 @@ import { z } from 'zod'
 import { requireUser } from './shared'
 
 /**
- * The Files tab's Read deck button (SPA-90). The trigger is manual and
- * pull-based (docs/spec-ai-substrate.md §4): pressing it enqueues one
- * `document.read-deck` job keyed on the document, and pg-boss's
- * `singletonKey` — not a table — is what refuses a second press while the
- * first is queued or active. Each read is one `ai_run` (SPA-100).
+ * The Files tab's Read deck button. Manual and pull-based: pressing it
+ * enqueues one `document.read-deck` job keyed on the document, and pg-boss's
+ * `singletonKey`, not a table, refuses a second press while the first is
+ * queued or active. Each read is one `ai_run`.
  */
 
 export const readDeck = createServerFn({ method: 'POST' })
@@ -29,7 +28,7 @@ export const readDeck = createServerFn({ method: 'POST' })
   })
 
 /**
- * Read deck and summarize (SPA-100): the same job with the record the
+ * Read deck and summarize: the same job with the record the
  * summary lands on — one two-step run, extract then synthesize. The same
  * key, so it is refused while the deck is already being read either way.
  */

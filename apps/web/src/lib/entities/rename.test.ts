@@ -2,11 +2,9 @@ import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
 /**
- * Renaming keeps the old name (SPA-63). `updateRecord` used to set
- * `entity.canonical_name` and record nothing, so the previous name fell out
- * of Cmd-K the moment it was replaced. The rename now writes a `name` alias
- * through the same insert-if-absent check `resolveEntity` uses, for every
- * object-model kind the server fn serves.
+ * Renaming keeps the old name, so it still reaches the record from Cmd-K:
+ * the rename writes a `name` alias through the same insert-if-absent check
+ * `resolveEntity` uses, for every object-model kind the server fn serves.
  *
  * The server fn itself needs a session, so these drive the program the fn
  * is a wrapper around (`renameRecordProgram`) and the query
@@ -119,7 +117,7 @@ describe('renaming a record', () => {
       renameRecordProgram(actor, { id: rec.id, name: `Fund II ${tag}` }),
     )
 
-    // Since SPA-60 a custom record is born holding its name alias, so the
+    // A custom record is born holding its name alias, so the
     // rename's insert-if-absent on the outgoing name is a no-op and the
     // record ends up with exactly two rows, not three.
     const aliases = await nameAliases(rec.id)

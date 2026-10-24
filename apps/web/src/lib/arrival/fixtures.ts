@@ -1,6 +1,6 @@
 /**
- * Raw RFC 822 fixtures for the arrival lane (SPA-56), shared by the pure
- * forward table (`forwarded.test.ts`) and the poll tests, which deliver them
+ * Raw RFC 822 fixtures for the arrival lane, shared by the pure forward
+ * table and the poll tests, which deliver them
  * to the fake IMAP server. Line endings are `\n` here; the fake server turns
  * them into `\r\n` on delivery, and mailparser reads either.
  */
@@ -138,7 +138,7 @@ function partLines(part: FixturePart): Array<string> {
 }
 
 /**
- * A message with a real MIME tree (SPA-115): `multipart/mixed` holding a
+ * A message with a real MIME tree: `multipart/mixed` holding a
  * `multipart/related` — the text and HTML alternatives plus every part that
  * carries a Content-ID, the way Gmail and Outlook lay out an inline image —
  * followed by the parts that carry none. `headers` are the top-level lines

@@ -10,22 +10,18 @@ import { replaceChunks } from './embed-chunks'
 import type { ReplaceChunksFailure } from './embed-chunks'
 
 /**
- * A note's text or an embeddable attribute's value → its `chunk` rows
- * (SPA-132, ai-12b). The worker's `chunk.embed` job is this program;
- * `saveNoteProgram` and `setValuesEffect` enqueue it after their writes
- * commit (`./chunk-sources.ts`).
+ * A note's text or an embeddable attribute's value → its `chunk` rows. The
+ * worker's `chunk.embed` job is this program; `saveNoteProgram` and
+ * `setValuesEffect` enqueue it after their writes commit.
  *
- * This file only *reads* the source; the write is `replaceChunks`, the same
- * replace-stamp-embed transaction documents go through, so every rule there
- * holds here unchanged: rows land with null vectors when nothing is pinned
- * or the record is sensitive, a re-run replaces rather than appends, and an
- * empty text deletes the source's chunks.
+ * This only *reads* the source; the write is `replaceChunks`, so every rule
+ * there holds: null vectors with no pin or a sensitive record, a re-run
+ * replaces rather than appends, an empty text deletes.
  *
  * The text is read when the job runs, not when it was sent: a burst of note
  * autosaves coalesces into one queued job (`stately`), and whichever body is
  * current then is the one cut. A value cleared after the job was queued is
- * cut as empty, which deletes — the same answer the clear gave in its own
- * transaction.
+ * cut as empty, which deletes.
  *
  * A private note is chunked like any other. Who may read its chunks is
  * decided where they are read — the semantic lane's `canReadNoteSql`, the
@@ -76,8 +72,8 @@ export type EmbedSourceFailure =
 
 /**
  * The editor appends the note's mentions as a last paragraph —
- * `Mentions: [[Acme|entity:<uuid>]] …` (`deriveMarkdown`,
- * `components/editor/note-editor.tsx`) — so the links survive a lossy
+ * `Mentions: [[Acme|entity:<uuid>]] …` (`deriveMarkdown`) — so the links
+ * survive a lossy
  * markdown export. It is bookkeeping, not prose: left in, every note that
  * mentions Acme would carry an `entity:` uuid into its vectors and read as
  * close to every other. Only a trailing block is cut, so a sentence that

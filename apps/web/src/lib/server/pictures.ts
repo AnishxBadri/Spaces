@@ -4,7 +4,7 @@ import { requireUser } from './shared'
 
 /**
  * A record's picture set or cleared by hand: held from then on, so
- * enrichment never fills it again (D76). The bytes it replaced are reclaimed
+ * enrichment never fills it again. The bytes it replaced are reclaimed
  * once no row names them.
  */
 

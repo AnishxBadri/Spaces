@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { addBorn } from './born-rows'
 
 /**
- * SPA-53. The composer wash's one hard rule is the negative one: a row that
+ * The composer wash's one hard rule is the negative one: a row that
  * was already on the page when the list loaded must never wash. That is a
  * property of where the set comes from, so this is what the test holds.
  */

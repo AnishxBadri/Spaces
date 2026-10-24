@@ -21,11 +21,10 @@ import type { TestCallResult } from './test-call'
  * Settings → AI → Models: the three operations behind the Providers ledger.
  * Save and Test are admin-only — keys are the admin's — and the refusal is
  * `requireAdmin()`, the first line of the handler. The list is any member's,
- * with every key and header value redacted for them (D81).
+ * with every key and header value redacted for them.
  *
- * The handlers live here rather than in `lib/server/ai-settings.ts` so a test
- * can drive them without a request: `lib/server/*` exports ship to the
- * browser, and the server fns there are one-line delegations.
+ * The handlers live outside the server-fn module so a test can drive them
+ * without a request: that module's plain exports ship to the browser.
  *
  * The secret goes in and never comes back out: the ledger reads the redacted
  * `display` stored on `meta` at save time, nothing here decrypts except the
@@ -220,7 +219,7 @@ export const testAiProviderProgram = Effect.fn('testAiProvider')(function* (
 })
 
 // The server fns' bodies. `requireAdmin()` first on every write; the list is
-// a member's too, with every key and header value redacted (D81).
+// a member's too, with every key and header value redacted.
 
 export async function listAiProvidersHandler(): Promise<AiProviderRow[]> {
   const { isAdmin } = await requireSettingsReader()

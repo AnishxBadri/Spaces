@@ -34,7 +34,7 @@ import {
 import { EnrichmentPageFailed } from './enrichment-page'
 
 /**
- * A record's enrichment, as its page shows it (D76, D80):
+ * A record's enrichment, as its page shows it:
  * - what its Enrich will ask, in order, and how its last run went;
  * - each filled value's where-from: the source, the date and, for a
  *   changing figure, the earlier values.
@@ -62,7 +62,7 @@ export type LastRun = {
 export type RecordEnrichment = {
   /** The sources Enrich asks, in order. */
   readonly sources: ReadonlyArray<string>
-  /** Only free sources are on: the line offers More sources. (D80) */
+  /** Only free sources are on: the line offers More sources. */
   readonly onlyFree: boolean
   /** The record is sensitive: only local sources run. */
   readonly sensitive: boolean
@@ -171,7 +171,7 @@ const askedProgram = Effect.fn('enrichment.asked')(function* (
       id: r.id,
       name: jsonString(jsonRecord(r.manifest)['name']) ?? r.capabilityId,
     }))
-  // The Website reads every company, with or without a model. (D80)
+  // The Website reads every company, with or without a model.
   const website =
     kind === 'company'
       ? { id: (yield* query(enrichmentRow)).id, name: WEBSITE_NAME }

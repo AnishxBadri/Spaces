@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 
 /**
  * The last tab used on a kind of record, per browser like `chassis-prefs`:
- * the next record of that kind opens on it when its link names no tab. (D74)
+ * the next record of that kind opens on it when its link names no tab.
  * - The server render and the first client render read null (the default
  *   tab); the stored tab snaps in after hydration.
  * - The value is a plain string; the page decides whether it is one of its

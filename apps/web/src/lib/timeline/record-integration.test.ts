@@ -3,13 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 /**
- * A record a plugin birthed (sdk-7a): IdentityLive writes its
- * `company.created` activity with no user — `actor_id` null, the integration
- * in `meta` (`integrationMeta`, core's one spelling of it; the port side is
- * `packages/core/src/writes/ports/identity.test.ts`) — and the timeline must
- * show that row as the plugin, not as a person and not as "System". Dynamic
- * imports, as the other timeline tests do: the harness points `DATABASE_URL`
- * at this worker's database before `@spaces/db` loads.
+ * A record a plugin birthed: IdentityLive writes its `company.created`
+ * activity with no user — `actor_id` null, the integration in `meta`
+ * (`integrationMeta`) — and the timeline must show that row as the plugin,
+ * not as a person and not as "System". Dynamic imports: the harness points
+ * `DATABASE_URL` at this worker's database before `@spaces/db` loads.
  */
 describe('the record timeline, for a record a plugin birthed', () => {
   it('names the integration on the birth row', async () => {
@@ -53,7 +51,7 @@ describe('the record timeline, for a record a plugin birthed', () => {
 })
 
 /**
- * A value a plugin filled (sdk-9): the burst names the integration by its
+ * A value a plugin filled: the burst names the integration by its
  * manifest `name` once the loader has stored one, and by its capability id
  * until then — never as "An integration".
  */
@@ -139,7 +137,7 @@ describe('the record timeline, for values a plugin filled', () => {
 })
 
 /**
- * A document a plugin filed (sdk-8): `Content.fileDocument` runs core's
+ * A document a plugin filed: `Content.fileDocument` runs core's
  * intake as the integration, so `uploaded_by` and the activity row's
  * `actor_id` are null — and the record page must still say who filed it.
  * The Files tab reads the ref (`documentProvenance`, "via <capability>"),

@@ -316,7 +316,7 @@ export const hasEventJob = (manifest: Manifest | null): boolean =>
   manifest !== null &&
   Object.values(manifest.jobs).some((job) => job.trigger === 'event')
 
-/** Every live space, labelled `Fintech / Payments`, in path order; archived ones are out of the picker. (D73) */
+/** Every live space, labelled `Fintech / Payments`, in path order; archived ones are out of the picker. */
 export const spaceOptions = query(async () => {
   const rows = await db
     .select({
@@ -340,7 +340,7 @@ export const spaceOptions = query(async () => {
   })
 })
 
-/** Whether a plugin answers Enrich on a company or a person: an enrichment source. (D76) */
+/** Whether a plugin answers Enrich on a company or a person: an enrichment source. */
 export const enrichesRecords = (manifest: Manifest | null): boolean =>
   enrichActionFor(manifest, 'company') !== null ||
   enrichActionFor(manifest, 'person') !== null
@@ -348,7 +348,7 @@ export const enrichesRecords = (manifest: Manifest | null): boolean =>
 /**
  * A mail syncer's settings are its connection's, drawn on the account page
  * for the mailbox's owner and never here: they decide who reads that
- * person's mail. (D67)
+ * person's mail.
  */
 const ACCOUNT_PAGE_KEYS: ReadonlyArray<string> = [
   'shareBodies',
@@ -387,7 +387,7 @@ export const withoutAccountPageKeys = (manifest: Manifest): unknown => {
 
 /**
  * The host-owned settings an enrichment source's page leaves to the
- * Enrichment page: the reuse window there replaces its `cacheDays`. (D81)
+ * Enrichment page: the reuse window there replaces its `cacheDays`.
  */
 const ENRICHMENT_PAGE_KEYS: ReadonlySet<string> = new Set(['cacheDays'])
 

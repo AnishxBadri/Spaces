@@ -3,9 +3,8 @@ import { z } from 'zod'
 import { API_SCOPES } from '../tokens/scopes'
 
 /**
- * Settings → API tokens (SPA-23): the MCP server's per-user credentials.
- * The bodies live in `lib/tokens/handlers.ts` and are imported inside each
- * handler, so the token store (and `node:crypto`) never reach the client
+ * Settings → API tokens: the MCP server's per-user credentials. The bodies
+ * are imported inside each handler, so the token store (and `node:crypto`) never reach the client
  * bundle — this module is re-exported by the client-imported barrel.
  */
 
@@ -19,7 +18,7 @@ export const createApiToken = createServerFn({ method: 'POST' })
   .validator(
     z.object({
       name: z.string().max(200),
-      // What the token may do at /api/v1 (SPA-48). MCP ignores it.
+      // What the token may do at /api/v1. MCP ignores it.
       scopes: z.array(z.enum(API_SCOPES)).max(API_SCOPES.length),
     }),
   )

@@ -59,7 +59,7 @@ import type { RecorderLink } from './recorder-links'
  * The meeting reads behind Today's Meetings section, its Needs-you rows, the
  * Meetings page and the meeting window, plus the one write the window owns: pinning a record.
  * A meeting is an `interaction` of kind `meeting`; nothing here is stored
- * beyond what the calendar sync wrote. (D68)
+ * beyond what the calendar sync wrote.
  */
 
 export class MeetingReadFailed extends Schema.TaggedError<MeetingReadFailed>()(
@@ -279,8 +279,8 @@ const writeUp = alias(entity, 'e')
 /**
  * The Meetings page's read: what starts in `(now, until)`, earliest first,
  * and what started by `now`, the ones still needing a write-up first, then
- * newest first, cut at `PAST_LIMIT`. (D68 amended)
- * - Every meeting row is visible to every member (D67); canRead decides only
+ * newest first, cut at `PAST_LIMIT`.
+ * - Every meeting row is visible to every member; canRead decides only
  *   whether the reader may read the write-up, which reads `private`.
  * - `mine` matches the participants against the reader's login address and
  *   every connected account's.
@@ -403,7 +403,7 @@ export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
 /** How far back Needs you looks for a meeting nobody wrote up. */
 export const UNWRITTEN_DAYS = 14
 
-/** A past meeting with no write-up: a Needs-you row with Write. (D79) */
+/** A past meeting with no write-up: a Needs-you row with Write. */
 export type UnwrittenMeeting = {
   id: string
   title: string | null
@@ -457,7 +457,7 @@ export const unwrittenMeetingsProgram = Effect.fn('unwrittenMeetingsProgram')(
   },
 )
 
-/** Whether any member has a live Google Calendar connection. (D80) */
+/** Whether any member has a live Google Calendar connection. */
 export const calendarConnectedProgram = Effect.fn('calendarConnectedProgram')(
   function* (): Effect.fn.Return<boolean, MeetingReadFailed> {
     const rows = yield* query(() =>
@@ -477,7 +477,7 @@ export const calendarConnectedProgram = Effect.fn('calendarConnectedProgram')(
   },
 )
 
-/** One artifact in the window, by role. (D68) */
+/** One artifact in the window, by role. */
 export type MeetingArtifact = {
   documentId: string
   role: ArtifactRole
@@ -494,7 +494,7 @@ export type MeetingSuggestion = {
   summary: string
 }
 
-/** A note the meeting carries beyond its write-up, readable by the viewer (D78). */
+/** A note the meeting carries beyond its write-up, readable by the viewer. */
 export type MeetingCarriedNote = {
   id: string
   title: string
@@ -503,7 +503,7 @@ export type MeetingCarriedNote = {
   private: boolean
   /** "Open in <provider>": the note at the recorder that filed it. */
   openIn: RecorderLink | null
-  /** "via <tool> · <author>" (D78). */
+  /** "via <tool> · <author>". */
   via: NoteVia | null
 }
 
@@ -515,7 +515,7 @@ export type MeetingDetail = {
   cancelled: boolean
   conferenceUrl: string | null
   participants: Array<MeetingParticipant>
-  /** The edged records, then each edged company's open deals (D49). */
+  /** The edged records, then each edged company's open deals. */
   records: Array<MeetingRecord>
   /** The write-up; `title` is null when the reader may not see it. */
   note: {
@@ -532,7 +532,7 @@ export type MeetingDetail = {
 
 /**
  * The open deals of `companyIds`: a deal reaches a meeting by derivation
- * from its company, never by an edge (D49). A deal whose stage sits in the
+ * from its company, never by an edge. A deal whose stage sits in the
  * `closed` option group is not open.
  */
 const openDealsOf = (companyIds: ReadonlyArray<string>) =>
@@ -724,7 +724,7 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
         openIn: links.get(n.id) ?? null,
         via: via.get(n.id) ?? null,
       })),
-      // A transcript private to its member is theirs alone (D78).
+      // A transcript private to its member is theirs alone.
       artifacts: artifacts
         .filter((a) => canRead(user, a))
         .map((a) => ({
@@ -743,7 +743,7 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
 )
 
 /**
- * Pin a record to a meeting: the one manual `interaction_entity` edge (D49).
+ * Pin a record to a meeting: the one manual `interaction_entity` edge.
  * A link never invites anyone. The record's interaction stats follow in the
  * same transaction.
  */

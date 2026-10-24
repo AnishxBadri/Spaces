@@ -18,7 +18,7 @@ import {
 } from './setup-status'
 
 /**
- * The first-run reads against a real database (D80): What's set up reads
+ * The first-run reads against a real database: What's set up reads
  * each of its seven items live from the vault, users, mailbox, connections
  * and integrations; Today's empty state turns on the company count.
  */

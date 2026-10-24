@@ -1,5 +1,5 @@
 /**
- * The count column every inverse attribute brings to a list (D69): read-only,
+ * The count column every inverse attribute brings to a list: read-only,
  * sortable and filterable, never in `entity.values` as stored.
  * - Its slug is `count:<inverse slug>`; the colon keeps it apart from every
  *   attribute slug (`[a-z0-9_]`), as `stat:` does.

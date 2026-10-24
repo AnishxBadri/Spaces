@@ -43,53 +43,41 @@ import { WebLayer } from './runtime'
 import { API_PREFIX, API_VERSION, CAPTURE_SCHEMA_VERSION } from './versions'
 
 /**
- * The external API door (SPA-37; CONTEXT.md "Backend paradigm" decision 3 as
- * amended 2026-09-16, D8; one `/api/v1` namespace, D27).
+ * The external API door: one `/api/v1` namespace.
  *
- * This file is the only one in the repo that imports `effect/unstable/httpapi`
- * — `one-door.test.ts` asserts it, and eslint keeps the package out of
- * `src/routes/**` and `src/components/**`. Everything the API is lives here:
- * the definition (`Api`), the handlers, the web handler the TanStack splat
- * route `src/routes/api/v1/$.ts` hands every method to, the typed client, and
- * the OpenAPI document at `/api/v1/openapi.json`. One definition, two
- * audiences: the HTTP caller and the typed client both go through `Api`.
+ * - The only file that imports `effect/unstable/httpapi`; eslint keeps the
+ *   package out of routes and components. It holds the definition (`Api`),
+ *   the handlers, the web handler the splat route mounts, the typed client
+ *   and the OpenAPI document. Both audiences go through `Api`.
+ * - Procedures are Effect programs whose services come from `WebLayer`,
+ *   provided once when the web handler is built.
+ * - Server-fns are untouched.
  *
- * Procedures are Effect programs. Their services come from `WebLayer`
- * (`./runtime.ts`), provided once when the web handler is built — the same
- * closed-Layer shape `runJob` provides in the worker.
+ * ## Versioning: two clocks
  *
- * Server-fns are untouched (decision 4: the boundary finds itself).
+ * The path is the only version (`API_VERSION`). Within v1 every change is
+ * additive: a new procedure, optional input field or output field. Anything a
+ * v1 caller could trip on forces v2: a removed or renamed procedure, path or
+ * field; a narrowed type; a newly required input; a changed status or error
+ * tag. v2 is a second `Api` under `/api/v2`, with v1 still served beside it.
  *
- * ## Versioning — two clocks (SPA-45; `docs/api-versioning.md`)
+ * `CAPTURE_SCHEMA_VERSION` is the second clock, inside v1 on purpose: the
+ * capture extension ships on its own release cycle, so it moves when the
+ * capture payload's shape changes and the API version does not.
+ * `capture.hello` answers both, which is how an extension tells "update me"
+ * from breakage.
  *
- * The path is the only version: `/api/v1`, `API_VERSION` in `./versions.ts`.
- * Within v1 every change is additive — a new procedure, a new optional input
- * field, a new output field. What forces v2 is anything a v1 caller could
- * trip on: a removed or renamed procedure, path or field; a narrowed type (a
- * wider input refused, an output that loses a case); a required input that
- * was optional; a changed status or error tag. v2 is a second `Api` under
- * `/api/v2`, with v1 still served beside it.
- *
- * `captureSchemaVersion` (`CAPTURE_SCHEMA_VERSION`) is the second clock, and
- * it lives inside v1 on purpose: the capture extension ships on its own
- * release cycle (CONTEXT.md integration map #8), so the shape of the capture
- * payload moves on its own. It moves when that payload's shape changes; the
- * API version does not move with it. `capture.hello` answers both, which is
- * how an installed extension tells "update me" from breakage.
- *
- * `openapi.test.ts` snapshots the whole document at `OPENAPI_PATH`: the
- * snapshot diff is the review of every change to the external contract.
- *
- * Manual check that a generated client can call the handshake (not a
- * dependency, not run in tests), against `pnpm dev`:
+ * The OpenAPI snapshot test pins the whole document at `OPENAPI_PATH`: its
+ * diff is the review of every change to the external contract. Manual check
+ * that a generated client can call the handshake, against `pnpm dev`:
  *
  *     npx openapi-typescript http://localhost:3000/api/v1/openapi.json -o /tmp/spaces-api.d.ts
  *     curl -s http://localhost:3000/api/v1/capture/hello
  *
- * The docs UI is `HttpApiScalar`, served at `DOCS_PATH` from the bundled
- * script (no CDN). It is a page, not a procedure, and not part of the contract.
+ * The docs UI is `HttpApiScalar` at `DOCS_PATH`, from the bundled script (no
+ * CDN). It is a page, not a procedure, and not part of the contract.
  *
- * ## Failures — one shape, one status per kind
+ * ## Failures: one shape, one status per kind
  *
  * Every non-2xx answer from `/api/v1/*` has the body
  * `{ "error": { "tag": string, "message": string } }`, and never a stack.
@@ -119,26 +107,25 @@ import { API_PREFIX, API_VERSION, CAPTURE_SCHEMA_VERSION } from './versions'
  * | A defect, an interrupt, anything else                | 500    | `InternalError`                   |
  *
  * A declared failure is a `Schema.TaggedError` with a `message`, carried on
- * the wire through `onTheWire` below, which is what gives it its status and
- * its envelope — so the typed client decodes the same body back into the
- * same class. Everything else never reaches a handler's error channel; the
- * seam (`web` below) catches it at the router and renders it with
+ * the wire through `onTheWire`, which gives it its status and envelope, so
+ * the typed client decodes the same body back into the same class. Anything
+ * else is caught by the seam (`web`) at the router and rendered by
  * `failureOf`. The 500 message is fixed ("Internal error"): the cause is
- * logged on the server, and nothing about it is sent.
+ * logged on the server and never sent.
  *
- * ## Authentication — one personal-token store, scoped (SPA-48)
+ * ## Authentication: one personal-token store, scoped
  *
  * A procedure that needs a caller carries the `TokenAuth` middleware and
- * declares the scope it requires as the `RequiredScope` annotation (`null`
- * for "any live token"). The credential is `Authorization: Bearer <token>`,
- * the same `api_token` rows the MCP server reads — one store, minted once in
- * Settings → API tokens, not a second credential. `authorize` below hashes
- * the token, finds the row, compares the digests in constant time
- * (`lib/tokens/store.ts`), refuses 401 or 403 per the table, and otherwise
- * puts the token's user and grant in the procedure's context as `Principal`.
- * A procedure then runs as that user — canRead and all. A token is an
- * identity, never an escalation: a scope can only narrow what the user could
- * already do. The token itself is never logged and never answered.
+ * declares its scope as the `RequiredScope` annotation (`null` for any live
+ * token). The credential is `Authorization: Bearer <token>`, the same
+ * `api_token` rows the MCP server reads, not a second credential. `authorize`
+ * hashes the token, finds the row, compares digests in constant time, refuses
+ * 401 or 403 per the table, and otherwise puts the token's user and grant in
+ * the context as `Principal`. The procedure then runs as that user, canRead
+ * and all.
+ * - A token is an identity, never an escalation: a scope only narrows what
+ *   the user could already do.
+ * - The token itself is never logged and never answered.
  */
 
 // ---------------------------------------------------------------------------
@@ -213,14 +200,14 @@ export class NotFound extends Schema.TaggedError<NotFound>()('NotFound', {
   message: Schema.String,
 }) {}
 
-/** A capture's text is over `MAX_CAPTURE_BYTES` (SPA-111). */
+/** A capture's text is over `MAX_CAPTURE_BYTES`. */
 export class PayloadTooLarge extends Schema.TaggedError<PayloadTooLarge>()(
   'PayloadTooLarge',
   { message: Schema.String },
 ) {}
 
 /**
- * A capture payload version this instance does not read (SPA-111): the
+ * A capture payload version this instance does not read: the
  * extension and the instance have drifted, and the answer is "update the
  * extension", never a schema error.
  */
@@ -442,8 +429,8 @@ const Instant = Schema.String.check(
 ).annotate({ description: 'When the page was captured, ISO 8601' })
 
 /**
- * The capture payload, v1 (SPA-111; CONTEXT.md integration map #8). The
- * shape an extension, a bookmarklet or curl posts.
+ * The capture payload, v1: the shape an extension, a bookmarklet or curl
+ * posts.
  */
 const CapturePayload = Schema.Struct({
   captureSchemaVersion: Schema.Int.annotate({
@@ -551,13 +538,10 @@ class SessionGroup extends HttpApiGroup.make('session').add(
 ) {}
 
 /**
- * The read half of integration map #11 (SPA-80): the registry, then records
- * a page at a time, then one record — every one `records:read`, every one a
- * thin wrapper over a program the app already runs (`./records.ts` says
- * which). Three things are absent on purpose, each owned elsewhere, and
- * `records-api.test.ts` fails if one appears here: a filter parameter
- * (docsurf-12b's condition registry and ai-18), search (the fused query,
- * clean-5 and ai-11; MCP has it via ai-23b) and any write (ai-24's one
+ * The records read API: the registry, records a page at a time, one record.
+ * Every one needs `records:read` and wraps a program the app already runs.
+ * Absent on purpose, and the records API test fails if one appears: a filter
+ * parameter, search (MCP has it) and any write (writes go through the one
  * proposal door).
  */
 const RegistryAttributeWire = Schema.Struct({
@@ -718,7 +702,7 @@ export class Api extends HttpApi.make('spaces')
     OpenApi.annotations({ title: 'Spaces', version: String(API_VERSION) }),
   ) {}
 
-/** Served beside the procedures; `openapi.test.ts` pins its contents. */
+/** Served beside the procedures; the OpenAPI snapshot test pins its contents. */
 export const OPENAPI_PATH = `${API_PREFIX}/openapi.json` as const
 
 /** The Scalar reference page over the same document. */

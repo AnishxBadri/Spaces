@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 /**
- * Manual interaction logging and its write-up (SPA-123).
+ * Manual interaction logging and its write-up.
  *
  * The two paths the dialog's two footer buttons take: "Log meeting", which
  * leaves `note_id` null and writes no note at all, and "Log and write up",
@@ -13,7 +13,7 @@ import { FIXTURE_ACTOR } from '../../../vitest.seed'
  * interaction — and the fourth is what the record page reads.
  *
  * Imports are dynamic like the rest of the DB-coupled suite: `@spaces/db`
- * builds its pool from `DATABASE_URL` at import time and `vitest.setup.ts`
+ * builds its pool from `DATABASE_URL` at import time and the test setup
  * rewrites it per file.
  */
 
@@ -51,8 +51,7 @@ async function aPerson(name: string): Promise<string> {
 
 /**
  * The database's refusal, message and cause — drizzle wraps the driver error,
- * so the constraint name lives one level down. Same shape as
- * `source-class.test.ts`'s helper.
+ * so the constraint name lives one level down.
  */
 async function refusalOf(run: () => Promise<unknown>): Promise<string> {
   try {

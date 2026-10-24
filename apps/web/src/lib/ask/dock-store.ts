@@ -4,7 +4,7 @@ import type { AskScopeChip } from './types'
 
 /**
  * Ask's docked column, per browser: open or closed, its width, and the
- * thread it holds. (D70)
+ * thread it holds.
  * - Open state, width and thread survive a reload (localStorage); closing
  *   keeps the thread.
  * - A door hands over a draft (the text typed in Cmd-K) and asks for focus;

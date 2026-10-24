@@ -20,18 +20,11 @@ import { onDocumentExtracted } from './on-extracted'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * SPA-62, the seam: `document.extracted` has one author. Whatever runs
- * after an extraction is enqueued by `onDocumentExtracted`, which is called
- * from extractDocument's success path and nowhere else — the grep at the
- * bottom holds both halves. Between them: `document.embed` always, and
- * `document.classify` only for a document still at `other` with the
- * classify lane routed.
- *
- * SPA-94 is the seam's second tenant, as SPA-62's body named it ("ai-21's
- * vision write"): the vision job reaches `onDocumentExtracted` through the
- * *store* — `ExtractionStore.onExtracted`, whose layer is the one call site
- * below — so the single-call-site assertion is unchanged, and the store
- * seam's callers are pinned by name beside it.
+ * The seam: `document.extracted` has one author. Whatever runs after an
+ * extraction is enqueued by `onDocumentExtracted`, called from the extract
+ * job's success path and nowhere else; the grep at the bottom holds it.
+ * The vision job reaches it through `ExtractionStore.onExtracted`, whose
+ * callers are pinned by name beside it.
  */
 
 const USER = FIXTURE_ACTOR.id
@@ -163,7 +156,7 @@ describe('onDocumentExtracted — classify routed', () => {
 
 // ---------- the single author ----------
 
-// Both source trees (SPA-181): the author is apps/web's, its callers are
+// Both source trees: the author is apps/web's, its callers are
 // apps/worker's jobs. Paths are repo-relative.
 const ROOT = resolve(
   fileURLToPath(new URL('.', import.meta.url)),
@@ -199,7 +192,7 @@ describe('document.extracted has one author', () => {
   it('the store seam is called by extraction and by the vision write, and nobody else', () => {
     // `ExtractionStore.onExtracted` is `onDocumentExtracted` behind the
     // job's Layer. Extraction calls it on its success path; the vision job
-    // (SPA-94) calls it after writing through the same `markExtracted`,
+    // calls it after writing through the same `markExtracted`,
     // because a scanned page read by a model is extraction too.
     const calls = files.flatMap((f) =>
       [...f.text.matchAll(/\bstore\.onExtracted\(/g)].map(() => f.path),

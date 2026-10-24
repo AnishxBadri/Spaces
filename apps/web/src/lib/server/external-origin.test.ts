@@ -103,13 +103,10 @@ describe('the http-on-a-public-host warning', () => {
 })
 
 /**
- * Hostability contract #3 says the forwarded-proto header is trusted "only
- * from the proxy". Today it is trusted nowhere — nothing in `src` reads it —
- * and that is the stronger answer: every external URL comes from APP_URL, so
- * a spoofed header changes nothing. This test pins that. Introducing a read
- * of a forwarded header (or even naming one in a comment) fails the suite,
- * which forces the proxy-trust question to be decided on purpose rather than
- * arrived at by a one-line convenience.
+ * The forwarded-proto header is trusted nowhere: every external URL comes
+ * from APP_URL, so a spoofed header changes nothing. Reading a forwarded
+ * header, or even naming one in a comment, fails the suite, so trusting the
+ * proxy has to be decided on purpose.
  */
 describe('the proxy-trust non-decision', () => {
   const srcDir = fileURLToPath(new URL('../..', import.meta.url))

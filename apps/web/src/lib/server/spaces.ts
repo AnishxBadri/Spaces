@@ -10,10 +10,9 @@ import {
 } from '#/lib/spaces/read'
 import { createSpaceRow, requireUser } from './shared'
 
-// Spaces — first real write path through the entity core. The reads are
-// Effect programs in lib/spaces/read.ts: the handler checks the session, the
-// program does the work, `Effect.runPromise` is the seam. Nothing but server
-// fns may be exported from this file — see the note at the top of read.ts.
+// Spaces server fns. The handler checks the session, an Effect program does
+// the work, `Effect.runPromise` is the seam. Nothing but server fns may be
+// exported from this file: it is re-exported to the client bundle.
 
 export const listSpaces = createServerFn().handler(async () => {
   const u = await requireUser()
@@ -68,7 +67,7 @@ export const renameSpace = createServerFn({ method: 'POST' })
   })
 
 /**
- * What belongs here, edited in place on the space page (D72). A blank save
+ * What belongs here, edited in place on the space page. A blank save
  * clears it; each change is one `space.criteria_changed` line.
  */
 export const setSpaceCriteria = createServerFn({ method: 'POST' })
@@ -87,7 +86,7 @@ export const setSpaceCriteria = createServerFn({ method: 'POST' })
     }
   })
 
-/** Archive asks nothing — Restore undoes it. (D73) */
+/** Archive asks nothing — Restore undoes it. */
 export const archiveSpace = createServerFn({ method: 'POST' })
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
@@ -142,7 +141,7 @@ export const moveSpace = createServerFn({ method: 'POST' })
 /**
  * "Run now" on a watch: send its run at once, cadence or not. The next
  * cadence tick still fires; an archived space or a stopped plugin is
- * refused, never queued. (D72)
+ * refused, never queued.
  */
 export const runWatchNow = createServerFn({ method: 'POST' })
   .validator(z.object({ watchId: z.string().uuid() }))
@@ -209,7 +208,7 @@ export const addSpaceWatch = createServerFn({ method: 'POST' })
 /**
  * Move here: the chosen companies leave this space for one of its
  * subspaces, an untag and a tag each. The `filed` events and the lowering
- * restamps go after the commit. (D73)
+ * restamps go after the commit.
  */
 export const moveIntoSubspace = createServerFn({ method: 'POST' })
   .validator(

@@ -19,9 +19,9 @@ import type { FormValues, SettingsForm } from '#/lib/integrations/settings-form'
 import { watchLabel } from './watch-status'
 
 /**
- * The watching half of a space page (D72): its watches with their latest
+ * The watching half of a space page: its watches with their latest
  * run, the engines a watch can be added with, and What's moving on its
- * members. Outside `lib/server/` so tests call the programs directly.
+ * members. Outside the server-fn module so tests call the programs directly.
  */
 
 export class WatchingFailed extends Schema.TaggedError<WatchingFailed>()(
@@ -414,7 +414,7 @@ const refuse = (message: string, errors: { [key: string]: string } = {}) =>
   new WatchRefused({ message, errors })
 
 /**
- * Refused: the same space, engine and settings is already a watch. (D72)
+ * Refused: the same space, engine and settings is already a watch.
  * `watchId` is null when a racing save took the lens at the insert.
  */
 export class AlreadyWatching extends Schema.TaggedError<AlreadyWatching>()(

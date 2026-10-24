@@ -22,8 +22,8 @@ import {
 import type { RowPlan } from '@spaces/core/import/plan'
 
 /**
- * Resolve preview (SPA-167). Batches are inserted straight into the tables,
- * as in `mapping.test.ts`: this file needs rows, not bytes. The graph is
+ * Resolve preview. Batches are inserted straight into the tables, as in the
+ * mapping tests: this file needs rows, not bytes. The graph is
  * seeded through `resolveEntity`, the door the preview must agree with.
  */
 

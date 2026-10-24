@@ -11,7 +11,7 @@ import {
 } from './settings'
 
 /**
- * SPA-29. Settings → AI → Providers, driven through the handlers the three
+ * Settings → AI → Providers, driven through the handlers the three
  * server fns delegate to, with the one thing a suite cannot build — the
  * request — stubbed: `getRequest` returns an empty request and the session
  * `requireAdmin()` reads is whichever this file says. Everything under it is

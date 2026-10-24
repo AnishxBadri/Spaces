@@ -4,16 +4,16 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The external API has one door (SPA-37, D8). `effect/unstable/httpapi` is
- * imported by exactly one file, `api.ts`, so the definition, its handlers,
- * the typed client and the OpenAPI document cannot drift into two. And no
+ * The external API has one door. `effect/unstable/httpapi` is imported by
+ * exactly one file, `api.ts`, so the definition, its handlers, the typed
+ * client and the OpenAPI document cannot drift into two. And no
  * route or component names `effect` at all, statically or by dynamic import:
  * the `/api/v1/$` route reaches the door through `#/lib/rpc/api`, never
  * through Effect. eslint says the second half too; this says the first,
  * which no import rule can — "only this file" is a fact about the whole tree.
  *
- * Text only, like `job-run-one-writer.test.ts`: no imports of the code under
- * guard, and a failure names the file.
+ * Text only: no imports of the code under guard, and a failure names the
+ * file.
  */
 
 const repoRoot = fileURLToPath(new URL('../../../../../', import.meta.url))

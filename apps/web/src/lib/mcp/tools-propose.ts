@@ -18,19 +18,17 @@ import {
 } from '@spaces/core/writes/read/record'
 
 /**
- * The write half of the MCP surface (SPA-31, `docs/spec-ai-substrate.md`
- * §3, §5, §6), and deliberately one verb: `propose_suggestion(entity,
- * patch, rationale, refs)` calls `proposeProgram` — the same one door every
- * in-app feature proposes through. It writes a `suggestion` row and nothing
- * else; a person accepting it in /inbox is what writes a value.
+ * The write half of the MCP surface, deliberately one verb:
+ * `propose_suggestion(entity, patch, rationale, refs)` calls `proposeProgram`,
+ * the same door every in-app feature proposes through. It writes a
+ * `suggestion` row and nothing else; a person accepting it in /inbox is what
+ * writes a value.
  *
- * The design rule, stated once in §6: an agent is a client of the four
- * contracts. It gets no fifth contract, no privileged write path, no direct
- * DB access. So there is no accept, write, delete or merge tool here, and
- * `acceptProgram` refuses an integration actor (`tools-propose.test.ts`
- * holds both, in the test named for the rule). A prompt injection inside a deck an
- * outside assistant read can at worst propose noise into a queue a person
- * empties.
+ * An agent is a client of the four contracts: no fifth contract, no
+ * privileged write path, no direct DB access. So there is no accept, write,
+ * delete or merge tool, and `acceptProgram` refuses an integration actor. A
+ * prompt injection inside a deck an outside assistant read can at worst
+ * propose noise into a queue a person empties.
  *
  * canRead is the token user's, as on the read tools: a record they cannot
  * read (a teammate's private note) is not found — neither proposable nor

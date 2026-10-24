@@ -7,25 +7,12 @@ import { activity } from '@spaces/db/schema/activity'
 import type { NoteBody } from '@spaces/db/schema/kinds'
 
 /**
- * Note creation (SPA-104), Effect-first behind `effectFn` per the ratchet.
- *
- * The bug this file closes: "Note about this" on a record used to write a
- * single `link(mentions, extracted)` row, so a note started from a company
- * was *referenced* by it and never *filed* against it — and because
- * `saveNote` diff-syncs exactly the extracted mentions it owns, deleting the
- * starter mention block took the note's only edge with it.
- *
- * Two mechanisms, never conflated (CONTEXT.md → Filed vs referenced):
- *
- * - **Filed** is an act. A space files through `entity_space`, which is the
- *   one filing mechanism for every kind and carries `source`/`confidence`;
- *   a record files through `link(tagged_in, manual)`. Written first, because
- *   it is the thing the user asked for.
- * - **Referenced** is a side effect of writing. The starter block's
- *   `[[mention]]` materializes `link(mentions, extracted)` — stamped exactly
- *   as `saveNote`'s diff-sync stamps the rows it owns, so the next save
- *   treats it as its own and removing the block removes the row. The filing
- *   is untouched by that, which is the whole point.
+ * Note creation. Filed and referenced are two mechanisms, never conflated:
+ * - Filed is the act: a space files through `entity_space`, a record through
+ *   `link(tagged_in, manual)`. Written first; it is what the user asked for.
+ * - Referenced is a side effect: the starter `[[mention]]` writes
+ *   `link(mentions, extracted)`, stamped as `saveNote` stamps the rows it
+ *   owns, so deleting the block removes that row and leaves the filing.
  */
 
 export class NoteCreateFailed extends Schema.TaggedError<NoteCreateFailed>()(
@@ -46,19 +33,14 @@ export type CreateNoteInput = {
   about: NoteAbout | null
   noteKind: NoteKind
   /**
-   * The note's name at birth (SPA-123). Omitted, the note is born Untitled
-   * and the editor is where it gets a name — which is right for "Note about
-   * this" and wrong for a meeting write-up, whose name is the subject the
-   * user already typed into the log dialog.
+   * The note's name at birth. Omitted, the note is born Untitled; a meeting
+   * write-up passes the subject the user already typed.
    */
   title?: string
   /**
-   * Whether the note opens on the starter mention block (SPA-123). Default
-   * true, which is the "Note about this" behaviour above. A meeting write-up
-   * passes false: its attendees are *filed*, not mentioned, and the
-   * `link(mentions, extracted)` a starter block drags along would put the
-   * note in both lanes of every attendee's Notes section for a sentence
-   * nobody wrote.
+   * Whether the note opens on the starter mention block. Default true. A
+   * meeting write-up passes false: its attendees are filed, and a starter
+   * mention would put the note in both lanes of every attendee's Notes.
    */
   starter?: boolean
 }
@@ -133,9 +115,7 @@ export const createNoteProgram = Effect.fn('createNoteProgram')(function* (
 
         if (about) {
           if (about.kind === 'space') {
-            // Written while standing in the space, so it is filed there, not
-            // merely referenced — and it files through entity_space like
-            // every other kind, inheriting its provenance/confidence story.
+            // Filed in the space through entity_space, like every other kind.
             // No link row: `link` cannot express `source` + `confidence`.
             await tx
               .insert(entitySpace)

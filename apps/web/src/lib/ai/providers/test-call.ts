@@ -12,7 +12,7 @@ import type { LlmProvider } from './ids'
  * for, so it comes back as `{ok: false, message}` carrying the provider's own
  * words (a wrong key reads `invalid x-api-key`, not "something went wrong").
  *
- * It runs through `complete()` (SPA-42) like every model call, so a completed
+ * It runs through `complete()` like every model call, so a completed
  * test writes its one `ai_usage` row, recorded under `via.lane` and the
  * caller who pressed the button. The model is handed in already built — the
  * Test call tests one provider's saved key, not the routing grid.
@@ -121,7 +121,7 @@ export const runTestCall = Effect.fn('runTestCall')(function* (
 ): Effect.fn.Return<TestCallResult> {
   return yield* completeProgram(via.lane, [], undefined, {
     caller: via.caller,
-    // An admin checking a key, not record bytes: nothing to resolve (SPA-61).
+    // An admin checking a key, not record bytes: nothing to resolve.
     sensitivity: 'normal',
     budgetChars: 1000,
     task: TEST_PROMPT,

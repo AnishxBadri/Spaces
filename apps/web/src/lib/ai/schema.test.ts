@@ -2,16 +2,11 @@ import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The app-side half of the registry → JSON-schema compiler's tests (SPA-21).
- * The compiler itself is `@spaces/core/ai/schema` and its snapshot suite runs
- * in core with no database; this file holds the two claims that need the
- * app: a user-built object compiles with zero AI-specific code, and a
- * proposal round-trips into the one write path's `planPatch`.
- *
- * The Fund is built through `createObjectProgram` and `createAttributeProgram`
- * — the same programs the settings UI calls — so the registry the compiler
- * reads is exactly the rows a user would have made. `planPatch` is pure; the
- * round trip below touches no table after the registry is read.
+ * The app-side claims about the registry → JSON-schema compiler
+ * (`@spaces/core/ai/schema`): a user-built object compiles with zero
+ * AI-specific code, and a proposal round-trips into `planPatch`.
+ * - The Fund is built through `createObjectProgram`/`createAttributeProgram`,
+ *   as the settings UI does, so the registry is what a user would have made.
  */
 
 describe('registry → JSON schema, on a user-built object', () => {

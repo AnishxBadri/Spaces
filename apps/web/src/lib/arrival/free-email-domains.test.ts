@@ -3,7 +3,7 @@ import { FREE_MAIL_DOMAINS, registrableDomain } from '@spaces/sdk/identity'
 import { FREE_EMAIL_DOMAINS, isFreeEmailDomain } from './free-email-domains'
 
 /**
- * D34's data file, held to the shape its lookup depends on. No Postgres.
+ * The free-provider list, held to the shape its lookup depends on. No Postgres.
  */
 
 describe('the free email provider list', () => {

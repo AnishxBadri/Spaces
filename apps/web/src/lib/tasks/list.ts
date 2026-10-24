@@ -18,14 +18,12 @@ import { user } from '@spaces/db/schema/auth'
 import type { DueDay } from './due'
 
 /**
- * The /tasks read (CONTEXT.md 15b), outside `lib/server/` so a test can run
- * it without a request — `listTasks` is the request half only. Effect-first
- * since SPA-87 opened it for the focused row (CONTEXT.md "Backend paradigm").
+ * The /tasks read, outside the server-fn barrel so a test can run it without
+ * a request — `listTasks` is the request half only.
  *
  * Done is a window, not the log: the 50 most recently closed. A Cmd-K hit
- * routes to `/tasks?task=<id>` (15b, "hits route to /tasks with the row
- * focused"), and a hit on a task closed long ago falls outside that window —
- * so `focus` names a task the payload must carry whatever the window holds.
+ * routes to `/tasks?task=<id>`, and a task closed long ago falls outside the
+ * window — so `focus` names a task the payload must carry regardless.
  */
 
 /** How many closed tasks the Done tab lists. */

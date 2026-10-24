@@ -19,7 +19,7 @@ import {
 } from './settings'
 
 /**
- * SPA-56: Settings → Arrival's programs. The app password is write-only —
+ * Settings → Arrival's programs. The app password is write-only —
  * stored through `storeCredential` as `kind: 'mailbox'`, read back only as
  * its redacted display — and Test connection answers in the server's words.
  * The tests share one file's database and run in order.

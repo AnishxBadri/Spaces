@@ -1,6 +1,6 @@
 /**
  * The read-only interaction columns a list offers beside its attributes
- * (D67): sortable and filterable, never editable, never in `entity.values`.
+ * sortable and filterable, never editable, never in `entity.values`.
  * - The slug is the table's column id and a view condition's slug alike;
  *   the colon keeps it apart from every attribute slug (`[a-z0-9_]`).
  * - Client-safe: the SQL half is `interactionStatAt` beside

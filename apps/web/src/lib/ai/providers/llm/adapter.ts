@@ -1,7 +1,7 @@
 import type { ProviderMeta } from '../meta'
 
 /**
- * What every LLM adapter takes (`docs/spec-ai-substrate.md` §9): the vault
+ * What every LLM adapter takes: the vault
  * credential's secret and its non-secret `meta`, an optional model id, and an
  * optional transport. Every adapter passes `baseURL` (and, where the provider
  * has a key, `apiKey`) explicitly, so an SDK's environment fallback

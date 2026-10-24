@@ -2,38 +2,19 @@ import { randomUUID } from 'node:crypto'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Condition } from '@spaces/core/views/filter'
 
-// The CONCURRENTLY index mint takes ~11 s under full-suite load; the default
-// 10 s hook timeout made this file the suite's one recurring flake.
+// The CONCURRENTLY index mint takes ~11 s under full-suite load, past the
+// default 10 s hook timeout.
 vi.setConfig({ hookTimeout: 90_000 })
 
 /**
- * The half of SPA-93 that cannot be argued, only measured: does the planner
- * actually use `attr_idx_<id>` for the query the list page runs?
- *
- * Everything else about the reconciler is asserted in
- * `packages/db/src/value-indexes.test.ts`. This file asserts the one claim
- * the whole slice rests on — and it has to, because an expression index that
- * does not match the emitted expression is *invisible*: the page is exactly
- * as slow as before, no error is raised anywhere, and `\d entity` shows the
- * index sitting there looking correct. That failure mode is why the recorded
- * decision said "prove that with an EXPLAIN assertion rather than trusting
- * it", and it is what `views-3`'s recorded seq-scan baseline was measured
- * against.
- *
- * **What the index can and cannot do.** It serves the `order by`. It does
- * not serve the `where`: `compileConditions` wraps every condition in
- * `coalesce(…, false)` so SQL's third truth value cannot leak, and a
- * `CoalesceExpr` is not a clause the planner can match to an index key. So
- * the plan under test is the paged query with a condition *and* a sort — an
- * index scan in `attr_idx_…` order, with the condition applied as a filter —
- * which is the shape the sort-a-big-object demo runs.
- *
- * The query is rebuilt here from the same three seams `records.ts` composes
- * (`entityValuesResolver`, `compileConditions`, `compileSortKey`) rather
- * than imported: `listRecordsProgram` runs its query, and EXPLAIN needs the
- * query. Rebuilding from the same seams is what makes the assertion
- * meaningful — if `compileSortKey` ever emits something the reconciler does
- * not index, this goes red.
+ * EXPLAIN check that the planner uses `attr_idx_<id>` for the list page's query.
+ * - An index that does not match the emitted expression is invisible: no error,
+ *   the index looks correct, the page is just slow. Only a plan proves it.
+ * - The index serves the `order by`, not the `where`: `compileConditions` wraps
+ *   each condition in `coalesce(…, false)`, which no index key matches.
+ * - The query is rebuilt from `listRecordsProgram`'s seams (`entityValuesResolver`,
+ *   `compileConditions`, `compileSortKey`), so a sort key the reconciler does
+ *   not index turns this red.
  */
 
 /** Big enough that a seq scan plus a sort is unambiguously the worse plan. */
@@ -85,11 +66,10 @@ async function seam() {
 }
 
 /**
- * `records.ts`'s page query, built from `records.ts`'s seams: one object's
- * live records, narrowed by a view condition, ordered by an attribute,
- * capped at a page. `object_id` goes in as a bind parameter, which is the
- * whole reason the index leads with it rather than being partial on a
- * literal id.
+ * `listRecordsProgram`'s page query, built from its seams: one object's live
+ * records, narrowed by a condition, ordered by an attribute, capped at a page.
+ * `object_id` is a bind parameter, which is why the index leads with it
+ * rather than being partial on a literal id.
  */
 /**
  * How the statement is planned. `custom` is the production path — node-
@@ -321,7 +301,7 @@ describe('the paged list plan', () => {
 })
 
 /**
- * The inverse half (D69): an inverse attribute stores nothing, so its filter,
+ * The inverse half: an inverse attribute stores nothing, so its filter,
  * count and sort read `link` — and flagging it mints `attr_idx_links` on
  * `link(to_entity_id, attr_slug)`. Each target carries many inbound links of
  * other kinds, so `link_to_idx` alone would read them all and filter.

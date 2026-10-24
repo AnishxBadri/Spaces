@@ -6,11 +6,9 @@ import { requireUser } from './shared'
  * One document's card, by entity id — everything `DocumentPreview` needs to
  * open, and nothing else.
  *
- * It lives beside `documents.ts` rather than in it because the Files tab's
- * `listRecordDocuments` starts from a *record* and joins through
- * `link(tagged_in)`. A mention chip has only the document's own id: the note
- * mentioning a deck is not the record the deck is filed against, and often
- * there is no such record at all.
+ * Separate from `listRecordDocuments`, which starts from a *record* and joins
+ * through `link(tagged_in)`: a mention chip has only the document's own id,
+ * and often there is no record the deck is filed against.
  *
  * Deliberately not the text or the blob: the preview fetches those itself,
  * lazily, through `getDocumentText` / `getDocumentDownloadUrl`.

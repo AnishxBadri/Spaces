@@ -30,16 +30,15 @@ import { CAPTURE_SCHEMA_VERSION } from './versions'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * SPA-48 — the personal-token store opens the HttpApi door. The same
+ * The personal-token store opens the HttpApi door. The same
  * `api_token` rows the MCP server reads are the bearer here; the middleware
- * in `api.ts` refuses 401 for anything but a live token and 403 for a live
+ * refuses 401 for anything but a live token and 403 for a live
  * token without the procedure's scope, and puts the token's user in the
  * procedure's context. Everything goes through `handleApiRequest`, the
  * function the `/api/v1/$` route hands a request to — what curl sends.
  *
- * The scope half is proven against `POST /api/v1/capture` (SPA-111), the
- * first mounted procedure that requires `capture:write` — it took over from
- * the unmounted probe SPA-48 stood in its place.
+ * The scope half is proven against `POST /api/v1/capture`, which requires
+ * `capture:write`.
  */
 
 const ORIGIN = 'http://spaces.test'
@@ -291,7 +290,7 @@ describe('a token is an identity, never an escalation', () => {
     // The door hands the procedure the token's user — TEAMMATE, not whoever
     // else exists — and a canRead read path fed that principal cannot see
     // FIXTURE_ACTOR's private note. The MCP suite proves the same over its
-    // own transport (`lib/mcp/server.test.ts`), against this same store.
+    // own transport, against this same store.
     const theirs = await mint(TEAMMATE.id, [
       'capture:write',
       'records:read',

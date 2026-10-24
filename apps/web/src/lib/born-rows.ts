@@ -1,21 +1,12 @@
 import { useCallback, useState } from 'react'
 
 /**
- * "Born this session" — the marker the composer wash is driven off
- * (DESIGN.md §5, Micro-interactions; SPA-53).
- *
- * The contract the wash has to keep is the negative one: a row that was
- * already on the page when the list loaded must never wash. `createdAt`
- * alone cannot decide that — reload a list ten seconds after adding a task
- * and every fresh row would flash again, for something nobody just did here.
- * So the set starts empty on mount and grows only when a composer reports
- * the id its own write returned. A row the session did not create is not in
- * it, by construction, and a reload empties it.
- *
- * Membership is permanent for the life of the list: the wash is a CSS
- * animation that plays once when the row mounts, so keeping the id costs a
- * `Set` entry and buys a guarantee that a re-render or a re-sort can never
- * replay it.
+ * "Born this session" — the marker the composer wash is driven off.
+ * - A row already on the page when the list loaded must never wash, so the
+ *   set starts empty and grows only with ids a composer's own write returned
+ *   (not `createdAt`, which would re-flash fresh rows after a reload).
+ * - Membership lasts the life of the list, so a re-render or re-sort can
+ *   never replay the one-shot CSS animation.
  */
 
 const NONE: ReadonlySet<string> = new Set()

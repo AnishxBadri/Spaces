@@ -12,27 +12,14 @@ import {
 import { storage } from '@spaces/core/writes/storage'
 
 /**
- * **Is any row still holding this digest?** A `stored` document, a
- * document's prior revision, a staged import batch,
- * a record's picture (`entity.picture_sha`) or the workspace logo
- * (`workspace.settings.logo`) — the one question both
- * directions of blob GC ask, asked in one place (SPA-54).
- *
- * Content addressing means one file backs several rows: the deck emailed to
- * both partners, the same deck filed on a company and on a space. So "delete
- * the bytes" is never a consequence of deleting *a* row — it is a
- * consequence of the last row going. Until this slice the count lived inline
- * at the bottom of `deleteDocumentWithBlobGc`, which was fine while a delete
- * was the only thing that could strand bytes. The orphan sweep reclaims from
- * the other direction — a prepare whose finalize never came — and asks the
- * identical question, so a second copy of the query would be two places that
- * must stay in step about what "referenced" means. `blob-refs.test.ts`
- * asserts there is only one.
- *
- * It lives in `lib/documents/` and **not** in `lib/server/`: the server-fns
- * barrel re-exports `lib/server/*` wholesale to the browser and a plain
- * export there ships with it (CLAUDE.md → Traps, SPA-155), while the worker
- * and the delete path both have to call this without a request.
+ * **Is any row still holding this digest?** A `stored` document, a prior
+ * revision, a staged import batch, a record's picture or the workspace logo.
+ * - Content addressing means one file backs several rows, so the bytes go
+ *   only when the last row goes.
+ * - Both directions of blob GC (the delete path and the orphan sweep) ask
+ *   this one query; never add a second copy of "referenced".
+ * - Never move it into the server-fn modules: their plain exports ship to
+ *   the browser, and the worker calls this without a request.
  */
 export async function blobIsReferenced(
   sha: string,
@@ -49,8 +36,7 @@ export async function blobIsReferenced(
       : ne(document.entityId, exceptDocumentId),
   )
   // `.at(0)` rather than a destructure: drizzle types the element as
-  // always-present, which is a claim about a result set rather than one the
-  // compiler checked (CLAUDE.md gate 4).
+  // always-present, which the compiler never checked.
   const row = (
     await db.select({ value: count() }).from(document).where(held)
   ).at(0)
@@ -64,8 +50,8 @@ export async function blobIsReferenced(
       .where(eq(documentRevision.blobSha, sha))
   ).at(0)
   if ((revision?.value ?? 0) > 0) return true
-  // A staged import names its spreadsheet by digest and has no document row
-  // (SPA-164): the same file filed as a document and then deleted must not
+  // A staged import names its spreadsheet by digest and has no document row:
+  // the same file filed as a document and then deleted must not
   // take the batch's bytes with it.
   const staged = (
     await db
@@ -91,7 +77,7 @@ export async function blobIsReferenced(
       .where(sql`${workspace.settings} ->> 'logo' = ${sha}`)
   ).at(0)
   if ((logo?.value ?? 0) > 0) return true
-  // An email keeps its raw MIME by digest in `meta` (D67).
+  // An email keeps its raw MIME by digest in `meta`.
   const mime = (
     await db
       .select({ value: count() })
@@ -107,7 +93,7 @@ export async function blobIsReferenced(
  * delete path (`deleteDocumentWithBlobGc`) and the orphan sweep — so what
  * "goes with the blob" is listed once.
  *
- * Today that is the extraction cache (`extraction_cache`): answers keyed by
+ * That is the extraction cache (`extraction_cache`): answers keyed by
  * the sha rather than by a document, so no entity delete reaches them, and a
  * deleted deck must leave no answers behind — unless a `remote` document
  * still names the sha (`reclaimDerivedIfUnnamed`). The derived rows go

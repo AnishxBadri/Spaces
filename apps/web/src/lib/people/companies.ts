@@ -18,12 +18,10 @@ import type {
 } from '@spaces/core/writes/attributes/values'
 
 /**
- * A person's companies: the `companies` record-reference attribute on people
- * (D60). The value is authoritative; the write path materializes it as
- * `link(references, attr_slug: 'companies')`, which is what every reader
- * joins. Nothing writes `contact_at` any more.
- *
- * Outside `lib/server/` so tests can call it without a request.
+ * A person's companies: the `companies` record-reference attribute on people.
+ * The value is authoritative; the write path materializes it as
+ * `link(references, attr_slug: 'companies')`, which every reader joins.
+ * Never write `contact_at`. Outside the server-fn barrel so tests call it.
  */
 export const PERSON_COMPANIES = 'companies'
 

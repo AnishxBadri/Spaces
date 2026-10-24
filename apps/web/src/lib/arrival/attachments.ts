@@ -1,8 +1,7 @@
 import type { Attachment } from 'mailparser'
 
 /**
- * Which parts of a message are documents (SPA-115, spec
- * `docs/spec-storage-sources.md` §3.1 entry point 6). Pure: mailparser has
+ * Which parts of a message are documents. Pure: mailparser has
  * already decoded every part into a Buffer, and the only question left is
  * which of them a person would call "the attachment".
  *
@@ -21,8 +20,8 @@ import type { Attachment } from 'mailparser'
  *   dozen of them onto every company a founder writes from. The floor is for
  *   images only: a small PDF or CSV is a genuine attachment at any size.
  *
- * Everything else is filed, whatever its type — the classify lane (SPA-62)
- * is what decides what a document *is*, after extraction.
+ * Everything else is filed, whatever its type — the classify lane decides
+ * what a document *is*, after extraction.
  */
 
 /**

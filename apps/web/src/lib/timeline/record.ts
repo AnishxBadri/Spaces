@@ -31,25 +31,12 @@ import { resolveRefsProgram } from '@spaces/core/writes/context/names'
 import type { ResolvedRef } from '@spaces/core/writes/context/names'
 
 /**
- * Merged timeline: macro activity + attribute_event bursts. Bursts group
- * consecutive attribute changes by the same actor within 10 minutes —
- * read-time condensing, per CONTEXT.md. The grouping itself is
- * `@spaces/core/timeline/bursts`, which is testable; this file is the
- * queries.
- *
- * Effect-first as of SPA-70 (the ratchet: an existing module converts when it
- * is open for behavioral change, in the same PR — it was open there because
- * the typed actor gained `actor_ref`). Effect stops at `Effect.runPromise`
- * inside the server fn; nothing of it reaches React.
- *
- * Out here rather than in `server/timeline.ts` since SPA-137, on the pattern
- * of `lib/entities/delete.ts` and `lib/notes/delete.ts`: `src/lib/
- * server-fns.ts` re-exports every `server/*` module wholesale to the client
- * (CLAUDE.md → Traps), so an exported Effect program in that folder would
- * drag Effect and the pg client into the browser bundle. Here it is
- * importable by the server fn and by the suite, and by nothing the client
- * sees — which is what lets a test assert that a logged interaction reaches
- * the record timeline.
+ * Merged timeline: macro activity + attribute_event bursts, condensed at
+ * read time (same actor within 10 minutes). The grouping is
+ * `@spaces/core/timeline/bursts`; this file is the queries.
+ * - Effect stops at `Effect.runPromise` inside the server fn; none reaches React.
+ * - Outside the client-imported server-fn barrel, which would drag Effect and
+ *   the pg client into the browser; the server fn and the suite import it here.
  */
 
 class TimelineQueryFailed extends Schema.TaggedError<TimelineQueryFailed>()(
@@ -70,12 +57,11 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
     )
     const userNames = new Map(users.map((u) => [u.id, u.name]))
 
-    // A name, not the integration id: "Apollo changed sector" is what the
-    // reader needs, and the row id is the join, not the name (sdk-9). The
-    // manifest's `name` once the loader has validated the plugin
-    // (`integration.manifest`, sdk-11); the capability id before that, and
-    // for a first-party `core.*` row, which has no manifest. An uninstalled
-    // plugin keeps its row, so what it wrote reads "Apollo, since removed".
+    // A name, not the integration id: "Apollo changed sector". The manifest's
+    // `name` once the loader has validated the plugin; the capability id before
+    // that, and for a first-party `core.*` row, which has no manifest. An
+    // uninstalled plugin keeps its row, so what it wrote reads
+    // "Apollo, since removed".
     const integrations = yield* query(() =>
       db
         .select({
@@ -121,8 +107,7 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
     )
     const bursts = condenseBursts(events)
 
-    // Every change's receipts, resolved in one pass (`names.ts` — one query
-    // per ref kind) so the timeline ships labels and the component renders
+    // Every change's receipts, resolved in one pass (one query per ref kind) so the timeline ships labels and the component renders
     // strings. A ref whose target was deleted comes back `missing`.
     const resolved = yield* resolveRefsProgram(
       bursts.flatMap((b) => b.changes.flatMap((c) => c.refs)),
@@ -139,10 +124,10 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
     )
 
     // Whose interactions this timeline reads. A record reads its own; a deal
-    // also reads its company's and its contacts' (D49, SPA-56): a thread
-    // reaches a deal by derivation, never by an edge written at arrival, so
-    // a company carrying two deals shows every thread on both. The deal's
-    // own edges still count — the one explicit pin D49 keeps.
+    // also reads its company's and its contacts': a thread reaches a deal by
+    // derivation, never by an edge written at arrival, so a company carrying
+    // two deals shows every thread on both. The deal's own edges still count —
+    // the one explicit pin.
     const self = (yield* query(() =>
       db
         .select({ kind: entity.kind, values: entity.values })
@@ -175,9 +160,8 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           kind: interaction.kind,
           subject: interaction.subject,
           occurredAt: interaction.occurredAt,
-          // The write-up, when there is one (SPA-123). Null is the ordinary
-          // case — a meeting logged in twenty seconds has no body — and the
-          // row renders exactly as it did before.
+          // The write-up, when there is one. Null is the ordinary case — a
+          // meeting logged in twenty seconds has no body.
           noteId: interaction.noteId,
           sourceRef: interaction.sourceRef,
           meta: interaction.meta,
@@ -266,7 +250,7 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
     )
     // canRead on every write-up: a body the viewer may not read is not
     // linked, and its row says so. Subject, participants and date stay; an
-    // email its owner widened to the viewer reads like their own (D67).
+    // email its owner widened to the viewer reads like their own.
     const noteIds = myInteractions.flatMap((i) =>
       i.noteId === null ? [] : [i.noteId],
     )
@@ -298,7 +282,7 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
       kind === 'person' && self ? jsonStrings(self.values.emails) : []
 
     // A deal's checks, read off the ledger by `deal_id`: each original with
-    // the instant it was voided, so History can strike it. (D12)
+    // the instant it was voided, so History can strike it.
     const checks =
       kind === 'deal'
         ? yield* query(() =>
@@ -361,7 +345,7 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           type: 'macro' as const,
           id: m.id,
           verb: m.verb,
-          // A plugin's port writes its activity with no user (sdk-7a): the
+          // A plugin's port writes its activity with no user: the
           // integration it ran as is in `meta.integrationId`, and the row
           // reads as that plugin's name, never as a person.
           actorName: m.actorId
@@ -391,7 +375,7 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
       })),
       ...myInteractions.map((i) => {
         const privateBody = i.noteId !== null && unreadable.has(i.noteId)
-        // Body-derived, so private with the body (D67).
+        // Body-derived, so private with the body.
         const listing = emailListing(i.meta, !privateBody)
         return {
           type: 'interaction' as const,
@@ -408,7 +392,7 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           via: i.sourceRef
             ? (integrationNames.get(i.sourceRef) ?? null)
             : (loggedBy.get(i.id) ?? null),
-          // Attachments are private with the body (D67): no count, no filter.
+          // Attachments are private with the body: no count, no filter.
           attachments: privateBody ? 0 : (attachmentsBy.get(i.id) ?? 0),
           hasAttachments: !privateBody && i.hasAttachments,
           answer: meetingAnswer(i.meta, ownEmails),

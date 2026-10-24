@@ -1,37 +1,13 @@
 /**
- * **The one URL guard** (SPA-117, `docs/spec-storage-sources.md` §3.1 entry
- * point 5).
- *
- * A self-hosted Spaces runs inside the operator's network, beside whatever
- * else is on it: a metadata endpoint, a Postgres on a private subnet, an
- * intranet wiki. "Fetch this URL for me" is therefore a request to make the
- * server issue a request, and the reason this module exists at all is that
- * the *only* safe answer is a table of what the server refuses — refusing
- * loopback, the RFC 1918 ranges, link-local (169.254/16, which is where the
- * cloud metadata endpoint lives), unique-local IPv6, and every scheme that
- * is not http or https.
- *
- * It lives in its own module, and not inside the clip, because
- * **docsurf-10b's PDF branch reuses it**: a URL whose response turns out to
- * be a PDF becomes a real blob through intake, and it must arrive through
- * this same table rather than a second one written from memory a fortnight
- * later. Two guard tables is how one of them ends up missing 169.254.
- *
- * It lives in `lib/documents/` and **not** `lib/server/`: the server-fns
- * barrel re-exports `lib/server/*` wholesale to the browser and a plain
- * export there ships with it (CLAUDE.md → Traps, SPA-155), while
- * `fetch-guard.test.ts` has to call these without a request. Same
- * arrangement as `birth.ts` and `refile.ts`.
- *
- * **What it does not do: resolve DNS.** `urlRefusal` reads the host as
- * written, so `evil.example` with an A record pointing at 127.0.0.1 passes
- * the table and is caught by nothing here. Closing that means resolving the
- * name, checking every address, and then connecting to the address rather
- * than the name — a custom dispatcher, not a predicate — and it buys little
- * against an attacker who can already run DNS: the deployment-level answer
- * is an egress policy. What this table does buy is that the obvious
- * targets, the ones a person types by hand and the ones a redirect chain
- * walks into, are refused in a sentence the operator can read.
+ * **The one URL guard** (SSRF). A self-hosted server sits beside metadata
+ * endpoints, private databases and intranets, so "fetch this URL" is answered
+ * by a table of what it refuses: loopback, RFC 1918, link-local (169.254/16,
+ * the cloud metadata endpoint), unique-local IPv6, and every non-http(s)
+ * scheme.
+ * - Every URL fetch goes through this one table; never write a second.
+ * - Outside the server-fn modules, whose plain exports ship to the browser.
+ * - **It does not resolve DNS**: a name pointing at 127.0.0.1 passes. That
+ *   needs a custom dispatcher; the deployment answer is an egress policy.
  */
 
 /** How many `Location` hops one fetch may walk before it is a loop. */
@@ -43,8 +19,8 @@ export const MAX_REDIRECTS = 5
  * outcome into an `extraction_status` and a sentence, and a `reason` in the
  * value is one less `catch` that can swallow it.
  *
- * `bytes` and not text, because the second caller is docsurf-10b's PDF
- * branch, which needs the octets to hash and store. The clip decodes.
+ * `bytes` and not text, because the clip's PDF branch needs the octets to
+ * hash and store. The clip decodes.
  */
 export type GuardedFetchResult =
   | {
@@ -285,8 +261,7 @@ export type GuardedFetchOptions = {
  * manual redirect hands the 3xx back and this loop decides.
  *
  * The timeout is one signal created before the loop, not one per hop: five
- * hops each given the full budget is five times the budget, and "total time"
- * is what the acceptance criterion asks for.
+ * hops each given the full budget is five times the budget.
  */
 export async function guardedFetch(
   raw: string,

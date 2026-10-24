@@ -2,11 +2,10 @@ import { Effect, Schema } from 'effect'
 import { ImapFlow } from 'imapflow'
 
 /**
- * The IMAP half of the forwarding mailbox (SPA-56, D31): log in with the app
- * password, open the folder read-only, and hand back the raw RFC 822 bytes
- * of every message above the cursor. Nothing here parses mail or touches the
- * database — `poll.ts` does both — so the one thing this module owns is the
- * protocol, and the one trap in it: **UIDVALIDITY**.
+ * The IMAP half of the forwarding mailbox: log in with the app password,
+ * open the folder read-only, and hand back the raw RFC 822 bytes of every
+ * message above the cursor. Nothing here parses mail or touches the
+ * database; the one trap this module owns is **UIDVALIDITY**.
  *
  * A UID only names a message under the UIDVALIDITY it was read with. When the
  * server changes it (a folder deleted and recreated, a provider migrating its

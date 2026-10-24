@@ -26,7 +26,7 @@ import type { SensitivityReadFailed } from './sensitivity-for'
 import type { SensitivityVia } from './sensitivity'
 
 /**
- * An email's cached display text (D67): a one-line summary through the
+ * An email's cached display text: a one-line summary through the
  * synthesize lane and category labels through the classify lane, written to
  * `interaction.meta.summary` / `meta.categories`.
  * - Under the sensitivity gate: any record the email is edged to, or its

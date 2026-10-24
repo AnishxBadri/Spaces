@@ -28,10 +28,8 @@ function senderOrNull(queue: EnqueueTarget): Sender | null {
     sender ??= createSender({ connectionString: requireEnv('DATABASE_URL') })
     return sender
   } catch (err) {
-    // An unset DATABASE_URL used to surface as a rejected connect promise
-    // inside the sender and so came back as `null` like any other queue
-    // failure. It is read out here now, so the same answer is given here —
-    // a misconfigured deployment must not turn a completed upload into a 500.
+    // An unset DATABASE_URL answers `null` like any other queue failure: a
+    // misconfigured deployment must not turn a completed upload into a 500.
     console.error(`[queue] could not reach ${queue}`, err)
     return null
   }
@@ -52,7 +50,7 @@ export async function enqueue(
 
 /**
  * The jobs on `queue` keyed `key`, any state, or `null` when the queue cannot
- * be read (SPA-90's `readDeckStatus`).
+ * be read (what `readDeckStatus` reads).
  */
 export async function jobsByKey(
   queue: EnqueueTarget,

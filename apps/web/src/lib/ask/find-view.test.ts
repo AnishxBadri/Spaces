@@ -16,7 +16,7 @@ import { WEB_CHIP, withMention, withWeb } from './page-scope'
 import { rpcMessages, toolKey, urlsIn } from './mount'
 import type { AskFindRow, AskFindTable } from './types'
 
-/** The Find table's rules and the web chip, pure. (D77) */
+/** The Find table's rules and the web chip, pure. */
 
 const via = { integrationId: 'i', name: 'Exa' }
 const row = (domain: string, standing: AskFindRow['standing']): AskFindRow => ({

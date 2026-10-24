@@ -38,7 +38,7 @@ import {
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * D67's three layers at read time, against a real database: a synced
+ * The three privacy layers at read time, against a real database: a synced
  * email's body and attachment are the mailbox owner's; the owner's override
  * on a record opens every email they have with it; a grant opens one email
  * to one member. Each reader a teammate has is asserted on its own.

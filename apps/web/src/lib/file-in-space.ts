@@ -48,7 +48,7 @@ export function spaceChoices(
 
 /**
  * Cmd-K's "File in a space…": asks for the space in the palette, files the
- * record there with `tagIntoSpace`, and stays open for another. (D70)
+ * record there with `tagIntoSpace`, and stays open for another.
  * The row's lane says how many spaces hold it now: `in 2 now`.
  * The list is the space picker's own `listSpaces`.
  */

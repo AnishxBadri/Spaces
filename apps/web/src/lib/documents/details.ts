@@ -14,7 +14,7 @@ import {
  * read (words, pages) and which notes mention it.
  * - A document the viewer cannot read answers null; private notes they
  *   cannot read are left out, not counted.
- * - Outside `lib/server/` so it never reaches the client barrel.
+ * - Outside the server-fn modules so it never reaches the client barrel.
  */
 
 export class DocumentDetailsFailed extends Schema.TaggedError<DocumentDetailsFailed>()(

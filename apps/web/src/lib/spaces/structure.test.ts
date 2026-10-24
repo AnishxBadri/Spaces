@@ -36,7 +36,7 @@ import { FIXTURE_ACTOR } from '../../../vitest.seed'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * Spaces are malleable (D73): rename, archive and restore from the head, and
+ * Spaces are malleable: rename, archive and restore from the head, and
  * move as one path rewrite. Every reader computes from the path and the
  * archive flag at read time, so each case asserts on the readers.
  */

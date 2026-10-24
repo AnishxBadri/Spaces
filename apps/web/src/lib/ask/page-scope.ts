@@ -5,7 +5,7 @@ import type { AskScopeChip } from './types'
  * The page you are on as Ask's default scope chip: a record or a space, by
  * its path, named by what the page publishes to Cmd-K; a saved view or an
  * open file, by what that surface publishes (`useAskSubject`). Any other
- * page asks the whole workspace. (D70)
+ * page asks the whole workspace.
  */
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
@@ -63,7 +63,7 @@ export function dockScope(
     .slice(0, SCOPE_MAX)
 }
 
-/** The web as a scope chip: the mounted plugins' search, removable. (D72) */
+/** The web as a scope chip: the mounted plugins' search, removable. */
 export const WEB_CHIP: AskScopeChip = {
   kind: 'web',
   id: null,

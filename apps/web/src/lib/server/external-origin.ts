@@ -1,21 +1,13 @@
 /**
- * What the app decided its public identity is — CONTEXT.md hostability
- * contract #3.
- *
- * The app never terminates TLS and never reads a forwarded header (there is
- * a test pinning that no source file does). `APP_URL` is therefore the only
- * thing that decides the scheme: it is the auth `baseURL`, which is what
- * makes Better Auth's session cookie Secure (`src/lib/auth.ts`); it is the
- * origin of invite links (`src/lib/server/members.ts`); and it is the origin
- * of local blob presign URLs (`packages/core/src/writes/storage/local.ts`). All three strip a
- * trailing slash and nothing else, so this module does the same — a path
- * component in APP_URL is preserved, because those three preserve it.
- *
- * One misconfiguration is worth a loud warning: a plain-http APP_URL behind
- * a proxy that serves https. The browser then gets a non-Secure cookie on a
- * public host, and the login round-trip silently fails. It is a warning and
- * never a refusal — the required-env set is frozen at {DATABASE_URL,
- * APP_URL} (contract #6) and a plain-http LAN install has to keep working.
+ * What the app decided its public identity is.
+ * - The app never terminates TLS and never reads a forwarded header (a test
+ *   pins that no source file does), so `APP_URL` alone decides the scheme.
+ * - It is the auth `baseURL` (which makes the session cookie Secure), the
+ *   origin of invite links and of local blob presign URLs. All three strip a
+ *   trailing slash and nothing else, so this module does the same.
+ * - A plain-http APP_URL behind an https proxy loses the login cookie
+ *   silently. It warns, never refuses: the required env stays
+ *   {DATABASE_URL, APP_URL} and a plain-http LAN install must keep working.
  */
 
 export const DEFAULT_APP_URL = 'http://localhost:3000'

@@ -5,8 +5,8 @@ import { requireUser } from './shared'
 /**
  * Attach from a storage source (Drive): a pasted link, the provider's
  * picker, and the poll a pending row reads. Each handler is `requireUser()`
- * plus a program from `#/lib/documents`, reached by a dynamic import so
- * Effect and drizzle stay out of the client bundle (CLAUDE.md → Traps).
+ * plus a documents program, reached by a dynamic import so Effect and
+ * drizzle stay out of the client bundle.
  */
 
 export type {

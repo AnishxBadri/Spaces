@@ -3,9 +3,8 @@ import { z } from 'zod'
 import { requireUser } from './shared'
 
 /**
- * The Summarize buttons (SPA-66) — on a Files-tab row (a document) and in a
- * record's header (the record itself). Manual and pull-based
- * (docs/spec-ai-substrate.md §4): pressing enqueues one `entity.summarize`
+ * The Summarize buttons — on a Files-tab row (a document) and in a record's
+ * header (the record itself). Manual and pull-based: pressing enqueues one `entity.summarize`
  * job keyed on the record and the source, and pg-boss's `singletonKey`
  * refuses a second press while the first is queued or active. The result is
  * a `suggestion(kind: 'note')` in the inbox, never a note.

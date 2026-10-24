@@ -4,14 +4,10 @@ import { company, entity, person } from '@spaces/db/schema'
 import type { SQL } from 'drizzle-orm'
 
 /**
- * Which `entity` rows a list page is a list *of* (SPA-162), before any view
- * condition narrows it: the subtype guard, the kind, and "not merged away".
- *
- * Spelled once so a view chip's count and the page it opens cannot disagree
- * about the set they count. `/companies` and `/people` page through it
- * (`directory.ts`), `/o/$objectSlug` pages through it (`records.ts`), `/deals`
- * loads it whole (`listDealsTable`), and `counts.ts` counts every saved view
- * over it. A fifth list surface adds an arm here, not a copy of a `where`.
+ * Which `entity` rows a list page lists, before any view condition: the
+ * subtype guard, the kind, and "not merged away".
+ * Spelled once so a view chip's count and the page it opens cannot disagree.
+ * A new list surface adds an arm here, not a copy of a `where`.
  */
 export type ListScope =
   | { kind: 'company' }
@@ -23,8 +19,7 @@ export function listScope(scope: ListScope): SQL {
   const live = isNull(entity.mergedIntoId)
   switch (scope.kind) {
     case 'company':
-      // The subtype row is the guard the old `innerJoin company` was; as an
-      // `exists` it cannot multiply a row.
+      // The subtype row is the guard; as an `exists` it cannot multiply a row.
       return and(
         eq(entity.kind, 'company'),
         exists(
@@ -36,8 +31,7 @@ export function listScope(scope: ListScope): SQL {
         live,
       )!
     case 'person':
-      // `/people` filtered on the subtype row alone, never on `entity.kind`;
-      // that is preserved rather than tightened here.
+      // `/people` filters on the subtype row alone, never on `entity.kind`.
       return and(
         exists(
           db

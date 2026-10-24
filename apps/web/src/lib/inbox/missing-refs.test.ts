@@ -2,13 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 /**
- * The one ref resolver's two app consumers (SPA-119): a suggestion whose
- * cited record was deleted still lists on /inbox, and an accepted one still
- * draws on the record timeline — each citation `missing`, neither consumer
- * failing. The resolver itself and the rest of its tests are core's since
- * SPA-182 (`packages/core/src/writes/context/names.test.ts`); this half
- * stayed because both consumers are apps/web's. On this worker's test
- * database, truncated and reseeded before the file was imported (SPA-145).
+ * The one ref resolver's two app consumers: a suggestion whose cited record
+ * was deleted still lists on /inbox, and an accepted one still draws on the
+ * record timeline — each citation `missing`, neither consumer failing. The
+ * resolver's own tests are core's; these live here because both consumers
+ * are apps/web's.
  */
 describe('resolveRefs — deleted targets, in the app', () => {
   it('reaches /inbox and the record timeline as missing — neither consumer fails', async () => {

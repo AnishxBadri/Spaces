@@ -8,8 +8,8 @@ import { tagByHand, untagByHand } from './tag'
 /**
  * Split by hand: Move here untags each chosen company from a space and tags
  * it into one of that space's subspaces. Filings never move on their own;
- * this is the explicit choice that moves them. (D73)
- * Outside `lib/server/` so tests call the program directly.
+ * this is the explicit choice that moves them.
+ * Outside the server-fn module so tests call the program directly.
  */
 
 export class MoveHereFailed extends Schema.TaggedError<MoveHereFailed>()(

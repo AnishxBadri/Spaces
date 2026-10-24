@@ -14,8 +14,8 @@ import type { MovingSignal } from '#/lib/records/moving'
 /**
  * What Today reads beyond the existing lists: open Review cards grouped by
  * source and space, the reader's broken connections, auto-enrich runs parked
- * at a source's cap, and What's moving. (D76, D79)
- * Outside `lib/server/` so tests can call the programs without a request.
+ * at a source's cap, and What's moving.
+ * Outside the server-fn barrel so tests can call the programs without a request.
  */
 
 export type { MovingSignal, ParkedSource, ReviewGroup }
@@ -36,7 +36,7 @@ export type BrokenConnection = {
   fixTo: (typeof JOB_PAGE)[AccountJob]
 }
 
-/** Uploads on a pushing binding not yet in the provider's folder. (§6) */
+/** Uploads on a pushing binding not yet in the provider's folder. */
 export type WaitingExport = {
   provider: string
   /** `Drive`, `Box`. */

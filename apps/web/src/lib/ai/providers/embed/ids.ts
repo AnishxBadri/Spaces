@@ -4,18 +4,13 @@ import { LLM_PROVIDERS, PROVIDERS } from '../ids'
 import type { LlmProvider } from '../ids'
 
 /**
- * Embedding providers, their models and the pin's copy, with nothing
- * server-side imported — the Embeddings section and the server-fn validators
- * both read this, and the validators are evaluated in the client bundle too
- * (SPA-51, `docs/spec-ai-substrate.md` §9, CONTEXT.md "Embeddings — the
- * dimension trap").
- *
- * The workspace pins a **dimension**, not only a model: `chunk.embedding` is
- * `vector(768)`, so a model is pinnable only if it can emit exactly 768
- * floats — natively, or because its API takes a width and 768 is one it
- * accepts. Anything else is listed greyed as "needs re-pin" and cannot be
- * chosen: re-pin (ALTER COLUMN TYPE, index rebuild, full re-embed) is not
- * built, and a vector of another width would be silently garbage.
+ * Embedding providers, their models and the pin's copy.
+ * - Imports nothing server-side: the server-fn validators also ship to the
+ *   client bundle.
+ * - The pin is a dimension, not only a model: `chunk.embedding` is
+ *   `vector(768)`, so only a model that can emit exactly 768 floats is
+ *   pinnable. Others are greyed "needs re-pin": re-pin is not built, and a
+ *   vector of another width would be silently garbage.
  */
 
 /** The width every stored vector has. `chunk.embedding` is `vector(768)`. */
@@ -37,7 +32,7 @@ export const KEYED_EMBEDDING_PROVIDERS = [
 ] as const satisfies ReadonlyArray<EmbeddingProvider>
 
 /**
- * - `local` — runs on a box the operator runs (Ollama, SPA-83). A
+ * - `local` — runs on a box the operator runs (Ollama). A
  *   `sensitive` embed may go to a local provider and to nothing else: the
  *   pin itself when it is local, else the sensitive slot, else refused.
  * - `keyless` — authenticates nobody, and has no embedding key of its own:
@@ -101,8 +96,8 @@ export type EmbeddingModelInfo = {
   emitsPin: boolean
   /**
    * The provider's list price per million input tokens, in US dollars — what
-   * the backfill's pre-flight estimate multiplies by (SPA-136). An estimate,
-   * never a bill: the catalogue's note says where each figure came from.
+   * the backfill's pre-flight estimate multiplies by. An estimate, never a
+   * bill.
    */
   usdPerMillionTokens: number
 }
@@ -121,21 +116,15 @@ export type EmbeddingModelInfo = {
  *   Listed anyway so the admin sees why rather than wondering where Voyage
  *   went; the adapter is built so a same-width model is a table row away.
  *
- * `usdPerMillionTokens` (SPA-136) is each provider's published list price
- * for input tokens **as of 2026-09-23**, written down by hand, and every
- * figure is an estimate: the backfill's pre-flight line is its only reader
- * and says so. None was read from an installed package — the provider SDKs
- * carry no pricing. OpenAI's three ($0.02, $0.13, $0.10) and Voyage's two
- * ($0.06, $0.02) are long-standing list prices; Google's
- * `gemini-embedding-001` ($0.15) is its paid-tier price. `text-embedding-004`
- * ($0.10) is **unverified** — the Gemini API has listed it free on some
- * tiers, so this errs high. A local model (SPA-83's slot) reads "free" by its
- * provider's `local` flag, not by a zero here.
+ * - Ollama `nomic-embed-text` is 768 natively → pinnable, and the model a
+ *   sensitive slot is built for. `mxbai-embed-large` is 1024 and Ollama
+ *   truncates nothing for it → greyed.
  *
- * - Ollama (SPA-83) `nomic-embed-text` is 768 natively → pinnable, and the
- *   model a sensitive slot is built for. `mxbai-embed-large` is 1024 and
- *   Ollama truncates nothing for it → greyed. Their price is 0 only because
- *   the field is a number; the estimate never reads it for a local provider.
+ * `usdPerMillionTokens` is each provider's published input price, copied by
+ * hand (the SDKs carry no pricing); every figure is an estimate.
+ * `text-embedding-004` ($0.10) is unverified — some Gemini tiers list it
+ * free, so it errs high. A local provider reads "free" by its `local` flag;
+ * its 0 here is never read.
  */
 export const EMBEDDING_MODELS: ReadonlyArray<EmbeddingModelInfo> = [
   {
@@ -225,7 +214,7 @@ export const isEmbeddingProvider = (
  * prefix gives the embedding key its own row — and its own AAD, which is
  * `scope:provider` — while `kind: 'embedding'` says what the row holds.
  *
- * **A keyless provider reuses the LLM row** (SPA-83): Ollama's credential
+ * **A keyless provider reuses the LLM row**: Ollama's credential
  * is a base URL and no secret, so there is no key to keep apart, and a
  * second `embed:ollama` row would be a second address for one server that
  * could drift from the first. The embedding adapter reads the row the
@@ -243,7 +232,7 @@ export const embeddingCredentialKind = (
 
 /**
  * The Models key an embedding provider falls back to when it has no
- * embedding key of its own: the LLM provider of the same id. (D81)
+ * embedding key of its own: the LLM provider of the same id.
  * - Null for a keyless provider (it already reads the LLM row) and for one
  *   Models has no provider for (Voyage), which always asks for its own key.
  * - An embedding key, once saved, takes precedence over the reused one.
@@ -285,8 +274,8 @@ export const missingCredentialMessage = (
 export const ollamaNotPulledMessage = (model: string): string =>
   `${model} is not pulled on this Ollama server — run "ollama pull ${model}" there, then test again`
 
-// The copy. The wording is the safety mechanism (SPA-51), so each sentence
-// is spelled once, here, and the server and the section both read it.
+// The copy. The wording is the safety mechanism, so each sentence is spelled
+// once, here, and the server and the section both read it.
 
 /** A greyed row's note, with the model's real width. */
 export const needsRepinNote = (model: EmbeddingModelInfo): string =>
@@ -305,8 +294,8 @@ export const pinHeadline = (pin: EmbeddingPinView): string =>
 
 /**
  * Why an existing pin will not move to `target`: a different width. A
- * same-width swap is allowed since SPA-136 (`pinSwapNote`); a change of
- * width is the unbuilt half of re-pin, and the sentence says what it needs.
+ * same-width swap is allowed (`pinSwapNote`); a change of width is the
+ * unbuilt half of re-pin, and the sentence says what it needs.
  */
 export const pinLockedMessage = (
   pin: { provider: EmbeddingProvider; model: string; dims: number },
@@ -321,8 +310,8 @@ export const pinSwapNote = (
 ): string =>
   `Swapping to ${EMBEDDING_PROVIDER_INFO[target.provider].label} ${target.model} keeps the ${PIN_DIMS}-wide column. Every stored vector is ${pin.model}'s, so search leaves them out until a backfill re-embeds them.`
 
-// The sensitive slot (SPA-83, D11): a local provider beside the pin, at the
-// pin's width, that sensitive records are embedded through.
+// The sensitive slot: a local provider beside the pin, at the pin's width,
+// that sensitive records are embedded through.
 
 export type EmbeddingSlotView = {
   provider: EmbeddingProvider
@@ -363,8 +352,8 @@ export const slotSearchNote = (
     ? `Search reads these vectors: the slot and the pin are both ${pin.model}.`
     : `Search reads only ${pin.model}'s vectors, so sensitive records embedded by ${slot.model} stay out of semantic search — the same width is not the same model.`
 
-// The backfill's pre-flight estimate (SPA-136). The one place in the product
-// that asks before it embeds, so the figure is shown before anything runs.
+// The backfill's pre-flight estimate. The one place in the product that asks
+// before it embeds, so the figure is shown before anything runs.
 
 /** What the estimate needs to know about the pinned model. */
 export type BackfillPricing = {

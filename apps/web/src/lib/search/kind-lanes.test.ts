@@ -12,7 +12,7 @@ import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { kindLanesProgram } from './kind-lanes'
 
 /**
- * A Records row's kind lane (D70): the object's singular, the stage word
+ * A Records row's kind lane: the object's singular, the stage word
  * and the first live space the record was filed in, with its ancestors.
  */
 

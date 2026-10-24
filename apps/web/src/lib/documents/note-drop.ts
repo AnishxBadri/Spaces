@@ -1,20 +1,10 @@
 /**
- * §3.1 **entry point 4** — a file dropped on a note's body (SPA-140).
- *
- * The gesture itself is DOM (a `dragover`/`drop` pair on the editor's
- * container, a ProseMirror coordinate, a chip inserted where the pointer let
- * go), and the suite runs on `environment: 'node'`, so this file is the half
- * of it that is a **value**: where the drop files, what the reader is told,
- * and whether the position captured at drop time still means anything after
- * the upload resolved. `note-drop.test.ts` runs those against the real
- * writer; the tsx around them (`components/editor/note-editor.tsx`,
- * `routes/_app/notes_.$noteId.tsx`) holds nothing this file could have held.
- *
- * It sits beside `upload.ts` and `file-against.ts` because it is the same
- * lane — client-side, no `node:`, no drizzle, no Effect — and it takes
- * `FileAgainst` from `upload.ts` rather than re-declaring the shape, which is
- * itself read off the server fn. Three declarations of one union is how the
- * empty array stops meaning unfiled somewhere.
+ * A file dropped on a note's body, as **values**: where the drop files, what
+ * the reader is told, and whether the position captured at drop time still
+ * means anything once the upload resolved. The gesture itself is DOM.
+ * - Client-side lane: no `node:`, no drizzle, no Effect.
+ * - Takes `FileAgainst` from the upload module rather than re-declaring it;
+ *   copies of the union are how the empty array stops meaning unfiled.
  */
 
 import type { FileAgainst } from './upload'
@@ -29,26 +19,24 @@ export const NOTE_DROP_LABEL = 'Drop to file into this note'
 
 /**
  * What a note filed nowhere is told, verbatim. A note's filing is
- * `entity_space` and nothing else (CONTEXT.md → _The note model_), so a note
- * in no space has no filing to inherit — the document lands unfiled, which is
- * a first-class state (§3.2) rather than a failure, and the reader is told
+ * `entity_space` and nothing else, so a note in no space has no filing to
+ * inherit — the document lands unfiled, which is a first-class state rather
+ * than a failure, and the reader is told
  * plainly instead of the UI guessing a space for it.
  */
 export const UNFILED_NOTE_MESSAGE =
   'Filed nowhere yet — this note is in no space'
 
-/** The shelf filter that message links to (SPA-124). */
+/** The shelf filter that message links to. */
 export const UNFILED_SHELF_LABEL = 'Show unfiled'
 
 /**
  * Where a document dropped on this note is filed: **every space the note is
  * filed in, in one array**.
  *
- * This is the reason document birth takes an array of targets rather than one
- * (SPA-113). One call with N targets is one document row carrying N
- * `entity_space` edges — §3.4's "filed in N places without copying". N calls
- * with one target each would be N document rows, which is the copy the spec
- * exists to refuse.
+ * One call with N targets is one document row carrying N `entity_space`
+ * edges: filed in N places without copying. Never N calls, which would be N
+ * document rows.
  *
  * A note's filing is `entity_space` only, so every element is `space`: a note
  * filed against a *record* carries `link(tagged_in)`, which is the note's own
@@ -96,9 +84,8 @@ export function noteDropFiledIn(
  *
  * The position is resolved from the pointer at drop time, before any `await`
  * — the drop handler both uploads and inserts, and reading the coordinate
- * after the upload would read a pointer that is no longer anywhere
- * (CLAUDE.md → Browser verification: beware stale closures when clicking and
- * submitting in one tick). But a hash and a PUT take seconds, and the writer
+ * after the upload would read a pointer that is no longer anywhere (a stale
+ * closure). But a hash and a PUT take seconds, and the writer
  * may have typed, undone or deleted in them, so the captured number can
  * outlive the position it named.
  *

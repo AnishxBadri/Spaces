@@ -12,20 +12,12 @@ import type { DeleteQueryFailed } from '@spaces/core/writes/entities/delete'
 import { canRead } from '#/lib/server/shared'
 
 /**
- * Note deletion (SPA-125). Hard delete, no trash — the same answer documents
- * and terms already give (CONTEXT.md → The note model).
- *
- * The note row and the entity row go; what the note *fed* survives. That is
- * not a promise this file keeps by hand: `deleteEntityProgram` walks
- * ENTITY_REFS, where `link` is `cascade` in both directions, so a document
- * `derived_from → note` loses the edge and keeps its blob, its
- * `extracted_text` and its `tsv`; `entity_space` and `activity` cascade the
- * same way; `mandate.note` is `block`, so the fund's mandate refuses by name
- * before a single row is touched.
- *
- * Two programs, one read path: both start at `readNote`, which applies the
- * predicate `getNote` applies, so a private note someone else wrote answers
- * "Note not found" rather than confirming it exists.
+ * Note deletion: hard delete, no trash, like documents and terms.
+ * - The note and entity rows go; what the note fed survives, because
+ *   `deleteEntityProgram` walks ENTITY_REFS (`link`, `entity_space`,
+ *   `activity` cascade; `mandate.note` is `block` and refuses by name first).
+ * - Both programs read through `readNote`, so someone else's private note
+ *   answers "Note not found" rather than confirming it exists.
  */
 
 /** The note is not there, or not yours to read. The two are one answer. */
@@ -43,12 +35,9 @@ export type NoteDeleteFailure =
   NoteNotFound | NoteQueryFailed | Blocked | DeleteQueryFailed
 
 /**
- * The sentence the client is shown. `Effect.runPromise` rejects with the
- * typed error itself, and a `Schema.TaggedError` carries no `message`, so
- * without this the dialog would get an empty string — which is the generic
- * error toast the acceptance criteria rule out. A `Blocked` answers in the
- * registry's own words, which is why `DeleteStrategy.reason` is written as a
- * sentence about the data.
+ * The sentence the client is shown; a `Schema.TaggedError` carries no
+ * `message`. A `Blocked` answers in the registry's words, which is why
+ * `DeleteStrategy.reason` is written as a sentence about the data.
  */
 export function noteDeleteMessage(failure: unknown): string {
   if (failure instanceof Blocked) return failure.reason

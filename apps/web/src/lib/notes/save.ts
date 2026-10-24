@@ -14,22 +14,14 @@ import { noteSource } from '@spaces/core/writes/ai/chunk-sources'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 
 /**
- * Saving a note (converted to Effect by SPA-34, which opened it to run the
- * glossary matcher on save).
- *
- * One transaction writes the title, the body and the note's extracted
- * `mentions` edges. Those edges have two authors and one diff: the
- * `[[mention]]` chips the client read out of the document, and the glossary
- * terms the shared matcher finds in `body_md` (`lib/glossary/link-terms.ts`).
- * Two diffs over the same rows would each delete the other's, so the wanted
- * set is their union. A manual `mentions` row is never touched — see the
- * edge rule in `link-terms.ts`.
- *
- * Once that commits, the note's chunks are queued for replacement (SPA-132,
- * docs/spec-ai-substrate.md §9: embed on note save, silently, pin or no
- * pin). Every save queues — the title is part of the chunked text — and
- * `chunk.embed` coalesces a burst of autosaves into one queued job. Private
- * notes are chunked too; the read rule lives where chunks are read.
+ * Saving a note: title, body and extracted `mentions` edges in one transaction.
+ * - The edges have two authors, the client's `[[mention]]` chips and the
+ *   glossary matcher over `body_md`; one diff over their union, since two
+ *   diffs would delete each other's rows. Manual `mentions` rows are never
+ *   touched.
+ * - After commit every save queues a re-embed (the title is chunked too);
+ *   `chunk.embed` coalesces autosave bursts. Private notes are chunked; the
+ *   read rule lives where chunks are read.
  */
 
 export type SaveNoteInput = {

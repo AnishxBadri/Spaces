@@ -72,9 +72,9 @@ export const createCompany = createServerFn({ method: 'POST' })
       values: data.values,
     })
     // The birth's embeddable values, queued once the resolve has returned —
-    // core hands them back rather than reaching the queue (SPA-174/175).
+    // core hands them back rather than reaching the queue.
     for (const s of reembed) await enqueueSourceEmbed(s)
-    // A manual birth's `entity.created`; null on an attach. (D65)
+    // A manual birth's `entity.created`; null on an attach.
     await emitDomainEvent(emit)
 
     if (result.action === 'created') {
@@ -93,20 +93,13 @@ export const createCompany = createServerFn({ method: 'POST' })
   })
 
 /**
- * The `/companies` table, on views-3's paging contract (SPA-96).
+ * The `/companies` table, paged like every list: takes
+ * `{conditions, cursor, limit, sort, q}` and answers `{rows, nextCursor, total}`
+ * with the keyset cursor and server count `/o/$objectSlug` uses. Side queries
+ * run over the page's ids only, never the whole table.
  *
- * It selected every company, then ran two side queries with no `where` — one
- * over every domain alias in the database, one over every space tag — so a
- * fifty-row screen paid for the whole table three times. It takes
- * `{conditions, cursor, limit, sort, q}` now and answers
- * `{rows, nextCursor, total}`: the same keyset cursor, the same page size and
- * the same server count `/o/$objectSlug` uses, and the side queries run over
- * the page's ids.
- *
- * The read is `listCompaniesPageProgram`, which lives outside `lib/server/`
- * because this module is re-exported by the client-imported barrel; it is
- * imported inside the handler so it stays out of that graph, and a test can
- * call it without a request.
+ * `listCompaniesPageProgram` is imported inside the handler: this module is
+ * re-exported by the client-imported barrel, and a test can call it directly.
  */
 export const listCompaniesTable = createServerFn()
   .validator(pagedListInput)
@@ -159,7 +152,7 @@ export const getCompany = createServerFn()
     const spaces = await recordSpaces(data.id)
 
     // Team, Associated deals and every other relationship, both halves,
-    // through the one resolver (D69).
+    // through the one resolver.
     const { effectFn } = await import('./effect')
     const { recordRelationsProgram, relationNames } =
       await import('@spaces/core/writes/read/relations')
@@ -248,9 +241,6 @@ export const updateRecord = createServerFn({ method: 'POST' })
     let identity: SetValuesResult['identity'] = {}
     let identityValues: SetValuesResult['identityValues'] = {}
     if (data.name) {
-      // The rename half is Effect-first through the effectFn seam
-      // (backend-paradigm ratchet); the values patch below is untouched and
-      // stays Promise-shaped until it is open for behavioural change.
       const { effectFn } = await import('./effect')
       const { renameRecordProgram } =
         await import('@spaces/core/writes/entities/rename')
@@ -264,8 +254,7 @@ export const updateRecord = createServerFn({ method: 'POST' })
         await import('@spaces/core/writes/attributes/values')
       // The identity outcome is the only thing this call returns that the
       // client cannot recompute: the claim was decided inside the write's
-      // transaction. Threaded out so the editing surfaces can say so
-      // (SPA-97) — the write itself is unchanged.
+      // transaction. Threaded out so the editing surfaces can say so.
       const result = await setValues({
         entityId: data.id,
         patch: data.patch,
@@ -274,13 +263,12 @@ export const updateRecord = createServerFn({ method: 'POST' })
       identity = result.identity
       identityValues = result.identityValues
       // After the commit: the embeddable values this write set, queued here
-      // because core hands them back rather than reaching the queue
-      // (SPA-174/175).
+      // because core hands them back rather than reaching the queue.
       for (const s of result.reembed) await enqueueSourceEmbed(s)
-      // A company or person this write made a deal's party (D76).
+      // A company or person this write made a deal's party.
       for (const party of result.dealParties)
         await emitDomainEvent(dealLinked(party, 'manual'))
-      // A domain or email the record gained: auto-enrich may run now (D76).
+      // A domain or email the record gained: auto-enrich may run now.
       for (const added of result.identityAdded) await emitDomainEvent(added)
       // The pipeline→portfolio seam: a deal reaching Invested births a
       // holding (idempotent — follow-ons land on the existing one).

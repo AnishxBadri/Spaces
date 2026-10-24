@@ -13,7 +13,7 @@ import { integrationName } from '@spaces/core/plugins/name'
 import { parseRecorderKey } from '@spaces/core/writes/interactions/recorded-note'
 
 /**
- * "Open in <provider>" for the notes a recorder filed (D78): the note's
+ * "Open in <provider>" for the notes a recorder filed: the note's
  * `web_url`, kept on its recorder event in `interaction.meta`.
  * - A note matches the event its integration wrote through its author's
  *   connection, or a webhook recorder's, which has none.

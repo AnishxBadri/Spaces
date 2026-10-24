@@ -9,7 +9,7 @@ import { planImportProgram } from './plan'
 import { commitImportProgram } from './commit'
 
 /**
- * Importing people onto the name parts (D67), end to end: First name and
+ * Importing people onto the name parts, end to end: First name and
  * Last name columns land on the parts and make `canonical_name`; a Name
  * column lands on the join and is split into the parts.
  */

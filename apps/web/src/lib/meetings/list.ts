@@ -4,7 +4,7 @@ import type { DayMeeting, MeetingRsvp } from './day'
 /**
  * The Meetings page's pure half, client-safe: the row the list read hands
  * over, its filters and counts, the upcoming horizon and the day groups.
- * Times are read in the browser's clock. (D68 amended)
+ * Times are read in the browser's clock.
  */
 
 /**

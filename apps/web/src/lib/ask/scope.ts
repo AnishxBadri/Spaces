@@ -2,7 +2,7 @@ import type { Condition } from '@spaces/core/views/filter'
 import type { AskScopeChip } from './types'
 
 /**
- * What a turn's scope chips narrow, and how. (D70, D71)
+ * What a turn's scope chips narrow, and how.
  * - A record, person, space or file chip is an entity: the turn's seed for
  *   `get_context`, and the first thing the egress gate reads.
  * - A space chip is also `query_records`' default condition: filed in it or

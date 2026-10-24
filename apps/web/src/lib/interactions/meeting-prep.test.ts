@@ -23,7 +23,7 @@ import { prepEvents, prepStream, savePrepNoteProgram } from './meeting-prep'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * Prep (D68): the assembler over the meeting's linked records, streamed
+ * Prep: the assembler over the meeting's linked records, streamed
  * through the synthesize lane on demand and never stored; "Save as note"
  * files the brief on the same records with the reader as author; and the
  * sensitivity gate per call — a record under a sensitive space routes local

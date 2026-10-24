@@ -2,7 +2,7 @@ import { redirect } from '@tanstack/react-router'
 import { z } from 'zod'
 
 /**
- * The search of the Files page, shared with the old path so a redirect
+ * The search of the Files page, shared with `/documents` so a redirect
  * carries it whole.
  *
  * - `.catch('all')`, not a bare default: a hand-typed `?filed=nonsense`
@@ -17,8 +17,8 @@ export type FilesSearch = z.infer<typeof filesSearch>
 
 /**
  * The `beforeLoad` of `/documents`: one permanent redirect to `/files`, query
- * intact, so Today's old `?filed=unfiled` links and bookmarks land on the same
- * filtered list. (D68 amended)
+ * intact, so `?filed=unfiled` links and bookmarks land on the same filtered
+ * list.
  *
  * - 301, not the 307 default: the rename is a decision, not a condition.
  * - `replace` keeps the old path out of the back stack.

@@ -42,7 +42,7 @@ export type ConnectionIdInput = z.infer<typeof connectionIdInput>
 export type ConnectionListRow = {
   connectionId: string
   provider: ProviderId
-  /** The D66 product: `drive`, `calendar`, `gmail`, `box`. */
+  /** The product: `drive`, `calendar`, `gmail`, `box`. */
   product: string
   externalEmail: string
   /** Registry `value`s, as granted. */
@@ -69,7 +69,7 @@ export type ConnectionListRow = {
  */
 export type ConnectionDisconnectResult = {
   connectionId: string
-  /** `none`: a pasted key, which has no grant at the provider to revoke (D78). */
+  /** `none`: a pasted key, which has no grant at the provider to revoke. */
   revoke: 'revoked' | 'already-revoked' | 'unreachable' | 'kept' | 'none'
 }
 
@@ -86,7 +86,7 @@ export type AccountsView = {
 }
 
 /**
- * A synced mailbox's settings as its account page saves them (D67). Entries
+ * A synced mailbox's settings as its account page saves them. Entries
  * are checked again by the server against `senderEntry`.
  */
 export const mailboxSyncInput = z.object({
@@ -114,7 +114,7 @@ export type MailboxSyncResult = {
   removed: number
 }
 
-/** A member's own key for a recorder, pasted on You → Meeting notes (D78). */
+/** A member's own key for a recorder, pasted on You → Meeting notes. */
 export const recorderKeyInput = z.object({
   provider: z.enum(KEYED_PROVIDER_IDS),
   key: z.string().trim().min(1, 'Paste the key').max(512),
@@ -122,7 +122,7 @@ export const recorderKeyInput = z.object({
 
 export type RecorderKeyInput = z.infer<typeof recorderKeyInput>
 
-/** A recorder connection's ticks and opt-ins, applied at once (D81). */
+/** A recorder connection's ticks and opt-ins, applied at once. */
 export const recorderSettingsInput = z.object({
   connectionId: z.uuid(),
   folderIds: z.array(z.string().trim().min(1).max(256)).max(500),

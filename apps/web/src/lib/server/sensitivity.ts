@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { requireUser } from './shared'
 
 /**
- * The record header's Sensitive switch (SPA-61). Any member may flag a
+ * The record header's Sensitive switch. Any member may flag a
  * record — `requireUser()`, not `requireAdmin()`.
  *
  * Sensitivity is an egress flag, never access control: it decides where a

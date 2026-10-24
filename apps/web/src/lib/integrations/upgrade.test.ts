@@ -24,7 +24,7 @@ import type { RegistrySource } from './registry'
  * The update badge and the rollback answer, through the programs the
  * Integrations page calls: a registry.json and signed tarballs on disk, a
  * scratch data directory, the real database. The worker's half (migrations
- * on reload, the record it writes) is `apps/worker`'s upgrade-live test.
+ * on reload, the record it writes) is the worker's upgrade-live test.
  */
 
 const signer = fixtureSigner()

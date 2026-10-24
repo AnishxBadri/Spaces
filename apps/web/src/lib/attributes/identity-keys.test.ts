@@ -2,8 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
 /**
- * Opt-in identity keys on a custom object (spec §9; CONTEXT.md "Two-tier
- * object model", 2026-09-19). The three doctrine lines this file holds:
+ * Opt-in identity keys on a custom object. The three rules this file holds:
  * declaring a key materializes its backing attribute in the same write, the
  * backing attribute is an ordinary non-system attribute, and the backing
  * attribute cannot be archived out from under a standing key.
@@ -235,7 +234,7 @@ describe('object identity keys', () => {
 })
 
 /**
- * The slug rule applied to the declaration (spec §9, §3): revisable while
+ * The slug rule applied to the declaration: revisable while
  * the object has no records, frozen the moment one exists — otherwise a
  * record's alias outlives the key that justified it.
  */

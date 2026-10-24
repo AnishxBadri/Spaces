@@ -59,16 +59,15 @@ import type { ReferenceOutcome } from '@spaces/core/import/references'
 import type { ImportFailure } from './stage'
 
 /**
- * **Ledger mapping** (SPA-170, import-8) — the database half of the ledger
- * import's mapping and preview steps. The rules are
- * `@spaces/core/import/ledger`'s; this module reads the batch, looks up the
- * company column through the SPA-168 reference matcher (exact only), asks
- * which of the found companies already hold a position, and stores each
- * row's plan on `import_row.plan`.
- *
- * **Nothing here writes to `round`, `investment`, `mark` or
- * `distribution`** — the commit is `./ledger-commit`'s (SPA-171). Outside `lib/server/` for the
- * barrel's reason (CLAUDE.md → Traps).
+ * Ledger mapping: the database half of the ledger import's mapping and
+ * preview steps. The rules are `@spaces/core/import/ledger`'s; this module
+ * reads the batch, looks up the company column through the reference matcher
+ * (exact only), asks which found companies already hold a position, and
+ * stores each row's plan on `import_row.plan`.
+ * - Nothing here writes to `round`, `investment`, `mark` or `distribution`;
+ *   the commit is `commitLedgerProgram`'s.
+ * - Outside the server-fns barrel's modules: a plain export there ships to
+ *   the browser.
  */
 
 const query = <T>(run: () => Promise<T>) =>
@@ -120,13 +119,13 @@ const editableLedger = Effect.fn('editableLedger')(function* (
     return yield* new ImportRefused({
       reason: `This import is ${batch.status} and can no longer change`,
     })
-  // A plan the commit is replaying must not move under it (SPA-171).
+  // A plan the commit is replaying must not move under it.
   if (batch.status === 'planned' && (yield* commitStarted(batch.id)))
     return yield* new ImportRefused({ reason: COMMITTING })
   return batch
 })
 
-/** Every mapping write clears the plan, as in records mode (SPA-167). */
+/** Every mapping write clears the plan, as in records mode. */
 const writeMapping = (batchId: string, mapping: Mapping) =>
   query(() =>
     db.transaction(async (tx) => {
@@ -489,7 +488,7 @@ export const loadLedgerImportProgram = Effect.fn('loadLedgerImportProgram')(
     const batch = yield* batchOf(batchId)
     if (!batch) return yield* new ImportNotFound()
     if (batch.mode !== 'ledger') return null
-    // A committed batch is its receipt (SPA-171), not a step to edit.
+    // A committed batch is its receipt, not a step to edit.
     if (
       batch.mapping === null ||
       batch.status === 'committed' ||

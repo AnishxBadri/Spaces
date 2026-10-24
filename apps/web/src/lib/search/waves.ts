@@ -9,7 +9,7 @@
  *   nothing, so typing a word bills no provider call per letter.
  * - **semantic**, 600ms after the last keystroke: Passages, the vector lane
  *   alone. Its answer fills its own group below Records and never replaces
- *   or reorders a row above it. (D70)
+ *   or reorders a row above it.
  *
  * - An answer lands only while its query is still the one typed: a slow
  *   answer to a query typed past is dropped.

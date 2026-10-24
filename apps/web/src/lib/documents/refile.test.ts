@@ -7,20 +7,12 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * Re-filing a document (SPA-50), against the test database.
- *
- * §3.4's rule is the one worth pinning: a document is filed in N places, so
- * the deck lives on the company *and* the deal from one blob, and taking one
- * edge away must leave the other exactly as it was. The second rule is the
- * one an implementation is most likely to get wrong on its own: **removing
- * the last edge is not a delete** — the row, the blob and the extracted text
- * all stay, and the document is simply unfiled.
- *
- * The programs are driven directly rather than through their server fns, for
- * `documents-filing.test.ts`'s reason: a server fn wants a request context no
- * test has. Imports are dynamic for the same reason as the rest of the
- * DB-coupled suite — `@spaces/db` builds its pool from `DATABASE_URL` at
- * import time and `vitest.setup.ts` rewrites it per file.
+ * Re-filing a document, against the test database.
+ * - A document filed in N places loses one edge and keeps the others exactly.
+ * - **Removing the last edge is not a delete**: row, blob and text stay.
+ * Programs are driven directly (a server fn wants a request), and imports are
+ * dynamic because `@spaces/db` builds its pool from `DATABASE_URL` at import
+ * time and the vitest setup rewrites it per file.
  */
 
 async function actorId(): Promise<string> {
@@ -152,7 +144,7 @@ describe('a document filed in N places', () => {
     const dealId = await aDeal(tag)
     const deckId = await aFiledDeck(tag, companyId)
 
-    // One blob, one row, two edges — never a copy (§3.4).
+    // One blob, one row, two edges — never a copy.
     await Effect.runPromise(
       fileDocumentProgram(me, {
         documentId: deckId,

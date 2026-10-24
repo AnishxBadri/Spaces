@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
 /**
- * `deal.referred_by` (SPA-59) — the who behind the channel, beside
+ * `deal.referred_by` — the who behind the channel, beside
  * `deal.source`. It is a seeded system attribute and nothing else: no
  * column, no `ENTITY_REFS` entry, no cell type, no server fn. These tests
  * pin the two things that claim buys — the seeder stays idempotent with it
@@ -208,7 +208,7 @@ describe('deal.referred_by — backlinks', () => {
     })
 
     // The inbound-references query every record page's backlink section
-    // runs (`getObjectRecord`'s `referencedBy`, objects.ts): to_entity_id =
+    // runs (`getObjectRecord`'s `referencedBy`): to_entity_id =
     // this record, relation = 'references', alive referrers only.
     const referencedBy = await db
       .select({

@@ -9,10 +9,10 @@ import { requireEnv } from './env'
 
 /**
  * Web's one LISTEN client on `job_status`, fanning each notification out to
- * the record pages' status streams by entity. (D64)
+ * the record pages' status streams by entity.
  * - The first long-lived pg client in the web process: a dedicated
  *   `pg.Client`, never the pool, created on the first subscriber and
- *   released on shutdown. Rejected: a client per subscriber. (D64)
+ *   released on shutdown. Rejected: a client per subscriber.
  * - It stays connected after the last subscriber leaves: one idle connection
  *   is cheaper than a reconnect on every navigation.
  * - A lost connection reconnects with capped backoff, and every LISTEN tells

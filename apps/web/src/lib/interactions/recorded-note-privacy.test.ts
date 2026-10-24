@@ -28,7 +28,7 @@ import { noteRecorderLinkProgram } from './recorder-links'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * What a Granola note becomes, read by its member and by a partner (D78):
+ * What a Granola note becomes, read by its member and by a partner:
  * the write-up is everyone's, with "Open in Granola"; the opted-in typed
  * notes and transcript are the member's alone, on every read path a private
  * note already is — each asserted on its own.

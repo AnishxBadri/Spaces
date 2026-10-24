@@ -35,8 +35,8 @@ import {
 import type { RowPlan } from '@spaces/core/import/plan'
 
 /**
- * Idempotent commit (SPA-169). Batches are inserted straight into the tables
- * and planned through the real preview, as `plan.test.ts` does; the commit
+ * Idempotent commit. Batches are inserted straight into the tables and
+ * planned through the real preview, as the preview's tests do; the commit
  * program is driven directly, and once through `runJob` for its `job_run`
  * row. Counts are read from every table a commit can touch, so "a re-run
  * writes nothing" is asserted end to end rather than inferred.
@@ -403,7 +403,7 @@ describe('a domain identity alias', () => {
     expect(aliases).toEqual([
       { value: 'example.com', valueNorm: 'example.com' },
     ])
-    // …and the same host is the record's `domains` value (D75).
+    // …and the same host is the record's `domains` value.
     const born = (
       await db
         .select({ values: entity.values })
@@ -711,7 +711,7 @@ describe('a pair column', () => {
     const ada = (await rowsOf(batchId)).at(0)?.entityId
     if (!ada) throw new Error('the row landed no person')
 
-    // The owner holds the value; the inverse is read, never written. (D69)
+    // The owner holds the value; the inverse is read, never written.
     const person = (
       await db
         .select({ values: entity.values })

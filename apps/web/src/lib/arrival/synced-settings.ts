@@ -6,7 +6,7 @@ import type { MailExclude } from './noise'
 /**
  * A connected mailbox's settings, read from its integration row's config —
  * the keys the Gmail plugin's manifest declares, with the same defaults.
- * - `shareBodies` off is D67's default: synced bodies private to the
+ * - `shareBodies` defaults off: synced bodies private to the
  *   mailbox owner. Subject, participants and date are always visible.
  * - A key that is absent or unreadable reads as its default, never as
  *   "share": a config this cannot parse must not widen who reads mail.

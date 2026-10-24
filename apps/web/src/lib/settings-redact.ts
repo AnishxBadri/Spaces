@@ -6,7 +6,7 @@ import type { IntegrationDetail } from './integrations/ledger'
 
 /**
  * What a member reads of an admin settings page: the same shapes, with every
- * secret redacted to one word. (D81)
+ * secret redacted to one word.
  * - A stored key's display (`sk-…7Hq2`) reads `set`; none stored stays null.
  * - Header values and a plugin's webhook URL are secrets too.
  * - The admin's reads are unchanged; writes refuse a member regardless.

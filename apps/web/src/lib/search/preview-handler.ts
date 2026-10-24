@@ -7,7 +7,7 @@ import {
 } from './preview'
 import type { ObjectPreview, PassagePreview, RecordPreview } from './preview'
 
-/** The preview server fns' bodies, out of `lib/server/` so a test can call them. */
+/** The preview server fns' bodies, outside the server-fn module so a test can call them. */
 
 export async function previewRecordHandler(data: {
   id: string

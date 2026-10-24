@@ -10,7 +10,7 @@ import type { AskScopeChip } from './types'
 /**
  * A turn's chips read into its narrowing, each chip on its own: one that
  * does not resolve is dropped with a line naming it, and the rest still
- * narrow. (D70)
+ * narrow.
  * - A space chip must name a space that still exists.
  * - A view chip must name a view over an object that the asker may read.
  */

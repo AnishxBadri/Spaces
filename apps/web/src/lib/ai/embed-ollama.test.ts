@@ -30,7 +30,7 @@ import {
 } from './providers/embed/settings'
 
 /**
- * SPA-83. The Ollama embedding adapter and the sensitive slot, against
+ * The Ollama embedding adapter and the sensitive slot, against
  * Postgres and an in-repo fake of `/api/embed` (`#/test/fake-ollama`)
  * stubbed over the global `fetch` — so the real path runs: the Providers
  * section's keyless Ollama row → `resolveEmbedCall` → the adapter → the

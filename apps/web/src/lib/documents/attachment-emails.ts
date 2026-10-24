@@ -18,7 +18,7 @@ export class AttachmentEmailsFailed extends Schema.TaggedError<AttachmentEmailsF
 
 /**
  * The email each attached document is named by on the Files tab: the
- * earliest one the viewer can read through its body gate (D67). Whether the
+ * earliest one the viewer can read through its body gate. Whether the
  * document is listed at all is `canReadDocumentSql`'s question.
  */
 export const attachmentEmailsProgram = Effect.fn('attachmentEmails')(function* (

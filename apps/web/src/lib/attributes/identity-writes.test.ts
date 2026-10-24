@@ -2,10 +2,10 @@ import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The declaration made flesh (spec §9, objects-7): a write to an attribute
+ * A write to an attribute
  * carrying `options.identityKey` mirrors into `entity_alias` as an identity
  * alias, in the transaction that wrote the value. The doctrine this file
- * pins, line by line:
+ * pins:
  *
  * - the alias lands beside the value and its `attribute_event`, stamped with
  *   the provenance the write came through;
@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest'
  *   answer, because the alias insert sits in a savepoint and only the
  *   savepoint rolls back;
  * - re-writing what you already own is `already_own`, not a second row;
- * - **clearing the value releases the claim** (CONTEXT.md, 2026-09-19) —
+ * - **clearing the value releases the claim** —
  *   name aliases are history and never retire, identity aliases are claims
  *   and do;
  * - and no core object's registry carries a key, because core identity is

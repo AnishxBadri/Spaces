@@ -11,7 +11,6 @@ import type { QueryVector } from './query-embedding'
 
 /**
  * Cmd-K's Passages: the semantic lane on its own, never fused into Records.
- * (D70)
  * - Places to go, never answers: each row is the record or file whose chunk
  *   sat nearest the query, with that chunk's text and page.
  * - No embedding pin, or an embed that fails, answers nothing — the group

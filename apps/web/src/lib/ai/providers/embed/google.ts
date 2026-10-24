@@ -5,7 +5,7 @@ import { sdkDimensionOptions, sdkEmbedCall } from './adapter'
 import type { EmbedAdapterInput, EmbedCall } from './adapter'
 
 /**
- * The Google (Gemini API) embedding adapter (SPA-51), asking for the pin's
+ * The Google (Gemini API) embedding adapter, asking for the pin's
  * width with `outputDimensionality`. `text-embedding-004` is 768 already;
  * `gemini-embedding-001` truncates its 3072 on request. The key rides the
  * `x-goog-api-key` header, as the LLM adapter's does.

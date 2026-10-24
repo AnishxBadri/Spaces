@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { API_PREFIX } from './versions'
 
 /**
- * `/api/v1` shadows nothing (SPA-45). The raw routes stay raw and stay where
- * they are: an HMAC over an exact raw body is not a procedure
- * (docs/spec-plugin-sdk.md §11), and a path moved under the versioned
- * namespace would become an external contract. Read from the committed route
- * tree, so a route file added under `routes/api/v1/` fails here by name.
+ * `/api/v1` shadows nothing. The raw routes stay raw and stay where they
+ * are: an HMAC over an exact raw body is not a procedure, and a path moved
+ * under the versioned namespace would become an external contract. Read from
+ * the committed route tree, so a route file added under `routes/api/v1/`
+ * fails here by name.
  */
 
 const routeTree = readFileSync(
@@ -30,7 +30,7 @@ const underPrefix = (path: string) =>
   path === API_PREFIX || path.startsWith(`${API_PREFIX}/`)
 
 /**
- * Raw by design, and mounted today. The job-status stream is SSE (D64); the
+ * Raw by design, and mounted today. The job-status stream is SSE; the
  * webhook ingress verifies an HMAC over the exact raw body; a connect leg is
  * a browser redirect to and from the provider, with a cookie; the workspace
  * logo is image bytes an `<img>` loads.

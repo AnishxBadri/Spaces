@@ -4,7 +4,7 @@ import { Upload } from 'lucide-react'
 import { openUploadDialog } from './upload-dialog-store'
 
 /**
- * The verbs a page publishes to Cmd-K's Actions group. (D70)
+ * The verbs a page publishes to Cmd-K's Actions group.
  * - A route calls `usePageActions` once with its own verbs, record verbs
  *   first; the registration goes when the route unmounts.
  * - A page with a subject (a record, a space) names it as the `scope`:

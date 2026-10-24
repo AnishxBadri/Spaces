@@ -18,25 +18,15 @@ import type {
 import { birthHolding } from './holding'
 
 /**
- * **The portfolio write path** (SPA-171). `addRound`, `addInvestment`,
- * `addMark` and `addDistribution` held their bodies inline in server-fn
- * handlers, so the ledger importer calling the tables itself would have been
- * a second writer into append-only history. The bodies moved here; the
- * server fns (`lib/server/portfolio.ts`) are thin callers through
- * `effectFn`, and the import commit (`lib/import/ledger-commit.ts`) calls the
- * same four programs.
- *
- * Each program, given a transaction (`tx`), runs inside it — which is how a
- * ledger row's holding and its events land or fail together — and without
- * one opens its own. Every one of them is one or more INSERTs: there is no
- * edit and no delete here, and there may never be (D12 — a correction is a
- * compensating event, `./reverse.ts`).
- *
- * Money arrives as numbers and is turned into drizzle's `numeric` strings
- * here, at the write boundary, and nowhere else.
- *
- * Outside `lib/server/` for the barrel's reason (CLAUDE.md → Traps): the
- * import worker and the tests call these without a request.
+ * **The portfolio write path**: `addRound`, `addInvestment`, `addMark` and
+ * `addDistribution`, the one writer into append-only history. The server fns
+ * and the ledger import commit both call these programs.
+ * - Given `tx`, a program runs inside it (a ledger row's holding and events
+ *   land or fail together); without one it opens its own.
+ * - INSERTs only: no edit and no delete, ever. A correction is a
+ *   compensating event (`voidLedgerEventProgram`).
+ * - Money arrives as numbers and becomes `numeric` strings here, nowhere else.
+ * - Outside the server-fn barrel: the import worker and tests call these.
  */
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -129,7 +119,7 @@ export type AddRoundInput = {
 
 /**
  * A financing event in a company. A round carries no `batch_id` and no
- * `reverses_id` (D12 left it out on purpose): it is a fact of the company,
+ * `reverses_id` on purpose: it is a fact of the company,
  * not a summed event of ours, so a batch void never reaches it.
  */
 export const addRoundProgram = Effect.fn('addRoundProgram')(function* (
@@ -191,7 +181,7 @@ export type AddInvestmentInput = {
   cap?: number | null | undefined
   discount?: number | null | undefined
   vehicle?: string | null | undefined
-  /** The bulk-void handle (D12): the import batch that appended the cheque. */
+  /** The bulk-void handle: the import batch that appended the cheque. */
   batchId?: string | undefined
   actorId: string
 }

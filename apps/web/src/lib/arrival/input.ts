@@ -1,10 +1,9 @@
 import { z } from 'zod'
 
 /**
- * Settings → Arrival's inputs (SPA-56). Client-safe on purpose: the server
- * fns in `lib/server/mailbox.ts` validate with these and that module is
- * re-exported by the client-imported barrel, so nothing here may import the
- * vault, the database or imapflow.
+ * Settings → Arrival's inputs. Client-safe on purpose: the mailbox server
+ * fns validate with these and are re-exported by the client-imported barrel,
+ * so nothing here may import the vault, the database or imapflow.
  */
 
 /** The mailbox's connection, as the section edits it. */

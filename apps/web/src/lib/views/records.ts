@@ -21,36 +21,13 @@ import type { ListPageOptions, RecordSort } from './paging'
 import type { Condition } from '@spaces/core/views/filter'
 
 /**
- * The registry-generated list page's rows, filtered, sorted, counted and
- * **paged** in Postgres (SPA-40, then SPA-64).
- *
- * This is the read `listObjectRecords` wraps. It lives outside
- * `lib/server/` on purpose: `lib/server-fns.ts` is a client-imported barrel
- * and re-exports `server/objects.ts`, so a plain export from there ships to
- * the browser — only `createServerFn().handler()` bodies are stripped
- * (CLAUDE.md, traps). A test that wants the query without a request calls
- * this program directly.
- *
- * The live registry read is what makes an archived attribute *ignorable*
- * rather than exclusionary: it never reaches the resolver, so its condition
- * is dropped and the list widens.
- *
- * **Why keyset and not an offset.** This is the surface the CSV import area
- * floods first, and a record born while someone is paging shifts every
- * offset after it by one — a row is shown twice or never. A cursor that
- * names the last row's `(sort key, id)` cannot: the next page is defined by
- * where the reader stopped, not by how many rows happen to precede it.
- *
- * **Why the text box is a server ILIKE and not Cmd-K.** The other half of
- * the choice was to delete the box and let the palette do it. The palette is
- * fused search across every kind — it answers "where is Acme", one hit at a
- * time, and it leaves this table alone. The box answers "narrow *this*
- * table", keeps the rows in the grid with their columns and their sort, and
- * composes with the view's conditions. Those are different questions, so the
- * box stays and becomes an `ILIKE` on `canonical_name` sent with the
- * request. Deliberately *not* wired into `lib/server/search.ts`'s fused CTE:
- * that query is being rewritten by three other slices, and it ranks across
- * kinds, which is exactly what this surface does not want.
+ * The registry list page's rows, filtered, sorted, counted and keyset-paged
+ * in Postgres; the read `listObjectRecords` wraps.
+ * - Kept out of the client-imported server-fns barrel, where a plain export
+ *   would ship to the browser; tests call it directly.
+ * - Archived attributes never reach the resolver, so their conditions drop.
+ * - The text box is an `ILIKE` on `canonical_name`, not fused search: it
+ *   narrows this table, while fused search ranks across kinds.
  */
 
 export class RecordQueryFailed extends Schema.TaggedError<RecordQueryFailed>()(
@@ -66,8 +43,7 @@ const query = <T>(run: () => Promise<T>) =>
 
 /**
  * Re-exported so the shape of this surface's options reads at the call site;
- * the pager itself is `./paging`, shared with `/companies` and `/people`
- * (SPA-96).
+ * the pager itself is `./paging`, shared with `/companies` and `/people`.
  */
 export type { RecordSort }
 export type ListRecordsOptions = ListPageOptions

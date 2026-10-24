@@ -10,11 +10,9 @@ import {
 
 /**
  * Settings → AI. Every write is admin-only (`requireAdmin()`); the reads are
- * any member's, secrets redacted for them (D81). The bodies live in
- * `lib/ai/providers/settings.ts` and its siblings, and are imported inside
- * the handler so the AI SDK and the vault never
- * reach the client bundle — this module is re-exported by the client-imported
- * `server-fns` barrel.
+ * any member's, secrets redacted for them. The handler bodies are imported
+ * dynamically so the AI SDK and the vault never reach the client bundle: this
+ * module is re-exported by the client-imported `server-fns` barrel.
  */
 
 export const listAiProviders = createServerFn().handler(async () => {
@@ -42,8 +40,8 @@ export const testAiProvider = createServerFn({ method: 'POST' })
   })
 
 /**
- * One cell of the lane × sensitivity routing grid (SPA-42), upserted — or,
- * with `provider: null`, cleared (SPA-69). The Routing ledger writes through
+ * One cell of the lane × sensitivity routing grid, upserted, or cleared with
+ * `provider: null`. The Routing ledger writes through
  * it; so does a seed: "set the classify lane to Anthropic" is
  * `{lane: 'classify', sensitivity: 'normal', provider: 'anthropic', model}`.
  */
@@ -77,7 +75,7 @@ export const isLaneRouted = createServerFn()
   })
 
 /**
- * The workspace sensitivity floor on Models (D81). Any member reads it; the
+ * The workspace sensitivity floor on Models. Any member reads it; the
  * write is admin-only and applies at once.
  */
 export const getSensitivityDefault = createServerFn().handler(async () => {
@@ -94,7 +92,7 @@ export const setSensitivityDefault = createServerFn({ method: 'POST' })
 
 /**
  * Settings → AI · Caps: the workspace token caps. Any member reads them; the
- * write is admin-only. The bodies live in `lib/ai/caps.ts`.
+ * write is admin-only.
  */
 export const getAiCaps = createServerFn().handler(async () => {
   const { getAiCapsHandler } = await import('../ai/caps')
@@ -116,10 +114,9 @@ export const getAiUsageToday = createServerFn().handler(async () => {
 })
 
 /**
- * Settings → Usage (SPA-100): the run log, newest first, and the calls no
- * run owns. Any signed-in member may read it — it is provenance, and the
- * inbox's "produced by this run" opens it; the body lives in
- * `lib/ai/usage.ts`, whose handlers open with `requireUser()`.
+ * Settings → Usage: the run log, newest first, and the calls no run owns.
+ * Any signed-in member may read it: it is provenance, and the inbox's
+ * "produced by this run" opens it. The handlers open with `requireUser()`.
  */
 export const getAiUsage = createServerFn().handler(async () => {
   const { getAiUsageHandler } = await import('../ai/usage')
@@ -136,8 +133,7 @@ export const getAiRun = createServerFn()
 
 /**
  * Settings → AI · Search: the pin, the embedding keys, the Test call. The
- * read is any member's with the keys redacted; the rest are admin-only. The
- * bodies live in `lib/ai/providers/embed/settings.ts`.
+ * read is any member's with the keys redacted; the rest are admin-only.
  */
 export const getEmbeddingSettings = createServerFn().handler(async () => {
   const { getEmbeddingSettingsHandler } =
@@ -165,7 +161,7 @@ export const testEmbedding = createServerFn({ method: 'POST' })
 
 /**
  * Pins the workspace to one model at 768 dimensions, or swaps a pinned one
- * for another 768-wide model (SPA-136) — which offers the backfill and does
+ * for another 768-wide model, which offers the backfill and does
  * not start it. Refused — `PinLocked`, with the re-pin explanation — when the
  * new model would change the width.
  */
@@ -178,7 +174,7 @@ export const pinEmbedding = createServerFn({ method: 'POST' })
   })
 
 /**
- * Settings → Embeddings · Backfill (SPA-136): the pending count, the
+ * Settings → Embeddings · Backfill: the pending count, the
  * pre-flight estimate and where the run stands — database reads and a queue
  * read, never a provider call. Any member reads it; starting a run is the
  * admin's.
@@ -201,7 +197,7 @@ export const startEmbedBackfill = createServerFn({ method: 'POST' }).handler(
 )
 
 /**
- * Settings → Embeddings · Sensitive slot (SPA-83, D11): a local model beside
+ * Settings → Embeddings · Sensitive slot: a local model beside
  * a cloud pin that sensitive records embed through. Refused — `SlotRefused`,
  * with the reason — unless the model is local, Test-green and the pin's
  * width. Admin-only; the bodies open with `requireAdmin()`.

@@ -5,7 +5,7 @@ import { requireUser } from './shared'
 import { pagedListShape } from '#/lib/views/page-input'
 
 /**
- * Bulk Enrich from a list (D76): the estimate window's read and its Enrich n.
+ * Bulk Enrich from a list: the estimate window's read and its Enrich n.
  * - `target` is the selection bar's checked ids, or the list's view (its
  *   conditions and text box) for the `···` menu — at most `BULK_MAX`.
  * - The estimate spends nothing; `bulkEnrich` recomputes it before it sends.

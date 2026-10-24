@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { focusTab } from './focus'
 
 /**
- * Which tab `/tasks?task=<id>` opens (SPA-87). Open and Done are exclusive,
+ * Which tab `/tasks?task=<id>` opens. Open and Done are exclusive,
  * so a focused closed task must open Done or it renders nothing.
  */
 

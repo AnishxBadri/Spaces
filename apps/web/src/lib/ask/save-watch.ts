@@ -24,7 +24,7 @@ import type { AskCall, AskFindRow, AskFindTable } from './types'
 
 /**
  * Save as watch: a Find turn's question becomes a `space_watch`, and its
- * results are carried, not repeated. (D77)
+ * results are carried, not repeated.
  * - Needs a space: the table's, one picked, or one created from the question.
  * - The same space, engine and settings is `AlreadyWatching` and writes nothing.
  * - Rows the reader added or dismissed are left as they are; rows left
