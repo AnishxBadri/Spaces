@@ -2,7 +2,7 @@ import type { JsonObject, JsonValue } from '../contract.ts'
 import type { FetchLike } from './fake-drive-api.ts'
 
 /**
- * Granola's read-only REST API, in process (D78): a `fetch`-shaped function
+ * Granola's read-only REST API, in process: a `fetch`-shaped function
  * the recorder's real HTTP code runs against — the member (`/me`), their
  * folders, a folder's notes page by page, and one note with its typed notes
  * and, when asked, its transcript.

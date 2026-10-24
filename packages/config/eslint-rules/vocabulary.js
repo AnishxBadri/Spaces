@@ -3,45 +3,21 @@
 /**
  * `instrument/vocabulary` — only Instrument words reach a class string.
  *
- * Replaces the CLAUDE.md gate-5 grep (deleted 2026-09-18). The grep read the
- * whole file, so `rounded(?![-\w])` could not tell a class from the word
- * "rounded" in a comment — it printed a false positive on
- * `attribute-dialog.tsx:981` forever. This reads className string literals and
- * the string arguments of `cn()` / `cva()` and nothing else, so prose is
- * invisible to it, and it names the Instrument replacement in every message.
- *
- * It also covers the half of the vocabulary the grep never mentioned: the
- * shadcn semantic colour names (sidebar, chart-N, card, popover, secondary,
- * muted as a class, background outside the root route). Those `--color-*`
- * exports are gone from the `@theme` block in `src/styles.css`;
- * `design-tokens.test.ts` keeps them gone.
- *
- * DESIGN.md is the source for the replacements: `text-graphite`, `border-rule`,
- * `bg-bone`, `bg-paper`, `text-label`, `text-ui`, `rounded-md` / `rounded-none`.
- *
- * SPA-79 adds the other way the vocabulary leaks: an arbitrary type size.
- * DESIGN.md §3 ends "if a size isn't on the list it does not go in the app",
- * and `text-[0.625rem]` / `leading-[1.125rem]` are how the list gets bypassed —
- * forty sites had spelled the 10px field step out by hand before it existed as
- * a token. Both are banned, with the nearest named step in the message. Only
- * *lengths* are banned: `text-[var(--badge-amber-ink)]` is a colour, and the
- * two-tier colour rule is a different axis with its own slice. A genuine
- * one-off (optical sizing of initials inside a 16–22px square) takes an inline
- * comment saying why plus a scoped disable — the honest form of an exception.
- *
- * SPA-52 adds the colour axis SPA-79 left open. The app is light by decision
- * (2026-09-19): `color-scheme: light` on `:root`, no `dark` custom-variant, no
- * next-themes. Dark stays a backlog feature, and what keeps it a second token
- * file rather than a redraw is that no surface ever writes a colour value
- * down — so a raw hex (`bg-[#f4f3ef]`), or an `rgb()` / `hsl()` / `oklch()`
- * spelled into a class string, is an error naming the tokens. Reading a custom
- * property is the sanctioned arbitrary value: `bg-[var(--badge-amber)]` passes,
- * because the token is still the one place the value lives. The tree had zero
- * occurrences when the check landed, and this is what keeps it at zero.
- *
- * Elevation is two named utilities, `shadow-dither` and `shadow-solid`, and an
- * arbitrary `shadow-[…]` / `shadow-(…)` anywhere in the app is an error naming
- * both: which one a sheet casts is decided by its kind, in the primitive.
+ * Reads className string literals and the string arguments of `cn()` / `cva()`
+ * and nothing else, so prose is invisible to it; every message names the
+ * Instrument replacement. It bans:
+ * - Non-Instrument utilities, including the shadcn semantic colour names
+ *   (sidebar, chart-N, card, popover, secondary, muted, background outside the
+ *   root route). Their `--color-*` exports are kept out of `@theme` by
+ *   `design-tokens.test.ts`.
+ * - Arbitrary type *lengths* (`text-[0.625rem]`, `leading-[1.125rem]`): a size
+ *   not on the named list does not go in the app; the message names the
+ *   nearest step. A genuine one-off takes a scoped disable with a reason.
+ * - Raw colours in a class string (a hex, `rgb()` / `hsl()` / `oklch()`). The
+ *   app is light by decision, and dark stays a token file rather than a redraw
+ *   only while no surface writes a colour value down. `bg-[var(--token)]` passes.
+ * - Arbitrary `shadow-[…]` / `shadow-(…)`: elevation is `shadow-dither` or
+ *   `shadow-solid`, picked by the primitive from the sheet's kind.
  */
 
 /**
@@ -71,7 +47,7 @@ const SPACING_REM = 0.25
 
 /** @type {Array<Ban>} */
 const BANS = [
-  // Type scale — named steps only (DESIGN.md §2).
+  // Type scale — named steps only.
   { re: /^text-xs$/, use: 'text-label' },
   { re: /^text-sm$/, use: 'text-ui' },
 
@@ -86,7 +62,7 @@ const BANS = [
   },
 
   // Elevation — never a blur, and never spelled at a call site: the
-  // primitive picks one of two by what sits behind it (DESIGN.md §4).
+  // primitive picks one of two by what sits behind it.
   {
     re: /^shadow-xs$/,
     use: 'shadow-dither (popover, menu, picker) or shadow-solid (a window over the scrim), or no shadow at all',
@@ -266,8 +242,8 @@ function nearestStep(/** @type {number} */ rem) {
 }
 
 /**
- * Every arbitrary type size in one class string (DESIGN.md §3). Exported for
- * the fixture test.
+ * Every arbitrary type size in one class string. Exported for the fixture
+ * test.
  *
  * @param {string} value
  * @returns {Array<{ index: number, length: number, token: string, fix: string }>}
@@ -330,7 +306,7 @@ const HEX = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-fA-F])/
 const COLOUR_FN = /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/
 
 /**
- * Every raw colour in one class string (SPA-52). Exported for the fixture test.
+ * Every raw colour in one class string. Exported for the fixture test.
  *
  * @param {string} value
  * @returns {Array<{ index: number, length: number, token: string, literal: string }>}

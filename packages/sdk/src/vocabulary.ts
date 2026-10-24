@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { JsonValue } from './contract.ts'
 
 /**
- * The enrichment vocabulary: every key a source may answer in (D76). A
+ * The enrichment vocabulary: every key a source may answer in. A
  * source answers `company.headcount`, never an attribute slug; the host
  * maps each key to whatever attribute links it (`options.enrichmentKey`).
  * - `kind`: the record kind the key describes.

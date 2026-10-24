@@ -5,7 +5,7 @@ import { isVersion, parseSdkRange } from './range.ts'
 import { ENRICHMENT_VOCABULARY, isVocabularyKey } from './vocabulary.ts'
 
 /**
- * The manifest (docs/spec-plugin-sdk.md §3, amended 2026-09-30 by D51).
+ * The manifest.
  *
  * Authored once, as a TS const whose `settings` is a zod schema
  * (`defineManifest`), and emitted by the plugin build as `manifest.json` with
@@ -15,14 +15,14 @@ import { ENRICHMENT_VOCABULARY, isVocabularyKey } from './vocabulary.ts'
  * `manifestSchema` validates the on-disk shape; the build runs it on what it
  * writes and the loader on what it reads.
  *
- * There is no plugin-level `kind` (D51). Each job declares a `trigger`, which
+ * There is no plugin-level `kind`. Each job declares a `trigger`, which
  * fixes what it is handed and returns, and the ports it `uses`, which the
  * loader grants for that (integration, job) and nothing more. `provides:
  * 'storage-source'` is a provider interface core calls into, not a job.
  */
 
 /**
- * The six triggers (D51; `watch` since SDK 1.5, D72). Closed and
+ * The six triggers (`watch` from SDK 1.5). Closed and
  * semver-frozen: a new one is a minor.
  */
 export const TRIGGERS = [
@@ -37,7 +37,7 @@ export type Trigger = (typeof TRIGGERS)[number]
 
 /**
  * The jobs a plugin does for the operator, as the Plugins catalogue groups
- * them (D81). Optional on the manifest and on the registry entry, so the
+ * them. Optional on the manifest and on the registry entry, so the
  * catalogue can group a plugin before it is installed. A new role is a minor.
  */
 export const ROLES = [
@@ -82,7 +82,7 @@ const compiles = (pattern: string): boolean => {
 const jobSchema = z.strictObject({
   trigger: z.enum(TRIGGERS),
   // The ports this job is granted — the admin reads this list at install,
-  // and the loader's Layer holds exactly these (D51).
+  // and the loader's Layer holds exactly these.
   uses: z
     .array(
       z.enum(PORT_NAMES, {
@@ -167,7 +167,7 @@ const HEADER_NAME = /^[A-Za-z0-9][A-Za-z0-9-]*$/
 
 /**
  * A plugin's remote MCP server, which Ask mounts for a turn while the
- * integration runs. (D72, SDK 1.5)
+ * integration runs. (SDK 1.5)
  * - `url` is https: the workspace key travels with every call.
  * - `auth.header` names the header the key from `requires.credential` goes
  *   in, never the URL, so no error line can carry it; `scheme` prefixes it.
@@ -225,7 +225,7 @@ export const manifestSchema = z
             })
             .optional(),
           // An OAuth grant with its scopes, or a key each member pastes for
-          // their own account (`key: true`, SDK 1.5, D78): then every
+          // their own account (`key: true`, SDK 1.5): then every
           // schedule job runs once per member's connection.
           connection: z
             .union([

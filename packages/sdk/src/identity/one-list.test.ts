@@ -4,15 +4,13 @@ import { describe, expect, it } from 'vitest'
 import { ROLE_PREFIXES } from './normalize.ts'
 
 /**
- * One role-prefix list (SPA-195). The rule "a role email never identifies a
- * person" (CONTEXT.md, Entity resolution & merge) is only one rule while it
- * is one list: a second copy in core or the SDK would drift from this one,
+ * One role-prefix list. "A role email never identifies a person" is only one
+ * rule while it is one list: a second copy in core or the SDK would drift,
  * and the plugin and the choke point would disagree about who is a person.
  *
- * A second list is recognised by what it contains — a source file, other
- * than normalize.ts, spelling four or more of the prefixes as string
- * literals. apps/web's `ROLE_SENDERS` (arrival/noise.ts) is out of scope on
- * purpose: it filters mail noise, a different job.
+ * A second list is a source file, other than normalize.ts, spelling four or
+ * more of the prefixes as string literals. apps/web's `ROLE_SENDERS` is out
+ * of scope on purpose: it filters mail noise, a different job.
  */
 const packagesDir = fileURLToPath(new URL('../../../', import.meta.url))
 const HOME = 'sdk/src/identity/normalize.ts'

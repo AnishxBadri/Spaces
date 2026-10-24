@@ -16,9 +16,8 @@ const pkg = z
   )
 
 describe('@spaces/sdk package.json', () => {
-  // D55: "nothing internal", and a short third-party list a test pins.
-  // tldts joined with sdk-4b: the identity normalizers need the public
-  // suffix list, and one normalizer on both sides of the port is the point.
+  // Nothing internal, and a short third-party list pinned here. tldts is for
+  // the identity normalizers' public suffix list.
   it('depends on effect, zod and tldts and nothing else', () => {
     expect(pkg.dependencies).toEqual({
       effect: '4.0.0-rc.112',
@@ -33,12 +32,10 @@ describe('@spaces/sdk package.json', () => {
 })
 
 describe('the runtimes a plugin shares with the host', () => {
-  // A plugin's bare `effect` and `zod` resolve to the host's copies (sdk-11),
-  // and the sdk's own manifestSchema and configOf run on the sdk's copies —
-  // so the two must be one install, or a plugin's settings schema is a
-  // foreign zod to the sdk that parses it. pnpm resolved the sdk to a newer
-  // zod than the rest of the workspace once (fixed in the lockfile); this
-  // compares the resolved files, read from disk, with core's — no import.
+  // A plugin's bare `effect` and `zod` resolve to the host's copies, and the
+  // sdk's manifestSchema and configOf run on the sdk's — so the two must be
+  // one install, or a plugin's settings schema is a foreign zod to the sdk
+  // that parses it. Compares the resolved files on disk with core's.
   const from = (dir: string) =>
     createRequire(new URL(`../../${dir}/package.json`, import.meta.url))
   it.each(['effect', 'zod'])(

@@ -1,10 +1,8 @@
 /**
- * @spaces/sdk — what a plugin imports (docs/spec-plugin-sdk.md §3–§6): the
- * manifest, the version check and `definePlugin` (sdk-3); the frozen
- * contract — port names, claims, trigger shapes, the cost hook, job errors
- * (sdk-4a, `contract.ts`); the port tags (sdk-5, `ports.ts`); the
- * storage-source provider interface (`storage-source.ts`). The testing kit
- * is `@spaces/sdk/testing`.
+ * @spaces/sdk — what a plugin imports: the manifest, the version check and
+ * `definePlugin`; the frozen contract (port names, claims, trigger shapes,
+ * the cost hook, job errors); the port tags; the storage-source provider
+ * interface. The testing kit is `@spaces/sdk/testing`.
  */
 export { SDK_VERSION } from './version.ts'
 export { satisfiesSdk, parseSdkRange, isVersion } from './range.ts'

@@ -7,9 +7,9 @@ import { toManifestJson } from '../manifest.ts'
 import type { Plugin } from '../plugin.ts'
 
 /**
- * The plugin build (sdk-3's call, recorded in the README): one `vite build
- * --ssr` config that every plugin package reuses — D26 made vite the one
- * bundler — with a plugin package's `vite.config.ts` being
+ * The plugin build: one `vite build --ssr` config that every plugin package
+ * reuses (vite is the one bundler), with a plugin package's `vite.config.ts`
+ * being
  *
  *   export default pluginBuildConfig()
  *
@@ -20,8 +20,7 @@ import type { Plugin } from '../plugin.ts'
  *   host to resolve: `effect`, `zod` and `@spaces/sdk` (plus `node:*`). A
  *   plugin never ships its own Effect or its own copy of the SDK — two copies
  *   of the SDK's service tags in one process is "service not found" at best
- *   — so those three are the host's, resolved to its copies by the loader
- *   (sdk-11).
+ *   — so those three are the host's, resolved to its copies by the loader.
  * - `manifest.json` — the bundle's `default.manifest` through
  *   `toManifestJson`: settings as JSON Schema, validated by `manifestSchema`,
  *   so a build that would write a manifest the loader refuses fails here.

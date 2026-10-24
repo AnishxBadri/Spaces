@@ -48,7 +48,7 @@ import type {
 } from '../ports.ts'
 
 /**
- * `@spaces/sdk/testing` (sdk-5; docs/spec-plugin-sdk.md §6, §13.1): the port
+ * `@spaces/sdk/testing`: the port
  * Layers a plugin author tests with — in memory, no Postgres, no network.
  * Each `XTest(…)` returns `{ layer, calls }`: the Layer to provide and a
  * recorder listing every call it received, in order, with what it returned.
@@ -59,10 +59,9 @@ import type {
  * `testPorts(…)` builds them all over one shared recorder, which is what a
  * job test usually wants: one Layer, one ordered list of port calls.
  *
- * Not here: `PluginDb`, whose behaviour is Postgres's own — a plugin's SQL is tested against a real
- * database, as the worker's PluginDb test does. A DryRun Layer (this recorder in production, over core's
- * `previewResolve`) is the later answer to an importer preview. Nor
- * `Discover`: the host has no live port for a fake to mirror.
+ * Not here: `PluginDb`, whose behaviour is Postgres's own — a plugin's SQL
+ * is tested against a real database. Nor `Discover`: the host has no live
+ * port for a fake to mirror.
  */
 
 export type RecordedCall = {
@@ -116,7 +115,7 @@ const counter = (prefix: string) => {
 
 /**
  * The key forms the fake treats as equal — the choke point's own
- * normalizers (`@spaces/sdk/identity`, sdk-4b), key for key as
+ * normalizers (`@spaces/sdk/identity`), key for key as
  * `resolveEntity` maps them. A key that normalizes to nothing (a free-mail
  * domain, a malformed email) identifies nothing, here as there, and neither
  * does a LinkedIn URL.
@@ -1005,7 +1004,7 @@ export type {
   CalendarApiRequest,
 } from './fake-calendar-api.ts'
 
-// Granola's read-only notes API over a fake member's folders — a keyed recorder (D78)
+// Granola's read-only notes API over a fake member's folders — a keyed recorder
 export {
   makeFakeGranolaApi,
   fakeGranolaSeed,
