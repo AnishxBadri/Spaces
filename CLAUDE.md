@@ -309,28 +309,27 @@ errors, 62% of them in test files and `apps/web/src/lib/seeds/dev.ts`, where man
 from gate 4. Revisit when project 2's test-database slices rewrite the tests
 anyway. Don't re-litigate it from the flag list.
 
-## Comments (decided 2026-10-02)
+## Comments
 
-A comment is for the next reader of the code, not a record of how it was
-designed. Short and formatted:
+1. Comment the why, not the what. A comment that restates the code goes;
+   comments carry intent, assumptions and surprising trade-offs.
+2. `/** */` describes, `//` explains: JSDoc on an export says what it is for
+   its caller; `//` in a body explains a non-obvious step.
+3. Write for the reader of the current code, not as history: no issue ids,
+   decision ids, slice or milestone names, dates, "used to", "moved from",
+   "until X". The commit message carries the history.
+4. Keep every warning and invariant, stated plainly ("never inside a
+   transaction", "must not import db").
+5. Don't repeat what the types say.
+6. One line ideal, five lines max; compress a long invariant to tight
+   bullets ("X before Y because Z") rather than deleting it.
+7. Name symbols, not file paths.
+8. Link out only for external facts (an RFC, an API quirk, an algorithm).
+9. A correct, short comment is left alone.
 
-- **First line says what it is.** Bullets for rules and invariants.
-- **Keep:** non-obvious _why_, invariants, warnings ("never inside a
-  transaction", "never add to the journal"). Keep warnings word for word.
-- **Rejected alternatives:** one line plus a decision id, at most
-  (`// Not access control — canRead decides visibility. (Dnn)`). The full
-  reasoning lives in `CONTEXT.md`, `docs/decisions-*.md` or `docs/adr/`.
-- **Leave out:** SPA ids, dates, "grilled", slice or milestone names, plan
-  state ("until mono-9a"), history of what used to be there. Those belong
-  in the commit message.
-- **Name symbols, not file paths.** A path goes stale when a module moves; a
-  symbol is found by search.
-- **Aim for 5 lines or fewer.** Longer means it belongs in a doc.
-
-Bring a comment to this style when you change the code under it. Rewriting
-comments in code you are not otherwise changing is a sweep, done one package
-at a time, and the sweep must not drop an invariant. No lint rule can check
-this; the reviewer does.
+`comments/no-history` (gate 4) rejects issue ids, decision ids and ISO dates
+in comments; the rest is the reviewer's. Directive comments (`eslint-disable`,
+`@ts-expect-error`, `prettier-ignore`, …) are code, not prose.
 
 ## After specific change kinds
 
