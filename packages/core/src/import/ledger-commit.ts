@@ -8,12 +8,10 @@ import type {
 } from '@spaces/db/schema/import'
 
 /**
- * **Ledger commit** (SPA-171, project 14 `import-9`) — the rules the ledger
- * commit's receipt decides without a query. The database half — each row's
- * holding and events through the portfolio write path, in the row's own
- * transaction — is `apps/web/src/lib/import/ledger-commit.ts`; here is what
- * the outcome lane says a committed row appended, which events still want an
- * FX rate, and the receipt's two commentary lines.
+ * Ledger commit: the receipt's rules that need no query — what a committed
+ * row appended, which events still want an FX rate, and the receipt's two
+ * commentary lines. The database half (each row through the portfolio write
+ * path, in its own transaction) lives in apps/web.
  */
 
 export type { LedgerCommitted, LedgerEventKind }
@@ -125,7 +123,8 @@ export type LedgerVoidState = {
   distributions: number
   /** Of those, how many a compensating event already cites. */
   voided: number
-  /** Rounds this batch created — never stamped, never voided (D12). */
+  /** Rounds this batch created — never stamped, never voided. */
+
   rounds: number
 }
 

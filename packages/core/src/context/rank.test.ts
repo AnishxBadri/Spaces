@@ -4,12 +4,12 @@ import type { Candidate } from './rank'
 import { ref } from './ref'
 
 /**
- * Frostbyte Cooling, as the assembler would hand it to the ranker on
- * 2026-09-10. Every later property test perturbs this one fixture.
+ * Frostbyte Cooling, as the assembler would hand it to the ranker on the
+ * `ASOF` date. Every later property test perturbs this one fixture.
  */
 const CO = 'co-frostbyte'
 const DECK = 'doc-deck'
-/** The deck before DECK: the same kind, replaced by it (D59). */
+/** The deck before DECK: the same kind, replaced by it. */
 const OLD_DECK = 'doc-deck-v1'
 const MEMO = 'note-memo'
 const SPACE_MEMO = 'note-space-memo'

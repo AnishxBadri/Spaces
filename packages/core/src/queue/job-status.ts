@@ -5,7 +5,7 @@ import { QUEUES } from './names'
 /**
  * The `job_status` notification: what `runJob`'s ledger says on the channel
  * when it opens or closes a plugin job's `job_run` row, and what web's one
- * LISTEN client reads back. (D64)
+ * LISTEN client reads back.
  * - Status only, never state: a reader that missed one resyncs from
  *   `job_run`, so nothing here is the only copy of anything.
  * - `encodeJobStatus` keeps the payload under pg's 8000-byte NOTIFY limit.

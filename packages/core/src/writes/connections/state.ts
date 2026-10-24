@@ -8,7 +8,7 @@ import { loadMasterKey } from '../vault/key'
  * - `<base64url(canonical JSON)>.<base64url(HMAC-SHA256)>`, keyed off the
  *   master key. Signed, not encrypted: it holds nothing secret.
  * - Never carries the PKCE verifier — the state travels through the
- *   provider; the verifier stays in the browser's cookie (`pkce.ts`).
+ *   provider; the verifier stays in the browser's cookie (`verifierCookie`).
  * - Ten-minute life, checked against `issuedAt` on the way back.
  */
 
@@ -17,7 +17,7 @@ export const STATE_TTL_MS = 10 * 60 * 1000
 export type ConnectState = {
   readonly userId: string
   readonly provider: string
-  /** The product the grant is for (D66): `drive`, `calendar`, `gmail`, `box`. */
+  /** The product the grant is for: `drive`, `calendar`, `gmail`, `box`. */
   readonly product: string
   /** Registry `value`s, as asked for. */
   readonly scopes: ReadonlyArray<string>

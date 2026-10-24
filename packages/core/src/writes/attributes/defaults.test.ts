@@ -158,9 +158,8 @@ describe('birthValues', () => {
       .select()
       .from(attributeEvent)
       .where(eq(attributeEvent.entityId, machine.entityId))
-    // `system`, not `integration`: since SPA-70 an integration actor names an
-    // `integration` row (biconditional check on actor_ref), and a keyless
-    // import has none to name.
+    // `system`, not `integration`: an integration actor must name an
+    // `integration` row (check on actor_ref), and a keyless import has none.
     expect(mEvent.actorType).toBe('system')
     expect(mEvent.actorRef).toBe(null)
     expect(mEvent.source).toBe('default')
@@ -188,8 +187,7 @@ describe('birthValues', () => {
       .values({ capabilityId: 'apollo', version: '1.0.0' })
       .returning({ id: integration.id })
 
-    // The hole SPA-70 left open: the call site had no integration row to
-    // name, so a machine birth said `system`. The pair carries the id now.
+    // A machine birth with an integration row names it, not `system`.
     const written = await resolveEntity({
       kind: 'company',
       name: `DfltCo ${tag} plugin`,

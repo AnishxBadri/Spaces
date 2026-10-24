@@ -20,26 +20,19 @@ import { documentWidenedSql, noteWidenedSql } from './can-read-sql'
 import { recordRelationsProgram } from './relations'
 
 /**
- * One record, read as a given reader: the MCP surface's `get_record` and
- * the plugin SDK's `Read.entity` are this one read, so a merged-away id, an unreadable note and the registry
- * shape mean the same thing to an assistant and to a plugin.
- *
- * The read half of the MCP surface's record tool (SPA-23, spec §5):
- * `get_record(id)` — one record, registry-shaped: its object, every live
- * attribute of that object in registry order with the stored value and the
- * line the assembler would render for it, then its links both ways and the
- * spaces it is tagged into. The inverse half of a relationship is listed
- * under its own slug, marked `derived`, its value resolved from the owner's
- * links (D69).
- *
- * canRead is the token user's, applied at every door a private note could
- * leave through: the record itself (a teammate's private note is not found,
- * not refused — its existence is not disclosed), and the far end of every
- * link. Nothing here writes; the propose-only boundary is ai-23b's.
- *
- * `resolveEntityRefProgram` lets `get_context(entity)` take a name as well
- * as an id: without `search_records` (ai-23b) an assistant asked about
- * "Orbital Composites" has no other way in.
+ * One record, read as a given reader: the MCP `get_record` and the plugin
+ * SDK's `Read.entity` are this one read, so a merged-away id, an unreadable
+ * note and the registry shape mean the same thing to an assistant and to a
+ * plugin.
+ * - Registry-shaped: its object, every live attribute in registry order with
+ *   the stored value and its assembler line, its links both ways and its
+ *   spaces. A relationship's inverse half is listed under its own slug,
+ *   marked `derived`, resolved from the owner's links.
+ * - canRead is the token user's, at every door a private note could leave
+ *   through: the record itself (not found, not refused — its existence is
+ *   not disclosed) and the far end of every link. Nothing here writes.
+ * - `resolveEntityRefProgram` lets `get_context(entity)` take a name as well
+ *   as an id.
  */
 
 export class McpToolRefused extends Schema.TaggedError<McpToolRefused>()(
@@ -65,7 +58,7 @@ type Reader = { id: string }
 
 /**
  * The ids among `ids` that `reader` may not read: a note or a document
- * private to someone else and not widened to them (D67).
+ * private to someone else and not widened to them.
  */
 const unreadableIds = Effect.fn('unreadableIds')(function* (
   reader: Reader,
@@ -162,7 +155,7 @@ export type RecordAttribute = {
   value: Json
   /** The assembler's rendering, `Name: value` — null when unset. */
   text: string | null
-  /** The inverse half of a relationship: read from the owner's links. (D69) */
+  /** The inverse half of a relationship: read from the owner's links. */
   derived?: true
 }
 

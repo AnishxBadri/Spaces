@@ -9,10 +9,9 @@ import { setValuesEffect } from './values'
 import type { Actor } from './values'
 
 /**
- * `setValuesEffect`'s fill-blanks mode (sdk-9), the lane `Facts.fill` runs
- * on: blank is decided after the entity row lock, so two fills racing for
- * one blank slug cannot both see it blank. The port-level behaviour —
- * provenance, receipts, the JobError mapping — is `ports/facts.test.ts`.
+ * `setValuesEffect`'s fill-blanks mode, the lane `Facts.fill` runs on: blank
+ * is decided after the entity row lock, so two fills racing for one blank
+ * slug cannot both see it blank. The port-level behaviour is `Facts`' suite.
  */
 
 const anIntegration = async (capabilityId: string) => {

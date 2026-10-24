@@ -1,5 +1,5 @@
 /**
- * Currency conversion against the workspace base (CONTEXT.md, 2026-08-06).
+ * Currency conversion against the workspace base.
  * Original currency is truth; conversion happens at read. Lookup is the
  * latest rate ≤ the requested date. A missing rate returns null — callers
  * surface it ("N events need a rate"), never assume 1.0.

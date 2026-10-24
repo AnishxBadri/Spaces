@@ -10,11 +10,9 @@ import {
 } from './key-terms'
 
 /**
- * SPA-91. The per-kind key-terms schema is hand-written, not compiled from
- * the registry (the module comment says why), so this snapshot is the one
- * place a reviewer sees the output type the extract lane is handed for a
- * term sheet and for a diligence pack. @spaces/core's suite has no model
- * and no connection string by construction.
+ * The key-terms schema is hand-written, not compiled from the registry, so
+ * this snapshot is the one place a reviewer sees the output type the extract
+ * lane is handed for a term sheet and for a diligence pack.
  */
 
 describe('keyTermsSchema', () => {

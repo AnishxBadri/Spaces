@@ -33,7 +33,7 @@ import { BindingStoreFailed } from './bind'
 import { goneNot } from './gone'
 
 /**
- * Write-through (docs/spec-storage-sources.md §6): an in-app upload on a
+ * Write-through: an in-app upload on a
  * record whose folder binding is `push` or `both` lands in that folder too.
  * - Only a person's upload: `manual`, with bytes, no page address and no
  *   provider copy. Integration arrivals, clips and captures never export.
@@ -382,7 +382,7 @@ export const exportDocumentProgram = Effect.fn('exportDocumentProgram')(
     const { home } = plan
 
     if (plan.externalId === null) {
-      // The bound folder itself: no kind subfolder is made. (§6, lazy folders)
+      // The bound folder itself: no kind subfolder is made.
       const folderId = yield* source.ensureFolder(home.folderId, '')
       const stream = yield* bytesOf(input.blobSha)
       const put = yield* source.putFile(folderId, plan.filename, {

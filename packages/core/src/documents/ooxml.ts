@@ -2,8 +2,8 @@ import { strFromU8, unzipSync } from 'fflate'
 
 /**
  * The OOXML container helpers, shared by the two readers that open one: the
- * pptx text path in `extract.ts` and the xlsx grid in `import/read.ts`
- * (SPA-163). This is the repo's only `unzipSync` call — a second xlsx or
+ * pptx text path in `extractDocumentText` and the xlsx grid in `readXlsx`.
+ * This is the repo's only `unzipSync` call — a second xlsx or
  * pptx parser would have to come through here, which is where it would be
  * noticed.
  */

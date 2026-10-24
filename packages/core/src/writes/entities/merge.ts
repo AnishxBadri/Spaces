@@ -32,8 +32,7 @@ import {
 } from '@spaces/db/schema/portfolio'
 
 /**
- * Merge executor, per CONTEXT.md: repoint at write time, resolve nothing at
- * read time. Loser survives as a redirect (merged_into_id); every moved or
+ * Merge executor: repoint at write time, resolve nothing at read time. Loser survives as a redirect (merged_into_id); every moved or
  * dropped row lands in merge_event.snapshot so unmerge stays possible.
  *
  * Restricted to company | person | custom, and to pairs that are the same
@@ -41,17 +40,17 @@ import {
  * different semantics, and two custom records share a kind without sharing a
  * registry, so a Fund must never merge into a Vendor. Customs need no section
  * of their own: they have no side table, so the ENTITY_REFS loop below is the
- * whole job (spec-attribute-engine.md §9, merge-as-target).
+ * whole job.
  */
 
-/** Declared beside the column it lands in (src/db/schema/entities.ts). */
+/** Declared beside the column it lands in (`merge_event.snapshot`). */
 type SnapshotEntry = MergeSnapshotEntry
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 /**
- * The kinds this executor will take. Exported because the fuzzy sweep
- * (`sweep.ts`) reads it: a suggestion the Merge button would throw on is
+ * The kinds this executor will take. Exported because the fuzzy sweep reads
+ * it: a suggestion the Merge button would throw on is
  * worse than no suggestion, and the sweep must not re-derive the list.
  */
 export const MERGEABLE: ReadonlySet<string> = new Set([
@@ -254,10 +253,9 @@ export async function mergeEntities(opts: {
       throw new Error('Only same-kind entities can merge')
     if (!MERGEABLE.has(winner.kind))
       throw new Error(`Merging ${winner.kind} entities is not supported`)
-    // Kind alone stopped meaning "same registry" when customs became
-    // mergeable: every custom record is kind `custom`, and the object is
-    // what separates a Fund from a Vendor. Checked after the kind and the
-    // MERGEABLE gates so the older refusals keep their own wording.
+    // Kind alone is not "same registry": every custom record is kind
+    // `custom`, and the object separates a Fund from a Vendor. Checked after
+    // the kind and MERGEABLE gates so those refusals keep their own wording.
     if (winner.objectId !== loser.objectId)
       throw new Error('Only records of the same object can merge')
 
@@ -514,8 +512,8 @@ export async function mergeEntities(opts: {
           .set({ values: { ...wv, ...fill } })
           .where(eq(entity.id, winnerId))
         // History stays honest: a fill is a value change nobody asserted,
-        // logged as the system's, through the merge door (typed actor,
-        // spec §4). Snapshotted so unmerge can drop the rows again.
+        // logged as the system's, through the merge door (typed actor).
+        // Snapshotted so unmerge can drop the rows again.
         for (const [key, filledWith] of Object.entries(fill)) {
           await logMergeEvent(tx, snapshot, {
             entityId: winnerId,

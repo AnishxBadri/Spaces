@@ -31,7 +31,7 @@ import { runEnrichment } from './run'
 /**
  * The host's auto-enrich checks against a real database, on an `Enqueue`
  * that keeps pg-boss's stately singleton rule — one queued job per key —
- * and a clock the test sets. (D76)
+ * and a clock the test sets.
  */
 
 type Sent = {

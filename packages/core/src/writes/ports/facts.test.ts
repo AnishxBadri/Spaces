@@ -20,7 +20,7 @@ import { FactsLive } from './facts'
 import { ReceiptsLive } from './receipts'
 
 /**
- * Facts bound to an integration row (sdk-9), against a real database: fill
+ * Facts bound to an integration row, against a real database: fill
  * blanks only, the bound row as the actor, a person's value refused and
  * returned, this integration's own value updated, and the receipt it cites
  * checked to be its own — every refusal leaving nothing written.

@@ -1,11 +1,9 @@
 import { z } from 'zod'
 
 /**
- * The autocomplete's input (`searchEntities`, mentions and reference
- * pickers). Pure on purpose (SPA-198): `apps/web/src/lib/server/search.ts`
- * hands it to a server fn's `.validator()`, which survives into the client
- * bundle, so this module must not reach `db`. The query that takes it is
- * `@spaces/core/writes/read/entity-search`.
+ * Input for entity autocomplete (`searchEntities`: mentions, reference
+ * pickers). Must not import `db`: a server fn's `.validator()` ships to the
+ * client bundle. The query that takes it is `entitySearchRows`.
  */
 export const entitySearchInput = z.object({
   q: z.string().max(120),

@@ -1,25 +1,18 @@
 import type { ContextHop, ContextKind } from '@spaces/db/entity-refs'
 
 /**
- * The context contract (docs/spec-ai-substrate.md §1). Pure types — no
- * drizzle, no server imports — so the ranker and the registry can both
- * depend on them.
- *
- * `ContextKind` and `ContextHop` are the two the registry speaks: every
- * ENTITY_REFS entry declares the kind and hop its column contributes, so
- * they are declared in `@spaces/db/entity-refs` and re-exported here
- * unchanged (SPA-142). Both move to core with the rest of this file at
- * mono-9a.
+ * The context contract. Pure types, no drizzle or server imports, so the
+ * ranker and the registry can both depend on them.
+ * `ContextKind` and `ContextHop` live in `@spaces/db/entity-refs` because every
+ * `ENTITY_REFS` entry declares the kind and hop its column contributes.
  */
 export type { ContextHop, ContextKind }
 
 /**
  * Where an assembled item sits: a hop from the seed, a standing source, or
- * `similar` — the judgment-memory lane (SPA-139), which does not walk out
- * from the seed at all but reaches sideways to other records' close_reasons
- * and terminal-stage notes by embedding distance. Kept out of `ContextHop`
- * on purpose: that type is the registry's (`ENTITY_REFS` declares the hop a
- * column contributes), and no column contributes a sideways item.
+ * `similar`, the lane that reaches sideways to other records' close_reasons
+ * and terminal-stage notes by embedding distance. Not in `ContextHop`: that
+ * is the registry's, and no column contributes a sideways item.
  */
 export type AssembledHop = ContextHop | 'similar'
 
@@ -32,12 +25,12 @@ export type ContextEdge =
   | 'supersedes'
   | 'space'
   | 'co_investor'
-  /** Another company filed in the seed's leaf space. (D71) */
+  /** Another company filed in the seed's leaf space. */
   | 'peer'
 
 /** One canonical, model-agnostic shape for everything AI-visible. */
 export type ContextItem = {
-  /** Stable citation id — see `ref.ts`. */
+  /** Stable citation id, in the `ref` grammar. */
   ref: string
   kind: ContextKind
   /** Plain-text rendering. Text is the interchange, not embeddings. */

@@ -23,7 +23,7 @@ import {
 import type { RecordedInteraction } from './write'
 
 /**
- * A recorder's payload through the one writer (D68): it attaches to the
+ * A recorder's payload through the one writer: it attaches to the
  * calendar meeting a key names — or the one inside the window whose
  * attendees include every payload email — and births a `call` only when
  * nothing matches. One meeting, one row.

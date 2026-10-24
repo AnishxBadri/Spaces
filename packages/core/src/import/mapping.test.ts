@@ -26,7 +26,8 @@ import type {
 } from './mapping'
 
 /**
- * SPA-165. The mapping's rules, with no database: @spaces/core's vitest
+ * The mapping's rules, with no database: @spaces/core's vitest
+
  * config loads no env, so this file runs with Postgres stopped.
  */
 

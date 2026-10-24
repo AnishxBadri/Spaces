@@ -20,7 +20,7 @@ import { BRIEF_KEY_SLUGS } from './space-brief'
 import { query } from './spaces'
 
 /**
- * Where a record sits in the market map, and what sits beside it. (D71)
+ * Where a record sits in the market map, and what sits beside it.
  * - Position: one hop-0 item per filed space, naming its full path. A space
  *   archived on its path gives none.
  * - Peers: other companies filed in a leaf space — a filed space no other

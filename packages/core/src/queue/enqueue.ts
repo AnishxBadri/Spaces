@@ -3,13 +3,11 @@ import type { EnqueueOptions, Sender } from './sender'
 import type { EnqueueTarget } from './names'
 
 /**
- * The queue seam as an Effect service (sdk-7a, decided at publish): a
- * write port that hands work back — `resolveEntity`'s `reembed`, sdk-8a's
- * extraction — enqueues through this, and whoever runs the port provides
- * it. The worker builds it from `createSender` with its own `DATABASE_URL`
- * (`Enqueue.fromSender`), so a port running there never reaches web's
- * `#web/lib/queue`; a test provides a recording one. Pure: core reads no
- * environment, and this declares only the shape.
+ * The queue seam as an Effect service: a write port that hands work back
+ * (`resolveEntity`'s `reembed`, document extraction) enqueues through this,
+ * and whoever runs the port provides it — the worker via
+ * `Enqueue.fromSender`, a test with a recording one. Core reads no
+ * environment, so this declares only the shape.
  *
  * Never fails, like every enqueue (`Sender.enqueue`): a job that could not
  * be sent answers `null`, and the write it follows stays committed.

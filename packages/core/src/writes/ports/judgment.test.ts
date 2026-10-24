@@ -19,9 +19,9 @@ import { JudgmentLive } from './judgment'
 import { ReceiptsLive } from './receipts'
 
 /**
- * Judgment bound to an integration row (sdk-10), against a real database:
- * one open suggestion per call with the row as proposer and the claim's
- * rationale and refs verbatim; and the loop the spec draws from Facts — a
+ * Judgment bound to an integration row, against a real database: one open
+ * suggestion per call with the row as proposer and the claim's rationale
+ * and refs verbatim; and the loop from Facts — a
  * `Facts.fill` conflict raised as exactly one suggestion, a re-run raising
  * none, held by `suggestion_open_integration_unique` rather than by a read.
  */
@@ -225,7 +225,7 @@ describe('Judgment.suggest, bound to an integration row', () => {
       refs: [],
     } as const
     // Both spellings satisfy the SDK's template types; neither parses in
-    // the grammar (D4), so neither is a citation a reviewer could follow.
+    // the ref grammar, so neither is a citation a reviewer could follow.
     expect(
       permanentReason(
         await suggestExit(row, { ...base, refs: ['event:', `attr:${co}:`] }),

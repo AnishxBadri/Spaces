@@ -6,13 +6,12 @@ import type { Json } from '@spaces/db/json'
 import { jsonRecord } from '../json'
 
 /**
- * The owner's enrichment settings, `workspace.settings.enrichment` (D76):
+ * The owner's enrichment settings, `workspace.settings.enrichment`:
  * - `sources`: integration ids in the order they are asked;
  * - `reuseDays`: a source's receipt younger than this is reused, not re-asked;
  * - `scopes`: per integration id, which triggers auto-enrich.
- * Each falls back to what the integration rows still hold (`cacheDays`,
- * `autoEnrichScopes`/`autoEnrichSpaces` on `integration.config`) until the
- * settings form writes the new home.
+ * Each unset part falls back to the integration row's own (`cacheDays`,
+ * `autoEnrichScopes`/`autoEnrichSpaces` on `integration.config`).
  */
 
 export type EnrichmentSettings = {
@@ -97,7 +96,7 @@ export const orderSources = <TRow extends { readonly id: string }>(
 
 /**
  * The order with a built-in source in it: where the owner's list puts it,
- * else first — the Website is on for every record from install (D76).
+ * else first — the Website is on for every record from install.
  */
 export const withBuiltIn = <TRow extends { readonly id: string }>(
   settings: EnrichmentSettings,

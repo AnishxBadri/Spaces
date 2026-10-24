@@ -6,18 +6,17 @@ import type { CashFlow } from './xirr'
 import { xirr } from './xirr'
 
 /**
- * Derived metric kit (CONTEXT.md phase 15): cost basis, realized,
- * unrealized, MOIC/TVPI/RVPI/DPI, gross XIRR — computed live from events,
- * always as-of capable. Conversion convention (2026-08-06): cash flows at
- * transaction-date rates, unrealized value at the as-of-date rate — FX
- * gain/loss lands inside base-currency performance. A holding whose events
- * share one currency computes natively in it, needing no rates.
+ * Derived metric kit: cost basis, realized, unrealized, MOIC/TVPI/RVPI/DPI,
+ * gross XIRR — computed live from events, always as-of capable. Cash flows
+ * convert at transaction-date rates, unrealized value at the as-of-date rate,
+ * so FX gain/loss lands inside base-currency performance. A holding whose
+ * events share one currency computes natively in it, needing no rates.
  *
- * Corrections are appends (D12): the loader passes **originals only** —
+ * Corrections are appends: the loader passes **originals only** —
  * never a compensating row — each stamped with `reversedAt`, the instant
  * its void was written. `liveAt` drops an event once the as-of day has
  * reached that instant, so an as-of date before the void still sees the
- * original. See `./reversal.ts`.
+ * original. See `liveAt`.
  */
 
 export type MetricInvestment = Reversible & {

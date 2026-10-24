@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { surfaceKey, viewTarget } from './target'
 
-// views-1 (D2): the surface key the three view server fns take. The old
-// `objectKey` refine accepted a call with neither kind nor objectId and
-// resolved it to 'company'; that call is now a validation error.
+// The surface key the three view server fns take. A call with neither kind
+// nor objectId is a validation error, never a silent resolve to 'company'.
 
 describe('surface key', () => {
   it('takes an object surface named by kind or by id, never by neither', () => {

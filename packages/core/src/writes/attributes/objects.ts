@@ -6,8 +6,8 @@ import { CORE_OBJECTS } from '../../attributes/registry'
 import type { ObjectKind } from '../../attributes/registry'
 
 /**
- * Kind → object-row resolution for the core objects (Effect-first per the
- * backend-paradigm ratchet). System object ids are stable after seed, so
+ * Kind → object-row resolution for the core objects. System object ids are
+ * stable after seed, so
  * they're cached for the process lifetime; custom objects are addressed by
  * object_id directly and never pass through here.
  */

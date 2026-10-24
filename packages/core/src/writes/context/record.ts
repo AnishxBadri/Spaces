@@ -16,10 +16,8 @@ import { resolveRefsProgram } from './names'
  * the requesting user, then label every item's ref for a person to read. The
  * clock and the budget are arguments — the caller stamps them at its
  * boundary — so this stays as deterministic as the assembler is.
- *
- * In core since SPA-182, beside the assembler. Like it, it declares the
- * `SimilarLane` service rather than importing the embedding substrate: the
- * pin read that decides `similarAvailable` is the lane's `pinned()`.
+ * Declares the `SimilarLane` service rather than importing the embedding
+ * substrate: `similarAvailable` is the lane's `pinned()`.
  */
 
 export type RecordContextItem = {
@@ -27,7 +25,7 @@ export type RecordContextItem = {
   kind: ContextKind
   text: string
   at: string | null
-  /** Human citation — `resolveRefsProgram` (`names.ts`) over `cite.ts`. */
+  /** Human citation — `resolveRefsProgram` over `cite`. */
   cite: string
   /** `asOf − at`, for `formatSince`; null for a timeless fact. */
   sinceMs: number | null
@@ -60,14 +58,14 @@ export type RecordContextInput = {
   similar?: boolean | undefined
   /**
    * Task text — `AssembleOptions.taskText`, the lexical lane. The record page
-   * never sends one; the MCP `get_context` tool passes its `task` (SPA-23).
+   * never sends one; the MCP `get_context` tool passes its `task`.
    */
   taskText?: string | undefined
   /** `AssembleOptions.excludeSensitive`: set by an AI caller on a non-local route. */
   excludeSensitive?: boolean | undefined
 }
 
-/** The Context section's default budget; the MCP tool's too (SPA-23). */
+/** The Context section's default budget; the MCP tool's too. */
 export const DEFAULT_BUDGET_CHARS = 8000
 
 export const recordContextProgram = Effect.fn('recordContextProgram')(

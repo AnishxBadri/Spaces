@@ -27,7 +27,7 @@ import { enrichmentRow } from './apply'
 import { lastEnrichedAt, spendSince } from './credits'
 
 /**
- * The host's auto-enrich path (D76): a domain event queues `enrichment.run`
+ * The host's auto-enrich path: a domain event queues `enrichment.run`
  * for its record only past the checks `AUTO_ENRICH_CHECKS` names, in order.
  * - The singleton send is the `queued` check: pg-boss refuses a second job
  *   keyed on the record, so it answers before `credits` even though it runs
@@ -69,7 +69,7 @@ const read = <T>(run: () => Promise<T>) => Effect.tryPromise(run)
 
 /**
  * The Website, with or without a model: it is on for every record from
- * install, so its scope is every trigger unless the owner set one. (D76, D80)
+ * install, so its scope is every trigger unless the owner set one.
  */
 const websiteCandidate = (settings: EnrichmentSettings) =>
   read(async (): Promise<Candidate> => {

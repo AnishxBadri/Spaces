@@ -63,7 +63,7 @@ describe('the scope vocabulary', () => {
   })
 
   it('names a manifest that asks for a scope its provider does not list', () => {
-    // Full `drive` is refused by decision (D66); a typo'd Box scope and an
+    // Full `drive` is refused by decision; a typo'd Box scope and an
     // unregistered provider are both strays too.
     expect(
       strays('drive-everything', {

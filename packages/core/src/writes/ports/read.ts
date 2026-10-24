@@ -9,23 +9,14 @@ import { lexicalRowsProgram } from '../read/search'
 import type { BoundIntegration } from './binding'
 
 /**
- * ReadLive (sdk-6b): the plugin's view of the graph, read **as the bound
- * integration** — the reader is `{ type: 'integration', id: row.id }`, taken
- * from the row this Layer is built for and from nothing else. No function
- * here takes an actor, so a plugin cannot read as anyone else. Today that
- * means a private note is never visible to a plugin (`canRead` passes only a
- * note's author, and an integration authors none); the shape is right when
- * the policy gets richer.
- *
- * - `entity(id)` is MCP's `get_record` (`../read/record.ts`, one program):
- *   a merged-away id follows `merged_into_id` to the survivor, an id the
- *   integration may not read is null — the same answer as an id that does
- *   not exist — and so is anything that is not a company, person or deal.
- *   The identity keys are the record's `entity_alias` rows by kind, already
- *   normalized; the values are the record's attributes by slug.
- * - `search(q)` is the lexical + fuzzy fused statement (`../read/search.ts`)
- *   with `canReadNoteSql` as the integration — no embedding call (D56).
- *   Only company, person and deal hits come back.
+ * ReadLive: the plugin's view of the graph, read **as the bound integration**
+ * (`{ type: 'integration', id: row.id }`). No function here takes an actor,
+ * so a plugin cannot read as anyone else; a private note is never visible.
+ * - `entity(id)` is MCP's `get_record` program: merged ids follow to the
+ *   survivor; an unreadable id, a missing one and anything not a company,
+ *   person or deal all answer null.
+ * - `search(q)` is the lexical + fuzzy fused statement with `canReadNoteSql`
+ *   as the integration — no embedding call. Company, person and deal only.
  */
 
 export type IntegrationActor = {
@@ -87,7 +78,7 @@ export const ReadLive = (
         string,
         (typeof record.attributes)[number]['value']
       > = {}
-      // Stored values only: a relationship's inverse half stays MCP's. (D69)
+      // Stored values only: a relationship's inverse half stays MCP's.
       for (const a of record.attributes)
         if (a.value !== null && a.derived !== true) values[a.slug] = a.value
       const result: ReadEntity = {

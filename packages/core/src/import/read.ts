@@ -2,12 +2,12 @@ import type { Zip } from '../documents/ooxml'
 import { allRuns, decodeXml, entry, numbered, unzip } from '../documents/ooxml'
 
 /**
- * The spreadsheet reader (SPA-163, import-1): CSV, TSV and XLSX bytes into
- * one cell grid, so every later import step — staging, mapping, coercion,
- * resolve — reads the same shape whatever the user uploaded. Pure: bytes in,
- * strings out, no database, no dependency beyond the fflate the xlsx text
- * path already carried. `extract.ts`'s `fromXlsx` reads through
+ * The spreadsheet reader: CSV, TSV and XLSX bytes into one cell grid, so
+ * every later import step — staging, mapping, coercion, resolve — reads the
+ * same shape whatever the user uploaded. Pure: bytes in, strings out, no
+ * database, no dependency beyond fflate. `fromXlsx` reads through
  * `readXlsx` here, so the repo keeps one xlsx parser.
+
  *
  * Cells are strings, verbatim. The one interpretation the reader makes is a
  * date: a numeric xlsx cell whose style is a date format comes back as

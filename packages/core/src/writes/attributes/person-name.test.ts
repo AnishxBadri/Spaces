@@ -11,7 +11,7 @@ import { resolveEntity } from '../entities/resolve'
 import { renameRecordProgram } from '../entities/rename'
 import { AttributeValidationError, setValues } from './values'
 
-/** A person's name parts and `canonical_name`, kept in step by `setValues` (D67). */
+/** A person's name parts and `canonical_name`, kept in step by `setValues`. */
 
 async function actorId() {
   const row = (await db.select({ id: user.id }).from(user).limit(1)).at(0)

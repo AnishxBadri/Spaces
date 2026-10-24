@@ -19,63 +19,37 @@ import type { DocumentFilingTarget } from '../../documents/filing'
 import type { SourceClass } from '@spaces/db/schema'
 
 /**
- * **The birth of a document** — the one server path §3.1 promises all nine
- * entry points converge on: dedupe, then `entity` + `document` + the filing
- * edges + the activity line in one transaction, then enqueue extraction
- * outside it (SPA-113).
- *
- * Until this slice that sequence was inlined in `finalizeDocumentUpload` and
- * reachable only from a browser PUT, so entry points 2–9 each had a writer to
- * copy or a server fn to abuse. It is widened here **once**, for every caller
- * already queued rather than three times later:
- *
- * - `fileAgainst` is an **array** of targets — zero for an unfiled document
- *   (§11.6's inbox), one for a record or a space, N for a note filed in two
- *   spaces. N targets are N edges against **one** document row, which is
- *   §3.4's "a document can be filed in N places" read literally.
- * - `blobSha` is **nullable**: a URL clip keeps a readability snapshot and no
- *   bytes, and a row with no blob is still a row.
- * - the actor is **nullable**: a plugin files as an integration, not as a
- *   person, and `activity.actor_id` / `document.uploaded_by` are user columns.
- *   The integration is named by `sourceRef`, which is the FK the
- *   `document_source_ref_invariant` check enforces.
- * - `provenance` is one bag — `source_path`, `external_id`, `external_url`,
- *   `connection_id` (SPA-78) — so a storage source files through the same
- *   call a person does.
- *
- * **This is not a byte path.** Birth never reads or writes bytes. The browser
- * lane PUT them before it is called (apps/web's `lib/documents/upload.ts`);
- * the server lane (`intake.ts`, beside this) hashes and stores them before it
- * is called. What arrives here is a
- * digest, or nothing.
- *
- * It lives in core's db-coupled half since SPA-201 (sdk-8a), beside intake:
- * a plugin files through the SDK from the worker, and the worker reaches it
- * through `@spaces/core` rather than a `#web/*` crossing. It imports nothing
- * from apps/web. The one thing it used to borrow from there — the post-commit
- * extraction enqueue — goes through core's `Enqueue` **service**, which each
- * process provides from its own sender (apps/web's `webEnqueue` in
- * `lib/enqueue-live.ts`, the worker's `workerEnqueue`). The server fn still
- * reaches it through a dynamic import inside the handler, so neither Effect
- * nor drizzle enters the client bundle (CLAUDE.md → Traps, SPA-155).
+ * **The birth of a document** — the one server path every entry point
+ * converges on: dedupe, then `entity` + `document` + the filing edges + the
+ * activity line in one transaction, then enqueue extraction outside it.
+ * - `fileAgainst` is an array: zero targets is an unfiled document; N targets
+ *   are N edges against **one** document row.
+ * - `blobSha` is nullable: a URL clip keeps a snapshot and no bytes.
+ * - The actor is nullable: a plugin files as an integration, named by
+ *   `sourceRef` (the FK `document_source_ref_invariant` enforces).
+ * - **Not a byte path.** The browser lane and `intake` store bytes first;
+ *   what arrives here is a digest, or nothing.
+ * - Imports nothing from apps/web. The server fn reaches it through a dynamic
+ *   import inside the handler, so neither Effect nor drizzle enters the
+ *   client bundle.
  */
 
 /**
- * Where the provider's copy lives, for the entry points that have one
- * (spec §11 delta 1). Every field is optional because five of the nine entry
+ * Where the provider's copy lives, for the entry points that have one.
+ * Every field is optional because five of the nine entry
  * points have nothing to say about any of them — a person dropping a deck on
  * a Files tab is not a connection.
  */
 export type DocumentProvenance = {
-  /** The provider's own tree, verbatim (§5.3) — a label, never a key. */
+  /** The provider's own tree, verbatim — a label, never a key. */
   sourcePath?: string | null
-  /** The provider's id for the file — the idempotency key of a sync (§6, §8). */
+  /** The provider's id for the file — the idempotency key of a sync. */
   externalId?: string | null
   /** The provider's own link, rendered as "Open in source". */
   externalUrl?: string | null
   /** Whose account it came through. */
   connectionId?: string | null
-  /** Whether the provider still holds it (§8): `linked` from a sync. */
+  /** Whether the provider still holds it: `linked` from a sync. */
   externalStatus?: 'linked' | 'gone' | null
   /** The binding whose sync filed it — provenance, never the dedupe key. */
   bindingId?: string | null
@@ -98,7 +72,7 @@ export type DocumentActor =
 /**
  * Who may read the document, through `canRead` exactly as a note: private
  * means `authorId` only. A synced mailbox's attachment is private to the
- * mailbox owner (D67); omitted is shared with no author.
+ * mailbox owner; omitted is shared with no author.
  */
 export type DocumentPrivacy = {
   visibility: 'shared' | 'private'
@@ -112,21 +86,17 @@ export type DocumentBirthInput = {
   blobSha: string | null
   filename: string
   /**
-   * The page this row **is**, for the one entry point that keeps no bytes:
-   * §3.1's URL clip writes the article's address here and `blobSha` null
-   * (SPA-117). A capture (§3.1 entry 8, SPA-111) writes it too, beside a
-   * real blob: the page's text is the bytes, the page is still where they
-   * came from. It is not `provenance.externalUrl` — that column is the
-   * provider's copy of a file we also hold, rendered as "Open in source"
-   * (docsurf-11), and a clip has no provider and no second copy. Optional
-   * because most entry points have no URL at all.
+   * The page this row **is**: a URL clip writes the article's address here
+   * with `blobSha` null; a capture writes it beside a real blob of the page's
+   * text. Not `provenance.externalUrl`, which is a provider's copy of a file
+   * we also hold ("Open in source"); a clip has no provider and no copy.
    */
   url?: string | null
   mime: string | null
   sizeBytes: number | null
   kind: DocumentKind
   /**
-   * The eight-value class, never a vendor (D1, SPA-137). `manual` for a
+   * The eight-value class, never a vendor. `manual` for a
    * person in a surface we ship, `integration` plus a `sourceRef` for a
    * connector.
    */
@@ -176,10 +146,9 @@ function actorUserId(actor: DocumentActor): string | null {
 }
 
 /**
- * The activity row's half of an integration actor (sdk-8). `actor_id` is a
- * user column and stays null, so the integration rides in `meta` under the
- * keys the plugin ports write (`integrationMeta` in `../ports/identity.ts`)
- * — `meta.integrationId` is what the record timeline names the row by,
+ * The activity row's half of an integration actor. `actor_id` is a user
+ * column and stays null, so the integration rides in `meta` under the keys
+ * the plugin ports write (`integrationMeta`) — `meta.integrationId` is what the record timeline names the row by,
  * rather than "System". A person's or an unattributed filing adds nothing.
  */
 function actorMeta(actor: DocumentActor): {
@@ -197,8 +166,8 @@ function actorMeta(actor: DocumentActor): {
  * target would otherwise dedupe against the wrong edge table and answer
  * `{ deduped: true }` for a filing that could never exist.
  *
- * One read for the whole array rather than one per target: N targets is the
- * ordinary case now, not the exceptional one.
+ * One read for the whole array rather than one per target: N targets is an
+ * ordinary case, not an exceptional one.
  */
 const checkTargets = Effect.fn('birth.checkTargets')(function* (
   targets: Array<DocumentFilingTarget>,
@@ -232,7 +201,7 @@ const checkTargets = Effect.fn('birth.checkTargets')(function* (
 })
 
 /**
- * §3.4's rule, per target: same bytes already filed at a requested target is
+ * The dedupe rule, per target: same bytes already filed at a requested target is
  * one row, not two. The read answers the **first** such document row — a
  * second drop is almost always a double-click — and the caller then adds
  * whichever of the requested edges that row is missing.
@@ -300,8 +269,7 @@ const existingFiling = Effect.fn('birth.existingFiling')(function* (
 /**
  * Add whatever edges this document does not already carry. Idempotence is the
  * database's, not a read's: `onConflictDoNothing` against `link_edge_unique`
- * and against `entity_space`'s composite primary key, the SPA-50 pattern, so
- * two drops racing produce one edge rather than one edge and one violation.
+ * and against `entity_space`'s composite primary key, so two drops racing produce one edge rather than one edge and one violation.
  */
 export async function addEdges(
   tx: BirthTx,
@@ -351,14 +319,14 @@ export async function addEdges(
 }
 
 /**
- * The arrival half of the orphan-blob sweep (SPA-54). `prepareDocumentUpload`
+ * The arrival half of the orphan-blob sweep. `prepareDocumentUpload`
  * writes a `pending_blob` row for bytes it is about to be sent; the row's
  * only job is to make an upload that never finished findable, so the moment a
  * `document` row names the digest the intent is spent and the row goes.
  *
  * It is deleted **here**, inside birth's own transaction, and not in the
  * server fn that called it — birth is the one path every entry point
- * converges on (§3.1), so the server intake, the URL clip and the Drive sync
+ * converges on, so the server intake, the URL clip and the Drive sync
  * inherit the delete without knowing the table exists. In the transaction so
  * a rolled-back birth leaves the row behind: bytes with no document row are
  * exactly what the sweep is for.
@@ -419,7 +387,7 @@ async function recordArrival(
 /**
  * A dedupe that arrives shared widens the row it landed on: the same bytes
  * came from somewhere that shares them, so a private attachment is private
- * no longer (D67).
+ * no longer.
  * - The author stays only when it is the same one, so the mailbox's share
  *   toggle can still narrow its own; any other arrival leaves no author.
  * - A private arrival changes nothing: one author column holds one owner,
@@ -509,7 +477,7 @@ async function insertDocumentRows(
   // `activity.subject_entity_id` is NOT NULL, so zero targets and N
   // targets both need a subject that is not "the one place this went".
   // The document's own entity id is that subject: one target reads on
-  // the record's or the space's timeline exactly as it did before, and
+  // the record's or the space's timeline as usual, and
   // an unfiled or multiply-filed document gets a stream of its own
   // rather than an arbitrary target promoted to stand for the rest.
   const only = targets.length === 1 ? targets.at(0) : undefined
@@ -529,7 +497,7 @@ async function insertDocumentRows(
   return ent.id
 }
 
-/** A provider's link with no bytes — a recorder's recording (D68). */
+/** A provider's link with no bytes — a recorder's recording. */
 export type LinkDocumentInput = {
   filename: string
   /** The provider's own link: "Open in <provider>" on the row. */
@@ -573,7 +541,7 @@ export async function birthLinkDocument(
 
 /**
  * The whole birth, and the only writer of a `document` row outside tests and
- * seeds — asserted by `birth.test.ts`, which fails naming any second writer.
+ * seeds — a test fails naming any second writer.
  */
 export const birthDocumentProgram = Effect.fn('birthDocumentProgram')(
   function* (
@@ -586,7 +554,7 @@ export const birthDocumentProgram = Effect.fn('birthDocumentProgram')(
     const targets = input.fileAgainst
     yield* checkTargets(targets)
 
-    // §3.4 is a rule about a *target*: "the same bytes already filed here".
+    // The dedupe is a rule about a *target*: "the same bytes already filed here".
     // An unfiled document has no target for it to apply to, so there is
     // nothing it could be the same filing as — every blobless drop and every
     // unfiled one inserts, and two unfiled copies of one deck are two rows in
@@ -611,8 +579,8 @@ export const birthDocumentProgram = Effect.fn('birthDocumentProgram')(
       return { id: existing, deduped: true }
     }
 
-    // An upload on a record whose binding pushes is that binding's to export
-    // (§6): stamped in the birth's transaction, sent after it.
+    // An upload on a record whose binding pushes is that binding's to export:
+    // stamped in the birth's transaction, sent after it.
     const born = yield* query(() =>
       db.transaction(async (tx) => {
         const writeThrough = isUploadArrival(input)

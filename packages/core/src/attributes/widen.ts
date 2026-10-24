@@ -3,7 +3,7 @@ import type { Json } from '@spaces/db/json'
 import type { Cardinality } from './relationship'
 
 /**
- * Edits widen only (D69): a single-valued attribute may become multi-valued,
+ * Edits widen only: a single-valued attribute may become multi-valued,
  * never the reverse.
  * - `select` widens to `multi_select`; a reference, phone or email keeps its
  *   type and gains `multi`.

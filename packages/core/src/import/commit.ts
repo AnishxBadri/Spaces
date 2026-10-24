@@ -7,12 +7,10 @@ import type {
 } from '@spaces/db/schema/import'
 
 /**
- * **Idempotent commit** (SPA-169, project 14 `import-7`) — the rules the
- * commit decides without a query. The database half — the worker job that
- * replays each row through its creator in its own transaction — is
- * `apps/web/src/lib/import/commit.ts`; here is what two rows folded into one
- * write carry, what a row's outcome is called once the job has passed it,
- * and the counts the batch page reads.
+ * Idempotent commit: the rules that need no query — what rows folded into
+ * one write carry, a row's outcome once the job has passed it, and the batch
+ * page's counts. The database half (a worker job replaying each row through
+ * its creator in its own transaction) lives in apps/web.
  */
 
 // ---------------------------------------------------------------------------
@@ -100,8 +98,8 @@ export type CommitOutcome =
   | { kind: 'created'; entityId: string }
   | { kind: 'attached'; entityId: string }
   /**
-   * A ledger row (SPA-171): the events it appended onto the company's
-   * holding, as the lane prints them.
+   * A ledger row: the events it appended onto the company's holding, as the
+   * lane prints them.
    */
   | {
       kind: 'appended'

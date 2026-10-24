@@ -23,7 +23,7 @@ import type {
 } from '../../attributes/registry'
 
 /**
- * Attribute creation as an Effect program (spec §7 dialog, §3 lifecycle).
+ * Attribute creation.
  * The slug is derived here and never editable; type and record-reference
  * target are fixed at this moment for good. Everything the dialog can set
  * — options, per-type config, a default, required, description — lands in
@@ -60,8 +60,8 @@ export type CreateAttributeInput = {
         targetObjectId?: string | undefined
         multi?: boolean | undefined
         /**
-         * This attribute backs one of its object's declared identity keys
-         * (spec §9). Only `createObjectProgram` passes it, inside the
+         * This attribute backs one of its object's declared identity keys.
+         * Only `createObjectProgram` passes it, inside the
          * transaction that declares the key — which is why it is gated to
          * the one type each key can wear, like every other config field.
          */
@@ -71,23 +71,18 @@ export type CreateAttributeInput = {
   default?: Json | undefined
   required?: boolean | undefined
   /**
-   * The dialog's one "Filter and sort on this" tick (SPA-93) — two columns
-   * because the reconciler and a later per-capability UI want them apart,
-   * one input because a reader does not distinguish them. Not part of
-   * `config`: `buildOptions` polices per-type config and refuses what a type
-   * cannot carry, and these two mean the same thing for all fifteen types.
-   *
-   * The insert only records the intent. The `attr_idx_<id>` index is minted
-   * by `reconcileValueIndexes()` **after** this program's write commits —
-   * `CREATE INDEX CONCURRENTLY` cannot run inside a transaction, and this
-   * program may itself be running inside the caller's (`tx`).
+   * The dialog's one "Filter and sort on this" tick, stored as two columns.
+   * Not in `config`: it means the same for every type.
+   * The insert only records intent; `reconcileValueIndexes()` mints the
+   * index **after** the write commits — `CREATE INDEX CONCURRENTLY` cannot
+   * run inside a transaction, and this may run inside the caller's (`tx`).
    */
   indexed?: boolean | undefined
   createdBy: string
   /**
    * Run inside a caller's transaction instead of on its own connection.
    * The backing attribute of an identity key and the object row that
-   * declares it are one write or neither (CONTEXT.md, 2026-09-19).
+   * declares it are one write or neither.
    */
   tx?: Tx | undefined
 }
@@ -161,7 +156,7 @@ const buildOptions = Effect.fn('buildOptions')(function* (
     else if (cfg.targetObjectId) out.targetObjectId = cfg.targetObjectId
     out.multi = cfg.multi ?? false
   } else if (input.type === 'phone') {
-    // A phone may hold several numbers (D67); the shape is fixed at creation.
+    // A phone may hold several numbers; the shape is fixed at creation.
     if (cfg.targetKind !== undefined || cfg.targetObjectId !== undefined)
       return yield* reject(
         'Relationship settings are not settings of this type',
@@ -184,7 +179,7 @@ const buildOptions = Effect.fn('buildOptions')(function* (
     out.identityKey = cfg.identityKey
   }
 
-  // Required means can't-clear (spec §5); unchecked is a value for a
+  // Required means can't-clear; unchecked is a value for a
   // checkbox, so the flag is meaningless there and never stored.
   if (input.required && input.type !== 'checkbox') out.required = true
 
@@ -227,7 +222,7 @@ export const createAttributeProgram = Effect.fn('createAttributeProgram')(
     const conn = input.tx ?? db
 
     // Slug: derived once, suffixed on collision within the object, then
-    // immutable forever (spec §3 — Attio's mutable slug is the footgun).
+    // immutable forever (Attio's mutable slug is the footgun).
     const base = slugifyAttributeName(name)
     let slug = base
     for (let i = 2; ; i++) {

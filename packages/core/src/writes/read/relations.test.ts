@@ -18,7 +18,7 @@ import { getRecordProgram } from './record'
 import { recordRelationsProgram, relationsProgram } from './relations'
 import type { RelationHalf } from './relations'
 
-/** The inverse resolver reads both halves of a relationship from its links. (D69) */
+/** The inverse resolver reads both halves of a relationship from its links. */
 
 const actor = { type: 'user', id: FIXTURE_ACTOR.id } as const
 const tag = () => randomUUID().slice(0, 8)

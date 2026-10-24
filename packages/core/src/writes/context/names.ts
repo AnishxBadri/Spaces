@@ -16,17 +16,16 @@ import type { CiteLookup } from '../../context/cite'
 import { parseRef } from '../../context/ref'
 
 /**
- * The one ref resolver (SPA-18 built the lookup, SPA-119 made it the reader):
- * stored refs — `suggestion.refs`, `attribute_event.refs`, a Context item's
- * ref — in, `{ref, entityId, label, missing}` out. `cite.ts` is the only
- * renderer and stays pure; this is the only file that knows where the names
- * live, and the only caller of `cite()`. Nothing else in `src` formats a ref.
+ * The one ref resolver: stored refs — `suggestion.refs`,
+ * `attribute_event.refs`, a Context item's ref — in,
+ * `{ref, entityId, label, missing}` out. `cite` is the only renderer and
+ * stays pure; this is the only module that knows where the names live, and
+ * the only caller of `cite()`. Nothing else in `src` formats a ref.
  *
- * - **Merges.** Ids inside refs may be merged losers (`ref.ts`). A merge
- *   flattens chains at write time (`entity.merged_into_id` always names a
- *   survivor), so one hop is the whole walk — the rule `canonicalId` in
- *   `lib/entities/sweep.ts` reads — and it is taken in the same query that
- *   fetches the entity, through a self-join.
+ * - **Merges.** Ids inside refs may be merged losers. A merge flattens chains
+ *   at write time (`entity.merged_into_id` always names a survivor), so one
+ *   hop is the whole walk — the rule `canonicalId` reads — and it is taken in
+ *   the same query that fetches the entity, through a self-join.
  * - **Re-chunks.** `doc:<id>#<idx>` names the document, not a chunk row, so a
  *   re-chunk leaves the ref resolving to the same document; the index may now
  *   point at different text, and that is the accepted trade.
@@ -47,7 +46,7 @@ export type ResolvedRef = {
    * target.
    */
   entityId: string | null
-  /** What a person reads — `cite.ts`, or {@link MISSING_LABEL}. */
+  /** What a person reads — `cite`, or {@link MISSING_LABEL}. */
   label: string
   /** The target was deleted. */
   missing: boolean

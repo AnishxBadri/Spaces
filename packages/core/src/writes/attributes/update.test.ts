@@ -4,7 +4,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { AttributeConfigPatch, UpdateAttributePatch } from './update'
 
 // ---------------------------------------------------------------------------
-// Type-level: the §3 immutables are absent from the patch, not rejected.
+// Type-level: the immutables are absent from the patch, not rejected.
 // ---------------------------------------------------------------------------
 
 describe('UpdateAttributePatch shape', () => {
@@ -322,8 +322,8 @@ describe('updateAttributeProgram', () => {
 })
 
 // ---------------------------------------------------------------------------
-// SPA-72: `options.ai` (the spec's `attribute.config.ai`) sits beside the §3
-// guards, not inside them — adding it trips none, and none drops it.
+// `options.ai` sits beside the mutability guards, not inside them —
+// adding it trips none, and none drops it.
 // ---------------------------------------------------------------------------
 
 describe('updateAttributeProgram — the ai key', () => {

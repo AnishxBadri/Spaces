@@ -27,7 +27,7 @@ import { phoneProblem, toE164 } from './phone'
  * `attribute.options` column (`@spaces/db/schema/attributes`), `IdentityKey`
  * at the `object.identity_keys` column, and all four are re-exported here
  * unchanged — packages/db imports nothing internal, and the column owns the
- * shape of what it stores (SPA-142).
+ * shape of what it stores.
  */
 export type {
   AttributeOptions,
@@ -41,9 +41,9 @@ export type {
 export const OBJECT_KINDS: Array<ObjectKind> = ['company', 'person', 'deal']
 
 /**
- * The seeded system rows of the object registry (one registry, system
- * rows — CONTEXT.md "Two-tier object model"). Slugs are plural, matching
- * the rule custom objects follow (slug derived from the plural noun).
+ * The seeded system rows of the object registry (one registry: custom
+ * objects sit beside these). Slugs are plural, matching the rule custom
+ * objects follow (slug derived from the plural noun).
  */
 export const CORE_OBJECTS: Record<
   ObjectKind,
@@ -62,8 +62,8 @@ export function toObjectKind(kind: string): ObjectKind | null {
 }
 
 /**
- * An attribute's slug, from its name — derived once at creation and frozen
- * (spec §3). The create program suffixes it on collision; the import mapping
+ * An attribute's slug, from its name — derived once at creation and frozen.
+ * The create program suffixes it on collision; the import mapping
  * slugifies a sheet's header with it so `Close date` finds `close_date`.
  */
 export function slugifyAttributeName(name: string): string {
@@ -79,7 +79,7 @@ export function slugifyAttributeName(name: string): string {
 
 /**
  * The identity keys a custom object may declare, and the attribute each one
- * materializes (spec §9). The slug falls out of the name through the same
+ * materializes. The slug falls out of the name through the same
  * slugifier every attribute uses, which is what makes `domain` and
  * `linkedin` predictable to the write path.
  */
@@ -116,7 +116,7 @@ export const CORE_IDENTITY_KEYS: Array<CoreIdentityKey> = [
 
 /**
  * What identifies a person or a company, and the multi-valued system
- * attribute that holds it (D75): a person's `emails`, a company's `domains`.
+ * attribute that holds it: a person's `emails`, a company's `domains`.
  * `setValues` mirrors each value into an identity alias; LinkedIn is a plain
  * attribute on both and identifies neither.
  */
@@ -268,7 +268,7 @@ export function identityForm(key: CoreIdentityKey, raw: string): string | null {
 
 /**
  * An identity-backed value has to survive normalization, because the claim
- * it makes is the normalized form (spec §9); a role address survives it and
+ * it makes is the normalized form; a role address survives it and
  * is stored as non-identity (`isNonIdentityValue`). `domain` is `z.string().max(255)`
  * for everyone else — deliberately permissive, it is a field like any other
  * — but on an attribute carrying `options.identityKey` a value that
@@ -323,7 +323,7 @@ const multiText = (
  * Validator for one attribute's value (null clears — always allowed).
  *
  * `held` is the value the record currently stores. An archived option is
- * history, not vocabulary (spec §3): a write may keep one the record already
+ * history, not vocabulary: a write may keep one the record already
  * holds — a multi-select gaining a tag must not lose its retired one — but
  * never asserts one afresh.
  */
@@ -418,7 +418,7 @@ export function valueValidator(
 }
 
 // ---------------------------------------------------------------------------
-// Fill from enrichment (D76)
+// Fill from enrichment
 // ---------------------------------------------------------------------------
 
 /** The attribute types a vocabulary value type can be written into. */
@@ -458,7 +458,7 @@ export function enrichmentLinkProblem(
 }
 
 // ---------------------------------------------------------------------------
-// Seeded system attributes (CONTEXT.md "Seeded system attributes").
+// Seeded system attributes.
 // Idempotent: seed inserts what's missing, never overwrites — options are
 // user-editable content after first boot.
 // ---------------------------------------------------------------------------
@@ -469,18 +469,15 @@ type SeedDef = {
   type: AttributeType
   options?: AttributeOptions
   /**
-   * Engine flags (SPA-93): a seeded attribute the product itself expects
-   * every list to filter and sort on, so its `attr_idx_<id>` expression
-   * index exists from first boot rather than waiting for somebody to tick
-   * a box. Exactly one attribute carries them today — `deal.stage`, which
-   * every board, every saved view and the funnel group by. Everything else
-   * ships off: an index nobody's query needs is a write cost with no read.
-   * The pair is set together because the one dialog control sets both.
+   * Engine flags: the seeded attribute is born with its `attr_idx_<id>`
+   * expression index. Only `deal.stage` carries them — every board, saved
+   * view and the funnel group by it; an index nobody's query needs is a write
+   * cost with no read. Set as a pair because the one dialog control sets both.
    */
   filterable?: boolean
   sortable?: boolean
   /**
-   * The other half of a relationship (D69). The seeder pairs the two rows
+   * The other half of a relationship. The seeder pairs the two rows
    * once both exist, writing `options.inverseOf` on each; the owner and the
    * `derived` half say which is which in `options`.
    */
@@ -500,17 +497,16 @@ const opt = (
 })
 
 /**
- * Sensitivity is deliberately not here (SPA-61). `ObjectKind` is
- * `company | person | deal`, so an attribute can never reach a space or a
- * document — the two things sensitivity most needs to cover. It is the
- * `entity.sensitive` column instead, resolved by `resolveSensitivity`.
- *
- * A person's `emails` and a company's `domains` are identity (D75):
- * multi-valued, carrying `options.identityKey`, mirrored into `entity_alias`
- * by `setValues`. LinkedIn is a plain `url` on both.
- *
- * `options.enrichmentKey` is the default link to the enrichment vocabulary
- * (D76); `seedEnrichmentLinks` adds it to installs seeded before it existed.
+ * The seeded system attributes, per core kind.
+ * - Sensitivity is not an attribute: an attribute can never reach a space or
+ *   a document. It is the `entity.sensitive` column, read by `resolveSensitivity`.
+ * - A person's `emails` and a company's `domains` are identity: multi-valued,
+ *   carrying `options.identityKey`, mirrored into `entity_alias` by `setValues`.
+ *   LinkedIn is a plain `url` on both.
+ * - `options.enrichmentKey` is the default enrichment link; `seedEnrichmentLinks`
+ *   adds it to installs seeded without it.
+ * - Append new entries, never slot them: the seeder derives sortOrder from the
+ *   array index and only inserts what is missing.
  */
 export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
   company: [
@@ -571,24 +567,17 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       options: { enrichmentKey: 'company.linkedin' },
     },
     {
-      // The people who started it (SPA-160). A company deck names its
-      // founders, and without a person reference on the company registry
-      // the deck reader had nowhere to put them: only a deal's `people` /
-      // `referred_by` turned into identity suggestions, so a deck filed on
-      // a bare company proposed none. Accepting such an identity writes the
-      // person here and adds the company to the person's `companies`.
-      //
-      // Appended, never slotted: `seedSystemAttributes` derives sortOrder
-      // from the array index and only inserts what is missing (see
-      // `referred_by` below). Not filterable by default, like every seeded
-      // attribute but `deal.stage`.
+      // Where the deck reader puts the founders a company deck names, so a
+      // deck filed on a bare company still proposes identities. Accepting one
+      // writes the person here and the company to the person's `companies`.
+      // Appended, never slotted.
       slug: 'founders',
       name: 'Founders',
       type: 'record_reference',
       options: { targetKind: 'person', multi: true },
     },
     {
-      // Identity (D75): every value is an `entity_alias` claim, so a domain
+      // Identity: every value is an `entity_alias` claim, so a domain
       // another company holds is refused at that element. Appended, never
       // slotted — the seeder derives sortOrder from the array index.
       slug: 'domains',
@@ -597,9 +586,9 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       options: { multi: true, identityKey: 'domain' },
     },
     {
-      // The people at this company: the inverse of a person's `companies`
-      // (D60, D69). Stores nothing — `setValues` writes a person's
-      // `companies` instead. Appended, never slotted.
+      // The people at this company: the inverse of a person's `companies`.
+      // Stores nothing — `setValues` writes a person's `companies` instead.
+      // Appended, never slotted.
       slug: 'team',
       name: 'Team',
       type: 'record_reference',
@@ -612,8 +601,8 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       pair: { kind: 'person', slug: 'companies' },
     },
     {
-      // The deals naming this company: the inverse of a deal's `company`
-      // (D69). Stores nothing. Appended, never slotted.
+      // The deals naming this company: the inverse of a deal's `company`.
+      // Stores nothing. Appended, never slotted.
       slug: 'associated_deals',
       name: 'Associated deals',
       type: 'record_reference',
@@ -657,14 +646,12 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       type: 'url',
       options: { enrichmentKey: 'person.twitter' },
     },
-    // Unlinked by default: a phone costs extra credits and is opt-in. (D76)
+    // Unlinked by default: a phone costs extra credits and is opt-in.
     { slug: 'phone', name: 'Phone', type: 'phone', options: { multi: true } },
     {
-      // The companies this person is at (D60): angels, advisors and
-      // co-investors sit at several, hence multi. Written through the one
-      // write path, which materializes `link(references, 'companies')`;
-      // the `contact_at` relation it replaced is retired. Appended, never
-      // slotted — the seeder derives sortOrder from the array index.
+      // The companies this person is at: angels, advisors and co-investors
+      // sit at several, hence multi. The write path materializes
+      // `link(references, 'companies')`. Appended, never slotted.
       slug: 'companies',
       name: 'Companies',
       type: 'record_reference',
@@ -674,23 +661,23 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
         enrichmentKey: 'person.company',
         cardinality: 'N:N',
       },
-      // The owner of the pair a company's `team` reads (D69).
+      // The owner of the pair a company's `team` reads.
       pair: { kind: 'company', slug: 'team' },
     },
     {
-      // Identity (D75), like a company's domains. Appended, never slotted.
+      // Identity, like a company's domains. Appended, never slotted.
       slug: 'emails',
       name: 'Emails',
       type: 'email',
       options: { multi: true, identityKey: 'email' },
     },
-    // The name in two parts (D67); `setValues` keeps `canonical_name` their
+    // The name in two parts; `setValues` keeps `canonical_name` their
     // join. Appended, never slotted — the record page draws them as one cell.
     { slug: 'first_name', name: 'First name', type: 'text' },
     { slug: 'last_name', name: 'Last name', type: 'text' },
     {
-      // The deals this person is on: the inverse of a deal's `people`
-      // (D69). Stores nothing. Appended, never slotted.
+      // The deals this person is on: the inverse of a deal's `people`.
+      // Stores nothing. Appended, never slotted.
       slug: 'deals',
       name: 'Deals',
       type: 'record_reference',
@@ -741,7 +728,7 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
         required: true,
         cardinality: 'N:1',
       },
-      // The owner of the pair a company's `associated_deals` reads (D69).
+      // The owner of the pair a company's `associated_deals` reads.
       pair: { kind: 'company', slug: 'associated_deals' },
     },
     {
@@ -749,13 +736,13 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       name: 'People',
       type: 'record_reference',
       options: { targetKind: 'person', multi: true, cardinality: 'N:N' },
-      // The owner of the pair a person's `deals` reads (D69).
+      // The owner of the pair a person's `deals` reads.
       pair: { kind: 'person', slug: 'deals' },
     },
     {
       // New deals arrive owned — the most repetitive click in deal capture.
-      // Existing deployments get this default via migration 0019 (the seed
-      // never rewrites rows a user may have edited).
+      // The seed never rewrites rows a user may have edited, so existing
+      // installs got this default from a migration.
       slug: 'owner',
       name: 'Owner',
       type: 'actor_reference',
@@ -776,7 +763,7 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       },
     },
     {
-      // Post-mortem memory (CONTEXT.md): Passed and Lost carry distinct
+      // Post-mortem memory: Passed and Lost carry distinct
       // lessons — the reason is captured at close time, while it's fresh.
       slug: 'close_reason',
       name: 'Close reason',
@@ -784,18 +771,11 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       options: {},
     },
     {
-      // The who behind the channel (CONTEXT.md machine-write design, build
-      // order ①): `source` says how the deal arrived, `referred_by` says who
-      // sent it. A record-reference and nothing more — the one write path
-      // already syncs a link(relation:'references', attr_slug:'referred_by')
-      // row in the same transaction, so backlinks, the merge executor's
-      // referrer repoint and the context assembler read it for free.
-      //
-      // Appended, never slotted next to Source: `seedSystemAttributes`
-      // derives sortOrder from the array index ((i+1)*10) and only inserts
-      // what is missing, so a mid-array insert would hand this the sortOrder
-      // an already-seeded install already gave close_reason. Sitting beside
-      // Source on screen is a reorder in the object's attribute settings.
+      // Who sent the deal; `source` says how it arrived. A plain reference:
+      // the write path syncs its `references` link in the same transaction,
+      // so backlinks, the merge repoint and the context assembler read it.
+      // Appended, never slotted next to Source: sortOrder is (i+1)*10 and a
+      // mid-array insert would collide with an installed close_reason.
       slug: 'referred_by',
       name: 'Referred by',
       type: 'record_reference',

@@ -7,33 +7,20 @@ import type {
 import { docOfRef, parseRef } from './ref'
 
 /**
- * The ranker — the pure half of the assembler (docs/spec-ai-substrate.md
- * §1, ranking decided 2026-09-09). Rows in, ranked + trimmed items out. No
- * database, no model, no clock: `asOf` is an input, so the same candidates
- * always produce the same output and "what would the analyzer see" is a
- * snapshot fixture.
+ * The ranker, the pure half of the context assembler: candidates in, ranked
+ * and trimmed items out. No database, model or clock (`asOf` is an input), so
+ * the same candidates always give the same output.
  *
- * Score = hop × edge × kind prior × recency, × `superseded` when a newer
- * version replaces the item (D59). Multiplicative, all deterministic. When the task carried text, a lexical lane (tsv rank,
- * supplied per candidate) is fused by reciprocal rank fusion — the same
- * trick search.ts uses, and the seam an embedding lane joins later.
- *
- * Standing sources (mandate, glossary) are not ranked against the graph:
- * they take a reserved slice of the budget. Attributes at hop 0 are taken
- * first. One chunk per document lands before any document's second.
- *
- * The judgment-memory lane (`hop: 'similar'`, SPA-139) is ranked apart from
- * the graph as well: its items are other records', so hop × edge means
- * nothing for them. Each scores `similar` prior × its embedding similarity,
- * and the lane takes its own capped slice of the budget right after the
- * hop-0 attribute floor — so it can never crowd those out, and the rest of
- * the graph can never crowd it out either. With no similar candidates the
- * slice is empty and the budget is exactly what it was before the lane.
- *
- * Peers (`edge: 'peer'`, D71) are graph items, capped and ordered first:
- * nearest stage, then most recent, then ref. Only the first `peerMax`
- * stay, each a step below the one before, so they compete for the budget
- * rather than flood it.
+ * - Score = hop × edge × kind prior × recency, × `superseded` when a newer
+ *   version replaces the item. A lexical lane, when the task carried text,
+ *   is fused by reciprocal rank fusion.
+ * - Standing sources (mandate, glossary) take a reserved slice of the budget.
+ *   Hop-0 attributes land first; one chunk per document before any second.
+ * - The similar lane holds other records' items, so it scores `similar` ×
+ *   embedding similarity and takes its own capped slice right after the
+ *   hop-0 floor: neither it nor the graph can crowd the other out.
+ * - Peers are capped at `peerMax` (nearest stage, newest, ref), each a step
+ *   below the last, so they compete for the budget rather than flood it.
  */
 
 // ---------- input ----------
@@ -46,11 +33,11 @@ export type Candidate = ContextItem & {
   lexicalRank?: number | undefined
   /** `1 − cosine distance` to the anchor; only a `similar` item has one. */
   similarity?: number | undefined
-  /** The target of a `supersedes` link: a newer version replaces it. (D59) */
+  /** The target of a `supersedes` link: a newer version replaces it. */
   superseded?: boolean | undefined
   /**
    * A peer's stage distance from the seed's (0 is the same stage); null when
-   * either has none. Only an `edge: 'peer'` item reads it. (D71)
+   * either has none. Only an `edge: 'peer'` item reads it.
    */
   stageDistance?: number | null | undefined
 }
@@ -70,7 +57,7 @@ export type Weights = {
    * record's own hop-0 facts (weight 1), so it sits below them.
    */
   similar: number
-  /** Factor between one ranked peer and the next. (D71) */
+  /** Factor between one ranked peer and the next. */
   peerStep: number
   /** Half-life in days; null = no decay. */
   halfLifeDays: Record<ContextKind, number | null>
@@ -146,10 +133,10 @@ export type RankedItem = ContextItem & {
 export type DropReason =
   'budget' | 'standing_budget' | 'similar_budget' | 'peer_cap'
 
-/** The similar lane's cap, as a share of `budgetChars` (SPA-139). */
+/** The similar lane's cap, as a share of `budgetChars`. */
 export const SIMILAR_SHARE = 0.15
 
-/** The peer set's cap: the leaf space's nearest companies. (D71) */
+/** The peer set's cap: the leaf space's nearest companies. */
 export const PEER_MAX = 5
 
 export type RankResult = {
@@ -272,7 +259,6 @@ export function rank(
       (c.edge !== 'peer' || peerStep.has(c.ref)),
   )
 
-  // Structural lane.
   const lexical = new Map<string, number>()
   for (const c of graph)
     if (c.lexicalRank != null) lexical.set(c.ref, c.lexicalRank)

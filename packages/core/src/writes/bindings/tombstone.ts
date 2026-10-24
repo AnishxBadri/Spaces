@@ -3,7 +3,7 @@ import { db } from '@spaces/db'
 import { document, storageTombstone } from '@spaces/db/schema'
 
 /**
- * The resurrection guard (§8, "deleted in app"): a bound document deleted
+ * The resurrection guard: a bound document deleted
  * here leaves a `storage_tombstone` for (binding, external id), and the
  * filer never births that id for that binding again — not from the poll,
  * not from a re-list after an expired cursor.

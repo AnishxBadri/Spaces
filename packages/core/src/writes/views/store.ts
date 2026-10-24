@@ -12,7 +12,7 @@ export type { ViewSort, ViewSurface, ViewTarget }
  * Views, the write side (Effect-first). Anyone may create a view, private
  * or shared; only its author or an admin may change or delete it. A view is
  * addressed by its `ViewTarget` — the surface, plus the object row when the
- * surface is `object` (D2, 2026-09-23). An object view references the object
+ * surface is `object`. An object view references the object
  * row, never an entity, so the merge executor stays out of it.
  */
 

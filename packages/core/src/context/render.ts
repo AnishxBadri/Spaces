@@ -3,7 +3,7 @@ import { fmtMoney } from '../portfolio/format'
 
 /**
  * Plain-text renderings for ContextItems. Pure: values in, one line out.
- * Text is the interchange (spec §1), so these lines are what a model sees
+ * Text is the interchange, so these lines are what a model sees
  * and what the "everything about this record" panel shows. Names for
  * record and actor references come in as a lookup so the renderer never
  * touches the database.

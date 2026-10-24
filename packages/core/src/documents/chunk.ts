@@ -2,13 +2,12 @@ import type { Format } from './extract'
 
 /**
  * `chunk(text, format)` — a document's extracted text cut into the retrieval
- * grain (docs/spec-ai-substrate.md §9; SPA-121, ai-10b). Pure: no database,
- * no clock, no model — the embed program (`apps/web/src/lib/ai/embed-document.ts`)
- * is the only caller that does I/O with the result.
+ * grain. Pure: no database, no clock, no model — the embed program is the
+ * only caller that does I/O with the result.
  *
- * The cut follows the structure `extract.ts` leaves in the text:
+ * The cut follows the structure `extractDocumentText` leaves in the text:
  *
- * - **PDF / PPTX — by page.** `[Page N]` / `[Slide N]` markers (ai-10a) each
+ * - **PDF / PPTX — by page.** `[Page N]` / `[Slide N]` markers each
  *   open one chunk, however short the page is: a 40-slide deck is 40 chunks,
  *   never one 40-slide blob, because the slide is what a citation names.
  *   `page` is N — the real number, so a skipped scan page is not renumbered.
@@ -23,12 +22,12 @@ import type { Format } from './extract'
  *   short sections are packed together up to the size limit and a chunk is
  *   only ever closed at one. A false positive (a bullet with no full stop)
  *   costs a slightly earlier boundary, nothing more. `page` is null.
- * - **Text (and a PDF extracted before ai-10a, with no markers)** — the
+ * - **Text (and a PDF whose stored text has no markers)** — the
  *   paragraph packing DOCX uses, with no headings.
  *
  * Size: ~400–600 tokens, estimated at a fixed {@link CHARS_PER_TOKEN} characters
  * per token (no tokenizer — the estimate only has to keep a chunk inside
- * every provider's input limit and near the spec's range). A unit longer
+ * every provider's input limit and near the target range). A unit longer
  * than {@link MAX_CHARS} is split at a line break, else a space, and the next
  * piece re-reads the last ≤ {@link OVERLAP_CHARS} characters of the one before
  * — overlap is only added where the boundary is arbitrary; a page, a sheet
@@ -89,7 +88,7 @@ function cut(
         format === 'pdf' ? PAGE_MARKER : SLIDE_MARKER,
         (m) => Number(m[1]),
       )
-      // No marker at all: text extracted before ai-10a. Paragraphs, then.
+      // No marker at all (text extracted without page markers): paragraphs.
       if (sections.every((s) => s.head === null))
         return packed(paragraphs(text))
       return sections.flatMap((s) => withHead(s.head, s.body, s.page))
@@ -108,7 +107,7 @@ function cut(
 
 /**
  * Split on marker lines. A marker counts only at the start of the text or
- * after a blank line — the shape `extract.ts` joins pages and sheets in — so
+ * after a blank line — the shape `extractDocumentText` joins pages and sheets in — so
  * a spreadsheet row that happens to read `[x]` stays a row.
  */
 function byMarker(

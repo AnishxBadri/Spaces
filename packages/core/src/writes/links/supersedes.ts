@@ -6,7 +6,7 @@ import { canRead } from '../../read-policy'
 import type { Tx } from '../attributes/values'
 
 /**
- * The one `supersedes` writer: `link(supersedes)` newer → older. (D59)
+ * The one `supersedes` writer: `link(supersedes)` newer → older.
  * - Nothing is deleted; both rows and their chunks stay. The ranker demotes
  *   the older one.
  * - Never written automatically — only a verb the user chose calls this.

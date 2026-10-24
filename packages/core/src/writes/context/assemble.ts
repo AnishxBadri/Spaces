@@ -57,26 +57,17 @@ import {
 import type { NoteGate } from './spaces'
 
 /**
- * The assembler, fetch half (docs/spec-ai-substrate.md §1; Effect-first per
- * CONTEXT.md "Backend paradigm"). Walks the graph from one record, renders
- * every row it finds to a Candidate, and hands the list to the pure ranker.
- *
- * A space seed is its own subject (`assembleSpaceProgram`); a document seed
- * puts its own chunks first; a record is placed by its filed spaces' paths
- * and its leaf spaces' peers (D71).
- *
- * canRead is enforced in SQL (CONTEXT.md: private-note filters live in the
- * queries) — a teammate's private note never enters the ranker. The output
- * stage re-checks as an invariant; a hit there means a fetch lost its
- * filter and is a bug, not a policy decision.
- *
- * Deterministic on (data, asOf, user). No Date.now(), and every fetch is
- * ordered so the ranker's first-wins dedupe sees a stable input.
- *
- * In core since SPA-182. The one lane it cannot run itself — judgment
- * memory, which reads the embedding pin and pgvector — is the `SimilarLane`
- * service (`../../context/similar-lane.ts`, D58): the program declares it,
- * and the caller provides apps/web's live Layer or a test's stub.
+ * The assembler, fetch half: walks the graph from one record, renders every
+ * row it finds to a Candidate, and hands the list to the pure ranker.
+ * - A space seed is its own subject (`assembleSpaceProgram`); a document seed
+ *   puts its own chunks first; a record is placed by its filed spaces' paths
+ *   and its leaf spaces' peers.
+ * - canRead is enforced in SQL, so a teammate's private note never enters the
+ *   ranker. The output re-checks as an invariant; a hit is a bug.
+ * - Deterministic on (data, asOf, user): no Date.now(), and every fetch is
+ *   ordered so the ranker's first-wins dedupe sees a stable input.
+ * - Judgment memory (embedding pin, pgvector) is the `SimilarLane` service:
+ *   declared here, provided by the caller.
  */
 
 export { ContextEntityNotFound, ContextLeak, ContextQueryFailed }
@@ -91,11 +82,10 @@ export type AssembleOptions = {
   /** Task text; enables the lexical lane and glossary matching. */
   taskText?: string | undefined
   /**
-   * The judgment-memory mode (SPA-139, spec §1): add the `similar` lane —
-   * the nearest close_reasons and terminal-stage notes of *other* records
-   * (the `SimilarLane` service; apps/web's `lib/ai/similar.ts`). Off
-   * unless asked for, so a default assembly sends the same statements and
-   * returns the same items it always did.
+   * The judgment-memory mode: add the `similar` lane — the nearest
+   * close_reasons and terminal-stage notes of *other* records (the
+   * `SimilarLane` service). Off unless asked for, so a default assembly runs
+   * no extra statements and returns no extra items.
    */
   similar?: boolean | undefined
   /**
@@ -113,7 +103,7 @@ export type AssembleResult = RankResult & {
   seed: { id: string; kind: string; name: string }
   /**
    * Something assembled is sensitive: the seed by any input, or, for a
-   * space seed, a subspace or member below it. (D71)
+   * space seed, a subspace or member below it.
    */
   sensitive: boolean
   /** Every entity the context is about, for the caller's egress gate. */
@@ -520,7 +510,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
 
   // notes + memos — canRead in SQL
   const notesById = new Map<string, typeof note.$inferSelect>()
-  // rows let through only because an email was widened to the reader (D67)
+  // rows let through only because an email was widened to the reader
   const widenedIds = new Set<string>()
   if (noteIds.length > 0)
     for (const { n, widened } of yield* query(() =>
@@ -577,7 +567,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
               : sql<number>`0`,
           })
           .from(chunk)
-          // A document's chunks only: note and attribute chunks (SPA-102)
+          // A document's chunks only: note and attribute chunks
           // are the semantic lane's, and render as their own kinds.
           .where(
             and(
@@ -605,7 +595,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
   }
 
   // An inbound reference that is a relationship's owner side reads under the
-  // seed's inverse attribute: `Team: Ada (person)`. (D69)
+  // seed's inverse attribute: `Team: Ada (person)`.
   const inverseName = new Map<string, string>()
   if (links.some((l) => l.relation === 'references' && l.toEntityId === seedId))
     for (const half of yield* recordRelationsProgram(seedId).pipe(
@@ -715,7 +705,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
       .where(eq(entitySpace.entityId, seedId))
       .orderBy(asc(space.path)),
   )
-  // Where it sits, and the companies beside it in its leaf spaces. (D71)
+  // Where it sits, and the companies beside it in its leaf spaces.
   candidates.push(
     ...(yield* positionAndPeersProgram({ id: seedId, objectId, values }, tags)),
   )
@@ -842,7 +832,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
     }
   }
 
-  // ---------- supersedes: a replaced note or document ranks lower (D59) ----------
+  // ---------- supersedes: a replaced note or document ranks lower ----------
   const versioned = new Set<string>()
   for (const c of candidates)
     if (c.kind === 'note' || c.kind === 'memo' || c.kind === 'doc_chunk')

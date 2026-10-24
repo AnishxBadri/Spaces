@@ -8,32 +8,17 @@ import { MERGEABLE } from './merge'
 import type { Executor } from './resolve'
 
 /**
- * The fuzzy-name lane of dedupe, in one module: who is a duplicate of whom,
- * and the pg_trgm sweep that proposes it. Effect-first per the backend
- * paradigm; `sweepNameSimilarity` is the Promise seam, in the same shape as
- * `setValues`/`setValuesEffect`, for `resolveEntity`, which is still
- * Promise-shaped. New Effect code — `createRecordProgram` — composes
- * `sweepNameSimilarityEffect` directly. There is one copy of the similarity
- * SQL and it lives here.
- *
- * Two rules the sweep did not have when it was a private function inside
- * `resolve.ts` (spec-attribute-engine.md §9, "Fuzzy-name dedupe: every
- * object"):
- *
- * 1. **Scope is the object, not the kind.** Every custom record shares the
- *    kind `custom`, so scoping by kind put every custom object's records in
- *    one bucket and a Fund would be offered as a duplicate of a Vendor.
- * 2. **Only pairs the merge executor will actually take.** The sweep reads
- *    `MERGEABLE` rather than relying on which kinds happen to hold name
- *    aliases, so the inbox can never show a pair whose Merge button throws.
- *    Deals hold aliases the moment they are renamed (SPA-63) — the accident
- *    that used to keep them out of the inbox is gone, and this is the
- *    invariant that replaces it.
+ * The fuzzy-name lane of dedupe: who is a duplicate of whom, and the pg_trgm
+ * sweep that proposes it. The one copy of the similarity SQL lives here.
+ * 1. Scope is the object, not the kind: every custom record is kind
+ *    `custom`, so a kind scope would offer a Fund as a duplicate of a Vendor.
+ * 2. Only pairs the merge executor takes: the sweep reads `MERGEABLE`, so the
+ *    inbox never shows a pair whose Merge button throws (deals hold name
+ *    aliases once renamed).
  */
 
 /**
- * Pinned, and pinned by measurement: `sweep.test.ts` asserts the pg_trgm
- * score of both fixture pairs with `select similarity(...)`, so the two
+ * Pinned by measurement: the sweep's test asserts the pg_trgm score of both fixture pairs with `select similarity(...)`, so the two
  * sides of this number — 0.71 suggests, 0.40 does not — are proven rather
  * than asserted in a comment.
  */
@@ -56,7 +41,7 @@ const query = <T>(run: () => Promise<T>) =>
 /**
  * Follow a merge redirect. Chains are flattened at merge time → one hop.
  *
- * `on` is the executor (`resolve.ts`): `db` by default, a caller's
+ * `on` is the executor: `db` by default, a caller's
  * transaction when the redirect has to be read against writes that
  * transaction has not committed yet.
  */
@@ -139,17 +124,10 @@ export const sweepNameSimilarityEffect = Effect.fn('sweepNameSimilarity')(
     // user cannot act on is worse than none.
     if (!MERGEABLE.has(self.kind)) return { suggested: 0 }
 
-    // Rule 1, and the fallback the issue spells out: `object_id` is set for
-    // every record-of-an-object (the three core kinds and every custom), and
-    // null only for the research kinds — `space`, `note`, `document`, `term`
-    // — which the MERGEABLE gate above has already sent home. The kind
-    // branch is therefore reachable only for a row written straight through
-    // drizzle without its object; it is kept so the scope is total rather
-    // than relying on that never happening.
-    //
-    // Scoping by the object is also what makes the pair mergeable on the
-    // other side: two rows of one object share a kind, so checking the
-    // sweeping row's kind above settles both ends of the pair.
+    // Rule 1. `object_id` is null only for the research kinds, which the
+    // MERGEABLE gate already sent home; the kind branch covers a row written
+    // without its object, so the scope is total. Two rows of one object share
+    // a kind, so the gate above settles both ends of the pair.
     const scope =
       self.objectId === null
         ? eq(entity.kind, self.kind)
@@ -178,8 +156,7 @@ export const sweepNameSimilarityEffect = Effect.fn('sweepNameSimilarity')(
 )
 
 /**
- * Promise seam for `resolveEntity`, which the ratchet has not converted yet.
- * New Effect code composes `sweepNameSimilarityEffect` instead.
+ * Promise seam for `resolveEntity`, which is Promise-shaped. New Effect code composes `sweepNameSimilarityEffect` instead.
  */
 export const sweepNameSimilarity = (
   entityId: string,

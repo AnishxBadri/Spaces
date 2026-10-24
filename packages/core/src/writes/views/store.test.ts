@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { SaveViewInput } from './store'
 
-// The 'view store' half of what used to be views/filter.test.ts. The pure
-// condition tests moved to @spaces/core with filter.ts (mono-7); this block
-// exercises store.ts against a real database and so stays here, unchanged,
-// until mono-8b takes the view store to core as well.
+// The view store against a real database; the pure condition tests live
+// beside the filter compiler.
 
 describe('view store', () => {
   it('lists shared + own, guards edits to author or admin', async () => {
@@ -96,9 +94,8 @@ describe('view store', () => {
     }
   })
 
-  // views-1 (D2): the surface discriminator. An object view keeps its
-  // object_id and keeps listing under the object target — which is what
-  // /companies, /people, /deals and /o/$objectSlug read on first paint.
+  // The surface discriminator. An object view keeps its object_id and lists
+  // under the object target — what the object lists read on first paint.
   it('lists an object view under its object target only', async () => {
     const { Effect } = await import('effect')
     const { listViewsProgram, saveViewProgram } = await import('./store')
@@ -272,16 +269,11 @@ describe('view store', () => {
     expect(left.map((v) => v.id)).not.toContain(shared.id)
   })
 
-  // docsurf-12a: the shelf's half of the round-trip, and the mirror of
-  // 'lists an object view under its object target only' above. /documents
-  // saves the same snapshot the four object lists save — the literal is
-  // typed as the store's own input, and the bar's `ViewSnapshot`
-  // (components/views/view-bar.tsx) is checked against the same input where
-  // it calls the server fn, so the two shapes cannot drift — and reads it
-  // back on first paint:
-  // column visibility keyed by the shelf's own column ids, and a sort naming
-  // one of them. Column *widths* are absent by design: `view.columns` is
-  // Record<string, boolean>, so widths stay in useTablePrefs.
+  // The document shelf's round-trip, mirroring the object-target test above.
+  // - The literal is typed as the store's own input, and the view bar's
+  //   `ViewSnapshot` is checked against it too, so the shapes cannot drift.
+  // - Column widths are absent by design: `view.columns` is
+  //   Record<string, boolean>, so widths stay in useTablePrefs.
   it('reads back the documents shelf’s columns and sort', async () => {
     const { Effect } = await import('effect')
     const { listViewsProgram, saveViewProgram } = await import('./store')

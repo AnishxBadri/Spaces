@@ -14,15 +14,10 @@ import {
 import type { CredentialInput } from './index'
 
 /**
- * SPA-112. `credential_kind` opened from `llm | enrichment | search` to six
- * values so `storage-1` (OAuth client id/secret), `sdk-23` (webhook signing
- * secrets) and the AI substrate's embedding providers have a column that can
- * hold what they were specified against.
- *
- * Two things have to stay true across that widening: every row written under
- * the old enum still decrypts (the AAD is `scope:provider`, so `kind` was
- * never an encryption input), and a kind outside the six is refused at the
- * vault's Zod boundary rather than by Postgres.
+ * `credential_kind` beyond `llm | enrichment | search`. Two things must hold:
+ * - A row written under the narrower enum still decrypts: the AAD is
+ *   `scope:provider`, so `kind` is never an encryption input.
+ * - An unknown kind is refused at the vault's Zod boundary, not by Postgres.
  */
 
 const base = {
@@ -34,10 +29,9 @@ const base = {
 
 describe('a row written before the enum widened', () => {
   it('keeps its kind and still decrypts', async () => {
-    // Written the way the pre-SPA-112 code path wrote it: one of the three
-    // original kinds, ciphertext bound to `scope:provider` and to nothing
-    // else. The bytes are what that path produced — the secret, the AAD and
-    // the master key are its only inputs.
+    // One of the three original kinds, ciphertext bound to `scope:provider`
+    // and nothing else — the secret, the AAD and the master key are the only
+    // inputs.
     const secret = 'sk-ant-written-before-the-migration'
     await db.insert(credential).values({
       scope: 'workspace',
@@ -56,9 +50,8 @@ describe('a row written before the enum widened', () => {
     expect(row?.kind).toBe('llm')
     await expect(resolveSecret('anthropic', 'llm')).resolves.toBe(secret)
 
-    // And moving that row onto a value the enum only just gained changes
-    // nothing about the ciphertext, which is the whole argument for why the
-    // widening needs no re-encryption pass.
+    // Moving the row onto a newer kind changes nothing about the ciphertext,
+    // which is why widening the enum needs no re-encryption pass.
     await db
       .update(credential)
       .set({ kind: 'embedding' })
@@ -69,8 +62,7 @@ describe('a row written before the enum widened', () => {
 
 describe('the vault write path', () => {
   it('accepts all seven kinds', async () => {
-    // `mailbox` is the seventh (SPA-56): the forwarding mailbox's app
-    // password, added by that slice's own migration.
+    // `mailbox` is the seventh: the forwarding mailbox's app password.
     expect(CREDENTIAL_KINDS).toEqual([
       'llm',
       'embedding',

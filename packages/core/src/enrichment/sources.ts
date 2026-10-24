@@ -3,7 +3,7 @@ import type { Effect } from 'effect'
 import type { JobError } from '@spaces/sdk'
 
 /**
- * How an enrichment run asks one source (D76): run its enrich action for a
+ * How an enrichment run asks one source: run its enrich action for a
  * record, with the vocabulary keys still wanted. The source answers through
  * `Facts.answer`, which the run collects (`EnrichmentCollector`).
  * - `asked: false` with the reason when the host declined before any call:

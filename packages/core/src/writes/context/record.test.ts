@@ -6,9 +6,8 @@ const ASOF = '2026-09-10T00:00:00Z'
 /**
  * `recordContextProgram` is what a caller runs once it has the session user
  * and the clock, so the privacy guarantee is asserted here, without a
- * request: a teammate's
- * private note reaches its author and nobody else, and every item leaves
- * with a human citation.
+ * request: a teammate's private note reaches its author and nobody else, and
+ * every item leaves with a human citation.
  */
 describe('recordContextProgram', () => {
   const tag = randomUUID().slice(0, 8)

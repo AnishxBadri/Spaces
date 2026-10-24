@@ -32,7 +32,7 @@ import { removeConnectionRecordings } from './recorded-note'
 import { writeIntegrationInteraction } from './write'
 
 /**
- * The recorder contract's host half (D78) through `Content.logRecordedNote`:
+ * The recorder contract's host half through `Content.logRecordedNote`:
  * a recorded note attaches to its calendar meeting by event id, else by
  * start time and attendees inside 30 minutes, else births a call; delivered
  * twice it is one row and one receipt; gone, it takes with it what it became.

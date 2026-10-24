@@ -14,7 +14,7 @@ import { forgetConnection } from './list'
 import { accessTokenFor } from './token'
 
 /**
- * A personal connection made from a key the member pastes (D78): Granola's
+ * A personal connection made from a key the member pastes: Granola's
  * You → Meeting notes. The key is an `account_connection` row — `api_key`
  * bundle under the connection AAD, no expiry, no scopes — so it lists
  * beside the OAuth accounts and `accessTokenFor` hands it to the plugin.
@@ -284,7 +284,7 @@ export const recorderAccountProgram = Effect.fn('recorderAccount')(function* (
 })
 
 /**
- * The member's ticks and opt-ins, applied at once (D81). The next run fetches
+ * The member's ticks and opt-ins, applied at once. The next run fetches
  * from the ticked folders only and removes what an unticked one held.
  */
 export const saveRecorderSettingsProgram = Effect.fn('saveRecorderSettings')(

@@ -4,10 +4,9 @@ import { Config } from '@spaces/sdk'
 import type { BoundIntegration } from './binding'
 
 /**
- * ConfigLive (sdk-6a): `integration.config`, validated against the plugin's
- * own settings schema when the Layer is built — the zod schema the bundle
- * exports on `manifest.settings`, which the worker's loader holds. (The
- * manifest's JSON Schema is for web's form, project 19.) A row whose config
+ * ConfigLive: `integration.config`, validated against the bundle's zod
+ * `manifest.settings` when the Layer is built (the manifest's JSON Schema is
+ * only for web's form). A row whose config
  * does not parse fails the Layer with `ConfigInvalid`, naming the field,
  * which the loader turns into `degraded` rather than a crash; a job never
  * starts on a config its plugin would refuse.

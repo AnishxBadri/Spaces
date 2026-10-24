@@ -8,7 +8,7 @@ import type { ProviderScope } from '../../providers/registry'
 /**
  * What a connection already holds, for the callers that grow it: the picker
  * asks `hasScopes` before opening, a folder binding before it binds.
- * - Scopes grow within one product's row (D66); another product's scopes
+ * - Scopes grow within one product's row; another product's scopes
  *   are a separate connection, never a union.
  * - Takes no user: the worker calls it with a connection id it already owns.
  */

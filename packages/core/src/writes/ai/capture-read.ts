@@ -6,24 +6,14 @@ import type { ObjectKind } from '@spaces/core/attributes/registry'
 import type { Tx } from '@spaces/core/writes/attributes/values'
 
 /**
- * A captured page, read (SPA-134; CONTEXT.md integration map #8). A capture
- * names nobody we hold a record for, so what the deck reader proposes off it
- * is anchored on the **captured document's own entity** — documents are
- * entities — and read against the registry of the object the capture
- * declared (`person` for a profile, `company` for a company page, or a
- * custom object's slug).
+ * A captured page, read. A capture names nobody we hold a record for, so its
+ * proposals anchor on the captured document's own entity and are read against
+ * the object the capture declared (`person`, `company` or a custom slug).
  *
- * The declared object is kept where the run log already keeps what an
- * action was: the `ai_run.task` it ran under, `Read captured page · <slug>`
- * — the shape a column run names itself by (`columnRunTask`), and what
- * Settings → Usage lists it as. Every suggestion the read writes carries
- * that run (`suggestion.run_id`), so the object a document-anchored patch is
- * held to is one read away for the three places that need it:
- * `writes/suggestions/propose.ts` (validate at propose, and at accept in
- * apps/web's `lib/ai/propose.ts`), and apps/web's `lib/inbox/queue.ts`
- * (draw the fields). Moved here from apps/web by SPA-204 with the propose
- * writer that reads it. No column, no migration: the slug is the object's key, and an
- * object's slug is minted once and never renamed.
+ * - The declared object lives in the run's `ai_run.task`
+ *   (`Read captured page · <slug>`); each suggestion carries `run_id`, so
+ *   propose, accept and the inbox recover it in one read.
+ * - No column: an object's slug is minted once and never renamed.
  */
 
 export const CAPTURE_READ_TASK = 'Read captured page'

@@ -65,7 +65,7 @@ describe('migration 0060: duplicate credentials collapse', () => {
   )
 
   it('keeps the newest row per group and repoints mailbox, integration and ai_run at it', async () => {
-    // The test database is already past 0060, so the old index is put back
+    // The test database is already migrated, so the old index is put back
     // inside a transaction, duplicates written under it, the migration run
     // again, and everything rolled back — the schema is never left changed.
     const outcome = db.transaction(async (tx) => {

@@ -275,7 +275,7 @@ describe('setValues', () => {
 
     // Only this test's own writes: another suite may hold custom attributes
     // with defaults on the company object at the same moment, and those
-    // fire at birth (SPA-9), so the row count alone is not ours to assert.
+    // fire at birth, so the row count alone is not ours to assert.
     const events = (
       await db
         .select()
@@ -371,7 +371,7 @@ describe('setValues', () => {
 
     // Accepting a suggestion: the accepter is the actor, the receipt rides
     // the event — "from p.4 of the deck" survives acceptance. The id is a
-    // real row since SPA-46 put the FK on `attribute_event.suggestion_id`.
+    // real row: `attribute_event.suggestion_id` is a foreign key.
     const receipt = (
       await db
         .insert(suggestion)

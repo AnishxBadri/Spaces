@@ -18,13 +18,12 @@ import { LogLive } from './log'
 import type { LogLevel } from './log'
 
 /**
- * The four ambient ports bound to one integration row (sdk-6a). The Http
+ * The four ambient ports bound to one integration row. The Http
  * tests drive time with `TestClock` and stand a fake server in for fetch:
  * it records the clock's time at each request it receives and answers from
  * a script.
  *
- * That the ports read no environment is `src/purity.test.ts`'s to enforce:
- * `writes/ports/` is not one of the two directories it lets read it.
+ * That the ports read no environment is the purity test's to enforce.
  */
 
 const settings = z.object({

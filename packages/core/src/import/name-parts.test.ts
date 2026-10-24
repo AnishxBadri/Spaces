@@ -4,7 +4,8 @@ import type { MappingAttribute, MappingRegistry } from './mapping'
 import { readRow } from './plan'
 
 /**
- * Import onto a person's name (D67): First name and Last name columns map
+ * Import onto a person's name: First name and Last name columns map
+
  * onto the two parts and make the name; a Name column maps onto the join.
  * No database.
  */

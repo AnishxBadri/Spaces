@@ -4,7 +4,7 @@ import { enrichmentLinkProblem } from '../attributes/registry'
 import type { AttributeType } from '../attributes/registry'
 
 /**
- * "Fill from" (D76): which vocabulary keys an attribute may link, and the
+ * "Fill from": which vocabulary keys an attribute may link, and the
  * words a key is shown by. Client-safe — the attribute window imports it.
  */
 

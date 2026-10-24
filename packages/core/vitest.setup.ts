@@ -3,11 +3,9 @@ import { truncatePublicTables } from '@spaces/db/test-db'
 import { seedCoreTestDatabase } from './vitest.seed.ts'
 
 /**
- * Per-file isolation (SPA-145), the packages/db shape: empty `public` before
- * every file, then the seed `vitest.seed.ts` describes. A static import of
- * `db` is safe here because this suite runs `fileParallelism: false`, one
- * worker against `spaces_test_core1`, which `vitest.config.ts` has already
- * put in `DATABASE_URL` before setup files run.
+ * Per-file isolation: empty `public` before every file, then reseed.
+ * A static `db` import is safe: one worker (`fileParallelism: false`) runs
+ * against `spaces_test_core1`, already in `DATABASE_URL` before setup files.
  */
 await truncatePublicTables((text) => db.$client.query(text))
 

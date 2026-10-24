@@ -3,25 +3,13 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The package's reason to exist, as a gate (mono-7), per directory since
- * SPA-174. @spaces/core is the domain in two halves. The pure half computes:
- * portfolio maths, the formatters, the glossary automaton, the due-date
- * grammar, the filter matcher, extraction, identity normalization, the
- * attribute registry — nothing there may reach a database. The db-coupled
- * half is `src/writes/` and nothing else: the attribute write path the plugin
- * SDK's Facts port will sit on, which needs drizzle and the `db` handle by
- * definition. Neither half may reach a renderer, and one directory in the
- * db-coupled half — `writes/vault/` (MASTER_KEY, DATA_DIR; SPA-176) and
- * `writes/storage/` (STORAGE_DRIVER, S3_*; SPA-178) — may read the
- * environment, and no other. All of that is
- * a claim that rots in a week unless something checks it, so this is that
- * something.
- *
- * Three of the four forbidden strings would be in this file if they were
- * written out, and the acceptance criterion greps the whole of
- * `packages/core/src` for them. So the needles are assembled from pieces and
- * the specifier checks parse import statements rather than matching source
- * text — the scanner has to stay outside the set it scans for.
+ * The fence between core's two halves.
+ * - Outside `writes/` is pure: it computes and never reaches a database
+ *   (types from `@spaces/db` only).
+ * - `writes/` is the db-coupled half and the only place drizzle or `db` passes.
+ * - Neither half reaches a renderer; only ENV_READING_DIRS read the environment.
+ * - The needles are assembled from pieces and imports are parsed, not
+ *   grepped, so this file never matches a grep for the strings it bans.
  */
 
 const SRC = fileURLToPath(new URL('.', import.meta.url))
@@ -34,23 +22,17 @@ const DB_PKG = `@spaces/${'db'}`
 
 /**
  * The directories, relative to `src/`, where a database import is allowed.
- * Everything else is pure. A directory joins this list when a db-coupled
- * module moves into core (SPA-174 brought `writes/`; the vault, storage and
- * the assembler each add theirs when they land) — and only then, because a
- * name here is a directory the driver ban no longer watches.
+ * Everything else is pure. Add a directory only when a db-coupled module
+ * lands in it: a name here is a directory the driver ban no longer watches.
  */
 const DB_COUPLED_DIRS: ReadonlyArray<string> = ['writes/']
 
 /**
- * The directories, relative to `src/`, where an environment read is allowed
- * — the vault, whose whole job is to resolve MASTER_KEY and DATA_DIR
- * (SPA-176), and the blob backend, which picks its driver by STORAGE_DRIVER
- * and configures s3 from S3_* (SPA-178). Narrower than DB_COUPLED_DIRS on
- * purpose: the write paths beside them take a transaction or a connection
- * string and read nothing; an enqueue that would have needed DATABASE_URL
- * stayed in apps/web for exactly this reason. One file joins them: the
- * first-boot conveniences, whose input is SPACES_PLUGINS and
- * SPACES_CREDENTIAL_<ID>.
+ * Where an environment read is allowed, relative to `src/`: the vault
+ * (MASTER_KEY, DATA_DIR), the blob backend (STORAGE_DRIVER, S3_*) and the
+ * first-boot conveniences (SPACES_PLUGINS, SPACES_CREDENTIAL_<ID>).
+ * Narrower than DB_COUPLED_DIRS on purpose: other write paths take a
+ * transaction or connection string and read no env.
  */
 const ENV_READING_DIRS: ReadonlyArray<string> = [
   'writes/vault/',
@@ -108,7 +90,7 @@ function driverOffenders(set: ReadonlyArray<Source>): Array<string> {
 }
 
 /**
- * Spec §2 lets core depend on db, and the column payload types
+ * Core may depend on db, and the column payload types
  * (`AttributeOptions`, `SelectOption`, `ObjectKind`, `BadgeColor`, the view
  * condition shapes) are declared at their columns and re-exported from here
  * — so in a pure directory the reach is real but has to stay a type.
@@ -249,9 +231,8 @@ describe('@spaces/core is pure outside src/writes/', () => {
         }
       }
     }
-    // drizzle-orm is declared since SPA-174 — it is what `writes/` imports —
-    // so the manifest check is the renderer only; the driver ban is the
-    // per-directory scan above.
+    // drizzle-orm is a declared dependency (`writes/` imports it), so the
+    // manifest check is the renderer only; the driver ban is the scan above.
     expect(named.has(REACT)).toBe(false)
     expect(named.has(`${REACT}-dom`)).toBe(false)
     expect(named.has('@tanstack/react-start')).toBe(false)

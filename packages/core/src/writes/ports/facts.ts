@@ -36,44 +36,23 @@ import { ReceiptNotOwned, checkReceipt } from './receipts'
 import { integrationPatch } from './judgment'
 
 /**
- * FactsLive (sdk-9; spec-plugin-sdk §4, D52): `Facts.fill` over the one
- * attribute write path in its fill-blanks mode (`SetValuesInput.fillBlanks`),
- * so what counts as blank is decided under the entity row lock, never by a
- * read before the write.
- *
- * - **Provenance is the port's.** Every event is `actor_type 'integration'`,
- *   `actor_ref` = the bound row, `source 'enrichment'` — from the row, never
- *   from the claim, which carries no source field (D52).
- * - **The receipt is evidence.** `claim.receiptId` becomes the events'
- *   `refs` as `event:<receiptId>` — the shipped ref grammar (D4), the same
- *   spelling the context assembler cites an `enrichment_record` by. It must
- *   be a receipt **this** integration stored (checkpoint review,
- *   2026-10-01): checked inside the write's transaction, and a receipt that
- *   is missing or another integration's refuses the whole fill — otherwise
- *   a plugin could cite someone else's response as its evidence.
- * - **Conflicts are refused, returned, and raised** (D52; SPA-204): a value
- *   a person — or another integration — already holds is written nowhere,
- *   handed back with the held and the proposed value, and becomes one
- *   suggestion in the review inbox ("Apollo says 120, you have 85") — the
- *   Judgment lane's row (`integrationPatch`), proposed by the bound row,
- *   citing the receipt, its rationale naming the slug and both values. It
- *   is inserted in the fill's own transaction, so the fill and its
- *   suggestions commit together; a re-run raising the same conflict is a
- *   no-op insert against `suggestion_open_integration_unique`, never a read
- *   first. A relationship's conflict is proposed as identity claims (name
- *   plus domain or email), never as record ids; one the inbox still could
- *   not take is returned and not raised. This integration's own earlier
- *   value is updated in place — a relationship's never is (D72).
- * - **One transaction.** A value the registry refuses fails the fill
- *   permanently (retrying would send it again) and nothing of the claim is
- *   written. A merged-away record is filled on its survivor.
- *
- * Embeddable values go out through core's `Enqueue` after the commit, as
- * `IdentityLive`'s birth values do.
- *
- * `Facts.answer` (D76) takes a source's answers in the vocabulary: inside an
- * enrichment run they go to the run's `EnrichmentCollector`; outside one
- * they are applied at once by `applyRun` as a run of this source alone.
+ * FactsLive: `Facts.fill` over the one attribute write path in fill-blanks
+ * mode, so blank is decided under the entity row lock, never by a read first.
+ * - **Provenance is the port's**: `actor_type 'integration'`, `actor_ref` =
+ *   the bound row, `source 'enrichment'` — never from the claim.
+ * - **The receipt is evidence**: `claim.receiptId` becomes `event:<id>` refs,
+ *   and must be a receipt **this** integration stored, checked in the
+ *   write's transaction — else a plugin could cite another's response.
+ * - **Conflicts are refused, returned and raised**: a value someone else
+ *   holds is written nowhere, handed back, and proposed as one suggestion in
+ *   the fill's own transaction (a re-run is a no-op insert against
+ *   `suggestion_open_integration_unique`). A relationship's conflict is
+ *   proposed as identity claims, never record ids. This integration's own
+ *   earlier value is updated in place — a relationship's never is.
+ * - **One transaction**: a refused value fails the fill permanently and
+ *   writes nothing. A merged-away record is filled on its survivor.
+ * Embeddable values go out through `Enqueue` after the commit. `Facts.answer`
+ * feeds the run's `EnrichmentCollector`, or `applyRun` outside a run.
  */
 
 const failure = (cause: unknown) =>

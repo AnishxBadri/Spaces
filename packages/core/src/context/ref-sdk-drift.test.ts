@@ -4,9 +4,9 @@ import { parseRef, ref } from './ref'
 import type { ParsedRef } from './ref'
 
 /**
- * `@spaces/sdk`'s `Ref` is a hand copy of this directory's D4 grammar — the
- * SDK cannot import core, so the two are held together here, where core may
- * import the SDK (checkpoint review of PR #4, 2026-10-01). Both directions:
+ * `@spaces/sdk`'s `Ref` is a hand copy of core's ref grammar. The SDK cannot
+ * import core, so the two are held together here, where core may import the
+ * SDK. Both directions:
  * every SDK shape parses as the kind it names, and every kind core's parser
  * knows has an SDK shape. A kind added on one side only fails this file — at
  * typecheck through the mapped type, and at run time through the key lists.

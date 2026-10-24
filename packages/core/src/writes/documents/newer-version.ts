@@ -12,7 +12,7 @@ import type { SupersedesPayload } from '../../ai/supersedes'
 
 /**
  * The supersedes suggestion: a document filed on a record that already holds
- * one of the same kind proposes "newer version of" the latest. (D59)
+ * one of the same kind proposes "newer version of" the latest.
  * - Only proposes; the link is written by a person accepting it.
  * - Only kinds that come in versions: a deck and a cap table are revised; two
  *   articles, two legal papers or two diligence files are different facts.

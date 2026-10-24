@@ -21,7 +21,7 @@ import type { BindingFiler, SyncBinding, SyncFailure } from './sync'
 
 /**
  * The change poll: one `changes` pass per connection, fanned out to the
- * folder bindings it touches (docs/spec-storage-sources.md §8, first two rows).
+ * folder bindings it touches.
  * - The cursor is the connection's (`storage_cursor`): one pass reads every
  *   drive the connection sees, so two bindings on one drive share it.
  * - The cursor advances only once the whole page is handled. A page cut

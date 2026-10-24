@@ -16,10 +16,8 @@ export {
 } from '../../attributes/default-values'
 
 /**
- * Default values (spec §4, grilled 2026-09). A default is a standing human
- * instruction — the email-filter analogy, not machine opinion — so it fires
- * on every creation path: dialog, composer, import, sync. Three rules:
- *
+ * Default values: a standing human instruction, not machine opinion, so it
+ * fires on every creation path (dialog, composer, import, sync).
  * - Fill blanks only. A supplied value always wins (imports: mapped columns
  *   win, unmapped ones default).
  * - `current-user` resolves only when a human is present; machine creation
@@ -47,7 +45,7 @@ export type BirthValuesInput = {
  */
 /**
  * What birth reports back. `identity`/`identityValues` ride along unchanged
- * from the one write path (SPA-97): a record born holding a domain another
+ * from the one write path: a record born holding a domain another
  * record already claims is the same collision an edit makes, and the create
  * dialog owes the operator the same sentence the rail does.
  */

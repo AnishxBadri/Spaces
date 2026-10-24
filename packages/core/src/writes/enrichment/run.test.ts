@@ -47,7 +47,7 @@ import { runEnrichment } from './run'
 /**
  * The enrichment run against a real database, with two fixture sources —
  * Website and Apollo — that answer through the live Facts and Receipts
- * ports and log what they were asked. (D76)
+ * ports and log what they were asked.
  */
 
 const EnqueueTest = Layer.succeed(

@@ -4,34 +4,14 @@ import { JSON_SCHEMA_DRAFT } from './schema'
 import type { JsonSchema } from './schema'
 
 /**
- * Key terms (SPA-91; docs/spec-ai-substrate.md §11, the `dd / legal` row):
- * what a diligence pack or a legal document says about the deal's terms,
- * read by the extract lane and landed as **a note** — never as attribute
- * values.
- *
- * **Why this schema is hand-written and not compiled from the registry.**
- * `schemaFor` (`./schema.ts`) compiles an object's attributes into the
- * extract lane's output type, because what a deck states *is* a record's
- * fields: stage, sector, round size — values a pipeline is filtered and
- * sorted by. The terms here are the opposite kind of fact. A liquidation
- * preference, a board seat, a no-shop clause are read once, by a person
- * deciding, in the words the document uses ("1x non-participating, pari
- * passu with the Seed"); nobody filters a pipeline by governing law. Made
- * into attributes they would be fifteen free-text columns on every deal that
- * are empty on nearly all of them, and each would claim a write path — the
- * patch, the activity log, the index reconciler — for a string that is only
- * ever read. So the vocabulary lives here, per document kind, as data this
- * module owns, and the answer is rendered into a note body
- * (`keyTermsMarkdown`) that the note accept path already knows how to write.
- * Changing a term is a code change reviewed here, not a registry edit, and
- * the snapshot (`key-terms.test.ts`) is what shows the reviewer the output
- * type the model is handed.
- *
- * The envelope is the registry compiler's minus `confidence`:
- * `{value, refs}` per term. `refs` is required and non-empty, because every
- * row of the note carries its citation; and no term is required, because a
- * term the document does not mention is absent — a model forced to fill it
- * writes "not found", and the note would print it.
+ * Key terms: what a legal or diligence document says about a deal's terms,
+ * read by the extract lane and landed as a note — never as attribute values.
+ * - Hand-written, not compiled by `schemaFor`: terms are read once in the
+ *   document's words, never filtered on, so as attributes they would be
+ *   mostly-empty columns each claiming a write path. The test snapshot shows
+ *   the reviewer the output type the model is handed.
+ * - Envelope `{value, refs}`: `refs` non-empty, since every note row cites;
+ *   no term required, since a forced model writes "not found".
  */
 
 /** The document kinds that get a key-terms read. */

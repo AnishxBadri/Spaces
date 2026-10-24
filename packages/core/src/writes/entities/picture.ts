@@ -7,7 +7,7 @@ import { PICTURE_MAX_BYTES, judgePicture } from '../../enrichment/picture'
 import { putBlobProgram } from '../documents/intake'
 
 /**
- * A person sets or clears a record's picture by hand (D76).
+ * A person sets or clears a record's picture by hand.
  * - Either write marks the picture held: enrichment never fills it again.
  * - Answers the digest it replaced, so the caller can reclaim those bytes
  *   once no row names them (`reclaimBlobIfOrphaned`).

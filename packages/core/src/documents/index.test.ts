@@ -7,11 +7,8 @@ import {
 } from './index'
 
 /**
- * `document_kind` lost `memo` (SPA-25, spec-storage-sources §11 delta 3): it
- * collided with `note.kind = 'memo'` while meaning something else. The
- * guesser used to read "memo" in a filename and file the document under a
- * kind the enum no longer has, so the load-bearing case is the one the issue
- * names — an investment memo PDF is `other`, and the edge to the note it was
+ * `document_kind` has no `memo` (it would collide with `note.kind = 'memo'`),
+ * so an investment memo PDF guesses `other`; the edge to the note it was
  * exported from is what says it is a memo.
  *
  * The second half is the invariant behind that: the guesser is total. It

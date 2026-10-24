@@ -5,7 +5,7 @@ import { ownership } from './ownership'
 import { liveAt, reversalInEffect } from './reversal'
 
 /**
- * Corrections are appends (D12, SPA-150), proven where it matters: the
+ * Corrections are appends, proven where it matters: the
  * derived numbers. The loader hands these functions only originals, each
  * stamped with `reversedAt`; a voided one returns the metrics to *exactly*
  * their pre-entry values, and an as-of date before the void still sees it.

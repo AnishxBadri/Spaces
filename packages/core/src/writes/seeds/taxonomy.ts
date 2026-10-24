@@ -3,18 +3,10 @@ import { db } from '@spaces/db'
 import { entity, space } from '@spaces/db/schema'
 
 /**
- * The starter taxonomy — deliberately tiny (CONTEXT.md → Seed taxonomy).
- *
- * An earlier plan shipped 150–250 curated nodes. That was reversed: the tree
- * is the investor's own vocabulary, and a shipped ontology pre-empts it. What
- * remains is a handful of nodes that demonstrate the *shape* — a root, a
- * segment inside it, and the fact that depth is earned — so that a fresh
- * install is not an empty page pretending to be a map.
- *
- * Because it is this small, there is no reconciliation machinery: no seed
- * keys, no rename detection, no upgrade migration. Seeded nodes are ordinary
- * rows the user may rename, move, or delete, and `is_seeded` records only
- * where they came from.
+ * The starter taxonomy, deliberately tiny: the tree is the investor's own
+ * vocabulary, so this only shows the shape (a root, a segment, depth earned).
+ * No reconciliation machinery: seeded nodes are ordinary rows the user may
+ * rename, move or delete; `is_seeded` records only where they came from.
  */
 
 type SeedNode = {

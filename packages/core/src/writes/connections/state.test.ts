@@ -11,7 +11,7 @@ import {
 import { STATE_TTL_MS, newNonce, signState, verifyState } from './state'
 import type { ConnectState } from './state'
 
-/** The verifier 225's callback consumes: one round trip and each refusal. */
+/** The verifier the callback consumes: one round trip and each refusal. */
 
 const master = randomBytes(32)
 const issuedAt = Date.UTC(2026, 9, 7, 12, 0, 0)

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { identityPayloadOf, readIdentityPayload } from './identity'
 
-/** SPA-105 — the identity suggestion's payload, decoded once. */
+/** The identity suggestion's payload, decoded once. */
 describe('the identity payload', () => {
   it('reads a claim and drops what is not a person key', () => {
     expect(

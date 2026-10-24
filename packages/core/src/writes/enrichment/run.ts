@@ -38,7 +38,7 @@ import { fetchPicture } from './picture'
 import { askWebsite, websiteFor } from './website'
 
 /**
- * `enrichment.run(entityId, reason)` (D76): the owner's sources asked in
+ * `enrichment.run(entityId, reason)`: the owner's sources asked in
  * order, each for the linked keys still wanted after the ones before it,
  * and every answer applied at once by `applyRun`.
  * - A plugin source is asked through `EnrichmentSources`, the built-in
@@ -227,7 +227,7 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
     only === undefined ? ordered : ordered.filter((s) => only.includes(s.id))
   const asker = yield* EnrichmentSources
   // A sensitive record never reaches an outside source: only the Website
-  // runs, its model half through a local route. (D76)
+  // runs, its model half through a local route.
   const sensitive =
     website?.sensitivity.sensitivity === 'sensitive' ||
     (website === null &&

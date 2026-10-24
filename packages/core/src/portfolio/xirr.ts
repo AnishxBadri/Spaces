@@ -1,7 +1,7 @@
 /**
  * Gross XIRR: the annualized rate r where NPV of dated flows is zero.
  * Newton-Raphson from a neutral guess, bisection fallback when Newton
- * diverges or leaves the domain (CONTEXT.md phase 15). Pure — no schema
+ * diverges or leaves the domain. Pure — no schema
  * imports; dates are ISO YYYY-MM-DD strings, day-count Actual/365.
  */
 

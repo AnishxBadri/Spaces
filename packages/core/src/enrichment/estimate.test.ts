@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { estimateBulk, skippedTotal } from './estimate'
 import type { EstimateRecord, EstimateSource } from './estimate'
 
-/** The bulk estimate over facts the db half would read. (D76, D53) */
+/** The bulk estimate over facts the db half would read. */
 
 const NOW = new Date('2026-10-10T15:30:00.000Z')
 const DAY = 86_400_000

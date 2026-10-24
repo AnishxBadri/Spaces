@@ -4,15 +4,12 @@ import type { EnqueueTarget } from './names'
 
 /**
  * The sending half of the web→worker seam. A sender only ever *sends*: it
- * runs with maintenance, scheduling and migration off, so booting a web
- * process never competes with the worker over pg-boss housekeeping or races
- * it through a schema migration.
+ * runs with maintenance, scheduling and migration off, so a web process never
+ * competes with the worker over pg-boss housekeeping or races it through a
+ * schema migration.
  *
- * It lives in @spaces/core so the app is not the only thing that can enqueue,
- * and it takes its connection string from the caller rather than reading it:
- * this package may not touch the environment (`src/purity.test.ts`), which
- * makes the adapter that does — `apps/web/src/lib/queue.ts` — the one place
- * DATABASE_URL is read for the queue.
+ * Takes its connection string from the caller: core must not read the
+ * environment, so the caller's adapter is the one place DATABASE_URL is read.
  */
 
 /**
@@ -42,7 +39,7 @@ export type EnqueueOptions = { singletonKey?: string; startAfter?: Date }
 /**
  * One job as a sender reads it back — the slice of pg-boss's
  * `JobWithMetadata` a status read needs. `output` is whatever the worker's
- * wrapper stored when it settled the job (`JobOutcome` in `run-job.ts`).
+ * wrapper stored when it settled the job (`JobOutcome`).
  */
 export type QueuedJob = {
   state: 'created' | 'retry' | 'active' | 'completed' | 'cancelled' | 'failed'
@@ -50,8 +47,8 @@ export type QueuedJob = {
   createdOn: Date
   /**
    * When a queued job becomes eligible to run. pg-boss always answers it; a
-   * test's fake may leave it out. SPA-136's backfill status reads it to tell
-   * a run paused until the AI cap resets from one queued to run now.
+   * test's fake may leave it out. The backfill status reads it to tell a run
+   * paused until the AI cap resets from one queued to run now.
    */
   startAfter?: Date
 }

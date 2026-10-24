@@ -6,7 +6,7 @@ import type { Tx } from '../entities/resolve'
 
 /**
  * `interaction_stat` upkeep: first, last and next interaction per entity and
- * kind, plus `any` (D67).
+ * kind, plus `any`.
  * - Recomputed from the interactions, never patched: a write hands over the
  *   entities it touched and their rows are rebuilt from every edge they hold.
  * - Runs in the caller's transaction, so a rolled-back interaction leaves the

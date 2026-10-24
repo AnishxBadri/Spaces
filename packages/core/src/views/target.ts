@@ -4,18 +4,13 @@ import type { ViewSurface } from '@spaces/db/schema/views'
 export type { ViewSurface }
 
 /**
- * How a view names the list it belongs to (D2, decided 2026-09-23) — the
- * key half of the view server fns, and the `view_surface_object_id` CHECK
- * spelled as a type. `object` is a row of the object registry; `document` is
- * /documents, a research kind with no object row and no attribute registry,
- * so it takes no further fields.
- *
- * A third surface is a migration to the `view_surface` enum plus an arm
- * here and a branch wherever this union is matched — never a registry row.
- * See CONTEXT.md "Lists — deferred" for the rule that admits one.
- *
- * Client-safe on purpose: the ViewBar builds a target to save with, and
- * `views/store.ts` cannot be imported from the browser (it imports the db).
+ * How a view names the list it belongs to: the key half of the view server
+ * fns, and the `view_surface_object_id` CHECK spelled as a type. `object` is a
+ * row of the object registry; `document` is /documents, which has no object
+ * row or attribute registry, so it takes no further fields.
+ * - A third surface is a `view_surface` enum migration plus an arm here and
+ *   wherever this union is matched — never a registry row.
+ * - Client-safe: the ViewBar builds a target, and the view store imports db.
  */
 export type ViewTarget =
   { surface: 'object'; objectId: string } | { surface: 'document' }
@@ -32,7 +27,7 @@ export const viewTarget = (objectId: string | null): ViewTarget =>
  * The unresolved key a caller sends. On the `object` surface it names the
  * object either by core kind or by id — **exactly one**, so a call that
  * supplies neither is a validation error rather than a silent resolve to
- * 'company' (which is what this slice removed).
+ * 'company'.
  */
 export const objectKeyFields = {
   surface: z.literal('object'),

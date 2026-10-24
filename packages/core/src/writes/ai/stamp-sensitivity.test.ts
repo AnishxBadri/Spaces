@@ -4,12 +4,10 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * `chunk.sensitive` has one writing module, `stamp-sensitivity.ts`, across
- * the whole workspace — apps, packages and plugins, seeds included, tests
- * excluded (a test may insert a stamped fixture row) — and every write of a
- * binding or the workspace default names its raise. The behaviour of the
- * raise and the lowering job is asserted beside the write paths that call
- * them, in apps/web's `restamp.test.ts` and `restamp-inputs.test.ts`.
+ * `chunk.sensitive` has one writing module (`stampSensitivity`'s) across the
+ * whole workspace — seeds included, tests excluded, since a test may insert a
+ * stamped fixture row — and every write of a binding or the workspace default
+ * names its raise. Raise and lowering behaviour is tested in apps/web.
  */
 
 const root = resolve(

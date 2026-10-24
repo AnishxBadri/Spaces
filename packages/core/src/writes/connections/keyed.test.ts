@@ -19,7 +19,7 @@ import {
 import { accessTokenFor } from './token'
 
 /**
- * A member's Granola key on You → Meeting notes (D78), against the fake
+ * A member's Granola key on You → Meeting notes, against the fake
  * Granola: one `account_connection` row with an `api_key` bundle, the
  * member's folders listed with their key, ticks written to `settings`.
  */

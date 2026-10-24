@@ -4,7 +4,7 @@ import type { DomainEvent } from '@spaces/sdk'
 /**
  * Auto-enrich scopes: which of a record's triggers run an integration's
  * event jobs for the owner. Host state on `integration.config`, never a
- * plugin setting. (D76)
+ * plugin setting.
  * - `deal`: the record joins a deal; `space`: it is filed into a chosen
  *   space (or a space below one); `meeting`: it appears in a synced
  *   meeting or a recorded call (`interaction.logged`).

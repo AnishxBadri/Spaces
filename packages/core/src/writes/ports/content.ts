@@ -71,80 +71,42 @@ import { integrationMeta } from './identity'
 import { ReceiptNotOwned, checkReceipt, insertReceipt } from './receipts'
 
 /**
- * ContentLive's interaction and signal lanes (sdk-7b; spec §4, D52, D57):
- * the evidence rows a syncer, a researcher or a webhook job writes, stamped
+ * ContentLive's interaction, signal and document lanes. Every row is stamped
  * `source_class 'integration'` + `source_ref` = the bound row **by the
- * port**. The claim types carry no source (D52), and nothing below reads a
- * field a claim does not declare — the rows are built field by field, never
- * by spreading the claim — so a job cannot change who wrote them.
- *
- * - `logInteraction` is core's integration interaction lane,
- *   `writeIntegrationInteraction` (`../interactions/write.ts`), the one the
- *   forwarding mailbox runs on: one row per `messageId` through
- *   `interaction_message_id_unique` — a duplicate writes nothing and hands
- *   back the existing row's id — and a new row every time when the claim
- *   has no key, as on the manual path. An edge per entity, a merged-away id
- *   following `merged_into_id` to the survivor; an id that does not exist is
- *   a permanent failure, since retrying would name it again.
- * - **The body is the interaction's note, and its visibility is the
- *   port's** (D30, D49): the claim carries no visibility field and must not
- *   grow one. A body written through `logInteraction` is born **`private`**,
- *   authored by the bound row's connection user, else the admin who
- *   installed it, else the first admin. Synced mail is `logEmail`'s, whose
- *   lane reads the connection's own setting (D67).
- * - `emitSignal` writes one `signal` row on the entity — `source` is the
- *   manifest id (display text), the claim's own fields and its `payload`
- *   kept whole in `payload`, a cited receipt (this integration's own) as
- *   `refs: ['event:<receiptId>']` — and one `signal.emitted` activity row with no
- *   user and the integration in `meta`, which is how the record timeline
- *   names the plugin (sdk-7a). Evidence, not a fact: it never touches an
- *   attribute. A claim with a `key` is written once per (record,
- *   integration, key), decided under a transaction-scoped advisory lock on
- *   the triple: a re-emit writes nothing and hands back the first id.
- * - `fileDocument` (sdk-8, D52) is a **thin port over core's intake** and
- *   has no pipeline of its own: it validates the claim, opens the plugin's
- *   bytes as a `Readable`, and hands them to `intakeDocumentProgram` with
- *   `source_class 'integration'`, `source_ref` = the bound row and the actor
- *   `{ integrationId }` — so `uploaded_by` and the activity row's
- *   `actor_id` are null and the integration is named by the ref. The size
- *   meter (`MAX_UPLOAD_BYTES`, which no claim field can raise), the digest,
- *   the store write, birth's per-target dedupe and the post-commit
- *   extraction enqueue (core's `Enqueue`, which is why this Layer requires
- *   one) are all intake's and birth's. Nothing here writes a `document` row,
- *   hashes a byte or touches the blob store — copying any of that is how the
- *   plugin lane and the hand upload would drift apart, and the
- *   workspace-rooted greps in `../documents/intake.test.ts` fail naming a
- *   second writer. Targets follow `merged_into_id` to the survivor, as the
- *   interaction lane's edges do.
- * - `logInteraction` with a `recorder` payload (D68) stores the payload as a
- *   receipt with no record before anything else, resolves its participants
- *   through the `MeetingLane`'s participants module, and hands the rest to
- *   `writeRecordedInteraction`, which attaches it to the calendar meeting or
- *   births a call. It writes no note: what the notes become is the host's
- *   landing rules' (D78).
- * - `logRecordedNote` (D78) is the recorder contract: a checked note, its
- *   attendees through the participants module, and `writeRecordedNote` —
- *   keyed per bound connection, its author that connection's member. A gone
- *   note, or one with `deletedAt`, is `removeRecordedNotesProgram`. Once the
- *   write commits it queues the note's action items and files the opted-in
- *   transcript.
- * - Every interaction write's `interaction.logged` events are dispatched
- *   once it commits.
+ * port**: claims carry no source, and rows are built field by field, never
+ * by spreading the claim, so a job cannot change who wrote them.
+ * - `logInteraction` runs `writeIntegrationInteraction`: one row per
+ *   `messageId` (a duplicate hands back the existing id), a new row each time
+ *   without one. Merged ids follow `merged_into_id`; an unknown id is a
+ *   permanent failure.
+ * - The body is the interaction's note and its visibility is the port's: the
+ *   claim must not grow a visibility field. Born `private`, authored by the
+ *   connection user, else the installing admin, else the first admin.
+ * - `emitSignal` writes one `signal` row plus a `signal.emitted` activity
+ *   row; evidence, never an attribute. A keyed claim is written once per
+ *   (record, integration, key) under an advisory lock on the triple.
+ * - `fileDocument` is a thin port over `intakeDocumentProgram`: nothing here
+ *   writes a `document` row, hashes a byte or touches the blob store — a
+ *   copy would let the plugin lane and hand upload drift apart.
+ * - A `recorder` payload is stored as a receipt first, then handed to
+ *   `writeRecordedInteraction`; it writes no note. `logRecordedNote` is the
+ *   recorder note contract (`writeRecordedNote`, `removeRecordedNotesProgram`).
+ * - `interaction.logged` events are dispatched once the write commits.
  */
 
 /**
- * `logMeeting` (SDK 1.5) checks the claim — a bundle is JavaScript — and
+ * `logMeeting` checks the claim — a bundle is JavaScript — and
  * hands it to the `MeetingLane`, which this Layer requires: the noise rules
  * and the participants module are the arrival lane's, and a second copy of
  * either here is how a calendar attendee and a mail participant would drift
  * apart. Records it creates are created by the body author below.
  *
- * `logEmail` (SDK 1.5) checks and decodes the claim and hands it to the
+ * `logEmail` checks and decodes the claim and hands it to the
  * `EmailLane` the same way: the parser, noise rules, exclude list and the
  * body's visibility are the arrival lane's, read from the bound connection.
  */
 
-/** A body written through `logInteraction` is private to its author (D30). */
+/** A body written through `logInteraction` is private to its author. */
 export const PLUGIN_BODY_VISIBILITY: BodyVisibility = 'private'
 
 const messageOf = (cause: unknown) =>
@@ -716,7 +678,7 @@ export const ContentLive = (
       url: claim.url ?? null,
       mime: claim.mime,
       kind,
-      // Provenance is the port's (D52): the claim carries none, and these
+      // Provenance is the port's: the claim carries none, and these
       // are the only values intake is ever handed from here.
       sourceClass: 'integration',
       sourceRef: row.id,
@@ -743,7 +705,7 @@ export const ContentLive = (
     }
     const { participants, recorder } = read
 
-    // The payload first, whole, before anything it claims is applied (D68).
+    // The payload first, whole, before anything it claims is applied.
     const receiptId =
       recorder === null
         ? null

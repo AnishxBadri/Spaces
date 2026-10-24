@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { Manifest } from '@spaces/sdk'
 
 /**
- * A source's credit policy (D53): how long its receipt is reused and its
+ * A source's credit policy: how long its receipt is reused and its
  * daily cap. The plugin host's guard and the host's auto-enrich checks read
  * it the same way.
  */

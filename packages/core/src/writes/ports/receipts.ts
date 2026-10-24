@@ -9,10 +9,10 @@ import type { Tx } from '../attributes/values'
 import type { BoundIntegration } from './binding'
 
 /**
- * ReceiptsLive (sdk-7a): one `enrichment_record` per `store`, the provider's
- * payload kept whole (`raw`), `credits_used` when the job supplies it (D53
- * counts spend from these), and the bound integration in `integration_id`
- * (D57) — from the row, never from the claim. `provider` is display text,
+ * ReceiptsLive: one `enrichment_record` per `store`, the provider's payload
+ * kept whole (`raw`), `credits_used` when the job supplies it (spend is
+ * counted from these), and the bound integration in `integration_id` — from
+ * the row, never from the claim. `provider` is display text,
  * written as the plugin's manifest id.
  */
 export const ReceiptsLive = (

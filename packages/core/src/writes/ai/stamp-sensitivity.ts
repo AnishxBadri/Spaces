@@ -11,28 +11,15 @@ import type {
 } from './sensitivity-for'
 
 /**
- * The only module that writes `chunk.sensitive`, a derived cache of the
- * resolver so retrieval can filter in SQL before scoring. Two writers, one
- * per direction:
- *
- * - `stampSensitivity(entityId)` resolves the entity live (`sensitivityFor`)
- *   and writes the answer onto every chunk it owns. The embed job calls it
- *   for the chunks it has just written; the `sensitivity.restamp` job calls
- *   it after a flag is cleared or a filing removed.
- * - `raiseSensitivity(tx, scope)` is the set-based raise, run inside the
- *   transaction that writes a sensitivity input: a record's flag, a filing,
- *   a binding, a document's binding, the workspace default.
- * - `restampStampedProgram()` is the lowering after the workspace default
- *   goes back to normal: every entity still stamped, restamped live.
- *
- * Raising is synchronous and lowering is a job: the cautious OR means a new
- * sensitive input can only raise, so the raise needs no resolver; a removed
- * one may leave another input still holding the entity sensitive, so the
- * lowering resolves live. `stampedSensitive` names the entities a lowering
- * must restamp.
- *
- * The routing boundary never reads this column — `complete()` and `embed()`
- * resolve live, because a stale cache where bytes leave the box is a leak.
+ * The only module that writes `chunk.sensitive`, a cache of the resolver so
+ * retrieval can filter in SQL before scoring.
+ * - `stampSensitivity` writes the live answer onto an entity's chunks (embed
+ *   job, `sensitivity.restamp` job).
+ * - `raiseSensitivity` runs inside the transaction that writes a sensitivity
+ *   input. Raising needs no resolver (the OR can only go up); lowering is a
+ *   job that resolves live, since another input may still hold it.
+ * - The routing boundary never reads this column: `complete()` and `embed()`
+ *   resolve live, because a stale cache where bytes leave the box is a leak.
  */
 
 export class StampWriteFailed extends Schema.TaggedError<StampWriteFailed>()(

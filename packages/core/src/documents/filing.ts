@@ -1,19 +1,12 @@
 /**
- * Where a document is filed (SPA-19). Two mechanisms, never mixed, exactly
- * the split notes already carry (CONTEXT.md → Sources are documents): a
- * record files through `link(tagged_in)`, a space files through
- * `entity_space`, which is what gives a space-filed document the
+ * Where a document is filed. Two mechanisms, never mixed, the same split
+ * notes carry: a record files through `link(tagged_in)`, a space files
+ * through `entity_space`, which gives a space-filed document the
  * source/confidence provenance every other member of a space has.
  *
- * It is a discriminated union rather than a bare uuid because the old
- * `attachTo: string` made "a space is a link target" expressible, and the
- * whole of migration 0008 was undoing that for notes. Here the caller has to
- * say which mechanism it means, and the writer checks the entity agrees.
- *
- * Pure, and in core since SPA-201 (sdk-8a): document birth moved to
- * `writes/documents/birth.ts` and needs both halves, and core never reaches
- * back into apps/web. `apps/web/src/lib/server/shared.ts` re-exports them so
- * its importers are unchanged.
+ * A discriminated union rather than a bare uuid so "a space is a link
+ * target" is not expressible: the caller says which mechanism it means, and
+ * the writer checks the entity agrees.
  */
 export type DocumentFilingTarget =
   { kind: 'record'; entityId: string } | { kind: 'space'; entityId: string }

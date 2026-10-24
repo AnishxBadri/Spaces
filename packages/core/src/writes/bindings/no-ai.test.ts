@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest'
 /**
  * A bound folder's filing never calls a model: `resolveItem`, its kind
  * dictionary and the sync walk import nothing under an `ai` namespace.
- * Storage sources deliver bytes; the extraction event fires the AI features
- * (spec-ai-substrate §11). A grep over each module's import specifiers.
+ * Storage sources deliver bytes; the extraction event fires the AI features.
+ * A grep over each module's import specifiers.
  * - The sensitivity stamp is the one exception: a chunk flag written in the
  *   filing's transaction, never a model call.
  */

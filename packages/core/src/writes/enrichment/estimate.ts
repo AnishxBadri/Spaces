@@ -41,7 +41,7 @@ import { sendRun } from './auto'
 import { spendSince } from './credits'
 
 /**
- * Bulk Enrich from a list (D76): `bulkEstimateProgram` reads what
+ * Bulk Enrich from a list: `bulkEstimateProgram` reads what
  * `estimateBulk` needs and spends nothing; `bulkEnrichProgram` recomputes
  * it and sends one `enrichment.run` per record asked.
  * - The send is keyed on the record, so a record already queued or parked
@@ -50,7 +50,7 @@ import { spendSince } from './credits'
  *   at the next 00:00 UTC and `parkedBy`, the auto-enrich parking path.
  * - A paid source's rate is the mean credits of its paid receipts over
  *   `RATE_DAYS`, else `DEFAULT_CREDITS_PER_RECORD`: web never loads the
- *   plugin bundle whose `cost` hook knows it. (D53, D63)
+ *   plugin bundle whose `cost` hook knows it.
  */
 
 export class BulkEstimateFailed extends Schema.TaggedError<BulkEstimateFailed>()(

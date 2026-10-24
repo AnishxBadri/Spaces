@@ -6,21 +6,13 @@ import type {
 import type { AttributeType } from '../attributes/registry'
 
 /**
- * AI attributes (SPA-72, docs/spec-ai-substrate.md §13) — the pure half.
- *
- * **The spec's `attribute.config.ai` is the code's `attribute.options.ai`.**
- * There is no `config` column: the per-type blob is `attribute.options`
- * jsonb, so `options.ai = {mode, prompt, variables?, lane}` is the spec's
- * `config.ai` under its real name (`AiAttributeConfig`,
- * `packages/db/src/schema/attributes.ts`). Config on the existing types, not
- * new types: nothing here names an object, so a custom object's attribute
- * gets the affordance the moment its type can hold a mode.
- *
- * What lives here: the mode × type matrix the config panel and the update
- * program both read, the mode → lane map, the config's decoder, the
- * `{{slug}}` variable grammar, and the rationale line that carries a
- * proposed new select option (a registry proposal — never a value, never a
- * silent new option).
+ * AI attributes, the pure half: the mode × type matrix, the mode → lane map,
+ * the `options.ai` decoder (`AiAttributeConfig`), the `{{slug}}` variable
+ * grammar, and the rationale line that carries a proposed new select option.
+ * - AI is config on existing types, not new types, and names no object, so a
+ *   custom object's attribute gets it once its type can hold a mode.
+ * - A proposed option is a registry proposal — never a value, never a silent
+ *   new option.
  */
 
 export type { AiAttributeConfig, AiAttributeMode }

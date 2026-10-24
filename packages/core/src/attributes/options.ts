@@ -13,7 +13,7 @@ export type OptionLike = {
 }
 
 /**
- * How one stored option id renders (spec §3): its label, its palette
+ * How one stored option id renders: its label, its palette
  * position, and whether the option has been retired. An archived option
  * still resolves — a value never silently vanishes from a chip, a cell, or
  * the timeline — it just wears the greyed treatment.

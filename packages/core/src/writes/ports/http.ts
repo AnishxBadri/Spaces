@@ -10,36 +10,20 @@ import { noScrub } from './binding'
 import type { Scrub } from './binding'
 
 /**
- * HttpLive (sdk-6a): the only way a plugin reaches the network — no raw
- * `fetch` in a plugin (spec §4). A fetch with a throttle in front of it that
- * learns the provider's limits from its responses rather than from a
- * hardcoded rate (CONTEXT.md, Enrichment: "read rate-limit headers, do not
- * hardcode"):
+ * HttpLive: the only way a plugin reaches the network — no raw `fetch` in a
+ * plugin. The throttle learns limits from responses, never a hardcoded rate:
+ * - **429.** Wait for `Retry-After` (seconds or HTTP date), else
+ *   `X-RateLimit-Reset` with `Remaining: 0`, else one second; hold every call
+ *   on this binding and retry **once**. A second 429 fails `JobRateLimited`,
+ *   which `runJob` re-sends without spending the retry budget.
+ * - **Remaining 0 on any response** holds the next call until the reset.
+ * - **`manifest.http.rateLimit.rpm`** spaces requests `60s / rpm` apart.
+ * - **The throttle is per worker process**, keyed by integration row: several
+ *   workers can exceed a provider's limit by that factor.
  *
- * - **429.** `Retry-After` (seconds or an HTTP date), else
- *   `X-RateLimit-Reset` with `X-RateLimit-Remaining: 0`, says when to come
- *   back; with neither, one second. The throttle holds every call on this
- *   binding until then, and the request is retried **once**. A second 429
- *   fails `JobRateLimited` with the wait it asked for, and the worker re-sends
- *   the job later without spending its retry budget (`runJob`).
- * - **Remaining 0 on any response.** `X-RateLimit-Remaining: 0` with a reset
- *   holds the next call until the reset, so the 429 never happens.
- * - **`manifest.http.rateLimit.rpm`.** When the manifest declares one,
- *   requests start at least `60s / rpm` apart: concurrent calls queue behind
- *   the throttle rather than bursting.
- *
- * **The throttle is per worker process.** Its state lives in this module,
- * one entry per integration row, so every job of one integration in this
- * process shares it — and a second worker process has its own. A deployment
- * that runs several workers can exceed a provider's limit by that factor;
- * a shared throttle (in Postgres) is the fix when that deployment exists.
- *
- * Network failures are `JobRetryable`; any other status comes back as a
- * response for the job to judge. A string or byte request body is sent as
- * is, anything else as JSON. `request` reads the response body as text; `stream`
- * hands it over unread, so a download is never buffered here. Every error reason passes through the
- * binding's scrub, so a key carried in a URL is never written whole.
- * Time is Effect's `Clock`, so a test drives it with `TestClock`.
+ * Network failures are `JobRetryable`; other statuses go back to the job.
+ * `stream` hands the body over unread. Every error reason passes the
+ * binding's scrub, so a key in a URL is never written whole. Time is `Clock`.
  */
 
 /** What HttpLive calls — `globalThis.fetch`'s shape; a test hands a fake. */

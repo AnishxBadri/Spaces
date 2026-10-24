@@ -16,31 +16,18 @@ import {
 import { tombstoneDocument } from '../bindings/tombstone'
 
 /**
- * Delete executor (SPA-77). The third consumer of ENTITY_REFS, beside the
- * merge executor and the context assembler: every column that points at an
- * entity declares `del`, and this walks the list rather than hand-listing
- * tables. `deleteDocument` and `deleteTerm` each carried such a hand-list,
- * and both had already fallen behind it — neither cleared `entity_space`,
- * `task_entity`, `interaction_entity` or `duplicate_candidate`, so a
- * document tagged into a space could not be deleted at all.
- *
- * One transaction, three phases:
- *
- *  1. every `block` column is checked before a single row is touched, so a
- *     refusal costs nothing and rolls back nothing;
+ * Delete executor: every column that points at an entity declares `del` in
+ * `ENTITY_REFS`, and this walks the list rather than hand-listing tables.
+ * Adding an entity-referencing column means adding a registry entry, not
+ * editing this file. One transaction, three phases:
+ *  1. every `block` column is checked before a row is touched, so a refusal
+ *     costs nothing and rolls back nothing;
  *  2. every `cascade` / `orphan` column is applied, in registry order;
  *  3. the side-table row and the entity row go last.
  *
- * Adding an entity-referencing column therefore means adding a registry
- * entry, not editing this file.
- *
- * **Side tables dispatch on kind, they are not passed in by the caller.**
- * The registry deliberately cannot answer for them — a side table's own
- * single-column PK *is* the entity, so the membership rule excludes it — and
- * of the two designs the issue offers, dispatch is the one that cannot be
- * forgotten: a caller that omits its side table gets a foreign-key violation
- * at run time, whereas a kind missing from `SIDE_TABLES` below is a type
- * error, because the map is keyed by every `entity.kind`.
+ * Side tables dispatch on kind, not from the caller: the registry cannot see
+ * them (their PK *is* the entity), and a kind missing from `SIDE_TABLES` is a
+ * type error, where a forgetful caller would be a runtime FK violation.
  */
 
 /** The delete was refused; `key` is the ENTITY_REFS entry that refused it. */
@@ -94,8 +81,7 @@ const SIDE_TABLES: Record<EntityKind, SideTable | null> = {
 
 /**
  * TS property name for a column — `update().set()` is keyed by property, not
- * by SQL name. merge.ts carries the same six lines for the same reason;
- * sharing them would make every delete import the merge executor and its
+ * by SQL name. The merge executor carries the same six lines; sharing them would make every delete import the merge executor and its
  * import-time handler check.
  */
 function propertyKey(table: PgTable, column: PgColumn): string {

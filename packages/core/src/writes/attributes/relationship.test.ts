@@ -14,7 +14,7 @@ import { updateAttributeProgram } from './update'
 import { setValues, setValuesInTx } from './values'
 import type { Cardinality } from '../../attributes/relationship'
 
-/** A relationship is a pair of attributes, its value stored once on the owner. (D69) */
+/** A relationship is a pair of attributes, its value stored once on the owner. */
 
 const actor = { type: 'user', id: FIXTURE_ACTOR.id } as const
 const tag = () => randomUUID().slice(0, 8)

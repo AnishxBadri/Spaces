@@ -20,7 +20,7 @@ import { setValues } from './values'
 import type { CreateAttributeInput } from './create'
 import type { Cardinality } from '../../attributes/relationship'
 
-/** Edits widen only; system attributes are never archived. (D69) */
+/** Edits widen only; system attributes are never archived. */
 
 const actor = { type: 'user', id: FIXTURE_ACTOR.id } as const
 const tag = () => randomUUID().slice(0, 8)

@@ -2,8 +2,8 @@ import type { integration } from '@spaces/db/schema'
 import { redact } from '../vault/crypto'
 
 /**
- * The integration row a plugin's ports are bound to (sdk-6a; spec §4). The
- * loader builds one Layer per (integration, job) from it (sdk-12b): every
+ * The integration row a plugin's ports are bound to. The loader builds one
+ * Layer per (integration, job) from it: every
  * port here takes the row, so provenance, credentials and config come from
  * the binding and never from the plugin's arguments.
  */

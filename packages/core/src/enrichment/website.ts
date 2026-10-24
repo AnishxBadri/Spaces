@@ -10,7 +10,7 @@ import type { ContextItem } from '../context/types'
 import { PICTURE_KEYS } from './picture'
 
 /**
- * The built-in Website source, pure half (D76, D80): a company's own pages
+ * The built-in Website source, pure half: a company's own pages
  * read to text, in two halves.
  * - The markup half needs no model: the meta description (else the title),
  *   the icon or share image as the logo, the profile links in the markup.

@@ -5,12 +5,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { dataDir } from './key'
 
 /**
- * SPA-101. The whole tree moved under `apps/web`, which moved every cwd the
- * app is ever started from. `dataDir()` used to fall back to
- * `process.cwd()/data`, so after the move `pnpm dev` would have quietly used
- * `apps/web/data` — a fresh directory, a freshly generated `secret.key`, and
- * every credential in the vault unreadable. Nothing throws when that happens,
- * which is why it is pinned here instead of in a comment.
+ * `dataDir()` must not follow the cwd: under `pnpm --filter` that is
+ * `apps/web`, so a cwd fallback would mean a fresh `data/`, a freshly
+ * generated `secret.key`, and every credential unreadable. Nothing throws
+ * when that happens, which is why it is pinned by a test.
  */
 
 const repoRoot = fileURLToPath(new URL('../../../../../', import.meta.url))

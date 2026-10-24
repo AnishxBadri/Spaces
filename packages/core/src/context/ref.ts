@@ -14,7 +14,7 @@
  *   term:<entityId>            a glossary term
  *
  * Entity ids inside refs may be merged losers; resolvers follow
- * merged_into_id at read time (decided 2026-09-09).
+ * merged_into_id at read time.
  */
 
 export type ParsedRef =

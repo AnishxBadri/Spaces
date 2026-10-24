@@ -52,11 +52,8 @@ import {
 /**
  * The one write path for attribute values. Validates against the registry,
  * diffs, writes entity.values, records attribute_event rows, and syncs
- * record-reference link rows — all in one transaction.
- *
- * Effect-first per the backend-paradigm ratchet (converted in SPA-6, the
- * first behavioral change to the engine after the rule landed): planning is
- * a pure program with typed failures; the transaction applies the plan.
+ * record-reference link rows — all in one transaction. Planning is a pure
+ * program with typed failures; the transaction applies the plan.
  * `setValues` is the Promise seam for server-fns and tests.
  */
 
@@ -64,7 +61,7 @@ import {
  * An object's live attributes, in order.
  * - The inverse half of a pair (`isDerived`) is left out unless asked for:
  *   `values` never holds it, so a reader that wrote back what it read would
- *   empty the relationship. `setValuesInTx` asks. (D69)
+ *   empty the relationship. `setValuesInTx` asks.
  */
 export async function getRegistryByObjectId(
   objectId: string,
@@ -112,8 +109,8 @@ export class EntityNotFound extends Schema.TaggedError<EntityNotFound>()(
 ) {}
 
 /**
- * A write to the derived half of a relationship whose owner is archived
- * (D69): archiving a half detaches the pair, so the derived half stores
+ * A write to the derived half of a relationship whose owner is archived:
+ * archiving a half detaches the pair, so the derived half stores
  * nothing new. The refusal names the archived pair.
  */
 export class PairedAttributeLocked extends Schema.TaggedError<PairedAttributeLocked>()(
@@ -130,11 +127,10 @@ const invalid = (slug: string, detail: string) =>
   new AttributeValidationError({ slug, message: `${slug}: ${detail}` })
 
 /**
- * Who attended to a write (spec §4). `user` carries the user FK; `integration`
- * carries the `integration` row's id (SPA-70 — the table landed, so the
- * id-less member is gone and the column's biconditional check is what makes
- * its absence unrepresentable rather than merely discouraged); `system` is
- * the merge executor and seeds — rewrites no person asserted.
+ * Who attended to a write. `user` carries the user FK; `integration` carries
+ * the `integration` row's id (the column's check constraint makes it
+ * required); `system` is the merge executor and seeds — rewrites no person
+ * asserted.
  */
 export type Actor =
   | { type: 'user'; id: string }
@@ -157,8 +153,7 @@ type Change = {
  * semantics: keys present are set; null (or '' / undefined) clears; absent
  * keys are untouched; no-op diffs drop out.
  *
- * `required` means can't-clear, nothing more (spec §5, grilled 2026-09):
- * an explicit clear of a required attribute is rejected for every type. A
+ * `required` means can't-clear, nothing more: an explicit clear of a required attribute is rejected for every type. A
  * record may still be *born* without the value — creation completeness is
  * the create dialog's concern, and machine writes and imports legitimately
  * create partial records. Clearing an already-empty required field is a
@@ -222,7 +217,7 @@ function ofObject(objectId: string, core: ObjectKind | null): SQL {
 }
 
 /**
- * The widening reshape (D69): every record of the object holding a scalar
+ * The widening reshape: every record of the object holding a scalar
  * under `slug` gets it back as a one-element list, in one statement, and the
  * attribute gets one `attribute_event` — never one per record.
  * - Absent keys, nulls and lists are left alone; reference links are
@@ -268,7 +263,7 @@ export async function wrapStoredValues(
 }
 
 /**
- * 1:1 and 1:N on the owner (D69): a target may be held by one owner at a
+ * 1:1 and 1:N on the owner: a target may be held by one owner at a
  * time. The refusal names the record that already holds it.
  */
 async function checkHeldOnce(
@@ -345,7 +340,7 @@ async function checkReferences(tx: Tx, change: Change) {
   if (targets.length !== ids.length)
     throw invalid(slug, 'Referenced record not found')
   for (const t of targets) {
-    // Targets stay single-object (§6): a core kind for the system objects,
+    // Targets stay single-object: a core kind for the system objects,
     // an object row for custom ones — the picker just lists more objects.
     if (def.options.targetObjectId) {
       if (t.objectId !== def.options.targetObjectId)
@@ -385,10 +380,10 @@ const identityString = (v: Json): string | null =>
   typeof v === 'string' && v.trim() !== '' ? v : null
 
 /**
- * Which identity keys this write touches (spec §9). Two sources, because a
- * no-op is still an answer: a slug the patch changed, and a slug the patch
- * named without changing — re-writing the domain you already own is
- * `already_own`, and that is the outcome objects-8 shows. Reconciling the
+ * Which identity keys this write touches. Two sources, because a no-op is
+ * still an answer: a slug the patch changed, and a slug the patch named
+ * without changing — re-writing the domain you already own is
+ * `already_own`. Reconciling the
  * no-op is also what re-adds an alias that went missing, so the claim and
  * the field cannot drift apart silently.
  */
@@ -427,7 +422,7 @@ const identityList = (v: Json): Array<string> =>
 
 /**
  * A multi-valued identity slug, claimed element by element before its value
- * is written (D75), so the stored array and the aliases cannot disagree.
+ * is written, so the stored array and the aliases cannot disagree.
  * - A removed element retires its alias; every remaining one is claimed.
  * - An element another record holds is refused: dropped from the value and
  *   raised as a `duplicate_candidate`; the rest of the patch still writes.
@@ -514,37 +509,34 @@ export type SetValuesInput = {
   suggestionId?: string
   refs?: Array<string>
   /**
-   * The import batch this write belongs to (SPA-169), stamped on every
+   * The import batch this write belongs to, stamped on every
    * event it writes — the supplied values and the defaults alike — so a
    * commit's receipts are findable by batch.
    */
   batchId?: string
   /**
-   * Birth mode (spec §4): after the patch, fill every still-blank attribute
+   * Birth mode: after the patch, fill every still-blank attribute
    * that carries a default, logged through the `default` door — inside the
    * same transaction and registry read as the supplied values.
    */
   fillDefaults?: { now: Date }
   /**
-   * Fill-blanks mode (sdk-9, `Facts.fill`; spec-plugin-sdk §4, CONTEXT.md
-   * "Enrichment" — never overwrite a manually-edited field). Decided here,
-   * after the `FOR UPDATE` row lock, against the values the lock returned:
-   * deciding "blank" before the transaction is the read-modify-write race
-   * the lock exists to prevent. Per slug the patch changes:
-   *
+   * Fill-blanks mode (`Facts.fill`: never overwrite a manually-edited
+   * field). Decided after the `FOR UPDATE` row lock, against the values it
+   * returned: deciding "blank" before the transaction is the race the lock
+   * prevents. Per slug the patch changes:
    * - blank (absent or null) → filled, unless a person cleared it: a
    *   blank whose latest `attribute_event` is a user's is user-held and
-   *   skipped (`skipped`), neither written nor a conflict (D72);
+   *   skipped (`skipped`), neither written nor a conflict;
    * - held, and the slug's latest `attribute_event` is this write's own
    *   actor (same type and id) recording the value still held → updated in
    *   place: machine-over-machine by the same integration is a fill;
    * - a relationship (`record_reference`) fills only when empty: any held
-   *   value is refused, this actor's own included (D72);
+   *   value is refused, this actor's own included;
    * - held by anyone else — a person, another integration, a merge, a
    *   value with no event at all → refused, written nowhere, and handed
    *   back in `conflicts`. Disagreement between providers is normal;
    *   last-write-wins would corrupt it.
-   *
    * Validation still runs over the whole patch first, so a value the
    * registry refuses fails the write (`AttributeValidationError`) whether
    * or not its slug would have conflicted, and a required attribute's
@@ -581,9 +573,8 @@ export type ValueConflict = {
  * `identity` is the per-slug outcome of the identity mirror, computed
  * inside the transaction that wrote the values — decided here, where the
  * claim was actually made, and nowhere else can reconstruct it afterwards.
- * `updateRecord` and `createObjectRecord` hand both maps to the client, and
- * `collisionToast` turns them into the one sentence a losing write owes the
- * operator (SPA-97 — "a conflict is never silent").
+ * `collisionToast` turns both maps into the sentence a losing write owes
+ * the operator: a conflict is never silent.
  *
  * `identityValues` is the same keys, carrying the *normalized* value each
  * slug asserted — what the unique index compared, so the toast names
@@ -605,11 +596,10 @@ export type SetValuesResult = {
    */
   identityClaims: Record<string, Array<IdentityClaim>>
   /**
-   * The embeddable values this write set (SPA-132), to be chunked once it
-   * has committed. The caller queues them — apps/web's `enqueueSourceEmbed`
-   * — because the queue reads the environment and core may not
-   * (SPA-174/175); a caller that owns the transaction owned that step
-   * already. A clear is not here: its chunks were deleted inside the write.
+   * The embeddable values this write set, to be chunked once it has
+   * committed. The caller queues them (`enqueueSourceEmbed`) because the
+   * queue reads the environment and core may not. A clear is not here: its
+   * chunks were deleted inside the write.
    */
   reembed: Array<EmbedSource>
   /**
@@ -719,8 +709,7 @@ const ownedBy = (actor: Actor, held: Json, last: LastWriter | undefined) => {
  * is the usual door and opens its own; a caller whose write must be atomic
  * with a row of its own passes its transaction here instead — accepting a
  * suggestion flips `status` and writes the value in one transaction, so two
- * concurrent accepts cannot both write (`apps/web/src/lib/ai/propose.ts`,
- * SPA-46). Refusals throw the typed errors (`AttributeValidationError`,
+ * concurrent accepts cannot both write (`acceptProgram`). Refusals throw the typed errors (`AttributeValidationError`,
  * `EntityNotFound`), which roll the caller's transaction back.
  */
 export async function setValuesInTx(
@@ -799,7 +788,7 @@ export async function setValuesInTx(
     name,
     birth: fillDefaults !== undefined,
   })
-  // The inverse half of a pair stores nothing (D69): its slugs leave the
+  // The inverse half of a pair stores nothing: its slugs leave the
   // patch here and are written on their owners once this record's own write
   // is done, so a self-relationship's owner write reads this one's result.
   const inverse = await planInverse(tx, registry, named)
@@ -975,16 +964,12 @@ export async function setValuesInTx(
     await recordNameAlias(entityId, renamed, claimSource, tx)
   }
 
-  // The declaration made flesh (spec §9): an attribute carrying
-  // `options.identityKey` mirrors its value into `entity_alias` as an
-  // identity alias, in this transaction, beside the `attribute_event`
-  // that logged it. The value is the user's field and always lands;
-  // only the *claim* is withheld from the loser of a race, which is a
-  // `duplicate_candidate` and never an error. A change of value
-  // retires the claim the old one made before asserting the new one,
-  // and a clear retires it and asserts nothing — clearing the value
-  // releases the claim (CONTEXT.md, 2026-09-19), so another record may
-  // take the domain.
+  // An `options.identityKey` attribute mirrors its value into
+  // `entity_alias` in this transaction, beside its `attribute_event`.
+  // - The value always lands; only the claim is withheld from a race's
+  //   loser, as a `duplicate_candidate`, never an error.
+  // - A change retires the old claim before asserting the new one; a clear
+  //   retires it and asserts nothing, so another record may take the key.
   for (const work of planIdentity(registry, current, effectivePatch, changes)) {
     if (work.held !== null && work.held !== work.value) {
       await releaseIdentityAlias(tx, entityId, work.key, work.held)
@@ -1074,7 +1059,7 @@ export async function setValuesInTx(
   }
 }
 
-/** A write to the inverse half of a pair, and the owner it lands on. (D69) */
+/** A write to the inverse half of a pair, and the owner it lands on. */
 type InverseWrite = {
   def: AttributeDef
   owner: AttributeDef
@@ -1192,7 +1177,7 @@ async function writeInverse(
         proposed: w.value,
         reference: true,
       })
-    // Fill-blanks: a relationship fills only when empty. (D72)
+    // Fill-blanks: a relationship fills only when empty.
     if (door.fillBlanks && held.length > 0) {
       conflict(w.def.options.multi ? held : (held.at(0) ?? null))
       continue
@@ -1288,9 +1273,8 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
         ? cause
         : new ValuesWriteFailed({ cause }),
   })
-  // `result.reembed` is the caller's to queue once this returns, silently
-  // (spec-ai-substrate §9: "automatic once enabled"). Until SPA-174/175 the
-  // loop was here; it moved out with the enqueue, which core cannot hold.
+  // `result.reembed` is the caller's to queue once this returns, silently:
+  // core cannot hold the enqueue.
   return result
 })
 

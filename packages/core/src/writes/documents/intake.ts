@@ -25,53 +25,24 @@ import type {
 } from './birth'
 
 /**
- * **The server byte lane** (SPA-130) — every arrival that is not a browser
- * PUT and has **no row yet**. A plugin filing a document through the SDK, a
- * pasted Drive link, the Drive walker: they hold a `Readable` server-side,
- * hold **no sha**, and want a document born at the end of it — which is the
- * half `birthDocumentProgram` deliberately cannot do. Built exactly once,
- * which is the point of the cluster.
- *
- * **The URL clip's PDF response is the one arrival this lane does not
- * serve** (docsurf-10b, `apps/worker/src/jobs/clip-document.ts`). This program ends
- * in birth, and a clip's row already exists — `clipUrlProgram` wrote it
- * before the fetch — so routing it here would mint a second document and
- * orphan the first. It hashes and `put`s the bytes itself, which is why
- * `intake.test.ts` asserts *two* `storage().put(` sites and not one.
- *
- * **The other lane is apps/web's `lib/documents/upload.ts`,** and browser
- * uploads must keep using it: the page hashes with WebCrypto and PUTs
- * straight at storage through a presigned URL, which is what keeps a 200 MB
- * deck out of Node (CONTEXT.md → Storage). The presigned PUT lands at
- * apps/web's `routes/api/blob/$key.ts`, which re-hashes through
- * `LocalStorage.putContentAddressed` because there the key is a *client's
- * claim*. Here the digest is something we measured ourselves, so the port's
- * plain `put` is the right call and `putContentAddressed` stays local-only —
- * promoting it onto the `Storage` port would offer S3 a verification it
- * cannot perform.
- *
- * Two constraints the shape exists for, and both are easy to get wrong:
- *
- * - **The sha is unknown until the bytes are read** (spec §4: bytes are
- *   hashed on arrival, always — no provider hash is trusted across
- *   providers). So the stream lands in a temp file under `os.tmpdir()` while
- *   a hash+meter transform runs over it, and only then is `put` called under
- *   the measured digest. Never a Buffer: 250 MB of deck must not become 250
- *   MB of RSS. The temp directory is `mkdtemp`'d and removed on **every**
- *   path — success, refusal, failure, interruption — by `acquireUseRelease`.
- *   Not `<DATA_DIR>/blobs/.incoming`, which is a local-driver detail while
- *   the store may well be S3.
+ * **The server byte lane** — every arrival that is not a browser PUT and has
+ * **no row yet** (a plugin's `Content.fileDocument`, a pasted Drive link, the
+ * Drive walker): a server-side `Readable`, **no sha**, and a document born at
+ * the end — the half `birthDocumentProgram` deliberately cannot do.
+ * - **Not the URL clip's PDF**: `clip-document.ts` already has its row, so
+ *   routing it here would mint a second document. It `put`s the bytes itself.
+ * - **Browser uploads stay on the presigned lane**, which keeps a 200 MB deck
+ *   out of Node; its blob route re-hashes via `putContentAddressed` because
+ *   the key is a client's claim. Here we measured the digest, so plain `put`.
+ * - **The sha is unknown until the bytes are read**; no provider hash is
+ *   trusted. The stream lands in a `mkdtemp` dir under `os.tmpdir()` (not the
+ *   local driver's dir: the store may be S3), removed on **every** path by
+ *   `acquireUseRelease`. Never a Buffer: 250 MB of deck must not be RSS.
  * - **`MAX_UPLOAD_BYTES` is enforced while streaming.** `declaredSize` is
- *   advisory and routinely absent — a Drive Docs export reports no size at
- *   all — so the meter is the guard that counts, and passing the limit
- *   destroys the source mid-transfer and leaves no blob behind.
- *
- * It lives in core's db-coupled half since SPA-201 (sdk-8a), with birth:
- * the worker files through it (a plugin's `Content.fileDocument`, sdk-8) and
- * reaches it through `@spaces/core`, never a `#web/*` crossing. It imports
- * nothing from apps/web; the extraction enqueue at the end of birth is
- * core's `Enqueue` service, which the caller provides. Never re-exported
- * from apps/web's `src/lib/server-fns.ts` (CLAUDE.md → Traps, SPA-155).
+ *   advisory and often absent, so the meter is the guard; passing the limit
+ *   destroys the source mid-transfer and leaves no blob.
+ * - Imports nothing from apps/web. Never re-export it from the client
+ *   server-fns barrel.
  */
 
 export type DocumentIntakeInput = {
@@ -80,7 +51,7 @@ export type DocumentIntakeInput = {
   filename: string
   /**
    * The page these bytes are the text of, for the one server-lane arrival
-   * that has one: a capture (SPA-111) stores the page's text as a blob *and*
+   * that has one: a capture stores the page's text as a blob *and*
    * keeps its address, which birth writes to `document.url`. Every other
    * caller omits it.
    */
@@ -93,7 +64,7 @@ export type DocumentIntakeInput = {
    */
   declaredSize: number | null
   kind: DocumentKind
-  /** The eight-value class, never a vendor (D1). `integration` + a ref here. */
+  /** The eight-value class, never a vendor. `integration` + a ref here. */
   sourceClass: SourceClass
   sourceRef: string | null
   provenance: DocumentProvenance
@@ -155,7 +126,7 @@ const removeTempDir = (dir: string) =>
   )
 
 /**
- * The stream, metered and hashed on its way to disk — the `local.ts`
+ * The stream, metered and hashed on its way to disk — the
  * `putContentAddressed` pattern, except that here the digest is the *answer*
  * rather than something to check a claim against.
  *
@@ -208,7 +179,7 @@ const drainToTempFile = Effect.fn('documentIntake.drainToTempFile')(function* (
  * `putBlobProgram`, so this module stays the one `storage().put(` site of the
  * server lane.
  *
- * `intent` is the `pending_blob` row (SPA-54), written **before** the bytes
+ * `intent` is the `pending_blob` row, written **before** the bytes
  * and only when they are new — the order `prepareBlobUploadProgram` keeps, so
  * no crash can leave stored bytes the orphan sweep has not heard of. Intake
  * passes none: birth follows in the same program and clears nothing it did
@@ -268,7 +239,7 @@ const storeAndBirth = Effect.fn('documentIntake.storeAndBirth')(function* (
     null,
   )
 
-  // The document row is still born on a stored blob — §3.4's dedupe is about
+  // The document row is still born on a stored blob — the dedupe is about
   // a *target*, and it is birth's rule to apply, not ours.
   return yield* birthDocumentProgram({
     blobSha: sha,
@@ -296,7 +267,7 @@ export type PutBlobInput = {
 }
 
 /**
- * **Bytes to a blob and nothing else** (SPA-164) — the lane for a payload
+ * **Bytes to a blob and nothing else** — the lane for a payload
  * that must never become a document: a spreadsheet staged for import is a
  * portfolio ledger, and a `document` row would queue extraction, chunks and
  * embeddings, which is exactly what must not happen to it. Same drain, same
@@ -350,7 +321,7 @@ export const intakeDocumentProgram = Effect.fn('intakeDocumentProgram')(
       (dir) => storeAndBirth(dir, input),
       (dir) => removeTempDir(dir),
     )
-    // Filed on a record that holds one of its kind: suggest, never link. (D59)
+    // Filed on a record that holds one of its kind: suggest, never link.
     if (input.fileAgainst.some((t) => t.kind === 'record'))
       yield* proposeNewerVersionProgram(born.id)
     return born

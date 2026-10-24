@@ -11,10 +11,9 @@ import {
 } from './index'
 
 /**
- * SPA-29. `resolveSecret` returned the decrypted string and nothing else, so
- * a credential's `meta` — the base URL and headers a gateway passthrough
- * needs — was unreachable through the vault's read path. `resolveCredential`
- * returns both; `resolveSecret` is now that minus the meta.
+ * `resolveCredential` returns the decrypted secret and the row's `meta` — the
+ * base URL and headers a gateway passthrough needs; `resolveSecret` is that
+ * minus the meta.
  */
 
 const base = {

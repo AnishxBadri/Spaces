@@ -9,10 +9,8 @@ const ASOF = '2026-09-10T00:00:00Z'
  * the walk can reach — attributes, alias, history, memo, shared note, a
  * teammate's private note, a deck with chunks, a space with a memo, a task,
  * an interaction — assembles it as two users, and snapshots the shape.
- *
- * In core since SPA-182: the judgment-memory lane is the `SimilarLane`
- * service, and these tests provide a stub of it — the empty lane for the
- * walk, a lane that hands back a private note for the leak invariant.
+ * The `SimilarLane` service is stubbed: the empty lane for the walk, a lane
+ * that hands back a private note for the leak invariant.
  */
 describe('assembleProgram', () => {
   const tag = randomUUID().slice(0, 8)
@@ -260,7 +258,7 @@ describe('assembleProgram', () => {
     expect(mine.items.find((x) => x.ref === `memo:${ids.spaceMemo}`)?.hop).toBe(
       1,
     )
-    // where it is filed, as a hop-0 fact (D71)
+    // where it is filed, as a hop-0 fact
     expect(
       mine.items.find((x) => x.ref === `attr:${spc.id}:path`),
     ).toMatchObject({
@@ -614,7 +612,7 @@ describe('assembleProgram', () => {
       (x) => x.ref === ref.attr(person, 'companies'),
     )
     expect(fromCompany).toMatchObject({ hop: 1, kind: 'attribute' })
-    // Named by the company's own inverse attribute, not the person's. (D69)
+    // Named by the company's own inverse attribute, not the person's.
     expect(fromCompany?.text).toBe(`Team: Worker ${tag} (person)`)
     expect(fromCompany?.structural).toBeCloseTo(
       DEFAULT_WEIGHTS.hop[1] *

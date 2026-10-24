@@ -31,7 +31,7 @@ export async function markBoundConnectionRefused(
   return markConnectionRefused(connectionId, reason, handle)
 }
 
-/** One connection refused by its provider — a member's key a keyed run was refused on (D78). */
+/** One connection refused by its provider — a member's key a keyed run was refused on. */
 export async function markConnectionRefused(
   connectionId: string,
   reason: string,

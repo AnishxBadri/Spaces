@@ -5,8 +5,8 @@ import type { EntitySearchInput } from '../../search/entity-search-input'
 
 /**
  * The query behind `searchEntities`, minus the request context, so it can
- * be exercised without a session — which is how SPA-63 pins that a renamed
- * record is still reachable by its previous name.
+ * be exercised without a session (e.g. that a renamed record is still
+ * reachable by its previous name).
  *
  * Its input schema lives in the pure half (`entitySearchInput`) so the
  * server fn's `.validator()` — which survives into the client bundle —
@@ -34,12 +34,9 @@ export async function entitySearchRows(
     .where(
       and(
         isNull(entity.mergedIntoId),
-        // The default lane excludes nothing by kind (SPA-27). It used to end
-        // `ne(entity.kind, 'document')`, which is what kept a deck out of the
-        // note-body @ menu — and the note editor is the only caller that
-        // omits `kinds`, so widening it widens exactly that one menu. Every
-        // other caller (log-interaction, value-editor, the record-filing
-        // picker) names its kinds and is unchanged.
+        // The default lane excludes nothing by kind, so a deck reaches the
+        // note-body @ menu. The note editor is the only caller that omits
+        // `kinds`; every other caller names its kinds.
         data.objectId
           ? eq(entity.objectId, data.objectId)
           : data.kinds

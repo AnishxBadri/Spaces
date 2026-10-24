@@ -15,17 +15,14 @@ import type { ProposeInput, SuggestionFailure } from '../suggestions/propose'
 import type { BoundIntegration } from './binding'
 
 /**
- * JudgmentLive (sdk-10; spec-plugin-sdk §4, D52): `Judgment.suggest` lands a
- * proposal in the review inbox — one `suggestion` row per call, through
- * core's one propose writer (`writes/suggestions/propose.ts`), never a value
- * in the graph.
- *
+ * JudgmentLive: `Judgment.suggest` lands a proposal in the review inbox — one
+ * `suggestion` row per call, through `proposeProgram`, never a value in the
+ * graph.
  * - **Provenance is the port's.** `proposed_by_type 'integration'`,
  *   `proposed_by_id` = the bound row's id — from the row, never from the
- *   claim, which carries no proposer field (D52).
+ *   claim, which carries no proposer field.
  * - **Why travels with it.** The claim's `rationale` and `refs` are written
- *   verbatim; every ref must parse in the shipped grammar (D4,
- *   `context/ref.ts`), or the call fails permanently — a citation the
+ *   verbatim; every ref must parse in the ref grammar, or the call fails permanently — a citation the
  *   reviewer cannot follow is the plugin's bug, not a retry.
  * - **Never pre-accepted.** The writer takes no status, so the row is born
  *   in the inbox's initial state (`'open'`) whatever the claim carries.

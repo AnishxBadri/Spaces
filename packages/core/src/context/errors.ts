@@ -1,10 +1,9 @@
 import { Schema } from 'effect'
 
 /**
- * The assembler's tagged failures, in a module of their own so a lane file
- * (`similar.ts`) can raise them without importing the assembler that
- * imports it. `assemble.ts` re-exports all three; callers keep importing
- * them from there.
+ * The assembler's tagged failures, in their own module so a lane can raise
+ * them without importing the assembler that imports it. The assembler
+ * re-exports all three.
  */
 
 export class ContextQueryFailed extends Schema.TaggedError<ContextQueryFailed>()(

@@ -7,10 +7,9 @@ import { schemaFor, toPatch, validateProposal, proposalRefs } from './schema'
 import type { JsonSchema, SchemaAttribute } from './schema'
 
 /**
- * The registry → JSON-schema compiler (spec-ai-substrate §2, §14 step 1).
- * This file runs in @spaces/core's suite, which loads no env file and has no
- * connection string by construction: the compiled company schema — the deck
- * reader's output type — is legible with no model and no database.
+ * The registry → JSON-schema compiler. Needs no model and no database: the
+ * compiled company schema (the deck reader's output type) is legible from
+ * the registry alone.
  */
 
 const def = (
@@ -197,8 +196,8 @@ describe('schemaFor', () => {
 
   it('is a function of the registry alone — a custom object needs no AI code', () => {
     // The same `AttributeDef` shape `createObjectProgram` + the attribute
-    // dialog produce for a user's "Fund" object; the DB-backed twin of this
-    // lives in apps/web/src/lib/ai/schema.test.ts.
+    // dialog produce for a user's "Fund" object; apps/web has the db-backed
+    // twin of this test.
     const fund = [
       def('strategy', 'select', {
         options: [

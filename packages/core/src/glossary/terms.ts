@@ -2,12 +2,11 @@ import { buildAutomaton, findMatches } from './aho-corasick'
 import type { Automaton, Pattern } from './aho-corasick'
 
 /**
- * The one way a term set becomes a matcher (SPA-34). Two consumers read it:
- * the editor decoration (client, `components/editor/glossary-decoration.ts`)
- * and the server link sync (`lib/glossary/link-terms.ts`), which writes
- * `link(note|document → term, mentions, extracted)`. Both call
- * `termAutomaton`, so the rule "a term that highlights in the editor links
- * in the graph" is one function, not two that happen to agree.
+ * The one way a term set becomes a matcher. The editor's glossary decoration
+ * (client) and the server link sync (which writes
+ * `link(note|document → term, mentions, extracted)`) both call
+ * `termAutomaton`, so "a term that highlights in the editor links in the
+ * graph" is one function, not two that happen to agree.
  *
  * Pure: no drizzle, no React — the decoration ships to the browser.
  */

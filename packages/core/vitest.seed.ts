@@ -3,22 +3,15 @@ import { user } from '@spaces/db/schema/auth'
 import { seedSystemAttributes } from './src/writes/attributes/seed.ts'
 
 /**
- * What a core test file assumes a database already has, in one function so
- * the global setup and the per-file setup cannot drift (SPA-145, here since
- * SPA-174/175 brought the write paths and their tests). Two things, in the
- * order `apps/web/src/db/boot.ts` composes the first: the system objects and
- * SYSTEM_ATTRIBUTES — `objectIdForKindAsync('company')` is a precondition of
- * half the files here — and one better-auth user row for the
- * `select id from user limit 1` sites. Not the starter taxonomy: that seed is
- * still apps/web's until the boot composition moves (mono-9e), and no core
- * test wants a space.
- *
- * apps/web's `vitest.seed.ts` composes this plus the taxonomy, and takes
- * FIXTURE_ACTOR from here so the two suites agree on the one user.
- *
- * Importing this module opens `@spaces/db`'s pool against whatever
- * `process.env.DATABASE_URL` says at that moment, so the global setup imports
- * it dynamically, below `prepareTestDatabase`.
+ * What every core test file assumes the database has, in one function so the
+ * global and per-file setups cannot drift.
+ * - The system objects and SYSTEM_ATTRIBUTES, in boot order
+ *   (`objectIdForKindAsync('company')` is a precondition of half the files).
+ * - One better-auth user row for the `select id from user limit 1` sites.
+ * - Not the starter taxonomy: no core test wants a space. apps/web's seed adds
+ *   it and takes FIXTURE_ACTOR from here so both suites share the user.
+ * - Importing this opens `db`'s pool against the current `DATABASE_URL`, so
+ *   the global setup imports it dynamically, below `prepareTestDatabase`.
  */
 
 /**

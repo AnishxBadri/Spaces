@@ -1,8 +1,8 @@
 import { z } from 'zod'
 
 /**
- * The `suggestion(kind: 'identity')` payload (SPA-105, spec-ai-substrate.md
- * §11): a person a document names, as the document names them. Not an id —
+ * The `suggestion(kind: 'identity')` payload: a person a document names, as
+ * the document names them. Not an id —
  * accepting it is what walks the claim through `resolveEntity`, the one door
  * every creator uses, which decides attach or create.
  *
@@ -16,12 +16,11 @@ export const identityPayloadSchema = z
     email: z.string().trim().email().max(255).optional(),
     linkedin: z.string().trim().min(1).max(500).optional(),
     /**
-     * The slug of the person-reference attribute the claim was read off
-     * (SPA-160): `founders` on a company, `people` or `referred_by` on a
-     * deal. Accepting writes the resolved person into that attribute on the
-     * record. Optional because rows proposed before SPA-160 carry none —
-     * those accept with the person alone (a company record also joins the
-     * person's `companies`).
+     * The slug of the person-reference attribute the claim was read off:
+     * `founders` on a company, `people` or `referred_by` on a deal.
+     * Accepting writes the resolved person into it. Optional because older
+     * rows carry none — those accept with the person alone (a company record
+     * also joins the person's `companies`).
      */
     attribute: z.string().trim().min(1).max(100).optional(),
   })

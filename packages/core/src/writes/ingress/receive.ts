@@ -13,7 +13,7 @@ import type { PluginQueueName } from '../../queue/names'
 import { resolveSecretById } from '../vault'
 
 /**
- * Webhook ingress (spec-plugin-sdk §11): verify, store raw, enqueue. Runs in
+ * Webhook ingress: verify, store raw, enqueue. Runs in
  * web and never loads plugin code — the manifest stored on the row says what
  * to check and which jobs to hand the payload to.
  * - Every refusal before the signature check is one `IngressNotFound`, so a

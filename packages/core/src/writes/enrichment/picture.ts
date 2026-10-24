@@ -8,7 +8,7 @@ import { WebsiteReader } from '../../enrichment/website'
 import { putBlobProgram } from '../documents/intake'
 
 /**
- * A picture answer fetched once and stored as a blob (D76): through the URL
+ * A picture answer fetched once and stored as a blob: through the URL
  * guard under `PICTURE_MAX_BYTES`, raster images only.
  * - A new blob carries its `pending_blob` row until `applyRun` sets the
  *   picture; one that never lands is the orphan sweep's.

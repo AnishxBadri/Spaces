@@ -17,7 +17,7 @@ import type { SystemObjectNotSeeded } from './objects'
 import type { AttributeQueryFailed } from './update'
 
 /**
- * A relationship (D69): two `record_reference` attributes, one per object,
+ * A relationship: two `record_reference` attributes, one per object,
  * created together in one transaction and joined by `options.inverseOf`.
  * - Each carries the cardinality read from its own side.
  * - The owner stores the value; the other half is `derived` and stores
