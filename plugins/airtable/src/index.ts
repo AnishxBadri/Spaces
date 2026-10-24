@@ -24,8 +24,8 @@ const readText = (stream: ReadableStream<Uint8Array>, filename: string) =>
 /** The jobs as written; `definePlugin` checks each `R` against its `uses`. */
 export const jobs = {
   /**
-   * The export, read as Airtable writes it, handed to core as one grid
-   * (D39 as amended). Core lands it in the batch the import wizard is
+   * The export, read as Airtable writes it, handed to core as one grid.
+   * Core lands it in the batch the import wizard is
    * waiting on; mapping, preview and commit are the wizard's.
    */
   stage: Effect.fn('airtable.stage')(function* ({

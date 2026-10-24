@@ -15,7 +15,7 @@ import { manifest } from './manifest.ts'
 
 /**
  * A poller's ports: PluginDb, Http, Content, Config and Log, never Facts or
- * Identity. Gate 1 checks the type half — the job's `R` is exactly the five,
+ * Identity. Typecheck checks the type half — the job's `R` is exactly the five,
  * and `definePlugin` bounds it by `uses`.
  */
 type Services<T> =

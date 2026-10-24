@@ -23,7 +23,7 @@ export default definePlugin({
   jobs: {
     echo: (input) => Effect.succeed(input).pipe(Effect.asVoid),
     enrich: {
-      // D52: the job calls ports, each port writes through its lane at once,
+      // The job calls ports, each port writes through its lane at once,
       // and the next call uses what the last one returned.
       run: ({ entityId }) =>
         Effect.gen(function* () {
@@ -76,7 +76,7 @@ export default definePlugin({
             conflicts: conflicts.map((c) => c.slug),
           })
         }),
-      // One organization lookup costs one provider credit (D53).
+      // One organization lookup costs one provider credit.
       cost: ({ entityIds }) => ({ credits: entityIds.length }),
     },
   },

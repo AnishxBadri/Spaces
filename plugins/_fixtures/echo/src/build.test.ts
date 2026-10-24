@@ -14,7 +14,7 @@ import { manifest } from './manifest.ts'
  * The plugin build, end to end on the first plugin: `vite build` with this
  * package's config (`@spaces/sdk/build`) writes dist/bundle.mjs and
  * dist/manifest.json — exactly what the loader will find under
- * /data/plugins/echo/current/ (docs/spec-plugin-sdk.md §7).
+ * /data/plugins/echo/current/.
  */
 const root = fileURLToPath(new URL('..', import.meta.url))
 const read = (file: string) =>

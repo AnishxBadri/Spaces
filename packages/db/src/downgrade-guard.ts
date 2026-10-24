@@ -8,8 +8,8 @@ import { z } from 'zod'
  *
  * - Drizzle's `migrate()` treats unknown applied migrations as nothing to do,
  *   so old code would start against a new schema; `runMigrations` asks this first.
- * - Contract 5 (CONTEXT.md, hostability): "Never run an older image against
- *   a newer schema." There is deliberately no override.
+ * - Never run an older image against a newer schema. There is deliberately
+ *   no override.
  * - `drizzle.__drizzle_migrations` stores `hash` and `created_at` (the
  *   journal's `when`), never the tag, so `when` is the join key.
  */

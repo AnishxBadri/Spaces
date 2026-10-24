@@ -28,7 +28,7 @@ export type SpaceWatchState = { [k: string]: Json }
 
 /**
  * A saved research lens on a space: one integration, its settings, an
- * optional clock. Host state — the engine never knows the space table. (D72)
+ * optional clock. Host state — the engine never knows the space table.
  * - `cadence_minutes` null: the watch runs only on "Run now".
  * - An archived space pauses its watches; the scheduler reads `space`, so
  *   no column here says so.
@@ -78,7 +78,7 @@ export const spaceWatch = pgTable(
 /**
  * "Not this one, not here": a domain dismissed from a space's discovery
  * cards. Permanent per (space, domain), and read before a card is made, so
- * a later proposal for the domain is a database no-op. (D72)
+ * a later proposal for the domain is a database no-op.
  * - `domain` is normalized (`normalizeDomain`) before it is written.
  */
 export const spaceWatchDismissal = pgTable(

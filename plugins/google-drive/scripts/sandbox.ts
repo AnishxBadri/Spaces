@@ -1,8 +1,7 @@
 /**
  * The real-sandbox run: the storage-source conformance suite against a real
- * Google Drive, opt-in and never in CI's gates. A nightly job (the mono
- * area's to wire) runs it with a sandbox account's token; a failure is an
- * issue to open, not a blocked PR.
+ * Google Drive, opt-in and never in CI's gates. A nightly job runs it with a
+ * sandbox account's token; a failure is an issue to open, not a blocked PR.
  *
  *   GOOGLE_DRIVE_SANDBOX_TOKEN=<access token, drive.readonly> \
  *   GOOGLE_DRIVE_SANDBOX_FIXTURE=<path to a fixture JSON> \

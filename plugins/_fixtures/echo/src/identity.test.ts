@@ -6,7 +6,7 @@ import {
 import { describe, expect, it } from 'vitest'
 
 /**
- * A plugin normalizes an identity claim's keys with the SDK alone (sdk-4b) —
+ * A plugin normalizes an identity claim's keys with the SDK alone —
  * the same functions `resolveEntity` runs, since core re-exports these.
  */
 describe('identity keys, from @spaces/sdk only', () => {

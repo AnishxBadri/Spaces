@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import plugin, { MESSAGES_URL } from './index.ts'
 
 /**
- * The syncer's `sync` job on the SDK's test Layers (sdk-7b): no database,
+ * The syncer's `sync` job on the SDK's test Layers: no database,
  * no network. The snapshot is the job's whole conversation with the host —
  * every port call in order, with what each returned — and the replay shows
  * the lane's contract from the plugin's side: the same Message-ID is the

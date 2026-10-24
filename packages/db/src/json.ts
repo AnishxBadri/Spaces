@@ -1,7 +1,7 @@
 /**
  * The closed JSON type every `jsonb()` column is typed against.
  * - Stored JSON gets its type once, at the column, and no reader re-asserts
- *   it (CLAUDE.md, principles).
+ *   it.
  * - Closed rather than `unknown` because Start's serializer rejects `unknown`
  *   at the server-fn seam.
  * - The runtime narrowings (`jsonString`, `jsonRecord`, `jsonValue`) are

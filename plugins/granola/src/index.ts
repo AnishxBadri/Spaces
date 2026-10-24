@@ -69,7 +69,7 @@ const refused = (
  * that is no longer in a ticked folder, or that Granola deleted, handed back
  * as gone.
  * - A folder nobody ticked is never listed, and a note outside the ticked
- *   folders is never requested. (D78)
+ *   folders is never requested.
  * - The typed notes and the transcript are fetched only when the member
  *   opted in, and only for a note that changed since it was handed over.
  * - The host keys each note per connection, so a run cut short and re-run

@@ -16,22 +16,21 @@ import { entity } from './entities'
 import { accountConnection } from './vault'
 
 /**
- * Storage bindings (docs/spec-storage-sources.md §5): "this folder over there
- * is this node over here". No binding, no sync — a whole Drive is never
+ * Storage bindings: "this folder over there is this node over here". No binding, no sync — a whole Drive is never
  * mirrored.
  */
 
 /** A bound folder, or one followed file. */
 export const bindingGrain = pgEnum('binding_grain', ['folder', 'file'])
 
-/** Which way bytes flow: `pull` is Drive → us, `push`/`both` write through (§6). */
+/** Which way bytes flow: `pull` is Drive → us, `push`/`both` write through. */
 export const bindingDirection = pgEnum('binding_direction', [
   'pull',
   'push',
   'both',
 ])
 
-/** `text` keeps the derived layers and drops the bytes after derivation (§7). */
+/** `text` keeps the derived layers and drops the bytes after derivation. */
 export const bindingRetain = pgEnum('binding_retain', ['full', 'text'])
 
 /** `inherit` takes the filing's sensitivity; `sensitive` forces the local lane. */
@@ -53,7 +52,7 @@ export const bindingStatus = pgEnum('binding_status', [
  *   directions, since no listing names a folder's parents.
  * - Unique on (provider, folder_id) across the workspace, not per
  *   connection: two users binding one data room would file every document
- *   twice. (§5.6)
+ *   twice.
  * - No change cursor here: one poll reads every drive a connection sees, so
  *   the cursor is `account_connection.storage_cursor`.
  */
@@ -83,7 +82,7 @@ export const storageBinding = pgTable(
     retain: bindingRetain('retain').notNull().default('full'),
     mapSubfolders: boolean('map_subfolders').notNull().default(true),
     sensitivity: bindingSensitivity('sensitivity').notNull().default('inherit'),
-    /** The workspace's one write-through root (§6); at most one row. */
+    /** The workspace's one write-through root; at most one row. */
     isMirrorRoot: boolean('is_mirror_root').notNull().default(false),
     lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
     status: bindingStatus('status').notNull().default('active'),
@@ -113,7 +112,7 @@ export const storageBinding = pgTable(
 )
 
 /**
- * A bound file deleted in the app (§8, "deleted in app"): the walk and the
+ * A bound file deleted in the app: the walk and the
  * poll never file this external id for this binding again.
  * - Written in the document delete's transaction; the provider is untouched.
  * - Unlinking the binding cascades its tombstones away, so a re-bind of the

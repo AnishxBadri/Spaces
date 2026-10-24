@@ -3,8 +3,7 @@ import { db } from './index.ts'
 import { integration } from './schema/integrations.ts'
 
 /**
- * The degraded plugins, as `/api/health` lists them (spec-plugin-sdk §10
- * "boot reconciliation").
+ * The degraded plugins, as `/api/health` lists them after boot reconciliation.
  * - Read from `integration` rows the worker's loader wrote, never from
  *   `/data`, so the web process answers it in a split-role deployment too.
  * - A degraded plugin is not an unhealthy box: the route keeps its status and

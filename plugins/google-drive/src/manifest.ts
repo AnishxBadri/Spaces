@@ -10,12 +10,12 @@ export const DRIVE_ID = /^[\w-]+$/
  *   and no job may use Facts or Ai — it delivers bytes and never files them.
  * - The connection asks `drive.file` only: files picked in Google's
  *   picker. `drive.readonly` is asked for when a whole folder is bound,
- *   never at install. (D66)
+ *   never at install.
  * - `list` is the demo job: one row is one folder, walked and logged.
  * - `pickerApiKey` and `pickerAppId` are what Google's picker needs from the
  *   same Cloud project as the OAuth client; without them the Files tab
  *   says the picker is not set up.
- * - `sdk: '^1.4'`: `roles` arrived in SDK 1.4.
+ * - `sdk: '^1.4'`: the first SDK with `roles`.
  */
 export const manifest = defineManifest({
   manifestVersion: 1,

@@ -10,7 +10,7 @@ export type IngressHeaders = { [name: string]: string }
 
 /**
  * One webhook delivery web verified and accepted, stored raw before its job
- * was enqueued (spec-plugin-sdk §11, Ingress).
+ * was enqueued.
  * - `body` is the exact bytes the signature was computed over.
  * - Pruned on a fixed retention by the `ingress.prune` job; the job a
  *   delivery enqueues is handed the payload itself, never this row.

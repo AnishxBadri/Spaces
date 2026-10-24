@@ -22,7 +22,7 @@ export const domainOf = (filename: string): string | null => {
 export default definePlugin({
   manifest,
   jobs: {
-    // D52: the company is resolved first and the document names the id that
+    // The company is resolved first and the document names the id that
     // came back. The bytes go to the port as the stream they arrived as —
     // never read here: the size meter, the hash, the dedupe against a hand
     // upload and the extraction hand-off are all the host's intake.

@@ -89,7 +89,7 @@ const callApollo = Effect.fn('apollo.call')(function* (
 })
 
 /**
- * D52's order: the receipt first, then the keys Apollo returned, then the
+ * The claim order: the receipt first, then the keys Apollo returned, then the
  * answers in the host's vocabulary, then the signals — each citing the
  * receipt the store returned.
  */
@@ -141,7 +141,7 @@ const first = (keys: ReadonlyArray<string>) => keys.at(0)
 
 /**
  * Ask by email, else by the LinkedIn URL the record holds — what
- * `people/match` matches on. LinkedIn is a value, never a key. (D75)
+ * `people/match` matches on. LinkedIn is a value, never a key.
  */
 const personQuery = (person: ReadEntity) => {
   const email = first(person.keys.email)
@@ -152,7 +152,7 @@ const personQuery = (person: ReadEntity) => {
   return null
 }
 
-/** One credit per record asked about, whatever fields are wanted (D53). */
+/** One credit per record asked about, whatever fields are wanted. */
 const cost = ({ entityIds }: CostInput) => ({
   credits: entityIds.length * CREDITS_PER_MATCH,
 })

@@ -29,7 +29,7 @@ import type { Json } from '../json'
  *   `pinEmbeddingProgram` moves it to another model of the same width (the
  *   backfill re-embeds) and refuses a change of width — that re-pin (ALTER
  *   COLUMN TYPE, index rebuild, full re-embed) is not built.
- * - `embedding.sensitive` (D11): a second, local provider at the pin's width
+ * - `embedding.sensitive`: a second, local provider at the pin's width
  *   that a sensitive embed routes to when the pin is a cloud provider. Absent,
  *   a sensitive embed is refused and the record is left unembedded. It lives
  *   inside `embedding` so a pin swap merges into the object, not replaces it.
@@ -70,8 +70,8 @@ export type WorkspaceSettings = {
  *   credential(scope: 'workspace'), which otherwise reference a ghost.
  * - The CHECK constraint makes the singleton structural rather than
  *   remembered.
- * - Not the target shape: one install holds N workspaces, and the CHECK and
- *   magic id = 1 go away then (CONTEXT.md, "Single user first, team ready").
+ * - Not the target shape: one install will hold N workspaces, and the CHECK
+ *   and magic id = 1 go with that.
  */
 export const workspace = pgTable(
   'workspace',
@@ -95,7 +95,7 @@ export const workspace = pgTable(
 export const mandateStatus = pgEnum('mandate_status', ['active', 'archived'])
 
 /**
- * The mandate — the fund's prescriptive strategy (CONTEXT.md, "Mandate").
+ * The mandate — the fund's prescriptive strategy.
  * - Prose lives in a real note; the few typed columns are the objective
  *   measures. Not the attribute engine: one row, a registry buys nothing.
  * - `stages` holds option ids from the company funding_stage vocabulary.

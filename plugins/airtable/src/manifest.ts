@@ -8,7 +8,7 @@ import { defineManifest } from '@spaces/sdk'
  *   built-in view's name ends in "view" (`Grid view`, `Kanban view`); a
  *   browser's ` (1)` on a second download still matches. A renamed view's
  *   export takes the plain CSV path and its mapping step.
- * - `sdk: '^1.4'`: Import and `accepts` arrived in SDK 1.1, `roles` in 1.4.
+ * - `sdk: '^1.4'`: the first SDK with `roles` (Import and `accepts` need 1.1).
  */
 export const manifest = defineManifest({
   manifestVersion: 1,

@@ -56,7 +56,7 @@ export const participantClaim = (
 export default definePlugin({
   manifest,
   jobs: {
-    // D52: each participant is resolved first and the interaction names the
+    // Each participant is resolved first and the interaction names the
     // ids that came back; the message's Message-ID is the dedupe key, so a
     // page read twice is one interaction per message.
     sync: ({ cursor }) =>

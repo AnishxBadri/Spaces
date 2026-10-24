@@ -33,7 +33,7 @@ import {
 
 /**
  * Send: one message the host prepared (`OutgoingEmail`), built as MIME and
- * sent through `messages.send` with `gmail.send` (D66, D67).
+ * sent through `messages.send` with `gmail.send`.
  * - Threads: the parent's Gmail thread is found by its Message-ID, and the
  *   message carries `In-Reply-To` and `References` from the host.
  * - Idempotent by the host's Message-ID: a message the mailbox already

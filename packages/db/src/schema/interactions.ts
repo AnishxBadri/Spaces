@@ -32,7 +32,7 @@ export const interactionKind = pgEnum('interaction_kind', [
 export type InteractionKind = (typeof interactionKind.enumValues)[number]
 
 /**
- * `interaction.meta` for an email: its headers (D67). `mime_blob_sha` is the
+ * `interaction.meta` for an email: its headers. `mime_blob_sha` is the
  * content address of the stored raw MIME, null until it is kept.
  */
 export type EmailMeta = {
@@ -42,7 +42,7 @@ export type EmailMeta = {
   cc: Array<string>
   /**
    * Blind copies, on a message this workspace sent. Never edged, never in
-   * the stats: a Bcc stays hidden everywhere. (D67)
+   * the stats: a Bcc stays hidden everywhere.
    */
   bcc?: Array<string>
   /** The `Date` header, as an ISO instant. */
@@ -53,7 +53,7 @@ export type EmailMeta = {
   /** The mailbox's own preview of the body (Gmail's `snippet`), when it sent one. */
   snippet?: string
   /**
-   * Derived display text (D67), written once by the summarize and classify
+   * Derived display text, written once by the summarize and classify
    * lanes under the sensitivity gate and never rewritten: a one-line summary
    * and category labels. Absent until a lane answers.
    */
@@ -66,7 +66,7 @@ export type MeetingStatus = 'scheduled' | 'cancelled'
 export type MeetingRsvp = 'accepted' | 'declined' | 'tentative' | 'needs_action'
 
 /**
- * `interaction.meta` for a meeting (D68). Calendar sync rewrites it in place;
+ * `interaction.meta` for a meeting. Calendar sync rewrites it in place;
  * a cancelled meeting is marked, never deleted.
  */
 export type MeetingMeta = {
@@ -85,7 +85,7 @@ export type MeetingMeta = {
    * nothing else, finds its row.
    */
   calendar_event_id?: string
-  /** Recorder payloads attached to this meeting, one per provider event (D68). */
+  /** Recorder payloads attached to this meeting, one per provider event. */
   recorder_events?: Array<RecorderEvent>
 }
 
@@ -98,7 +98,7 @@ export type RecorderEvent = {
   web_url?: string
 }
 
-/** `interaction.meta` for a call a recorder births (D68). */
+/** `interaction.meta` for a call a recorder births. */
 export type CallMeta = {
   kind: 'call'
   provider_event_id: string
@@ -125,7 +125,7 @@ export const interaction = pgTable(
      * Which lane produced the interaction — as a class, and the vendor as a
      * row: `source_ref` names the installed integration, not a product
      * category. Not a vendor-named enum, which a plugin would have to ALTER to
-     * say it wrote a row. (CONTEXT.md "Interactions and enrichment")
+     * say it wrote a row.
      */
     sourceClass: sourceClass('source_class').notNull().default('manual'),
     /** The integration that wrote the row; null for every other class. */
@@ -137,13 +137,13 @@ export const interaction = pgTable(
     subject: text('subject'),
     /**
      * The interaction's write-up, as a real note row; the structured event
-     * stays here. (CONTEXT.md "Interactions and enrichment")
+     * stays here.
      * - Nullable, and lazily filled: a call logged with nothing written must
      *   not manufacture an empty note row. "Log and write up" sets it.
      * - `interaction_note_unique` stops two interactions claiming one body.
      */
     noteId: uuid('note_id').references(() => note.entityId),
-    /** Per-kind metadata (D67, D68); null when the lane has none. */
+    /** Per-kind metadata; null when the lane has none. */
     meta: jsonb('meta').$type<InteractionMeta>(),
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -195,7 +195,7 @@ export const INTERACTION_STAT_KINDS = [
 export type InteractionStatKind = (typeof INTERACTION_STAT_KINDS)[number]
 
 /**
- * First, last and next interaction per entity and kind, derived (D67).
+ * First, last and next interaction per entity and kind, derived.
  * - Written only by `recomputeInteractionStats`, in the transaction of the
  *   interaction write that changed it; never edited, never in `entity.values`.
  * - `first`/`last` are uncancelled interactions that have happened; `next` is
@@ -229,7 +229,7 @@ export const interactionStat = pgTable(
   ],
 )
 
-/** What a document is to the interaction it hangs off (D68). */
+/** What a document is to the interaction it hangs off. */
 export const interactionDocumentRole = pgEnum('interaction_document_role', [
   'attachment',
   'transcript',
@@ -239,7 +239,7 @@ export const interactionDocumentRole = pgEnum('interaction_document_role', [
 /**
  * Every artifact of an interaction: an email's attachments, a meeting's
  * transcript and recording link. One meeting, many artifacts — never a
- * `document_id` column on `interaction`. (D67, D68)
+ * `document_id` column on `interaction`.
  */
 export const interactionDocument = pgTable(
   'interaction_document',
@@ -259,12 +259,13 @@ export const interactionDocument = pgTable(
 )
 
 /**
- * Layer two of D67's email privacy: the owner's emails with one record,
+ * Email privacy, layer two (an email starts private to its mailbox owner):
+ * the owner's emails with one record,
  * opened to the workspace ("my emails with Flent are visible to the
  * workspace"). Read by `emailWidenedSql`; removing the row restores privacy
  * and leaves `email_grant` alone.
  * - Covers the emails edged to the record, and on a deal the threads it
- *   derives from its company and contacts (D49).
+ *   derives from its company and contacts.
  * - `scope` has one value today; the check keeps it honest.
  */
 export const emailVisibility = pgTable(
@@ -289,7 +290,7 @@ export const emailVisibility = pgTable(
 )
 
 /**
- * Layer three of D67's email privacy: one email's body and attachments
+ * Email privacy, layer three: one email's body and attachments
  * opened to one named member, by its owner. Read by `emailWidenedSql`.
  */
 export const emailGrant = pgTable(
@@ -325,7 +326,7 @@ export const signal = pgTable(
       .notNull()
       .defaultNow(),
     /**
-     * Who wrote the signal (D57): the same pair `entity` and `entity_alias`
+     * Who wrote the signal: the same pair `entity` and `entity_alias`
      * carry. `source` stays as the display text; these two are the provenance
      * a plugin cannot forge — `Content.emitSignal` writes the bound
      * integration's id from the port, never from the plugin.
@@ -364,7 +365,7 @@ export const enrichmentRecord = pgTable(
     raw: jsonb('raw').$type<Json>().notNull(),
     creditsUsed: integer('credits_used'),
     /**
-     * The integration whose call this is (D57), written by `Receipts.store`
+     * The integration whose call this is, written by `Receipts.store`
      * from the bound row. Nullable only for legacy rows; the port always
      * sets it.
      */
@@ -376,7 +377,7 @@ export const enrichmentRecord = pgTable(
   (t) => [index('enrichment_entity_idx').on(t.entityId)],
 )
 
-/** What a note is to the meeting it hangs off, beyond its one write-up (D78). */
+/** What a note is to the meeting it hangs off, beyond its one write-up. */
 export const interactionNoteRole = pgEnum('interaction_note_role', [
   'recorder_note',
   'typed_notes',
@@ -384,7 +385,7 @@ export const interactionNoteRole = pgEnum('interaction_note_role', [
 
 /**
  * The notes a meeting carries beyond its one write-up (`interaction.note_id`):
- * a recorder's shared second note, a member's private typed notes. (D78)
+ * a recorder's shared second note, a member's private typed notes.
  */
 export const interactionNote = pgTable(
   'interaction_note',

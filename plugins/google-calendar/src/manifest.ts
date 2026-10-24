@@ -8,9 +8,9 @@ import { defineManifest } from '@spaces/sdk'
  *   never Facts, Identity or Ai. Attendees become records host-side, through
  *   the participants module mail uses.
  * - The connection asks `calendar.events.readonly` only; RSVP is shown,
- *   never edited. (D66, D68)
- * - `sdk: '^1.4'` until the SDK release that carries `logMeeting`,
- *   `connectedAt` and `CursorInvalid` is cut, as the watch fixture does.
+ *   never edited.
+ * - `sdk: '^1.4'`, as the watch fixture: raise it once an SDK release
+ *   carries `logMeeting`, `connectedAt` and `CursorInvalid`.
  */
 export const manifest = defineManifest({
   manifestVersion: 1,

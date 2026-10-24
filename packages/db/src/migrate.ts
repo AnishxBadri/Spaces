@@ -23,8 +23,7 @@ export type MigrationOutcome =
  * of what packages/db will do to a database.
  *
  * - Seeding is deliberately not here: core's boot composition calls this and
- *   then seeds. packages/db never grows a seed
- *   (CONTEXT.md, "packages/db — what moved").
+ *   then seeds. packages/db never grows a seed.
  * - `migrationsFolder` exists for the guard's fixtures (truncated journals).
  *   It is not a way around the guard: whatever folder is named, the guard
  *   runs against it first.
@@ -38,7 +37,7 @@ export async function runMigrations(options?: {
     // The guard runs before anything else reaches the database — migrate(),
     // then whatever the caller seeds. It is the only thing standing between
     // an old image and a new schema. Deliberately no override env var:
-    // hostability contract 5 says rollback is restore.
+    // rollback is a restore, never an older image over a newer schema.
     const verdict = await inspectDowngrade(
       (text) => db.$client.query(text),
       folder,

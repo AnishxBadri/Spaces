@@ -32,8 +32,8 @@ import {
 } from './test-fixtures.ts'
 
 /**
- * Each job's grant (D51): its `R` is within the ports its `uses` names — no
- * Facts, no Identity — checked by gate 1 here and at runtime the way the
+ * Each job's grant: its `R` is within the ports its `uses` names — no
+ * Facts, no Identity — checked by typecheck here and at runtime the way the
  * host does it, by picking exactly the declared tags.
  */
 type Services<T> =

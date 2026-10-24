@@ -21,13 +21,13 @@ export const watchSettings = z.object({
  * as JSON Schema.
  * - Neither job names Facts or Identity: a web hit is evidence, never a
  *   field, and Exa never births a record — a found company is a candidate
- *   the host turns into a card. (D72)
+ *   the host turns into a card.
  * - `Secrets` is in `uses` because each job reads the key from it for the
  *   `x-api-key` header.
  * - Without the workspace `search` key the host degrades the integration,
  *   so the Research action is absent rather than failing when pressed.
  * - `mcp` is Exa's hosted MCP server, which Ask mounts for a turn with the
- *   web in scope: fast search only — websets stay the watch's. (D77)
+ *   web in scope: fast search only — websets stay the watch's.
  */
 export const manifest = defineManifest({
   manifestVersion: 1,

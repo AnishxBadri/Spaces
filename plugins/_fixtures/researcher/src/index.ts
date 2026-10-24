@@ -73,8 +73,8 @@ export default definePlugin({
   manifest,
   jobs: {
     // The brief is drafted before anything is written, so a refused call
-    // (a sensitive record, the day's cap) leaves no signal behind. D52: each
-    // emitSignal hands back the signal's id, which the suggestion cites (D4).
+    // (a sensitive record, the day's cap) leaves no signal behind. Each
+    // emitSignal hands back the signal's id, which the suggestion cites.
     research: ({ entityId }) =>
       Effect.gen(function* () {
         const record = yield* (yield* Read).entity(entityId)

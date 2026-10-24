@@ -18,14 +18,14 @@ import { credential } from './vault'
 import type { Json } from '../json'
 
 /**
- * The AI provider contract's tables (spec-ai-substrate §4, §9).
+ * The AI provider contract's tables.
  * - Features never name a model, only a lane; `ai_route` turns lane ×
  *   sensitivity into a provider and a model (`aiRouteProgram` reads it).
  * - `ai_usage` is the per-call cost ledger; `completeProgram` is its only writer.
  * - `ai_run` is the run log the calls roll up into.
  */
 
-/** What a feature asks for. `vision` is an LLM with image input (spec §9). */
+/** What a feature asks for. `vision` is an LLM with image input. */
 export const aiLane = pgEnum('ai_lane', [
   'extract',
   'classify',
@@ -114,7 +114,7 @@ export type AiRunStep = {
 }
 
 /**
- * The run log (spec-ai-substrate §6): one row per logical AI action ("Read
+ * The run log: one row per logical AI action ("Read
  * deck and summarize") with its ordered steps.
  * - Every suggestion it produced cites it (`suggestion.run_id`), as every call
  *   it made does (`ai_usage.run_id`).
@@ -216,7 +216,7 @@ export const aiUsage = pgTable(
 )
 
 /**
- * The extraction cache (spec-storage-sources §9): what one extract-lane call
+ * The extraction cache: what one extract-lane call
  * answered for one blob, one compiled schema and one model, so asking again
  * is free.
  * - A cache and nothing more: truncating it costs provider calls, never

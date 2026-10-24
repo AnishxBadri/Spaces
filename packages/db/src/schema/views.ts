@@ -43,21 +43,19 @@ export type ViewExtra = Record<string, string | number | boolean | null>
 export type ViewColumns = Record<string, boolean>
 
 /**
- * Which list a view is saved against (D2). `object` is a
- * row of the object registry — `object_id` names it. `document` is
- * /documents, a research kind with no object row and no attribute registry,
- * so it carries no `object_id` at all. A third value is a migration to this
- * enum plus a `resolve` branch for its fields, never a registry row: see
- * CONTEXT.md "Lists — deferred" for the rule that admits one.
+ * Which list a view is saved against. `object` is a row of the object
+ * registry — `object_id` names it. `document` is /documents, a research kind
+ * with no object row and no attribute registry, so it carries no `object_id`
+ * at all. A third value is a migration to this enum plus a `resolve` branch
+ * for its fields, never a registry row.
  */
 export const viewSurface = pgEnum('view_surface', ['object', 'document'])
 
 export type ViewSurface = (typeof viewSurface.enumValues)[number]
 
 /**
- * A view is a saved way of looking at one list (CONTEXT.md "Lists —
- * deferred"): filter conditions, which columns show, one sort,
- * and any surface-specific extra (the deals stage chips). It holds no
+ * A view is a saved way of looking at one list: filter conditions, which
+ * columns show, one sort, and any surface-specific extra (the deals stage chips). It holds no
  * values — anything worth saying about a record is an attribute on the
  * record. `surface` says which list; on the `object` surface `object_id`
  * keys the object row, so core and custom objects get the same thing.

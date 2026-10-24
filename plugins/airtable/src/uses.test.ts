@@ -6,10 +6,10 @@ import { jobs } from './index.ts'
 import { manifest } from './manifest.ts'
 
 /**
- * The job's `R` is bounded by its `uses` — a claim gate 1 checks: this file
+ * The job's `R` is bounded by its `uses` — a claim typecheck checks: this file
  * fails typecheck if the job yields a port its manifest entry does not list.
  * The runtime half — a withheld port is "service not found", mapped to a
- * permanent failure — is apps/worker's `airtable-live.test.ts`.
+ * permanent failure — is the worker's airtable-live test.
  */
 type Services<T> =
   T extends Effect.Effect<unknown, unknown, infer R> ? R : never

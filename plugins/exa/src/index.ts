@@ -189,7 +189,7 @@ export const jobs = {
    * Research: search, draft the brief, then write. The brief is drafted
    * before anything is written, so a refused Ai call (a sensitive record,
    * the day's cap) leaves no signal behind. Each hit's signal id is what the
-   * brief cites (D4, D52); no hits means no brief.
+   * brief cites; no hits means no brief.
    */
   research: Effect.fn('exa.research')(function* ({ entityId }: ActionInput) {
     const settings = yield* configOf(manifest)
@@ -218,7 +218,7 @@ export const jobs = {
   /**
    * Watch: the first run creates a webset from the space's brief; every run
    * pages it from the stored cursor. A member's item is a signal on the
-   * member, anything else a candidate for the host to judge (D72). The run
+   * member, anything else a candidate for the host to judge. The run
    * stops at the cap with the cursor where it stopped; every answer Exa gave
    * is kept as a receipt on the space.
    */

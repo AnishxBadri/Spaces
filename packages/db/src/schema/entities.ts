@@ -29,7 +29,7 @@ export type DuplicateReason = Record<string, string>
 
 /**
  * One row the merge executor moved, dropped, filled, or inserted. The
- * snapshot convention is the only unmerge contract (CLAUDE.md), so the
+ * snapshot convention is the only unmerge contract, so the
  * shape is declared here, beside the column, not in the executor.
  */
 export type MergeSnapshotEntry = {
@@ -50,7 +50,7 @@ export type MergeSnapshotEntry = {
  * Polymorphic entity core. Everything linkable is an entity: one mention
  * system, one backlink query, one search index, one attach mechanism.
  * Core kinds are fixed in code; custom objects share the 'custom' kind and
- * are differentiated by object_id (CONTEXT.md "Two-tier object model").
+ * are differentiated by object_id.
  */
 
 export const entityKind = pgEnum('entity_kind', [
@@ -66,7 +66,7 @@ export const entityKind = pgEnum('entity_kind', [
 
 /**
  * Provenance as a kind of writer, never a vendor: a plugin is `integration`
- * plus `source_ref`. (CONTEXT.md "Plugin architecture", D1)
+ * plus `source_ref`.
  * - `manual` a human in the app, the extension's clip included ·
  *   `integration` an installed plugin · `ai` the substrate's own lanes
  * - `import` a CSV or backfill · `seed` starter taxonomy, dev data ·
@@ -117,7 +117,7 @@ export const entity = pgTable(
     sensitive: boolean('sensitive').notNull().default(false),
     /**
      * The record's picture: a blob digest, fetched once and stored, never a
-     * remote URL (D76, D67). Not an `ENTITY_REFS` entry — it names a blob,
+     * remote URL. Not an `ENTITY_REFS` entry — it names a blob,
      * and `blobIsReferenced` counts it so GC never takes one in use.
      */
     pictureSha: text('picture_sha'),
@@ -142,7 +142,7 @@ export const entity = pgTable(
     // A biconditional, like `attribute_event_actor_invariant`: one direction
     // alone would let a `seed` row carry an integration id, or a plugin write
     // a row that cannot say which plugin wrote it. Both directions are the
-    // point. (D1)
+    // point.
     check(
       'entity_source_ref_invariant',
       sql`(${t.sourceClass} = 'integration') = (${t.sourceRef} IS NOT NULL)`,
@@ -170,7 +170,7 @@ export type CoreIdentityKey = Exclude<
 /**
  * The identity index. Deterministic keys (domain/email/linkedin) carry
  * is_identity and are globally unique; the values themselves live in
- * `entity.values` and `setValues` mirrors each one here (D75). A colliding
+ * `entity.values` and `setValues` mirrors each one here. A colliding
  * identity alias becomes a duplicate_candidate, never an error.
  * Name aliases are never identity and never unique — they only feed pg_trgm.
  */

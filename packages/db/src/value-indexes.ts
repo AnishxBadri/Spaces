@@ -4,8 +4,7 @@ import { attribute } from './schema/attributes.ts'
 
 /**
  * Per-attribute expression indexes over `entity.values`, reconciled from the
- * flagged attributes. Not a GIN over `values`. (CONTEXT.md, _Open questions_,
- * `values jsonb` indexing strategy)
+ * flagged attributes. Not a GIN over `values`.
  * - DDL from application code, never the drizzle journal: the set is a
  *   function of user data.
  * - `CREATE INDEX CONCURRENTLY` cannot run inside a transaction, so the mint
@@ -19,7 +18,7 @@ import { attribute } from './schema/attributes.ts'
  *   because Postgres refuses a subquery in an index expression.
  * - `isNumericType` is passed in, not copied: this package imports nothing
  *   internal, and a second copy of the set would drift from the evaluator.
- * - An inverse attribute (D69) stores nothing in `values`; flagging one wants
+ * - An inverse attribute stores nothing in `values`; flagging one wants
  *   `LINK_INDEX_NAME` on `link` instead, shared by every inverse.
  */
 
@@ -35,7 +34,7 @@ export const valueIndexName = (attributeId: string) =>
   `${VALUE_INDEX_PREFIX}${attributeId}`
 
 /**
- * The inverse attributes' one index (D69): `link(to_entity_id, attr_slug)`,
+ * The inverse attributes' one index: `link(to_entity_id, attr_slug)`,
  * which every inverse's link join reads, so it is minted once while any
  * inverse attribute is flagged and dropped with the last flag.
  */

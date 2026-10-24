@@ -12,7 +12,7 @@ import { integration } from './integrations'
 import { spaceWatch } from './watches'
 
 /**
- * The attempt ledger (docs/spec-plugin-sdk.md §11): one row per pg-boss
+ * The attempt ledger: one row per pg-boss
  * attempt, answering "did the work run, when, and how did it end".
  *
  * - Written by `runJob` and by nothing else — only the wrapper knows when an
@@ -51,7 +51,7 @@ export const jobRun = pgTable(
     entityId: uuid('entity_id').references(() => entity.id),
     /**
      * The `space_watch` row a watch run ran for; its space is `entity_id`, so
-     * the per-entity status stream reaches the space page too. (D72)
+     * the per-entity status stream reaches the space page too.
      * - Set null when the watch is deleted: the ledger outlives it.
      */
     watchId: uuid('watch_id').references(() => spaceWatch.id, {

@@ -8,7 +8,7 @@ import { user } from './auth'
  *   point converges on.
  * - Older than the grace period and named by no `document` row → the orphan
  *   sweep reclaims it.
- * - An intent row, not a store listing. (CONTEXT.md "Orphan blobs")
+ * - An intent row, not a store listing.
  */
 export const pendingBlob = pgTable('pending_blob', {
   /** The content address, which is also the storage key. */
