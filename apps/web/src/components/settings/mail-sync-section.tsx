@@ -27,7 +27,7 @@ export function addedEntries(
 }
 
 /**
- * A synced mailbox on its account page (D67): whether its bodies are shared,
+ * A synced mailbox on its account page: whether its bodies are shared,
  * and what is never synced. Its owner's alone.
  * - The switch writes at once; sharing asks first, since every body already
  *   synced is shown too. Subject, people and date are visible either way.

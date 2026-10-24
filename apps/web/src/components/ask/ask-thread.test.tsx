@@ -48,7 +48,7 @@ const parse = (html: string) => {
 }
 
 /**
- * Ask's turns as the dock and `/ask` draw them (D70): your turn right on
+ * Ask's turns as the dock and `/ask` draw them: your turn right on
  * bone with a hairline, the answer left with no box and in sans, the scope
  * divider, and every terminal state's line.
  */

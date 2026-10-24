@@ -38,7 +38,7 @@ import { FindTableHead } from './save-as-watch'
 
 /**
  * A find's results as a table, never prose: name, domain, one line, place,
- * the pages it was found on and the plugin it came through. (D77)
+ * the pages it was found on and the plugin it came through.
  * - A row ends on its state word and one action — Add, or File here;
  *   Add and file here and Dismiss live in its `···`.
  * - A filed row is greyed and has no control.
@@ -58,7 +58,7 @@ const reduce = (state: JobStatusState, action: StreamAction) =>
     ? jobStatusInit(state, action.rows)
     : jobStatusEvent(state, action.event)
 
-/** "added · enriching" until the new record's jobs settle. (D64, D76) */
+/** "added · enriching" until the new record's jobs settle. */
 function useAddedWord(entityId: string | null): string | null {
   const [state, dispatch] = useReducer(reduce, emptyJobStatus)
   const [quiet, setQuiet] = useState(false)

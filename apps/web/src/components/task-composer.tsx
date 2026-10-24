@@ -31,8 +31,7 @@ function duePresets(today: string): Array<[string, string | null]> {
 }
 
 /**
- * The task composer (CONTEXT.md 15b — Attio's create-bar as reference):
- * one line of text, pills for due date / assignee / linked records.
+ * The task composer: one line of text, pills for due date / assignee / linked records.
  * Natural-language dates parse deterministically; "no date" is legal.
  */
 
@@ -62,13 +61,13 @@ export function TaskComposer({
   /** Record page rails pass their record — pre-linked, removable. */
   presetEntity?: LinkedRecord
   /** The composer's row landed: the id is what the list's wash reads
-   *  (`useBornRows`, DESIGN.md §5 Micro-interactions). */
+   *  (`useBornRows`). */
   onCreated?: (id: string) => void
   /** A bare key that opens the composer from anywhere on the page — the
    *  key hint printed in the trigger must be true. Ignored while typing. */
   hotkey?: string
   /** `band` renders the composer inline as the bone band under a page
-   *  header (P6); `dialog` (default) opens it from a trigger. */
+   *  header; `dialog` (default) opens it from a trigger. */
   variant?: 'dialog' | 'band'
 }) {
   const router = useRouter()

@@ -10,7 +10,7 @@ const CRITERIA_MAX = 1000
 /**
  * What belongs in a space, edited in place: the paragraph becomes its own
  * field, as the title does on rename. ↵ or leaving the field saves, ⇧↵
- * breaks a line, esc keeps what was there. (D72)
+ * breaks a line, esc keeps what was there.
  * - Blank saves as cleared; the prompt shown in its place is never stored.
  */
 export function SpaceCriteria({

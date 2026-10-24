@@ -67,7 +67,7 @@ import { openAsk } from '#/lib/ask/dock-store'
 import { cn } from '#/lib/utils'
 
 /**
- * Cmd-K finds and goes; Ask answers. (D70)
+ * Cmd-K finds and goes; Ask answers.
  * - Four groups in order: Jump to, Actions, Records, Passages. A group with
  *   nothing in it is absent.
  * - Nothing typed on a record or a space shows only its verbs, under
@@ -437,7 +437,7 @@ export type PaletteBodyProps = {
   loaders: PreviewLoaders
   /** Open a file in the viewer, at a page when the passage knows it. */
   onOpenFile: (id: string, page: number | null) => void
-  /** Tab: hand the typed text to Ask. The palette never answers. (D70) */
+  /** Tab: hand the typed text to Ask. The palette never answers. */
   onAsk?: ((text: string) => void) | undefined
 }
 

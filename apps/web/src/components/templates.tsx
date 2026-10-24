@@ -22,7 +22,7 @@ import { Label } from './ui/label'
 import { listTemplates } from '#/lib/server-fns'
 
 /**
- * Template application is manual plus a context hint (CONTEXT.md, 2026-08):
+ * Template application is manual plus a context hint:
  * the picker is scoped by suggest_on — templates tagged for the surface
  * they're opened from sort first. Ordering, not automation; nothing
  * auto-creates.
@@ -90,8 +90,8 @@ export function TemplatePicker({
           </DropdownMenuItem>
         ) : (
           items.map((t) => {
-            // The kind lane, drawn the way the notes index draws it
-            // (SPA-109): quiet, lowercase, and blank for the default. A memo
+            // The kind lane, drawn the way the notes index draws it:
+            // quiet, lowercase, and blank for the default. A memo
             // template is legible before you stamp it; a plain-note template
             // has nothing to say, and space/record templates carry no note
             // kind at all.

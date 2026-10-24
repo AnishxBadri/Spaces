@@ -8,7 +8,7 @@ import {
 import { footLine } from './mapping-grid'
 
 /**
- * SPA-173, the wizard's nits: the object a `?object=` link names, the foot
+ * The wizard's details: the object a `?object=` link names, the foot
  * line's column range, and the refused-Continue toast that must not outlive
  * the Continue that goes through. `sonner` is mocked, so the toast calls are
  * asserted rather than drawn.

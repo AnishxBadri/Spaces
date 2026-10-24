@@ -29,7 +29,6 @@ import { AskComposer, AskTurns, SaveAsNote, useAskThread } from './ask-thread'
 
 /**
  * Ask docked: a third column right of the page, the page usable beside it.
- * (D70)
  * - 408px by default, resized from its left edge between 360 and 560px;
  *   ⌘J or × closes it completely, leaving no rail, and the thread is kept.
  * - The page you are on is the default scope chip — a record, a space, a

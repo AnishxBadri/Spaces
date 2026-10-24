@@ -18,7 +18,7 @@ import { fileType } from '#/lib/documents/files-tab'
 import { cn } from '#/lib/utils'
 
 /**
- * "Newer version of…" (D59): the record's other files of the same kind, one
+ * "Newer version of…": the record's other files of the same kind, one
  * pick, then Mark as newer. Writes one `supersedes` link; nothing is deleted
  * and the older file stays readable and searchable, ranked lower.
  */

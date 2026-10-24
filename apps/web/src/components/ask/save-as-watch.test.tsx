@@ -18,7 +18,7 @@ import type { AskFindTable, SpaceWatching } from '#/lib/server-fns'
  * Save as watch on a Find table, mounted on a happy-dom `Window` with the
  * server fns stubbed: the window prefilled from the turn, Weekly, the space
  * asked for when the turn had none, the line once saved, and "Already
- * watching this" landing on the existing watch. (D77)
+ * watching this" landing on the existing watch.
  */
 
 const fns = vi.hoisted(() => {

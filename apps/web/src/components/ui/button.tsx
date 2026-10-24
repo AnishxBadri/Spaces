@@ -6,7 +6,7 @@ import { Slot } from 'radix-ui'
 import { cn } from '#/lib/utils.ts'
 
 const buttonVariants = cva(
-  // `focus-ring` is the one focus treatment app-wide (see styles.css); shadcn's
+  // `focus-ring` is the one focus treatment app-wide; shadcn's
   // default translucent ring sat under 3:1 against white. Keep this swap if
   // these primitives are ever re-vendored.
   "focus-ring inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-ui font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out-quart active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
@@ -39,8 +39,7 @@ const buttonVariants = cva(
 )
 
 /**
- * Whether the button around you is mid-write (DESIGN.md §5,
- * Micro-interactions; SPA-53). `KeyHint` reads it so `Save ⌘↵` becoming
+ * Whether the button around you is mid-write. `KeyHint` reads it so `Save ⌘↵` becoming
  * `Saving…` does not leave a keycap standing for an action that is no longer
  * armed. A context rather than a `group-data-` class because the hint has to
  * leave the accessibility tree too — a screen reader announcing

@@ -4,11 +4,10 @@ import { ValueEditor } from './value-editor'
 import type { RegistryEntry } from './value-editor'
 
 /**
- * Money reads as money (2026-09-30). The deals table's Value column printed
- * `150000` because a currency cell fell through to the plain text editor,
- * which formatted only a `number` with a precision. The system `value`
- * attribute and a user-made currency attribute go through the same cell,
- * so both are pinned here, in both variants.
+ * Money reads as money, not `150000`: a currency cell must not fall through
+ * to the plain text editor. The system `value` attribute and a user-made
+ * currency attribute go through the same cell, so both are pinned here, in
+ * both variants.
  */
 
 const dealValue: RegistryEntry = {

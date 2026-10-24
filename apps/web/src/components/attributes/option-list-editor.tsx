@@ -13,11 +13,11 @@ import type { BadgeColor } from '@spaces/core/attributes/colors'
 import { cn } from '#/lib/utils'
 
 /**
- * The inline options editor (spec §7; Overlays · Flows "New attribute"):
+ * The inline options editor:
  * a rule-bordered box of 30px rows — ⋮⋮ grip, a 14px square swatch, the
  * label, the status group — with a composer as the last row. Enter appends,
  * Backspace on an empty unsaved row drops it, Alt+↑↓ reorder, a pasted
- * list becomes rows. Saved options archive rather than delete (§3): they
+ * list becomes rows. Saved options archive rather than delete: they
  * stay struck in graphite with a mono `restore`; only never-saved rows can
  * be removed. Hue is auto-assigned; the swatch overrides it.
  */
@@ -26,12 +26,7 @@ export type OptionGroup = 'active' | 'parked' | 'closed'
 
 export const OPTION_GROUPS: Array<OptionGroup> = ['active', 'parked', 'closed']
 
-/**
- * The group picker's rows. Before SPA-38 this list was three `<option>`s and
- * a `toOptionGroup(v: string)` narrower beside them, because a native select
- * hands back a bare string; `Select<OptionGroup>` hands back the group, so
- * the narrower is gone and `OPTION_GROUPS` is the only list.
- */
+/** The group picker's rows; `Select<OptionGroup>` hands back the group, so no narrower is needed. */
 const GROUP_ITEMS: Array<SelectItem<OptionGroup>> = OPTION_GROUPS.map((g) => ({
   value: g,
   label: g,

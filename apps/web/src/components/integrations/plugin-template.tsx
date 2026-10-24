@@ -8,7 +8,7 @@ import { cn } from '#/lib/utils'
 import { ROLLBACK_WORD, STATE_WORD } from './integration-ledger'
 
 /**
- * One plugin's page, one template for every plugin (D81). Seven blocks in a
+ * One plugin's page, one template for every plugin. Seven blocks in a
  * fixed order, each a `section[data-block]`:
  * - status and version, the workspace key, what it sends out of the box,
  *   the manifest settings, what it switches on, recent runs, and Disable /

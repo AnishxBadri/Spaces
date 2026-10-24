@@ -12,13 +12,12 @@ import { recordPath } from '#/lib/record-path'
 import type { getTermPage } from '#/lib/server-fns'
 
 /**
- * The term page's parts (SPA-75). The page is a record (design contract §3,
- * "a record — the term page"), composed from `record-parts` and nothing new.
- *
- * What is missing is the design: no "file into", no "tag", no "attach", no
- * "track companies". A concept never holds things (CONTEXT.md → Glossary);
- * every list here is something the graph learned by matching the term. The
- * empty state's one primary writes a note that mentions it.
+ * The term page's parts: a record page, composed from `record-parts` and
+ * nothing new.
+ * - What is missing is the design: no "file into", "tag", "attach" or "track
+ *   companies". A concept never holds things; every list here is what the
+ *   graph learned by matching the term.
+ * - The empty state's one primary writes a note that mentions it.
  */
 
 type Page = NonNullable<Awaited<ReturnType<typeof getTermPage>>>

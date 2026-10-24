@@ -24,7 +24,7 @@ import { cn } from '#/lib/utils'
  * one row per setting — a switch for a boolean, a picker for an enum, a
  * field for a number or a string.
  * - A switch, a picker or a checkbox saves when it changes; a typed field or
- *   a key joins the page's Save bar (D81). The card draws no Save of its own.
+ *   a key joins the page's Save bar. The card draws no Save of its own.
  * - A field that failed its schema turns its row rose and says why under the
  *   label, with `not saved`; nothing is written until every field passes.
  * - A saved key is never shown: the row reads its redacted display.
@@ -202,7 +202,7 @@ export function SettingsFields({
   )
 }
 
-/** The three auto-enrich scopes, each the trigger it stands for. (D76) */
+/** The three auto-enrich scopes, each the trigger it stands for. */
 export const SCOPE_ROWS: ReadonlyArray<{
   readonly scope: AutoEnrichScopeName
   readonly label: string

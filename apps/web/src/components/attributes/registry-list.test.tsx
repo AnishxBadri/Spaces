@@ -7,8 +7,8 @@ import { RegistryList } from './registry-list'
 import type { RegistryAttr } from './registry-list'
 
 /**
- * The attributes ledger (R1): a system attribute's `···` has no Archive, a
- * user attribute's does. (D69)
+ * The attributes ledger: a system attribute's `···` has no Archive, a
+ * user attribute's does.
  * - happy-dom's DOM globals are installed by hand before React loads, as in
  *   the other window tests.
  */

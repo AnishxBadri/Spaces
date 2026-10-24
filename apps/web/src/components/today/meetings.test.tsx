@@ -10,11 +10,11 @@ import type { DayMeeting, SetupAudience } from '#/lib/server-fns'
 import { MeetingsSection } from './meetings'
 
 /**
- * Today's Meetings section (D79, D80): the head carries the day's count once,
+ * Today's Meetings section: the head carries the day's count once,
  * `‹ today ›` and "all meetings ›"; a row prints the time, the title, each
  * participant with the RSVP mark and never a control to change it, the
- * linked records and the artifact marks; with no calendar the section is the
- * one D80 line, which names an admin for a member.
+ * linked records and the artifact marks; with no calendar the section is one
+ * line, which names an admin for a member.
  */
 
 const ADMIN: SetupAudience = { isAdmin: true, admins: ['Anish'] }

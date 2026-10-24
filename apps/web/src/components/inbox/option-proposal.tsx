@@ -8,7 +8,7 @@ import { Button } from '#/components/ui/button'
 import { addProposedOption } from '#/lib/server-fns'
 
 /**
- * A registry proposal (SPA-72): an AI attribute's classify run wanted an
+ * A registry proposal: an AI attribute's classify run wanted an
  * option the attribute does not have. It is never a value and never a
  * silent new option — the suggestion's patch is empty and its rationale
  * names the option (`optionProposalLine`). This body says so and offers the

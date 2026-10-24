@@ -21,8 +21,8 @@ import { KIND_ORDER } from '#/lib/documents/files-tab'
 import { recordPath } from '#/lib/record-path'
 
 /**
- * The viewer's sidebar on a Files tab (D66): KIND, FILED ON with File on…,
- * VERSIONS, TEXT, MENTIONED IN and SOURCE. Filing is §3.3's re-file: every
+ * The viewer's sidebar on a Files tab: KIND, FILED ON with File on…,
+ * VERSIONS, TEXT, MENTIONED IN and SOURCE. Filing is a re-file: every
  * edge, not just this record's, because one file sits in several places.
  */
 

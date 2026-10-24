@@ -10,14 +10,13 @@ import {
 import type { SuggestSpacesStatus } from '#/lib/server-fns'
 
 /**
- * "Suggest spaces" (SPA-103) — the Spaces rail's one AI verb. Pressing it
+ * "Suggest spaces" — the Spaces rail's one AI verb. Pressing it
  * enqueues one classify run for this record; the run proposes a `space_tag`
  * suggestion per space it places the record in, and those land in Review
- * and on this rail's "Waiting" chips (SPA-114) — this control draws no
+ * and on this rail's "Waiting" chips — this control draws no
  * pending state of its own beyond its label.
  *
- * **Absent while the classify lane is unrouted** — kind classify's rule
- * (SPA-62). The gate is the lane routed at either scope, not at this
+ * **Absent while the classify lane is unrouted.** The gate is the lane routed at either scope, not at this
  * record's resolved sensitivity: a record under a sensitive space on a
  * cloud-routed lane still sees the action, and pressing it is refused with
  * a toast naming the space, which is how a person learns why. The run is a

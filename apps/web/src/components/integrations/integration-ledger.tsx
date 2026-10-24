@@ -10,7 +10,7 @@ import { cn } from '#/lib/utils'
  * The Installed ledger: one 40px row per plugin — the operator's switch,
  * its mark, name and version, the jobs it does, its state over the one
  * number that matters (credits, signals, people connected), and `Open ›`,
- * or `Update` when the registry has a newer version it can run. (D81)
+ * or `Update` when the registry has a newer version it can run.
  * The three ways of not running read apart:
  * - degraded — amber row, the worker's reason, Fix;
  * - tripped — rose row, the breaker's reason, Reset;

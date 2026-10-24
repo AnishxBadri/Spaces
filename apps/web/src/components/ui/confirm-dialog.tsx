@@ -23,7 +23,7 @@ export type ConfirmOptions = {
   /**
    * The verb on the acting button: "Delete", "Archive 3". Omitted, the sheet
    * is a notice — one way out and no button that promises something the
-   * server has already refused (SPA-125: the mandate's note).
+   * server has already refused (the mandate's note).
    */
   action?: string
   /** The safe way out. */
@@ -33,7 +33,7 @@ export type ConfirmOptions = {
 }
 
 /**
- * The destructive confirm (Overlays sheet, "Confirm — destructive"): a 440px
+ * The destructive confirm: a 440px
  * sheet whose bone head band holds the crimson square and the serif question;
  * on paper under it, one sentence and an optional ledger of what is affected
  * on a rule border; then the 52px bone foot: Keep, and the acting button
@@ -130,8 +130,8 @@ export function ConfirmDialog({
 
 /**
  * `const { confirm, confirmDialog } = useConfirm()` — render `confirmDialog`
- * once, then `if (!(await confirm({...}))) return` where `window.confirm`
- * used to be. Resolves false on esc, the overlay, and Keep.
+ * once, then `if (!(await confirm({...}))) return` in place of
+ * `window.confirm`. Resolves false on esc, the overlay, and Keep.
  */
 export function useConfirm() {
   const [pending, setPending] = useState<{

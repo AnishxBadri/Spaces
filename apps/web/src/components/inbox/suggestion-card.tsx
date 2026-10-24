@@ -50,11 +50,9 @@ import { recordPath } from '#/lib/record-path'
 import { cn } from '#/lib/utils'
 
 /**
- * The suggestion card (SPA-98, spec-ai-substrate.md §10) — every open
- * suggestion on one record, one row per suggestion, each accepted or
- * rejected on its own. The card is the pair card's container (the queue
- * precedent, `docs/design-contract.md` §3); the row is rationale, citations
- * and a decision.
+ * The suggestion card — every open suggestion on one record, one row per
+ * suggestion, each accepted or rejected on its own. The card is the pair
+ * card's container; the row is rationale, citations and a decision.
  *
  * Generic over `suggestion.kind`: a kind with a body in `SUGGESTION_BODIES`
  * draws it, every other kind prints its payload in the same row shape. The
@@ -81,7 +79,7 @@ export const SUGGESTION_KIND_WORD: Record<SuggestionKind, string> = {
 }
 
 /**
- * What a field row can do beyond showing its value (SPA-110): accept its
+ * What a field row can do beyond showing its value: accept its
  * attribute on every record that proposes it, and show why the last batch
  * could not apply it. Null where the row is drawn read-only.
  */
@@ -108,7 +106,7 @@ const SUGGESTION_BODIES: Partial<Record<SuggestionKind, SuggestionBody>> = {
         actions={actions}
       />
     ) : readOptionProposals(item.rationale).length > 0 ? (
-      // SPA-72: a registry proposal — an empty patch naming an option an AI
+      // A registry proposal — an empty patch naming an option an AI
       // attribute's classify run wanted. "Add option" is its explicit write.
       <OptionProposalBody suggestionId={item.id} rationale={item.rationale} />
     ) : (
@@ -206,7 +204,7 @@ const SUGGESTION_BODIES: Partial<Record<SuggestionKind, SuggestionBody>> = {
 
 /**
  * The decision's words, per kind. A discovery card's reject is a dismissal,
- * permanent for its space, so it says so. (D72)
+ * permanent for its space, so it says so.
  */
 type DecisionWords = {
   accept: string
@@ -256,7 +254,7 @@ export function decisionWords(kind: SuggestionKind): DecisionWords {
       rejectTitle: null,
       icons: true,
     }
-  // The Action Grammar's foot: Dismiss · the verb, no icons. (D59)
+  // The Action Grammar's foot: Dismiss · the verb, no icons.
   if (kind === 'supersedes')
     return {
       accept: 'Mark as newer version',
@@ -289,7 +287,7 @@ export function PayloadBody({ item }: BodyProps): React.ReactNode {
 }
 
 /**
- * A person the document named (SPA-105): the claim as the deck gave it, in
+ * A person the document named: the claim as the deck gave it, in
  * the patch body's label/value rows. Accepting resolves it — attach on an
  * email or LinkedIn match, else a new person, whose near-miss names land in
  * this same queue as a pair card.
@@ -327,7 +325,7 @@ function IdentityBody({ claim }: { claim: IdentityPayload }) {
 }
 
 /**
- * A classification (SPA-62): the kind the document looks like, in the
+ * A classification: the kind the document looks like, in the
  * patch body's label/value rows. Accepting sets the document's kind and
  * nothing else — a deck's Read deck button appears; nobody presses it here.
  */
@@ -353,7 +351,7 @@ function DocumentKindBody({ proposed }: { proposed: DocumentKindPayload }) {
 }
 
 /**
- * A drafted note (SPA-66): its title and its body as the note will hold it,
+ * A drafted note: its title and its body as the note will hold it,
  * citations and all. Markdown, read as text — the card is where a person
  * decides whether to keep it, and the editor is where it is formatted.
  */
@@ -393,7 +391,7 @@ function TaskBody({ title, due }: { title: string; due: string | null }) {
 }
 
 /**
- * A space tag (SPA-103): the space of the tree the record looks like it
+ * A space tag: the space of the tree the record looks like it
  * belongs in, by its path, in the patch body's label/value rows. Accepting
  * tags the record into it (`source: ai`, this confidence, by the accepter).
  */
@@ -419,7 +417,7 @@ function SpaceTagBody({ proposed }: { proposed: SpaceTagPayload }) {
 }
 
 /**
- * A newer version (D59): the document just filed and the one it would
+ * A newer version: the document just filed and the one it would
  * supersede, each named once. Accepting links them; neither is deleted.
  */
 function SupersedesBody({ pair }: { pair: SupersedesPayload }) {
@@ -526,7 +524,7 @@ function LedgerEventBody({ ledger }: { ledger: LedgerEventPayload }) {
 }
 
 /**
- * A company a watch found (D72): its name, its domain, and the pages that
+ * A company a watch found: its name, its domain, and the pages that
  * put it forward.
  */
 function DiscoveryBody({
@@ -744,7 +742,7 @@ export function SuggestionEntry({
         <p className="text-ui text-graphite">
           {item.rationale ?? 'No rationale given.'}
         </p>
-        {/* SPA-31: a proposal from outside the app says which door it came
+        {/* A proposal from outside the app says which door it came
             through, so it never reads as one of the app's own. */}
         {item.origin.via === 'mcp' ? (
           <p className="text-label text-graphite">
@@ -770,7 +768,7 @@ export function SuggestionEntry({
             ))}
           </ul>
         ) : null}
-        {/* SPA-100: the run that proposed it, opened in Settings → Usage. A
+        {/* The run that proposed it, opened in Settings → Usage. A
             plain anchor, so the entry stays pure over its props. */}
         {item.runId === null ? null : (
           <a
@@ -921,7 +919,7 @@ export function SuggestionCard({ card }: { card: SuggestionRow }) {
   return (
     <li className="flex flex-col border border-hairline bg-paper shadow-solid">
       <div className="flex min-h-11 items-center gap-3 border-b border-hairline px-5 py-2.5">
-        {/* SPA-134: a captured page's card is headed by the page. */}
+        {/* A captured page's card is headed by the page. */}
         {card.page === null ? (
           <RecordChip record={card.record} />
         ) : (

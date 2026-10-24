@@ -59,7 +59,7 @@ function anchor(at: number): string {
 
 /**
  * Today's working hours, 08–20, as a band under the head: the elapsed part
- * dithered up to a pine now-dot with `now · hh:mm` beside it. (D79)
+ * dithered up to a pine now-dot with `now · hh:mm` beside it.
  * - `meetings` are ink blocks with their names; Today passes them once a
  *   calendar source feeds the day.
  * - Dither cells stay 2px: the svg has no viewBox, so its user units are pixels.

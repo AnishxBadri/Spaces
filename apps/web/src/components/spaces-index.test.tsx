@@ -17,7 +17,7 @@ import type { SpacesIndex } from './spaces-index'
 import type * as RouterModule from '@tanstack/react-router'
 
 /**
- * The spaces index by sheet 00 (D73), mounted under a memory router on a
+ * The spaces index, mounted under a memory router on a
  * happy-dom `Window`: the label row, the tree, the last filed lane, the
  * archived fold and the New space window. Server fns are stubs.
  */

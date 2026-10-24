@@ -10,7 +10,7 @@ import { engineFor, savedWatchLine, spaceNameFrom } from '#/lib/ask/find-view'
 
 /**
  * A Find table's head: Save as watch, and once saved the thread's line
- * linking to the watch — which says so when the watch is gone. (D77)
+ * linking to the watch — which says so when the watch is gone.
  * - Absent until a watch engine is installed, like the space page's Add watch.
  * - The window opens on the table's space, else asks for one and offers to
  *   create a space named from the question; How often opens on Weekly.

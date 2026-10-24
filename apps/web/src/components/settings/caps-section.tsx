@@ -23,8 +23,7 @@ function parseCeiling(raw: string): number | null | 'invalid' {
 }
 
 /**
- * Limits — the workspace's AI token ceilings, a group of Usage & limits
- * (D81).
+ * Limits — the workspace's AI token ceilings, a group of Usage & limits.
  * - Two typed fields in the page's Save bar; a blank one is no cap.
  * - Only an admin changes them: a member reads them disabled, with whom to
  *   ask in the group head.

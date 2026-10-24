@@ -21,7 +21,7 @@ export function whereFromWords(from: WhereFrom): string {
 }
 
 /**
- * A filled value's where-from (D76): a small square after the value that
+ * A filled value's where-from: a small square after the value that
  * opens, on hover or focus, the source that filled it, the day, and — for
  * a changing figure — its earlier values with their days. Dithered, as
  * every popover is.

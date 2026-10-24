@@ -12,7 +12,7 @@ import { NoticesBand } from './notices'
 /**
  * The notices band's auto-enrich line: one per source at its daily cap, with
  * the records waiting and when they resume; and the write-through line, one
- * per provider with uploads not yet in their bound folder. (D76, D79, §6)
+ * per provider with uploads not yet in their bound folder.
  */
 
 async function render(

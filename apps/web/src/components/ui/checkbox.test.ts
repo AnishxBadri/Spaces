@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { checkboxClasses, radioClasses } from './checkbox.tsx'
 
-/** SPA-22. Asserted through the class helper — see `badge.test.ts` for why. */
+/** Asserted through the class helper — see the badge test for why. */
 describe('checkboxClasses', () => {
   it('is a 14px square, never a rounded native control', () => {
     const c = checkboxClasses({ checked: false }).split(' ')

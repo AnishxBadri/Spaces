@@ -27,7 +27,7 @@ import type { SearchHit } from '#/lib/search/query'
 import type { PreviewLoaders } from './palette-preview'
 
 /**
- * The palette as D70 draws it, mounted on a happy-dom `Window`: the input,
+ * The palette, mounted on a happy-dom `Window`: the input,
  * the four groups in order, the second wave's running head, the record's
  * verbs, the step with its mode label, and the foot. `PaletteBody` is what
  * the window holds; the searches are stubs the test answers by hand.

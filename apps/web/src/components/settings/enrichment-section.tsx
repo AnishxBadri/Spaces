@@ -40,7 +40,7 @@ import {
 } from './settings-section'
 
 /**
- * Settings → Integrations → Enrichment (D76, D81): where enriched values
+ * Settings → Integrations → Enrichment: where enriched values
  * come from. Top to bottom: three readouts (number above a sentence-case
  * label), the sources in order (drag or ↑↓; each row's switch takes a source
  * in or out of the order — the Website's is always on), when to enrich
@@ -287,7 +287,7 @@ function SourcesBlock({
 /**
  * The three auto-enrich scopes and the five trigger words they carry:
  * joining a deal and filing into a space each also cover a record created,
- * or gaining a domain or an email, while it is in one. (D76)
+ * or gaining a domain or an email, while it is in one.
  */
 const SCOPE_LABELS: ReadonlyArray<{
   readonly scope: AutoEnrichScopeName

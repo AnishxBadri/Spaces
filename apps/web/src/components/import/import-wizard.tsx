@@ -12,16 +12,12 @@ import { columnLetter } from '@spaces/core/import/mapping'
 import { cn } from '#/lib/utils'
 
 /**
- * The import wizard's chrome (SPA-164, import-2): the page header, the
- * four-step strip, the drop zone, the define row (object + mode), the sheet
- * tabs and the preview grid. Steps 1 to 3 are live (the mapping grid is
- * `mapping-grid.tsx`, SPA-165; the preview ledger `preview-ledger.tsx`,
- * SPA-167); the strip draws the commit inert so the shape of the wizard is
- * visible from the start.
- *
- * Copied, not designed: the header is `PageHeader`, the drop zone is the P5
- * `EmptyState` anatomy with a dashed rule, the grid keeps `RecordTable`'s
- * 36px rows on rules and its caps mono head.
+ * The import wizard's chrome: the page header, the four-step strip, the
+ * drop zone, the define row (object + mode), the sheet tabs and the preview
+ * grid. The strip draws the commit inert so the wizard's shape shows from
+ * the start.
+ * Copied, not designed: `PageHeader`, the `EmptyState` anatomy on a dashed
+ * rule, and `RecordTable`'s 36px rows and caps mono head.
  */
 
 export type ImportMode = 'records' | 'ledger'
@@ -29,7 +25,7 @@ export type ImportMode = 'records' | 'ledger'
 export type ImportObject = { id: string; plural: string }
 
 /**
- * The object `/import?object=` names (SPA-173). The list pages' Import
+ * The object `/import?object=` names. The list pages' Import
  * action carries the registry slug (`deals`), and a hand-typed link says
  * `deal` or `Deals` as often: slug, singular or plural, in any case, is the
  * same object. Nothing matched is no object — the picker starts empty.
@@ -114,7 +110,7 @@ export function ImportHeader({
 // ---------------------------------------------------------------------------
 
 /**
- * One id for the toast a refused Continue raises (SPA-173): a second refusal
+ * One id for the toast a refused Continue raises: a second refusal
  * replaces the first, and the Continue that goes through dismisses it, so
  * no refusal lingers into the next step.
  */
@@ -156,7 +152,7 @@ export const NO_LAND_TAIL: Record<NoLandStop, string> = {
 }
 
 /**
- * The no-land row's tail (SPA-173): one mono token saying where the fix is,
+ * The no-land row's tail: one mono token saying where the fix is,
  * never a sentence — the why lane already carries the cause. A decision
  * stop links back to step 2 when the step hands it the way there.
  */
@@ -205,9 +201,9 @@ export function StepStrip({
   step?: 0 | 1 | 2 | 3
   /** Step 2's readout once its mapping would advance — `7 of 11 mapped`. */
   mapHint?: string | null
-  /** A ledger batch maps to event fields (SPA-170). */
+  /** A ledger batch maps to event fields. */
   mode?: ImportMode
-  /** Step 3's readout once the batch commits — `46 rows` (SPA-169). */
+  /** Step 3's readout once the batch commits — `46 rows`. */
   previewHint?: string | null
 }) {
   return (
@@ -265,7 +261,7 @@ export function StepStrip({
 // Drop zone
 // ---------------------------------------------------------------------------
 
-/** P5 anatomy on a dashed rule: dither, one serif line, one sans line. */
+/** `EmptyState` anatomy on a dashed rule: dither, one serif line, one sans line. */
 export function DropZone({
   onFile,
   busy,

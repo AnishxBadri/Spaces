@@ -14,15 +14,15 @@ import { FolderGlyph } from './file-glyph'
 import { formatBytes } from '@spaces/core/documents'
 
 /**
- * Link a Drive folder (D66): a window titled with the Drive path in mono —
+ * Link a Drive folder: a window titled with the Drive path in mono —
  * where the files land, what is inside, and the three options whose hints
  * survive the invariant-line test (cost, privacy, consequence).
  * - Presentational: the caller binds and says how it went; a refusal (the
  *   folder already has an owner) stays in the window, above the foot.
  * - The dialog sets no direction: a binding made here reads, Drive → us.
- * - One owner per option's behaviour. Keep is storage-12's: `text` drops the
- *   bytes after extraction (`dropBytesAfterExtraction`) and a flip to `full`
- *   backfills (`setBindingRetain`). Sensitive is storage-18's.
+ * - Each option's behaviour lives elsewhere: Keep `text` drops the bytes
+ *   after extraction (`dropBytesAfterExtraction`) and a flip to `full`
+ *   backfills (`setBindingRetain`).
  */
 
 /** What Link folder stores on the binding. */

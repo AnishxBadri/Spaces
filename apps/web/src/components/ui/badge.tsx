@@ -7,8 +7,8 @@ import { cn } from '#/lib/utils.ts'
 
 /**
  * The colour → inline-style map, re-exported so the badge is the one place in
- * the app that turns a stored colour into paint. `option-list-editor`'s colour
- * swatches take it from here rather than from core: a swatch is choosing a
+ * the app that turns a stored colour into paint. `ColorPicker`'s swatches take
+ * it from here rather than from core: a swatch is choosing a
  * badge colour, so it belongs to the badge, and `@spaces/core`'s `badgeStyle`
  * keeps exactly one importer.
  */
@@ -16,9 +16,9 @@ export { badgeStyle }
 
 /**
  * What a badge needs of an option row. Deliberately the row and not a resolved
- * colour: `optionColor`'s index fallback is why a set defined before the
- * palette existed still renders fully coloured, and why the board and Today
- * agree on hues for the same stage. Hand a `Badge` a colour and that agreement
+ * colour: `optionColor`'s index fallback is why a set with no stored colours
+ * still renders fully coloured, and why the board and Today agree on hues for
+ * the same stage. Hand a `Badge` a colour and that agreement
  * becomes each caller's problem.
  */
 export type BadgeOption = { color?: string } | undefined
@@ -27,15 +27,10 @@ export type BadgeOption = { color?: string } | undefined
  * The class string a badge wears. Exported for tests and for the rare caller
  * that owns its own element without going through `asChild`.
  *
- * Square chips, mono 11 medium, 20px tall, 6px inset (DESIGN.md §5 "Option
- * Badges"). Two states drop the hue, both documented:
- *
- * - `archived` — struck graphite on bone (DESIGN.md §5, Settings: "archived
- *   options struck on bone"). It is a prop rather than each caller's business
- *   because the treatment was duplicated at four sites and had drifted at
- *   three of them.
- * - `unselected` — a dashed rule in graphite (DESIGN.md §5, the Mandate:
- *   "stages as badges with the unselected ones dashed").
+ * Square chips, mono 11 medium, 20px tall, 6px inset. Two states drop the hue:
+ * - `archived` — struck graphite on bone. A prop rather than each caller's
+ *   business, so the treatment cannot drift between sites.
+ * - `unselected` — a dashed rule in graphite (the Mandate's unchosen stages).
  */
 export function badgeClasses({
   archived = false,

@@ -15,9 +15,8 @@ const storedPrefs = z.object({
 
 /**
  * Which columns are shown and how wide they are, remembered per object kind.
- * Local to the browser on purpose — saved *views* (shared, server-side) are
- * deferred, and this is the column state a single operator expects to survive
- * a reload, not a feature standing in for them.
+ * Local to the browser on purpose: the column state a single operator expects
+ * to survive a reload, not a stand-in for shared, server-side saved views.
  */
 export function useTablePrefs(key: string) {
   const [prefs, setPrefs] = useState<Prefs>(() => {

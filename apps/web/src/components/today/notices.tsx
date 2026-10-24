@@ -52,7 +52,7 @@ const utcClock = (iso: string) => `${iso.slice(11, 16)} UTC`
  * What stops the machine, one line each with the link that fixes it: a
  * plugin switched on and not running or capped, auto-enrich parked at a
  * source's daily cap, the reader's connections in `error`, and uploads
- * waiting to reach a bound folder. Renders nothing when all runs. (D76, D79)
+ * waiting to reach a bound folder. Renders nothing when all runs.
  */
 export function NoticesBand({
   stopped,

@@ -11,8 +11,8 @@ import { estimateColumnRun, runColumn } from '#/lib/server-fns'
 import type { ColumnRunEstimate } from '#/lib/server-fns'
 
 /**
- * "Run on this view" (SPA-122, spec-ai-substrate §13 "bulk = job with
- * estimate + per-day cap") — the column header's verb on an attribute that
+ * "Run on this view" — a bulk run is a job with an estimate and a per-day
+ * cap. The column header's verb on an attribute that
  * carries `options.ai`, over the saved view the list is showing. Nothing
  * runs on the press: the confirm opens with the **estimate** — the view's
  * records counted in SQL over its saved conditions, minus the ones already

@@ -17,7 +17,7 @@ import { createRelationship } from '#/lib/server-fns'
 import type { Cardinality } from '@spaces/core/attributes/relationship'
 
 /**
- * The Relationship dialog (R2, D69): two objects, the attribute's name on
+ * The Relationship dialog: two objects, the attribute's name on
  * each, and the cardinality — one commit that creates both halves. Object A
  * starts as the object the dialog was opened from.
  */

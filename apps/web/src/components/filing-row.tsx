@@ -10,7 +10,7 @@ export type FilingChip = {
   /** null = this kind has no page; the chip reads as text, not a dead link. */
   href: string | null
   Icon: LucideIcon | undefined
-  /** An archived space: the filing stays, drawn graphite and marked. (D73) */
+  /** An archived space: the filing stays, drawn graphite and marked. */
   archived?: boolean | undefined
 }
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { switchClasses } from './switch.tsx'
 
-/** SPA-22. Asserted through the class helper — see `badge.test.ts` for why. */
+/** Asserted through the class helper — see the badge test for why. */
 describe('switchClasses', () => {
   it('draws a 24×14 square track with a 10px square knob', () => {
     const { track, knob } = switchClasses({ checked: false })

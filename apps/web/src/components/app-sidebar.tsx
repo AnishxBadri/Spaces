@@ -52,8 +52,8 @@ import { openUploadDialog } from '#/lib/upload-dialog-store'
 import { cn } from '#/lib/utils'
 
 /**
- * The chassis: 232px of bone with a hairline right edge (DESIGN.md §5,
- * sidebar A). Work (Today, Tasks, Spaces with its starred spaces), then three
+ * The chassis: 232px of bone with a hairline right edge. Work (Today, Tasks,
+ * Spaces with its starred spaces), then three
  * groups that fold per browser — Library, Objects, Capital.
  *
  * - The current row is a hairline box on paper, inside the chassis, expanded
@@ -85,7 +85,7 @@ type NavItem = {
   readonly icon: LucideIcon
   /**
    * The G-chord printed in the row's right lane. The shell binds it, the
-   * keyboard sheet lists it, and `nav-grammar.test.ts` names both pages if
+   * keyboard sheet lists it, and the nav grammar test names both pages if
    * two rows claim one letter.
    */
   readonly key: string
@@ -94,7 +94,7 @@ type NavItem = {
 }
 
 export const NAV_ITEMS = [
-  // Today first: login lands there, and it is the one attention page (D79).
+  // Today first: login lands there, and it is the one attention page.
   { to: '/today', label: 'Today', icon: Sunrise, key: 'G T', group: 'work' },
   {
     to: '/tasks',
@@ -111,7 +111,7 @@ export const NAV_ITEMS = [
     key: 'G N',
     group: 'library',
   },
-  // Meetings takes E: M is Mandate. (D68 amended)
+  // Meetings takes E: M is Mandate.
   {
     to: '/meetings',
     label: 'Meetings',
@@ -119,7 +119,7 @@ export const NAV_ITEMS = [
     key: 'G E',
     group: 'library',
   },
-  // Files keeps Documents' L (library): D is Deals. (D68 amended)
+  // Files takes L (library): D is Deals.
   {
     to: '/files',
     label: 'Files',
@@ -234,7 +234,7 @@ export function AppSidebar({
   workspaceName?: string | null | undefined
   /** The logo's URL; the monogram stands in without one. */
   workspaceLogo?: string | null
-  /** Custom objects (spec §9) — they join the nav right after Deals. */
+  /** Custom objects — they join the nav right after Deals. */
   objects?: Array<CustomObject>
   /** Open tasks due today or overdue; nonzero, Tasks' lane reads `n due`. */
   tasksDue?: number
@@ -710,7 +710,7 @@ function AccountMenu({
 }
 
 /**
- * Drafts (E5), with the count read each time the menu opens — so a draft
+ * Drafts, with the count read each time the menu opens — so a draft
  * saved or trashed since is already counted.
  */
 function DraftsItem() {

@@ -3,11 +3,10 @@ import type { ReactNode } from 'react'
 import { DitherBlock } from './dither'
 
 /**
- * P5 — Empty state (Instrument, 2026-09-10): a dither block, one serif
- * sentence, one sans line, one primary action carrying its key. It teaches
- * what the surface will do in two sentences or less and offers the create
- * action when the backend exists. The `icon` is kept for callers; the
- * block is the picture now.
+ * Empty state: a dither block, one serif sentence, one sans line, one
+ * primary action carrying its key. It teaches what the surface will do in
+ * two sentences or less and offers the create action when the backend
+ * exists. The dither block is the picture; `icon` is accepted and not drawn.
  */
 export function EmptyState({
   title,

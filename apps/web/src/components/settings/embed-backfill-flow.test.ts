@@ -13,7 +13,7 @@ import { backfillRunOf } from '#/lib/ai/embed-backfill'
 import { backfillConfirmOptions, confirmThenStart } from './embed-backfill-flow'
 
 /**
- * SPA-136. The backfill asks before it embeds: the estimate is on the sheet
+ * The backfill asks before it embeds: the estimate is on the sheet
  * before anything runs, a cancel makes no call, and a local provider reads
  * "free" rather than a dollar figure. Pure — no DOM, no provider.
  */

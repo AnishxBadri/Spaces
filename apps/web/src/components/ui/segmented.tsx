@@ -2,10 +2,7 @@ import { cn } from '#/lib/utils'
 
 /**
  * The segmented control: two or three mutually exclusive choices drawn as
- * one hairline box, the chosen one inked. Extracted from the attribute
- * dialog's local copy (2026-09-11) when the log-interaction dialog's
- * hand-rolled call/meeting switch and the note editor's Note · Memo ·
- * Scratch toggle became the second and third of the same shape.
+ * one hairline box, the chosen one inked.
  *
  * A radiogroup, not a row of toggle buttons: exactly one is chosen at all
  * times, which is what `role="radio"` + `aria-checked` says and what

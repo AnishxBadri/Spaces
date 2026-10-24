@@ -23,8 +23,8 @@ import { RecordHeader } from './record/record-parts'
  * body. `IntersectionObserver` is absent from the test DOM, so it is stubbed
  * and its callback fired by hand — the title leaving and coming back.
  *
- * The DOM is a happy-dom `Window` on this file's globals, as in
- * `use-hotkey.test.tsx`, so the per-file database setup stays on node.
+ * The DOM is a happy-dom `Window` on this file's globals, so the per-file
+ * database setup stays on node.
  */
 
 type Entry = {

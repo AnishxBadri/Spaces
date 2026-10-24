@@ -9,7 +9,7 @@ import { attributeColumnMeta } from '#/components/table/cells'
 import { inverseCountSlug } from '#/lib/views/inverse-fields'
 
 /**
- * An inverse attribute's two columns (D69): the referencing records, edited
+ * An inverse attribute's two columns: the referencing records, edited
  * as the owner's value, and their count, read-only. Both sort and filter on
  * the server; the list page fills the row's values with them.
  */

@@ -10,7 +10,7 @@ import {
 } from './ui/dialog'
 
 /**
- * The keyboard sheet (Overlays · Flows). Two columns of 26px rows on rules:
+ * The keyboard sheet. Two columns of 26px rows on rules:
  * Go, Create, On a deal, In a sheet. Every key printed here also shows
  * inside the control it triggers; nothing is listed that does not work.
  */

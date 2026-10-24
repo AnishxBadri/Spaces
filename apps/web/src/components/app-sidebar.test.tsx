@@ -25,8 +25,8 @@ import type * as RouterModule from '@tanstack/react-router'
  * spaces under Spaces, the pinned views under their object, the account row's
  * two icons and the current row's tab.
  *
- * The DOM is a happy-dom `Window` on this file's globals, as in
- * `use-hotkey.test.tsx`, so the per-file database setup stays on node.
+ * The DOM is a happy-dom `Window` on this file's globals, so the per-file
+ * database setup stays on node.
  */
 
 type PinnedAnswer = {

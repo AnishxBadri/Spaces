@@ -2,7 +2,7 @@ import type { RecordReadout } from '#/components/record/record-parts'
 import { STALE_MARK_DAYS } from '#/lib/today/needs-you'
 
 /**
- * Today's readouts: derived figures, never section counts. (D79)
+ * Today's readouts: derived figures, never section counts.
  * - Each cell links to the list it counted; Unfiled carries the filter.
  * - Colour only when nonzero and bad; a zero reads graphite.
  */

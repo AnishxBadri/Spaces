@@ -20,7 +20,7 @@ export type RelationRow = {
   objectSlug: string | null
 }
 
-/** One attribute of a relationship as the record reads it (D69). */
+/** One attribute of a relationship as the record reads it. */
 export type RelationHalfRow = {
   slug: string
   derived: boolean

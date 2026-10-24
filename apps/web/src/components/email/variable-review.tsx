@@ -5,7 +5,7 @@ import type { ReviewChoices } from '#/lib/email/compose'
 import type { VariableReview } from '#/lib/server-fns'
 
 /**
- * Review, the composer's second stage (D67): recipients × the variables the
+ * Review, the composer's second stage: recipients × the variables the
  * draft uses, each resolved for that recipient.
  * - A blank is flagged in its row and filled in place, or the row's blanks
  *   are accepted to go out empty.

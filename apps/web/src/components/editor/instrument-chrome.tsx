@@ -31,13 +31,10 @@ import { cn } from '#/lib/utils.ts'
 
 /**
  * The half of BlockNote's chrome the app owns by handing the library its own
- * components. `note-editor.tsx` carries the map of which surface went which
- * way; this file is the parts list.
- *
- * BlockNote reads these out of its `ShadCNComponentsContext`, so a surface
- * built from them is drawn by exactly the file every other menu, button and
- * tooltip in the app is drawn by — no restyling from outside, and no second
- * copy of the vocabulary to keep in step.
+ * components; `NoteEditor` carries the map of which surface went which way.
+ * BlockNote reads these from its `ShadCNComponentsContext`, so these surfaces
+ * are drawn by the app's own primitives, with no second copy of the
+ * vocabulary to keep in step.
  */
 
 /**
@@ -82,8 +79,7 @@ function EditorToggle({
  * The components map handed to `BlockNoteView`. Only the groups the app
  * already owns are listed: `Select`, `Badge`, `Card`, `Avatar`, `Skeleton`,
  * `Tabs` and `Form` have no Instrument primitive behind them, so BlockNote
- * keeps its own and `styles.css` dresses them — see the map comment in
- * `note-editor.tsx`.
+ * keeps its own and the stylesheet dresses them — see the map in `NoteEditor`.
  */
 export const instrumentChrome = {
   Button: { Button },
@@ -115,29 +111,16 @@ const SHEET_ORIGIN = {
 }
 
 /**
- * Enter and exit for the editor's floating sheets — DESIGN.md §5, "Menus:
- * 150/100", on `--ease-out-quart`, origin-aware, scale 0.96 → 1.
- *
- * This is the third seam (see the map in `note-editor.tsx`). BlockNote's
- * floating elements are positioned by floating-ui, which writes both the
- * position AND the transition as **inline style** on the wrapper — so neither
- * the components map nor a stylesheet can reach it, and this object is the
- * only way in.
- *
- * `transform: false` is load-bearing, not a preference: floating-ui positions
- * with `transform: translate(…)` by default and spreads the transition styles
- * over the positioning styles, so a `transform` in the transition would
- * overwrite the position and drop the sheet at the origin. Told to position
- * with `top`/`left` instead, `transform` is free for the motion. The
- * `transition-property` floating-ui emits is derived from the *keys* of
- * `initial`, so naming exactly `opacity` and `transform` is what holds the
- * Compositor Rule here — no third key may join them.
- *
- * Reduce Motion needs nothing added: the app's one global
- * `@media (prefers-reduced-motion: reduce)` rule (`styles.css`, `@layer base`)
- * sets `transition-duration: 0.01ms !important` on `*`, and `!important`
- * outranks an inline style, so the kill switch reaches this without knowing
- * it exists.
+ * Enter and exit for the editor's floating sheets: 150ms in, 100ms out, on
+ * `--ease-out-quart`, origin-aware, scale 0.96 → 1. floating-ui writes
+ * position and transition as inline style, so this object is the only way in.
+ * - `transform: false` is load-bearing: floating-ui would otherwise position
+ *   with `transform` and the motion's `transform` would drop the sheet at
+ *   the origin.
+ * - `transition-property` comes from the keys of `initial`: exactly
+ *   `opacity` and `transform`, never a third (the Compositor Rule).
+ * - Reduce Motion is the global `prefers-reduced-motion` rule, whose
+ *   `!important` outranks the inline style.
  */
 export const SHEET_MOTION = {
   useFloatingOptions: { transform: false },
@@ -153,8 +136,7 @@ export const SHEET_MOTION = {
 
 /**
  * The drag handle and its `+`. A hover affordance rather than a sheet, so it
- * takes DESIGN.md §5's other number — "hovers: ≤100ms or nothing" — and never
- * scales: a handle that grows as the pointer crosses a block reads as a
+ * takes the hover timing — ≤100ms or nothing — and never scales: a handle that grows as the pointer crosses a block reads as a
  * twitch, not as an overlay arriving. Positioning is left on `transform`
  * because this one tracks the pointer down the document.
  */

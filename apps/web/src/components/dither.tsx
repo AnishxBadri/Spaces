@@ -1,7 +1,7 @@
 import { cn } from '#/lib/utils'
 
 /**
- * Texture — the Dither Rule (Instrument, 2026-09-10). One bit, pine or ink,
+ * Texture — the Dither Rule. One bit, pine or ink,
  * never under text, never animated. Allowed in empty states, chart fills,
  * fallback marks, thumbnails and loading. Cells are 2px; a 4×4 Bayer matrix
  * decides which cells a given density fills, so two blocks of the same
@@ -36,7 +36,8 @@ export const SHADOW_OFFSET = 4
  * edge plus the dithered copy of its box offset down and right.
  * - Unsized on purpose: a border image with no intrinsic size is drawn at
  *   the border-image area, so cells stay 2px at any sheet size.
- * - styles.css carries this string verbatim; a test fails when they drift.
+ * - The stylesheet's `shadow-dither` utility carries this string verbatim; a
+ *   test fails when they drift.
  */
 export function ditherShadowUrl(ink: string): string {
   const cells = cellsFor(SHADOW_LEVEL)

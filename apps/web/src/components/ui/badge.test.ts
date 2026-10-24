@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { badgeClasses, badgeTint } from './badge.tsx'
 
 /**
- * SPA-22. `@testing-library/react` is not a dependency of this package and the
+ * `@testing-library/react` is not a dependency of this package and the
  * suite runs `environment: 'node'` over `src/**\/*.test.ts`, so the contract is
  * asserted through the class-and-style helpers the primitive is built from
  * rather than through a render. Adding a DOM renderer to prove three class
@@ -22,7 +22,7 @@ describe('badgeClasses', () => {
       'font-medium',
     ])
       expect(c.split(' ')).toContain(cls)
-    // No radius class at all — squares, never pills (DESIGN.md §4).
+    // No radius class at all — squares, never pills.
     expect(c).not.toMatch(/rounded/)
   })
 
@@ -32,7 +32,7 @@ describe('badgeClasses', () => {
     expect(live.split(' ')).toContain('focus-ring')
     expect(live).toMatch(/hover:opacity-80/)
     expect(live).toMatch(/active:opacity-70/)
-    // The reticle is the only focus treatment — never a ring (DESIGN.md).
+    // The reticle is the only focus treatment — never a ring.
     expect(live).not.toMatch(/(?:^|\s)ring-|focus(?:-visible)?:ring/)
   })
 

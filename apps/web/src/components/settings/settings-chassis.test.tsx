@@ -22,7 +22,7 @@ import type * as RouterModule from '@tanstack/react-router'
  * settings was opened from — Today on a cold load.
  *
  * Mounted under a memory router whose tree mirrors the app's `_app` →
- * `settings` ids, on a happy-dom `Window` as in `app-sidebar.test.tsx`.
+ * `settings` ids, on a happy-dom `Window` as in the sidebar's test.
  */
 
 const win = new Window({ url: 'http://localhost/' })

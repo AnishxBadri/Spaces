@@ -62,28 +62,14 @@ type BackfillView = Awaited<ReturnType<typeof getEmbedBackfill>>
  * Settings → AI → Search — the embedding pin: three readouts (how much is
  * searchable by meaning, what waits, where sensitive records go), then
  * Model (the provider, its models as radios, the key, Test and Pin),
- * Sensitive records and Catch up.
- *
- * Its words are its safety mechanism. A model that cannot emit the
- * workspace's 768 stays in the ledger, greyed on bone-deep with its note
- * ("needs re-pin — emits 1536, this workspace stores 768") and no control,
- * so the admin sees why rather than wondering where it went. Once pinned,
- * choosing another 768-wide model is a swap (SPA-136): the action row says
- * what it does to the stored vectors, the button reads Swap and asks first,
- * and the swap offers the backfill below rather than starting it. A model
- * of another width is never choosable here, and the server refuses it
- * `PinLocked` regardless.
- *
- * Ollama (SPA-83) is a provider row like the rest, flagged local, with no
- * key of its own: its key row is the address it borrows from Settings → AI ·
- * Providers, with where to point it. Once a local model has tested green,
- * the Sensitive slot block offers it beside a cloud pin, and says in its
- * readout what search will and will not read.
- *
- * Catch up (the backfill) shows how many chunks carry the pinned model
- * and what embedding the rest would cost; its button asks with that
- * estimate before anything is queued. With a local route it counts the
- * sensitive chunks apart and prices them "free — local model".
+ * Sensitive records and Catch up. Its words are its safety mechanism:
+ * - A model that cannot emit the workspace's width stays listed, greyed with
+ *   its note and no control; the server refuses it `PinLocked` regardless.
+ * - Once pinned, another same-width model is a swap: it says what it does to
+ *   the stored vectors, asks first, and offers the backfill, never starts it.
+ * - Ollama is flagged local with no key; its row is the address it borrows.
+ * - Catch up asks with its estimate before anything is queued, pricing
+ *   sensitive chunks on a local route "free — local model".
  */
 export function EmbeddingsSection({
   settings,
@@ -367,7 +353,7 @@ const LINK =
   'focus-ring self-start rounded-md text-label text-graphite hover:text-foreground'
 
 /**
- * The Models key Search embeds on (D81), as a tick: "Use the OpenAI key
+ * The Models key Search embeds on, as a tick: "Use the OpenAI key
  * from Models", with "Use a different key" under it. Unticked, the
  * provider's own key field opens; a key saved there takes precedence.
  */
@@ -622,7 +608,7 @@ function Backfill({
 }
 
 /**
- * The sensitive slot (SPA-83, D11): a head whose readout says where
+ * The sensitive slot: a head whose readout says where
  * sensitive records go, then — beside a cloud pin — one row for the local
  * model that has tested green, with Set or Clear. Nothing is offered until a
  * local model is Test-green; with the pin itself local there is nothing to

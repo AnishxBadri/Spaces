@@ -29,7 +29,7 @@ import { stamp } from '#/lib/timeline/stamp'
 import { DraftComposer, savedLine } from './draft-composer'
 
 /**
- * The drafts list (E5) and the full composer (E4), mounted once in the app
+ * The drafts list and the full composer, mounted once in the app
  * shell and opened through `openDrafts` / `openCompose`. Drafts are the
  * viewer's own; the list says so.
  */
@@ -189,7 +189,7 @@ export function DraftsDialog({
 
 type Loaded = { draft: DraftState; savedAt: string | null }
 
-/** E4: a held draft read back, or a new email under a fresh id. */
+/** The full composer: a held draft read back, or a new email under a fresh id. */
 function ComposeDialog({
   target,
   onClose,

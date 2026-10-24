@@ -7,7 +7,7 @@ import { useViewState } from './use-view-state'
 
 /**
  * The hook's application of a view, read off a server render.
- * - `apps/web` tests run on `environment: 'node'` with no DOM, so the page is
+ * - These tests run on `environment: 'node'` with no DOM, so the page is
  *   a harness whose column state lives beside the hook, as every list page's
  *   `useTablePrefs` does, and the snapshot is rendered as JSON.
  * - A server render settles render-phase updates before it returns, which is

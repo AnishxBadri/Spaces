@@ -7,7 +7,7 @@ import type { StampProps } from '#/components/ui/stamp'
 import { cn } from '#/lib/utils'
 
 /**
- * P7 — Record page anatomy (D74). Header: the stamp and breadcrumb, actions,
+ * Record page anatomy. Header: the stamp and breadcrumb, actions,
  * serif name + badge, a readout strip of the numbers that matter, the
  * double rule under; scrolled past its name it folds to `HeadBar`.
  * Body: `RecordBody details=…` — the 320px details column on bone left (the
@@ -110,7 +110,7 @@ export function RecordHeader({
 }
 
 /**
- * The readout strip, variant B: equal cells on rules under a hairline, the
+ * The readout strip: equal cells on rules under a hairline, the
  * value in mono over a sentence-case label. The record head draws it, so do
  * Cmd-K's preview of a record and Today's head.
  * - A cell with `to` is a link to the list it counted; hover inks the label.
@@ -267,7 +267,7 @@ export function PreviewHead({
 }
 
 /**
- * Body. With `details` it is the tabbed record (D74): the 320px details
+ * Body. With `details` it is the tabbed record: the 320px details
  * column on bone left, sticking under the folded bar on wide screens, and
  * `children` — the tab head over its view — taking the rest, edge to edge.
  * - Without it, the older shape the term and holding pages keep: the page
@@ -348,7 +348,7 @@ export function PropertyGrid({ children }: { children: ReactNode }) {
 
 /**
  * A rejected write reads crimson in place for two seconds, then returns to
- * rest (DESIGN.md §5, Micro-interactions; SPA-53). Three phases, because the
+ * rest. Three phases, because the
  * hold and the leaving are different things: `rest` draws nothing, `hold` is
  * the crimson, `leaving` is the 120ms fade off it.
  */
@@ -628,7 +628,7 @@ export function InitialsMark({
 /**
  * A record's picture in place of its mark, cropped square at the mark's
  * size. `src` is only ever the blob store's URL for a stored picture, never
- * a remote address (D67).
+ * a remote address.
  */
 export function PictureMark({
   src,

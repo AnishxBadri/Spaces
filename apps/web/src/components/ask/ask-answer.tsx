@@ -7,7 +7,7 @@ import { cn } from '#/lib/utils'
 
 /**
  * An answer, set in sans: text with every claim's sources as ref chips, and
- * any claim that carries none withheld behind one line. (D70)
+ * any claim that carries none withheld behind one line.
  * - `dock`: a table scrolls sideways inside its card, with "Open in /ask ›".
  * - `page`: a table breaks out of the 760px column to the content width,
  *   which the page declares as an inline-size container.

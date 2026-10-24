@@ -32,18 +32,12 @@ import {
 import { cn } from '#/lib/utils'
 
 /**
- * Sources — the documents filed **into** a space (spec-storage-sources §3.2,
- * entry point 2). A space page is a ledger, so this is the page's own
- * vocabulary — `LedgerSection` / `LedgerRow` / `LedgerFigure`, exactly as
- * "Filed here" and "Companies" are — and not `RecordFiles`, which is a Files
- * *tab* with its own upload strip and three-letter tile.
- *
- * What is shared is the upload path, which is the same four steps the Files
- * tab takes: hash in the browser, ask for a URL, PUT straight at storage,
- * then file the row — with `fileAgainst: {kind:'space'}`, so the edge is
- * `entity_space` and never `link(tagged_in)` (SPA-19). Those four steps are
- * `uploadDocument` in `#/lib/documents/upload.ts` since SPA-71; this file and
- * the Files tab are its two callers, and the union is all that differs.
+ * Sources — the documents filed **into** a space. Drawn in the page's ledger
+ * vocabulary (`LedgerSection` / `LedgerRow` / `LedgerFigure`), not as
+ * `RecordFiles`, which is a Files tab with its own upload strip and tile.
+ * - The upload path is the Files tab's `uploadDocument`, with
+ *   `fileAgainst: {kind:'space'}`, so the edge is `entity_space` and never
+ *   `link(tagged_in)`.
  */
 
 /** In-flight uploads, shown above the filed rows. */
@@ -70,8 +64,8 @@ export function SpaceSources({
   spaceName: string
   sources: Array<SpaceSource>
   /**
-   * Documents reached through the companies tagged into this space
-   * (SPA-67). They render in a closed disclosure under the filed rows and
+   * Documents reached through the companies tagged into this space.
+   * They render in a closed disclosure under the filed rows and
    * are never counted anywhere else on the page.
    */
   inherited: Array<InheritedSource>
@@ -96,8 +90,7 @@ export function SpaceSources({
           file,
           // The one line that differs from the Files tab: a space is filed
           // *into*, through `entity_space`, so the target says `space` and
-          // the writer picks the other edge table (SPA-19). One element, for
-          // the Files tab's reason.
+          // the writer picks the other edge table.
           fileAgainst: [{ kind: 'space', entityId: spaceId }],
           onPhase: setPhase,
         })
@@ -114,8 +107,7 @@ export function SpaceSources({
   }
 
   /**
-   * A link dragged onto the section — §3.1 entry point 5 (SPA-117). A space
-   * is filed *into*, so the target is the same `entity_space` one a file drop
+   * A link dragged onto the section. A space is filed *into*, so the target is the same `entity_space` one a file drop
    * uses; what differs is that there are no bytes, and the worker fetches the
    * page after the row exists.
    */
@@ -233,7 +225,7 @@ export function SpaceSources({
           </LedgerRow>
         ) : null}
 
-        {/* The inherited lane (SPA-67, spec §3.2): documents on the
+        {/* The inherited lane: documents on the
             companies tagged in here. Closed on first render because it is a
             convenience and not a claim of filing — `<details>` with no
             `open`, so "closed" is the markup's state and not a hook's, and
@@ -364,7 +356,7 @@ function SourceRow({
         >
           <Eye />
         </Button>
-        {/* Bytes or an address, never both (docsurf-10b). A clipped
+        {/* Bytes or an address, never both. A clipped
             article has no blob, so Download could only reach
             `getDocumentDownloadUrl`'s throw; the row offers the page it
             was read from instead. */}
@@ -401,7 +393,7 @@ function SourceRow({
 }
 
 /**
- * One inherited source (SPA-67). The same row as a direct source with two
+ * One inherited source. The same row as a direct source with two
  * differences, and both are the point:
  *
  * - it names the company it came in on, and that name is the link to the
@@ -473,7 +465,7 @@ function InheritedRow({
         >
           <Eye />
         </Button>
-        {/* Bytes or an address, never both (docsurf-10b). A clipped
+        {/* Bytes or an address, never both. A clipped
             article has no blob, so Download could only reach
             `getDocumentDownloadUrl`'s throw; the row offers the page it
             was read from instead. */}
@@ -507,8 +499,8 @@ function InheritedRow({
 function SourceNote({ source }: { source: SpaceSource }) {
   const kind = DOCUMENT_KIND_LABELS[source.kind].toLowerCase()
   if (source.extractionStatus === 'pending') {
-    // A clip has no bytes to extract — it has a page still to be fetched
-    // (SPA-117), which is a different sentence about a different step.
+    // A clip has no bytes to extract — it has a page still to be fetched,
+    // which is a different sentence about a different step.
     return (
       <p className="truncate mono text-field text-graphite">
         {kind} · {source.url === null ? 'extracting text…' : 'fetching…'}

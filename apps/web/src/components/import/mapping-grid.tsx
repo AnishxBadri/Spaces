@@ -41,13 +41,13 @@ import type {
 import type { ColumnView, ImportMappingView } from '#/lib/import/mapping'
 
 /**
- * The mapping step (SPA-165, import-3): SPA-164's preview grid, where **the
- * column head is the mapping control**. Each head stacks the source header,
+ * The mapping step: the wizard's preview grid, where **the column head is
+ * the mapping control**. Each head stacks the source header,
  * a picker naming the target and its type, and one mono line — a status
  * square and the parse count, whose click opens the refused rows. Above the
  * grid one bone strip says what the rows match on; below it one mono line
  * says how much of the sheet is on screen. Those two are the only
- * commentary (design contract §1): nothing in a head or a cell explains
+ * commentary: nothing in a head or a cell explains
  * policy.
  *
  * The picker is the `Select` sheet's anatomy — Radix `Popover` around a cmdk

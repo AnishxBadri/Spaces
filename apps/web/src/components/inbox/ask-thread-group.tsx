@@ -6,7 +6,7 @@ import { SuggestionCard } from './suggestion-card'
 /**
  * Action cards an Ask thread left undecided, under a head naming the thread.
  * The members are the ordinary per-record cards: Accept runs the same writer
- * Apply did in the thread. (D70)
+ * Apply did in the thread.
  */
 export function AskThreadGroup({ group }: { group: AskCardsRow }) {
   return (

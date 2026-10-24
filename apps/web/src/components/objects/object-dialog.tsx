@@ -31,7 +31,7 @@ import type { IdentityKey } from '@spaces/core/attributes/registry'
 import type { ReactNode } from 'react'
 
 /**
- * Object creation / rename (spec §9 birth contract): singular, plural
+ * Object creation / rename: singular, plural
  * (suggested from the singular, always editable), optional icon. No slug
  * field — derived from the plural, frozen, hidden. Creation lands on the
  * object's attributes page, where the real work starts.
@@ -39,7 +39,7 @@ import type { ReactNode } from 'react'
  * Both modes carry one more block: the identity keys this object opts into.
  * Declaring one materializes its backing attribute in the same transaction,
  * undeclaring one drops it — which the slug rule allows only while the
- * object has no records (§9). Once a record exists the block is disabled and
+ * object has no records. Once a record exists the block is disabled and
  * says why, so the rule is met where it binds rather than as a failed save.
  */
 export function ObjectDialog(
@@ -58,7 +58,7 @@ export function ObjectDialog(
           plural: string
           icon: string | null
           identityKeys: Array<IdentityKey>
-          /** one record freezes the declaration (§9 — the slug rule) */
+          /** one record freezes the declaration (the slug rule) */
           hasRecords: boolean
         }
       }
@@ -100,7 +100,7 @@ function ObjectForm(
           plural: string
           icon: string | null
           identityKeys: Array<IdentityKey>
-          /** one record freezes the declaration (§9 — the slug rule) */
+          /** one record freezes the declaration (the slug rule) */
           hasRecords: boolean
         }
       }
@@ -113,7 +113,7 @@ function ObjectForm(
   const [pluralTouched, setPluralTouched] = useState(Boolean(existing))
   const [icon, setIcon] = useState<string | null>(existing?.icon ?? 'boxes')
   // Unticked at birth: identity is opt-in, and a bag that wants none is the
-  // common case (spec §9). In edit mode it starts as what stands.
+  // common case. In edit mode it starts as what stands.
   const [identityKeys, setIdentityKeys] = useState<Array<IdentityKey>>(
     existing?.identityKeys ?? [],
   )
@@ -268,7 +268,7 @@ function ObjectForm(
         </div>
       </div>
 
-      {/* Identity keys (spec §9). Declaring one materializes its backing
+      {/* Identity keys. Declaring one materializes its backing
           attribute in the same write and undeclaring one drops it, so the
           declaration is revisable only while the object has no records. */}
       <div className="flex flex-col gap-1.5">

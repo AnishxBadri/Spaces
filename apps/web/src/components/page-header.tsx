@@ -9,7 +9,7 @@ import { keyHintClasses, useButtonPending } from './ui/button'
 import { cn } from '#/lib/utils'
 
 /**
- * P1 — Page header (Instrument, 2026-09-10). Serif title, or a sentence when
+ * Page header. Serif title, or a sentence when
  * the page has a state to report; one mono line of what the instrument
  * measured (above as an eyebrow, or below as a readout); actions right,
  * each carrying its key hint inside the button. The double rule under,
@@ -101,7 +101,7 @@ export function PageHeader({
 
 /**
  * A key hint inside a button — mono, never a chip. It drops with the label
- * swap while the button is pending (SPA-53) and comes back when the action
+ * swap while the button is pending and comes back when the action
  * re-arms; it stays in the DOM throughout, so the width it holds never moves
  * anything next to it, and leaves the accessibility tree with the paint.
  */

@@ -4,22 +4,12 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * A mention in a note body is a chip, not a browser link (2026-09-30).
- *
- * `note-editor.tsx` imports `@blocknote/shadcn/style.css`, which carries
- * `.bn-shadcn .bn-editor a { color: revert; text-decoration: revert }` —
- * every anchor inside the editor goes back to the user agent's blue
- * underline. The chip is an anchor inside the editor whenever its kind has a
- * page, and `.mention-chip` alone is 0-1-0 against the vendor's 0-2-1, so the
- * chip kept its bone box and rule edge and lost its ink: default blue,
- * underlined, on the note page and on the mandate, the two places a note
- * body renders.
- *
- * No DOM here, so the cascade is checked the way the browser decides it for
- * two unlayered sheets: for every vendor rule that sets `color` or
- * `text-decoration` on an anchor, `styles.css` must hold a rule for
- * `a.mention-chip` that sets the same property and outranks it on
- * specificity — stylesheet order is not something either file controls.
+ * A mention in a note body is a chip, not a browser link.
+ * - `@blocknote/shadcn/style.css` reverts every anchor in the editor to the
+ *   user agent's blue underline at 0-2-1, which `.mention-chip` (0-1-0) loses to.
+ * - No DOM here: for every vendor rule setting `color` or `text-decoration`
+ *   on an anchor, the app sheet must hold an `a.mention-chip` rule that sets
+ *   it and outranks it on specificity — sheet order is not controlled.
  */
 
 type Rule = { selectors: Array<string>; decls: Map<string, string> }

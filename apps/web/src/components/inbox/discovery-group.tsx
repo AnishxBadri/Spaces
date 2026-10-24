@@ -32,9 +32,9 @@ import type { AfterState } from '#/lib/inbox/discovery-view'
 import { decisionWords } from './suggestion-card'
 
 /**
- * A space's discovery cards in Review (R1, P9): a bone head — the space's
+ * A space's discovery cards in Review: a bone head — the space's
  * path, `via` each plugin that found them, the mono count — over one row per
- * company, each decided on its own. (D72, D77)
+ * company, each decided on its own.
  * - Accepting "add X?" keeps the row in place showing its after-state while
  *   `entity.created` fans out, then lets the queue drop it.
  * - Dismiss's tooltip is where "permanent for this space" is said.
@@ -194,7 +194,7 @@ const reduce = (state: JobStatusState, action: StreamAction) =>
     ? jobStatusInit(state, action.rows)
     : jobStatusEvent(state, action.event)
 
-/** The new record's enrich state, off its job-status stream. (D64) */
+/** The new record's enrich state, off its job-status stream. */
 function useEnrichPhase(entityId: string | null): AfterState | null {
   const [state, dispatch] = useReducer(reduce, emptyJobStatus)
   const [quiet, setQuiet] = useState(false)

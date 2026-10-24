@@ -24,28 +24,20 @@ import { fileType } from '#/lib/documents/files-tab'
 import { cn } from '#/lib/utils'
 
 /**
- * The file viewer: a window over the page, looking at a document without
- * downloading it. A window rather than a route, so Back undoes reading
- * position and not the look. (D66)
- * - Title bar: glyph, name, `deck · 4.1 MB · 14 pages`, `Replaced by → …`
- *   on an older version, a PDF's page nav and zoom, Download. It closes from its foot (the close-mark rule).
- * - A caller may pass a `sidebar` (the Files tab's KIND, FILED ON, …) and
- *   `foot` actions beside Cancel.
+ * The file viewer: a window over the page rather than a route, so Back
+ * undoes reading position and not the look. Closes from its foot.
  *
  * **Nothing here relaxes the download hardening.** Blobs are served as
- * `application/octet-stream; attachment`, because an uploaded `.html` served
- * inline from this origin is stored XSS. The viewer fetches those opaque
- * bytes and renders them itself: a PDF through pdf.js to a canvas, an image
- * through an object URL whose type we choose, office files from the
- * extracted text. SVG never renders inline: it is a script vector.
+ * `application/octet-stream; attachment` (an uploaded `.html` served inline
+ * is stored XSS); the viewer renders the opaque bytes itself — pdf.js to a
+ * canvas, images through an object URL whose type we choose, office files
+ * from extracted text. SVG never renders inline: it is a script vector.
  *
- * A row with no blob (a clipped article) has no bytes: its text is shown
- * with the address linked, and Download becomes Open source, because
- * `getDocumentDownloadUrl` throws for a null `blob_sha` and should.
- *
- * A `remote` row (its binding keeps text only) has no local bytes either:
- * `getDocumentBytes` fetches them through its connection while the page says
- * where from, and a connection in error is said in the page, never blank.
+ * - No blob (a clipped article): text with the address linked, and Open
+ *   source for Download — `getDocumentDownloadUrl` throws for a null
+ *   `blob_sha`, and should.
+ * - `remote` (text-only binding): `getDocumentBytes` fetches through the
+ *   connection; a connection in error is said in the page, never blank.
  */
 
 type Doc = {
@@ -61,7 +53,7 @@ type Doc = {
   blobSha: string | null
   /** The page a clip was read from, and null on every row that had bytes. */
   url: string | null
-  /** The newer version that supersedes this file; the head says so. (D59) */
+  /** The newer version that supersedes this file; the head says so. */
   replacedBy?: { id: string; name: string } | null
 }
 
@@ -117,7 +109,7 @@ export function DocumentPreview({
   /** Foot actions, left of Cancel. */
   foot?: ReactNode
 }) {
-  // An open file is Ask's default chip while it is on screen. (D70)
+  // An open file is Ask's default chip while it is on screen.
   useAskSubject(doc === null ? null : fileChip(doc))
   return (
     <Dialog open={Boolean(doc)} onOpenChange={onOpenChange}>

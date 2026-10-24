@@ -6,7 +6,7 @@ import { PayloadFallback, rendererFor } from '#/routes/_app/review.tsx'
 import { columnRunConfirm, useColumnRun } from './column-run'
 
 /**
- * SPA-122, the client half: the column header offers "Run on this view"
+ * The client half of a column run: the column header offers "Run on this view"
  * only on an attribute that carries `options.ai`, and only over a saved
  * view; the confirm shows the estimate, or the refusal with no button; the
  * inbox has a renderer for the run's group.

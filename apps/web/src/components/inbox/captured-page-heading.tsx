@@ -2,7 +2,7 @@ import { Globe } from 'lucide-react'
 import type { CapturedPage } from '#/lib/server-fns'
 
 /**
- * The heading of a captured page's card in the review inbox (SPA-134). A
+ * The heading of a captured page's card in the review inbox. A
  * capture usually names somebody we hold no record for, so what its read
  * proposes sits on the captured document, and the card is headed by the
  * page — its title, and the address it was captured from — where a record
@@ -10,7 +10,7 @@ import type { CapturedPage } from '#/lib/server-fns'
  * accepting the identity matches or creates the person and files the page
  * on them, and the page's fields then apply to that person.
  *
- * The header row's type follows the column-run group's (SPA-122).
+ * The header row's type follows the column-run group's.
  */
 export function CapturedPageHeading({ page }: { page: CapturedPage }) {
   return (

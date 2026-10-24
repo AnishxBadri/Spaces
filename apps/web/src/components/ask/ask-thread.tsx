@@ -28,7 +28,7 @@ import type { AnswerVariant } from './ask-answer'
 
 /**
  * One Ask thread, shared by the dock and `/ask`: the turns as stored, the
- * turn streaming now, and the composer. (D70)
+ * turn streaming now, and the composer.
  * - Your turn is a bone block with a hairline, right-aligned, at most three
  *   quarters of the column, its time under it; the answer has no box.
  * - A scope change between questions is a centred mono divider.
@@ -169,7 +169,7 @@ export function CallStrip({ calls: all }: { calls: ReadonlyArray<AskCall> }) {
   )
 }
 
-/** The find tables a turn's calls left, each drawn as its own table. (D77) */
+/** The find tables a turn's calls left, each drawn as its own table. */
 function FindTables({
   calls,
   turnId,

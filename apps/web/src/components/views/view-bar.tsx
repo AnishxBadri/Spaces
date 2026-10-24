@@ -99,18 +99,17 @@ export function ViewBar({
   /**
    * The object row this list's records belong to, or null on a surface that
    * has none (/files). `viewTarget` turns it into the surface key the
-   * three view server fns take — D2, 2026-09-23.
+   * three view server fns take.
    */
   objectId: string | null
   registry: Array<RegistryEntry>
   views: Array<ViewRow>
   /**
    * Each saved view's record count, from `countViews` in the page's loader
-   * (SPA-162) — SQL through `compileConditions`, so every chip has its
+   * — SQL through `compileConditions`, so every chip has its
    * number on first paint, the inactive ones included. Omitted on
    * /files, which is the one surface that is not counted: its registry
-   * is synthetic (docsurf-12b) and its conditions do not compile to SQL — see
-   * `countViews` in `lib/server/views.ts`.
+   * is synthetic and its conditions do not compile to SQL (see `countViews`).
    */
   counts?: Record<string, ViewCount>
   /** Every record on the list, unfiltered: the `All` tab's count. */
@@ -442,8 +441,9 @@ function FilterPopover({
                   conditions list scrolls when a view has more of them than
                   the popover is tall, so the trigger takes the inset reticle
                   (an offset one would be clipped by the scroller). Its sheet
-                  sizes to the attribute names, not to the fixed 160px trigger (fixed,
-                  because a trigger that resizes with its value is a shift).
+                  sizes to the attribute names, not to the fixed 160px trigger
+                  (fixed, because a trigger that resizes with its value is a
+                  shift).
                 */}
                 <Select
                   aria-label="Attribute"
@@ -466,12 +466,8 @@ function FilterPopover({
                   emptyLabel="No attribute matches."
                   className="w-40 shrink-0 bg-transparent"
                 />
-                {/*
-                  `toConditionOp` is gone from this call: the items are typed
-                  `ConditionOp` by `opsFor`, so the picker hands back the op
-                  the stored condition already holds. Same shape, one fewer
-                  narrowing.
-                */}
+                {/* The items are typed `ConditionOp` by `opsFor`, so the picker
+                    hands back the op the stored condition holds. */}
                 <Select
                   aria-label="Operator"
                   value={c.op}

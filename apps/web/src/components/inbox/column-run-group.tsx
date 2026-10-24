@@ -8,7 +8,7 @@ import type { ColumnRunRow, ColumnRunSummary } from '#/lib/server-fns'
 import { SuggestionCard, batchSummary, usageRunHref } from './suggestion-card'
 
 /**
- * A column run in the review inbox (SPA-122): every open suggestion one run
+ * A column run in the review inbox: every open suggestion one run
  * wrote, gathered under one header — what ran, where it stands, and "Accept
  * all", which accepts the run's attribute across the run's suggestions
  * through `acceptColumnProgram` (never the same attribute proposed by

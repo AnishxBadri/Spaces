@@ -88,8 +88,8 @@ export function CreateCompanyDialog({
         toast(`${result.name} added`)
       }
       void router.invalidate()
-      // The rows come from a keyed query now, not from the loader alone —
-      // and the head's count comes from the loader, so both.
+      // The rows come from a keyed query and the head's count from the
+      // loader, so both are refreshed.
       void queryClient.invalidateQueries({ queryKey: ['company-records'] })
     } catch (err) {
       setError(

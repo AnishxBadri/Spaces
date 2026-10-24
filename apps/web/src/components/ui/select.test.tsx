@@ -5,12 +5,11 @@ import { SEARCH_FROM, Select, selectClasses } from './select.tsx'
 import { opsFor } from '@spaces/core/views/filter'
 
 /**
- * SPA-38. The picker's contract, asserted two ways.
+ * The picker's contract, asserted two ways.
  *
- * The **sheet and trigger** are asserted through `selectClasses`, the way
- * `badge.test.ts` and `switch.test.ts` assert theirs: `apps/web` runs vitest
- * on `environment: 'node'` with no `@testing-library/react` and no
- * jsdom/happy-dom, and this slice added no dependency to change that.
+ * The **sheet and trigger** are asserted through `selectClasses`, the way the
+ * badge and switch tests assert theirs: this suite runs on
+ * `environment: 'node'` with no DOM renderer.
  *
  * The **trigger's ARIA** is asserted against real markup — `renderToStaticMarkup`
  * is the same server render the app ships through, and a closed Radix popover
@@ -156,10 +155,8 @@ describe('the search box', () => {
 
 describe('the stored shape at the call site', () => {
   it('hands back the op the condition already holds, not a bare string', () => {
-    // `Select<ConditionOp>` is what removed `toConditionOp` from the view
-    // bar: the items come from `opsFor`, so `onChange` is typed by the same
-    // union `Condition.op` is (`packages/db/src/schema/views.ts`). The
-    // round-trip shape is unchanged by construction.
+    // The items come from `opsFor`, so `onChange` is typed by the same union
+    // `Condition.op` is; no narrower is needed.
     const items = opsFor('select').map((op) => ({ value: op, label: op }))
     expect(items.map((i) => i.value)).toEqual([
       'is',

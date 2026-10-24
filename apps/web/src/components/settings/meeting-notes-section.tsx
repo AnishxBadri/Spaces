@@ -19,7 +19,7 @@ import {
 } from '#/lib/server-fns'
 
 /**
- * Settings → You → Meeting notes (D78, D81): the reader's recorders, each a
+ * Settings → You → Meeting notes: the reader's recorders, each a
  * key they pasted for their own account.
  * - A folder tick is the share decision: a ticked folder's notes are shared
  *   with the workspace, and a note outside every ticked folder is never read.

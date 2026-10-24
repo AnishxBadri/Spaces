@@ -10,12 +10,12 @@ import { textLine } from './viewer-sidebar'
 import type { RecordDocument } from './types'
 
 /**
- * The Files tab as the printed sheets draw it (D66): our files under their
+ * The Files tab as the printed sheets draw it: our files under their
  * kind, an empty kind left out, every row ending on its end lane and state
  * word, no extracted text; the row's `···` and the Remove confirm saying
  * whether the file leaves the server.
  * - A happy-dom window's DOM globals are installed by hand before React
- *   loads, as `storage-picker.test.tsx` does.
+ *   loads, as in the other window tests.
  */
 
 await vi.hoisted(async () => {

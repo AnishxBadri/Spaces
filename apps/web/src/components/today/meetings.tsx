@@ -144,7 +144,7 @@ function TodayMeetingRow({
 /**
  * Today's Meetings: one day with `‹ today ›`, a now-rule on today, Prep on
  * what is ahead, and "all meetings ›" to the Meetings page. With no calendar
- * connected it is the one line that says so. (D79, D80)
+ * connected it is the one line that says so.
  * - External meetings only: internal ones are never stored.
  * - The head's count is the day's count, and nothing else prints it.
  */

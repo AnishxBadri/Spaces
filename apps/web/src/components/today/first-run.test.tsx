@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest'
 import { Route as TodayRoute } from '#/routes/_app/today'
 
 /**
- * Today with no company (D80): the P5 block's three ways in and no other
+ * Today with no company: the empty-state block's three ways in and no other
  * section — no day strip, no readouts, no ledger, no rail. The company
  * count that switches it off is `companyCountProgram`'s test.
  */

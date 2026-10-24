@@ -5,7 +5,7 @@ import { cn } from '#/lib/utils.ts'
 /**
  * The three class strings a switch is made of. Exported for tests.
  *
- * DESIGN.md §5, "Inputs / Fields" (Switches, 2026-09-15): a 24×14 square track
+ * A 24×14 square track
  * with a 10px square knob and 2px of padding, no radius. Off is a rule track on
  * paper with a **graphite** knob; on is the pine selection wash with a pine
  * border and a **pine** knob — pine is what "active" is made of everywhere else

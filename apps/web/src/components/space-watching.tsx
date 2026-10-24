@@ -49,9 +49,9 @@ import { recordPath } from '#/lib/record-path'
 import { cn } from '#/lib/utils'
 
 /**
- * The watching half of the space page's details column (D72): Watching —
- * one 32px row per watch with its live status off the space's job-status
- * stream (D64) — and What's moving, the signals on its members. The Add
+ * The watching half of the space page's details column: Watching — one
+ * 32px row per watch with its live status off the space's job-status
+ * stream — and What's moving, the signals on its members. The Add
  * watch window is the head's.
  */
 
@@ -464,7 +464,7 @@ export type WatchDraft = {
   cadenceMinutes: number | null
 }
 
-/** A window opened from a Find turn: prefilled from it. (D77) */
+/** A window opened from a Find turn: prefilled from it. */
 export type WatchPrefill = {
   integrationId: string | null
   /** The question, which Look for holds unless it is the space's criteria. */
@@ -481,7 +481,7 @@ const questionKey = (engine: WatchEngine | undefined): string | null => {
 
 /**
  * The watch window: Engine, Look for (the engine's watch settings), How
- * often (Manual first and the space page's default, D77), At most per run,
+ * often (Manual first and the space page's default), At most per run,
  * then Save watch. With no `space` its first row picks one, its last row
  * creating `newSpaceName`. A text setting equal to the criteria saves blank.
  */

@@ -342,7 +342,7 @@ export function StoragePicker({
 const BUTTON = 'shrink-0'
 
 /**
- * The Drive button, saying what it will do by readiness (D66): Connect Drive
+ * The Drive button, saying what it will do by readiness: Connect Drive
  * with no connection, Attach from Drive… when Google asks once more,
  * `Picker not set up` disabled until an admin adds the picker key.
  */

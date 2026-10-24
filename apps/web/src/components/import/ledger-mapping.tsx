@@ -60,18 +60,16 @@ import type {
 import type { LedgerMappingView } from '#/lib/import/ledger'
 
 /**
- * The ledger mapping step (SPA-170, import-8): the sheet's columns onto
+ * The ledger mapping step: the sheet's columns onto
  * **event fields**, not attributes. Left, the target table — caps groups
  * (company, round, our cheque, current mark, proceeds), each with one mono
  * hint, and 36px lines of field · picker · what row 1 becomes. Right, the
  * bone decisions panel: what the plan cannot decide alone — an ambiguous
  * instrument value, a mark with no date, a row naming no currency, a date
  * that reads two ways. The group hints and the panel's one-line notes are
- * the only commentary (design contract §1).
- *
- * Copied, not designed: the page header and step strip are the wizard's,
- * the line picker is `mapping-grid.tsx`'s trigger over the shipped Popover
- * with one `Select` per field, the panel is the bone strip anatomy.
+ * the only commentary.
+ * Copied, not designed: the wizard's header and step strip, the mapping
+ * grid's picker trigger, and the bone strip anatomy for the panel.
  */
 
 type Batch = {
@@ -624,10 +622,10 @@ export function LedgerMappingStep({
   }
 
   // "Marks as of" is written on blur, not on change: Chrome reports every
-  // partial year (`0002`, `0020`, …) as a change. Blur alone lost the date
-  // when Continue's plan call raced the write (found live, SPA-170), so the
-  // typed value waits in a ref and Continue flushes it before it plans; the
-  // in-flight write is chained so the plan never overtakes it.
+  // partial year (`0002`, `0020`, …) as a change. Blur alone loses the date
+  // when Continue's plan call races the write, so the typed value waits in a
+  // ref and Continue flushes it before it plans; the in-flight write is
+  // chained so the plan never overtakes it.
   const pendingAsOf = useRef<string | null>(null)
   const asOfFlight = useRef<Promise<void>>(Promise.resolve())
   const storedAsOf = ledgerDecisionsOf(ledgerColumnsOf(view.mapping)).marksAsOf

@@ -3,12 +3,10 @@ import { VERB_LABELS, VERB_TYPES } from './record-timeline'
 
 /**
  * Every verb a producer writes to `activity` renders as a sentence, never as
- * its raw name. The portfolio's verbs read `Anish mark.added` on every
- * company record until 2026-09-30 because nothing pinned them; this is the
- * pin. Add a verb to a producer, add it here.
+ * its raw name (`Anish mark.added`). Add a verb to a producer, add it here.
  */
 const PRODUCED = [
-  // lib/portfolio/holding.ts, write.ts, reverse.ts
+  // The portfolio ledger: births, writes and voids.
   'holding.created',
   'holding.writtenoff',
   'investment.added',
@@ -21,15 +19,15 @@ const PRODUCED = [
   'distribution.added',
   'distribution.voided',
   'distribution.batch_voided',
-  // lib/spaces, lib/glossary, lib/mandate
+  // Spaces, the glossary, the mandate.
   'space.created',
   'term.created',
   'mandate.created',
-  // packages/core/src/writes/ports/content.ts (sdk-7b)
+  // A plugin's `Content.emitSignal`.
   'signal.emitted',
-  // packages/core/src/writes/enrichment/apply.ts
+  // An enrichment run.
   'entity.enriched',
-  // the record, note and document verbs pinned before
+  // The record, note and document verbs.
   'record.created',
   'company.created',
   'person.created',
