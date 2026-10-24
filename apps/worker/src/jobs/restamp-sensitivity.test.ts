@@ -14,7 +14,7 @@ import {
 /**
  * sensitivity.restamp's wrapper view: the payload, the ledger ref, and that a
  * run writes what the live resolver says. Which write paths send it is
- * asserted beside them (apps/web's `restamp.test.ts`).
+ * asserted beside them (apps/web's restamp suite).
  */
 
 async function aDocWithChunk(sensitiveFlag: boolean, stamped: boolean) {

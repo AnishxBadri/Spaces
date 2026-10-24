@@ -29,7 +29,7 @@ import { PluginDbLive } from './plugin-db'
 
 /**
  * The grant: the Layer one (integration, job) runs on, built from exactly
- * the ports the job's `uses` names and bound to the row (D51).
+ * the ports the job's `uses` names and bound to the row.
  *
  * - There is no port table: `uses` is the grant. The host picks the declared
  *   tags out of what this builds, so an ambient port the job did not name

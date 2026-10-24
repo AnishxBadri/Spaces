@@ -7,11 +7,9 @@ import {
 } from '@spaces/db/heartbeat'
 
 /**
- * The `ROLE=worker` container's HEALTHCHECK (SPA-57; CONTEXT.md hostability
- * contract 4). A worker-only container runs no HTTP server, so wget-ing
- * :3000 is the wrong check for it — it asks its own `worker_heartbeat` row
- * instead, which is the same row `/api/health` reports and is written by the
- * process this check is really about.
+ * The `ROLE=worker` container's HEALTHCHECK. A worker-only container runs no
+ * HTTP server, so it asks its own `worker_heartbeat` row instead — the row
+ * `/api/health` reports, written by the process this check is about.
  *
  * Exit 0 when the row is fresh, non-zero when it is stale, missing, or
  * unreadable. No pg-boss: this starts a connection, runs one select, and

@@ -26,7 +26,7 @@ import { splitStatements } from './sql-split'
  * - A refused CREATE ROLE, a role that can write `public`, or a failing
  *   migration degrades that one plugin with the reason — never uncontained.
  * - A guard against a plugin's mistake, not a sandbox: SQL that means to can
- *   RESET ROLE. Trust in plugin code comes from signing. (D54)
+ *   RESET ROLE. Trust in plugin code comes from signing.
  */
 
 export const PLUGIN_RUNTIME_ROLE = 'plugin_runtime'

@@ -19,7 +19,7 @@ import type { JobHost, JobOutcome } from '../run-job'
 /**
  * The record page's status snapshot, read from the rows `runJob` actually
  * writes: the latest attempt per plugin queue, a run whose worker is gone
- * settled as failed, and only for a record the viewer could open. (D64)
+ * settled as failed, and only for a record the viewer could open.
  */
 
 const epoch = new Date(0)

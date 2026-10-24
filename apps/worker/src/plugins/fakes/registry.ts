@@ -61,7 +61,7 @@ const MAILBOXES: { readonly [pluginId: string]: () => FakeGmailApi } = {
   gmail: () => makeFakeGmailApi({ others: (url, init) => fetch(url, init) }),
 }
 
-/** A keyed recorder's notes and folders, laid out around the moment it is first asked for (D78). */
+/** A keyed recorder's notes and folders, laid out around the moment it is first asked for. */
 const RECORDERS: { readonly [pluginId: string]: () => FakeGranolaApi } = {
   granola: () => makeFakeGranolaApi(),
 }

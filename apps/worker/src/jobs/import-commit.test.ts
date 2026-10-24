@@ -15,9 +15,9 @@ import type { JobHost, JobOutcome } from '../run-job'
 import { importCommit } from './import-commit'
 
 /**
- * SPA-169: `import.commit` through `runJob`, so the `job_run` row it leaves
- * is the real one — the ledger the batch page reads its last run from. The
- * commit's own behaviour is `#/lib/import/commit.test.ts`.
+ * `import.commit` through `runJob`, so the `job_run` row it leaves is the
+ * real one — the ledger the batch page reads its last run from. The commit's
+ * own behaviour is apps/web's import commit suite.
  */
 
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))

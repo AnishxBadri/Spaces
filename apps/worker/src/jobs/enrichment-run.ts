@@ -22,9 +22,9 @@ import type { JobDef } from '../run-job'
 import { CLIP_MAX_BYTES, CLIP_TIMEOUT_MS } from './clip-document'
 
 /**
- * enrichment.run — one record enriched from the owner's sources in order
- * (D76). The summary is the run's timeline line in short, or why nothing
- * was asked, and when it parked for a source's daily cap.
+ * enrichment.run: one record enriched from the owner's sources in order. The
+ * summary is the run's timeline line in short, or why nothing was asked, and
+ * when it parked for a source's daily cap.
  * - An auto run carries its trigger and the sources in scope, a list's
  *   Enrich… the sources that pass its checks and `bulk`; the Enrich button
  *   sends none of them and asks every source.

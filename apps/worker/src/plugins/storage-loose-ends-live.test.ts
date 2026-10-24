@@ -46,7 +46,7 @@ import { syncStorageBinding } from '../jobs/sync-storage-binding'
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
 /**
- * The storage lane's loose ends on the real google-drive bundle against the
+ * Storage edge cases on the real google-drive bundle against the
  * mutable fake Drive: the starting cursor a bind stores, the bound record a
  * sync or export run is ledgered on, and a file the record refuses skipped
  * while the walk and the poll go on.

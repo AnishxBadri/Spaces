@@ -4,17 +4,9 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * `job_run` has exactly one writer, and that is the whole point of the table
- * (SPA-106). The row belongs to `runJob`, so every job that ever runs — the
- * extract job, every plugin job the SDK registers, the storage list job, the
- * ingest job — inherits it instead of instrumenting itself. The moment a
- * second writer appears the ledger stops being a ledger: two files disagree
- * about when an attempt started, a handler that throws leaves no row at all,
- * and "one row per attempt" becomes a convention nobody can check.
- *
- * So it is checked. This scans the source the way `entity-refs.test.ts` scans
- * drizzle's metadata — no database, no imports, just the text — and fails
- * naming the file that wrote the second statement.
+ * `job_run` has exactly one writer, `runJob`, so every job inherits the row
+ * instead of instrumenting itself. A second writer would break "one row per
+ * attempt". Scans source text (no database) and names the offending file.
  */
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url))
@@ -61,8 +53,7 @@ function sourceFiles(dir: string): Array<string> {
 }
 
 function scanRoots(): Array<string> {
-  // Every app and every package: the writer lives in apps/worker since
-  // SPA-181, and a second one could appear in any of them.
+  // Every app and every package: a second writer could appear in any of them.
   const roots: Array<string> = []
   for (const group of ['apps', 'packages']) {
     for (const pkg of readdirSync(join(repoRoot, group))) {

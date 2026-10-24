@@ -6,11 +6,9 @@ import type { JobWithMetadata } from 'pg-boss'
 import type { JobHost, JobOutcome } from './run-job'
 
 /**
- * The `job_run` rows themselves, against a real database. The wrapper's own
- * tests (`run-job.test.ts`) drive it through a fake JobHost with the ledger
- * stubbed out, which is right for the settlement logic and useless for the
- * ledger: the claim here is that Postgres actually holds one row per attempt
- * with a duration on each, and only Postgres can say so.
+ * The `job_run` rows themselves, against a real database: Postgres holds one
+ * row per attempt with a duration on each. The settlement logic is tested
+ * against a fake JobHost elsewhere.
  *
  * Everything is imported dynamically: `@spaces/db` builds its pool from
  * `process.env.DATABASE_URL` at import time, and `vitest.setup.ts` rewrites
@@ -18,7 +16,7 @@ import type { JobHost, JobOutcome } from './run-job'
  */
 
 // The real ExtractionStore enqueues `document.embed` after a successful
-// extraction (SPA-121); the test databases carry no pgboss schema.
+// extraction; the test databases carry no pgboss schema.
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
 const epoch = new Date(0)
@@ -122,10 +120,8 @@ describe('runJob — the job_run ledger', () => {
       "select column_name from information_schema.columns where table_schema = 'public' and table_name = 'job_run'",
     )
     const names = columns.rows.map((r) => String(r.column_name)).sort()
-    // spec-plugin-sdk §11 sketches `tokens?` on this row; it is overridden in
-    // packages/db/src/schema/jobs.ts because a retried attempt would
-    // double-count. Asserting the absence keeps the override from being
-    // quietly undone by someone reading the spec instead of the schema.
+    // No `tokens` column on this row: a retried attempt would double-count.
+    // Asserting the absence keeps it from being quietly added back.
     expect(names).not.toContain('tokens')
     expect(names).toEqual([
       'attempt',
@@ -138,9 +134,9 @@ describe('runJob — the job_run ledger', () => {
       'queue',
       'started_at',
       'status',
-      // SPA-56: a successful handler's own one line (the mail poll's counts).
+      // A successful handler's own one line (the mail poll's counts).
       'summary',
-      // A watch run's `space_watch` row (D72).
+      // A watch run's `space_watch` row.
       'watch_id',
     ])
   })

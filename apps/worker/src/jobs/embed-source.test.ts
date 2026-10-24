@@ -14,10 +14,9 @@ import { JobPermanent } from '../run-job'
 import { embedSource, embedSourceData, runEmbedSource } from './embed-source'
 
 /**
- * SPA-132. `chunk.embed`'s wrapper view: the payload it accepts and how the
- * program's outcomes become job outcomes. What the program writes is
- * asserted beside the write paths that queue it
- * (`lib/notes/embed-note.test.ts`, `lib/attributes/embed-close-reason.test.ts`).
+ * `chunk.embed`'s wrapper view: the payload it accepts and how the program's
+ * outcomes become job outcomes. What the program writes is asserted beside
+ * the write paths that queue it (the note and close-reason embed suites).
  */
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 

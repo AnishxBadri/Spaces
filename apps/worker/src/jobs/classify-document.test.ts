@@ -32,14 +32,14 @@ import { Enqueue } from '@spaces/core/queue/enqueue'
 
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
-// Birth's extraction enqueue is core's `Enqueue` service since SPA-201;
-// here it records into the same stub the mocked `#web/lib/queue` does.
+// Birth's extraction enqueue is core's `Enqueue` service; here it records
+// into the same stub the mocked `#web/lib/queue` does.
 const stubEnqueue = Enqueue.fromSender({ enqueue: stubSend })
 
 /**
- * SPA-62, the lane, from extraction's tail to the inbox decision. It sits
- * beside the worker because it runs the job, and nothing under `lib/` may
- * import the worker. Through an injected model (`MockLanguageModelV4`, as
+ * The lane, from extraction's tail to the inbox decision. Here, not in
+ * apps/web, because it runs the job and nothing in apps/web may import the
+ * worker. Through an injected model (`MockLanguageModelV4`, as
  * the deck reader's test): the route, the sensitivity read, the suggestion
  * row, the accept and the reject are all real; nothing reaches a network.
  */

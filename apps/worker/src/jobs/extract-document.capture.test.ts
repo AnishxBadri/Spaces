@@ -15,13 +15,11 @@ import { JobContext } from '../run-job'
 import { ExtractionStore, extractDocument } from './extract-document'
 
 /**
- * SPA-111's last acceptance criterion, on the worker's side of the seam for
- * the reason `extract-document.arrival.test.ts` gives (nothing under `lib/`
- * may import `#/worker/**`): a page captured through `POST /api/v1/capture`
- * reaches `extraction_status 'done'` through the existing extract job, with
- * no change to it. The job runs under its real `ExtractionStore` layer and
- * the `JobContext` `runJob` would hand it; the queue is the stub, whose
- * record is the enqueue the job would have been woken by.
+ * A page captured through `POST /api/v1/capture` reaches `extraction_status
+ * 'done'` through the ordinary extract job. Here, not in apps/web, because
+ * nothing in apps/web may import the worker. The job runs under its real
+ * `ExtractionStore` layer and the `JobContext` `runJob` would hand it; the
+ * queue is the stub, whose record is the enqueue that would wake the job.
  */
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 

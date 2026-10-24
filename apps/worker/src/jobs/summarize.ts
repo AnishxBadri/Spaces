@@ -7,14 +7,11 @@ import { JobPermanent } from '../run-job'
 import type { JobDef } from '../run-job'
 
 /**
- * entity.summarize — Summarize on the worker (SPA-66). The program is
- * `lib/ai/summarize.ts`; this is the wrapper's view of it, shaped exactly as
- * the deck reader's job (`./read-deck.ts`).
+ * entity.summarize: Summarize on the worker.
  *
- * **Every failure is permanent**, for the deck reader's reasons: nothing a
- * retry thirty seconds later would fix — an unrouted lane, a sensitive
- * record routed to the cloud, nothing to summarize — and every retry of a
- * frontier call is a cost. The failure's sentence is the job's output
+ * Every failure is permanent: an unrouted lane, a sensitive record routed to
+ * the cloud or nothing to summarize is not fixed by a retry, and each retried
+ * frontier call costs. The sentence is the job's output
  * (`JobOutcome.reason`), which `summarizeStatus` reads back for the toast.
  */
 

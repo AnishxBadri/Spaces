@@ -43,7 +43,7 @@ vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
  * Retain per binding on the real google-drive bundle against the fake Drive:
  * a `text` binding's files are extracted and their bytes dropped, the
  * viewer fetches them back through the connection, and a flip to `full`
- * backfills every one. (docs/spec-storage-sources.md §7)
+ * backfills every one.
  */
 
 const hosts: Array<PluginHost> = []

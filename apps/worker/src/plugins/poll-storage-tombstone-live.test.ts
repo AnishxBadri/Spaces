@@ -38,7 +38,7 @@ import { syncStorageBinding } from '../jobs/sync-storage-binding'
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
 /**
- * The resurrection guard (§8, "deleted in app" and "cursor expired") end to
+ * The resurrection guard (deleted in the app, cursor expired) end to
  * end on the real google-drive bundle against the mutable fake Drive.
  * - Deleting a synced document in the app tombstones (binding, external id);
  *   the provider is untouched and neither the poll nor a re-list files it again.

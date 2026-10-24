@@ -6,7 +6,7 @@ import type { QueueName } from '@spaces/core/queue/names'
  * The worker's own clock-driven jobs, scheduled at boot in UTC. Each nightly
  * scan has its own tick so they never contend on a single-worker host.
  * - No enrichment queue is ever here: nothing re-enriches on a clock; a
- *   record is enriched by a trigger or a press. (D76)
+ *   record is enriched by a trigger or a press.
  * - The mail poll's schedule follows the mailbox row, and plugin schedules
  *   their manifests; neither is in this list.
  * - The storage change poll is a clock, not a push channel: Drive's webhooks

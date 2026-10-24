@@ -15,51 +15,20 @@ import { JobPermanent, JobRetryable } from '../run-job'
 import type { JobDef } from '../run-job'
 
 /**
- * document.clip — the fetching half of §3.1's URL clip (SPA-117).
+ * document.clip: fetches a clipped URL whose row `clipUrlProgram` already
+ * wrote as `pending`, and ends it `done`, `unsupported` or `failed`.
  *
- * `clipUrlProgram` wrote the row and returned before any network call, so
- * everything that can go wrong with somebody else's web server goes wrong
- * here, on the worker, where a 30-second page is thirty seconds of a job and
- * not of a request. The row is already `pending`; this job's whole output is
- * that status becoming `done`, `unsupported` or `failed`, plus the text.
- *
- * **Every refusal is a row write and a `JobPermanent`, never a throw.**
- * `runJob`'s promise must not reject (hostability contract 2 — an uncaught
- * throw past the wrapper is a container death), and none of the four
- * refusals is worth another attempt:
- *
- *   - the guard refused the URL or a redirect → 'failed', the sentence
- *   - a network error or a timeout            → 'failed', the sentence
- *   - a content-type that is neither HTML
- *     nor PDF                                 → 'unsupported', the type
- *   - readability found no article            → 'unsupported'
- *
- * The network branch is the judgement call. A blob read is retried by
- * `extract-document` because the store may simply have been slow; a *guarded*
- * fetch has already spent its whole time budget by the time it fails, so a
- * retry would spend another full budget to reach the same server that just
- * refused, and the row would read 'pending' for minutes while it did. Re-ask
- * for it explicitly instead — the row keeps the URL, which is all a re-clip
- * needs. The one retryable failure is Postgres itself, which says nothing
- * about the page and may well take the write next time.
- *
- * **The PDF branch is docsurf-10b** (§3.1 entry point 5, "PDF snapshot"): a
- * URL whose response is a PDF is not a second kind of thing, it is a deck
- * that happened to arrive over HTTP, so it goes down the ordinary blob path
- * — hash the bytes, store them under the digest, point the row at them and
- * hand it to `document.extract`, which is the same pipeline an upload walks.
- *
- * **It is the second `storage().put(` in the app, and deliberately not
- * `intakeDocumentProgram`.** The server byte lane
- * (core's `writes/documents/intake.ts`) ends in `birthDocumentProgram`: it *births a
- * row*. Here the row already exists — `clipUrlProgram` wrote it, named it,
- * filed it and enqueued this job before a packet left the box — so reusing
- * intake would mean a second document for the same clip and an orphaned
- * first one. What is shared instead is the thing worth sharing: content
- * addressing. The digest is the key, so an identical deck already uploaded
- * is already stored and `exists` says so — one blob, two rows, which is the
- * only dedupe a pre-existing row can have. `intake.test.ts`'s one-caller
- * assertion names this file for exactly that reason.
+ * - Every refusal is a row write and a `JobPermanent`, never a throw: `runJob`'s
+ *   promise must not reject, since an uncaught throw past it kills the container.
+ *   Guard refusal or network error/timeout → 'failed'; a type neither HTML nor
+ *   PDF, or no readable article → 'unsupported'.
+ * - A failed guarded fetch is not retried: it has already spent its whole time
+ *   budget, and the row keeps the URL for a re-clip. Only Postgres is retryable.
+ * - A PDF response goes down the ordinary blob path (hash, store, point the
+ *   row, enqueue `document.extract`), like an upload.
+ * - This is the second `storage().put(`, deliberately not intake
+ *   (`writes/documents/intake.ts`): intake births a row, and this row already
+ *   exists. Content addressing still dedupes the blob: one blob, two rows.
  */
 
 export const clipDocumentData = z.object({
@@ -69,22 +38,18 @@ export const clipDocumentData = z.object({
 export type ClipDocumentData = z.infer<typeof clipDocumentData>
 
 /**
- * 10MB and 20 seconds. An article is tens of kilobytes; the cap is against a
- * URL that streams forever, not against long prose. Both are constants and
- * not env vars for the reason `ORPHAN_BLOB_GRACE_MS` is: a deployment-wide
- * knob here is a way to switch the guard off in production by accident, and
- * `{DATABASE_URL, APP_URL}` is frozen (CONTEXT.md → Hostability).
+ * 10MB and 20 seconds: the cap is against a URL that streams forever, not long
+ * prose. Constants, not env vars: a deployment-wide knob could switch the
+ * guard off in production by accident, and the env surface is frozen at
+ * `{DATABASE_URL, APP_URL}`.
  */
 export const CLIP_MAX_BYTES = 10 * 1024 * 1024
 export const CLIP_TIMEOUT_MS = 20_000
 
 /**
- * Below this, readability found chrome and called it an article. 200 is not
- * arbitrary: it is the snippet width every surface renders
- * (`left(extracted_text, 200)`), so a "clip" with less text than the row's
- * own one-line preview has nothing in it worth calling an article — and
- * saying so as 'unsupported' is a truer answer than a `done` row whose whole
- * body is a navigation menu.
+ * Below this, readability found chrome and called it an article. 200 is the
+ * snippet width every surface renders (`left(extracted_text, 200)`), so less
+ * text than the row's own preview is reported 'unsupported'.
  */
 export const CLIP_MIN_ARTICLE_CHARS = 200
 
@@ -130,12 +95,9 @@ const PDF_MIME = 'application/pdf'
 const PDF_MAGIC = Uint8Array.from([0x25, 0x50, 0x44, 0x46, 0x2d])
 
 /**
- * A PDF, by what the server said *or* by what it actually sent. The magic
- * bytes are not belt-and-braces: a deck behind a download endpoint is served
- * as `application/octet-stream` about as often as it is labelled honestly,
- * and a content-type table alone would record those as 'unsupported' with a
- * perfectly good PDF in hand. Read before the HTML branch, so bytes win over
- * a mislabel in either direction.
+ * A PDF, by what the server said or by the magic bytes: download endpoints
+ * often serve decks as `application/octet-stream`. Checked before the HTML
+ * branch, so bytes win over a mislabel in either direction.
  */
 function isPdf(type: string, bytes: Uint8Array): boolean {
   if (type === PDF_MIME) return true
@@ -144,10 +106,9 @@ function isPdf(type: string, bytes: Uint8Array): boolean {
 }
 
 /**
- * The filename inside a URL — `…/decks/seed-deck.pdf` → `seed-deck.pdf` —
- * which is all `guessDocumentKind` needs and the only name this arrival has.
- * A URL ending in a slash, or one with no path at all, has no segment to
- * read and falls back to the whole address, which guesses `other`.
+ * The filename inside a URL (`…/decks/seed-deck.pdf` → `seed-deck.pdf`), for
+ * `guessDocumentKind`. With no path segment it falls back to the whole
+ * address, which guesses `other`.
  */
 function lastPathSegment(raw: string): string {
   try {
@@ -162,14 +123,9 @@ function lastPathSegment(raw: string): string {
 }
 
 /**
- * Readability over linkedom. linkedom rather than jsdom because this parses
- * hostile HTML on the worker: jsdom runs scripts and implements far more of
- * the platform than an article needs, and linkedom is a parser and a DOM and
- * nothing else.
- *
- * Exported so `clip-document.test.ts` can assert the extraction against a
- * fixture without a fetch, and so docsurf-10b's HTML branch has one place to
- * call rather than a second `new Readability(...)`.
+ * Readability over linkedom. Not jsdom: this parses hostile HTML, and jsdom
+ * runs scripts; linkedom is only a parser and a DOM.
+ * Exported so tests can assert extraction against a fixture without a fetch.
  */
 export function readArticle(
   html: string,
@@ -184,13 +140,9 @@ export function readArticle(
 }
 
 /**
- * Readability's `textContent` is the source's whitespace verbatim, so a page
- * whose HTML was pretty-printed comes back with a newline and eight spaces in
- * the middle of every sentence. That is not a cosmetic problem: it is what
- * the Files tab renders as its snippet and what an embedding pass will chunk.
- *
- * Paragraph breaks — a blank line — are the one piece of structure worth
- * keeping, so they survive; everything else collapses to a single space.
+ * Collapses Readability's verbatim source whitespace, which is what the
+ * snippet renders and embedding chunks. Paragraph breaks (a blank line)
+ * survive; all other whitespace becomes one space.
  */
 function tidy(raw: string): string {
   return raw
@@ -201,32 +153,23 @@ function tidy(raw: string): string {
 }
 
 /**
- * The bytes as text. `guardedFetch` answers octets because docsurf-10b wants
- * a PDF's; an HTML page is decoded here, and `fatal: false` because a page
- * mis-declaring its encoding should lose a character, not the whole clip.
+ * The bytes as text (`guardedFetch` answers octets so a PDF survives).
+ * `fatal: false`: a page mis-declaring its encoding should lose a character,
+ * not the whole clip.
  */
 function decode(bytes: Uint8Array): string {
   return new TextDecoder('utf-8', { fatal: false }).decode(bytes)
 }
 
 /**
- * The PDF response, stored — hash, put (unless the digest is already there),
- * point the row at it, enqueue extraction.
- *
- * The bytes are already whole and already capped: `guardedFetch` counted
- * them off the stream against `CLIP_MAX_BYTES` and answered `ok: false` at
- * 10MB + 1, so a runaway response is a 'failed' row with the limit in the
- * sentence and **nothing stored** — the store is never reached. That is why
- * a `Buffer` is honest here where `intake.ts` needs a temp file: intake
- * takes a 250MB upload of unknown length, this takes ten megabytes at most.
- *
- * `extraction_status` back to 'pending' and `extraction_error` to null on
- * purpose: a re-clip of a row that failed last time must not leave the old
- * sentence sitting under a blob that is now perfectly extractable.
- *
- * The enqueue is last and outside any transaction, exactly as birth's is: a
- * queue that is down must not undo a good row, and with no worker the row
- * reads 'pending' and says so on every surface.
+ * Stores the PDF response: hash, put unless the digest exists, point the row
+ * at it, enqueue extraction.
+ * - A `Buffer` is fine: `guardedFetch` already capped the bytes at
+ *   `CLIP_MAX_BYTES`, and an oversize response stores nothing.
+ * - Resets `extraction_status`/`extraction_error` so a re-clip does not keep
+ *   the old failure under a now-extractable blob.
+ * - The enqueue is last and outside any transaction: a down queue must not
+ *   undo a good row.
  */
 const storePdf = Effect.fn('clipDocument.storePdf')(function* (
   documentId: string,
@@ -235,10 +178,8 @@ const storePdf = Effect.fn('clipDocument.storePdf')(function* (
   const bytes = fetched.bytes
   const sha = createHash('sha256').update(bytes).digest('hex')
 
-  // Content addressing *is* the dedupe available to a row that already
-  // exists: the same deck uploaded an hour ago is already these bytes under
-  // this key, so the two rows share one file on disk. §3.4's row-level
-  // dedupe is birth's, and birth is not on this path.
+  // Content addressing is the only dedupe for a row that already exists: an
+  // identical upload shares this blob. Row-level dedupe is birth's.
   const stored = yield* store('blobExists', () => storage().exists(sha))
   if (!stored) {
     yield* store('blobPut', () =>
@@ -251,13 +192,11 @@ const storePdf = Effect.fn('clipDocument.storePdf')(function* (
       .update(document)
       .set({
         blobSha: sha,
-        // What we counted, never what the server declared — the same rule
-        // intake applies to `declaredSize`.
+        // What we counted, never what the server declared.
         sizeBytes: bytes.byteLength,
         mime: PDF_MIME,
-        // The row was born `article`, which is what a pasted link usually
-        // is. This one turned out to be a file, so it is filed the way the
-        // same file would have been had somebody dragged it in.
+        // Born `article`; it turned out to be a file, so file it as an
+        // upload of the same file would be.
         kind: guessDocumentKind(lastPathSegment(fetched.url)),
         extractionStatus: 'pending',
         extractionError: null,
@@ -317,16 +256,15 @@ const program = Effect.fn('clipDocument')(function* (data: ClipDocumentData) {
 
   const type = mediaType(fetched.contentType)
   // Before the HTML branch: a PDF is a document with bytes, not a page that
-  // failed to be an article, and this is the whole of docsurf-10b.
+  // failed to be an article.
   if (isPdf(type, fetched.bytes)) {
     return yield* storePdf(documentId, fetched)
   }
   if (!isHtml(type)) {
     return yield* new ClipRefused({
       status: 'unsupported',
-      // The content-type verbatim, because the next question an operator asks
-      // is "what was it then". PDF is handled above; everything still landing
-      // here — a zip, a video, a JSON API — has no reader in the product.
+      // The content-type verbatim: the operator's next question is "what
+      // was it then".
       reason: `Not an HTML page — the server answered ${type === '' ? 'no content-type' : type}`,
     })
   }
@@ -339,10 +277,9 @@ const program = Effect.fn('clipDocument')(function* (data: ClipDocumentData) {
     })
   }
 
-  // One statement for text and tsv, as `extract-document` does and for the
-  // same reason: they must never disagree, or search returns rows whose text
-  // says otherwise. `filename` moves with the title because it is the display
-  // name every surface renders — the row was named by its URL until now.
+  // One statement for text and tsv: they must never disagree, or search
+  // returns rows whose text says otherwise. `filename` is the display name,
+  // so it takes the title in place of the URL.
   yield* store('markExtracted', async () => {
     await db
       .update(document)
@@ -359,8 +296,7 @@ const program = Effect.fn('clipDocument')(function* (data: ClipDocumentData) {
       .where(eq(document.entityId, documentId))
   })
 
-  // And the entity's own name, which is what ⌘K, the mention menu and every
-  // timeline line read. It has said the URL since the row was born.
+  // The entity's name too, which ⌘K, mentions and the timeline read.
   if (article.title !== null) {
     const title = article.title
     yield* store('renameEntity', async () => {
@@ -395,9 +331,9 @@ const onClipRefused = Effect.fn('clipDocument.onClipRefused')(function* (
       })
       .where(eq(document.entityId, documentId))
   }).pipe(
-    // The status write is the point of this handler, but a Postgres that
-    // cannot take it must not turn a refusal into a defect: the job still
-    // ends permanently, and `job_run` carries the reason either way.
+    // A Postgres that cannot take the status write must not turn a refusal
+    // into a defect: the job still ends permanently, and `job_run` carries
+    // the reason either way.
     Effect.catchTag('ClipStoreUnavailable', (unavailable) =>
       Effect.sync(() => {
         console.error(
@@ -413,17 +349,11 @@ const onClipRefused = Effect.fn('clipDocument.onClipRefused')(function* (
 export const clipDocument: JobDef<ClipDocumentData> = {
   name: QUEUES.clipDocument,
   schema: clipDocumentData,
-  // The document *is* an entity, so its id is the ledger's entity_id — the
-  // same declaration `extractDocument` makes, and what puts a clip's attempts
-  // on the row's own run history.
+  // The document is an entity, so a clip's attempts land on its run history.
   refs: (data) => ({ entityId: data.documentId }),
-  // One retry, and it is for Postgres and not for the page. Every refusal
-  // above is a `JobPermanent` and never reaches this budget — see the module
-  // note: a guarded fetch that failed has already spent its whole time
-  // budget, so re-fetching buys nothing but a row that reads 'pending' for
-  // another twenty seconds. What a retry *is* worth is a database that blinked
-  // between the fetch and the write, which would otherwise throw away a page
-  // we already have in hand.
+  // One retry, for Postgres and not the page: every refusal is a
+  // `JobPermanent`. It saves a fetched page from a database that blinked
+  // before the write.
   retry: { limit: 1, delaySeconds: 30, backoff: false },
   run: (data) =>
     program(data).pipe(

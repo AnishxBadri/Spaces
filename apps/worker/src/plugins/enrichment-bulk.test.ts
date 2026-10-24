@@ -29,7 +29,6 @@ import { workerEnqueue } from './enqueue'
  * A list's Enrich… on a real pg-boss: one job per record through the
  * singleton key, a second press doubling none, and the records past the
  * cap parked until 00:00 UTC and asked once the clock has passed it.
- * (D53, D76)
  */
 
 const QUEUE = QUEUES.enrichmentRun

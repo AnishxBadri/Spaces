@@ -8,20 +8,16 @@ import { JobPermanent, JobRetryable } from '../run-job'
 import type { JobDef } from '../run-job'
 
 /**
- * chunk.embed — a note's text or an embeddable attribute value → `chunk`
- * rows, with vectors when a model is pinned (SPA-132). The program is
- * `lib/ai/embed-source.ts`; the outcome mapping is `document.embed`'s
- * (`./embed-document.ts`), because the write underneath is the same
- * `replaceChunks`:
- *
- *   - no pin / sensitive record     → completed; chunks written, no vectors
- *   - the source is gone or merged  → completed, nothing to do
- *   - any other embed failure       → JobPermanent with `embedMessage`'s
- *     sentence; the chunks were still written, without vectors
- *   - a slug not on the embeddable list → JobPermanent; the payload is wrong
- *     and will be wrong on every retry
- *   - Postgres unreachable          → JobRetryable; delete-and-insert in one
- *     transaction, so a retry is safe
+ * chunk.embed: a note's text or an embeddable attribute value → `chunk` rows,
+ * with vectors when a model is pinned. Same mapping as `document.embed`,
+ * since both write through `replaceChunks`:
+ * - no pin / sensitive record → completed; chunks written, no vectors
+ * - the source is gone or merged → completed
+ * - any other embed failure → JobPermanent with `embedMessage`'s sentence;
+ *   chunks still written without vectors
+ * - a slug not on the embeddable list → JobPermanent; the payload is wrong
+ * - Postgres unreachable → JobRetryable; delete-and-insert in one
+ *   transaction makes a retry safe
  */
 
 export const embedSourceData = z.discriminatedUnion('sourceKind', [

@@ -15,23 +15,15 @@ import {
 import type { JobStatusEvent } from '@spaces/core/queue/job-status'
 
 /**
- * The one wrapper every job goes through (spec-plugin-sdk §11; CONTEXT.md
- * "Workers and jobs"). Parse job.data against the JobDef's schema, provide
- * the job's Layer plus a JobContext, run the Effect, and resolve each job in
- * the batch explicitly.
- *
- * Two pg-boss facts shape this. A batch handler that rejects fails the whole
- * batch, so `runJob`'s own promise must never reject — hostability contract 2
- * says an uncaught throw past the wrapper is a container death. And pg-boss
- * settles the batch itself once the handler resolves, but `complete()` only
- * touches jobs still in the `active` state, so jobs this wrapper has already
- * resolved are left alone.
- *
- * It is also the only writer of `job_run` (SPA-106). Every attempt of every
- * queue leaves a row here and nowhere else — extraction, every plugin job the
- * SDK registers, the storage list job, the ingest job — because the wrapper
- * is the only code that sees the two cases a self-instrumenting handler
- * cannot: a defect, and job data that never parsed.
+ * The one wrapper every job goes through: parse job.data against the JobDef's
+ * schema, provide its Layer plus a JobContext, run the Effect, and resolve
+ * each job in the batch explicitly.
+ * - `runJob`'s promise must never reject: a rejecting batch handler fails the
+ *   whole batch, and an uncaught throw past the wrapper kills the container.
+ * - pg-boss settles the batch once the handler resolves, but `complete()` only
+ *   touches `active` jobs, so jobs resolved here are left alone.
+ * - The only writer of `job_run`: only the wrapper sees a defect or job data
+ *   that never parsed, which a self-instrumenting handler cannot.
  */
 
 // ---------------------------------------------------------------------------
@@ -39,9 +31,9 @@ import type { JobStatusEvent } from '@spaces/core/queue/job-status'
 // ---------------------------------------------------------------------------
 
 /**
- * The three outcomes are the SDK's classes (sdk-11, checkpoint review of
- * PR #4), not a second set sharing their tags: a plugin job's failure and a
- * core job's are the same class, so `runJob` treats both identically.
+ * The three outcomes are the SDK's classes, not a second set sharing their
+ * tags: a plugin job's failure and a core job's are the same class, so
+ * `runJob` treats both identically.
  * `JobRetryable` — may succeed on a later attempt; retry handling belongs to
  * the queue's retryLimit/retryBackoff, the wrapper never counts attempts.
  * `JobRateLimited` — a throttle, not a failure: the job is completed and
@@ -53,7 +45,7 @@ export { JobPermanent, JobRateLimited, JobRetryable }
 
 /**
  * The job deliberately did no work: a cache hit or a credit-cap refusal the
- * plugin host decides before an action job runs (D53).
+ * plugin host decides before an action job runs.
  * - Completed in pg-boss, never retried; the `job_run` row closes `skipped`
  *   with `reason` in `summary`, and the breaker is not charged.
  * - The host's, not the SDK's: a plugin cannot skip itself — `invoke` maps
@@ -130,7 +122,7 @@ export interface JobRunRefs {
 
 /**
  * What a successful attempt may say about itself: one line the wrapper writes
- * to `job_run.summary` (SPA-56's mail poll returns its message counts). A
+ * to `job_run.summary` (the mail poll returns its message counts). A
  * handler with nothing to say returns `void`, and the column stays null.
  */
 export type JobSummary = string
@@ -198,7 +190,7 @@ export interface JobHost {
   ) => Promise<void>
   /**
    * Re-sends a job for later. `singletonKey` carries the original's key, so
-   * a keyed job on an `exclusive` queue comes back still holding it (SPA-136).
+   * a keyed job on an `exclusive` queue comes back still holding it.
    */
   readonly send: (
     queue: string,
@@ -260,11 +252,10 @@ export interface JobRunEnd {
 
 /**
  * The ledger seam, the same bargain `JobHost` makes with pg-boss: the wrapper
- * owns the statements, the seam is what lets its own tests run with no
- * Postgres in sight. The Postgres implementation below is the default and the
- * only one that ships, and it is deliberately not exported — the `insert into
- * job_run` in this file is the only one in the repo, which
- * `job-run-one-writer.test.ts` asserts by scanning the source.
+ * owns the statements, the seam lets its tests run without Postgres.
+ * - `postgresLedger` is the only implementation that ships and is deliberately
+ *   not exported: its `insert into job_run` must be the only one in the repo
+ *   (a source-scanning test asserts it).
  */
 export interface JobRunLedger {
   /** Opens the row in `running`; null means the ledger is unavailable. */
@@ -456,7 +447,7 @@ async function announce(tx: JobTx, event: JobStatusEvent): Promise<void> {
 
 /**
  * Opens and closes the row; a plugin queue's row is also announced on
- * `job_status` from the same transaction. (D64)
+ * `job_status` from the same transaction.
  */
 const postgresLedger: JobRunLedger = {
   begin: (row) =>
@@ -627,14 +618,10 @@ const isJobClose = (result: JobResult): result is JobClose =>
   typeof result === 'object'
 
 /**
- * The wrapper's typed tag, then its reason. This is not the operator-facing
- * text a tenant writes on its own row — `document.extraction_error` keeps
- * that, and the two are not redundant: the tag is a per-attempt
- * classification that is uniform across every queue and lives on a ledger
- * that will be pruned, while the document's message is the current state of
- * one document and outlives every run of it. A reader grouping failures by
- * kind reads this column; a reader asking "what is wrong with this file"
- * reads that one.
+ * The wrapper's typed tag, then its reason: a per-attempt classification,
+ * uniform across queues, on a ledger that gets pruned. Not redundant with
+ * the operator-facing text a tenant keeps on its own row
+ * (`document.extraction_error`), which is one document's current state.
  */
 function ledgerError(
   settled: JobOutcome | null,
@@ -803,7 +790,7 @@ async function settle<TData, TServices>(
 
     // No typed failure in the cause: either the fiber was interrupted (worker
     // shutdown — the job deserves another run) or the handler threw something
-    // the type said it would not. The second is the case contract 2 is about.
+    // the type said it would not, which must never escape the wrapper.
     if (Cause.hasInterrupts(exit.cause)) {
       const reason = 'handler was interrupted'
       console.warn(
@@ -906,12 +893,11 @@ async function resolveFailure(
         )
         return
       }
-      // A keyed job re-sends with its key (SPA-136's backfill), and on an
-      // `exclusive` queue this job holds that key until it leaves `active` —
-      // a send first would be refused as a duplicate and the job would
-      // vanish. So it is settled first and re-sent after; the cost is that a
-      // failed send now loses the job rather than leaving it to expire, which
-      // for a keyed job is a press of its button away.
+      // A keyed job re-sends with its key, and on an `exclusive` queue this
+      // job holds that key until it leaves `active` — a send first would be
+      // refused as a duplicate and the job would vanish. So settle first,
+      // re-send after; a failed send then loses the job instead of leaving it
+      // to expire, which for a keyed job is a press of its button away.
       await host.complete(
         queue,
         job.id,

@@ -47,7 +47,7 @@ import { pollStorageChanges } from '../jobs/poll-storage-changes'
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
 /**
- * Write-through (§6) end to end: an in-app upload on a record whose binding
+ * Write-through end to end: an in-app upload on a record whose binding
  * pushes, born by core's birth and exported by `storage.export` through the
  * real google-drive (and box) bundle against the mutable fake.
  * - The next poll reads our own write as no change: no download, no row.

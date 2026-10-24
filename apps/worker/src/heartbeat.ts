@@ -3,15 +3,11 @@ import { BEAT_EVERY_MS, WORKER_ROLE, beat } from '@spaces/db/heartbeat'
 import type { BeatIdentity } from '@spaces/db/heartbeat'
 
 /**
- * The worker's half of the heartbeat (SPA-57). One row, upserted on boot and
- * every 15s, so a `ROLE=worker` container and `/api/health` both have
- * something to check other than "the process exists".
- *
- * A failed beat is never fatal. Postgres blinking should not kill the worker
- * — the beat simply does not land, the row goes stale on its own, and the
- * next tick heals it. An unhandled rejection here would be a container death
- * (hostability contract 2) caused by the monitoring, which is worse than the
- * thing it monitors.
+ * The worker's half of the heartbeat: one row, upserted on boot and every 15s,
+ * so a `ROLE=worker` container and `/api/health` can check more than "the
+ * process exists".
+ * - A failed beat is never fatal: the row goes stale and the next tick heals
+ *   it. An unhandled rejection here would kill the container over monitoring.
  */
 export function workerIdentity(): BeatIdentity {
   return {
@@ -32,13 +28,11 @@ export interface Heartbeat {
 }
 
 export function startHeartbeat(identity: BeatIdentity): Heartbeat {
-  // The heartbeat is what brings a drizzle pool into the worker process, so
-  // the heartbeat owns that pool's 'error' event. node-postgres re-emits an
-  // idle client's error on the pool — `terminating connection due to
-  // administrator command` every time Postgres restarts — and an
-  // EventEmitter 'error' with no listener is an uncaught throw. Without this
-  // line the monitoring is the reason the container dies, on nothing worse
-  // than a database restart the pool recovers from by itself.
+  // The heartbeat brings the drizzle pool into this process, so it owns the
+  // pool's 'error' event. node-postgres re-emits an idle client's error on the
+  // pool (`terminating connection due to administrator command` on every
+  // Postgres restart), and an 'error' with no listener is an uncaught throw:
+  // without this line a database restart would kill the container.
   db.$client.on('error', (err: Error) => {
     console.error('[worker] heartbeat pool error', err.message)
   })

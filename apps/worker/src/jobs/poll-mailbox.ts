@@ -10,21 +10,13 @@ import { JobPermanent } from '../run-job'
 import type { JobDef, JobRetryPolicy } from '../run-job'
 
 /**
- * mail.poll — the forwarding mailbox's poll (SPA-56). The body is
- * `pollMailboxProgram` (`lib/arrival/poll.ts`); this is the pg-boss half.
- *
- * The data is what the schedule carries (`{ mailboxId, integrationId }`) or
- * what Settings → Arrival sends on save, and nullish-tolerant for the reason
- * `dedupeSweepData` is: pg-boss stores `null` for a schedule registered
- * without a payload. The poll reads its row itself rather than trusting the
- * id in the payload, so a stale schedule for a replaced row still polls the
- * live one; the id is there for `refs`, which is what puts the integration on
- * the `job_run` row.
- *
- * Every failure is permanent. A refused login or an unreachable host has
- * already been written to the mailbox row and set the backoff; a pg-boss
- * retry a few seconds later would be exactly the tight loop the backoff
- * exists to prevent. The next scheduled tick is the retry.
+ * mail.poll: the forwarding mailbox's poll; the body is `pollMailboxProgram`.
+ * - Data is nullish-tolerant: pg-boss stores `null` for a payload-less
+ *   schedule. The poll reads its row itself, so a stale schedule for a
+ *   replaced row still polls the live one; the id is only for `refs`.
+ * - Every failure is permanent: a refused login or unreachable host is already
+ *   on the mailbox row with a backoff set, and a pg-boss retry would be the
+ *   tight loop the backoff prevents. The next scheduled tick is the retry.
  */
 
 export const pollMailboxData = z

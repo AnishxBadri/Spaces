@@ -11,30 +11,15 @@ import { JobPermanent } from '../run-job'
 import type { JobDef } from '../run-job'
 
 /**
- * document.read-deck — the deck reader on the worker (SPA-90). The program
- * is `lib/ai/read-deck.ts`; this is the wrapper's view of it.
- *
- * **Every failure is permanent.** A provider that is unreachable, a lane that
- * is not routed, a sensitive record routed to the cloud: none is fixed by
- * pg-boss trying again in thirty seconds, and each retry of a model call is a
- * cost. The failure's sentence is the job's output (`JobOutcome.reason`),
- * which `readDeckStatus` reads back for the Files tab's toast — no column on
- * `document` is borrowed for it; `extraction_error` is extraction's.
- *
- * **Read deck and summarize** (SPA-100) is the same job with
- * `summarizeOnto` set: the record to summarize the deck onto, after the read,
- * in one two-step run (`lib/ai/read-deck-summarize.ts`). One queue, so one
- * deck is read once at a time whichever button was pressed, and the Files
- * tab's status and toast read both the same way.
- *
- * **A captured page** (SPA-134) is the same job again, with `capture` set:
- * the object the page was captured as. The program is the same one —
- * `readDeckProgram` with `against`, anchored on the document — so one
- * extract program serves decks and pages alike, and the queue's singleton
- * key on the document id is what refuses a re-posted page a second read
- * while the first is queued or running. A second queue would have bought
- * nothing but a second worker registration and a second key space for the
- * same one-read-per-document rule.
+ * document.read-deck: runs the deck reader on the worker.
+ * - Every failure is permanent: none is fixed by a retry, and each retried
+ *   model call costs. The sentence is the job's output (`JobOutcome.reason`),
+ *   which `readDeckStatus` reads back for the toast; it borrows no `document`
+ *   column (`extraction_error` is extraction's).
+ * - With `summarizeOnto` set it also summarizes onto that record, in one
+ *   two-step run; with `capture` set it reads a captured page as that object,
+ *   anchored on the document. One queue for all three, so its singleton key
+ *   on the document id keeps one read per document at a time.
  */
 
 export const readDeckData = z.object({
@@ -65,7 +50,7 @@ const readOnly = (data: ReadDeckData, seam: ReadDeckSeam) =>
     documentId: data.documentId,
     userId: data.userId,
     ...(seam.extractModel === undefined ? {} : { model: seam.extractModel }),
-    // A captured page anchors on its own document (SPA-134).
+    // A captured page anchors on its own document.
     ...(data.capture === undefined
       ? {}
       : {

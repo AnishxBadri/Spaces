@@ -19,7 +19,7 @@ import { messageOf } from './loader'
 
 /**
  * Credit safety around an `action` job, in the host so no plugin can bypass
- * it (D53). Before the job runs:
+ * it. Before the job runs:
  * - Cache: a receipt from this integration for the entity younger than
  *   `cacheDays` skips the job — no provider call.
  * - Cap: today's spend plus the job's `cost` estimate over `dailyCreditCap`
@@ -92,7 +92,7 @@ export type CreditGuard = {
   readonly entityId: string
   readonly defaults: CreditPolicy
   readonly cost: CostHook | null
-  /** The workspace's reuse window, over the integration's `cacheDays`. (D76) */
+  /** The workspace's reuse window, over the integration's `cacheDays`. */
   readonly cacheDays?: number
 }
 

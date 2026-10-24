@@ -20,8 +20,8 @@ import type { OpenedSource } from '../jobs/storage-sources'
  * A storage-source plugin's provider, built for one acting user: core asks
  * for a provider and a connection, and gets the plugin's `StorageSource`
  * over the ambient ports.
- * - Secrets is bound to the given connection (the user who pasted the link,
- *   D66), never to the integration row's own `connection_id`.
+ * - Secrets is bound to the given connection (the user who pasted the link),
+ *   never to the integration row's own `connection_id`.
  * - Built per call in the caller's scope, so its ports close with the job.
  */
 

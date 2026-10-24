@@ -6,13 +6,11 @@ import {
 } from '@spaces/db/test-db'
 
 /**
- * Per-file isolation (SPA-145), apps/web's shape (SPA-181): empty `public`
- * before every file, then the seed `vitest.seed.ts` describes. The base url
- * is read from `TEST_DATABASE_BASE_URL`, not from `DATABASE_URL`, which this
- * file overwrites once per file in the same process; the mutation happens
- * before anything imports `@spaces/db`, whose pool is built from
- * `process.env.DATABASE_URL` at import time — hence the dynamic imports and
- * `pool: 'forks'` in the config.
+ * Per-file isolation: empty `public` before every file, then reseed.
+ * - The base url comes from `TEST_DATABASE_BASE_URL`, because this file
+ *   overwrites `DATABASE_URL` once per file in the same process.
+ * - That overwrite must happen before anything imports `@spaces/db`, whose
+ *   pool reads `DATABASE_URL` at import time; hence the dynamic imports.
  */
 
 const base = process.env.TEST_DATABASE_BASE_URL

@@ -31,7 +31,7 @@ import { ExtractionStore, extractDocument } from './extract-document'
 import { embedDocument, runEmbedDocument } from './embed-document'
 
 /**
- * SPA-121. `document.embed` against Postgres, with the embedding model
+ * `document.embed` against Postgres, with the embedding model
  * injected through `embed()`'s seam — the pin, the sensitivity refusal, the
  * width assertion and the `ai_usage` row are real; `fetch` is stubbed to
  * throw, so a call that tried the network would fail the test rather than
@@ -73,7 +73,7 @@ const PIN: EmbeddingPinSetting = {
   pinned_at: '2026-09-20T00:00:00.000Z',
 }
 
-/** `pages` marked pages, the shape `fromPdf` leaves (SPA-30). */
+/** `pages` marked pages, the shape `fromPdf` leaves. */
 const deckText = (pages: number, word = 'orbital') =>
   Array.from(
     { length: pages },

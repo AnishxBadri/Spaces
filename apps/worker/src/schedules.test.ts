@@ -7,9 +7,7 @@ import { db } from '@spaces/db'
 import { QUEUES } from '@spaces/core/queue/names'
 import { CORE_SCHEDULES, CORE_SCHEDULE_TZ, scheduleCoreJobs } from './schedules'
 
-/**
- * No periodic refresh: nothing re-enriches a record on a clock. (D76)
- */
+/** No periodic refresh: nothing re-enriches a record on a clock. */
 
 const ENRICHMENT_QUEUES: ReadonlyArray<string> = [QUEUES.enrichmentRun]
 

@@ -10,15 +10,11 @@ import { JobPermanent } from '../run-job'
 import type { JobDef } from '../run-job'
 
 /**
- * document.classify — kind classify on the worker (SPA-62). The program is
- * `lib/ai/classify-document.ts`; this is the wrapper's view of it. Enqueued
- * by `onDocumentExtracted` and by nothing else.
- *
- * **Every failure is permanent**, for the deck reader's reasons: an
- * unreachable provider or an unrouted lane is not fixed by pg-boss trying
- * again in thirty seconds, and each retry of a model call is a cost. A skip
- * (the kind already set, a classification already made, an answer with no
- * proposable kind) is not a failure: the job completes and says why.
+ * document.classify: kind classify, enqueued only by `onDocumentExtracted`.
+ * - Every failure is permanent: an unreachable provider or unrouted lane is
+ *   not fixed by a retry, and each retried model call costs.
+ * - A skip (kind already set, already classified, no proposable kind)
+ *   completes and says why.
  */
 
 export const classifyDocumentData = z.object({

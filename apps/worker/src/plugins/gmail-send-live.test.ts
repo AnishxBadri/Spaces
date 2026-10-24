@@ -49,7 +49,7 @@ import { mailLaneLive } from './mail'
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
 /**
- * Send (D67) end to end under `SPACES_FAKE_PROVIDERS=1`: the composer's
+ * Send end to end under `SPACES_FAKE_PROVIDERS=1`: the composer's
  * program queues the real gmail bundle's `send` on a real pg-boss and waits
  * for it; the fake Gmail takes the message and the mail lane writes the
  * outgoing row from the sent copy. Then the sync runs and dedupes on the

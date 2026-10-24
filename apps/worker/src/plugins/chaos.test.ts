@@ -31,7 +31,7 @@ import { reconcilePlugins } from './loader'
 import type { PluginQueuesOptions } from './queues'
 
 /**
- * The chaos list (spec §13.7), run against each enricher's provider fake:
+ * The chaos list, run against each enricher's provider fake:
  * the real bundle, loaded and wired as boot does it, its queue worked by a
  * real pg-boss through `runJob` on this worker's test database. The fake is
  * the only provider; `fetch` itself throws, so nothing reaches a network.

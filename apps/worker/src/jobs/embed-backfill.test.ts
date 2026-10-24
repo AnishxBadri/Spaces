@@ -34,7 +34,7 @@ import { fakeOllama } from '#web/test/fake-ollama'
 import { RESUME_SLACK_MS, runEmbedBackfill } from './embed-backfill'
 
 /**
- * SPA-136, the corpus backfill, against Postgres. The embedding wire is a
+ * The corpus backfill, against Postgres. The embedding wire is a
  * counting fake (`MockEmbeddingModelV4` through `embed()`'s `model` seam),
  * so the pin, the live sensitivity check, the shared AI cap and the
  * `ai_usage` row are all real and every provider call is counted; `fetch`
@@ -108,7 +108,7 @@ async function newDeck(name: string, text = name) {
   return row.id
 }
 
-/** `n` chunks on one deck, as SPA-121 writes them with no pin: no vectors. */
+/** `n` chunks on one deck, as `document.embed` writes them with no pin: no vectors. */
 async function unembeddedChunks(entityId: string, n: number, from = 0) {
   const rows = Array.from({ length: n }, (_, i) => ({
     entityId,
@@ -272,7 +272,7 @@ describe('the run', () => {
         .returning({ id: entity.id })
     ).at(0)?.id
     if (!noteId || !dealId) throw new Error('entity insert returned nothing')
-    // SPA-132's two other sources, as `chunk.embed` writes them with no pin.
+    // The two other sources, as `chunk.embed` writes them with no pin.
     await db.insert(chunk).values([
       {
         entityId: noteId,

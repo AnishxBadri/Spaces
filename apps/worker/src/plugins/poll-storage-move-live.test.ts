@@ -47,14 +47,14 @@ import { syncStorageBinding } from '../jobs/sync-storage-binding'
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
 /**
- * The change poll's renamed / moved row (§8) end to end on the real
+ * The change poll's renamed / moved row end to end on the real
  * google-drive bundle against the mutable fake Drive: a rename or a move
  * inside the bound subtree advances the path in place, and a move that
  * crosses to another record's folder is a re-file suggestion a person
- * accepts, never a silent re-file (§5.6). A move under another binding of
+ * accepts, never a silent re-file. A move under another binding of
  * the same connection is the same rule, and the file's binding follows.
  * - Its own file: each case seeds companies by name, and two cases' names
- *   in one database would no longer match exactly.
+ *   in one database would not match exactly.
  */
 
 const NoEnqueue = Layer.succeed(

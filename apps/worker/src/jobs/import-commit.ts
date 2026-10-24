@@ -7,19 +7,14 @@ import { JobPermanent } from '../run-job'
 import type { JobDef } from '../run-job'
 
 /**
- * `import.commit` (SPA-169, import-7) — a planned batch's rows through their
- * creators, each row in its own transaction (`#/lib/import/commit`); a
- * ledger batch's rows through the portfolio write path (SPA-171,
- * `#/lib/import/ledger-commit`). The
- * program never fails on a row — a row's failure is its own `error` — so
- * the job fails only when the batch itself cannot commit (not planned, a
- * collision undecided, a query that broke), and then permanently: the
- * operator re-runs it, and a re-run writes nothing for a row that landed.
- *
- * Its `job_run.summary` is the run's line, led by the batch id —
- * `batch <id> · 46 written · 0 attached · 0 failed · 0 unchanged` — which is
- * how the batch page finds its own last run on a ledger with no batch
- * column; a refusal carries the same prefix in `job_run.error`.
+ * import.commit: commits a planned batch, each row in its own transaction
+ * through its creator, or a ledger batch through the portfolio write path.
+ * - A row's failure is its own `error`; the job fails only when the batch
+ *   cannot commit (not planned, collision undecided, a broken query), and
+ *   then permanently. A re-run writes nothing for a row that landed.
+ * - `job_run.summary` leads with `batch <id> · …`, which is how the batch page
+ *   finds its last run on a ledger with no batch column; a refusal carries
+ *   the same prefix in `job_run.error`.
  */
 
 export const importCommitData = z.object({

@@ -37,7 +37,7 @@ import { ExtractionStore, extractDocument } from './extract-document'
 import { pollMailbox, syncMailScheduleProgram } from './poll-mailbox'
 
 /**
- * SPA-56, the pg-boss half of `mail.poll`: the job through `runJob`, so the
+ * The pg-boss half of `mail.poll`: the job through `runJob`, so the
  * `job_run` row it leaves is the real one, and the schedule sync the worker
  * runs at boot, over a recording stand-in for pg-boss.
  */
@@ -45,12 +45,11 @@ import { pollMailbox, syncMailScheduleProgram } from './poll-mailbox'
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
 /**
- * The upload ceiling, lowered for this file (SPA-115): "refused mid-stream"
- * is a claim about the intake meter, and 250 MB of base64 through the fake
- * IMAP server would test the fixture, not the meter. Every module reading the
- * constant — core's `writes/documents/intake.ts` among them, whose relative
- * `../../documents` resolves to the same mocked file — sees this value;
- * nothing in the intake itself changes.
+ * The upload ceiling, lowered for this file: "refused mid-stream" is a claim
+ * about the intake meter, and 250 MB of base64 through the fake IMAP server
+ * would test the fixture, not the meter. Every module reading the constant
+ * sees this value, core's intake included (its relative import resolves to
+ * the same mocked file); nothing in the intake itself changes.
  */
 vi.mock('@spaces/core/documents', async (importOriginal) => ({
   ...(await importOriginal<object>()),

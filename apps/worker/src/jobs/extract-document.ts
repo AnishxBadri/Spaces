@@ -14,27 +14,18 @@ import { JobContext, JobPermanent, JobRetryable } from '../run-job'
 import type { JobDef } from '../run-job'
 
 /**
- * document.extract — the reason the worker process exists. Parsing a 200-page
- * PDF or a 90MB deck is CPU-bound; run it on the web process and every other
- * request waits behind it.
+ * document.extract: parses a stored file's text off the web process, since
+ * parsing a 200-page PDF is CPU-bound.
  *
  * Writes extracted_text and tsv together in one statement: they must never
  * disagree, or search silently returns rows whose text says otherwise.
  *
- * First tenant of the `runJob` wrapper (SPA-49), and that is a behaviour
- * change, not a rewrite: this handler used to swallow every failure into
- * document.extraction_status and complete the job, so nothing ever retried.
- * The mapping is now explicit and asserted in extract-document.test.ts —
- *
- *   - blob unreadable (a transient store read)  → JobRetryable; the row is
- *     left alone while retries remain and only the final attempt writes
- *     'failed', so the operator sees "pending" not "failed" mid-retry
- *   - no stored blob                            → JobPermanent, 'unsupported'
- *   - sha mismatch                              → JobPermanent, 'failed'
- *   - extractor says unsupported/failed         → JobPermanent, that status
- *
- * The operator-facing reason text is byte-identical to the pre-wrapper
- * strings in every one of those branches.
+ * Failure mapping:
+ * - blob unreadable → JobRetryable; only the final attempt writes 'failed',
+ *   so the row reads "pending" mid-retry
+ * - no stored blob → JobPermanent, 'unsupported'
+ * - sha mismatch → JobPermanent, 'failed'
+ * - extractor says unsupported/failed → JobPermanent, that status
  */
 
 export const extractDocumentData = z.object({
@@ -73,9 +64,8 @@ export class ExtractionFailed extends Schema.TaggedError<ExtractionFailed>()(
 ) {}
 
 /**
- * The job's Layer. Splitting the I/O out of the program is what lets the
- * retryable-versus-terminal mapping be asserted without a Postgres or a blob
- * store — and it is the shape every plugin job will take.
+ * The job's I/O, split out so the retryable-versus-terminal mapping can be
+ * tested without Postgres or a blob store.
  */
 export class ExtractionStore extends Context.Service<
   ExtractionStore,
@@ -96,10 +86,9 @@ export class ExtractionStore extends Context.Service<
       reason: string,
     ) => Effect.Effect<void, StoreUnavailable>
     /**
-     * `document.extracted` (SPA-62): hand the stored text on to whichever
-     * follow-on lanes are routed — `document.embed` always (SPA-121),
-     * `document.classify` for a document still at `other`. It never fails,
-     * so it cannot fail the extraction whose text is already committed.
+     * `document.extracted`: hands the stored text to the routed follow-on
+     * lanes (`document.embed` always, `document.classify` for a document
+     * still at `other`). Never fails, so it cannot fail a committed extraction.
      */
     readonly onExtracted: (documentId: string) => Effect.Effect<void>
     /**
@@ -157,10 +146,9 @@ export class ExtractionStore extends Context.Service<
                 })
                 .where(eq(document.entityId, documentId))
               // Glossary terms the text mentions become
-              // `link(document → term, mentions, extracted)` (SPA-34), in
-              // the same transaction so the text and its concept edges
-              // never disagree. A re-extraction of unchanged text writes no
-              // edge — the sync is a diff.
+              // `link(document → term, mentions, extracted)`, in the same
+              // transaction so the text and its concept edges never
+              // disagree. The sync is a diff: unchanged text writes no edge.
               await linkTermMentionsInTx(tx, {
                 fromId: documentId,
                 text,
@@ -252,11 +240,9 @@ const program = Effect.fn('extractDocument')(function* (
 
   const bytes = yield* store.bytes(blobSha)
 
-  // Universal integrity backstop (2026-08): the local driver verifies on
-  // write and enforcing S3 endpoints verify on PUT, but partially-compatible
-  // targets (Garage) may not. We're holding the whole blob anyway, so
-  // re-verify "same sha ⇒ same bytes" here — the invariant dedupe and the
-  // immutable cache header lean on.
+  // Integrity backstop: partially-compatible S3 targets (Garage) may not
+  // verify on PUT. We hold the whole blob anyway, so re-verify "same sha ⇒
+  // same bytes", the invariant dedupe and the immutable cache header lean on.
   const digest = createHash('sha256').update(bytes).digest('hex')
   if (digest !== blobSha) {
     return yield* new ExtractionFailed({
@@ -266,9 +252,7 @@ const program = Effect.fn('extractDocument')(function* (
   }
 
   // Deliberately Effect.promise, not tryPromise: an extractor that throws is
-  // a bug, and the wrapper's defect path is where bugs belong. Mapping it to
-  // a reason string here would invent operator-facing text for a case the
-  // pre-wrapper handler never had one for either.
+  // a bug, and the wrapper's defect path is where bugs belong.
   const outcome = yield* Effect.promise(() =>
     extractDocumentText({
       bytes,
@@ -311,9 +295,8 @@ const onExtractionFailed = Effect.fn('extractDocument.onExtractionFailed')(
 
 /**
  * A blob we could not read is the one failure worth another attempt. The row
- * stays 'pending' while attempts remain so the operator is not told the
- * document failed by a retry that is still coming; the final attempt writes
- * the same 'failed' reason the old handler wrote on the first one.
+ * stays 'pending' while attempts remain; only the final attempt writes
+ * 'failed'.
  */
 const onBlobUnreadable = Effect.fn('extractDocument.onBlobUnreadable')(
   function* (documentId: string, err: BlobUnreadable) {
@@ -335,9 +318,8 @@ const onBlobUnreadable = Effect.fn('extractDocument.onBlobUnreadable')(
 export const extractDocument: JobDef<ExtractDocumentData, ExtractionStore> = {
   name: QUEUES.extractDocument,
   schema: extractDocumentData,
-  // The document *is* an entity, so its id is the ledger's entity_id. This is
-  // a declaration, not instrumentation: there is no job_run code in this
-  // file, and the row runJob writes from it is what the Files tab reads.
+  // The document is an entity, so its id is the ledger's entity_id; the row
+  // runJob writes from it is what the Files tab reads.
   refs: (data) => ({ entityId: data.documentId }),
   // Extraction is CPU-bound and synchronous once it starts, so an Effect
   // timeout could not interrupt it — pg-boss's own expiry is the backstop.
