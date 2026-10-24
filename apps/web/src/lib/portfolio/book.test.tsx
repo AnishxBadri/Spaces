@@ -211,7 +211,7 @@ describe('loadPortfolio — the one book Today and Portfolio read', () => {
     const { loadPortfolio } = await import('./detail')
     await book()
 
-    // The void was written today; on 2025-07-01 nobody had struck the
+    // The void was written today; on `2025-07-01` nobody had struck the
     // 900,000 mark yet, so it is what the book said then.
     const then = await loadPortfolio('2025-07-01')
     expect(then.rollup.unrealized).toBeCloseTo(900_000 + 420_000, 6)

@@ -515,14 +515,14 @@ export function isDateFormat(code: string): boolean {
 }
 
 const DAY_MS = 86_400_000
-/** 9999-12-31 in the 1900 system — past it a Date cannot print four digits. */
+/** `9999-12-31` in the 1900 system — past it a Date cannot print four digits. */
 const MAX_SERIAL = 2_958_465
 
 /**
  * An Excel serial as `YYYY-MM-DD`, the time of day dropped. The 1900 system
- * counts from 1899-12-31 and keeps Lotus's phantom 1900-02-29 at 60, so
- * from 61 on the epoch is effectively 1899-12-30 (45000 → 2023-03-15). The
- * 1904 system counts from 1904-01-01. Null for anything that is not a
+ * counts from `1899-12-31` and keeps Lotus's phantom `1900-02-29` at 60, so
+ * from 61 on the epoch is effectively `1899-12-30` (45000 → `2023-03-15`). The
+ * 1904 system counts from `1904-01-01`. Null for anything that is not a
  * non-negative serial a calendar can print.
  */
 export function serialToIsoDate(

@@ -228,7 +228,7 @@ function fromPptx(bytes: Uint8Array): string {
  *
  * The grid is the import reader's (`readXlsx`), so search and
  * import read through one xlsx parser — including its date resolution, which
- * makes a date column searchable as 2023-03-15 rather than as 45000. The
+ * makes a date column searchable as `2023-03-15` rather than as 45000. The
  * blank cells the rectangular grid pads a short row with are layout, not
  * text, so they are dropped here.
  */

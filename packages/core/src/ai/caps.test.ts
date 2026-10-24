@@ -17,7 +17,7 @@ const at = (
   tokensOut,
 })
 
-// Straddles 2026-09-23 00:00 UTC: two rows the evening before, two after.
+// Straddles `2026-09-23` 00:00 UTC: two rows the evening before, two after.
 const ACROSS_MIDNIGHT = [
   at('2026-09-22T23:58:00.000Z', 400, 100),
   at('2026-09-22T23:59:59.999Z', 300, 200),

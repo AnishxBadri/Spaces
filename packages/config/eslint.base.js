@@ -10,6 +10,7 @@ import drizzle from 'eslint-plugin-drizzle'
 import * as astroParser from 'astro-eslint-parser'
 import tsParser from '@typescript-eslint/parser'
 import instrument from './eslint-rules/vocabulary.js'
+import comments from './eslint-rules/history.js'
 
 // The repo root, absolute so the zones resolve the same from every cwd.
 // - Not named eslint.config.js: ESLint looks its config up from the cwd, and
@@ -254,6 +255,13 @@ export default [
     files: ['apps/web/src/**/*.tsx'],
     plugins: { instrument },
     rules: { 'instrument/vocabulary': 'error' },
+  },
+  // Comments describe the current code; ids and dates belong in the commit.
+  {
+    files: ['**/*.{ts,tsx,mts,cts,js,mjs,cjs}'],
+    ignores: ['**/routeTree.gen.ts', 'packages/db/drizzle/**'],
+    plugins: { comments },
+    rules: { 'comments/no-history': 'error' },
   },
   // Just the two classic hooks rules — the v7 "recommended" set adds React
   // Compiler rules that fight TanStack Table's API.
