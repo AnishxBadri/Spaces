@@ -29,7 +29,7 @@ import type { SendInput } from './email-send'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * Send (D67) up to the queue: who sends, what each message is, what is
+ * Send up to the queue: who sends, what each message is, what is
  * refused before any job, and what a settled job does to the draft. The
  * plugin half runs in the worker's live test; here a stand-in queue
  * settles each job as told.

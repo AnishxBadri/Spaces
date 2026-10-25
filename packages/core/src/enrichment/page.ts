@@ -8,7 +8,7 @@ import type { VocabularyKey } from '@spaces/sdk/vocabulary'
 import type { Json } from '@spaces/db/json'
 
 /**
- * The Enrichment page and the where-from popover, pure (D76):
+ * The Enrichment page and the where-from popover, pure:
  * - what each source can answer, from its enrich action's `answers`;
  * - What fills what: per linked attribute, which source answers it;
  * - a filled value's source, date and earlier figures.

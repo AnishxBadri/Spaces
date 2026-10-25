@@ -9,7 +9,7 @@ import { RefChip } from './ask-answer'
 
 /**
  * Ask's action cards beside an answer: the proposal, its evidence, and one
- * pine Apply with Skip as the outline secondary. (D70)
+ * pine Apply with Skip as the outline secondary.
  * - A decided card shows its outcome as a mono state word, never a disabled
  *   button.
  * - A card without evidence is refused: one line says so, never the card.

@@ -4,8 +4,7 @@ import { join } from 'node:path'
 import { dataDir } from '@spaces/core/writes/vault/key'
 
 /**
- * The /setup one-time token — CONTEXT.md's first-run trap #2. Between
- * `docker compose up` and admin creation, /setup would otherwise be open to
+ * The /setup one-time token. Between `docker compose up` and admin creation, /setup would otherwise be open to
  * anyone who can reach the port. The token is generated on first ask,
  * printed to the container logs (the operator is the one person who can
  * read them), required by the setup wizard, and deleted the moment the

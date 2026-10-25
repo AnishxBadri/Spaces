@@ -12,25 +12,19 @@ import type { DomainEvent } from '@spaces/sdk'
 import type { Tx } from '@spaces/core/writes/attributes/values'
 
 /**
- * The one insert that tags a record into a space (SPA-103). Callers:
- * `tagByHand` (a person picks the space, `source: 'manual'`),
- * the `space_tag` accept branch in `acceptProgram` (a person accepts the
- * classify lane's proposal, `source: 'ai'` with the model's confidence) and
- * its discovery-card accepts (`fileDiscovered`, D72). `created_by` is the person either way — a model never
- * tags anything; the accepter does.
- *
- * `(entity_id, space_id)` is the primary key, so a record already in the
- * space keeps the row it has — its source, confidence and author — and the
- * answer is `tagged: false`. A new tag hands back the `filed` event its
- * caller dispatches after the commit (D76). `tag.test.ts` greps that these two call sites reach
- * `entity_space` through here and nowhere else.
- *
- * A new tag raises the record's chunks to `sensitive` in the caller's
- * transaction when the space, or one of its ancestors, is sensitive.
- *
- * It lives outside `lib/server/` so the accept path, which runs without a
- * request, can call it, and nothing here reaches the client bundle
- * (CLAUDE.md, SPA-155).
+ * The one insert that tags a record into a space. Callers: `tagByHand`
+ * (`source: 'manual'`), the `space_tag` accept branch in `acceptProgram`
+ * (`source: 'ai'` with the model's confidence) and the discovery-card
+ * accepts (`fileDiscovered`).
+ * - `created_by` is always the person: a model never tags; the accepter does.
+ * - A record already in the space keeps its row (`(entity_id, space_id)` is
+ *   the primary key) and the answer is `tagged: false`.
+ * - A new tag hands back the `filed` event its caller dispatches after the
+ *   commit, and raises the record's chunks to `sensitive` in the caller's
+ *   transaction when the space or an ancestor is sensitive.
+ * - Tests grep that tagging reaches `entity_space` through here only.
+ * - Outside the server-fn module so the accept path can call it without a
+ *   request, and nothing here reaches the client bundle.
  */
 
 export type TagSource = (typeof tagSource.enumValues)[number]
@@ -89,8 +83,8 @@ export async function insertSpaceTag(
 
 /**
  * Whether `spaceId` is a live space — a row in `space` whose entity has not
- * been merged away. The accept branch asks before tagging, because a space
- * proposed last week may have been merged since.
+ * been merged away. The accept branch asks before tagging, because a
+ * proposed space may have been merged since.
  */
 export async function isLiveSpace(
   reader: Tx | typeof db,

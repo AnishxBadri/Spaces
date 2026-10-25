@@ -17,7 +17,7 @@ import { unpricedCurrencies } from './rail'
 import { todayReadouts } from './readouts'
 
 /**
- * Today by sheet 00 (D79): the shared readout strip, the date line over the
+ * Today: the shared readout strip, the date line over the
  * title with New task and Log interaction, the 08–20 day strip, sentence-case
  * kind filters with a fold that names its kinds, the Portfolio rail and a
  * What's moving that is drawn even on a quiet week.
@@ -127,7 +127,7 @@ describe('Today by sheet 00', () => {
       expect(classOf(html, label)).toContain('text-label')
       expect(classOf(html, label)).not.toContain('field-label')
     }
-    // The value first, in the record strip's mono 22 — never the old 20px.
+    // The value first, in the record strip's mono 22, not 20px.
     const unfiled = /class="([^"]*)">3<\/span><span[^>]*>Unfiled files</.exec(
       html,
     )?.[1]
@@ -136,7 +136,7 @@ describe('Today by sheet 00', () => {
     expect(html).toContain('href="/files?filed=unfiled"')
     expect(html).not.toContain('text-xl')
 
-    // today.tsx draws none of its own: the strip is the record primitive.
+    // Today draws none of its own: the strip is the record primitive.
     const source = readFileSync(
       new URL('../../routes/_app/today.tsx', import.meta.url),
       'utf8',

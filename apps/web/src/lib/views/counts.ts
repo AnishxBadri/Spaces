@@ -13,34 +13,13 @@ import type { Condition } from '@spaces/core/views/filter'
 import type { ListScope } from './scope'
 
 /**
- * How many records each saved view holds, counted in Postgres (SPA-162) —
- * the number a `ViewChip` prints after its name, for every chip on the bar,
- * including the ones whose rows the page has never loaded.
- *
- * **One predicate, not two.** The count is `compileConditions` over the
- * object's live registry, inside `listScope` — exactly the `where` the list
- * page filters by (`records.ts`, `directory.ts`), so a chip cannot promise a
- * number the table then contradicts. There is no second filter semantics
- * here, and `counts.test.ts` walks every op in `OP_LABELS` to hold it.
- *
- * **Refusing, not widening.** `compileConditions` drops a condition whose
- * slug the resolver returns null for (an archived or never-declared
- * attribute). For the records page that is the decided behaviour — a stale
- * view widens rather than empties. For a *count* it would be a number from a
- * partial `where`, printed as though it were the view's: so every slug is
- * resolved here first, and a view with any unresolvable condition comes back
- * `{ count: null, reason }` and is never compiled. `compileConditions` is
- * left exactly as it is.
- *
- * **One round trip for the whole bar.** A single `select` over the scope
- * with one `count(*) filter (where …)` per countable view: one scan of the
- * object's rows however many chips there are, rather than N queries that
- * each scan it again. The chips arrive together, and the query is as cheap
- * with twelve views as with one.
- *
- * It lives outside `lib/server/` for the reason `records.ts` does: the server
- * fn that wraps it is re-exported by a client-imported barrel, so the test
- * calls this program directly.
+ * How many records each saved view holds: the number every `ViewChip` prints.
+ * - Same predicate as the list page (`compileConditions` inside `listScope`),
+ *   so a chip never contradicts the table; the tests walk every op in `OP_LABELS`.
+ * - Refuses rather than widens: a view with an unresolvable slug returns
+ *   `{ count: null, reason }` and is never compiled into a partial `where`.
+ * - One `select` with a `count(*) filter (where …)` per view: one scan per bar.
+ * - Kept out of the client-imported server-fns barrel; tests call it directly.
  */
 
 export class ViewCountFailed extends Schema.TaggedError<ViewCountFailed>()(
@@ -75,7 +54,7 @@ export const scopeOf = (object: { id: string; slug: string }): ListScope => {
 /**
  * The object's live registry as the list page reads it — the resolver its
  * `where` is compiled with — plus the archived attributes' names, which only
- * name a reason. Shared with the column run (SPA-122), which walks exactly
+ * name a reason. Shared with the column run, which walks exactly
  * the rows a chip counts.
  */
 export type ViewLens = {

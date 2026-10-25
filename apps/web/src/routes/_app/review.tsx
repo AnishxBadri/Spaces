@@ -34,16 +34,15 @@ import { recordPath } from '#/lib/record-path'
 import { cn } from '#/lib/utils'
 
 /**
- * Review — the queue precedent of `docs/design-contract.md` §3, and the one
- * surface every later review lane joins (spec-ai-substrate.md §10).
- * `/inbox` and `/dedupe` redirect here. (D61)
+ * Review — the queue, and the one surface every review lane joins.
+ * `/inbox` and `/dedupe` redirect here.
  */
 /**
- * `record` scopes both lanes to one entity (SPA-114 — the record rail's
- * "Waiting" chips link here); `source` and `space` are a Today Review row's
+ * `record` scopes both lanes to one entity (the record rail's "Waiting"
+ * chips link here); `source` and `space` are a Today Review row's
  * filter. All three are loader deps, since they change what the server
  * sends. `lane` only seeds the tab on arrival and is not a dep: the
- * tabs stay React state, as they were. `.catch` rather than a failure, so a
+ * tabs stay React state. `.catch` rather than a failure, so a
  * hand-typed bad value lands on the whole queue, not an error boundary.
  */
 const inboxSearch = z.object({
@@ -127,8 +126,8 @@ function isSuggestionRow(row: QueueRow): row is SuggestionRow {
 
 /**
  * One renderer per row kind. **Add a member to `InboxRow` and a renderer
- * here, never a page** — that is the whole contract of this surface, and
- * the reason `/dedupe` stopped being its own route. A kind with no renderer
+ * here, never a page** — that is the whole contract of this surface. A kind
+ * with no renderer
  * falls back to `PayloadFallback` rather than taking the list down with it,
  * so a row written by a newer build degrades to its payload instead of a
  * blank screen.
@@ -288,7 +287,7 @@ function InboxPage() {
         }
       />
 
-      {/* Why a record head is missing a plugin's action (D63). */}
+      {/* Why a record head is missing a plugin's action. */}
       {stoppedPlugins.length > 0 ? (
         <div className="max-w-220 px-8 pt-6">
           <PluginStatusSection stopped={stoppedPlugins} />
@@ -327,7 +326,7 @@ function InboxPage() {
 }
 
 /**
- * "on <record>" — the queue is narrowed to one record (SPA-114). The chip is
+ * "on <record>" — the queue is narrowed to one record. The chip is
  * the record-reference chip, and its × clears the param back to the whole
  * queue; the tab the reader chose stays chosen.
  */
@@ -402,7 +401,7 @@ function HeaderTab({
 }
 
 /**
- * The nightly sweep's human door (SPA-81). It queues the job, it does not
+ * The nightly sweep's human door. It queues the job, it does not
  * run it — the rows appear when the worker gets to it, which is why the
  * toast says "queued" and the list is not invalidated here. Admin-only on
  * the server; a teammate who presses it is told so by `requireAdmin`.
@@ -608,17 +607,11 @@ function PairCard({
 }
 
 /**
- * Aliases first, then the record's own field (SPA-97).
- *
- * The side that caused an identity pair is the side that *lost* the claim,
- * so it holds no domain alias and this row used to read "—" for the exact
- * record under discussion. `identityDomain` is that side's value for its
- * object's `domain` identity key, normalized the same way the alias lane is,
- * so both columns print the colliding domain and the pair is comparable.
- *
- * Core pairs are unchanged: a company's domain *is* an alias, the system
- * objects declare no identity-key attribute, so `identityDomain` is null
- * and the first branch is the only one that ever runs.
+ * Aliases first, then the record's own field.
+ * - The side that caused an identity pair *lost* the claim, so it holds no
+ *   domain alias; `identityDomain` is its `domain` identity value, normalized
+ *   like the alias lane, so both columns print the colliding domain.
+ * - Core pairs only take the first branch: a company's domain *is* an alias.
  */
 function sideDomain(side: InboxSide): string {
   if (side.domains.length > 0) return side.domains.join(' · ')

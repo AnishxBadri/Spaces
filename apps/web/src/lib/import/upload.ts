@@ -1,13 +1,11 @@
 /**
- * The browser half of staged import (SPA-164) — the client module beside
- * `lib/documents/upload.ts`, and deliberately unlike it in one respect: the
- * file is **posted to the server**, which hashes it, rather than hashed here
- * and PUT at storage. An import is read on the server anyway (`readGrid`
- * needs the bytes), so there is no Node hop to save, and the repo's one
+ * The browser half of staged import. Unlike the document upload, the file is
+ * posted to the server, which hashes it, rather than hashed here and PUT at
+ * storage: the server must read it anyway (`readGrid`), and the app's one
  * WebCrypto digest stays the document lane's.
  *
- * Like its neighbour it imports from `@spaces/core/documents` and the
- * server-fns barrel and nothing else: no `node:`, no drizzle, no Effect.
+ * Imports from `@spaces/core/documents` and the server-fns barrel only: no
+ * `node:`, no drizzle, no Effect.
  */
 
 import { MAX_UPLOAD_BYTES, formatBytes } from '@spaces/core/documents'

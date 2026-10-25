@@ -22,7 +22,7 @@ import { noteViaProgram } from './via'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * A record's From meetings lane and the via mark (D78): the meeting's
+ * A record's From meetings lane and the via mark: the meeting's
  * write-up and its second notes, a private typed note for its author only,
  * a recorder note listed once under All though it is also filed, and the
  * mark only on what a recorder filed.

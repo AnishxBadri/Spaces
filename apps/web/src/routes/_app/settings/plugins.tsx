@@ -26,7 +26,7 @@ import type { InstallOutcome, IntegrationRow } from '#/lib/server-fns'
  * ledger, each with its switch, jobs, state and one number, and `Open ›`;
  * then Available from the registry in tabs by job, each with Install. Upload
  * in the head takes a tarball from disk for a box with no outbound HTTPS.
- * A member reads the same catalogue with every write disabled. (D81)
+ * A member reads the same catalogue with every write disabled.
  * - Available sits outside the section's disabled fieldset so a member can
  *   still switch its tabs; its Install takes `disabled` instead.
  */

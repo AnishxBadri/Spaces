@@ -12,13 +12,13 @@ import {
 } from './settings-nav'
 
 /**
- * The settings nav grammar, the sibling of `nav-grammar.test.ts`.
+ * The settings nav grammar, the sibling of the app nav grammar's test.
  * `SETTINGS_SECTIONS` is the one place a settings section is declared; this
  * file makes a second section at one path, a stray group, a row filed out of
  * group order, or an eyebrow naming another group a failing test.
  */
 
-/** D81's map as shipped: group crumb, then each row as label → path. */
+/** The settings map as shipped: group crumb, then each row as label → path. */
 const MAP: ReadonlyArray<
   readonly [crumb: string, rows: ReadonlyArray<readonly [string, string]>]
 > = [

@@ -28,13 +28,13 @@ import { storage } from '../storage'
 import { ContentLive } from './content'
 
 /**
- * `Content.fileDocument` bound to an integration row (sdk-8, SPA-203),
+ * `Content.fileDocument` bound to an integration row,
  * against a real database and the real blob store: the port is a thin
  * shell over core's intake, so every assertion here is about a row, a blob
  * or a queued job that intake and birth produced — the port only chose the
  * provenance.
  *
- * The limit is lowered for this file. `intake.test.ts` proves the meter at
+ * The limit is lowered for this file. Intake's own suite proves the meter at
  * the real 250 MB; what this file proves is that a plugin's stream reaches
  * that meter, and a quarter-gigabyte fixture would only prove it slower. The
  * claim has no size field, so nothing a plugin sends can move the number.
@@ -501,8 +501,8 @@ describe('Content.fileDocument, bound to an integration row', () => {
 })
 
 /**
- * The port has no pipeline of its own (D52, sdk-8): the workspace-rooted
- * greps in `../documents/intake.test.ts` already hold `insert(document)` and
+ * The port has no pipeline of its own: the workspace-rooted greps in
+ * intake's suite already hold `insert(document)` and
  * `storage().put(` to their one site each; this names the port's own source
  * so a copied hash or a reached-for store fails here, beside it.
  */

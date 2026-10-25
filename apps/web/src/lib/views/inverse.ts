@@ -11,7 +11,7 @@ import { inverseCountSlug } from './inverse-fields'
 import type { InverseSource, ResolverAttribute } from './resolve'
 
 /**
- * An object's registry as a list resolves it, inverse halves included (D69).
+ * An object's registry as a list resolves it, inverse halves included.
  * - A derived half carries its owner's slug and object, so the compiler can
  *   read its links; one whose owner is archived or gone resolves to nothing
  *   and is left out of `live`, as `relationsProgram` drops it.

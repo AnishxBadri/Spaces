@@ -112,9 +112,8 @@ first; `--force` re-runs.
 
 ## Picking up work
 
-The maintainer schedules work in Linear; the roadmap and every open
-decision are in [`docs/roadmap-2026-09.md`](docs/roadmap-2026-09.md) and
-[`docs/decisions-2026-09.md`](docs/decisions-2026-09.md). For an outside
+The maintainer schedules work in Linear; the roadmap and everydecision are in [`docs/roadmap.md`](docs/roadmap.md) and
+[`docs/decisions.md`](docs/decisions.md). For an outside
 contribution, open a GitHub issue first with the decision block you read and
 the shape you propose. Small fixes can go straight to a PR.
 

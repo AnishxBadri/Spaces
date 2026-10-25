@@ -1,15 +1,12 @@
 import type { Json } from '@spaces/db/json'
 
 /**
- * Read-time burst condensing for the record timeline (CONTEXT.md — history is
- * stored per attribute and condensed when read, never on write).
+ * Read-time burst condensing for the record timeline: history is stored per
+ * attribute and condensed when read, never on write.
  *
- * This is a pure function and not a block inside the server fn because
- * nothing in this repo can test a server fn: `requireUser()` reads
- * `getRequest()`, so no test imports `lib/server/*`. The grouping key is the
- * part with a bug in it — it decides which changes the reader is told were
- * one act — so it is the part that has to be reachable from a test. The
- * server fn keeps the queries; this keeps the judgement.
+ * Pure rather than inside the server fn because a server fn cannot be tested
+ * (`requireUser()` reads `getRequest()`), and the grouping key decides which
+ * changes the reader is told were one act. The server fn keeps the queries.
  */
 
 /**
@@ -54,12 +51,10 @@ export const BURST_GAP_MS = 10 * 60 * 1000
  * Fold a descending-by-`at` run of attribute events into bursts.
  *
  * The key is `(actorType, actorId, actorRef, source)`. `actorRef` is load
- * bearing and was the bug this function was extracted to fix: two different
- * integrations enriching the same record inside the gap share an actorType,
- * a null actorId and a source, so without it they folded into one burst that
- * claimed a single actor did work two of them did — a lie the reader has no
- * way to see through. A merge's rewrites are kept out of the person's edits
- * around them by the same key, via `source`.
+ * bearing: two integrations enriching the same record inside the gap share an
+ * actorType, a null actorId and a source, and without it would fold into one
+ * burst claiming a single actor did both. `source` keeps a merge's rewrites
+ * out of the person's edits around them.
  *
  * Events are expected newest-first, as the timeline query returns them; the
  * gap is measured from the burst's own timestamp back to the next event.

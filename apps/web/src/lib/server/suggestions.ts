@@ -3,8 +3,7 @@ import { z } from 'zod'
 import { requireUser } from './shared'
 
 /**
- * The suggestion card's two verbs (SPA-98), over SPA-46's programs in
- * `lib/ai/propose.ts`. Accept writes through the one write path with the
+ * The suggestion card's two verbs, over the propose programs. Accept writes through the one write path with the
  * signed-in user as actor and the suggestion as the receipt; reject closes
  * the row and writes nothing else, and a rejected row never reappears.
  *
@@ -18,7 +17,7 @@ const byId = z.object({ id: z.string().uuid() })
 export type { OpenSuggestionCount } from '../inbox/queue'
 
 /**
- * Open suggestions on one record, grouped by kind (SPA-114) — the record
+ * Open suggestions on one record, grouped by kind — the record
  * rail's "Waiting" chips. One query, called once from each record route's
  * loader beside its other reads. Empty when nothing waits, and the rail then
  * draws no section at all.
@@ -58,7 +57,7 @@ export const acceptSuggestion = createServerFn({ method: 'POST' })
 export type { BatchOutcome } from '../ai/propose'
 
 /**
- * The two bulk verbs (SPA-110, spec §10): "accept all on this record" and
+ * The two bulk verbs: "accept all on this record" and
  * "accept this column". Each item goes through `acceptProgram` on its own,
  * never one transaction, and the answer is one outcome per item — a failed
  * item carries `suggestionMessage()`'s sentence, and its row stays open.
@@ -84,7 +83,7 @@ export const acceptSuggestionColumn = createServerFn({ method: 'POST' })
   .validator(
     z.object({
       attributeSlug: z.string().min(1),
-      // A column run's "Accept all" (SPA-122): only that run's suggestions.
+      // A column run's "Accept all": only that run's suggestions.
       runId: z.string().uuid().optional(),
     }),
   )

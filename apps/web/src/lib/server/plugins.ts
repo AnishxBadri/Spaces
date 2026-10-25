@@ -19,7 +19,7 @@ export const listStoppedPlugins = createServerFn().handler(async () => {
   return effectFn(stoppedPluginsProgram)()
 })
 
-/** The manifest actions a record of `kind` carries in its head. (D63) */
+/** The manifest actions a record of `kind` carries in its head. */
 export const listRecordActions = createServerFn()
   .validator(z.object({ kind: z.enum(['company', 'person', 'deal']) }))
   .handler(async ({ data }) => {

@@ -32,35 +32,17 @@ import type {
 } from './sensitivity-for'
 
 /**
- * Summarize (SPA-66; docs/spec-ai-substrate.md §11 "Summarize", §14 step
- * 5): the synthesize lane, landing as a `suggestion(kind: 'note')` on the
- * record the button was pressed on — never a note, a row in the inbox.
- * Accepting it is what writes the note (`acceptProgram` → `lib/notes/
- * from-suggestion.ts`).
+ * Summarize: the synthesize lane, landing as a `note` suggestion on the
+ * record the button was pressed on. Only accepting it writes the note.
  *
- * Two scopes, one path:
- *
- * - **a document** (the Files tab's Summarize): the document's own text
- *   first — every `chunk` row of it, labelled with its page, else the
- *   extracted text whole — then `assemble(document)` for what surrounds it
- *   (the records it is filed against, the mandate, the glossary). The
- *   assembler reaches a *linked* document's chunks, never the seed's own,
- *   which is why the document's text is read here.
- * - **a record** (the record header's Summarize): `assemble(record)` —
- *   its notes, memos and filed documents' chunks, its fields and history.
- *   A record none of whose own notes or documents reached the context
- *   refuses "Nothing to summarize" **before** the model is called: a
- *   summary of an empty context is a model inventing one.
- *
- * Either way: private notes are dropped from the context — the note this
- * lands as is `shared`, and a teammate's accept must not publish what only
- * the requester could read. Sensitivity is read live for the record and,
- * for a document, the document too; either sensitive makes the call
- * sensitive. Then `completeProgram('synthesize', items)` — text, no schema —
- * and every `[ref]` the model cited is rewritten into the words a person
- * reads (`inline-citations.ts`), so "(DD pack.pdf, p.4)" is in the body and
- * outlives the suggestion row. A cited ref the context did not carry is
- * dropped, not printed.
+ * - A document: its own chunks (page-labelled, else the text whole), then
+ *   `assemble(document)` — the assembler never reaches the seed's own chunks.
+ * - A record: `assemble(record)`. With none of its own notes or documents in
+ *   the context it refuses before the model is called.
+ * - Private notes are dropped: the note lands `shared`, and a teammate's
+ *   accept must not publish what only the requester could read.
+ * - Either sensitive (record or document) makes the call sensitive. Cited
+ *   refs are rewritten into readable words; an uncarried ref is dropped.
  */
 
 /** The assembler's budget for the neighbourhood of the thing summarized. */
@@ -141,9 +123,8 @@ export type SummarizeInput = {
   asOf?: string
   jobRunId?: string
   /**
-   * The run this summary is a step of (SPA-100) — "Read deck and summarize"
-   * hands its run here. Absent, Summarize opens and closes its own one-step
-   * run.
+   * The run this summary is a step of — "Read deck and summarize" hands its
+   * run here. Absent, Summarize opens and closes its own one-step run.
    */
   runId?: string
 }
@@ -152,7 +133,7 @@ type Source = { id: string; name: string; what: string }
 
 /**
  * A document's own text as context items, one per chunk, page-labelled.
- * Also the key-terms reader's context (SPA-91, `./key-terms.ts`).
+ * Also the key-terms reader's context.
  */
 export const documentItems = Effect.fn('summarize.documentItems')(function* (
   documentId: string,
@@ -198,10 +179,10 @@ const where = (page: number | null, idx: number): string =>
 
 /**
  * The words each ref becomes in the body. A document chunk is its filename
- * and page ("DD pack.pdf, p.4") — the page, not `cite.ts`'s chunk index,
+ * and page ("DD pack.pdf, p.4") — the page, not the ref's chunk index,
  * because a person checks a citation against the PDF. Everything else is
  * `resolveRefsProgram`'s label; a missing target gets none, and is dropped.
- * The key-terms table's citation column reads the same words (SPA-91).
+ * The key-terms table's citation column reads the same words.
  */
 export const citationLabels = Effect.fn('summarize.citationLabels')(function* (
   refs: ReadonlyArray<string>,
@@ -497,11 +478,9 @@ const inFlight = (j: QueuedJob): boolean =>
 
 /**
  * Press Summarize: one job on an `exclusive` queue keyed on the record and
- * the source — the deck reader's trigger (SPA-90), for the same reasons: a
- * synthesize call over a diligence pack is a minute of a frontier model, and
- * no request should hold that; and pg-boss, not a table, refuses the second
- * press. The checks here are the cheap ones; the empty-context refusal needs
- * the assembler and is the job's.
+ * the source. A frontier synthesize call is too long for a request, and
+ * pg-boss, not a table, refuses the second press. The checks here are the
+ * cheap ones; the empty-context refusal needs the assembler and is the job's.
  */
 export const enqueueSummarizeProgram = Effect.fn('enqueueSummarize')(
   function* (input: {

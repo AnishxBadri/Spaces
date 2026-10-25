@@ -23,14 +23,11 @@ import type { Tx } from '../entities/resolve'
 import { interactionParticipants, recomputeInteractionStats } from './stats'
 
 /**
- * The integration interaction lane (SPA-200, sdk-7b): one interaction, its
- * body note and its edges, written inside the caller's transaction. Two
- * callers, one row shape: the forwarding mailbox (`apps/web/src/lib/arrival/
- * file.ts`, plugin zero) and `Content.logInteraction`
- * (`../ports/content.ts`). The manual "Log interaction" dialog is not a
- * caller — it is `manual`, carries no `message_id` and births its write-up
- * through the note door with a `note.created` row; that path is
- * `apps/web/src/lib/interactions/log.ts` and stays as it was.
+ * The integration interaction lane: one interaction, its body note and its
+ * edges, written inside the caller's transaction. Callers: the forwarding
+ * mailbox and `Content.logInteraction`. The manual "Log interaction" dialog
+ * is not one: it is `manual`, carries no `message_id` and births its
+ * write-up through the note door.
  *
  * **The dedupe is the index.** With a `messageId`, the insert is `on conflict
  * (message_id) do nothing` against `interaction_message_id_unique`, and an
@@ -38,21 +35,19 @@ import { interactionParticipants, recomputeInteractionStats } from './stats'
  * pre-check would race a concurrent writer and the index cannot. A
  * duplicate writes nothing else: no body note, no edges. Without a
  * `messageId` there is no key to collide on (NULLs are distinct in a unique
- * index), so every call is a new row, as on the manual path.
+ * index), so every call is a new row.
  *
- * **The interaction first, then its body, then its edges** — the order the
- * mailbox has always written in, so a duplicate leaves no orphan note and a
- * failed edge insert (the caller's transaction rolls back) leaves no
- * bodyless interaction the next attempt would skip as a duplicate. `edges`
- * may be a function of the transaction, which is how the mailbox matches
- * participants and inherits thread edges after the row exists, exactly as
- * it did before the extraction.
+ * **The interaction first, then its body, then its edges**, so a duplicate
+ * leaves no orphan note and a failed edge insert (the caller's transaction
+ * rolls back) leaves no bodyless interaction the next attempt would skip as
+ * a duplicate. `edges` may be a function of the transaction, which is how
+ * the mailbox matches participants and inherits thread edges after the row
+ * exists.
  *
  * **The body is a note**, claimed by `interaction.note_id` and filed against
  * nothing: it reaches a record through the interaction's edges on the
- * timeline. Its visibility is the caller's to decide (D30, D49) — a
- * forwarded body is `shared`, a synced or plugin-written one `private` —
- * and never the writer's.
+ * timeline. Its visibility is the caller's to decide — a forwarded body is
+ * `shared`, a synced or plugin-written one `private` — never the writer's.
  *
  * **The stats follow in the same transaction.** Every entity edged is handed
  * to `recomputeInteractionStats` before the writer returns, and
@@ -97,9 +92,7 @@ export type InteractionBody = {
 /**
  * The birth of a body note, inside the caller's transaction: the `note`
  * entity (source `integration`, ref the writing row) and its `note` row,
- * filed against nothing. Moved here from `apps/web/src/lib/notes/
- * body-note.ts` with its rows unchanged; only the visibility became the
- * caller's.
+ * filed against nothing. Visibility is the caller's.
  */
 export async function insertBodyNote(
   tx: Tx,
@@ -187,7 +180,7 @@ async function loggedEvents(
 
 /**
  * The edges minus every person reached only through a Bcc: a blind copy is
- * never edged and never counted in the stats, so it stays hidden. (D67)
+ * never edged and never counted in the stats, so it stays hidden.
  * - A person also named in From, To or Cc keeps the edge.
  */
 async function withoutBlindCopies(
@@ -314,7 +307,7 @@ export type InteractionChange = {
 
 /**
  * An interaction changed in place — a meeting moved, renamed or cancelled
- * (D68: a cancelled meeting is marked, never deleted). Its participants'
+ * (a cancelled meeting is marked, never deleted). Its participants'
  * stats, and those of every entity it lost, are rebuilt in the same
  * transaction. Answers the `interaction.logged` events for the edges it
  * added, or null when no such row.
@@ -366,8 +359,8 @@ export async function updateInteraction(
 }
 
 /**
- * A recorder's payload: attach it to the calendar meeting, or birth a `call`
- * (D68). One meeting, one row.
+ * A recorder's payload: attach it to the calendar meeting, or birth a `call`.
+ * One meeting, one row.
  * - The match, in order: the meeting `icalUid` keys (or one instance of its
  *   series, `<uid>#<start>`, inside the window), the one whose
  *   `calendar_event_id` is given, else one starting within `MATCH_WINDOW_MS`
@@ -380,7 +373,7 @@ export async function updateInteraction(
  *   delivered twice is one row through `interaction_message_id_unique`.
  * - Serialized per (integration, provider event) by an advisory lock, so a
  *   replay racing the first delivery reads it rather than doubling it.
- * - Writes no note: what a recorder's notes become is the caller's (D78).
+ * - Writes no note: what a recorder's notes become is the caller's.
  */
 
 /** How far from `occurredAt` a meeting may start and still be the one recorded. */
@@ -529,7 +522,7 @@ async function filingRecords(
 /**
  * The artifacts on `interaction_document`, each with its role.
  * - A recording is a document with no blob whose `external_url` is the
- *   provider's — never copied (D68). The same link on the row twice is one.
+ *   provider's — never copied. The same link on the row twice is one.
  * - A transcript or attachment must be a document this integration filed.
  */
 async function attachArtifacts(

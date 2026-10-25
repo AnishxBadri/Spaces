@@ -43,7 +43,7 @@ import {
 } from '@spaces/core/writes/read/record'
 
 /**
- * The MCP surface's read tools beyond `get_record` (spec §5):
+ * The MCP surface's read tools beyond `get_record`:
  *
  * - `search_records(query, object?)` — Cmd-K's search, `searchAllProgram`,
  *   run as the token's user. canRead is the program's own: the private-note
@@ -58,10 +58,10 @@ import {
  *   from the database on every call, so an object or attribute created a
  *   minute ago is in the next answer with no restart.
  * - `query_records(object, conditions, sort, limit)` — the views compiler
- *   behind a door: computed filters, order and counts. (D70, D71)
+ *   behind a door: computed filters, order and counts.
  * - `portfolio_summary(asOf?)` and `holding_detail(holdingId, asOf?)` — the
  *   portfolio loaders and the pure libs, so money is computed too; sensitive
- *   holdings are absent. (D70, D12)
+ *   holdings are absent.
  *
  * Nothing here writes. `object` is spoken the way a person names it — the
  * slug, the singular or the plural, in any case — so "Fund" and "funds"
@@ -248,11 +248,11 @@ export const listRegistryProgram = Effect.fn('listRegistryProgram')(
 )
 
 // ---------------------------------------------------------------------------
-// query_records (D70, D71)
+// query_records
 
 /**
  * The interaction-stat columns `query_records` names beside attributes,
- * read from `interaction_stat` through the compiler's helpers. (D67)
+ * read from `interaction_stat` through the compiler's helpers.
  * - A registry attribute with the same slug wins.
  * - The list pages' `stat:` slugs are accepted too.
  */
@@ -406,7 +406,7 @@ const resolveSpaceProgram = Effect.fn('resolveSpaceProgram')(function* (
 
 /**
  * Filed in the space, or with descendants in any space whose path sits
- * under it — ancestor visibility, one `exists` per row. (D71)
+ * under it — ancestor visibility, one `exists` per row.
  */
 export const inSpaceSql = (at: FiledSpace, includeDescendants: boolean): SQL =>
   includeDescendants
@@ -615,7 +615,7 @@ export const queryRecordsProgram = Effect.fn('queryRecordsProgram')(function* (
 })
 
 // ---------------------------------------------------------------------------
-// portfolio_summary and holding_detail (D70, D12)
+// portfolio_summary and holding_detail
 
 const isoDay = z
   .string()
@@ -789,7 +789,7 @@ type LedgerRow = {
 }
 
 /**
- * The ledger as the pure libs read it at `asOf` (D12): originals only, dated
+ * The ledger as the pure libs read it at `asOf`: originals only, dated
  * on or before it, and a voided one only while its void is still ahead.
  */
 const standingAt = <T extends LedgerRow>(

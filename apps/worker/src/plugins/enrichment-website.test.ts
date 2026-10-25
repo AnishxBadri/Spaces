@@ -41,7 +41,7 @@ import { ModelCallLive } from './model-call'
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
 /**
- * The built-in Website end to end (D76): a fixture site served from memory
+ * The built-in Website end to end: a fixture site served from memory
  * through the URL guard with `fetch` stubbed (no sockets), the Extract lane
  * through `complete()` on an injected model, and a stand-in paid source
  * after it that must still be asked when the Website fails.

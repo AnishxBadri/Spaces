@@ -9,7 +9,7 @@ import type { EmailResult, JobError } from '@spaces/sdk'
  * the forwarding mailbox runs on — so a synced message and a forwarded one
  * are judged by one policy and dedupe on one Message-ID index.
  * - The lane reads the bound connection itself: whose mailbox it is decides
- *   who may read the body (D67), and no claim field may say otherwise.
+ *   who may read the body, and no claim field may say otherwise.
  * - `NoEmailLane` is for a process that runs ports but files no mail.
  */
 

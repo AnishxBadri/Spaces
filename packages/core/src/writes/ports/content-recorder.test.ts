@@ -18,7 +18,7 @@ import { NoEmailLane } from '../interactions/email-lane'
 import { ContentLive, readInteractionShape } from './content'
 
 /**
- * `Content.logInteraction` with a recorder's payload (D68), bound to one
+ * `Content.logInteraction` with a recorder's payload, bound to one
  * integration row: the payload is a receipt before anything it claims is
  * applied, its participants go through the lane's participants module, and
  * the writer — never the port — decides between the meeting and a call.

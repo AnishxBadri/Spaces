@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseDue } from './parse-due'
 
-// 2026-08-07 is a Friday.
+// `2026-08-07` is a Friday.
 const TODAY = '2026-08-07'
 
 describe('parseDue', () => {

@@ -1,6 +1,5 @@
 /**
- * The bind-time guards of a storage binding (docs/spec-storage-sources.md
- * §5.6): one folder, one owner node. Pure; the writer is
+ * The bind-time guards of a storage binding: one folder, one owner node. Pure; the writer is
  * `bindFolderProgram`.
  * - Containment is membership in a folder's path of ids (its ancestry from
  *   `getFolder`, then itself), in both directions. Not a whole-path prefix:
@@ -8,7 +7,7 @@
  *   two paths to one folder can share only their tail.
  */
 
-/** The kinds a folder may be bound to: §5.1's space, company, deal or custom record. */
+/** The kinds a folder may be bound to: a space, company, deal or custom record. */
 export const BINDABLE_KINDS: ReadonlyArray<string> = [
   'company',
   'deal',

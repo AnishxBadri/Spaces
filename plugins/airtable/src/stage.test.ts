@@ -8,8 +8,8 @@ import plugin from './index.ts'
  * The `stage` job on the SDK's test Layers: no database, no blob store. Its
  * whole conversation with the host is one `Import.stage` and one log line;
  * what lands is `ImportTest`'s reading, which is the live port's. The live
- * port, the import wizard's routing and the preview are apps/worker's
- * `airtable-live.test.ts`.
+ * port, the import wizard's routing and the preview are the worker's
+ * airtable-live test.
  */
 
 const FILENAME = 'Companies-Grid view.csv'

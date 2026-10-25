@@ -17,7 +17,7 @@ import { documentWidenedSql, noteWidenedSql } from '../read/can-read-sql'
  * the live ancestor chain of some spaces, the memos tagged into them, the
  * mandate, and the ranked, `canRead`-checked output.
  * - `canRead` is applied in SQL: a note or a document is readable when
- *   shared, the reader's own, or an email widened to them (D67). An
+ *   shared, the reader's own, or an email widened to them. An
  *   integration authors neither, so it reads shared only.
  * - Every fetch is ordered, so a caller's first-wins dedupe is stable.
  */

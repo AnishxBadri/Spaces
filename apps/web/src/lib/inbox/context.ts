@@ -15,22 +15,21 @@ import { provenanceOf } from '@spaces/core/writes/entities/provenance'
 import { nonEmptyValueCount } from './keeper'
 
 /**
- * One side of an inbox pair, read off the record (SPA-76).
+ * One side of an inbox pair, read off the record.
  *
- * Outside `lib/server/` because the suite drives `entityContext` directly and
- * a plain export from a `lib/server/*.ts` module keeps its imports alive in
- * the client bundle (SPA-155) — `server/inbox.ts` re-exports only the type.
+ * Outside the server-fn modules because the suite drives `entityContext`
+ * directly, and a plain export there keeps its imports alive in the client
+ * bundle; the inbox server module re-exports only the type.
  */
 
 /**
- * The domain a record *says* it has when it holds no domain alias (SPA-97).
+ * The domain a record *says* it has when it holds no domain alias.
  *
- * The colliding side of an identity pair is exactly the side that lost the
- * claim, so it owns no `entity_alias` row — which left the pair card's
- * Domain row reading "—" for the very record that caused the pair. The
- * value is still on the record, in `entity.values`, under whichever slug
- * that object declared as its `domain` identity key; the slug is resolved
- * here rather than assumed, because an object names its own attributes.
+ * The colliding side of an identity pair lost the claim, so it owns no
+ * `entity_alias` row; without this the card's Domain row would read "—" for
+ * the very record that caused the pair. The value is still in
+ * `entity.values`, under whichever slug that object declared as its `domain`
+ * identity key, resolved here because an object names its own attributes.
  *
  * Core pairs are untouched by construction: the system company/person
  * objects carry no attribute with `options.identityKey`, so this answers
@@ -88,8 +87,8 @@ export async function entityContext(id: string) {
   // identity-domain fallback and the value count below, and a whole
   // record's values on every side of every pair is payload for no reader.
   const { objectId, values, ...card } = head
-  // Provenance is the pair now, and the pair is only half an answer on its
-  // own: "integration" names no integration. `provenanceOf` resolves the
+  // Provenance is a pair, and half an answer on its own: "integration"
+  // names no integration. `provenanceOf` resolves the
   // ref to the capability id the operator installed.
   const provenance = await provenanceOf(id)
   const aliases = await db
@@ -118,7 +117,7 @@ export async function entityContext(id: string) {
     // in — `normalizeName`, not lowercase. Lowercasing leaves the legal
     // suffix on ("acme inc" vs the alias "acme"), so a record would list
     // its own current name as something it was also seen as. Renames write
-    // a name alias now (SPA-63), so every record has that row.
+    // a name alias, so every record has that row.
     otherNames: aliases
       .filter(
         (a) => a.kind === 'name' && a.valueNorm !== normalizeName(card.name),

@@ -8,15 +8,14 @@ import { defineManifest } from '@spaces/sdk'
  *   never Facts, Identity or Ai. Participants become records host-side.
  * - `send` is an interactive payload action on the same four ports, never
  *   retried: a retry could send twice. The host awaits it.
- * - The connection asks `gmail.readonly` and `gmail.send` (D66, D67). A
+ * - The connection asks `gmail.readonly` and `gmail.send`. A
  *   connection made before `gmail.send` still syncs; the host checks the
  *   scope before it sends, and the account page reconnects for it.
  * - The settings are the connection's, edited on its account page, and read
- *   by the host: whether bodies are shared (D67) and the exclude list. The
+ *   by the host: whether bodies are shared and the exclude list. The
  *   defaults are the host's `DEFAULT_MAIL_EXCLUDE`, asserted equal.
- * - `sdk: '^1.4'` until the SDK release that carries `logEmail`,
- *   `connectedAt`, `CursorInvalid` and `ConnectionRefused` is cut, as
- *   google-calendar does.
+ * - `sdk: '^1.4'`, as google-calendar: raise it once an SDK release carries
+ *   `logEmail`, `connectedAt`, `CursorInvalid` and `ConnectionRefused`.
  */
 export const DEFAULT_EXCLUDE_SENDERS = [
   'noreply@',

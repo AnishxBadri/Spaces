@@ -38,8 +38,8 @@ const malformedOf = (rows: ReadonlyArray<LandedRow>) =>
   )
 
 /**
- * ImportLive: a dialect's grid into the waiting `import_batch` (D39 as
- * amended), landed by `landImportGrid` — the same answer `ImportTest` gives.
+ * ImportLive: a dialect's grid into the waiting `import_batch`, landed by
+ * `landImportGrid` — the same answer `ImportTest` gives.
  * - The batch, its header and its rows are one transaction under the
  *   batch's row lock; a batch that already holds rows is answered, not
  *   rewritten, so a retried job stages once.

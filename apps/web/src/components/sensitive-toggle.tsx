@@ -23,7 +23,7 @@ function viaLabel(via: SensitivityVia): string | null {
 }
 
 /**
- * The record header's Sensitive switch (SPA-61). It toggles the record's own
+ * The record header's Sensitive switch. It toggles the record's own
  * `entity.sensitive` and nothing else. A record that is sensitive only
  * because of a filed space (or the workspace default) shows a read-only
  * marker naming where it came from; the switch beside it stays off and still

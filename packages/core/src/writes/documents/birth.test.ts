@@ -8,27 +8,17 @@ import { Enqueue } from '../../queue/enqueue'
 import type { DocumentBirthInput } from './birth'
 
 /**
- * The birth of a document (SPA-113) — §3.1's one server path, and the four
- * widenings it took so entry points 2–9 need no second writer: N targets,
- * a nullable blob, a nullable actor, and one provenance bag.
- *
- * The last test in the file is the enforcer for all of it: exactly one
- * `insert(document)` outside tests and seeds. A second writer is how the
- * dedupe rule, the activity line and the enqueue drift apart, and the grep
- * catches it before a reviewer has to.
- *
- * The queue is core's `Enqueue` service, provided by a recording Layer.
- * Here it is also the assertion: whether extraction is enqueued
- * is part of this slice — enqueueing a blobless row spends a worker attempt
- * to write 'unsupported', and never enqueueing a blob-bearing one leaves it
- * 'pending' forever — and there is no other seam to read it through, since
- * `enqueue` swallows its own failures and answers `null` either way.
- *
- * Moved from apps/web with the program (SPA-201, sdk-8a).
+ * The birth of a document: the one server path every entry point files
+ * through — N targets, a nullable blob, a nullable actor, one provenance bag.
+ * - The last test enforces exactly one `insert(document)` outside tests and
+ *   seeds; a second writer is how dedupe, activity and enqueue drift apart.
+ * - The recording `Enqueue` Layer is also an assertion: enqueueing a blobless
+ *   row wastes a worker attempt, and skipping a blob-bearing one leaves it
+ *   'pending' forever.
  */
 /**
- * The queue, as core's `Enqueue` service (SPA-201): birth no longer imports a
- * sender, it asks for one, so the test provides a recording one rather than
+ * The queue, as core's `Enqueue` service : birth asks for a sender rather than
+ * importing one, so the test provides a recording one rather than
  * mocking a module. `enqueue` never fails by contract, so what was sent is
  * the only way to observe the decision at all.
  */
@@ -256,7 +246,7 @@ describe('birthDocumentProgram', () => {
     )
     expect(await edgesOf(first.id)).toEqual({ links: [], spaces: [] })
 
-    // §3.4's rule is about a target, and there is none — so the activity row
+    // The dedupe rule is about a target, and there is none — so the activity row
     // takes the document's own id as its subject, the column being NOT NULL.
     expect(await activityFor(first.id)).toEqual([
       { verb: 'document.filed', subject: first.id, actorId: await actorId() },
@@ -460,10 +450,9 @@ describe('birthDocumentProgram', () => {
 })
 
 /**
- * §3.1's promise, mechanically. `insert(document)` outside tests and seeds
- * must be **one** line, and it must be birth's — across the whole workspace
- * since SPA-201 moved birth out of apps/web, so a second writer in any
- * package (apps/web, the worker, core, a plugin) fails here by name.
+ * `insert(document)` outside tests and seeds must be **one** line, and it must
+ * be birth's — across the whole workspace, so a second writer in any package
+ * (apps/web, the worker, core, a plugin) fails here by name.
  */
 describe('one writer', () => {
   it('has exactly one insert(document) outside tests and seeds', () => {

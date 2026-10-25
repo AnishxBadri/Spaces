@@ -45,7 +45,7 @@ import { runAttributeRun } from './attribute-run'
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
 /**
- * SPA-72, one AI attribute cell end to end — on a custom "Fund" object, so
+ * One AI attribute cell end to end — on a custom "Fund" object, so
  * the affordance is shown to need no AI-specific code per object: the
  * config written through the attribute's own update path, the press, the
  * run through an injected model (`MockLanguageModelV4`, no network), the

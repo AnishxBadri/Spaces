@@ -3,7 +3,7 @@ import type { Effect } from 'effect'
 import type { IsoTimestamp, JsonObject } from './contract.ts'
 
 /**
- * The storage-source provider interface (docs/spec-storage-sources.md §4).
+ * The storage-source provider interface.
  * Not a job and not a trigger: core calls into it, it calls nothing. A
  * plugin that implements it says `provides: 'storage-source'` in its
  * manifest, and `manifestSchema` refuses such a plugin any job that uses
@@ -135,7 +135,7 @@ export type ChangePage = {
 export type PickerConfig = JsonObject
 
 // ---------------------------------------------------------------------------
-// The write half (docs/spec-storage-sources.md §6)
+// The write half
 // ---------------------------------------------------------------------------
 
 /**

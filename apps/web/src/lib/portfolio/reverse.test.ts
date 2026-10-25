@@ -3,15 +3,12 @@ import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The void flow against the test database (D12, SPA-150). What is asserted
- * here is what the acceptance criteria name: the original is neither updated
+ * The void flow against the test database. Asserted: the original is neither updated
  * nor deleted, the compensating row is an exact negative citing it, both
  * refusals answer by name, the partial unique index refuses the double void
  * at the database by constraint name, and a batch refuses whole.
- *
- * Imports are dynamic like the rest of the DB-coupled suite: `@spaces/db`
- * builds its pool from `DATABASE_URL` at import time and `vitest.setup.ts`
- * rewrites it per file.
+ * Dynamic imports: `@spaces/db` builds its pool from `DATABASE_URL` at import
+ * time, and the setup file rewrites it per file.
  */
 
 /** drizzle wraps the driver error; the SQLSTATE is one or more hops down. */

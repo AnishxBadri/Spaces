@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 /**
- * The MCP endpoint (SPA-23, `docs/spec-ai-substrate.md` §5): Streamable HTTP,
+ * The MCP endpoint: Streamable HTTP,
  * stateless, authenticated by a per-user bearer token minted in Settings →
  * API tokens. Every verb goes to the one handler — it checks the token
  * first, then answers GET and DELETE 405 (stateless) — and the handler,

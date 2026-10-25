@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 /**
  * Web never loads a plugin bundle or reads the plugins directory: it renders
  * from `integration.manifest` alone, so web and worker can live in separate
- * containers. (D63)
+ * containers.
  * - The source half reads every module under `src`.
  * - The build half reads `.output` when a build has left one, and passes
  *   vacuously when none has run.

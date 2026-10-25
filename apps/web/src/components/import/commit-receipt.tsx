@@ -19,14 +19,14 @@ import type {
 } from '#/lib/import/ledger-commit'
 
 /**
- * The commit step (SPA-169, import-7): the batch page is the receipt. A
+ * The commit step: the batch page is the receipt. A
  * ledger of a stream, copied from the preview it follows — the same header,
  * the same strip anatomy, the same 40px rows on rules — with one lane added
  * that each row gains as the job passes it: the outcome, in mono, linking to
  * the record it wrote. Never a spinner: the strip's REMAINING counts down
  * and the rows fill.
  *
- * A ledger batch (SPA-171) draws the same page: its strip reads what landed
+ * A ledger batch draws the same page: its strip reads what landed
  * — HOLDINGS · INVESTMENTS · ROUNDS · MARKS · FAILED · REMAINING — and a
  * row's outcome is the events it appended, linking to the holding.
  */
@@ -60,7 +60,7 @@ const plural = (n: number, one: string) =>
   `${n.toLocaleString('en-US')} ${n === 1 ? one : `${one}s`}`
 
 /**
- * A ledger receipt's title (SPA-171): `10 holdings · 11 investments · 8
+ * A ledger receipt's title: `10 holdings · 11 investments · 8
  * rounds · 7 marks · 1 failed.` — what landed, then where a run is.
  */
 export function ledgerReceiptSentence(
@@ -106,7 +106,7 @@ export function ReceiptHeader({
   const last = view.lastRun
   const idle = !view.running
   // Once voided, a re-run is not the primary action: it moves under the
-  // voided line as a quiet `Re-import ›` (`VoidLine`, SPA-173).
+  // voided line as a quiet `Re-import ›` (`VoidLine`).
   const voided = view.ledger?.voided ?? false
   return (
     <PageHeader
@@ -160,7 +160,7 @@ export function ReceiptStrip({
 }: {
   counts: CommitCounts
   batchId: string
-  /** A ledger batch's strip reads what landed (SPA-171). */
+  /** A ledger batch's strip reads what landed. */
   ledger?: LedgerReceiptCounts | null
 }) {
   const failed = {
@@ -198,7 +198,7 @@ export function ReceiptStrip({
 }
 
 /**
- * The ledger receipt's commentary (SPA-171), one mono line per section: the
+ * The ledger receipt's commentary, one mono line per section: the
  * FX rates the committed events still need, linked where `/today` links, and
  * what a batch void reaches — never a round.
  */
@@ -220,7 +220,7 @@ export function MissingRateLine({ ledger }: { ledger: LedgerReceipt }) {
 /**
  * The void line, with `void batch ›` while something is left to void. Once
  * the batch is voided the header's `Commit again` moves here as a quiet
- * `Re-import ›` (SPA-173) — the same commit, confirmed first.
+ * `Re-import ›` — the same commit, confirmed first.
  */
 export function VoidLine({
   ledger,

@@ -43,7 +43,7 @@ import { runAttributeColumnRun } from './attribute-column-run'
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
 /**
- * SPA-122, the column run end to end on a custom "Fund" object: the
+ * The column run end to end on a custom "Fund" object: the
  * estimate counted in SQL over a saved view's conditions minus the rows
  * already proposed, the job walking the view a page at a time through an
  * injected model (`MockLanguageModelV4`, no network), one run whose steps

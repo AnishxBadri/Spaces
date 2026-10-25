@@ -6,10 +6,10 @@ import { defineManifest } from '@spaces/sdk'
  * `settings` as JSON Schema.
  * - `Secrets` is listed in `uses` because a job's `R` is bounded by its
  *   `uses`, and the job reads the key from it for the `X-Api-Key` header.
- * - `cacheDays` and `dailyCreditCap` are the host's to enforce (D53); the
+ * - `cacheDays` and `dailyCreditCap` are the host's to enforce; the
  *   jobs never read them.
  * - No event job: auto-enrich is the host's `enrichment.run`, which presses
- *   these actions in the owner's scope. (D76)
+ *   these actions in the owner's scope.
  * - `phone` is off by default: asking Apollo for a phone number costs extra
  *   credits, so only the owner turns it on. The person jobs read it through
  *   `Config`.

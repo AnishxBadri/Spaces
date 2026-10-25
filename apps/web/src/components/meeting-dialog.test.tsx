@@ -7,12 +7,12 @@ import type { MeetingDetail, PrepEvent } from '#/lib/server-fns'
 import { MeetingDialog, applyPrepEvent } from './meeting-dialog'
 
 /**
- * The meeting window (D68, M2): RSVPs shown and never editable with "Open in
+ * The meeting window: RSVPs shown and never editable with "Open in
  * Google" the only way to change one; artifacts by role; one close in the
  * foot and no `esc` or `↵` printed; Prep streamed on demand, never kept, and
  * "Save as note" sending the brief that was shown; a refusal said in place.
  * - A happy-dom window's DOM globals are installed by hand before React
- *   loads, as `storage-picker.test.tsx` does.
+ *   loads.
  */
 
 await vi.hoisted(async () => {

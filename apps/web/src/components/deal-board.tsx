@@ -159,7 +159,7 @@ export function DealBoard({
           const cards = deals.filter((d) => stageOf(d) === stage.id)
           const medianDays = medianDaysInStage[stage.id]
           // An archived stage is history: it stays on the board only while
-          // deals still sit in it (spec §3), and nothing can be dropped into
+          // deals still sit in it, and nothing can be dropped into
           // it — the write would be rejected anyway, so the drop is not
           // offered. Cards can still be dragged out; that's the cleanup.
           if (stage.archived && cards.length === 0) return null
@@ -339,7 +339,7 @@ export function DealBoard({
 }
 
 /**
- * Move stage (Overlays sheet): every live stage as a numbered row — square
+ * Move stage: every live stage as a numbered row — square
  * badge, a mono note (current · days, → next, asks for a reason), the digit
  * that picks it. Digits pick, ↵ confirms; Passed and Lost open the reason
  * field, which lands on the record as close_reason. The picked row is the

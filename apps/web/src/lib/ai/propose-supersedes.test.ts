@@ -20,7 +20,7 @@ import {
 } from './propose'
 
 /**
- * The `supersedes` suggestion (D59): accept writes `link(supersedes)` through
+ * The `supersedes` suggestion: accept writes `link(supersedes)` through
  * the supersedes writer and closes the row; dismiss closes it, and a
  * re-intake of the same pair proposes nothing.
  */

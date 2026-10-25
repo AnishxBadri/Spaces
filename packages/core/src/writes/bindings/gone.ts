@@ -6,8 +6,7 @@ import { BindingStoreFailed } from './bind'
 
 /**
  * A pointer that stopped being one: deleted at the provider, or moved out of
- * every bound subtree (§8, "deleted in Drive"; the move out is decided the
- * same way).
+ * every bound subtree (both are handled the same way).
  * - Ours is kept: the row, its blob, chunks, edges and `binding_id` stay, so
  *   it still previews and searches from our copy. Nothing is deleted at the
  *   provider, and nothing is proposed — there is no new home to offer.

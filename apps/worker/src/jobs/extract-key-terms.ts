@@ -7,16 +7,12 @@ import { JobPermanent } from '../run-job'
 import type { JobDef } from '../run-job'
 
 /**
- * document.key-terms — Extract key terms on the worker (SPA-91). The
- * program is `lib/ai/key-terms.ts`; this is the wrapper's view of it, shaped
- * exactly as the deck reader's job (`./read-deck.ts`).
+ * document.key-terms: Extract key terms on the worker.
  *
- * **Every failure is permanent**, for the deck reader's reasons: an unrouted
- * lane, a sensitive deal routed to the cloud, a document filed on no deal,
- * a document that states no terms — none is fixed by a retry, and each
- * retry of a model call is a cost. The failure's sentence is the job's
- * output (`JobOutcome.reason`), which `keyTermsStatus` reads back for the
- * Files tab's toast.
+ * Every failure is permanent: an unrouted lane, a sensitive deal routed to
+ * the cloud, a document filed on no deal or stating no terms is not fixed by
+ * a retry, and each retried model call costs. The sentence is the job's
+ * output (`JobOutcome.reason`), which `keyTermsStatus` reads for the toast.
  */
 
 export const extractKeyTermsData = z.object({

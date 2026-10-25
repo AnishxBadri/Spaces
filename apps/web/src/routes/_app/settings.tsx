@@ -23,7 +23,7 @@ import {
  * - The loader stays whole here because the nav's right lane counts five of
  *   the sections — one round of queries for the shell, not one per section.
  * - The page form and its Save bar live here, one per page; a member on an
- *   admin-only row reads the page with its controls disabled. (D81)
+ *   admin-only row reads the page with its controls disabled.
  */
 export const Route = createFileRoute('/_app/settings')({
   loader: async () => {

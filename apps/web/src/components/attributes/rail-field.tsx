@@ -22,8 +22,7 @@ import type { WhereFrom } from '#/lib/server-fns'
  * the reader has to reconcile across the screen. The server's message is
  * `slug: detail`; the slug is redundant next to the label, so it's cut.
  *
- * The visual half of that path (DESIGN.md §5, Micro-interactions; SPA-53):
- * the snap back to the stored value is what the remount already does, and the
+ * The visual half of that path: the snap back to the stored value is what the remount already does, and the
  * cell reads crimson in place for two seconds on top of it. It runs off the
  * rejection `setValues` already returns — the same rejected promise the error
  * line reads — so nothing asks the server a second time.
@@ -45,20 +44,20 @@ export function RailField({
   value: unknown
   refNames?: RefNames | undefined
   onSave: (value: unknown) => Promise<void>
-  /** the attribute row, when the rail may open the edit dialog (spec §7) */
+  /** the attribute row, when the rail may open the edit dialog */
   attr?: EditableAttribute | undefined
   objectLabel?: string | undefined
   /** The object's plural, for the edit window's head (`on Companies`). */
   objectPlural: string
   onAttributeSaved?: (() => void) | undefined
   /**
-   * The record the field belongs to: given, an AI attribute (SPA-72) grows
+   * The record the field belongs to: given, an AI attribute grows
    * its cell trigger beside the value, inside an `AiCellsProvider`.
    */
   entityId?: string | undefined
   /** The record kind whose vocabulary the edit window's Fill from offers. */
   fillFrom?: 'company' | 'person' | undefined
-  /** Where the value came from, when a source filled it (D76). */
+  /** Where the value came from, when a source filled it. */
   whereFrom?: WhereFrom | undefined
 }) {
   const [error, setError] = useState<string | null>(null)

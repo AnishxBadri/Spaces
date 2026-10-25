@@ -39,16 +39,16 @@ import { openModalId } from '#/lib/modal-search'
 import { stamp } from '#/lib/timeline/stamp'
 
 /**
- * The email window (D67, E2): subject and date in the bone head, the
+ * The email window: subject and date in the bone head, the
  * participants, the body, then the attachments. Cancel is the one close.
  * - The body is the server's sanitized document in an iframe sandboxed with
  *   no scripts and no forms; popups are allowed so a link opens a new tab.
  * - Same-origin lets the window size the frame to its content; with no
  *   scripts in the frame and a CSP refusing every load, it grants nothing.
- * - A body private to someone else is one line, never fetched. (D67)
+ * - A body private to someone else is one line, never fetched.
  * - A body private by default carries its privacy row; its owner widens it
  *   from there, for `recordId` (the record it was opened from) or members.
- * - Reply is the foot's primary: the draft grows under the message (E3),
+ * - Reply is the foot's primary: the draft grows under the message,
  *   which folds to one line, and the mode is a row of tabs.
  */
 export function EmailDialog({
@@ -77,7 +77,7 @@ export function EmailDialog({
 }
 
 /**
- * The window opened from the page's own URL: `?modal=email&id=` (D74).
+ * The window opened from the page's own URL: `?modal=email&id=`.
  * Closing drops the two params and keeps the rest.
  */
 export function EmailModal({ recordId = null }: { recordId?: string | null }) {

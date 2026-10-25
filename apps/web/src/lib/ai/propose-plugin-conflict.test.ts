@@ -3,15 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 /**
- * The loop sdk-10 closes, end to end through the inbox's existing accept
- * path (SPA-204): a plugin's `Facts.fill` refuses a value a person holds and
- * raises it as one suggestion; the inbox shows it once however often the
- * job re-runs; a person accepting it writes the value as themselves,
- * `source 'suggestion'`, citing the suggestion and the receipt the plugin
- * stored. The port side is `packages/core/src/writes/ports/judgment.test.ts`;
- * this file proves the accept half, which stays in apps/web. Dynamic imports,
- * as the other DB-backed tests here do: the harness points `DATABASE_URL` at
- * this worker's database before `@spaces/db` loads.
+ * A plugin conflict, end to end through the inbox's accept path: `Facts.fill`
+ * refuses a value a person holds and raises one suggestion, shown once however
+ * often the job re-runs; accepting writes the value as the person, `source
+ * 'suggestion'`, citing the plugin's receipt. This file is the accept half.
+ * Dynamic imports: the harness points `DATABASE_URL` at this worker's
+ * database before `@spaces/db` loads.
  */
 describe('a Facts.fill conflict, accepted from the inbox', () => {
   it('raises one suggestion, stays one on a re-run, and accepts as a user write citing the receipt', async () => {

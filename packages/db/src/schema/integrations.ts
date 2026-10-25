@@ -13,7 +13,7 @@ import { accountConnection, credential } from './vault'
 import type { Json } from '../json'
 
 /**
- * The installed-integration row (CONTEXT.md "Plugin architecture").
+ * The installed-integration row.
  * Capability = code (a manifest id); integration = this row, the host's side
  * of the install: version, on/off, vault material, health. The bytes live in
  * `/data/plugins`.
@@ -106,8 +106,8 @@ export const integration = pgTable('integration', {
    * The last upgrade, the rollback answer's record. Null on a row never
    * upgraded; an install or reinstall clears all three.
    * - `upgradedFrom`: the version `current` pointed at before, kept one back.
-   * - `upgradeMigrated`: whether the loader's step 5 applied any migration
-   *   file since — null until it runs, sticky once true. False means the
+   * - `upgradeMigrated`: whether the loader applied any migration file
+   *   since — null until it runs, sticky once true. False means the
    *   previous directory can be swapped back; true means restore from backup.
    */
   upgradedFrom: text('upgraded_from'),

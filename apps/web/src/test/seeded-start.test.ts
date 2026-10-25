@@ -11,20 +11,12 @@ import {
 import { FIXTURE_ACTOR } from '../../vitest.seed'
 
 /**
- * What every file in this suite may assume about the database it was handed
- * (SPA-145): the seed, and nothing else.
+ * What every file in this suite may assume about the database it was handed:
+ * the seed, and nothing else — the invariant behind `select id from user
+ * limit 1` and `objectIdForKindAsync('company')`.
  *
- * `vitest.setup.ts` truncates `public` and reseeds before each file, so this
- * is not a test of one file's luck — it is the invariant the other
- * twenty-three rely on when they do `select id from user limit 1` or ask for
- * `objectIdForKindAsync('company')`. The cross-file half of the regression
- * (rows written in one file are gone in the next) is
- * `packages/db/src/file-isolation-{a,b}.test.ts`, where a single worker makes
- * "the next file" deterministic; here the four workers have four databases.
- *
- * The probe rows written at the end are left behind on purpose: nothing
- * deletes them, so a second run of the suite that found them still there
- * would fail on the assertions above.
+ * The probe rows written at the end are left behind on purpose: a later run
+ * that still found them would fail on the assertions above.
  */
 describe('a file starts against the seed and nothing else', () => {
   it('has the core objects, the system attributes, the taxonomy and the actor', async () => {

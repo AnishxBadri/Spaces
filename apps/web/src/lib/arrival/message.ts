@@ -14,13 +14,13 @@ import { sortAttachments } from './attachments'
 import type { SortedAttachments } from './attachments'
 
 /**
- * One fetched message → what the poll writes, or why it writes nothing
- * (SPA-56). No database and no network: `mailparser` turns the bytes into
+ * One fetched message → what the poll writes, or why it writes nothing.
+ * No database and no network: `mailparser` turns the bytes into
  * headers and text, and everything after that is a pure function of them, so
  * the forward fixtures and the noise table are asserted with no Postgres.
  *
  * The shape is the interaction's, not the message's. On a BCC the message is
- * the conversation, headers and all. On a **true forward** (D49) the message
+ * the conversation, headers and all. On a **true forward** the message
  * is a wrapper — from the forwarder, no References, the original's headers
  * printed at the top of the body — so the sender, the participants, the date,
  * the subject and the thread all come out of the Forwarded-message block.
@@ -48,22 +48,22 @@ export type ArrivalMessage = {
   participants: Array<Address>
   /**
    * To and Cc as the conversation addressed them, the mailbox left out —
-   * the fields `decideParticipants` reads (SPA-86). The original's on a true
+   * the fields `decideParticipants` reads. The original's on a true
    * forward.
    */
   to: Array<Address>
   cc: Array<Address>
   /**
    * Blind copies, on a message this mailbox sent: never participants, kept
-   * only in `meta.bcc` (D67). Empty on a true forward.
+   * only in `meta.bcc`. Empty on a true forward.
    */
   bcc: Array<Address>
-  /** The plain-text body, stored as the interaction's note (D30). */
+  /** The plain-text body, stored as the interaction's note. */
   body: string
   forwarded: boolean
   /**
    * The parts that are documents, and the ones skipped as inline or
-   * signature images (SPA-115, `attachments.ts`). On a true forward these are
+   * signature images. On a true forward these are
    * the wrapper's parts, which is where every client puts the original's
    * attachments.
    */

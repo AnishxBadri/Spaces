@@ -143,7 +143,7 @@ function ReviewLink({
 
 /**
  * A past meeting with no write-up: the title opens the meeting window, and
- * Write writes one now and lands in the editor. (D79)
+ * Write writes one now and lands in the editor.
  */
 function MeetingRow({
   row,
@@ -304,7 +304,7 @@ function RowBody({
 /**
  * Needs you: one ledger in urgency order with a kind lane, sentence-case
  * filters in the head by kind, a fold at eight, and the task composer as its last
- * row. (D79) The caller orders the rows (`byUrgency`).
+ * row. The caller orders the rows (`byUrgency`).
  */
 export function NeedsYou({
   rows,

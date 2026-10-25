@@ -16,7 +16,7 @@ import type { JobHost, JobOutcome } from './run-job'
 /**
  * `job_status`: the ledger announces a plugin queue's row when it opens and
  * when it closes, from the transaction that writes it, and never a core
- * queue's. (D64) Real Postgres on both ends: the LISTEN here is the same
+ * queue's. Real Postgres on both ends: the LISTEN here is the same
  * statement web's listener runs.
  */
 

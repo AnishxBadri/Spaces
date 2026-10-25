@@ -3,7 +3,7 @@ import type { ContextItem } from '@spaces/core/context/types'
 import { renderBlock, renderPrompt } from './prompt'
 
 /**
- * SPA-42. The prompt renderer is pure — this file imports nothing that
+ * The prompt renderer is pure — this file imports nothing that
  * touches a database or a network — and it is what makes a model's output
  * citable: every ContextItem appears exactly once as `[ref] text`, and the
  * whole prompt fits `budgetChars`.

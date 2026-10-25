@@ -3,7 +3,7 @@ import { buildAutomaton, findMatches } from './aho-corasick'
 import { mentionedTermIds, termAutomaton, termPatterns } from './terms'
 
 /**
- * The shared builder (SPA-34). The editor decoration and the server link
+ * The shared builder. The editor decoration and the server link
  * sync both build their matcher through `termAutomaton`, so what is asserted
  * here is asserted for both: a term that highlights links, and nothing links
  * that would not highlight.

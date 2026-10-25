@@ -69,7 +69,7 @@ import {
 import { RecordMoreMenu } from '#/components/record/record-more-menu'
 
 /**
- * The registry-generated record page for a custom object (spec §9, D74): a
+ * The registry-generated record page for a custom object: a
  * company's anatomy minus enrichment. The details column holds the grid
  * from the registry, the records that point here, Spaces and Tasks; the
  * head logs an interaction (`L`) and adds a task (`T`). A record merged
@@ -91,7 +91,7 @@ export const Route = createFileRoute('/_app/o_/$objectSlug/$recordId')({
       })
     const [registry, timeline, documents, spaces, notes, waiting, sensitivity] =
       await Promise.all([
-        // Derived halves too: their rows read the resolver's value. (D69)
+        // Derived halves too: their rows read the resolver's value.
         listRegistry({
           data: { objectId: record.object.id, includeDerived: true },
         }),
@@ -318,7 +318,7 @@ function ObjectRecordPage() {
 
             <WaitingRail entityId={record.id} counts={waiting} />
 
-            {/* Each relationship, either half, through the resolver. (D69) */}
+            {/* Each relationship, either half, through the resolver. */}
             <RelationSections
               defs={registry}
               halves={record.relations}

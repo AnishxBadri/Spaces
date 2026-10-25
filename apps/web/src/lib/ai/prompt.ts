@@ -1,9 +1,9 @@
 import type { ContextItem } from '@spaces/core/context/types'
 
 /**
- * The prompt renderer behind `complete()` (docs/spec-ai-substrate.md §4, the
- * map's "prompt: [ref] text … + task"). Pure: no clock, no randomness, no
- * I/O — the same items, task and budget always render the same string.
+ * The prompt renderer behind `complete()`: `[ref] text` blocks, then the
+ * task. Pure: no clock, no randomness, no I/O — the same items, task and
+ * budget always render the same string.
  *
  * - Each item renders once, as `[ref] text`, so the model can cite what it
  *   read by the ref the assembler minted. A second item with a ref already

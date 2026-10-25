@@ -41,7 +41,7 @@ const countOf = (stopped: ReadonlyArray<StoppedPlugin>): string => {
  * The plugin lines on Today and Review: one row per plugin that is switched
  * on and not running, or refusing work at its daily credit cap, with the
  * reason. This is where a record head's missing action, or an action that
- * did nothing, is explained (D53, D63). Renders nothing while every plugin
+ * did nothing, is explained. Renders nothing while every plugin
  * runs; a stopped line clears when its row is reset, a capped one at UTC
  * midnight.
  */

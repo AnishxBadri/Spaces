@@ -4,28 +4,22 @@ import { pathToFileURL } from 'node:url'
 import { HOST_PACKAGES } from '@spaces/sdk/build'
 
 /**
- * A plugin bundle runs on the host's Effect (sdk-11). The plugin build
- * (`@spaces/sdk/build`) leaves exactly three bare imports in `bundle.mjs` —
- * `effect`, `zod`, `@spaces/sdk` — and a bundle lives in
- * `<dataDir>/plugins/<id>/current/`, where node's own lookup would walk up
- * from `/data` and find no `node_modules` at all (or, worse, some other
- * copy). Two copies of the SDK in one process means two sets of service
- * tags, and a job yielding the plugin's `Identity` against a Layer built from
- * the host's is "service not found".
+ * A plugin bundle runs on the host's Effect, sdk and zod. The plugin build
+ * leaves exactly three bare imports (`effect`, `zod`, `@spaces/sdk`), and
+ * node's own lookup from `<dataDir>/plugins/<id>/current/` finds no
+ * `node_modules` (or some other copy). Two SDK copies mean two sets of
+ * service tags, and a job's `Identity` against the host's Layer is "service
+ * not found".
  *
- * So a synchronous resolve hook (`module.registerHooks`, node ≥ 22.15 —
- * in-thread, no loader file to ship beside the bundle, which is why it is
- * this and not `module.register()`): a bare import of one of the three,
- * made by a module under a registered plugins root, is resolved as if this
- * file had made it. The host's resolver, the host's conditions, the host's
- * `node_modules` — the same URL, so the same module instance, as the
- * worker's own `import { Identity } from '@spaces/sdk'`. In the image this
- * file is inside `apps/worker/dist/index.mjs`, which is why `@spaces/sdk` is
- * external to the worker bundle and present in `/app/node_modules`.
- *
- * Every other specifier passes through untouched, so a bundle that imports
- * anything else (it cannot — the build inlines everything but the three and
- * `node:*`) fails to resolve, as it should.
+ * - A synchronous in-thread hook (`module.registerHooks`, node ≥ 22.15), so
+ *   no loader file ships beside the bundle, unlike `module.register()`.
+ * - A bare import of one of the three, from a module under a registered
+ *   plugins root, resolves as if this module made it: the same URL, so the
+ *   same instance as the worker's own. This is why the worker bundle leaves
+ *   `@spaces/sdk` external and the image ships it in `node_modules`.
+ * - Every other specifier passes through untouched; the build inlines
+ *   everything else but `node:*`, so anything more fails to resolve, as it
+ *   should.
  */
 
 const HOST_URL = import.meta.url

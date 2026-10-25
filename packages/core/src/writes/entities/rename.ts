@@ -8,30 +8,15 @@ import { setValuesEffect } from '../attributes/values'
 import type { AttributeValidationError } from '../attributes/values'
 
 /**
- * Renaming a record, for every object-model kind `updateRecord` serves
- * (SPA-63). Before this, the rename set `entity.canonical_name` and kept
- * nothing: the old name fell out of Cmd-K the moment it was replaced, which
- * is the common drift case now that customs rename freely.
- *
- * So a rename is four writes, not one — the name, the activity row, and
- * *both* names through the insert-if-absent check `resolveEntity` already
- * uses: the one being left behind, then the one being taken. Recording the
- * old name is what makes the title true on its own; recording the new one is
- * what makes the *next* rename cheap and what puts the current name in
- * `entity_alias`, which is why the dedupe card had to stop comparing in the
- * wrong normal form.
- *
- * Both are no-ops when the normalized name is already held, so every record
- * — core through `resolveEntity`, custom through `createRecordProgram`
- * (SPA-60), both of which write the birth name alias — gains exactly one row
- * per rename, not two.
- *
- * Names are history: an earlier alias is never replaced or deleted.
- * `searchEntities` matches `entity_alias` name rows already, so the record
- * stays findable by what it used to be called without any sweep running.
- *
- * A person's name is the join of `first_name` and `last_name` (D67), so a
- * person's rename goes through `setValues`, which splits it into the parts.
+ * Renaming a record, for every object-model kind `updateRecord` serves. Four
+ * writes: the name, the activity row, and both names through the
+ * insert-if-absent alias check — the old one first, then the new.
+ * - Names are history: an earlier alias is never replaced or deleted, so
+ *   `searchEntities` still finds the record by what it used to be called.
+ * - Both are no-ops when the normalized name is already held, so a rename
+ *   gains at most one row.
+ * - A person's name is the join of `first_name` and `last_name`, so a
+ *   person's rename goes through `setValues`, which splits it.
  */
 
 export class RenameQueryFailed extends Schema.TaggedError<RenameQueryFailed>()(
@@ -107,10 +92,8 @@ export const renameRecordProgram = Effect.fn('renameRecordProgram')(function* (
   }
   yield* query(() => recordNameAlias(input.id, input.name, { class: 'manual' }))
 
-  // No fuzzy sweep here, deliberately. The spec names two sweep lanes and
-  // only two: at create (`resolveEntity`, on a freshly born entity) and the
-  // nightly job (objects-4, over everything). A rename is neither, and a
-  // third lane firing per rename would re-suggest the same pairs with no
+  // No fuzzy sweep here, deliberately: the lanes are at create and the
+  // nightly job. A sweep per rename would re-suggest the same pairs with no
   // new entity to justify them — drift is the nightly job's lane.
 
   return { ok: true }

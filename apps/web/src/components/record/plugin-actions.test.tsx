@@ -14,7 +14,7 @@ import type { RecordEnrichView } from './plugin-actions.tsx'
 /**
  * The record head's plugin controls: one outline button per action the loader
  * handed it, labelled as the manifest declares, and nothing at all when no
- * runnable plugin declares one on this kind. (D63)
+ * runnable plugin declares one on this kind.
  */
 
 const enrich: RecordAction = {
@@ -53,7 +53,7 @@ describe('PluginActions', () => {
 })
 
 /**
- * The host's Enrich (D76, D80): one button asking every source in order,
+ * The host's Enrich: one button asking every source in order,
  * the line beside it naming them, then how the last run went.
  */
 describe('the host Enrich', () => {

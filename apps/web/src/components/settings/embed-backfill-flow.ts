@@ -3,7 +3,7 @@ import { formatNumber } from '@spaces/core/format'
 import type { BackfillEstimate } from '#/lib/ai/providers/embed/ids'
 
 /**
- * The backfill's ask (SPA-136) — the one place embedding waits for a yes.
+ * The backfill's ask — the one place embedding waits for a yes.
  * Kept out of the tsx so the promise it makes can be tested without a DOM:
  * the estimate is on the sheet before anything runs, and cancelling makes
  * no call at all. The estimate itself came from `getEmbedBackfill`, which
@@ -11,8 +11,8 @@ import type { BackfillEstimate } from '#/lib/ai/providers/embed/ids'
  */
 
 /**
- * `sensitive` is the chunks stamped sensitive that a local route will take
- * (SPA-83): their own rows on the sheet, priced by the route's `local` flag,
+ * `sensitive` is the chunks stamped sensitive that a local route will take:
+ * their own rows on the sheet, priced by the route's `local` flag,
  * and said to go to the local model only.
  */
 export function backfillConfirmOptions(

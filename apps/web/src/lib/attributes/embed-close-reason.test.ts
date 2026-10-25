@@ -15,15 +15,11 @@ import { setValuesEffect } from '@spaces/core/writes/attributes/values'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 
 /**
- * SPA-132 (ai-12b): a deal's `close_reason` is an attribute value, so it is
- * chunked through the one write path rather than a bespoke hook. A set
- * through `setValuesEffect` hands the source back as `reembed`, and the
- * caller — the server fn; here, `write` — queues `chunk.embed` with
- * `source_kind: 'attribute'` and `source_key: 'close_reason'` after the write
- * commits (SPA-174/175 moved the enqueue out of core with the write path); a
- * clear deletes the chunks inside the write's own transaction. The job's
- * program is `embedSourceProgram`, run here as the worker runs it (the
- * worker's own outcome mapping is `worker/jobs/embed-source.test.ts`).
+ * A deal's `close_reason` is chunked through the one attribute write path.
+ * - A set through `setValuesEffect` hands the source back as `reembed`; the
+ *   caller (here `write`) queues `chunk.embed` after the write commits.
+ * - A clear deletes the chunks inside the write's own transaction.
+ * - The job runs `embedSourceProgram` as the worker runs it.
  */
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 

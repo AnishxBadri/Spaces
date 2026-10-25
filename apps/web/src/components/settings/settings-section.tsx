@@ -14,19 +14,16 @@ import {
 } from '#/components/ui/tooltip'
 
 /**
- * The settings section — the shape every section of the settings shell takes
- * (`docs/design-contract.md` §3, "A settings section"), and the page head:
- * the shell draws no title of its own. Top to bottom:
- *
+ * The settings section — the shape every section of the settings shell
+ * takes, and the page head: the shell draws no title of its own. Top to bottom:
  *   - the **mono eyebrow** in sentence case, `Settings · <Group>` — the group
  *     is the one the section's row names in `SETTINGS_SECTIONS`;
- *   - the **serif title** in `title-serif`, and no sentence under it (D81);
+ *   - the **serif title** in `title-serif`, and no sentence under it;
  *   - for a member on an admin page, one mono line, "Only admins can change
- *     this · ask <admins>", and every control in the section disabled (D81);
+ *     this · ask <admins>", and every control in the section disabled;
  *   - an optional **action** right — the one primary of the section;
  *   - the **double rule** under the head (a settings section is the page),
  *     then the rows, grouped under `SettingsGroupHead` caps labels.
- *
  * The section belongs to a page form (`SettingsForm`): typed fields collect
  * into its one Save bar. With no page form above it, the section opens one.
  */
@@ -170,7 +167,7 @@ export function SettingsGroupHead({
 
 /**
  * A tooltip on one control — where a row's explanation goes when it is not
- * about cost, privacy or something irreversible (D81). The child must take a
+ * about cost, privacy or something irreversible. The child must take a
  * ref and spread its props (an `Input`, a `Button`).
  */
 export function SettingsTip({
@@ -191,7 +188,7 @@ export function SettingsTip({
 /**
  * One row on a rule: the label in a 210px lane, the control in the lane after
  * it, left-aligned — never pinned to the row's end.
- * - `hint` is for cost, privacy or something irreversible only (D81); any
+ * - `hint` is for cost, privacy or something irreversible only; any
  *   other explanation is a tooltip on the control, or nothing.
  */
 export function SettingsRow({

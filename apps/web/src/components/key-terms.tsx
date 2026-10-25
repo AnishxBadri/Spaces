@@ -10,13 +10,14 @@ import type { listRecordDocuments } from '#/lib/server-fns'
 import { offersKeyTerms } from '#/lib/documents/key-terms-gate'
 
 /**
- * Extract key terms (SPA-91) — the Files-tab row's control, a copy of Read
- * deck (`record-files.tsx`, `useDeckReader`): the gate is asked once per tab
- * — the extract lane routed, with a live credential, and to a local model
- * when the record resolves sensitive — and a row shows the button only when
- * `offersKeyTerms` says so: a `legal` or `dd` document, its text extracted,
- * filed on a deal. The read is a worker job, polled while it runs, whose end
- * is a toast: the note is in Review, or the job's own sentence.
+ * Extract key terms — the Files-tab row's control, shaped like Read deck
+ * (`useDeckReader`).
+ * - The gate is asked once per tab: the extract lane routed, a live
+ *   credential, and a local model when the record resolves sensitive.
+ * - A row shows the button only when `offersKeyTerms` says so: a `legal` or
+ *   `dd` document, its text extracted, filed on a deal.
+ * - The read is a polled worker job ending in a toast: the note is in
+ *   Review, or the job's own sentence.
  */
 
 type Documents = Awaited<ReturnType<typeof listRecordDocuments>>

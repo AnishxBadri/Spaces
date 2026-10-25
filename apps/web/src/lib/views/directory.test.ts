@@ -3,19 +3,11 @@ import { describe, expect, it } from 'vitest'
 import type { Condition } from '@spaces/core/views/filter'
 
 /**
- * SPA-96. `/companies` and `/people` take views-3's contract, so the two
- * reads behind them get the same three questions `records.test.ts` asks of
- * `/o/$objectSlug`: does the page boundary hold, does `total` count the
- * matching set rather than the loaded rows, and does a row edited out of the
- * filter actually leave.
- *
- * The third is the one this slice added rather than inherited. A cell edit
- * that makes a record stop matching the active view used to be invisible —
- * the row was already in the browser and the filter ran there — so the grid
- * kept a ghost the count would have disagreed with. The route's refresh
- * re-runs this read with the same conditions; the assertion here is that the
- * read is what drops the row, which is the half a component test could not
- * prove.
+ * `/companies` and `/people` reads get the same questions as `/o/$objectSlug`:
+ * does the page boundary hold, does `total` count the matching set rather
+ * than the loaded rows, and does a row edited out of the filter leave.
+ * The last is proved on the read the route's refresh re-runs, which a
+ * component test cannot reach.
  */
 
 async function actorId() {

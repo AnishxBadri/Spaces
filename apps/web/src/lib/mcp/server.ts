@@ -8,7 +8,7 @@ import { toolRegistry } from './registry'
 import type { ToolCaller } from './registry'
 
 /**
- * The MCP server (`docs/spec-ai-substrate.md` §5): the tool table in
+ * The MCP server: the tool table in
  * `toolRegistry` as a surface a person's own assistant connects to. Ask is
  * the other client of the same table.
  *
@@ -86,12 +86,10 @@ const unauthorized = () =>
  * one reaches the transport.
  */
 export async function handleMcpRequest(request: Request): Promise<Response> {
-  // The same store the /api/v1 door authenticates against (SPA-48), but
-  // scopes are not consulted here: they gate the HttpApi procedures, and the
-  // MCP tools (SPA-28/31) are not on that door. A token minted before scopes
-  // existed ('{}') keeps working over MCP exactly as it did; every tool still
-  // runs as the token's user, so the missing check widens nothing canRead
-  // does not already allow.
+  // The same store the /api/v1 door authenticates against, but scopes are
+  // not consulted: they gate the HttpApi procedures, not the MCP tools. A
+  // token with no scopes ('{}') works over MCP; every tool runs as the
+  // token's user, so this widens nothing canRead does not already allow.
   const auth = await Effect.runPromiseExit(
     authenticateBearerProgram(request.headers.get('authorization')),
   )

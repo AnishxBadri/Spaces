@@ -27,8 +27,7 @@ import type { PluginDbOptions } from './plugin-db'
 
 /**
  * Boot reconciliation: decides whether each plugin may run at all, before
- * any queue registers. Steps 1–5 and 8 of the loader; step 6 is
- * `makePluginHost`.
+ * any queue registers. `makePluginHost` wires what passes.
  *
  * - Discovers enabled `integration` rows, never a `core.*` row (a
  *   first-party channel, not a plugin) and never an uninstalled one
@@ -266,7 +265,7 @@ const check = (
     if (manifest.requires?.credential && row.credentialId === null && !faked) {
       return yield* new Degraded({ reason: 'missing credential' })
     }
-    // A keyed connection is each member's own (D78): the row binds none.
+    // A keyed connection is each member's own: the row binds none.
     if (
       manifest.requires?.connection &&
       keyedProviderOf(manifest) === null &&

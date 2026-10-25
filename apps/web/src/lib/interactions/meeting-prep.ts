@@ -30,7 +30,7 @@ import type { PrepEvent } from '#/lib/meetings/day'
 
 /**
  * Prep: the assembler over a meeting's linked records, through the
- * synthesize lane, streamed into the meeting window on demand. (D68)
+ * synthesize lane, streamed into the meeting window on demand.
  * - Never stored. "Save as note" is a separate write of the text the reader
  *   was shown, filed `tagged_in` on the same records, the reader as author.
  * - The sensitivity gate is per call: any linked record that resolves

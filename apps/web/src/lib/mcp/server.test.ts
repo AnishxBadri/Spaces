@@ -28,7 +28,7 @@ import { createAttributeProgram } from '@spaces/core/writes/attributes/create'
 import { readEmbeddingPinProgram } from '#/lib/ai/embedding-pin'
 
 /**
- * SPA-23 — the MCP read surface, end to end: a real MCP client speaks
+ * The MCP read surface, end to end: a real MCP client speaks
  * Streamable HTTP to `handleMcpRequest` (the `/api/mcp` route's whole body)
  * through an in-process fetch, with a token minted by the real store. The
  * browser session the palette and member handlers read is stubbed, so their
@@ -305,12 +305,12 @@ describe('an MCP client with a per-user token', () => {
     expect(tools.map((t) => t.name).sort()).toEqual([
       'get_context',
       'get_record',
-      'holding_detail', // SPA-269
-      'list_registry', // SPA-28
-      'portfolio_summary', // SPA-269
-      'propose_suggestion', // SPA-31
-      'query_records', // SPA-260
-      'search_records', // SPA-28
+      'holding_detail',
+      'list_registry',
+      'portfolio_summary',
+      'propose_suggestion',
+      'query_records',
+      'search_records',
     ])
     const ctx = tools.find((t) => t.name === 'get_context')
     expect(Object.keys(ctx?.inputSchema.properties ?? {}).sort()).toEqual([
@@ -452,7 +452,7 @@ describe('an MCP client with a per-user token', () => {
 })
 
 /**
- * SPA-28 — the other two read tools. `search_records` is Cmd-K's search run
+ * The other two read tools. `search_records` is Cmd-K's search run
  * as the token's user, compared against the palette's own request half
  * (`searchAllHandler`, the `searchAll` server fn's body) under a stubbed
  * session; `list_registry` reads the registry on every call, so an object

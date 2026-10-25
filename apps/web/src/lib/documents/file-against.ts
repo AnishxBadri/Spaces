@@ -1,21 +1,11 @@
 /**
- * The global upload dialog's **file-against control, as a value** (SPA-108).
- *
- * §3.1 entry point 3 is the one entry point whose filing is a question rather
- * than a fact: the Files tab knows it means this record, a space's Sources
- * knows it means this space, but a deck that arrives before you know whose it
- * is has three answers — a record, a space, or nowhere. This module is those
- * three answers and the one translation into what `finalizeDocumentUpload`
- * validates, so the translation can be asserted against the real writer
- * (`file-against.test.ts` runs all three through `birthDocumentProgram`)
- * instead of only being read in a `.tsx` the node-environment suite cannot
- * render.
- *
- * It lives beside `upload.ts` because it is the same lane — client-side, no
- * `node:`, no drizzle, no Effect — and it takes `FileAgainst` from there
- * rather than re-declaring the shape, which is itself read off the server fn.
- * Three declarations of one union is how the empty array stops meaning
- * unfiled somewhere.
+ * The global upload dialog's **file-against control, as a value**: a record,
+ * a space, or nowhere, and the one translation into what
+ * `finalizeDocumentUpload` validates, so the test can run it through the
+ * real writer.
+ * - Client-side lane: no `node:`, no drizzle, no Effect.
+ * - Takes `FileAgainst` from the upload module rather than re-declaring it;
+ *   copies of the union are how the empty array stops meaning unfiled.
  */
 
 import type { FileAgainst } from './upload'
@@ -28,7 +18,7 @@ export type PickedEntity = { entityId: string; name: string }
 
 /**
  * Where one drop is filed. `unfiled` is a first-class answer and the default
- * — §3.2's inbox row is a document with no edge, not an orphan — so it is a
+ * — an inbox row is a document with no edge, not an orphan — so it is a
  * member of this union rather than a `null` every caller has to remember to
  * handle.
  */
@@ -58,8 +48,8 @@ export function uploadTarget(
 /**
  * The target as `finalizeDocumentUpload`'s `fileAgainst` — one element for a
  * record (`link(tagged_in)`) or a space (`entity_space`), and the **empty
- * array** for unfiled, which is SPA-113's widening read literally: zero
- * targets is a document row with no link and no `entity_space`, whose
+ * array** for unfiled: zero targets is a document row with no link and no
+ * `entity_space`, whose
  * activity subject is the document itself.
  *
  * One target for every file in a multi-file drop: the reader answered the

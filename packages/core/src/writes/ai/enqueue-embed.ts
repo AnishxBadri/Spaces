@@ -5,9 +5,9 @@ import { embedSourceKey } from './chunk-sources'
 import type { EmbedSource } from './chunk-sources'
 
 /**
- * `enqueueSourceEmbed` as an Effect over core's `Enqueue` service (sdk-7a):
- * the same job, the same singleton key, for a write port running where web's
- * `lib/ai/enqueue-embed.ts` (which reads `DATABASE_URL`) cannot be reached.
+ * `enqueueSourceEmbed` as an Effect over core's `Enqueue` service: the same
+ * job and singleton key, for a write port that cannot reach apps/web's
+ * `enqueueSourceEmbed` (which reads `DATABASE_URL`).
  */
 export const enqueueEmbeds = (sources: ReadonlyArray<EmbedSource>) =>
   Effect.gen(function* () {

@@ -28,30 +28,25 @@ import type {
 } from '@spaces/core/import/references'
 
 /**
- * **Reference cells find their record** (SPA-168, import-6) — the database
- * half. A `record_reference` cell is matched, in order and exactly:
- *
- * 1. by the referenced object's identity key, when the cell reads as one
- *    (a domain in a company column, an address in a person column) —
- *    through `matchIdentity`, the lookup `resolveEntity` and the preview
- *    already share, so a reference finds what a resolve would;
- * 2. by a `name` alias (or the record's own name) of the referenced object
- *    that equals the cell once whitespace is collapsed and case dropped;
+ * Reference cells find their record — the database half. A `record_reference`
+ * cell is matched, in order and exactly:
+ * 1. by the referenced object's identity key, when the cell reads as one,
+ *    through `matchIdentity` — so a reference finds what a resolve would;
+ * 2. by a `name` alias (or the record's own name) equal to the cell once
+ *    whitespace is collapsed and case dropped;
  * 3. two or more records by that name → ambiguous, naming them;
  * 4. none → missing.
  *
- * **There is no fuzzy step, and there must not be one.** A near-match is a
- * skipped cell the operator fixes in the sheet; a guess that attaches a deal
- * to the wrong company is silent and far worse. Similarity belongs to the
- * nightly sweep, which only ever suggests (CONTEXT.md, "deterministic auto,
- * probabilistic suggest").
+ * There is no fuzzy step, and there must not be one: a near-match is a
+ * skipped cell the operator fixes, while a wrong attach is silent and far
+ * worse. Similarity belongs to the nightly sweep, which only ever suggests.
  *
- * An `actor_reference` cell is a workspace member's email, matched exactly
- * and case-insensitively against `user.email`. A name is not accepted, and an
+ * An `actor_reference` cell is a member's email, matched exactly and
+ * case-insensitively against `user.email`. A name is not accepted, and an
  * unknown address never falls back to the importing user.
  *
- * Read-only throughout. Outside `lib/server/` for the barrel's reason
- * (CLAUDE.md → Traps).
+ * Read-only throughout. Outside the server-fns barrel's modules: a plain
+ * export there ships to the browser.
  */
 
 const query = <T>(run: () => Promise<T>) =>

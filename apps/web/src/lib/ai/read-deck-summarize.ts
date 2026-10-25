@@ -11,26 +11,15 @@ import { summarizeMessage, summarizeProgram } from './summarize'
 import type { Suggestion } from '@spaces/core/writes/suggestions/propose'
 
 /**
- * Read deck and summarize (SPA-100; docs/spec-ai-substrate.md §6, §14 step
- * 10): the first **two-step run**. One press on a Files-tab deck opens one
- * `ai_run` and runs, in order, inside it:
+ * Read deck and summarize: one press opens one `ai_run` with two steps,
+ * **extract** (`readDeckProgram`, through the extraction cache) then
+ * **synthesize** (Summarize onto the record it was pressed on).
  *
- *   1. **extract** — the deck reader (`./read-deck.ts`), through the
- *      extraction cache, so a deck already read against these fields is a
- *      `cached` step with no call and no `ai_usage` row;
- *   2. **synthesize** — Summarize (`./summarize.ts`) of the same deck onto
- *      the record whose Files tab it was pressed on.
- *
- * Both are handed the run's id, so they open no run of their own: every
- * `ai_usage` row either writes and every suggestion either proposes carries
- * it, and each adds its step in order. The steps are independent reads of
- * the deck — the summary never reads step 1's suggestions, which are not
- * yet true and never enter a prompt (spec §3).
- *
- * A failed step fails the run with that step's sentence — the provider's own
- * words when it answered with an error — and stops. What an earlier step
- * proposed stays in the inbox, open and cited: a suggestion is a row, and
- * the run failing after it does not unwrite it.
+ * - Both get the run's id, so every `ai_usage` row and suggestion carries it.
+ * - The summary never reads step 1's suggestions: they are not yet true and
+ *   never enter a prompt.
+ * - A failed step fails the run with its own sentence and stops; what an
+ *   earlier step proposed stays in the inbox.
  */
 
 /**

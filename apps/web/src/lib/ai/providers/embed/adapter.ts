@@ -6,13 +6,10 @@ import type { ProviderMeta } from '../meta'
 import type { EmbeddingProvider } from './ids'
 
 /**
- * What every embedding adapter takes and gives (`docs/spec-ai-substrate.md`
- * §9, `ai/providers/embed/`). The input is the LLM adapters' shape plus the
- * width to ask for; the output is one `EmbedCall` — texts in, vectors and a
- * token count out, as an Effect — so the AI SDK adapters (OpenAI, Google)
- * and the plain-fetch one (Voyage, which has no SDK provider) are one type
- * to `embed()`. Width checking is not the adapter's: `embed()` asserts it
- * against the pin, whatever the adapter asked for.
+ * What every embedding adapter takes and gives: the LLM adapters' input plus
+ * a width, and one `EmbedCall` out, so SDK and plain-fetch adapters are one
+ * type to `embed()`. Width checking is not the adapter's: `embed()` asserts
+ * it against the pin.
  */
 export type EmbedAdapterInput = {
   secret: string

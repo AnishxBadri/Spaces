@@ -19,7 +19,7 @@ import {
 import { RecordTabs } from './record-tabs.tsx'
 
 /**
- * A record's body as D74 draws it: the 320px details column on bone left —
+ * A record's body: the 320px details column on bone left —
  * the property grid as label–value rows, then the relationship sections —
  * and the tab head over one view right, every tab counted and an empty one
  * grey at 0.

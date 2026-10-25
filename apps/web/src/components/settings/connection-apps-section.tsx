@@ -17,7 +17,7 @@ import { setProviderApp } from '#/lib/server-fns'
  * Settings → Integrations → Connection apps: one OAuth client group per
  * provider — redirect address, client id and a write-only secret, which never
  * reaches the page (a stored one reads as `●●●● set MM-DD`). Every member's
- * Connect leaves through these clients. (D81)
+ * Connect leaves through these clients.
  */
 export function ConnectionAppsSection({
   apps,

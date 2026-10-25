@@ -1,37 +1,16 @@
 import type { Json } from '../json'
 
 /**
- * Markdown → BlockNote blocks, on the server (SPA-66). Pure: no DOM, no
- * editor instance, no clock, no randomness — the same markdown always
- * renders the same blocks.
- *
- * Why it exists: `note.body_json` is authoritative and `note.body_md` is
- * derived from it (schema/kinds.ts), and until now the only thing that ever
- * produced either was the editor in the browser. A lane that writes a note
- * from the server — the summary first, every later note-writing lane after
- * it — has markdown from a model and nothing to turn it into blocks. Writing
- * `body_md` alone is the worst failure the note model has: `note.tsv` is
- * generated from it, so search would find a note that opens blank.
- *
- * So a note written here gets both columns from **one** source: the
- * markdown is parsed into blocks, and `body_md` is serialized back **from
- * those blocks** (`blocksToMarkdown`), never copied from the input. The two
- * cannot disagree, because one is computed from the other — exactly the
- * relationship the editor keeps on save.
- *
- * The block types are the ones a summary uses: paragraph, heading (1–6) and
- * bullet list (nested by indentation), with inline links and the bold,
- * italic and code text styles — and, since SPA-91's key terms, a GFM pipe
- * table (a header row, a `---` delimiter row, body rows), which becomes
- * BlockNote's own `table` block with the first row as its header. Anything
- * else in the markdown — a numbered list, a quote, a fence — lands as
- * paragraph text, never dropped: a line the renderer does not know is still
- * a line somebody can read and edit.
- *
- * The block shape is BlockNote's own document JSON with its default props
- * spelled out, minus `id`: BlockNote mints ids when it loads a document
- * (as it does for `createNote`'s starter block), and leaving them out is
- * what keeps this function deterministic.
+ * Markdown → BlockNote blocks, for notes written on the server. Pure: no DOM,
+ * no editor, no clock, no randomness — the same markdown, the same blocks.
+ * - `note.body_json` is authoritative; `body_md` is serialized back from the
+ *   blocks (`blocksToMarkdown`), never copied from the input, so the two
+ *   cannot disagree. Never write `body_md` alone: `note.tsv` is generated
+ *   from it, and search would find a note that opens blank.
+ * - Supported: paragraph, heading (1–6), nested bullets, a GFM pipe table,
+ *   inline links, bold, italic, code. Anything else lands as paragraph text,
+ *   never dropped.
+ * - Blocks carry no `id`: BlockNote mints ids on load, which keeps this deterministic.
  */
 
 export type StyledText = {

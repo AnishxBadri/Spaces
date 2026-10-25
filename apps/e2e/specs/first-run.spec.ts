@@ -4,7 +4,7 @@ import { expect, test } from '../harness/fixtures.ts'
 import type { Page } from '@playwright/test'
 
 /**
- * The first-run window (CONTEXT.md, self-host auth trap 2), against
+ * The first-run window, against
  * `firstRun` — an empty database nobody has signed up to. Between compose up
  * and the first admin, /setup is open to anyone who can reach the port; the
  * one-time token printed to the server log is what closes it. The token is
@@ -109,7 +109,7 @@ test.describe('the first-run window', () => {
     expect(await res.json()).toMatchObject({ code: 'FAILED_TO_CREATE_USER' })
     // With an admin present the hook closes signup before it looks at a
     // token at all; the token file itself was deleted inside the hook the
-    // moment the first admin was created (apps/web/src/lib/auth.ts).
+    // moment the first admin was created.
     await expect.poll(since).toMatch(/Error: Signup is closed/)
     expect(await firstRun.userCount()).toBe(1)
   })

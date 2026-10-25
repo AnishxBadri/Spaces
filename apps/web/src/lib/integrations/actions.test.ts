@@ -16,7 +16,7 @@ import {
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * Manifest actions in the record head (D63): read from `integration.manifest`
+ * Manifest actions in the record head: read from `integration.manifest`
  * for runnable rows only, matched on the record's kind, and fired by any
  * member as one `plugin.<id>.<job>` enqueue carrying `{ entityId }`. The
  * request is stubbed; `requireUser`, the database and the decode are real.

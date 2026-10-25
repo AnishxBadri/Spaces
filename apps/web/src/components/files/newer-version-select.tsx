@@ -10,7 +10,7 @@ import type {
 } from '#/lib/documents/newer-version'
 
 /**
- * "Newer version of" on an arriving file (D59): one optional field under the
+ * "Newer version of" on an arriving file: one optional field under the
  * row, defaulting to none, over the record's files of the same kind.
  * - Renders nothing when there is no candidate; never a disabled select.
  * - The same control on the upload dialog, the Files tab's uploads and a

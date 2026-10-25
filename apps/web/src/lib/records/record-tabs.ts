@@ -6,7 +6,7 @@ import { notesCounts } from '#/lib/notes/notes-filter'
 import type { NoteLanes, NotesFilter } from '#/lib/notes/notes-filter'
 
 /**
- * A record body's tabs (D74): Notes · Interactions · Files · History. There
+ * A record body's tabs: Notes · Interactions · Files · History. There
  * is no Context tab — Ask's answer card carries the sources.
  */
 export const RECORD_TABS = [
@@ -17,12 +17,12 @@ export const RECORD_TABS = [
 ] as const
 export type RecordTab = (typeof RECORD_TABS)[number]
 
-/** A record opens on Notes. (D74) */
+/** A record opens on Notes. */
 export const DEFAULT_RECORD_TAB: RecordTab = 'notes'
 
 /**
  * `?tab=` deep-links a tab; anything else reads as no tab. `?modal=` opens a
- * window over the Interactions tab. (D74)
+ * window over the Interactions tab.
  */
 export const recordSearch = z.object({
   tab: z.enum(RECORD_TABS).optional().catch(undefined),

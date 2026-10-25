@@ -68,7 +68,7 @@ export function isLeaveSettingsKey(e: KeyboardEvent): boolean {
 }
 
 /**
- * The chassis while settings is open (D81): `‹ Settings` back to the page
+ * The chassis while settings is open: `‹ Settings` back to the page
  * settings was opened from, over the settings nav, in place of the app nav.
  * Escape goes back too; no key hint is printed beside it.
  */

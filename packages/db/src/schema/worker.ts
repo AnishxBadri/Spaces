@@ -2,8 +2,7 @@ import { integer, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 
 /**
  * One row per worker role, upserted on boot and every 15s, so `/api/health`
- * can answer "is the background worker running" (CONTEXT.md, hostability
- * contract 4).
+ * can answer "is the background worker running".
  *
  * - Keyed on `role`, not `instance`: restarts leave exactly one row whatever
  *   the container is named.

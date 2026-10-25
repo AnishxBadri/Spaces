@@ -15,10 +15,10 @@ import { updateAttribute } from '#/lib/server-fns'
 import type { RegistryAttr } from './registry-list'
 
 /**
- * AI answers (spec-ai-substrate §13) — the per-object config, listing only
- * the attributes that answer with AI. The spec's `attribute.config.ai` is
- * stored as `attribute.options.ai`, written through `updateAttribute`'s
- * `config.ai`, the same door as a currency code or a rating's max.
+ * AI answers — the per-object config, listing only the attributes that
+ * answer with AI. Stored as `attribute.options.ai`, written through
+ * `updateAttribute`'s `config.ai`, the same door as a currency code or a
+ * rating's max.
  * - `+ Add` offers the rest of the attributes whose type can hold a mode
  *   (`aiModesFor`); the editor opens under its row. One the type holds
  *   none of is never offered, and the program refuses it anyway.

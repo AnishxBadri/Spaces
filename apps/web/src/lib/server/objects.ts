@@ -16,9 +16,9 @@ import type { IdentityKey } from '@spaces/core/attributes/registry'
 import { recordSpaces } from '#/lib/spaces/filed-in'
 
 /**
- * The object registry, read side (CONTEXT.md "Two-tier object model"). One
- * list serves the settings index and, later, the sidebar for custom objects:
- * system rows first (seed order), then user objects by creation.
+ * The object registry, read side. One list serves the settings index and the
+ * sidebar for custom objects: system rows first (seed order), then user
+ * objects by creation.
  */
 
 class ObjectNotFound extends Schema.TaggedError<ObjectNotFound>()(
@@ -92,7 +92,7 @@ const getObjectProgram = Effect.fn('getObjectProgram')(function* (
     plural: string
     icon: string | null
     identityKeys: Array<IdentityKey>
-    /** whether the identity-key declaration is still revisable (§9) */
+    /** whether the identity-key declaration is still revisable */
     hasRecords: boolean
     isSystem: boolean
     archived: boolean
@@ -118,7 +118,7 @@ const getObjectProgram = Effect.fn('getObjectProgram')(function* (
   if (!row)
     return yield* new ObjectNotFound({ slug, message: 'Object not found' })
   // One record — merged-away included, it still holds values — freezes the
-  // identity-key declaration (§9, the slug rule). The page asks here so it
+  // identity-key declaration. The page asks here so it
   // can show the rule rather than an error toast.
   const hasRecords = yield* query(() =>
     db
@@ -139,7 +139,7 @@ export const getObject = createServerFn()
   })
 
 // ---------------------------------------------------------------------------
-// Custom objects: creation, lifecycle, and their records (spec §9).
+// Custom objects: creation, lifecycle, and their records.
 // ---------------------------------------------------------------------------
 
 export const createObject = createServerFn({ method: 'POST' })
@@ -149,7 +149,7 @@ export const createObject = createServerFn({ method: 'POST' })
       plural: z.string().trim().min(1).max(60),
       icon: z.string().max(40).optional(),
       /**
-       * Opt-in identity (§9). The enum is the two keys the dialog offers;
+       * Opt-in identity. The enum is the two keys the dialog offers;
        * `email` arrives as a free string from anything but the dialog and
        * is refused *by name* in the program, which is where the reason
        * lives.
@@ -176,7 +176,7 @@ export const updateObject = createServerFn({ method: 'POST' })
       icon: z.string().max(40).nullable().optional(),
       archived: z.boolean().optional(),
       /**
-       * The whole declaration, not a delta (§9 — the slug rule). Applied
+       * The whole declaration, not a delta. Applied
        * only while the object has no records; the two keys the dialog
        * offers are narrowed in the program, where the reason lives.
        */
@@ -200,16 +200,11 @@ export const updateObject = createServerFn({ method: 'POST' })
 
 /**
  * The registry-generated list page's rows: name, values, spaces, added.
- *
- * The view's conditions come with the request and are compiled into the
- * `where` (SPA-40) — the page no longer loads every record to hide most of
- * them. Since SPA-64 the sort, the text box and the page itself come with it
- * too, and the answer carries `total` (a count over the same `where`) and
- * `nextCursor` (keyset on the sort key and id), so the grid never holds more
- * than the pages it asked for. The read itself is `listRecordsProgram`,
- * which lives outside `lib/server/` because this module is re-exported by
- * the client-imported barrel; it is imported inside the handler so it stays
- * out of that graph.
+ * - The view's conditions, sort, text box and page are compiled into the
+ *   `where`; the answer carries `total` (same `where`) and `nextCursor`
+ *   (keyset on sort key and id), so the grid holds only the pages it asked for.
+ * - `listRecordsProgram` is imported inside the handler: this module is
+ *   re-exported by the client-imported barrel.
  */
 export const listObjectRecords = createServerFn()
   .validator(z.object({ objectId: z.string().uuid(), ...pagedListShape }))
@@ -269,9 +264,9 @@ export const getObjectRecord = createServerFn()
       .where(
         andOp(eq(link.fromEntityId, data.id), eq(link.relation, 'references')),
       )
-    // Incoming references — backlinks both ways (§9): who points at this,
+    // Incoming references: who points at this,
     // one details section per referring object and attribute, as on a person.
-    // Every relationship this record sits on, both halves (D69); an owner's
+    // Every relationship this record sits on, both halves; an owner's
     // link that reads as an inverse half here leaves the backlinks.
     const { effectFn } = await import('./effect')
     const { recordRelationsProgram, relationNames } =
@@ -342,7 +337,7 @@ export const createObjectRecord = createServerFn({ method: 'POST' })
       source: 'manual',
     })
     // Queued after the commit, here, because core hands the sources back
-    // rather than reaching the queue (SPA-174/175).
+    // rather than reaching the queue.
     for (const s of reembed) await enqueueSourceEmbed(s)
     return born
   })

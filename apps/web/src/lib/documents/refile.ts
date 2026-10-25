@@ -18,26 +18,14 @@ import type { Tx } from '@spaces/core/writes/attributes/values'
 import type { DocumentFilingTarget } from '#/lib/server/shared'
 
 /**
- * The three actions §3.3 lists that a filed document never had (SPA-50):
- * re-file, change kind, re-extract. Until this slice a document's filing was
- * whatever the upload said, so a misdrop was permanent short of delete —
- * which also takes the bytes and the extracted text with it.
- *
- * Effect-first through `effectFn` (CONTEXT.md → Backend paradigm), and here
- * rather than in `lib/server/documents.ts` for `lib/notes/filing.ts`'s
- * reason: the server fns are the auth check, and a test has no request. It
- * stays out of `lib/server/` so nothing it exports can be dragged into the
- * client bundle by the barrel (CLAUDE.md → Traps).
- *
- * Filing reuses the `DocumentFilingTarget` union SPA-19 introduced rather
- * than re-typing it: the same two mechanisms, never mixed — a record files
- * through `link(tagged_in)`, a space through `entity_space` — so a document
- * re-filed here is indistinguishable from one filed at upload.
- *
- * **Removing the last edge is legal.** An unfiled document keeps its row,
- * its blob and its extracted text; `/documents` and the unfiled inbox are
- * what it is then reachable through (§11.6). Unfiling is not a delete and
- * must never grow into one.
+ * Re-file, change kind and re-extract a filed document.
+ * - Outside the server-fn modules: the server fns are the auth check, a test
+ *   has no request, and their plain exports ship to the browser.
+ * - Filing reuses `DocumentFilingTarget`: a record files through
+ *   `link(tagged_in)`, a space through `entity_space`, never mixed, so a
+ *   re-filed document is indistinguishable from one filed at upload.
+ * - **Removing the last edge is legal.** An unfiled document keeps its row,
+ *   blob and text. Unfiling is not a delete and must never grow into one.
  */
 
 /** The document named is not a document, or is not there at all. */
@@ -149,7 +137,7 @@ export const fileDocumentProgram = Effect.fn('fileDocumentProgram')(function* (
   const outcome = yield* query(() =>
     db.transaction((tx) => fileDocumentInTx(tx, userId, input)),
   )
-  // Filed on a record after arrival: the same suggestion intake makes. (D59)
+  // Filed on a record after arrival: the same suggestion intake makes.
   if (outcome.filed && target.kind === 'record')
     yield* proposeNewerVersionProgram(documentId)
   if (outcome.filed) yield* writeThroughRefile(documentId)
@@ -159,7 +147,7 @@ export const fileDocumentProgram = Effect.fn('fileDocumentProgram')(function* (
 /**
  * An upload a pushing binding holds follows its filing to the provider: the
  * export job moves it when it left its binding's record for another pushing
- * one. After the commit, like every enqueue here. (§6)
+ * one. After the commit, like every enqueue here.
  */
 const writeThroughRefile = Effect.fn('refile.writeThrough')(function* (
   documentId: string,
@@ -314,7 +302,7 @@ export async function unfileDocumentInTx(
 }
 
 /**
- * Kind is a genre, not a folder (§3.4), and a genre read off a filename at
+ * Kind is a genre, not a folder, and a genre read off a filename at
  * upload is a guess. Changing it is one `update` of one column: no edge
  * moves, no re-extraction, nothing else in the row changes.
  *

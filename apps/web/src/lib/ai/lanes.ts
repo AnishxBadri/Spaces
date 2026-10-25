@@ -55,7 +55,7 @@ export type AiRouteSetInput = z.infer<typeof aiRouteSetInput>
 /**
  * `setAiRoute`'s input: a cell set to a provider and model, or cleared with
  * `provider: null` — which deletes the row, leaving the lane unrouted at that
- * sensitivity (SPA-69).
+ * sensitivity.
  */
 export const aiRouteInput = z.union([
   aiRouteSetInput,
@@ -68,13 +68,13 @@ export const aiLaneInput = z.object({ lane: z.enum(AI_LANES) })
 
 /**
  * The lanes the Models routing grid draws: every lane but `embed`, which
- * Search owns. The router still routes `embed`. (D81)
+ * Search owns. The router still routes `embed`.
  */
 export const MODELS_GRID_LANES = AI_LANES.filter((lane) => lane !== 'embed')
 
 /**
  * `setSensitivityDefault`'s input: the workspace floor, which can only raise
- * a record's sensitivity, never lower it. (D81)
+ * a record's sensitivity, never lower it.
  */
 export const sensitivityDefaultInput = z.object({
   sensitivity: z.enum(AI_SENSITIVITIES),

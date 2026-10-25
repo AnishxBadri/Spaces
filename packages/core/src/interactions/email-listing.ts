@@ -2,7 +2,7 @@ import type { InteractionMeta } from '@spaces/db/schema/interactions'
 
 /**
  * What an email row lists under its subject: the cached one-line summary,
- * Gmail's snippet as its fallback, and the category labels (D67).
+ * Gmail's snippet as its fallback, and the category labels.
  * - Derived display text, never a proposal and never an attribute: the
  *   summarize and classify lanes write `meta.summary` and `meta.categories`.
  * - All three come from the body, so they are hidden with it: a reader who

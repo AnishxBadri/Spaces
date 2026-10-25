@@ -52,7 +52,7 @@ import type { RegistrySource } from './registry'
  * Install from the running deployment, through the programs the server fns
  * call: a registry.json and its signed tarballs on disk (`file:` URLs, never
  * the network), a scratch data directory, and the real database. No plugin
- * code runs — the worker's half is `apps/worker`'s install-live test.
+ * code runs — the worker's half is the worker's install-live test.
  */
 
 const session: { current: { id: string; role: string } | null } = {

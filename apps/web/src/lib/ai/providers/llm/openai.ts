@@ -5,7 +5,7 @@ import { PROVIDERS } from '../ids'
 import type { AdapterInput } from './adapter'
 
 /**
- * The OpenAI LLM adapter (SPA-39). Chat Completions rather than the SDK's
+ * The OpenAI LLM adapter. Chat Completions rather than the SDK's
  * default Responses API, on purpose: Responses keeps the conversation on
  * OpenAI's side unless told not to, and Chat Completions is the surface every
  * gateway an operator might point this at (LiteLLM, Helicone, Portkey)

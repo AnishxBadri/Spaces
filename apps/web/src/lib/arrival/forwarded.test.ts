@@ -11,7 +11,7 @@ import { arrivalFromSource } from './message'
 import type { Arrival, ArrivalMessage } from './message'
 
 /**
- * SPA-56 / D49: a true forward is matched on the original. Every fixture here
+ * A true forward is matched on the original. Every fixture here
  * is a whole RFC 822 message run through mailparser and `toArrival` — no
  * database — and the assertion is the interaction the poll would write: the
  * original's sender and participants, dated from the block's date line, and

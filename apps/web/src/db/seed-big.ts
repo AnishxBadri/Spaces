@@ -2,7 +2,7 @@
  * The volume bench's runner — `seedBigObject` against whatever
  * `DATABASE_URL` names.
  *
- *   DATABASE_URL=postgresql://…/spaces_spa64_test \
+ *   DATABASE_URL=postgresql://…/spaces_bench_test \
  *     corepack pnpm --filter @spaces/web exec tsx src/db/seed-big.ts --count=20000
  *
  * Flags:

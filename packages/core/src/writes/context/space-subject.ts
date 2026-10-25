@@ -13,7 +13,7 @@ import { mandateCandidate, query, rankChecked, revealed } from './spaces'
 import type { NoteGate } from './spaces'
 
 /**
- * A space as the assembler's subject (D71): its path, subspace tree with
+ * A space as the assembler's subject: its path, subspace tree with
  * counts, companies grouped by stage, memos and terms, from the brief.
  * - Read as the asker: memos by `canRead`; nothing sensitive is cut, the
  *   result is marked sensitive instead and its egress gate decides.

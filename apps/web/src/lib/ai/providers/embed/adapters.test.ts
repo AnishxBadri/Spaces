@@ -12,7 +12,7 @@ import {
 } from './ids'
 
 /**
- * SPA-51. The three embedding adapters, each asserted against the request it
+ * The three embedding adapters, each asserted against the request it
  * builds: a stub transport records the one request and answers in that
  * provider's wire format, so the URL, the key, the model and the requested
  * width are read off the wire with no network and no database row.

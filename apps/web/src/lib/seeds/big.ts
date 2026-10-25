@@ -11,10 +11,9 @@ import type { AttributeType } from '@spaces/core/attributes/registry'
 /**
  * The volume bench — one custom object and twenty thousand records of it.
  *
- * `dev.ts` is the developer's *working* fund: a few dozen rows, every
- * surface with something true on it. This is the other question, and it is
- * the one SPA-64 exists to answer: does `/o/$slug` still paint when the CSV
- * import area has filled a table? Nothing here is meant to be read. The
+ * The dev seed is the developer's *working* fund; this answers another
+ * question: does `/o/$slug` still paint when an import has filled a table?
+ * Nothing here is meant to be read. The
  * values are varied on purpose — six attributes across the four shapes the
  * compiler casts differently (select, number, currency, date, text) so a
  * filter and a sort each have something to be slow about.
@@ -22,11 +21,11 @@ import type { AttributeType } from '@spaces/core/attributes/registry'
  * It writes rows into `entity` directly rather than through
  * `createRecordProgram`: twenty thousand validated writes with their
  * activity rows and their link rows would take an hour and would measure the
- * write path, which is not the thing being measured. `apps/web/src/lib/seeds/**`
- * is the sanctioned exemption from the `entity.values` write-path rule.
+ * write path, which is not the thing being measured. The seeds are the
+ * sanctioned exemption from the `entity.values` write-path rule.
  *
  * **Never point this at the dev `spaces` database.** `seedBigObject` writes
- * whatever `DATABASE_URL` names; the runner (`src/db/seed-big.ts`) refuses a
+ * whatever `DATABASE_URL` names; its runner script refuses a
  * database whose name does not look like a test one unless told twice.
  */
 

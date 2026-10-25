@@ -5,14 +5,12 @@ import { EMBEDDING_PROVIDER_INFO } from './ids'
 import type { EmbedAdapterInput, EmbedAnswer, EmbedCall } from './adapter'
 
 /**
- * The Voyage embedding adapter (SPA-51). Voyage has no AI SDK provider
- * installed, so this is `POST /v1/embeddings` over `fetch` as an Effect, its
- * answer decoded through a Schema rather than trusted.
+ * The Voyage embedding adapter: `POST /v1/embeddings` over `fetch` (no AI SDK
+ * provider), the answer decoded through a Schema rather than trusted.
  *
- * Every Voyage model in the catalogue is greyed today — `output_dimension`
- * accepts 256, 512, 1024 or 2048 and never 768 — so nothing reaches this
- * adapter until a same-width model or a re-pin exists. It is built now so
- * that is a catalogue row, not a transport.
+ * Every Voyage model in the catalogue is greyed (`output_dimension` never
+ * accepts 768), so nothing reaches this until a same-width model or a re-pin
+ * exists.
  *
  * A refusal is raised as the SDK's own `APICallError`, so the settings Test
  * call's `providerFailure` reads Voyage's status and words the same way it

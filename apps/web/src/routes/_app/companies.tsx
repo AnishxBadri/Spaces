@@ -64,19 +64,18 @@ export const Route = createFileRoute('/_app/companies')({
   loader: async ({ deps }) => {
     const [withInverses, viewData, session] = await Promise.all([
       // Inverse halves (Team) come too: they are columns and filters, read
-      // from the links the list page fills each row with. (D69)
+      // from the links the list page fills each row with.
       listRegistry({ data: { kind: 'company', includeDerived: true } }),
       listViews({ data: { surface: 'object', kind: 'company' } }),
       getSession(),
     ])
-    // The view's conditions and its sort go down with the request (SPA-96,
-    // on views-3's contract), so the first paint is already the filtered,
-    // ordered first page — no flash of the rows the view hides, and no
-    // client sort of a set the client does not hold.
+    // The view's conditions and its sort go down with the request, so the
+    // first paint is already the filtered, ordered first page — no flash of
+    // the rows the view hides, and no client sort of a set it does not hold.
     const view = viewData.views.find((v) => v.id === deps.view) ?? null
     const conditions = view?.filter ?? []
     const sort = view?.sort ?? null
-    // Every chip's count rides the same load (SPA-162), so the bar paints
+    // Every chip's count rides the same load, so the bar paints
     // with its numbers — the inactive views' included — beside page one.
     const [initial, counts, all] = await Promise.all([
       listCompaniesTable({
@@ -136,7 +135,7 @@ function CompaniesPage() {
   const navigate = useNavigate()
   const prefs = useTablePrefs(PREFS_KEY)
   const { view: activeId } = Route.useSearch()
-  // SPA-122: "Run on this view" in an AI attribute's column header.
+  // "Run on this view" in an AI attribute's column header.
   const columnRun = useColumnRun({
     viewId: views.find((v) => v.id === activeId)?.id ?? null,
     registry,
@@ -151,12 +150,10 @@ function CompaniesPage() {
   })
   const { sorting, setSorting } = vs
   /**
-   * The text box is a **server** narrowing now (SPA-96): `ILIKE` on the name
-   * or on any identity domain, debounced. It used to be a client
-   * `globalFilter` over every loaded row, which stopped being able to tell
-   * the truth the moment the table stopped loading every row. Spaces dropped
-   * out of what it matches — they are a join, not a column — so the
-   * placeholder no longer promises them.
+   * The text box is a debounced **server** `ILIKE` on the name or any
+   * identity domain: the table holds one page, so a client filter would lie.
+   * Spaces are a join, not a column, so it does not match them and the
+   * placeholder does not promise them.
    */
   const [globalFilter, setGlobalFilter] = useState('')
   const [q, setQ] = useState('')
@@ -219,8 +216,8 @@ function CompaniesPage() {
   }, [loaded])
 
   /**
-   * The loader is no longer the only thing holding the rows, so a write has
-   * to reach both: the loader for the registry, the duplicate count and the
+   * A write has to reach both holders of the rows: the loader for the
+   * registry, the duplicate count and the
    * views, the query for whichever condition set is on screen. Invalidating
    * the prefix refetches every loaded page of the active key — which is how
    * a row edited out of the active filter leaves, and how `total` follows it
@@ -231,7 +228,7 @@ function CompaniesPage() {
     void router.invalidate()
     void queryClient.invalidateQueries({ queryKey: ['company-records'] })
   }, [router, queryClient])
-  // Enrich… from the selection bar or the head's ···, behind an estimate. (D76)
+  // Enrich… from the selection bar or the head's ···, behind an estimate.
   const enrich = useListEnrich({
     kind: 'company',
     label: 'Companies',
@@ -294,7 +291,7 @@ function CompaniesPage() {
           />
         ),
       }),
-      // Domains are an attribute like any other (D75), so they sort and
+      // Domains are an attribute like any other, so they sort and
       // filter through the views compiler; shown first, beside the name.
       ...identityFirst(registry).map((def) =>
         col.accessor((r): unknown => r.values[def.slug] ?? null, {
@@ -334,7 +331,7 @@ function CompaniesPage() {
           </span>
         ),
       }),
-      // Read-only, from the interaction stats; sorted on the server. (D67)
+      // Read-only, from the interaction stats; sorted on the server.
       ...statColumns<Row>(),
       col.accessor('createdAt', {
         id: 'createdAt',

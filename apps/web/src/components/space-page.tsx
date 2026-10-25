@@ -70,7 +70,7 @@ import { findQuestion } from '#/lib/ask/find-view'
 import { useWebSources } from '#/lib/ask/web-sources'
 
 /**
- * A space reads like a record (D73, D74): the head with its stamp, crumb
+ * A space reads like a record: the head with its stamp, crumb
  * and three readouts; the details column left (Criteria, Watching, What's
  * moving, Map, Glossary, Tasks); the tabbed view right. The route owns which
  * tab is open, and `into` — the subspace a split moves companies into.
@@ -143,7 +143,7 @@ export function SpacePageView({
       toast.error(err instanceof Error ? err.message : 'Could not create note')
     }
   }
-  /** A split lands here on Companies, selecting into the new child. (D73) */
+  /** A split lands here on Companies, selecting into the new child. */
   async function subspaceCreated(id: string) {
     setComposing(false)
     if (splitting) {
@@ -462,7 +462,7 @@ function SpaceMenu({
           <MessageSquareText className="size-4" />
           Ask about this
         </DropdownMenuItem>
-        {/* Opens Ask with this space and the web in scope. (D77) */}
+        {/* Opens Ask with this space and the web in scope. */}
         <DropdownMenuItem
           onSelect={() =>
             finders.length > 0
@@ -519,7 +519,7 @@ function SpaceMenu({
 /**
  * Rename in place: the title becomes a boxed field with `↵ save` under it.
  * ↵ or a blur saves, Escape keeps the name. Links, filings and watches point
- * at the space id, so nothing else changes. (D73)
+ * at the space id, so nothing else changes.
  */
 function RenameField({
   id,
@@ -580,7 +580,7 @@ function RenameField({
 /**
  * Under an archived head: what still holds, and the one way back. A space
  * archived with an ancestor is restored from that ancestor.
- * - Archive hides and pauses: filings stay, watches stop running. (D73)
+ * - Archive hides and pauses: filings stay, watches stop running.
  */
 function ArchivedNotice({
   filings,

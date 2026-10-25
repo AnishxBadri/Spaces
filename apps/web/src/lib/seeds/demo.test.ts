@@ -13,7 +13,7 @@ import {
 } from './demo'
 
 /**
- * Demo data is removable in one step (D80): the seed records exactly the
+ * Demo data is removable in one step: the seed records exactly the
  * entities it births at `workspace.settings.demo`, and removal deletes those
  * through the entity delete program — never a space the starter taxonomy
  * already held, never a record added since.

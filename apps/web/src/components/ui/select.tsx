@@ -13,15 +13,13 @@ import { cn } from '#/lib/utils.ts'
  * The one picker. A native `<select>` renders the operating system's list —
  * rounded on macOS, a different font, a blue system highlight, and on a
  * machine set to dark OS chrome a dark list dropping out of a paper form.
- * DESIGN.md §5 "Menus / pickers" says a picker is paper, 1px ink, a dithered
- * popover shadow, 28px rows, the highlighted row in bone, 150/100ms — the
- * sheet the command palette and the attribute type pane already draw. This is
- * that sheet with a trigger in front of it (SPA-38), and it is what every
- * `<select>` in the app became.
+ * A picker is paper, 1px ink, a dithered popover shadow, 28px rows, the
+ * highlighted row in bone, 150/100ms — the command palette's sheet with a
+ * trigger in front of it, used in place of every `<select>`.
  *
  * The anatomy is not new: Radix `Popover` for the layer, dismissal and the
  * reticle-free escape, cmdk `Command` for the list, its roles and its
- * ↑↓/↵ handling — the same two pieces `command.tsx` and `attribute-dialog`'s
+ * ↑↓/↵ handling — the same two pieces `Command` and the attribute dialog's
  * `TypePane` are built from. `PopoverContent` takes the cmdk root `asChild`,
  * so the element Radix focuses on open **is** the element cmdk listens on,
  * and the arrows work with or without a search box.
@@ -67,8 +65,7 @@ export type SelectItem<T extends string> = {
 /**
  * The class strings a picker is made of, exported the way `badgeClasses` and
  * `switchClasses` are: the contract is asserted against these, not against a
- * rendered tree (`apps/web/vitest.config.ts` runs on `node`, and this slice
- * added no DOM dependency to change that).
+ * rendered tree (the suite runs on `node`).
  */
 export function selectClasses({
   width,

@@ -12,27 +12,17 @@ import { Enqueue } from '../../queue/enqueue'
 import type { DocumentIntakeInput } from './intake'
 
 /**
- * The server byte lane (SPA-130) — no browser, no HTTP, no presigned URL:
- * a `Readable` and some metadata go in, a blob, a `document` row and its
- * edges come out.
- *
- * What is actually worth asserting here is the two constraints the shape
- * exists for, because both are invisible in a passing happy path: the digest
- * is measured off the stream rather than taken from anyone, and 250 MB of
- * deck must not become 250 MB of RSS. Hence the temp-directory sweep, the
- * `storage().put` spy, and the RSS bound on a generated 200 MB arrival.
- *
- * The queue is core's `Enqueue` service, provided by a recording Layer; it
- * is how the hand-off to extraction is read, since `enqueue` never fails and
- * answers `null` for a job it could not send. The
- * worker is not running, so the extract job's own program is then driven
- * directly against the arrived row — `extractDocument.run` under its real
- * `ExtractionStore` layer, exactly what `runJob` would hand it, with no
- * change to `extract-document`.
+ * The server byte lane — no browser, no HTTP, no presigned URL: a `Readable`
+ * and some metadata go in, a blob, a `document` row and its edges come out.
+ * - Asserts the two constraints a happy path hides: the digest is measured
+ *   off the stream, and 250 MB of deck must not become 250 MB of RSS (the
+ *   temp-dir sweep, the `storage().put` spy, the RSS bound).
+ * - The recording `Enqueue` Layer reads the hand-off to extraction, since
+ *   `enqueue` never fails and answers `null` for a job it could not send.
  */
 /**
- * The queue, as core's `Enqueue` service (SPA-201): birth no longer imports a
- * sender, it asks for one, so the test provides a recording one rather than
+ * The queue, as core's `Enqueue` service : birth asks for a sender rather than
+ * importing one, so the test provides a recording one rather than
  * mocking a module. `enqueue` never fails by contract, so what was sent is
  * the only way to observe the decision at all.
  */
@@ -170,7 +160,7 @@ describe('intakeDocumentProgram', () => {
     const { id, deduped } = await intake({
       stream: Readable.from([bytes]),
       filename: `SHA-${tag}.pdf`,
-      // §3.1 corrected: the class, never a vendor word, and the ref is the
+      // The class, never a vendor word, and the ref is the
       // integration's own id. The provider's tree is a label, stored verbatim.
       sourceClass: 'integration',
       sourceRef: integrationId,
@@ -197,12 +187,9 @@ describe('intakeDocumentProgram', () => {
     })
 
     // Birth handed the row to the worker, which is not running here. Driving
-    // the extract job itself needs to import from apps/worker, and spec §2's
-    // seam — `web → core, sdk, never worker`, an eslint zone since SPA-146 —
-    // forbids that from `lib/`. So the other half of this arrival, the one
-    // that reaches extraction_status 'done' off these exact bytes, is
-    // `apps/worker/src/jobs/extract-document.arrival.test.ts`, on the
-    // worker's side of the line where the import is legal.
+    // the extract job needs an import from apps/worker, which the eslint
+    // boundary forbids, so the half that reaches extraction_status 'done' off
+    // these bytes is the worker's own arrival test.
     const { QUEUES } = await import('../../queue/names')
     expect(enqueued).toEqual([
       { name: QUEUES.extractDocument, data: { documentId: id } },
@@ -228,7 +215,7 @@ describe('intakeDocumentProgram', () => {
       fileAgainst: [{ kind: 'record', entityId: companyId }],
     })
 
-    // One blob for two arrivals; the row is born anyway, because §3.4's
+    // One blob for two arrivals; the row is born anyway, because the
     // dedupe is about a target and is birth's rule, not this module's.
     expect(put).not.toHaveBeenCalled()
     expect(deduped).toBe(false)
@@ -348,14 +335,12 @@ describe('intakeDocumentProgram', () => {
 /**
  * Two lanes for bytes, one writer each, and neither module claiming to be the
  * only one — both carry a comment naming the other. Asserted the way
- * `birth.test.ts` asserts its single `insert(document)`: test files and
- * `lib/seeds/` are out of scope, being fixtures rather than paths bytes
+ * birth's single `insert(document)` is: test files and seeds are out of
+ * scope, being fixtures rather than paths bytes
  * actually arrive through.
  */
 describe('one writer of bytes, per lane', () => {
-  // Re-rooted at the workspace (SPA-201): intake and birth moved into
-  // packages/core, so a grep over apps/web alone would now watch nothing. Every
-  // workspace package's `src/` — the globs `pnpm-workspace.yaml` lists — is
+  // Every workspace package's `src/` — the globs `pnpm-workspace.yaml` lists — is
   // read, and paths are repo-relative. Seeds are fixtures, not a lane.
   const root = resolve(
     fileURLToPath(new URL('.', import.meta.url)),
@@ -382,8 +367,8 @@ describe('one writer of bytes, per lane', () => {
   }
 
   /**
-   * Two sites, and the second one is named rather than tolerated
-   * (docsurf-10b). `intake.ts` is the lane for bytes that still need a
+   * Two sites, and the second one is named rather than tolerated. Intake is
+   * the lane for bytes that still need a
    * document; the clip job's PDF branch has a document already —
    * `clipUrlProgram` wrote the row before the fetch — so it cannot reuse
    * intake without minting a second one and orphaning the first. What it
@@ -410,8 +395,7 @@ describe('one writer of bytes, per lane', () => {
     expect(readFileSync(join(root, lane), 'utf8')).toContain(
       'putContentAddressed',
     )
-    // The local driver and the server lane both live in @spaces/core now
-    // (SPA-178, SPA-201); the driver still names the lane.
+    // The local driver names the server lane.
     expect(
       readFileSync(
         join(root, 'packages/core/src/writes/storage/local.ts'),
@@ -428,9 +412,8 @@ describe('one writer of bytes, per lane', () => {
 
   /**
    * And one writer of a `document` row, over the same trees: birth's
-   * `insert(document)` — asserted in `birth.test.ts` too, beside the writer,
-   * and here with the other storage-6a1/6a2 greps so the three cannot be
-   * re-rooted apart.
+   * `insert(document)` — asserted beside the writer too, and here with the
+   * byte-lane greps so the three cannot be re-rooted apart.
    */
   it('has exactly one insert(document) outside tests and seeds', () => {
     expect(sourcesContaining('insert(document)')).toEqual([

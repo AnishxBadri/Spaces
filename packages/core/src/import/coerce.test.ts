@@ -4,7 +4,8 @@ import { coerce, summarizeColumn } from './coerce'
 import type { CoerceOptions, CoercedValue, Coercion } from './coerce'
 
 /**
- * SPA-166. Every attribute type, the shapes it accepts and the shapes it
+ * Every attribute type, the shapes it accepts and the shapes it
+
  * refuses. No database anywhere: @spaces/core's vitest config loads no env,
  * so this file runs with Postgres stopped by construction.
  */

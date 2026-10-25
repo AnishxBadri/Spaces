@@ -14,7 +14,7 @@ import type { FolderNode } from '#/lib/documents/files-tab'
 import { cn } from '#/lib/utils'
 
 /**
- * A bound Drive folder (D66): its own band under our files, with Drive's
+ * A bound Drive folder: its own band under our files, with Drive's
  * tree, read-only. Subfolders fold; each file is a `FileRow` in folder mode
  * (`edited MM-DD · google ↗` for a native file, `■ gone` for a deleted one).
  * The band renders from the binding its caller hands it; it syncs nothing.

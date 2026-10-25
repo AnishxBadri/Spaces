@@ -10,8 +10,8 @@ import { setupTokensIn } from './admin.ts'
 import type { ChildProcess } from 'node:child_process'
 
 /**
- * One running copy of the app, the way CI runs it: `apps/web/src/db/boot.ts`
- * migrates and seeds a database nothing else uses, then `node
+ * One running copy of the app, the way CI runs it: the boot entry migrates
+ * and seeds a database nothing else uses, then `node
  * apps/web/.output/server/index.mjs` serves it. Both are *processes* — this
  * package imports nothing from the workspace (the eslint zone holds that),
  * so the product under test is exactly the bytes `vite build` produced.
@@ -45,7 +45,7 @@ export type Instance = {
   /**
    * Run a script of apps/web to completion against this instance — the same
    * tsx, tsconfig, environment and log as its boot. The screenshot pipeline
-   * seeds the developer bench this way (`src/db/seed.ts`), as a process,
+   * seeds the developer bench this way (`pnpm db:seed`'s script), as a process,
    * because this package imports nothing internal.
    */
   readonly exec: (script: string, args?: ReadonlyArray<string>) => Promise<void>
@@ -251,7 +251,7 @@ export async function publicRowCount(connectionString: string) {
  * on the server right now: the one DATABASE_URL names (the dev database, or
  * CI's `spaces`), and every database the unit suite owns — `<that>_test*`
  * by default, or `<DATABASE_URL_TEST's name>*` when that override is set,
- * the same derivation packages/db/src/test-db.ts makes.
+ * the same derivation `resolveTestDatabaseUrl` makes.
  */
 export async function countOutsideRows(): Promise<Map<string, number>> {
   const source = sourceDatabaseUrl()

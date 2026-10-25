@@ -6,22 +6,14 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * Documents file into spaces through `entity_space` (SPA-19), against the
- * test database.
+ * Documents file into spaces through `entity_space`, against the test
+ * database. Pinned: a space is never a link target, the dedupe guard sees a
+ * space filing, and delete clears the `entity_space` row.
  *
- * The union `fileAgainst: {kind:'record'|'space', entityId}` replaced a bare
- * `attachTo: uuid` that wrote `link(tagged_in)` whatever it pointed at, so
- * the three things worth pinning are the ones that were expressible before
- * and must not be now: a space reached as a link target, a dedupe guard that
- * cannot see a space filing, and a delete that trips over the `entity_space`
- * row it never knew about.
- *
- * The server fns need a request context no test has, so these call the write
- * they delegate to — `birthDocumentProgram` in `@spaces/core/writes/documents/birth`, which
- * since SPA-113 is the single writer both edge kinds go through and which the
- * client barrel does not re-export. Imports are dynamic for the same reason as
- * the rest of the DB-coupled suite: `@spaces/db` builds its pool from
- * `DATABASE_URL` at import time and `vitest.setup.ts` rewrites it per file.
+ * The server fns need a request context no test has, so these call
+ * `birthDocumentProgram`, the single writer both edge kinds go through.
+ * Imports are dynamic: `@spaces/db` builds its pool from `DATABASE_URL` at
+ * import time and `vitest.setup.ts` rewrites it per file.
  */
 
 async function actorId(): Promise<string> {
@@ -226,8 +218,8 @@ describe('the dedupe guard', () => {
     const again = await file(sha, tag, { kind: 'record', entityId: companyId })
     expect(again).toEqual({ id: onCompany.id, deduped: true })
 
-    // The half that was broken: the old guard joined `link` only, so a space
-    // filing never deduped and every re-drop into a space made a row.
+    // A guard that joined `link` only would miss a space filing, and every
+    // re-drop into a space would make a row.
     const inSpace = await file(sha, tag, { kind: 'space', entityId: spaceId })
     expect(inSpace.deduped).toBe(false)
     expect(inSpace.id).not.toBe(onCompany.id)
@@ -282,8 +274,8 @@ describe('deleting a filed document', () => {
     })
     const inSpace = await file(sha, tag, { kind: 'space', entityId: spaceId })
 
-    // The space-filed one first: before SPA-77's registry walk this was the
-    // delete that raised an entity_space foreign-key violation.
+    // The space-filed one first: a delete that skipped the registry walk
+    // would raise an entity_space foreign-key violation here.
     await deleteDocumentWithBlobGc(inSpace.id)
     expect(await edgesOf(inSpace.id)).toEqual({ links: [], spaces: [] })
     expect(

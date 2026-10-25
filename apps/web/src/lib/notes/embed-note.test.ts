@@ -28,19 +28,13 @@ import { embedSourceProgram, noteEmbedText } from '#/lib/ai/embed-source'
 import { saveNoteProgram } from './save'
 
 /**
- * SPA-132 (ai-12b): notes embed on save. `saveNoteProgram` queues
- * `chunk.embed` once its write commits; the job's program
- * (`embedSourceProgram`, run here as the worker runs it) replaces the note's chunks through the same
- * replace-stamp-embed transaction documents use. The embedding wire is a
- * fake chosen per text through `embed()`'s `model` seam, so the pin, the
- * width check and the `ai_usage` row are real and "nearest" is decided by
- * the fixture.
- *
- * The search half calls `searchAllProgram` read-only — this slice changes no
- * file under `lib/search/`, and these tests are the proof that the unchanged
- * query reaches the new source: a note found by meaning, beside a deck, and
- * a teammate's private note kept out by `canReadNoteSql` although its chunk
- * is the nearest of all.
+ * Notes embed on save: `saveNoteProgram` queues `chunk.embed` after commit,
+ * and `embedSourceProgram` (run as the worker runs it) replaces the chunks as
+ * for documents. The embedding wire is a fake chosen per text through
+ * `embed()`'s `model` seam, so pin, width check and `ai_usage` are real.
+ * The search half runs `searchAllProgram`: a note found by meaning beside a
+ * deck, and a teammate's private note kept out by `canReadNoteSql` although
+ * its chunk is the nearest.
  */
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 

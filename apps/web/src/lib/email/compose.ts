@@ -7,7 +7,7 @@ import type {
 } from '#/lib/server-fns'
 
 /**
- * The composer's client half (D67): the draft it edits, the mode switch, the
+ * The composer's client half: the draft it edits, the mode switch, the
  * autosave debounce and the store the account menu opens Drafts through.
  * Imports types from the barrel and nothing that reaches a database.
  */

@@ -16,7 +16,7 @@ import type { ReconcileOptions, Reconciled, Verdict } from './loader'
  * - Requests coalesce and never run concurrently: they wait `debounceMs`,
  *   and one arriving while a reload runs folds into a single follow-up.
  * - A failed reload is logged, never fatal: the remedy is an ordinary
- *   restart. No exit-75 fallback. (D62)
+ *   restart, never an exit-75 fallback.
  */
 
 export type PluginReloaderOptions = {

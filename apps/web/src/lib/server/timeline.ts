@@ -10,10 +10,9 @@ import { recordTimelineProgram } from '../timeline/record'
 import { requireUser } from './shared'
 
 /**
- * The timeline server fns. The merged record timeline itself is
- * `lib/timeline/record.ts` — this barrel-exported file holds the auth check
- * and the `Effect.runPromise` seam, and nothing Effect-shaped escapes it
- * (SPA-137 moved the program out; CLAUDE.md → Backend paradigm).
+ * The timeline server fns. The merged record timeline is its own program;
+ * this barrel-exported file holds the auth check and the `Effect.runPromise`
+ * seam, and nothing Effect-shaped escapes it.
  */
 
 export const getRecordTimeline = createServerFn()

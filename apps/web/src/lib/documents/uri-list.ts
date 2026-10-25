@@ -1,23 +1,10 @@
 /**
- * **A link dropped on a dropzone** (SPA-117, §3.1 entry point 5's second
- * half).
- *
- * Dragging a tab, a bookmark or a link out of any browser puts
- * `text/uri-list` on the `DataTransfer` and no files. The Files tab and a
- * space's Sources already accept a file drop; this is the one predicate that
- * turns the same gesture on a *link* into a clip instead of a no-op, and it
- * lives here rather than twice in tsx so the two surfaces cannot disagree
- * about what counts as a link.
- *
- * RFC 2483's format is lines, where a line beginning `#` is a comment — the
- * first non-comment line is the URL. Chrome and Safari send exactly one line;
- * Firefox sends the URL and then its title, so taking the first line rather
- * than the whole payload is not pedantry.
- *
- * **One link, not N.** A multi-select drag would give several, and filing
- * them would mean N server calls, N rows and N toasts from one gesture whose
- * feedback is a single line. The dialog's field is where a person adds
- * several deliberately.
+ * **A link dropped on a dropzone.** A dragged tab, bookmark or link carries
+ * `text/uri-list` and no files; this one predicate turns that drop into a
+ * clip, so the Files tab and a space's Sources cannot disagree.
+ * - RFC 2483: lines, `#` lines are comments, the first other line is the URL
+ *   (Firefox sends the URL and then its title).
+ * - **One link, not N.** Several links are added deliberately in the dialog.
  */
 
 /** The first URL a `text/uri-list` payload names, or null. */

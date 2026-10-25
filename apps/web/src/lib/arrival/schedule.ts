@@ -2,7 +2,7 @@ import { Context, Effect, Layer } from 'effect'
 import { QUEUES } from '@spaces/core/queue/names'
 
 /**
- * When the forwarding mailbox is polled (SPA-56). The cadence is a column,
+ * When the forwarding mailbox is polled. The cadence is a column,
  * `mailbox.cadence_minutes`, so the schedule is data the worker keeps in step
  * with it — the way it keeps the nightly `dedupeSweep` one — rather than a
  * constant: registered while a mailbox row exists, removed when none does.

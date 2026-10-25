@@ -5,6 +5,6 @@ import { pgEnum } from 'drizzle-orm/pg-core'
  * - A sync-created value is `integration`; the merge executor's rewrites
  *   are `system`.
  * - `actor_id` is a real user FK, set iff type = 'user'; `actor_ref` a real
- *   integration FK, set iff type = 'integration'. Both are constraints. (D1)
+ *   integration FK, set iff type = 'integration'. Both are constraints.
  */
 export const actorType = pgEnum('actor_type', ['user', 'integration', 'system'])

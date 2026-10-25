@@ -5,8 +5,8 @@ import { JobPermanent } from '../run-job'
 import { runSummarize, summarize, summarizeData } from './summarize'
 
 /**
- * SPA-66, the wrapper's view. The program's own behaviour is
- * `lib/ai/summarize.test.ts`; this holds the job to the deck reader's
+ * The wrapper's view. The program's own behaviour is apps/web's summarize
+ * suite; this holds the job to the deck reader's
  * contract: every failure ends the job permanently with the program's
  * sentence as its reason, and pg-boss never retries a frontier call.
  */

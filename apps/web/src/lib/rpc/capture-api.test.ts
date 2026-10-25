@@ -31,14 +31,13 @@ import {
 } from './versions'
 
 /**
- * SPA-111 — `POST /api/v1/capture`: page text in, a filed document out,
+ * `POST /api/v1/capture`: page text in, a filed document out,
  * authenticated by a `capture:write` token. Everything goes through
  * `handleApiRequest`, what the `/api/v1/$` route hands a request to — what
  * curl or a bookmarklet sends. The queue is the stub every document fixture
  * uses: birth enqueues extraction, and `enqueued` is the record of it. The
- * row reaching `done` through the unchanged extract job is
- * `worker/jobs/extract-document.capture.test.ts`, on the worker's side of
- * the seam.
+ * row reaching `done` through the extract job is proven on the worker's side
+ * of the seam.
  */
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
@@ -201,7 +200,7 @@ describe('POST /api/v1/capture — unfiled', () => {
       mime: CAPTURE_MIME,
       sizeBytes: Buffer.byteLength(body.text, 'utf8'),
       kind: 'article',
-      // The clip's class (SPA-137): a person, in a first-party surface.
+      // The clip's class: a person, in a first-party surface.
       sourceClass: 'manual',
       sourceRef: null,
       uploadedBy: FIXTURE_ACTOR.id,

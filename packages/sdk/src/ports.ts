@@ -34,22 +34,21 @@ import type {
 import type { AuthoredManifest } from './manifest.ts'
 
 /**
- * The ports (docs/spec-plugin-sdk.md §4). Effect service tags
- * and no implementations: a plugin imports these, core implements them over
- * the real database (`packages/core/src/writes/ports/`, sdk-6a…sdk-10), and
- * the loader provides the implementations bound to one `integration` row,
- * holding exactly the ports the job's `uses` names (D51).
+ * The ports. Effect service tags and no implementations: a plugin imports
+ * these, core implements them over the real database, and the loader
+ * provides the implementations bound to one `integration` row, holding
+ * exactly the ports the job's `uses` names.
  *
- * The house pattern (the one SPA-182's `SimilarLane` copies):
+ * The house pattern (`SimilarLane` copies it):
  *
  *   export class X extends Context.Service<X, Shape>()('spaces/…/X') {}
  *
  * **The service keys are part of the contract.** A key is how the host's
  * Layer finds the tag a bundle yields; a renamed key is "service not found"
- * in every installed plugin, so `ports.test.ts` snapshots the list and a
+ * in every installed plugin, so a test snapshots the list and a
  * rename there is an SDK major.
  *
- * **A write port returns what its lane decided (D52)** — the id it wrote, or
+ * **A write port returns what its lane decided** — the id it wrote, or
  * the conflicts it refused — and fails with a `JobError`, the three outcomes
  * `runJob` maps, so a port failure propagates out of a job unchanged.
  *
@@ -132,8 +131,8 @@ export type AnswerResult = {
 
 /**
  * - `fill`: by slug, for writers that are not enrichment sources.
- * - `answer` (SDK 1.3): an enrichment source's answers, by vocabulary key
- *   (D76). A key outside `ENRICHMENT_VOCABULARY`, or a value of the wrong
+ * - `answer` (SDK 1.3): an enrichment source's answers, by vocabulary key.
+ *   A key outside `ENRICHMENT_VOCABULARY`, or a value of the wrong
  *   shape, fails the call permanently naming the key. The host applies the
  *   enrichment rules: blanks fill, a person's value is never touched (a
  *   disagreement becomes one Review card per record), another source's
@@ -178,14 +177,14 @@ export class Content extends Context.Service<
     /**
      * One message from the bound connection's mailbox, judged and filed by
      * the host; the body's visibility is the connection's, never the
-     * plugin's (SDK 1.5, D67).
+     * plugin's (SDK 1.5).
      */
     readonly logEmail: (
       claim: EmailClaim,
     ) => Effect.Effect<EmailResult, JobError>
     /**
      * One recorder note, matched to its meeting by the host, or its removal
-     * (SDK 1.5, D78).
+     * (SDK 1.5).
      */
     readonly logRecordedNote: (
       note: RecordedNote | RecordedNoteGone,
@@ -217,7 +216,7 @@ export class Receipts extends Context.Service<
 // Ai
 // ---------------------------------------------------------------------------
 
-/** The AI substrate's lanes a plugin may call (docs/spec-ai-substrate.md). */
+/** The AI substrate's lanes a plugin may call. */
 export type AiLane = 'extract' | 'classify' | 'synthesize'
 
 /** One piece of context, citable by its ref. */
@@ -279,7 +278,7 @@ export type SearchOptions = {
 /**
  * The plugin's view of the graph. `entity` is null for an id that does not
  * exist *and* for one the integration may not read — deliberately the same
- * answer. `search` is lexical + fuzzy in v1 (D56).
+ * answer. `search` is lexical + fuzzy, not semantic.
  */
 export class Read extends Context.Service<
   Read,
@@ -299,8 +298,7 @@ export class Read extends Context.Service<
 // ---------------------------------------------------------------------------
 
 /**
- * No OAuth connection for this integration — not granted, revoked, or (until
- * the storage area builds `Secrets.accessToken`) not implemented. A job
+ * No OAuth connection for this integration — not granted, or revoked. A job
  * decides what that means for it; usually `JobPermanent`.
  */
 export class NotConnected extends Schema.TaggedError<NotConnected>()(
@@ -309,10 +307,8 @@ export class NotConnected extends Schema.TaggedError<NotConnected>()(
 ) {}
 
 /**
- * The bound row's credential, decrypted in the worker only. `accessToken` is
- * declared now so adding it later is not an SDK major; its live
- * implementation belongs to the storage area and fails `NotConnected` until
- * then.
+ * The bound row's credential, decrypted in the worker only. `accessToken`
+ * fails `NotConnected` when the row has no connection to give a token for.
  */
 export class Secrets extends Context.Service<
   Secrets,
@@ -483,8 +479,7 @@ export type StageResult = {
 }
 
 /**
- * A dialect's grid into the import batch the wizard is waiting on (D39 as
- * amended). Core walks it through the same mapping, preview, commit and
+ * A dialect's grid into the import batch the wizard is waiting on. Core walks it through the same mapping, preview, commit and
  * batch void as a hand-mapped CSV; the plugin never maps or commits. Only a
  * `file` job the import wizard started has a batch to stage into — anything
  * else fails permanently. Staging twice writes nothing the second time.
@@ -497,7 +492,7 @@ export class Import extends Context.Service<
 >()('spaces/sdk/Import') {}
 
 // ---------------------------------------------------------------------------
-// Spaces, Discover — a watch's subject and its hand-back (D72)
+// Spaces, Discover — a watch's subject and its hand-back
 // ---------------------------------------------------------------------------
 
 /** One space on the way to the brief's subject, root first. */
@@ -549,7 +544,7 @@ export type SpaceBriefNode = {
 
 /**
  * What a space is, as data an engine turns into its own query — never a
- * rendered prompt. (D71, D72)
+ * rendered prompt.
  * - `members` is capped; `memberCount` is the whole.
  * - Sensitive members and sensitive subspaces are left out.
  */
@@ -615,7 +610,7 @@ export const watchSettingsOf = <TSettings extends z.ZodType>(
 }
 
 // ---------------------------------------------------------------------------
-// The name → tag map (D51's grant)
+// The name → tag map (the loader's grant)
 // ---------------------------------------------------------------------------
 
 /** The tag for each name in `PORT_NAMES` — what the loader builds a Layer from. */

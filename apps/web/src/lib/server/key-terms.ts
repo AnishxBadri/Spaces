@@ -3,8 +3,8 @@ import { z } from 'zod'
 import { requireUser } from './shared'
 
 /**
- * The Files tab's Extract key terms button (SPA-91). Manual and pull-based
- * (docs/spec-ai-substrate.md §4), the Read deck button's shape: pressing it
+ * The Files tab's Extract key terms button. Manual and pull-based, the Read
+ * deck button's shape: pressing it
  * enqueues one `document.key-terms` job keyed on the document, and
  * pg-boss's `singletonKey` refuses a second press while the first is queued
  * or active. The result is a `suggestion(kind: 'note')` on the deal, never a

@@ -24,7 +24,7 @@ export type { WebSource } from '../ask/mount'
 
 /**
  * Ask's server fns: a turn streamed as `AskEvent`s, and the thread store —
- * every one keyed on the signed-in user, whose threads alone it reads. (D70)
+ * every one keyed on the signed-in user, whose threads alone it reads.
  * Programs are imported inside the handlers so their database code never
  * reaches the client bundle.
  */
@@ -129,7 +129,7 @@ const byCard = z.object({ suggestionId: z.uuid() })
 /**
  * An action card's two verbs, as the reader. Apply runs the writer a person
  * would — the task writer, the stage write, the one tag insert — and answers
- * the card with its outcome; Skip closes it and writes nothing. (D70)
+ * the card with its outcome; Skip closes it and writes nothing.
  */
 export const applyAskCard = createServerFn({ method: 'POST' })
   .validator(byCard)
@@ -151,7 +151,7 @@ export const skipAskCard = createServerFn({ method: 'POST' })
 
 /**
  * The plugins whose MCP servers a turn can mount: what lights the dock's
- * web chip and the space head's Find companies. (D72)
+ * web chip and the space head's Find companies.
  */
 export const askWebSources = createServerFn().handler(async () => {
   await requireUser()
@@ -162,7 +162,7 @@ export const askWebSources = createServerFn().handler(async () => {
 
 /**
  * A Find row's verbs, as the reader, on a row of their own answer: Add,
- * Add and file here / File here (`file`), or Dismiss for the space. (D77)
+ * Add and file here / File here (`file`), or Dismiss for the space.
  */
 export const actOnFindRow = createServerFn({ method: 'POST' })
   .validator(
@@ -211,7 +211,7 @@ export const getSaveWatchSetup = createServerFn().handler(async () => {
 /**
  * Save as watch on a Find table: one `space_watch`, the table's untouched
  * rows as cards under the space, and the thread's link. The same lens again
- * comes back as `exists`, naming the watch, and writes nothing. (D77)
+ * comes back as `exists`, naming the watch, and writes nothing.
  */
 export const saveFindAsWatch = createServerFn({ method: 'POST' })
   .validator(

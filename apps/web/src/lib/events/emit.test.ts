@@ -18,7 +18,7 @@ vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
  * committed, and the dispatcher sends only what the row's auto-enrich scope
  * covers: `createCompany` (`entity.created`), `createDeal` (the deal's
  * `entity.created` and its company's `deal.linked`) and a space tag
- * (`filed`). (D65, D76)
+ * (`filed`).
  */
 
 const QUEUE = 'plugin.apollo.autoEnrich'

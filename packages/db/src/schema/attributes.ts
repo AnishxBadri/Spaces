@@ -59,9 +59,8 @@ export type SelectOption = {
 }
 
 /**
- * AI attribute config (spec-ai-substrate §13) — the spec's
- * `attribute.config.ai` is this `attribute.options.ai`; there is no `config`
- * column.
+ * AI attribute config, stored at `attribute.options.ai`; there is no
+ * `config` column.
  * - Config on the existing types, never a new type: the fifteen-type menu
  *   stays frozen, and a custom object's attribute carries it as a core one does.
  * - `AI_MODE_TYPES` and `AI_MODE_LANE` are the mode × type matrix and mode →
@@ -80,7 +79,7 @@ export type AiAttributeConfig = {
 
 /**
  * A relationship's cardinality, read from the attribute's own side: own
- * object : target object. `N:1` holds one record, `1:N` and `N:N` many. (D69)
+ * object : target object. `N:1` holds one record, `1:N` and `N:N` many.
  */
 export type Cardinality = '1:1' | '1:N' | 'N:1' | 'N:N'
 
@@ -98,30 +97,30 @@ export type AttributeOptions = {
   /** number: display decimals; stored numbers untouched */
   precision?: number
   /**
-   * This attribute backs an identity key (spec §9; D75): a custom object's
+   * This attribute backs an identity key: a custom object's
    * declared `domain`/`linkedin`, or a person's `emails` and a company's
    * `domains`. The write path mirrors its values into `entity_alias`, and
    * archiving is refused while the key stands.
    */
   identityKey?: CoreIdentityKey
   /**
-   * Default (spec §4): a static value in the type's write shape, or one of
+   * Default: a static value in the type's write shape, or one of
    * exactly two dynamic forms — `'current-user'` (actor_reference) and an
    * ISO-8601 duration for dates (`'P7D'` = a week out). Fires on every
    * creation path, fills blanks only. Validated at attribute save
    * (`validateDefault`), resolved at record birth (`resolveDefault`).
    */
   default?: Json
-  /** AI attribute config — the spec's `attribute.config.ai`; see `AiAttributeConfig`. */
+  /** AI attribute config; see `AiAttributeConfig`. */
   ai?: AiAttributeConfig
   /**
-   * Fill from enrichment (D76): the vocabulary key whose answers this
+   * Fill from enrichment: the vocabulary key whose answers this
    * attribute takes, from every source. Null is the owner's "from nothing",
    * which the boot seeder never re-links; absent is never decided.
    */
   enrichmentKey?: string | null
   /**
-   * A relationship (D69): two `record_reference` attributes, one per object,
+   * A relationship: two `record_reference` attributes, one per object,
    * each naming the other's id here, with the cardinality on both.
    * - The owner stores the value; the half marked `derived` stores nothing,
    *   and `setValues` rewrites a write to it into one on the owner.
@@ -132,7 +131,7 @@ export type AttributeOptions = {
 }
 
 /**
- * The attribute engine (CONTEXT.md "Attribute engine"). Every object — core
+ * The attribute engine. Every object — core
  * or custom — carries a registry of attributes keyed by object_id; ALL
  * values (system and custom) live in entity.values jsonb keyed by slug.
  * Identity, kind, canonical_name never enter this system.
@@ -167,7 +166,7 @@ export const attribute = pgTable(
     slug: text('slug').notNull(),
     name: text('name').notNull(),
     // Optional, human-facing help text; `schemaFor` also hands it to the AI
-    // extract lane as the property's description (spec §8).
+    // extract lane as the property's description.
     description: text('description'),
     type: attributeType('type').notNull(),
     /**
@@ -180,8 +179,7 @@ export const attribute = pgTable(
     /**
      * Engine properties, not `options` keys: they mean the same thing for all
      * fifteen types, and `reconcileValueIndexes()` reads them in a `select` to
-     * decide which `attr_idx_<id>` indexes must exist. (D36; CONTEXT.md "Open
-     * questions", values jsonb indexing)
+     * decide which `attr_idx_<id>` indexes must exist.
      * - One dialog control sets both; they stay two columns because the
      *   reconciler and any later per-capability UI want them apart.
      */
@@ -229,7 +227,7 @@ export const attributeEventSource = pgEnum('attribute_event_source', [
  * the same transaction as the value write. Deal stage history is
  * `attr_slug = 'stage'`. Timeline condenses bursts at read time.
  * - Exactly one of `entity_id` / `attribute_id`: a value change is on a
- *   record; a reshape of the attribute itself (a widening, D69) is one row
+ *   record; a reshape of the attribute itself (a widening) is one row
  *   on the attribute, never one per record.
  *
  * Provenance lives on the event, not only on the suggestion row: once a
@@ -285,7 +283,7 @@ export const attributeEvent = pgTable(
       .on(t.batchId)
       .where(sql`${t.batchId} is not null`),
     // actor_type = 'user' ⇔ actor_id set, and actor_type = 'integration' ⇔
-    // actor_ref set (spec §4; D1). Biconditionals, not implications: a
+    // actor_ref set. Biconditionals, not implications: a
     // `system` row carrying an integration id is a provenance lie, and an
     // integration write that cannot say *which* integration is a hole.
     check(

@@ -3,7 +3,7 @@ import { cn } from '#/lib/utils'
 /**
  * The workspace's mark: its logo when one is set, else the monogram — the
  * name's initial in an ink square. Drawn at the sidebar head (24px) and in
- * General's Logo row (48px). (D81)
+ * General's Logo row (48px).
  * - The logo is never cropped: it sits whole inside the square.
  */
 export function WorkspaceMark({

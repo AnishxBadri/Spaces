@@ -7,33 +7,25 @@ import { logExternalOrigin } from '#/lib/server/external-origin'
  * (migrations auto-run, no `docker exec` step) and usable in dev as
  * `pnpm db:migrate:run`.
  *
- * The composition — migrate, then system attributes, then the starter
- * taxonomy, then the value-index reconcile, then the optional
- * `SPACES_PLUGINS` / `SPACES_CREDENTIAL_<ID>` install, as one command — is
- * `@spaces/core`'s `boot()` since SPA-177. What is left here is the process:
- * the two lines an operator reads at the top of `docker compose logs app`,
+ * The composition (migrate, system attributes, starter taxonomy, value-index
+ * reconcile, optional `SPACES_PLUGINS` install) is `@spaces/core`'s `boot()`.
+ * This is the process around it: the two log lines an operator reads first,
  * the argv a test hands over, and the exit code.
  */
 async function main() {
-  // The entrypoint runs this before either process starts, for every ROLE,
-  // so it is the one place that logs exactly once per boot. Print the
-  // APP_URL decision first: when HTTPS is misconfigured, the answer is
-  // waiting at the top of `docker compose logs app`. `logExternalOrigin`
-  // only prints — it reads APP_URL and touches no database — so keeping it
-  // ahead of the downgrade guard costs nothing, and a refused boot still
-  // tells the operator which origin this image thought it had.
+  // The one place that logs exactly once per boot, for every ROLE. The APP_URL
+  // decision prints first so a misconfigured HTTPS shows at the top of the
+  // logs; `logExternalOrigin` touches no database, so it runs ahead of the
+  // downgrade guard and a refused boot still names its origin.
   logExternalOrigin()
-  // Where secret.key, the setup token and the blobs live, said once per boot
-  // (SPA-176): an unset DATA_DIR resolves to `<workspace root>/data`, and
-  // the failure this line exists to make visible is the quiet one — a wrong
-  // directory means a freshly generated key and every stored credential
+  // Where secret.key, the setup token and the blobs live, said once per boot:
+  // a wrong directory means a freshly generated key and every stored credential
   // unreadable, with nothing thrown.
   console.log(`[data] DATA_DIR resolved to ${dataDir()}`)
 
-  // argv[2], when present, names the migrations folder. Nothing in the boot
-  // path passes it — `@spaces/db` resolves its own journal from
-  // `import.meta.url`, so this runs identically from any cwd. It is how
-  // `boot.test.ts` boots this entry against deliberately truncated journals.
+  // argv[2], when present, names the migrations folder: how the boot test runs
+  // against truncated journals. Otherwise `@spaces/db` resolves its own journal
+  // from `import.meta.url`, so this runs identically from any cwd.
   const folder = process.argv.at(2)
   const outcome = await boot(
     folder === undefined ? undefined : { migrationsFolder: folder },

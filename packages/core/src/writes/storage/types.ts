@@ -1,7 +1,7 @@
 import type { Readable } from 'node:stream'
 
 /**
- * Storage abstraction per CONTEXT.md. Keys are content-addressed:
+ * Storage abstraction. Keys are content-addressed:
  * sha256 of the file. Same deck emailed to both partners → one blob,
  * two document rows. Dedupe free, immutable, cache-forever.
  *

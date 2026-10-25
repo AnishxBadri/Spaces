@@ -8,7 +8,7 @@ import {
 } from './variables'
 import type { VariableContext, VariableRecord } from './variables'
 
-/** The variable grammar and its resolver (D67): every path family, blanks, refusals. */
+/** The variable grammar and its resolver: every path family, blanks, refusals. */
 
 const def = (
   slug: string,

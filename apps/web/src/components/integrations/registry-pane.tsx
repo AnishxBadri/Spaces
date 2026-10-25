@@ -62,7 +62,7 @@ export const pluginAnchor = (pluginId: string): string => `plugin-${pluginId}`
  * names, and Other only when an entry names none. One row per plugin: mark,
  * name and version over what it does, its jobs and what it will ask for,
  * Install. A removed plugin is back here, and installing it again reuses its
- * old row. (D81)
+ * old row.
  */
 export function RegistryPane({
   view,

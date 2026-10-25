@@ -23,7 +23,7 @@ import type { SpaceTab } from '#/lib/spaces/page'
 import type { SpaceWatching } from '#/lib/server-fns'
 
 /**
- * The space page as the owner approved it (D73, D74), mounted under a memory
+ * The space page, mounted under a memory
  * router on a happy-dom `Window`: the head, the three readouts, the details
  * column and the five tabs. Server fns are stubs; the toast is captured so
  * the untag's Undo can be pressed.

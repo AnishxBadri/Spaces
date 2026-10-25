@@ -15,7 +15,7 @@ import { arrivalFromSource } from './message'
 import type { ArrivalMessage } from './message'
 
 /**
- * SPA-115's pure half: which parts of a real MIME tree are documents. The
+ * The pure half: which parts of a real MIME tree are documents. The
  * fixture is parsed by mailparser exactly as the poll parses a fetched
  * message, so the dispositions, the Content-IDs and the HTML are what a
  * client sends, not a hand-built stand-in for mailparser's output.

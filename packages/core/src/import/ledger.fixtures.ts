@@ -1,11 +1,8 @@
 /**
- * Tracking-sheet fixtures for the ledger planner (SPA-170). **Built, not
- * collected:** the owner has not supplied a real tracking sheet yet, so these
- * are in the shape of the "universal tracking sheet" CONTEXT.md phase 15
- * item 9 names — one row per cheque, the company repeated on a follow-on —
- * and they assume ISO or slashed dates, amounts written with or without a
- * currency mark, and a free-text instrument column. Validation against the
- * owner's real sheets is still owed.
+ * Tracking-sheet fixtures for the ledger planner. **Built, not collected**
+ * — not validated against a real tracking sheet. One row per cheque, the
+ * company repeated on a follow-on; ISO or slashed dates, amounts with or
+ * without a currency mark, a free-text instrument column.
  */
 
 export const UNIVERSAL_HEADER = [

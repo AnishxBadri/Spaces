@@ -4,14 +4,12 @@ import { session, user } from '@spaces/db/schema/auth'
 import { requireAdmin } from '#/lib/server/shared'
 
 /**
- * `setMemberBanned`'s body — Settings → Members' "Suspend access" and
- * "Restore access" — out of `lib/server/` so a test can call it with the
- * request stubbed (CLAUDE.md, SPA-155). Suspension is how a member leaves
- * the workspace: the `user` row stays (their notes, events and suggestions
- * still name an author), `banned` flips, and every live session is deleted.
- * The ban is what every credential checks — Better Auth's admin plugin at
- * login, and `authenticateBearerProgram` for an MCP token (SPA-28 tests the
- * token half through here).
+ * `setMemberBanned`'s body (Settings → Members' Suspend/Restore access),
+ * outside the server-fn barrel so a test calls it with the request stubbed.
+ * - Suspension is how a member leaves: the `user` row stays (authorship),
+ *   `banned` flips, and every live session is deleted.
+ * - Every credential checks the ban: Better Auth at login, and
+ *   `authenticateBearerProgram` for an MCP token.
  */
 export async function setMemberBannedHandler(data: {
   userId: string

@@ -28,11 +28,9 @@ const integrationEvent = (id: string, slug: string, at: Date) =>
 
 describe('condenseBursts', () => {
   /**
-   * The regression this module was extracted for. Before `actor_ref` the key
-   * was (actorType, actorId, source), and two integrations both write with
-   * actorType 'integration', a null actorId and source 'enrichment' — so a
-   * minute apart they folded into one burst attributed to a single actor that
-   * never did half the work.
+   * Two integrations both write with actorType 'integration', a null actorId
+   * and source 'enrichment'; without `actor_ref` in the key, a minute apart
+   * they would fold into one burst attributed to a single actor.
    */
   it('keeps two integrations apart inside the gap', () => {
     const apollo = '11111111-1111-4111-8111-111111111111'

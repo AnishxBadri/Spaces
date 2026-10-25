@@ -16,7 +16,7 @@ import { manifest } from './manifest.ts'
 
 /**
  * A storage source's ports: Config, Http, Secrets and Log, never Facts or
- * Ai — it delivers bytes and never decides filing. Gate 1 checks the type
+ * Ai — it delivers bytes and never decides filing. Typecheck checks the type
  * half.
  */
 type Services<T> =

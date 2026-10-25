@@ -3,12 +3,11 @@ import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 /**
- * Integration test against the test database (SPA-77). The demo, in three
- * parts: a document tagged into a space and linked to a task deletes and
+ * Integration test against the test database, in three parts: a document tagged into a space and linked to a task deletes and
  * takes nothing else with it; an entity named by a merge_event refuses; the
  * mandate's note refuses. The imports are dynamic like the rest of the
  * DB-coupled suite — `@spaces/db` builds its pool from `DATABASE_URL` at
- * import time and `vitest.setup.ts` rewrites it per file.
+ * import time and the setup file rewrites it per file.
  */
 
 /**
@@ -57,7 +56,7 @@ async function buildTaggedDocument(tag: string) {
     sourceClass: 'manual',
   })
 
-  // The four rows the hand-written lists missed, and the two they cleared.
+  // Four rows a hand-written delete list would miss, and two it would clear.
   await db
     .insert(entitySpace)
     .values({ entityId: doc.id, spaceId: spc.id, source: 'manual' })
@@ -105,10 +104,8 @@ describe('deleteEntity', () => {
     const tag = randomUUID().slice(0, 8)
     const built = await buildTaggedDocument(tag)
 
-    // The failure this slice exists to remove: deleteDocument's hand-list
-    // cleared chunks, links, activity, the document row and the entity row,
-    // and knew nothing about entity_space — so Postgres refused the entity
-    // delete. Run that exact list and watch it still refuse.
+    // A hand-written list (chunks, links, activity, the document row, the
+    // entity row) misses entity_space, so Postgres refuses the entity delete.
     const oldPathFailure = await db
       .transaction(async (tx) => {
         await tx

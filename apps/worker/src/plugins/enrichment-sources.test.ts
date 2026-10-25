@@ -14,7 +14,7 @@ import type { LoadedPlugin } from './loader'
 /**
  * The worker's EnrichmentSources over a stand-in host: the enrich action
  * for the kind is invoked with the keys still wanted, behind the credit
- * guard, whose cache window the workspace's reuse days override. (D76)
+ * guard, whose cache window the workspace's reuse days override.
  */
 
 const manifest = toManifestJson(

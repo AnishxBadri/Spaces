@@ -1,20 +1,12 @@
 /**
- * The AI spend cap (SPA-73, D46 Option 1) — tokens per workspace per UTC
- * day, counted from `ai_usage`. One pure predicate that every model call
- * consults before it spends: `complete()` today, `embed()` when ai-9a lands
- * it. The window is "since UTC midnight of `now`", so the day turns over at
- * 00:00 UTC for every operator whatever their timezone, and `resetsAt` is
- * always the next UTC midnight.
+ * The AI spend cap: tokens per workspace per UTC day, counted from
+ * `ai_usage`. One pure predicate every model call consults before it spends.
+ * The day turns over at 00:00 UTC for everyone; `resetsAt` is the next UTC
+ * midnight.
  *
- * This is **not** sdk-16's enrichment credit cap, and the two are kept apart
- * on purpose. That one counts a provider's *credits* per *integration*, read
- * from `enrichment_record`, and is enforced in the worker before an
- * enrichment job calls out (CONTEXT.md, "Credit safety"); this one counts
- * model *tokens* per *workspace*, read from `ai_usage`. Different units
- * (a credit is whatever the vendor bills; a token is the model's), different
- * ledgers, different scopes — a merged counter would have to convert one
- * into the other, and there is no honest rate. Two counters, two homes;
- * neither reimplements the other.
+ * Not the enrichment credit cap (vendor credits per integration, from
+ * `enrichment_record`). Different units, ledgers and scopes, with no honest
+ * conversion rate, so the two never merge.
  */
 
 import type { AiCapsSetting } from '@spaces/db/schema/workspace'

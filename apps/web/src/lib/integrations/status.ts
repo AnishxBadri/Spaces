@@ -18,7 +18,7 @@ import { CAP_REFUSAL_PREFIX } from '@spaces/core/plugins/credit'
  * Plugins that are switched on and not running, or refusing work at their
  * credit cap, for Today's and Review's `PluginStatusSection` — the
  * explanation for an action missing from a record head, or one that did
- * nothing. (D53, D63)
+ * nothing.
  * - Tripped: `enabled` with status `disabled`, the worker's breaker. Degraded:
  *   `enabled` with status `degraded`, the loader could not run it.
  * - Capped: a running plugin with cap refusals since UTC midnight, when its

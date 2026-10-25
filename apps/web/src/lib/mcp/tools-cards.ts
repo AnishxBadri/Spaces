@@ -20,7 +20,7 @@ import type { ProposeCaller } from './tools-propose'
 /**
  * `propose_card`: an action card checked against the workspace and handed
  * back to the turn, which stores it as an open suggestion when the answer
- * lands. Nothing is written here. (D70)
+ * lands. Nothing is written here.
  * - Ask only: an MCP token proposes through `propose_suggestion`.
  * - A card naming what is already so (the stage it is in, a space it is filed
  *   in) is refused, so the model is told rather than the reader.

@@ -1,5 +1,5 @@
 /**
- * Phone values are stored in E.164: `+` then 2–15 digits (D67).
+ * Phone values are stored in E.164: `+` then 2–15 digits.
  * - `toE164` accepts the punctuation people type between digits and
  *   nothing else; a number without its `+` country code is refused.
  * - `formatPhone` is display only: the country code, then the national

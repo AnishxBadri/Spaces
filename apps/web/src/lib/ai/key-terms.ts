@@ -36,37 +36,16 @@ import type { SensitivityVia } from './sensitivity'
 import { citationLabels, documentItems } from './summarize'
 
 /**
- * Key terms (SPA-91; docs/spec-ai-substrate.md §11's `dd / legal` row, §14
- * step 5). A document of kind `legal` or `dd` filed on a deal is read on the
- * extract lane against a **hand-written** per-kind schema
- * (`@spaces/core/ai/key-terms`, which says why it is not compiled from the
- * registry), and what it states lands as one `suggestion(kind: 'note')` on
- * the deal — the note's body a term / value / citation table. It is the
- * extract that proves not every extract is an attribute patch: nothing here
- * writes a value, and the accept path is the summary's (`acceptProgram` →
- * `lib/notes/from-suggestion.ts`), which renders the table into a BlockNote
- * `table` block (`markdownToBlocks`).
- *
- * 1. **The deal.** The document's filing — its `tagged_in` links — must
- *    reach a deal, or the run refuses before any model call: the terms have
- *    nowhere to belong. A document filed on two deals is read once and
- *    proposed on each, since each is where the terms are looked for.
- * 2. **The context** is the document's own text, page-labelled
- *    (`documentItems`), and nothing else: the terms are what this document
- *    says, and a record's memos would only give the model somewhere else to
- *    read them from. It also keeps the extraction cache honest — the answer
- *    is a function of the bytes and the schema, whichever deal asks.
- * 3. **Sensitivity** is read live for the document and every deal; any one
- *    sensitive makes the call sensitive.
- * 4. **The call** goes through `cachedExtractProgram` under
- *    `key-terms/<kind>/v1`, so a re-press over the same bytes is answered
- *    from disk with no provider call.
- * 5. **The answer** is held to the schema again (`readKeyTerms`): a term the
- *    document does not state is absent — never a row saying "not found" —
- *    and a term whose every ref is one the context did not carry is dropped,
- *    so every row of the table carries a citation. The citation is written
- *    as words ("term sheet.pdf, p.2") by the summary's own labeller, because
- *    the note outlives the suggestion row that holds the refs.
+ * Key terms: a `legal` or `dd` document filed on a deal is read on the
+ * extract lane against a hand-written per-kind schema
+ * (`@spaces/core/ai/key-terms`) and lands as one `suggestion(kind: 'note')`
+ * per deal, a term / value / citation table. Nothing here writes a value.
+ * - Its `tagged_in` filing must reach a deal, or it refuses before any model call.
+ * - Context is the document's own pages only, so the cached answer depends
+ *   on bytes and schema alone, whichever deal asks.
+ * - Sensitivity is read live for the document and every deal; any one wins.
+ * - An unstated term is absent (never "not found"); a term citing nothing the
+ *   context carried is dropped, so every row carries a citation.
  */
 
 export const KEY_TERMS_BUDGET_CHARS = 48_000
@@ -138,7 +117,7 @@ export type KeyTermsInput = {
   /** The test seam: an injected model replaces the vault lookup. */
   model?: LanguageModel
   jobRunId?: string
-  /** A run this is a step of (SPA-100); absent, it opens its own. */
+  /** A run this is a step of; absent, it opens its own. */
   runId?: string
 }
 
@@ -369,9 +348,8 @@ const inFlight = (j: QueuedJob): boolean =>
 
 /**
  * Press Extract key terms: one job keyed on the document, on an `exclusive`
- * queue — the deck reader's trigger (SPA-90). The cheap checks are here, the
- * same the button's gate made in the browser (`offersKeyTerms`), so a stale
- * tab cannot queue a read that would only refuse.
+ * queue. Repeats the button's cheap checks (`offersKeyTerms`) so a stale tab
+ * cannot queue a read that would only refuse.
  */
 export const enqueueKeyTermsProgram = Effect.fn('enqueueKeyTerms')(function* (
   documentId: string,

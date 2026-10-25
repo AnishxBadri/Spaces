@@ -5,7 +5,7 @@ import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
 
 /**
  * One document's card for `getDocumentPreview`, or null when it is gone,
- * merged away or private to someone else (D67) — the three answer alike.
+ * merged away or private to someone else — the three answer alike.
  */
 export async function documentPreviewCard(viewer: { id: string }, id: string) {
   // `.at(0)` rather than destructuring: the row genuinely may not exist —
@@ -22,7 +22,7 @@ export async function documentPreviewCard(viewer: { id: string }, id: string) {
         extractionStatus: document.extractionStatus,
         extractionError: document.extractionError,
         // The two columns that decide whether there is a file to fetch at
-        // all (docsurf-10b). A clipped article has no blob and an address
+        // all. A clipped article has no blob and an address
         // instead, and the dialog renders the extracted text with the
         // address linked rather than asking storage for bytes it never
         // stored — which is what `getDocumentDownloadUrl` throws about.
@@ -35,7 +35,7 @@ export async function documentPreviewCard(viewer: { id: string }, id: string) {
       .where(
         and(
           eq(document.entityId, id),
-          // A private document opens for its author only (D67).
+          // A private document opens for its author only.
           canReadDocumentSql(viewer.id),
         ),
       )

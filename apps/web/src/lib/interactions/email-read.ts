@@ -24,7 +24,7 @@ import { emailPrivacyProgram } from './email-privacy'
 import type { EmailPrivacy } from './email-privacy'
 
 /**
- * The email window's read (D67): headers always, the body only through
+ * The email window's read: headers always, the body only through
  * `canRead` on the body note — the gate the record timeline applies.
  * - A body private to someone else returns `private`: no blob is read and
  *   no attachment is listed. Subject, participants and date stay — and
@@ -80,7 +80,7 @@ export type EmailDetail = {
   from: EmailParticipant | null
   to: Array<EmailParticipant>
   cc: Array<EmailParticipant>
-  /** Blind copies: the sender's alone, empty for anyone else. (D67) */
+  /** Blind copies: the sender's alone, empty for anyone else. */
   bcc: Array<EmailParticipant>
   /** Whose mailbox it came through: the body note's author. */
   via: string | null

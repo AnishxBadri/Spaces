@@ -7,7 +7,7 @@ import {
 } from './cards'
 import type { AskCardView } from './cards'
 
-/** The card catalogue and the renderer's refusal. (D70) */
+/** The card catalogue and the renderer's refusal. */
 
 const card = (over: Partial<AskCardView>): AskCardView => ({
   id: 's',

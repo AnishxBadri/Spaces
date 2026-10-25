@@ -4,7 +4,7 @@ import { matchesConditions } from '@spaces/core/views/filter'
 import type { Condition, ConditionOp } from '@spaces/core/views/filter'
 
 /**
- * Inverse attributes in a list (D69): company Team, read from the links a
+ * Inverse attributes in a list: company Team, read from the links a
  * person's `companies` writes, plus a 1:1 pair whose inverse holds one
  * record. The SQL and the browser evaluator — over the row values the page
  * fills from `relationsProgram` — must pick the same companies, and a saved

@@ -4,7 +4,8 @@ import { pluginQueueName } from '../queue/names'
 import type { PluginQueueName } from '../queue/names'
 
 /**
- * A dialect plugin as the import wizard sees it (D39 as amended): a `file`
+ * A dialect plugin as the import wizard sees it: a `file`
+
  * job that `uses` Import and `accepts` the dropped file's name. Read from
  * the stored manifest — web never loads a bundle.
  */

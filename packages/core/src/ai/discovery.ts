@@ -1,14 +1,14 @@
 import { z } from 'zod'
 
 /**
- * The two discovery cards a space's watch hands back (D72): `add_record`
+ * The two discovery cards a space's watch hands back: `add_record`
  * for a company nobody holds, `file_record` for one held elsewhere.
  * - `spaceId` and `domain` are the card's identity: one open card per pair,
  *   and a dismissal of the pair refuses every later card for it.
  * - `domain` is stored normalized (`normalizeDomain`): the propose path
  *   rewrites it before the row is written.
  * - `watchIds` are the watches that found it: a later find merges its
- *   evidence and its watch into the open card ("found by 2 watches"). (D77)
+ *   evidence and its watch into the open card ("found by 2 watches").
  *
  * One decoder, three readers: the propose path holds a new row to it, the
  * accept path reads it back, and the Review card draws it.

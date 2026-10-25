@@ -5,22 +5,12 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * Unfiled is defined by **edges** — SPA-124, `docs/spec-storage-sources.md`
- * §3.2. Six states in one fixture, because the bug this file exists to
- * prevent is a definition that drifts toward `source_class` or `blob_sha`:
- * the moment "unfiled" means "uploaded by hand" or "has no bytes", a plugin
- * that filed nothing stops being visible and the arrival is lost, which is
- * the whole point of the inbox.
- *
- * The two `NOT EXISTS` halves are what the record-only and space-only rows
- * pin. An anti-join over both edge tables would let a document carrying one
- * edge kind survive the other's null test — it would read as unfiled while
- * sitting on a company's Files tab.
- *
- * Dynamic imports for the reason the rest of the DB-coupled suite uses them:
- * `@spaces/db` builds its pool from `DATABASE_URL` at import time and
- * `vitest.setup.ts` rewrites it per file. The programs are called directly —
- * the server fns need a request no test has.
+ * Unfiled is defined by **edges**. Six states in one fixture, because the
+ * bug to prevent is a definition drifting toward `source_class` or
+ * `blob_sha`: then a plugin that filed nothing stops being visible.
+ * The record-only and space-only rows pin the two `NOT EXISTS` halves.
+ * Imports are dynamic because `@spaces/db` builds its pool from
+ * `DATABASE_URL` at import time and the vitest setup rewrites it per file.
  */
 
 async function actorId(): Promise<string> {
@@ -105,8 +95,8 @@ async function birth(input: Birth): Promise<string> {
 }
 
 /**
- * The shelf is the whole workspace, and truncation is per test *file*
- * (CLAUDE.md → Isolation), so every case tags its fixtures and reads back
+ * The shelf is the whole workspace, and truncation is per test *file*,
+ * so every case tags its fixtures and reads back
  * only its own rather than asserting on the bare list.
  */
 async function shelf(filed: 'all' | 'unfiled', tag: string) {

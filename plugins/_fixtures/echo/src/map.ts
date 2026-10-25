@@ -26,9 +26,9 @@ const organizationResponse = z.object({
 })
 
 /**
- * The pure half of the `enrich` job: provider JSON in, claims out (D52 —
- * the job then calls the ports with them: `Identity.resolve(identity)`,
- * `Receipts.store(receipt(id))`, `Facts.fill(facts(id, receiptId))`). The
+ * The pure half of the `enrich` job: provider JSON in, claims out. The job
+ * then calls the ports with them: `Identity.resolve(identity)`,
+ * `Receipts.store(receipt(id))`, `Facts.fill(facts(id, receiptId))`. The
  * identity is claimable before any id exists; the receipt and the facts
  * name the entity the resolve returned, so they are functions of it.
  */

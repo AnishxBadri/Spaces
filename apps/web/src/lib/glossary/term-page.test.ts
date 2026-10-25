@@ -4,12 +4,10 @@ import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The term page's load (SPA-75), against the test database. The page is
- * everything the graph learned by matching a term — mentions with the
+ * The term page's load, against the test database: mentions with the
  * palette's snippets, companies reached through them, co-mentioned terms —
- * with canRead in the SQL. The file's database was truncated and reseeded
- * before it was imported (SPA-145); imports are dynamic because `@spaces/db`
- * builds its pool from `DATABASE_URL`, which `vitest.setup.ts` rewrites.
+ * with canRead in the SQL. Imports are dynamic because `@spaces/db` builds
+ * its pool from `DATABASE_URL`, which the setup file rewrites per file.
  */
 
 async function deps() {

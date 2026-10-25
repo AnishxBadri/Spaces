@@ -14,12 +14,12 @@ export const ENV = {
   mainDb: 'E2E_MAIN_DATABASE_URL',
   adminStorage: 'E2E_ADMIN_STORAGE',
   /**
-   * Set by the caller, not by a setup: the composed image to smoke (SPA-186).
-   * When present the suite runs the image project instead of booting its
-   * own instances — see playwright.config.ts.
+   * Set by the caller, not by a setup: the composed image to smoke. When
+   * present the suite runs the image project instead of booting its own
+   * instances.
    */
   imageUrl: 'E2E_IMAGE_URL',
-  /** The screenshot pipeline's one instance (playwright.screenshots.config.ts). */
+  /** The screenshot pipeline's one instance. */
   shotsUrl: 'E2E_SHOTS_URL',
   shotsDb: 'E2E_SHOTS_DATABASE_URL',
 } as const

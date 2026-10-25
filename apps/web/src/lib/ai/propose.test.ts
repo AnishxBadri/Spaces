@@ -5,7 +5,7 @@ import type { Decider } from './propose'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 /**
- * The suggestion table end to end (SPA-46): propose writes a row and no
+ * The suggestion table end to end: propose writes a row and no
  * value; accept writes the value through the one write path with the
  * accepter as actor and the row as the receipt; a payload the registry no
  * longer holds leaves the row open; two racing accepts write once.
@@ -20,8 +20,8 @@ async function setup() {
   ).at(0)
   if (!accepter) throw new Error('the test seed has no user')
   const tag = randomUUID().slice(0, 8)
-  // Name only: a domain would be a birth value with an event of its own
-  // (D75), and these tests count the events an accept writes.
+  // Name only: a domain would be a birth value with an event of its own,
+  // and these tests count the events an accept writes.
   const company = await resolveEntity({
     kind: 'company',
     name: `Proposed ${tag}`,
@@ -302,7 +302,7 @@ describe('propose → accept', () => {
 })
 
 /**
- * SPA-110 — bulk accept. Each item goes through `acceptProgram` in its own
+ * Bulk accept. Each item goes through `acceptProgram` in its own
  * transaction; one bad field is one failed item, never an aborted batch.
  */
 describe('bulk accept', () => {

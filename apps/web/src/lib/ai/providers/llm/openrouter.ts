@@ -5,7 +5,7 @@ import { PROVIDERS } from '../ids'
 import type { AdapterInput } from './adapter'
 
 /**
- * The OpenRouter LLM adapter (SPA-39), through OpenRouter's own AI SDK
+ * The OpenRouter LLM adapter, through OpenRouter's own AI SDK
  * provider. No `appName` / `appUrl`: those send attribution headers to
  * OpenRouter's dashboard, which is the operator's call to make through the
  * extra-headers field, not ours to make by default.

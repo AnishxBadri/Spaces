@@ -7,11 +7,9 @@ import type { CashFlow } from './xirr'
 /**
  * The portfolio roll-up and its headline — the one computation every surface
  * that states "what the book is worth" reads (Portfolio's strip, Today's
- * rail). It lives here, pure, so a surface cannot re-derive a figure of its
- * own: Today used to add `unrealized + realized` in the route and print it as
- * "Value" beside Portfolio's "Current value", and the two read $7.0M and
- * $5.9M off the same book (2026-09-30). Both were the same roll-up; one had
- * quietly folded the cash already returned into the value still held.
+ * rail). Pure and shared so no surface re-derives a figure of its own: one
+ * that folds realized cash into "Value" disagrees with "Current value" off
+ * the same book.
  *
  * Everything is forced to base. A holding whose events need a rate the
  * workspace does not have is excluded and named, never converted at 1.0.
@@ -38,7 +36,7 @@ export type PortfolioRollup = {
 
 export type RollupHolding = {
   id: string
-  /** originals only, each stamped with `reversedAt` (the D12 reader contract) */
+  /** originals only, each stamped with `reversedAt` (the reversal reader contract) */
   events: HoldingEvents
   /**
    * The holding's display metrics, when the caller already computed them —

@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { defineManifest } from '@spaces/sdk'
 
 /**
- * Sync-shaped (sdk-7b): resume from the cursor, page the provider, resolve
+ * Sync-shaped: resume from the cursor, page the provider, resolve
  * each participant, log each message, hand back the next cursor. `uses`
  * deliberately lacks Facts — a syncer files evidence and never writes an
  * attribute.

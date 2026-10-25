@@ -16,12 +16,9 @@ import { testAiProviderProgram } from './providers/settings'
 import { setAiCapsProgram, usageTodayProgram } from './caps'
 
 /**
- * SPA-42. `complete()` through an injected model — `MockLanguageModelV4`
- * from `ai/test` — which is the pattern every later AI test follows: the
- * route, the sensitivity refusal, the prompt and the `ai_usage` row are all
- * real, and nothing reaches a network. The one test that exercises the real
- * Anthropic adapter (the Providers Test call, end to end) hands it a stub
- * `fetch`, as `providers/anthropic.test.ts` does.
+ * `complete()` through an injected `MockLanguageModelV4`: route, sensitivity
+ * refusal, prompt and `ai_usage` row are real, and nothing reaches a network.
+ * The Test call exercising the real Anthropic adapter gets a stub `fetch`.
  */
 
 const ITEMS: ContextItem[] = [

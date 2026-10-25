@@ -14,25 +14,18 @@ import { readImageJournal } from '@spaces/db/downgrade-guard'
 import { MIGRATIONS_FOLDER } from '@spaces/db/migrate'
 
 /**
- * The boot composition, end to end (SPA-36, re-sited by SPA-142).
- *
- * The guard's own unit tests live with the guard, in
- * `packages/db/src/downgrade-guard.test.ts`. What is proven *here* is the
- * ordering that only the app can compose: migrate first, and the two seeds
- * only if migrate was allowed to run. So it needs a Postgres it can create a
- * database on — a throwaway beside the one DATABASE_URL names, migrated with
- * the full journal, then booted by `src/db/boot.ts` exactly as the container
- * entrypoint boots it.
+ * The boot composition, end to end: migrate first, and the seeds only if
+ * migrate was allowed to run. The guard's own unit tests live with the guard.
+ * Runs against a throwaway database beside the one DATABASE_URL names, booted
+ * exactly as the container entrypoint boots it.
  */
 
 const webRoot = fileURLToPath(new URL('../..', import.meta.url))
 const bootEntry = path.join(webRoot, 'src/db/boot.ts')
 const imageFolder = MIGRATIONS_FOLDER
 
-// Derived from the worker's own test database (SPA-143/145 hand each vitest
-// worker its own), so two checkouts running this file at once — main and an
-// agent worktree — cannot drop each other's database mid-test. A fixed name
-// did exactly that on 2026-09-19.
+// Derived from the worker's own test database, so two checkouts running this
+// file at once cannot drop each other's database mid-test.
 const TEST_DB = `${new URL(process.env.DATABASE_URL!).pathname.slice(1)}_boot`
 
 describe('db/boot.ts (real database)', () => {
@@ -84,11 +77,9 @@ describe('db/boot.ts (real database)', () => {
 
   /**
    * Boot the app's entry the way the entrypoint does. `migrationsFolder` is
-   * the fixture's journal, handed over on argv — since SPA-142 the folder is
-   * resolved from `import.meta.url` inside the package, so varying the cwd
-   * no longer varies the journal, and a fixture has to say which one it
-   * means. `cwd` defaults to a directory that is not the repo, which is the
-   * point of the criterion the last test in this block checks.
+   * the fixture's journal, handed over on argv: the default journal resolves
+   * from `import.meta.url`, not cwd. `cwd` defaults to a directory that is not
+   * the repo, which the last test in this block relies on.
    */
   function runBoot(options?: { migrationsFolder?: string; cwd?: string }) {
     return spawnSync(
@@ -239,11 +230,9 @@ describe('db/boot.ts (real database)', () => {
   })
 
   /**
-   * The criterion the folder move turns on: booted from a directory that is
-   * neither the repo nor anywhere near the journal, and told nothing about
-   * where the journal is, it still finds it — because `@spaces/db` resolves
-   * it from `import.meta.url`. Before SPA-142 the same run read `./drizzle`
-   * relative to this cwd and found nothing.
+   * Booted from a directory nowhere near the journal and told nothing about
+   * where it is, boot still finds it: `@spaces/db` resolves it from
+   * `import.meta.url`, not cwd.
    */
   it('boots from an unrelated cwd with no folder argument, and seeds', async () => {
     const run = runBoot({ cwd: tmpdir() })

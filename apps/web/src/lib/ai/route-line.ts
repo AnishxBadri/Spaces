@@ -4,7 +4,7 @@ import type { SensitivityVia } from './sensitivity'
 /**
  * The words a streamed answer is footed with: which model answered, whether
  * the sensitivity gate sent it local, or why it was refused. Prep and Ask
- * both print these, so they are spelled once. (D70, D68)
+ * both print these, so they are spelled once.
  */
 
 export const providerLabel = (provider: string): string =>

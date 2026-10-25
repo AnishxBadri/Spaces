@@ -5,7 +5,7 @@ import { PROVIDERS } from '../ids'
 import type { AdapterInput } from './adapter'
 
 /**
- * The Anthropic LLM adapter (`docs/spec-ai-substrate.md` §9): a vault
+ * The Anthropic LLM adapter: a vault
  * credential in, an AI SDK `LanguageModel` out. The key comes from the vault
  * and only from the vault — `apiKey` is always passed, so the SDK's
  * `ANTHROPIC_API_KEY` environment fallback can never engage.

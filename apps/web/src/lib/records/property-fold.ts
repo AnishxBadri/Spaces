@@ -1,5 +1,5 @@
 /**
- * Which attribute values the details column folds away (D69): nothing
+ * Which attribute values the details column folds away: nothing
  * stored, a blank string, or an empty list. `false` and `0` are values.
  */
 export function isEmptyValue(value: unknown): boolean {

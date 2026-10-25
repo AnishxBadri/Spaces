@@ -20,7 +20,7 @@ import { NoEmailLane } from '@spaces/core/writes/interactions/email-lane'
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
 /**
- * The demo, against the real arrival lane: a calendar meeting synced through
+ * Recorders against the real arrival lane: a calendar meeting synced through
  * `Content.logMeeting`, then a recorder's payload naming its iCalUID through
  * `Content.logInteraction`. The payload lands on the meeting's row and its
  * attendees resolve to the same people; one naming nothing becomes a call;

@@ -2,7 +2,7 @@ import { valueValidator } from './registry'
 import type { AttributeDef } from './registry'
 
 /**
- * Pure half of defaults (spec §4): parsing a duration, resolving what a
+ * Pure half of defaults: parsing a duration, resolving what a
  * default means at birth, validating one at attribute save. No db here —
  * the write path imports this, so it cannot import the write path.
  */

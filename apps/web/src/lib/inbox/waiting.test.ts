@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 /**
- * SPA-114. The record rail's "Waiting" lane and the inbox it links into:
- * open suggestions counted per kind on one record in one query, rejected
- * ones gone for good, and `listInboxProgram` narrowed to one record across
- * both lanes. Integration against this worker's test database, truncated
- * and reseeded before the file was imported (SPA-145) — no cleanup here.
+ * The record rail's "Waiting" lane and the inbox it links into: open
+ * suggestions counted per kind on one record in one query, rejected ones gone
+ * for good, and `listInboxProgram` narrowed to one record across both lanes.
+ * The test database is truncated and reseeded before the file, so there is
+ * no cleanup here.
  */
 
 async function world() {

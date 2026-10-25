@@ -5,31 +5,19 @@ import { document, entity, link, term } from '@spaces/db/schema'
 import { mentionedTermIds, termAutomaton } from '@spaces/core/glossary/terms'
 
 /**
- * Glossary terms as concept nodes (SPA-34; CONTEXT.md → Glossary, "Concept
- * node"). The matcher that highlights a term in the editor runs here too,
- * over a note's `body_md` on save and over a document's `extracted_text`
- * after extraction, and diff-syncs `link(from → term, mentions, extracted)`
- * so the graph learns that PUE was mentioned.
+ * Glossary terms as concept nodes: the editor's term matcher, run over a
+ * note's `body_md` on save and a document's `extracted_text`, diff-syncing
+ * `link(from → term, mentions, extracted)`. Deterministic: no model, no key.
+ * Kept out of the server-fn barrel so the worker and tests call it directly.
  *
- * Deterministic: no model, no key, no chunks — spec §11's "glossary match"
- * row, whose lane is "none".
+ * **The edge rule.** `link_edge_unique` ignores `source`, so a pair carries
+ * one `mentions` row at most. The sync deletes only `extracted` rows and
+ * inserts only where no `mentions` row exists: a manual link is never
+ * deleted or duplicated.
  *
- * Lives outside `lib/server/` (SPA-155) so the worker and the tests call it
- * without a request.
- *
- * **The edge rule.** `link_edge_unique` is `(from, to, relation, attr_slug)`
- * whatever the `source`, so a pair carries one `mentions` row at most. The
- * sync owns only `source: 'extracted'` rows: it deletes those alone, and it
- * inserts only where no `mentions` row of any source exists. A manual
- * `mentions` link on the same pair is therefore never deleted and never
- * duplicated — while it stands, the extracted one is simply not written.
- *
- * **Scope.** A term is visible from an entity through the spaces the entity
- * is filed in (`entity_space`) and every ancestor of those (`ltree @>`),
- * plus the global terms (`space_id` null). A note filed in several spaces
- * sees the union; one filed nowhere sees the global terms only. This is the
- * query `listTermsForNote` hands the editor decoration, so the decoration
- * and the sync agree on the term set as well as on the matcher.
+ * **Scope.** Terms of the entity's spaces and their ancestors (`ltree @>`),
+ * plus global terms (`space_id` null). `listTermsForNote` hands the editor
+ * the same set, so decoration and sync agree.
  */
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]

@@ -3,7 +3,7 @@ import { db } from './index.ts'
 import { workerHeartbeat } from './schema/worker.ts'
 
 /**
- * The worker heartbeat, from both ends (CONTEXT.md, hostability contract 4).
+ * The worker heartbeat, from both ends.
  *
  * - The worker writes through `beat()`; `/api/health` and the `ROLE=worker`
  *   container's health command read the same row. Both pass `STALE_AFTER` to

@@ -12,14 +12,14 @@ import { openrouterLanguageModel } from './llm/openrouter'
 import { readProviderMeta } from './meta'
 
 /**
- * LLM providers: vault credential → adapter → AI SDK `LanguageModel`
- * (`docs/spec-ai-substrate.md` §9). The ids live in `./ids` (client-safe);
- * this module is server-only because it reads the vault.
+ * LLM providers: vault credential → adapter → AI SDK `LanguageModel`. The
+ * ids live in `./ids` (client-safe); this module is server-only because it
+ * reads the vault.
  */
 export { LLM_PROVIDERS, PROVIDERS } from './ids'
 export type { LlmProvider } from './ids'
 
-/** No active credential: the feature is hidden, not broken (CONTEXT.md, BYOK). */
+/** No active credential: the feature is hidden, not broken. */
 export class NoCredential extends Schema.TaggedError<NoCredential>()(
   'NoCredential',
   { provider: Schema.String },

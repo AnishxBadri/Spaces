@@ -21,7 +21,7 @@ import { refreshGrant } from './exchange'
  * - A refused refresh marks the row `error` with the provider's reason and
  *   keeps its scopes and bundle; an `error` or `revoked` row never yields a
  *   token and never reaches the provider.
- * - A pasted key (D78) is returned as it is: it has no expiry and no refresh.
+ * - A pasted key is returned as it is: it has no expiry and no refresh.
  */
 
 export class AuthExpired extends Schema.TaggedError<AuthExpired>()(

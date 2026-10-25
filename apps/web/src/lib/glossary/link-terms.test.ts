@@ -3,17 +3,12 @@ import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 /**
- * Glossary terms as concept nodes (SPA-34), against the test database.
- *
- * The note half runs through `saveNoteProgram` — the body of the `saveNote`
- * server fn — so what is pinned is the save a person makes, not a helper
- * beside it. The document half's standalone form is here too; the
- * extraction job's own run is `worker/jobs/extract-document.terms.test.ts`
- * (nothing under `lib/` may import the worker).
- *
- * Imports are dynamic like the rest of the DB-coupled suite: `@spaces/db`
- * builds its pool from `DATABASE_URL` at import time and `vitest.setup.ts`
- * rewrites it per file.
+ * Glossary terms as concept nodes, against the test database.
+ * - The note half runs through `saveNoteProgram`, the `saveNote` body, so
+ *   the save a person makes is what is pinned. The document half's
+ *   standalone form is here; the extraction job's run is the worker's test.
+ * - Imports are dynamic: `@spaces/db` builds its pool from `DATABASE_URL`
+ *   at import time, and the setup file rewrites it per file.
  */
 
 async function actorId(): Promise<string> {

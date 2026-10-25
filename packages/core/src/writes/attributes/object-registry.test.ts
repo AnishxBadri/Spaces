@@ -14,11 +14,7 @@ describe('object nouns (pure)', () => {
 describe('custom objects', () => {
   const tag = randomUUID().slice(0, 8)
 
-  // No afterAll: isolation is per file and structural since SPA-145 — the
-  // setup file truncates and reseeds before this file is imported. The
-  // hand-written delete list that used to live here outlived its purpose
-  // and, once a custom record started carrying a birth alias (SPA-60),
-  // started failing on the alias's own foreign key.
+  // No afterAll: the setup file truncates and reseeds before each file.
 
   it('creates an object, its attributes, records with defaults, and references both ways', async () => {
     const { Effect } = await import('effect')

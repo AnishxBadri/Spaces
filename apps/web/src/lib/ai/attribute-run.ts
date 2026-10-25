@@ -53,37 +53,19 @@ import type {
 } from './sensitivity-for'
 
 /**
- * AI attributes (SPA-72, docs/spec-ai-substrate.md §13) — one cell at a
- * time. An attribute whose `options.ai` is set (the spec's
- * `attribute.config.ai`; there is no `config` column, so the per-type
- * `options` blob carries it — see `AiAttributeConfig`) grows a trigger on
- * its cell, on the record rail and in the table. Pressing it enqueues one
- * `attribute.run` job for that (record, attribute); the job asks the mode's
- * lane and **proposes** — D41, "AI proposes, a person accepts": the answer
- * is a `suggestion(kind: 'attribute_patch')` through `proposeProgram`,
- * carrying a rationale and refs on every mode, never a value and never a
- * pre-filled control. Accepting it in /inbox is what writes the value, by
- * the accepter, through the one write path.
+ * AI attributes, one cell at a time. An attribute whose `options.ai` is set
+ * (`AiAttributeConfig`) gets a trigger; a press enqueues one `attribute.run`
+ * job for that (record, attribute).
  *
- * **No AI-specific code per object.** The output schema is `schemaFor`
- * narrowed to the one attribute, so a custom object's attribute is
- * runnable the moment it carries a mode; the context is the assembler
- * (`recordContextProgram` — notes, documents, links, the mandate), not the
- * record's attribute values alone.
- *
- * **A new option is a registry proposal.** A classify answer naming an
- * option the attribute does not have is dropped from the patch and becomes
- * its own suggestion: an empty patch whose rationale opens with
- * `optionProposalLine` (`@spaces/core/ai/attribute-ai`). No suggestion kind
- * is added for it; the inbox card reads the line back and offers "Add
- * option", which goes through the attribute's existing option-list edit
- * (`updateAttributeProgram`) and then closes the proposal as accepted. A
- * label the person rejected before on this cell is not proposed again.
- *
- * **One open proposal per cell.** A cell with an open suggestion naming its
- * attribute — a value or a registry proposal, from this lane or the deck
- * reader — reads "proposed", and a press on it is refused rather than
- * duplicated, at the button and again in the job.
+ * - AI proposes, a person accepts: the answer is an `attribute_patch`
+ *   suggestion through `proposeProgram`, never a written value.
+ * - No AI-specific code per object: the schema is `schemaFor` narrowed to
+ *   the attribute, the context is `recordContextProgram`.
+ * - A classify answer naming an unknown option becomes a registry proposal:
+ *   an empty patch whose rationale opens with `optionProposalLine`. A label
+ *   the person rejected before on this cell is not proposed again.
+ * - One open proposal per cell: a press on a "proposed" cell is refused, at
+ *   the button and again in the job.
  */
 
 /** The record's context the model reads beside the task. */
@@ -148,7 +130,7 @@ type Cell = {
   }
   def: AttributeDef
   registry: Array<AttributeDef>
-  /** Both halves of each relationship as names, by slug — `{{team}}`. (D69) */
+  /** Both halves of each relationship as names, by slug — `{{team}}`. */
   related: Readonly<Record<string, string>>
   ai: AiAttributeConfig
 }
@@ -436,10 +418,9 @@ export type AttributeRunInput = {
   asOf?: string
   jobRunId?: string
   /**
-   * The run this cell is one step of (`./run.ts`, SPA-100) — a column run
-   * (SPA-122) threads its one run through every row. Absent, the press is
-   * its own one-step run, opened at the model call and closed when the
-   * cell settles.
+   * The run this cell is one step of; a column run threads its one run
+   * through every row. Absent, the press is its own one-step run, opened at
+   * the model call and closed when the cell settles.
    */
   runId?: string
 }
@@ -676,7 +657,7 @@ const attributeRunInRun = Effect.fn('attributeRun.inRun')(function* (
 /**
  * The wanted labels that become registry proposals: trimmed, deduplicated,
  * no longer than an option label may be, and never one the person already
- * rejected for this cell — a rejection is remembered (D41).
+ * rejected for this cell — a rejection is remembered.
  */
 const keepWanted = Effect.fn('attributeRun.keepWanted')(function* (
   cell: Cell,

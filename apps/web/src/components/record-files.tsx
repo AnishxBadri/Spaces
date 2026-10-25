@@ -55,7 +55,7 @@ import { linkReady, versionCandidates } from '#/lib/documents/newer-version'
 import type { VersionPick } from '#/lib/documents/newer-version'
 
 /**
- * A record's Files tab (D66, amended): one add row, our files grouped by
+ * A record's Files tab: one add row, our files grouped by
  * kind, a bound Drive folder as its own band, every row ending on a state
  * word. We make no folders — kind, filing and spaces do that work.
  * - The whole tab is the drop target; a drag washes it pine.
@@ -63,7 +63,7 @@ import type { VersionPick } from '#/lib/documents/newer-version'
  *   file, PUTs it at storage, then files the row. Extraction runs on the
  *   worker after, so a fresh row reads `reading text.` for a moment.
  * - An upload or picked Drive file of a kind the record already holds offers
- *   "Newer version of" on its row (D59), and its row stays as `filed.` until
+ *   "Newer version of" on its row, and its row stays as `filed.` until
  *   the pick is made or dismissed; the link is written after the birth.
  * - Link a Drive folder (the add row's `···`, or a pasted folder link) is
  *   offered only with the user's own Drive connection; a bound folder is a
@@ -608,22 +608,16 @@ function useExtractionPolling(
 }
 
 /**
- * Read deck (SPA-90). The gate is asked once per Files tab, not per row:
- * the extract lane must be routed — with a live credential, and to a local
- * model when the record resolves sensitive — at this record's sensitivity,
- * or no row shows the button. A row shows it when its document's kind is
- * `deck` and its text is extracted, and on nothing else: however the kind
- * was set — the filename guesser, a bound folder, an accepted classify
- * suggestion — the row reads `kind` alone.
- *
- * The read runs on the worker. While any deck is reading the tab polls
- * `readDeckStatus`; a read that settles says so in a toast — the suggestions
- * are in Review, or the job's own failure sentence — and the button
- * comes back.
- *
- * Read deck and summarize (SPA-100) sits beside it when the synthesize lane
- * can run too: the same job and key with this record as the summary's home,
- * one two-step run — so the status, the polling and the toast are shared.
+ * Read deck.
+ * - The gate is asked once per Files tab, not per row: the extract lane
+ *   routed, a live credential, and a local model when the record resolves
+ *   sensitive — or no row shows the button.
+ * - A row shows it for a `deck` with extracted text, reading `kind` alone
+ *   however it was set (filename guess, bound folder, accepted suggestion).
+ * - The read is a worker job: the tab polls `readDeckStatus` and a settled
+ *   read toasts (suggestions in Review, or the job's failure sentence).
+ * - Read deck and summarize sits beside it when the synthesize lane can run
+ *   too: the same job and key, with this record as the summary's home.
  */
 /** A document's read state; a deck the tab has not asked about is idle. */
 function stateOf(

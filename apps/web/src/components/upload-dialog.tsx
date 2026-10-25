@@ -54,36 +54,21 @@ import {
 import { cn } from '#/lib/utils'
 
 /**
- * **The global upload** — §3.1 entry point 3 (SPA-108).
- *
- * Every byte entered through a record's Files tab until this slice, so a deck
- * that arrived before you knew whose it was had nowhere to land. This is the
- * one surface where the filing is a question: a record, a space, or nowhere,
- * defaulting to **nowhere** — an unfiled document is §3.2's inbox row, not an
- * orphan, and the writer has accepted an empty `fileAgainst` since SPA-113.
- *
- * Three entry points, one component: the `/files` header, the chassis'
- * Upload row, and ⌘K's "Upload a file…". None of them owns it — it is mounted
- * once in the app shell and opened through `lib/upload-dialog-store.ts`, so a
- * fourth surface costs one call and no prop.
- *
- * **It never aborts.** Closing the dialog mid-upload closes Radix's content,
- * not this component, so an in-flight file keeps running in the state below
- * and lands as a toast. The two outcomes are therefore the only two there
- * are: `finalizeDocumentUpload` completed and a row exists, or the browser
- * lane failed before it — a PUT that never finished, a tab closed — in which
- * case there is no row at all and the bytes sit in the store as garbage for
- * the blob GC (SPA-54) to collect. Nothing in between: the row is written by
- * one transaction, and no half of it is written by the browser. The dialog
- * says which, in the foot and in the toast on close.
- *
- * The hasher is `lib/documents/upload.ts` and only that (SPA-71) — the size
- * guard, the secure-context check and the already-stored short circuit all
- * live there, and this surface passes it the drop's one target per file.
- *
- * A file dropped on a record that already holds one of its kind gets
- * "Newer version of" under its row (D59), optional and none by default; the
- * link is written by a second call once the row has committed.
+ * **The global upload** — the one surface where the filing is a question: a
+ * record, a space, or nowhere, defaulting to **nowhere** (an unfiled
+ * document is an inbox row, not an orphan).
+ * - Mounted once in the app shell and opened through `openUploadDialog`, so
+ *   the `/files` header, the chassis' Upload row and ⌘K share it.
+ * - **It never aborts.** Closing the dialog closes Radix's content, not this
+ *   component, so an in-flight file lands as a toast. Either
+ *   `finalizeDocumentUpload` completed and a row exists, or the browser lane
+ *   failed first and the bytes are garbage for the blob GC — the row is one
+ *   transaction, never half-written by the browser.
+ * - Hashing, the size guard, the secure-context check and the already-stored
+ *   short circuit are `uploadDocument`'s alone; this passes it one target
+ *   per file.
+ * - A file dropped on a record holding one of its kind gets an optional
+ *   "Newer version of", linked by a second call after the row commits.
  */
 
 /** A file this dialog started, terminal or not. */
@@ -144,8 +129,8 @@ export function UploadDialog() {
     patchUpload(key, linked ? { linked: true } : { olderId: null }),
   )
 
-  // Each opening is a new drop: the picker starts at Unfiled, as §3.1 says it
-  // defaults, and last session's finished rows are history. Anything still
+  // Each opening is a new drop: the picker starts at Unfiled, and last
+  // session's finished rows are history. Anything still
   // running is not — it stays on the list it is still writing to.
   useEffect(() => {
     if (!open) return
@@ -432,21 +417,13 @@ function useRecordDocuments(entityId: string | null) {
 }
 
 /**
- * **Paste a link** — §3.1 entry point 5 (SPA-117), under the drop zone and
- * filing against the same answer the drop zone would use. A saved article is
- * a document like any other: no separate table, readability text into the
- * same `extracted_text` / `tsv` pipeline, one ⌘K over decks and articles
- * together.
- *
- * It is the drop zone's sibling and not a second dialog because the question
- * above it — a record, a space, or nowhere — is the same question, and
- * `fileAgainstFor` is the same translation.
- *
- * The call **returns before any network call**: the server writes the row and
- * hands the fetching to the worker, so this resolves in milliseconds and the
- * row that appears says "fetching…" until the job lands. A refusal — an
- * intranet address, a `file://`, a target that will not take a filing — comes
- * back as the guard's own sentence and is shown as-is.
+ * **Paste a link**, under the drop zone and filing against the same answer
+ * (`fileAgainstFor`). A saved article is a document like any other: same
+ * table, same `extracted_text` / `tsv` pipeline.
+ * - The call **returns before any network call**: the server writes the row
+ *   and the worker fetches, so the row reads "fetching…" until the job lands.
+ * - A refusal (an intranet address, a `file://`, a target that will not take
+ *   a filing) is the guard's own sentence, shown as-is.
  */
 function LinkField({ target }: { target: UploadTarget | null }) {
   const router = useRouter()
@@ -519,10 +496,9 @@ function LinkField({ target }: { target: UploadTarget | null }) {
 
 /**
  * Records are unbounded, so this is the debounced search the Files tab's
- * filing popover and the note page's filing row already draw — and `kinds` is
- * **explicit** for the same reason it is there: SPA-27 widened the default
- * lane to include documents so a deck could be mentioned in a note body, and
- * a document filed against a document is a mention, not a filing. The server
+ * filing popover and the note page's filing row draw. `kinds` is
+ * **explicit**: the default lane includes documents (for mentions), and a
+ * document filed against a document is a mention, not a filing. The server
  * refuses those targets either way (`documentFilingRefusal`).
  */
 function RecordPicker({

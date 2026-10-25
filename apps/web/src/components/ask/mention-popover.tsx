@@ -9,7 +9,7 @@ import { cn } from '#/lib/utils'
 
 /**
  * Ask's composer field with `@`: typing it opens a popover over spaces and
- * records, found by Cmd-K's finder, and a pick becomes a scope chip. (D70)
+ * records, found by Cmd-K's finder, and a pick becomes a scope chip.
  * - ↑ ↓ move, ↵ or Tab picks, Esc closes; the keys are never printed.
  * - The name stays in the text where it was typed, without the `@`.
  */

@@ -29,7 +29,7 @@ import type {
 } from '#/lib/import/plan'
 
 /**
- * The preview step (SPA-167, import-5): the dry run, drawn from the stored
+ * The preview step: the dry run, drawn from the stored
  * plans. Copied, not designed — the header is `PageHeader` with the verdict
  * sentence as its title, the counts are the shipped `ReadoutStrip`, and the
  * rows keep the ledger rhythm (fixed lanes on rules, a mono lane the row ends
@@ -200,7 +200,7 @@ function DecisionLane({
     case 'create':
       return null
     // A records row stops on its name cell or a required reference — both
-    // the sheet's to fix; no mapping decision stops one (SPA-173).
+    // the sheet's to fix; no mapping decision stops one.
     case 'no-land':
       return <NoLandTail stop="sheet" />
     case 'collide':
@@ -261,7 +261,7 @@ function LedgerLanes({
 }
 
 /**
- * A secondary create (SPA-168): the record a create-missing reference makes,
+ * A secondary create: the record a create-missing reference makes,
  * drawn under the row that carries it, on the same lanes.
  */
 function AlsoRow({
@@ -416,7 +416,7 @@ export type LedgerItem =
 /**
  * Ledger items in sheet order, a collision drawn once — as a block, where
  * its lowest drawn row falls — with every row of it, drawn or not. A row's
- * secondary creates follow it (SPA-168); under the create filter a carrier
+ * secondary creates follow it; under the create filter a carrier
  * that does not itself create is left out and its creates still drawn.
  */
 export function ledgerItems(view: ImportPreviewView): Array<LedgerItem> {

@@ -5,9 +5,8 @@ import type { RowPlan } from '@spaces/core/import/plan'
 import type { ImportPreviewView, PreviewRow } from '#/lib/import/plan'
 
 /**
- * SPA-167. The preview's header and the ledger's grouping, server-rendered
- * with no DOM (`inbox.test.tsx`'s reason: the ledger's links want a router,
- * the header and the item list do not).
+ * The preview's header and the ledger's grouping, server-rendered with no
+ * DOM: the ledger's links want a router, the header and the item list do not.
  */
 
 const counts = {

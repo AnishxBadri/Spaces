@@ -4,14 +4,12 @@ import type { NameLookup } from './render'
 /**
  * Citation labels — a `ContextItem.ref` turned into the words a person reads
  * beside the item ("deck.pdf · chunk 4", "Stage on Acme", "the mandate").
- * Pure, exactly as `render.ts` is: every name comes in through a lookup, so
- * this file never touches the database and its test needs no DATABASE_URL.
- * `names.ts` is the program that fills the lookup.
+ * Pure: every name comes in through a lookup, so this never touches the
+ * database.
  *
- * Ids inside refs may be merged losers (`ref.ts`, decided 2026-09-09), so
- * every entity id is walked along `mergedInto` to the survivor before its
- * name is read. The walk is here, not in the lookup, so the rule lives in
- * one place whoever supplies the names.
+ * Ids inside refs may be merged losers, so every entity id is walked along
+ * `mergedInto` to the survivor before its name is read. The walk is here, not
+ * in the lookup, so the rule holds whoever supplies the names.
  */
 
 export type CiteLookup = {

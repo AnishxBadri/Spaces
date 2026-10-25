@@ -462,7 +462,7 @@ describe('manifestSchema', () => {
   })
 
   describe('provides storage-source', () => {
-    // The port-grant table (docs/spec-plugin-sdk.md §4): a storage-source
+    // The port-grant table: a storage-source
     // provider never fills facts and never calls Ai; every other port in
     // PORT_NAMES stays grantable.
     const storageSource = (uses: Array<string>) => {

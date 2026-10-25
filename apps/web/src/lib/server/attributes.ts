@@ -18,7 +18,7 @@ export const listRegistry = createServerFn()
         objectId: z.string().uuid().optional(),
         includeArchived: z.boolean().optional(),
         /**
-         * The inverse half of a relationship (D69). `values` never holds it,
+         * The inverse half of a relationship. `values` never holds it,
          * so only a surface that reads its value from the resolver asks —
          * the ledger and the record pages; one that edited what `values`
          * holds would empty the relationship.
@@ -30,8 +30,7 @@ export const listRegistry = createServerFn()
       }),
   )
   .handler(async ({ data }) => {
-    // Effect-first through the effectFn seam (backend-paradigm ratchet);
-    // auth stays promise-land outside the program.
+    // Auth stays promise-land outside the program.
     await requireUser()
     const { attribute, objectDef } = await import('@spaces/db/schema')
     const { objectIdForKind } =
@@ -99,9 +98,8 @@ export const listRegistry = createServerFn()
         isSystem: d.isSystem,
         archived: d.archived,
         sortOrder: d.sortOrder,
-        // One control in the dialog, two columns here (SPA-93) — the edit
-        // dialog reads `filterable` back so a reopened attribute shows the
-        // box as it was left.
+        // One control in the dialog, two columns here: the edit dialog reads
+        // `filterable` back so a reopened attribute shows the box as it was left.
         filterable: d.filterable,
         sortable: d.sortable,
         pair:
@@ -146,16 +144,16 @@ const optionEdit = z.object({
    *  field is how someone stores 2:1 grey-on-white and the badge stops being
    *  readable. Structure fixed, content free. */
   color: z.enum(BADGE_COLORS).optional(),
-  /** archive replaces removal — stored values keep resolving (spec §3) */
+  /** archive replaces removal — stored values keep resolving */
   archived: z.boolean().optional(),
 })
 
 /**
- * The update boundary (spec-attribute-engine §3).
+ * The update boundary.
  * - `type`, `slug`, `targetKind` and `config.multi` are not here: zod strips
  *   unknown keys, so those edits cannot reach `updateAttributeProgram`.
  * - The one shape change is top-level `multi`, which widens and is refused
- *   when it would narrow. (D69)
+ *   when it would narrow.
  */
 export const updateAttributeInput = z.object({
   id: z.string().uuid(),
@@ -182,14 +180,14 @@ export const updateAttributeInput = z.object({
       max: z.number().int().min(1).max(10).optional(),
       /** number — decimals shown */
       precision: z.number().int().min(0).max(6).optional(),
-      /** spec §4 default — shape checked by the program, per type */
+      /** the default value — shape checked by the program, per type */
       default: jsonValue.optional(),
       /**
-       * SPA-72: the spec's `attribute.config.ai`, stored as `options.ai`;
-       * null clears. The mode is checked against the type by the program.
+       * The attribute's AI config, stored as `options.ai`; null clears. The
+       * mode is checked against the type by the program.
        */
       ai: aiConfigInput.nullable().optional(),
-      /** "Fill from" (D76): the vocabulary key to link; null unlinks. Checked by the program. */
+      /** "Fill from": the vocabulary key to link; null unlinks. Checked by the program. */
       enrichmentKey: z.string().trim().min(1).max(80).nullable().optional(),
     })
     .optional(),
@@ -199,7 +197,7 @@ export const updateAttributeInput = z.object({
  * Attribute maintenance. Structure fixed, content free: names, options and
  * per-type config are editable (system included); options can be added,
  * renamed and archived but not removed — stored values may reference them.
- * - A user attribute widens to a list and archives; a system one does neither. (D69)
+ * - A user attribute widens to a list and archives; a system one does neither.
  */
 export const updateAttribute = createServerFn({ method: 'POST' })
   .validator(updateAttributeInput)
@@ -217,7 +215,7 @@ export const updateAttribute = createServerFn({ method: 'POST' })
       id: u.id,
     })
     // After the write commits, never inside it: `CREATE INDEX CONCURRENTLY`
-    // cannot run in a transaction (SPA-93). Ticking the box mints the
+    // cannot run in a transaction. Ticking the box mints the
     // attribute's `attr_idx_<id>`, unticking it — or archiving the
     // attribute — drops it, with no restart. A failed mint is logged by the
     // reconciler and leaves the attribute usable; the next boot retries.
@@ -248,7 +246,7 @@ const ATTRIBUTE_TYPES = [
 ] as const
 
 /**
- * The create boundary (spec §7): everything the morphing dialog can set.
+ * The create boundary: everything the morphing dialog can set.
  * No slug — derived server-side, immutable forever. Option ids are derived
  * from labels the same way the dialog previews them (`deriveOptionIds`).
  */
@@ -307,7 +305,7 @@ export const createAttribute = createServerFn({ method: 'POST' })
   })
 
 /**
- * The Relationship dialog's one commit (D69): both halves in one
+ * The Relationship dialog's one commit: both halves in one
  * transaction, each naming the other in `options.inverseOf`. Additive, so
  * member-level like `createAttribute`.
  */

@@ -5,7 +5,7 @@ import { INTERACTION_STAT_FIELDS } from '#/lib/views/stat-fields'
 import type { RowStats } from '#/lib/views/stat-fields'
 
 /**
- * Last contact, Last email and Next meeting as table columns (D67): read
+ * Last contact, Last email and Next meeting as table columns: read
  * from `interaction_stat`, sorted on the server by their `stat:` id, never
  * editable.
  */

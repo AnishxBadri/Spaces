@@ -6,7 +6,7 @@ import type { DocumentKind } from './index'
  * `resolveItem`: where one item of a bound folder is filed, decided from its
  * name, its parent's target and the lookups the caller made. Pure — the walk
  * reads the database, this decides — so it never creates a record and never
- * calls a model (spec-ai-substrate §11).
+ * calls a model.
  * - Folder names are hints, never identity: a folder under a space lands on
  *   a company only on an exact match; a near one leaves the files where
  *   they are and hands the candidates back.

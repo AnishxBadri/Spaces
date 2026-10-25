@@ -7,7 +7,7 @@ import { raiseSensitivity, stampedSensitive } from '../ai/stamp-sensitivity'
 import type { StampScope } from '../ai/stamp-sensitivity'
 
 /**
- * Space writes: archive, restore and move (D73), and criteria (D72). Rename is
+ * Space writes: archive, restore, move and criteria. Rename is
  * `renameRecordProgram` on the space entity.
  * - The ltree path is the only derived structure; every reader computes from
  *   it, so a move rewrites paths and nothing else but the sensitivity cache.
@@ -228,7 +228,7 @@ const chainSensitive = (path: string) =>
 /**
  * Move a space under a new parent, or to the root: one UPDATE rewrites the
  * subtree's paths and the space's `parent_id`, one activity row names both
- * paths. (D73)
+ * paths.
  * - Refused under itself or a descendant, and on a slug a sibling under the
  *   target already holds — never a silent rename.
  * - Sensitivity: the raise runs in the transaction; a move out from under a
@@ -313,7 +313,7 @@ export const moveSpaceProgram = Effect.fn('moveSpaceProgram')(function* (
 })
 
 /**
- * Set or clear what belongs in a space (D72). One `space.criteria_changed`
+ * Set or clear what belongs in a space. One `space.criteria_changed`
  * line per save that changes it.
  * - Blank clears to null; nothing else is ever stored in its place.
  * - An unchanged value writes nothing and answers `changed: false`.

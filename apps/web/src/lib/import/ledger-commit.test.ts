@@ -33,8 +33,8 @@ import { dataRowsOf } from './stage'
 import type { LedgerRowPlan } from '@spaces/core/import/ledger'
 
 /**
- * Ledger commit (SPA-171) against the database. The demo sheet is the file
- * the orchestrator uploads — `fixtures/portfolio-tracker.csv`, read through
+ * Ledger commit against the database. The demo sheet is the file the
+ * orchestrator uploads — `portfolio-tracker.csv`, read through
  * the real reader — staged straight into the tables and planned by the real
  * ledger preview, then committed through `commitImportProgram`, the
  * `import.commit` job's body. Counts are read from the four event tables

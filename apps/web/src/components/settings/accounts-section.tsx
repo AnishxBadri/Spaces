@@ -49,8 +49,8 @@ import { disconnectConnection } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 /**
- * Settings → You: the reader's accounts grouped by the job they do (D81).
- * Underneath, a connection is one product row (D66); these pages group the
+ * Settings → You: the reader's accounts grouped by the job they do.
+ * Underneath, a connection is one product row; these pages group the
  * rows by provider address, and an account page (`Options ›`) holds which
  * products it is used for and Disconnect.
  */
@@ -371,11 +371,10 @@ function disconnectedLine(
  * ticking one runs that product's own consent, unticking disconnects it —
  * each product's last sync, and Disconnect for this page's products.
  * - A product's per-connection choices are drawn only when its plugin runs
- *   on the account: a mail sync's sharing and exclude list (D67).
+ *   on the account: a mail sync's sharing and exclude list.
  * - Google's Testing mode, read off a refresh token that lapses, is one
  *   graphite line under the head: state, never a control.
- * - Sync now is drawn only for a product with a per-connection sync job;
- *   none has one yet.
+ * - Sync now is drawn only for a product with a per-connection sync job.
  */
 export function AccountSection({
   job,

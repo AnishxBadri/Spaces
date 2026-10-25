@@ -80,7 +80,7 @@ import {
 import { RecordMoreMenu } from '#/components/record/record-more-menu'
 
 /**
- * A person's page (D74): the head and readouts, then the details column —
+ * A person's page: the head and readouts, then the details column —
  * the property grid, Companies with the role, Deals, Waiting, Spaces, Tasks
  * — and the tabbed view. `?tab=` deep-links a tab.
  */
@@ -101,7 +101,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
     ] = await Promise.all([
       getPerson({ data: { id: params.personId } }),
       listSpaces(),
-      // Derived halves too: their rows read the resolver's value. (D69)
+      // Derived halves too: their rows read the resolver's value.
       listRegistry({ data: { kind: 'person', includeDerived: true } }),
       getRecordTimeline({ data: { entityId: params.personId } }),
       listRecordDocuments({ data: { entityId: params.personId } }),
@@ -164,10 +164,10 @@ function PersonRecordPage() {
   const [interactionFilter, setInteractionFilter] =
     useState<InteractionFilter>('all')
 
-  // Identity is an attribute (D75): the first email names the record.
+  // Identity is an attribute: the first email names the record.
   const firstEmail = jsonStrings(person.values.emails).at(0)
   const role = jsonString(person.values.job_title)
-  // Both sides of each relationship come from the one resolver. (D69)
+  // Both sides of each relationship come from the one resolver.
   const companies = relationRows(person.relations, 'companies', false)
   const deals = relationRows(person.relations, 'deals', true)
   const values = withDerived(person.values, person.relations)
@@ -175,7 +175,7 @@ function PersonRecordPage() {
   const nameMeta = [role, companies.at(0)?.name, firstEmail]
     .filter((part) => part !== null && part !== undefined && part !== '')
     .join(' · ')
-  // The name's parts lead the grid; the head is their join. (D67)
+  // The name's parts lead the grid; the head is their join.
   const fields = [
     ...registry.filter((def) => isNamePart(def.slug)),
     ...registry.filter((def) => !isNamePart(def.slug)),

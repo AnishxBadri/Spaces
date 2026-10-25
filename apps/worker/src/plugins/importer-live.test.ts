@@ -27,12 +27,11 @@ import { NoEmailLane } from '@spaces/core/writes/interactions/email-lane'
 /**
  * The importer fixture's `importDeck` job — the real bundle, loaded by the
  * loader exactly as boot loads it — run once on the **live** ports over the
- * test database (sdk-8, SPA-203): `Content.fileDocument` is core's intake,
+ * test database: `Content.fileDocument` is core's intake,
  * so the fixture PDF lands as a blob and a `document` row filed against the
  * company with the integration's provenance, birth queues extraction after
  * the commit, the existing `extract-document` job reads its text, and the
- * identical file uploaded by hand afterwards dedupes to the same row. This
- * is the demo the orchestrator repeats against the dev database.
+ * identical file uploaded by hand afterwards dedupes to the same row.
  */
 
 const fixtures = fileURLToPath(
@@ -46,7 +45,7 @@ type ImportDeck = (
   input: FileInput,
 ) => Effect.Effect<void, JobError, ImportServices>
 
-/** The loaded job is `unknown` until sdk-12b wires it; this is its shape. */
+/** The loader types a job as `unknown`; this is its shape. */
 const isImportDeck = (job: unknown): job is ImportDeck =>
   typeof job === 'function'
 

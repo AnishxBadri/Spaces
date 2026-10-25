@@ -11,7 +11,7 @@ import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import { NoteNotFound, NoteQueryFailed } from '#/lib/notes/delete'
 
 /**
- * "Save as new version" on a note: a new note that supersedes the old. (D59)
+ * "Save as new version" on a note: a new note that supersedes the old.
  * - The copy carries the title, kind, visibility and body, its mentions, and
  *   every filing — the records it is filed against and its spaces.
  * - The old note is untouched: it stays readable and searchable, ranked lower.

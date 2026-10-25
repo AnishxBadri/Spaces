@@ -17,7 +17,7 @@ import type { WatchRunData } from '../../queue/watch'
 import type { PluginQueueName } from '../../queue/names'
 
 /**
- * The two ways a watch run is sent (D72): "Run now", from web, and the
+ * The two ways a watch run is sent: "Run now", from web, and the
  * cadence tick, from the worker. Both send `{ watchId, spaceId }` onto the
  * plugin's watch queue keyed by the watch id.
  * - An archived space — itself or an ancestor — pauses both.
@@ -41,7 +41,7 @@ const query = <T>(run: () => Promise<T>) =>
     catch: (cause) => new WatchRunFailed({ cause }),
   })
 
-/** The space `spaceId` names is live: neither it nor an ancestor archived. (D73) */
+/** The space `spaceId` names is live: neither it nor an ancestor archived. */
 export const liveSpaceOf = (spaceId: AnyPgColumn | SQL): SQL =>
   sql`not exists (
     select 1 from space s

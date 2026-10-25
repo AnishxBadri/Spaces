@@ -1,7 +1,6 @@
 /**
- * Aho-Corasick over the glossary term set. ~120 lines and no dependency,
- * per CONTEXT.md — the alternative is a library that does the same thing
- * plus a bundle and a supply-chain surface.
+ * Aho-Corasick over the glossary term set. ~120 lines and no dependency —
+ * a library would do the same thing plus a bundle and a supply-chain surface.
  *
  * One pass over the note body finds every term and alias at once, which is
  * the point: a naive loop is O(terms × body) and gets slower every time the

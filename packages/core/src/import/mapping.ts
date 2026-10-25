@@ -18,7 +18,7 @@ import type {
 } from '@spaces/db/schema/import'
 
 /**
- * The mapping step's rules (SPA-165, project 14 `import-3`). Pure: the caller
+ * The mapping step's rules. Pure: the caller
  * hands over the target object's registry, and everything the mapping table
  * offers, guesses and refuses is computed from it — which is why a custom
  * object maps with no importer code. The shape itself is declared at the
@@ -60,7 +60,7 @@ export const IDENTITY_KEY_LABELS: Record<CoreIdentityKey, string> = {
 /**
  * A reference is matched to a record, not read from its cell — `coerce`
  * refuses every cell of these two types for value shape, and the plan finds
- * what the cell names instead (SPA-168, `./references`).
+ * what the cell names instead (`resolveReferenceCells`).
  */
 export function isReferenceType(type: AttributeType): boolean {
   return type === 'record_reference' || type === 'actor_reference'
@@ -69,7 +69,7 @@ export function isReferenceType(type: AttributeType): boolean {
 /**
  * The attributes a column may map onto: live, and not the backing attribute
  * of an identity key — a custom object's declared `domain` is offered once,
- * as the identity target it is. References included since SPA-168.
+ * as the identity target it is. References are included.
  */
 export function mappableAttributes(
   registry: MappingRegistry,
@@ -336,7 +336,8 @@ export function specFor(
   registry: MappingRegistry,
 ): ColumnSpec | null {
   switch (target.target) {
-    // A ledger column is read by `./ledger`, field by field — not as an attribute.
+    // A ledger column is read by the ledger plan, field by field — not as an attribute.
+
     case 'ignore':
     case 'ledger':
       return null
@@ -514,7 +515,8 @@ export function validateMapping(
       })
   })
   const names = byClaim.get('name') ?? []
-  // A person's First and Last name columns make the name. (D67)
+  // A person's First and Last name columns make the name.
+
   const parts = mapping.some(
     (t) =>
       t.target === 'attribute' &&

@@ -1,11 +1,10 @@
 /**
- * Server functions consumed by route loaders and forms. Auth checks happen
- * here — never trust the client to have done them. The implementations live
- * in src/lib/server/, one file per domain (companies, attributes, people,
- * deals, interactions, documents, timeline, inbox, notes, search, glossary,
- * spaces, settings); private helpers shared across domains sit in
- * src/lib/server/shared.ts. This barrel re-exports everything so call sites
- * keep importing from '#/lib/server-fns'.
+ * Server functions for route loaders and forms, one module per domain,
+ * re-exported here so call sites import `#/lib/server-fns`. Auth checks
+ * happen in the handlers — never trust the client to have done them.
+ * - A client-imported barrel: server fns and types only. A plain export from
+ *   a re-exported module ships to the browser; server-side helpers go in the
+ *   shared server module or further out.
  */
 
 export * from './server/settings'

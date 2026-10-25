@@ -11,7 +11,7 @@ import { runnable } from '#/lib/integrations/runnable'
 import { requireUser } from '#/lib/server/shared'
 
 /**
- * Manifest actions in the record head. (D63)
+ * Manifest actions in the record head.
  * - Read from `integration.manifest` alone: web never loads a bundle or
  *   reads the plugins directory.
  * - Runnable means `enabled` and status `enabled`; a degraded,

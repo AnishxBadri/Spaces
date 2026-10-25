@@ -3,7 +3,7 @@ import { cn } from '#/lib/utils'
 
 /**
  * The Files kit's glyphs: 1px ink line drawings in a 28px slot, the page's
- * cut corner the same cut as the stamp and the open tab. (D66)
+ * cut corner the same cut as the stamp and the open tab.
  * - A file glyph says the type (`PDF`, `XLS`), never the kind.
  * - A Google Doc, Sheet or Slides file wears its product mark instead.
  * - Folders are only ever a bound Drive folder and its subfolders.

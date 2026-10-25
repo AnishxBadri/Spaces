@@ -22,10 +22,10 @@ type ArrivalSettings = Awaited<ReturnType<typeof getMailboxSettings>>
 type TestResult = Awaited<ReturnType<typeof testMailbox>>
 
 /**
- * Settings → Email forwarding (D31) — the forwarding mailbox: an address the
+ * Settings → Email forwarding — the forwarding mailbox: an address the
  * fund forwards or BCCs mail to, polled over IMAP with an app password.
  * - The typed fields are one draft in the page's Save bar; the Secure switch
- *   saves alone once a mailbox exists (D81).
+ *   saves alone once a mailbox exists.
  * - The app password is write-only. A saved one reads as `●●●● saved` with
  *   Replace; a save with the field empty keeps it. Test connection tries
  *   what is typed, without saving.

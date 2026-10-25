@@ -48,7 +48,7 @@ vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
  * Find in Ask against the test database and a fake MCP server: the plugin's
  * server mounted from its integration row, its tools in the call strip with
  * the integration, the sensitive unmount, the credit cap, the results table
- * read through Discover, and Add / File here / Dismiss. (D72, D77)
+ * read through Discover, and Add / File here / Dismiss.
  */
 
 const run = <TValue, TError>(e: Effect.Effect<TValue, TError>) =>

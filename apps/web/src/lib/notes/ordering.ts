@@ -1,18 +1,10 @@
 import type { noteKind } from '@spaces/db/schema'
 
 /**
- * The one ordering rule for a lane of notes (SPA-104).
- *
- * A memo is a note with the flag up — presentation, never structure — and
- * what that presentation buys is the top of wherever the note is filed
- * (CONTEXT.md → The note model). That is a rule about a *lane*, not about
- * one page, so it lives here: the company lane sorts through this
- * comparator, and the person / deal / custom lanes of notes-1b reuse it
- * rather than each re-deriving "memos first, then recent".
- *
- * Deliberately not in SQL. `order by kind = 'memo' desc` would put the rule
- * in four query strings instead of one function, and none of them testable
- * without a database.
+ * The one ordering rule for a lane of notes: memos first, then recent. Every
+ * lane (record pages, spaces) sorts through it.
+ * Not in SQL: `order by kind = 'memo' desc` would repeat the rule in every
+ * query, none testable without a database.
  */
 
 export type NoteKind = (typeof noteKind.enumValues)[number]

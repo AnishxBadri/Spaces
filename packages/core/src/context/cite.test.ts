@@ -5,7 +5,7 @@ import type { CiteLookup } from './cite'
 import { ref } from './ref'
 
 /**
- * Pure: a stubbed lookup stands in for `names.ts`, and nothing here needs a
+ * Pure: a stubbed lookup stands in for the name loader, and nothing here needs a
  * database. The ids are fixed strings so the file reads as the table it is.
  */
 

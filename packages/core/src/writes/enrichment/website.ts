@@ -33,7 +33,7 @@ import { ReceiptsLive } from '../ports/receipts'
 import { enrichmentRow } from './apply'
 
 /**
- * The built-in Website source (D76, D80): the company's home page read in
+ * The built-in Website source: the company's home page read in
  * two halves, then answered as one.
  * - The markup half always runs and needs no model: no `ai_usage` row.
  * - The model half reads the home page and its about page with the owner's
@@ -70,7 +70,7 @@ const messageOf = (cause: unknown) =>
 
 /**
  * The Website for this record, or null when it is not a company. It is in
- * the order with or without a model (D80); the plan says whether the model
+ * the order with or without a model; the plan says whether the model
  * half may read.
  */
 export const websiteFor = Effect.fn('websiteFor')(function* (

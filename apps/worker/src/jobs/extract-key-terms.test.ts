@@ -9,8 +9,8 @@ import {
 } from './extract-key-terms'
 
 /**
- * SPA-91, the wrapper's view. The program's own behaviour is
- * `lib/ai/key-terms.test.ts`; this holds the job to the deck reader's
+ * The wrapper's view. The program's own behaviour is apps/web's key-terms
+ * suite; this holds the job to the deck reader's
  * contract: every failure ends the job permanently with the program's
  * sentence as its reason, and pg-boss never retries a model call.
  */

@@ -7,22 +7,17 @@ import { JobPermanent, JobRetryable } from '../run-job'
 import type { JobDef } from '../run-job'
 
 /**
- * document.embed — extracted text → `chunk` rows, with vectors when a model
- * is pinned (SPA-121). The program is `lib/ai/embed-document.ts`; this is the
- * wrapper's view of it, enqueued by `extractDocument` once the text is
- * stored.
+ * document.embed: extracted text → `chunk` rows, with vectors when a model is
+ * pinned. Enqueued by `extractDocument` once the text is stored.
  *
- * The outcome mapping:
- *
- *   - no pin / sensitive document   → completed; chunks written, no vectors
- *   - any other embed failure       → JobPermanent with `embedMessage`'s
- *     sentence; the chunks were still written, without vectors, so the
- *     lexical lane has them. Not retried: a cap, a missing key or a wrong
- *     width is the same answer in thirty seconds, and a provider outage is
- *     already retried inside the AI SDK call.
- *   - the document vanished         → completed, nothing to do
- *   - Postgres unreachable          → JobRetryable; the whole run is
- *     idempotent (delete-and-insert in one transaction), so a retry is safe
+ * Outcome mapping:
+ * - no pin / sensitive document → completed; chunks written, no vectors
+ * - any other embed failure → JobPermanent with `embedMessage`'s sentence;
+ *   chunks are still written for the lexical lane. Not retried: the AI SDK
+ *   call already retries outages, and a cap or missing key won't change.
+ * - the document vanished → completed
+ * - Postgres unreachable → JobRetryable; delete-and-insert in one
+ *   transaction makes the run idempotent
  */
 
 export const embedDocumentData = z.object({

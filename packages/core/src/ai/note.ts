@@ -1,8 +1,8 @@
 import { z } from 'zod'
 
 /**
- * The `suggestion(kind: 'note')` payload (SPA-66, spec-ai-substrate.md §11
- * "Summarize"): a note a model drafted, not yet a note. Accepting it is what
+ * The `suggestion(kind: 'note')` payload: a note a model drafted, not yet a
+ * note. Accepting it is what
  * writes the `note` row — with the accepter as author — filed against the
  * record the suggestion sits on and `derived_from` the source it was drafted
  * from.
@@ -13,9 +13,9 @@ import { z } from 'zod'
  * serializes `body_md` back from those blocks
  * (`noteBodyFromMarkdown`).
  *
- * One decoder, three readers — the identity payload's shape
- * (`./identity.ts`): `proposeProgram` holds a new row to it, the accept path
- * reads it back, and the inbox card draws it.
+ * One decoder, three readers, like the identity payload: `proposeProgram`
+ * holds a new row to it, the accept path reads it back, and the inbox card
+ * draws it.
  */
 export const notePayloadSchema = z
   .object({

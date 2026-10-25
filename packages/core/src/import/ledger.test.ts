@@ -34,7 +34,8 @@ import type { ReferenceOutcome } from './references'
 import type { Mapping } from '@spaces/db/schema/import'
 
 /**
- * SPA-170. The ledger planner is pure: these run with Postgres stopped —
+ * The ledger planner is pure: these run with Postgres stopped —
+
  * core's vitest config loads no environment at all.
  */
 

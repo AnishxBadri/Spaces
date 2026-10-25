@@ -8,27 +8,21 @@ import { Enqueue } from '@spaces/core/queue/enqueue'
 import { enqueue as stubSend } from '#web/test/queue-stub'
 
 /**
- * document.clip driven end to end (SPA-117) — the row from `clipUrlProgram`,
- * a stubbed `fetch`, and the four outcomes the acceptance criteria name.
- *
- * `fetch` is stubbed and never real: the whole point of the guard is that
- * this job talks to somebody else's server, and a test that actually did so
- * would be slow, flaky and a different assertion every week. What is real is
- * everything else — the document row, the readability pass over fixture HTML,
- * the text + tsv write, and the entity rename.
- *
- * It lives beside the job rather than beside `clip.ts` for the reason
- * `dedupe-sweep.test.ts` does: `src/lib/**` may not import `src/worker/**`
- * (spec §2's forbidden edge, enforced by `import/no-restricted-paths`), and
- * the whole file drives the job.
- *
- * The test databases carry no `pgboss` schema and birth enqueues; see
- * `#/test/queue-stub`.
+ * document.clip driven end to end: the row from `clipUrlProgram`, a stubbed
+ * `fetch`, and the job's outcomes.
+ * - `fetch` is never real: this job talks to somebody else's server, and a
+ *   test that did would be slow, flaky and a different assertion every week.
+ *   Everything else is real — the row, readability over fixture HTML, the
+ *   text + tsv write, the entity rename.
+ * - Here, not beside `clipUrlProgram`, because an eslint zone bars apps/web
+ *   from importing the worker.
+ * - The queue is stubbed: birth enqueues and test databases have no `pgboss`
+ *   schema.
  */
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
-// Birth's extraction enqueue is core's `Enqueue` service since SPA-201;
-// here it records into the same stub the mocked `#web/lib/queue` does.
+// Birth's extraction enqueue is core's `Enqueue` service; here it records
+// into the same stub the mocked `#web/lib/queue` does.
 const stubEnqueue = Enqueue.fromSender({ enqueue: stubSend })
 
 beforeEach(async () => {
@@ -138,8 +132,8 @@ async function runClip(documentId: string): Promise<'ok' | string> {
   )
   if (Exit.isSuccess(exit)) return 'ok'
   const failure = Cause.findErrorOption(exit.cause)
-  // A typed failure, never a defect: contract 2 says an uncaught throw past
-  // the wrapper is a container death, so this assertion is load-bearing.
+  // A typed failure, never a defect: an uncaught throw past the wrapper is a
+  // container death, so this assertion is load-bearing.
   expect(Option.isSome(failure)).toBe(true)
   if (Option.isNone(failure)) throw new Error('unreachable')
   return failure.value._tag
@@ -298,9 +292,8 @@ describe('clipDocument', () => {
   })
 
   /**
-   * docsurf-10b — §3.1 entry point 5's PDF snapshot. The assertion that
-   * matters is not "a PDF is handled" but "the row is indistinguishable from
-   * an upload's": a digest, bytes under it in the store, a size we counted,
+   * A clipped PDF. The assertion that matters is not "a PDF is handled" but
+   * "the row is indistinguishable from an upload's": a digest, bytes under it in the store, a size we counted,
    * and `document.extract` holding the job — the pipeline a deck dragged onto
    * the Files tab walks, reached from a URL.
    */
@@ -323,7 +316,7 @@ describe('clipDocument', () => {
       // `clipUrlProgram` enqueued this very job; what is under test is what
       // the job enqueues next, so the record starts from here.
       enqueued.length = 0
-      // Not a refusal any more: the job succeeds, as an HTML clip does.
+      // The job succeeds, as an HTML clip does.
       expect(await runClip(id)).toBe('ok')
 
       const row = await rowOf(id)
@@ -409,9 +402,9 @@ describe('clipDocument', () => {
       const clipped = await aClip('https://example.com/decks/seed-deck.pdf')
       expect(await runClip(clipped)).toBe('ok')
 
-      // Two documents — the clip's row already existed, so §3.4's row-level
-      // dedupe is not available to it and was never attempted — and **one**
-      // blob, which is the dedupe content addressing actually buys.
+      // Two documents — the clip's row already existed, so row-level dedupe
+      // was never available to it — and **one** blob, which is the dedupe
+      // content addressing actually buys.
       expect(clipped).not.toBe(uploaded.id)
       expect((await rowOf(clipped))?.blobSha).toBe(sha)
       expect(await storage().exists(sha)).toBe(true)
@@ -454,7 +447,7 @@ describe('clipDocument', () => {
   })
 
   /**
-   * The reader's half of docsurf-10b. Every surface that renders a document
+   * The reader's half. Every surface that renders a document
    * row decides between Download and "Open source" off two columns, so the
    * two lanes that serve those surfaces have to carry both — a shape a
    * component test cannot check, because a column missing from a loader is

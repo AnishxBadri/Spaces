@@ -15,7 +15,7 @@ import { entityValuesResolver } from './resolve'
 import { compileConditions } from './sql'
 
 /**
- * The interaction stat columns as the lists read them (D67): People sorts
+ * The interaction stat columns as the lists read them: People sorts
  * by Last contact with the quiet ones at the bottom, a logged call moves a
  * row, the `stat:` conditions filter, and the plan reads `interaction_stat`
  * through its `(entity_id, kind)` key.

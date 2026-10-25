@@ -2,21 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ClipUrlInput } from './clip'
 
 /**
- * The URL clip's web half (SPA-117) — §3.1's one arrival that keeps no bytes.
- *
- * What this file is really asserting is a sequence: the row exists **before**
- * anything is fetched. Nothing here stubs `fetch`, and nothing here needs to,
- * because `clipUrlProgram` returning without one is the contract — a server
- * function that held a request open while somebody else's web server thought
- * about it would be the bug. The fetching is `worker/jobs/clip-document.ts`,
- * and its own test drives it.
- *
- * The queue is stubbed through `#/test/queue-stub`, as in every document
- * fixture file, and here it is also the assertion: a blobless row must
- * enqueue `document.clip` and must **not** enqueue `document.extract`, which
- * would spend a worker attempt writing 'unsupported' on a row that has no
- * bytes by design. `enqueue` swallows its own failures and answers `null`
- * either way, so the stub is the only seam that can see the decision.
+ * The URL clip's web half: the row exists **before** anything is fetched.
+ * Nothing stubs `fetch` because `clipUrlProgram` must return without one;
+ * the clip job's own test drives the fetching.
+ * The queue stub is also the assertion: a blobless row enqueues
+ * `document.clip` and never `document.extract`.
  */
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
@@ -104,12 +94,11 @@ describe('clipUrlProgram', () => {
     expect(row?.mime).toBeNull()
     // The clip's own address, on the column that marks it a clip.
     expect(row?.url).toBe(url)
-    // `external_url` is docsurf-11's "Open in source" for a *provider's* copy
-    // and must stay null: the clip's URL already has a column.
+    // `external_url` is "Open in source" for a *provider's* copy and must
+    // stay null: the clip's URL already has a column.
     expect(row?.externalUrl).toBeNull()
-    // The class is `manual` and never `url` — D1/SPA-137 collapsed the old
-    // `document_origin` enum, and a person pasting a link into a surface we
-    // ship is the plainest manual write there is (§11 delta 2).
+    // The class is `manual` and never `url`: `url` is not a source class,
+    // and a person pasting a link is the plainest manual write there is.
     expect(row?.sourceClass).toBe('manual')
     expect(row?.sourceRef).toBeNull()
     expect(row?.kind).toBe('article')

@@ -7,33 +7,25 @@ import { Enqueue } from '@spaces/core/queue/enqueue'
 import { enqueue as stubSend } from '#web/test/queue-stub'
 
 /**
- * The orphan-blob sweep (SPA-54) — the half of blob GC that runs from the
- * upload's side rather than the delete's.
+ * The orphan-blob sweep — the half of blob GC that runs from the upload's
+ * side rather than the delete's.
  *
  * The window it closes: `prepareDocumentUpload` hands out a URL, the browser
  * PUTs the bytes, and only `finalizeDocumentUpload` writes the `document`
- * row. A tab closed in between leaves bytes no row will ever name, and the
- * only GC that existed ran off a row being deleted — so there was nothing
- * that could ever reclaim them.
- *
- * Every test here drives the real store. The local driver is the default and
- * writes plain files under `<DATA_DIR>/blobs`, so "the bytes are gone" is an
- * assertion about a file that no longer exists rather than about a call that
- * was made — the same bargain `documents-filing.test.ts` makes for the
- * delete-side GC.
- *
- * The test databases carry no `pgboss` schema and birth enqueues extraction;
- * see `#/test/queue-stub`.
- *
- * It lives beside the job and not beside `prepare.ts`, for the reason
- * `dedupe-sweep.test.ts` does: `src/lib/**` may not import `src/worker/**`
- * (spec §2's forbidden edge, enforced by `import/no-restricted-paths`), and
- * the whole file drives the job.
+ * row. A tab closed in between leaves bytes no row will ever name, and
+ * delete-side GC never sees them.
+ * - Every test drives the real store: the local driver writes plain files
+ *   under `<DATA_DIR>/blobs`, so "the bytes are gone" is about a file, not a
+ *   call that was made.
+ * - The queue is stubbed: birth enqueues extraction and test databases have
+ *   no `pgboss` schema.
+ * - Here, not in apps/web, because an eslint zone bars it from importing the
+ *   worker.
  */
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
-// Birth's extraction enqueue is core's `Enqueue` service since SPA-201;
-// here it records into the same stub the mocked `#web/lib/queue` does.
+// Birth's extraction enqueue is core's `Enqueue` service; here it records
+// into the same stub the mocked `#web/lib/queue` does.
 const stubEnqueue = Enqueue.fromSender({ enqueue: stubSend })
 
 async function actorId(): Promise<string> {
@@ -273,8 +265,8 @@ describe('a prepare followed by a finalize', () => {
   })
 
   it('takes the blob’s cached extractions with the bytes, and leaves a filed blob’s alone', async () => {
-    // SPA-74: answers keyed by the sha go through the same reclaim the
-    // bytes do, so neither direction of GC can strand one.
+    // Answers keyed by the sha go through the same reclaim the bytes do, so
+    // neither direction of GC can strand one.
     const { db } = await import('@spaces/db')
     const { extractionCache } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
@@ -375,8 +367,8 @@ describe('the alreadyStored short circuit', () => {
  */
 describe('one reference check', () => {
   it('has no second copy of the count query outside blob-refs.ts', () => {
-    // Both source trees (SPA-181): the sweep is apps/worker's, the delete
-    // path and the query's home are apps/web's.
+    // Both source trees: the sweep is apps/worker's, the delete path and the
+    // query's home are apps/web's.
     const root = resolve(
       fileURLToPath(new URL('.', import.meta.url)),
       '../../../..',
@@ -390,11 +382,9 @@ describe('one reference check', () => {
       .filter((f) => {
         const text = readFileSync(join(root, f), 'utf8')
         // A count over `document` **narrowed by** its blob digest: the
-        // `eq(...)` is what makes it this query rather than a coincidence.
-        // `document.blobSha` alone was the test until docsurf-10b, when the
-        // shelf started selecting the column to decide Download versus
-        // "Open source" — and a module that merely reads the column while
-        // counting something else entirely is not a second asker.
+        // `eq(...)` is what makes it this query rather than a coincidence. A
+        // module that reads the column while counting something else (the
+        // shelf does) is not a second asker.
         return text.includes('count()') && text.includes('eq(document.blobSha')
       })
       .sort()

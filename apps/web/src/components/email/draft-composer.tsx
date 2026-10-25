@@ -51,7 +51,7 @@ import { AddressRow, RecipientLine } from './recipient-line'
 import { VariableReviewTable } from './variable-review'
 
 /**
- * The composer (D67; E3 inline under a message, E4 in its own window): the
+ * The composer (inline under a message, or in its own window): the
  * address block, the subject, the body and the files, then the foot.
  * - Cc and Bcc open from the address block and are closed when empty.
  * - Autosaved after `AUTOSAVE_MS` of quiet; Cancel and closing keep the row.
@@ -142,7 +142,7 @@ export function DraftComposer({
   modes?: ReplyOpening['modes'] | null
   /** The record it was opened from: whose files Attach offers. */
   recordId?: string | null
-  /** What sits over the address block: the folded message, for E3. */
+  /** What sits over the address block: the folded message, inline. */
   above?: ReactNode
   onSaved?: (at: string) => void
   onClose: () => void

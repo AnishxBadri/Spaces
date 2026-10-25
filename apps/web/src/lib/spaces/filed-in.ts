@@ -6,7 +6,7 @@ import { liveSpaceSql } from './live'
 /**
  * The spaces a record is filed in, for its details column. Filings outlive
  * an archive: an archived space stays in the list with `archived` set, and
- * the rail dims it and offers no action. (D73)
+ * the rail dims it and offers no action.
  */
 export function recordSpaces(entityId: string) {
   return db

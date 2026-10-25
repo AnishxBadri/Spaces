@@ -19,11 +19,10 @@ export { readTar, writeTar, TarFormatError } from './tar.ts'
 export type { TarEntry, TarEntryType, TarInput } from './tar.ts'
 
 /**
- * Pack and sign a plugin (sdk-21a; D54, docs/spec-plugin-sdk.md §9). Node
- * only — `@spaces/sdk/pack` is a separate subpath so the contract a plugin
- * imports never reaches `node:*`. Authors run it; the plugin release
- * workflow (ship-9) runs it with the signing key from its secret. Core's
- * `plugins/verify.ts` is the other half and reads what this writes.
+ * Pack and sign a plugin. Node only — `@spaces/sdk/pack` is a separate
+ * subpath so the contract a plugin imports never reaches `node:*`. Authors
+ * run it; the plugin release workflow runs it with the signing key from its
+ * secret. Core's plugin verifier is the other half and reads what this writes.
  *
  * The artifact set for `<id>-<version>`:
  *
@@ -59,7 +58,7 @@ const SHA256 = /^[0-9a-f]{64}$/
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/
 
 /**
- * One `registry.json` entry (§9, as sdk-21a fixes it). No `kind` (D51).
+ * One `registry.json` entry. No plugin `kind`.
  * `keyId` names the public key the image trusts for `sig`; the key itself is
  * never in the registry — whoever serves the registry would then choose it.
  */

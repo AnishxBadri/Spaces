@@ -2,15 +2,15 @@ import { z } from 'zod'
 import { defineManifest } from '@spaces/sdk'
 
 /**
- * Granola's manifest: a keyed recorder (D78).
+ * Granola's manifest: a keyed recorder.
  * - `requires.connection.key`: each member pastes their own Granola key on
  *   You → Meeting notes, and the host runs `sync` once per member's
  *   connection, with that member's ticked folders and opt-ins.
  * - One `schedule` job about every 15 minutes: Granola sends no events.
  * - `uses` is a syncer's grant: the key (Secrets), the provider (Http), the
  *   recorder lane (Content) and Log — never Facts, Identity or Ai.
- * - `sdk: '^1.4'` until the SDK release that carries `logRecordedNote` and
- *   keyed connections is cut, as google-calendar does.
+ * - `sdk: '^1.4'`, as google-calendar: raise it once an SDK release carries
+ *   `logRecordedNote` and keyed connections.
  */
 export const manifest = defineManifest({
   manifestVersion: 1,

@@ -4,7 +4,7 @@ import type { DocumentKind } from '../documents'
 
 /**
  * The `suggestion(kind: 'supersedes')` payload: a document filed on a record
- * that looks like a newer version of one the record already holds. (D59)
+ * that looks like a newer version of one the record already holds.
  * - Decoded by `proposeWith` on insert, by the accept path before it writes
  *   the link, and by the Review card.
  * - The names are as filed when proposed; the ids are what accept writes.

@@ -27,8 +27,8 @@ import type { ColumnTarget } from '@spaces/core/import/mapping'
 import type { RowPlan } from '@spaces/core/import/plan'
 
 /**
- * Reference cells find their record (SPA-168). Batches go straight into the
- * tables, as in `plan.test.ts`; the graph is seeded through `resolveEntity`,
+ * Reference cells find their record. Batches go straight into the tables,
+ * as in the preview tests; the graph is seeded through `resolveEntity`,
  * the door a reference must agree with.
  */
 

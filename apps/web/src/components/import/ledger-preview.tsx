@@ -17,17 +17,16 @@ import type {
 import type { LedgerFailedRow, LedgerPreviewView } from '#/lib/import/ledger'
 
 /**
- * The ledger preview (SPA-170, import-8): the dry run of a ledger batch,
- * drawn from the stored plans in SPA-167's frame — the verdict sentence as
+ * The ledger preview: the dry run of a ledger batch, drawn from the stored
+ * plans in the records preview's frame — the verdict sentence as
  * the title, the readout strip, the ledger rows — except that **a row is a
  * company**, and its what-lands lane is the events it would write, in date
  * order: `round Seed 2023-03-15 · investment $50,000 priced · mark $120,000
  * 2025-12-31`. Rows that will not land follow, each with its reason, and a
  * SAFE decided per row carries its choice in the decision lane; any other
  * stop ends on one token — `decide in mapping ›` back to step 2, or `fix in
- * the sheet` (SPA-173). Commit
- * (SPA-171) enqueues the same `import.commit` job a records batch does, and
- * the page turns into its receipt.
+ * the sheet`. Commit enqueues the same `import.commit` job a records batch
+ * does, and the page turns into its receipt.
  */
 
 export function ledgerStripCells(counts: LedgerCounts) {
@@ -151,7 +150,7 @@ export function LedgerPreviewStep({
   batch: { id: string; filename: string }
   view: LedgerPreviewView
   uploadHint: string
-  /** Armed once a row lands (SPA-171); the page becomes the receipt. */
+  /** Armed once a row lands; the page becomes the receipt. */
   onCommit?: () => void
   committing?: boolean
 }) {

@@ -10,19 +10,15 @@ import { decryptSecret, encryptSecret, redact } from './crypto'
 export { redact }
 
 /**
- * The seven kinds (`mailbox` since SPA-56), read off the column rather than retyped, so widening the
- * enum (SPA-112) widens this boundary in the same edit and cannot drift from
- * it. `llm` and (from SPA-29's AI settings on) the AI substrate write here;
- * `embedding`, `oauth_client` and `webhook` are claimed by the AI substrate,
- * `storage-1` and `sdk-23`.
+ * The credential kinds, read off the column rather than retyped, so widening
+ * the enum widens this boundary in the same edit and cannot drift from it.
  */
 export const CREDENTIAL_KINDS = credentialKind.enumValues
 
 /**
  * The vault's write boundary. A kind Postgres would reject is rejected here
  * first, with a field-named Zod error instead of a 22P02 from the driver —
- * the database is the backstop, not the validator (CONTEXT.md: Zod stays at
- * the boundaries, hand-written at write-path choke points).
+ * the database is the backstop, not the validator.
  */
 export const credentialInput = z
   .object({
@@ -32,7 +28,7 @@ export const credentialInput = z
     kind: z.enum(CREDENTIAL_KINDS),
     secret: z.string().max(4000),
     /**
-     * A provider that authenticates nobody (a local Ollama, SPA-39). Its row
+     * A provider that authenticates nobody (a local Ollama). Its row
      * still carries `secret_enc` — the column stays not-null — holding the
      * encryption of the empty string. Saying so is the only way to store an
      * empty secret: without the flag an empty one is refused, so a blank
@@ -119,8 +115,8 @@ export async function storeCredential(rawInput: CredentialInput) {
 /**
  * A resolved credential: the decrypted secret and the row's non-secret
  * `meta` (base URL, extra headers, last test), which an adapter needs as much
- * as the key — a gateway passthrough is a `baseURL` plus a header
- * (`docs/spec-ai-substrate.md` §9). `resolveSecret` is this minus the meta.
+ * as the key — a gateway passthrough is a `baseURL` plus a header.
+ * `resolveSecret` is this minus the meta.
  */
 export type ResolvedCredential = {
   id: string
@@ -130,7 +126,7 @@ export type ResolvedCredential = {
 }
 
 /**
- * Resolution order per CONTEXT.md: user key → workspace key → null.
+ * Resolution order: user key → workspace key → null.
  * Null means the feature is hidden, not broken.
  */
 export async function resolveCredential(
@@ -196,7 +192,7 @@ export async function resolveSecret(
 
 /**
  * One row's secret by id, for a caller that holds a foreign key to it rather
- * than a provider name — the forwarding mailbox's `credential_id` (SPA-56).
+ * than a provider name — the forwarding mailbox's `credential_id`.
  * Null when the row is gone or marked invalid. Decrypted here, in the vault,
  * with the same `scope:provider` AAD every other read uses.
  */

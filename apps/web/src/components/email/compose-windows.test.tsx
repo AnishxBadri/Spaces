@@ -6,7 +6,7 @@ import type { DraftRow } from '#/lib/server-fns'
 import { DraftsDialog, recipientsLine } from './compose-windows'
 
 /**
- * The drafts list (D67, E5): only what the server lists for the viewer,
+ * The drafts list: only what the server lists for the viewer,
  * `(no subject)` for a draft without one, and Trash on the row's end.
  */
 

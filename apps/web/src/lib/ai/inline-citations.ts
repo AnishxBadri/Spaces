@@ -1,15 +1,9 @@
 import { parseRef } from '@spaces/core/context/ref'
 
 /**
- * Citations written into the text (SPA-66). A model is handed context as
- * `[ref] text` blocks (`./prompt.ts`) and cites by those refs —
- * `[doc:<id>#3]`. A ref is an address for a machine; the suggestion row
- * carries it in `refs`, and the row is what goes away once it is decided.
- * A note is read for years after that, so every citation is rewritten here
- * into the words a person reads — "(DD pack.pdf, p.4)" — and the words are
- * what the note keeps.
- *
- * Pure: the labels come in, nothing is fetched. `summarize.ts` builds them.
+ * Rewrites a model's ref citations (`[doc:<id>#3]`) into the words a person
+ * reads ("(DD pack.pdf, p.4)"), because the note outlives the suggestion row
+ * that carries the refs. Pure: the labels come in, nothing is fetched.
  *
  * - A bracket whose every entry parses as a ref (`parseRef`) is a citation;
  *   a list — `[doc:a#1, doc:a#2]` or `;`-separated — is one citation.

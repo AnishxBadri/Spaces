@@ -19,27 +19,16 @@ import type { ResolveSource } from '../entities/resolve'
 import type { BoundIntegration } from './binding'
 
 /**
- * IdentityLive (sdk-7a): the Identity port over core's choke point,
- * `resolveEntity` and `addIdentityValue`, with the provenance supplied **by
- * the port** — `{ class: 'integration', ref: <bound row id> }` — and never by
- * the plugin: the claim types carry no source field (D52), and this module
- * builds the source from the row it was given, so nothing a job passes can
- * change who wrote the entity, its aliases or its birth values.
- *
- * `resolve` attaches to the entity a key identifies, or creates one, exactly
- * as every other caller of the choke point does. It then claims **every**
- * key of the claim on that entity, which is what the frozen contract says
- * (`ResolveOutcome`): a key another entity already holds is still `attached`
- * to the one that matched, and the collision becomes a `duplicate_candidate`
- * for a human — never an error, never a second entity. Enrichment finds
- * your duplicates as a side effect. A key is a value of the record's
- * identity attribute (D75), so every claim goes through `setValues`; a
- * LinkedIn URL identifies neither kind and is not claimed.
- *
- * A birth writes one `activity` row (`<kind>.created`) with no `actor_id`
- * and the integration named in `meta`, which the record timeline reads; its
- * embeddable values (`reembed`) and its `entity.created` go out through
- * core's `Enqueue` service, which the process running the port provides.
+ * IdentityLive: the Identity port over `resolveEntity` and `addIdentityValue`,
+ * with provenance `{ class: 'integration', ref: <bound row id> }` built **by
+ * the port** from its row — the claim carries no source, so nothing a job
+ * passes can change who wrote the entity, its aliases or its birth values.
+ * - `resolve` attaches or creates, then claims **every** key on that entity
+ *   through `setValues`: a key another entity holds stays `attached` here
+ *   and becomes a `duplicate_candidate`, never an error or a second entity.
+ *   A LinkedIn URL identifies neither kind and is not claimed.
+ * - A birth writes one `<kind>.created` activity row (integration in `meta`)
+ *   and sends `reembed` and `entity.created` through `Enqueue`.
  */
 
 /** What an integration-written activity row carries in `meta`. */

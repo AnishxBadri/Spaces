@@ -30,12 +30,12 @@ import type {
 } from '@spaces/db/schema/import'
 
 /**
- * **Ledger mapping** (SPA-170, project 14 `import-8`) — the portfolio
- * bootstrap's pure half. One row of the universal tracking sheet (company,
- * date, amount, instrument, round, current value) becomes **dated events** —
- * an optional `round`, one `investment`, an optional `mark`, an optional
- * `distribution` — and never a balance: CONTEXT.md phase 15 fixes every
- * aggregate as derived, and "as on <date>" as a filter over events.
+ * **Ledger mapping** — the portfolio bootstrap's pure half. One row of the
+ * universal tracking sheet (company, date, amount, instrument, round,
+ * current value) becomes **dated events** — an optional `round`, one
+ * `investment`, an optional `mark`, an optional `distribution` — and never a
+ * balance: every aggregate is derived, and "as on <date>" is a filter over
+ * events.
  *
  * Three rules are pinned rather than guessed:
  *
@@ -49,7 +49,7 @@ import type {
  *    corrupt the dilution ledger for good.
  *
  * Money stays a number here, as `coerce` answers it; it becomes a string
- * only at the write boundary (SPA-171). Planning the same rows under the
+ * only at the write boundary. Planning the same rows under the
  * same mapping is byte-identical: every output is a function of the cells
  * and the stored mapping.
  */
@@ -1477,7 +1477,8 @@ export function ledgerReport(
 }
 
 /**
- * Where a stopped row's fix is (SPA-173): a decision the mapping step has
+ * Where a stopped row's fix is: a decision the mapping step has
+
  * not made — an instrument, a marks-as-of date, a date order, a currency —
  * or the sheet itself (a blank company, an amount that does not read).
  */

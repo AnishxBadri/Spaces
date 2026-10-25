@@ -8,7 +8,7 @@ import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { saveNoteAsNewVersionProgram } from './new-version'
 import { NoteNotFound } from './delete'
 
-/** "Save as new version" (D59): a copy filed where the old note is, superseding it. */
+/** "Save as new version": a copy filed where the old note is, superseding it. */
 
 async function make(kind: 'company' | 'space' | 'note', name: string) {
   const row = (

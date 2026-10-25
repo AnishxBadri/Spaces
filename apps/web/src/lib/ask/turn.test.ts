@@ -35,7 +35,7 @@ vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 /**
  * An Ask turn end to end against the test database: tools through the
  * registry, the turn frozen as asked, the sensitivity gate per retrieval,
- * the cap, Stop, lost access, Save as note and privacy. (D70)
+ * the cap, Stop, lost access, Save as note and privacy.
  */
 
 const run = <TValue, TError>(e: Effect.Effect<TValue, TError>) =>
@@ -707,7 +707,7 @@ describe('the thread store', () => {
       .from(link)
       .where(and(eq(link.fromEntityId, noteId), eq(link.relation, 'tagged_in')))
     expect(filed.map((l) => l.toEntityId)).toEqual([acme])
-    // The user's own note: its provenance is theirs, so no via mark (D78).
+    // The user's own note: its provenance is theirs, so no via mark.
     expect(await run(noteViaProgram(noteId))).toBeNull()
     const rows = await run(listThreadsProgram(FIXTURE_ACTOR.id))
     expect(rows.find((r) => r.id === threadOf(events))?.saved).toBe(1)

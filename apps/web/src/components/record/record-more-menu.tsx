@@ -11,7 +11,7 @@ import { openAsk } from '#/lib/ask/dock-store'
 
 /**
  * A record head's boxed `···`: Ask about this, which opens Ask docked with
- * the record as its scope chip, and Copy link. (D70, A4)
+ * the record as its scope chip, and Copy link.
  */
 export function RecordMoreMenu({ name }: { name: string }) {
   return (

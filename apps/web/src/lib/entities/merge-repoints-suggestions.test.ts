@@ -2,10 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
 /**
- * `mergeEntities` repoints open suggestions onto the winner (SPA-46). This
- * case lived in `merge.test.ts` until that file moved to @spaces/core with
- * `merge.ts` (SPA-174/175); it drives `proposeProgram`, which is apps/web's
- * AI module, so it stayed behind as its own file.
+ * `mergeEntities` repoints open suggestions onto the winner. Here rather
+ * than in core because it drives `proposeProgram`, which is apps/web's.
  */
 describe('mergeEntities and open suggestions', () => {
   it("repoints both companies' open suggestions onto the winner (SPA-46)", async () => {

@@ -22,7 +22,7 @@ export type AddIdentityValueOutcome =
 
 /**
  * One more email on a person, or domain on a company, through the one write
- * path (D75): the element is appended to `emails` / `domains` and claimed by
+ * path: the element is appended to `emails` / `domains` and claimed by
  * `setValues`, so the value, its `attribute_event` and its alias land in one
  * transaction. A key another record holds is refused at that element and
  * raised as a `duplicate_candidate`.

@@ -52,7 +52,7 @@ import { SuggestionInvalid, proposeWith } from '../suggestions/propose'
 import type { PictureFetched } from './picture'
 
 /**
- * Applies one enrichment run's answers to a record (D76), in one
+ * Applies one enrichment run's answers to a record, in one
  * transaction under the entity row lock: the decision is made against the
  * values the lock returned, never a read before it.
  * - Each source's winning fields are written as that source, citing its

@@ -14,7 +14,7 @@ import type { JobDef } from '../run-job'
 
 /**
  * interaction.recorded-note-tasks: a recorded note's action items as `task`
- * suggestions (D78). The program is `recordedNoteTasksProgram`.
+ * suggestions. The program is `recordedNoteTasksProgram`.
  * - A refused or unrouted lane is not a failure: nothing is proposed and the
  *   job completes.
  * - A provider down or an unreadable row is retried; anything else (the

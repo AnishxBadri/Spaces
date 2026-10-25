@@ -10,15 +10,14 @@ import { setAiRouteProgram } from './route'
 import { sensitivityFor, setEntitySensitiveProgram } from './sensitivity-for'
 
 /**
- * SPA-61. `sensitivityFor` against Postgres, over the resolver's cases with
+ * `sensitivityFor` against Postgres, over the resolver's cases with
  * a three-level space tree — Hydrogen › Green hydrogen › Electrolysers —
  * and a company filed at the bottom of it. Then the demo: flag Hydrogen,
  * route extract at a cloud provider, and `complete()` refuses naming the
  * space; route it at Ollama and the same call runs.
  *
- * The binding case is the resolver's alone (`sensitivity.test.ts`):
- * `storage_binding` is storage-8a's table and does not exist yet, so the
- * gatherer passes no binding.
+ * The binding case is left to the resolver's own suite; the gatherer here
+ * passes no binding.
  */
 
 async function mkEntity(

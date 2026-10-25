@@ -3,14 +3,12 @@ import { db } from '@spaces/db'
 import { entity, note } from '@spaces/db/schema'
 
 /**
- * The query behind `listNotes`, minus the request context, so the rows can
- * be exercised without a session — the same reason `entitySearchRows` exists.
- * It has no kind predicate and must not grow one: a scratch note is a note
- * that is listed like any other (SPA-109).
- *
- * It lives outside `lib/server/` because a plain export from a
- * `lib/server/*.ts` module keeps its imports alive in the client bundle
- * (SPA-155); only the server fn that wraps it stays in `server/notes.ts`.
+ * The query behind `listNotes`, minus the request context, so tests can run
+ * it without a session.
+ * - No kind predicate, and must not grow one: a scratch note is listed like
+ *   any other.
+ * - Kept out of the server-fn modules: a plain export there keeps its imports
+ *   alive in the client bundle.
  */
 export async function listNoteRows(userId: string) {
   return db

@@ -10,7 +10,7 @@ import { NO_LAND_TAIL } from './import-wizard'
 import type { LedgerCompanyReport } from '@spaces/core/import/ledger'
 
 /**
- * SPA-170. The ledger preview's rows, server-rendered with no DOM: a company
+ * The ledger preview's rows, server-rendered with no DOM: a company
  * with its events in date order in the what-lands lane, and a stopped row
  * whose SAFE is decided per row carrying its picker.
  */

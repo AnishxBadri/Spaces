@@ -65,7 +65,7 @@ export const listRecordNotes = createServerFn()
     return effectFn(listRecordNotesProgram)(u.id, data.entityId)
   })
 
-/** The rows are `listNoteRows` (`lib/notes/list-rows.ts`); this shapes them. */
+/** The rows are `listNoteRows`; this shapes them. */
 export const listNotes = createServerFn().handler(async () => {
   const u = await requireUser()
   const { listNoteRows } = await import('../notes/list-rows')
@@ -94,7 +94,7 @@ export const getNote = createServerFn()
           updatedAt: note.updatedAt,
           authorId: note.authorId,
           visibility: note.visibility,
-          // An email body its owner widened to the reader (D67).
+          // An email body its owner widened to the reader.
           widened: noteWidenedSql(u.id),
         })
         .from(note)
@@ -140,7 +140,7 @@ export const getNote = createServerFn()
       .orderBy(asc(entity.canonicalName))
 
     // The newer version that replaced this note, if one the reader can see
-    // exists (D59): the page shows "Replaced by → <title>", dimmed.
+    // exists: the page shows "Replaced by → <title>", dimmed.
     const replacedBy =
       (
         await db
@@ -161,7 +161,7 @@ export const getNote = createServerFn()
         .map((r) => ({ id: r.id, title: r.title || 'Untitled' }))
         .at(0) ?? null
 
-    // A recorder's note opens at the recorder too (D78).
+    // A recorder's note opens at the recorder too.
     const { noteRecorderLinkProgram } =
       await import('../interactions/recorder-links')
     const { effectFn } = await import('./effect')
@@ -206,8 +206,7 @@ export const previewNoteDeletion = createServerFn()
   })
 
 /**
- * Hard delete, no trash — decided 2026-09-19 (CONTEXT.md → The note model).
- * The note goes; what it fed survives, because the registry says which edges
+ * Hard delete, no trash. The note goes; what it fed survives, because the registry says which edges
  * die with it and which rows only lose an edge.
  *
  * The typed failures are turned into sentences here rather than allowed to
@@ -264,8 +263,7 @@ export const setNoteVisibility = createServerFn({ method: 'POST' })
 
 /**
  * Kind is a promote or a demote of the same row — same entity, same links,
- * same filing (CONTEXT.md → The note model: "a memo is a note with the flag
- * up"). Deliberately *not* author-only, unlike visibility: a shared note's
+ * same filing ("a memo is a note with the flag up"). Deliberately *not* author-only, unlike visibility: a shared note's
  * genre is the team's reading of it, so whoever may read it may change it.
  *
  * The typed failure is turned into a sentence here for the same reason the
@@ -293,7 +291,7 @@ export const setNoteKind = createServerFn({ method: 'POST' })
 
 /**
  * File this note against a record — the record half of the two filing
- * mechanisms (CONTEXT.md → The note model). The kind allowlist is the
+ * mechanisms. The kind allowlist is the
  * program's, not this validator's: the picker only ever offers the four
  * kinds, but the rule is enforced where it cannot be skipped.
  */
@@ -352,9 +350,8 @@ export const saveNote = createServerFn({ method: 'POST' })
   .validator(saveNoteInput)
   .handler(async ({ data }) => {
     const u = await requireUser()
-    // The write — and the diff-sync of the note's extracted `mentions`
-    // edges, `[[mention]]` chips and glossary terms together (SPA-34) —
-    // is `lib/notes/save.ts`.
+    // `saveNoteProgram` also diff-syncs the note's `mentions` edges,
+    // `[[mention]]` chips and glossary terms together.
     const { saveNoteProgram, noteSaveMessage } = await import('../notes/save')
     const { effectFn } = await import('./effect')
     try {

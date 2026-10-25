@@ -38,14 +38,13 @@ import type { ScheduleTarget } from './schedule'
 import { MAILBOX_CAPABILITY, saveMailboxProgram } from './settings'
 
 /**
- * SPA-56 end to end, minus the network: the poll against the in-repo fake
- * IMAP server (`#/test/fake-imap`), writing to this worker's test database.
- * Each claim of the slice that is about what lands in Postgres is one test
- * here — the dedupe, the UIDVALIDITY restart, the provenance pair, the
- * backoff, the shared body, the inherited edges and the derived deal
- * timeline. SPA-86 turned match-never-create into participants-become-
- * records; its claims are the second `describe` below. The `job_run` row is the worker's, so its test is
- * `worker/jobs/poll-mailbox.test.ts` (the web tree may not import the worker).
+ * The poll end to end, minus the network: against the in-repo fake IMAP
+ * server, writing to this worker's test database. Each claim about what
+ * lands in Postgres is one test — the dedupe, the UIDVALIDITY restart, the
+ * provenance pair, the backoff, the shared body, the inherited edges and the
+ * derived deal timeline; participants-become-records is the second
+ * `describe`. The `job_run` row is the worker's, so its test lives there
+ * (the web tree may not import the worker).
  */
 
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
@@ -369,7 +368,7 @@ describe('the forwarding mailbox poll', () => {
     const row = (await db.select().from(interaction)).at(0)
     expect(row?.subject).toBe('Seed round')
     expect(row?.occurredAt.toISOString()).toBe('2026-09-21T10:04:00.000Z')
-    // Raj, on the Cc, had no record; arrival-2 made one (SPA-86).
+    // Raj, on the Cc, had no record; arrival made one.
     const raj = await holderOf('email', 'raj@acme.io')
     expect(await edgesOf(row?.messageId ?? '')).toEqual(
       [acme, jane, raj].sort(),
@@ -437,7 +436,7 @@ describe('the forwarding mailbox poll', () => {
       }),
     )
     await poll()
-    // Kim and her company are records now (SPA-86); the thread's are
+    // Kim and her company are records now; the thread's are
     // inherited beside them.
     const kim = await holderOf('email', 'kim@elsewhere.org')
     const elsewhere = await holderOf('domain', 'elsewhere.org')

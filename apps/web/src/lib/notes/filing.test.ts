@@ -3,27 +3,15 @@ import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 /**
- * Filing a note against a record (SPA-116), against the test database.
- *
- * Three things are pinned here. The first is the stamp: the editor's chip
- * writes the same `link(tagged_in, manual)` row `createNoteProgram` writes
- * at birth, so a note filed from the editor and a note filed by "Note about
- * this" are one row shape, not two.
- *
- * The second is the load-bearing one — **unfiling removes the filing and
- * nothing else.** A `mentions` edge to the same record is a different row in
- * the edge table, and after the × it is still there, which is what moves the
- * note from "Filed here" to "Mentions this" on that record rather than off
- * its page.
- *
- * The third is that the allowlist lives on the server. The picker never
- * offers a space, a note, a document, a term, a merged record or the note
- * itself; every one of those is asked of the program directly here, because
- * a client filter is a convenience and never a rule.
- *
- * Imports are dynamic like the rest of the DB-coupled suite: `@spaces/db`
- * builds its pool from `DATABASE_URL` at import time and `vitest.setup.ts`
- * rewrites it per file.
+ * Filing a note against a record. Pins three things:
+ * - The editor writes the same `link(tagged_in, manual)` row
+ *   `createNoteProgram` writes at birth.
+ * - Unfiling removes the filing and nothing else: a `mentions` edge survives,
+ *   moving the note to "Mentions this".
+ * - The allowlist is enforced on the server; each refused target is asked of
+ *   the program directly.
+ * Imports are dynamic: `@spaces/db` builds its pool from `DATABASE_URL` at
+ * import time, and the test setup rewrites it per file.
  */
 
 async function actorId(): Promise<string> {

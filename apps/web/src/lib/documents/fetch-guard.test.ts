@@ -2,8 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MAX_REDIRECTS, guardedFetch, urlRefusal } from './fetch-guard'
 
 /**
- * The SSRF table (SPA-117), and the acceptance criterion that it is checked
- * **without touching the network**. Every case below is either a pure call to
+ * The SSRF table, checked **without touching the network**. Every case below is either a pure call to
  * `urlRefusal` or a `guardedFetch` driven against a stubbed `fetch` — nothing
  * here opens a socket, which is the point: a guard whose tests need the
  * internet is a guard nobody runs.

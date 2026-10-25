@@ -1,6 +1,6 @@
 /**
  * Providers a member connects by pasting their own key rather than through
- * an OAuth dance (D78): no client, no scopes, no refresh. Pure data,
+ * an OAuth dance: no client, no scopes, no refresh. Pure data,
  * client-safe; the key becomes an `account_connection` row like a grant.
  * - `product` is stored on the row; `plugin` is the manifest id whose
  *   schedule jobs run once per such connection.

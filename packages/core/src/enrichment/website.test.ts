@@ -14,7 +14,7 @@ import {
 } from './website'
 import type { WebsiteOutput } from './website'
 
-/** The Website source's pure half: a page read, the about link, both halves' answers. (D76, D80) */
+/** The Website source's pure half: a page read, the about link, both halves' answers. */
 
 const HOME = `<!doctype html>
 <html><head>

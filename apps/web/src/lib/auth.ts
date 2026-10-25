@@ -24,7 +24,7 @@ function authSecret(): string {
 }
 
 /**
- * Auth per CONTEXT.md:
+ * Auth:
  * - DB-backed revocable sessions, httpOnly cookies.
  * - Roles: admin (settings, integrations, keys, user mgmt) and member.
  * - First run: signup open only while count(user) == 0, guarded server-side,

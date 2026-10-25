@@ -52,16 +52,13 @@ import type { ImportFailure } from './stage'
 import type { ReferenceLabel } from './references'
 
 /**
- * **Column mapping** (SPA-165, import-3) — the wizard's second step. Each
- * source column takes one target from the chosen object's registry; the
- * rules are `@spaces/core/import/mapping`'s, and this module is only their
- * persistence: the mapping lives on `import_batch.mapping`, written on every
- * change, so a reload resumes where the operator left it and the step is
- * read off the batch rather than out of component state.
- *
- * Beside `stage.ts` and outside `lib/server/` for the same reason: the
- * server-fns barrel ships plain exports to the browser, and the tests call
- * these programs without a request.
+ * Column mapping, the wizard's second step: each source column takes one
+ * target from the chosen object's registry. The rules are
+ * `@spaces/core/import/mapping`'s; this module persists them on
+ * `import_batch.mapping`, written on every change, so a reload resumes where
+ * the operator left it.
+ * Outside the server-fns barrel's modules: a plain export there ships to the
+ * browser, and the tests call these programs without a request.
  */
 
 const query = <T>(run: () => Promise<T>) =>
@@ -173,7 +170,7 @@ const firstRowWidth = (batchId: string) =>
 /**
  * Every mapping write. The plan is computed from the mapping, so the write
  * that changes the mapping clears every row's plan and verdict and returns
- * the batch to `staged`, in one transaction (SPA-167) — the preview is
+ * the batch to `staged`, in one transaction — the preview is
  * recomputed on Continue and a stale verdict is never shown.
  */
 const writeMapping = (batchId: string, mapping: Mapping) =>
@@ -357,7 +354,7 @@ export type ColumnRead = {
   spec: ColumnSpec | null
   /** Null for an ignored column — and for a reference, which is looked up, not read. */
   summary: ColumnSummary | null
-  /** A reference column: its count is `n of m found` (SPA-168). */
+  /** A reference column: its count is `n of m found`. */
   reference: boolean
 }
 
@@ -383,7 +380,7 @@ export function readColumns(
 /**
  * What stops the mapping step advancing: the mapping's own rules, then the
  * columns where nothing parses. The step's view and the preview's refusal
- * (SPA-167) read the one list.
+ * read the one list.
  */
 export function mappingProblemsOf(
   mapping: Mapping,

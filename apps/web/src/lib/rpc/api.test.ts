@@ -72,7 +72,7 @@ describe('capture.hello over HTTP', () => {
 })
 
 describe('one definition, two audiences', () => {
-  // SPA-45: the same procedure over both handlers — the typed transport
+  // The same procedure over both handlers — the typed transport
   // (`makeApiClient`) and plain REST (`handleApiRequest`, what curl and a
   // client generated from the OpenAPI document call) — compared byte for byte.
   it('typed client and REST answer the handshake byte-identically', async () => {

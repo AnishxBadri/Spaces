@@ -22,10 +22,9 @@ import {
 import type { RegistryEntry } from './value-editor'
 
 /**
- * AI attribute cells (SPA-72, spec-ai-substrate §13) — the per-cell trigger
- * on the record rail and in the table, for an attribute whose
- * `options.ai` is set (the spec's `attribute.config.ai`). Pull-based: a
- * person presses one cell; nothing runs on its own.
+ * AI attribute cells — the per-cell trigger on the record rail and in the
+ * table, for an attribute whose `options.ai` is set. Pull-based: a person
+ * presses one cell; nothing runs on its own.
  *
  * - **No `ai` config → nothing.** `AiCell` renders its child untouched, on
  *   the rail and in the table alike, so a plain attribute's cell is the cell
@@ -34,9 +33,9 @@ import type { RegistryEntry } from './value-editor'
  *   hides on): classify for classify, synthesize for summarize and prompt,
  *   research for research.
  * - **An open proposal → "proposed"**: the Waiting chip's shape and mark
- *   (DESIGN.md "Waiting chip", SPA-114 — "SPA-72's proposed table cell
- *   inherits this chip"), a pointer into `/review` scoped to the record. It
- *   is never a verb: accept and reject live in Review (D44), and a
+ *   (the proposed table cell inherits the Waiting chip), a pointer into
+ *   `/review` scoped to the record. It
+ *   is never a verb: accept and reject live in Review, and a
  *   pressed cell with a proposal waiting is refused by the server anyway.
  *
  * `AiCellsProvider` reads once for every record a surface shows — the

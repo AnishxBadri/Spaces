@@ -25,7 +25,7 @@ import { setEntitySensitiveProgram } from './sensitivity-for'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * A recorded note's action items (D78) through an injected model: the
+ * A recorded note's action items through an injected model: the
  * landing, the routes, the live sensitivity read and the proposal writer are
  * real; nothing reaches a network.
  */

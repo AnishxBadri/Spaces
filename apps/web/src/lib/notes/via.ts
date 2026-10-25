@@ -13,8 +13,8 @@ import { integrationName } from '@spaces/core/plugins/name'
 import type { NoteVia } from './via-mark'
 
 /**
- * The "via <tool> · <author>" mark on a note a person filed from their tool
- * (D78): read from the note's provenance, never stored.
+ * The "via <tool> · <author>" mark on a note a person filed from their tool:
+ * read from the note's provenance, never stored.
  * - A note marks when an integration wrote it (`entity.source_ref`) and a
  *   meeting or call carries it, as write-up or second note. An email's body
  *   is integration-written too but is mail, not a filed note.

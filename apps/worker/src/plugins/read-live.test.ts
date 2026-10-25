@@ -23,7 +23,7 @@ import { FIXTURE_ACTOR } from '../../vitest.seed'
 import { reconcilePlugins } from './loader'
 
 /**
- * `ReadTest` and `ReadLive` are one interface (sdk-6b): the echo fixture's
+ * `ReadTest` and `ReadLive` are one interface: the echo fixture's
  * `enrich` job — the real bundle, loaded by the loader exactly as boot loads
  * it — runs once on the SDK's test Layers and once with `Read` swapped for
  * the live port over the test database. Both runs make the same port calls
@@ -48,7 +48,7 @@ type EnrichRun = (
   input: ActionInput,
 ) => Effect.Effect<void, JobError, EnrichServices>
 
-/** The loaded job is `unknown` until sdk-12b wires it; this is its shape. */
+/** The loader types a job as `unknown`; this is its shape. */
 const isEnrich = (job: unknown): job is { run: EnrichRun } =>
   typeof job === 'object' &&
   job !== null &&

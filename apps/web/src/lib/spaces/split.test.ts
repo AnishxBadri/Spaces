@@ -10,7 +10,7 @@ import { MoveHereRefused, moveHereProgram } from './split'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 /**
- * Split by hand against the test database (D73): Move here untags each
+ * Split by hand against the test database: Move here untags each
  * chosen company from the parent and tags it in the child — one
  * `space.untagged` and one `space.tagged` each — and moves only the
  * parent's own filings.

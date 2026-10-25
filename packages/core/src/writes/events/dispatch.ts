@@ -26,7 +26,7 @@ import { scopeFacts } from './scope-facts'
 /**
  * The domain-event dispatcher: an emitted event becomes one
  * `plugin.<id>.<job>` enqueue per subscribed event job, through the
- * process's own `Enqueue`. No outbox, no NOTIFY bus. (D65)
+ * process's own `Enqueue`. No outbox, no NOTIFY bus.
  * - Runnable means `enabled` and status `enabled`: one predicate skips a
  *   degraded, an operator-disabled and a breaker-tripped row alike.
  * - A row's auto-enrich scope (`scopeFor`: the workspace's enrichment

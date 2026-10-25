@@ -35,7 +35,7 @@ import {
 import { API_PREFIX } from './versions'
 
 /**
- * SPA-80 — the read half of integration map #11: `registry.list`,
+ * The records read API: `registry.list`,
  * `records.list(object, cursor?, limit?)` and `records.get(id)`, each
  * `records:read`, each a wrapper over a program the app already runs. Every
  * call goes through `handleApiRequest` (what curl and n8n hit) or the typed
@@ -151,7 +151,7 @@ beforeAll(async () => {
         kind: 'company' as const,
         objectId: companiesObject,
         canonicalName: `Company ${String(i).padStart(2, '0')}`,
-        // Identity is an attribute (D75): the domain is a value and an alias.
+        // Identity is an attribute: the domain is a value and an alias.
         values: {
           description: `Maker #${i}`,
           domains: [`company-${i}.example`],
@@ -572,8 +572,8 @@ describe('records:read', () => {
 
 /**
  * Three things are absent from this surface on purpose, and each has an
- * owner elsewhere. If this test fails, a parameter or verb was added here —
- * delete the test deliberately, in the slice that owns it, not in passing.
+ * owner elsewhere. If this test fails, a parameter or verb was added here:
+ * delete the test deliberately, in the change that owns it, not in passing.
  */
 describe('no filter, search or write on records/registry — owned by docsurf-12b + ai-18 (filters), clean-5 + ai-11 (search) and ai-24 (writes)', () => {
   it('only GET verbs, no request body, and no parameter beyond object, id, cursor and limit', async () => {
@@ -593,11 +593,11 @@ describe('no filter, search or write on records/registry — owned by docsurf-12
       'registry.list',
     ])
     for (const { path, method, op } of ours) {
-      // ai-24: proposals go through its single door, nothing writes here.
+      // Proposals go through their single door; nothing writes here.
       expect(method, `${path} is read-only`).toBe('get')
       expect(op.requestBody, `${path} takes no body`).toBeUndefined()
-      // docsurf-12b + ai-18: one filter dialect, the view evaluator's.
-      // clean-5 + ai-11: one search, the fused query (MCP has it, ai-23b).
+      // One filter dialect, the view evaluator's.
+      // One search, the fused query (MCP has it).
       for (const p of op.parameters) {
         expect(
           ['object', 'id', 'cursor', 'limit'],

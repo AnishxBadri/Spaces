@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { inlineCitations } from './inline-citations'
 
-/** SPA-66. Refs → the words a note keeps. Pure; no database. */
+/** Refs → the words a note keeps. Pure; no database. */
 
 const D = '11111111-1111-4111-8111-111111111111'
 const N = '22222222-2222-4222-8222-222222222222'

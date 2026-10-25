@@ -7,7 +7,7 @@ import { normalizeDomain } from '@spaces/sdk/identity'
 import { toE164 } from '../attributes/phone'
 
 /**
- * The enrichment rules, pure (D76): which linked keys a source is still
+ * The enrichment rules, pure: which linked keys a source is still
  * asked for, and what a run's answers do to a record.
  * - The first source with an answer for a key wins; a later one is kept in
  *   the receipt (`losers`), never a card.

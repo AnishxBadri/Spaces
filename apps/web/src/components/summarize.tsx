@@ -9,13 +9,12 @@ import {
 } from '#/lib/server-fns'
 
 /**
- * Summarize (SPA-66) — the control, on a Files-tab row (a document) and in a
- * record's header (the record itself). A copy of the Files tab's Read deck
- * (`record-files.tsx`, `useDeckReader`): the gate is asked once per record —
- * the synthesize lane routed, with a live credential, and to a local model
- * when the record resolves sensitive — and the run is a worker job, polled
- * while it runs, whose end is a toast: the suggestion is in Review, or
- * the job's own sentence ("Nothing to summarize: …").
+ * Summarize — the control on a Files-tab row (a document) and in a record's
+ * header (the record itself), shaped like Read deck (`useDeckReader`).
+ * - The gate is asked once per record: the synthesize lane routed, a live
+ *   credential, and a local model when the record resolves sensitive.
+ * - The run is a polled worker job ending in a toast: the suggestion is in
+ *   Review, or the job's own sentence ("Nothing to summarize: …").
  */
 
 type Status = Awaited<ReturnType<typeof summarizeStatus>>[string]

@@ -16,7 +16,7 @@ import { compileConditions } from './sql'
 import { entityValuesResolver } from './resolve'
 
 /**
- * The pin (SPA-40): two evaluators, one fixture list, and the assertion that
+ * Two evaluators, one fixture list, and the assertion that
  * they select the same records. `matchesConditions` runs over the fixtures in
  * memory; `compileConditions` runs as a real `where` against the same rows
  * stored as entities. Every op in `OP_LABELS` is walked against every type

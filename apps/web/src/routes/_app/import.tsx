@@ -14,7 +14,7 @@ import { listObjects } from '#/lib/server-fns'
 import type { PreviousImport } from '#/components/import/import-wizard'
 
 /**
- * `/import` — the wizard before a file (SPA-164). Reached by URL, from the
+ * `/import` — the wizard before a file. Reached by URL, from the
  * `Import` action on an object list page (which carries `?object=<slug>` so
  * the target is picked already), never from the sidebar.
  */

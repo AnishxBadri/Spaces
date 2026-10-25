@@ -40,7 +40,7 @@ import type { MovableDocument, UnmappedFolder } from './move'
 
 /**
  * A binding's sync: the bound folder's whole subtree walked through the
- * plugin's `StorageSource`, every file filed on the bound record (§5.2).
+ * plugin's `StorageSource`, every file filed on the bound record.
  * The filing decision is here; the provider calls are the plugin's.
  * - Idempotent on (connection, external id), the unique index: a held file
  *   is claimed for the binding and filed, never downloaded again. Bindings

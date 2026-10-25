@@ -1,5 +1,5 @@
 /**
- * A person's name in two parts (D67): `first_name` and `last_name` are
+ * A person's name in two parts: `first_name` and `last_name` are
  * system attributes, and `entity.canonical_name` is their join.
  * - `setValues` keeps the column equal to `joinName` of the parts.
  * - A whole name splits on its last space (`splitName`); one without a

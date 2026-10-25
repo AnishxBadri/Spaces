@@ -2,7 +2,7 @@ import { SDK_VERSION } from './version.ts'
 
 /**
  * `manifest.sdk` against the host's SDK_VERSION — the loader's compatibility
- * check (docs/spec-plugin-sdk.md §6, §7 step 3). Hand-rolled on purpose:
+ * check. Hand-rolled on purpose:
  * `semver` is a dependency nowhere in the repo, and a manifest range needs
  * three operators, not the npm grammar. The three:
  *

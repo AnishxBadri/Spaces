@@ -46,7 +46,7 @@ import { meetingLaneLive } from './meetings'
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
 /**
- * The recorder contract end to end (D78), on a real pg-boss through `runJob`:
+ * The recorder contract end to end, on a real pg-boss through `runJob`:
  * Granola's schedule job once per member's key against the fake Granola,
  * and Fathom's and tl;dv's deliveries through the ingress — every recorded
  * note matched by the same writer, deduped on its note id, and a note that

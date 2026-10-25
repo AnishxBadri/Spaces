@@ -30,7 +30,7 @@ import type { AskCall, AskFindRow, AskFindTable, AskVia } from './types'
 
 /**
  * Find in Ask: the companies a web search turned up, shown as a table and
- * read against what is held. (D77)
+ * read against what is held.
  * - A row cites pages a mounted plugin's call returned this turn; a row the
  *   model could not source is left out.
  * - Each row passes the Discover checks for the turn's space: filed there,
@@ -268,7 +268,7 @@ export type FindActed = {
 }
 
 /**
- * Add: the company resolved as the reader, `entity.created` fired so D76
+ * Add: the company resolved as the reader, `entity.created` fired so
  * enrichment follows. Nothing is filed.
  */
 export const addFindRowProgram = Effect.fn('ask.addFindRow')(function* (

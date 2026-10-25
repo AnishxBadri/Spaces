@@ -64,11 +64,11 @@ import type {
 import type { ReactNode } from 'react'
 
 /**
- * The one attribute dialog (spec §7). It morphs by type: a fixed header
+ * The one attribute dialog. It morphs by type: a fixed header
  * (type first, then name, optional description), a per-type slot, then the
  * default widget and the required flag. No slug anywhere — derived and
  * hidden. In edit mode the type is static text and config edits ride the
- * §3 mutability guards server-side. Cmd/Ctrl+Enter submits from anywhere
+ * server's mutability guards. Cmd/Ctrl+Enter submits from anywhere
  * in the form; Enter inside the options list appends a row instead.
  */
 
@@ -83,7 +83,7 @@ type TypeMeta = {
 }
 
 /**
- * The per-type slot's pickers. Every one is the `Select` sheet (SPA-38) at
+ * The per-type slot's pickers. Every one is the `Select` sheet at
  * `width="content"`: the labels here are sentences — "SAFE (post-money)",
  * "Relative to creation", an object's singular name — and a sheet locked to
  * a half-width dialog column would truncate them.
@@ -158,8 +158,8 @@ const TYPE_GLYPHS: Record<string, string> = {
   actor_reference: '◉',
 }
 
-/** Mirrors the server's derivation (lib/attributes/create.ts) so the frozen
- *  slug can be shown before it exists; the server still owns the `_2`. */
+/** Mirrors the server's slug derivation so the frozen slug can be shown
+ *  before it exists; the server still owns the `_2`. */
 const slugPreview = (name: string) =>
   name
     .toLowerCase()
@@ -214,13 +214,13 @@ export type EditableAttribute = {
   type: AttributeType
   options: AttributeOptions | null
   /**
-   * Engine flag (SPA-93), not a member of `options` — the reconciler reads
+   * Engine flag, not a member of `options` — the reconciler reads
    * it in SQL and it means the same thing for every type. `sortable` is its
    * twin column; the dialog sets both from one control, so reading one back
    * is enough to show the box.
    */
   filterable?: boolean
-  /** Ships with the product: never widened. Absent offers no widening. (D69) */
+  /** Ships with the product: never widened. Absent offers no widening. */
   isSystem?: boolean
   /** The other half of a relationship, named for the widening note. */
   pair?: { name: string; objectPlural: string } | null
@@ -249,7 +249,7 @@ type Props = {
   attributeCount?: number | undefined
   /**
    * The record kind whose enrichment vocabulary "Fill from" offers, in edit
-   * mode; absent draws no Fill from (a deal or a custom object). (D76)
+   * mode; absent draws no Fill from (a deal or a custom object).
    */
   fillFrom?: 'company' | 'person' | undefined
   onSaved: () => void
@@ -280,7 +280,7 @@ export function AttributeDialog(props: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
-      {/* Two panes on one sheet (Overlays · Flows): the type list left with
+      {/* Two panes on one sheet: the type list left with
           its › search, the form right, a 44px head and a 52px bone foot.
           One height for every type — the type list's — so switching type
           never resizes the sheet; a longer form scrolls in its pane. */}
@@ -310,7 +310,7 @@ export function AttributeDialog(props: Props) {
 
 /**
  * The widening note: which side holds many once this one widens. A pair
- * names its other half and what it keeps. (D69)
+ * names its other half and what it keeps.
  */
 export function widenNote(
   objectPlural: string,
@@ -393,7 +393,7 @@ function AttributeForm({
     ? target.slice('object:'.length)
     : ''
   const [multi, setMulti] = useState(stored.multi ?? false)
-  // Edits widen only (D69): a user attribute holding one value may become a
+  // Edits widen only: a user attribute holding one value may become a
   // list, once. On a pair this side holds many; the note says what the
   // other side keeps.
   const canWiden =
@@ -408,11 +408,11 @@ function AttributeForm({
   )
   const [widen, setWiden] = useState(false)
   const [required, setRequired] = useState(stored.required ?? false)
-  // "Filter and sort on this": one control, two columns (SPA-93). A user
+  // "Filter and sort on this": one control, two columns. A user
   // does not distinguish filtering a list from sorting it, and both want
   // the same btree — `attr_idx_<id>` on `(object_id, <the sort key>)`.
   const [indexed, setIndexed] = useState(attr?.filterable ?? false)
-  // "Fill from" (D76): the linked vocabulary key, or NOT_LINKED.
+  // "Fill from": the linked vocabulary key, or NOT_LINKED.
   const storedKey = stored.enrichmentKey ?? NOT_LINKED
   const [fillKey, setFillKey] = useState<string>(storedKey)
   const fillKeys =
@@ -510,7 +510,7 @@ function AttributeForm({
       setError('Pick what the relationship points at.')
       return
     }
-    // A currency relabel changes how every stored amount reads (§3): the
+    // A currency relabel changes how every stored amount reads: the
     // warning comes before the write, once, here.
     if (
       mode === 'edit' &&

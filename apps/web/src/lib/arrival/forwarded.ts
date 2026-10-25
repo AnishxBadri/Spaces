@@ -1,5 +1,5 @@
 /**
- * The Forwarded-message block (SPA-56, D49), pure. A BCC carries its own
+ * The Forwarded-message block, pure. A BCC carries its own
  * headers; a true forward is a new message *from the forwarder*, with no
  * References, and the original's sender, recipients and date survive only as
  * text at the top of the quoted body. Matching the forwarder instead of the

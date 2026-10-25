@@ -4,10 +4,9 @@ import { entitySearchInput } from '@spaces/core/search/entity-search-input'
 import { requireUser } from './shared'
 
 /**
- * The validator's schema is core's pure `search/entity-search-input`
- * (SPA-198): a server fn's `.validator()` survives into the client bundle,
- * so it must come from a module that imports no `db` (SPA-155); the query
- * it feeds is `@spaces/core/writes/read/entity-search`, loaded lazily below.
+ * The validator's schema is core's pure entity-search input: a server fn's
+ * `.validator()` survives into the client bundle, so it must come from a
+ * module that imports no `db`. The query it feeds is loaded lazily below.
  */
 export type { EntitySearchInput } from '@spaces/core/search/entity-search-input'
 
@@ -23,8 +22,8 @@ export const searchEntities = createServerFn()
 
 /**
  * Cmd-K's Records and its lexical passages — the fused statement only, never
- * the vector lane, in its name-first order. (D70) The query and its
- * invariants live in `lib/search/query.ts`; this is the request half.
+ * the vector lane, in its name-first order. This is the request half; the
+ * query states its own invariants.
  */
 export const searchAll = createServerFn()
   .validator(z.object({ q: z.string().max(200) }))
@@ -48,7 +47,7 @@ export const searchPassages = createServerFn()
 
 /**
  * Cmd-K's preview pane, one read per highlighted result, cached by the
- * palette for its life. (D70) The reads are `lib/search/preview.ts`.
+ * palette for its life.
  */
 export const previewRecord = createServerFn()
   .validator(z.object({ id: z.string().uuid() }))

@@ -60,7 +60,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          // P8 — overlay anatomy: paper sheet, 1px ink, the solid shadow of a
+          // Overlay anatomy: paper sheet, 1px ink, the solid shadow of a
           // window over the scrim (dither would vanish there). The 20px body
           // padding is the sheet's; DialogHeader and DialogFooter break out
           // of it to run edge to edge.

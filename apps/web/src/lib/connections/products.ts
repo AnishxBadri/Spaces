@@ -1,7 +1,7 @@
 import type { ProviderId } from '@spaces/core/providers/registry'
 
 /**
- * A connection is per product (D66): Drive, Calendar and Gmail each carry
+ * A connection is per product: Drive, Calendar and Gmail each carry
  * their own consent under the one Google client; Box is its own product.
  * Client-safe data, read by the start route and the Connect control.
  * - `plugin` is the plugin's manifest id, as the plugin registry carries it
@@ -13,7 +13,7 @@ import type { ProviderId } from '@spaces/core/providers/registry'
  * - `base` is what Connect asks for when no scopes are named.
  */
 
-/** The settings page an account is listed on, by the job its product does. (D81) */
+/** The settings page an account is listed on, by the job its product does. */
 export const ACCOUNT_JOBS = [
   'email-calendar',
   'files',

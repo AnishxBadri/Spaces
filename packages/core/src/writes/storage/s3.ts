@@ -10,16 +10,15 @@ import type { Readable } from 'node:stream'
 import type { Storage } from './types'
 
 /**
- * S3 driver — opt-in via STORAGE_DRIVER=s3 (CONTEXT.md: local filesystem
- * stays the default; nothing is bundled). One driver covers every
+ * S3 driver — opt-in via STORAGE_DRIVER=s3; the local filesystem stays the
+ * default and nothing is bundled. One driver covers every
  * S3-compatible target: AWS, Cloudflare R2, Backblaze B2, MinIO, Garage —
  * the operator brings a bucket like they bring an LLM key.
  *
  * Integrity: the local driver re-hashes bytes as it writes; a presigned PUT
  * bypasses this server entirely, so verification is delegated to the bucket
- * via x-amz-checksum-sha256 baked into the signature (checksum matrix,
- * researched 2026-08: AWS and MinIO verify and reject mismatches; R2 and B2
- * added support in 2024/2025; Garage is doubtful). Belt-and-braces for
+ * via x-amz-checksum-sha256 baked into the signature (AWS and MinIO verify
+ * and reject mismatches; R2 and B2 support it; Garage is doubtful). Belt-and-braces for
  * partially-compatible endpoints: the extraction worker re-verifies the
  * digest of every blob it reads — see extract-document.
  *

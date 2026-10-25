@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 /**
- * SPA-98. The inbox's second lane: open suggestions grouped one card per
- * record, sharing the queue with duplicate pairs newest-first. Integration against this worker's test
- * database, truncated and reseeded before the file was imported (SPA-145) —
- * no cleanup here, and the tests below build on each other's rows.
+ * The inbox's suggestion lane: open suggestions grouped one card per record,
+ * sharing the queue with duplicate pairs newest-first. The test database is
+ * truncated and reseeded before the file, so there is no cleanup, and the
+ * tests below build on each other's rows.
  */
 
 async function world() {
@@ -154,7 +154,7 @@ describe('listInbox — the suggestion lane', () => {
     })
 
     // A patch carries its fields against the live registry, and its refs
-    // as citations resolved through `names.ts`.
+    // as citations resolved through the ref resolver.
     expect(founded.fields).toEqual([
       expect.objectContaining({
         slug: 'founded_year',

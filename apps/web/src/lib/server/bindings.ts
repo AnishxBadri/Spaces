@@ -5,7 +5,7 @@ import { requireUser } from './shared'
 /**
  * Link a Drive folder (storage bindings): bind, the poll the bind dialog
  * reads, the record's bindings, and Unlink. Each handler is `requireUser()`
- * plus a program from `#/lib/documents/bindings`, reached by a dynamic
+ * plus a bindings program, reached by a dynamic
  * import so Effect and drizzle stay out of the client bundle.
  */
 

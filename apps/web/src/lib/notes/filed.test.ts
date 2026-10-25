@@ -3,14 +3,9 @@ import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The filed block of a space page (SPA-120).
- *
- * What it has to prove: a memo leads its space even when a scratch note was
- * touched this morning — before SPA-120 the query ordered by `updated_at`
- * alone and the memo sank; two memos still order among themselves by
- * recency, because there is no singleton memo (CONTEXT.md → Filed vs
- * referenced); and the visibility filter the extraction moved is the one
- * that was there — a teammate's private note never reaches the loader.
+ * The filed block of a space page: a memo leads even when a scratch note was
+ * touched later; two memos order by recency (there is no singleton memo); a
+ * teammate's private note never reaches the loader.
  */
 
 async function actorId(): Promise<string> {

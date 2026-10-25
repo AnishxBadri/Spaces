@@ -1,13 +1,13 @@
 import { getDomain } from 'tldts'
 
 /**
- * Normalization rules for identity keys, per CONTEXT.md. These functions
+ * Normalization rules for identity keys. These functions
  * are the ONLY place normalization happens — every alias write and every
  * lookup goes through them, or matching silently rots.
  *
  * In the SDK so a plugin normalizes an identity claim's keys exactly as the
  * choke point (`resolveEntity`) does, because it is the same code. Its one
- * import is `tldts`, the SDK's third dependency (D55).
+ * import is `tldts`.
  */
 
 /** Free-mail domains never create or match a company. */
@@ -39,10 +39,9 @@ const FREE_MAIL = new Set([
 ])
 
 /**
- * Role-prefixed emails are never person-identity. The one list (SPA-195):
- * `identity/one-list.test.ts` fails if a second appears in packages/core or
- * packages/sdk. apps/web's `ROLE_SENDERS` (arrival/noise.ts) filters mail
- * noise — a different job — and is not this list.
+ * Role-prefixed emails are never person-identity. The one list: a test fails
+ * if a second appears in packages/core or packages/sdk. apps/web's
+ * `ROLE_SENDERS` filters mail noise — a different job — and is not this list.
  */
 export const ROLE_PREFIXES: ReadonlySet<string> = new Set([
   'info',
@@ -92,7 +91,7 @@ export function normalizeDomain(input: string): string | null {
  * Host → registrable domain (eTLD+1), lowercase, free-mail or not; null when
  * the host has none. `normalizeDomain` minus the free-mail refusal, for the
  * caller that has to *ask* whether a host is a free provider rather than be
- * told nothing (the arrival lane's participant judgement, SPA-86).
+ * told nothing (the arrival lane's participant judgement).
  */
 export function registrableDomain(input: string): string | null {
   const raw = input.trim().toLowerCase()
@@ -105,9 +104,8 @@ export function isFreeMailDomain(domain: string): boolean {
 }
 
 /**
- * The free-mail set itself, read-only — for the arrival lane's own list
- * (`apps/web/src/lib/arrival/free-email-domains.ts`, D34), whose test holds
- * it to a superset of this one.
+ * The free-mail set itself, read-only — for the arrival lane's own list,
+ * whose test holds it to a superset of this one.
  */
 export const FREE_MAIL_DOMAINS: ReadonlySet<string> = FREE_MAIL
 
@@ -171,7 +169,7 @@ export function normalizeLinkedin(input: string): string | null {
  * holds; any other scheme, whitespace, or a host without a dot is null. Not
  * an identity key — LinkedIn identity is `normalizeLinkedin` — but the one
  * place a URL somebody else typed becomes one the registry's `url` validator
- * accepts (SPA-166: the importer calls this rather than a copy of it).
+ * accepts (the importer calls this rather than a copy of it).
  */
 export function normalizeUrl(input: string): string | null {
   const raw = input.trim()
@@ -195,7 +193,7 @@ export function normalizeUrl(input: string): string | null {
  * A domain as a record shows it: the host `normalizeUrl` reads, lowercase,
  * without a leading `www.` — `https://www.Example.com/` is `example.com`,
  * `app.deel.com/login` stays `app.deel.com`. The display half of a domain
- * identity alias (SPA-173); what it matches on is `normalizeDomain`'s eTLD+1
+ * identity alias; what it matches on is `normalizeDomain`'s eTLD+1
  * in `value_norm`, and this never feeds a comparison. Null when the input
  * reads as no web host.
  */

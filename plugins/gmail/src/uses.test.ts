@@ -16,7 +16,7 @@ import { manifest } from './manifest.ts'
 /**
  * A syncer's ports: Secrets for the connection's token, Http, Content for
  * the mail lane, and Log — never Facts, Identity or Ai. Participants become
- * records host-side, through the participants module. Gate 1 checks the type
+ * records host-side, through the participants module. Typecheck checks the type
  * half; the worker's live test checks the Layer the host builds.
  */
 type Services<T> =

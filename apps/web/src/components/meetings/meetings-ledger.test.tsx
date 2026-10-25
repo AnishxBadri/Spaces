@@ -11,7 +11,7 @@ import type { MeetingFilter } from '#/lib/meetings/list'
 import { MeetingsLedger } from './meetings-ledger'
 
 /**
- * The Meetings page's list (D68 amended): upcoming under day heads with
+ * The Meetings page's list: upcoming under day heads with
  * Prep, the past with Write on what nobody wrote up and the write-up state
  * on the rest, a cancelled meeting struck in place, and each filter
  * narrowing it.

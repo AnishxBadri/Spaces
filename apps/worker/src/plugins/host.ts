@@ -72,9 +72,9 @@ import {
 import type { PluginQueue, PluginQueuesOptions } from './queues'
 
 /**
- * The plugin host: loader steps six and seven. For each loaded plugin it
- * builds one scoped Layer per (integration, job) from that job's `uses`
- * (D51), caches it, runs jobs through it (`invoke`), registers each job's
+ * The plugin host: wires what the loader passed. For each loaded plugin it
+ * builds one scoped Layer per (integration, job) from that job's `uses`,
+ * caches it, runs jobs through it (`invoke`), registers each job's
  * queue (`registerQueues`), and undoes all of it on release.
  *
  * - The Layer is the privilege boundary: a job that reaches for a port it
@@ -233,7 +233,7 @@ type Wired = {
 
 const isRun = (value: unknown): value is JobRun => typeof value === 'function'
 
-/** The function a job export runs: itself, or an action job's `run` (D53). */
+/** The function a job export runs: itself, or an action job's `run`. */
 const runOf = (trigger: Trigger, exported: unknown): JobRun | null => {
   if (isRun(exported)) return exported
   if (
@@ -690,7 +690,7 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
       }
       if (connectionId === undefined)
         return runJobOn(integrationId, plugin, jobName, job, job, input, null)
-      // One member's run (D78): the same grant, bound to their connection,
+      // One member's run: the same grant, bound to their connection,
       // built for this invocation and closed with it.
       return Effect.scoped(
         Layer.build(

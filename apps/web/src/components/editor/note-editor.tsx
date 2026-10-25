@@ -1,14 +1,9 @@
 /**
- * The LAYOUT half of BlockNote, and only that: this file is
- * `@blocknote/react/style.css` (which is `@blocknote/core/style.css` plus the
- * floating-element geometry) and a dozen `.bn-shadcn` rules that size the side
- * menu, the table cell handle and the toolbar's overflow. It carries no
- * shadow, no radius, no font and no colour the app has not already replaced —
- * the visual half of the shadcn theme was never in this stylesheet, it is
- * Tailwind class names emitted by the vendor's own JSX, which the app's
- * Tailwind build does not scan and therefore never builds. The VISUAL half is
- * the app's, in the `.prose-note` block of `src/styles.css`. Keep the import:
- * without it the editor has no block layout at all.
+ * The LAYOUT half of BlockNote only: block layout, floating-element geometry
+ * and a few `.bn-shadcn` sizing rules. Its visual half is Tailwind classes in
+ * the vendor's JSX, which the app's build never scans; the app's `.prose-note`
+ * styles are the visual half. Keep the import: without it the editor has no
+ * block layout at all.
  */
 import '@blocknote/shadcn/style.css'
 
@@ -153,9 +148,8 @@ export function NoteEditor({
     blocksToMarkdownLossy: () => Promise<string>
   }) => void
   /**
-   * §3.1 entry point 4 (SPA-140), and **opt-in**: omitted, this editor is not
-   * a file drop target at all and the browser and BlockNote handle a drop
-   * exactly as they did before. Only the note page passes it — an interaction
+   * Opt-in: omitted, this editor is not a file drop target at all and the
+   * browser and BlockNote handle a drop as usual. Only the note page passes it — an interaction
    * write-up or a template body has no filing of its own to hand a document,
    * so giving them the gesture would mean inventing an answer for them.
    */
@@ -198,9 +192,8 @@ export function NoteEditor({
   /**
    * Upload, then insert — never the other way round. There is no placeholder
    * chip: a chip that has to be removed again when the PUT fails is a second
-   * write path into the note body, and the body is the source of truth
-   * (CONTEXT.md → the glossary is decorations for the same reason). A failed
-   * upload leaves the document exactly as the reader left it.
+   * write path into the note body, and the body is the source of truth. A
+   * failed upload leaves the document exactly as the reader left it.
    *
    * `droppedAt` was resolved from the pointer inside the drop handler, before
    * any `await`, because by the time a hash and a PUT have finished there is
@@ -362,38 +355,14 @@ export function NoteEditor({
         editor={editor as never}
         theme="light"
         /**
-         * WHICH SURFACE WENT WHICH WAY — the map the next BlockNote upgrade
-         * needs. Three seams, because BlockNote builds its chrome three ways.
-         *
-         * 1. COMPONENT OVERRIDE (`shadCNComponents`, here → `instrument-chrome
-         *    .tsx`). BlockNote reads these out of its own context, so handing it
-         *    the app's primitives means the surface is drawn by the same file
-         *    the rest of the app is drawn by and needs no CSS at all:
-         *      Button        the drag handle, the `+`, every toolbar button
-         *      DropdownMenu  the drag-handle block menu, the toolbar dropdowns
-         *      Popover       edit-link, create-link, file caption and rename
-         *      Tooltip       a toolbar button's name on hover
-         *      Input, Label  the URL field inside those
-         *      Toggle        bold/italic — the one adapter, over `Button`
-         *
-         * 2. CSS, in the `.prose-note` block of `src/styles.css`. These BlockNote
-         *    builds from its own markup with shadcn class names it never reads
-         *    from the context, so there is no seam to hand anything to:
-         *      .bn-suggestion-menu  the slash menu AND the @-mention menu
-         *      .bn-toolbar          the formatting and link toolbar sheets
-         *      .bn-side-menu        the handle colour (geometry left alone)
-         *      .bn-table-handle     colour and radius only, per the same rule
-         *      .bn-select, badge    the block-type picker and the kind chip —
-         *                           the two groups with no app primitive behind
-         *                           them, so they are dressed, not replaced
-         *      --bn-*               BlockNote's own variables: radius, 1px ink
-         *                           edge, the grey ramp → Instrument materials
-         *
-         * 3. MOTION (`floatingUIOptions`, below). Every floating element's enter
-         *    and exit is a floating-ui INLINE style, which neither seam above
-         *    can reach — so the four default controllers are switched off and
-         *    re-rendered here by hand, each carrying the timing. See
-         *    `instrument-chrome.tsx` for why the scale half lives in CSS.
+         * Which surface went which way — the map a BlockNote upgrade needs.
+         * 1. Component override (`instrumentChrome`): Button, DropdownMenu,
+         *    Popover, Tooltip, Input, Label, Toggle — the app's primitives.
+         * 2. CSS in `.prose-note`: the slash and @-mention menus, toolbars,
+         *    side menu and table handle colour, the block-type picker and
+         *    kind chip (no app primitive), and the `--bn-*` variables.
+         * 3. Motion (`floatingUIOptions`): floating-ui's inline styles, so the
+         *    four default controllers are off and re-rendered here.
          */
         shadCNComponents={instrumentChrome}
         formattingToolbar={false}
@@ -413,10 +382,9 @@ export function NoteEditor({
         <SideMenuController floatingUIOptions={HANDLE_MOTION} />
         <SuggestionMenuController
           triggerCharacter="/"
-          // Verbatim from BlockNote's own default slash menu
-          // (BlockNoteDefaultUI.tsx): a table cell is not a place to insert a
-          // block. Switching the default controller off is what makes this our
-          // line to keep.
+          // Verbatim from BlockNote's default slash menu: a table cell is not a
+          // place to insert a block. With the default controller off, this
+          // line is ours to keep.
           shouldOpen={(tr) =>
             !tr.selection.$from.parent.type.isInGroup('tableContent')
           }

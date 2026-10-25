@@ -26,7 +26,7 @@ import {
 } from './providers/embed/settings'
 
 /**
- * SPA-51. `embed()` through an injected `EmbeddingModel` — the pin, the
+ * `embed()` through an injected `EmbeddingModel` — the pin, the
  * sensitivity refusal, the cap, the width assertion and the `ai_usage` row
  * are all real; nothing reaches a network. Where the real OpenAI adapter is
  * exercised, it is handed a stub `fetch` that answers in OpenAI's
@@ -335,8 +335,8 @@ describe('the embedding pin', () => {
   })
 
   it('refuses to change the pin to another width with the re-pin explanation, and leaves it as it was', async () => {
-    // A same-width swap is allowed since SPA-136 (`worker/jobs/embed-backfill.test.ts`);
-    // a change of width is still the unbuilt half of re-pin.
+    // A same-width swap is allowed (the backfill job's suite covers it); a
+    // change of width is the unbuilt half of re-pin.
     await saveKey('openai', 'sk-embed-test-0000')
     const first = await pin('openai', 'text-embedding-3-small')
 

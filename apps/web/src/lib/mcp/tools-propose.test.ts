@@ -22,17 +22,17 @@ import { createApiTokenProgram } from '#/lib/tokens/store'
 import { handleMcpRequest } from './server'
 
 /**
- * SPA-31 — `propose_suggestion`, the MCP surface's one write verb, end to
- * end: a real MCP client over Streamable HTTP into `handleMcpRequest`, with
- * a token minted by the real store, landing in the real inbox queue. The
- * transport plumbing is the same as `server.test.ts` (SPA-23).
+ * `propose_suggestion`, the MCP surface's one write verb, end to end: a real
+ * MCP client over Streamable HTTP into `handleMcpRequest`, with a token
+ * minted by the real store, landing in the real inbox queue. The transport
+ * plumbing is the same as the read surface's suite.
  */
 
 const ENDPOINT = 'http://localhost/api/mcp'
 const inProcess = (url: string | URL, init?: RequestInit) =>
   handleMcpRequest(new Request(url, init))
 
-/** See `server.test.ts`: the SDK transport, relayed past its `sessionId`. */
+/** As in the read surface's suite: the SDK transport, relayed past its `sessionId`. */
 function relay(inner: StreamableHTTPClientTransport): Transport {
   const outer: Transport = {
     start: () => inner.start(),

@@ -33,7 +33,7 @@ import { FIXTURE_ACTOR } from '../../vitest.seed'
  * The `Discover` port end to end through the loader: the discover fixture's
  * watch runs on its space, signals on the members through Content, and
  * hands back candidates the host turns into one card each — or nothing.
- * Invoked straight through the host; `watch-live.test.ts` covers the queue.
+ * Invoked straight through the host; the watch suite covers the queue.
  */
 
 const fixtures = fileURLToPath(

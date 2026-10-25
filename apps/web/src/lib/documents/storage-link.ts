@@ -8,7 +8,7 @@ import type { ProviderId } from '@spaces/core/providers/registry'
 
 export type StorageLinkProvider = {
   readonly provider: ProviderId
-  /** The product whose connection fetches it (D66). */
+  /** The product whose connection fetches it. */
   readonly product: string
   /** The provider's word for itself on a row: "Open in Drive". */
   readonly label: string
@@ -35,7 +35,7 @@ export function storageLinkProvider(url: string): StorageLinkProvider | null {
 
 /**
  * A pasted Drive *folder* link. The add row refuses it in place: a folder is
- * linked through Link a Drive folder, never fetched as a file. (D66)
+ * linked through Link a Drive folder, never fetched as a file.
  */
 export function isFolderLink(url: string): boolean {
   if (storageLinkProvider(url) === null) return false

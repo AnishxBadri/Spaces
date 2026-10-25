@@ -15,7 +15,7 @@ import {
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 
 /**
- * The data migration that made identity a unique attribute (D75): every live
+ * The data migration that made identity a unique attribute: every live
  * person's email aliases become `values.emails`, every company's domain
  * aliases `values.domains`, LinkedIn aliases on either go back to the plain
  * `values.linkedin`, and `cin` leaves `alias_kind`. The test database is past

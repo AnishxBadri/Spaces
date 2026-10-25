@@ -93,7 +93,7 @@ function MembersSection({
   const [inviting, setInviting] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
 
-  /** Suspending signs a member out everywhere, so it asks; restoring does not. (D81) */
+  /** Suspending signs a member out everywhere, so it asks; restoring does not. */
   async function setBanned(m: Member) {
     if (!m.banned) {
       const ok = await confirm({

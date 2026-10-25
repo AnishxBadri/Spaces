@@ -3,9 +3,7 @@ import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The two lanes of a record's Notes section (SPA-104).
- *
- * What the lanes have to prove: a note filed *and* mentioning appears once
+ * The two lanes of a record's Notes section: a note filed and mentioning appears once
  * under filed; a teammate's private note appears in neither lane, because
  * its title is what leaks and the filter is in SQL; memos pin to the top of
  * the filed lane through the one comparator; and a merged-away note stops
@@ -253,7 +251,7 @@ describe('byMemoThenRecent', () => {
   })
 })
 
-/** A person, a deal and a custom record — the three pages notes-1b fans out to. */
+/** A person, a deal and a custom record: the other pages the lanes serve. */
 async function aPerson(tag: string): Promise<string> {
   const { db } = await import('@spaces/db')
   const { entity, person } = await import('@spaces/db/schema')
@@ -299,10 +297,9 @@ async function aCustomRecord(tag: string): Promise<string> {
 }
 
 /**
- * notes-1b fans the one component out to people, deals and custom records.
- * The lanes are keyed by entity id and nothing else — no record kind and,
- * for an /o/ page, no object slug — so the split and the privacy filter are
- * the company page's, proven once per kind rather than re-implemented.
+ * The lanes are keyed by entity id alone (no record kind, no object slug), so
+ * people, deals and custom records get the company page's split and privacy
+ * filter, proven once per kind.
  */
 describe('the lanes on every record kind (SPA-107)', () => {
   const kinds: Array<[string, (tag: string) => Promise<string>]> = [

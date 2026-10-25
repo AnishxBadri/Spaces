@@ -31,8 +31,8 @@ import type { RegistrySource } from './registry'
  * fetches the tarball (or takes an upload, for a box with no outbound
  * HTTPS) and hands the bytes to core's installer; it never runs plugin code.
  * - `installPlugin` is called by the registry install and the upload here,
- *   and by first boot; upgrade and uninstall have one caller each (asserted
- *   by `installer-callers.test.ts`).
+ *   and by first boot; upgrade and uninstall have one caller each (a test
+ *   asserts this over the source).
  * - `RegistrySource` exists so tests point it at a registry and tarballs on
  *   disk; the server fns pass none.
  */
@@ -289,7 +289,7 @@ export const uninstallIntegrationProgram = Effect.fn(
   }
 })
 
-/** Any member reads the catalogue (D81); install and upload are the admin's. */
+/** Any member reads the catalogue; install and upload are the admin's. */
 export async function listAvailableHandler(): Promise<RegistryView> {
   await requireUser()
   return run(availableProgram())

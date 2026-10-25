@@ -3,7 +3,7 @@ import { resolveSensitivity } from './sensitivity'
 import type { SensitivityInputs } from './sensitivity'
 
 /**
- * SPA-61. The resolver is pure: no Postgres, no drizzle. Six cases — one per
+ * The resolver is pure: no Postgres, no drizzle. Six cases — one per
  * authored input plus nothing sensitive — and the two that make the OR
  * cautious.
  */

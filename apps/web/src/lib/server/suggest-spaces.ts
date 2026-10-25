@@ -3,12 +3,12 @@ import { z } from 'zod'
 import { requireUser } from './shared'
 
 /**
- * The Spaces rail's "Suggest spaces" (SPA-103). Pressing it checks the
+ * The Spaces rail's "Suggest spaces". Pressing it checks the
  * classify lane's policy against the record's sensitivity — a record under a
  * sensitive space on a cloud route is refused here, naming the space — then
  * enqueues one `entity.suggest-spaces` job keyed on the record; pg-boss's
  * `singletonKey` refuses a second press while the first is queued or
- * active. The bodies live in `lib/ai/suggest-spaces.ts`.
+ * active.
  */
 
 const byRecord = z.object({ entityId: z.string().uuid() })

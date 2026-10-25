@@ -6,7 +6,7 @@ import type { AttributeOptions } from '../../attributes/registry'
 import { objectIdForKindAsync } from './objects'
 import { seedSystemAttributes } from './seed'
 
-/** The boot seeder's enrichment-link pass: insert-if-absent, never over the owner. (D76) */
+/** The boot seeder's enrichment-link pass: insert-if-absent, never over the owner. */
 
 const companyAttr = async (slug: string) => {
   const objectId = await objectIdForKindAsync('company')

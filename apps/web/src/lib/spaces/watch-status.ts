@@ -3,7 +3,7 @@ import type { JobStatusEvent } from '@spaces/core/queue/job-status'
 /**
  * The Watching lane's rules, pure and client-safe: the cadence choices, a
  * watch's label, and each watch's status off the space's job-status stream,
- * keyed by watch. (D64, D72)
+ * keyed by watch.
  * - The loader's latest `job_run` per watch seeds the state; the stream's
  *   `init` replaces it and `status` applies on top, an older attempt never
  *   overwriting a newer one.
@@ -11,7 +11,7 @@ import type { JobStatusEvent } from '@spaces/core/queue/job-status'
  *   pressed over arrives for that watch.
  */
 
-/** How often: Manual first and the space page's default. (D77) */
+/** How often: Manual first and the space page's default. */
 export const CADENCES: ReadonlyArray<{
   readonly value: string
   readonly label: string

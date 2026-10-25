@@ -6,7 +6,7 @@ import { Tooltip as TooltipPrimitive } from 'radix-ui'
 import { cn } from '#/lib/utils.ts'
 
 /**
- * Tooltips are inverted (DESIGN.md P8): an ink sheet with paper text, 0
+ * Tooltips are inverted: an ink sheet with paper text, 0
  * radius, on the tooltip layer, 120ms in / 80ms out. Names on hover for
  * marks-only controls — never the only way to learn what a control does.
  */

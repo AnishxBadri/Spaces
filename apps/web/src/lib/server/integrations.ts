@@ -5,7 +5,7 @@ import { z } from 'zod'
  * Settings → Integrations: the installed plugins, one plugin's settings and
  * key, on/off and breaker reset, the registry's Install, Update and
  * Uninstall, and Upload for a box with no outbound HTTPS. Every write opens
- * with `requireAdmin()`; the reads are any member's, secrets redacted (D81).
+ * with `requireAdmin()`; the reads are any member's, secrets redacted.
  * The bodies are imported inside the handlers so their database code never
  * reaches the client bundle.
  */

@@ -33,32 +33,23 @@ import {
 /**
  * THE choke point. Every creator of a person or a company — manual, deck,
  * mention, clip, Apollo, Gmail, import — goes through resolveEntity(). No
- * exceptions; bypassing it is how the database rots. (Scoped honestly since
- * SPA-167: `EntityKindResolvable` is those two kinds. A deal is born by
- * `createDeal`'s direct insert and a custom record by `createRecordProgram`,
- * neither through here — which is why the import plan names its creator per
- * row.)
+ * exceptions; bypassing it is how the database rots. Deals (`createDeal`)
+ * and custom records (`createRecordProgram`) are born elsewhere.
  *
  * Doctrine: deterministic auto, probabilistic suggest.
  * - Exact identity-key match on a record of the kind asked for → attach: a
- *   company's domain, a person's email (`CORE_IDENTITY`, D75). A LinkedIn
+ *   company's domain, a person's email (`CORE_IDENTITY`). A LinkedIn
  *   URL identifies neither; a birth keeps it as the `linkedin` value.
  * - No match → create, then fuzzy-sweep names into duplicate_candidate.
  * - Fuzzy NEVER merges or attaches.
  *
- * **One collision door** (SPA-86). A key already held by a record of
- * *another* kind — a custom Fund record that claimed `sequoia.com`, asked
- * for as a company — is not this record, so it is not an attach. The record
- * is created without that key and the claim goes through
- * `claimIdentityAlias`, which is what every identity write does on a
- * collision: a `duplicate_candidate` for the inbox, never an error and never
- * a second identity alias. The create path's race — a concurrent writer
- * committing the same key between the lookup and the insert — lands on the
- * same door, since the alias inserts run in `claimIdentityAlias`'s
- * savepoint. And the collision is recorded once: asked again for the same
- * key, the record that lost that claim before is the one returned
- * (`priorClaimant`), so an arrival lane re-reading a thread does not mint a
- * second loser each time.
+ * **One collision door.** A key held by a record of *another* kind (a
+ * custom Fund holding `sequoia.com`, asked for as a company) is not an
+ * attach: the record is created without it and the claim goes through
+ * `claimIdentityAlias` — a `duplicate_candidate`, never an error, never a
+ * second identity alias. A concurrent writer racing the same key lands on
+ * the same door (its savepoint). Asked again, the earlier loser is returned
+ * (`priorClaimant`), so a re-read thread does not mint a second loser.
  */
 
 export type EntityKindResolvable = 'company' | 'person'
@@ -83,10 +74,6 @@ export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
  * makes it a claim the compiler checked rather than one the caller asserted:
  * `{ class: 'integration' }` with no `ref` does not typecheck, which is the
  * same thing `entity_source_ref_invariant` says in Postgres, said earlier.
- *
- * This replaces `'manual' | 'gmail' | 'apollo' | 'import' | 'clip'`, a
- * vendor list that had also drifted off the enum it was writing into — it
- * omitted `seed`, which the seeds wrote straight through drizzle.
  */
 export type ResolveSource =
   | { class: 'integration'; ref: string }
@@ -115,16 +102,15 @@ export type ResolveResult = {
   /** Which key matched, when attached. */
   matchedOn?: CoreIdentityKey
   /**
-   * The embeddable values the birth set (SPA-132), for the caller to queue
-   * once this has returned; empty on an attach. `setValuesEffect` used to
-   * queue them itself; the enqueue reads the environment, which core may
-   * not, so it is handed back (SPA-174/175).
+   * The embeddable values the birth set, for the caller to queue once this
+   * has returned; empty on an attach. The enqueue reads the environment,
+   * which core may not, so it is handed back.
    */
   reembed: Array<EmbedSource>
   /**
    * The `entity.created` this birth emits, for the caller to dispatch once
    * the birth has committed (`dispatchDomainEvent`). Null on an attach and
-   * for a `seed` or `import` birth. (D65)
+   * for a `seed` or `import` birth.
    */
   emit: DomainEvent | null
 }
@@ -190,7 +176,7 @@ export function normalizeKeys(
     const norm = normalizeDomain(k.domain)
     // The alias a resolve writes shows the host it matches on — a sheet's
     // `https://www.Example.com/` is stored as `example.com` beside the
-    // eTLD+1 in `value_norm` (SPA-173). Nothing compares on `value`.
+    // eTLD+1 in `value_norm`. Nothing compares on `value`.
     if (norm)
       out.push({
         kind: 'domain',
@@ -220,7 +206,7 @@ async function birthSupplied(
   const raw = input.keys?.linkedin
   const url = raw ? normalizeUrl(raw) : null
   if (url === null || input.values?.linkedin != null) return input.values
-  // Imported here: values.ts imports this module.
+  // Imported here: the values module imports this one (a cycle).
   const { getRegistry } = await import('../attributes/values')
   const live = (await getRegistry(input.kind)).some(
     (d) => d.slug === 'linkedin' && d.type === 'url',
@@ -275,11 +261,10 @@ export const RESOLVE_NEEDS_NAME_OR_KEY =
  * key held by another kind of record falls through to the record that lost
  * that claim before (`priorClaimant`). Both `resolveEntity` and
  * `previewResolve` call this — one lookup, so the preview cannot say
- * *attach* where the write would create. The import's reference cells
- * (SPA-168, `lib/import/references.ts`) call it too, for a company or
- * person column holding a domain or an address; their name match is exact
- * and lives there, not here — this module gets no fuzzy attach path, since
- * a near-match that attaches is how a deal lands on the wrong company.
+ * *attach* where the write would create. The import's reference cells call
+ * it too; their name match is exact and lives there — this module gets no
+ * fuzzy attach path, since a near-match that attaches is how a deal lands
+ * on the wrong company.
  */
 export async function matchIdentity(
   kind: EntityKindResolvable,
@@ -328,7 +313,7 @@ export type PreviewResolveResult =
   | { verdict: 'refused'; reason: typeof RESOLVE_NEEDS_NAME_OR_KEY }
 
 /**
- * **The read-only twin of step 1** (SPA-167). What `resolveEntity` would do
+ * **The read-only twin of step 1.** What `resolveEntity` would do
  * with this input, decided by the same `normalizeKeys`, the same identity
  * alias lookup and the same `canonicalId` redirect — and nothing written:
  * no name alias on an attach, no create (step 2), no fuzzy sweep (step 3).
@@ -463,8 +448,8 @@ export async function resolveEntity(
 
   // 2. No identity match → create.
   const canonicalName = name ?? keys[0].valueNorm
-  // Every resolvable kind is an object record now, so every one carries an
-  // object row — the ghost kind that had none was deleted (clean-1).
+  // Every resolvable kind is an object record, so every one carries an
+  // object row.
   const objectId = await (
     await import('../attributes/objects')
   ).objectIdForKindAsync(input.kind)
@@ -472,16 +457,10 @@ export async function resolveEntity(
     insertResolved(tx, input, keys, name, canonicalName, objectId),
   )
 
-  // Birth values (spec §4): supplied first, then defaults for the blanks.
-  // After the transaction, since setValues takes its own row lock.
-  //
-  // SPA-70 left this at `user`-or-`system`, because an integration actor
-  // names an `integration` row and this call site had no way to be handed
-  // one. The pair is that way: `{class:'integration', ref}` is exactly the
-  // id the actor wants, so `birthActor` above can finally return it, and
-  // the birth `attribute_event` rows carry `actor_ref` = the same row
-  // `entity.source_ref` points at. The two provenance stories on a record
-  // now come from one argument and cannot disagree.
+  // Birth values: supplied first, then defaults for the blanks. After the
+  // transaction, since setValues takes its own row lock. `birthActor` reads
+  // the same provenance pair as `entity.source_ref`, so the two cannot
+  // disagree.
   const { birthValues } = await import('../attributes/defaults')
   const { reembed } = await birthValues({
     entityId: created.id,
@@ -558,7 +537,7 @@ async function insertResolved(
   // is refused at that element as a duplicate_candidate, never an error.
   const identity = birthIdentity(input, keys)
   if (identity.length > 0) {
-    // Imported here: values.ts imports this module.
+    // Imported here: the values module imports this one (a cycle).
     const { setValuesInTx } = await import('../attributes/values')
     await setValuesInTx(tx, {
       entityId: ent.id,
@@ -590,7 +569,7 @@ export type ResolveInTxResult = ResolveResult & {
 }
 
 /**
- * **`resolveEntity` inside a caller's transaction** (SPA-169). The import
+ * **`resolveEntity` inside a caller's transaction.** The import
  * commit writes each row in one transaction — its secondary creates, its own
  * record, its values — so a failure anywhere rolls back that row alone; a
  * resolve that opened its own would commit a record the row then failed to
@@ -636,7 +615,7 @@ export async function resolveEntityInTx(
   )
   // Birth values in this transaction: supplied first, defaults for the
   // blanks, through the one write path — imported dynamically for the cycle
-  // `resolveEntity` avoids the same way (values.ts imports this module).
+  // `resolveEntity` avoids the same way (the values module imports this one).
   const { setValuesInTx } = await import('../attributes/values')
   const values = Object.fromEntries(
     Object.entries(
@@ -722,9 +701,8 @@ async function priorClaimant(
  * it has worn and `searchEntities` keeps finding it by the old one.
  *
  * Three callers, one check — `resolveEntity` when a known entity arrives
- * under a new name, `renameRecordProgram` when a user renames a record
- * (SPA-63), and `createRecordProgram` for a custom record's birth alias
- * (SPA-60). Copying the check instead would be how the three drift.
+ * under a new name, `renameRecordProgram` when a user renames a record, and
+ * `createRecordProgram` for a custom record's birth alias. Copying the check instead would be how the three drift.
  *
  * `on` is the executor: `db` by default, a transaction when the caller needs
  * the alias to land or fail with the row it names — which is exactly the
@@ -788,11 +766,9 @@ export function normalizeIdentityValue(
 }
 
 /**
- * What one identity-backed slug did on a write (spec §9). `released` is the
- * clear: the record stops asserting the key, so the alias is retired and the
- * domain is free for another record to claim (CONTEXT.md, 2026-09-19 —
- * name aliases are history and never retire, identity aliases are claims and
- * do).
+ * What one identity-backed slug did on a write. `released` is the clear: the
+ * alias is retired and the key is free for another record to claim. Name
+ * aliases are history and never retire; identity aliases are claims and do.
  */
 export type IdentityOutcome =
   'added' | 'already_own' | 'suggested_duplicate' | 'released'

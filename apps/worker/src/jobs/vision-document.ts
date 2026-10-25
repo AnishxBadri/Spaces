@@ -34,28 +34,17 @@ import { ExtractionStore } from './extract-document'
 import type { BlobUnreadable, StoreUnavailable } from './extract-document'
 
 /**
- * document.vision — Read with vision on the worker (SPA-94). The lane, the
- * no-rasterizer decision and the chunk bound are `lib/ai/vision.ts`; this is
- * the job that reads one scanned PDF and, when every page range has
- * answered, writes the text **through extraction's own store**:
- * `ExtractionStore.markExtracted` is the one statement that sets
- * `extracted_text`, `tsv` and `extraction_status: 'done'` together (with the
- * glossary links in the same transaction), and `ExtractionStore.onExtracted`
- * is the `document.extracted` seam, so chunking, embedding and classify
- * follow exactly as they follow a text layer. This file never names a
- * column of `document` it writes — it has none.
- *
- * - **Refused** (the document is gone, has extracted since, is not a stored
- *   PDF at `unsupported`): the job ends, the row is not touched.
- * - **A page range that fails** — the provider's error, an unrouted lane, a
- *   sensitive document routed to the cloud, a cap, a PDF pdf-lib cannot
- *   cut, or a model that read no text at all: nothing is written to the
- *   text; the row stays `unsupported` and `extraction_error` carries the
- *   sentence. Every range is read before anything is written, so no text is
- *   ever half-written.
- *
- * **Every failure is permanent**, the deck reader's rule: none is fixed by a
- * retry in thirty seconds, and each retry re-pays for every page before it.
+ * document.vision: reads one scanned PDF with a vision model and writes the
+ * text through extraction's own store (`ExtractionStore.markExtracted`, then
+ * `onExtracted`), so chunking, embedding and classify follow as for a text
+ * layer. This job never writes a `document` column itself.
+ * - Refused (gone, extracted since, not a stored PDF at `unsupported`): ends
+ *   without touching the row.
+ * - A failing page range: nothing is written to the text, the row stays
+ *   `unsupported` with the sentence in `extraction_error`. Every range is read
+ *   before anything is written, so text is never half-written.
+ * - Every failure is permanent: no retry fixes one, and each re-pays for
+ *   every page before it.
  */
 
 export const visionDocumentData = z.object({
@@ -215,8 +204,8 @@ const program = Effect.fn('visionDocument')(function* (
     run,
   }).pipe(
     Effect.catch((failure) => {
-      // The read failed: the row stays `unsupported`, its text untouched,
-      // and the provider's sentence is what the operator reads on it.
+      // The row stays `unsupported`, its text untouched, with the
+      // provider's sentence as its error.
       const reason = visionMessage(failure)
       return store
         .markFailed(documentId, 'unsupported', reason)
@@ -224,8 +213,8 @@ const program = Effect.fn('visionDocument')(function* (
     }),
   )
 
-  // Extraction's statement, then extraction's hand-off — the sanctioned
-  // AI write to a document, and nothing else here writes one.
+  // Extraction's statement, then its hand-off: the one sanctioned direct AI
+  // write to a document.
   const text = visionText(sections)
   yield* store.markExtracted(documentId, text)
   yield* store.onExtracted(documentId)
@@ -238,7 +227,7 @@ const program = Effect.fn('visionDocument')(function* (
 type ProgramFailure =
   VisionFailure | StoreUnavailable | BlobUnreadable | JobPermanent
 
-/** The sentence a failure leaves — on the job, and on the run (SPA-100). */
+/** The sentence a failure leaves, on the job and on the run. */
 const reasonOf = (failure: ProgramFailure): string =>
   failure._tag === 'JobPermanent'
     ? failure.reason

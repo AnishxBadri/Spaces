@@ -5,7 +5,7 @@ import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
 
 /**
  * The documents filed on one record, as its Files tab lists them, newest
- * first. A document private to someone else is not listed (D67, D78).
+ * first. A document private to someone else is not listed.
  */
 export function recordDocumentRows(viewerId: string, entityId: string) {
   return db
@@ -19,17 +19,16 @@ export function recordDocumentRows(viewerId: string, entityId: string) {
       extractionError: document.extractionError,
       createdAt: document.createdAt,
       uploadedBy: document.uploadedBy,
-      // Whether there are bytes at all (docsurf-10b). Null on a clipped
+      // Whether there are bytes at all. Null on a clipped
       // article — the page was read, never stored — and the row's controls
       // read it: a download that cannot exist is offered as "Open source"
       // instead, rather than as a button that throws when pressed.
       blobSha: document.blobSha,
-      // The clip's own address (SPA-117), and the one column that tells a
+      // The clip's own address, and the one column that tells a
       // saved article from a file: the row's pending state reads
       // "fetching…" rather than "extracting text…" when it is set.
       url: document.url,
-      // The storage-source half of the row (SPA-78,
-      // `docs/spec-storage-sources.md` §8): where the provider's copy can
+      // The storage-source half of the row: where the provider's copy can
       // be opened, and whether it is still there. Both null on every
       // document until a storage-source plugin files one, and the row
       // renders nothing extra when they are.
@@ -52,7 +51,7 @@ export function recordDocumentRows(viewerId: string, entityId: string) {
         eq(link.toEntityId, entityId),
         eq(link.relation, 'tagged_in'),
         isNull(entity.mergedIntoId),
-        // A document private to someone else is not listed (D67).
+        // A document private to someone else is not listed.
         canReadDocumentSql(viewerId),
       ),
     )

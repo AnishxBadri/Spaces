@@ -11,21 +11,12 @@ import {
 } from './note-drop'
 
 /**
- * §3.1 entry point 4, as far as a node-environment suite can take it
- * (SPA-140). The gesture is DOM and the editor is a `.tsx`, so what is
- * asserted here is the **value** that leaves the drop and what the writer
- * does with it: `fileAgainstForNote` → `birthDocumentProgram`, which is
- * exactly the path `uploadDocument` takes through `finalizeDocumentUpload`
- * (the server fn hands `data.fileAgainst` straight to the same program).
- *
- * The one claim that cannot be checked here is that the chip lands at the
- * pointer rather than at the end — `posAtCoords` needs a laid-out document.
- * What can be checked is the half that goes wrong silently: the position
- * captured before the `await` is re-validated against the document as it is
- * after it.
- *
- * The queue is stubbed the way every document fixture file stubs it —
- * `enqueue` is the one side effect birth has outside the transaction.
+ * A file dropped on a note body, as far as a node suite can take it: the
+ * value that leaves the drop and what the writer does with it,
+ * `fileAgainstForNote` → `birthDocumentProgram`, the path
+ * `finalizeDocumentUpload` takes.
+ * - Not checked: the chip landing at the pointer (`posAtCoords` needs
+ *   layout). Checked: the captured position is re-validated after the await.
  */
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
@@ -108,8 +99,8 @@ describe('a file dropped on a note body', () => {
 
     const born = await dropOnNote([hydrogen, climate], aSha('two spaces'))
 
-    // One row, two edges — §3.4's "filed in N places without copying", and
-    // the reason birth takes an array of targets rather than one.
+    // One row, two edges: filed in N places without copying, which is why
+    // birth takes an array of targets rather than one.
     const { db } = await import('@spaces/db')
     const { document } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
@@ -121,7 +112,7 @@ describe('a file dropped on a note body', () => {
 
     // `entity_space` for both, and **no** `link(tagged_in)` at all: a note's
     // filing is entity_space only, so there is nothing for a record edge to
-    // have come from (SPA-19's union).
+    // have come from.
     expect(await edgesOf(born.id)).toEqual({
       links: [],
       spaces: [hydrogen.id, climate.id].sort(),

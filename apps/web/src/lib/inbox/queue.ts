@@ -46,16 +46,14 @@ import { JUDGMENT, JUDGMENT_REF } from './review-groups'
 import type { InboxSide } from './context'
 
 /**
- * The review inbox's queue (SPA-76, SPA-98) — one list over typed rows.
- * `lib/server/inbox.ts` is the door (session check, then these programs
- * through `effectFn()`); the programs live here, outside `lib/server/`, so
- * the suite can drive them without a request and nothing below reaches the
- * client bundle (SPA-155).
+ * The review inbox's queue: one list over typed rows. The inbox server fns
+ * are the door (session check, then these programs through `effectFn()`);
+ * the programs live outside the server-fn modules so the suite can drive
+ * them without a request and nothing below reaches the client bundle.
  *
- * Two lanes today: `duplicate_candidate` (the sweep's pairs) and
- * `suggestion` (the AI layer's proposals, spec-ai-substrate.md §10). A later
- * lane adds a member to `InboxRow`, a branch here and a renderer in
- * `routes/_app/inbox.tsx` — never a page.
+ * Two lanes: `duplicate_candidate` (the sweep's pairs) and `suggestion` (the
+ * AI layer's proposals). A new lane adds a member to `InboxRow`, a branch
+ * here and a renderer in the inbox route — never a page.
  */
 
 export class InboxQueryFailed extends Schema.TaggedError<InboxQueryFailed>()(
@@ -108,13 +106,13 @@ export type SuggestionField = {
 }
 
 /**
- * A citation: the stored ref resolved server-side (`names.ts`) — the words
- * `cite.ts` turns it into, the survivor it lands on, or `missing`.
+ * A citation: the stored ref resolved server-side — the words the citation
+ * renderer turns it into, the survivor it lands on, or `missing`.
  */
 export type SuggestionCitation = ResolvedRef
 
 /**
- * Where a suggestion came from (SPA-31). `app`: an in-app feature — a
+ * Where a suggestion came from. `app`: an in-app feature — a
  * person's click or a worker job. `mcp`: an outside assistant over the MCP
  * server, named by the API token that made it (revoked tokens keep their
  * name: the proposal outlives the credential). `integration`: an integration
@@ -137,12 +135,12 @@ export type SuggestionItem = {
   fields: Array<SuggestionField> | null
   origin: SuggestionOrigin
   createdAt: string
-  /** The run that produced it (SPA-100) — the card's "produced by this run". */
+  /** The run that produced it — the card's "produced by this run". */
   runId: string | null
 }
 
 /**
- * The captured page a card is anchored on (SPA-134): a capture names
+ * The captured page a card is anchored on: a capture names
  * somebody we hold no record for, so its read's suggestions sit on the
  * document itself, and the card's heading names the page — its title and
  * the address it was captured from — where a record card has its chip.
@@ -173,7 +171,7 @@ export type SuggestionRow = {
 }
 
 /**
- * A column run as its inbox header reads it (SPA-122): the `ai_run` row's
+ * A column run as its inbox header reads it: the `ai_run` row's
  * task, where it stands, and — for a run the daily cap stopped — its
  * summary line (rows done, rows left), which the run writes to
  * `ai_run.error` when it closes.
@@ -190,7 +188,7 @@ export type ColumnRunSummary = {
 }
 
 /**
- * Every open suggestion one column run wrote, under one header (SPA-122):
+ * Every open suggestion one column run wrote, under one header:
  * the run's summary and "Accept all", which accepts the run's attribute
  * across its suggestions through `acceptColumnProgram`. The members are the
  * ordinary per-record cards, so each is still decided on its own.
@@ -222,7 +220,7 @@ export type DiscoverySpace = {
 /**
  * A space's open discovery cards (`add_record`, `file_record`) under one
  * head: the space's path, the plugins that found them, the count. Each card
- * is decided on its own; there is no bulk accept. (D72)
+ * is decided on its own; there is no bulk accept.
  */
 export type DiscoveryRow = {
   kind: 'discovery'
@@ -238,7 +236,7 @@ export type DiscoveryRow = {
 
 /**
  * Action cards an Ask thread left undecided, under a head naming the thread.
- * Shown so only to the thread's author, since threads are private (D70);
+ * Shown so only to the thread's author, since threads are private;
  * anyone else sees them as ordinary record cards.
  */
 export type AskCardsRow = {
@@ -253,7 +251,7 @@ export type AskCardsRow = {
 
 /**
  * Every row the inbox can hold. Add a lane by adding a member here and a
- * renderer in `routes/_app/inbox.tsx` — the queue, the count and the page
+ * renderer in the inbox route — the queue, the count and the page
  * follow. Nothing else in the app switches on this union.
  */
 export type InboxRow =
@@ -432,7 +430,7 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
   if (open.length === 0) return []
 
   // A discovery card groups under its space, not the record it may name;
-  // an `add_record` names none. (D72)
+  // an `add_record` names none.
   const anchorOf = (s: (typeof open)[number]): string | null =>
     isDiscoveryKind(s.kind) ? discoverySpaceOf(s.payload) : s.entityId
   const entityIds = [
@@ -458,7 +456,7 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
       .where(inArray(entity.id, entityIds)),
   )
   const headOf = new Map(heads.map((h) => [h.id, h]))
-  // SPA-134: a document is the anchor of a captured page's read; its
+  // A document is the anchor of a captured page's read; its
   // address is what the card's heading links.
   const docIds = heads.filter((h) => h.kind === 'document').map((h) => h.id)
   const pageUrl = new Map(
@@ -507,7 +505,7 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
   for (const s of open)
     citationsOf.set(s.id, resolved.slice(at, (at += s.refs.length)))
 
-  // SPA-31: an MCP proposal carries its API token's id as the integration
+  // An MCP proposal carries its API token's id as the integration
   // actor's id — the token's name is what the card labels it with.
   const tokenIds = [
     ...new Set(
@@ -594,7 +592,7 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
     return token === undefined ? { via: 'integration' } : { via: 'mcp', token }
   }
 
-  // SPA-122: a column run's suggestions gather under the run. The runs are
+  // A column run's suggestions gather under the run. The runs are
   // read once for the lane; a run that is not a column run (a per-cell
   // press, a deck read) leaves its suggestions on their record's card.
   const runIds = [
@@ -621,7 +619,7 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
       .filter((r) => isColumnRunTask(r.task))
       .map((r) => [r.id, { ...r, startedAt: r.startedAt.toISOString() }]),
   )
-  // SPA-134: a capture read's run names the object its page was read as.
+  // A capture read's run names the object its page was read as.
   const pageSlugOf = new Map(
     runs.flatMap((r) => {
       const slug = captureReadSlug(r.task)
@@ -921,7 +919,7 @@ export type OpenSuggestionCount = { kind: SuggestionKind; count: number }
 const KIND_ORDER: ReadonlyArray<SuggestionKind> = suggestionKind.enumValues
 
 /**
- * The record rail's "Waiting" lane (SPA-114): open suggestions on one
+ * The record rail's "Waiting" lane: open suggestions on one
  * record, grouped by kind, in one query — a record page calls it once from
  * its loader, never once per rail section. `GROUP BY` answers no row for a
  * kind with nothing open, so a record with nothing waiting is an empty

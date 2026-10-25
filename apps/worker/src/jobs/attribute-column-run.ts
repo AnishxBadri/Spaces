@@ -7,23 +7,17 @@ import { JobPermanent } from '../run-job'
 import type { JobDef } from '../run-job'
 
 /**
- * attribute.column-run — one AI attribute over one saved view (SPA-122).
- * The program is `lib/ai/column-run.ts`; this is the wrapper's view of it.
- * Enqueued by "Run on this view" in a list's column header, nothing else.
- *
- * **Never retried**, and a refusal is permanent: a view the compiler cannot
- * express, an attribute with no AI config or an unrouted lane is not fixed
- * by pg-boss trying again, and a retry would re-spend on every row the
- * first attempt had not reached. A run the daily cap stopped is not a job
- * failure either: it completes, its `ai_run` closed `failed` with rows done
- * and left, and pressing again after the reset proposes only what is still
- * missing.
+ * attribute.column-run: one AI attribute over one saved view, enqueued only by
+ * "Run on this view" in a column header.
+ * - Never retried; a refusal (inexpressible view, no AI config, unrouted lane)
+ *   is permanent, and a retry would re-spend on every row not yet reached.
+ * - A run the daily cap stopped completes, its `ai_run` closed `failed`; a
+ *   press after the reset proposes only what is still missing.
  */
 
 /**
- * How long one run may stay active before pg-boss expires it. The default
- * 15 minutes is a deck read's budget; a column run is one lane call per row
- * of a view, so it is given hours rather than being failed mid-walk.
+ * How long one run may stay active before pg-boss expires it. A column run is
+ * one lane call per row, so it gets hours, not the default 15 minutes.
  */
 export const COLUMN_RUN_EXPIRE_SECONDS = 4 * 60 * 60
 

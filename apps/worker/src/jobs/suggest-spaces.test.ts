@@ -34,7 +34,7 @@ import { runSuggestSpaces } from './suggest-spaces'
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
 /**
- * SPA-103, the lane end to end: the press, the run, the inbox decision.
+ * The lane end to end: the press, the run, the inbox decision.
  * Beside the worker because it runs the job, as kind classify's test does.
  * Through an injected model (`MockLanguageModelV4`): the route, the
  * sensitivity read, the context assembly, the suggestion rows, the accept

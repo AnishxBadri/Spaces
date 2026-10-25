@@ -1,8 +1,7 @@
 /**
  * A small ustar (POSIX.1-1988) reader and writer — the plugin tarball's
- * format (sdk-21a). Hand-rolled rather than a dependency: the repo had no tar
- * reader or writer (`fflate` is zip), the SDK may depend on effect, zod and
- * tldts only (D55), and owning the reader makes the verifier's
+ * format. Hand-rolled rather than a dependency: the SDK may depend on effect,
+ * zod and tldts only, and owning the reader makes the verifier's
  * path-traversal check ours by construction — it sees every header field,
  * including the ones a permissive extractor would quietly honour.
  *
@@ -13,7 +12,7 @@
  * The reader returns every header it meets, typed, and judges nothing but
  * the format: it rejects a bad checksum or a truncated archive, and leaves
  * "is this entry safe to unpack" to the verifier, which refuses links,
- * devices, absolute paths and `..` (core's `plugins/verify.ts`).
+ * devices, absolute paths and `..`.
  */
 
 const BLOCK = 512

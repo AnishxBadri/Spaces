@@ -8,7 +8,7 @@ import { dataDir, workspaceRoot } from '../writes/vault/key.ts'
 import type { PluginTrust } from './verify.ts'
 
 /**
- * What this box trusts (sdk-21a; D54): the public keys baked into the image
+ * What this box trusts: the public keys baked into the image
  * and the development escape. Neither comes from the environment — the
  * required-env set stays `{DATABASE_URL, APP_URL}` — and neither from
  * `registry.json`, whose server would then choose the key.

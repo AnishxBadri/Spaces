@@ -8,7 +8,7 @@ import type * as ReactRouter from '@tanstack/react-router'
 import type * as PaletteModule from './command-palette'
 
 /**
- * The palette is a window over the scrim (D70, amended): the solid shadow,
+ * The palette is a window over the scrim: the solid shadow,
  * never the dithered one, over a bone-deep scrim; and it widens while the
  * preview pane is open. Mounted whole, with the router and the query cache
  * stubbed.

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { splitByFilled } from '#/lib/records/property-fold'
 
 /**
- * The property grid's rows with the empty attributes folded (D69): the
+ * The property grid's rows with the empty attributes folded: the
  * filled ones in order, then one `Show all · n empty` row that expands the
  * rest in place, each reading `—`.
  * - The fold is per mount; a value written while open moves up on reload.

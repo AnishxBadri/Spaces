@@ -66,8 +66,8 @@ describe('the nav grammar', () => {
   })
 
   it('puts Files in the Library on G L, the chord Documents had', () => {
-    // D68 amended: Documents is renamed Files and keeps L (library), since
-    // `G D` is Deals. No row is left on the old path.
+    // Files takes L (library), since `G D` is Deals; no row is left on
+    // `/documents`.
     const files = NAV_ITEMS.find((item) => item.to === '/files')
     expect(files?.label).toBe('Files')
     expect(files?.key).toBe('G L')
@@ -81,15 +81,15 @@ describe('the nav grammar', () => {
     expect(
       NAV_GROUPS.library.map((item) => `${item.label} ${item.key}`),
     ).toEqual(['Notes G N', 'Meetings G E', 'Files G L'])
-    // The chords D68 kept clear of: Mandate and Portfolio stand.
+    // The chords kept clear: Mandate and Portfolio stand.
     const chord = (to: string) => NAV_ITEMS.find((item) => item.to === to)?.key
     expect(chord('/mandate')).toBe('G M')
     expect(chord('/portfolio')).toBe('G F')
   })
 
   it('keeps every row in the lane it shipped in', () => {
-    // The criterion SPA-82 asked to assert rather than eyeball: adding a row
-    // must not move Companies, People, Deals or anyone else. A snapshot of
+    // Adding a row must not move Companies, People, Deals or anyone else.
+    // A snapshot of
     // the labels per group is the cheapest way to say so, and it fails
     // naming the group that changed.
     expect({

@@ -26,7 +26,7 @@ import type { ParticipantAddresses } from './participant-records'
 
 /**
  * The calendar's arrival lane: one event → one `meeting` interaction, keyed
- * by its `uid` in `message_id`, born once and then followed (D68). What
+ * by its `uid` in `message_id`, born once and then followed. What
  * `Content.logMeeting` runs, through the `MeetingLane` service.
  *
  * - **One policy.** The organizer and the attendees are addresses, judged by
@@ -38,7 +38,7 @@ import type { ParticipantAddresses } from './participant-records'
  *   insert; `interaction_message_id_unique` keeps one and the loser follows it.
  * - **Edges follow the attendees.** Each sync edges what the current list
  *   resolves to and drops what only a departed attendee matched; deals and
- *   pins are never touched (D49).
+ *   pins are never touched.
  * - **Each new participant is an `interaction.logged`**, dispatched once the
  *   write commits: the meeting auto-enrich scope's trigger.
  */

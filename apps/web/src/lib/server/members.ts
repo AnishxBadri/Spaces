@@ -90,8 +90,8 @@ export const setMemberRole = createServerFn({ method: 'POST' })
 export const setMemberBanned = createServerFn({ method: 'POST' })
   .validator(z.object({ userId: z.string(), banned: z.boolean() }))
   .handler(async ({ data }) => {
-    // The body lives outside `lib/server/` so a test can drive the real
-    // suspension (SPA-28 — a suspended member's MCP token stops answering).
+    // The body lives outside the server-fn modules so a test can drive the
+    // real suspension (a suspended member's MCP token stops answering).
     const { setMemberBannedHandler } = await import('#/lib/members/suspend')
     return setMemberBannedHandler(data)
   })

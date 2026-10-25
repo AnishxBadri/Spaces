@@ -67,7 +67,7 @@ const keyed = Effect.fn('connectionIsKeyed')(function* (
 
 /**
  * Disconnect one product: delete its row, and revoke at the provider only
- * when it was the account's last live product row. (D81)
+ * when it was the account's last live product row.
  * - Google's revoke ends the whole grant for the account, so while a Mail,
  *   Calendar or Drive row for the same address is live the grant is `kept`.
  *   A sibling already `revoked` holds no grant and does not count.
@@ -85,7 +85,7 @@ export const disconnectConnectionProgram = Effect.fn('disconnectConnection')(
     providers: ProviderEndpoints = PROVIDERS,
   ) {
     yield* ownedBy(userId, connectionId)
-    // A pasted key (D78): no grant at the provider, and the notes its runs
+    // A pasted key: no grant at the provider, and the notes its runs
     // synced go with it.
     if (yield* keyed(userId, connectionId)) {
       yield* disconnectKeyedProgram(userId, connectionId).pipe(

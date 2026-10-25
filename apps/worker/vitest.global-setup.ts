@@ -7,19 +7,14 @@ import {
 } from '@spaces/db/test-db'
 
 /**
- * The worker's half of the SPA-143 harness, apps/web's shape (SPA-181):
- * derive the test database, create it if absent, migrate it, seed the
- * reference database, then build `spaces_test_worker1…n` — one database per
- * vitest worker, because isolation is per file (SPA-145) and the truncate
- * that buys it must not reach a file running in another worker. `spaces_test`
- * stays the reference database every package migrates and nothing writes
- * rows into; `prepareTestDatabase` holds the harness advisory lock across
- * create, migrate and the reference seed because turbo runs the four `test`
- * tasks in parallel — apps/web and packages/core seed the same database.
- *
- * Every import of app code is dynamic and below `prepareTestDatabase`,
- * because `@spaces/db`'s `db` builds its pool from `process.env.DATABASE_URL`
- * at import time.
+ * Prepares the test databases: create, migrate and seed the reference
+ * database, then build one database per vitest worker.
+ * - One per worker because the per-file truncate must not reach a file running
+ *   in another worker. Nothing writes rows into the reference database.
+ * - The reference seed runs inside `prepareTestDatabase`'s advisory lock:
+ *   turbo runs the packages' suites at once and several seed that database.
+ * - App code is imported dynamically, below `prepareTestDatabase`, because
+ *   `db` builds its pool from `process.env.DATABASE_URL` at import time.
  */
 export default async function setup() {
   const { url } = await prepareTestDatabase(loadWorkspaceEnv(), async () => {

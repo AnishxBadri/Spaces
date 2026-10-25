@@ -10,10 +10,10 @@ import {
 import { activity } from '@spaces/db/schema/activity'
 
 /**
- * Ledger corrections are appends (D12, SPA-150).
+ * Ledger corrections are appends.
  *
- * `investment`, `mark` and `distribution` still have no edit path and no
- * delete path. A wrong entry is answered by a *compensating* entry: same
+ * `investment`, `mark` and `distribution` have no edit path and no delete
+ * path, and must never get one. A wrong entry is answered by a *compensating* entry: same
  * holding, the original's date, negated amount and shares, `reverses_id`
  * citing the row it voids and `created_by` naming who voided it. The
  * original row is read and never written — the void is one INSERT.

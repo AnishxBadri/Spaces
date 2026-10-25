@@ -8,7 +8,7 @@ import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { reviewVariablesProgram } from './email-variables'
 
 /**
- * Review (D67): three founders, one with no first name. Every variable is
+ * Review: three founders, one with no first name. Every variable is
  * resolved per recipient from the record's values, its current company and
  * its interaction stats; the blank is named in its row.
  */

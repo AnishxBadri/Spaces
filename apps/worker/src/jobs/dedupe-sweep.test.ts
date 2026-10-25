@@ -11,15 +11,13 @@ import {
 } from './dedupe-sweep'
 
 /**
- * The nightly sweep, driven directly against this worker's test database —
- * truncated and reseeded before the file was imported (SPA-145), so there is
- * no cleanup here and nothing to add when a table appears.
+ * The nightly sweep, driven directly against this worker's test database
+ * (truncated and reseeded before the file, so no cleanup here).
  *
- * Every run is scoped with `{ objectId }`. That is not decoration: the job's
+ * Every run is scoped with `{ objectId }`, and that is not decoration: the
  * unscoped shape is what the 03:30 schedule sends, and a test running it
  * unscoped would pair whatever the seed and the other cases left lying
- * around. The scope is also the thing this slice's third criterion is about,
- * so exercising it is exercising the feature.
+ * around. The scope is itself a feature under test.
  */
 
 const pair = (x: string, y: string) => (x < y ? [x, y] : [y, x])
@@ -264,9 +262,8 @@ describe('dedupe sweep job', () => {
     expect(merged.suggested).toBe(0)
     expect(await candidatesIn(trusts.id)).toEqual([])
 
-    // Deals hold name aliases the moment they are renamed (SPA-63), so the
-    // accident that used to keep them out of the inbox is gone; MERGEABLE
-    // is the invariant that replaces it, and the job reads the same set.
+    // Deals hold name aliases once renamed, so only MERGEABLE keeps them out
+    // of the inbox, and the job reads the same set.
     expect(MERGEABLE.has('deal')).toBe(false)
     const deals = await objectIdForKindAsync('deal')
     await born(deals, 'Hyperion Series A', 'deal')
@@ -362,12 +359,10 @@ function fakeJob(data: object): JobWithMetadata<object> {
 }
 
 /**
- * The handler half: the queue that used to be `stub('entity.dedupe-sweep')`
- * settles through `runJob` now, on the name the 03:30 schedule fires into.
- * The schedule's own `null` payload is covered a layer down, against the
- * schema — `JobWithMetadata<object>` cannot hold a null `data` without a
- * type assertion, and a cast to prove a parse is a worse test than the
- * parse itself.
+ * The handler half: the queue settles through `runJob`, on the name the 03:30
+ * schedule fires into. The schedule's `null` payload is covered a layer down,
+ * against the schema: `JobWithMetadata<object>` cannot hold a null `data`
+ * without a type assertion.
  */
 describe('dedupeSweep JobDef', () => {
   it('registers on the dedupe queue and completes a run', async () => {

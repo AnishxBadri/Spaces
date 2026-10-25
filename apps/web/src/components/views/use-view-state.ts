@@ -31,7 +31,7 @@ export function useViewState<TExtra extends ViewExtra>({
   columnVisibility: VisibilityState
   setColumnVisibility: (v: VisibilityState) => void
   defaultExtra: TExtra
-  /** The list's path; with it, the active view is Ask's default chip. (D70) */
+  /** The list's path; with it, the active view is Ask's default chip. */
   listPath?: string
 }) {
   const active = useMemo(
@@ -101,7 +101,7 @@ export function useViewState<TExtra extends ViewExtra>({
   }
 
   /**
-   * A stable cache key for the condition array (SPA-40). Conditions live in
+   * A stable cache key for the condition array. Conditions live in
    * React state and change without a navigation, so a surface that filters
    * on the server refetches on this rather than on the URL; `?view=` stays
    * the only linkable filter state. Serialized because the array identity

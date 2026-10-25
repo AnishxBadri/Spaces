@@ -9,15 +9,13 @@ export type LifecycleHook = () => Effect.Effect<void, unknown, unknown>
 
 /**
  * One job per name the manifest declares — no more, no fewer — each typed by
- * the trigger its manifest entry declares (D51; the shapes are
- * `contract.ts`'s). A `schedule` job must hand back `{ nextCursor }`, only
- * an `action` job may carry `cost` (D53), and an action declaring `input:
- * 'payload'` is handed `{ payload }` (SDK 1.5).
+ * its trigger (`JobFor`). A `schedule` job must hand back `{ nextCursor }`,
+ * only an `action` job may carry `cost`, and an action declaring `input:
+ * 'payload'` is handed `{ payload }`.
  *
- * And each job's `R` is bounded by its `uses` (D51, sdk-5): the services it
- * may require are exactly the ports it declared, so a job that yields `Facts`
- * without listing `'Facts'` fails typecheck here — the same grant the loader
- * enforces at runtime, where the undeclared port is "service not found".
+ * Each job's `R` is bounded by its `uses`: a job that yields `Facts` without
+ * listing `'Facts'` fails typecheck — the same grant the loader enforces at
+ * runtime, where the undeclared port is "service not found".
  */
 export type PluginJobs<TManifest extends AuthoredManifest> = {
   readonly [K in keyof TManifest['jobs']]: JobFor<
@@ -61,8 +59,8 @@ export type Plugin<TManifest extends AuthoredManifest = AuthoredManifest> = {
 } & StorageSourceMember<TManifest>
 
 /**
- * The one export a bundle has (`export default definePlugin({ … })`,
- * docs/spec-plugin-sdk.md §6). Identity at runtime; the type is the point:
+ * The one export a bundle has (`export default definePlugin({ … })`).
+ * Identity at runtime; the type is the point:
  * `jobs` must carry exactly the manifest's job names, each shaped by its
  * trigger, so a bundle that declares `enrich` and exports `enrichh` — or
  * writes a schedule job that forgets its cursor — fails typecheck rather

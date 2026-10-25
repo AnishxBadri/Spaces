@@ -22,15 +22,11 @@ import type {
 } from './run-job'
 
 /**
- * The wrapper's own tests. No Postgres: `runJob` settles through a JobHost,
- * so a fake host is the whole pg-boss surface it touches. That is the point —
- * hostability contract 2 says an uncaught throw past the wrapper kills the
- * container, and a claim like that has to be testable without a database.
- *
- * The `job_run` ledger is the second seam and is stubbed out the same way: a
- * `begin` that returns null is a ledger that is not there, which `runJob`
- * already has to survive. The rows themselves are asserted against a real
- * database in `run-job.ledger.test.ts`.
+ * The wrapper's own tests, no Postgres: `runJob` settles through a JobHost, so
+ * a fake host is the whole pg-boss surface. The `job_run` ledger is stubbed
+ * the same way — a `begin` returning null is a missing ledger, which `runJob`
+ * must survive. The rows themselves are asserted against a real database
+ * in the ledger suite.
  */
 
 const noLedger: JobRunLedger = {
@@ -256,7 +252,7 @@ describe('runJob — typed outcomes', () => {
   })
 
   it('settles a keyed rate-limited job first, then re-sends it holding its key', async () => {
-    // SPA-136: on an `exclusive` queue the active job holds its key, so a
+    // On an `exclusive` queue the active job holds its key, so a
     // send before the settle would be refused as a duplicate.
     const { host, calls } = fakeHost()
     const handler = runJob(
@@ -309,7 +305,7 @@ describe('runJob — defects', () => {
 
     // Resolving rather than rejecting is the assertion: a rejecting batch
     // handler fails the whole batch, and a throw past the wrapper is a
-    // container death (hostability contract 2).
+    // container death.
     await expect(handler([fakeJob('d', { n: 1 })])).resolves.toBeUndefined()
 
     expect(calls.map((c) => c.call)).toEqual(['failTerminal'])

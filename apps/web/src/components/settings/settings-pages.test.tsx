@@ -18,7 +18,7 @@ import type * as RouterModule from '@tanstack/react-router'
 import type { RouteComponent } from '@tanstack/react-router'
 
 /**
- * The settings pages as D81 makes them behave, walked route by route under a
+ * The settings pages' behaviour, walked route by route under a
  * memory router whose ids mirror the app's (`_app` → `settings` → page):
  * - no page draws more than one Save, and that one is the page's Save bar;
  * - a typed field shows the bar with its count, Discard restores it, and a
@@ -95,6 +95,9 @@ vi.mock('sonner', () => ({
     message: () => undefined,
   }),
 }))
+
+// Importing every settings route cold can pass the 10 s default on a busy runner.
+vi.setConfig({ hookTimeout: 90_000 })
 
 const win = new Window({ url: 'http://localhost/' })
 let createRoot: typeof CreateRoot
@@ -1607,7 +1610,7 @@ describe('Objects, by sheet 06', () => {
     await mount('/settings/objects/funds')
     const head = byText('New relationship')
     expect(head?.getAttribute('data-variant')).toBe('outline')
-    // Edit and Archive wait in the head's ···, not beside the primary (A1).
+    // Edit and Archive wait in the head's ···, not beside the primary.
     expect(byText('Edit')).toBeUndefined()
     expect(
       document.querySelector('button[aria-label="More for Funds"]'),
@@ -1715,7 +1718,7 @@ describe('Objects, by sheet 06', () => {
       expect(rulesOf('domain')).toBe('identity · unique')
       expect(rulesOf('name')).toBe('required')
       expect(rulesOf('model')).toBe('AI answers')
-      // A relationship half names its pair as data. (D69)
+      // A relationship half names its pair as data.
       expect(rulesOf('founders')).toBe('↔ Backed · N:N · pair archived')
       expect(
         document.querySelector('button[aria-label="More for Name"]'),

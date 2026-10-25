@@ -5,33 +5,14 @@ import type { Tx } from '@spaces/core/writes/attributes/values'
 import { noteBodyFromMarkdown } from '@spaces/core/notes/markdown-blocks'
 
 /**
- * A note written from the server with a body (SPA-66) — the path
- * `createNote` never had: it writes an empty Untitled note and leaves the
- * body to the editor, which is the only thing that has ever produced
- * `body_json`. Accepting a `suggestion(kind: 'note')` writes here, inside
- * the accept's transaction (`acceptProgram` in `lib/ai/propose.ts`), so the
- * note, its edges and the suggestion's flip commit together or not at all.
- *
- * What it writes, and why each:
- *
- * - `entity(kind: note)` + `note` — the **accepter** as `created_by` and
- *   `author_id` (spec §3: the person who decided is the actor), kind `note`,
- *   visibility `shared`. `body_json` and `body_md` from one markdown source,
- *   `body_md` serialized from the blocks (`markdown-blocks.ts`), so the
- *   editor and search read the same note.
- * - `link(note → record, tagged_in)` — **filed** against the record, the
- *   stamp `fileNoteAgainst` and "Note about this" write (`source: manual`),
- *   so a summary sits in the record's "Filed here" lane like any other note.
- * - `link(note → source, derived_from)` — provenance: the document (or the
- *   record) it was drafted from, stamped `source: ai` because a model drew
- *   it. `created_by` still names the accepter. A record's own summary has
- *   the record as both source and filing target: two relations, two rows,
- *   which the edge index's `(from, to, relation, attr_slug)` key allows.
- * - `activity(note.created)` — subject the record, object the note: the
- *   shape `createNoteProgram` writes when a note is born on a record, so the
- *   record's timeline reads it with no new rule.
- *
- * `recordId` and `sourceId` are canonical — the caller follows merges.
+ * A note written server-side with a body, inside `acceptProgram`'s
+ * transaction, so note, edges and the suggestion's flip commit together.
+ * - The accepter is `created_by` and `author_id`: the person who decided is
+ *   the actor. `body_md` is serialized from the same blocks as `body_json`.
+ * - `link(tagged_in, manual)` files it like any note; `link(derived_from, ai)`
+ *   is provenance. Source and target may be the same record: two rows.
+ * - `activity(note.created)` has the record as subject, as `createNoteProgram`.
+ * `recordId` and `sourceId` are canonical; the caller follows merges.
  */
 export async function writeSuggestedNoteInTx(
   tx: Tx,

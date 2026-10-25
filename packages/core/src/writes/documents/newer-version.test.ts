@@ -13,7 +13,7 @@ import { markNewerVersionProgram } from '../links/supersedes'
 import { intakeDocumentProgram } from './intake'
 
 /**
- * Intake's supersedes suggestion (D59): a second document of a kind filed on
+ * Intake's supersedes suggestion: a second document of a kind filed on
  * a record proposes one link to the latest, and nothing ever writes it.
  */
 

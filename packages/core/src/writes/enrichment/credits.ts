@@ -3,7 +3,7 @@ import { db } from '@spaces/db'
 import { enrichmentRecord } from '@spaces/db/schema'
 
 /**
- * The credit counter (D53): spend is only `sum(enrichment_record.credits_used)`
+ * The credit counter: spend is only `sum(enrichment_record.credits_used)`
  * for an integration, so it survives a restart and no second tally exists.
  */
 

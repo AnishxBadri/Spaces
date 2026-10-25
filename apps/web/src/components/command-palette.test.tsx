@@ -18,8 +18,8 @@ import {
  * The palette's record and passage rows. Asserted over the row's content and
  * its destination rather than the dialog: `CommandPalette` wants a router
  * and a Radix portal, and the suite runs on `environment: 'node'` with no
- * DOM. `renderToStaticMarkup` is the server render the app ships through
- * (`routes/_app/inbox.test.tsx`). `go(href)` is the row's whole `onSelect`,
+ * DOM. `renderToStaticMarkup` is the server render the app ships through.
+ * `go(href)` is the row's whole `onSelect`,
  * so `hrefFor` is where a selected hit lands.
  */
 

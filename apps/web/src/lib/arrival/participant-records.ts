@@ -17,7 +17,7 @@ import { decideParticipants } from './participants'
 import type { ParticipantDecision } from './participants'
 
 /**
- * The write half of `participants.ts` (SPA-86): every `create` decision goes
+ * The write half of `decideParticipants`: every `create` decision goes
  * through `resolveEntity`, the single entry gate, with the mailbox's
  * integration as its source — so a new record, its identity aliases and its
  * birth events all carry `source_class = 'integration'` and the one
@@ -25,7 +25,7 @@ import type { ParticipantDecision } from './participants'
  * A key another kind of record already holds is the gate's collision door
  * (a `duplicate_candidate`), not this module's business.
  *
- * Runs before `file.ts` opens its transaction, because `resolveEntity`
+ * Runs before `fileArrivalProgram` opens its transaction, because `resolveEntity`
  * commits its own; and it runs for a duplicate too, which is what makes a
  * re-poll all attaches rather than a no-op that proves nothing. A record
  * created here for a message whose interaction then fails to write is not
@@ -165,7 +165,7 @@ export const resolveParticipantsProgram = Effect.fn('resolveParticipants')(
         )
       }
     }
-    // Each birth has committed by now; an attach emits nothing. (D65)
+    // Each birth has committed by now; an attach emits nothing.
     for (const r of results)
       yield* dispatchDomainEvent(r.emit).pipe(Effect.provide(webEnqueue))
     return {

@@ -5,7 +5,7 @@ import type { NameLookup } from '../context/render'
 import { formatDate } from '../format'
 
 /**
- * Variables as paths (D67): one grammar for an email and an AI prompt.
+ * Variables as paths: one grammar for an email and an AI prompt.
  * - A variable is `{{path}}`, the path dotted lowercase segments with no
  *   spaces: `{{name.first}}`, `{{company.name}}`, `{{stage}}`.
  * - The families are the person's name parts, their current company, the

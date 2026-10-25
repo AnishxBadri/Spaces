@@ -3,7 +3,7 @@ import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema'
 
 /**
- * Dev fixture runner — `pnpm db:seed`, the sibling of `db/migrate.ts`.
+ * Dev fixture runner — `pnpm db:seed`.
  *
  * Flags:
  *   --reset          wipe every record first (auth, workspace, and the

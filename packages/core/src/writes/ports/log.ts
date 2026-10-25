@@ -5,7 +5,7 @@ import { noScrub } from './binding'
 import type { Scrub } from './binding'
 
 /**
- * LogLive (sdk-6a): every line prefixed `[plugin:<id>]`, its fields as JSON,
+ * LogLive: every line prefixed `[plugin:<id>]`, its fields as JSON,
  * and the whole line passed through the binding's scrub — a secret a plugin
  * logs, in the message or in a field, is written in the vault's `redact()`
  * form. The sink is the process's console by default; a test captures it.

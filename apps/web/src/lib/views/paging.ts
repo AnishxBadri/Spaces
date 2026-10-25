@@ -9,24 +9,13 @@ import type { SQL } from 'drizzle-orm'
 import type { FieldResolver, SortCast } from './sql'
 
 /**
- * One keyset pager for every entity-backed list surface (SPA-64, extracted
- * SPA-96).
- *
- * `records.ts` grew these helpers for `/o/$objectSlug`; `/companies` and
- * `/people` take the same contract, so they live here rather than being
- * copied twice. **One cursor shape, one page size, one foot** — a second
- * spelling of "strictly after this row" is a bug waiting for the day the
- * two disagree about nulls.
- *
- * Every list that pages does so over `entity`: the sort key is a column of
- * it or a member of its `values` jsonb, and the tiebreaker is `entity.id`.
- * That is the whole assumption. What varies between surfaces — the `where`,
- * the joins, the side queries a page's ids need — stays with the surface.
- *
- * **Why keyset and not an offset.** A record born while someone is paging
- * shifts every offset after it by one, so a row is shown twice or never. A
- * cursor that names the last row's `(sort key, id)` cannot: the next page is
- * defined by where the reader stopped, not by how many rows precede them.
+ * The one keyset pager for every entity-backed list surface.
+ * - One cursor shape, page size and foot: a second spelling of "strictly
+ *   after this row" would one day disagree about nulls.
+ * - Assumes paging over `entity`: sort key is a column or a `values` member,
+ *   tiebreaker `entity.id`. The `where`, joins and side queries stay with the surface.
+ * - Keyset, not offset: a record born mid-paging would shift offsets, showing
+ *   a row twice or never.
  */
 
 /**
@@ -67,8 +56,7 @@ export type PageCursor = { k: string | null; id: string }
  * `resolve` seam the conditions use, so an archived attribute drops its sort
  * exactly as it drops its condition — the list stays ordered, by the default
  * key. A `stat:` id sorts on its interaction timestamp, a `count:` id on
- * an inverse attribute's count. Anything this
- * surface has no key for (`spaces`, `domains`) falls back the same way;
+ * an inverse attribute's count. Anything this surface has no key for (`spaces`, `domains`) falls back the same way;
  * those columns disable their sort menu rather than promising an order
  * nobody can serve.
  */

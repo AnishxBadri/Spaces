@@ -12,11 +12,10 @@ import type {
 } from '@spaces/db/schema/import'
 
 /**
- * **Reference cells** (SPA-168, project 14 `import-6`) — the pure half of
- * matching a `record_reference` or `actor_reference` cell to what it names.
- * The lookups are the database half's (`apps/web/src/lib/import/references.ts`);
- * what a cell reads as, what an outcome is called in the why lane, and what
- * an outcome does to the row are decided here.
+ * **Reference cells** — the pure half of matching a `record_reference` or
+ * `actor_reference` cell to what it names. The lookups are the database
+ * half's; what a cell reads as, what an outcome is called in the why lane,
+ * and what an outcome does to the row are decided here.
  *
  * **Exact only, on purpose.** A cell finds a record by an identity key it
  * normalises as, or by a name alias that equals it once trimmed, collapsed
@@ -24,7 +23,8 @@ import type {
  * operator fixes in the sheet: silently attaching a deal to the wrong
  * company is worse than a row that lands without one, and the fuzzy lane
  * already exists where it belongs — as a suggestion, never an attach
- * (CONTEXT.md, "deterministic auto, probabilistic suggest").
+ * (deterministic auto, probabilistic suggest).
+
  */
 export type { ImportReference }
 

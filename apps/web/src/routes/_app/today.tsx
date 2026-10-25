@@ -55,8 +55,8 @@ const DAY_MS = 86_400_000
 /**
  * Today: the one surface that gathers what needs the reader — tasks, idle
  * deals, stale marks and Review — in one ranked ledger, with what stops the
- * machine above it and the portfolio and what's moving beside it. (D79)
- * With no company yet it is the three ways in and nothing else. (D80)
+ * machine above it and the portfolio and what's moving beside it.
+ * With no company yet it is the three ways in and nothing else.
  */
 export const Route = createFileRoute('/_app/today')({
   validateSearch: modalSearch,

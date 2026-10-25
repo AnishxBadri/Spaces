@@ -10,7 +10,7 @@ import {
 import { extractDocumentText } from './extract'
 
 /**
- * SPA-121. One fixture per format, in the exact shape `extract.ts` leaves
+ * One fixture per format, in the exact shape `extractDocumentText` leaves
  * the text in, snapshotted whole — the cut *is* the behaviour — plus the
  * properties a snapshot would let drift unnoticed: the size ceiling, the
  * dense 0-based `idx`, and the 40-slide deck arriving as 40 chunks.
@@ -53,7 +53,7 @@ describe('chunk — pdf, by page', () => {
   const text = [
     '[Page 1]\nVayu Orbital\nSeed round',
     '[Page 2]\nTraction\nARR is $1.2M',
-    // Page 3 was a scan with no text layer: extract.ts skipped it.
+    // Page 3 was a scan with no text layer: extraction skipped it.
     `[Page 4]\nMarket\n${prose(420)}`,
     '[Page 5]\nTeam',
   ].join('\n\n')

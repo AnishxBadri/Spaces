@@ -8,22 +8,12 @@ import { NoteCreateFailed } from '#/lib/notes/create'
 import { AttendeeNotFound, InteractionLogFailed, writeUpNote } from './log'
 
 /**
- * Writing up an interaction that was logged without a body (SPA-128).
- *
- * `interaction.note_id` is nullable and lazily filled (CONTEXT.md →
- * "Interactions and enrichment"; SPA-123): the twenty-second "Log call" path
- * leaves it null, every row synced from a calendar or a mailbox has it null,
- * and the common case is writing the call up that evening. This is that
- * second door — the same note, born the same way, just later.
- *
- * **Idempotent by contract.** An interaction that already has a body gets
- * that body back; nothing is created, nothing is moved. The two calls the
- * "write up" affordance can make between one render and the next therefore
- * land in the same editor.
- *
- * Deliberately no backfill job. A note manufactured for every historical
- * interaction is exactly the empty-note problem SPA-123 refused to create;
- * a meeting stays bodyless until someone writes the body.
+ * Writing up an interaction logged without a body (a plain Log, or any
+ * calendar or mailbox sync): the same note, born the same way, just later.
+ * - Idempotent: an interaction that already has a body hands it back and
+ *   nothing is created, so two calls between renders land in one editor.
+ * - No backfill job: a note per historical interaction is the empty-note
+ *   problem; a meeting stays bodyless until someone writes the body.
  */
 
 /** The interaction is not there — deleted between render and click. */
@@ -60,8 +50,8 @@ const query = <T>(run: () => Promise<T>) =>
 /**
  * `23505` anywhere in the cause chain naming `interaction_note_unique` —
  * drizzle wraps the driver error, so the pg fields are a level down. Same
- * walk as `entities/resolve.ts`'s `isUniqueViolation`, narrowed to the one
- * index that can refuse this write.
+ * walk as resolve's `isUniqueViolation`, narrowed to the one index that can
+ * refuse this write.
  */
 function noteAlreadyClaimed(cause: unknown): boolean {
   let e: unknown = cause
@@ -97,8 +87,7 @@ export const writeUpInteractionProgram = Effect.fn('writeUpInteractionProgram')(
     )).at(0)
     if (!row) return yield* new InteractionNotFound({ id: interactionId })
     // Already written up: hand back the body rather than forking a second
-    // one. This is the whole of the "open note" case, and the cheap half of
-    // the race — the expensive half is below.
+    // one. The cheap half of the race; the claim below is the other.
     if (row.noteId) return { noteId: row.noteId }
 
     // The attendee set is `interaction_entity` and nothing else: the note is
@@ -127,23 +116,14 @@ export const writeUpInteractionProgram = Effect.fn('writeUpInteractionProgram')(
     )
 
     /**
-     * The claim, and the race.
-     *
-     * Note-first for the reason SPA-123 is note-first: the failure it leaves
-     * is a note the author can see and delete, where interaction-first would
-     * leave a silently body-less meeting. The cost is that two concurrent
-     * calls have each already made a body by the time either claims one, so
-     * the claim has to be the thing that decides.
-     *
-     * `where id = … and note_id is null` is what decides it. Under READ
-     * COMMITTED the second UPDATE blocks on the row lock, re-evaluates the
-     * predicate after the winner commits, and matches nothing — so exactly
-     * one call comes back with a row. `interaction_note_unique` is the
-     * backstop behind that guard, not the guard itself: it constrains one
-     * body to one interaction, and two write-ups of the *same* interaction
-     * carry two distinct new note ids, which is a lost update rather than a
-     * uniqueness violation. Both are caught here and both mean the same
-     * thing — someone else got there first — so both answer `null`.
+     * The claim, and the race. Note-first, so a failure leaves a note the
+     * author can delete, not a body-less meeting; two concurrent calls each
+     * hold a body by now, so the claim decides.
+     * - `where note_id is null` decides: under READ COMMITTED the loser's
+     *   UPDATE re-evaluates after the winner commits and matches nothing.
+     * - `interaction_note_unique` is only the backstop (two write-ups of one
+     *   interaction are a lost update, not a violation). Either way someone
+     *   else got there first, so both answer `null`.
      */
     const claimed = yield* query(() =>
       db

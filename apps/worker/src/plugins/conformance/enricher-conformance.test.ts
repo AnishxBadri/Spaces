@@ -28,9 +28,8 @@ import { pluginQueues } from '../queues'
 
 /**
  * What every enricher must do to ship, run once per entry in `ENRICHERS`
- * against its provider fake on the live ports. One entry today (Apollo), so
- * this is the contract written down rather than a comparison; a second
- * enricher is one more entry and runs every case here.
+ * against its provider fake on the live ports. A new enricher is one more
+ * entry and runs every case here.
  *
  * The real bundle, loaded and wired as boot does it; jobs run through the
  * host's `invoke`, the queue being the chaos suite's business.
@@ -149,7 +148,7 @@ describe.each(ENRICHERS)('enricher $id', (enricher) => {
     expect((await enrich(companyId))._tag).toBe('Success')
 
     // The provider's receipt, and beside it the host's receipt of the run
-    // its answers were applied in. (D76)
+    // its answers were applied in.
     const all = await receiptsOf(companyId)
     const receipts = all.filter((r) => r.provider !== ENRICHMENT_CAPABILITY)
     expect(receipts).toHaveLength(1)

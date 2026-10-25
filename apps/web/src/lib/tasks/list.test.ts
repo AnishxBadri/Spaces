@@ -2,14 +2,13 @@ import { randomUUID } from 'node:crypto'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 /**
- * The /tasks read carries the focused task (SPA-87), against the test
+ * The /tasks read carries the focused task, against the test
  * database. Done is a 50-row window ordered by `done_at desc`, so a Cmd-K
  * hit on a task closed long ago is not in it — the program must fetch that
  * task by id rather than hope. `listTasksProgram` rather than the server fn:
- * `requireUser` reads a request the suite has no way to build. Imports are
- * dynamic like the rest of the DB-coupled suite: `@spaces/db` builds its
- * pool from `DATABASE_URL` at import time and `vitest.setup.ts` rewrites it
- * per file.
+ * `requireUser` reads a request the suite has no way to build. Dynamic
+ * imports: `@spaces/db` builds its pool from `DATABASE_URL` at import time,
+ * and the setup file rewrites it per file.
  */
 
 async function actorId(): Promise<string> {

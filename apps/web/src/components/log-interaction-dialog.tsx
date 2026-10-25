@@ -23,7 +23,7 @@ import { useHotkey } from '#/lib/use-hotkey'
 /**
  * Manual interaction logging — the calendar primitive, hand-fed. Twenty
  * seconds after a founder call: kind, title, when, who was in the room.
- * Google Calendar later automates rows into exactly this shape.
+ * Calendar sync (`Content.logMeeting`) writes the same kind of interaction row.
  */
 
 type Attendee = { id: string; name: string; kind: string }
@@ -70,7 +70,7 @@ export function LogInteractionDialog({
   /**
    * Both footer buttons, one write. `writeUp` is the whole difference: the
    * server creates the body note and answers with its id, and the caller
-   * lands in the editor instead of staying where it was (SPA-123).
+   * lands in the editor instead of staying where it was.
    */
   async function submit(writeUp: boolean) {
     setError(null)

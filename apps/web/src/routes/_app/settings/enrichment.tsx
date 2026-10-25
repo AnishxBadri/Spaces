@@ -3,7 +3,7 @@ import { EnrichmentSection } from '#/components/settings/enrichment-section'
 import { getEnrichmentPage } from '#/lib/server-fns'
 
 /**
- * Settings → Integrations → Enrichment (D76, D81): the sources in order,
+ * Settings → Integrations → Enrichment: the sources in order,
  * auto-enrich, What fills what and the recent runs. A member reads it too,
  * every control disabled.
  */

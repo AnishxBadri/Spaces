@@ -20,7 +20,7 @@ import type { TableSelect } from './record-table'
 import { SelectionBar, useRowSelection } from './selection-bar'
 
 /**
- * Enrich… from a list (D76): a window with the estimate per source — to ask,
+ * Enrich… from a list: a window with the estimate per source — to ask,
  * skipped by reason, credits against what is left today — and one pine
  * Enrich n. Opening it reads; nothing is queued until the button.
  */

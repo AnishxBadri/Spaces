@@ -14,7 +14,7 @@ import type { MailAttachment, SortedAttachments } from './attachments'
 
 /**
  * Every mail attachment, forwarded or synced, is a document joined to its
- * email on `interaction_document` as `attachment` (D67, D68).
+ * email on `interaction_document` as `attachment`.
  * - **One byte path.** Each part goes through `intakeDocumentProgram`, the
  *   one writer of `document`; nothing here inserts a document row.
  * - **Filed on every participant record** the interaction edged, people and
@@ -25,7 +25,7 @@ import type { MailAttachment, SortedAttachments } from './attachments'
  * - **Provenance is the mailbox's**: `source_class = 'integration'`, the
  *   lane's integration as `source_ref` and actor, the subject as
  *   `source_path`. `kind` stays `other`; the classify lane proposes one.
- * - **Private with the email's body** (D67): born with `privacy`, which a
+ * - **Private with the email's body**: born with `privacy`, which a
  *   synced mailbox sets to its owner.
  * - **A refusal is per part, never the message's**: too large or a store
  *   that is down is recorded on the poll's summary line and the rest lands.
@@ -47,7 +47,7 @@ export type AttachmentFilingContext = {
 }
 
 export type AttachmentOutcome = {
-  /** Filed onto its records — a fresh row, or the one §3.4 answered. */
+  /** Filed onto its records — a fresh row, or the one birth deduped onto. */
   filed: number
   /** Written with no edge at all. */
   unfiled: number

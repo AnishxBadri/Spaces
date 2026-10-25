@@ -22,7 +22,7 @@ import { IdentityLive } from './identity'
 import { ReceiptsLive } from './receipts'
 
 /**
- * Identity and Receipts bound to one integration row (sdk-7a). Every row
+ * Identity and Receipts bound to one integration row. Every row
  * these ports write must name that row — and nothing a caller passes may
  * change it.
  */
@@ -126,7 +126,7 @@ describe('Identity.resolve, bound to an integration row', () => {
   it('ignores a source a caller tries to smuggle in', async () => {
     const row = await boundRow()
     const other = await boundRow('exa')
-    // The claim types carry no source (D52); at runtime an object can carry
+    // The claim types carry no source; at runtime an object can carry
     // anything, and the port must not read it.
     const smuggled = {
       kind: 'company' as const,

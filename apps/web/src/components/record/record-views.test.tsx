@@ -19,8 +19,8 @@ import { RecordNotes } from './record-notes'
  * Inside a record's tabs and details column: the empties fold, the kind
  * and History filters with their counts, a voided check struck, the notes
  * composer row first, and the property row's dates, numbers and lists.
- * - happy-dom's globals go in by hand before React loads, as the picker's
- *   test does: the environment would also replace node's `URL`.
+ * - happy-dom's globals go in by hand before React loads, as in the other
+ *   window tests: the environment would also replace node's `URL`.
  */
 
 await vi.hoisted(async () => {
@@ -70,7 +70,7 @@ const routerSearch = vi.hoisted(() => {
   return { current }
 })
 
-// The window is its own suite's (`email-dialog.test.tsx`); here only the row.
+// The window has its own suite; here only the row.
 vi.mock('#/components/email-dialog', () => ({ EmailModal: () => null }))
 vi.mock('@tanstack/react-router', () => ({
   useRouter: () => ({ invalidate: () => Promise.resolve() }),

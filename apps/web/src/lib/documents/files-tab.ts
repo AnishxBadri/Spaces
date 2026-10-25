@@ -5,7 +5,7 @@ import { storageLinkProvider } from './storage-link'
 
 /**
  * What a record's Files tab prints about a file, as pure functions: the
- * glyph's type, the kind groups, the mono end lane and the state word. (D66)
+ * glyph's type, the kind groups, the mono end lane and the state word.
  * Client-safe: no server import, so the tab and its tests share one copy.
  */
 
@@ -168,7 +168,7 @@ export type StateWord = {
 }
 
 type Stated = Typed & {
-  /** The newer version that supersedes this file (D59). */
+  /** The newer version that supersedes this file. */
   readonly replacedBy?: { readonly id: string; readonly name: string } | null
   readonly blobSha: string | null
   readonly url: string | null

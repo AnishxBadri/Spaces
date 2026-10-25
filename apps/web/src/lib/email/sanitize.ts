@@ -2,8 +2,8 @@ import createDOMPurify from 'dompurify'
 import { JSDOM } from 'jsdom'
 
 /**
- * An email's HTML part → the `srcdoc` the viewer's sandboxed iframe shows
- * (D67). Server-only: DOMPurify over jsdom, never shipped to the browser.
+ * An email's HTML part → the `srcdoc` the viewer's sandboxed iframe shows.
+ * Server-only: DOMPurify over jsdom, never shipped to the browser.
  * - Scripts, forms, embeds and event handlers are gone; a Content-Security-
  *   Policy inside the document refuses every load but `data:` as a second
  *   wall, so a tracking pixel the sanitizer missed still never fetches.
@@ -113,7 +113,7 @@ export function sanitizeEmailHtml(html: string): SanitizedEmail {
       a.setAttribute('target', '_blank')
       a.setAttribute('rel', 'noopener noreferrer')
     } else if (/^mailto:/i.test(href)) {
-      // No composer yet: the address reads as plain text. (A7)
+      // No composer yet: the address reads as plain text.
       a.replaceWith(...Array.from(a.childNodes))
     } else {
       a.removeAttribute('href')

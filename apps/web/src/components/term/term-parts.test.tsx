@@ -11,11 +11,11 @@ import {
 import type { MentionRow } from './term-parts'
 
 /**
- * The term page's parts (SPA-75), rendered the way the app ships them
+ * The term page's parts, rendered the way the app ships them
  * (`renderToStaticMarkup`, `environment: 'node'`). Rows that carry a `Link`
  * want a router, so the cases here are the ones that draw none — which are
- * also the ones the spec is about: what is absent, what the empty state
- * says, and a snippet drawn exactly as Cmd-K draws it.
+ * also the ones that matter: what is absent, what the empty state says, and
+ * a snippet drawn exactly as Cmd-K draws it.
  */
 
 const unfiledDeck: MentionRow = {

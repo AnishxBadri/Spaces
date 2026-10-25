@@ -18,11 +18,10 @@ import type { FxRate } from '@spaces/core/portfolio/fx'
 
 /**
  * The portfolio read layer — the loader the server fns call once they have a
- * user. It lives here rather than in `server/portfolio.ts` because that
- * module is re-exported wholesale by the client-imported `server-fns.ts`
- * barrel, which may carry server fns and types and nothing else.
+ * user. Not in the server fns' module, which the client-imported barrel
+ * re-exports wholesale: that barrel carries server fns and types only.
  *
- * **Reader contract for reversals (D12, SPA-150).** A void appends a
+ * **Reader contract for reversals.** A void appends a
  * compensating row citing the original; the pure libs never see that row.
  * `partitionReversals` keeps the originals and stamps each with
  * `reversedAt` — the reversal's `created_at`, which is the void instant —

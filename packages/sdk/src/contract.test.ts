@@ -71,7 +71,7 @@ describe('claims carry no provenance (D52)', () => {
     expectTypeOf<
       Extract<KeysOf<EmailClaim>, Provenance>
     >().toEqualTypeOf<never>()
-    // Who may read a synced body is the host's (D67), never the plugin's.
+    // Who may read a synced body is the host's, never the plugin's.
     expectTypeOf<
       Extract<KeysOf<EmailClaim>, 'visibility'>
     >().toEqualTypeOf<never>()

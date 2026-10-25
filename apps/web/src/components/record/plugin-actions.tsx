@@ -31,14 +31,14 @@ import type { JobStatusRow } from '#/lib/integrations/job-status'
 /**
  * A record head's plugin actions: one outline button per manifest action
  * declared on this record's kind, beside the record's own, each with its
- * job's state in a ledger figure. (D63, D64)
+ * job's state in a ledger figure.
  * - The list comes from the loader, which offers only runnable plugins; a
  *   stopped one is absent here and explained on Today and Review.
  * - Firing reads pending at once; the status stream turns it into the
  *   outcome, and a reopened page or a reconnected stream reads `job_run`.
  *   No polling.
  * - With `enrich`, the host's Enrich comes first and asks every source in
- *   order, so a source's own Enrich action is not drawn beside it. (D76)
+ *   order, so a source's own Enrich action is not drawn beside it.
  */
 export function PluginActions({
   entityId,
@@ -266,14 +266,14 @@ export function enrichLine(
 }
 
 /**
- * The host's Enrich (D76, D80): one button that asks every source in the
+ * The host's Enrich: one button that asks every source in the
  * owner's order, and one mono line beside it — the sources it will ask
  * ("Website, then Apollo"), then while it runs and how it went: done with
  * counts, nothing blank, sensitive (local sources only), a source's limit
  * reached with the reset, or the failure.
  * - With only free sources on, "More sources ›" follows, in place: before
  *   any run an admin reads "Website, then More sources ›".
- * - A company always has the Website, with or without a model. (D80)
+ * - A company always has the Website, with or without a model.
  */
 function EnrichAction({
   entityId,

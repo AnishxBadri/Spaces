@@ -14,7 +14,7 @@ import { setValues, setValuesInTx } from './values'
 
 /**
  * A person's emails and a company's domains are multi-valued identity
- * attributes (D75): every element is an `entity_alias` claim made in the
+ * attributes: every element is an `entity_alias` claim made in the
  * value's own transaction, and an element another record holds is refused
  * at that element while the rest of the patch writes.
  */

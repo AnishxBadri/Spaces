@@ -6,8 +6,7 @@ import { cn } from '#/lib/utils.ts'
 /**
  * The class string a checkbox box wears. Exported for tests.
  *
- * A 14px square that fills with pine (DESIGN.md §5, "Typed Value Editors"):
- * never a native rounded control, never a circle. Unchecked tints to bone on
+ * A 14px square that fills with pine: never a native rounded control, never a circle. Unchecked tints to bone on
  * hover the way a highlighted option does; focus is the reticle and nothing
  * else.
  */

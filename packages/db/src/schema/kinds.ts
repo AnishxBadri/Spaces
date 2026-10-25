@@ -28,7 +28,7 @@ export type NoteBody = Array<Json>
 
 /**
  * Per-kind side tables. Kind markers only: identity lives in `entity.values`
- * with `entity_alias` as its index (D75), never on a side table.
+ * with `entity_alias` as its index, never on a side table.
  */
 
 // ---------- company / person ----------
@@ -62,7 +62,7 @@ export const space = pgTable(
     isSeeded: boolean('is_seeded').notNull().default(false),
     /**
      * Archived: out of the tree, the picker and the context climb; filings
-     * stay. Never a delete. (D73)
+     * stay. Never a delete.
      * - One archive stamps the same instant on the space and every live
      *   descendant; Restore clears exactly the rows carrying that instant.
      */
@@ -70,7 +70,7 @@ export const space = pgTable(
     /**
      * What belongs here, in one to three sentences — the membership rule a
      * watch's engine and the classify lane read literally. The memo stays the
-     * thesis. Null when unwritten; never a placeholder. (D72)
+     * thesis. Null when unwritten; never a placeholder.
      */
     criteria: text('criteria'),
   },
@@ -129,8 +129,7 @@ export const visibility = pgEnum('visibility', ['shared', 'private'])
  * export is lossy, so md can't round-trip.
  * - `body_md` is derived on save; it feeds search/embeddings/export
  *   (`[[Label|entity:uuid]]` for mentions). Attachment goes through `link`.
- * - Visibility defaults to shared (CONTEXT.md "Single user first, team
- *   ready").
+ * - Visibility defaults to shared.
  */
 export const note = pgTable('note', {
   entityId: uuid('entity_id')
@@ -156,7 +155,7 @@ export const note = pgTable('note', {
 
 /**
  * A document's genre. No `memo`: an exported memo PDF is `derived_from` a
- * note, a provenance edge, not a genre (CONTEXT.md, "Sources are documents").
+ * note, a provenance edge, not a genre.
  */
 export const documentKind = pgEnum('document_kind', [
   'deck',
@@ -180,7 +179,7 @@ export const extractionStatus = pgEnum('extraction_status', [
 ])
 
 /**
- * What the provider's copy is doing (`docs/spec-storage-sources.md` §8).
+ * What the provider's copy is doing.
  * - `linked`: the live mapping. `gone`: deleted on their side — we keep ours
  *   and the row says so; an archive that deletes when Drive deletes is not
  *   an archive.
@@ -189,7 +188,7 @@ export const extractionStatus = pgEnum('extraction_status', [
 export const externalStatus = pgEnum('external_status', ['linked', 'gone'])
 
 /**
- * Whether this row's sha is held on disk (§7, retain per binding).
+ * Whether this row's sha is held on disk (a binding's `retain` decides).
  * - `stored`: the blob is ours. `remote`: a `retain: text` binding dropped it
  *   after extraction; the sha, the derived layers and the pointer stay, and
  *   preview and download fetch through the file's connection.
@@ -228,7 +227,7 @@ export const document = pgTable(
     /**
      * How the bytes arrived, as a class and never as a vendor.
      * - Upload, URL and clip are a person in a surface we ship (the extension
-     *   is first-party, CONTEXT.md "Plugin architecture"), so all are `manual`.
+     *   is first-party), so all are `manual`.
      * - A connector's attachment is `integration` plus `source_ref`.
      */
     sourceClass: sourceClass('source_class').notNull().default('manual'),
@@ -288,7 +287,7 @@ export const document = pgTable(
     /**
      * Who may read it, read through `canRead` exactly as a note is: private
      * means `author_id` only. A synced mailbox's attachment is born private
-     * to the mailbox owner (D67); everything else is born shared.
+     * to the mailbox owner; everything else is born shared.
      */
     visibility: visibility('visibility').notNull().default('shared'),
     /** The member a private document belongs to. A user id, not an entity ref. */
@@ -319,8 +318,7 @@ export const document = pgTable(
 )
 
 /**
- * A followed document's prior bytes (`docs/spec-storage-sources.md` §5.2,
- * §8): the sha the row held before the provider's revision advanced it.
+ * A followed document's prior bytes: the sha the row held before the provider's revision advanced it.
  * - Keyed on the provider's revision id, never the sha — an export of an
  *   unchanged Doc hashes differently every time.
  * - `blob_sha` keeps its bytes: `blobIsReferenced` counts this column.

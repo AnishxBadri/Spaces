@@ -1,18 +1,12 @@
 /**
- * Job queue names — the seam between web and worker. Web enqueues, worker
- * executes. Anything CPU-bound (extraction, embedding) or slow (enrichment,
- * sync) lives here; the web process must never run it inline.
+ * Job queue names: web enqueues, the worker executes. Anything CPU-bound
+ * (extraction, embedding) or slow (enrichment, sync) runs here; the web
+ * process must never run it inline.
  *
- * This list lives in @spaces/core rather than beside the worker because both
- * processes need it and `web → worker` is a forbidden edge (spec §2). Once
- * `apps/worker` is lifted out, nothing in the web app follows it.
- *
- * The strings themselves are deliberately unchanged by that move. Spec §11
- * wants `core.<domain>.<verb>`, but a rename is a runtime event, not a file
- * move: in-flight pg-boss jobs are keyed by name and would be orphaned, and
- * the nightly `entity.dedupe-sweep` schedule row would keep firing on the old
- * name with no worker registered for it. That belongs in the slice that owns
- * the worker's boot sequence and can migrate the schedule with it.
+ * Lives in core because both processes need it and web must never import
+ * the worker. Never rename a queue string casually: in-flight pg-boss jobs
+ * are keyed by name and would be orphaned, and the nightly
+ * `entity.dedupe-sweep` schedule row would keep firing on the old name.
  */
 export const QUEUES = {
   /** PDF/DOCX/PPTX/XLSX → extracted_text + tsv. */
@@ -20,204 +14,170 @@ export const QUEUES = {
   /** extracted_text → chunks + embeddings. */
   embedDocument: 'document.embed',
   /**
-   * A note's body or an embeddable attribute value → its chunks, with
-   * vectors when a model is pinned (SPA-132) — `document.embed`'s
-   * replace-stamp-embed for the sources that are not documents. `chunk.`
-   * and not `note.`, because the row it writes is the chunk and the source
-   * rides the payload. Created `stately` and sent with a per-source
-   * `singletonKey`, so a burst of note autosaves is one queued job.
+   * A note body or embeddable attribute value → its chunks, with vectors
+   * when a model is pinned. Named `chunk.` because the row it writes is the
+   * chunk. `stately` with a per-source `singletonKey`, so a burst of note
+   * autosaves is one queued job.
    */
   embedSource: 'chunk.embed',
   /**
-   * The corpus backfill (SPA-136): every chunk not yet carrying the pinned
-   * model's vector, in batches, stopped by the AI cap and resumed after its
-   * reset. `chunk.` and not `document.`, because note and attribute chunks
-   * are in it too. Created `exclusive` and sent with one fixed
-   * `singletonKey`, so there is only ever one run queued or active.
+   * Corpus backfill: every chunk lacking the pinned model's vector, in
+   * batches, stopped by the AI cap and resumed after its reset. `exclusive`
+   * with one fixed `singletonKey`, so only one run is ever queued or active.
    */
   embedBackfill: 'chunk.embed-backfill',
   /**
    * The lowering half of `chunk.sensitive`: one entity's chunks restamped
    * from the live resolver after a flag is cleared or a filing removed.
-   * Created `stately` and sent with `singletonKey = entityId`, so a burst of
-   * changes is one queued job that resolves when it runs.
+   * `stately` with `singletonKey = entityId`, so a burst is one queued job.
    */
   restampSensitivity: 'sensitivity.restamp',
   /**
-   * A saved link → readability text on the same `document` row (SPA-117).
-   * `document.` and not `clip.`, because the row it acts on is a document
-   * like every other: no separate source table, one search box over decks
-   * and articles together (CONTEXT.md → "Sources are documents").
+   * A saved link → readability text on the same `document` row. Sources are
+   * documents: no separate clip table, one search over decks and articles.
    */
   clipDocument: 'document.clip',
   /**
-   * A pasted storage-source link (Drive) → one document, fetched through the
-   * enabled storage-source plugin with the acting user's grant. Sent with a
-   * per-paste `singletonKey` the Files tab polls its state by; a file already
-   * held for that connection is re-filed, never downloaded again.
+   * A pasted storage-source link (Drive) → one document, fetched with the
+   * acting user's grant. Per-paste `singletonKey` the Files tab polls; a file
+   * already held for that connection is re-filed, never downloaded again.
    */
   fetchStorageFile: 'document.fetch-storage',
   /**
-   * Link a Drive folder: the folder's ancestry read through the storage-source
-   * plugin with the binding user's grant, then the guarded bind. Sent with a
-   * per-bind `singletonKey` the bind dialog polls; a refusal is the job's
-   * permanent reason.
+   * Link a Drive folder: its ancestry read with the binding user's grant,
+   * then the guarded bind. Per-bind `singletonKey` the bind dialog polls; a
+   * refusal is the job's permanent reason.
    */
   bindStorageFolder: 'storage.bind-folder',
   /**
-   * A binding's sync: the bound folder walked through the storage-source
-   * plugin with the binder's grant, every file filed on the bound record.
-   * Sent by a successful bind; a re-sync is the same job sent again. Created
-   * `stately` and sent with `singletonKey = bindingId`, so two syncs of one
-   * binding never overlap; a re-run files nothing twice.
+   * A binding's sync: the bound folder walked with the binder's grant, every
+   * file filed on the bound record. `stately` with `singletonKey =
+   * bindingId`, so two syncs of one binding never overlap; a re-run files
+   * nothing twice.
    */
   syncStorageBinding: 'storage.sync',
   /**
-   * The change poll: every quarter hour, one `changes` pass per connection
-   * with an active folder binding, a new file in a bound subtree filed on its
-   * binding's record. `singleton`, so two polls never share one cursor; never
-   * retried — the next tick is the retry, and the cursor only advances once
-   * a page is handled.
+   * Quarter-hourly change poll: one `changes` pass per connection with an
+   * active folder binding. `singleton`, so two polls never share a cursor;
+   * never retried — the next tick is the retry, and the cursor only advances
+   * once a page is handled.
    */
   pollStorageChanges: 'storage.poll',
   /**
-   * Write-through (§6): an in-app upload on a record whose binding pushes,
-   * put in the bound folder through the storage-source plugin with the
-   * binding's grant; an exported document re-filed or renamed here, moved or
-   * renamed there. Created `stately` and sent with `singletonKey =
-   * documentId`; retried with backoff for about a day while no connection
-   * can write, and counted on Today meanwhile.
+   * Write-through: an in-app upload on a pushing binding is put in the bound
+   * folder; a re-filed or renamed export is moved or renamed there.
+   * `stately` with `singletonKey = documentId`; retried with backoff for
+   * about a day while no connection can write, counted on Today meanwhile.
    */
   exportDocument: 'storage.export',
   /**
-   * A `remote` document's bytes fetched back through its connection for the
-   * preview or a download (§7, `retain: text`): held under the sha with a
-   * `pending_blob` intent, so the orphan sweep is the cache's expiry. Created
-   * `stately` and sent with `singletonKey = documentId`; the viewer polls it.
+   * A `remote` document's bytes fetched back for preview or download, held
+   * under the sha with a `pending_blob` intent so the orphan sweep is the
+   * cache's expiry. `stately` with `singletonKey = documentId`; the viewer
+   * polls it.
    */
   fetchRemoteBytes: 'storage.fetch-bytes',
   /**
    * A binding flipped `text → full`: one job per `remote` document, which
-   * fetches the bytes back and marks the row `stored`. Created `stately` and
-   * sent with `singletonKey = documentId`.
+   * fetches the bytes and marks the row `stored`. `stately` with
+   * `singletonKey = documentId`.
    */
   retainBackfill: 'storage.retain-backfill',
   /**
-   * The deck reader (SPA-90): a `kind: deck` document → one `attribute_patch`
-   * suggestion per record it is filed against. Created with the `exclusive`
-   * policy and sent with `singletonKey = documentId`, so a second press while
-   * one is queued or active is refused by pg-boss rather than by a table.
+   * Deck reader: a `kind: deck` document → one `attribute_patch` suggestion
+   * per record it is filed on. `exclusive` with `singletonKey = documentId`,
+   * so pg-boss refuses a second press while one is queued or active.
    */
   readDeck: 'document.read-deck',
   /**
-   * Kind classify (SPA-62): a document still at `other` once its text is
-   * extracted → one `document_kind` suggestion. Enqueued by
-   * `onDocumentExtracted` and nothing else, only when the classify lane is
-   * routed. Created `exclusive` and sent with `singletonKey = documentId`,
-   * so a re-extraction while one is queued adds nothing.
+   * Kind classify: a document still at `other` once extracted → one
+   * `document_kind` suggestion. Enqueued only by `onDocumentExtracted`, only
+   * when the classify lane is routed. `exclusive` with `singletonKey =
+   * documentId`, so a re-extraction while one is queued adds nothing.
    */
   classifyDocument: 'document.classify',
   /**
-   * Live-file ledger events (spec-ai-substrate §11): a new revision of a
-   * bound cap table, filed on a company we hold, read against the holding →
-   * at most one `ledger_event` suggestion. Enqueued by `onDocumentExtracted`
-   * and nothing else. Created `exclusive` and sent with `singletonKey =
-   * <documentId>:<revision>`, so one revision is one queued job.
+   * Live-file ledger events: a new revision of a bound cap table filed on a
+   * held company, read against the holding → at most one `ledger_event`
+   * suggestion. Enqueued only by `onDocumentExtracted`. `exclusive` with
+   * `singletonKey = <documentId>:<revision>`: one revision, one queued job.
    */
   proposeLedgerEvent: 'document.ledger-event',
   /**
-   * Space-tag suggestions (SPA-103): a record → one `space_tag` suggestion
-   * per space of the live tree the classify lane places it in. Enqueued by
-   * the Spaces rail's "Suggest spaces" and nothing else. Created `exclusive`
-   * and sent with `singletonKey = entityId`, so a second press while one is
-   * queued or active is refused by pg-boss.
+   * Space-tag suggestions: a record → one `space_tag` suggestion per space
+   * the classify lane places it in. Enqueued only by "Suggest spaces".
+   * `exclusive` with `singletonKey = entityId`, so pg-boss refuses a second
+   * press while one is queued or active.
    */
   suggestSpaces: 'entity.suggest-spaces',
   /** Nightly pg_trgm sweep → duplicate_candidate rows. */
   dedupeSweep: 'entity.dedupe-sweep',
   /**
-   * An enrichment run (D76): the owner's sources asked in order for one
-   * record, every answer applied at once. Created `stately` and sent with
-   * `singletonKey = entityId`, so a burst of triggers is one queued run.
+   * An enrichment run: the owner's sources asked in order for one record,
+   * every answer applied at once. `stately` with `singletonKey = entityId`,
+   * so a burst of triggers is one queued run.
    */
   enrichmentRun: 'enrichment.run',
   /**
-   * Nightly reclaim of bytes a `prepare` promised and no `finalize` ever
-   * named (SPA-54). `blob.` and not `document.`, because the rows it acts on
-   * are precisely the ones that never became documents.
+   * Nightly reclaim of bytes a `prepare` promised and no `finalize` named.
+   * `blob.` because these rows never became documents.
    */
   sweepOrphanBlobs: 'blob.sweep-orphans',
   /**
-   * Summarize (SPA-66): a document or a record → one `suggestion(kind:
-   * 'note')` on the record the button was pressed on, through the
-   * synthesize lane. `entity.` because the scope is either kind. Created
-   * `exclusive` and sent with `singletonKey = <record>:<source>`, the deck
-   * reader's policy: a second press while one is queued or active is
-   * refused by pg-boss.
+   * Summarize: a document or record → one `note` suggestion on the record
+   * the button was pressed on, through the synthesize lane. `exclusive` with
+   * `singletonKey = <record>:<source>`, so pg-boss refuses a second press
+   * while one is queued or active.
    */
   summarize: 'entity.summarize',
   /**
-   * Key terms (SPA-91): a `legal` or `dd` document filed on a deal → one
-   * `suggestion(kind: 'note')` per deal, its body a term / value / citation
-   * table. `document.` because the job reads one document. Created
-   * `exclusive` and sent with `singletonKey = documentId`, the deck reader's
-   * policy: a second press while one is queued or active is refused by
-   * pg-boss.
+   * Key terms: a `legal` or `dd` document filed on a deal → one `note`
+   * suggestion per deal, its body a term / value / citation table.
+   * `exclusive` with `singletonKey = documentId`, so pg-boss refuses a
+   * second press while one is queued or active.
    */
   extractKeyTerms: 'document.key-terms',
   /**
-   * The vision lane (SPA-94): a stored PDF at `extraction_status:
-   * 'unsupported'` → its pages read by the routed vision model, written as
-   * `extracted_text` + `tsv` through extraction's own statement. Enqueued by
-   * the Files tab's "Read with vision" and nothing else. Created `exclusive`
-   * and sent with `singletonKey = documentId`, so a second press while one
-   * is queued or active is refused by pg-boss; never retried.
+   * Vision lane: a stored PDF at `extraction_status: 'unsupported'` → pages
+   * read by the vision model, written as `extracted_text` + `tsv` through
+   * extraction's own statement. Enqueued only by "Read with vision".
+   * `exclusive` with `singletonKey = documentId`; never retried.
    */
   visionDocument: 'document.vision',
   /**
-   * AI attributes (SPA-72): one cell — a (record, attribute) pair whose
-   * attribute carries `options.ai` — → one `attribute_patch` suggestion,
-   * plus a registry proposal per option a classify answer wanted and the
-   * attribute lacks. Enqueued by the cell trigger on the record rail and in
-   * the table, nothing else. Created `exclusive` and sent with
-   * `singletonKey = <entityId>:<attributeId>`, so a second press on one
-   * cell while one is queued or active is refused by pg-boss.
+   * AI attribute, one cell (record × attribute with `options.ai`) → one
+   * `attribute_patch` suggestion, plus a registry proposal per option a
+   * classify answer wanted and the attribute lacks. `exclusive` with
+   * `singletonKey = <entityId>:<attributeId>`, so a second press on one cell
+   * while one is queued or active is refused.
    */
   attributeRun: 'attribute.run',
   /**
-   * Column run (SPA-122, spec-ai-substrate §13 "bulk = job with estimate +
-   * per-day cap"): one AI attribute over every record a saved view names —
-   * the per-cell program once per row, walked a page at a time, all rows one
-   * `ai_run`, stopped by the daily cap. Enqueued by "Run on this view" in a
-   * list's column header, nothing else. Created `exclusive` and sent with
-   * `singletonKey = <viewId>:<attributeId>`, so a second press while one is
-   * queued or active is refused by pg-boss; never retried.
+   * Column run: one AI attribute over every record a saved view names, a
+   * page at a time, all rows one `ai_run`, stopped by the daily cap.
+   * Enqueued only by "Run on this view". `exclusive` with `singletonKey =
+   * <viewId>:<attributeId>`; never retried.
    */
   attributeColumnRun: 'attribute.column-run',
   /**
-   * The forwarding mailbox (SPA-56): one IMAP poll of the operator's
-   * mailbox → one interaction per new RFC Message-ID. Scheduled by the
-   * worker from `mailbox.cadence_minutes` and only while a mailbox row
-   * exists; saving the mailbox in Settings → Arrival also sends one, which
-   * polls at once and re-syncs that schedule. `singleton`, so two polls never
-   * run at the same time over one cursor; never retried — the next tick is
-   * the retry, and a refused login backs off rather than hammering.
+   * Forwarding mailbox: one IMAP poll → one interaction per new Message-ID.
+   * Scheduled from `mailbox.cadence_minutes` only while a mailbox row
+   * exists; saving the mailbox also sends one. `singleton`, so two polls
+   * never share a cursor; never retried — the next tick is the retry, and a
+   * refused login backs off rather than hammering.
    */
   pollMailbox: 'mail.poll',
   /**
-   * The import commit (SPA-169): one planned batch's rows replayed through
-   * their creators, each row in its own transaction, so a failure rolls back
-   * that row alone and a re-run writes nothing for a row that already holds
-   * its record. Enqueued by the batch page's Commit and Retry failed rows,
-   * nothing else. Created `exclusive` and sent with `singletonKey = batchId`,
-   * so a double click cannot run two commits of one batch; never retried —
-   * a failed row is re-run on its own, by the operator.
+   * Import commit: a planned batch's rows replayed through their creators,
+   * each in its own transaction, so a failure rolls back that row alone and
+   * a re-run skips rows that hold their record. `exclusive` with
+   * `singletonKey = batchId`, so a double click cannot run two commits;
+   * never retried — the operator re-runs a failed row.
    */
   importCommit: 'import.commit',
   /**
    * Nightly delete of stored webhook deliveries past
-   * `INGRESS_RETENTION_DAYS`. One statement; retried, since a re-run of a
-   * delete by cutoff is a no-op.
+   * `INGRESS_RETENTION_DAYS`. Retried: a delete by cutoff is idempotent.
    */
   pruneIngress: 'ingress.prune',
   /**
@@ -226,25 +186,21 @@ export const QUEUES = {
    */
   rollInteractionStats: 'interaction-stats.roll',
   /**
-   * An email's display text (D67): its one-line summary and category labels,
-   * through the synthesize and classify lanes under the sensitivity gate,
-   * written once into `interaction.meta`. Sent by the mail lanes when an
-   * email is written. Created `stately` and sent with `singletonKey =
-   * interactionId`, so one email is one queued job.
+   * An email's one-line summary and category labels, through the synthesize
+   * and classify lanes under the sensitivity gate, written once into
+   * `interaction.meta`. `stately` with `singletonKey = interactionId`.
    */
   summarizeEmail: 'interaction.summarize-email',
   /**
-   * Nightly: every mailed email still missing its summary or categories, a
-   * page at a time, through the same program — never rewriting one a lane
-   * wrote. `singleton`, so two runs never walk the same pages.
+   * Nightly: every email still missing its summary or categories, a page at
+   * a time — never rewriting one a lane wrote. `singleton`, so two runs
+   * never walk the same pages.
    */
   summarizeEmailBackfill: 'interaction.summarize-backfill',
   /**
-   * A recorded note's action items (D78): the Extract lane reads the shared
-   * note's summary and proposes one `task` suggestion per item, under the
-   * sensitivity gate. Sent by `Content.logRecordedNote` once the note is
-   * filed. Created `stately` and sent with `singletonKey = noteId`, so one
-   * note is one queued job.
+   * A recorded note's action items: the Extract lane proposes one `task`
+   * suggestion per item, under the sensitivity gate. Sent by
+   * `Content.logRecordedNote`. `stately` with `singletonKey = noteId`.
    */
   recordedNoteTasks: 'interaction.recorded-note-tasks',
 } as const

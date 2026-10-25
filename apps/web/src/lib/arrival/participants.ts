@@ -9,29 +9,25 @@ import { isFreeEmailDomain } from './free-email-domains'
 import { isRoleSender } from './noise'
 
 /**
- * Which participants become records (SPA-86, arrival-2; D34 option 1).
- * Parsed addresses in, one typed decision per address out — no database and
- * no network, because the same judgement decides what a forwarded thread, a
- * calendar attendee (arrival-5), a recorder participant (arrival-6) and a
- * synced Gmail thread (arrival-10) do to the graph, and it is proven by a
- * table in `participants.test.ts` with no Postgres.
+ * Which participants become records. Parsed addresses in, one typed decision
+ * per address out — no database and no network, because the same judgement
+ * decides what a forwarded thread, a calendar attendee, a recorder
+ * participant and a synced Gmail thread do to the graph.
  *
- * The policy is **create-all-visible, minus a free-provider list** (CONTEXT.md
- * "Email / calendar ingestion" records why it beat SENT-only):
+ * The policy is **create-all-visible, minus a free-provider list**:
  *
  * - **create** — a person keyed by the address, and a company keyed by the
  *   address's registrable domain when it is a work domain. A free provider
- *   (`free-email-domains.ts`) yields the person and no company. A shared
+ *   (`FREE_EMAIL_DOMAINS`) yields the person and no company. A shared
  *   inbox at a work domain (`founders@`, `hello@` — `isRoleEmail`) yields the
  *   company and no person: a role address identifies nobody, and
  *   `resolveEntity` would refuse it as a person key anyway.
  * - **attach** — the workspace's own people: a member's address, or any
  *   address at one of the workspace's own domains. Nothing is ever created
  *   for them; the interaction still names them when a record already exists.
- *   This is the rule that keeps the fund out of its own pipeline on day one,
- *   and it is settled whichever creation policy wins.
+ *   This is the rule that keeps the fund out of its own pipeline.
  * - **ignore** — a machine (`noreply@`, `notifications@`: the sender list
- *   `noise.ts` refuses whole messages on), a role address at a free
+ *   `ROLE_SENDERS` refuses whole messages on), a role address at a free
  *   provider, or an address that does not parse.
  *
  * `create` means "create if absent": every survivor goes through

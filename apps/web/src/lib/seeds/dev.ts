@@ -51,8 +51,8 @@ import type { ObjectKind } from '@spaces/core/attributes/registry'
 /**
  * Dev fixtures — a whole working fund, so every surface has something on it.
  *
- * Distinct from `demo.ts`, which is the operator-facing worked example
- * offered at setup: deliberately tiny, obviously fictional, one seam. This
+ * Distinct from the demo seed, the operator-facing worked example offered at
+ * setup: deliberately tiny, obviously fictional, one seam. This
  * is the developer's bench — pipeline at every stage with real stage
  * history, a portfolio with marks that have gone stale, dedupe candidates,
  * private notes, a second member, documents in every extraction state,
@@ -639,11 +639,10 @@ const NEAR_DUPES = [
 ]
 
 /**
- * Co-investors are Companies, since clean-1 deleted the ghost kind they used
- * to carry (CONTEXT.md "Two-tier object model": no fourth system object for
- * funds/investors — a user models co-investors as Companies or as a custom
- * object, their call). Each carries a domain — an identity key is what makes
- * a re-run attach to the firm already on file instead of minting a second one.
+ * Co-investors are Companies: there is no system object for funds or
+ * investors (a user models them as Companies or a custom object). Each
+ * carries a domain — the identity key that makes a re-run attach to the firm
+ * already on file instead of minting a second one.
  */
 const INVESTORS = [
   { name: 'Meridian Deeptech', domain: 'meridiandeeptech.example' },
@@ -2700,7 +2699,7 @@ async function seedDeals(
         }),
       })
       // A close reason is the one embeddable value; queued as the server fn
-      // would (SPA-174/175: core hands the sources back).
+      // would, since core hands the sources back.
       for (const s of written.reembed) await enqueueSourceEmbed(s)
     }
 
@@ -3091,7 +3090,7 @@ async function seedDocuments(
         createdBy: userId,
       })
       .returning({ id: entity.id })
-    // Exempt from the one-writer rule `lib/documents/birth.test.ts` asserts:
+    // Exempt from the document one-writer rule (birth's test lists it):
     // these are backdated, pre-extracted fixtures, and birth would stamp them
     // with `now()` and enqueue extraction work for text already written here.
     await db.insert(document).values({
@@ -3102,7 +3101,7 @@ async function seedDocuments(
       sizeBytes: bytes.byteLength,
       kind: d.kind,
       // The row's writer, not a fiction about how the bytes arrived: this
-      // file wrote it, and its entity row has said `seed` since SPA-118.
+      // file wrote it, and its entity row says `seed`.
       sourceClass: 'seed',
       extractedText: d.status === 'done' ? d.text : null,
       // Same expression the extraction worker writes — one tsvector config.
@@ -3172,12 +3171,9 @@ async function seedInteractions(
         .insert(interaction)
         .values({
           kind,
-          // Was `email_sync` for the email rows — the only writer of a
-          // vendor-named lane anywhere in the tree, and the reason SPA-137
-          // had a backfill to decide at all. Nothing synced these: this file
-          // generated them, so they say `seed` like every other row it
-          // writes. The lane a real email arrives by will be an integration
-          // row in `source_ref`, not a word in a shared enum.
+          // `seed`, not a vendor-named lane: nothing synced these, this file
+          // generated them. A real email's lane is an integration row in
+          // `source_ref`, not a word in a shared enum.
           sourceClass: 'seed',
           messageId: kind === 'email' ? `<seed-${i}-${k}@dealos.local>` : null,
           threadId: `seed-thread-${i}`,

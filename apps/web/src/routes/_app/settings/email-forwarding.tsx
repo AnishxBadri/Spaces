@@ -3,7 +3,7 @@ import { ArrivalSection } from '#/components/settings/arrival-section'
 import { getMailboxSettings } from '#/lib/server-fns'
 
 /**
- * Settings → Integrations → Email forwarding: the forwarding mailbox. (D81)
+ * Settings → Integrations → Email forwarding: the forwarding mailbox.
  * - A member reads it too, the app password redacted and every control
  *   disabled.
  * - Loading the page never connects to the mail server; only Test

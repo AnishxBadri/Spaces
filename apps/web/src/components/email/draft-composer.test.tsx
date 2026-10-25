@@ -8,7 +8,7 @@ import type { DraftState } from '#/lib/email/compose'
 import { DraftComposer } from './draft-composer'
 
 /**
- * The composer (D67, E3/E4): Cc and Bcc closed until asked for, a Bcc chip
+ * The composer: Cc and Bcc closed until asked for, a Bcc chip
  * that reads as hidden, the recipient search with the alias pick on the
  * chip, one save per pause rather than per keystroke, the save a close
  * leaves behind, Trash, ⌘↵ as the one printed key, and Review: a draft with

@@ -1,5 +1,5 @@
 /**
- * The as-of gate on a voided ledger event (D12, SPA-150).
+ * The as-of gate on a voided ledger event.
  *
  * A correction is an append: the void writes a compensating event carrying
  * the *original's* date, so cost basis, MOIC and XIRR return to exactly

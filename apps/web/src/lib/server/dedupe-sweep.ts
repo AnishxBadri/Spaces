@@ -6,20 +6,12 @@ import { effectFn } from './effect'
 import { requireAdmin } from './shared'
 
 /**
- * The human door onto `entity.dedupe-sweep` (SPA-81). The job is nightly, at
- * 03:30 — which makes "does it work?" a question nobody can answer before
- * tomorrow, and a first pass on an established workspace something the owner
- * should be able to choose the moment for. This enqueues exactly the job the
- * schedule enqueues, with exactly the payload it sends (none), so the button
- * and the cron are the same run.
- *
- * Admin-only. The sweep writes rows into a queue every teammate reads, and
- * its bounds are the owner's call, so the trigger belongs to the same role
- * that owns the object registry.
- *
- * It is a seam, not a lane: the sweep's own file lives in `worker/jobs/`,
- * and nothing here imports it. A web process that could run the scan inline
- * is exactly what the queue exists to prevent.
+ * The human door onto the nightly `entity.dedupe-sweep`, so the owner can run
+ * a first pass now. It enqueues exactly the job the schedule enqueues, with
+ * the same (empty) payload, so the button and the cron are the same run.
+ * - Admin-only: the sweep fills a queue every teammate reads.
+ * - A seam, not a lane: nothing here imports the sweep. The web process must
+ *   never run the scan inline; that is what the queue exists to prevent.
  */
 
 class EnqueueFailed extends Schema.TaggedError<EnqueueFailed>()(

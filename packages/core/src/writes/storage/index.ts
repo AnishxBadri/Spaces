@@ -4,11 +4,7 @@ import type { Storage } from './types'
 
 export type { Storage } from './types'
 
-/**
- * Driver selection: STORAGE_DRIVER=local (default) | s3.
- * The S3 driver (@aws-sdk/client-s3, forcePathStyle for non-AWS) lands when
- * document upload is built — interface is frozen here so it's a drop-in.
- */
+/** Driver selection: STORAGE_DRIVER=local (default) | s3. */
 let instance: Storage | null = null
 
 export function storage(): Storage {

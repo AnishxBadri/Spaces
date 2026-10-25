@@ -9,9 +9,9 @@ import type { SQL } from 'drizzle-orm'
 export const DOCUMENT_ID_REF: SQL = sql`"document"."entity_id"`
 
 /**
- * The owner's override covers this email (D67 layer two): the owner opened
- * their emails with a record the email is on to the workspace — on a deal,
- * the threads it derives from its company and contacts too (D49).
+ * The owner's override covers this email: the owner opened their emails with
+ * a record the email is on to the workspace — on a deal, the threads it
+ * derives from its company and contacts too.
  * - `interactionId` and `ownerId` are expressions in the outer query; the
  *   owner is the body's or the attachment's author.
  */
@@ -33,7 +33,7 @@ export const emailOpenedToWorkspaceSql = (
               ))
           )`
 
-/** An email opened past its owner to `userId`: a grant to them (layer three) or the override. */
+/** An email opened past its owner to `userId`: a grant to them or the override. */
 const emailWidenedSql = (
   userId: string,
   interactionId: SQL,
@@ -47,7 +47,7 @@ const emailWidenedSql = (
 /**
  * The ids of every email body opened to `userId` past its owner. Uncorrelated,
  * so Postgres computes it once per statement and the outer anti-join keeps
- * the plan it had before the widening existed (the views' index scans).
+ * the views' index scans.
  */
 const widenedNoteIdsSql = (userId: string): SQL => sql`array(
             select wi.note_id from interaction wi
@@ -87,7 +87,7 @@ export const documentWidenedSql = (
 /**
  * canRead over one document, in SQL: true unless it is private to someone
  * other than `userId` and not opened to them — a synced email's attachment
- * is private to its mailbox owner until a layer widens it (D67).
+ * is private to its mailbox owner until a grant or the override widens it.
  * - `documentId` is an expression in the outer query: `DOCUMENT_ID_REF` by
  *   default, `e.id` inside `canReadNoteSql`.
  * - `is distinct from`, so a private row with no author reads as nobody's,

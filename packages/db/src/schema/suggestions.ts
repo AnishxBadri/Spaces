@@ -26,9 +26,9 @@ import type { Json } from '../json'
  */
 
 /**
- * What the payload proposes. Only `attribute_patch` has an accept path today;
- * the other four are named now so the queue's vocabulary does not need a
- * migration each time a lane lands, and accept refuses them by name.
+ * What the payload proposes. Kinds with no accept path are named up front so
+ * the queue's vocabulary needs no migration per lane; accept refuses them by
+ * name.
  */
 export const suggestionKind = pgEnum('suggestion_kind', [
   'attribute_patch',
@@ -40,22 +40,22 @@ export const suggestionKind = pgEnum('suggestion_kind', [
   // `entity_space(source: 'ai')` through the one tag insert.
   'space_tag',
   // An action item — from a recorder or from Ask. Accepting writes one task
-  // through the task writer, by the accepter. (D68)
+  // through the task writer, by the accepter.
   'task',
   // A company a space's watch found that nobody holds: accepting resolves
   // it, files it in the space and fires `entity.created`. No record yet, so
-  // the row's `entity_id` is null. (D72)
+  // the row's `entity_id` is null.
   'add_record',
   // A company held elsewhere that a watch found for this space: accepting
-  // files it here. (D72)
+  // files it here.
   'file_record',
   // A newer version of a document already on the record: accepting writes
   // `link(supersedes)` newer → older through the one supersedes writer.
-  // Never written without that accept. (D59)
+  // Never written without that accept.
   'supersedes',
   // A storage-source document whose Drive folder now resolves to another
   // record: accepting moves its filing edge from one to the other, by the
-  // accepter. Never a silent re-file (§5.6).
+  // accepter. Never a silent re-file.
   'refile_document',
 ])
 
@@ -137,7 +137,7 @@ export const suggestion = pgTable(
       ),
     /**
      * One open discovery card per (space, domain): a later find appends its
-     * evidence to the open card instead of proposing again. (D77)
+     * evidence to the open card instead of proposing again.
      * - `suggestion_is_discovery` is an IMMUTABLE SQL function from migration
      *   0072, never an enum comparison: an index predicate may not name an
      *   enum value added earlier in the same transaction (55P04) and may not

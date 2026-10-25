@@ -33,7 +33,7 @@ import {
 /**
  * The domain events from the writes that emit them to the plugin queues that
  * subscribe to them, gated by the row's auto-enrich scope, on a recording
- * `Enqueue`. (D65, D76)
+ * `Enqueue`.
  */
 
 const sent: Array<{ queue: string; data: unknown }> = []

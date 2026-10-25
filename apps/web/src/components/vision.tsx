@@ -11,15 +11,14 @@ import type { listRecordDocuments } from '#/lib/server-fns'
 import { offersVision } from '#/lib/documents/vision-gate'
 
 /**
- * Read with vision (SPA-94) — the Files-tab row's control, a copy of Read
- * deck (`record-files.tsx`, `useDeckReader`) and Extract key terms
- * (`./key-terms.tsx`). The gate is asked once per tab — the vision lane
- * routed, with a live credential, and to a local model when the record
- * resolves sensitive — and a row shows the button only when `offersVision`
- * says so: a stored PDF at `unsupported`, never one at `failed`. The read
- * is a worker job, polled while it runs; when it settles the rows reload,
- * so a success shows the text's snippet and a failure the provider's
- * sentence where "no text layer" was.
+ * Read with vision — the Files-tab row's control, shaped like Read deck
+ * (`useDeckReader`) and Extract key terms (`useKeyTermsExtractor`).
+ * - The gate is asked once per tab: the vision lane routed, a live
+ *   credential, and a local model when the record resolves sensitive.
+ * - A row shows the button only when `offersVision` says so: a stored PDF
+ *   at `unsupported`, never one at `failed`.
+ * - The read is a polled worker job; when it settles the rows reload, so a
+ *   success shows the snippet and a failure the provider's sentence.
  */
 
 type Documents = Awaited<ReturnType<typeof listRecordDocuments>>

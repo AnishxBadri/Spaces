@@ -65,7 +65,7 @@ import type {
 } from './types'
 
 /**
- * One Ask turn: the agent loop over the MCP tool table, streamed. (D70)
+ * One Ask turn: the agent loop over the MCP tool table, streamed.
  * - Tools are called through `toolRegistry.call`, the external MCP server's
  *   door, as the asker.
  * - The gate is per call and reads what was retrieved: the scope first,
@@ -500,7 +500,7 @@ export async function* askEvents(asked: AskInput): AsyncGenerator<AskEvent> {
   }
 
   // The web chip mounts each running plugin's MCP server — unless the
-  // scope is sensitive, which unmounts them all before any call. (D72)
+  // scope is sensitive, which unmounts them all before any call.
   const webAsked = input.scope.some((c) => c.kind === 'web')
   const sources = webAsked
     ? await Effect.runPromise(

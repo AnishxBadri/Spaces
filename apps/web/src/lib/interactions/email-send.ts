@@ -36,7 +36,7 @@ import type { EmailDraft } from './email-drafts'
 import { recipientContextsProgram } from './email-variables'
 
 /**
- * Send (D67): a draft handed to the Gmail plugin's `send` action and awaited.
+ * Send: a draft handed to the Gmail plugin's `send` action and awaited.
  * - The sender is the viewer's Gmail connection bound to a running Gmail
  *   plugin — the parent's mailbox for a reply, else the earliest. Without
  *   `gmail.send` there is nothing to send with: the composer hides Send and

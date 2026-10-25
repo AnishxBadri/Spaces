@@ -2,23 +2,13 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 
 /**
- * The worker's two runtime entries, bundled for the image (SPA-185, mono-13b;
- * D26: `vite build --ssr`, no second bundler). `pnpm build` here writes
- * `dist/index.mjs` (the pg-boss host) and `dist/health.mjs` (the ROLE=worker
- * HEALTHCHECK), which the container runs with plain `node` — no tsx and no
- * `src/` in the image. Dev is unchanged: `pnpm worker` still runs tsx.
- *
- * What is inside a bundle and what stays outside is Vite's SSR default, and
- * it is the right split: every npm package resolves into node_modules and is
- * left as a runtime import — pg, pg-boss, drizzle-orm, effect, unpdf,
- * mammoth, fflate, tldts, the AI providers — so native and optional
- * dependencies (pg-native, pdf.js's worker lookup) resolve exactly as they
- * do under tsx, from the image's pruned node_modules. The workspace
- * packages (@spaces/core, @spaces/db) are links, not node_modules content,
- * so they are bundled in; so are the apps/web server modules the jobs reach
- * through `#web/*`. This file is not vitest's (vitest.config.ts wins for
- * `vitest run`), so the aliases are declared again here, exactly as
- * tsconfig.json declares them.
+ * The worker's two runtime entries, bundled for the image with `vite build
+ * --ssr` (no second bundler): `index.mjs` (the pg-boss host) and `health.mjs`
+ * (the ROLE=worker HEALTHCHECK), run with plain `node`. Dev runs tsx.
+ * - npm packages stay runtime imports, so native and optional deps (pg-native,
+ *   pdf.js's worker lookup) resolve as they do under tsx.
+ * - Workspace packages and the `#web/*` modules are bundled in.
+ * - Vitest has its own config, so the aliases repeat tsconfig's here.
  */
 const webSrc = fileURLToPath(new URL('../web/src/', import.meta.url))
 
@@ -37,21 +27,14 @@ export default defineConfig({
     minify: false,
     sourcemap: false,
     rollupOptions: {
-      // Every bare import stays a runtime import, except the workspace's own
-      // packages, which are bundled. Vite's SSR default externalizes only what
-      // resolves from this package's root, and under pnpm @spaces/core's
-      // dependencies (unpdf, mammoth, @aws-sdk, fflate, tldts) resolve from
-      // packages/core — so they were inlined, pdf.js and all. One rule here
-      // rather than a package list to keep current.
+      // Every bare import stays a runtime import except the workspace's own
+      // packages. Vite's SSR default externalizes only what resolves from this
+      // package's root, which under pnpm would inline core's deps (pdf.js and all).
       //
-      // @spaces/sdk is the exception to the exception (sdk-11): it stays a
-      // runtime import from /app/node_modules. A plugin bundle's bare
-      // `@spaces/sdk` import is resolved by the loader's hook to the copy
-      // *this* process loaded, so the worker must load one from
-      // node_modules rather than carry an inlined copy of its own — an
-      // inlined sdk would be a second set of port tags, and every plugin
-      // job would fail "service not found". The Dockerfile puts the sdk's
-      // package.json and dist/ there.
+      // @spaces/sdk must stay external (the Dockerfile puts it in
+      // /app/node_modules): the loader's hook hands plugin bundles the copy
+      // this process loaded, and an inlined sdk is a second set of port tags —
+      // every plugin job would fail "service not found".
       external: (id) =>
         /^(node:|[a-z@])/.test(id) &&
         (!id.startsWith('@spaces/') || /^@spaces\/sdk(\/|$)/.test(id)),

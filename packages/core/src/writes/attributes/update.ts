@@ -26,15 +26,11 @@ import type {
 } from '../../attributes/registry'
 
 /**
- * Attribute maintenance as an Effect program (backend-paradigm ratchet: the
- * handler was opened for behavioral change, so its core converts here; the
- * server-fn stays a thin wrapper).
- *
- * The config-mutability table (spec-attribute-engine §3) is the contract.
+ * Attribute maintenance. The config-mutability table is the contract.
  * - Slug and record_reference `targetKind` are not in the patch at all, so
  *   the illegal edit is unrepresentable rather than validated away.
  * - Type and `multi` change only through `multi`, which widens and never
- *   narrows (D69).
+ *   narrows.
  */
 
 export class AttributeNotFound extends Schema.TaggedError<AttributeNotFound>()(
@@ -56,7 +52,7 @@ export class RatingMaxBelowValues extends Schema.TaggedError<RatingMaxBelowValue
 
 /**
  * Archiving an attribute that backs one of its object's declared identity
- * keys (spec §9). The key would be left pointing at nothing, so the refusal
+ * keys. The key would be left pointing at nothing, so the refusal
  * names the object: undeclare the key, then archive.
  */
 export class IdentityKeyAttributeLocked extends Schema.TaggedError<IdentityKeyAttributeLocked>()(
@@ -64,13 +60,13 @@ export class IdentityKeyAttributeLocked extends Schema.TaggedError<IdentityKeyAt
   { key: Schema.String, object: Schema.String, message: Schema.String },
 ) {}
 
-/** System attributes ship with the product: never archived, never reshaped. (D69) */
+/** System attributes ship with the product: never archived, never reshaped. */
 export class SystemAttributeLocked extends Schema.TaggedError<SystemAttributeLocked>()(
   'SystemAttributeLocked',
   { attribute: Schema.String, message: Schema.String },
 ) {}
 
-/** A multi-valued attribute asked to hold one value again. Edits widen only. (D69) */
+/** A multi-valued attribute asked to hold one value again. Edits widen only. */
 export class AttributeNarrowingRefused extends Schema.TaggedError<AttributeNarrowingRefused>()(
   'AttributeNarrowingRefused',
   { attribute: Schema.String, message: Schema.String },
@@ -104,21 +100,19 @@ export type AttributeConfigPatch = {
   /** number — display-only */
   precision?: number | undefined
   /**
-   * spec §4 — static value in the write shape, `'current-user'`, or an
+   * Static value in the write shape, `'current-user'`, or an
    * ISO-8601 duration for dates; null clears. Validated here, at config
    * time, never at record creation.
    */
   default?: Json | undefined
   /**
-   * AI attribute config (SPA-72) — the spec's `attribute.config.ai`, stored
-   * as `options.ai`; null clears. Any type that can hold the mode may carry
-   * it (`@spaces/core/ai/attribute-ai`); it rewrites no value and touches no
-   * other key, so it sits outside every §3 guard above rather than
-   * loosening one.
+   * AI attribute config, stored as `options.ai`; null clears. Any type that
+   * can hold the mode may carry it; it rewrites no value and touches no other
+   * key, so it sits outside every mutability guard rather than loosening one.
    */
   ai?: AiConfigInput | null | undefined
   /**
-   * Fill from enrichment (D76): a vocabulary key the attribute's type and
+   * Fill from enrichment: a vocabulary key the attribute's type and
    * object can hold; null is "from nothing", which the seeder respects.
    */
   enrichmentKey?: string | null | undefined
@@ -129,10 +123,10 @@ export type UpdateAttributePatch = {
   name?: string | undefined
   /** null clears */
   description?: string | null | undefined
-  /** can't-clear (spec §5); freely toggleable — it never rewrites data */
+  /** can't-clear; freely toggleable — it never rewrites data */
   required?: boolean | undefined
   /**
-   * "Filter and sort on this" (SPA-93): both engine flags, set together by
+   * "Filter and sort on this": both engine flags, set together by
    * the one dialog control. Freely toggleable — it rewrites no data, it only
    * changes which `attr_idx_<id>` expression index `reconcileValueIndexes()`
    * wants to exist. The mint and the drop happen **after** this program's
@@ -142,7 +136,7 @@ export type UpdateAttributePatch = {
   indexed?: boolean | undefined
   archived?: boolean | undefined
   /**
-   * true widens a single-valued attribute to a list (D69): `select` becomes
+   * true widens a single-valued attribute to a list: `select` becomes
    * `multi_select`, a reference, phone or email gains `multi`, and every
    * stored value is wrapped. false on a multi-valued one is refused.
    */
@@ -206,7 +200,7 @@ export const countRatingsAbove = Effect.fn('countRatingsAbove')(function* (
 /**
  * Option-list edit: options can be added, renamed and archived but never
  * removed — stored values may reference them, and archiving leaves those
- * values untouched (spec §3). Colours are pinned on save so the editor never
+ * values untouched. Colours are pinned on save so the editor never
  * reshuffles what the user has been looking at.
  */
 const mergeOptions = Effect.fn('mergeOptions')(function* (
@@ -245,7 +239,7 @@ const mergeOptions = Effect.fn('mergeOptions')(function* (
   })
 })
 
-/** The §3 table, one branch per row. Returns the merged options blob. */
+/** The mutability table, one branch per row. Returns the merged options blob. */
 const applyConfig = Effect.fn('applyConfig')(function* (
   attr: { type: AttributeType; objectId: string; slug: string },
   current: AttributeOptions,
@@ -362,7 +356,7 @@ type WidenPlan = {
 }
 
 /**
- * Widen or refuse (D69), before anything is written.
+ * Widen or refuse, before anything is written.
  * - `multi: false` on a list is refused naming the attribute; on a single
  *   value it is a no-op, as is `multi: true` on a list.
  * - A pair widens on the side asked: that side holds many and the other
@@ -473,7 +467,7 @@ export const updateAttributeProgram = Effect.fn('updateAttributeProgram')(
       })
     // Refused before anything is written: a declared identity key with no
     // live attribute behind it is the state the materialization rule exists
-    // to prevent (CONTEXT.md "Two-tier object model", 2026-09-19).
+    // to prevent.
     const identityKey = attr.options.identityKey
     if (patch.archived === true && identityKey !== undefined) {
       const owner = yield* query(() =>
@@ -488,7 +482,7 @@ export const updateAttributeProgram = Effect.fn('updateAttributeProgram')(
           .then((rows) => rows.at(0)),
       )
       // A core object's identity attribute (a person's emails, a company's
-      // domains) is what `resolveEntity` births records through. (D75)
+      // domains) is what `resolveEntity` births records through.
       if (owner?.isSystem)
         return yield* new IdentityKeyAttributeLocked({
           key: identityKey,
@@ -509,7 +503,7 @@ export const updateAttributeProgram = Effect.fn('updateAttributeProgram')(
       })
     // Either half of a relationship may be archived; that detaches the pair,
     // and a write to a derived half whose owner is archived is refused by
-    // `setValues` (`PairedAttributeLocked`). (D69)
+    // `setValues` (`PairedAttributeLocked`).
     const current = attr.options
 
     let next = current

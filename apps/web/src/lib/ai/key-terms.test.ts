@@ -41,7 +41,7 @@ import { clearAiRouteProgram, setAiRouteProgram } from './route'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * SPA-91. Extract key terms through an injected model
+ * Extract key terms through an injected model
  * (`MockLanguageModelV4`, as the deck reader's tests): the route, the
  * sensitivity read, the extraction cache, the citation labels and the
  * suggestion row are real; nothing reaches a network.

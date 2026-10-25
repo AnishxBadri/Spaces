@@ -17,14 +17,14 @@ import { entity } from './entities'
 import { user } from './auth'
 
 /**
- * The financial engine (CONTEXT.md, "Build record", Portfolio layer).
+ * The financial engine.
  * - Every row is an append-only dated event; every aggregate (ownership,
  *   MOIC, XIRR, NAV) is derived at read, never stored.
  * - Money stays in its original currency; conversion is a read-time fx_rate
  *   lookup against the workspace base currency.
  * - A correction is an append: no edit and no delete path. A void is an
  *   exact-negative event citing the original via `reverses_id`, dated as the
- *   original was. `fx_rate` has no reversal — it is a lookup. (D12)
+ *   original was. `fx_rate` has no reversal — it is a lookup.
  */
 
 /**
@@ -137,11 +137,11 @@ export const investment = pgTable(
     cap: numeric('cap', { precision: 20, scale: 4 }),
     discount: numeric('discount', { precision: 7, scale: 4 }),
     vehicle: text('vehicle'),
-    /** Set on a compensating event; points at the check it voids (D12). */
+    /** Set on a compensating event; points at the check it voids. */
     reversesId: uuid('reverses_id').references(
       (): AnyPgColumn => investment.id,
     ),
-    /** The bulk-void handle. No FK — nothing owns a batch yet (D12). */
+    /** The bulk-void handle. No FK — nothing owns a batch yet. */
     batchId: uuid('batch_id'),
     createdBy: text('created_by').references(() => user.id),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -176,9 +176,9 @@ export const mark = pgTable(
     fairValue: numeric('fair_value', { precision: 20, scale: 4 }).notNull(),
     currency: char('currency', { length: 3 }).notNull(),
     basis: markBasis('basis').notNull(),
-    /** Set on a compensating event; points at the mark it voids (D12). */
+    /** Set on a compensating event; points at the mark it voids. */
     reversesId: uuid('reverses_id').references((): AnyPgColumn => mark.id),
-    /** The bulk-void handle. No FK — nothing owns a batch yet (D12). */
+    /** The bulk-void handle. No FK — nothing owns a batch yet. */
     batchId: uuid('batch_id'),
     createdBy: text('created_by').references(() => user.id),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -219,11 +219,11 @@ export const distribution = pgTable(
     kind: distributionKind('kind').notNull(),
     sharesSold: numeric('shares_sold', { precision: 20, scale: 4 }),
     pricePerShare: numeric('price_per_share', { precision: 20, scale: 8 }),
-    /** Set on a compensating event; points at the row it voids (D12). */
+    /** Set on a compensating event; points at the row it voids. */
     reversesId: uuid('reverses_id').references(
       (): AnyPgColumn => distribution.id,
     ),
-    /** The bulk-void handle. No FK — nothing owns a batch yet (D12). */
+    /** The bulk-void handle. No FK — nothing owns a batch yet. */
     batchId: uuid('batch_id'),
     createdBy: text('created_by').references(() => user.id),
     createdAt: timestamp('created_at', { withTimezone: true })

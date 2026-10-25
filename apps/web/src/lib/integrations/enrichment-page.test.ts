@@ -29,7 +29,7 @@ import { whereFromProgram } from './enrichment-record'
 /**
  * Settings → Integrations → Enrichment against a real database: the order
  * and auto-enrich written where the run and the auto checks read them,
- * What fills what, Apollo's page, and a filled headcount's where-from. (D76)
+ * What fills what, Apollo's page, and a filled headcount's where-from.
  */
 
 const manifestFor = (id: string, name: string) =>
@@ -141,7 +141,7 @@ describe('the sources in order', () => {
       ['Exa', false],
     ])
     expect(page.sources[0].sends).toBe('domain')
-    // No model is routed here: the Website still runs, on its markup. (D80)
+    // No model is routed here: the Website still runs, on its markup.
     expect(page.sources[1]).toMatchObject({
       builtIn: true,
       sends: 'nothing out · free',

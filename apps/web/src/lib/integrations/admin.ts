@@ -29,7 +29,7 @@ import type { FormValues } from './settings-form'
 /**
  * Settings → Integrations, the write half: on/off, breaker reset, settings
  * and the key. Every write opens with `requireAdmin`; the reads are any
- * member's, secrets redacted (D81).
+ * member's, secrets redacted.
  * - Every write NOTIFYs `plugin_changed` with the plugin id once it has
  *   committed; the worker reloads that one plugin and writes its status.
  * - The key goes into the vault and never comes back: only its redacted
@@ -155,7 +155,7 @@ export const saveIntegrationSettingsProgram = Effect.fn(
 /**
  * Write the auto-enrich scope onto `integration.config`. Refused for a
  * plugin with no event job. The dispatcher reads the row on every event, so
- * nothing reloads. (D76)
+ * nothing reloads.
  */
 export const saveIntegrationAutoEnrichProgram = Effect.fn(
   'saveIntegrationAutoEnrichProgram',
@@ -291,7 +291,7 @@ export const run = async <T, TError>(
   }
 }
 
-// The reads are any member's, with a plugin's secrets redacted (D81); every
+// The reads are any member's, with a plugin's secrets redacted; every
 // write below opens with `requireAdmin()`.
 
 export async function listIntegrationsHandler(): Promise<

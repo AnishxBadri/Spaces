@@ -3,19 +3,14 @@ import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * SPA-103's "no second write path to entity_space", held by grep: the
- * `tagIntoSpace` server fn and the `space_tag` accept branch both reach the
- * table through `insertSpaceTag` (`./tag.ts`), and neither spells an insert
- * of its own.
- *
- * The allowlist below is every production module that inserts into
- * `entity_space` today. Only `./tag.ts` *tags* a record; the other four
- * *file* something at birth or on a refile — a document filed where it was
- * dropped, a note written while standing in a space, a note's new version
- * filed where the old one is — and are not a person or a model placing a
- * record in the tree. A fourth module inserting here
- * fails this test until it is either routed through `insertSpaceTag` or
- * added below with its reason.
+ * No second write path to entity_space, held by grep: the `tagIntoSpace`
+ * server fn and the `space_tag` accept branch both reach the table through
+ * `insertSpaceTag`, and neither spells an insert of its own.
+ * - The allowlist is every production module inserting into `entity_space`.
+ *   Only `insertSpaceTag`'s module *tags*; the others *file* at birth or on a
+ *   refile, not a person or model placing a record in the tree.
+ * - A new inserter fails here until routed through `insertSpaceTag` or added
+ *   below with its reason.
  */
 
 const SRC = join(import.meta.dirname, '..', '..')
@@ -69,8 +64,8 @@ describe('one entity_space insert for tagging', () => {
   })
 
   it('the only production modules inserting into entity_space are the known ones', () => {
-    // Document birth moved to core's write half (SPA-201), so core's source
-    // is walked too and named with a `core:` prefix.
+    // Document birth is in core's write half, so core's source is walked too
+    // and named with a `core:` prefix.
     const production = (root: string, prefix: string) =>
       walk(root)
         .filter((f) => !/\.test\.tsx?$/.test(f) && !f.includes('/seeds/'))

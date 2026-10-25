@@ -25,7 +25,7 @@ type Moving = {
 /**
  * Move to… — a window over the scrim listing the tree, the space and its
  * descendants greyed with the reason and its parent marked "now here". One
- * pick, then Move. (D73)
+ * pick, then Move.
  */
 export function SpaceMoveDialog({
   open,

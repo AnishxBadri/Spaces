@@ -26,7 +26,7 @@ import { PRODUCTS, productOf, productPage } from './products'
  * a 302 to the provider's own consent screen out, with the PKCE verifier
  * left behind in a cookie (`verifierCookie`) and the signed state riding along.
  * - A data grant, never a login: better-auth is not involved past the session.
- * - Outside `lib/server/` so a test drives it without a request context.
+ * - Outside the server-fn barrel so a test drives it without a request context.
  */
 
 export class ProviderUnconfigured extends Schema.TaggedError<ProviderUnconfigured>()(

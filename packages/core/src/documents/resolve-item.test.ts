@@ -5,7 +5,7 @@ import { lookupFor, resolveItem } from './resolve-item'
 import type { CompanyMatch, FolderLookups, ItemTarget } from './resolve-item'
 
 /**
- * `resolveItem` against §5.3's rows and the seeded research tree. Pure: no
+ * `resolveItem` against the filing rules and the seeded research tree. Pure: no
  * database, no provider, no model — the lookups the walk would make are
  * handed in, so every decision below is made with no AI configured at all.
  */

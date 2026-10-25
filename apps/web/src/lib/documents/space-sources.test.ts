@@ -6,20 +6,12 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * The space page's Sources lane (SPA-44), against the test database.
- *
- * What is worth pinning is the half the Files-tab query cannot answer: a
- * space filing is an `entity_space` row, not a `link(tagged_in)` one, so a
- * lane keyed on `link` would have returned nothing for every space that
- * ever had a source. The rest is the row shape the section renders —
- * newest first, the uploader resolved to a name, the snippet collapsed and
- * capped, and a merged-away document gone.
- *
- * Dynamic imports for the reason the rest of the DB-coupled suite uses
- * them: `@spaces/db` builds its pool from `DATABASE_URL` at import time and
- * `vitest.setup.ts` rewrites it per file. The program is called directly —
- * `getSpace` needs a request no test has, which is why the query lives
- * outside `lib/server/` at all.
+ * The space page's Sources lane, against the test database. A space filing
+ * is an `entity_space` row, not `link(tagged_in)`, so a lane keyed on `link`
+ * would return nothing. The rest is the row shape: newest first, uploader
+ * named, snippet collapsed and capped, merged-away documents gone.
+ * Imports are dynamic because `@spaces/db` builds its pool from
+ * `DATABASE_URL` at import time and the vitest setup rewrites it per file.
  */
 
 async function actorId(): Promise<string> {
@@ -253,12 +245,10 @@ describe('spaceSourcesProgram', () => {
 })
 
 /**
- * The inherited lane (SPA-67) — documents reached *through* the companies
- * tagged into the space. What is worth pinning is the seam between the two
- * lanes: a document that is both filed here and tagged onto a company here
- * belongs to the direct list and must not be counted twice, and the merge
- * filter has to hold on both ends of the join, because there are now two
- * `entity` rows in one statement.
+ * The inherited lane: documents reached *through* the companies tagged into
+ * the space. A document both filed here and tagged onto a company here
+ * belongs to the direct list only, and the merge filter holds on both
+ * `entity` rows of the join.
  */
 describe('spaceInheritedSourcesProgram', () => {
   it('reads documents on a company tagged into the space, newest first', async () => {

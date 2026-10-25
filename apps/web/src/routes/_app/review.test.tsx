@@ -5,7 +5,7 @@ import type { BatchOutcome, SuggestionItem } from '#/lib/server-fns'
 import { InboxItem, PayloadFallback, rendererFor } from './review.tsx'
 
 /**
- * SPA-76. The review inbox is a queue over typed rows, and the renderer map
+ * The review inbox is a queue over typed rows, and the renderer map
  * is the whole contract: a later lane adds a member to `InboxRow` and a
  * renderer keyed by its `kind`, never a second page. What has to hold for
  * that to be safe is the miss — a row whose kind this build has no renderer
@@ -14,7 +14,7 @@ import { InboxItem, PayloadFallback, rendererFor } from './review.tsx'
  * Asserted over the dispatch rather than the page: `PairCard` wants a router
  * (`useRouter`, `Link`) and the suite runs on `environment: 'node'` with no
  * DOM, while the fallback is plain markup. `renderToStaticMarkup` is the
- * same server render the app ships through (`select.test.tsx`).
+ * same server render the app ships through.
  */
 
 /** Rows from a build that knows lanes this one does not. */
@@ -81,9 +81,8 @@ describe('the inbox renderer map', () => {
 })
 
 /**
- * SPA-98. The suggestion lane is the second member, and its card is generic
- * over `suggestion.kind`: a kind with no sub-renderer (every kind but
- * `attribute_patch` today) prints its payload in the same row shape, so the
+ * The suggestion lane's card is generic over `suggestion.kind`: a kind with
+ * no sub-renderer prints its payload in the same row shape, so the
  * later lanes add a body, not a page. Driven over every value of the
  * database enum, so a kind added there is covered here without an edit.
  */
@@ -373,7 +372,7 @@ describe('the suggestion card', () => {
   })
 
   it('labels an MCP proposal with its token, and an in-app one not at all', async () => {
-    // SPA-31: a proposal from an outside assistant is distinguishable.
+    // A proposal from an outside assistant is distinguishable.
     const { SuggestionEntry } =
       await import('#/components/inbox/suggestion-card')
     const draw = (origin: SuggestionItem['origin']) =>
@@ -406,7 +405,7 @@ describe('the suggestion card', () => {
   })
 
   it('draws an identity as the person the deck named, not its payload', async () => {
-    // SPA-105: the claim's rows in the patch body's label/value shape.
+    // The claim's rows in the patch body's label/value shape.
     const { SuggestionEntry } =
       await import('#/components/inbox/suggestion-card')
     const html = renderToStaticMarkup(
@@ -459,7 +458,7 @@ describe('the suggestion card', () => {
 })
 
 /**
- * SPA-110. The two bulk verbs: "Accept all" on the card header, "Accept
+ * The two bulk verbs: "Accept all" on the card header, "Accept
  * column" on each field row, and a failed field's message inline under it.
  */
 describe('bulk accept on the suggestion card', () => {
@@ -562,7 +561,7 @@ describe('bulk accept on the suggestion card', () => {
 })
 
 /**
- * A space's discovery cards (D72, D77): one group under a bone space head —
+ * A space's discovery cards: one group under a bone space head —
  * path, `via` the plugin's mark, the count — each card with its name,
  * domain, evidence chips opening their URLs, and its two verbs.
  */

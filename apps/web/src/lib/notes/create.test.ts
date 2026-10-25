@@ -3,18 +3,11 @@ import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 /**
- * Note creation (SPA-104), against the test database.
- *
- * The bug: "Note about this" on a record wrote one `link(mentions,
- * extracted)` row, so the note was referenced by the company and never filed
- * against it — and `saveNote`'s diff-sync owns exactly that stamp, so
- * deleting the starter block took the note's only edge with it. The filing
- * and the mention are two different rows here, and the second test is the
- * one that proves it: the mention goes, the filing stays.
- *
- * Imports are dynamic like the rest of the DB-coupled suite: `@spaces/db`
- * builds its pool from `DATABASE_URL` at import time and `vitest.setup.ts`
- * rewrites it per file.
+ * Note creation. The filing and the starter mention are two rows: removing
+ * the starter block drops the mention (the `saveNote` diff-sync owns it) and
+ * the filing stays.
+ * Imports are dynamic: `@spaces/db` builds its pool from `DATABASE_URL` at
+ * import time, and the test setup rewrites it per file.
  */
 
 async function actorId(): Promise<string> {
@@ -120,9 +113,8 @@ describe('createNoteProgram', () => {
       }),
     )
 
-    // Exactly what `saveNote` does to the mentions it owns when the block is
-    // gone: delete the extracted rows no longer wanted. The filing is not
-    // one of the rows it owns, which is the whole fix.
+    // What `saveNote` does when the block is gone: delete the extracted rows
+    // no longer wanted. The filing is not one of the rows it owns.
     await db
       .delete(link)
       .where(

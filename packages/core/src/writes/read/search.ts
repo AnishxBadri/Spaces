@@ -5,14 +5,11 @@ import { db } from '@spaces/db'
 import { canReadNoteSql } from './can-read-sql'
 
 /**
- * The lexical half of unified search, in core since SPA-198 (extracted from
- * `apps/web/src/lib/search/query.ts`, which composes it with its semantic
- * lane and re-exports what moved): the fused four-lane statement, its
- * `canReadNoteSql` predicate and the snippet options. Cmd-K sends exactly the
- * statement it always has — `apps/web` builds the fifth lane (the query
- * vector belongs to web's embedding stack) and hands it in — and the plugin
- * SDK's `Read.search` (`../ports/read.ts`) runs the lexical statement alone,
- * which embeds nothing (D56).
+ * The lexical half of unified search: the fused four-lane statement, its
+ * `canReadNoteSql` predicate and the snippet options. Cmd-K hands in the
+ * fifth, semantic lane (the query vector belongs to apps/web's embedding
+ * stack); the plugin SDK's `Read.search` runs the lexical statement alone,
+ * which embeds nothing.
  *
  * canRead is enforced in SQL on every lane that can reach a note or a
  * document — a private one never enters the fusion for anyone but its
@@ -40,9 +37,9 @@ const query = <T>(run: () => Promise<T>) =>
 export const HEADLINE_OPTIONS =
   'MaxWords=18, MinWords=6, ShortWord=3, MaxFragments=1, StartSel=«, StopSel=»'
 
-// Spelled as a literal, not a bind parameter, so the emitted statement is the
-// one the palette has always sent. The constant is ours; nothing user-typed
-// reaches `sql.raw`.
+// Spelled as a literal, not a bind parameter, so the emitted statement is
+// exactly the palette's. The constant is ours; nothing user-typed reaches
+// `sql.raw`.
 const headlineOptions = sql.raw(`'${HEADLINE_OPTIONS}'`)
 
 // canRead's SQL twins live beside it, free of `db`, so a server fn's dynamic

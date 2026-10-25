@@ -13,7 +13,7 @@ import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
 
 /**
- * How a settings page saves (D81).
+ * How a settings page saves.
  * - A switch, checkbox or select writes at once, with a toast; it never
  *   touches this module.
  * - A typed field (a name, a host, a port, a key) is a draft: it registers

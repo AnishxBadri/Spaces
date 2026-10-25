@@ -6,29 +6,13 @@ import {
 } from '@spaces/db/test-db'
 
 /**
- * Isolation, per test file (SPA-145). Vitest runs a setup file once before
- * each test file it collects, which is the seam this needs: every file starts
- * against a database holding the seed and nothing else.
- *
- * It replaces `cleanupTestEntities`, which found rows by regex over
- * `entity.canonical_name` and hand-deleted from eleven tables in foreign-key
- * order. Anything a test wrote that was not reachable from a tagged entity
- * name — an attribute, a view, a duplicate_candidate on an untagged pair —
- * simply survived, and every new table was one more the list did not know
- * about. Truncating `public` needs no list and cannot be forgotten.
- *
- * Transaction-per-test with rollback was the other candidate and is ruled out
- * by the code: `values.ts`, `update.ts`, `resolve.ts` and `merge.ts` each open
- * their own `db.transaction`, and a naive outer transaction breaks all four.
- *
- * The base url is read from `TEST_DATABASE_BASE_URL` and not from
- * `DATABASE_URL`, which this file overwrites: it runs once per file in the
- * same process, and deriving from a value it had already rewritten would give
- * the second file `spaces_test_web1_web1`. The mutation has to happen before
- * anything imports `@spaces/db`, whose pool is built from
- * `process.env.DATABASE_URL` at import time — hence the dynamic imports
- * below, and hence `pool: 'forks'` in the config, so that this worker's
- * `process.env` is this worker's alone.
+ * Per-file isolation: before each test file, truncate `public` and reseed, so
+ * every file starts with the seed and nothing else, with no delete list.
+ * - Not transaction-per-test: the write paths open their own `db.transaction`.
+ * - The base url comes from `TEST_DATABASE_BASE_URL`, not `DATABASE_URL`, which
+ *   this file overwrites once per file in the same process.
+ * - `DATABASE_URL` must be set before anything imports `@spaces/db` (its pool
+ *   reads it at import time), hence the dynamic imports and `pool: 'forks'`.
  */
 
 const base = process.env.TEST_DATABASE_BASE_URL
@@ -54,10 +38,8 @@ await truncatePublicTables((text) => db.$client.query(text))
 
 const { seedTestDatabase } = await import('./vitest.seed.ts')
 
-// The seeds say what they inserted, which is what you want on boot and
-// seventy-nine lines of noise across a suite run, since after a truncate they
-// insert every time. Quiet for the reseed only — the global setup still logs
-// its one line per database.
+// The seeds log what they inserted, which after a truncate is everything,
+// every file. Quiet for the reseed only.
 const speak = console.log
 console.log = () => undefined
 try {

@@ -3,13 +3,11 @@ import { ESLint } from 'eslint'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The two dependency fences, proved on the real packages (SPA-191). Until
- * this slice `SDK_IMPORTS_NOTHING_INTERNAL` and `PLUGIN_IMPORTS_SDK_ONLY`
- * (packages/config/eslint.base.js) were proved against placeholder fixture
- * directories; now @spaces/sdk and plugins/_fixtures/echo exist, so the
- * failing case runs where it matters. This lints source text through the
- * workspace's own eslint config (the root shim), at a path inside each
- * package, and expects the zone's message — nothing is written to disk.
+ * The two dependency fences, `SDK_IMPORTS_NOTHING_INTERNAL` and
+ * `PLUGIN_IMPORTS_SDK_ONLY`, proved on the real packages. This lints source
+ * text through the workspace's own eslint config (the root shim), at a path
+ * inside each package, and expects the zone's message — nothing is written
+ * to disk.
  *
  * Only `no-restricted-imports` runs, and without type information: the
  * files do not exist, so the type-aware parser has no program to put them

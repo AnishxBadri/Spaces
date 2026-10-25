@@ -22,54 +22,38 @@ import type { DocumentFilingTarget } from '#/lib/server/shared'
 import { ACCEPTED_CAPTURE_SCHEMA_VERSIONS } from './versions'
 
 /**
- * `POST /api/v1/capture` (SPA-111) — CONTEXT.md integration map #8, and
- * `docs/spec-storage-sources.md` §3.1 entry point 8: page text in, a filed
- * document out. What `capture.capture` in `api.ts` runs, with no HttpApi
- * import so the door stays one file (`one-door.test.ts`), the way
- * `./records.ts` holds the read half.
+ * `POST /api/v1/capture`: page text in, a filed document out. What
+ * `capture.capture` runs, with no HttpApi import so the API door stays one
+ * file.
  *
  * **This module writes no bytes and no rows of its own.** The text goes
- * through `intakeDocumentProgram` (`writes/documents/intake.ts` in core) — stream → sha
- * → blob → `birthDocumentProgram` → `tagged_in` edge → enqueue extract — the
- * same server lane forwarded attachments file through
- * (`lib/arrival/attachment-filing.ts`), and birth is the one writer of
- * `document` (`birth.test.ts`). So:
+ * through `intakeDocumentProgram` (stream → sha → blob →
+ * `birthDocumentProgram` → `tagged_in` edge → enqueue extract), the lane
+ * forwarded attachments file through; birth is the one writer of `document`.
  *
- * - **A real blob, not a blobless row.** The text is stored as
- *   `text/plain; charset=utf-8`, byte for byte what was posted — plain, not
- *   markdown, because what an extension grabs is a page's visible text and
- *   nothing in it was written as markdown. Preview and download then work
- *   exactly as they do for an uploaded `.txt`, and the unchanged extract job
- *   reads it through its `text` extractor.
- * - **The sha is the text's alone**, so re-posting the same page is §3.4's
- *   sha+target dedupe in birth: filed against the same record it is the same
- *   row. `capturedAt` is validated and deliberately *not* folded into the
- *   bytes — doing so would make every re-post a new digest and defeat that
- *   rule. (An unfiled re-post is two rows, which is birth's existing rule for
- *   every unfiled arrival: no target, nothing to be the same filing as.)
- * - **`url` is the page's address** (`document.url`), and the title is the
- *   canonical name (and the filename, which birth writes from the same
- *   field).
- * - **Provenance is `manual`, `source_ref` null, the actor the token's user.**
- *   A capture is a person clicking a button in their own browser session;
- *   the extension is first-party, which is why the old `document_origin`
- *   `clip` collapsed into `manual` (SPA-137, `packages/db/src/schema/
- *   kinds.ts`; spec §3.1's D1 correction names entry 8 explicitly). The token
- *   is a credential, not an integration: `source_ref` is an FK to
- *   `integration.id`, and the biconditional check refuses a ref on a
- *   `manual` row anyway. The token's user lands in `uploaded_by` and the
- *   activity line, which is where "who filed it" is read.
- * - **`kind` is `article`**, as the URL clip files a page (`clip.ts`).
+ * - **A real blob, not a blobless row**, stored as `text/plain;
+ *   charset=utf-8`, byte for byte what was posted (a page's visible text is
+ *   not markdown). Preview, download and extraction work as for a `.txt`.
+ * - **The sha is the text's alone**, so a re-post against the same record is
+ *   birth's sha+target dedupe. `capturedAt` is deliberately *not* folded into
+ *   the bytes, or every re-post would be a new digest. An unfiled re-post is
+ *   two rows, birth's rule for every unfiled arrival.
+ * - **`url` is the page's address** (`document.url`); the title is the
+ *   canonical name and the filename.
+ * - **Provenance is `manual`, `source_ref` null, the actor the token's
+ *   user.** The extension is first-party; the token is a credential, not an
+ *   integration (`source_ref` is an FK to `integration.id`, and the check
+ *   refuses a ref on a `manual` row anyway). "Who filed it" is read from
+ *   `uploaded_by` and the activity line.
+ * - **`kind` is `article`**, as the URL clip files a page.
  *
- * **Extraction (SPA-134).** `object` declares what the page is — `person`
- * for a profile, `company` for a company page, or any object's slug,
- * singular or plural — and is checked against the registry before anything
- * is stored: an object the registry does not hold is refused naming the
+ * **Extraction.** `object` declares what the page is (`person`, `company`,
+ * or any object's slug, singular or plural) and is checked against the
+ * registry before anything is stored; an unknown one is refused naming the
  * slug. Declared, the page is queued for the deck reader's program against
- * that object's registry, anchored on the document
- * (`enqueueCaptureReadProgram`); the answer says `queued`. With the extract
- * lane unrouted, or no object declared, the page still lands and nothing is
- * queued: the answer says `skipped`, never an error.
+ * that object (`enqueueCaptureReadProgram`) and the answer says `queued`.
+ * With the extract lane unrouted or no object declared, the page still lands
+ * and the answer says `skipped`, never an error.
  */
 
 /** The payload as the handler receives it, already schema-decoded. */
@@ -81,7 +65,7 @@ export type CaptureInput = {
   readonly text: string
   /** A record id, or a record's exact name; omitted for an unfiled capture. */
   readonly target?: string
-  /** The registry object the page is read as (SPA-134); omitted, unread. */
+  /** The registry object the page is read as; omitted, unread. */
   readonly object?: string
 }
 
@@ -89,7 +73,7 @@ export type CaptureResult = {
   documentId: string
   /** Where the capture can be seen in the app, on `APP_URL`. */
   url: string
-  /** Whether the page was queued to be read against its object (SPA-134). */
+  /** Whether the page was queued to be read against its object. */
   extraction: CaptureReadQueued
 }
 
@@ -155,7 +139,7 @@ export function captureTooLargeMessage(sizeBytes: number): string {
   return `Capture text is ${sizeBytes} bytes, larger than the ${formatBytes(MAX_CAPTURE_BYTES)} limit (${MAX_CAPTURE_BYTES} bytes)`
 }
 
-/** Mirrors `lib/arrival/attachment-filing.ts`: the meter counts slices. */
+/** Mirrors attachment filing: the meter counts slices. */
 const CHUNK_BYTES = 64 * 1024
 
 function streamOf(bytes: Buffer): Readable {
@@ -172,7 +156,7 @@ export const CAPTURE_MIME = 'text/plain; charset=utf-8'
 type Target = { id: string; kind: string; objectSlug: string | null }
 
 /**
- * The target, as SPA-23/31 resolve one — an id, or an exact
+ * The target, resolved as everywhere else: an id, or an exact
  * (case-insensitive) name that fits one record — then read once for what the
  * deep link needs. canRead is the token user's: a private note they may not
  * read is not found, never filed onto, whether named or addressed by id.
@@ -215,8 +199,8 @@ const resolveTarget = Effect.fn('capture.resolveTarget')(function* (
 
 /**
  * The deep link: the record the capture was filed on, or the unfiled inbox
- * (`/files?filed=unfiled`) it lands in otherwise. A document has no page
- * of its own by decision (spec §3.2), so these are the two places it shows.
+ * (`/files?filed=unfiled`) it lands in otherwise. A document has no page of
+ * its own, so these are the two places it shows.
  */
 function deepLink(target: Target | null): string {
   const { origin } = describeExternalOrigin(process.env.APP_URL)

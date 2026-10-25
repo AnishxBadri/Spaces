@@ -12,10 +12,9 @@ import type { LogSink } from './log'
 import { SecretsLive, resolveBoundSecret } from './secrets'
 
 /**
- * The four ambient ports for one integration row, built together (sdk-6a):
- * the credential is resolved once, and the same secret feeds SecretsLive and
- * the scrub LogLive and HttpLive write through. What the loader (sdk-12b)
- * merges with the lane ports a job's `uses` names.
+ * The four ambient ports for one integration row, built together: the
+ * credential is resolved once, and the same secret feeds SecretsLive and
+ * the scrub LogLive and HttpLive write through. What the loader merges with the lane ports a job's `uses` names.
  */
 export type AmbientOptions = {
   /** The bundle's own `manifest.settings` zod schema. */

@@ -15,7 +15,7 @@ import type { JobDef } from '../run-job'
 
 /**
  * interaction.summarize-email and its nightly backfill: an email's summary
- * and categories (D67). The programs are `summarizeEmailProgram` and
+ * and categories. The programs are `summarizeEmailProgram` and
  * `summarizeEmailBackfillProgram`; these are the wrapper's view of them.
  * - A refused or unrouted lane is not a failure: the field stays absent and
  *   the job completes.

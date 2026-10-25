@@ -10,27 +10,20 @@ import { Enqueue } from '@spaces/core/queue/enqueue'
 import { enqueue as stubSend } from '#web/test/queue-stub'
 
 /**
- * The second half of SPA-130's arrival test, and it lives here rather than
- * beside core's `writes/documents/intake.test.ts` for one mechanical reason: spec §2's
- * seam — `web → core, sdk. Never plugins/*, never worker` — is an eslint zone
- * (`import/no-restricted-paths`, SPA-146), so nothing under `lib/` may import
- * `#/worker/**`, a test included. The worker is allowed to be the worker, so
- * the join runs on this side of the line.
- *
- * What it asserts is the acceptance criterion `intake.test.ts` can only take
- * to the enqueue: a fixture PDF that arrived through the **server byte lane**
- * — a `Readable`, no browser, no HTTP — reaches `extraction_status 'done'`
- * through the existing `extract-document` job, with no change to it. The job
- * runs under its real `ExtractionStore` layer and the `JobContext` `runJob`
- * would hand it, which is everything `runJob` provides bar the ledger.
- *
- * The queue is stubbed as in every document fixture file: birth enqueues, and
- * there is no pg-boss schema on a test database.
+ * The worker half of the arrival test: a fixture PDF that arrived through the
+ * **server byte lane** (a `Readable`, no browser, no HTTP) reaches
+ * `extraction_status 'done'` through the ordinary `extract-document` job.
+ * - Here, not beside core's intake suite, because an eslint zone bars web and
+ *   core code (tests included) from importing the worker.
+ * - The job runs under its real `ExtractionStore` layer and the `JobContext`
+ *   `runJob` would hand it: everything `runJob` provides bar the ledger.
+ * - The queue is stubbed: birth enqueues, and a test database has no pg-boss
+ *   schema.
  */
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
-// Birth's extraction enqueue is core's `Enqueue` service since SPA-201;
-// here it records into the same stub the mocked `#web/lib/queue` does.
+// Birth's extraction enqueue is core's `Enqueue` service; here it records
+// into the same stub the mocked `#web/lib/queue` does.
 const stubEnqueue = Enqueue.fromSender({ enqueue: stubSend })
 
 beforeEach(async () => {
@@ -120,7 +113,7 @@ describe('a server-lane arrival, through the existing extract job', () => {
 
     expect(row?.extractionStatus).toBe('done')
     expect(row?.extractedText).toContain(phrase)
-    // The provider's own tree, stored verbatim — a label, never a key (§5.3).
+    // The provider's own tree, stored verbatim — a label, never a key.
     expect(row?.sourcePath).toBe('Data room/Legal/SHA.pdf')
 
     const { storage } = await import('@spaces/core/writes/storage')

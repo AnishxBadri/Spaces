@@ -57,7 +57,7 @@ function target(urlVar: EnvName, logVar: EnvName, dbVar: EnvName): Target {
 export const test = base.extend<{
   main: Target
   firstRun: Target
-  /** The composed image's address (SPA-186's project only). */
+  /** The composed image's address (the image project only). */
   imageUrl: string
   /** A page signed in as the admin global setup created. */
   adminPage: Page

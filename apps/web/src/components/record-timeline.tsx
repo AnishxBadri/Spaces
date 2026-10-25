@@ -38,7 +38,7 @@ import { cn } from '#/lib/utils'
 import type { getRecordTimeline } from '#/lib/server-fns'
 
 /**
- * The record ledger (Instrument, 2026-09-10): one row per entry on a rule —
+ * The record ledger: one row per entry on a rule —
  * mono time lane, mono type lane, then the body in sans. Macro verbs,
  * interactions, and attribute-change bursts ("changed 3 attributes",
  * expandable to attr → new value) share the same three lanes so the eye
@@ -48,17 +48,14 @@ import type { getRecordTimeline } from '#/lib/server-fns'
 type Items = Awaited<ReturnType<typeof getRecordTimeline>>
 
 /**
- * A burst names who attended to the values (typed actor, spec §4): a person
- * by name, an integration by its plugin's name, or the system — the
- * merge executor's rewrites must never read as a teammate's edit, and two
+ * A burst names who attended to the values (the typed actor): a person by
+ * name, an integration by its plugin's name, or the system. The merge
+ * executor's rewrites must never read as a teammate's edit, and two
  * integrations must never read as one.
- *
- * `integrationName` comes off `attribute_event.actor_ref` → `integration` —
- * the manifest's `name`, else the capability id (sdk-9) — so an integration
- * burst names the thing the reader configured ("Apollo") rather than the
- * anonymous class of thing it belongs to. The fallback is unreachable while
- * the check constraint and the FK both hold; it exists because a label has
- * to render either way.
+ * - `integrationName` is `attribute_event.actor_ref` → `integration`: the
+ *   manifest's `name`, else the capability id ("Apollo", not "a plugin").
+ * - The fallback is unreachable while the check constraint and the FK
+ *   hold; it exists because a label has to render either way.
  */
 function burstActorLabel(item: {
   actorType: 'user' | 'integration' | 'system'
@@ -97,14 +94,13 @@ export const VERB_LABELS: Record<string, string> = {
   'space.created': 'created this space',
   'term.created': 'defined a term',
   'mandate.created': 'wrote the mandate',
-  // A plugin's Content.emitSignal (packages/core/src/writes/ports/content.ts);
-  // the actor is the integration, named from `meta.integrationId`.
+  // A plugin's `Content.emitSignal`; the actor is the integration, named
+  // from `meta.integrationId`.
   'signal.emitted': 'reported a signal',
   // One enrichment run on the record, whichever sources answered.
   'entity.enriched': 'enriched this record',
-  // The portfolio ledger's verbs (lib/portfolio/write.ts, holding.ts,
-  // reverse.ts). Read raw as `mark.added` on every company record until
-  // 2026-09-30; a producer's verb is pinned here by record-timeline.test.ts.
+  // The portfolio ledger's verbs. A producer's verb is pinned here by a
+  // test, so none reads raw as `mark.added`.
   'holding.created': 'opened this holding',
   'holding.writtenoff': 'wrote off this holding',
   'investment.added': 'recorded a check',
@@ -249,7 +245,7 @@ function FoldFoot({
 
 /**
  * The head's `···` for a viewer with private emails here: their emails with
- * this record, opened to the workspace or not (D67's record override). The
+ * this record, opened to the workspace or not (the record override). The
  * state is read when the menu opens.
  */
 function EmailVisibilityMenu({ recordId }: { recordId: string }) {
@@ -304,8 +300,7 @@ function EmailVisibilityMenu({ recordId }: { recordId: string }) {
 }
 
 /**
- * The Interactions tab: the kind filters, the composer row (DESIGN.md P7,
- * the Composer Row), then calls, emails and meetings, folded past
+ * The Interactions tab: the kind filters, the composer row, then calls, emails and meetings, folded past
  * `INTERACTIONS_FOLD`. The filter is the view's own state, as the space
  * page's Notes filter is, unless the page holds it for the tab head's count.
  * - `recordId` lets the email window widen for this record, and puts the
@@ -388,8 +383,8 @@ export function RecordInteractions({
 }
 
 /**
- * The History tab, folded past `HISTORY_FOLD`, the way the contract's
- * question 17 asks a surface to bound itself. `filters` draws All · Stage ·
+ * The History tab, folded past `HISTORY_FOLD` so the surface is bounded.
+ * `filters` draws All · Stage ·
  * Attributes · Ledger over it (a deal's).
  */
 export function RecordHistory({
@@ -586,15 +581,15 @@ export function interactionLine(item: {
 }
 
 /**
- * One interaction on the ledger (D67's list row): kind glyph, subject in ink
+ * One interaction on the ledger: kind glyph, subject in ink
  * and participants in graphite, the summary clamped at two lines with the
  * snippet as its unmarked fallback and the category chips, then the mono end
  * lane — `via`, attachments, the answer and the date.
- * - An email opens its window from the subject (`?modal=email&id=`, D74);
+ * - An email opens its window from the subject (`?modal=email&id=`);
  *   any other written-up row opens its note; one that is not offers
  *   `Write up` as a row action, shown on hover and focus.
  * - A body private to someone else keeps its subject and says
- *   `body private`; its summary, snippet and chips are never sent (D67).
+ *   `body private`; its summary, snippet and chips are never sent.
  */
 function InteractionRow({
   item,

@@ -31,7 +31,7 @@ export type {
 /**
  * What Ask's surfaces read: a thread, its turns, and the events a turn
  * streams. Plain data, so it crosses the server-fn seam and both the dock
- * and `/ask` draw from it. (D70)
+ * and `/ask` draw from it.
  */
 
 export type AskTurnView = {

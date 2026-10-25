@@ -5,13 +5,12 @@ import { QUEUES } from './names'
 import type { EnqueueOptions, QueueClient } from './sender'
 
 /**
- * Two properties, both of which the web app depends on and neither of which
- * is visible from a call site: the sender never does housekeeping, and a
- * sender that cannot reach Postgres still returns to its caller.
+ * Two properties the web app depends on that no call site shows: the sender
+ * never does housekeeping, and a sender that cannot reach Postgres still
+ * returns to its caller.
  *
- * No database here — mono-7's contract is that this package's suite runs with
- * DATABASE_URL unset. The failure case gets a connection string pointing at a
- * closed port, which is a real pg-boss failure with no server involved.
+ * No database here. The failure case points at a closed port: a real pg-boss
+ * failure with no server involved.
  */
 
 const CLOSED_PORT = 'postgres://nobody:nothing@127.0.0.1:1/nowhere'

@@ -17,10 +17,10 @@ import { defineImportBatchProgram, loadImportBatchProgram } from './stage'
 import type { ImportMappingView } from './mapping'
 
 /**
- * Column mapping (SPA-165). The mapping is generated from the registry, lives
- * on the batch row, and reads every staged row for the parse count its head
- * shows. Batches are inserted directly: staging is SPA-164's and its tests
- * cover it; this file needs rows, not bytes.
+ * Column mapping. The mapping is generated from the registry, lives on the
+ * batch row, and reads every staged row for the parse count its head shows.
+ * Batches are inserted directly: staging has its own tests, and this file
+ * needs rows, not bytes.
  */
 
 async function actorId(): Promise<string> {

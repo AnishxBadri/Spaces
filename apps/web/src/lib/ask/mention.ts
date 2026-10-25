@@ -3,7 +3,7 @@ import type { AskScopeChip } from './types'
 
 /**
  * `@` in Ask's composer: where a mention is being typed, and what a chosen
- * hit becomes. Pure, so the composer and a test share it. (D70)
+ * hit becomes. Pure, so the composer and a test share it.
  */
 
 /** Longest name typed after `@` before the popover gives up. */

@@ -9,38 +9,15 @@ import { unfiledPredicate } from '#/lib/documents/unfiled'
 import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
 
 /**
- * The shelf behind `/documents` (SPA-58) — every document in the workspace
- * as one row, with the filing resolved.
- *
- * `listRecordDocuments` is the shape this generalizes, and the one thing it
- * could not be reused for: that query starts at `link` and answers **one row
- * per filing**, so a deck filed against a company and a deal arrives twice.
- * A shelf is a list of documents, not of edges, so this starts at `document`
- * and folds the edges in.
- *
- * Three statements, and that ceiling is the design rather than an
- * optimisation: the obvious shape — a row, then its records, then its spaces
- * — is 2N+1 round trips on a workspace where N is every file the fund owns.
- * One read of the documents, one of `link(tagged_in)`, one of `entity_space`,
- * the last two being `documentFilingEdges` (`lib/server/shared.ts`), which is
- * the same reader the Files tab's filing control already uses. A fourth edge
- * reader here is how the two would have drifted.
- *
- * `sourceCapability` rides along the first statement rather than through
- * `documentProvenance`, which would have been a fourth: the join it makes is
- * one `left join integration`, and the first statement is already selecting
- * from `document`.
- *
- * The `filed` filter (SPA-124) is one `where` clause on statement one — the
- * three-statement ceiling above is the design, so the unfiled inbox is a
- * predicate on the shelf and not a fourth read, and not a route of its own.
- * The predicate itself is `unfiledPredicate()`, shared with the count Today's
- * badge reads.
- *
- * It lives outside `lib/server/` for the reason `space-sources.ts` does
- * (CLAUDE.md → Traps, SPA-155): `lib/server/documents.ts` is re-exported by
- * the client barrel, and a plain export there ships to the browser. Here a
- * test can call it without a request.
+ * The shelf behind `/documents`: every document in the workspace as one row,
+ * with the filing resolved. `listRecordDocuments` answers one row per filing;
+ * this starts at `document` and folds the edges in.
+ * - Three statements, by design, not 2N+1: the documents, then
+ *   `documentFilingEdges` for links and spaces (the Files tab's reader too;
+ *   never add a second edge reader).
+ * - `sourceCapability` and the `filed` filter ride on statement one; the
+ *   unfiled inbox is `unfiledPredicate()`, shared with Today's count.
+ * - Outside the server-fn modules, whose plain exports ship to the browser.
  */
 
 export class DocumentShelfFailed extends Schema.TaggedError<DocumentShelfFailed>()(
@@ -73,9 +50,9 @@ export type ShelfDocument = {
   extractionError: string | null
   /**
    * The two columns that say whether this row has a file behind it or only
-   * an address (docsurf-10b). `blobSha` is null on a clipped article — the
+   * an address. `blobSha` is null on a clipped article — the
    * page was read, never stored — and `url` is set on the clips and on
-   * captures (SPA-111), which keep the page's text as a blob too. The shelf
+   * captures, which keep the page's text as a blob too. The shelf
    * reads the pair to offer "Open source" wherever there is a page, and never
    * a download where there are no bytes.
    */
@@ -85,15 +62,11 @@ export type ShelfDocument = {
   /** The integration that filed it, named; null for a manual upload. */
   sourceCapability: string | null
   /**
-   * The three storage-source columns the Source column reads (SPA-78,
-   * `docs/spec-storage-sources.md` §11 delta 1). All three are null on every
-   * document until a storage-source plugin files one, and the column renders
-   * exactly what it rendered before when they are — a null path is not an
-   * empty cell, it is the origin on its own.
-   *
-   * `external_id` and `connection_id` are the other two columns of that delta
-   * and are deliberately not here: they are the sync's idempotency key, not
-   * anything a reader sees, and a shelf row is what the shelf renders.
+   * The three storage-source columns the Source column reads. All null until
+   * a storage-source plugin files the document, and a null path renders the
+   * origin on its own, not an empty cell.
+   * `external_id` and `connection_id` are left out: they are the sync's
+   * idempotency key, nothing a reader sees.
    */
   sourcePath: string | null
   externalUrl: string | null
@@ -115,7 +88,7 @@ export type ShelfDocument = {
 
 /**
  * Which slice of the shelf to read. `'unfiled'` is the inbox
- * (`docs/spec-storage-sources.md` §3.2) — arrivals with no edge — and it is a
+ * — arrivals with no edge — and it is a
  * filter on this list rather than a surface of its own, which is why it is a
  * parameter and not a second program.
  */
@@ -131,7 +104,7 @@ const SNIPPET_CHARS = 200
 export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
   function* (input: {
     filed: DocumentFiled
-    /** Whose shelf: a document private to someone else is not on it (D67). */
+    /** Whose shelf: a document private to someone else is not on it. */
     viewer: { id: string }
   }): Effect.fn.Return<Array<ShelfDocument>, DocumentShelfFailed> {
     const visible = canReadDocumentSql(input.viewer.id)
@@ -171,7 +144,7 @@ export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
           // survivor, and the shelf would otherwise list both. The inbox
           // rides on the same clause — one statement, two conditions.
           // A private email attachment is off every viewer's shelf but its
-          // reader's (D67).
+          // reader's.
           .where(
             input.filed === 'unfiled'
               ? and(isNull(entity.mergedIntoId), unfiledPredicate(), visible)
@@ -237,8 +210,7 @@ export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
 )
 
 /**
- * How many documents are unfiled — Today's badge (SPA-124,
- * `docs/spec-storage-sources.md` §11 delta 6).
+ * How many documents are unfiled — Today's badge.
  *
  * A count, not the list: the readout wants one number, and the shelf query
  * above folds edges into every row it returns to produce it.

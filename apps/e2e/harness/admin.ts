@@ -27,8 +27,8 @@ export type Owner = {
  * own, since the workspace and owner names show in every capture.
  *
  * `readLog` is where the log lives: a file the harness wrote for an instance
- * it booted (global-setup.ts), or `docker compose logs app` for the composed
- * image (image-setup.ts). Loading /setup is what prints the token
+ * it booted, or `docker compose logs app` for the composed image. Loading
+ * /setup is what prints the token
  * (getSetupState), so the log is read after the page is up, never before.
  */
 export async function createAdmin(

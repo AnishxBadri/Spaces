@@ -5,18 +5,12 @@ import type { entity } from '@spaces/db/schema'
 
 /**
  * Which texts beyond a document's are chunked, and the key that gets them
- * chunked once (SPA-132; docs/spec-ai-substrate.md §7 and §9 — "embed on
- * `document.extracted` (and note save, `close_reason`) with no dialog").
+ * chunked once.
  *
- * Kept light on purpose: the write paths that decide *when* a source needs
- * re-chunking — `saveNoteProgram` and `setValuesInTx` — import this and not
- * the embed program, which pulls in every provider adapter. The worker's
- * `chunk.embed` job (`worker/jobs/embed-source.ts`) runs the program.
- *
- * The enqueue itself is not here (SPA-174/175): it reaches the queue, which
- * reads DATABASE_URL, and core may not read the environment. Core's write
- * paths hand back the sources they would have queued (`reembed`), and
- * apps/web's `lib/ai/enqueue-embed.ts` is the one place that queues them.
+ * - Kept light: `saveNoteProgram` and `setValuesInTx` import this, not the
+ *   embed program, which pulls in every provider adapter.
+ * - No enqueue here: the queue reads DATABASE_URL and core may not read the
+ *   environment. Write paths hand back `reembed`; `enqueueSourceEmbed` queues.
  */
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -32,10 +26,10 @@ export type EmbedSource =
  * The attribute values that are chunked, by the kind of record carrying
  * them. A write through the one write path to one of these enqueues the
  * embed after commit, and a clear deletes its chunks in the write's own
- * transaction (`lib/attributes/values.ts`). Keyed by kind as well as slug so
+ * transaction (`setValuesInTx`). Keyed by kind as well as slug so
  * a custom object's own `close_reason` is not swept in by name.
  *
- * Adding one is adding a line: the reader (`lib/ai/embed-source.ts`) takes
+ * Adding one is adding a line: the embed-source reader takes
  * any text value, and the semantic lane joins `chunk` on `entity_id` without
  * filtering `source_kind`, so a new entry is searchable with no query change.
  */

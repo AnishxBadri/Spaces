@@ -3,12 +3,11 @@ import { z } from 'zod'
 import { requireUser } from './shared'
 
 /**
- * The Files tab's Read with vision button (SPA-94). Manual and pull-based,
- * the Read deck button's shape: pressing it enqueues one `document.vision`
- * job keyed on the document, and pg-boss's `singletonKey` refuses a second
- * press while the first is queued or active. The program, the lane and the
- * no-rasterizer decision are `lib/ai/vision.ts`, imported inside the handler
- * so pdf-lib and the AI SDK never reach the client bundle — this module is
+ * The Files tab's Read with vision button. Manual and pull-based, the Read
+ * deck button's shape: pressing it enqueues one `document.vision` job keyed
+ * on the document, and pg-boss's `singletonKey` refuses a second press while
+ * the first is queued or active. The program is imported inside the handler
+ * so pdf-lib and the AI SDK never reach the client bundle: this module is
  * re-exported by the client-imported `server-fns` barrel.
  */
 

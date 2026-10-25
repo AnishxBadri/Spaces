@@ -24,8 +24,8 @@ import { runDetailProgram, usageViewProgram } from './usage'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * SPA-100. The run log, through the first two-step run: Read deck and
- * summarize. Both lanes answer through injected models
+ * The run log through a two-step run, Read deck and summarize. Both lanes
+ * answer through injected models
  * (`MockLanguageModelV4`), so the route, the extraction cache, the ai_usage
  * rows, the suggestions and the `ai_run` row are all real and nothing reaches
  * a network.

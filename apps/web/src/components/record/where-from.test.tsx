@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { WhereFromMark, whereFromWords } from './where-from'
 
-/** A filled value's where-from (D76): the source, the day, the earlier figure. */
+/** A filled value's where-from: the source, the day, the earlier figure. */
 describe('the where-from', () => {
   const headcount = {
     source: 'Apollo',

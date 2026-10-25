@@ -19,7 +19,7 @@ import { useHotkey } from '#/lib/use-hotkey'
  * filter lists in the lanes `listRecordNotesProgram` hands them. Under All
  * a note from a meeting or a mention carries its lane in the mono end lane.
  * - Every title is serif: what a person wrote or filed. A recorder's note
- *   adds "via <tool> · <author>" in mono (D78).
+ *   adds "via <tool> · <author>" in mono.
  * - The filter is the tab's own state unless the page holds it for the tab
  *   head's count.
  */

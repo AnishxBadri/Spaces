@@ -77,15 +77,15 @@ describe('the filters', () => {
 
 describe('the upcoming horizon', () => {
   it('ends this week and next: the local Monday after next, at midnight', () => {
-    // Mon 2026-10-12 → Mon 2026-10-26.
+    // Mon `2026-10-12` → Mon `2026-10-26`.
     const monday = upcomingHorizon(new Date(2026, 9, 12, 15, 0))
     expect(isoDay(monday)).toBe('2026-10-26')
     expect(monday.getHours()).toBe(0)
-    // Sun 2026-10-18 is still this week → Mon 2026-10-26.
+    // Sun `2026-10-18` is still this week → Mon `2026-10-26`.
     expect(isoDay(upcomingHorizon(new Date(2026, 9, 18, 23, 0)))).toBe(
       '2026-10-26',
     )
-    // Wed 2026-10-14 → Mon 2026-10-26.
+    // Wed `2026-10-14` → Mon `2026-10-26`.
     expect(isoDay(upcomingHorizon(new Date(2026, 9, 14, 8, 0)))).toBe(
       '2026-10-26',
     )

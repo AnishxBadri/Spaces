@@ -18,7 +18,7 @@ import type { SyncedMailSettings } from './synced-settings'
  * on the forwarding mailbox's parser, noise rules, participants module and
  * writer, so a thread both forwarded and synced is one interaction.
  * - The bound connection decides: its owner authors the body, its address
- *   is never a participant, and its settings say who reads the body (D67).
+ *   is never a participant, and its settings say who reads the body.
  * - Refused before anything is stored: mail received before the connection
  *   (forward-only), noise, and whatever the exclude list names.
  */

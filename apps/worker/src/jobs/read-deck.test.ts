@@ -5,8 +5,8 @@ import { JobPermanent } from '../run-job'
 import { readDeck, readDeckData, runReadDeck } from './read-deck'
 
 /**
- * SPA-90, the wrapper's view. The program's own behaviour is
- * `lib/ai/read-deck.test.ts`; this holds the job to its contract: every
+ * The wrapper's view. The program's own behaviour is apps/web's read-deck
+ * suite; this holds the job to its contract: every
  * failure ends the job permanently with the program's sentence as its
  * reason, and pg-boss is never asked to retry a model call.
  */

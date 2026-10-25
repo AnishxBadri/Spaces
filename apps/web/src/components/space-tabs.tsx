@@ -42,8 +42,8 @@ import type { getSpace } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 /**
- * The space page's view: the tab head over one tab, as a record's body is
- * (D73, D74). Each tab owns its room — a filter row in the underline
+ * The space page's view: the tab head over one tab, as a record's body is.
+ * Each tab owns its room — a filter row in the underline
  * grammar where it has one, then 40px rows on rules.
  */
 
@@ -490,7 +490,7 @@ type NotesFilter = 'all' | 'filed' | 'mentions'
 /**
  * Filed here on purpose, or only mentioning the space from elsewhere; All
  * lists the filed notes, then the mentions under their own label.
- * - An archived space's rows go graphite, as its name does. (D73)
+ * - An archived space's rows go graphite, as its name does.
  */
 function NotesTab({
   spc,

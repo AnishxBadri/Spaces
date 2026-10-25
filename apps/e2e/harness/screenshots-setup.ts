@@ -9,14 +9,14 @@ import { assertUntouched, countOutsideRows, startInstance } from './instance.ts'
 import { ENV } from './shared.ts'
 
 /**
- * Global setup for `pnpm screenshots` (playwright.screenshots.config.ts):
+ * Global setup for `pnpm screenshots`:
  * the README and marketing captures, taken from the built app rather than
  * drawn, so they can be re-taken after any UI change.
  *
  * One instance against a throwaway `spaces_e2e_<pid>_shots` database, the
  * owner made through the real first-run flow, then the developer bench
- * (`apps/web/src/db/seed.ts`, the script behind `pnpm db:seed`) run against
- * it as a process. The bench is the source because every company, person
+ * (`pnpm db:seed`) run against it as a process. The bench is the source
+ * because every company, person
  * and number in it is invented and it covers every surface; `--bulk` is left
  * off, since its filler rows are named "Bench Co 001" and would read as a
  * stress test rather than a fund's book.

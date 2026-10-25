@@ -11,7 +11,7 @@ import type { JobStatusEvent } from '@spaces/core/queue/job-status'
 /**
  * A record's plugin job state, read from `job_run`: what the status stream
  * opens with and resyncs from, so a reopened page or a dropped stream never
- * depends on a notification that already fired. (D64)
+ * depends on a notification that already fired.
  */
 
 export class JobStatusFailed extends Schema.TaggedError<JobStatusFailed>()(
@@ -93,7 +93,7 @@ export const jobStatusSnapshotProgram = Effect.fn('jobStatusSnapshotProgram')(
   },
 )
 
-/** A space streams its watch runs, which carry its id. (D72) */
+/** A space streams its watch runs, which carry its id. */
 const RECORD_KINDS: ReadonlySet<string> = new Set([...ACTION_TARGETS, 'space'])
 
 /**
@@ -113,7 +113,7 @@ export const recordReadableProgram = Effect.fn('recordReadableProgram')(
         .where(eq(entity.id, entityId)),
     )).at(0)
     if (row === undefined || row.mergedIntoId !== null) return false
-    // A record carries no visibility of its own, so `canRead` passes today;
+    // A record carries no visibility of its own, so `canRead` always passes;
     // it is asked so a richer policy binds here too.
     return RECORD_KINDS.has(row.kind) && canRead(user, {})
   },

@@ -6,12 +6,10 @@ import { TarFormatError, readTar } from '@spaces/sdk/pack'
 import type { TarEntry } from '@spaces/sdk/pack'
 
 /**
- * Verify a plugin tarball before anything unpacks it (sdk-21a; D16's plugin
- * half as D54 builds it, docs/spec-plugin-sdk.md §9). Pure: bytes, the
- * registry entry that names them and the trust the caller loaded
- * (`./trust.ts`) in; the verified files or one named refusal out. Web's
- * installer (project 19) and the worker's loader both call it — it is here,
- * in core, because both import core and neither imports the other.
+ * Verify a plugin tarball before anything unpacks it. Pure: bytes, the
+ * registry entry that names them and the trust from `loadPluginTrust` in; the
+ * verified files or one named refusal out. In core because web's installer
+ * and the worker's loader both call it.
  *
  * The checks, in order — the first that fails is the refusal:
  *

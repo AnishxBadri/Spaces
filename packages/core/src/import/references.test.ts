@@ -9,10 +9,7 @@ import {
 } from './references'
 import type { ReferenceColumn, ReferenceOutcome } from './references'
 
-/**
- * SPA-168. What a reference cell reads as and what its outcome is called —
- * pure, no database.
- */
+/** What a reference cell reads as and what its outcome is called — pure, no database. */
 
 const companyColumn = (createMissing = false): ReferenceColumn => ({
   type: 'record',

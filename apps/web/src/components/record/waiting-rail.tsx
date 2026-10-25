@@ -4,15 +4,14 @@ import { RailSection } from '#/components/record/record-parts'
 import type { OpenSuggestionCount, SuggestionKind } from '#/lib/server-fns'
 
 /**
- * The record rail's "Waiting" lane (SPA-114): open suggestions on this
+ * The record rail's "Waiting" lane: open suggestions on this
  * record, one chip per kind, each a link into `/review` scoped to the record
  * and its suggestion lane. Grouped by kind rather than listed, so fifty open
  * suggestions are still at most five chips — one wrapped row.
  *
- * **A pointer, never a verb (D44).** Inline accept/reject on the chip was
- * considered and declined: accept and reject live in Review only, so
- * SPA-110's bulk accept has one path to build on rather than two to keep in
- * step. Do not add an action here — link to Review instead.
+ * **A pointer, never a verb.** Accept and reject live in Review only, so
+ * bulk accept has one path rather than two to keep in step. Do not add an
+ * action here — link to Review instead.
  *
  * Nothing waiting → no section, no zero: the component answers `null`.
  */

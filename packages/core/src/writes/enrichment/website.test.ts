@@ -22,7 +22,6 @@ import { runEnrichment } from './run'
  * The built-in Website inside a run, over a fake reader and model: its two
  * halves, where it sits in the order, and what a sensitive record lets it
  * do. The guarded fetch and the real model call are the worker's test.
- * (D76, D80)
  */
 
 const HOME = `<html><head><title>Keyhold</title></head><body>

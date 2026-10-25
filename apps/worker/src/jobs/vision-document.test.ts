@@ -22,7 +22,7 @@ import {
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
 /**
- * SPA-94, Read with vision, against a real database and an injected model
+ * Read with vision, against a real database and an injected model
  * (`MockLanguageModelV4`): the route, the sensitivity read, `complete()`'s
  * `ai_usage` row and extraction's own `markExtracted` / `onExtracted` are
  * the real ones; only the blob read is stood in for, handing over a PDF with

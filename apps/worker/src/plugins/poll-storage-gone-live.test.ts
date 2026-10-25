@@ -40,10 +40,9 @@ import { syncStorageBinding } from '../jobs/sync-storage-binding'
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
 /**
- * The change poll's gone pointers (§8) end to end on the real google-drive
+ * The change poll's gone pointers end to end on the real google-drive
  * bundle against the mutable fake Drive: a file deleted in Drive, and one
- * moved out of every bound subtree (the row §8 leaves open, decided the same
- * way), keep our copy and are marked `external_status = 'gone'`.
+ * moved out of every bound subtree, keep our copy and are marked `external_status = 'gone'`.
  * - Nothing is deleted at the provider and nothing is proposed.
  * - A gone row never tracks again: a later page or a re-sync walk naming
  *   the same external id flips nothing and files nothing.

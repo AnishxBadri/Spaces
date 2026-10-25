@@ -14,7 +14,7 @@ import type { JobDef, JobFailure } from '../run-job'
 
 /**
  * A `remote` document's bytes fetched back through the connection it came
- * through (`retain: text`, docs/spec-storage-sources.md §7).
+ * through (`retain: text`).
  * - `storage.fetch-bytes` is the viewer's: the bytes land under their sha
  *   with a `pending_blob` intent, so the orphan sweep reclaims them again.
  * - `storage.retain-backfill` is a `text → full` flip's: the row turns

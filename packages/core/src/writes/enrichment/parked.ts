@@ -6,7 +6,7 @@ import { QUEUES } from '../../queue/names'
 
 /**
  * Runs parked at a source's daily cap, for Today's notices band: per source,
- * how many records wait and when they resume (D76). "Auto-enrich paused ·
+ * how many records wait and when they resume. "Auto-enrich paused ·
  * Apollo cap reached · 14 waiting · resumes 00:00 UTC".
  * - Read from pg-boss's own job table: a parked run is a queued
  *   `enrichment.run` whose `startAfter` is still ahead and whose data names

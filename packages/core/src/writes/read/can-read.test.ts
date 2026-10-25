@@ -29,7 +29,7 @@ import {
  * canRead and its SQL twins give one answer for every row: the pure
  * predicate, `canReadNoteSql` over `e` and `canReadDocumentSql` over the
  * document row. A private document is its author's alone, as a note is,
- * until D67's record override or a grant opens a synced email's body and
+ * until the owner's record override or a grant opens a synced email's body and
  * attachments to someone else.
  */
 
@@ -212,7 +212,7 @@ describe('the assembler reads a document through canRead', () => {
   })
 })
 
-// ---------- D67's widening layers ----------
+// ---------- the email widening layers ----------
 
 async function makeRecord(kind: 'company' | 'deal', name: string) {
   const e = (

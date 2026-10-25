@@ -24,7 +24,7 @@ import { emailDetailProgram } from './email-read'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * The stored MIME and the window over it (D67): both lanes keep the raw
+ * The stored MIME and the window over it: both lanes keep the raw
  * bytes as one content-addressed blob, and the window reads the body only
  * through the gate the timeline uses.
  */

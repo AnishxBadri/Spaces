@@ -11,7 +11,7 @@ import type {
 import { EmailModal } from './email-dialog'
 
 /**
- * The email window (D67, E2) opened from `?modal=email&id=` (D74): the
+ * The email window opened from `?modal=email&id=`: the
  * sandboxed frame, the remote-image count printed once, a private body as
  * one line, one close in the foot that drops the two params, and the
  * privacy row with its widen window.

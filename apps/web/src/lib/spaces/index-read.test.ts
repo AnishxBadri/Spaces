@@ -13,7 +13,7 @@ import { spacesIndexProgram } from './read'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 /**
- * The spaces index (D73): every live row carries its last filed day, rolled
+ * The spaces index: every live row carries its last filed day, rolled
  * up over its live subtree, and the archive heads come back for the fold.
  */
 

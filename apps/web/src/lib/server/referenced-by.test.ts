@@ -2,18 +2,14 @@ import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The person page's referring-deals section (SPA-153). SPA-59 already
- * writes the edge — `deal.referred_by` syncs a
- * `link(relation:'references', attr_slug:'referred_by')` row — and
- * `apps/web/src/lib/attributes/referred-by.test.ts` pins that write. What
- * these tests pin is the read: the inbound-references query lifted out of
- * `getObjectRecord` into `referencedByRows`, and the grouping by
+ * The person page's referring-deals section. `deal.referred_by` syncs a
+ * `link(relation:'references', attr_slug:'referred_by')` row (pinned
+ * elsewhere); these pin the read: `referencedByRows`, and the grouping by
  * `attr_slug` that gives every record-reference attribute pointing at a
  * person its own heading without a page edit.
  *
- * The render half is unproven here on purpose — the route renders exactly
- * these groups (`people_.$personId.tsx`), one `RecordSection` per group,
- * each row linked through `recordPath`.
+ * The render half is unproven here on purpose: the person route renders
+ * exactly these groups, one `RecordSection` per group, linked by `recordPath`.
  */
 
 const actorId = async () => {

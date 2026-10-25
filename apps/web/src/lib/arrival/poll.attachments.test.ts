@@ -35,14 +35,12 @@ import { MailSchedule } from './schedule'
 import { MAILBOX_CAPABILITY, saveMailboxProgram } from './settings'
 
 /**
- * SPA-115 against a real database: forwarded attachments go through the
- * documents intake (core's `writes/documents/intake.ts`) and land on the company the
- * thread matched, or nowhere. The poll runs against the fake IMAP server as
- * in `poll.test.ts`; the byte half is the real intake over the real storage
- * driver, so "one blob" is a statement about the store, not a mock.
- *
- * The `job_run` refusal and the extraction-to-Cmd-K half need the worker, so
- * they are `worker/jobs/poll-mailbox.attachments.test.ts`.
+ * Forwarded attachments against a real database: they go through the
+ * documents intake and land on the company the thread matched, or nowhere.
+ * The poll runs against the fake IMAP server; the byte half is the real
+ * intake over the real storage driver, so "one blob" is a statement about
+ * the store, not a mock. The `job_run` refusal and the extraction-to-Cmd-K
+ * half need the worker, so they are tested there.
  */
 
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
@@ -250,7 +248,7 @@ describe('forwarded attachments file themselves', () => {
       {
         id: expect.any(String),
         filename: 'Acme seed.pdf',
-        // The classify lane's to propose, after extraction (SPA-62).
+        // The classify lane's to propose, after extraction.
         kind: 'other',
         sourceClass: 'integration',
         sourceRef: ref,
@@ -319,7 +317,7 @@ describe('forwarded attachments file themselves', () => {
     )
     const second = await poll()
     expect(second).toMatchObject({ written: 1, duplicate: 1 })
-    // §3.4 answered the existing row: filed, not a second one.
+    // Birth answered the existing row: filed, not a second one.
     expect(second.attachments).toMatchObject({ filed: 1, unfiled: 0 })
 
     const acme = await holderOf('domain', 'acme.io')
@@ -428,7 +426,7 @@ describe('forwarded attachments file themselves', () => {
     expect(await joinsOf(unfiledDoc.id)).toEqual([
       { subject: 'Note to self', role: 'attachment' },
     ])
-    // docsurf-7's readers, unchanged, see it.
+    // The document readers, unchanged, see it.
     const unfiled = await Effect.runPromise(
       listDocumentsProgram({ filed: 'unfiled', viewer: FIXTURE_ACTOR }),
     )

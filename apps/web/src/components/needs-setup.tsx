@@ -4,7 +4,7 @@ import type { SetupPath } from '#/lib/setup/whats-set-up'
 import type { SetupAudience } from '#/lib/server-fns'
 
 /**
- * The in-place setup prompt (D80): one line, one link, where a missing
+ * The in-place setup prompt: one line, one link, where a missing
  * piece would be used — never a checklist or a banner.
  * - An admin reads `<what it needs> · <action> ›`, the link to set it up.
  * - A member reads `Ask <admin names> to set up <thing>` and no link.

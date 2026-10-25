@@ -7,39 +7,21 @@ import { firstBootPlugins } from './plugins/first-boot'
 import { seedStarterTaxonomy } from './seeds/taxonomy'
 
 /**
- * The boot composition, and only the composition (SPA-177; the interim
- * apps/web entry mono-3 created is now the process shell around this): the
- * five things every boot does, in the one order that is safe, as one
- * function the container entrypoint and `pnpm db:migrate:run` both reach
- * through `apps/web/src/db/boot.ts`.
+ * Every boot, in the one safe order (the container entrypoint and
+ * `db:migrate:run` both call this):
+ * 1. `runMigrations` — the downgrade guard runs inside it; a refusal stops
+ *    here, and nothing below may touch a database the guard refused.
+ * 2. System objects and `SYSTEM_ATTRIBUTES` — insert-if-absent every boot,
+ *    so a new attribute appears on upgrade and a user's rename survives it.
+ * 3. Starter taxonomy — first boot only; after the attributes its rows use.
+ * 4. Per-attribute `values` indexes — after the seed, which flags
+ *    `deal.stage`; retries any mint an earlier boot left undone. Never fatal.
+ * 5. `SPACES_PLUGINS` / `SPACES_CREDENTIAL_<ID>` — optional, last, never
+ *    fatal; the worker reconciles every row on its own boot.
  *
- * 1. Migrate — `@spaces/db`'s `runMigrations()`, a library function this
- *    composes and never the reverse: the schema package grows no seed,
- *    because then it would depend on the product. The downgrade guard runs
- *    inside it, and a refusal stops here — nothing below may touch a
- *    database the guard would not let the migrator touch.
- * 2. System objects and SYSTEM_ATTRIBUTES — insert-if-absent on every boot,
- *    so a release's new attribute appears on upgrade and a user's rename
- *    survives it.
- * 3. The starter taxonomy — first boot only, idempotent on path, so a
- *    deleted node stays deleted. After the attributes, because its entity
- *    rows are written against them.
- * 4. Per-attribute `values` indexes (SPA-93) — the same insert-if-absent
- *    shape one step up, for a set of objects drizzle's journal cannot hold
- *    because it is a function of user data rather than of the schema. After
- *    the seed because the seed is what declares `deal.stage` flagged on a
- *    fresh database, and it is the retry for every mint an earlier boot or
- *    an interrupted `CREATE INDEX CONCURRENTLY` left undone. Never fatal: an
- *    unindexed attribute is a slow list, not a broken one.
- * 5. `SPACES_PLUGINS` / `SPACES_CREDENTIAL_<ID>` — optional; unset, nothing
- *    happens. Last, because it writes rows against the migrated schema. The
- *    installer's NOTIFY may reach no worker yet; the worker reconciles every
- *    row on its own boot. Never fatal.
- *
- * `migrationsFolder` names a journal other than the package's own; nothing
- * in the boot path passes it — `boot.test.ts` does, to boot against
- * deliberately truncated journals, and it defeats nothing: the guard runs
- * against whatever folder is named.
+ * `runMigrations` stays a library this composes, never the reverse: the
+ * schema package must not depend on the product. `migrationsFolder` is for
+ * tests booting against truncated journals; the guard still runs against it.
  */
 export async function boot(options?: {
   migrationsFolder?: string

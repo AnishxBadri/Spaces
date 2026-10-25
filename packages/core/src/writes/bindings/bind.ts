@@ -24,7 +24,7 @@ import type { BindingFolder } from '../../documents/bindings'
  *   this module never reaches a provider.
  */
 
-/** The options the bind dialog sets (§5.2). */
+/** The options the bind dialog sets. */
 export type BindingOptions = {
   readonly mapSubfolders: boolean
   readonly retain: 'full' | 'text'

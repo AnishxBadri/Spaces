@@ -16,9 +16,9 @@ import type { DocumentForExtraction } from './extract-document'
  * The retryable-versus-terminal mapping, asserted. No Postgres and no blob
  * store: the job's Layer is the seam, so a fake ExtractionStore is the whole
  * of its I/O, and the `job_run` ledger is stubbed out the same way (its rows
- * are asserted against a real database in `../run-job.ledger.test.ts`). The reason strings are quoted verbatim here on purpose — they
- * are what the operator reads on the document row, and the port onto runJob
- * must not have changed a byte of them.
+ * are asserted against a real database in run-job's ledger suite). The
+ * reason strings are quoted verbatim on purpose: they are what the operator
+ * reads on the document row.
  */
 
 type Settlement =
@@ -187,8 +187,8 @@ describe('extractDocument — the happy path still completes', () => {
     })
     const { calls, writes } = await run(store)
 
-    // SPA-121, SPA-62: the follow-on lanes (document.embed first among
-    // them) are handed the document only once the text is stored.
+    // The follow-on lanes (document.embed first among them) are handed the
+    // document only once the text is stored.
     expect(writes).toEqual([
       {
         op: 'extracted',

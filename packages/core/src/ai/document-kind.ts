@@ -3,9 +3,8 @@ import { DOCUMENT_KINDS } from '../documents'
 import type { DocumentKind } from '../documents'
 
 /**
- * The `suggestion(kind: 'document_kind')` payload (SPA-62,
- * spec-ai-substrate.md §11's first row): the kind the classify lane read a
- * document as. `other` is never proposed — it is the kind the document
+ * The `suggestion(kind: 'document_kind')` payload: the kind the
+ * classify lane read a document as. `other` is never proposed — it is the kind the document
  * already has, and "unknown" is not an answer worth a row in the inbox.
  *
  * One decoder, three readers, as the identity payload: `proposeProgram`

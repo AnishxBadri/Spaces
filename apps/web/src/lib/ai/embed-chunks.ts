@@ -14,20 +14,17 @@ import { stampSensitivity } from '@spaces/core/writes/ai/stamp-sensitivity'
 import type { StampWriteFailed } from '@spaces/core/writes/ai/stamp-sensitivity'
 
 /**
- * The replace-stamp-embed half every chunk source shares (SPA-121 wrote it
- * for documents; SPA-132 lifted it out so notes and embeddable attributes
- * reuse it rather than growing a second writer). A caller cuts its text into
- * pieces; this embeds them and writes them in place of whatever the same
- * source held before.
+ * The replace-stamp-embed half every chunk source shares. A caller cuts its
+ * text into pieces; this embeds them and writes them in place of whatever
+ * the same source held before.
  *
  * - **With or without a pin.** No pin (`EmbeddingNotPinned`) and a sensitive
  *   record with no local route (`SensitiveRouteRefused`) both write the rows
  *   with a null `embedding` and a null `embedding_model` — the designed
- *   outcome, reported in `skipped`. With the sensitive slot set (SPA-83),
- *   `embed()` routes a sensitive record's pieces to it and the rows carry
- *   the slot's model as `embedding_model`. Any other embed failure still writes the rows without
- *   vectors and comes back in `failure`, for the caller to turn into its own
- *   typed error.
+ *   outcome, reported in `skipped`. With the sensitive slot set, `embed()`
+ *   routes a sensitive record's pieces to it and the rows carry the slot's
+ *   model. Any other embed failure still writes the rows without vectors and
+ *   comes back in `failure`, for the caller to turn into its own typed error.
  * - **Replace, never append.** The source's rows — `(entity_id, source_kind,
  *   source_key)` — are deleted and the new cut inserted in one transaction,
  *   the one `stampSensitivity` writes `sensitive` in. The unique index

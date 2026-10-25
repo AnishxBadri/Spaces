@@ -12,11 +12,11 @@ import type { LogoType } from './workspace-logo-file'
 
 /**
  * The workspace logo: bytes in the blob store, its digest at
- * `workspace.settings.logo`. (D81)
+ * `workspace.settings.logo`.
  * - Set and Remove answer the digest they replaced, so the caller reclaims
  *   it once no row names it (`reclaimBlobIfOrphaned`).
- * - Server-only, outside `lib/server/` so tests and the logo route call it
- *   without a request.
+ * - Server-only, outside the server-fn barrel so tests and the logo route
+ *   call it without a request.
  */
 
 export class LogoRefused extends Schema.TaggedError<LogoRefused>()(

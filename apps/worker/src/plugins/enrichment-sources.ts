@@ -7,7 +7,7 @@ import type { PluginHost } from './host'
 
 /**
  * The worker's `EnrichmentSources`: a source's enrich action run in process
- * on its wired Layer, behind the same credit guard as its queue (D53) — a
+ * on its wired Layer, behind the same credit guard as its queue — a
  * receipt younger than the reuse window or a reached cap declines before
  * any call.
  */

@@ -84,19 +84,19 @@ export const Route = createFileRoute('/_app/people')({
   loaderDeps: ({ search }) => ({ view: search.view ?? null }),
   loader: async ({ deps }) => {
     const [withInverses, companies, viewData, session] = await Promise.all([
-      // Inverse halves (Deals) come too, as columns and filters. (D69)
+      // Inverse halves (Deals) come too, as columns and filters.
       listRegistry({ data: { kind: 'person', includeDerived: true } }),
       listCompanies(),
       listViews({ data: { surface: 'object', kind: 'person' } }),
       getSession(),
     ])
-    // The view's conditions and its sort go down with the request (SPA-96,
-    // on views-3's contract), so the first paint is already the filtered,
-    // ordered first page rather than every person with most of them hidden.
+    // The view's conditions and its sort go down with the request, so the
+    // first paint is already the filtered, ordered first page rather than
+    // every person with most of them hidden.
     const view = viewData.views.find((v) => v.id === deps.view) ?? null
     const conditions = view?.filter ?? []
     const sort = view?.sort ?? null
-    // Every chip's count rides the same load (SPA-162), so the bar paints
+    // Every chip's count rides the same load, so the bar paints
     // with its numbers — the inactive views' included — beside page one.
     const [initial, counts, all] = await Promise.all([
       listPeopleTable({
@@ -158,7 +158,7 @@ function PeoplePage() {
   const navigate = useNavigate()
   const prefs = useTablePrefs(PREFS_KEY)
   const { view: activeId } = Route.useSearch()
-  // SPA-122: "Run on this view" in an AI attribute's column header.
+  // "Run on this view" in an AI attribute's column header.
   const columnRun = useColumnRun({
     viewId: views.find((v) => v.id === activeId)?.id ?? null,
     registry,
@@ -173,11 +173,10 @@ function PeoplePage() {
   })
   const { sorting, setSorting } = vs
   /**
-   * The text box is a **server** narrowing now (SPA-96): `ILIKE` on the name
-   * or on any identity email, debounced. A client `globalFilter` over the
-   * loaded rows stopped being able to tell the truth the moment the table
-   * stopped loading every row. The employer dropped out of what it matches —
-   * that is a join, not a column — so the placeholder no longer promises it.
+   * The text box is a debounced **server** `ILIKE` on the name or any
+   * identity email: the table holds one page, so a client filter would lie.
+   * The employer is a join, not a column, so it does not match it and the
+   * placeholder does not promise it.
    */
   const [globalFilter, setGlobalFilter] = useState('')
   const [q, setQ] = useState('')
@@ -245,7 +244,7 @@ function PeoplePage() {
     void router.invalidate()
     void queryClient.invalidateQueries({ queryKey: ['people-records'] })
   }, [router, queryClient])
-  // Enrich… from the selection bar or the head's ···, behind an estimate. (D76)
+  // Enrich… from the selection bar or the head's ···, behind an estimate.
   const enrich = useListEnrich({
     kind: 'person',
     label: 'People',
@@ -305,7 +304,7 @@ function PeoplePage() {
           />
         ),
       }),
-      // Emails are an attribute like any other (D75), so they sort and
+      // Emails are an attribute like any other, so they sort and
       // filter through the views compiler; shown first, beside the name.
       ...identityFirst(registry).map((def) =>
         col.accessor((r): unknown => r.values[def.slug] ?? null, {
@@ -327,7 +326,7 @@ function PeoplePage() {
         }),
       ),
       ...inverseColumns<Row>(inverses, { refNames, onSave: saveCell }),
-      // Read-only, from the interaction stats; sorted on the server. (D67)
+      // Read-only, from the interaction stats; sorted on the server.
       ...statColumns<Row>(),
       col.accessor('createdAt', {
         id: 'createdAt',
@@ -474,8 +473,8 @@ function CreatePersonDialog({
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [values, setValues] = useState<Record<string, unknown>>({})
-  // Still submitted through `FormData` — the picker mirrors its value into a
-  // hidden `company` input, so the submit path below is untouched.
+  // Submitted through `FormData`: the picker mirrors its value into a
+  // hidden `company` input.
   const [company, setCompany] = useState('')
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -516,7 +515,7 @@ function CreatePersonDialog({
         toast(`${result.name} added`)
       }
       void router.invalidate()
-      // The rows come from a keyed query now, not from the loader alone.
+      // The rows come from a keyed query, not from the loader alone.
       void queryClient.invalidateQueries({ queryKey: ['people-records'] })
     } catch {
       setError('Could not add the person.')

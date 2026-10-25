@@ -6,8 +6,8 @@ import type { AccountJob } from './products'
 
 /**
  * The accounts pages' grouping, client-safe: a connection is one product
- * row (D66); a page lists accounts — one provider address — by the job its
- * products do (D81). A Google address holding Gmail and Drive shows once on
+ * row; a page lists accounts — one provider address — by the job its
+ * products do. A Google address holding Gmail and Drive shows once on
  * Email & calendar and once on Files.
  */
 

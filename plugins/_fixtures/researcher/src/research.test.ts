@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import plugin, { SEARCH_URL } from './index.ts'
 
 /**
- * The researcher's `research` job on the SDK's test Layers (sdk-7b): no
+ * The researcher's `research` job on the SDK's test Layers: no
  * database, no network. The snapshot is the job's whole conversation with
  * the host — every port call in order, with what each returned — so a
  * change in what it emits is a reviewed diff.

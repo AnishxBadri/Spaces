@@ -10,15 +10,12 @@ import { JobPermanent } from '../run-job'
 import type { JobDef } from '../run-job'
 
 /**
- * entity.suggest-spaces — space-tag suggestions on the worker (SPA-103).
- * The program is `lib/ai/suggest-spaces.ts`; this is the wrapper's view of
- * it. Enqueued by the Spaces rail's "Suggest spaces" and nothing else.
- *
- * **Every failure is permanent**, for the deck reader's reasons: an
- * unreachable provider, an unrouted lane or a sensitive record on a cloud
- * route is not fixed by pg-boss trying again, and each retry of a model
- * call is a cost. A run that finds nothing to propose is not a failure: the
- * job completes, and the rail counts the rows it wrote.
+ * entity.suggest-spaces: space-tag suggestions, enqueued only by the Spaces
+ * rail's "Suggest spaces".
+ * - Every failure is permanent: an unreachable provider, an unrouted lane or a
+ *   sensitive record on a cloud route is not fixed by a retry, and each
+ *   retried model call costs.
+ * - A run that finds nothing completes; the rail counts the rows it wrote.
  */
 
 export const suggestSpacesData = z.object({

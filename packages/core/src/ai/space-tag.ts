@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 /**
- * The `suggestion(kind: 'space_tag')` payload (SPA-103): one space a record
+ * The `suggestion(kind: 'space_tag')` payload: one space a record
  * may belong in, as the classify lane read it off the live space tree.
  * Accepting writes `entity_space(source: 'ai', confidence)` for the record
  * and this space, by the accepter.

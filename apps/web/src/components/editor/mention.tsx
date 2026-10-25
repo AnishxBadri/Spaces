@@ -25,7 +25,7 @@ export const KIND_ICONS: Record<string, LucideIcon | undefined> = {
   space: Layers,
   note: FileText,
   // A document has no page, so its chip is the only place the paperclip has
-  // to say what was mentioned (SPA-27).
+  // to say what was mentioned.
   document: Paperclip,
   custom: Boxes,
 }
@@ -61,12 +61,10 @@ export const Mention = createReactInlineContentSpec(
         </>
       )
 
-      // A document is the one kind with no page *and* somewhere to go: the
-      // preview modal. The chip cannot open it from in here (no dialog
-      // context under ProseMirror), so it asks the page to — see
-      // `lib/editor/document-preview-event.ts`. A button, never an anchor:
-      // there is no URL to put in one, and `href={undefined}` renders a
-      // focusable element that navigates nowhere.
+      // A document has no page but opens the preview modal. With no dialog
+      // context under ProseMirror, the chip asks the page to open it with a
+      // window event. A button, never an anchor: there is no URL, and
+      // `href={undefined}` renders a focusable element that navigates nowhere.
       if (kind === 'document') {
         return (
           <button
@@ -86,8 +84,7 @@ export const Mention = createReactInlineContentSpec(
         )
       }
 
-      // Every other page-less kind reads as text, which is what the rule
-      // above always meant — an anchor with no href was the bug.
+      // Every other page-less kind reads as text, never an anchor with no href.
       if (!href) {
         return (
           <span

@@ -18,10 +18,9 @@ import { credential } from './vault'
 /**
  * The forwarding mailbox: an operator-owned address polled over IMAP with an
  * app password — core, not a plugin. Admin-only, one row in practice.
- * (D30, D31, D49)
  * - `integration_id`: the core channel's integration row
  *   (`core.mailbox`), which every interaction, note and job run of this lane
- *   names. (D1)
+ *   names.
  * - `last_uid` / `last_uid_validity`: the IMAP cursor. A UID means nothing
  *   under another UIDVALIDITY, so a change restarts from UID 1, leaning on
  *   `interaction_message_id_unique`. `bigint`: a UID is unsigned 32-bit.

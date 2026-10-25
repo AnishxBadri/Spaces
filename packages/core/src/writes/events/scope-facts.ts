@@ -11,7 +11,7 @@ import type {
 /**
  * What the auto-enrich scopes ask about an event's record, read only as far
  * as the scopes ask. The dispatcher's event jobs and the host's enrichment
- * run read it the same way. (D76)
+ * run read it the same way.
  */
 
 const read = <T>(run: () => Promise<T>) => Effect.tryPromise(run)

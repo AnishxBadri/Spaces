@@ -32,7 +32,7 @@ import {
 /**
  * The meeting reads: a day's external meetings with RSVP per participant
  * from `meta.rsvp`, the past meetings nobody wrote up, whether a calendar is
- * connected, the window's whole read, and the pin. (D68, D79, D80)
+ * connected, the window's whole read, and the pin.
  */
 
 const run = <TValue, TError>(e: Effect.Effect<TValue, TError>) =>
@@ -393,7 +393,7 @@ describe('meetingListProgram', () => {
     }
     expect(state(mine)).toEqual({ writeUp: 'written', via: null })
     expect(state(recorded)).toEqual({ writeUp: 'written', via: 'Granola' })
-    // The row stays: the meeting is shared, only its write-up is not. (D67)
+    // The row stays: the meeting is shared, only its write-up is not.
     expect(state(hidden)).toEqual({ writeUp: 'private', via: null })
   })
 

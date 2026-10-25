@@ -6,7 +6,7 @@ import { Button } from '#/components/ui/button'
 import { openUploadDialog } from '#/lib/upload-dialog-store'
 
 /**
- * Today in a workspace with no companies (D80): the P5 block with the
+ * Today in a workspace with no companies: the empty-state block with the
  * three ways in, and nothing else. It goes once a company exists; there is
  * nothing to tick or dismiss.
  */

@@ -4,13 +4,12 @@ import { DOCS_PATH, OPENAPI_PATH, handleApiRequest } from './api'
 import { API_PREFIX, API_VERSION } from './versions'
 
 /**
- * The external contract, pinned (SPA-45). `GET /api/v1/openapi.json` is what
+ * The external contract, pinned. `GET /api/v1/openapi.json` is what
  * an automation tool imports, so it is checked two ways: structurally, as an
  * OpenAPI 3.1 document a consumer can resolve without guessing, and whole,
  * as a file snapshot — adding a procedure changes the snapshot, and removing
  * a field shows up as a diff in review. Updating the snapshot
- * (`vitest -u`) is a statement that the change is additive, or that it is v2
- * (`docs/api-versioning.md`).
+ * (`vitest -u`) is a statement that the change is additive, or that it is v2.
  *
  * No validator dependency: the rules below are the ones the OpenAPI 3.1
  * specification states for the parts this generator emits, written out.
@@ -109,7 +108,7 @@ describe(`GET ${OPENAPI_PATH}`, () => {
 
     const operationIds: Array<string> = []
     for (const [path, item] of Object.entries(doc.paths)) {
-      // Every procedure lives under the one namespace (D27).
+      // Every procedure lives under the one namespace.
       expect(path.startsWith(`${API_PREFIX}/`), path).toBe(true)
       for (const method of METHODS) {
         const operation = item[method]

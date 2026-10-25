@@ -10,18 +10,17 @@ import { Enqueue } from '@spaces/core/queue/enqueue'
 import { enqueue as stubSend } from '#web/test/queue-stub'
 
 /**
- * SPA-34's document half: extraction of a deck that mentions a glossary term
- * links the document to the term, and the link survives re-extraction.
+ * Extraction of a deck that mentions a glossary term links the document to
+ * the term, and the link survives re-extraction.
  *
  * The job runs under its real `ExtractionStore` layer — `markExtracted` is
- * where the sync lives, in the same transaction as the text — exactly as
- * `extract-document.arrival.test.ts` runs it. It sits beside the worker for
- * the same reason that file does: nothing under `lib/` may import it.
+ * where the sync lives, in the same transaction as the text. Here, not in
+ * apps/web, because nothing in apps/web may import the worker.
  */
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
-// Birth's extraction enqueue is core's `Enqueue` service since SPA-201;
-// here it records into the same stub the mocked `#web/lib/queue` does.
+// Birth's extraction enqueue is core's `Enqueue` service; here it records
+// into the same stub the mocked `#web/lib/queue` does.
 const stubEnqueue = Enqueue.fromSender({ enqueue: stubSend })
 
 beforeEach(async () => {

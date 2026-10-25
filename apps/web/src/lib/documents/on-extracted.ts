@@ -9,30 +9,19 @@ import { sensitivityFor } from '#/lib/ai/sensitivity-for'
 import { enqueue } from '#/lib/queue'
 
 /**
- * `document.extracted` (SPA-62; docs/spec-ai-substrate.md §11): the one
- * place the follow-on lanes of an extraction are enqueued. Called from
- * exactly one site — extractDocument's success path, once the text and tsv
- * are committed — and it does nothing but enqueue. A lane that wants to run
- * after extraction registers here instead of editing the extraction job;
- * `on-extracted.test.ts` greps the tree to hold both halves of that.
+ * `document.extracted`: the one place the follow-on lanes of an extraction
+ * are enqueued, called only from the extract job's success path once text and
+ * tsv are committed. A new follow-on lane registers here, never in the job.
+ * - `document.embed`, always: chunking runs with or without an embedding pin.
+ * - `document.classify`, only when the kind is still `other` **and** the lane
+ *   is routed at the resolved sensitivity. A kind set at filing is never
+ *   classified.
+ * - `document.ledger-event`, only for a cap table revision (never a first
+ *   filing) on a held company, extract routed at the stricter sensitivity.
+ *   Keyed on (document, revision).
  *
- * The lanes, in order:
- *
- *   - `document.embed` (SPA-121), always: chunking runs with or without an
- *     embedding pin, so the lexical chunk lane has rows on a keyless box.
- *   - `document.classify` (SPA-62), only when the document's kind is still
- *     `other` **and** the classify lane is routed at the document's resolved
- *     sensitivity. A kind set at filing time — by `guessDocumentKind` off
- *     the filename, by a bound folder, by a person — is never classified.
- *   - `document.ledger-event`, only for a cap table with a
- *     `document_revision` (a revision, never a first filing) filed on a
- *     company with a holding, the extract lane routed at the sensitivity of
- *     either. Keyed on (document, revision): one revision, one job.
- *
- * It never fails: the text it follows is already committed, and an enqueue
- * or a routing read that goes wrong must not turn a good extraction into a
- * retry. With the classify lane unrouted it reads the routing table, finds
- * nothing, and returns — no document read, no log line.
+ * It never fails: an enqueue or routing read that goes wrong must not turn a
+ * committed extraction into a retry.
  */
 export const onDocumentExtracted = Effect.fn('onDocumentExtracted')(function* (
   documentId: string,

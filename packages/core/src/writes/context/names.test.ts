@@ -3,16 +3,11 @@ import { join, relative } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
 /**
- * The one ref resolver (SPA-119), on this worker's test database — truncated
- * and reseeded before the file was imported (SPA-145), so the tests below
- * write what they like. A ref that names a merged loser lands on the winner
+ * The one ref resolver: a ref that names a merged loser lands on the winner
  * for every entity-bearing kind; a re-chunk keeps `doc:<id>#<idx>` on its
  * document; a deleted target resolves `missing` and nothing throws; the cost
- * is one query per ref kind, not per ref; and `cite.ts` is the only renderer.
- * That the two consumers in apps/web — /inbox and the record timeline —
- * read a missing target without failing is
- * `apps/web/src/lib/inbox/missing-refs.test.ts` (split out when this file
- * moved into core, SPA-182).
+ * is one query per ref kind, not per ref; and `cite` is the only renderer.
+ * The apps/web consumers reading a missing target are tested in apps/web.
  */
 
 async function deps() {
@@ -293,9 +288,8 @@ describe('resolveRefs — cost', () => {
 
 describe('cite.ts is the one renderer', () => {
   it('is called only from names.ts, and no other file in src formats a ref', () => {
-    // Both source trees: `cite.ts` is @spaces/core's pure half since SPA-179,
-    // `names.ts` its db-coupled half since SPA-182, and apps/web is where a
-    // second renderer would most likely grow.
+    // Both source trees: core holds `cite` and the resolver, and apps/web is
+    // where a second renderer would most likely grow.
     const root = join(import.meta.dirname, '..', '..', '..', '..', '..')
     const files: Array<string> = []
     const walk = (dir: string) => {

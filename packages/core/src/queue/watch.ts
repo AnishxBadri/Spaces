@@ -4,7 +4,7 @@ import { pluginQueueName } from './names'
 import type { PluginQueueName } from './names'
 
 /**
- * Where a watch runs (D72): a plugin's one watch job, on its own queue, once
+ * Where a watch runs: a plugin's one watch job, on its own queue, once
  * per `space_watch` row. Web's "Run now" and the worker's cadence tick both
  * send `{ watchId, spaceId }` keyed by the watch id, so the queue's `stately`
  * policy holds one run of a watch queued at a time.

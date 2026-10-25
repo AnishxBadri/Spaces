@@ -12,7 +12,7 @@ import { listPeoplePageProgram } from '#/lib/views/directory'
 import { companyPeopleProgram, setPersonCompanyProgram } from './companies'
 
 /**
- * A person's companies are the `companies` attribute (D60): every write goes
+ * A person's companies are the `companies` attribute: every write goes
  * through the one write path, and every reader — the people table, the
  * company page, a saved view — reads the value or the link it materializes.
  */
@@ -90,7 +90,7 @@ describe('the companies attribute', () => {
         targetKind: 'company',
         multi: true,
         enrichmentKey: 'person.company',
-        // The owner of the pair a company's `team` reads. (D69)
+        // The owner of the pair a company's `team` reads.
         cardinality: 'N:N',
         inverseOf: expect.any(String),
       },

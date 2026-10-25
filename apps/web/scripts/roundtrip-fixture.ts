@@ -10,9 +10,8 @@ import { resolveSecret, storeCredential } from '@spaces/core/writes/vault'
  * `plant` puts one of each thing a restore has to bring back: a document row
  * naming a blob that is already in ./data, and a credential encrypted under
  * ./data/secret.key. `verify` reads both back after the restore — the
- * document through the same join the Files tab uses (listRecordDocuments in
- * src/lib/server/documents.ts, minus the session check a script has no way
- * to hold), the credential through the real vault, so a secret.key that came
+ * document through the same join as `listRecordDocuments` (minus the session
+ * check), the credential through the real vault, so a secret.key that came
  * back wrong fails here rather than silently returning null.
  *
  *   tsx apps/web/scripts/roundtrip-fixture.ts plant  --blob=<sha256> --size=<bytes> --secret=<s>

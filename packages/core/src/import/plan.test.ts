@@ -22,7 +22,8 @@ import type { PlannedRow, Resolved, RowInput } from './plan'
 import type { ReferenceColumn, ReferenceOutcome } from './references'
 
 /**
- * SPA-167. The preview's pure half: reading a row under the mapping, the
+ * The preview's pure half: reading a row under the mapping, the
+
  * in-file collision rule `resolveEntity` cannot see, decisions, the counts.
  * No database — the identity lookup is handed in as `resolved`.
  */

@@ -1,5 +1,5 @@
 /**
- * Whether a Files-tab row offers Read with vision (SPA-94). Client-safe and
+ * Whether a Files-tab row offers Read with vision. Client-safe and
  * pure, as `offersReadDeck` is, so the rule is one function the row calls,
  * the enqueue checks again, and a test can hold.
  *
@@ -8,7 +8,7 @@
  *   a corrupt file or a bug, not a missing text layer, and a vision model
  *   would only be paid to read the same broken bytes;
  * - there are stored bytes to send (`blobSha`), and they are a PDF — the
- *   one file part the vision lane sends (`lib/ai/vision.ts`);
+ *   one file part the vision lane sends;
  * - `routed` is `isLaneRouted('vision')` at the record's resolved
  *   sensitivity, asked once per tab. Unrouted, the button is hidden.
  */

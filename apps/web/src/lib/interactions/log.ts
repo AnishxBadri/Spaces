@@ -7,21 +7,16 @@ import { recomputeInteractionStats } from '@spaces/core/writes/interactions/stat
 import { NoteCreateFailed, createNoteProgram } from '#/lib/notes/create'
 
 /**
- * Manual interaction logging (SPA-123), Effect-first behind `effectFn` per
- * the ratchet — the conversion of `writeInteraction`, which used to live in
- * `server/shared.ts` and is now this program.
+ * Manual interaction logging, Effect-first behind `effectFn`.
  *
- * Out here rather than in `server/interactions.ts` for the reason
- * `lib/timeline/record.ts` and `lib/notes/create.ts` are out here:
- * `src/lib/server-fns.ts` re-exports every `server/*` module wholesale to the
- * client (CLAUDE.md → Traps), so an exported Effect program in that folder
- * would drag Effect and the pg client into the browser bundle.
+ * Kept out of the server-fn modules: the client barrel re-exports every one
+ * wholesale, so an exported Effect program there would drag Effect and the
+ * pg client into the browser bundle.
  *
- * **The write-up is a real note, not a body column.** `interaction` never
- * carried prose (CONTEXT.md → "Interactions and enrichment", decided
- * 2026-09-14): the structured event keeps kind, occurred_at and the attendee
- * edges, and `interaction.note_id` points at a `note` row filed against the
- * same records. One editor, one mention system, one search index.
+ * **The write-up is a real note, not a body column.** The interaction keeps
+ * kind, occurred_at and the attendee edges; `interaction.note_id` points at
+ * a `note` filed against the same records. One editor, one mention system,
+ * one search index.
  *
  * Two paths, and the difference is one boolean:
  *
@@ -88,11 +83,9 @@ const query = <T>(run: () => Promise<T>) =>
  * first attendee, which is the one filing `createNoteProgram` itself writes;
  * the rest are added by the caller's own transaction.
  *
- * Exported for its second caller (SPA-128): `interactions/write-up.ts` fills
- * `note_id` on an interaction that was logged without one, and a meeting
- * written up that evening has to be born exactly the way one written up in
- * the dialog is — same kind, same visibility, same `starter: false`, same
- * `note.created` row. One helper, or the two paths drift.
+ * Exported for `writeUpInteractionProgram`: a meeting written up later must
+ * be born exactly as one written up in the dialog — same kind, visibility,
+ * `starter: false` and `note.created` row. One helper, or the two drift.
  */
 export const writeUpNote = Effect.fn('writeUpNote')(function* (
   actorId: string,
@@ -192,7 +185,7 @@ export const logInteractionProgram = Effect.fn('logInteractionProgram')(
           }
         }
 
-        // The attendees' first/last/next, in this transaction. (D67)
+        // The attendees' first/last/next, in this transaction.
         await recomputeInteractionStats(tx, attendeeIds)
 
         await tx.insert(activity).values({

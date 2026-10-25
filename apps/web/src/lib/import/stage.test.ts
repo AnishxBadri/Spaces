@@ -30,7 +30,7 @@ import {
 import type { StageImportInput, StageImportResult } from './stage'
 
 /**
- * Staged import (SPA-164). A spreadsheet in, a batch and its rows out — and,
+ * Staged import. A spreadsheet in, a batch and its rows out — and,
  * the half a happy path cannot show, nothing else: no `document` row, bytes
  * stored only when the file is accepted, the refusal's own words passed
  * through.
@@ -368,8 +368,8 @@ describe('a staged batch', () => {
 describe('the browser never hashes an import', () => {
   const src = resolve(fileURLToPath(new URL('.', import.meta.url)), '../..')
 
-  // The needle is assembled so this file is not itself a hit: the scan is
-  // the `grep -rn` of the acceptance criterion, test files included.
+  // The needle is assembled so this file is not itself a hit: the scan
+  // covers every source file, test files included.
   const needle = ['crypto', 'subtle'].join('.')
 
   it('keeps exactly one WebCrypto call in the app, the document lane’s', () => {

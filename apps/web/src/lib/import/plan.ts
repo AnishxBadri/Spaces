@@ -48,17 +48,16 @@ import type {
 import type { ImportFailure } from './stage'
 
 /**
- * **Resolve preview** (SPA-167, import-5) — the wizard's third step. Every
- * staged row is read under the mapping, looked up through `previewResolve`
- * (the read-only twin of `resolveEntity`'s step 1) and given a stored plan:
- * its verdict, its coerced patch, its errors. The plan is the dry run — the
- * report is drawn from it and the commit (SPA-169) replays it, so the two
- * cannot disagree. Nothing here writes to the graph: no entity, no alias, no
- * duplicate candidate; only `import_row.plan` / `verdict` and the batch's
- * status.
- *
- * Beside `stage.ts` and outside `lib/server/` for the barrel's reason
- * (CLAUDE.md → Traps).
+ * Resolve preview, the wizard's third step: every staged row is read under
+ * the mapping, looked up through `previewResolve` (the read-only twin of
+ * `resolveEntity`'s lookup) and given a stored plan — verdict, coerced patch,
+ * errors.
+ * - The plan is the dry run: the report is drawn from it and the commit
+ *   replays it, so the two cannot disagree.
+ * - Nothing here writes to the graph (no entity, alias or duplicate
+ *   candidate); only `import_row.plan` / `verdict` and the batch's status.
+ * Outside the server-fns barrel's modules: a plain export there ships to the
+ * browser, and the tests call these programs without a request.
  */
 
 const query = <T>(run: () => Promise<T>) =>
@@ -203,7 +202,7 @@ export const planImportProgram = Effect.fn('planImportProgram')(function* (
   const first = problems.at(0)
   if (first) return yield* new ImportRefused({ reason: first.reason })
 
-  // Reference cells (SPA-168): every distinct cell looked up once, exactly.
+  // Reference cells: every distinct cell looked up once, exactly.
   const refColumns = yield* referenceColumnsOf(mapping, object.registry)
   const lookup = yield* lookupReferences(refColumns, rows)
 
@@ -349,7 +348,7 @@ const plannedBatch = Effect.fn('plannedBatch')(function* (batchId: string) {
  * of it (and the rows that merged silently into them). The rows are locked
  * with the batch, so two decisions cannot interleave. Every row that names a
  * secondary create is read too, and the creates re-carried after the
- * decision (SPA-168): a carrier the decision skips hands its creates on.
+ * decision: a carrier the decision skips hands its creates on.
  */
 export const decideImportCollisionProgram = Effect.fn(
   'decideImportCollisionProgram',

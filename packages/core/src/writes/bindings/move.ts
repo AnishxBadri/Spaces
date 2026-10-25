@@ -12,13 +12,13 @@ import { BindingStoreFailed } from './bind'
 import { goneNot } from './gone'
 
 /**
- * A held file renamed or moved inside its bound subtree (§8, third row), or
+ * A held file renamed or moved inside its bound subtree, or
  * into another binding's subtree on the same connection.
  * - The path and the name advance in place: no edge, no new document, no
  *   extraction. Moved under another binding, `binding_id` follows the folder.
  * - When the new folder resolves to another record than the old one did,
  *   the outcome is a `refile_document` suggestion naming both, never a
- *   silent re-file (§5.6). A person's accept moves the edge.
+ *   silent re-file. A person's accept moves the edge.
  * - The old target is the stored `source_path` folded through the same
  *   `resolveItem` steps as the new one, so a move between two folders of
  *   one company proposes nothing.

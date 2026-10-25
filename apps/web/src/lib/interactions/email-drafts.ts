@@ -44,7 +44,7 @@ import {
 import type { ReplyMode } from './email-draft-prefill'
 
 /**
- * Email drafts (D67): the composer's store, author-private and local only.
+ * Email drafts: the composer's store, author-private and local only.
  * - Every read and write filters on `user_id = viewer`; another member's
  *   draft reads as missing, never as forbidden.
  * - Saved by id: the composer mints the id, so an autosave racing the next

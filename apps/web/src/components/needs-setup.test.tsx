@@ -10,7 +10,7 @@ import type { SetupAudience } from '#/lib/server-fns'
 import { NeedsSetup } from './needs-setup'
 
 /**
- * The in-place setup prompt (D80): an admin reads what is missing and the
+ * The in-place setup prompt: an admin reads what is missing and the
  * link that sets it up; a member reads whom to ask, by name, and no link.
  */
 

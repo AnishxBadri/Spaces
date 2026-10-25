@@ -6,10 +6,10 @@ import { cn } from '#/lib/utils'
  *
  * A settings section reaches the shell as **one row of data** in
  * `SETTINGS_SECTIONS`: the child route it links to, the label, the group it
- * joins, and whether only an admin may change it. A new section is one row plus one file
- * under `routes/_app/settings/`, placed by D81's map.
+ * joins, and whether only an admin may change it. A new section is one row
+ * plus one settings route file.
  *
- * The groups are by whose it is (D81):
+ * The groups are by whose it is:
  * - `you`: the reader's own accounts and tokens.
  * - `workspace`: the workspace, its people, what it records and prices.
  * - `ai`: models, search and what AI spends.
@@ -51,14 +51,14 @@ export type SettingsSectionRow = {
   /**
    * Admin-only writes. A member still opens the page and reads it, with every
    * control disabled under the head's "Only admins can change this" line;
-   * the write server fns refuse a member regardless. (D81)
+   * the write server fns refuse a member regardless.
    */
   readonly admin: boolean
 }
 
 export const SETTINGS_SECTIONS = [
   // The reader's own accounts, by the job they do; the OAuth clients are
-  // Connection apps. (D81)
+  // Connection apps.
   {
     to: '/settings/email-calendar',
     label: 'Email & calendar',
@@ -122,7 +122,7 @@ export const SETTINGS_SECTIONS = [
     group: 'integrations',
     admin: true,
   },
-  // Where enriched values come from: the sources in order and auto-enrich. (D76)
+  // Where enriched values come from: the sources in order and auto-enrich.
   {
     to: '/settings/enrichment',
     label: 'Enrichment',
@@ -145,7 +145,7 @@ export const SETTINGS_SECTIONS = [
   },
 ] as const satisfies readonly SettingsSectionRow[]
 
-/** Where `/settings` lands: General, the workspace's own page. (D81) */
+/** Where `/settings` lands: General, the workspace's own page. */
 export const SETTINGS_LANDING = '/settings/general' satisfies SettingsPath
 
 /** A row's path; the type a landing or a lookup must be one of. */

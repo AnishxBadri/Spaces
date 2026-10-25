@@ -1,5 +1,5 @@
 /**
- * An in-repo fake of Ollama's `POST /api/embed` (SPA-83), handed to a test as
+ * An in-repo fake of Ollama's `POST /api/embed`, handed to a test as
  * a `fetch` — through `embedCallFor`'s transport argument, or stubbed over
  * the global one so the real vault → adapter path reaches it. Nothing leaves
  * the process.

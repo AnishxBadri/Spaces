@@ -4,7 +4,7 @@ import { getEmbedBackfill, getEmbeddingSettings } from '#/lib/server-fns'
 
 /**
  * Settings → AI → Search: the workspace's embedding pin and the corpus
- * backfill. (D81)
+ * backfill.
  * - A member reads it too, keys redacted and every control disabled.
  * - The estimate is database reads; loading this page never calls a provider.
  */

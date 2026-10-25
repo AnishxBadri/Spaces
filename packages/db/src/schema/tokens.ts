@@ -5,7 +5,7 @@ import { user } from './auth'
 /**
  * Per-user API tokens — the one credential store for the MCP server and the
  * `/api/v1` door. Per-user because canRead is per user; not OAuth, not a
- * better-auth plugin. (CONTEXT.md "API tokens")
+ * better-auth plugin.
  * - The plaintext never lands here: `token_hash` is its sha256; `prefix` is
  *   kept so the settings ledger can say which token a row is.
  * - Revoke sets `revoked_at`; nothing deletes a row.

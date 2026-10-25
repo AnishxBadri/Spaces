@@ -10,11 +10,10 @@ import { requireUser } from './shared'
 import type { ColumnTarget } from '@spaces/core/import/mapping'
 
 /**
- * Staged import (SPA-164, import-2). Every handler is `requireUser()` plus a
- * program from `#/lib/import/stage`, reached by a **dynamic** import so
- * Effect, drizzle and the spreadsheet reader stay out of the client bundle:
- * this file is re-exported to the browser by the server-fns barrel and only
- * handler bodies are stripped (CLAUDE.md → Traps).
+ * Staged import. Every handler is `requireUser()` plus an import program,
+ * reached by a dynamic import so Effect, drizzle and the spreadsheet reader
+ * stay out of the client bundle: this file is re-exported to the browser by
+ * the server-fns barrel and only handler bodies are stripped.
  */
 
 const IMPORT_MODES = ['records', 'ledger'] as const
@@ -140,7 +139,7 @@ export const discardImportBatch = createServerFn({ method: 'POST' })
   })
 
 // ---------------------------------------------------------------------------
-// The mapping step (SPA-165, import-3)
+// The mapping step
 // ---------------------------------------------------------------------------
 
 const dateOrder = z.enum(['dmy', 'mdy'])
@@ -157,7 +156,7 @@ const columnTargetInput = z.discriminatedUnion('target', [
     target: z.literal('attribute'),
     attributeId: uuid,
     dateOrder: dateOrder.optional(),
-    /** SPA-168: a record reference column plans what it does not find. */
+    /** A record reference column plans what it does not find. */
     createMissing: z.literal(true).optional(),
   }),
   z.object({
@@ -172,7 +171,7 @@ const columnTargetInput = z.discriminatedUnion('target', [
     options: z.array(z.string().trim().min(1).max(60)).max(50).optional(),
     dateOrder: dateOrder.optional(),
   }),
-  /** SPA-170: accepted so the type is whole; a records batch refuses it. */
+  /** Accepted so the type is whole; a records batch refuses it. */
   z.object({
     target: z.literal('ledger'),
     field: z.string().refine(isLedgerField, 'Not an event field'),
@@ -310,10 +309,10 @@ export const createImportAttribute = createServerFn({ method: 'POST' })
   })
 
 // ---------------------------------------------------------------------------
-// The preview step (SPA-167, import-5)
+// The preview step
 // ---------------------------------------------------------------------------
 
-/** Spelled here rather than imported: `#/lib/import/plan` is server-only. */
+/** Spelled here rather than imported: the plan module is server-only. */
 const PREVIEW_FILTERS = ['all', 'create', 'attach', 'decide', 'noland'] as const
 
 /** Continue from step 2: every row planned and stored; answers the counts. */
@@ -384,8 +383,8 @@ export const reopenImportMapping = createServerFn({ method: 'POST' })
   })
 
 // ---------------------------------------------------------------------------
-// Ledger mode (SPA-170, import-8) — the mapping onto event fields and its
-// preview. Every program is `#/lib/import/ledger`'s, reached dynamically.
+// Ledger mode: the mapping onto event fields and its preview. Every program
+// is reached dynamically.
 // ---------------------------------------------------------------------------
 
 const INSTRUMENT_VALUES = [
@@ -527,10 +526,10 @@ export const decideLedgerRow = createServerFn({ method: 'POST' })
   })
 
 // ---------------------------------------------------------------------------
-// The commit step (SPA-169, import-7)
+// The commit step
 // ---------------------------------------------------------------------------
 
-/** Spelled here rather than imported: `#/lib/import/commit` is server-only. */
+/** Spelled here rather than imported: the commit module is server-only. */
 const RECEIPT_FILTERS = ['all', 'failed'] as const
 
 /**

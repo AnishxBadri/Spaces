@@ -2,9 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
 /**
- * Integration tests — run against this worker's test database, which
- * `vitest.setup.ts` truncated and reseeded before this file was imported
- * (SPA-145), never the dev one. The hex tags in the fixture names are kept:
+ * Integration tests — run against this worker's test database, truncated
+ * and reseeded before this file was imported, never the dev one. The hex tags in the fixture names are kept:
  * they cost nothing and they keep a failure message telling you which run
  * wrote a row.
  */

@@ -30,36 +30,19 @@ import {
 import type { Actor, EventSource, ValuesWriteFailed } from './values'
 
 /**
- * Custom objects (spec §9, two-tier model). An object is an attribute bag
- * with a name: nouns rename freely, the slug is derived from the plural at
- * creation and frozen, archive replaces delete. Records of a custom object
- * are `entity.kind = 'custom'` rows keyed by `object_id`; they get the full
- * attribute engine and the research graph (spaces, mentions, notes,
- * documents); of the identity machinery they get fuzzy-name dedupe and
- * merge-as-target (narrowed 2026-09-13) but no enrichment and no
- * interactions — which is why they are born here and never through
- * resolveEntity.
- *
- * They do carry a birth `name` alias and they do join the sweep (SPA-60).
- * That half of the old header — "no aliases, no dedupe sweep" — was the
- * pre-narrowing boundary left behind: a record with only
- * `entity.canonical_name` is invisible to pg_trgm, so "customs get dedupe"
- * was true on paper and dead in the database. The alias is written in the
- * same transaction as the entity row (there is no birth without it), and the
- * sweep scopes by `object_id`, so a Fund is never offered as a duplicate of
- * a Vendor.
- *
- * The one genuinely per-object piece of identity is opt-in: an object may
- * declare `domain` and/or `linkedin` as identity keys, and each declared key
- * materializes its backing attribute in the same transaction (CONTEXT.md
- * "Two-tier object model", 2026-09-19). Nothing is bound later — a key with
- * no attribute behind it would be a promise the write path cannot find.
- *
- * The declaration follows the slug rule (spec §9, §3): revisable while the
- * object has no records, frozen the moment one exists — otherwise a
- * record's alias outlives the key that justified it. Creation and revision
- * go through the same `materializeIdentityKey`, so the two paths cannot
- * drift into two kinds of backing attribute.
+ * Custom objects: an attribute bag with a name. Nouns rename freely; the slug
+ * is derived from the plural at creation and frozen; archive replaces delete.
+ * - Records are `entity.kind = 'custom'` rows keyed by `object_id`, with the
+ *   full attribute engine and research graph, fuzzy-name dedupe and
+ *   merge-as-target, but no enrichment or interactions — so they are born
+ *   here, never through `resolveEntity`.
+ * - Birth writes a `name` alias in the same transaction (pg_trgm sees only
+ *   aliases); the sweep scopes by `object_id`, so a Fund is never offered as
+ *   a duplicate of a Vendor.
+ * - Optional identity keys (`domain`, `linkedin`) materialize their backing
+ *   attribute in the same transaction, through `materializeIdentityKey` for
+ *   both creation and revision. Revisable while the object has no records,
+ *   frozen once one exists, or a record's alias outlives its key.
  */
 
 export class ObjectRejected extends Schema.TaggedError<ObjectRejected>()(
@@ -107,7 +90,7 @@ export type CreateObjectInput = {
   singular: string
   plural: string
   icon?: string | null | undefined
-  /** opt-in identity (§9) — `domain`, `linkedin`, or neither */
+  /** opt-in identity — `domain`, `linkedin`, or neither */
   identityKeys?: ReadonlyArray<string> | undefined
   createdBy: string
 }
@@ -252,7 +235,7 @@ const dropBackingAttribute = async (args: {
  * Does this object hold a record? A merged-away record counts: it keeps its
  * values and its snapshot, and the merge that retired it is itself a
  * consequence of the identity keys, so the declaration is as frozen by a
- * loser as by a live record (spec §9 — the slug rule).
+ * loser as by a live record (the slug rule).
  */
 const objectHasRecords = Effect.fn('objectHasRecords')(function* (
   objectId: string,
@@ -282,7 +265,7 @@ export const createObjectProgram = Effect.fn('createObjectProgram')(function* (
       message: `"${plural}" is taken by the app — pick another plural`,
     })
   const identityKeys = yield* readIdentityKeys(input.identityKeys)
-  // Slug: derived once, suffixed on collision, then immutable (§3).
+  // Slug: derived once, suffixed on collision, then immutable.
   let slug = base
   for (let i = 2; ; i++) {
     const taken = yield* query(() =>
@@ -296,7 +279,7 @@ export const createObjectProgram = Effect.fn('createObjectProgram')(function* (
     slug = `${base}-${i}`
   }
   // One write or neither: the object row and the backing attribute of every
-  // key it declares (CONTEXT.md, 2026-09-19). The attributes go in through
+  // key it declares. The attributes go in through
   // createAttributeProgram — the door that rejects config a type cannot
   // carry — sharing this transaction rather than a second connection.
   return yield* Effect.tryPromise({
@@ -362,7 +345,7 @@ export const updateObjectProgram = Effect.fn('updateObjectProgram')(function* (
       .then((rows) => rows.at(0)),
   )
   if (!row) return yield* new ObjectRejected({ message: 'Object not found' })
-  // System objects ship with the product: never archivable (§9).
+  // System objects ship with the product: never archivable.
   if (input.archived !== undefined && row.isSystem)
     return yield* new ObjectRejected({
       message: 'System objects cannot be archived',
@@ -381,7 +364,7 @@ export const updateObjectProgram = Effect.fn('updateObjectProgram')(function* (
   if (input.icon !== undefined) patch.icon = input.icon
   if (input.archived !== undefined) patch.archived = input.archived
 
-  // Identity keys follow the slug rule (spec §9): revisable while the object
+  // Identity keys follow the slug rule: revisable while the object
   // has no records, frozen the moment one exists. A no-op declaration is not
   // a change, so re-saving the dialog on a populated object is not a refusal.
   const declaration =
@@ -446,7 +429,7 @@ export const updateObjectProgram = Effect.fn('updateObjectProgram')(function* (
 })
 
 /**
- * Which door a custom record came through (SPA-169). It decides the pair the
+ * Which door a custom record came through. It decides the pair the
  * columns carry: `entity.source_class` and its birth alias say `manual`,
  * `seed` or `import`, and the birth values log through `direct`, `seed` or
  * `import` — so an imported record is honestly an import rather than a
@@ -462,7 +445,7 @@ const RECORD_EVENT_SOURCE: Record<RecordSource, EventSource> = {
 
 export type CreateRecordInput = {
   objectId: string
-  /** the display name — core-owned, required at birth (§9 birth contract) */
+  /** the display name — core-owned, required at birth */
   name: string
   values?: Record<string, unknown> | undefined
   actor: Actor
@@ -473,7 +456,7 @@ export type CreateRecordInput = {
 
 /**
  * The new record's id, plus what its identity-backed values did on the way
- * in (SPA-97). A birth that lost a domain race is a `suggested_duplicate`
+ * in. A birth that lost a domain race is a `suggested_duplicate`
  * and the record still exists — the caller toasts, it does not roll back.
  */
 export type CreateRecordResult = { id: string } & Pick<
@@ -573,13 +556,11 @@ type CreateRecordFailure =
  * Birth of a custom record: `birthRecordInTx` in its own transaction, then —
  * once it has committed — the fuzzy sweep every other record gets, with the
  * embeddable values handed back as `reembed` for the caller to queue (the
- * enqueue reads the environment, which core may not; SPA-174/175). The
- * birth alias is the `name` one — non-identity,
- * because a name is history rather than a claim — and it is what puts the
- * record in front of pg_trgm and in `searchEntities`' alias lane. Identity
- * aliases arrive by the other door: a supplied value for an attribute
- * carrying `options.identityKey` is mirrored into `entity_alias` by the
- * birth-values pass itself (objects-7), in the transaction that wrote it.
+ * enqueue reads the environment, which core may not).
+ * - The birth alias is the non-identity `name` one (a name is history, not a
+ *   claim); it puts the record in front of pg_trgm and `searchEntities`.
+ * - Identity aliases come from the birth-values pass, which mirrors a value
+ *   for an `options.identityKey` attribute into `entity_alias` in its own tx.
  */
 export const createRecordProgram = Effect.fn('createRecordProgram')(function* (
   input: CreateRecordInput,
@@ -612,7 +593,7 @@ export const sweepRecordName = (id: string, name: string) =>
   )
 
 /**
- * `createRecordProgram` inside a caller's transaction (SPA-169): the import
+ * `createRecordProgram` inside a caller's transaction: the import
  * commit writes a row's secondary creates, its record and its values in one
  * transaction, so a failure anywhere rolls the row back whole. The two steps
  * that must follow a commit are handed back rather than run — the embeddable

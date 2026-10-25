@@ -51,7 +51,7 @@ import { MAX_BODY_CHARS, writeRecordedInteraction } from './write'
 import type { RecordedArtifact } from './write'
 
 /**
- * The recorder contract's host half (D78): one recorded note in, matched to
+ * The recorder contract's host half: one recorded note in, matched to
  * its meeting by `writeRecordedInteraction`, or Spaces' copy of it out.
  * - The key is per connection: a member's note is theirs to share or take
  *   back, so two members' notes of one meeting are two recorder events.
@@ -318,7 +318,7 @@ async function keepWebUrl(
 }
 
 /**
- * The landing rules (D78): what a fetched note becomes.
+ * The landing rules: what a fetched note becomes.
  * - The summary is the meeting's write-up when it has none, else a second
  *   shared note (`interaction_note`, `recorder_note`) — never a suggestion,
  *   and a write-up already there is never rewritten.

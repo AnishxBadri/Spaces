@@ -7,14 +7,9 @@ import { termAutomaton } from '@spaces/core/glossary/terms'
 
 /**
  * Glossary auto-linking, as decorations rather than document content.
- *
- * This is the escape hatch CONTEXT.md reserved — BlockNote's inline-content
- * API can insert nodes, but a term highlight must not *be* a node: the note
- * JSON is authoritative, and writing highlights into it would mean editing
- * every stored note whenever a definition is renamed or deleted, and would
- * put derived data in the source of truth. Decorations are presentation
- * only, recomputed at render, and vanish when a term does.
- *
+ * - A term highlight must never be a node: the note JSON is authoritative,
+ *   and derived highlights in it would need rewriting on every rename.
+ * - Decorations are recomputed at render and vanish when a term does.
  * Reached through BlockNote's `_tiptapOptions.extensions`.
  */
 
@@ -62,7 +57,7 @@ function decorate(
 }
 
 export function createGlossaryExtension(terms: Array<GlossaryTerm>) {
-  // The same builder the server link sync uses (SPA-34): what highlights
+  // The same builder the server link sync uses: what highlights
   // here is what `link(note → term, mentions)` records.
   const automaton = termAutomaton(terms)
   const byId = new Map(terms.map((t) => [t.id, t]))

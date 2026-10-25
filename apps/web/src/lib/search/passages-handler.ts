@@ -3,7 +3,7 @@ import { requireUser } from '#/lib/server/shared'
 import { searchPassagesProgram } from './passages'
 import type { Passage } from './passages'
 
-/** `searchPassages`'s body, out of `lib/server/` so a test can call it. */
+/** `searchPassages`'s body, outside the server-fn module so a test can call it. */
 export async function searchPassagesHandler(data: {
   q: string
 }): Promise<Array<Passage>> {

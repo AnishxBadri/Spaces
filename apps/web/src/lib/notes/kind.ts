@@ -7,22 +7,12 @@ import { NoteNotFound, NoteQueryFailed } from '#/lib/notes/delete'
 import { canRead } from '#/lib/server/shared'
 
 /**
- * Note kind (SPA-109). `memo · note · scratch` — three, frozen (CONTEXT.md →
- * The note model). A memo is a note with the flag up: same row, same edges,
- * same filing, so a promote or a demote is one `update` of one column and
- * nothing else. This file writes no link, no `entity_space`, no body — and
- * the test pins that it cannot start to.
- *
- * Unlike visibility, kind is **not** author-only. Visibility is the author's
- * own trust boundary; the genre of a shared note is the team's reading of
- * it, so whoever may read the note may promote it — the same rule `saveNote`
- * already applies to the body.
- *
- * The read is `delete.ts`'s read: a note that is not there and a note that
- * is not yours answer with the same `NoteNotFound`, because a distinct error
- * would confirm that someone else's private note exists. Its two tagged
- * errors are imported rather than re-declared so the collapse stays one
- * collapse.
+ * Note kind: `memo · note · scratch`, three and frozen. A memo is a note with
+ * the flag up, so a promote or demote updates one column and writes no link,
+ * no `entity_space` and no body; the test pins that.
+ * - Not author-only: whoever may read a shared note may promote it.
+ * - Missing and unreadable answer the same `NoteNotFound` (imported, not
+ *   re-declared) so a private note's existence is never confirmed.
  */
 
 /** The three kinds, in the order the editor's segmented control draws them. */
@@ -42,10 +32,9 @@ export function noteKindMessage(failure: unknown): string {
 }
 
 /**
- * Promote or demote one note. Returns the kind it now has, so a caller that
- * set the kind it already had gets the same answer as one that changed it —
- * a second click is not an error. `changed` says whether a row moved, which
- * is what keeps the activity stream free of non-events.
+ * Promote or demote one note; setting the current kind is not an error.
+ * `changed` says whether a row moved, keeping non-events out of the activity
+ * stream.
  */
 export const setNoteKindProgram = Effect.fn('setNoteKindProgram')(function* (
   userId: string,
@@ -77,10 +66,8 @@ export const setNoteKindProgram = Effect.fn('setNoteKindProgram')(function* (
           .update(note)
           .set({ kind, updatedAt: new Date() })
           .where(eq(note.entityId, id))
-        // The note's own stream: the subject is the note, as `note.created`
-        // already writes it when the note was born out of nothing. `from`
-        // and `to` are in the meta so the timeline can say which way it went
-        // without reading the row it is describing.
+        // Subject is the note. `from`/`to` in the meta let the timeline say
+        // which way it went without reading the row.
         await tx.insert(activity).values({
           actorId: userId,
           verb: 'note.kind_changed',

@@ -2,11 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { collisionToast } from './collision-toast'
 
 /**
- * SPA-97. The toast fires on the client, so the wiring is proven by typing
- * (both server fns now return `identity`/`identityValues`) and the decision
- * itself is proven here: which outcome speaks, what it says, and the three
- * that stay quiet.
- *
+ * The toast fires on the client, so the wiring is proven by typing (both
+ * server fns return `identity`/`identityValues`); the decision is proven
+ * here: which outcome speaks, what it says, and the three that stay quiet.
  * Pure — no database, no React, no `sonner`.
  */
 describe('collisionToast', () => {

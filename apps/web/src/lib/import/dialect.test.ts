@@ -10,11 +10,10 @@ import { beginImportMappingProgram } from './mapping'
 import { loadImportBatchProgram, stageImportProgram } from './stage'
 
 /**
- * A dropped file an enabled dialect plugin accepts (D39 as amended): the
- * batch is born waiting with no rows, the plugin's file job is sent with the
- * stored blob, and the mapping step waits for the rows. The plugin itself,
- * the live port, the reader's run and the preview are apps/worker's
- * `airtable-live.test.ts`.
+ * A dropped file an enabled dialect plugin accepts: the batch is born
+ * waiting with no rows, the plugin's file job is sent with the stored blob,
+ * and the mapping step waits for the rows. The plugin itself, the live port,
+ * the reader's run and the preview are tested in the worker.
  */
 
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))

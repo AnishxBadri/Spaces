@@ -1,6 +1,6 @@
-# Decision ledger — the 2026-09 architecture week
+# Decision ledger
 
-_Forty-eight decisions surfaced by the reconciliation pass of 2026-09-15 and closed on 2026-09-16/18. Every one is carried by a slice that is `hitl` precisely because of it; the answer belongs in that slice's body before it is picked up. Options, consequences and reversal costs are in §3 of `docs/roadmap-2026-09.md` for the decisions whose carrying slice has not shipped; the rest are in that file's git history (trimmed 2026-09-27)._
+_Forty-eight decisions surfaced by the reconciliation pass of 2026-09-15 and closed on 2026-09-16/18. Every one is carried by a slice that is `hitl` precisely because of it; the answer belongs in that slice's body before it is picked up. Options, consequences and reversal costs are in §3 of `docs/roadmap.md` for the decisions whose carrying slice has not shipped; the rest are in that file's git history (trimmed 2026-09-27)._
 
 **All forty-eight are closed.** Ten were the owner's and were answered directly. Thirty-eight were engineering calls ratified as recommended, on the standing rule that the recommendation was in every case the reversible option and the carrying slice is `hitl`, so the judgement is met again in the code rather than lost.
 
@@ -310,7 +310,7 @@ _Build order:_ demotion + manual action → upload picker → intake suggestion.
 
 _Rejected:_ keeping `contact_at` as a link (no history, no views, no provenance, and a second way to say a fact `founders` also says); a single `company` attribute (shape migration the first time someone has two).
 
-_Carried by_ `graph-1` (`docs/roadmap-backlog.md`, Unplaced), a `migration` slice, so it runs alone on the migration lane.
+_Carried by_ `graph-1` (shipped), a `migration` slice, so it runs alone on the migration lane.
 
 ### D61-review-not-inbox
 
@@ -322,7 +322,7 @@ _Carried by_ `graph-1` (`docs/roadmap-backlog.md`, Unplaced), a `migration` slic
 
 _Rejected:_ keeping "Inbox" (reads as email); "Suggestions" (leaves out duplicates, which are not suggestions from the AI); "Queue" (says how it works, not what you do there).
 
-_Carried by_ `review-1` (`docs/roadmap-backlog.md`, Unplaced). Wait for in-flight `apps/web` route work to land first: the route tree is regenerated.
+_Carried by_ `review-1` (shipped). Wait for in-flight `apps/web` route work to land first: the route tree is regenerated.
 
 ---
 
@@ -350,7 +350,7 @@ _Four decisions taken by the owner while publishing project 18 (plugins run unat
 
 ### D66-linked-storage-behaviour
 
-**How do linked storage files and folders behave on a record?** Settled against Attio's Files tab, keeping `docs/spec-storage-sources.md`'s copy-in model underneath. Answered:
+**How do linked storage files and folders behave on a record?** Settled against Attio's Files tab, keeping `spec-storage-sources.md` (removed)'s copy-in model underneath. Answered:
 
 - **No folders the user creates.** §3.4 holds: kind, filed-against and space do what a folder would, and one file sits in several places. A linked folder shows **its own Drive tree, read-only**, grouped under the folder name, from each document's source path.
 - **Native Google files open in Google.** Clicking a Doc, Sheet or Slides file opens it in Google; every other format opens in the in-app preview. "Open in Drive" is in every linked file's menu.

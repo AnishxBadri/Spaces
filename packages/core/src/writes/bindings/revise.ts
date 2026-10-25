@@ -19,7 +19,7 @@ import type { SyncFailure } from './sync'
 
 /**
  * A held document's bytes changed at the provider: the row advances to the
- * new sha and the prior sha becomes a `document_revision` (§8, second row).
+ * new sha and the prior sha becomes a `document_revision`.
  * - The revision id is the port's `changeToken`, never the sha: a Docs
  *   export of an unchanged Doc hashes differently every time.
  * - A token equal to the stored one is no change and reads nothing — which

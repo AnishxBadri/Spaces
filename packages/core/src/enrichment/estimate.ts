@@ -1,5 +1,5 @@
 /**
- * The bulk Enrich estimate (D76, D53): what `enrichment.run` over a list
+ * The bulk Enrich estimate: what `enrichment.run` over a list
  * would ask, skip and spend, before anything is queued. Pure — the db half
  * (`bulkEstimateProgram`) reads the facts and hands them in.
  * - The checks are auto-enrich's, in its order, minus `scope` (choosing the

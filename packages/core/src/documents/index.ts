@@ -11,7 +11,7 @@
 export const MAX_UPLOAD_BYTES = 250 * 1024 * 1024
 
 /**
- * 2MB of page text: the cap on one `POST /api/v1/capture` (SPA-111). A
+ * 2MB of page text: the cap on one `POST /api/v1/capture`. A
  * capture is the visible text of one page posted as JSON through Node, never
  * a presigned PUT, so it is held to a limit a page could plausibly reach —
  * a long profile is tens of KB — and nowhere near `MAX_UPLOAD_BYTES`, which
@@ -21,12 +21,9 @@ export const MAX_UPLOAD_BYTES = 250 * 1024 * 1024
 export const MAX_CAPTURE_BYTES = 2 * 1024 * 1024
 
 /**
- * Mirrors the document_kind enum — six, not seven. `memo` was dropped
- * 2026-09-20 (SPA-25, spec-storage-sources §11 delta 3): it collided with
- * `note.kind = 'memo'` while meaning something else. An exported memo PDF is
- * a document that is `derived_from` a note — a provenance edge, which
- * link_relation already carries — not a genre of file. Anything that reads
- * like a memo now files as `other` and earns its meaning from the edge.
+ * Mirrors the document_kind enum. There is no `memo` kind: it would collide
+ * with `note.kind = 'memo'`. An exported memo PDF is `other` with a
+ * `derived_from` edge to its note — provenance, not a genre of file.
  */
 export const DOCUMENT_KINDS = [
   'deck',

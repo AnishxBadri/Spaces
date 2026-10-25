@@ -22,7 +22,7 @@ import { bundleSha256 } from '@spaces/core/plugins/lock'
 import { REASON_MAX, reconcilePlugins } from './loader'
 
 /**
- * Boot reconciliation (sdk-11) against real bundles: the four fixtures under
+ * Boot reconciliation against real bundles: the four fixtures under
  * plugins/_fixtures/ (echo, old-sdk, needs-key, tampered), built by turbo's
  * `^build` edge before this suite (they are this package's devDependencies),
  * copied into a data dir under the OS temp dir — outside every
@@ -43,7 +43,7 @@ const newPluginsRoot = () => {
   return root
 }
 
-/** Copy a fixture's dist/ to `<root>/<id>/current/`, as the installer will. */
+/** Copy a fixture's dist/ to `<root>/<id>/current/`, as the installer does. */
 const install = (root: string, fixture: string, id = fixture) => {
   const dir = path.join(root, id, 'current')
   mkdirSync(dir, { recursive: true })

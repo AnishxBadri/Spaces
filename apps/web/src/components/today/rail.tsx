@@ -52,7 +52,7 @@ export function unpricedCurrencies(
 
 /**
  * The book in the rail: Invested, Value, MOIC, then the holdings left out
- * for a missing rate with the rate to add. (D79)
+ * for a missing rate with the rate to add.
  */
 export function PortfolioRail({
   rollup,
@@ -105,7 +105,7 @@ export function PortfolioRail({
 /**
  * What's moving: signals from the last seven days on the reader's companies,
  * newest first, each citing where it was read. Always drawn; a quiet week
- * is one line. (D79)
+ * is one line.
  */
 export function WhatsMoving({
   signals,

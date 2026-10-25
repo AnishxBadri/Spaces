@@ -2,13 +2,13 @@ import { z } from 'zod'
 import type { Json } from '@spaces/core/json'
 
 /**
- * What an LLM provider's `credential.meta` holds (SPA-29). The column is an
+ * What an LLM provider's `credential.meta` holds. The column is an
  * open JSON record; this is the one decode an adapter reads it through, so a
  * row written by hand or by an older build cannot hand the SDK a number where
  * a URL goes. Unknown keys are kept by the column and ignored here.
  *
- * - `baseUrl` + `headers` — gateway passthrough (`docs/spec-ai-substrate.md`
- *   §9): point a provider at Helicone / LiteLLM / Portkey by URL and header.
+ * - `baseUrl` + `headers` — gateway passthrough: point a provider at
+ *   Helicone / LiteLLM / Portkey by URL and header.
  *   These are *non-secret config* by the vault's contract: they are stored in
  *   plain jsonb, not encrypted, and shown back to the admin.
  * - `display` — the redacted key (`sk-…abcd`), written at save so the ledger
@@ -16,7 +16,7 @@ import type { Json } from '@spaces/core/json'
  * - `lastTestedAt` / `lastTestOk` — the Test call's verdict. Never the
  *   model's answer and never the provider's error text.
  * - `embedTestedAt` / `embedTestOk` / `embedTestModel` — the embedding Test's
- *   verdict and the model it tested (SPA-83). Its own keys because Ollama's
+ *   verdict and the model it tested. Its own keys because Ollama's
  *   embedding half reuses the LLM row, and one Test must not answer for the
  *   other; the sensitive slot is offered on a green one.
  */

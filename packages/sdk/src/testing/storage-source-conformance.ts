@@ -681,7 +681,7 @@ export const makeSha256 = () => {
 }
 
 /**
- * The chaos list (docs/spec-plugin-sdk.md §13, layer 7) as cases, the same
+ * The chaos list as cases, the same
  * shape as `storageSourceConformance`, so a provider's test runs both.
  *
  * - Each bad day must surface as its typed failure: a throw or a rejected
@@ -1008,7 +1008,7 @@ const readBack = Effect.fn('readBack')(function* (
 })
 
 /**
- * The write half's suite (docs/spec-storage-sources.md §6 and §5.6), the
+ * The write half's suite, the
  * same shape as `storageSourceConformance`.
  *
  * - `ensureFolder` is run four at once: Drive permits duplicate folder

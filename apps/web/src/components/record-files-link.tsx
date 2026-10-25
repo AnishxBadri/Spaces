@@ -20,7 +20,7 @@ import { cn } from '#/lib/utils'
  *   its "Newer version of" pick.
  * - A refusal stays on its row with the reason; no connection offers
  *   Connect Drive there; a folder link is refused in place, before any
- *   fetch. Each is dismissed by hand. (D66)
+ *   fetch. Each is dismissed by hand.
  */
 
 export type LinkFetch = {

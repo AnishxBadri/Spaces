@@ -10,51 +10,33 @@ import { JobRetryable } from '../run-job'
 import type { JobDef } from '../run-job'
 
 /**
- * entity.dedupe-sweep — the nightly half of the promise CONTEXT.md makes
- * under "Entity resolution & merge": *at-create check + nightly sweep job*.
- * The at-create check (`lib/entities/sweep.ts`) only ever sees the name a
- * record is born with, so two records that drift into similarity through a
- * rename are invisible to it forever. This job is what finds them, and until
- * SPA-81 its queue was wired to `stub()` and had never run for any kind.
- *
- * **One statement, not a loop.** The scan is a single self-join of
- * `entity_alias` name rows — no `select` of every entity into memory, and
- * both caps (top-k per entity, rows per run) applied in SQL rather than in
- * JS after the fact. That is what lets it stay one query on a workspace
- * where the per-entity sweep would be one query per record.
- *
- * The insert is `on conflict do nothing` against `duplicate_pair_unique`,
- * which is the whole dismissal contract: "not a duplicate" is a negative
- * assertion the user made once, and a sweep that could re-insert a dismissed
- * pair would re-ask the question every night forever. The pair is ordered
- * `entity_a < entity_b` the same way `suggestDuplicate` orders it — the
- * uuid's text form and its byte form sort alike, so Postgres's `<` and the
- * JS `<` agree on which side is A.
+ * entity.dedupe-sweep: the nightly duplicate scan. The at-create check only
+ * sees a record's birth name, so records that drift together through a
+ * rename are found only here.
+ * - One statement, not a loop: a self-join of `entity_alias` name rows with
+ *   both caps applied in SQL.
+ * - `on conflict do nothing` against `duplicate_pair_unique` is the whole
+ *   dismissal contract: a dismissed pair must never be re-asked.
+ * - Pairs are ordered `entity_a < entity_b` as `suggestDuplicate` orders
+ *   them; uuid text and byte forms sort alike, so SQL and JS agree on A.
  */
 
 /**
- * The bound this job proposes against, and the reason it is `hitl`: its
- * first pass on an established workspace lands an unknown number of pairs in
- * a queue the owner reads daily. Both numbers in one object so moving them
- * is one line.
- *
- * `perEntity` is a `row_number()` cut, `perRun` a `limit` — neither is a
- * JS slice, so a workspace with ten thousand near-names costs the same query.
+ * Bounds on what one run proposes: a first pass on an established workspace
+ * would otherwise land an unknown number of pairs in the owner's queue.
+ * `perEntity` is a `row_number()` cut and `perRun` a `limit`, both in SQL.
  */
 export const DEDUPE_SWEEP_BOUNDS = {
   /** Top-k candidates kept per entity, best score first. */
   perEntity: 3,
-  /** Rows one run may offer. The rest wait for tomorrow's run. */
+  /** Rows one run may offer. The rest wait for the next run. */
   perRun: 50,
 } as const
 
 /**
- * Nullish-tolerant on purpose. pg-boss stores `data = null` for a schedule
- * registered with no payload (`manager.js`: `const { name, data = null }`),
- * and the 03:30 schedule is registered exactly that way — a bare
- * `z.object({...})` would fail every nightly run as `invalid-data` before
- * the handler ever ran. The optional `objectId` is what a test (and the
- * `/inbox` button, later) uses to scope a run to one object.
+ * Nullish-tolerant: pg-boss stores `data = null` for the payload-less nightly
+ * schedule, which a bare `z.object({...})` would fail as `invalid-data`.
+ * `objectId` scopes a run to one object.
  */
 export const dedupeSweepData = z
   .object({ objectId: z.string().uuid().optional() })
@@ -86,34 +68,22 @@ type SweepCounts = {
 }
 
 /**
- * The scan. Read it as four stages:
- *
- *  - `alive` — the population: `merged_into_id is null` (a loser row still
- *    exists and still redirects; suggesting it would be a merge the executor
- *    refuses) and `kind in MERGEABLE`, which is read from the executor rather
- *    than re-derived, so the inbox can never show a pair whose Merge button
- *    throws.
- *  - `pairs` — the self-join, `a.entity_id < b.entity_id` so a pair appears
- *    once and never as a self-pair, scoped to one object. `object_id` is the
- *    scope because every custom record shares the kind `custom`; the `kind`
- *    branch is the fallback for a row written without its object, exactly as
- *    `sweep.ts` documents. `max()`/`array_agg` collapse the several name
- *    aliases two records may each hold into one best pair + the name that
- *    matched.
- *  - `ranked`/`capped` — the two bounds, in SQL.
- *  - `inserted` — the append, conflict-ignoring.
- *
- * The final select reads all three counts off the same snapshot, so the
- * logged line describes the run that actually happened.
+ * The scan, in four stages:
+ * - `alive`: unmerged rows (a loser still redirects; the executor refuses it)
+ *   of a `MERGEABLE` kind, read from the executor so the inbox never shows a
+ *   pair whose Merge button throws.
+ * - `pairs`: the self-join, `a < b`, scoped to one object (every custom record
+ *   shares kind `custom`), falling back to `kind` for a row with no object.
+ *   `max()`/`array_agg` collapse multiple aliases into one best pair.
+ * - `ranked`/`capped`: the two bounds. `inserted`: the conflict-ignoring append.
+ * All three counts come off the same snapshot, so the log describes this run.
  */
 const scan = (data: DedupeSweepData) =>
   Effect.tryPromise({
     try: async () => {
-      // No `::text` on the column. Casting an enum away from its own type
-      // is what hides the column's statistics from the planner: with
-      // `kind::text in (…)` the `alive` scan estimated 6 rows out of 400
-      // and every join above it inherited the error. Untyped parameters let
-      // Postgres infer `entity_kind` from the comparison instead.
+      // No `::text` on the column: casting the enum hides its statistics
+      // from the planner and every join above inherits the misestimate.
+      // Untyped parameters let Postgres infer `entity_kind` instead.
       const kinds = sql.join(
         [...MERGEABLE].map((k) => sql`${k}`),
         sql`, `,
@@ -191,10 +161,8 @@ const scan = (data: DedupeSweepData) =>
   })
 
 /**
- * The job body, exported so a test drives it with a payload and no pg-boss
- * in sight — the `extract-document.ts` shape, minus its Layer: this job's
- * whole I/O is one statement against the same `db` every other read uses,
- * and faking that would assert nothing the statement itself is about.
+ * The job body, exported so a test drives it without pg-boss. No Layer: its
+ * only I/O is one statement, and faking `db` would test nothing.
  */
 export const dedupeSweepProgram = Effect.fn('dedupeSweep')(function* (
   data: DedupeSweepData,
@@ -207,8 +175,7 @@ export const dedupeSweepProgram = Effect.fn('dedupeSweep')(function* (
     capped: counts.eligible > DEDUPE_SWEEP_BOUNDS.perRun,
     ms: Date.now() - started,
   }
-  // The announcement, and the whole of it: the count, in the worker log.
-  // Nothing is written to the inbox beyond the rows themselves.
+  // The only announcement is this log line; the inbox gets just the rows.
   console.log(
     `[worker] ${QUEUES.dedupeSweep} scanned ${String(result.scanned)} · suggested ${String(result.suggested)}${result.capped ? ` · capped at ${String(DEDUPE_SWEEP_BOUNDS.perRun)}` : ''} · ${String(result.ms)}ms`,
   )
@@ -223,14 +190,12 @@ export const runDedupeSweepJob = (
 export const dedupeSweep: JobDef<DedupeSweepData> = {
   name: QUEUES.dedupeSweep,
   schema: dedupeSweepData,
-  // No `refs`: a sweep is about no one row, which is the case `JobRunRefs`
-  // documents both of its fields as optional for.
+  // No `refs`: a sweep is about no one row.
   run: (data) =>
     dedupeSweepProgram(data).pipe(
       Effect.asVoid,
-      // A failed scan is one statement that did not run — Postgres was busy,
-      // a lock was held. Nothing partial survives it (the insert is inside
-      // the statement), so the next attempt is a clean re-run.
+      // A failed scan is one statement that did not run; the insert is
+      // inside it, so nothing partial survives and a retry is a clean re-run.
       Effect.catchTag(
         'DedupeSweepFailed',
         (err) =>

@@ -6,7 +6,7 @@ import { RECORD_TABS, openRecordTab } from '#/lib/records/record-tabs'
 import type { RecordTab } from '#/lib/records/record-tabs'
 
 /**
- * A record's view (D74): the 44px bone tab head — Notes · Interactions ·
+ * A record's view: the 44px bone tab head — Notes · Interactions ·
  * Files · History, each with its mono count, empty ones grey at 0 — pinned
  * under the folded bar, over the open tab's view. The space page's head,
  * with a record's four tabs.

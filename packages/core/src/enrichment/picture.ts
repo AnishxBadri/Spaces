@@ -1,11 +1,11 @@
 import type { VocabularyKey } from '@spaces/sdk/vocabulary'
 
 /**
- * A record's picture, pure half (D76): which key answers it, what a fetched
+ * A record's picture, pure half: which key answers it, what a fetched
  * response must be to become one, and the words a refusal puts on the run's
  * timeline line.
  * - The picture is fetched once and stored as a blob, never hotlinked, so
- *   no view loads a third party's image (D67).
+ *   no view loads a third party's image.
  * - Raster images only, judged by their bytes: SVG is a script vector.
  */
 

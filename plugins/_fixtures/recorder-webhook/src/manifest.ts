@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { defineManifest } from '@spaces/sdk'
 
 /**
- * A webhook recorder (D78): Fathom or tl;dv pushes a delivery, web checks
+ * A webhook recorder: Fathom or tl;dv pushes a delivery, web checks
  * its HMAC-SHA256 signature against the saved secret, and `ingest` hands it
  * to the host as a recorded note — the contract Granola's schedule job uses.
  */

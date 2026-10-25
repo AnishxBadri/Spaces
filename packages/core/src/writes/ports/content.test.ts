@@ -34,8 +34,8 @@ import type {
 import { ContentLive } from './content'
 
 /**
- * Content's interaction and signal lanes bound to one integration row
- * (sdk-7b), against a real database: the dedupe is the same unique index the
+ * Content's interaction and signal lanes bound to one integration row,
+ * against a real database: the dedupe is the same unique index the
  * mailbox relies on, and every row these lanes write names the bound row —
  * whatever a caller passes.
  */
@@ -496,7 +496,7 @@ describe('provenance is the port’s', () => {
     const row = await boundRow('researcher')
     const other = await boundRow('impostor')
     const acme = await company('Smuggle Co', 'smuggle-content.example')
-    // The claim types carry no source (D52); at runtime an object can carry
+    // The claim types carry no source; at runtime an object can carry
     // anything, and the port must not read it.
     const forged = {
       source: 'impostor',

@@ -39,7 +39,7 @@ import type {
  * what it switches on, recent runs, Disable / Uninstall. Inside the settings
  * shell, so Plugins stays lit; the `_` keeps it out of the ledger's
  * component. A member reads it too, keys redacted and every control
- * disabled. (D81)
+ * disabled.
  */
 export const Route = createFileRoute('/_app/settings/plugins_/$integrationId')({
   loader: async ({ params }) => ({

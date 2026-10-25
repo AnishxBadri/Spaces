@@ -6,16 +6,15 @@ import { activity } from '@spaces/db/schema/activity'
 import { normalizeName } from '@spaces/sdk/identity'
 
 /**
- * Writing a term (SPA-75). The body of `createTerm` / `updateTerm`, moved out
- * of `lib/server/` when the write gained a behaviour (the Effect ratchet,
- * CONTEXT.md "Backend paradigm"), so a test calls it without a request.
+ * Writing a term: the body of `createTerm` / `updateTerm`, outside the
+ * server-fn barrel so a test calls it without a request.
  *
  * **Aliases are findable, not only matchable.** `term.aliases` is what the
  * glossary matcher reads, but the fused search query cannot see it: Cmd-K's
  * `name_hits` lane and `searchEntities` read `entity_alias(kind: 'name')`.
  * So every write that carries aliases diff-syncs them into that table —
- * `source_class: 'manual'`, `is_identity: false` — and "PUE" finds "Power
- * Usage Effectiveness" through a query nobody had to touch.
+ * `source_class: 'manual'`, `is_identity: false` — so "PUE" finds "Power
+ * Usage Effectiveness" with no change to search.
  *
  * The sync owns the manual name aliases of the term and nothing else: it
  * adds the ones the term gained, deletes the ones it lost, and leaves every

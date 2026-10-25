@@ -11,12 +11,10 @@ import {
 import { keyHintClasses } from './ui/button.tsx'
 
 /**
- * SPA-53 — the four specifics DESIGN.md §5 carried from the Micro-interactions
- * sheet as "proposed, not yet in code": the composer wash, the rejected cell's
+ * The four micro-interactions: the composer wash, the rejected cell's
  * crimson hold, the toast's 8px rise, and the pending button's dropped key
- * hint. Two of the four are class strings, asserted through their helpers the
- * way `switch.test.ts` does; two are CSS, asserted by reading styles.css the
- * way `design-tokens.test.ts` does.
+ * hint. Two are class strings, asserted through their helpers; two are CSS,
+ * asserted by reading the stylesheet.
  *
  * What the CSS half is really holding is the Compositor Rule and the
  * reduced-motion switch — neither is verifiable in a browser from a test

@@ -11,7 +11,7 @@ import { attributeEvent, entity } from '@spaces/db/schema'
  * - `medianDaysInStage` is the median over the live deals in each stage —
  *   Today's "Idle in stage" tick and the deal page's Days in stage readout.
  *
- * Outside `lib/server/` so tests and other loaders can call it.
+ * Outside the server-fn barrel so tests and other loaders can call it.
  */
 export type StageFunnel = {
   countByStage: Record<string, number>

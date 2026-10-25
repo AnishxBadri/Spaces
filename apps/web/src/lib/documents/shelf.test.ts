@@ -6,21 +6,12 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * The `/documents` shelf query (SPA-58), against the test database.
- *
- * What is worth pinning is the half `listRecordDocuments` cannot answer. That
- * one starts at `link` and returns **one row per filing**, so a deck filed
- * against a company and a deal is two rows; this returns one row per document
- * with both filings folded into it. Everything below is that difference, plus
- * the two exclusions the shelf has to get right — a merged-away document is
- * not a document, and a chip pointing at a merged-away target would route to
- * a page the merge redirects away from.
- *
- * Dynamic imports for the reason the rest of the DB-coupled suite uses them:
- * `@spaces/db` builds its pool from `DATABASE_URL` at import time and
- * `vitest.setup.ts` rewrites it per file. The program is called directly —
- * `listDocuments` needs a request no test has, which is why the query lives
- * outside `lib/server/` at all.
+ * The `/documents` shelf query, against the test database: one row per
+ * document with every filing folded in (`listRecordDocuments` is one row per
+ * filing), and the two exclusions — a merged-away document, and a chip
+ * pointing at a merged-away target.
+ * Imports are dynamic because `@spaces/db` builds its pool from
+ * `DATABASE_URL` at import time and the vitest setup rewrites it per file.
  */
 
 async function actorId(): Promise<string> {
@@ -82,7 +73,7 @@ async function fileDocument(
   return id
 }
 
-/** A second filing on an existing document row — the N-places rule (§3.4). */
+/** A second filing on an existing document row — the N-places rule. */
 async function alsoFileAgainst(documentId: string, entityId: string) {
   const { db } = await import('@spaces/db')
   const { link } = await import('@spaces/db/schema')
@@ -114,7 +105,7 @@ async function shelf() {
 
 /**
  * The shelf is the whole workspace by design, and truncation is per test
- * *file* rather than per test (CLAUDE.md → Isolation), so every case below
+ * *file* rather than per test, so every case below
  * tags its fixtures and reads back only its own. Asserting on the bare list
  * would make each test depend on the ones before it.
  */
@@ -196,8 +187,8 @@ describe('listDocumentsProgram', () => {
   })
 
   it('leaves an ordinary upload with no storage-source provenance', async () => {
-    // The five columns of §11 delta 1 are null on every document until a
-    // storage-source plugin files one (SPA-78), and this row must read
+    // The storage-source columns are null on every document until a
+    // storage-source plugin files one, and this row must read
     // exactly as it read before they existed: three nulls, not three empty
     // strings and not a placeholder dash — the Source column prints the
     // origin on its own when `sourcePath` is null.
@@ -213,8 +204,7 @@ describe('listDocumentsProgram', () => {
     expect(rows[0].sourcePath).toBeNull()
     expect(rows[0].externalUrl).toBeNull()
     expect(rows[0].externalStatus).toBeNull()
-    // Unchanged by this slice, and the reason the Source column can fall
-    // back to the origin text at all.
+    // The reason the Source column can fall back to the origin text at all.
     expect(rows[0].sourceClass).toBe('manual')
     expect(rows[0].sourceCapability).toBeNull()
   })
@@ -233,7 +223,7 @@ describe('listDocumentsProgram', () => {
     await db
       .update(document)
       .set({
-        // Verbatim (§5.3): the shelf prints what the provider called it, so
+        // Verbatim: the shelf prints what the provider called it, so
         // the row reads the way the user would say it out loud.
         sourcePath: 'Data room / Legal',
         externalUrl: 'https://drive.example/file/abc123',
@@ -245,7 +235,7 @@ describe('listDocumentsProgram', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].sourcePath).toBe('Data room / Legal')
     expect(rows[0].externalUrl).toBe('https://drive.example/file/abc123')
-    // Deleted on their side, kept on ours (§7, §8) — the row is still here,
+    // Deleted on their side, kept on ours — the row is still here,
     // which is the whole point of copy-in.
     expect(rows[0].externalStatus).toBe('gone')
   })

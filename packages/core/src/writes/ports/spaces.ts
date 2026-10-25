@@ -5,7 +5,7 @@ import type { BoundIntegration } from './binding'
 import { actorOf } from './read'
 
 /**
- * SpacesLive: a watch's subject, read as the bound integration (D72).
+ * SpacesLive: a watch's subject, read as the bound integration.
  * - `brief(spaceId)` is `spaceBriefProgram` with the row as the reader —
  *   no argument names a reader, so a plugin cannot read as anyone else.
  * - A refusal (missing, archived, sensitive) is `JobPermanent` naming why, so

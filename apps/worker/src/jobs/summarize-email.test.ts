@@ -13,7 +13,7 @@ import {
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
 /**
- * The wrapper's view of an email's summary job and its backfill (D67). The
+ * The wrapper's view of an email's summary job and its backfill. The
  * programs' behaviour is `summarizeEmail`'s own suite in apps/web; this holds
  * the jobs to their queues and their outcomes.
  */

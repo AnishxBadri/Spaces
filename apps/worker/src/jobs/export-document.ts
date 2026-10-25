@@ -15,11 +15,10 @@ import { JobPermanent, JobRateLimited, JobRetryable } from '../run-job'
 import type { JobDef, JobRetryPolicy } from '../run-job'
 
 /**
- * storage.export — write-through (§6): an in-app upload on a pushing
- * binding's record put in the bound folder through the storage-source plugin
- * with the binding's grant, and its pointer recorded by core's
- * `exportDocumentProgram`; an exported document re-filed or renamed here,
- * moved or renamed there.
+ * storage.export, write-through: an in-app upload on a pushing binding's
+ * record is put in the bound folder through the storage-source plugin with
+ * the binding's grant, its pointer recorded by `exportDocumentProgram`; an
+ * exported document re-filed or renamed here is moved or renamed there.
  * - A pull-only binding, a non-upload, a `gone` row or a deleted document
  *   is a no-op, never a failure.
  * - No usable connection (none bound, refused token, no plugin) is

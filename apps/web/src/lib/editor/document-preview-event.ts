@@ -1,22 +1,10 @@
 /**
- * How a document mention chip asks for a preview (SPA-27).
- *
- * A document has no page by decision — `recordPath` returns null for it — so
- * the chip opens the preview modal instead of navigating. The chip cannot
- * open it itself: `createReactInlineContentSpec` renders inside BlockNote's
- * ProseMirror tree, which sits under no router and under no dialog context,
- * and mounting a Radix dialog in there is the failure mode this event exists
- * to avoid (the editor re-renders the node on every keystroke near it, which
- * would remount the dialog mid-open).
- *
- * So the chip dispatches and the *page* listens. A bubbling DOM CustomEvent
- * is the seam: it leaves the editor through the ordinary DOM, needs no
- * React context on either side, and the listener is one `useEffect` on the
- * route that already owns the modal.
- *
- * The decode is a runtime check rather than a cast because an `Event` handed
- * to a listener carries no proof of who dispatched it — anything on the page
- * may fire this name.
+ * How a document mention chip asks for a preview. A document has no page
+ * (`recordPath` is null), so the chip dispatches a bubbling CustomEvent and
+ * the route that owns the modal listens.
+ * - Never mount the dialog inside the chip: BlockNote's ProseMirror tree has
+ *   no router or dialog context and re-renders the node mid-open.
+ * - The decode is a runtime check, not a cast: anything on the page may fire this name.
  */
 
 export const DOCUMENT_PREVIEW_EVENT = 'spaces:preview-document'

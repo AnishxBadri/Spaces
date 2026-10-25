@@ -19,7 +19,7 @@ import type {
 } from './job-status-listener'
 
 /**
- * Web's one LISTEN client (D64): however many record pages subscribe, one
+ * Web's one LISTEN client: however many record pages subscribe, one
  * connection; each notification reaches only its record's subscribers; a
  * lost connection reconnects and asks every subscriber to resync; shutdown
  * ends the connection and every stream.

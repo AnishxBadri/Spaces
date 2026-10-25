@@ -65,7 +65,7 @@ export async function seedSystemAttributes() {
         name: def.name,
         type: def.type,
         options: def.options ?? {},
-        // Engine flags (SPA-93). Seeded, never re-asserted: like options and
+        // Engine flags. Seeded, never re-asserted: like options and
         // names, they are user-editable content after first boot, so an
         // operator who unticks the box on `stage` keeps it unticked across
         // upgrades.
@@ -90,7 +90,7 @@ export async function seedSystemAttributes() {
 }
 
 /**
- * The system relationships (D69), paired insert-if-absent: each half gains
+ * The system relationships, paired insert-if-absent: each half gains
  * `options.inverseOf` naming the other, with the cardinality (and, on the
  * inverse, `derived`) its `SeedDef` declares. A half that already names a
  * pair is never touched, and a user attribute holding a system slug is
@@ -149,7 +149,7 @@ async function seedRelationshipPairs(
 }
 
 /**
- * The default enrichment links (D76) for system attributes seeded before
+ * The default enrichment links for system attributes seeded before
  * they existed: insert-if-absent on `options.enrichmentKey`. An attribute
  * the owner unlinked holds `enrichmentKey: null` and is never re-linked.
  */

@@ -9,14 +9,12 @@ import { ccy, isoDate, markInput, money, roundInput } from '../portfolio/inputs'
 import { requireUser } from './shared'
 
 /**
- * The financial engine's server layer (CONTEXT.md phase 15). Events are
- * append-only; every aggregate here is computed at read by the pure lib in
- * packages/core/src/portfolio/. Base currency lives in workspace.settings.
- *
- * The read itself is `../portfolio/detail`, which is where the reversal
- * reader contract (D12, SPA-150) is stated: the pure libs are handed
- * originals only, each stamped with `reversedAt`. These handlers are the
- * auth gate and the write paths.
+ * The financial engine's server layer. Events are append-only; every
+ * aggregate is computed at read by the pure portfolio lib. Base currency
+ * lives in workspace.settings.
+ * - The reversal reader contract: the pure libs are handed originals only,
+ *   each stamped with `reversedAt` (stated on the portfolio detail loader).
+ * - These handlers are the auth gate and the write paths.
  */
 
 /**
@@ -40,9 +38,9 @@ export const getHolding = createServerFn()
   })
 
 /**
- * The four event writers are thin callers (SPA-171): the bodies are the
- * programs in `../portfolio/write`, which the ledger import commit calls
- * too, so history has one writer.
+ * The four event writers are thin callers: the bodies are the portfolio write
+ * programs, which the ledger import commit calls too, so history has one
+ * writer.
  */
 export const addRound = createServerFn({ method: 'POST' })
   .validator(roundInput)
@@ -191,7 +189,7 @@ export const setBaseCurrency = createServerFn({ method: 'POST' })
   })
 
 /**
- * Void one ledger entry (D12). Nothing is edited and nothing is deleted:
+ * Void one ledger entry. Nothing is edited and nothing is deleted:
  * this appends an exact-negative event citing the original. The typed
  * refusals are turned into sentences here rather than allowed to reject as
  * they are — Effect rejects with the tagged error itself, which carries no

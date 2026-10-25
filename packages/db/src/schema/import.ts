@@ -322,7 +322,6 @@ export type LedgerEventKind = 'round' | 'investment' | 'mark' | 'distribution'
  * - Ids are events this commit appended, or existing live rows with the same
  *   natural key (named in `reused`).
  * - `roundId` is how the receipt names the round: a round has no `batch_id`.
- *   (D12)
  */
 export type LedgerCommitted = {
   holdingId: string

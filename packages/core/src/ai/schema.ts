@@ -5,19 +5,14 @@ import { isDerived } from '../attributes/relationship'
 import type { AttributeDef } from '../attributes/registry'
 
 /**
- * The registry is the output type system (docs/spec-ai-substrate.md §2).
- * `schemaFor` compiles an object's attribute registry into the JSON schema a
- * provider is handed as structured output; `validateProposal` holds what
- * comes back to the same validators a human write meets; `toPatch` turns a
- * valid proposal into the patch `planPatch` takes. Nothing here knows about
- * a model, a provider or a database — a custom object is extractable-into
- * the moment its attributes exist, with no AI-specific code.
- *
- * **The envelope (settled here, SPA-21).** Every property is wrapped
- * `{value, refs, confidence}`: the review UI needs "from p.4" per field, and
- * a per-field split cannot be recovered from a row-level list. The
- * suggestion row's own `refs[]` is the derived union (`proposalRefs`) —
- * cheap to compute from the split, while the reverse is impossible.
+ * The attribute registry is the AI output type system.
+ * - `schemaFor` compiles a registry into the structured-output JSON schema;
+ *   `validateProposal` holds the answer to a human write's validators;
+ *   `toPatch` turns it into `planPatch`'s patch. No model, provider or db
+ *   here, so a custom object is extractable-into once its attributes exist.
+ * - Every property is wrapped `{value, refs, confidence}`: review needs refs
+ *   per field, and a per-field split cannot be recovered from the row-level
+ *   union (`proposalRefs`), while the union is cheap to derive.
  */
 
 /** What the compiler reads off an attribute — a registry row satisfies it. */
@@ -25,7 +20,7 @@ export type SchemaAttribute = Pick<
   AttributeDef,
   'slug' | 'name' | 'type' | 'options' | 'archived'
 > & {
-  /** `attribute.description` (migration 0020) — the property's description */
+  /** `attribute.description` — the property's description */
   description?: string | null
 }
 
@@ -71,7 +66,7 @@ export type IdentityClaim = {
 /** One proposed field — the envelope every property wears. */
 export type ProposedField = {
   value: unknown
-  /** ContextItem refs (spec §1) the value was read from */
+  /** ContextItem refs the value was read from */
   refs: Array<string>
   confidence: number
 }
@@ -204,7 +199,7 @@ const envelope = (def: SchemaAttribute, value: JsonSchema): JsonSchema => ({
 
 /**
  * Registry → the structured-output schema. Archived attributes, the inverse
- * half of a relationship (`isDerived`, D69) and types with no write shape
+ * half of a relationship (`isDerived`) and types with no write shape
  * drop out.
  *
  * No property is `required`, whatever the attribute's own `required` says.

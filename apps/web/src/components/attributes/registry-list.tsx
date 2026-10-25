@@ -16,7 +16,7 @@ import type { listRegistry } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 /**
- * One object's registry as a settings ledger (spec §7): `ATTRIBUTES` with
+ * One object's registry as a settings ledger: `ATTRIBUTES` with
  * the live count and `drag to reorder` in its head, then one row per
  * attribute — grip · name · type in words (`Multi-select · 6`,
  * `Record · People`) · rules (`↔ Team · N:N`, `identity · unique`,
@@ -97,8 +97,9 @@ export function typeWords(
 
 /**
  * An attribute's rules in words: its relationship pair (`↔ Team · N:N`,
- * `· pair archived` once the other half is, D69), required, an identity key (unique by construction, D75), the
- * enrichment source that fills it, an AI answer. `filledBy` is the source's
+ * `· pair archived` once the other half is), required, an identity key
+ * (unique by construction), the enrichment source that fills it, an AI
+ * answer. `filledBy` is the source's
  * name, or null when none fills it.
  */
 export function ruleWords(
@@ -126,7 +127,7 @@ export function ruleWords(
     .join(' · ')
 }
 
-/** The record kind whose vocabulary Fill from offers: Companies and People only. (D76) */
+/** The record kind whose vocabulary Fill from offers: Companies and People only. */
 const fillFromOf = (object: ObjectRow): 'company' | 'person' | undefined =>
   !object.isSystem
     ? undefined
@@ -369,7 +370,7 @@ function AttributeRow({
             onSelect: () => onMove('down'),
           },
         ]),
-    // A system attribute is never archived, so its menu has no such item. (D69)
+    // A system attribute is never archived, so its menu has no such item.
     ...(attr.isSystem
       ? []
       : [

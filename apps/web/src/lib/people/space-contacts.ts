@@ -7,9 +7,7 @@ import { jsonString } from '@spaces/core/json'
 import { PERSON_COMPANIES, personCompanyEdge } from './companies'
 
 /**
- * Contacts — the people of one space (SPA-99), the second half of CONTEXT's
- * "sources and contacts sections" open question and the same two-lane shape
- * SPA-44/SPA-67 settled for Sources:
+ * Contacts — the people of one space, in the same two-lane shape as Sources:
  *
  * - **direct** — people with an `entity_space` row for this space, tagged in
  *   deliberately. These are the section, and the only thing the headline and
@@ -18,14 +16,11 @@ import { PERSON_COMPANIES, personCompanyEdge } from './companies'
  *   tagged into this space. A closed disclosure under the direct rows;
  *   never counted.
  *
- * Two programs rather than one union, for the reason `space-sources.ts`
- * gives: they answer different questions and the page renders them
- * differently.
+ * Two programs rather than one union: they answer different questions and
+ * the page renders them differently.
  *
- * It lives outside `lib/server/` on purpose. `lib/server/spaces.ts` is
- * reachable from the client barrel and a plain export there ships to the
- * browser (CLAUDE.md → Traps, SPA-155); a test can call these without a
- * request, which `getSpace` would never allow.
+ * Outside the server-fn barrel on purpose: a plain export there ships to the
+ * browser, and a test can call these without a request.
  *
  * `entity.merged_into_id` is filtered in SQL on **both** ends of the
  * inherited join — a person merged away stops being a contact, and a company
@@ -54,8 +49,7 @@ export type SpaceContact = {
  * A person reached through a company tagged into this space. The company is
  * part of the row because a person nobody tagged here has to say why they
  * are on the page at all — and one person at two companies here is
- * **two rows**, one under each, which is SPA-67's decision for documents
- * applied to the same question.
+ * **two rows**, one under each, as documents are under Sources.
  */
 export type InheritedContact = SpaceContact & {
   companyId: string

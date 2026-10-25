@@ -3,8 +3,8 @@ import { Log, definePlugin } from '@spaces/sdk'
 import { manifest } from './manifest.ts'
 
 /**
- * `boom` throws before it returns an Effect — the uncaught throw contract 2
- * is about, which the host turns into a failed job and never a dead worker.
+ * `boom` throws before it returns an Effect — an uncaught throw, which the
+ * host must turn into a failed job and never a dead worker.
  */
 export default definePlugin({
   manifest,

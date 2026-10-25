@@ -17,8 +17,8 @@ import type {
 import type { SearchHit } from '#/lib/search/query'
 
 /**
- * Cmd-K's preview pane: the highlighted result, right of the list. (D70)
- * - A record: its stamp, name and readout strip (variant B), then its first
+ * Cmd-K's preview pane: the highlighted result, right of the list.
+ * - A record: its stamp, name and readout strip, then its first
  *   six filled attributes as label–value rows.
  * - An object: its saved views with their counts.
  * - A passage: its page's text, the matched chunk set off.

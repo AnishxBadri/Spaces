@@ -3,11 +3,10 @@ import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * SPA-86's "one entry gate", held by grep: nothing under `lib/arrival/`
- * inserts into `entity` or `entity_alias` itself. People and companies
- * arrive through `resolveEntity` (`participant-records.ts`), whose collision
- * door is the only place an identity key is ever claimed; the body note
- * through `lib/notes/body-note.ts`.
+ * The one entry gate, held by grep: nothing in the arrival lane inserts
+ * into `entity` or `entity_alias` itself. People and companies arrive
+ * through `resolveEntity`, whose collision door is the only place an
+ * identity key is ever claimed; the body note through the body-note writer.
  *
  * Production modules only. The tests build the graph an arrival reads —
  * a company that already holds a domain, a deal on it — and that fixture

@@ -1,7 +1,7 @@
 import type { Cardinality } from '@spaces/db/schema/attributes'
 
 /**
- * The pure half of a relationship (D69): two `record_reference` attributes
+ * The pure half of a relationship: two `record_reference` attributes
  * joined by `options.inverseOf`, the value stored once on the owner.
  * Cardinality is always read from an attribute's own side.
  */

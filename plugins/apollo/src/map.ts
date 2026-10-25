@@ -17,14 +17,14 @@ import type {
  * claims. Provider JSON in, port arguments out — no Effect, no ports.
  * - Fields are parsed, never trusted: an absent or null field claims nothing,
  *   and a value the vocabulary would refuse is left in the receipt only.
- * - Answers are vocabulary keys (D76); the host decides which attribute,
+ * - Answers are vocabulary keys; the host decides which attribute,
  *   if any, each one fills. Apollo's own ids stay in the receipt.
  * - A domain or a verified email is an identity key; a LinkedIn URL is a
- *   value. (D75)
+ *   value.
  * - The latest round and a change of role are keyed signals, never values:
  *   dated evidence citing the receipt, written once however often it runs.
  * - Not read: departmental head count, Alexa ranking, retail location
- *   count, Apollo's tag ids. (D76)
+ *   count, Apollo's tag ids.
  */
 
 export const APOLLO_API = 'https://api.apollo.io/api/v1'

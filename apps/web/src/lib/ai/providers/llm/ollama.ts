@@ -5,7 +5,7 @@ import { PROVIDERS } from '../ids'
 import type { AdapterInput } from './adapter'
 
 /**
- * The Ollama LLM adapter (SPA-39), through `ollama-ai-provider-v2` against
+ * The Ollama LLM adapter, through `ollama-ai-provider-v2` against
  * Ollama's native `/api` rather than its OpenAI-compatible `/v1`.
  *
  * Keyless: the credential's secret is the empty string the settings save

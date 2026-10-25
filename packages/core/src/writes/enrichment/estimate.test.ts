@@ -24,7 +24,6 @@ import { runEnrichment } from './run'
 /**
  * Bulk Enrich against a real database, on an `Enqueue` that keeps
  * pg-boss's singleton rule — one queued job per key — and a set clock.
- * (D76, D53)
  */
 
 type Sent = {

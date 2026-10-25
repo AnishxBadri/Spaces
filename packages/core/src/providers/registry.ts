@@ -4,7 +4,7 @@
  * encrypted), under which N plugins hang. Pure data, client-safe.
  * - A manifest's `requires.connection.scopes` names `value`s from here;
  *   `wire` is what the authorize request sends.
- * - Least privilege (D66): Drive asks `drive.file` for the picker and adds
+ * - Least privilege: Drive asks `drive.file` for the picker and adds
  *   `drive.readonly` only when a folder is bound, incrementally; never full
  *   `drive`, never `mail.google.com`, `gmail.compose` or `gmail.modify`.
  */

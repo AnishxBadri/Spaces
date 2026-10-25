@@ -2,12 +2,12 @@ import type { Zip } from '../documents/ooxml'
 import { allRuns, decodeXml, entry, numbered, unzip } from '../documents/ooxml'
 
 /**
- * The spreadsheet reader (SPA-163, import-1): CSV, TSV and XLSX bytes into
- * one cell grid, so every later import step — staging, mapping, coercion,
- * resolve — reads the same shape whatever the user uploaded. Pure: bytes in,
- * strings out, no database, no dependency beyond the fflate the xlsx text
- * path already carried. `extract.ts`'s `fromXlsx` reads through
+ * The spreadsheet reader: CSV, TSV and XLSX bytes into one cell grid, so
+ * every later import step — staging, mapping, coercion, resolve — reads the
+ * same shape whatever the user uploaded. Pure: bytes in, strings out, no
+ * database, no dependency beyond fflate. `fromXlsx` reads through
  * `readXlsx` here, so the repo keeps one xlsx parser.
+
  *
  * Cells are strings, verbatim. The one interpretation the reader makes is a
  * date: a numeric xlsx cell whose style is a date format comes back as
@@ -515,14 +515,14 @@ export function isDateFormat(code: string): boolean {
 }
 
 const DAY_MS = 86_400_000
-/** 9999-12-31 in the 1900 system — past it a Date cannot print four digits. */
+/** `9999-12-31` in the 1900 system — past it a Date cannot print four digits. */
 const MAX_SERIAL = 2_958_465
 
 /**
  * An Excel serial as `YYYY-MM-DD`, the time of day dropped. The 1900 system
- * counts from 1899-12-31 and keeps Lotus's phantom 1900-02-29 at 60, so
- * from 61 on the epoch is effectively 1899-12-30 (45000 → 2023-03-15). The
- * 1904 system counts from 1904-01-01. Null for anything that is not a
+ * counts from `1899-12-31` and keeps Lotus's phantom `1900-02-29` at 60, so
+ * from 61 on the epoch is effectively `1899-12-30` (45000 → `2023-03-15`). The
+ * 1904 system counts from `1904-01-01`. Null for anything that is not a
  * non-negative serial a calendar can print.
  */
 export function serialToIsoDate(

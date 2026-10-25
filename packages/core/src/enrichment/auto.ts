@@ -5,7 +5,7 @@ import { CORE_IDENTITY } from '../attributes/registry'
 import { DEFAULT_CACHE_DAYS } from '@spaces/core/plugins/credit'
 
 /**
- * Auto-enrich is the Enrich button pressed for the owner (D76): a trigger
+ * Auto-enrich is the Enrich button pressed for the owner: a trigger
  * queues `enrichment.run` only past the host's checks, in this order.
  * - `scope`: some source has the trigger in its auto-enrich scope;
  * - `sensitive`: a sensitive record keeps only local sources;
@@ -74,7 +74,7 @@ const filled = (value: unknown): boolean =>
 
 /**
  * Whether a source has something to look the record up by: a company's
- * domain; a person's email or LinkedIn URL. (D76)
+ * domain; a person's email or LinkedIn URL.
  */
 export const hasLookupKey = (
   kind: 'company' | 'person',

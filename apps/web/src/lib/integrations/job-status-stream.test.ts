@@ -5,7 +5,7 @@ import type { JobStatusRow } from './job-status'
 import type { JobStatusSubscriber } from '#/lib/server/job-status-listener'
 
 /**
- * The record's status stream (D64): `init` from `job_run` on open and on
+ * The record's status stream: `init` from `job_run` on open and on
  * every resync, live `status` events for this record only, and nothing at
  * all for a viewer the record page would refuse.
  */

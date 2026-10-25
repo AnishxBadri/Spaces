@@ -26,8 +26,8 @@ import { sensitivityFor } from '../ai/sensitivity-for'
 import { memosTaggedIn, query, readableNote } from './spaces'
 
 /**
- * A space as the subject (D71): the brief a watch's engine turns into its own
- * query (D72). Data, never prompt text — each piece is a field, not a line.
+ * A space as the subject: the brief a watch's engine turns into its own
+ * query. Data, never prompt text — each piece is a field, not a line.
  * - Read as `reader` (`canRead`): an integration sees shared notes only.
  * - Refused, never partial: a space that is missing, archived (itself or an
  *   ancestor) or sensitive anywhere in its path answers `SpaceBriefRefused`.
@@ -60,7 +60,7 @@ const TERM_MAX = 600
  * How the brief is read.
  * - `watch`: it leaves the box. A sensitive or archived subject refuses; a
  *   sensitive subspace or member is left out.
- * - `context`: Ask's space subject (D71). Nothing sensitive is cut; the call
+ * - `context`: Ask's space subject. Nothing sensitive is cut; the call
  *   is marked sensitive instead, and only archived subspaces leave.
  */
 export type SpaceBriefMode = 'watch' | 'context'
@@ -83,7 +83,7 @@ export const spaceBriefProgram = Effect.fn('spaceBriefProgram')(function* (
   return (yield* readBrief(spaceId, reader, 'watch')).brief
 })
 
-/** A space as Ask's subject: the brief with nothing sensitive cut. (D71) */
+/** A space as Ask's subject: the brief with nothing sensitive cut. */
 export const spaceSubjectProgram = Effect.fn('spaceSubjectProgram')(function* (
   spaceId: string,
   reader: { readonly id: string },

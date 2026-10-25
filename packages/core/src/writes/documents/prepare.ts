@@ -4,25 +4,14 @@ import { pendingBlob } from '@spaces/db/schema'
 import { storage } from '../storage'
 
 /**
- * **The first half of an upload** — the call that hands out a URL, and the
- * one that decides whether these bytes need watching (SPA-54).
- *
- * Upload is two calls around a direct-to-storage PUT, because a 200MB deck
- * must not stream through Node (CONTEXT.md → Storage): this asks the store
- * for a URL, the browser PUTs, and `finalizeDocumentUpload` files the row.
- * The gap between the PUT and the finalize is the whole problem — a closed
- * tab there leaves bytes no `document` row will ever name — so this is also
- * where the `pending_blob` row is written.
- *
- * It lives in core's db-coupled half since SPA-201 (sdk-8a), beside
- * `birth.ts` and `intake.ts`, and never in apps/web's `lib/server/`: the
- * server-fns barrel re-exports `lib/server/*` wholesale to the browser and a
- * plain export there ships with it (CLAUDE.md → Traps, SPA-155), while the
- * two rules below — a pending row for a blob we do not hold, and no pending
- * row for one we do — need a test that can call them without a request.
- * `prepareDocumentUpload` is then `requireUser()` plus this and nothing else,
- * exactly as `finalizeDocumentUpload` is `requireUser()` plus
- * `birthDocumentProgram`.
+ * **The first half of an upload** — hands out a URL, and decides whether
+ * these bytes need watching.
+ * - Upload is two calls around a direct-to-storage PUT, so a 200MB deck never
+ *   streams through Node. A tab closed between PUT and finalize leaves bytes
+ *   no `document` row names, so this writes the `pending_blob` row.
+ * - Never in apps/web's server modules: the server-fns barrel ships their
+ *   plain exports to the browser. `prepareDocumentUpload` is `requireUser()`
+ *   plus this.
  */
 
 export type PrepareBlobUploadInput = {
@@ -64,8 +53,8 @@ export const prepareBlobUploadProgram = Effect.fn('prepareBlobUpload')(
     const store = storage()
 
     // Content-addressed: the same deck sent to both partners is one blob.
-    // Already stored ⇒ skip the transfer entirely — and, since SPA-54, write
-    // **no** pending row. These bytes are not in flight; they are bytes the
+    // Already stored ⇒ skip the transfer entirely, and write **no** pending
+    // row. These bytes are not in flight; they are bytes the
     // workspace already holds, either named by a document row or already
     // tracked by an earlier pending row with its own clock. A row written on
     // this branch would put a known deck's blob on the sweep's list every

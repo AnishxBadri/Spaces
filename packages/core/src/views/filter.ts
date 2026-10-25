@@ -11,12 +11,8 @@ import type {
  * evaluated over loaded rows (tables are not paginated). Ops are typed by
  * attribute so the editor only offers what makes sense: a select is
  * `is`/`is_not`, a number is `gt`/`lt`, everything can be `empty`.
- *
- * The shapes themselves are declared at the `view` table's jsonb columns
- * (`@spaces/db/schema/views`) and re-exported here, so every
- * `@spaces/core/views/filter` import reads the same names it always did
- * (SPA-142). This module is the behaviour: the op menu, the matcher, the
- * coercions.
+ * The shapes are declared at the `view` table's jsonb columns and re-exported
+ * here; this module is the behaviour: the op menu, the matcher, the coercions.
  */
 export type { Condition, ConditionOp, ConditionValue, ViewExtra, ViewSort }
 
@@ -63,10 +59,9 @@ export function opsFor(type: string): Array<ConditionOp> {
 export const isUnary = (op: ConditionOp) => op === 'empty' || op === 'not_empty'
 
 /**
- * Whether `is` compares numerically rather than by string. The second
- * evaluator (`apps/web/src/lib/views/sql.ts`) has to branch the same way, and
- * a second copy of the set would be a divergence the property test could only
- * report after the fact.
+ * Whether `is` compares numerically rather than by string. The SQL evaluator
+ * (`compileConditions`) must branch the same way, so it reads this set rather
+ * than a copy.
  */
 export const isNumericType = (type: string) => NUMBER_TYPES.has(type)
 

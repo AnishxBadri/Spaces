@@ -17,8 +17,7 @@ export type {
 export type { GridCell, WhereFrom } from '@spaces/core/enrichment/page'
 
 /**
- * Settings → Integrations → Enrichment and a record's enrichment (D76,
- * D81). Reads are any member's; every write opens with `requireAdmin()`.
+ * Settings → Integrations → Enrichment and a record's enrichment. Reads are any member's; every write opens with `requireAdmin()`.
  * The programs are imported inside the handlers so their database code
  * never reaches the client bundle.
  */

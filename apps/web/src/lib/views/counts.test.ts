@@ -13,8 +13,8 @@ import {
 import type { Condition, ConditionOp } from '@spaces/core/views/filter'
 
 /**
- * The chip counts (SPA-162) against the client evaluator: a saved view per
- * (attribute, op, probe) over `sql.test.ts`'s fixture rows, all counted in
+ * The chip counts against the client evaluator: a saved view per
+ * (attribute, op, probe) over the sql tests' fixture rows, all counted in
  * one `countViewsProgram` call, and each count must equal the number of rows
  * `matchesConditions` keeps. That is the assertion that the count is the list
  * page's own predicate — `compileConditions` over the live registry — and
@@ -22,7 +22,7 @@ import type { Condition, ConditionOp } from '@spaces/core/views/filter'
  *
  * The fixture list's `json` attribute (`misc`) is the one type the
  * `attribute_type` enum cannot store, so it has no registry row here;
- * `sql.test.ts` covers it through a hand-built registry. Every op is still
+ * the sql tests cover it through a hand-built registry. Every op is still
  * walked over every other type.
  */
 

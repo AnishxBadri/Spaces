@@ -26,7 +26,7 @@ import type { BoundIntegration } from './binding'
 
 /**
  * DiscoverLive: a watch's hand-back, one candidate company for its space.
- * (D72, D77) Every candidate passes three checks, in this order:
+ * Every candidate passes three checks, in this order:
  * - **dismissed**: a domain dismissed from the space returns at once,
  *   before any identity lookup;
  * - **member**: `previewResolve` over the identity normalizers — held and
@@ -61,7 +61,7 @@ export type DiscoverDeps = {
 
 const liveDeps: DiscoverDeps = { preview: previewResolve }
 
-/** Refused: the space is gone, merged away or archived. Cards stop. (D73) */
+/** Refused: the space is gone, merged away or archived. Cards stop. */
 export class DiscoverSpaceRefused extends Schema.TaggedError<DiscoverSpaceRefused>()(
   'DiscoverSpaceRefused',
   { spaceId: Schema.String, reason: Schema.String },
@@ -109,7 +109,7 @@ async function filedUnder(entityId: string, path: string): Promise<boolean> {
 /**
  * Where a candidate stands against what is held, read only — the checks a
  * card would pass, without proposing one. Ask's Find table reads its rows
- * through it. (D77)
+ * through it.
  * - With a space: dismissed from it, filed in it or below, held elsewhere,
  *   or unknown.
  * - Without one (`path` null): held or unknown; nothing is dismissed and

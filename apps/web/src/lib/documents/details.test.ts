@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
  * Remove confirm prints, the words and pages the viewer's TEXT line reads,
  * and the notes that mention the file — a private note only for its author.
  * Dynamic imports: `@spaces/db` builds its pool from `DATABASE_URL` at import
- * time and `vitest.setup.ts` rewrites it per file.
+ * time and the vitest setup rewrites it per file.
  */
 
 async function actorId(): Promise<string> {

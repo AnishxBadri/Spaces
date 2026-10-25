@@ -1,6 +1,6 @@
 /**
  * Today's attention rules, pure: which deals are idle, how the Needs you
- * ledger is ordered and folded, and the head's date stamp. (D79)
+ * ledger is ordered and folded, and the head's date stamp.
  * Client-safe: the route and its components call these during render.
  */
 

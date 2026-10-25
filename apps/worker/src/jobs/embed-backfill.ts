@@ -11,27 +11,18 @@ import { JobPermanent, JobRateLimited, JobRetryable } from '../run-job'
 import type { JobDef, JobRetryPolicy } from '../run-job'
 
 /**
- * chunk.embed-backfill — every chunk not on the pinned model, embedded in
- * batches (SPA-136). The program is `lib/ai/embed-backfill.ts`; this is the
- * wrapper's view of it, enqueued only by the admin confirming the estimate
- * on Settings → Embeddings.
+ * chunk.embed-backfill: embeds, in batches, every chunk not on the pinned
+ * model. Enqueued only by the admin confirming the estimate.
  *
- * The outcome mapping:
- *
- *   - done, or no pin                → completed
- *   - the day's AI cap               → `JobRateLimited` until the next UTC
- *     midnight (plus a minute of slack, so the resumed run's cap check reads
- *     the new day). The wrapper completes this job and re-sends it with the
- *     same `singletonKey` and that `startAfter`; the batches before the cap
- *     are committed, and the resumed run selects only what is still pending.
- *   - the per-run cap                → permanent: the run already sizes
- *     batches under it, so only a single chunk over the cap stops here, and
- *     waiting does not shrink a chunk
- *   - provider down / usage row lost → retryable; the run resumes where the
- *     rows say it stopped
- *   - no key, a wrong width, …       → permanent, with `embedMessage`'s
- *     sentence — the same answer in a minute
- *   - Postgres unreachable           → retryable
+ * Outcome mapping:
+ * - done, or no pin → completed
+ * - the day's AI cap → `JobRateLimited` until the next UTC midnight plus a
+ *   minute's slack (so the resumed run's cap check reads the new day). Earlier
+ *   batches are committed; the resumed run selects only what is pending.
+ * - the per-run cap → permanent: batches are sized under it, so only a single
+ *   oversized chunk stops here, and waiting does not shrink it
+ * - provider down / usage row lost / Postgres unreachable → retryable
+ * - no key, a wrong width, … → permanent, with `embedMessage`'s sentence
  */
 
 export const embedBackfillData = z.object({})
@@ -103,7 +94,7 @@ export const runEmbedBackfill = (
     }),
   )
 
-/** Set on the queue at create (`worker/index.ts`), as every queue's policy is. */
+/** Set on the queue at create, as every queue's policy is. */
 export const embedBackfillRetry: JobRetryPolicy = {
   limit: 2,
   delaySeconds: 60,

@@ -21,8 +21,8 @@ import type { NoteVia } from './via-mark'
  * - **Filed here** — `link(tagged_in)`. The user put the note against this
  *   record, so it is the record's own prose. Memos first (see `ordering`).
  * - **From meetings** — the write-ups and second notes of the record's
- *   meetings and calls (D78), newest meeting first. A deal reads its
- *   company's and contacts' meetings too, as its Interactions tab does (D49).
+ *   meetings and calls, newest meeting first. A deal reads its
+ *   company's and contacts' meetings too, as its Interactions tab does.
  *   May overlap Filed here.
  * - **Mentions this** — `link(mentions)` and nothing else: a note in either
  *   other lane shows there, since an edge is not a second note.
@@ -43,7 +43,7 @@ export type RecordNote = {
   title: string
   kind: NoteKind
   updatedAt: string
-  /** "via <tool> · <author>" for a note a recorder filed (D78). */
+  /** "via <tool> · <author>" for a note a recorder filed. */
   via: NoteVia | null
 }
 

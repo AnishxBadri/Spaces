@@ -8,31 +8,15 @@ import { user } from '@spaces/db/schema/auth'
 import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
 
 /**
- * The documents filed **into** one space (SPA-44) — the space-page twin of
- * `listRecordDocuments`' lane, and the same row shape.
- *
- * Filing into a space is `entity_space`, never `link(tagged_in)`
- * (CONTEXT.md → Sources are documents; `DocumentFilingTarget` in
- * `lib/server/shared.ts`), which is why this cannot reuse the Files-tab
- * query: that one reads the edge a record filing writes, and a space
- * filing writes the other table entirely.
- *
- * It lives outside `lib/server/` on purpose. `lib/server/spaces.ts` is
- * reachable from the client barrel, and a plain export there ships to the
- * browser (CLAUDE.md → Traps, SPA-155); `lib/notes/filed.ts` is the same
- * arrangement for the space page's notes lane, and a test can call this
- * without a request.
- *
- * `entity.merged_into_id` is filtered in SQL, as everywhere else on this
- * page: a document merged away stops being a source of the space it was
- * filed into.
- *
- * SPA-67 added the second lane the spec asks for —
- * `spaceInheritedSourcesProgram`, the documents reached *through* the
- * companies tagged into the space. Two programs rather than one union
- * because they answer different questions and the page renders them
- * differently: the direct lane is the section, the inherited lane is a
- * closed disclosure under it and never touches the headline count.
+ * The documents filed **into** one space: the space-page twin of
+ * `listRecordDocuments`, with the same row shape. A space filing is
+ * `entity_space`, never `link(tagged_in)`, so the Files-tab query cannot serve.
+ * - Outside the server-fn modules, whose plain exports ship to the browser.
+ * - `merged_into_id` is filtered in SQL: a merged-away document stops being
+ *   a source.
+ * - `spaceInheritedSourcesProgram` is a separate lane (documents reached
+ *   through the space's companies), rendered apart and never in the headline
+ *   count.
  */
 
 export class SpaceSourcesFailed extends Schema.TaggedError<SpaceSourcesFailed>()(
@@ -49,14 +33,14 @@ export type SpaceSource = {
   extractionStatus: (typeof document.$inferSelect)['extractionStatus']
   extractionError: string | null
   /**
-   * Whether the row has bytes behind it (docsurf-10b). Null on a clipped
+   * Whether the row has bytes behind it. Null on a clipped
    * article, which was read and never stored, and the row's controls read
    * it: with no blob there is no download to offer, so the control becomes
    * "Open source" against the `url` below instead of a button that throws.
    */
   blobSha: string | null
   /**
-   * The clip's own address (SPA-117), null for every document that arrived
+   * The clip's own address, null for every document that arrived
    * as bytes. It is what lets the row say "fetching…" while a saved link
    * waits on the worker, where a deck says "extracting text…".
    */
@@ -75,8 +59,7 @@ export type SpaceSource = {
 }
 
 /**
- * A document reached through a company tagged into this space (SPA-67) —
- * the inherited half of spec-storage-sources §3.2. Same row as a direct
+ * A document reached through a company tagged into this space. Same row as a direct
  * source plus the company it came in on, because a row a person did not
  * file here has to say why it is on the page at all.
  */
@@ -148,7 +131,7 @@ function toSource(r: SourceRow, now: number): SpaceSource {
 
 export const spaceSourcesProgram = Effect.fn('spaceSourcesProgram')(function* (
   spaceId: string,
-  /** Whose canRead applies: a private attachment is its author's (D67). */
+  /** Whose canRead applies: a private attachment is its author's. */
   viewerId: string,
 ): Effect.fn.Return<Array<SpaceSource>, SpaceSourcesFailed> {
   const rows = yield* Effect.tryPromise({
@@ -177,7 +160,7 @@ export const spaceSourcesProgram = Effect.fn('spaceSourcesProgram')(function* (
 })
 
 /**
- * The inherited lane (SPA-67): documents `tagged_in` a company that is
+ * The inherited lane: documents `tagged_in` a company that is
  * itself tagged into this space. One statement, not a query per company —
  * a space with forty companies is ordinary and forty round trips is not.
  *
@@ -199,7 +182,7 @@ export const spaceSourcesProgram = Effect.fn('spaceSourcesProgram')(function* (
  * Inheritance is never folded into the section's headline count. The
  * headline says what was filed here; this is a convenience lane. Both lanes
  * hold to `canReadDocumentSql`: a filed private attachment stays its
- * author's until its email is widened (D67).
+ * author's until its email is widened.
  */
 export const spaceInheritedSourcesProgram = Effect.fn(
   'spaceInheritedSourcesProgram',

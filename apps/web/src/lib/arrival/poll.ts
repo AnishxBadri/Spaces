@@ -14,8 +14,8 @@ import type { AttachmentOutcome } from './attachment-filing'
 import { MailSchedule } from './schedule'
 
 /**
- * One poll of the forwarding mailbox (SPA-56): the body of the `mail.poll`
- * job, outside `worker/` so the suite drives it against the fake IMAP server
+ * One poll of the forwarding mailbox: the body of the `mail.poll` job, kept
+ * outside the worker so the suite drives it against the fake IMAP server
  * with no pg-boss in sight.
  *
  * In order: keep the schedule in step with the row (or remove it when there
@@ -51,7 +51,7 @@ export type PollOutcome = {
   written: number
   duplicate: number
   refused: Partial<Record<NoiseReason | 'unparseable', number>>
-  /** Every written message's attachments, summed (SPA-115). */
+  /** Every written message's attachments, summed. */
   attachments: AttachmentOutcome
 }
 
@@ -107,10 +107,9 @@ async function authorFor(
 }
 
 /**
- * The attachments' clause, or nothing when no written message carried one —
- * so a poll of plain mail reads exactly as it did before SPA-115. A refused
- * part is named with its reason: this line is where "why is the deck not on
- * the company" is answered.
+ * The attachments' clause, or nothing when no written message carried one.
+ * A refused part is named with its reason: this line is where "why is the
+ * deck not on the company" is answered.
  */
 function describeAttachments(a: AttachmentOutcome): Array<string> {
   if (a.filed + a.unfiled + a.skipped + a.refused.length === 0) return []

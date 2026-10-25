@@ -9,15 +9,13 @@ import {
 import { user } from './auth'
 
 /**
- * The two keys a custom object may declare as identity (CONTEXT.md "Two-tier
- * object model"). `email` is refused: its role-prefix rule is about people
+ * The two keys a custom object may declare as identity. `email` is refused: its role-prefix rule is about people
  * and means nothing on a bag.
  */
 export type IdentityKey = 'domain' | 'linkedin'
 
 /**
- * The object registry — one registry, system rows (CONTEXT.md "Two-tier
- * object model"). Core objects (company/person/deal) are seeded is_system
+ * The object registry — one registry, system rows. Core objects (company/person/deal) are seeded is_system
  * rows; user-created custom objects are ordinary rows. The attribute
  * registry and entity.object_id key on this table; entity.kind stays the
  * machinery dispatch switch (merge/resolution/side tables) and never

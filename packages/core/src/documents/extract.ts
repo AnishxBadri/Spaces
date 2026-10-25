@@ -3,7 +3,7 @@ import { readXlsx } from '../import/read'
 import { numbered, ooxmlRuns, unzip } from './ooxml'
 
 /**
- * Text extraction, in-process, no extra containers (CONTEXT.md → Storage).
+ * Text extraction, in-process, no extra containers.
  * Pure functions over bytes so they unit-test without a database, a blob
  * store, or a worker; the worker is the only caller that does I/O.
  *
@@ -158,8 +158,8 @@ function normalize(text: string): string {
 
 /**
  * Page-wise, under `[Page N]` markers in the shape fromPptx gives
- * `[Slide N]`: the page is what a citation names and what a chunk is cut on
- * (spec-ai-substrate §9). N is the page's real number, so a page with no
+ * `[Slide N]`: the page is what a citation names and what a chunk is cut on.
+ * N is the page's real number, so a page with no
  * text layer is skipped rather than renumbering the rest — and a PDF that
  * is all scan comes back empty, which the caller reports as `unsupported`,
  * not as a column of bare markers.
@@ -226,9 +226,9 @@ function fromPptx(bytes: Uint8Array): string {
  * sheet names. Sheet names carry meaning ("Cap Table (post)") — dropping them
  * for sheet1/sheet2 throws away the most searchable string in the file.
  *
- * The grid is the import reader's (`import/read.ts`, SPA-163), so search and
+ * The grid is the import reader's (`readXlsx`), so search and
  * import read through one xlsx parser — including its date resolution, which
- * makes a date column searchable as 2023-03-15 rather than as 45000. The
+ * makes a date column searchable as `2023-03-15` rather than as 45000. The
  * blank cells the rectangular grid pads a short row with are layout, not
  * text, so they are dropped here.
  */

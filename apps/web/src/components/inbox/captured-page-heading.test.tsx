@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { CapturedPageHeading } from './captured-page-heading'
 
 /**
- * SPA-134: a captured page's card in /inbox has no record to chip, so it is
- * headed by the page — its title, "from a captured page", and the address
- * it was captured from. Server-rendered like `inbox.test.tsx`, no DOM.
+ * A captured page's card in /inbox has no record to chip, so it is headed by
+ * the page — its title, "from a captured page", and the address it was
+ * captured from. Server-rendered, no DOM.
  */
 describe('the captured page heading', () => {
   it('names the page and links the address it was captured from', () => {

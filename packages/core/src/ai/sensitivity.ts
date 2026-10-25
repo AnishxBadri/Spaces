@@ -22,7 +22,7 @@ import type { AiSensitivity } from '@spaces/db/schema/ai'
 
 export type { AiSensitivity }
 
-/** A storage binding's authored setting (storage-8a). */
+/** A storage binding's authored setting. */
 export type BindingSensitivity = 'inherit' | 'sensitive'
 
 /** Which input made a record sensitive — what the marker and a refusal name. */

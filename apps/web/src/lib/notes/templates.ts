@@ -7,13 +7,9 @@ import { canRead } from '@spaces/core/read-policy'
 import type { Json } from '@spaces/core/json'
 
 /**
- * Note-template capture and stamp (SPA-131), minus the request context.
- *
- * Outside `lib/server/` because the suite drives these directly — the server
- * fns in `lib/server/templates.ts` are thin `requireUser` wrappers — and a
- * plain export from a `lib/server/*.ts` module keeps its imports alive in
- * the client bundle, which is how `canRead`'s neighbour `getRequest` used to
- * reach the browser (SPA-155).
+ * Note-template capture and stamp, minus the request context, so the suite
+ * can drive them. Kept out of the server-fn modules: a plain export there
+ * keeps its imports alive in the client bundle.
  */
 
 /**
@@ -45,16 +41,9 @@ function stripMentions(node: Json): Json {
 }
 
 /**
- * Capture (SPA-131). A note template stamps a *genre*, not just a shape:
- * CONTEXT.md freezes `note.kind` at three precisely because "IC memo" and
- * "post-mortem" are templates that set title/structure/**kind**, so the
- * source note's current kind is captured alongside its body. Saving a memo
- * as a template records `note_kind = 'memo'`; nothing else about capture
- * changes — mentions are still stripped, and the body is still a copy.
- *
- * Split out of the server fn so the suite can drive it: `requireUser` reads
- * a request the tests have no way to build (the `entityContext` pattern in
- * `lib/inbox/context.ts`).
+ * Capture. A template stamps a genre, not just a shape, so the source note's
+ * kind is captured with its body (a memo saves `note_kind = 'memo'`).
+ * Mentions are stripped and the body is a copy.
  */
 export async function captureNoteTemplate(
   userId: string,
@@ -90,18 +79,11 @@ export async function captureNoteTemplate(
 }
 
 /**
- * Stamp (SPA-131). The template's `note_kind` becomes the new note's kind,
- * so an IC-memo template stamps a memo and not a plain note. Null — every
- * template saved before the column, and there is deliberately no backfill —
- * falls through to the column default, which is what those templates have
- * always produced.
- *
- * Still copy-not-reference and still mention-free: the body was stripped at
- * capture, so no `link` row is materialised here and none ever was. That is
- * also why this does not route through `createNoteProgram` — see the note in
- * `lib/notes/create.ts`: that program's job is a note born *about* something,
- * with the filing and starter-mention rows that implies, and a template note
- * is born about nothing with a body it did not write.
+ * Stamp. The template's `note_kind` becomes the new note's kind; null falls
+ * through to the column default (deliberately no backfill).
+ * - Copy, not reference, and mention-free: no `link` row is written.
+ * - Not `createNoteProgram`: that writes a note born about something, with
+ *   filing and starter-mention rows; a template note is about nothing.
  */
 export async function stampNoteTemplate(
   userId: string,

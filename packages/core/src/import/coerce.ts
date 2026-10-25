@@ -16,8 +16,8 @@ import {
 } from '@spaces/sdk/identity'
 
 /**
- * One spreadsheet cell → one attribute value, or the reason it is not one
- * (SPA-166, project 14 `import-4`). Pure: no database, no registry lookup —
+ * One spreadsheet cell → one attribute value, or the reason it is not one.
+ * Pure: no database, no registry lookup —
  * the caller hands over the attribute's type and options, plus whatever the
  * mapping step declared about the column.
  *
@@ -30,8 +30,7 @@ import {
  * Refusal is the point. A cell that could mean two things (`03/04/2026`
  * with no declared order), a label that is not an option (`Seed` on a
  * status with no such stage), a placeholder (`TBD`) — each is a reason the
- * mapping table can show beside its row, because per-row errors are what
- * CONTEXT.md phase 15 item 9 asks for and a silently wrong value is worse
+ * mapping table can show beside its row: a silently wrong value is worse
  * than a missing one. Nothing here ever mints an option.
  */
 
@@ -365,7 +364,8 @@ export type ColumnSummary = {
 
 /**
  * The truth about one mapped column — "38 of 40 values parse" — and the rows
- * behind the two that do not. What the mapping step (SPA-165) shows per
+ * behind the two that do not. What the mapping step shows per
+
  * column; `parsed === 0 && total > 0` is the column where nothing parses.
  */
 export function summarizeColumn(

@@ -19,10 +19,9 @@ import {
 import { createNote, getTermPage } from '#/lib/server-fns'
 
 /**
- * A term's page — the concept node (SPA-75; CONTEXT.md → Glossary). The
- * record shape (design contract §3), as `deals_.$dealId.tsx` draws it: caps
- * mono crumb, serif name, a readout strip, the body left and the bone rail
- * right. There is no actions menu — nothing is filed, tagged or attached
+ * A term's page — the concept node. The record shape: caps mono crumb, serif
+ * name, a readout strip, the body left and the bone rail right. There is no
+ * actions menu — nothing is filed, tagged or attached
  * into a term — and the term is edited where it is defined, in its space's
  * glossary.
  */

@@ -212,11 +212,11 @@ function PrepBody({ prep }: { prep: PrepState }) {
 }
 
 /**
- * The meeting window (D68): time and the conference link in the head;
+ * The meeting window: time and the conference link in the head;
  * participants with their RSVP, shown and never edited; linked records with
  * a pin to add one; the write-up; artifacts by role; open suggestions that
  * cite the meeting; and Prep, streamed on demand and never stored.
- * - Opens from a Meetings row and from `?modal=meeting&id=`. (D74)
+ * - Opens from a Meetings row and from `?modal=meeting&id=`.
  * - Cancel is the one close; Prep, then Save as note, is the one commit.
  */
 export function MeetingDialog({

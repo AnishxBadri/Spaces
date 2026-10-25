@@ -33,7 +33,7 @@ import { logSyncedEmailProgram } from './synced'
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
- * The synced mailbox's lane against a real database, and D67 at read time:
+ * The synced mailbox's lane against a real database, and body privacy at read time:
  * the owner's synced body is stored whole and private, and every read path a
  * teammate has — the record timeline, Cmd-K, the context assembler and the
  * AI substrate's MCP tools — refuses it, each asserted on its own.
@@ -339,7 +339,7 @@ describe('the forwarding mailbox and the synced one', () => {
           .where(eq(note.entityId, held?.noteId ?? ''))
       ).at(0)?.v
     expect(await visibility()).toBe('private')
-    // Forwarding is the consent (D49): the synced body widens, logged.
+    // Forwarding is the consent: the synced body widens, logged.
     expect((await forward(syncedFirst.messageId ?? '')).kind).toBe('duplicate')
     expect(await visibility()).toBe('shared')
     expect(
@@ -446,7 +446,7 @@ describe('the account page’s settings', () => {
 })
 
 /**
- * D67 at read time: the body is stored whole; who reads it is decided on
+ * Body privacy at read time: the body is stored whole; who reads it is decided on
  * the way out. One test per path a teammate has, each with the owner as its
  * control where the path reaches the body at all.
  */

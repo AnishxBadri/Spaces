@@ -8,7 +8,7 @@ import {
 import { commitOutcomeOf } from './commit'
 import type { LedgerRowPlan } from '@spaces/db/schema/import'
 
-/** SPA-171: the ledger receipt's pure half. */
+/** The ledger receipt's pure half. */
 
 const plan = (committed?: LedgerRowPlan['ledger']['committed']) => {
   const p: LedgerRowPlan = {

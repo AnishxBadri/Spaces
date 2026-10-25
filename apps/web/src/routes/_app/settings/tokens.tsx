@@ -35,7 +35,7 @@ type Created = Awaited<ReturnType<typeof createApiToken>>
  *   the create response; the ledger only ever has the prefix.
  * - Scopes are ticked at mint time and fixed. MCP reads none; a token with
  *   none still opens it, and at `/api/v1` answers only `GET /api/v1/me`.
- * - Revoke is final and asks first (D81).
+ * - Revoke is final and asks first.
  */
 export const Route = createFileRoute('/_app/settings/tokens')({
   loader: async () => ({ tokens: await listApiTokens() }),

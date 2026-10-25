@@ -7,7 +7,7 @@ import { createHash, randomBytes } from 'node:crypto'
  *   verified state names — a cookie from another dance is never found.
  * - Path is the callback's own path; ten-minute life, like the state.
  * - Never inside the state (it would pass through the provider) and never a
- *   row. Recorded in docs/spec-storage-sources.md §1, "The dance".
+ *   row.
  */
 
 export const VERIFIER_TTL_SECONDS = 600

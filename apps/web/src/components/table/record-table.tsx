@@ -31,13 +31,11 @@ declare module '@tanstack/react-table' {
 /**
  * The one record table. Companies, People and Deals are the same object shaped
  * three ways — registry-generated columns over `entity.values` — so they render
- * through one component. Three near-identical implementations is what let the
- * type scale, the focus ring and the sort affordance drift apart in the first
- * place; the fix is that there is now only one place to change.
- *
- * In scope (CONTEXT.md's v1 line): show/hide/resize, single sort, sticky header,
- * sticky first column, row → record, and row checkboxes for a selection bar's
- * verbs. Deliberately absent: bulk edit, calculations row, CSV, virtualization.
+ * through one component, and the type scale, focus ring and sort affordance
+ * have one place to change.
+ * - In scope: show/hide/resize, single sort, sticky header, sticky first
+ *   column, row → record, row checkboxes. Deliberately absent: bulk edit,
+ *   calculations row, CSV, virtualization.
  *
  * The head is its own table, pinned under the folded page head: the page
  * scrolls vertically, and a horizontal scroller around one table would trap a
@@ -56,13 +54,12 @@ const TRAILING_WIDTH = 40
 
 /**
  * Grouped, never compact — `Intl.NumberFormat` compact notation prints
- * differently under Node and Chrome and takes hydration down with it
- * (CLAUDE.md, traps). The locale is named so the two agree on the separator.
+ * differently under Node and Chrome and takes hydration down with it. The locale is named so the two agree on the separator.
  */
 const grouped = (n: number) => n.toLocaleString('en-US')
 
 /**
- * What a paged surface tells its foot (SPA-64). Absent on every unpaged
+ * What a paged surface tells its foot. Absent on every unpaged
  * surface, which keeps reading `getPreFilteredRowModel()` — those tables
  * hold every row they could show, so the pre-filtered model *is* the truth
  * there and a server round trip would only be able to agree with it.
@@ -81,7 +78,7 @@ export type TablePage = {
 
 /**
  * A surface's own verb in a column's header menu, after sort and hide —
- * "Run on this view" on an AI attribute's column (SPA-122). The menu closes
+ * "Run on this view" on an AI attribute's column. The menu closes
  * on select, so a verb that opens a dialog keeps the dialog outside it and
  * only flips its state here.
  */
@@ -160,7 +157,7 @@ export function RecordTable<T>({
 
   // `isolate`: the pinned head and the pinned column order themselves with
   // small local z values inside one stacking context, so the page's
-  // five-step scale never has to climb (DESIGN.md z-index scale).
+  // five-step z-index scale never has to climb.
   return (
     <div role="table" aria-label={label} className="isolate flex flex-col">
       <div

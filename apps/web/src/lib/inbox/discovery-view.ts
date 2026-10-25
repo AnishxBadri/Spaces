@@ -3,7 +3,7 @@ import type { JobStatusState } from '#/lib/integrations/job-status-view'
 
 /**
  * What a discovery card reads as in Review, pure so the card and its tests
- * share it. (D72, D77)
+ * share it.
  */
 
 /** "found by 2 watches"; null for one watch or none — the head says via. */

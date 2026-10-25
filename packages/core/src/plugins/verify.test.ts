@@ -14,7 +14,7 @@ import { UNSIGNED_ALLOWED, verifyPlugin } from './verify.ts'
 import type { EntryToVerify, PluginTrust, RefusalCode } from './verify.ts'
 
 /**
- * sdk-21a's tamper checks, end to end: a plugin packed and signed by the
+ * The tamper checks, end to end: a plugin packed and signed by the
  * SDK's packer (with an ephemeral key — no private key is ever committed),
  * then verified here against the trust `loadPluginTrust` reads from disk.
  * No database.

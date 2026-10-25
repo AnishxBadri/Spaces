@@ -2,22 +2,21 @@ import { defineConfig, devices } from '@playwright/test'
 import { launchOptions } from './harness/shared.ts'
 
 /**
- * The browser suite (SPA-184). One worker, no retries: the specs read and
- * write server-wide state (whether an admin exists), and a retry would hide
+ * The browser suite. One worker, no retries: the specs read and write
+ * server-wide state (whether an admin exists), and a retry would hide
  * exactly the flake this suite is meant to surface. Global setup boots the
- * instances and its returned function tears them down — see
- * harness/global-setup.ts.
+ * instances and its returned function tears them down.
  */
 /**
- * Two ways to run, one harness (SPA-186 added the second):
+ * Two ways to run, one harness:
  *
  *   default         global setup boots the built app twice against throwaway
  *                   databases; the specs under specs/ (not specs/image/) run.
  *   E2E_IMAGE_URL   the image smoke: CI has composed the image built for this
  *                   commit with Postgres and passes its address; nothing is
  *                   booted, global setup only waits for db ok + worker ok and
- *                   signs in, and only specs/image/ runs. The job is
- *                   `image-smoke` in .github/workflows/ci.yml.
+ *                   signs in, and only specs/image/ runs (CI's
+ *                   `image-smoke` job).
  */
 const imageUrl = process.env.E2E_IMAGE_URL
 const image = imageUrl !== undefined && imageUrl !== ''

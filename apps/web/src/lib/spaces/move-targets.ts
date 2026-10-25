@@ -24,7 +24,7 @@ function refusal(
 /**
  * The move window's rows, in tree order under a "Move to root" row: the
  * moving space and its descendants refused with the reason, its parent
- * marked current. (D73)
+ * marked current.
  */
 export function moveTargets(
   tree: ReadonlyArray<TreeRow>,

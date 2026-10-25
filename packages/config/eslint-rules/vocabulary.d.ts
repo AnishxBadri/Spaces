@@ -27,7 +27,7 @@ export const NAMED_STEPS: Array<{
   lineRem: number
 }>
 
-/** Every arbitrary type size in one class string (DESIGN.md §3). */
+/** Every arbitrary type size in one class string. */
 export function findArbitraryType(value: string): Array<ArbitraryTypeHit>
 
 export const rule: Rule.RuleModule

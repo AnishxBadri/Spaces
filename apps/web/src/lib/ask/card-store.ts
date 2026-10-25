@@ -30,7 +30,7 @@ import type { AskCallCard, AskRef } from './types'
 
 /**
  * Ask's action cards as stored: each is an open `suggestion` the turn's run
- * proposed, named from the answer's `calls` by `card.suggestionId`. (D70)
+ * proposed, named from the answer's `calls` by `card.suggestionId`.
  * - Stored when the answer lands, so a card left undecided is already the
  *   Review item it waits as; there is no second store.
  * - Apply is `acceptProgram` with the reader as actor, Skip `rejectProgram`.

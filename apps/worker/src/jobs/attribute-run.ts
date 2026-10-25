@@ -10,16 +10,12 @@ import { JobPermanent } from '../run-job'
 import type { JobDef } from '../run-job'
 
 /**
- * attribute.run — one AI attribute cell on the worker (SPA-72). The program
- * is `lib/ai/attribute-run.ts`; this is the wrapper's view of it. Enqueued
- * by a cell's trigger, on the record rail or in the table, and nothing else.
- *
- * **Every failure is permanent**, for the deck reader's reasons: an
- * unreachable provider, an unrouted lane, a sensitive record on a cloud
- * route or a cell that already has a proposal is not fixed by pg-boss
- * trying again, and each retry of a model call is a cost. A run that finds
- * no answer is not a failure: the job completes, and the cell's status
- * counts the rows it wrote.
+ * attribute.run: one AI attribute cell, enqueued only by a cell's trigger
+ * (record rail or table).
+ * - Every failure is permanent: an unreachable provider, an unrouted lane, a
+ *   sensitive record on a cloud route or a cell with a proposal is not fixed
+ *   by a retry, and each retried model call costs.
+ * - A run that finds no answer completes; the cell's status counts its rows.
  */
 
 export const attributeRunData = z.object({

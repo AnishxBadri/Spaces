@@ -7,21 +7,11 @@ import { byMemoThenRecent } from './ordering'
 import type { NoteKind } from './ordering'
 
 /**
- * The notes filed into one space (SPA-120) — the space-page twin of
- * `listRecordNotesProgram`'s filed lane, and ordered by the same rule.
- *
- * Filing into a space is an act: `entity_space`, not a `mentions` edge
- * (CONTEXT.md → Filed vs referenced). **There is no singular memo** — a space
- * holds as many filed notes as its owner wants, so this answers a list and
- * the ordering is what says which one is the face of the space: memos first,
- * then most recently updated, through the one comparator in `./ordering`.
- * `order by kind = 'memo' desc` in SQL would have put that rule in a second
- * place and left it untestable without a database.
- *
- * `canRead` is applied **in SQL** rather than over a row set the database
- * already sent: a teammate's private note must not reach the loader at all,
- * since its title is what leaks. `entity.merged_into_id` is filtered the same
- * way, so a note merged away stops appearing in the space it was filed into.
+ * The notes filed into one space (`entity_space`, not a `mentions` edge),
+ * ordered by `byMemoThenRecent`. There is no singular memo: a space holds any
+ * number of filed notes.
+ * - `canRead` is applied in SQL: a teammate's private note must never reach
+ *   the loader, since its title is what leaks. Merged-away notes are dropped.
  */
 
 export class FiledNotesFailed extends Schema.TaggedError<FiledNotesFailed>()(

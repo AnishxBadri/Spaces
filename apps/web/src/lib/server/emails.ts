@@ -26,7 +26,7 @@ export type { VariableReview } from '../interactions/email-variables'
 export type { EmailSender, Sent } from '../interactions/email-send'
 
 /**
- * The email window's read and its privacy writes. (D67)
+ * The email window's read and its privacy writes.
  * The programs are imported inside the handlers so their sanitizer and
  * database code never reach the client bundle.
  */
@@ -109,7 +109,7 @@ export const setRecordEmailVisibility = createServerFn({ method: 'POST' })
   })
 
 /**
- * Drafts (D67): author-private, so every fn reads the caller and nothing
+ * Drafts: author-private, so every fn reads the caller and nothing
  * else. Programs are imported inside the handlers, as above.
  */
 export const listEmailDrafts = createServerFn().handler(async () => {
@@ -205,7 +205,7 @@ export const searchEmailRecipients = createServerFn()
     return effectFn(searchRecipientsProgram)(data.q)
   })
 
-/** Review: every variable the draft uses, resolved per recipient. (D67) */
+/** Review: every variable the draft uses, resolved per recipient. */
 export const reviewEmailVariables = createServerFn({ method: 'POST' })
   .validator(
     z.object({
@@ -240,7 +240,7 @@ export const getEmailSender = createServerFn()
 
 /**
  * Send: the draft through the Gmail plugin, awaited. Review's fills come
- * with it; the server resolves every variable again. (D67)
+ * with it; the server resolves every variable again.
  */
 export const sendEmailDraft = createServerFn({ method: 'POST' })
   .validator(

@@ -375,7 +375,7 @@ describe('refusals write no row', () => {
 })
 
 /**
- * Scope growth stays within a product (D66), so the added scope is Drive's
+ * Scope growth stays within a product, so the added scope is Drive's
  * own `drive.readonly` on top of `drive.file`, not Calendar's.
  */
 describe('scope growth on a held connection', () => {
@@ -468,7 +468,7 @@ describe('scope growth on a held connection', () => {
 
 /**
  * Ticking a product on an account page: that product's own consent, for the
- * same address, while another product's row stands untouched. (D66, D81)
+ * same address, while another product's row stands untouched.
  */
 describe('a product added from the account page', () => {
   const lastAuthorize = () => idp.authorizeRequests.at(-1)

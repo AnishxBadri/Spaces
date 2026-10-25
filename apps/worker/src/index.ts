@@ -129,18 +129,17 @@ async function main() {
   reloader.request(null)
   await Effect.runPromise(reloader.settled())
 
-  // The deck reader's queue is `exclusive` (SPA-90): with `singletonKey` set
-  // to the document id, pg-boss refuses a second job for a deck while one is
-  // queued or active. Created before the loop below, whose plain create would
+  // The deck reader's queue is `exclusive`: with `singletonKey` set to the
+  // document id, pg-boss refuses a second job for a deck while one is queued
+  // or active. Created before the loop below, whose plain create would
   // otherwise make it `standard` first; a queue's policy is fixed at create.
   await boss
     .createQueue(QUEUES.readDeck, { policy: 'exclusive' })
     .catch(() => {})
-  // Notes and embeddable attributes → chunks (SPA-132): `document.embed`'s
-  // replace-stamp-embed for the sources that are not documents. One block,
-  // before the plain create loop below, because the queue must be born
-  // `stately` — one queued and one active per `singletonKey` — so a burst of
-  // note autosaves is one queued job that reads the latest body when it runs.
+  // Notes and embeddable attributes → chunks: `document.embed`'s
+  // replace-stamp-embed for sources that are not documents. Born `stately`
+  // (one queued, one active per `singletonKey`) before the plain create loop,
+  // so a burst of note autosaves is one queued job reading the latest body.
   await boss
     .createQueue(QUEUES.embedSource, { policy: 'stately' })
     .catch(() => {})
@@ -279,7 +278,7 @@ async function main() {
       ),
     }),
   )
-  // An enrichment run (D76): `stately` with `singletonKey = entityId`, so a
+  // An enrichment run: `stately` with `singletonKey = entityId`, so a
   // burst of triggers on one record is one queued run. Its sources run in
   // process on the wired plugin host; the built-in Website reads through the
   // URL guard and the Extract lane. Created before the plain create loop
@@ -306,14 +305,11 @@ async function main() {
       ),
     }),
   )
-  // The corpus backfill (SPA-136): `exclusive` with one fixed singletonKey,
-  // so one run is queued, active or paused for the AI cap at a time — and it
-  // is created here, before the loop below, for the same reason as the deck
-  // reader's. A run can take hours, so the 15-minute default expiry is
-  // replaced by a heartbeat: pg-boss refreshes it while the handler runs and
-  // retries the job within a minute of a dead worker, and the resumed run
-  // skips every chunk already on the pin. Batch of one; no Layer — its I/O
-  // is `db` and `embed()`.
+  // The corpus backfill: `exclusive` on one fixed singletonKey, so one run is
+  // queued, active or paused for the AI cap at a time; created before the loop
+  // below for the deck reader's reason. A run can take hours, so expiry is a
+  // heartbeat: a dead worker's job retries within a minute and the resumed run
+  // skips every chunk already on the pin. No Layer — its I/O is `db`, `embed()`.
   await boss
     .createQueue(QUEUES.embedBackfill, {
       policy: 'exclusive',
@@ -329,7 +325,7 @@ async function main() {
     { batchSize: 1, includeMetadata: true },
     runJob(embedBackfill, { host, layer: Layer.empty }),
   )
-  // Kind classify (SPA-62): enqueued only by `onDocumentExtracted`, with
+  // Kind classify: enqueued only by `onDocumentExtracted`, with
   // `singletonKey = documentId` — `exclusive`, so a re-extraction while one
   // is queued or active adds nothing. Created before the plain create loop
   // below for the deck reader's reason; a queue's policy is fixed at create.
@@ -367,13 +363,11 @@ async function main() {
     { batchSize: 1, includeMetadata: true },
     runJob(proposeLedgerEvent, { host, layer: Layer.empty }),
   )
-  // Summarize (SPA-66): the deck reader's shape — `exclusive`, so pg-boss
-  // refuses a second press on one (record, source) key while one is queued
-  // or active, and no retries, since every failure is permanent and every
-  // retry a frontier call. One block, before the plain create loop below,
-  // which would otherwise make it `standard` first — a queue's policy is
-  // fixed at create; `updateQueue` carries the retry policy to a queue an
-  // earlier boot made.
+  // Summarize: the deck reader's shape — `exclusive`, so pg-boss refuses a
+  // second press on one (record, source) key while one is queued or active,
+  // and no retries: every failure is permanent and every retry a frontier
+  // call. Created before the plain create loop below; `updateQueue` carries
+  // the retry policy to a queue an earlier boot made.
   await boss
     .createQueue(QUEUES.summarize, { policy: 'exclusive' })
     .catch(() => {})
@@ -388,7 +382,7 @@ async function main() {
     { batchSize: 1, includeMetadata: true },
     runJob(summarize, { host, layer: Layer.empty }),
   )
-  // An email's summary and categories (D67): `stately` with
+  // An email's summary and categories: `stately` with
   // `singletonKey = interactionId`, so one email is one queued job; created
   // before the plain create loop below, which would make it `standard`. A
   // model call or two per email, so a batch of one. No Layer.
@@ -406,7 +400,7 @@ async function main() {
     { batchSize: 1, includeMetadata: true },
     runJob(summarizeEmail, { host, layer: Layer.empty }),
   )
-  // A recorded note's action items (D78): `stately` with
+  // A recorded note's action items: `stately` with
   // `singletonKey = noteId`, so one note is one queued job; created before
   // the plain create loop below. One model call per note. No Layer.
   await boss
@@ -438,7 +432,7 @@ async function main() {
     { batchSize: 1, includeMetadata: true },
     runJob(summarizeEmailBackfill, { host, layer: Layer.empty }),
   )
-  // Space-tag suggestions (SPA-103): pressed on a record's Spaces rail,
+  // Space-tag suggestions: pressed on a record's Spaces rail,
   // with `singletonKey = entityId` — `exclusive`, so a second press while
   // one is queued or active adds nothing. Created before the plain create
   // loop below for the deck reader's reason. One model call per record, a
@@ -457,13 +451,11 @@ async function main() {
     { batchSize: 1, includeMetadata: true },
     runJob(suggestSpaces, { host, layer: Layer.empty }),
   )
-  // Key terms (SPA-91): the deck reader's shape — `exclusive` with
-  // `singletonKey = documentId`, so a second press while one is queued or
-  // active is refused by pg-boss; no retries, since every failure is
-  // permanent and every retry a model call. Created before the plain create
-  // loop below, which would otherwise make it `standard` first — a queue's
-  // policy is fixed at create. A batch of one; no Layer — its I/O is `db`
-  // and `complete()`.
+  // Key terms: the deck reader's shape — `exclusive` with
+  // `singletonKey = documentId`, so pg-boss refuses a second press while one
+  // is queued or active; no retries, since every failure is permanent and
+  // every retry a model call. Created before the plain create loop below.
+  // No Layer — its I/O is `db` and `complete()`.
   await boss
     .createQueue(QUEUES.extractKeyTerms, { policy: 'exclusive' })
     .catch(() => {})
@@ -478,7 +470,7 @@ async function main() {
     { batchSize: 1, includeMetadata: true },
     runJob(extractKeyTerms, { host, layer: Layer.empty }),
   )
-  // Read with vision (SPA-94): the deck reader's shape — `exclusive` with
+  // Read with vision: the deck reader's shape — `exclusive` with
   // `singletonKey = documentId`, so a second press while one is queued or
   // active is refused by pg-boss; no retries, since every failure is
   // permanent and a retry re-pays for every page before the one that broke.
@@ -499,7 +491,7 @@ async function main() {
     { batchSize: 1, includeMetadata: true },
     runJob(visionDocument, { host, layer: ExtractionStore.layer }),
   )
-  // AI attributes (SPA-72): one cell per job, pressed on the record rail or
+  // AI attributes: one cell per job, pressed on the record rail or
   // in the table, with `singletonKey = <entityId>:<attributeId>` —
   // `exclusive`, so a second press on one cell while one is queued or active
   // adds nothing. Created before the plain create loop below for the deck
@@ -519,7 +511,7 @@ async function main() {
     { batchSize: 1, includeMetadata: true },
     runJob(attributeRun, { host, layer: Layer.empty }),
   )
-  // Column run (SPA-122): the per-cell program over every row of one saved
+  // Column run: the per-cell program over every row of one saved
   // view, with `singletonKey = <viewId>:<attributeId>` — `exclusive`, so a
   // second press while one is queued or active adds nothing. Created before
   // the plain create loop for the deck reader's reason. One long job, a
@@ -545,7 +537,7 @@ async function main() {
     { batchSize: 1, includeMetadata: true },
     runJob(attributeColumnRun, { host, layer: Layer.empty }),
   )
-  // The forwarding mailbox (SPA-56): `singleton`, so two polls never share
+  // The forwarding mailbox: `singleton`, so two polls never share
   // one IMAP cursor, and never retried — the next scheduled tick is the
   // retry, and a refused login backs off on the mailbox row instead. Created
   // before the plain create loop below for the deck reader's reason. The
@@ -572,7 +564,7 @@ async function main() {
   await Effect.runPromise(
     Effect.provide(syncMailScheduleProgram(), mailSchedule),
   )
-  // The import commit (SPA-169): keyed by the batch, so a double click is
+  // The import commit: keyed by the batch, so a double click is
   // refused by pg-boss; never retried — a failed row is re-run on its own.
   await boss
     .createQueue(QUEUES.importCommit, {
@@ -619,7 +611,7 @@ async function main() {
     { batchSize: 1, includeMetadata: true },
     runJob(extractDocument, { host, layer: ExtractionStore.layer }),
   )
-  // Chunking + embedding (SPA-121), enqueued by extraction once the text is
+  // Chunking + embedding, enqueued by extraction once the text is
   // stored. Runs with or without an embedding pin — no pin writes chunks
   // with null vectors for the lexical lane. Batch of one: a document's
   // embed calls are one provider's latency, and two in series on one tick
@@ -629,14 +621,10 @@ async function main() {
     { batchSize: 1, includeMetadata: true },
     runJob(embedDocument, { host, layer: Layer.empty }),
   )
-  // The URL clip (SPA-117). `clipUrlProgram` wrote the row and returned
-  // before any network call; this is the half that actually goes out and
-  // fetches, which is why it is on the worker at all — a page that takes
-  // thirty seconds must not be thirty seconds of somebody's request. Batch of
-  // one, because a batch of pages fetched on one tick is a batch of timeouts
-  // sharing a process; includeMetadata is what `runJob` reads
-  // retryCount/retryLimit from, and the job carries no Layer — its I/O is
-  // `db` and one guarded `fetch`.
+  // The URL clip's fetch half: `clipUrlProgram` wrote the row before any
+  // network call, so a slow page is never somebody's request. Batch of one:
+  // pages fetched on one tick are timeouts sharing a process. No Layer — its
+  // I/O is `db` and one guarded `fetch`.
   await boss.work(
     QUEUES.clipDocument,
     { batchSize: 1, includeMetadata: true },
@@ -679,14 +667,14 @@ async function main() {
     { includeMetadata: true },
     runJob(dedupeSweep, { host, layer: Layer.empty }),
   )
-  // The deck reader (SPA-90). A model call per filed record, so a batch of
+  // The deck reader. A model call per filed record, so a batch of
   // one: two decks on one tick would be two providers' latency in series.
   await boss.work(
     QUEUES.readDeck,
     { batchSize: 1, includeMetadata: true },
     runJob(readDeck, { host, layer: Layer.empty }),
   )
-  // The orphan-blob sweep (SPA-54), registered exactly as the dedupe sweep
+  // The orphan-blob sweep, registered exactly as the dedupe sweep
   // above: one statement's worth of work per candidate, so the default batch
   // of one is right, and includeMetadata is what `runJob` reads
   // retryCount/retryLimit from. No Layer — its I/O is `db` and `storage()`.
@@ -712,7 +700,7 @@ async function main() {
   // prune, stats roll, storage change poll.
   await scheduleCoreJobs(boss)
 
-  // The heartbeat (SPA-57). Last, so the row only appears once this process
+  // The heartbeat. Last, so the row only appears once this process
   // is actually working queues — a row written before `boss.work` would claim
   // a worker that is not one yet.
   const identity = workerIdentity()

@@ -310,7 +310,7 @@ function OwnershipBlock({ ownership }: { ownership: Holding['ownership'] }) {
     </ol>
   )
 }
-/** The three tables a correction can be appended to (D12). */
+/** The three tables a correction can be appended to. */
 type VoidableTable = 'investment' | 'mark' | 'distribution'
 
 type EventRow = {
@@ -330,8 +330,8 @@ type EventRow = {
 
 /**
  * One append-only ledger per event kind: date, kind, entry, amount, detail.
- * There is still no edit and no delete affordance. A wrong entry is voided
- * (D12, SPA-150) — the original stays, struck, with its compensating row
+ * There is no edit and no delete affordance. A wrong entry is voided by a
+ * compensating event — the original stays, struck, with its compensating row
  * immediately beneath it naming who voided it and when, so the record of
  * what was believed and when survives the correction.
  *
@@ -523,11 +523,8 @@ function Field({
 
 /**
  * The three closed vocabularies the event forms write — declared once, as
- * the picker's rows. Before SPA-38 each was an `as const` tuple plus a
- * `to…(v: string)` narrower, because a native `<select>` hands back a bare
- * string; `Select<Instrument>` hands back the union member, so the list is
- * the type and the narrowers are gone. The form state still holds the
- * server's type and the submit still needs no assertion.
+ * the picker's rows. `Select<Instrument>` hands back the union member, so
+ * the list is the type and the submit needs no assertion.
  */
 const INSTRUMENT_ITEMS = [
   { value: 'priced', label: 'Priced' },

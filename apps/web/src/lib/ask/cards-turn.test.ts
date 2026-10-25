@@ -32,7 +32,7 @@ vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
  * Action cards end to end: a turn proposes them through `propose_card`, the
  * answer stores them as open suggestions, Apply writes through the writer a
  * person would as the reader, a conflict writes nothing, and an undecided
- * card waits in Review under its thread. (D70)
+ * card waits in Review under its thread.
  */
 
 const run = <TValue, TError>(e: Effect.Effect<TValue, TError>) =>

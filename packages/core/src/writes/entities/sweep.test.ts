@@ -4,13 +4,10 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * Integration tests against this worker's test database, truncated and
- * reseeded before the file was imported (SPA-145) — no cleanup here, and
- * nothing to add when a table appears.
- *
- * The fixture names carry no run tag on purpose: the two threshold cases are
+ * reseeded before the file was imported — no cleanup here.
+ * The fixture names carry no run tag on purpose: the threshold cases are
  * pinned to a measured pg_trgm score, and a hex tag would move it. Isolation
- * comes from the object each record belongs to instead, which is the thing
- * this slice made the sweep respect.
+ * comes from the object each record belongs to, which the sweep respects.
  */
 
 const pair = (x: string, y: string) => (x < y ? [x, y] : [y, x])
@@ -225,9 +222,8 @@ describe('sweepNameSimilarity', () => {
     const first = await born(`Hyperion Round ${tag}`)
     const second = await born(`Hyperion Round ${tag} placeholder`)
 
-    // Renaming is what gives a deal name aliases (SPA-63), so the old
-    // accident — "deals hold no aliases, so the sweep can't see them" — no
-    // longer protects anyone.
+    // Renaming gives a deal name aliases, so the sweep can see it; only
+    // MERGEABLE keeps it out.
     const firstName = `Hyperion Series A ${tag}`
     const secondName = `Hyperion Series A ${tag} Extension`
     await Effect.runPromise(

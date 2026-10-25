@@ -81,44 +81,21 @@ import {
 } from '#/lib/portfolio/write'
 
 /**
- * The AI layer's one mutating verb (docs/spec-ai-substrate.md §3, §10).
+ * Deciding a suggestion: accept and reject. `proposeProgram` (re-exported
+ * above) writes a `suggestion` row and nothing else, so a model or a prompt
+ * injection can at worst put noise in a queue.
  *
- * `proposeProgram` writes a `suggestion` row and nothing else — a model, an
- * agent or a prompt injection in a deck can at worst put noise in a queue.
- * It lives in `@spaces/core/writes/suggestions/propose` since SPA-204, where
- * the plugin ports reach it, and is re-exported above. `acceptProgram` is
- * the only way a suggestion becomes a value, and it goes through the one
- * write path (`setValuesInTx`) with the **accepter** as actor,
- * `source = 'suggestion'`, and the row's id and refs as the receipt on
- * every `attribute_event`. `rejectProgram` closes a row and writes nothing
- * else.
- *
- * Accept locks the row, writes the value and flips the status in **one**
- * transaction. The guard is `select … for update` refusing anything not
- * `open`: two accepts racing on one row serialize on its lock, the second
- * reads the status after the first commits and is refused — so one accept,
- * one set of events. Any refusal (an invalid payload, an unsupported kind)
- * rolls the whole transaction back, and the row stays `open` for the queue.
- * A partial accept (SPA-110) is the same transaction ending in a shrunk
- * payload rather than a flip; `acceptProgram` says the rule.
- *
- * Among the kinds: `attribute_patch` (a value, through the one write
- * path), `identity` (a person, through `resolveEntity`; a company record
- * joins the person's `companies`, and the person is written into the
- * reference field the claim came from), `task` (one task, through the task
- * writer), `supersedes` (one link, through the supersedes writer; D59) and
- * `ledger_event` (one `round` or `mark`, appended through the portfolio
- * writer; D12). The discovery cards (`add_record`, `file_record`) sit on a space, not a record: accept
- * resolves and files, reject dismisses the domain from the space. (D72)
- *
- * **A captured page is an anchor too (SPA-134).** A capture names somebody
- * we usually hold no record for, so its read is anchored on the captured
- * document's own entity (`@spaces/core/writes/ai/capture-read`). Two things differ
- * there, and nothing else: a patch on a document is held to the registry of
- * the object its run read the page against (`patchAnchor`), and lands on the
- * one record of that object the page is filed on; an identity on a document
- * files the page on the person it resolves (`tagged_in`) rather than adding
- * it to their companies — which is what then gives the patch its record.
+ * - `acceptProgram` is the only way a suggestion becomes a value: an
+ *   `attribute_patch` goes through `setValuesInTx` with the **accepter** as
+ *   actor, `source = 'suggestion'` and the row's id and refs as the receipt
+ *   on every `attribute_event`.
+ * - Accept locks the row (`for update`, refusing anything not `open`),
+ *   writes and flips in **one** transaction: two racing accepts serialize
+ *   and the second is refused. Any refusal rolls back; the row stays `open`.
+ * - `rejectProgram` closes a row and writes nothing else.
+ * - A captured page is anchored on its own document: a patch is held to the
+ *   object it was read against (`patchAnchor`) and lands on the record the
+ *   page is filed on; an identity files the page on the person.
  */
 
 /** Only a person accepts or rejects: the decision is what `decided_by` names. */
@@ -262,16 +239,15 @@ export type Accepted =
       resolved: ResolveResult
       /**
        * True when this accept added the company record to the person's
-       * `companies` — or, for a captured page (SPA-134), filed the page on
-       * them. False when it was already so, and for any other record.
+       * `companies` — or, for a captured page, filed the page on them.
+       * False when it was already so, and for any other record.
        */
       linked: boolean
       /**
        * The person-reference attribute that holds the person after this
-       * accept (SPA-160) — written now or already held. Null when the
-       * payload names no field (a row proposed before SPA-160), when the
-       * field no longer takes a person, or when it is single-valued and
-       * already holds somebody else.
+       * accept, written now or already held. Null when the payload names no
+       * field, when the field no longer takes a person, or when it is
+       * single-valued and already holds somebody else.
        */
       filed: string | null
     }
@@ -285,7 +261,7 @@ export type Accepted =
   | {
       kind: 'note'
       suggestion: Suggestion
-      /** The note the accept wrote (SPA-66). */
+      /** The note the accept wrote. */
       noteId: string
     }
   | {
@@ -340,28 +316,16 @@ export type Accepted =
     }
 
 /**
- * Accept an identity (SPA-105, spec §11): the person a document named walks
- * through `resolveEntity` — the one door every creator uses — and, when the
- * suggestion sits on a company, gains it in their `companies`. (D60)
+ * Accept an identity: the named person walks through `resolveEntity` and,
+ * on a company, gains it in their `companies`; then `fileIntoReference`
+ * writes them into the field the claim was read off, in this transaction.
  *
- * - An exact email or LinkedIn match **attaches**: no new entity, and the
- *   name the document used becomes a name alias of the person already held.
- * - No match **creates** the person, and `resolveEntity`'s inline trigram
- *   sweep files a `duplicate_candidate` for every near-miss name — the pair
- *   the /inbox pair card already draws. Fuzzy never merges.
- *
- * `resolveEntity` is Promise-shaped and writes on `db`, not on this
- * transaction, so the person it creates commits on its own connection
- * before the value writes and the flip below. The row lock this transaction
- * holds is what still serializes two accepts of one row: the second waits,
- * then reads `accepted`. If a write or the flip then fails, the person stays
- * and the suggestion stays open; a retry attaches by key or files the pair —
- * the one door's own doctrine, not a second person silently welded.
- *
- * Then the person is written into the field the claim was read off
- * (SPA-160; `fileIntoReference` below) — `founders` on a company, `people`
- * or `referred_by` on a deal — through the one write path, in this
- * transaction, so both values and the flip commit together.
+ * - An exact email or LinkedIn match **attaches** (the document's name
+ *   becomes an alias); no match **creates**, and near-miss names get a
+ *   `duplicate_candidate`. Fuzzy never merges.
+ * - `resolveEntity` commits on its own connection, before the flip. The row
+ *   lock still serializes two accepts; if a later write fails the person
+ *   stays, the suggestion stays open, and a retry attaches by key.
  */
 async function acceptIdentityInTx(
   tx: Tx,
@@ -394,11 +358,9 @@ async function acceptIdentityInTx(
       ...(claim.email === undefined ? {} : { email: claim.email }),
       ...(claim.linkedin === undefined ? {} : { linkedin: claim.linkedin }),
     },
-    // `entity_source` has no value meaning "extracted from a document", and
-    // adding one would collide with clean's source_class collapse. `import`
-    // it is until clean's source_class/source_ref work gives this birth its
-    // real provenance; until then the provenance rides the suggestion row —
-    // its refs cite the deck, and `decided_by` names who accepted it.
+    // `entity_source` has no "extracted from a document" value, so `import`;
+    // the real provenance rides the suggestion row (its refs cite the deck,
+    // `decided_by` names the accepter).
     source: { class: 'import' },
     // The accepter, never a machine: a person decided this person exists.
     createdBy: actor.id,
@@ -411,9 +373,8 @@ async function acceptIdentityInTx(
       { slug: 'identity', message: 'A person cannot be a contact at itself' },
     ])
 
-  // SPA-134: a captured page's identity. The page is not somewhere a person
-  // is a contact at; it is the source they were read from, so it is filed
-  // on them — which is also what its patch then applies through.
+  // A captured page is the source the person was read from, not somewhere
+  // they work: it is filed on them, which is what its patch applies through.
   if (record.kind === 'document')
     return {
       resolved,
@@ -436,8 +397,7 @@ async function acceptIdentityInTx(
           refs: row.refs,
         })
       : null
-  // A row proposed before SPA-160 names no field: it accepts as the company
-  // alone.
+  // An older row names no field: it accepts as the company alone.
   const filed =
     claim.attribute === undefined
       ? null
@@ -556,16 +516,12 @@ async function fileIntoReference(
 }
 
 /**
- * Accept a classification (SPA-62, spec §11's first row): the document's
- * `kind` is set to the proposed one and one `document.reclassified`
- * activity row is written on the document's own stream, attributed to the
- * accepter, `from` and `to` in its meta — as `setDocumentKindProgram`'s
- * `document.kind_changed` does for a hand edit, with the suggestion's id as
- * the receipt. The document row is locked first, so the `from` is the kind
- * this write replaced.
+ * Accept a classification: set the document's `kind` and write one
+ * `document.reclassified` row (accepter, `from`/`to`, the suggestion as
+ * receipt). The document row is locked first, so `from` is the kind replaced.
  *
- * Nothing is enqueued. Accepting `deck` is what makes Read deck appear on
- * the Files tab; a person presses it (spec §4, manual and pull-based).
+ * Nothing is enqueued: accepting `deck` only shows Read deck; a person
+ * presses it.
  */
 async function acceptDocumentKindInTx(
   tx: Tx,
@@ -598,7 +554,7 @@ async function acceptDocumentKindInTx(
   return { from: held.kind, to: kind }
 }
 
-// ---------- supersedes (D59) ----------
+// ---------- supersedes ----------
 
 /**
  * Accept a newer version: `link(supersedes)` newer → older through
@@ -711,7 +667,7 @@ async function acceptRefileDocumentInTx(
   }
 }
 
-// ---------- ledger_event (D12) ----------
+// ---------- ledger_event ----------
 
 /**
  * Accept a ledger event: one `round` or `mark` appended through the
@@ -763,16 +719,13 @@ function portfolioChecked<T>(validator: z.ZodType<T>, input: unknown): T {
   )
 }
 
-// ---------- note (SPA-66) ----------
+// ---------- note ----------
 
 /**
- * Accept a note (SPA-66, spec §11 "Summarize"): the drafted body becomes a
- * real note — `bodyJson` and `bodyMd` both — with the accepter as author,
- * filed `tagged_in` the record the suggestion sits on and `derived_from`
- * the source it was drafted from (`lib/notes/from-suggestion.ts`), in this
- * transaction. Both ends are followed through a merge; a source deleted
- * since the proposal refuses the accept rather than writing a note that
- * claims a provenance it no longer has.
+ * Accept a note: the drafted body becomes a real note by the accepter,
+ * `tagged_in` the record and `derived_from` its source, in this transaction.
+ * Both ends are followed through a merge; a source deleted since refuses
+ * rather than write a note claiming a provenance it no longer has.
  */
 async function acceptNoteInTx(
   tx: Tx,
@@ -807,19 +760,17 @@ async function acceptNoteInTx(
   })
 }
 
-// ---------- space tag (SPA-103) ----------
+// ---------- space tag ----------
 
 /**
- * Accept a space tag (SPA-103): the record is tagged into the proposed
- * space through `insertSpaceTag` — the one `entity_space` insert, the one
- * `tagIntoSpace` uses — with `source: 'ai'`, the model's confidence and the
- * **accepter** as `created_by`. A model proposes; a person tags.
+ * Accept a space tag through `insertSpaceTag` (the one `entity_space`
+ * insert) with `source: 'ai'`, the model's confidence and the **accepter**
+ * as `created_by`. A model proposes; a person tags.
  *
- * A record merged since the proposal is tagged on its survivor, as an
- * identity accept links its survivor. A space merged or gone since is
- * refused, and the row stays open. A record already in the space (tagged by
- * hand between the proposal and now) keeps the row it has; the suggestion
- * still closes accepted, and no second `space.tagged` is written.
+ * - A merged record is tagged on its survivor; a space merged or gone
+ *   refuses, and the row stays open.
+ * - A record already in the space keeps its row: the suggestion closes
+ *   accepted and no second `space.tagged` is written.
  */
 async function acceptSpaceTagInTx(
   tx: Tx,
@@ -887,7 +838,7 @@ async function acceptTaskInTx(
   return { taskId: id }
 }
 
-// ---------- discovery cards (D72) ----------
+// ---------- discovery cards ----------
 
 /**
  * The live subspace under `spaceId` a hint names, by name or slug, nearest
@@ -960,10 +911,9 @@ async function fileDiscovered(
  * already held attaches, else it is born — and is filed in the card's space,
  * or the hinted subspace when one matches. The birth's `entity.created` is
  * owed after the commit, so an auto-enrich scoped to the space sees the
- * filing. (D72)
- * - `resolveEntity` commits on its own connection, as the identity accept's
- *   does: a failure after it leaves the company and the card open, and a
- *   retry attaches by domain.
+ * filing.
+ * - `resolveEntity` commits on its own connection: a failure after it
+ *   leaves the company and the card open, and a retry attaches by domain.
  */
 async function acceptAddRecordInTx(
   tx: Tx,
@@ -1092,33 +1042,21 @@ async function shrink(
 /**
  * Accept a suggestion, whole or in part.
  *
- * `fields` omitted: every field of the patch, and the row closes
- * `accepted`. `fields` given (the bulk verbs below, SPA-110): only those
- * slugs are validated and written, and the rule for the row is —
- *
- * - no field left once these are applied → it closes `accepted`, the same
- *   guarded flip as a whole accept;
- * - fields left → it stays `open` with the accepted slugs **removed from
- *   its payload**. What was accepted is not lost: every `attribute_event`
- *   the write made carries this row's id as its receipt, so the payload is
- *   exactly what the queue should still show.
- *
- * A refused field rolls its whole transaction back, so the row keeps that
- * field and its `open` status — which is what lets a batch where every item
- * fails leave every suggestion as it found it.
- *
- * An `identity` accepts whole: it has no fields, so a `fields` argument is
- * refused as invalid rather than read as "all of it".
+ * - `fields` omitted: every field, and the row closes `accepted`.
+ * - `fields` given: only those slugs are written. No field left → closes
+ *   `accepted`; fields left → stays `open` with the accepted slugs
+ *   **removed from its payload** (each `attribute_event` carries the receipt).
+ * - A refused field rolls the whole transaction back: the row keeps it, open.
+ * - An `identity` accepts whole; a `fields` argument is refused as invalid.
  */
 export const acceptProgram = Effect.fn('acceptProgram')(function* (
   id: string,
   actor: Decider,
   fields?: ReadonlyArray<string>,
 ): Effect.fn.Return<Accepted, SuggestionFailure> {
-  // SPA-31, spec §6: an agent is a client of the four contracts and gets no
-  // fifth. `Decider` already admits only a person; this says it again at
-  // runtime for a caller that reached here past the type — an integration
-  // (an MCP token) proposes, it never accepts.
+  // `Decider` admits only a person; this checks it again at runtime for a
+  // caller past the type. An integration (an MCP token) proposes, it never
+  // accepts.
   if (!isPerson(actor))
     return yield* invalid([
       {
@@ -1357,9 +1295,9 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
         const checked = validateProposal(registry, picked)
         if (!checked.ok) throw invalid(checked.issues)
         const { patch, claims } = toPatch(registry, checked.proposal)
-        // A record_reference is proposed as an identity claim, not an id;
-        // resolving it is the identity lane's step, which is not built yet.
-        // Refused whole rather than half-applied.
+        // A record_reference is proposed as an identity claim, not an id,
+        // and accept cannot resolve one. Refused whole rather than
+        // half-applied.
         const unresolved = Object.keys(claims)
         if (unresolved.length > 0)
           throw invalid(
@@ -1371,7 +1309,7 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
 
         const write = await setValuesInTx(tx, {
           // A captured page's patch lands on the record the page is filed
-          // on, never on the document (SPA-134).
+          // on, never on the document.
           entityId:
             page === null
               ? row.entityId
@@ -1396,7 +1334,7 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
   })
   for (const event of owed) yield* Effect.promise(() => emitDomainEvent(event))
   for (const { documentId, after } of refiled) {
-    // Filed on a record after arrival: the same suggestion intake makes. (D59)
+    // Filed on a record after arrival: the same suggestion intake makes.
     if (after.proposeNewer) yield* proposeNewerVersionProgram(documentId)
     if (after.lowered.length > 0)
       yield* Effect.promise(() => enqueueRestamp(after.lowered))
@@ -1404,7 +1342,7 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
   return accepted
 })
 
-// ---------- bulk accept (SPA-110, spec §10 "bulk accept per column/list") ----------
+// ---------- bulk accept ----------
 
 /**
  * One item of a batch: one field of a suggestion, or — for a kind that is
@@ -1421,12 +1359,9 @@ type BatchItem = { suggestionId: string; slug?: string }
  * transaction.
  *
  * **Never one transaction around the batch.** A partial accept is a real
- * outcome the queue must be able to show: four fields that validate are
- * four values the person asked for, and one option archived since the
- * proposal must neither roll them back nor abort the fields after it. One
- * transaction would make the batch all-or-nothing — the behaviour this verb
- * exists to replace. Sequential rather than concurrent because two items
- * are often fields of one row and would queue on its lock anyway.
+ * outcome: one refused field must neither roll back the others nor abort
+ * the ones after it. Sequential because two items are often fields of one
+ * row and would queue on its lock anyway.
  */
 const acceptEach = Effect.fn('acceptEach')(function* (
   items: ReadonlyArray<BatchItem>,
@@ -1482,8 +1417,8 @@ export const acceptRecordProgram = Effect.fn('acceptRecordProgram')(
             eq(suggestion.entityId, input.entityId),
             eq(suggestion.status, 'open'),
             // Accepted one at a time, never in bulk: a wrong supersession
-            // hides true facts from the AI (D59), and a ledger event is an
-            // append a person makes alone — a round cannot be voided (D12).
+            // hides true facts from the AI, and a ledger event is an append
+            // a person makes alone — a round cannot be voided.
             notInArray(suggestion.kind, ['supersedes', 'ledger_event']),
           ),
         )
@@ -1506,7 +1441,7 @@ export const acceptRecordProgram = Effect.fn('acceptRecordProgram')(
  * accepted; the row's other fields stay open for their own decision.
  *
  * `runId` narrows it to one run's suggestions — a column run's "Accept all"
- * in /inbox (SPA-122), which must not also accept the same attribute
+ * in /inbox, which must not also accept the same attribute
  * proposed elsewhere by another run. A registry proposal (an empty patch
  * naming a wanted option) never matches: it proposes no value for the slug,
  * and accepting it would add nothing.
@@ -1543,7 +1478,7 @@ export const acceptColumnProgram = Effect.fn('acceptColumnProgram')(
 /**
  * Reject a suggestion. A discovery card's reject is a dismissal too: the
  * (space, domain) row, written in the same transaction, refuses every later
- * card for the domain in that space. (D72)
+ * card for the domain in that space.
  */
 export const rejectProgram = Effect.fn('rejectProgram')(function* (
   id: string,

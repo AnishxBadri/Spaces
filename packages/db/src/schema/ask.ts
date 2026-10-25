@@ -13,7 +13,7 @@ import { aiRun } from './ai'
 import { user } from './auth'
 
 /**
- * Ask's thread store: one thread per conversation, one row per turn. (D70)
+ * Ask's thread store: one thread per conversation, one row per turn.
  * - Private to their author and not entities: no `entity` row, no mentions,
  *   no search hits. Every read filters on `ask_thread.user_id`.
  * - A turn is frozen when it is asked: the scope, the calls and the cited
@@ -42,7 +42,7 @@ export type AskRef = {
 
 /**
  * A call's state. `unmounted`: a plugin's tool held back before any call,
- * because the turn's scope is sensitive. (D72)
+ * because the turn's scope is sensitive.
  */
 export type AskCallState =
   'running' | 'done' | 'refused' | 'failed' | 'unmounted'
@@ -53,7 +53,7 @@ export type AskVia = { integrationId: string; name: string }
 /** Where a found company stands, as it was read when shown. */
 export type AskFindStanding = 'filed' | 'held' | 'unknown'
 
-/** One company a find turned up: a web result until it is added. (D77) */
+/** One company a find turned up: a web result until it is added. */
 export type AskFindRow = {
   name: string
   /** Normalized; the row's key within its table. */
@@ -78,7 +78,7 @@ export type AskFindTable = {
   rows: ReadonlyArray<AskFindRow>
   /** Rows left out because their domain is dismissed from the space. */
   hidden: number
-  /** The watch this table was saved as; absent until Save as watch. (D77) */
+  /** The watch this table was saved as; absent until Save as watch. */
   savedWatch?: AskSavedWatch
 }
 
@@ -91,7 +91,7 @@ export type AskSavedWatch = {
   deleted?: boolean
 }
 
-/** The action cards Ask proposes; the catalogue in `ASK_CARD_CATALOGUE`. (D70) */
+/** The action cards Ask proposes; the catalogue in `ASK_CARD_CATALOGUE`. */
 export type AskCardKind =
   | 'task'
   | 'move_stage'

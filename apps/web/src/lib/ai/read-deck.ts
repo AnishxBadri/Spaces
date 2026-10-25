@@ -53,60 +53,29 @@ import type {
 } from './sensitivity-for'
 
 /**
- * The deck reader (SPA-90; docs/spec-ai-substrate.md §11, §14 step 2). The
- * first model call with a purpose: a `kind: deck` document whose text is
- * extracted becomes one `attribute_patch` suggestion on every record it is
- * filed against — never a value, a row in the inbox.
+ * The deck reader: a `kind: deck` document's extracted text becomes one
+ * `attribute_patch` suggestion on every record it is filed against — never a
+ * value. Per record:
  *
- * Per filed record, the same path with a different registry:
+ * 1. context: the deck's chunks (or its whole text as `doc:<id>#0`), then
+ *    `recordContextProgram` on the record;
+ * 2. `sensitivityFor` of record and deck, live, never cached; sensitive
+ *    when either is;
+ * 3. `cachedExtractProgram`, keyed on (blob, compiled schema, routed model);
+ *    a hit writes no `ai_usage` row;
+ * 4. per-field `validateProposal`: a refused field is dropped and counted,
+ *    never failing the run;
+ * 5. `toPatch`: a person-targeted `record_reference` claim becomes one
+ *    `identity` suggestion per person; a claim on any other target is held
+ *    back with a rationale line.
  *
- *   1. context — the deck's own text first (`doc:<id>#n` per chunk where
- *      `chunk` rows of `source_kind: document` exist, else the extracted text whole as
- *      `doc:<id>#0`), then `recordContextProgram` on the record, which brings
- *      the space memos, the mandate and the glossary for free;
- *   2. `sensitivityFor` of the record and of the deck — live, never cached —
- *      spread into the call, sensitive when either is (a deck can be
- *      sensitive through its storage binding alone);
- *   3. `cachedExtractProgram` (`./extraction-cache.ts`, SPA-74) — the
- *      extraction cache keyed on (blob, compiled schema, routed model), which
- *      answers a re-read or a second document over the same bytes from disk
- *      and otherwise calls `completeProgram('extract', items,
- *      schemaFor(registry), …)` and stores the answer; a hit says `cached` in
- *      the rationale and writes no `ai_usage` row;
- *   4. per-field `validateProposal`: a field naming an option id absent from
- *      the live enum (or anything else the registry refuses) is dropped and
- *      counted in the rationale, never written and never failing the run;
- *   5. `toPatch` — a claim on a person-targeted `record_reference` (a
- *      company's `founders`, a deal's `people`, `referred_by`) becomes one
- *      `suggestion(kind: 'identity')` per person on the same record, citing
- *      that field's refs and naming the field (SPA-105, SPA-160); accepting
- *      one is `resolveEntity`, the company in the person's `companies` when
- *      the record is one, and the person written into that field.
- *      A claim on any other target (a deal's `company`) is held back with a
- *      rationale line — no accept path resolves it yet.
- *
- * Every model call runs before any suggestion is written, so a provider that
- * fails on the second record leaves no half-read deck in the inbox. A person
- * target is skipped with a line in the rationale, not read.
- *
- * **Kind is kind.** The trigger and this program read `document.kind` and
- * nothing else — there is no column saying how the kind was set, and nothing
- * here would branch on one if there were.
- *
- * **A captured page is the third caller (SPA-134).** `against` swaps the
- * filed records for one declared object and one anchor: the page is read
- * against that object's registry — person for a profile, company for a
- * company page — through the same `cachedExtractProgram` call, the same
- * validator and the same `proposeProgram`, and what it proposes is anchored
- * on the captured document itself
- * (`@spaces/core/writes/ai/capture-read`), since a capture usually names
- * somebody we hold no record for. Read as a person, the schema
- * gains one field, `_subject` — a person reference, so its answer is the
- * same identity claim a deck's `founders` yields — and the page's subject
- * becomes one `identity` suggestion ahead of one `attribute_patch`. Every
- * other reference claim is held back: with no record, nothing could hold it.
- * A document that already carries a capture read's suggestions is not read
- * again, so a re-posted page opens nothing new.
+ * - Every model call runs before any suggestion is written, so a failure
+ *   leaves no half-read deck in the inbox. A filed person is skipped.
+ * - Reads `document.kind` and nothing else; never branch on how it was set.
+ * - A captured page (`against`) is read against one declared object and
+ *   anchored on its own document; as a person it gains `_subject`, proposed
+ *   as an `identity` ahead of the `attribute_patch`. A page already read is
+ *   not re-read.
  */
 
 export const READ_DECK_CONTEXT_CHARS = 12_000
@@ -120,7 +89,7 @@ export const READ_DECK_BUDGET_CHARS = 24_000
 export const READ_CAPTURE_PURPOSE = 'read-capture/v1'
 
 /**
- * The field a person page's subject is claimed through (SPA-134). Not an
+ * The field a person page's subject is claimed through. Not an
  * attribute: an attribute slug never starts with `_` (the slugifier trims
  * it), so it cannot shadow one, and it never reaches a patch.
  */
@@ -209,16 +178,14 @@ export type ReadDeckInput = {
   asOf?: string
   jobRunId?: string
   /**
-   * The run this read is a step of (SPA-100) — "Read deck and summarize"
-   * opens one and hands it here. Absent, the read opens and closes its own
-   * one-step run ("Read deck").
+   * The run this read is a step of ("Read deck and summarize" hands one in).
+   * Absent, the read opens and closes its own one-step run.
    */
   runId?: string
   /**
-   * A captured page (SPA-134): read against this object's registry rather
-   * than the records the document is filed on, and propose onto
-   * `anchorEntityId` — the captured document's own entity. Absent, the deck
-   * reader it always was.
+   * A captured page: read against this object's registry rather than the
+   * records the document is filed on, and propose onto `anchorEntityId`,
+   * the captured document's own entity.
    */
   against?: { objectId: string; anchorEntityId: string }
 }
@@ -281,9 +248,8 @@ const deckItems = Effect.fn('readDeck.deckItems')(function* (
       entityIds: [documentId],
       at,
     }))
-  // Before ai-10b chunks anything: the document itself, as one item. The
-  // ref grammar has no bare-document form, so it is chunk 0 — the whole of
-  // what exists — and a citation still resolves to the deck.
+  // Not chunked yet: the document as one item. The ref grammar has no
+  // bare-document form, so it is chunk 0 and a citation still resolves.
   const text = extractedText?.trim() ?? ''
   if (text === '') return []
   return [
@@ -374,7 +340,7 @@ export const readDeckProgram = Effect.fn('readDeck')(function* (
 
 /**
  * A captured page's text before its extraction lands: the blob is the text,
- * byte for byte what was posted (`lib/rpc/capture.ts`), so the read need not
+ * byte for byte what was posted, so the read need not
  * wait on the extract job to run.
  */
 const pageText = (
@@ -786,7 +752,7 @@ function subjectRationale(subject: PersonClaim, title: string): string {
 /**
  * Why an identity is on this record: who named them, where, as what. The
  * provenance `entity_source: 'import'` cannot carry lives here and in the
- * row's refs (SPA-105).
+ * row's refs.
  */
 function identityRationale(
   person: PersonClaim,
@@ -796,7 +762,7 @@ function identityRationale(
   const def = read.registry.find((d) => d.slug === person.slug)
   const kind = KIND_LABEL[read.target.kind] ?? 'record'
   const as = person.claim.role === undefined ? '' : ` as ${person.claim.role}`
-  // Only a company joins the person's `companies` on accept. (D60)
+  // Only a company joins the person's `companies` on accept.
   const at =
     read.target.kind === 'company'
       ? `, adds ${read.target.name} to their companies and`
@@ -826,7 +792,7 @@ export type ReadDeckEnqueued =
  * answers `null`; the jobs read back tell that refusal from a queue that is
  * down.
  *
- * `summarizeOnto` is Read deck and summarize (SPA-100): the same job, keyed
+ * `summarizeOnto` is Read deck and summarize: the same job, keyed
  * the same, with the record the summary lands on — one read of a deck at a
  * time, whichever button pressed it.
  */
@@ -867,7 +833,7 @@ export const enqueueReadDeckProgram = Effect.fn('enqueueReadDeck')(function* (
 export type CaptureReadQueued = 'queued' | 'skipped'
 
 /**
- * Queue a captured page's read (SPA-134) — the Read deck job with `capture`
+ * Queue a captured page's read — the Read deck job with `capture`
  * set, keyed on the document as Read deck is, so pg-boss refuses a second
  * send while one is queued or active. Routed first, at the page's own
  * sensitivity: with no model for the extract lane there is no job and no

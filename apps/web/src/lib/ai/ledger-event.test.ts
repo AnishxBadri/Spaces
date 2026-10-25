@@ -52,7 +52,7 @@ vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 /**
  * Live-file ledger events: a revised cap table proposes, the suggestion
  * queue is the only door, and accepting appends exactly one row to `round`
- * or `mark` — counted before and after, nothing updated or deleted. (D12)
+ * or `mark` — counted before and after, nothing updated or deleted.
  */
 
 const USER = FIXTURE_ACTOR.id

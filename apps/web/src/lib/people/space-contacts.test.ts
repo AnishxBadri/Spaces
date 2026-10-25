@@ -2,19 +2,13 @@ import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The space page's Contacts lanes (SPA-99), against the test database.
- *
- * What is worth pinning is the reconciliation the slice exists for: the
- * direct lane reads `entity_space`, which accepts any kind, so it has to be
- * the `person` join that makes it a contacts lane — and a person who is
- * both tagged here *and* a contact at a company here belongs to the direct
- * lane alone, or the page tells two stories about one person.
- *
- * Dynamic imports for the reason the rest of the DB-coupled suite uses
- * them: `@spaces/db` builds its pool from `DATABASE_URL` at import time and
- * `vitest.setup.ts` rewrites it per file. The programs are called directly —
- * `getSpace` needs a request no test has, which is why the queries live
- * outside `lib/server/` at all.
+ * The space page's Contacts lanes, against the test database.
+ * - The direct lane reads `entity_space`, which accepts any kind, so the
+ *   `person` join is what makes it a contacts lane.
+ * - A person both tagged here and at a company here is in the direct lane
+ *   alone, or the page tells two stories about one person.
+ * - Dynamic imports: `@spaces/db` builds its pool from `DATABASE_URL` at
+ *   import time, and the setup file rewrites it per file.
  */
 
 async function actorId(): Promise<string> {

@@ -32,10 +32,9 @@ import type {
 } from '@spaces/db/schema/import'
 
 /**
- * **Resolve preview** (SPA-167, project 14 `import-5`) — the rules that turn
- * staged rows into stored plans, pure. The database half (the identity
- * lookup through `previewResolve`, persistence) is
- * `apps/web/src/lib/import/plan.ts`; everything decided without a query is
+ * **Resolve preview** — the rules that turn staged rows into stored plans,
+ * pure. The database half (the identity lookup through `previewResolve`,
+ * persistence) lives in apps/web; everything decided without a query is
  * here: how one row reads under the mapping, which creator a row goes
  * through, and what two rows of one file claiming one identity key become —
  * the case `resolveEntity` cannot see, because the second row does not exist
@@ -95,7 +94,7 @@ export type ReadRow = {
   patch: Record<string, ImportCellValue>
   /**
    * The cells that stop a row: a name cell that did not read, and a required
-   * reference that found nothing (SPA-168).
+   * reference that found nothing.
    */
   errors: Array<ImportCellIssue>
   /** Every other cell that did not read, with its reason; the row lands without it. */
@@ -117,7 +116,7 @@ export const MALFORMED_ROW =
 /**
  * One staged row under the mapping: every mapped cell through the column's
  * spec (`readCell`, the coercer). **Red is a cell,
- * never a row** (SPA-166's contract): a cell that does not read is a
+ * never a row**: a cell that does not read is a
  * skipped cell with its reason, and the row still lands with that value
  * left blank — an identity cell included, in which case the row matches on
  * the keys that remain, or creates. A reference cell is not read here but
@@ -186,7 +185,7 @@ export function readRow(
         return
     }
   })
-  // No name column: a person's First and Last name columns make it. (D67)
+  // No name column: a person's First and Last name columns make it.
   if (out.name === null) {
     const joined = joinName(
       namePart(out.patch, registry, FIRST_NAME_SLUG),
@@ -209,7 +208,7 @@ function namePart(
 }
 
 /**
- * A read row with its reference cells looked up (SPA-168): hits join the
+ * A read row with its reference cells looked up: hits join the
  * patch, misses become skipped cells — or the row's errors, for a required
  * reference — and a create-missing miss plans a create.
  */
@@ -347,7 +346,7 @@ function secondaryPlan(
 }
 
 /**
- * Which row carries each secondary create (SPA-168). Every create-missing
+ * Which row carries each secondary create. Every create-missing
  * reference names its create by `key`; the first row naming it that lands
  * (else the first still waiting on a decision) carries it on `alsoCreates`,
  * so two rows naming one missing company plan one create, and the commit
@@ -559,7 +558,8 @@ export function applyDecision(
 export type PlanCounts = {
   /** Records created: landing rows that create, plus their secondary creates. */
   create: number
-  /** Of `create`, the records a create-missing reference makes (SPA-168). */
+  /** Of `create`, the records a create-missing reference makes. */
+
   referenceCreates: number
   attach: number
   noLand: number

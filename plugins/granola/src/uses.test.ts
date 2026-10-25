@@ -16,7 +16,7 @@ import { manifest } from './manifest.ts'
 /**
  * A keyed recorder's ports: Secrets for the member's key, Http, Content for
  * the recorder lane, and Log — never Facts, Identity or Ai. Attendees become
- * records host-side, through the participants module. Gate 1 checks the type
+ * records host-side, through the participants module. Typecheck checks the type
  * half; the worker's live test checks the Layer the host builds.
  */
 type Services<T> =

@@ -80,7 +80,7 @@ export function LabelHead({
 }
 
 /**
- * P2 — Ledger section. The bone head band (title + mono count left, one
+ * Ledger section. The bone head band (title + mono count left, one
  * mono link right), then 40px rows on rules; the last row may be a
  * composer. The section is a list, so the rows are `<li>`s and the caller
  * decides what a row is (a link, a task with its checkbox, a composer
@@ -110,14 +110,14 @@ export function LedgerSection({
 }
 
 /**
- * The class a row takes when a composer on this page just created it
- * (DESIGN.md §5, Micro-interactions; SPA-53) — a bone wash that fades out
- * over 250ms. Exported so a row that is not a `LedgerRow` (a table row, a
- * card) can land the same way, and so the contract is testable without a DOM.
+ * The class a row takes when a composer on this page just created it — a
+ * bone wash that fades out over 250ms. Exported so a row that is not a
+ * `LedgerRow` (a table row, a card) can land the same way, and so the
+ * contract is testable without a DOM.
  *
  * `wash` comes from `useBornRows().washes(id)`, never from a timestamp: the
  * wash is for a row this session added, not for a row that happens to be
- * young. The utility itself lives in styles.css.
+ * young. The utility itself lives in the stylesheet.
  */
 export function rowWashClass(wash: boolean | undefined): string {
   return wash === true ? 'row-wash' : ''
@@ -183,7 +183,7 @@ export function LedgerFigure({
 }
 
 /**
- * P3 — reference bar. A number is never shown alone when a median exists:
+ * Reference bar. A number is never shown alone when a median exists:
  * the ink fill is the value, the graphite tick is the median, the track is
  * the scale (the longest value in the section fills it). 1-bit, no colour.
  */

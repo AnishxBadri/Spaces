@@ -12,7 +12,7 @@ export const RECORD_ID =
  *   value.
  * - One integration row is one feed. The settings are scalars because the
  *   Integrations form draws string, number, boolean and enum only; many
- *   feeds per row is the watch plugins' shape. (D72)
+ *   feeds per row is the watch plugins' shape.
  */
 export const manifest = defineManifest({
   manifestVersion: 1,

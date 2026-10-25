@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 /**
  * The `suggestion(kind: 'refile_document')` payload: a document a storage
- * source brought whose folder now resolves to another record (§5.6, §8).
+ * source brought whose folder now resolves to another record.
  * - Decoded by `proposeWith` on insert, by the accept path before it moves
  *   the edge, and by the Review card.
  * - The ids are what accept writes; the names are as filed when proposed.

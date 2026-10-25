@@ -29,7 +29,7 @@ import {
 import type { QueryRecordsInput } from './tools-read'
 
 /**
- * `query_records` over the views compiler (D70, D71): the space condition
+ * `query_records` over the views compiler: the space condition
  * with descendants, the interaction-stat columns, `total` against the counts
  * compiler, the clamp, and canRead as the token's user.
  */

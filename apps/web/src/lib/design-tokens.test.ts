@@ -3,17 +3,16 @@ import { fileURLToPath } from 'node:url'
 import { Linter } from 'eslint'
 import { describe, expect, it } from 'vitest'
 
-// eslint-rules/ is packages/config's (SPA-180), loaded by the eslint base
-// beside it; one lint vocabulary serves every package.
+// The rule module is @spaces/config's, loaded by the eslint base beside
+// it; one lint vocabulary serves every package.
 import instrument, {
   NAMED_STEPS,
 } from '../../../../packages/config/eslint-rules/vocabulary.js'
 
 /**
- * SPA-16: the Instrument vocabulary is the only vocabulary, and the thing that
- * holds it there is a lint rule instead of the old CLAUDE.md grep. Two halves
- * are tested here — the rule over tsx class strings (gate 4 runs it for real),
- * and the `@theme` block, which no lint rule reads.
+ * The Instrument vocabulary is the only vocabulary, held there by a lint
+ * rule. Two halves are tested: the rule over tsx class strings (the lint
+ * gate runs it for real), and the `@theme` block, which no lint rule reads.
  */
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url))
@@ -38,8 +37,8 @@ function lint(code: string, filename = 'src/routes/_app/fixture.tsx') {
 
 describe('instrument/vocabulary', () => {
   it('does not read comments — the line the old grep printed forever', () => {
-    // Verbatim from src/components/attributes/attribute-dialog.tsx:979-981,
-    // the single false positive the gate-5 grep produced on a clean tree.
+    // Verbatim from the attribute dialog: a class string that a plain grep
+    // misreads as a banned class.
     const code = `
       /** A checkbox whose whole row is the hit area — no dead zone between box
        *  and text. The box is a 14px square that fills with pine (never a
@@ -177,7 +176,7 @@ describe('arbitrary type sizes (SPA-79)', () => {
   })
 
   // The size check bans lengths only; colour is its own axis, checked below
-  // since SPA-52 — and reading a token is the sanctioned arbitrary value.
+  // — and reading a token is the sanctioned arbitrary value.
   it('leaves a colour that reads a custom property alone', () => {
     expect(
       lint('<div className="mono text-[var(--badge-amber-ink)]" />'),
@@ -264,13 +263,9 @@ describe('light only (SPA-52)', () => {
   })
 
   it('declares color-scheme exactly once, so every date input inherits it', () => {
-    // SPA-38 keeps `<input type="date">` native — DESIGN.md §5 "Inputs /
-    // Fields" says native control in forms, and a hand-built calendar is a
-    // month of work and an accessibility regression. What makes that
-    // survivable on a dark OS is inheritance: `color-scheme` is an inherited
-    // property, so the one declaration on `:root` reaches every date field
-    // and every scrollbar with nothing to repeat at the call sites. A second
-    // declaration anywhere below is the only way one of them could go back to
+    // `<input type="date">` stays native. `color-scheme` is inherited, so the
+    // one declaration on `:root` draws every date field and scrollbar light; a
+    // second declaration anywhere below is the only way one could go back to
     // drawing dark, which is what this counts.
     expect(css.match(/^\s*color-scheme\s*:/gm)).toHaveLength(1)
   })
@@ -328,10 +323,9 @@ describe('@theme colour exports', () => {
   )
 
   it('exports no shadcn colour name Tailwind could build a class from', () => {
-    // Deleted 2026-09-18 (SPA-16). Each aliased bone, paper, hairline or ink,
-    // so nothing rendered differently — they only kept the shadcn class names
-    // reachable. Their `:root` halves followed in SPA-41 and SPA-154, once the
-    // note body's marks stopped reading them — see the block below.
+    // The shadcn alias tokens: each aliased bone, paper, hairline or ink, so
+    // keeping them only kept the shadcn class names reachable. None may return
+    // to `@theme`.
     const dead = [
       '--color-sidebar',
       '--color-chart-',
@@ -365,11 +359,9 @@ describe(':root custom properties', () => {
   )
 
   it('declares none of the shadcn aliases — the layer is gone, not just hidden', () => {
-    // SPA-41. `@theme` lost these in SPA-16, which stopped Tailwind building
-    // `bg-muted` and friends; the `:root` declarations outlived it because
-    // .mention-chip and .glossary-term still read them by hand. Both now draw
-    // on the Instrument materials (bone, rule, hairline, ink) directly, so a
-    // declaration here would have no reader at all.
+    // .mention-chip and .glossary-term draw on the Instrument materials (bone,
+    // rule, hairline, ink) directly, so a `:root` declaration of these would
+    // have no reader at all.
     for (const name of [
       '--muted',
       '--muted-foreground',
@@ -383,11 +375,10 @@ describe(':root custom properties', () => {
   })
 
   it('declares nothing else with zero readers either', () => {
-    // SPA-154 finishes what SPA-41 started: the rest of the alias layer. A
-    // reader is a `var(--name)` somewhere in apps/web/src or packages/, or a
-    // Tailwind class Tailwind could build from a `@theme` mapping of it. None
-    // of these had one — the chassis is drawn from bone and hairline, cards
-    // and popovers are paper on a 1px ink edge, and no chart ever shipped.
+    // The rest of the alias layer. A reader is a `var(--name)` in the app or
+    // packages, or a class Tailwind could build from a `@theme` mapping of it;
+    // none of these has one (the chassis is bone and hairline, cards and
+    // popovers paper on a 1px ink edge, and there are no charts).
     for (const name of [
       '--sidebar',
       '--sidebar-foreground',

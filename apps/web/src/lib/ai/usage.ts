@@ -35,17 +35,11 @@ import type { AiLane } from './lanes'
 import { suggestionOfOutputRef } from './run'
 
 /**
- * Settings → Usage (SPA-100): the run log read back. `ai_usage` has been
- * written since the first Test call (ai-4a); this is its surface, listed by
- * run — task, record, who, when, status, tokens, what the run proposed — and,
- * opened, each step's tool, model, tokens and `input_refs → output_ref`, the
- * refs resolved to names by `resolveRefsProgram` (`@spaces/core/writes/context/names`,
- * which renders through `cite.ts`). Calls no run owns — the settings Test
- * call — are listed apart, under "Calls outside a run".
- *
- * Read by any signed-in member: it is provenance, the page the inbox's
- * "produced by this run" opens, and it writes nothing. The refs it resolves
- * are the ones the inbox already resolves for the same reader.
+ * Settings → Usage: the run log read back, by run, each step with its model,
+ * tokens and `input_refs → output_ref` resolved to names by
+ * `resolveRefsProgram`. Calls no run owns (the Test call) are listed under
+ * "Calls outside a run".
+ * - Any signed-in member reads it: it is provenance and writes nothing.
  */
 
 export const RUNS_LISTED = 100

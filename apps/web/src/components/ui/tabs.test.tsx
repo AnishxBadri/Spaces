@@ -8,7 +8,7 @@ import { declared } from '#/test/tailwind-css'
 
 /**
  * The tab head's states this file owns: an empty tab drawn at disabled grey
- * with its 0 (D74 — the head stays the record's index), the head pinned
+ * with its 0 (the head stays the record's index), the head pinned
  * under the folded bar, and a switch that never fades the open tab's fill.
  */
 
@@ -116,8 +116,8 @@ describe('a pinned head', () => {
 })
 
 describe('a tab switch', () => {
-  // The open tab is an ink fill under a paper pane; fading that fill is what
-  // left both tabs half-inked for a frame. Only the text colour may move.
+  // The open tab is an ink fill under a paper pane; fading that fill leaves
+  // both tabs half-inked for a frame. Only the text colour may move.
   it('transitions colour only, on the open tab and the closed ones', async () => {
     const doc = render('notes')
     for (const t of Array.from(doc.querySelectorAll('[role="tab"]'))) {

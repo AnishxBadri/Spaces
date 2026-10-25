@@ -8,7 +8,7 @@ import { decryptSecret, encryptSecret } from '../vault/crypto'
  *   user's row fails the GCM tag instead of decrypting.
  * - Never the credential AAD (`scope:provider`), never a second crypto.
  * - Two shapes, told apart by `type`: an OAuth grant, or a key a member
- *   pasted (`api_key`, D78) that never expires and never refreshes. A stored
+ *   pasted (`api_key`) that never expires and never refreshes. A stored
  *   bundle with no `type` is an OAuth grant.
  */
 
@@ -20,7 +20,7 @@ export type TokenBundle = {
   readonly tokenType: string
 }
 
-/** A key a member pasted for their own account (D78). */
+/** A key a member pasted for their own account. */
 export type KeyBundle = { readonly type: 'api_key'; readonly key: string }
 
 /** What a row's `tokens_enc` holds, decrypted. */

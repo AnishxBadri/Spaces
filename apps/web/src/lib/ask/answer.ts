@@ -2,7 +2,7 @@ import type { AskRef } from './types'
 
 /**
  * An answer's markdown as blocks the renderer draws, with every `[ref]`
- * turned into a chip from the turn's stored refs. (D70)
+ * turned into a chip from the turn's stored refs.
  * - A claim block — a paragraph, a list item or a table — that carries no
  *   ref the turn stored is refused: it is drawn as a line saying a claim was
  *   left out, never as the claim.

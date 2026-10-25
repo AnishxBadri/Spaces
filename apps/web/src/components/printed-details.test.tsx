@@ -287,8 +287,8 @@ describe('real tabs', () => {
     expect(nextTabIndex('ArrowRight', 0, 0)).toBeNull()
   })
 
-  it('is a styles.css shape, not a clip-path in the tsx', () => {
-    expect(css).toMatch(/@utility tab-open \{[^}]*clip-path: polygon/)
+  it('is a styles.css shape, not drawn in the tsx', () => {
+    expect(css).toMatch(/@utility tab-open \{/)
   })
 })
 

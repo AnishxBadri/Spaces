@@ -3,13 +3,9 @@ import { describe, expect, it } from 'vitest'
 import type { Condition } from '@spaces/core/views/filter'
 
 /**
- * The consumer (SPA-40): the list page's server fn now takes the view's
- * conditions and narrows in Postgres, so a filtered list carries the rows it
- * shows and not the rows it hides.
- *
- * `listRecordsProgram` is the read `listObjectRecords` runs; the server fn
- * adds `requireUser()` and nothing else, which is why the assertion lives
- * here rather than against a fabricated request.
+ * The list page narrows by the view's conditions in Postgres, so a filtered
+ * list carries only the rows it shows. Tested on `listRecordsProgram`: the
+ * server fn adds only `requireUser()`.
  */
 
 async function fixture() {
@@ -128,7 +124,7 @@ describe('listObjectRecords — filtering in SQL', () => {
 })
 
 /**
- * SPA-64. The page is a keyset window, not an offset: the cursor names the
+ * The page is a keyset window, not an offset: the cursor names the
  * last row's (sort key, id), so a record born between two fetches changes
  * what the *next* page holds but cannot make the reader see a row twice or
  * miss one they had not reached.

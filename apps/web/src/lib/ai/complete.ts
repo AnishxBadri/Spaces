@@ -18,36 +18,15 @@ import type { SensitivityVia } from './sensitivity'
 import type { RunWriteFailed } from './run'
 
 /**
- * `complete(lane, items, schema?, opts)` — half of the provider contract
- * (docs/spec-ai-substrate.md §4, §9). A feature names a lane and hands over
- * ranked `ContextItem`s; this resolves the lane to a provider and model,
- * refuses a sensitive call to the cloud, renders the items as `[ref] text`
- * blocks (`./prompt.ts`) so the output can cite, calls the model once, and
- * writes one `ai_usage` row for the completed call.
- *
- * Sensitivity is an **input**: the caller supplies it, from
- * `sensitivityFor(subject)` (`./sensitivity-for.ts`, SPA-61), spreading its
- * `{sensitivity, via}` into the options so a refusal can name the space the
- * record inherited from.
- * A `sensitive` call whose target is not a local provider fails
- * `SensitiveRouteRefused` — there is no fallback to cloud, by construction:
- * the check runs against the one target this call has, after it is chosen
- * and before any model is built.
- *
- * The workspace AI cap (SPA-73, `./caps.ts`) is checked next, before any
- * model is built or called: a day whose tokens are at the ceiling, or a call
- * whose `budgetChars` estimate is over the per-run cap, fails `CapExceeded`.
- * The check is per call, never mid-stream — a call already in flight when
- * the ceiling is crossed completes and writes its `ai_usage` row.
- *
- * `opts.model` is the test seam every AI test uses: an injected AI SDK
- * `LanguageModel` (`MockLanguageModelV4` from `ai/test`) replaces the vault
- * lookup, so no test reaches a network. The route is still read, and the
- * sensitivity check still applies — the seam replaces the transport, not the
- * policy. `opts.route` replaces the table lookup with an explicit target:
- * the settings Test call, which tests one provider, and the extraction cache,
- * which has already read the route to key on its model and hands the same
- * target on so the model it keyed is the model called.
+ * `complete(lane, items, schema?, opts)`: resolves the lane to a provider and
+ * model, renders the ranked `ContextItem`s as citable `[ref] text` blocks,
+ * calls the model once and writes one `ai_usage` row.
+ * - Sensitivity is an input (from `sensitivityFor`). A `sensitive` call to a
+ *   non-local target fails `SensitiveRouteRefused`, checked before any model
+ *   is built; there is no fallback to cloud.
+ * - The cap is checked next (`CapExceeded`), per call, never mid-stream.
+ * - `opts.model` is the test seam (no network); route and sensitivity still
+ *   apply. `opts.route` pins the target (the Test call, the extraction cache).
  */
 
 /** Who asked. The same typed actor as `attribute_event` / `suggestion`. */
@@ -69,24 +48,21 @@ export type CompleteOptions = {
   route?: AiTarget
   jobRunId?: string
   /**
-   * The run this call is a step of (`./run.ts`, SPA-100) — written to
-   * `ai_usage.run_id`. Absent, the call is outside any run: the settings Test
-   * call.
+   * The run this call is a step of, written to `ai_usage.run_id`. Absent, the
+   * call is outside any run (the settings Test call).
    */
   runId?: string
   maxOutputTokens?: number
   maxRetries?: number
   /**
-   * Files sent beside the rendered prompt, as `file` parts of the one user
-   * message (SPA-94: the vision lane hands a PDF page range to the provider,
-   * which renders the pages itself). Absent or empty, the call is the plain
-   * `prompt` string it always was. The cap estimate is still `budgetChars`:
-   * a caller sending files sizes it for what the files will cost.
+   * Files sent as `file` parts of the one user message (the vision lane's PDF
+   * page range). Absent or empty, the call is a plain `prompt` string. The cap
+   * estimate is still `budgetChars`, so a caller sending files sizes it for them.
    */
   files?: ReadonlyArray<CompleteFile>
 }
 
-/** One file part of a `complete()` call. PDF only, until a lane needs more. */
+/** One file part of a `complete()` call. PDF only. */
 export type CompleteFile = {
   mediaType: 'application/pdf'
   data: Uint8Array
@@ -166,7 +142,7 @@ export type CompleteFailure =
   | UsageWriteFailed
   | CapExceeded
   | CapReadFailed
-  // Not raised here: a feature's run-log write (`./run.ts`). Named in this
+  // Not raised here: a feature's run-log write. Named in this
   // union so every feature's message, which falls through to
   // `completeMessage`, already has a sentence for it.
   | RunWriteFailed
@@ -215,12 +191,10 @@ const tokens = (usage: LanguageModelUsage) => ({
 })
 
 /**
- * The one target a call to `lane` at this sensitivity goes to, with the
- * sensitive-to-cloud refusal already applied — the policy half of
- * `complete()`, before any cap, model or prompt. Exported for the extraction
- * cache (`./extraction-cache.ts`, SPA-74), which must key on the routed model
- * before deciding whether to call, and must refuse a sensitive read to the
- * cloud even when the answer is already on disk.
+ * The one target a call to `lane` goes to, with the sensitive-to-cloud
+ * refusal applied: the policy half of `complete()`. Exported for the
+ * extraction cache, which keys on the routed model and must refuse a
+ * sensitive read to the cloud even when the answer is already cached.
  */
 export const laneTargetProgram = Effect.fn('laneTarget')(function* (
   lane: AiLane,

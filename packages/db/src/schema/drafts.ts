@@ -11,7 +11,7 @@ import { user } from './auth'
 import { interaction } from './interactions'
 
 /**
- * Email drafts (D67): author-private, local only — never synced to the
+ * Email drafts: author-private, local only — never synced to the
  * mailbox's drafts. Every read filters on `email_draft.user_id`.
  * - Reply modes carry `in_reply_to_id`, from which send takes `In-Reply-To`
  *   and `References`; a parent that goes away leaves a plain draft.

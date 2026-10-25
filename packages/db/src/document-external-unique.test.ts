@@ -10,7 +10,7 @@ import { user } from './schema/auth.ts'
  * `document_connection_external_unique`, asserted in Postgres.
  * - One document per (connection, provider file): write-through loop
  *   prevention and the full re-list are `on conflict` on that pair, and
- *   without it a re-list doubles every row (storage-sources spec §6, §8).
+ *   without it a re-list doubles every row.
  * - Partial: a predicate that caught the null rows would admit one
  *   hand-uploaded file per workspace.
  * - Asserted by constraint name: drizzle's message names the SQL, so matching
@@ -95,7 +95,7 @@ describe('document storage-source provenance in Postgres', () => {
   })
 
   it('lets the same provider file arrive on two connections', async () => {
-    // Two people bind the same shared folder: one blob, two documents (§5.6).
+    // Two people bind the same shared folder: one blob, two documents.
     // The key is the pair, never `external_id` alone.
     const externalId = `drive-${randomUUID()}`
     await aDocument({ connectionId: ids.connection, externalId })

@@ -94,7 +94,7 @@ export function meetingWhen(startsAt: string, endsAt: string): string {
   return `${weekdayDate(isoDay(new Date(startsAt)))} · ${timeSpan(startsAt, endsAt)}`
 }
 
-/** The RSVP mark printed after a name. Shown, never edited. (D68) */
+/** The RSVP mark printed after a name. Shown, never edited. */
 export const RSVP_MARK: Record<MeetingRsvp, string> = {
   accepted: '✓',
   declined: '✕',
@@ -140,7 +140,7 @@ export function nowIndex(
   return i < 0 ? meetings.length : i
 }
 
-/** Google Calendar on the meeting's day, where RSVP is changed. (D68) */
+/** Google Calendar on the meeting's day, where RSVP is changed. */
 export function googleDayUrl(startsAt: string): string {
   const d = new Date(startsAt)
   return `https://calendar.google.com/calendar/r/day/${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
@@ -149,7 +149,7 @@ export function googleDayUrl(startsAt: string): string {
 /**
  * One event of a Prep stream. `route` comes first when the call runs and
  * says how it was routed; `refused` and `failed` end a stream that never
- * reached a model. Prep is never stored. (D68)
+ * reached a model. Prep is never stored.
  */
 export type PrepEvent =
   | { type: 'route'; sensitive: boolean; line: string }

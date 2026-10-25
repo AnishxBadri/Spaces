@@ -6,10 +6,9 @@ import type {
 } from '@spaces/db/schema/interactions'
 
 /**
- * The closed JSON type every `jsonb()` column is typed against. It is
- * declared at the columns that claim it — `@spaces/db/json` — and re-exported
- * here so the app's `@spaces/core/json` imports (until SPA-176, `#/lib/json`)
- * read the same name they always did (SPA-142).
+ * The closed JSON type every `jsonb()` column is typed against. Declared at
+ * the columns (`@spaces/db/json`), re-exported so `@spaces/core/json` callers
+ * read one name.
  */
 export type { Json }
 
@@ -133,7 +132,7 @@ export function readInteractionMeta(
   return { ok: true, meta: parsed.data }
 }
 
-/** A recorder connection's choices (D78): the ticked folders and two opt-ins. */
+/** A recorder connection's choices: the ticked folders and two opt-ins. */
 export type RecorderSettings = {
   folderIds: Array<string>
   /** Fetch the member's typed notes, private to them. */
@@ -173,7 +172,7 @@ export function recorderSettingsJson(settings: RecorderSettings): {
   }
 }
 
-/** One recipient chip on an `email_draft`, as the composer sends it. (D67) */
+/** One recipient chip on an `email_draft`, as the composer sends it. */
 const draftRecipientSchema = z
   .object({
     email: z.email().max(320),
@@ -190,7 +189,7 @@ export const draftAttachmentsSchema = z
   .array(z.object({ documentId: z.uuid() }).strict())
   .max(50)
 
-/** An `email` template's body (D67): what applying it copies into a draft. */
+/** An `email` template's body: what applying it copies into a draft. */
 export type EmailTemplateBody = {
   subject: string
   body_md: string

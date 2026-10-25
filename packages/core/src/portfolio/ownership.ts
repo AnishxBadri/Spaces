@@ -1,5 +1,5 @@
 /**
- * Instrument-aware ownership (CONTEXT.md phase 15, YC mechanics):
+ * Instrument-aware ownership (YC mechanics):
  * - priced shares ÷ fully-diluted outstanding → an actual %, recomputed per
  *   round — an ownership *history* with dilution deltas, not a cap table.
  * - post-money SAFEs lock ownership at signing: amount ÷ cap, displayed as
@@ -7,10 +7,10 @@
  * - pre-money SAFEs and CCDs are cost-basis-only until conversion — a % is
  *   never faked.
  *
- * Corrections are appends (D12): the caller passes originals only, each
+ * Corrections are appends: the caller passes originals only, each
  * stamped with `reversedAt`, and a voided check drops out of the history
  * once the as-of day has reached the void. The `shares > 0` filter below is
- * *not* what excludes a compensating row — see `./reversal.ts`.
+ * *not* what excludes a compensating row — see `liveAt`.
  */
 import type { Reversible } from './reversal'
 import { liveAt } from './reversal'

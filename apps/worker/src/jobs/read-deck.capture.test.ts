@@ -33,13 +33,13 @@ import { storeCredential } from '@spaces/core/writes/vault'
 import { readDeckData, runReadDeck } from './read-deck'
 
 /**
- * SPA-134 — capture extraction, the deck reader's twin pointed at a person.
- * A page posted to `POST /api/v1/capture` with `object` declared is queued
- * on the Read deck job with `capture` set; the job runs `readDeckProgram`
- * against the declared object's registry, anchored on the captured
- * document. On the worker's side of the seam because the job is what is
- * under test (nothing under `lib/` may import `#/worker/**`); the model is
- * `MockLanguageModelV4`, the queue the stub, and nothing reaches a network.
+ * Capture extraction, the deck reader's twin pointed at a person. A page
+ * posted to `POST /api/v1/capture` with `object` declared is queued on the
+ * Read deck job with `capture` set; the job runs `readDeckProgram` against
+ * the declared object's registry, anchored on the captured document. Here,
+ * not in apps/web, because the job is under test and nothing in apps/web may
+ * import the worker. The model is `MockLanguageModelV4`, the queue the stub,
+ * and nothing reaches a network.
  */
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
 
@@ -332,7 +332,7 @@ describe('capture extraction (SPA-134)', () => {
   it('an identity matching a person already held attaches to them, and the patch applies to that person', async () => {
     const tag = randomUUID().slice(0, 8)
     const email = `katya-${tag}@milev.example`
-    // Matched by email: a LinkedIn URL identifies nobody (D75).
+    // Matched by email: a LinkedIn URL identifies nobody.
     const held = await resolveEntity({
       kind: 'person',
       name: `K. Milev ${tag}`,
@@ -534,8 +534,8 @@ describe('capture extraction (SPA-134)', () => {
 
 // ---------- one extract program, not two ----------
 
-// Both source trees (SPA-181): the deck reader's program is apps/web's, the
-// job that calls it is apps/worker's. Paths are repo-relative.
+// Both source trees: the deck reader's program is apps/web's, the job that
+// calls it is apps/worker's. Paths are repo-relative.
 const ROOT = resolve(
   fileURLToPath(new URL('.', import.meta.url)),
   '../../../..',
@@ -562,10 +562,10 @@ const calls = (text: string, fn: string) =>
 
 describe('one extract program, not two (SPA-134)', () => {
   it('the registry-compiled extract call is made once, in the deck reader, which reads company, deal and person alike', () => {
-    // `schemaFor(registry)` handed to the extraction cache: the call ai-6
-    // makes for a company and a deal (`lib/ai/read-deck.test.ts`, "reads a
-    // deck filed on a company and a deal as two calls") and a capture makes
-    // for a person. One site, not a fork per object.
+    // `schemaFor(registry)` handed to the extraction cache: the call the deck
+    // reader makes for a company and a deal (its "reads a deck filed on a
+    // company and a deal as two calls" test) and a capture makes for a
+    // person. One site, not a fork per object.
     const extracting = files.filter(
       (f) =>
         calls(f.text, 'cachedExtractProgram') > 0 &&

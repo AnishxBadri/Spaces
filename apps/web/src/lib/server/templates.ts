@@ -49,7 +49,7 @@ export const listTemplates = createServerFn()
       id: t.id,
       kind: t.kind,
       objectKind: t.objectKind,
-      // The genre a note template stamps (SPA-131); null on every
+      // The genre a note template stamps; null on every
       // space/record template and on note templates saved before the column.
       noteKind: t.noteKind,
       name: t.name,
@@ -84,7 +84,7 @@ export const updateTemplate = createServerFn({ method: 'POST' })
 
 // ---------- note templates ----------
 
-/** Capture is `captureNoteTemplate` (`lib/notes/templates.ts`). */
+/** Capture is `captureNoteTemplate`. */
 export const saveNoteAsTemplate = createServerFn({ method: 'POST' })
   .validator(
     z.object({
@@ -98,7 +98,7 @@ export const saveNoteAsTemplate = createServerFn({ method: 'POST' })
     return captureNoteTemplate(u.id, data)
   })
 
-/** Stamp is `stampNoteTemplate` (`lib/notes/templates.ts`). */
+/** Stamp is `stampNoteTemplate`. */
 export const createNoteFromTemplate = createServerFn({ method: 'POST' })
   .validator(z.object({ templateId: z.string().uuid() }))
   .handler(async ({ data }) => {
@@ -136,7 +136,7 @@ export const saveRecordAsTemplate = createServerFn({ method: 'POST' })
     if (!core) throw new Error('Record not found')
     const registry = await getRegistry(core)
     // Identity (a person's emails, a company's domains) belongs to one
-    // record; a template carrying it would only mint duplicates. (D75)
+    // record; a template carrying it would only mint duplicates.
     const templatable = new Map(
       registry
         .filter(
@@ -171,7 +171,7 @@ export const saveRecordAsTemplate = createServerFn({ method: 'POST' })
 
 // ---------- email templates ----------
 
-/** Save as template from the composer: its subject, body and files. (D67) */
+/** Save as template from the composer: its subject, body and files. */
 export const saveEmailAsTemplate = createServerFn({ method: 'POST' })
   .validator(
     z.object({

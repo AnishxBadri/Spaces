@@ -2,8 +2,8 @@ import { z } from 'zod'
 import { defineManifest } from '@spaces/sdk'
 
 /**
- * Importer-shaped (sdk-8): a `file` job is handed a stream, a filename and
- * a mime, and speaks claims through the ports (D39, D52) — here, one
+ * Importer-shaped: a `file` job is handed a stream, a filename and a mime,
+ * and speaks claims through the ports — here, one
  * Identity resolve for the company the filename names and one
  * Content.fileDocument with the bytes. `uses` lacks Facts: filing a
  * document never writes an attribute.

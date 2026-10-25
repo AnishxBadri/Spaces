@@ -681,7 +681,7 @@ describe('mergeEntities', () => {
     )
 
     // The survivor's Team follows the repointed links; the loser has none,
-    // and nothing about the merge changed for the inverse half. (D69)
+    // and nothing about the merge changed for the inverse half.
     const { Effect } = await import('effect')
     const { relationsProgram } = await import('../read/relations')
     const halves = await Effect.runPromise(relationsProgram([winner, loser]))
@@ -815,11 +815,10 @@ describe('mergeEntities', () => {
   })
 
   /**
-   * Customs are merge-as-target since the two-tier model was narrowed
-   * (CONTEXT.md, 2026-09-13). They have no side table, so the whole job is
-   * the ENTITY_REFS loop — these two tests are what says so: one proves the
-   * object guard refuses a Fund/Vendor pair without writing a row, the other
-   * walks a real pair through every generic strategy.
+   * Customs are merge-as-target with no side table, so the whole job is the
+   * ENTITY_REFS loop: one test proves the object guard refuses a Fund/Vendor
+   * pair without writing a row, the other walks a real pair through every
+   * generic strategy.
    */
   it('refuses two custom records of different objects and writes nothing', async () => {
     const { Effect } = await import('effect')
@@ -1060,9 +1059,9 @@ describe('mergeEntities', () => {
     await db.insert(taskEntity).values({ taskId: chore.id, entityId: loser.id })
 
     // The candidate that triggers the merge, plus one open elsewhere.
-    // Upserts, not inserts: since SPA-60 a custom record is born with a name
-    // alias and joins the fuzzy sweep, so these near-identical fixture names
-    // have already proposed themselves and a plain insert would collide with
+    // Upserts, not inserts: a custom record is born with a name alias and
+    // joins the fuzzy sweep, so these near-identical fixture names have already
+    // proposed themselves and a plain insert would collide with
     // `duplicate_pair_unique`.
     const pair = (x: string, y: string) => (x < y ? [x, y] : [y, x])
     const target = [duplicateCandidate.entityA, duplicateCandidate.entityB]
@@ -1258,15 +1257,14 @@ describe('mergeEntities', () => {
 
     // --- the loser is a redirect, and gone from every list -----------------
     // `getObjectRecord` returns this column as `mergedIntoId` and the record
-    // route's loader (routes/_app/o_.$objectSlug.$recordId.tsx) turns it into
-    // a redirect to the winner — asserted here at the data the loader reads.
+    // route's loader turns it into a redirect to the winner — asserted here at
+    // the data the loader reads.
     const [loserRow] = await db
       .select({ mergedIntoId: entity.mergedIntoId })
       .from(entity)
       .where(eq(entity.id, loser.id))
     expect(loserRow.mergedIntoId).toBe(winner.id)
-    // `listObjectRecords`' filter (lib/server/objects.ts) — the `/o/<slug>`
-    // list page.
+    // `listObjectRecords`' filter — the `/o/<slug>` list page.
     const listed = await db
       .select({ id: entity.id })
       .from(entity)

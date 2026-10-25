@@ -320,21 +320,12 @@ function NotePage() {
 }
 
 /**
- * §3.1 **entry point 4** (SPA-140): a file dropped on the note body becomes a
- * document filed exactly where the note is filed, and a mention chip where
- * the pointer let go.
- *
- * The editor owns the gesture and the insert; this owns the upload and
- * everything the reader is told, because the two things that decide both are
- * facts about the page — which spaces the note is filed in, and that a note
- * in none of them files the document nowhere rather than guessing one.
- *
- * `uploadDocument` is docsurf-6a's one browser lane and the only hasher in
- * the app (`lib/documents/upload.ts`): the bytes go from the page straight to
- * storage and only the row is filed through a server fn. One call per file,
- * carrying **every** space in one `fileAgainst` array — that array is the
- * whole reason birth takes a list, and the difference between one document
- * row with N edges and N copies of one deck (§3.4).
+ * A file dropped on the note body becomes a document filed exactly where the
+ * note is filed (nowhere, if the note is unfiled), and a mention chip where
+ * the pointer let go. The editor owns the gesture and the insert; this owns
+ * the upload and what the reader is told.
+ * - One `uploadDocument` call per file, carrying **every** space in one
+ *   `fileAgainst` array: one document row with N edges, never N copies.
  */
 function useNoteFileDrop(
   spaces: Array<{ id: string; name: string }>,
@@ -361,7 +352,7 @@ function useNoteFileDrop(
             toast.loading(`${file.name} · ${DROP_PHASES[phase]}`, { id }),
         })
         if (unfiled) {
-          // Not an error — unfiled is a first-class state (§3.2) — but not a
+          // Not an error — unfiled is a first-class state — but not a
           // silent success either: the document is real and nobody has said
           // where it lives, so the line that says so carries the way to it.
           toast.message(filedIn, {
@@ -393,8 +384,8 @@ function useNoteFileDrop(
 }
 
 /**
- * The document preview this page opens on behalf of its mention chips
- * (SPA-27). The chip carries only an entity id, so the row is fetched on the
+ * The document preview this page opens on behalf of its mention chips.
+ * The chip carries only an entity id, so the row is fetched on the
  * click rather than loaded with the note — a note may mention a dozen decks
  * and open none of them.
  */
@@ -454,7 +445,7 @@ type NoteKind = Awaited<ReturnType<typeof getNote>>['kind']
 
 /**
  * Note · Memo · Scratch, in the head row beside the save state. Kind is
- * presentation and intent, never structure (CONTEXT.md → The note model): a
+ * presentation and intent, never structure: a
  * promote or a demote moves this one column and leaves every link, every
  * space filing and the body exactly where they were.
  *
@@ -507,9 +498,8 @@ function KindToggle({
 }
 
 /**
- * Author-only. Default is shared — private is the exception you opt into
- * (CONTEXT.md: notes private-by-default is the trap that keeps partner #2
- * writing in Apple Notes).
+ * Author-only. Default is shared — private is the exception you opt into:
+ * private-by-default keeps the second partner writing elsewhere.
  */
 function VisibilityToggle({
   noteId,
@@ -654,7 +644,7 @@ function SpaceFiling({
 }
 
 /**
- * The other lane (SPA-116): the records this note is filed against, which is
+ * The other lane: the records this note is filed against, which is
  * `link(tagged_in)` — the outbound direction, and the opposite of the
  * "Linked from" aside, which lists who mentions the note.
  *
@@ -753,7 +743,7 @@ function RecordFilingPicker({
 
   // Already filed, and the note itself — the second is unreachable through
   // `kinds` above, and held here anyway so the exclusion does not depend on
-  // an argument a future edit could widen.
+  // an argument an edit could widen.
   const excluded = useMemo(
     () => new Set([...filedIds, noteId]),
     [filedIds, noteId],
@@ -802,7 +792,7 @@ function RecordFilingPicker({
 }
 
 /**
- * Hard delete, no trash (CONTEXT.md → The note model, 2026-09-19). The
+ * Hard delete, no trash. The
  * preview runs before the sheet opens, so the sheet can name what loses its
  * edge to this note — and so the mandate's note is refused *in the dialog*,
  * in the registry's own words, rather than by a toast after the user has
@@ -871,7 +861,7 @@ function DeleteNoteAction({ noteId }: { noteId: string }) {
 
 /**
  * The note head's `···`: Save as new version and Save as template….
- * - A new version is a copy filed where this note is, superseding it (D59).
+ * - A new version is a copy filed where this note is, superseding it.
  *   The pending autosave lands first, so the copy carries the latest body.
  */
 function NoteMoreMenu({

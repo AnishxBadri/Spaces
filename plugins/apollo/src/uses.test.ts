@@ -16,7 +16,7 @@ import { jobs } from './index.ts'
 import { manifest } from './manifest.ts'
 
 /**
- * Each job's `R` is bounded by its `uses` — a claim gate 1 checks: this file
+ * Each job's `R` is bounded by its `uses` — a claim typecheck checks: this file
  * fails typecheck if a job yields a port its manifest entry does not list.
  */
 type Services<T> =

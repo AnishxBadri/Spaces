@@ -2,10 +2,11 @@ import { z } from 'zod'
 
 /**
  * The `suggestion(kind: 'ledger_event')` payload: a new revision of a bound
- * cap table read against the company's holding (spec-ai-substrate §11).
+ * cap table read against the company's holding.
  * - `proposed` is the portfolio writer's input, minus the company and the
  *   actor: accept validates it with the server fns' own validators, then
- *   appends one `round` or one `mark`. Nothing is ever edited. (D12)
+ *   appends one `round` or one `mark`. Portfolio history is append-only:
+ *   nothing is ever edited.
  * - `before` is the holding as it stood when proposed; `after` is the
  *   ownership the revision reads. The card draws the two as a diff.
  * - One proposal per (document, revision), whatever its status.

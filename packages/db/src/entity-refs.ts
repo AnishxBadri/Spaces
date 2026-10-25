@@ -35,8 +35,7 @@ import {
 } from './schema'
 
 /**
- * The one list of columns that point at an entity (CONTEXT.md "One registry
- * of entity-referencing tables").
+ * The one list of columns that point at an entity.
  *
  * - Three consumers iterate every entry: the merge executor (repoint loser →
  *   winner), the context assembler ("everything about this record") and
@@ -96,15 +95,14 @@ export type DeleteStrategy =
 // ---------- context ----------
 
 /**
- * The two parts of the context contract (docs/spec-ai-substrate.md §1) that
- * ENTITY_REFS itself speaks. Declared here because every entry's `context` is
+ * The two parts of the context contract that ENTITY_REFS itself speaks. Declared here because every entry's `context` is
  * typed against them and packages/db imports nothing internal; core's context
  * types re-export them beside `ContextEdge` and `ContextItem`.
  */
 
 /**
- * ContextItem kinds: the spec's seven plus `interaction` and `task`, which
- * are citation targets and not entities.
+ * ContextItem kinds. `interaction` and `task` are citation targets, not
+ * entities.
  *
  * - A chunk is the retrieval grain, not the citation grain: a note chunk
  *   renders as `note` (ref `note:<id>`), a close_reason chunk as `attribute`
@@ -224,7 +222,7 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
     // follow too, beside the attribute_events that cite them.
     merge: { kind: 'repoint' },
     del: { kind: 'cascade' }, // a proposal about a deleted record is moot
-    // A suggestion is not yet true, and never enters a prompt (spec §3):
+    // A suggestion is not yet true, and never enters a prompt:
     // once accepted, the attribute_event it wrote is what the walk sees.
     context: null,
   },
@@ -288,7 +286,7 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
     context: null,
   },
   {
-    // An owner's emails with this record, opened to the workspace (D67).
+    // An owner's emails with this record, opened to the workspace.
     key: 'email_visibility.entity',
     table: emailVisibility,
     column: emailVisibility.entityId,
@@ -311,7 +309,7 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
     context: null,
   },
   {
-    // An interaction's artifact: attachment, transcript, recording link (D68).
+    // An interaction's artifact: attachment, transcript, recording link.
     key: 'interaction_document.document',
     table: interactionDocument,
     column: interactionDocument.documentId,
@@ -326,7 +324,7 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
     context: { role: 'item', kind: 'doc_chunk', hop: 1 },
   },
   {
-    // A meeting's note beyond its write-up: a recorder's, or typed notes (D78).
+    // A meeting's note beyond its write-up: a recorder's, or typed notes.
     key: 'interaction_note.note',
     table: interactionNote,
     column: interactionNote.noteId,
@@ -447,12 +445,12 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
     context: { role: 'item', kind: 'glossary', hop: 'standing' },
   },
 
-  // --- space watches (D72) ---------------------------------------------
+  // --- space watches -----------------------------------------------------
   {
     key: 'space_watch.space',
     table: spaceWatch,
     column: spaceWatch.spaceId,
-    // A space merge unions a space's watches when it lands. (D73)
+    // A space merge, if one is added, must union the two spaces' watches.
     merge: { kind: 'none', why: 'space kind is not mergeable' },
     del: { kind: 'cascade' }, // a lens on a deleted space looks at nothing
     context: null, // host state for the scheduler, never AI-visible

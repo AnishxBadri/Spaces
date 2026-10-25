@@ -1,6 +1,6 @@
 /**
- * Deterministic natural-language due dates for the task composer
- * (CONTEXT.md 15b) — a tiny grammar, not AI: the same string must always
+ * Deterministic natural-language due dates for the task composer — a tiny
+ * grammar, not AI: the same string must always
  * parse to the same date given the same "today". Unrecognized input
  * returns null and the caller falls back to a date input.
  *

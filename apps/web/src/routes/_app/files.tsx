@@ -33,17 +33,17 @@ import { filesSearch } from '#/lib/documents/to-files'
 
 /**
  * `/files` — the fund's files as a set. The page is Files; the rows are
- * `document`s, and every code name keeps that word (D68 amended).
+ * `document`s, and every code name keeps that word.
  *
- * This is **a shelf** (`docs/design-contract.md` §3): a list of things with no
+ * This is **a shelf**: a list of things with no
  * object row behind them. So its columns are hand-declared with
  * `createColumnHelper` over `RecordTable` like `/portfolio`, and it has **no
  * `ViewBar`**: saved views address objects, and a shelf is not one. Its one
  * filter is `All · Unfiled`, as tabs on the bar, plus the text box.
  *
  * A row opens the preview rather than navigating: a document has no page, by
- * decision (`docs/spec-storage-sources.md` §3.2) — inspection, not a
- * destination. The filename is a real button inside the sticky cell so the
+ * decision — inspection, not a destination. The filename is a real button
+ * inside the sticky cell so the
  * keyboard reaches it, exactly where `/portfolio` puts its link.
  *
  * `?filed=unfiled` is the unfiled inbox: a filter on the shelf, not a route —
@@ -94,17 +94,11 @@ function originText(r: DocumentRow): string {
 }
 
 /**
- * The Source column's text (SPA-78, `docs/spec-storage-sources.md` §12).
- *
- * Origin alone until a storage source files something; then the provider and
- * the path it sits at over there, so the row reads the way the user would say
- * it out loud — "Drive · Data room / Legal". The path is kept verbatim (§5.3)
- * and printed verbatim: it is a label and a write-back address, and shortening
- * it here would make the two disagree.
- *
- * A null path is the origin on its own, never an empty cell and never a dash —
- * the column said exactly this before this slice, and every existing row still
- * gets exactly this.
+ * The Source column's text: the origin alone, or for a storage source the
+ * provider and its path there — "Drive · Data room / Legal".
+ * - The path prints verbatim: it is also a write-back address, and shortening
+ *   it would make the two disagree.
+ * - A null path is the origin on its own, never an empty cell or a dash.
  */
 function sourceText(r: DocumentRow): string {
   const origin = originText(r)
@@ -115,7 +109,7 @@ function sourceText(r: DocumentRow): string {
  * The status word, and whether it is the bad kind. The word itself comes from
  * `DOCUMENT_EXTRACTION_LABELS`, which is also what the Filter popover's
  * Extraction options read — the cell and the filter naming the same state
- * differently is the drift that file exists to prevent.
+ * differently is the drift that map exists to prevent.
  */
 function extractionText(r: DocumentRow): { text: string; bad: boolean } {
   return {
@@ -203,11 +197,8 @@ function DocumentsPage() {
       col.accessor((r) => sourceText(r), {
         id: 'source',
         header: 'Source',
-        // Renamed from `origin` by SPA-78, and the id is renamed with the
-        // header on purpose: a stored width or hidden flag under the old id
-        // is simply not read, so the column comes back at its default once.
-        // That is the honest outcome — it is a wider column that now answers
-        // a question the old one could not.
+        // Not `origin`: a stored width or hidden flag under the old id is not
+        // read, so the column comes back at its default once, on purpose.
         size: 150,
         cell: (info) => {
           const r = info.row.original
@@ -230,12 +221,10 @@ function DocumentsPage() {
                   className="ml-auto opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                 />
               )}
-              {/* The page a row came from (docsurf-10b, SPA-111): a clipped
-                  article, which has an address and no bytes, and a capture,
-                  which has both — its text is the blob, the page is its
-                  source. Never rendered beside the button above: a clip's and
-                  a capture's `external_url` are null by construction
-                  (`lib/documents/clip.ts`, `lib/rpc/capture.ts`). */}
+              {/* The page a row came from: a clipped article (an address,
+                  no bytes) or a capture (both). Never rendered beside the
+                  button above: a clip's and a capture's `external_url` are
+                  null by construction. */}
               {r.url !== null ? (
                 <OpenSourceButton
                   url={r.url}
@@ -343,9 +332,8 @@ function DocumentsPage() {
         title="Files"
         {...(filed === 'all' ? { count: documents.length } : {})}
         action={
-          /* §3.1 entry point 3, on the shelf that lists what it produces.
-             The dialog lives in the app shell — this is one of its three
-             doors, and it opens the same component the chassis and ⌘K do. */
+          /* The upload door on the shelf that lists what it produces. The
+             dialog lives in the app shell; the chassis and ⌘K open it too. */
           <Button onClick={openUploadDialog}>
             <Upload className="size-3.5" strokeWidth={2} />
             Upload

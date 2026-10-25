@@ -21,7 +21,7 @@ import type { DocumentIntakeFailed } from '../documents/intake'
 import { BindingStoreFailed } from './bind'
 
 /**
- * Retain per binding (docs/spec-storage-sources.md §7): the bytes of a
+ * Retain per binding: the bytes of a
  * `remote` document fetched back through the connection it came through.
  * - The pointer is the row's own (`connection_id`, `external_id`): that pair
  *   is what the provider's id is unique within, whatever binding holds it.

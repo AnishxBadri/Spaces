@@ -46,28 +46,13 @@ import { captureObjectOfRun } from '../ai/capture-read'
 import type { CaptureObject } from '../ai/capture-read'
 
 /**
- * The write half of the AI layer's one mutating verb
- * (docs/spec-ai-substrate.md §3, §10): `proposeProgram` writes a
- * `suggestion` row and nothing else — a model, an agent, a plugin or a
- * prompt injection in a deck can at worst put noise in a queue.
- *
- * Moved here from `apps/web/src/lib/ai/propose.ts` by SPA-204 (sdk-10) so
- * the plugin ports reach it: `Judgment.suggest` and `Facts.fill`'s conflicts
- * (`writes/ports/judgment.ts`, `writes/ports/facts.ts`) both land here.
- * apps/web re-exports everything below under its old names. The accept path
- * — `acceptProgram`, the batch accepts, `rejectProgram` — stays in apps/web:
- * it writes notes and space tags through modules that have not left it.
- *
- * **A row is born open.** Nothing here takes a status: the column's default
- * (`'open'`) is the only one an insert can get, so no caller — and no port —
- * can propose a suggestion already accepted.
- *
- * **An integration's identical open proposal is one row** (SPA-204):
- * `suggestion_open_integration_unique` keys open `attribute_patch` rows from
- * `'integration'` proposers on (record, slugs, values). The insert is
- * `ON CONFLICT DO NOTHING`, and a refused insert hands back the row already
- * held — so a plugin re-run raises nothing new, decided by the database and
- * not by a read before the write.
+ * `proposeProgram` writes a `suggestion` row and nothing else, so a model, a
+ * plugin or a prompt injection in a deck can at worst put noise in a queue.
+ * - A row is born open: nothing takes a status, so no caller can propose a
+ *   suggestion already accepted.
+ * - An integration's identical open proposal is one row:
+ *   `suggestion_open_integration_unique` plus `ON CONFLICT DO NOTHING` hands
+ *   back the held row, decided by the database, not a read before the write.
  */
 
 export type SuggestionKind = (typeof suggestionKind.enumValues)[number]
@@ -155,9 +140,8 @@ export const asFailure = (cause: unknown): SuggestionFailure =>
 export type Reader = Tx | typeof db
 
 /**
- * The live registry of the object this record belongs to. Exported for the
- * deck reader (SPA-90), which compiles the same registry into the schema it
- * hands the model — so the schema and the validator here never disagree.
+ * The live registry of the object this record belongs to. The deck reader
+ * compiles the same registry into its model schema, so the two never disagree.
  */
 export async function registryFor(
   reader: Reader,
@@ -182,7 +166,7 @@ export async function registryFor(
 
 /**
  * What a patch on this entity is held to, and — for a captured page — the
- * object it was read against (SPA-134). A record is its own anchor and its
+ * object it was read against. A record is its own anchor and its
  * own registry. A document holds a patch only when a capture read wrote it:
  * its run names the object, and that object's live registry is the one the
  * model was handed, so propose and accept validate against what was read.
@@ -407,17 +391,17 @@ export async function proposeWith(
   // An identity is held to its shape now for the same reason: the card
   // draws it field by field, and the accept path resolves from it.
   if (input.kind === 'identity') identityOf(input.payload)
-  // A document kind likewise (SPA-62): never `other`, never off-enum.
+  // A document kind likewise: never `other`, never off-enum.
   if (input.kind === 'document_kind') documentKindOf(input.payload)
-  // A note (SPA-66) likewise: the card draws its title and body, and
+  // A note likewise: the card draws its title and body, and
   // the accept path renders the body into the note it writes.
   if (input.kind === 'note') noteOf(input.payload)
-  // A space tag likewise (SPA-103): a space id and the path it was read as.
+  // A space tag likewise: a space id and the path it was read as.
   if (input.kind === 'space_tag') spaceTagOf(input.payload)
   // A task likewise: a title, a due date or none, and the record it is about.
   if (input.kind === 'task') taskOf(input.payload)
   // A newer version is proposed once per pair on a record, ever: an open or
-  // a dismissed row for it is handed back and nothing new is written. (D59)
+  // a dismissed row for it is handed back and nothing new is written.
   if (input.kind === 'supersedes') {
     const pair = supersedesOf(input.payload)
     const { entityId } = input
@@ -580,7 +564,7 @@ export const proposeProgram = Effect.fn('proposeProgram')(function* (
   })
 })
 
-// ---------- discovery cards (D72) ----------
+// ---------- discovery cards ----------
 
 export type DiscoveryProposeInput = {
   kind: DiscoveryKind
@@ -653,7 +637,7 @@ const unionJsonb = (
  * domain) in the same statement: `ON CONFLICT` on
  * `suggestion_open_discovery_unique` appends the evidence (by URL), the
  * refs and the finding watches. The card's kind, name and record stay as
- * first proposed. (D77)
+ * first proposed.
  */
 async function upsertDiscovery(
   tx: Tx,
@@ -717,7 +701,7 @@ export async function isDismissed(
 }
 
 /**
- * Propose an `add_record` or `file_record` card for a space. (D72, D77)
+ * Propose an `add_record` or `file_record` card for a space.
  * - The dismissal read and the upsert share one transaction: a domain
  *   dismissed from the space writes nothing, ever.
  * - One open card per (space, domain): a later find merges into it

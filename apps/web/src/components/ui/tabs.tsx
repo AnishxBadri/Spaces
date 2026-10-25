@@ -4,10 +4,10 @@ import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
 import { cn } from '#/lib/utils'
 
 /**
- * Real tabs (DESIGN.md §5, Printed details): a bone bar on a hairline foot;
- * the open tab is paper with cut shoulders, joined to the body under it with
+ * Real tabs: a bone bar on a hairline foot;
+ * the open tab is paper with a straight ink edge, joined to the body under it with
  * no rule between, and the others sit on the bone in ink. Each tab may carry
- * its mono count, and an empty tab stays visible, graphite at 0 (D74): the
+ * its mono count, and an empty tab stays visible, graphite at 0: the
  * head stays the index.
  * - Keyboard: ←→ move and wrap, Home/End jump, and moving selects (automatic
  *   activation). Only the open tab is in the tab order.

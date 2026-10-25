@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
 /**
- * What the /dedupe card says about who wrote a record (SPA-118).
+ * What the /dedupe card says about who wrote a record.
  *
  * The render itself is unproven without a browser; the word it prints is
  * this function's return value, and the interesting half is that

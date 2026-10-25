@@ -7,7 +7,7 @@ import type { Json } from '@spaces/db/json'
 import { CORE_OBJECTS, OBJECT_KINDS } from '../../attributes/registry'
 
 /**
- * The inverse resolver (D69): both halves of every relationship a record
+ * The inverse resolver: both halves of every relationship a record
  * sits on, read from the `references` links `setValues` writes.
  * - The derived half is the links pointing at the record (`link_to_idx`)
  *   whose owner attribute names it in `options.inverseOf`; nothing is stored

@@ -6,7 +6,7 @@ import { companyName, decideParticipants } from './participants'
 import type { ParticipantDecision, ParticipantsInput } from './participants'
 
 /**
- * SPA-86's judgement as a table, no Postgres: which address may create a
+ * The participants judgement as a table, no Postgres: which address may create a
  * person, a company, both or neither, and which is only ever attached or
  * ignored. The fund is `fund.example`, with two members, one of them on
  * Gmail.

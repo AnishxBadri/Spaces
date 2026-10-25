@@ -11,9 +11,9 @@ export const BOX_ID = /^\d+$/
  * - The connection asks `root_readonly` at install: Box has no per-file
  *   grant, so the read half reads what the account can see. The write half
  *   needs `root_readwrite`, asked for when a binding pushes, never at
- *   install — as Drive asks `drive.readonly` only at bind time. (D66)
+ *   install — as Drive asks `drive.readonly` only at bind time.
  * - `list` is the demo job: one row is one folder, walked and logged.
- * - `sdk: '^1.4'`: `roles` arrived in SDK 1.4.
+ * - `sdk: '^1.4'`: the first SDK with `roles`.
  */
 export const manifest = defineManifest({
   manifestVersion: 1,

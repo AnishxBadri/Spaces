@@ -42,7 +42,7 @@ import { integrationLedgerProgram, spaceOptions } from './ledger'
 import type { IntegrationRow, SpaceOption } from './ledger'
 
 /**
- * Settings → Integrations → Enrichment (D76, D81): the sources in the
+ * Settings → Integrations → Enrichment: the sources in the
  * owner's order, auto-enrich, What fills what and the recent runs, and
  * the writes into `workspace.settings.enrichment`.
  * - The stored order is also which sources are on: a source left out of

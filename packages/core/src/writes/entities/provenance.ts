@@ -4,21 +4,14 @@ import { entity, integration } from '@spaces/db/schema'
 import type { SourceClass } from '@spaces/db/schema'
 
 /**
- * Who wrote a record, resolved to a word a reader recognises.
+ * Who wrote a record, resolved to a word a reader recognises. For an
+ * `integration` row the class names no integration, so the label is the
+ * `source_ref` row's capability id ("apollo"); for the other classes it is
+ * the class. The join is a left join because a non-integration row's ref is
+ * null, which `entity_source_ref_invariant` guarantees.
  *
- * The class alone is only half an answer for one of the eight values:
- * "integration" names no integration. `source_ref` is the other half, and
- * it is exactly the row the operator installed, so the label for a plugin
- * write is its capability id — "apollo", the word on the Integrations page
- * — and for the other seven classes it is the class itself. The left join
- * is a left join because a non-integration row's ref is null by
- * construction; `entity_source_ref_invariant` is what makes that a fact and
- * not a habit.
- *
- * Outside `lib/server/` for the same reason `canRead` is: it takes no request
- * context, `lib/inbox/context.ts` needs it, and a module the client barrel
- * can reach must not import `lib/server/shared.ts` and its `getRequest`
- * (SPA-155). `shared.ts` re-exports it, so nothing else moved.
+ * Takes no request context, so a module the client barrel reaches can use it
+ * without importing `getRequest`.
  */
 export async function provenanceOf(entityId: string): Promise<{
   sourceClass: SourceClass
@@ -42,9 +35,9 @@ export async function provenanceOf(entityId: string): Promise<{
 /**
  * The word for the writer. A plugin's capability id is already the word on
  * the Integrations page ("apollo"). A core capability is namespaced
- * `core.<channel>` (`core.mailbox`, SPA-56), and the reader wants the
- * channel — "mailbox" on the inbox card of a company a forwarded thread made
- * (SPA-86), not "core.mailbox" and not the bare word "integration".
+ * `core.<channel>` (`core.mailbox`), and the reader wants the channel —
+ * "mailbox" on the inbox card of a company a forwarded thread made, not
+ * "core.mailbox" and not the bare word "integration".
  */
 export function channelLabel(
   capability: string | null,

@@ -11,7 +11,7 @@ import type { NeedsYouRow } from './needs-you'
 import type { ReviewGroup } from '#/lib/server-fns'
 
 /**
- * Today's review row (D79): a space's open discovery cards as one row,
+ * Today's review row: a space's open discovery cards as one row,
  * "Proptech / Property ops · via Exa · 3 to add · 1 to file", linking to
  * Review filtered by that source and space.
  */

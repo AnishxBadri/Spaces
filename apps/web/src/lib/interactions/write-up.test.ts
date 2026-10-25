@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 
 /**
- * Writing up an interaction that was logged without a body (SPA-128).
+ * Writing up an interaction that was logged without a body.
  *
  * The four things the program claims: it fills `note_id` with an ordinary
  * note titled from the subject, it names a kind-and-date title when the
@@ -12,7 +12,7 @@ import { FIXTURE_ACTOR } from '../../../vitest.seed'
  * body and leave exactly one note row behind.
  *
  * Imports are dynamic like the rest of the DB-coupled suite: `@spaces/db`
- * builds its pool from `DATABASE_URL` at import time and `vitest.setup.ts`
+ * builds its pool from `DATABASE_URL` at import time and the test setup
  * rewrites it per file.
  */
 
@@ -47,8 +47,8 @@ async function aPerson(name: string): Promise<string> {
 }
 
 /**
- * A bodyless interaction — the shape everything logged before SPA-123 and
- * everything a calendar will sync is in. Written straight to the tables
+ * A bodyless interaction — the shape a plain Log and every calendar-synced
+ * row is in. Written straight to the tables
  * rather than through `logInteractionProgram` so that `subject` can be null,
  * which the dialog's validator forbids and a synced row does not.
  */

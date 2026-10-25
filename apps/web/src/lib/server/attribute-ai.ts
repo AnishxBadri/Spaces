@@ -3,13 +3,13 @@ import { z } from 'zod'
 import { requireAdmin, requireUser } from './shared'
 
 /**
- * AI attribute cells (SPA-72). A cell's trigger — on the record rail or in
- * the table, only where the attribute carries `options.ai` (the spec's
- * `attribute.config.ai`) — presses `runAttributeCell`; the cell polls
+ * AI attribute cells. A cell's trigger — on the record rail or in the table,
+ * only where the attribute carries `options.ai` — presses
+ * `runAttributeCell`; the cell polls
  * `attributeCellStatus` while its job runs, and a surface reads
  * `openCellProposals` once for the records it shows, to draw "proposed".
  * `addProposedOption` is the inbox card's "Add option" on a registry
- * proposal. The bodies live in `lib/ai/attribute-run.ts`.
+ * proposal.
  */
 
 const byCell = z.object({
@@ -66,7 +66,7 @@ const byColumn = z.object({
 })
 
 /**
- * Column run (SPA-122): what "Run on this view" would do — the view's
+ * Column run: what "Run on this view" would do — the view's
  * records counted in SQL over its conditions, the ones already proposed,
  * the rough token cost — or why it is refused. Read when the confirm
  * dialog opens; nothing is queued.

@@ -47,7 +47,7 @@ import type { FetchStorageFileData } from '../jobs/fetch-storage-file'
  * through intake, and the extraction that makes a phrase findable.
  * - `fakes` stands the API in, as `SPACES_FAKE_PROVIDERS=1` does.
  * - One case runs with the fakes off and the API as plain transport, so the
- *   token Drive sees is the pasting user's own connection (D66).
+ *   token Drive sees is the pasting user's own connection.
  */
 
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))

@@ -60,13 +60,13 @@ import type { JobInput, JobOutput } from './host'
 import { messageOf } from './loader'
 
 /**
- * Loader step seven: every declared job becomes a pg-boss queue worked
+ * Queue registration: every declared job becomes a pg-boss queue worked
  * through `runJob`, and a schedule job is scheduled at its cron.
  *
  * - Queue names encode ownership: `plugin.<id>.<job>`, and an interactive
  *   job its own `plugin.<id>.<job>.interactive`.
  * - A watch job's queue is `stately`, keyed by watch, with a `.tick` queue
- *   beside it on a one-minute cron that sends each due watch (D72).
+ *   beside it on a one-minute cron that sends each due watch.
  * - Unregistering stops the work and the schedule but never deletes the
  *   queue, so a job sent while the plugin is off waits for it to come back.
  */
@@ -104,7 +104,7 @@ export type PluginQueue = {
   /** The manifest's defaults for the credit guard's two settings. */
   readonly credit: CreditPolicy
   /**
-   * The provider whose members each key their own connection (D78): a
+   * The provider whose members each key their own connection: a
    * schedule job then runs once per such connection. Null for every other.
    */
   readonly keyed: string | null
@@ -340,7 +340,7 @@ const readCursors = (integrationId: string, job: string) =>
   })
 
 /**
- * A keyed plugin's schedule run (D78): the job once per member's active
+ * A keyed plugin's schedule run: the job once per member's active
  * connection, on ports bound to it, each from its own cursor and with its own
  * settings and `connectedAt`.
  * - A member whose run fails for good — their key refused, which the host

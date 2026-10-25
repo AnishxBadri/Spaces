@@ -22,10 +22,9 @@ import { deleteEntityProgram } from '@spaces/core/writes/entities/delete'
 /**
  * Demo data — opt-in at setup, never automatic.
  *
- * This is the answer to "never show an empty table" now that the starter
- * taxonomy is deliberately tiny: rather than shipping an opinionated
- * ontology as if it were doctrine, ship an obviously-fictional worked
- * example the operator chooses, and can delete.
+ * The answer to "never show an empty table" with a deliberately tiny
+ * starter taxonomy: an obviously fictional worked example the operator
+ * chooses, and can delete, rather than an opinionated ontology.
  *
  * It exercises the seam the product is built around — a company that lands
  * in a pipeline already carrying the space it was researched in and the

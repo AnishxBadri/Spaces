@@ -67,7 +67,7 @@ function Lane({
 }
 
 /**
- * The spaces index (D73): the market map as one tree, its last filed lane,
+ * The spaces index: the market map as one tree, its last filed lane,
  * the composer row, the archived fold and the New space window.
  */
 export function SpacesIndexPage({
@@ -244,7 +244,7 @@ function MapRow({
 /**
  * `n archived · show` — archived spaces are out of the tree but findable
  * here, each with Restore. A row is an archive head: Restore brings back
- * every space archived with it. (D73)
+ * every space archived with it.
  */
 function ArchivedFold({
   archived,
@@ -325,7 +325,7 @@ function ArchivedFold({
 }
 
 /**
- * The active empty state (decided 2026-08-07): instead of describing
+ * The active empty state: instead of describing
  * spaces, it asks the one question every investor can answer on day zero —
  * "what markets do you look at?" — and turns the answers into the first
  * top-level spaces. The mental model is taught by using it, on the surface

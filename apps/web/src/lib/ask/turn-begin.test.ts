@@ -19,7 +19,7 @@ vi.mock('#/lib/ai/run', async (original) => {
 
 const { askEvents } = await import('./turn')
 
-/** A turn whose run cannot be recorded writes nothing. (D70) */
+/** A turn whose run cannot be recorded writes nothing. */
 describe('beginning a turn', () => {
   it('leaves no thread and no answerless question when the ai_run insert fails', async () => {
     const events = askEvents({

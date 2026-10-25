@@ -6,7 +6,7 @@ import {
 } from './document-preview-event'
 
 /**
- * The seam between a mention chip and the page that owns the modal (SPA-27).
+ * The seam between a mention chip and the page that owns the modal.
  *
  * Worth its own test because both halves are written in files that cannot
  * see each other's types at runtime: the chip builds a DOM event, the route

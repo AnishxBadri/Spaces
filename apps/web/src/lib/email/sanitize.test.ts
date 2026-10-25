@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { CHART_PNG, TRACKER, htmlEmail } from './fixtures'
 import { sanitizeEmailHtml, stripRemoteCss } from './sanitize'
 
-/** The viewer's body, asserted on the sanitized output. (D67) */
+/** The viewer's body, asserted on the sanitized output. */
 
 const rendered = async () => {
   const parsed = await simpleParser(

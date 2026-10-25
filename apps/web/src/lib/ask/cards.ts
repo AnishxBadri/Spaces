@@ -3,7 +3,7 @@ import type { AskCardKind, AskRef } from './types'
 /**
  * Ask's action cards: the eight-card catalogue, the card as the thread draws
  * it, and the renderer's refusal. Pure, so the turn, the dock and the tests
- * read one table. (D70)
+ * read one table.
  * - A card is a proposal; applying it is a person's act through the writer a
  *   person would use. The agent never applies one.
  * - Attribute values are not a card: they go through `propose_suggestion`.

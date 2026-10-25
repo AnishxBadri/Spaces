@@ -8,7 +8,7 @@ import { DraftFailed, namedDocuments } from './email-drafts'
 import type { DraftDocument } from './email-drafts'
 
 /**
- * Email templates (D67): `{subject, body, attachments}`, saved from the
+ * Email templates: `{subject, body, attachments}`, saved from the
  * composer and applied into a draft. Workspace-shared like every template.
  * - Applying copies; editing the template later never touches a draft.
  * - The files are re-read for the member applying it: a document they may

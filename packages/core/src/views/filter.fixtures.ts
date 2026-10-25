@@ -1,11 +1,10 @@
 import type { ConditionValue } from './filter'
 
 /**
- * The one table both evaluators are judged against (SPA-40). `filter.ts`
- * decided the semantics of a view condition in the browser; `compileConditions`
- * (`apps/web/src/lib/views/sql.ts`) decides them again in Postgres, and the
- * only way the second stays the first is a shared fixture list plus a property
- * test that walks every op against every type.
+ * The one table both evaluators are judged against. `matchesConditions`
+ * decides a view condition in the browser and `compileConditions` decides it
+ * again in Postgres; a shared fixture list plus a property test walking every
+ * op against every type keeps them the same.
  *
  * It lives here, beside the matcher, as pure data: core imports nothing that
  * reads a database, so the SQL side reads this list across the package
@@ -14,11 +13,11 @@ import type { ConditionValue } from './filter'
  * Read the table column-wise. Each attribute carries one cell per row, so the
  * eight rows are eight *profiles* of the same shape — a full row, a row of
  * empties, a row with the key absent entirely, a row of JSON nulls, values
- * stored as strings (money is `numeric` → a string, CLAUDE.md), an
+ * stored as strings (money is `numeric` → a string), an
  * upper-cased/unparseable row, a whitespace-padded row, and a negative one.
  * `undefined` means the key is not in the object at all, which is the trap the
  * SQL side gets wrong by default: `values->'x'` is SQL NULL for both a missing
- * key and a stored JSON null, and `filter.ts` treats them alike only because
+ * key and a stored JSON null, and the matcher treats them alike only because
  * `isEmpty` covers both.
  */
 
@@ -137,7 +136,7 @@ export const FILTER_FIXTURE_ATTRIBUTES: Array<FilterFixtureAttribute> = [
     probes: [4, '12', 0, 'abc', null, -3],
   },
   {
-    // Money is drizzle `numeric` → a string in JS (CLAUDE.md), so a currency
+    // Money is drizzle `numeric` → a string in JS, so a currency
     // attribute is the one that most often holds a *string* number.
     slug: 'valuation',
     type: 'currency',
@@ -151,7 +150,7 @@ export const FILTER_FIXTURE_ATTRIBUTES: Array<FilterFixtureAttribute> = [
     probes: [3, 5, 0, '1', null],
   },
   {
-    // Dates are ISO strings compared lexically (CLAUDE.md), which is why the
+    // Dates are ISO strings compared lexically, which is why the
     // cells never vary in shape: same length, same separators.
     slug: 'founded',
     type: 'date',

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import plugin, { PROVIDER_URL } from './index.ts'
 
 /**
- * The echo `enrich` job end to end on the SDK's test Layers (sdk-5): no
+ * The echo `enrich` job end to end on the SDK's test Layers: no
  * database, no network — CI runs this file with DATABASE_URL unset. The
  * recorder shows exactly which port calls the job made, in order, including
  * the fill against the id `Identity.resolve` minted.

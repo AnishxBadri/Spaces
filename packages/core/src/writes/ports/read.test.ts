@@ -11,7 +11,7 @@ import { resolveEntity } from '../entities/resolve'
 import { ReadLive, actorOf } from './read'
 
 /**
- * ReadLive against the test database (sdk-6b): the plugin's reads, as the
+ * ReadLive against the test database: the plugin's reads, as the
  * bound integration. The integration row's id is all the Layer is given —
  * these tests never insert one, because the reader is derived from the id
  * and nothing is looked up by it.
@@ -73,7 +73,7 @@ describe('ReadLive.entity', () => {
         email: [],
         linkedin: [],
       },
-      // Identity is an attribute too (D75): the domain is in the values.
+      // Identity is an attribute too: the domain is in the values.
       values: { domains: ['northwind-robotics.example'] },
     })
     expect(JSON.stringify(record)).not.toContain('Sequoia')

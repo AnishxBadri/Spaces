@@ -5,12 +5,12 @@ import { describe, expect, it } from 'vitest'
 import plugin, { domainOf } from './index.ts'
 
 /**
- * The importer's `importDeck` job on the SDK's test Layers (sdk-8): no
+ * The importer's `importDeck` job on the SDK's test Layers: no
  * database, no network, no blob store. The snapshot is the job's whole
  * conversation with the host — every port call in order, with what each
  * returned; `ContentTest` records the stream as its presence, never its
- * bytes. What the live port does with those bytes is apps/worker's
- * `importer-live.test.ts`, on the real bundle over a test database.
+ * bytes. What the live port does with those bytes is the worker's
+ * importer-live test, on the real bundle over a test database.
  */
 const FILENAME = 'acme-fusion.example__series-a-deck.pdf'
 const pdf = readFileSync(new URL(`../fixtures/${FILENAME}`, import.meta.url))

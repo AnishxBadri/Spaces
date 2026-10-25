@@ -13,8 +13,8 @@ import type { JobDef } from '../run-job'
  * document.ledger-event — a revised cap table read against its company's
  * holding, on the worker. The program is `proposeLedgerEventProgram`;
  * enqueued by `onDocumentExtracted` and by nothing else.
- * - Every failure is permanent, the deck reader's rule: a retried model
- *   call is a cost, and an unrouted lane is not fixed by waiting.
+ * - Every failure is permanent: a retried model call costs, and an
+ *   unrouted lane is not fixed by waiting.
  * - A skip (a newer revision, a proposal already made, nothing moved) is
  *   not a failure: the job completes and says why.
  */

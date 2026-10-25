@@ -40,7 +40,7 @@ import { storageLinkProvider } from '#/lib/documents/storage-link'
 import { cn } from '#/lib/utils'
 
 /**
- * A Files-tab row (D66): the type glyph, the name, the mono end lane, the
+ * A Files-tab row: the type glyph, the name, the mono end lane, the
  * lowercase state word, and a `···` holding everything else. No icon strip
  * and no extracted-text line — the menu holds the actions, and the text is a
  * search result, not a file fact.
@@ -130,7 +130,7 @@ export function FileRow({
   /** A file in a bound Drive folder: Drive's tree, `Remove from record`. */
   inFolder?: boolean
   actions?: ReadonlyArray<FileAction>
-  /** Files this one may be the newer version of; none hides the item. (A7) */
+  /** Files this one may be the newer version of; none hides the item. */
   older?: ReadonlyArray<RecordDocument>
   className?: string | undefined
   onView: () => void
@@ -391,7 +391,7 @@ function DitherBar({ fraction }: { fraction: number }) {
 }
 
 /**
- * What the Remove confirm says (D66): whether the file leaves the server or
+ * What the Remove confirm says: whether the file leaves the server or
  * only this record, and the ledger of what goes.
  * - `record` removes it from this record; it leaves the server only when it
  *   is filed nowhere else.
@@ -445,7 +445,7 @@ export function removeConfirmOptions(
   }
 }
 
-/** Remove (or delete) a file behind the D66 confirm, then refresh the tab. */
+/** Remove (or delete) a file behind the Remove confirm, then refresh the tab. */
 export function useRemoveFile(recordId: string, recordName: string) {
   const router = useRouter()
   const { confirm, confirmDialog } = useConfirm()

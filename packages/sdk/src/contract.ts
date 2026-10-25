@@ -2,20 +2,19 @@ import { Schema } from 'effect'
 import type { Effect } from 'effect'
 
 /**
- * The semver-frozen contract (sdk-4a; docs/spec-plugin-sdk.md §4–§5 as
- * amended 2026-09-30 by D51–D53). Everything a plugin's code is typed
+ * The semver-frozen contract. Everything a plugin's code is typed
  * against lives in this one file so it can be read, and reviewed, as one:
  * the port names, the claims (the typed arguments of the write-port
  * methods), the six trigger shapes, the cost hook and the job errors.
  * Once published it moves only on a major — a new trigger, port, claim
  * variant or optional field is a minor; any changed shape is a major.
  *
- * Two rules hold across every claim below (D52):
+ * Two rules hold across every claim below:
  *
  * - **No provenance.** No claim carries `source`, `actor`, `actorType`,
  *   `integrationId` or `sourceRef` — who wrote what is the port's, stamped
- *   from the bound `integration` row (`contract.test.ts` asserts it over
- *   every claim type). A plugin cannot forge it because it cannot say it.
+ *   from the bound `integration` row (a test asserts it over every claim
+ *   type). A plugin cannot forge it because it cannot say it.
  * - **No handles.** A claim names existing things by id; the ids come back
  *   from the write port that made them (`Identity.resolve` → the entity id
  *   the next `Facts.fill` uses). Dependency order is the job's code order.
@@ -44,7 +43,7 @@ export type IsoTimestamp = string
 
 /**
  * A citation in the shipped ref grammar — the one and only citation format
- * (D4; `@spaces/core/context/ref`). A URL is not a ref: cite the signal the
+ * (`@spaces/core/context/ref`). A URL is not a ref: cite the signal the
  * URL was emitted as (`event:<signalId>`, the id `Content.emitSignal`
  * returns), so a reviewer's click lands on a row in the graph.
  */
@@ -64,8 +63,8 @@ export type Ref =
 // ---------------------------------------------------------------------------
 
 /**
- * The ports a job may declare in `uses` (D51) — the spec §4 table minus Clock
- * (Effect ships one; plugin code reads time through it). The manifest
+ * The ports a job may declare in `uses`. No Clock: Effect ships one, and
+ * plugin code reads time through it. The manifest
  * validates `uses` against this list, each name has a service tag, and the
  * loader builds a job's Layer from exactly the names it lists.
  * - Appended only: `Import` arrived in SDK 1.1.0, `Spaces` and `Discover`
@@ -91,15 +90,15 @@ export const PORT_NAMES = [
 export type PortName = (typeof PORT_NAMES)[number]
 
 // ---------------------------------------------------------------------------
-// Claims — the typed arguments of the write-port methods (D52)
+// Claims — the typed arguments of the write-port methods
 // ---------------------------------------------------------------------------
 
 /** The kinds an identity can be resolved to. A deal has no identity keys. */
 export type IdentityKind = 'company' | 'person'
 
 /**
- * Identity keys, as the provider gave them — the port normalizes (sdk-4b
- * puts the one normalizer in this package so plugin and choke point agree).
+ * Identity keys, as the provider gave them — the port normalizes (the one
+ * normalizer is in this package so plugin and choke point agree).
  * A company is identified by its domain and a person by their email; a
  * LinkedIn URL identifies neither and only fills a new record's LinkedIn.
  */
@@ -149,7 +148,7 @@ export type FactClaim = {
 /**
  * `Facts.answer(entityId, answers, receiptId)`: what an enrichment source
  * knows, in the host's vocabulary (`ENRICHMENT_VOCABULARY`), never in
- * attribute slugs (D76). The host maps each key through the attribute that
+ * attribute slugs. The host maps each key through the attribute that
  * links it; a key no attribute links is written nowhere and kept in the
  * run's receipt. `receiptId` is the raw response the answers came from.
  * `asOf` dates the figures when the source knows when they were true;
@@ -166,7 +165,7 @@ export type AnswerClaim = {
 export type ReceiptClaim = {
   readonly entityId: EntityId
   readonly raw: JsonValue
-  /** In the provider's own unit; spend is counted from these (D53). */
+  /** In the provider's own unit; spend is counted from these. */
   readonly creditsUsed?: number
 }
 
@@ -222,7 +221,7 @@ export type InteractionParticipant = {
 
 /**
  * What a recorder kept beside its payload (SDK 1.5), as an artifact of the
- * interaction (D68):
+ * interaction:
  * - `recording_link`: the provider's recording, kept as a link and never
  *   copied — a document with no bytes, "Open in <provider>".
  * - `transcript`, `attachment`: a document this integration already filed
@@ -241,7 +240,7 @@ export type InteractionArtifact =
     }
 
 /**
- * A recorder's payload (SDK 1.5, D68): the host decides where it lands.
+ * A recorder's payload (SDK 1.5): the host decides where it lands.
  * - It attaches to the calendar meeting `icalUid` names, else the one
  *   `calendarEventId` names, else the one starting within 30 minutes of
  *   `occurredAt` whose attendees include every participant email.
@@ -302,10 +301,10 @@ export type InteractionClaim = InteractionClaimBase &
   InteractionEdges &
   InteractionPayload
 
-/** A meeting's state on the calendar. A cancelled meeting is marked, never deleted (D68). */
+/** A meeting's state on the calendar. A cancelled meeting is marked, never deleted. */
 export type MeetingStatus = 'scheduled' | 'cancelled'
 
-/** An attendee's answer, shown and never edited (D68). */
+/** An attendee's answer, shown and never edited. */
 export type MeetingRsvp = 'accepted' | 'declined' | 'tentative' | 'needs_action'
 
 /**
@@ -372,7 +371,7 @@ export type MeetingResult =
   | { readonly outcome: 'refused'; readonly reason: string }
 
 /**
- * `Content.logRecordedNote(note)` (SDK 1.5, D78): one note a recorder took of
+ * `Content.logRecordedNote(note)` (SDK 1.5): one note a recorder took of
  * a meeting — Granola's from a `schedule` job, Fathom's or tl;dv's from a
  * webhook. The host does the rest.
  * - It attaches to the calendar meeting `calendarEventId` (or `icalUid`)
@@ -407,7 +406,7 @@ export type RecordedNote = {
   readonly transcript?: string
   /** The note at the provider: "Open in <provider>". */
   readonly webUrl?: string
-  /** A recording, kept as a link and never copied (D68). */
+  /** A recording, kept as a link and never copied. */
   readonly recordingUrl?: string
   /** The provider folders the note sits in. */
   readonly folderIds?: ReadonlyArray<string>
@@ -446,7 +445,7 @@ export type RecordedNoteResult =
  *   exclude list names before a byte is stored, resolves participants, files
  *   attachments and dedupes on the RFC Message-ID, so a thread both
  *   forwarded and synced is one interaction.
- * - Who may read the body is the host's (D67): the claim carries no
+ * - Who may read the body is the host's: the claim carries no
  *   visibility and must not grow one.
  */
 export type EmailClaim = {
@@ -583,7 +582,7 @@ export type DiscoveryEvidence = {
  * `Discover.candidate(claim)`: a company a watch found for a space. The host
  * decides what it becomes — nothing for a member or a dismissed domain, a
  * "file here" card for a known company, an "add" card for an unknown one —
- * and never creates a record or a deal from it. (D72)
+ * and never creates a record or a deal from it.
  */
 export type DiscoverClaim = {
   readonly spaceId: EntityId
@@ -615,7 +614,7 @@ export type ImportRow = {
 }
 
 /**
- * `Import.stage(grid)`: pre-mapping input (D39 as amended). The header and
+ * `Import.stage(grid)`: pre-mapping input. The header and
  * the rows, nothing else — no target, no mapping, no values: mapping,
  * preview and commit are core's, exactly as for a hand-mapped CSV.
  */
@@ -630,8 +629,7 @@ export type ImportGrid = {
 
 /**
  * The three typed outcomes a job can fail with. The tags are the worker's
- * (`apps/worker/src/run-job.ts`: `JobRetryable`, `JobRateLimited`,
- * `JobPermanent`), so runJob maps a plugin's failure exactly as it maps a
+ * (`JobRetryable`, `JobRateLimited`, `JobPermanent`), so runJob maps a plugin's failure exactly as it maps a
  * core job's: retry on the queue's policy, re-send after the throttle
  * without spending a retry, or fail now.
  */
@@ -653,7 +651,7 @@ export class JobPermanent extends Schema.TaggedError<JobPermanent>()(
 export type JobError = JobRetryable | JobRateLimited | JobPermanent
 
 // ---------------------------------------------------------------------------
-// Triggers (D51) — each fixes what a job is handed and returns
+// Triggers — each fixes what a job is handed and returns
 // ---------------------------------------------------------------------------
 
 /**
@@ -737,7 +735,7 @@ export type PayloadActionRun<TServices = unknown> = (
 ) => Effect.Effect<void, JobError, TServices>
 
 /**
- * The cost hook (D53): pure, in the provider's own unit. The host drops
+ * The cost hook: pure, in the provider's own unit. The host drops
  * entities with a fresh receipt, asks this about the rest, and refuses
  * before any API call when the estimate does not fit the daily cap.
  */
@@ -759,7 +757,7 @@ export type ActionJob<TServices = unknown> =
  *   nothing older.
  * - `connection` (SDK 1.5) is the bound connection's own settings, the
  *   choices its person made — for a recorder, `folder_ids`, `typed_notes`
- *   and `transcript` (D78). A keyed plugin's job runs once per member's
+ *   and `transcript`. A keyed plugin's job runs once per member's
  *   connection, each with its own cursor.
  */
 export type ScheduleInput = {
@@ -813,12 +811,12 @@ export type WebhookInput = {
 
 /**
  * `webhook` — call recorders. A plain job on the stored payload, like the
- * others. There is no plugin-side `verify` (checkpoint review, 2026-10-01):
- * plugin code runs only in the worker, after web has already answered the
- * provider, so a plugin check could gate nothing — and running one in web
- * would break "web never executes plugin code". The signature is
- * manifest-declared (`ingress.signature`) and core checks it in web (sdk-23)
- * before the payload is stored. If a provider ever needs a plugin-side
+ * others. There is no plugin-side `verify`: plugin code runs only in the
+ * worker, after web has already answered the provider, so a plugin check
+ * could gate nothing — and running one in web would break "web never
+ * executes plugin code". The signature is manifest-declared
+ * (`ingress.signature`) and core checks it in web before the payload is
+ * stored. If a provider ever needs a plugin-side
  * check, it arrives as an optional field — a minor.
  */
 export type WebhookJob<TServices = unknown> = (
@@ -827,7 +825,7 @@ export type WebhookJob<TServices = unknown> = (
 
 /**
  * `file` — an importer: a dialect export, a WhatsApp export. A dialect hands
- * core a grid through `Import`; anything else speaks claims (D39 as amended).
+ * core a grid through `Import`; anything else speaks claims.
  */
 export type FileInput = {
   readonly stream: ReadableStream<Uint8Array>
@@ -839,8 +837,8 @@ export type FileJob<TServices = unknown> = (
 ) => Effect.Effect<void, JobError, TServices>
 
 /**
- * `watch` — a saved research lens on a space, run once per `space_watch` row
- * (D72): on its cadence, or on "Run now".
+ * `watch` — a saved research lens on a space, run once per `space_watch` row:
+ * on its cadence, or on "Run now".
  * - `settings` is the row's, as the job's own `settings` schema took them —
  *   `watchSettingsOf` is the typed read.
  * - `state` is the cursor the last successful run handed back; null before

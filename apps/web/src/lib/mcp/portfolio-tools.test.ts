@@ -17,7 +17,7 @@ import { holdingDetailProgram, portfolioSummaryProgram } from './tools-read'
 import type { PortfolioFigures } from './tools-read'
 
 /**
- * `portfolio_summary` and `holding_detail` (D70) over the book Today and
+ * `portfolio_summary` and `holding_detail` over the book Today and
  * Portfolio are pinned on: three currencies, one with no rate, and a voided
  * mark. Then two sensitive holdings join it — one by its company's own flag,
  * one by a deal its check cites — and neither tool shows them.
