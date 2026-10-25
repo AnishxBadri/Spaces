@@ -128,10 +128,10 @@ printed matter, each with a budget so none becomes wallpaper. They are specified
 "Printed details" in §5:
 
 - **Double rule** — 2px ink, 2px gap, 1px ink. Page heads only.
-- **Ink stamp** — an ink label with cut ends naming what the page is (`COMPANY C-0231`,
-  `SPACE depth 2`). One per page; outline when the thing is archived.
-- **Real tabs** — the open tab is paper with cut shoulders that join the body below it.
-  Tab bars only.
+- **Ink stamp** — a plain ink rectangle naming the kind of thing the page is (`COMPANY`,
+  `SPACE`). One per page; outline when the thing is archived.
+- **Real tabs** — the open tab is paper with a straight ink edge, joined to the body
+  below it. Tab bars only.
 - **Dither is data** — charts, readout history, 1-bit fallback marks and popover
   elevation. One moment per region.
 
@@ -222,19 +222,20 @@ the instrument measured. Inter Variable (`cv11` + `ss01`), Source Serif 4 Variab
 JetBrains Mono Variable, all self-hosted via Fontsource — no font CDN calls from a
 privacy product.
 
-| voice | step              | size / leading | role                                                    |
-| ----- | ----------------- | -------------- | ------------------------------------------------------- |
-| serif | display · 600     | 28 / 32        | page titles, record names, the Today sentence           |
-| serif | section · 600     | 18 / 22–24     | dialog titles, settings sections, empty states          |
-| serif | prose · 400       | 17 / 27        | note bodies, theses, reasons                            |
-| sans  | title · 500       | 15 / 22        | a name inside a readout cell                            |
-| sans  | ui · 400 / 500    | 13 / 20        | rows, forms, buttons, the workhorse                     |
-| sans  | body · 400        | 14 / 20        | composer inputs, running UI text                        |
-| mono  | readout · 500     | 18–20 / 22–24  | the readout strip                                       |
-| mono  | numeral · 400     | 13 / 16        | money, counts, dates, IDs, domains in rows              |
-| mono  | label · 500 caps  | 11 / 14, .08em | group and section labels, tabs, stamps                  |
-| mono  | field label · 400 | 11 / 16 lower  | column and lane heads, field labels — `field-label`     |
-| mono  | key hint · 400    | 11 / 14        | `⌘K G T ↵ ⇧↵ M` — tooltips, composer end lanes, sidebar |
+| voice | step             | size / leading | role                                                    |
+| ----- | ---------------- | -------------- | ------------------------------------------------------- |
+| serif | display · 600    | 28 / 32        | page titles, record names, the Today sentence           |
+| serif | section · 600    | 18 / 22–24     | dialog titles, settings sections, empty states          |
+| serif | prose · 400      | 17 / 27        | note bodies, theses, reasons                            |
+| sans  | title · 500      | 15 / 22        | a name inside a readout cell                            |
+| sans  | ui · 400 / 500   | 13 / 20        | rows, forms, buttons, the workhorse                     |
+| sans  | body · 400       | 14 / 20        | composer inputs, running UI text                        |
+| mono  | readout · 500    | 18–20 / 22–24  | the readout strip                                       |
+| mono  | numeral · 400    | 13 / 16        | money, counts, dates, IDs, domains in rows              |
+| sans  | label · 400      | 12 / 16        | column, lane, property, field and readout labels        |
+| mono  | label · 500 caps | 11 / 14, .08em | kinds, stamps, band and group labels                    |
+| mono  | data word · 400  | 11 / 16        | state words and units in an end lane — `field-label`    |
+| mono  | key hint · 400   | 11 / 14        | `⌘K G T ↵ ⇧↵ M` — tooltips, composer end lanes, sidebar |
 
 **Who wrote it decides the voice** (owner 2026-10-08; D78):
 
@@ -244,27 +245,31 @@ privacy product.
   summary. Ask answers are sans in the panel and on `/ask`.
 
 Utilities: `title-serif`, `label-caps` (the 11/14 500 caps label step whole), `field-label`
-(the 11/16 400 field label whole — mono, lowercase, untracked), `mono`, `numeric` (tabular +
-right-aligned in one class), `tabular` (figures inline in a sentence). The scale steps
+(the 11/16 400 data word whole — mono, untracked, its case left as written), `mono`,
+`numeric` (tabular + right-aligned in one class), `tabular` (figures inline in a
+sentence). The scale steps
 stay named (`text-field … text-display`, the smallest being the field step at 10/12); if
 a size isn't on the list it does not go in the app — `instrument/vocabulary` rejects
 `text-[…]` and `leading-[…]` in tsx, so the only way onto the list is `src/styles.css`.
 A genuine one-off (optical sizing of initials inside a 16–22px square) takes an inline
 comment saying why and a scoped disable; there are four.
 
-**The Casing Rule** (2026-09-15, tiers redrawn 2026-10-11). Three tiers, and the tier
-is decided by who is speaking, never by how small the text is:
+**The Casing Rule** (2026-09-15, tiers redrawn 2026-10-11 and 2026-10-25). Three tiers,
+and the tier is decided by who is speaking, never by how small the text is. Nothing
+starts lowercase:
 
-- **CAPS** (`label-caps`) — a group or section label (`MARKET MAP`, `IDENTITY`,
-  `PORTFOLIO`), tabs and stamps. A page section's own head is titled in sentence case at
-  the title step (see The Separation Rule, §5).
-- **lowercase mono** (`field-label`) — what the instrument labels inside a structure:
-  lane and column heads, field labels in forms and windows, readout labels, key hints
-  (`↵ add · ⇧↵ add & keep open`), units and state words (`end`, `yest`, `fetching.`,
-  `board ›`).
+- **CAPS mono** (`label-caps`) — only for kinds, stamps and band or group labels
+  (`COMPANY`, `CALL`, `TASKS`, `IDENTITY`). A page section's own head is titled in
+  sentence case at the title step (see The Separation Rule, §5).
+- **Sans 12 graphite, sentence case** — what labels a structure: column and lane heads,
+  property labels, field labels in forms and windows, readout labels. Tabs are
+  sentence-case sans as well. `Last contact`, `Due date`, `In pipeline`.
 - **Sentence case** — anything a person reads or clicks. Every control, every button,
   every chip, every menu item, every empty-state invitation, and a settings row's
   210px label lane. `Add task`, `Due date`, `Assign to`, `Keep open`, `+ Link record`.
+
+A mono state word in an end lane (`fetching.`, `following`, `■ gone`) is data, not a
+label, and keeps its case; so does a key hint in the lanes that print one.
 
 The failure this rule was written against: the task composer's chips were controls
 dressed as annotations — `date…`, `assign to me`, `+ link record`, `create more` — sat
@@ -291,10 +296,11 @@ Structure is 1px ink. Inner rules are 1px rule. Nothing blurs.
   - The primitives choose (`Popover`, `DropdownMenu`, `Select`, the BlockNote sheets;
     `DialogContent`). No call site passes a shadow; gate 5 refuses `shadow-[…]`.
 - **Spacing.** 4 8 12 16 24 32; the page gutter is 32.
-- **Heights.** Table row 36 · ledger row 40 · section head 44 · control 32 · small 26 ·
-  badge 20 · nav row 30 · header row 48 · readout strip 56–64 · dialog head 48 · dialog
-  foot 52. The record table keeps 36: it is a spreadsheet and density is its job; every
-  ledger (record sections, Today, settings ledgers) is 40.
+- **Heights.** Table row 36 · ledger row 40 · section head 44 · tab bar 44 · control 32 ·
+  band 28 · segmented 28 · small 26 · a row's `···` 24 · badge 20 · nav row 30 · header
+  row 48 · readout strip 56–64 (Today and the holding's figures only) · dialog head 48 ·
+  dialog foot 52. The record table keeps 36: it is a spreadsheet and density is its
+  job; every ledger (record sections, Today, settings ledgers) is 40.
 - **Radius.** 0 on chassis, cards, badges, dialogs, sheets. 2px on controls and inputs.
   No 4, 6, 8, 12. No pills. No circles — initials sit in ink squares.
 - **Texture.** Dither, 1-bit, Bayer 4×4 at 2px cells, pine or ink. See the Dither Rule.
@@ -308,14 +314,17 @@ colour can't name what it encodes, it is forbidden. Kept from 2026-07.
 pale tint with same-hue ink, square. Kept from 2026-07; radius dropped.
 
 **The Numeral Rule.** Every measured thing is mono: money, counts, dates, durations, IDs,
-domains, column labels. Prose and names never are. New, 2026-09-10.
+domains. Prose and names never are, and since 2026-10-25 neither are column labels. New,
+2026-09-10.
 
 **The Reticle Rule.** Focus is four 2px ink crop marks 3px outside the control
 (`focus-ring`), inset inside scroll containers (`focus-ring-inset`). Never pine, never a
 ring. Replaces the Focus Rule.
 
 **The Dither Rule.** Dither is 1-bit, pine or ink, Bayer 4×4 at 2px cells. Never under
-text, never animated, never a third colour. It lives in empty states, chart fills,
+text, never moving at rest, never a third colour. The one animated dither is the
+**Twinkle**, a 4×4 grid stepping in Bayer order, and it marks a working state only:
+nothing spins (amended 2026-10-25). It lives in empty states, chart fills,
 fallback marks, thumbnails and loading. New, 2026-09-10. Amended 2026-10-08 (printed):
 **dither is data** — a chart, a readout's history, a 1-bit mark, and the elevation of a
 popover. One dither moment per region; a page that already has one adds no second.
@@ -492,7 +501,8 @@ load-bearing rules promoted here:
   the caret in a fresh sheet is the focus, and corner marks on that box read as a frame
   around the head; a borderless input inside a bordered composer row draws the marks on
   the row (`focus-ring-within`), never on the invisible input box.
-- **Labels:** the `Label` atom is an 11px lowercase mono field label in graphite.
+- **Labels:** the `Label` atom is sans 12 graphite in sentence case, 6px above its
+  control; an error sits under the control in destructive 12.
 - **Placeholders:** full-strength graphite — never a sub-100% opacity.
 - **Invalid:** border shifts to destructive; a required-and-empty field gets an amber
   square, not a red border.
@@ -525,13 +535,16 @@ outside its budget is wrong even when it looks good.
 
 - **Double rule.** 2px ink, 2px gap, 1px ink, under a page head (P1, a record head, a
   settings page head). Nowhere else: a section opens on the single hairline as before.
-- **Ink stamp.** An ink label with cut (angled) ends, mono caps inside, naming the kind
-  and one identifying fact: `COMPANY C-0231`, `SPACE depth 2`. One per page, above the
-  title. An archived thing's stamp turns to outline (`ARCHIVED 10-08`).
-- **Real tabs.** A tab bar's open tab is paper with cut shoulders, joined to the body
-  under it with no rule between; the others sit on bone. Tab bars only (a record's
-  Notes · Interactions · Files · History head, a space's tabs, `/ask`). Filter rows under
-  a tab stay the underline grammar.
+- **Ink stamp.** A plain ink rectangle, 22px, mono caps inside, naming the kind alone:
+  `COMPANY`, `SPACE`. One per page, on its own row above the title. An archived thing's
+  stamp turns to outline with the day (`ARCHIVED 8 Oct`).
+- **Real tabs.** A tab bar's open tab is paper with a straight ink edge, joined to the
+  body under it with no rule between; the others sit on bone. Tabs are sentence case,
+  with a mono count on a tab that holds something and none at 0. Tab bars only (a
+  record's Overview · Notes · Interactions · Files · History head, a space's tabs,
+  `/ask`). A nested switch under a tab is a bounded **Segmented** — 28px, a bone-deep
+  box, the selected segment paper, counts inside — never an underline row or a second
+  tab bar.
 - **Dither is data.** See the Dither Rule. A space's funding-stage mix bar, a readout's
   history, a portfolio chart and a popover's shadow are dither; a section head, a
   button or a page background never is.
@@ -549,10 +562,13 @@ band's edge, under its title.
 
 - **Material.** A section head is a 44px band on bone — title, count, tabs, filters and
   the head's one action live in it. A Drive folder band is the same band; a settings
-  page is the page, so its groups take no band. Dialog heads and feet are bone. Rows sit on paper.
-- **Scale.** The section title is the title step (15/22, sans 500, sentence case) with a
-  mono count beside it. A row's primary is body (14/20) in ink; at most one graphite
-  meta line under it. Tabs stay CAPS; column heads and field labels are lowercase mono.
+  page is the page, so its groups take no band. A group inside a pane opens on a 28px
+  bone **band** with a mono caps label and an optional link right. Dialog heads and feet
+  are bone. Rows sit on paper.
+- **Scale.** The section title is the title step (15/22, sans 500, sentence case); its
+  mono count sits at the band's right in ink, or a Segmented carries the counts, never
+  both. A row's primary is body (14/20) in ink; at most one graphite meta line under it.
+  Tabs, column heads and field labels are sentence-case sans (The Casing Rule, §3).
 - **One line, then a second when it is content.** A ledger row leads with one 40px
   line; secondary facts go to fixed lanes. A second graphite line is right when it is
   the row's description — an email's people and summary, a meeting's participants.
@@ -571,8 +587,9 @@ band's edge, under its title.
 things need you. Two are late."), a mono eyebrow above or a mono readout line below,
 actions right as `[outline]? [filled] [···]` with keys in tooltips (contract §1, A1 and
 A2), hairline under, 32px inset, 28px above.
-`ReadoutStrip`: cells split by rules on a hairline, caps mono label, mono 20/500 value,
-colour only when nonzero and bad.
+`ReadoutStrip`: cells split by rules on a hairline, a sans 12 graphite label, mono 20/500
+value, colour only when nonzero and bad. Since 2026-10-25 it serves Today and the
+holding's figures only; a record's readouts live in its Overview tab.
 
 Decided 2026-10-08/09 (port: project 27):
 
@@ -605,9 +622,10 @@ graphite tick, the track as rule — 1-bit, no colour.
 The hardest-working surface; spreadsheet-grade or the audience leaves.
 
 - **Rows:** one `--row-h` (36px) shared by header and body; rules between rows.
-- **Header:** 32px, sticky, paper, caps mono labels in graphite. Header cells are
-  buttons: the menu carries Sort A→Z / Z→A, Clear, Hide; the sort direction reads as a
-  mono arrow after the label; the chevron appears on hover. Hairline under the head.
+- **Header:** 32px, sticky, paper, sentence-case sans 12 labels in graphite
+  (2026-10-25). Header cells are buttons: the menu carries Sort A→Z / Z→A, Clear, Hide;
+  the sort direction reads as a mono arrow after the label; the chevron appears on
+  hover. Hairline under the head.
 - **Cells:** `text-ui`; measured columns `.numeric`; empty cells render an em dash in
   graphite. Editors open in place: ↵ commits, esc reverts. Status is never cell-edited —
   it reads a badge, and M opens Move stage on the record so the reason gets logged.
@@ -661,10 +679,10 @@ is toggled from the space head's `···` and kept per browser too. Rows are 30p
 14px mark slot so every label sits on one lane. The current row is a hairline box on
 paper inside the chassis, stopping short of its edge — never a tab cut through it, never
 a pine bar — and every row carries the same box, so nothing shifts. The head row ends on a
-mono `«` that folds the chassis (`⌘\`). The foot is one account row (ink initials
-square, name, email) with Upload and Settings (`G ,`) as icon buttons beside it; its
-menu opens to the right of the chassis — never up into the corner — and holds Keyboard
-and Sign out. Collapsed, the chassis is 48px of
+mono `«` that folds the chassis (`⌘\`). The foot is an Ask row (`⌘J`) above one account
+row (ink initials square, name, email) with Settings (`G ,`) as an icon button beside
+it; its menu opens to the right of the chassis — never up into the corner — and holds
+Keyboard and Sign out. Collapsed, the chassis is 48px of
 marks only: the mark on a hairline (which expands it again), `⌘K` on a rule, 36px rows
 with a 24px rule between groups and no headings, the current page in a 36×32 paper box
 on a hairline,
@@ -675,8 +693,8 @@ browser. Collapses to a drawer under a 48px top bar on mobile.
 Ported by `shell-1` except the Ask and Meetings rows, which their slices add, and
 an object's pinned saved views and the count on Tasks. The decided order:
 
-- **Search** (`⌘K`), then an **Ask** row under it; chats live in Ask, never in the
-  sidebar.
+- **Search** (`⌘K`) at the top; **Ask** (`⌘J`) is a foot row above the account row
+  (amended 2026-10-25); chats live in Ask, never in the sidebar.
 - **Today, Tasks, Spaces** at the top. Spaces lists starred spaces under it (five, then
   `▸ n more`).
 - **Library ▾**, a collapsible group: Notes (`G N`), Meetings (`G E`), Files (`G L`).
@@ -684,9 +702,13 @@ an object's pinned saved views and the count on Tasks. The decided order:
 - **Objects ▾**: the objects, then customs, overflowing inline as `▸ n more` (never a
   dropdown); an object's pinned saved views sit under it.
 - **Capital ▸**: Portfolio, Mandate.
-- **Counts only on Tasks.** No other row carries a number.
+- **Counts only on Tasks.** No other row carries a number. The count is ink, and
+  destructive only when a task is overdue.
 - **Review is not a row**; Today's Needs-you ledger reaches it (D79).
-- **Upload and Settings leave the list** for icon buttons on the account row.
+- **Upload and Settings leave the list.** Settings is the account row's one icon
+  button; Upload lives in ⌘K, on Files and in the first run (amended 2026-10-25).
+- **The workspace head opens a menu:** General, Members, Invite a member…. The phone
+  drawer prints no key hints.
 - **The current row is a hairline box on paper** (`border-hairline`), expanded and
   collapsed. Decided by the owner 2026-10-10, reversing this sheet's tab cut into the
   page edge. Still never a pine bar.
@@ -704,6 +726,16 @@ it until asked. Rail right on bone (360px): the stage stepper (one 8px segment
 per live stage, pine to the current one, hairline after), tasks, people. The rail is
 sticky; the body scrolls. Deals, companies, people, custom records, holdings and spaces
 share the parts.
+
+**Decided 2026-10-25** (D74 amended; port: project 30). The record reads as the canvas
+drew it; `docs/design-contract.md` §3 "A record" carries the whole anatomy.
+
+- **Head:** the stamp alone on its row, the kind only; the mark, the serif name and its
+  suffix with `[verb] [verb] [···]` on the next; the double rule; **no readout strip**.
+- **Rail left**, 300px on bone: the attribute grid (bone label cell, paper value cell)
+  and the relations. **Tabs right:** Overview · Notes · Interactions · Files · History,
+  Overview first and the default every time, which holds the readouts that have a value,
+  the open tasks, the latest threads and the latest files.
 
 - **A space (2026-09-16).** The head measures it — SUBSPACES · COMPANIES · IN PIPELINE ·
   MEMOS · TERMS (own `+inherited`) · REFERENCED — under a crumb of ancestor links. Body:
@@ -724,10 +756,14 @@ share the parts.
   - Archive asks nothing, because Restore undoes it; the archived page shows the outline
     stamp and one notice of what still holds. Move to… is a window that greys the space
     and its descendants.
+  - **Amended 2026-10-25** (D73 amended; port: project 30): the head is `···` alone
+    and the stamp prints no depth; Overview is the first tab and the default, holding
+    the three readouts, What's moving, open tasks and the latest companies; the rail is
+    Criteria, Watching and Map; Glossary… and Sensitive move into the `···`.
 
-- **The Ledger.** Three lanes on rules — mono `MM-DD HH:MM`, mono caps type
-  (`CALL · STAGE · FILE · EDIT · BORN · INVEST · MARK`), sans body. Attribute bursts
-  expand in place. Since 2026-09-30 it is two sections, not one list: **Interactions**
+- **The Ledger.** Three lanes on rules — the mono day (`13 Oct`, the time in a tooltip),
+  mono caps type (`CALL · STAGE · FILE · EDIT · BORN · INVEST · MARK`), sans body.
+  Attribute bursts expand in place. Since 2026-09-30 it is two sections, not one list: **Interactions**
   (calls, emails, meetings — each with its `Write up` / `Open note`) under the composer
   row, and **History** (stage moves, edits, filings, the portfolio's verbs) folded past
   six rows behind `+ N more`. A call and `tagged into a space` never again share a lane. An
@@ -748,7 +784,7 @@ share the parts.
 
 224px columns whose head is a mini readout strip — square stage badge, count, Σ,
 median — on a hairline. Paper cards on rule borders: 1-bit mark + name, `company ·
-check` mono with days in stage (crimson past 2× median), `close MM-DD · Nd` with the
+check` mono with days in stage (crimson past 2× median), `close 13 Oct · Nd` with the
 owner's initials. A dashed `+ N more` folds long columns; a pine dashed `drop →
 Stage` box appears while dragging over a column.
 
@@ -763,10 +799,11 @@ Stage` box appears while dragging over a column.
 - **Dialogs:** paper sheet, 1px ink, 3px solid shadow, 0 radius. 48px head on bone —
   serif title 18/600, mono context beside it, hairline under (bone since
   2026-10-05); no `esc` and no cross in the head (2026-10-06). 20px body on paper.
-  52px bone foot — Cancel beside the primary, the primary carrying ⌘↵; one close per
-  dialog. The first field takes the reticle on open. Wide (560px)
-  for forms, 420–480 otherwise; the quick task has no title bar — the input is the
-  title. A modal must be argued for.
+  52px bone foot — Cancel beside the primary, its key in the tooltip; one close per
+  dialog. The first field takes the reticle on open. Four sizes (2026-10-25): S 440 for
+  a confirm or one field, M 560 for a form, L 768 for a reading window, the file viewer
+  1152; a window opened from a window steps down under its parent, one stacked at most.
+  The quick task has no title bar — the input is the title. A modal must be argued for.
 - **The options editor** (inside the attribute sheet): a rule-bordered box of 30px rows
   — `⋮⋮` grip, a 14px square swatch, the borderless label, a mono status group — with a
   composer as the last row (`+ Add option… or paste a list`; a pasted list becomes
@@ -785,8 +822,11 @@ Stage` box appears while dragging over a column.
   `window.confirm` everywhere; a confirm exists to be read, never to be clicked through.
 - **Menus / pickers:** paper, 1px ink, the dithered shadow, 28px rows, highlighted row in
   bone, 150/100ms.
-- **Command palette:** 640px; a pine `›` prompt, `↑↓ move · ↵ open` on the right, caps
-  group labels, 32px rows, the `↵` hint on the highlighted row, a 32px bone foot.
+- **Command palette:** one fixed size (2026-10-25),
+  `min(1060px, 100vw−2rem)` × `min(560px, 100dvh−4rem)`, with every state — empty,
+  typing, no results, loading — in the same box and the preview pane always mounted; a
+  pine `›` prompt, `↑↓ move · ↵ open` on the right, caps group labels, 32px rows, the
+  `↵` hint on the highlighted row, a 32px bone foot.
   With an embedding model pinned, a second query with the meaning lane runs 600ms after
   the last keystroke and replaces the list — no spinner, no entrance, and never once
   the selection has moved or ↵ is pressed (SPA-129). A row found by meaning alone
@@ -794,11 +834,13 @@ Stage` box appears while dragging over a column.
   Decided 2026-10-08 (D70 amended; port: project 24/27): the palette **finds only**.
   It has no answer stage; Tab hands the typed query to Ask. Nothing typed shows the
   page's own actions, a highlighted passage previews its page, and an action that needs
-  one more answer asks it in the same palette.
+  one more answer asks it in the same palette. With nothing previewable highlighted the
+  pane is blank bone.
 - **Ask** (decided 2026-10-08, D70 amended; port: project 24). A docked 408px third
   column beside the page, and a full `/ask` page with the thread list, both over one
   thread store. Answers are sans with ref chips; action cards propose and the person
-  applies; the context in scope is shown as chips and frozen per turn.
+  applies; the context in scope is shown as chips and frozen per turn. The scope chips
+  sit in the composer, and a citation previews its passage on hover (2026-10-25).
   - The panel closes completely (⌘J or ×, no rail) and resizes from its left edge,
     360–560px, remembered per browser.
   - `/ask` reads in a 760px column with a collapsible thread list; tables break out to
@@ -858,7 +900,10 @@ port, the shipped nav and pages stand; build toward this:
     Templates, Currency & FX.
   - **AI:** Models (the sensitivity floor at the top, providers, who does what),
     Search (embeddings; reuses the Models key), Usage & limits.
-  - **Integrations:** Plugins, Enrichment (D76), Email forwarding, Connection apps.
+  - **Integrations:** Connections, Plugins, Enrichment (D76), Email forwarding
+    (amended 2026-10-25: Connection apps folds into Connections).
+  - The nav's group heads are ruled bands: mono caps in ink with a hairline under, the
+    grammar the settings ledgers' heads use (2026-10-25).
 - **One way to save.** Toggles and selects apply at once with a toast. Typed fields
   collect into one Save bar at the foot of the page, shown only while something changed.
   No per-section Save.
@@ -898,8 +943,9 @@ ARCHIVED section with a Restore button and no grip. `A` opens New attribute.
   all character.
 - **Do** set every measured thing in mono, and every comparable figure `.numeric`.
 - **Do** hold body text at ≥ 4.5:1 — graphite is the only second text colour.
-- **Do** print a working key inside the control it triggers when the binding is ours
-  and not guessable (`⌘↵` from a field, `L`, `G T`); `esc` and `↵` are never printed.
+- **Do** put a working key in its control's tooltip, the `?` sheet and Cmd-K when the
+  binding is ours and not guessable (`⌘↵` from a field, `L`, `G T`) — never inside the
+  button; `esc` and `↵` are never printed.
 - **Do** use density confidently in the ledger; calm comes from rules and rhythm, not
   sparseness.
 - **Do** print a hint only where a wrong choice costs credits, privacy or something
@@ -912,7 +958,8 @@ ARCHIVED section with a Restore button and no grip. `A` opens New attribute.
 - **Don't** draw a pine bar on any edge — the No-Bar Rule. Current, selected and
   highlighted have their own treatments.
 - **Don't** blur a shadow, round past 2px, or make a pill or a circle.
-- **Don't** put dither under text, animate it, or give it a third colour.
+- **Don't** put dither under text, move it at rest, or give it a third colour; the
+  Twinkle is the one moving dither, and only while something works.
 - **Don't** set a name or a sentence in mono, or a number in sans.
 - **Don't** use color decoratively. No gradient text, no side-stripe borders, no
   glassmorphism.

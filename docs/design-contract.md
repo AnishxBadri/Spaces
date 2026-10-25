@@ -44,8 +44,9 @@ Shadows are named by kind and chosen by the primitive: a popover `shadow-dither`
 Bayer 8/16), a window over the scrim `shadow-solid` (3px ink); a call site passes none
 and gate 5 refuses `shadow-[…]`. Nothing blurs. Spacing is 4 8 12 16 24 32 and
 the page gutter is 32 (`px-8`). Heights: table row 36 (`h-row`), ledger row 40 (`h-ledger-row`),
-section head 44, control 32, small 26, badge 20, nav row 30, readout strip 56–64, dialog head
-48, dialog foot 52.
+section head 44, tab bar 44, control 32, `Band` 28, `Segmented` 28, small 26, a row's `···`
+24, badge 20, nav row 30, dialog head 48, dialog foot 52. The readout strip (56–64) stays
+for Today and the holding's figures only; a record's readouts live in its Overview tab.
 
 ### The named type steps (`DESIGN.md` §3)
 
@@ -80,8 +81,8 @@ the instrument measured.
 - **Serif** — page titles, record names, dialog titles, settings section heads, empty-state
   sentences, note bodies, theses, reasons.
 - **Sans** — rows, forms, buttons, every running sentence. `text-ui` is the workhorse.
-- **Mono** — money, counts, dates, durations, IDs, domains, column labels, key hints.
-  Comparable figures take `numeric`.
+- **Mono** — money, counts, dates, durations, IDs, domains, key hints, kinds and stamps.
+  Comparable figures take `numeric`. Column and field labels are sans (the Casing Rule).
 
 Never a name or a sentence in mono, never a number in sans — with one shipped
 exception: the fixed mono lanes a ledger row or a board card **ends** on are the
@@ -91,32 +92,74 @@ graphite (`DESIGN.md` §5 P2's `LedgerFigure` and P4's `company · check`;
 
 ### The Casing Rule — three tiers (`DESIGN.md` §3)
 
-The tier is decided by who is speaking, never by how small the text is.
+The tier is decided by who is speaking, never by how small the text is. **Nothing starts
+lowercase.**
 
-- **CAPS** (`label-caps`) — a group or section label (`MARKET MAP`, `IDENTITY`,
-  `PORTFOLIO`, a settings group, a sidebar or palette group), tabs and stamps. A page
-  section's own head is titled in sentence case at the title step (below).
-- **lowercase mono** (`field-label`) — what the instrument labels inside a structure:
-  `RecordTable` column heads, `LabelHead` lane heads, a record's property labels, the
-  `Label` in forms and windows, readout labels, key hints (`↵ add · ⇧↵ add & keep
-open`), units and state words (`end`, `fetching.`, `board ›`).
+- **CAPS mono** (`label-caps`) — only for kinds, stamps and band or group labels: a
+  stamp (`COMPANY`), a kind lane (`CALL`, `STAGE`), a `Band` (`TASKS`, `LATEST`), a
+  settings or sidebar or palette group, a plugin's group in a `···`. A page section's own
+  head is titled in sentence case at the title step (below).
+- **Sans 12 graphite, sentence case** (`text-label text-graphite`) — what labels a
+  structure: `RecordTable` column heads, a ledger's lane heads, a record's property
+  labels, the `Label` in forms and windows, and readout labels. Tabs are sentence-case
+  sans too (`Tabs`, §2). `Due date`, `Last contact`, `In pipeline`.
 - **Sentence case** — anything a person reads or clicks. Every control, button, chip,
   menu item and empty-state invitation, and `SettingsRow`'s 210px label lane. `Add
 task`, `Due date`, `Keep open`.
+
+A mono state word in an end lane is data, not a label: `fetching.`, `following`,
+`■ gone` are what the instrument read, and keep their case (`field-label`, untransformed).
+A key hint is data the same way, in the lanes A2 allows.
 
 ### The Separation Rule (`DESIGN.md` §5, 2026-10-05)
 
 Every section separates itself by at least two of **material**, **space** and **ink
 weight**:
 
-- a hairline opens the section, then a 44px **bone head band** carrying the title in
-  sentence case at the title step with a mono count, plus its tabs, filters and one
-  action; dialog heads (48px) and feet are bone too;
+- a hairline opens the section, then a 44px **bone head band** (`SectionHead`) carrying
+  the title in sentence case at the title step, plus its tabs, filters and one action;
+  dialog heads (48px) and feet are bone too;
+- the section's count sits at the band's right in mono ink, **or** a `Segmented` in the
+  band carries the counts — never both;
+- a group inside a pane opens on a 28px **`Band`**: bone, a rule under it, its label in
+  mono caps graphite, an optional link right (`All interactions ›`);
 - rows sit on paper: **40px ledger rows**, the primary at body (14) in ink, at most one
   graphite meta line — a second line only when it is the row's description;
 - **32–40px** between sections and groups, nothing but a rule between rows.
 
 The record table keeps its 36px rows and paper head.
+
+### The hierarchy ladders
+
+Three ladders order everything on a surface, and none of them needs a new token.
+
+- **Text.** A value is ink at 13–14; its label is sans 12 graphite; a kind is graphite
+  mono caps. Nothing is lighter than graphite.
+- **Surface.** Paper is work, bone is frame, bone-deep is pressed. An attribute grid is
+  a bone label cell beside a paper value cell.
+- **Line.** The double rule once, under the page head; ink is structure; a rule
+  separates inside a pane; space separates inside a group.
+
+### Dates
+
+One set of forms, everywhere a date is printed:
+
+- today: the time, `10:42` — or `Today` in a readout;
+- this year: the day, `13 Oct`;
+- an older year: `4 Oct 2024`.
+
+Never `MM-DD`, never an ISO day in a lane. The formatter is hand-rolled and never
+`Intl`, for the reason `fmtMoney` is: the server and the browser must print the same
+string. Table date columns print the day. An age (`12d`) appears only in a stat column
+(Last contact, Last email, Last filed) and only under 30 days; past that the column
+prints the day. A readout prints the day with no `· Nd` tail (A8). Which rows print
+the time and which the day is H3.
+
+### Dither
+
+Dither is 1-bit and never under text, and **it never moves at rest**. The one animated
+dither is the `Twinkle`, and it is used only for a working state: a spinner never ships.
+A popover is dithered (`shadow-dither`); a window is solid (`shadow-solid`).
 
 ### The Commentary Rule — data is dense, commentary is scarce
 
@@ -182,15 +225,16 @@ architecture to a reviewer; the person at 8am needs the value.
   with _because_ or _never_, it is doctrine and comes out of the surface.
 - **Card feet** carry one status token and one action. Settings rows carry help
   only when the label does not explain itself.
-- **An empty section is one short line.** It states absence — `No notes.`,
-  `Nothing realized yet.` — and never instructs: the way in is the head's control
-  or the composer row, which are already there. A composer's hint text is an
-  ellipsis invitation (`Write the memo…`, `Tag a company…`), not a sentence about
-  what the section is for. Subheads inside a section are not a way to explain it:
-  when rows come in two lanes, the lane is a mark in the row's mono end lane
-  (`mention · note · 09-21`), never a second caps head over an empty list. The
-  shipped precedent is `/portfolio/$holdingId`; the record page's Notes and Files
-  sections were brought to it 2026-09-30.
+- **An empty section is one `Name +` row (H1).** No sentence, no composer and no 0:
+  the row names the section in graphite and is itself the way in (`EmptyRow`). The
+  absence sentence survives only where absence is news —
+  `Nothing matches that filter.` after a filter, not `No notes.` on a record that has
+  none. A section with rows keeps its composer, whose hint text is an ellipsis
+  invitation (`Write the memo…`, `Tag a company…`), not a sentence about what the
+  section is for. Subheads
+  inside a section are not a way to explain it: when rows come in two lanes, the lane
+  is a mark in the row's mono end lane (`mention · note · 21 Sep`), never a second
+  caps head over an empty list.
 
 ### The Action Grammar — one shape per element (2026-10-12)
 
@@ -198,7 +242,9 @@ Every control cluster in the app is one of the shapes below, and nothing else. T
 walk of 2026-10-11 counted ten page-head shapes, eight record heads, ten row ends and
 seven dialog feet for what is, each time, the same act; the grammar is what makes a
 cluster predictable before it is read. A new surface is built to it; an existing one is
-brought to it when its file is open.
+brought to it when its file is open. Cognitive load comes first: a rare act goes into a
+menu, a dropdown or a tooltip, and state shows only when it is not the default — the
+company head went from sixteen things to seven by this rule.
 
 - **A1 · A page head carries one filled primary, at most one outline secondary to its
   left, and a boxed `···` at the far right.** All three are 32px. Nothing used less
@@ -235,43 +281,70 @@ brought to it when its file is open.
   email); everything else is `More fields ›`, inferred (company from email, deal name
   from company and stage, date today) or filled later by enrichment. Focus lands in the
   first field.
-- **A10 · One tab bar shape, and it hides when there is one view.** Paper tabs with a
-  count on every tab, Filter · Sort · Columns and search to the right; a second axis is
-  a chip in that bar, never a second row; the bar is absent when there is a single
-  view.
+- **A10 · One tab bar shape, and it hides when there is one view.** Bone-bar tabs in
+  sentence case, a count on every tab that holds something and none at 0; Filter ·
+  Sort · Columns and search to the right; a nested switch is a bounded `Segmented`; a
+  second axis is a chip in the bar, never a second row; the bar is absent when there is
+  a single view.
+
+Three more rules govern what a section or a list prints rather than how it is acted on.
+
+- **H1 · An empty section is one `Name +` row.** The name in graphite and a `+`, with
+  no sentence, no composer and no 0. The absence sentence survives only where absence
+  is news (`Nothing matches that filter.`).
+- **H2 · You are never listed among a row's people.** The viewer is left out of the
+  people lane; a sent row reads `To X`.
+- **H3 · A list prints the day.** The time lives in the viewer or a tooltip, and a long
+  list breaks by week on bone bands. Today's rows and scheduled meetings show the time,
+  because the time is what they are about.
 
 ---
 
 ## 2. The primitives that exist
 
 Compose these. A new component is a last resort and needs the same argument a modal
-needs.
+needs. A row marked _decided_ is drawn and recorded but not in the code yet: it lands
+before the surfaces that use it, and a surface that needs it waits rather than
+hand-rolling one.
 
-| primitive                                                                         | file                                                    | for                                                                                                     |
-| --------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `PageHeader`, `KeyHint`, `ReadoutStrip`                                           | `apps/web/src/components/page-header.tsx`               | P1 — serif title or sentence, mono eyebrow/readout, actions right, the double rule under                |
-| `SectionHead`, `LedgerSection`, `LedgerRow`, `LedgerFigure`, `ReferenceBar`       | `apps/web/src/components/ledger-section.tsx`            | P2/P3 — bone head band (title + mono count), 40px rows on rules, a fixed mono lane, value-vs-median     |
-| `RecordHeader`, `RecordBody`, `RecordSection`, `PropertyGrid`, `PropertyCell`     | `apps/web/src/components/record/record-parts.tsx`       | P7 — the record anatomy: one stamp beside the crumb, readouts, the double rule, property grid, sections |
-| `RailSection`, `RailRow`, `RailItem`, `RailEmpty`, `StageStepper`                 | `apps/web/src/components/record/record-parts.tsx`       | the bone rail right of a record                                                                         |
-| `InitialsMark`, `DitherMark`, `initialsOf`                                        | `apps/web/src/components/record/record-parts.tsx`       | ink initials squares and 1-bit fallback marks                                                           |
-| `RecordTable`, `TableToolbar`, `AddColumnButton`                                  | `apps/web/src/components/table/record-table.tsx`        | the signature grid — sticky head, 36px rows, columns popover, `N OF M` foot                             |
-| `useTablePrefs`                                                                   | `apps/web/src/components/table/use-table-prefs.ts`      | per-surface column order / visibility / width, under a frozen key                                       |
-| `SelectionBar`, `useRowSelection`, `ListMenu`                                     | `apps/web/src/components/table/`                        | the 44px bone bar while rows are checked (count, controls, one pine verb); a list head's `···`          |
-| `RecordLinkCell`, `IconBadge`, `InitialBadge`, `ChipLink`, `MetaCell`, `DateCell` | `apps/web/src/components/table/cells.tsx`               | the cell renderers a hand-declared column uses                                                          |
-| `ViewBar`, `useViewState`                                                         | `apps/web/src/components/views/`                        | saved views — **object surfaces only** (`/companies`, `/deals`, `/people`, `/o/$slug`)                  |
-| `SettingsSection`, `SettingsRow`                                                  | `apps/web/src/components/settings/settings-section.tsx` | a section of the settings shell — serif title, sans sentence, mono crumb, 48px rows                     |
-| `SettingsNav`, `SETTINGS_SECTIONS`                                                | `apps/web/src/components/settings/settings-nav.tsx`     | the settings nav grammar — one row per section, groups derived, `admin` in the lane                     |
-| `EmptyState`                                                                      | `apps/web/src/components/empty-state.tsx`               | P5 — dither block, serif sentence, one sans line, the primary with its key                              |
-| `DitherBlock`, `DensityRamp`                                                      | `apps/web/src/components/dither.tsx`                    | the only texture; loading is a density ramp, never a shimmer                                            |
-| `Dialog`, `DialogContent`, `DialogHeader`, `DialogFooter`, …                      | `apps/web/src/components/ui/dialog.tsx`                 | P8 — 48px serif head + mono context, nothing right; 20px body; 52px bone foot, Cancel + primary         |
-| `useConfirm`, `ConfirmDialog`                                                     | `apps/web/src/components/ui/confirm-dialog.tsx`         | the destructive confirm; it replaces `window.confirm` everywhere                                        |
-| `Button`, `Input`, `Label`, `Popover`, `Tooltip`, `DropdownMenu`                  | `apps/web/src/components/ui/`                           | the atoms — reticle focus, 2px radius, keys in tooltips (A2)                                            |
-| `Badge`, `badgeClasses`, `badgeTint`                                              | `apps/web/src/components/ui/badge.tsx`                  | the square option badge — takes the option row + index, `archived` and `unselected`                     |
-| `Select`, `selectClasses`                                                         | `apps/web/src/components/ui/select.tsx`                 | the one picker — an Input-height trigger, a paper sheet, `width` and `inset` per caller                 |
-| `Checkbox`, `checkboxClasses`                                                     | `apps/web/src/components/ui/checkbox.tsx`               | the 14px square that fills with pine; a button, never a native control                                  |
-| `Stamp`, `spaceStamp`                                                             | `apps/web/src/components/ui/stamp.tsx`                  | the ink stamp — kind and one fact in mono caps with cut ends; outline with the day when archived        |
-| `Tabs`, `nextTabIndex`                                                            | `apps/web/src/components/ui/tabs.tsx`                   | real tabs — bone bar, the open tab paper with cut shoulders joining the body, mono counts, ←→ Home End  |
-| `Switch`, `switchClasses`                                                         | `apps/web/src/components/ui/switch.tsx`                 | the 24×14 square track — graphite knob off, pine knob on, legible from one switch                       |
+| primitive                                                                         | file                                                    | for                                                                                                                                                                                                                                |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PageHeader`, `ReadoutStrip`                                                      | `apps/web/src/components/page-header.tsx`               | P1 — serif title, `[outline?] [Primary] [···]` right, the double rule under; no `KeyHint` (A2), and a count only when the page has no tab bar                                                                                      |
+| `SectionHead`, `LedgerSection`, `LedgerRow`, `LedgerFigure`, `ReferenceBar`       | `apps/web/src/components/ledger-section.tsx`            | P2/P3 — bone head band (title left, mono ink count or a `Segmented` right, never both), 40px rows on rules, a fixed mono lane, value-vs-median                                                                                     |
+| `Band`, `EmptyRow`, `FoldRow` (_decided_)                                         | `apps/web/src/components/ledger-section.tsx`            | `Band`: the 28px bone group head inside a pane, mono caps label, optional link right. `EmptyRow`: H1's `Name +` row on bone, the whole row the button; replaces `RailEmpty`. `FoldRow`: a 40px `25 more` row that unfolds in place |
+| `RecordHeader`, `RecordBody`, `RecordSection`, `PropertyGrid`, `PropertyCell`     | `apps/web/src/components/record/record-parts.tsx`       | P7 — the record anatomy: the stamp alone above the title, no readout strip, the double rule, property grid, sections                                                                                                               |
+| `RailSection`, `RailRow`, `RailItem`, `RailEmpty`, `StageStepper`                 | `apps/web/src/components/record/record-parts.tsx`       | the bone rail left of a record                                                                                                                                                                                                     |
+| `InitialsMark`, `DitherMark`, `initialsOf`                                        | `apps/web/src/components/record/record-parts.tsx`       | ink initials squares and 1-bit fallback marks                                                                                                                                                                                      |
+| `RecordTable`, `TableToolbar`, `AddColumnButton`                                  | `apps/web/src/components/table/record-table.tsx`        | the signature grid — sticky head, 36px rows, columns popover, `N OF M` foot                                                                                                                                                        |
+| `useTablePrefs`                                                                   | `apps/web/src/components/table/use-table-prefs.ts`      | per-surface column order / visibility / width, under a frozen key                                                                                                                                                                  |
+| `SelectionBar`, `useRowSelection`, `ListMenu`                                     | `apps/web/src/components/table/`                        | the 44px bone bar while rows are checked (count, controls, one pine verb); a list head's `···`                                                                                                                                     |
+| `RecordLinkCell`, `IconBadge`, `InitialBadge`, `ChipLink`, `MetaCell`, `DateCell` | `apps/web/src/components/table/cells.tsx`               | the cell renderers a hand-declared column uses                                                                                                                                                                                     |
+| `ViewBar`, `useViewState`                                                         | `apps/web/src/components/views/`                        | saved views — **object surfaces only** (`/companies`, `/deals`, `/people`, `/o/$slug`)                                                                                                                                             |
+| `SettingsSection`, `SettingsRow`                                                  | `apps/web/src/components/settings/settings-section.tsx` | a section of the settings shell — serif title, sans sentence, mono crumb, 48px rows                                                                                                                                                |
+| `SettingsNav`, `SETTINGS_SECTIONS`                                                | `apps/web/src/components/settings/settings-nav.tsx`     | the settings nav grammar — one row per section, groups derived, `admin` in the lane                                                                                                                                                |
+| `EmptyState`                                                                      | `apps/web/src/components/empty-state.tsx`               | P5 — dither block, serif sentence, one sans line, the primary with its key                                                                                                                                                         |
+| `DitherBlock`, `DensityRamp`                                                      | `apps/web/src/components/dither.tsx`                    | the only texture; loading is a density ramp, never a shimmer                                                                                                                                                                       |
+| `Dialog`, `DialogContent`, `DialogHeader`, `DialogFooter`, …                      | `apps/web/src/components/ui/dialog.tsx`                 | P8 — 48px serif head + mono context, nothing right; 20px body; 52px bone foot, Cancel + primary; sizes below                                                                                                                       |
+| `useConfirm`, `ConfirmDialog`                                                     | `apps/web/src/components/ui/confirm-dialog.tsx`         | the destructive confirm; it replaces `window.confirm` everywhere                                                                                                                                                                   |
+| `Button`, `Input`, `Label`, `Popover`, `Tooltip`, `DropdownMenu`                  | `apps/web/src/components/ui/`                           | the atoms — reticle focus, 2px radius, keys in tooltips (A2)                                                                                                                                                                       |
+| `Badge`, `badgeClasses`, `badgeTint`                                              | `apps/web/src/components/ui/badge.tsx`                  | the square option badge — takes the option row + index, `archived` and `unselected`                                                                                                                                                |
+| `Select`, `selectClasses`                                                         | `apps/web/src/components/ui/select.tsx`                 | the one picker — an Input-height trigger, a paper sheet, `width` and `inset` per caller                                                                                                                                            |
+| `Checkbox`, `checkboxClasses`                                                     | `apps/web/src/components/ui/checkbox.tsx`               | the 14px square that fills with pine; a button, never a native control                                                                                                                                                             |
+| `Stamp`, `spaceStamp`                                                             | `apps/web/src/components/ui/stamp.tsx`                  | the ink stamp — a plain ink rectangle, 22px, the kind only in mono caps; outlined with the day when archived                                                                                                                       |
+| `Tabs`, `nextTabIndex`                                                            | `apps/web/src/components/ui/tabs.tsx`                   | real tabs — one 44px bone bar, sentence-case sans tabs, mono counts hidden at 0, the open tab paper with a straight ink edge joining the body, ←→ Home End                                                                         |
+| `Segmented`                                                                       | `apps/web/src/components/ui/segmented.tsx`              | the bounded switch — 28px, a bone-deep box, the selected segment paper, counts inside; a nested switch under a tab bar, never a second tab row                                                                                     |
+| `Switch`, `switchClasses`                                                         | `apps/web/src/components/ui/switch.tsx`                 | the 24×14 square track — graphite knob off, pine knob on, legible from one switch                                                                                                                                                  |
+| `MoreMenu` (_decided_)                                                            | `apps/web/src/components/ui/`                           | the one `···` — a boxed 32px trigger in a head, a bare 24px one on a row's hover; renders nothing with no enabled item and one item as that item's button (A7)                                                                     |
+| `Twinkle` (_decided_)                                                             | `apps/web/src/components/twinkle.tsx`                   | the one animated dither — a 1-bit 4×4 grid stepping in Bayer order, for a working state only, still under reduced motion                                                                                                           |
+
+### Windows
+
+A window takes one of four widths: **S 440 · M 560 · L 768 · viewer 1152**. A confirm
+or a one-field window is S, a form is M, a reading window (an email, a meeting, the
+keyboard sheet) is L, and the file viewer is 1152 in every case. The size is the
+primitive's prop, never a width the caller spells. A window opened from a window steps
+down under its parent, and at most one is stacked: a third is refused. Cmd-K owns its
+own size (D70).
 
 ### Pickers and dates (SPA-38)
 
@@ -350,8 +423,10 @@ label in a 210px lane and the controls in a left-aligned lane after it, never pi
 the row's end. A field hint under the label survives only for cost, privacy or
 something irreversible; any other explanation is a tooltip on the control
 (`SettingsTip`) or goes. The nav left is the chassis grammar one level in: bone,
-caps group labels, 30px rows, counts in the right lane. A ledger inside the section takes a `field-label` head on
-`border-y-hairline` with lanes shared by head and rows. It carries no foot caption: a
+each group head a ruled band (mono caps in ink with a hairline under it, the
+`LabelHead` grammar the settings ledgers use), 30px rows, counts in the right lane. A
+ledger inside the section takes a head of sentence-case sans 12 graphite lane labels on
+`border-y-hairline`, with lanes shared by head and rows. It carries no foot caption: a
 line under a settings ledger survives only for cost, privacy or irreversibility (D81).
 
 **A settings section is a child route under the settings shell** (SPA-26). `/settings`
@@ -379,18 +454,38 @@ its section's row lit, and takes the `SettingsSection` head
 (`settings/objects_.$objectSlug.tsx`; its `_` escapes only the index's component).
 
 **A record** — the term page, a provider, a connection. → **`RecordHeader`**,
-`apps/web/src/components/record/record-parts.tsx:21`, used as
-`apps/web/src/routes/_app/deals_.$dealId.tsx:178` uses it: caps mono breadcrumb, `[verb] [verb] [···]`
-(A4) — all outlined, keys in tooltips, a record head has no single affirmative to give pine to —
-mark + serif name + square badge, readout strip, then `RecordBody` as two columns: a
-320px details column on bone (bone, not bone-deep, even beside a bone nav; the 1px rule
-separates) left — the `PropertyGrid` as single
-label–value rows, then the relationship sections (Waiting, Team, Associated deals,
-Spaces, Tasks) — and the view right at full remaining width under a 44px bone tab head —
-Notes · Interactions · Files · History, each with its mono count, Notes by default, the
-last tab remembered, empty tabs grey with a zero (D74, 2026-10-06; the stacked
-sections and the right-hand rail of 2026-09-30 are superseded, and there is no
-Context tab — Ask's answer card carries a `Sources n ›` footer instead).
+`apps/web/src/components/record/record-parts.tsx:21`, and `RecordBody` beside it. The
+anatomy (D74 amended 2026-10-25):
+
+- **Head.** The stamp alone on the first row, the kind only. Then the 28px mark, the
+  serif name and its suffix (a parent path, a person's role, a deal's stage badge),
+  with `[verb] [verb] [···]` (A4) at the right of that row — all outlined, keys in
+  tooltips, a record head has no single affirmative to give pine to. Seven things at
+  most. A custom object's head carries Log interaction when the object links people.
+  Then the double rule, and **no readout strip**. A notices band sits under the double
+  rule only while something needs saying (a possible duplicate, enrichment parked, the
+  record archived).
+- **Rail.** Left, 300px on bone (bone, not bone-deep, even beside a bone nav; the 1px
+  rule separates): the attribute grid — a bone label cell beside a paper value cell,
+  the empty attributes folded into one `n empty +` row — and then the relations (Team,
+  Associated deals, Spaces, Waiting), each empty one an `EmptyRow`. Tasks are not in the
+  rail.
+- **View.** Right, at full remaining width under the 44px bone tab bar: Overview ·
+  Notes · Interactions · Files · History. **Overview is first and opens every time**;
+  no tab is remembered per kind. A tab that holds something carries its count; an empty
+  tab is graphite with none. Overview holds the readouts that have a value (never a
+  `—` or a 0), the open tasks with their composer, the latest three threads and the
+  latest files, each group a `Band` ending on a link to its tab.
+- **A space** is the same anatomy: the head is `···` only and the stamp prints no
+  depth; Overview holds its readouts (in pipeline, last filed, the funding-stage bar),
+  What's moving, open tasks and the latest companies; the rail is Criteria, Watching
+  and Map (D73 amended 2026-10-25).
+- **The holding** has one view and no tab bar, so its figures sit at the top of the
+  pane as the readout strip.
+
+There is no Context tab: Ask's answer card carries a `Sources n ›` footer instead. The
+stacked sections of 2026-09-30, the readout strip under the title and the Notes default
+of 2026-10-06 are superseded.
 
 **A ledger of a stream** — Ask's sources footer, a run log, a feed.
 → **Today's spine**, `apps/web/src/routes/_app/today.tsx:320`. `LedgerSection` with a
@@ -445,7 +540,7 @@ all five and still be the wrong surface — that is what the checklist is for.
 
 ### The review checklist
 
-Twenty-two questions. A merge needs a yes to each.
+Twenty-seven questions. A merge needs a yes to each.
 
 **Vocabulary**
 
@@ -453,10 +548,7 @@ Twenty-two questions. A merge needs a yes to each.
 2. Is radius 2px on controls and 0 everywhere else — no pill, no circle, no blur?
 3. Is every measured thing mono, and `numeric` where figures are comparable, with names
    and sentences in serif or sans outside the row's mono end lane?
-4. Does the casing follow the three tiers — CAPS (`label-caps`) for a group or section
-   label, tabs and stamps; lowercase mono (`field-label`) for column and lane heads,
-   field labels, key hints and state words; sentence case for anything a person reads or
-   clicks?
+4. Does the casing follow the three tiers? See 27.
 
 **The seven rules** (`DESIGN.md`, "The seven rules")
 
@@ -467,7 +559,8 @@ Twenty-two questions. A merge needs a yes to each.
 7. **Numeral** — see 3.
 8. **Reticle** — is focus `focus-ring` / `focus-ring-inset`, never a ring and never
    pine?
-9. **Dither** — 1-bit, pine or ink, never under text, never animated?
+9. **Dither** — 1-bit, pine or ink, never under text, still at rest, with the `Twinkle`
+   the only animated dither and only for a working state — never a spinner?
 10. **Contrast floor** — body ≥ 4.5:1, graphite the only second text colour, no
     sub-100% opacity text?
 11. **No-Bar** — no pine edge bar; current page is paper + rule + weight, a selected row
@@ -499,16 +592,35 @@ Twenty-two questions. A merge needs a yes to each.
 20. **Commentary** — one mono commentary line per section and none in a row or a
     cell; provenance a mark or a hover except for a machine write; consequence text
     only beside the control that commits it; no sentence on the surface that starts
-    with _because_ or _never_; every empty section one short line that states
-    absence, no subhead over an empty list; tooltips explain behaviour and hold no
-    value the surface should show? (§1, "The Commentary Rule")
+    with _because_ or _never_; every empty section one `Name +` row (H1), no subhead
+    over an empty list; tooltips explain behaviour and hold no value the surface
+    should show? (§1, "The Commentary Rule")
 21. **Separation** — does every section separate itself by at least two of material
     (bone head, paper rows), space (32–40px between groups) and ink weight (hairline
-    opens, rules between rows), with the title in sentence case at the title step?
-    (§1, "The Separation Rule")
+    opens, rules between rows), with the title in sentence case at the title step and
+    the count at the band's right or in a `Segmented`, never both? (§1, "The
+    Separation Rule")
 22. **Action Grammar** — does every cluster follow it: one filled primary, keys in
     tooltips not buttons, one control per act, state never a control? (§1, "The
     Action Grammar")
+
+**Hierarchy, dates and casing**
+
+23. **H1** — is every empty section one `Name +` row, with no sentence, no composer
+    and no 0, and does an absence sentence appear only where absence is news?
+24. **H2** — is the viewer left out of every row's people, and does a sent row read
+    `To X`?
+25. **H3** — does every list print the day, with the time in the viewer or a tooltip,
+    a long list broken by week on bone bands, and the time printed only on today's rows
+    and scheduled meetings?
+26. **Dates** — is every date one of the forms (`10:42` today, `Today` in a readout,
+    `13 Oct` this year, `4 Oct 2024` older), hand-rolled, never `MM-DD` and never
+    `Intl`, with an age (`12d`) only in a stat column and only under 30 days? (§1,
+    "Dates")
+27. **Casing** — is CAPS mono used only for kinds, stamps and band or group labels; are
+    tabs, column heads, lane heads, property and field labels and readout labels
+    sentence-case sans, the labels 12 graphite; and does nothing start lowercase except
+    a mono state word in an end lane? (§1, "The Casing Rule")
 
 ### afk or hitl
 
@@ -517,8 +629,9 @@ The same line the roadmap draws: **afk** is grabbable now, **hitl** needs the ow
 **afk — build it alone** when the surface is one of §3's five shapes, every token, step
 and primitive it needs already exists, and the checklist answers yes to every question.
 Everything in parts 1–3 is **pinned**: the token table, the type steps, the three
-voices, the Casing Rule, the seven rules, the engineering rules, and the five patterns
-with their files. None of it is open. Do not re-open it, and do not ask about it.
+voices, the Casing Rule, the hierarchy ladders, the dates, the seven rules, the
+engineering rules, the Action Grammar with H1–H3, and the five patterns with their
+files. None of it is open. Do not re-open it, and do not ask about it.
 
 **hitl — stop and ask** when any of these is true:
 
@@ -537,7 +650,37 @@ Say which of the four it is and ask. Never invent the missing half.
 Approved on the canvas and recorded, but not in the code yet. A slice that touches one
 of these surfaces builds toward the decided shape, not the shipped one; a slice that does
 not touch it leaves the shipped one alone. Each line names its decision and the work that
-carries it. Project 27 is "Instrument, printed — the decided design lands".
+carries it. Project 27 is "Instrument, printed — the decided design lands"; project 30
+is "The canvas lands — the instrument port".
+
+**The canvas port** (project 30; D63, D64, D70, D73, D74, D79 and D81 amended
+2026-10-25). The rules are in §1, the primitives marked _decided_ in §2, the record
+anatomy in §3. The surfaces:
+
+- **Lists.** The head is the title with no count, `[New <x>]` and a `···`; applied
+  filters are chips in a row under the bar, shown only while a condition exists. A
+  row's `···` shows on hover: Open in a new tab · Add to space… · Enrich… · Copy link,
+  and Archive once records archive; there is no Delete. Bulk is Enrich… (outline) and
+  Add to space, with no Tag. Deals switch `Table | Board` with a `Segmented` in the
+  bar, not a view tab. A first-run list is one `Name +` row.
+- **Today** (D79 amended): the head is the title and the day (`Thu 15 Oct · W42`) with
+  no verbs and no count; Notices, then Needs you, then Meetings; the day strip only with
+  a connected calendar.
+- **Undo holds the write.** Accepting or dismissing a suggestion, a duplicate or an Ask
+  card hides the row and holds the write for 5s; the toast's `Undo` is sans and
+  underlined.
+- **Windows.** A confirm's dismiss says Cancel; a reply opens as Reply; the sizes and
+  the stacking are §2's.
+- **Cmd-K and Ask** (D70 amended): Cmd-K is one fixed size in every state with its
+  preview pane always mounted, blank bone when nothing previewable is highlighted; Ask's
+  scope chips sit in the composer; a citation previews its passage on hover; Ask's row
+  is at the sidebar foot (`⌘J`).
+- **Shell.** Upload leaves the account row; the workspace head opens General · Members ·
+  Invite; a password reset is a one-time link an admin issues; the phone drawer prints
+  no key hints; sidebar counts are ink, destructive only when something is overdue.
+- **Settings** (D81 amended): the nav group heads are ruled bands; Integrations is
+  Connections · Plugins · Enrichment · Email forwarding; a settings head carries one
+  outline 32px action at most beside its `···`.
 
 **The printed details** (`DESIGN.md` §1, §5 "Printed details"; project 27, `print-*`). The double rule, the
 stamp and real tabs are built (§2) as the `double-rule`, `stamp`, `stamp-outline` and
@@ -558,7 +701,8 @@ the sticky head (`HeadBar`, inside `PageHeader` and `RecordHeader`).
   chassis edge, never a pine bar. Decided by the owner 2026-10-10, reversing the
   2026-10-08 shell verdict "active row as a tab cut".
 - **Cmd-K finds only**; Tab hands the query to Ask. **Ask** is a docked 408px column
-  plus `/ask`, one thread store, answers in sans (D70 amended; project 24).
+  plus `/ask`, one thread store, answers in sans (D70 amended; project 24). Its sidebar
+  row moves to the foot (project 30, above).
 
 **Settings** (D81; project 27, `settings-*`)
 
@@ -578,17 +722,19 @@ the sticky head (`HeadBar`, inside `PageHeader` and `RecordHeader`).
 
 - **Today** (D79, `today-1`): plain title with the date, the day strip, derived readouts
   only, one notices band, one Needs-you ledger with a kind lane (task, meeting, review,
-  deal, mark), Today's meetings, and a rail of Portfolio and What's moving.
+  deal, mark), Today's meetings, and a rail of Portfolio and What's moving. Amended by
+  the canvas port (above).
 - **First run** (D80, `first-run-1`): Today's empty state with three ways in; each
   missing setup named in place with one link; Settings → General → What's set up; demo
   data offered with Start empty as the primary.
 - **Meetings page** (D68 amended): Upcoming by day with Prep, Past with no-write-up rows
   first and Write, filters All · Upcoming · Past · No write-up · Mine.
-- **The space page in the record anatomy** (D73, D74): tabs Companies · Notes · Files ·
-  People · Records with Notes by default; three readouts (in pipeline, last filed, the
-  funding-stage mix); details column Map, Glossary, Tasks; a `···` menu with Rename,
-  New subspace, Move to…, Save as template…, Archive; archive asks nothing and Restore
-  undoes it.
+- **The space page in the record anatomy** (D73, D74, both amended 2026-10-25): tabs
+  Overview · Companies · Notes · Files · People · Records with Overview by default; its
+  three readouts (in pipeline, last filed, the funding-stage mix) in Overview; rail
+  Criteria, Watching, Map; a head of `···` alone, holding Find companies, Rename, Move
+  to…, Split into a subspace…, Save as template…, Glossary…, Sensitive and Archive;
+  archive asks nothing and Restore undoes it.
 - **The Enrichment page** (D76): sources in order with what each sends, auto-enrich
   scopes, What fills what per object, recent runs; the where-from popover on a filled
   value; Fill from on an attribute.

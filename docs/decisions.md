@@ -338,9 +338,13 @@ _Four decisions taken by the owner while publishing project 18 (plugins run unat
 
 **Where does a plugin's manifest action appear, and what happens when the plugin is unhealthy?** Answered: in the **record head's action area**, beside the record's own actions, for every action whose `on` matches the record's kind; **absent** when the plugin is degraded, disabled or breaker-tripped, with Review and the Today line saying why. Rejected: a separate plugin panel (a second place to look), and a present-but-disabled control explaining itself (a broken control on every record). Carried by `sdk-17`.
 
+_Amended 2026-10-25 (the canvas port):_ a plugin's verbs leave the record head for the record's `···`. They sit there as their own group, headed by the plugin's name in mono caps (`EXA`), after the record's own items, and the group is absent while the plugin is degraded, disabled or breaker-tripped — Review and the Today line still say why. The outcome of a run is a toast (`Exa found 5 · brief in Review`, with an underlined `Review`), never a figure in the head. The host's own **Enrich** is not a plugin action and stays a head verb, reading `Enriching…` while a run is in flight. Why: a record head is `[verb] [verb] [···]` on every kind (contract A4), and a head that grew a button per installed plugin broke it. Carried by project 30's record-head slice.
+
 ### D64-web-listen-client
 
 **May web hold a long-lived pg connection to stream job status?** Answered: **yes, one.** A single shared LISTEN client in web fans `job_status` notifications out over SSE to record pages; `runJob`'s ledger emits them, so no trigger and no migration. Pending and failed reuse the existing ledger cell states. State on reopen or reconnect comes from `job_run`, never from a missed notification. Rejected: polling (the latency the spec promised away), and a client per subscriber. Carried by `sdk-18`.
+
+_Amended 2026-10-25 (the canvas port, with D63):_ the stream's consumer on a record page is the completion toast, not a figure in the record head: plugin actions live in the `···` (D63 amended), so there is no head lane to update. The one LISTEN client, the `job_run` read on reopen and the reuse of the ledger's pending and failed states stand.
 
 ### D65-domain-event-emitter
 
@@ -553,6 +557,16 @@ _Carried by_ no slice yet; precedes D72's watches.
 _Rejected:_ stacked collapsed sections (the 09-30 answer, superseded now that two sections are products); a rail right of the tabs (two structures side by side, the view starved of width); an "Overview" tab that re-summarises (the readout strip and the details column already do); hiding empty tabs (loses the index); a Context tab (introspection of the assembler, routinely empty on a fresh record, and every use it had — see the sources, pin, exclude — has a home on the answer card or a row menu).
 
 _Carried by_ the record port slice beside SPA-214 for shipped routes, and the anatomy sheets O1–O4 on the canvas; E1 and S1 are the Interactions and Files tabs of the same record.
+
+_Amended 2026-10-25 (the canvas port):_
+
+- **Overview is the first tab and the default**, and it opens every time: the per-user memory of the last tab goes. The tabs read Overview · Notes · Interactions · Files · History. Overview holds the readouts that have a value (never a `—` or a 0), the open tasks with their composer, the latest three threads and the latest files, each group ending on a link to its tab. **The readout strip under the title goes**; its figures live in Overview. This reverses the rejection of an Overview tab above: what it would have re-summarised was the readout strip, which is gone.
+- **Empty tabs show in graphite with no count.** A tab that holds something carries its count; an empty one stays visible, so the tab bar is still the record's index, but prints no 0. This supersedes "grey, count 0".
+- **The details column is the rail:** the attribute grid and the relations (Team, Associated deals, Spaces, Waiting), each empty relation one `Name +` row. Tasks leave it for Overview.
+- **Interactions' kind filter is a bounded Segmented** (All · Email · Meetings · Calls, with counts) in the tab's toolbar, and the tab has no composer: the head's Log interaction is the control. This supersedes "a second row inside the tab".
+- **Notes loses its filter row.** Filed notes come first; the meeting notes D78 files sit under a `FROM MEETINGS` band in the same list instead of behind a filter.
+
+_Carried by_ project 30's record slices (the head, Overview and the rail, the tab bodies).
 
 ### D39-importer-parse-signature — amended
 
@@ -782,6 +796,19 @@ _Rejected:_
 
 _Carried by_ the Today slice (`today.tsx`), rewritten from T2 and Today sheet 00 on the canvas.
 
+_Amended 2026-10-25 (the canvas port):_
+
+- **The head is the title and the day** (`Thu 15 Oct · W42`, the app's date forms), with no verbs. `T` and `L` stay bound.
+- **The day strip shows only with a connected calendar**, and follows the day the Meetings section is on.
+- **The order is Notices, Needs you, Meetings**; the rail is unchanged.
+- **The readout strip shows non-zero figures only**, and is absent when all are zero. Each figure filters Needs you to its rows; a second click clears it. Unfiled files stays a link to the Files shelf.
+- **Proposals are decided in place.** A single suggestion is its own row with its accept and dismiss; a group (a watch, a column run, an Ask thread) folds with `Open in Review ›`, and a column run keeps `Accept all N` beside it.
+- **Duplicates appear on Today**, as Needs-you rows.
+- **The filter is a Segmented** (All · Tasks · Review · Meetings · Deals · Marks, with counts, a kind at 0 absent), and the title carries no count. This replaces "tabs in the head".
+- **Undo holds the write.** Accept, dismiss and an Ask card's apply or skip hide the row and hold the write for 5s behind a toast whose `Undo` is sans and underlined; the write commits when the hold ends, so an undone decision never reaches the server.
+
+_Carried by_ project 30's Today slices and its undo slice.
+
 ### D80-first-run-without-a-checklist
 
 **How does a self-hosted workspace learn to work, when most of the value sits behind keys the owner must bring (AI model, Google, Granola, Apollo, Exa)?** Answered (owner, 2026-10-09): **no setup checklist.** A missing piece shows only where it would be used, and the whole picture lives in one passive list.
@@ -848,6 +875,16 @@ _Rejected:_
 
 _Carried by_ the settings slices (nav and IA, then each page), on the canvas as Settings sheets 00–09 (05 and 07 redrawn for the accounts and the catalogue).
 
+_Amended 2026-10-25 (the canvas port):_
+
+- **The nav's group heads are ruled ink bands**: YOU · WORKSPACE · AI · INTEGRATIONS in mono caps in ink with a hairline under, the grammar the settings ledgers' heads use; no graphite whisper.
+- **Integrations = Connections · Plugins · Enrichment · Email forwarding.** Connection apps folds into Connections. The owner's verdict of 2026-10-24: a connection is a provider whose admin-registered OAuth app serves a core job (Google, Box, Microsoft later), never installed; everything else, recorders included, is a plugin. A provider is a page with Set up and In use tabs: the first Set up row asks whether the accounts are on Google Workspace or personal Gmail, sync health per use lives on In use, there is no Gmail plugin page, and a reconnect is a Today line. Whether the bundled providers are plugin code shipped in the image or core is the owner's call, recorded against D51 by project 30's Connections slice.
+- **The workspace head opens General · Members · Invite.**
+- **Members gains `Send a reset link…`**: an admin issues a one-time reset link, since there is no self-serve reset.
+- A settings page head carries one outline 32px action at most beside its `···`.
+
+_Carried by_ project 30's shell, settings and Connections slices.
+
 ### D70-find-and-ask — amended (where Ask lives)
 
 **Where does Ask answer, now that the palette both finds and answers?** Answered (owner, 2026-10-08): **⌘K only finds; Ask is a docked panel and a page.**
@@ -883,6 +920,15 @@ _Rejected (layout):_
 
 _Carried by_ `ask-5` and `ask-7` amended, on the canvas as Ask — printed, sheets 00–09 (07–09 the layout), and Shell — printed, sheet 01.
 
+_Amended 2026-10-25 (the canvas port):_
+
+- **Cmd-K is one fixed size**, `min(1060px, 100vw−2rem)` × `min(560px, 100dvh−4rem)`. Results scroll inside it, and every state — empty, typing, no results, loading — renders in the same box; it shrinks only with the screen.
+- **The preview pane is always mounted.** With nothing previewable highlighted it is blank bone. This supersedes "Nothing highlighted, the list runs full width": a list that changes width under the cursor is the jump the fixed size exists to stop.
+- **Ask's scope chips sit in the composer**, not in a head above the thread.
+- **Ask moves to the sidebar foot** (`⌘J`), a row above the account row in both sidebar states, rather than a row under Search.
+
+_Carried by_ project 30's Cmd-K, Ask and shell slices.
+
 ### D73-spaces-are-malleable and D74-record-body-is-tabbed — amended (the space page)
 
 **What does a space's own page look like, now that a record's body is tabbed?** Answered (owner, 2026-10-08): **a space reads like a record.**
@@ -906,3 +952,14 @@ _Rejected:_
 - A last-filed lane in the details column (skipped by the owner).
 
 _Carried by_ `spaces-1` amended and `spaces-4`, on the canvas as Spaces — printed, sheets 00–04.
+
+_Amended 2026-10-25 (the canvas port):_
+
+- **The space head is `···` only.** Note here, the Sensitive toggle and Add watch leave it. The stamp reads `SPACE` and prints no depth.
+- **Overview is the default tab**, first in Overview · Companies · Notes · Files · People · Records, and holds the three readouts, What's moving, open tasks and the latest companies. Notes is no longer the default, and the readouts leave the head.
+- **The rail is Criteria, Watching and Map.** Glossary leaves it for `Glossary…` in the `···`; Tasks leave it for Overview; Watching's `+` replaces the Add watch button.
+- **Sensitive moves to the `···`**, as a switch.
+- The `···` reads Find companies · Rename · Move to… · Split into a subspace… (was New subspace) · Save as template… · Glossary… · Sensitive, then Archive below a rule.
+- The Companies tab's filter is a bounded Segmented (All · In pipeline · Watching, with counts).
+
+_Carried by_ project 30's record-head and space slices.
