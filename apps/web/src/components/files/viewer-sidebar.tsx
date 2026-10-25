@@ -6,6 +6,7 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Select } from '../ui/select'
+import { FollowedRevisions } from './revision-ledger'
 import type { FilingEdge, RecordDocument } from './types'
 import { DOCUMENT_KIND_LABELS } from '@spaces/core/documents'
 import {
@@ -22,7 +23,7 @@ import { recordPath } from '#/lib/record-path'
 
 /**
  * The viewer's sidebar on a Files tab: KIND, FILED ON with File on…,
- * VERSIONS, TEXT, MENTIONED IN and SOURCE. Filing is a re-file: every
+ * VERSIONS (REVISIONS for a followed file), TEXT, MENTIONED IN and SOURCE. Filing is a re-file: every
  * edge, not just this record's, because one file sits in several places.
  */
 
@@ -80,7 +81,14 @@ export function useDocumentDetails(id: string | null): Details {
   return details
 }
 
-export function FileViewerSidebar({ doc }: { doc: RecordDocument }) {
+export function FileViewerSidebar({
+  doc,
+  recordId,
+}: {
+  doc: RecordDocument
+  /** The record whose Files tab opened it: where Unfollow refreshes. */
+  recordId: string
+}) {
   const router = useRouter()
   const details = useDocumentDetails(doc.id)
   const [busy, setBusy] = useState(false)
@@ -149,15 +157,19 @@ export function FileViewerSidebar({ doc }: { doc: RecordDocument }) {
         />
       </Section>
 
-      <Section label="Versions" count={1}>
-        <Line
-          mark={[doc.createdAt.slice(5, 10), doc.uploadedByName]
-            .filter((part) => part !== null)
-            .join(' · ')}
-        >
-          v1 · this one
-        </Line>
-      </Section>
+      {doc.follow === null ? (
+        <Section label="Versions" count={1}>
+          <Line
+            mark={[doc.createdAt.slice(5, 10), doc.uploadedByName]
+              .filter((part) => part !== null)
+              .join(' · ')}
+          >
+            v1 · this one
+          </Line>
+        </Section>
+      ) : (
+        <FollowedRevisions doc={doc} recordId={recordId} />
+      )}
 
       <Section label="Text">
         <p className="text-ui">{textLine(doc, details)}</p>

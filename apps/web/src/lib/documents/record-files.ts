@@ -1,6 +1,12 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { document, entity, link } from '@spaces/db/schema'
+import {
+  document,
+  documentRevision,
+  entity,
+  link,
+  storageBinding,
+} from '@spaces/db/schema'
 import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
 
 /**
@@ -39,6 +45,19 @@ export function recordDocumentRows(viewerId: string, entityId: string) {
       // The binding whose sync filed it: the Files tab puts it in that
       // folder's band. Null for everything else.
       bindingId: document.bindingId,
+      // Follow is offered on a file a storage connection brought: it has a
+      // provider id and a connection to poll with.
+      followable: sql<boolean>`${document.connectionId} is not null and ${document.externalId} is not null`,
+      // The provider's file id, for the revision ledger's foot.
+      externalId: document.externalId,
+      // A followed file's binding: null on every other row.
+      followStatus: storageBinding.status,
+      followSyncedAt: storageBinding.lastSyncedAt,
+      priorRevisions: sql<number>`(select count(*)::int from ${documentRevision} where ${documentRevision.documentId} = ${document.entityId})`,
+      // ISO from `to_json`, since a raw timestamp in `sql` is not decoded.
+      revisedAt: sql<
+        string | null
+      >`(select to_json(max(${documentRevision.at})) #>> '{}' from ${documentRevision} where ${documentRevision.documentId} = ${document.entityId})`,
       // Enough text to prove extraction worked, without hauling a
       // 2MB column into every Files-tab render.
       snippet: sql<string | null>`left(${document.extractedText}, 200)`,
@@ -46,6 +65,13 @@ export function recordDocumentRows(viewerId: string, entityId: string) {
     .from(link)
     .innerJoin(document, eq(document.entityId, link.fromEntityId))
     .innerJoin(entity, eq(entity.id, document.entityId))
+    .leftJoin(
+      storageBinding,
+      and(
+        eq(storageBinding.id, document.bindingId),
+        eq(storageBinding.grain, 'file'),
+      ),
+    )
     .where(
       and(
         eq(link.toEntityId, entityId),

@@ -23,15 +23,18 @@ import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
 import type { DocumentKind } from '@spaces/core/documents'
 import {
   deleteDocument,
+  followDocument,
   getDocumentDetails,
   getDocumentDownloadUrl,
   setDocumentKind,
   unfileDocument,
+  unfollowDocument,
 } from '#/lib/server-fns'
 import {
   KIND_ORDER,
   endLane,
   fileType,
+  followLane,
   googleNative,
   stateWord,
 } from '#/lib/documents/files-tab'
@@ -107,6 +110,44 @@ export async function downloadDocument(id: string) {
   }
 }
 
+/** Whether the file follows its provider right now: Unfollow, not Follow. */
+export function isFollowing(
+  doc: Pick<RecordDocument, 'follow' | 'externalStatus'>,
+) {
+  return (
+    doc.follow !== null &&
+    doc.follow.status !== 'paused' &&
+    doc.externalStatus !== 'gone'
+  )
+}
+
+/** Follow or Unfollow a file, then refresh the tab; the failure is toasted. */
+export function useFollow(recordId: string) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+
+  async function toggle(doc: RecordDocument) {
+    setBusy(true)
+    try {
+      if (isFollowing(doc))
+        await unfollowDocument({ data: { documentId: doc.id } })
+      else {
+        const outcome = await followDocument({
+          data: { documentId: doc.id, recordId },
+        })
+        if (outcome._tag === 'refused') toast.error(outcome.reason)
+      }
+      await router.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not follow')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return { busy, toggle }
+}
+
 /** Opens a file: a Google Doc, Sheet or Slides file in Google, anything else in the viewer. */
 export function openFile(doc: RecordDocument, onView: () => void) {
   if (googleNative(doc) !== null && doc.externalUrl !== null)
@@ -138,6 +179,8 @@ export function FileRow({
   const router = useRouter()
   const { remove, removeDialog } = useRemoveFile(recordId, recordName)
   const [versioning, setVersioning] = useState(false)
+  const follow = useFollow(recordId)
+  const followed = followLane(doc)
 
   async function setKind(kind: DocumentKind) {
     if (kind === doc.kind) return
@@ -176,9 +219,9 @@ export function FileRow({
         {doc.filename}
       </button>
       <span className="min-w-0 shrink truncate mono text-micro text-graphite">
-        {endLane(doc, inFolder)}
+        {followed === null ? endLane(doc, inFolder) : followed.end}
       </span>
-      <StateLane state={stateWord(doc, inFolder)} />
+      <StateLane state={followed === null ? stateWord(doc) : followed.state} />
       <DropdownMenu>
         <MenuTrigger name={doc.filename} />
         <DropdownMenuContent align="end" className="w-52">
@@ -201,6 +244,24 @@ export function FileRow({
               </a>
             </DropdownMenuItem>
           )}
+          {isFollowing(doc) ? (
+            <DropdownMenuItem
+              disabled={follow.busy}
+              onSelect={() => void follow.toggle(doc)}
+            >
+              Unfollow
+            </DropdownMenuItem>
+          ) : doc.canFollow ? (
+            <DropdownMenuItem
+              disabled={follow.busy}
+              onSelect={() => void follow.toggle(doc)}
+            >
+              Follow
+              <span className="ml-auto mono text-micro text-graphite">
+                keeps revisions
+              </span>
+            </DropdownMenuItem>
+          ) : null}
           {inFolder ? null : (
             <>
               <DropdownMenuSub>

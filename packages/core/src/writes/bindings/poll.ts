@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { accountConnection, entity, storageBinding } from '@spaces/db/schema'
 import type { StorageEntry, StorageFolder, StorageSource } from '@spaces/sdk'
@@ -7,8 +7,9 @@ import type { ItemTarget } from '../../documents/resolve-item'
 import { Enqueue } from '../../queue/enqueue'
 import { QUEUES } from '../../queue/names'
 import { BindingStoreFailed } from './bind'
+import { catchUpFollowedProgram, goneAtProviderProgram } from './follow'
 import { markGoneProgram } from './gone'
-import { isExport, moveHeldProgram } from './move'
+import { isExport, moveHeldProgram, renamedTo } from './move'
 import type { MoveOutcome } from './move'
 import {
   heldDocumentOf,
@@ -21,7 +22,7 @@ import type { BindingFiler, SyncBinding, SyncFailure } from './sync'
 
 /**
  * The change poll: one `changes` pass per connection, fanned out to the
- * folder bindings it touches.
+ * folder bindings it touches and the files it follows.
  * - The cursor is the connection's (`storage_cursor`): one pass reads every
  *   drive the connection sees, so two bindings on one drive share it.
  * - The cursor advances only once the whole page is handled. A page cut
@@ -38,6 +39,10 @@ import type { BindingFiler, SyncBinding, SyncFailure } from './sync'
  * - A held file no live binding brought is left alone.
  * - A file deleted in the app is tombstoned for its binding: the filer skips
  *   it, here and in the re-list an expired cursor sends.
+ * - A followed file (a `grain = 'file'` binding) is revised wherever it
+ *   sits; deleted at the provider it is gone and its binding pauses. Its
+ *   first poll reads it once (`catchUpFollowedProgram`), since the feed may
+ *   have passed an edit by before it was followed; so does a re-list.
  */
 
 /** A connection is polled once one of its bindings last synced this long ago. */
@@ -49,12 +54,21 @@ export type PollBinding = SyncBinding & {
   readonly folderId: string
 }
 
-/** One connection to poll: its cursor and its active folder bindings. */
+/** A followed file: an active file binding on the connection. */
+export type PollFileBinding = {
+  readonly id: string
+  readonly fileId: string
+  /** Null until its first poll, which reads the file once. */
+  readonly lastSyncedAt: Date | null
+}
+
+/** One connection to poll: its cursor, its active folder bindings and its followed files. */
 export type PollConnection = {
   readonly connectionId: string
   readonly provider: string
   readonly cursor: string | null
   readonly bindings: ReadonlyArray<PollBinding>
+  readonly files: ReadonlyArray<PollFileBinding>
 }
 
 /** What one connection's poll did with its page. */
@@ -117,9 +131,9 @@ const query = <T>(run: () => Promise<T>) =>
   })
 
 /**
- * The connections with an active folder binding, each with every such
- * binding, kept when one of them is due: never synced, or last synced at
- * least `STORAGE_POLL_MIN_INTERVAL_MS` before `now`.
+ * The connections with an active folder or file binding, each with every
+ * such binding, kept when one of them is due: never synced, or last synced
+ * at least `STORAGE_POLL_MIN_INTERVAL_MS` before `now`.
  */
 export const dueStorageConnectionsProgram = Effect.fn(
   'dueStorageConnectionsProgram',
@@ -132,7 +146,9 @@ export const dueStorageConnectionsProgram = Effect.fn(
         id: storageBinding.id,
         connectionId: storageBinding.connectionId,
         provider: storageBinding.provider,
+        grain: storageBinding.grain,
         folderId: storageBinding.folderId,
+        fileId: storageBinding.fileId,
         folderPath: storageBinding.folderPath,
         targetEntityId: storageBinding.targetEntityId,
         targetKind: entity.kind,
@@ -151,8 +167,16 @@ export const dueStorageConnectionsProgram = Effect.fn(
       .where(
         and(
           eq(storageBinding.status, 'active'),
-          eq(storageBinding.grain, 'folder'),
-          isNotNull(storageBinding.folderId),
+          or(
+            and(
+              eq(storageBinding.grain, 'folder'),
+              isNotNull(storageBinding.folderId),
+            ),
+            and(
+              eq(storageBinding.grain, 'file'),
+              isNotNull(storageBinding.fileId),
+            ),
+          ),
         ),
       )
       .orderBy(storageBinding.createdAt),
@@ -160,29 +184,40 @@ export const dueStorageConnectionsProgram = Effect.fn(
   const dueBefore = now.getTime() - STORAGE_POLL_MIN_INTERVAL_MS
   const byConnection = new Map<
     string,
-    { connection: PollConnection; bindings: Array<PollBinding>; due: boolean }
+    {
+      connection: PollConnection
+      bindings: Array<PollBinding>
+      files: Array<PollFileBinding>
+      due: boolean
+    }
   >()
-  for (const { lastSyncedAt, cursor, ...row } of rows) {
+  for (const { lastSyncedAt, cursor, grain, fileId, ...row } of rows) {
     const { connectionId, folderId } = row
-    if (connectionId === null || folderId === null) continue
+    if (connectionId === null) continue
     const group = byConnection.get(connectionId) ?? {
       connection: {
         connectionId,
         provider: row.provider,
         cursor,
         bindings: [],
+        files: [],
       },
       bindings: [],
+      files: [],
       due: false,
     }
-    group.bindings.push({ ...row, connectionId, folderId })
+    if (grain === 'folder' && folderId !== null)
+      group.bindings.push({ ...row, connectionId, folderId })
+    else if (grain === 'file' && fileId !== null)
+      group.files.push({ id: row.id, fileId, lastSyncedAt })
+    else continue
     if (lastSyncedAt === null || lastSyncedAt.getTime() <= dueBefore)
       group.due = true
     byConnection.set(connectionId, group)
   }
   return [...byConnection.values()]
     .filter((g) => g.due)
-    .map((g) => ({ ...g.connection, bindings: g.bindings }))
+    .map((g) => ({ ...g.connection, bindings: g.bindings, files: g.files }))
 })
 
 const storeCursor = (connectionId: string, cursor: string) =>
@@ -218,6 +253,66 @@ type Located = {
   readonly names: ReadonlyArray<string>
 }
 
+/** What reading followed files once did, folded into the poll's tally. */
+type CaughtUp = {
+  readonly revised: number
+  readonly gone: number
+  readonly ignored: number
+  readonly skipped: ReadonlyArray<{
+    readonly name: string
+    readonly reason: string
+  }>
+}
+
+/**
+ * Read each followed file once against the document that holds it. A
+ * document no longer on that binding, or already gone, is left alone.
+ */
+const catchUp = Effect.fn('pollStorage.catchUp')(function* (
+  connection: PollConnection,
+  source: StorageSource,
+  files: ReadonlyArray<PollFileBinding>,
+): Effect.fn.Return<CaughtUp, SyncFailure, Enqueue> {
+  let revised = 0
+  let gone = 0
+  let ignored = 0
+  const skipped: Array<{ name: string; reason: string }> = []
+  for (const file of files) {
+    const held = yield* heldDocumentOf(connection.connectionId, file.fileId)
+    if (
+      held === null ||
+      held.bindingId !== file.id ||
+      held.externalStatus === 'gone'
+    ) {
+      ignored += 1
+      continue
+    }
+    const outcome = yield* catchUpFollowedProgram({
+      connectionId: connection.connectionId,
+      held,
+      fileId: file.fileId,
+      source,
+    })
+    switch (outcome._tag) {
+      case 'revised':
+        revised += 1
+        break
+      case 'gone':
+        gone += 1
+        break
+      case 'unchanged':
+        ignored += 1
+        break
+      case 'skipped':
+        skipped.push({
+          name: held.filename ?? file.fileId,
+          reason: outcome.reason,
+        })
+    }
+  }
+  return { revised, gone, ignored, skipped }
+})
+
 /**
  * Re-list after an expired cursor: a fresh cursor first, so whatever changes
  * after it is the next poll's, then one sync per binding, then the store.
@@ -237,8 +332,10 @@ const relist = Effect.fn('pollStorage.relist')(function* (
     )
     if (id !== null) sent += 1
   }
+  yield* catchUp(connection, source, connection.files)
   const stored = sent === connection.bindings.length
   if (stored) yield* storeCursor(connection.connectionId, fresh.next)
+  yield* markPolled(connection.files.map((f) => f.id))
   const outcome: PollOutcome = {
     _tag: 'relisted',
     resynced: sent,
@@ -262,6 +359,12 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
     if (connection.cursor === null) {
       const start = yield* source.changes(null)
       yield* storeCursor(connection.connectionId, start.next)
+      yield* catchUp(
+        connection,
+        source,
+        connection.files.filter((f) => f.lastSyncedAt === null),
+      )
+      yield* markPolled(connection.files.map((f) => f.id))
       const started: PollOutcome = { _tag: 'started' }
       return started
     }
@@ -337,16 +440,22 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
       return target
     })
 
+    // A file followed since the last poll is read once before the page.
+    const caught = yield* catchUp(
+      connection,
+      source,
+      connection.files.filter((f) => f.lastSyncedAt === null),
+    )
     let filed = 0
     let held = 0
     let attached = 0
-    let revised = 0
+    let revised = caught.revised
     let moved = 0
     let proposed = 0
-    let gone = 0
-    let ignored = 0
+    let gone = caught.gone
+    let ignored = caught.ignored
     let outside = 0
-    const skipped: Array<{ name: string; reason: string }> = []
+    const skipped: Array<{ name: string; reason: string }> = [...caught.skipped]
     const refused: Array<{ bindingId: string; reason: string }> = []
 
     /**
@@ -376,11 +485,41 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
       return outcome
     })
 
+    /**
+     * A followed file, wherever it sits now: revised when its token moved.
+     * A rename of a native document only stores the token, as in a folder.
+     */
+    const followedFile = Effect.fn('pollStorage.followedFile')(function* (
+      doc: HeldDocument,
+      entry: StorageEntry,
+    ) {
+      if (doc.externalStatus === 'gone') {
+        ignored += 1
+        return
+      }
+      const outcome =
+        renamedTo(doc, entry) !== null && isExport(doc, entry)
+          ? yield* keepTokenProgram(doc, entry.changeToken)
+          : yield* reviseDocumentProgram({ held: doc, entry, source })
+      switch (outcome._tag) {
+        case 'revised':
+          revised += 1
+          break
+        case 'unchanged':
+          ignored += 1
+          break
+        case 'skipped':
+          skipped.push({ name: entry.name, reason: outcome.reason })
+      }
+    })
+
     /** A held file: moved and revised only for a binding still live in this poll. */
     const heldFile = Effect.fn('pollStorage.heldFile')(function* (
       doc: HeldDocument,
       entry: StorageEntry,
     ) {
+      if (connection.files.some((f) => f.id === doc.bindingId))
+        return yield* followedFile(doc, entry)
       const binding = [...live.values()].find((b) => b.id === doc.bindingId)
       if (doc.externalStatus === 'gone' || binding === undefined) {
         ignored += 1
@@ -467,7 +606,7 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
 
     for (const change of page.changes) {
       if (change._tag === 'removed') {
-        if (yield* markGoneProgram(connection.connectionId, change.id))
+        if (yield* goneAtProviderProgram(connection.connectionId, change.id))
           gone += 1
         else ignored += 1
         continue
@@ -480,7 +619,10 @@ export const pollConnectionProgram = Effect.fn('pollConnectionProgram')(
     }
 
     yield* storeCursor(connection.connectionId, page.next)
-    yield* markPolled([...live.values()].map((b) => b.id))
+    yield* markPolled([
+      ...[...live.values()].map((b) => b.id),
+      ...connection.files.map((f) => f.id),
+    ])
     const polled: PollOutcome = {
       _tag: 'polled',
       tally: {

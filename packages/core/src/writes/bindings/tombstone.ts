@@ -1,6 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { document, storageTombstone } from '@spaces/db/schema'
+import { document, storageBinding, storageTombstone } from '@spaces/db/schema'
 
 /**
  * The resurrection guard: a bound document deleted
@@ -10,13 +10,16 @@ import { document, storageTombstone } from '@spaces/db/schema'
  * - Nothing is deleted at the provider.
  * - Unlinking the binding cascades its tombstones away: a re-bind of the
  *   folder is the deliberate way back.
+ * - A followed file's binding follows only that document, so deleting the
+ *   document deletes the binding instead: nothing is left to poll.
  */
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 /**
  * Tombstone the document's (binding, external id), inside the transaction
- * that deletes it. A document no binding brought writes nothing.
+ * that deletes it. A document no binding brought writes nothing; a followed
+ * one takes its file binding with it.
  */
 export async function tombstoneDocument(
   tx: Tx,
@@ -33,6 +36,16 @@ export async function tombstoneDocument(
   ).at(0)
   if (row === undefined || row.bindingId === null || row.externalId === null)
     return
+  const followed = await tx
+    .delete(storageBinding)
+    .where(
+      and(
+        eq(storageBinding.id, row.bindingId),
+        eq(storageBinding.grain, 'file'),
+      ),
+    )
+    .returning({ id: storageBinding.id })
+  if (followed.length > 0) return
   await tx
     .insert(storageTombstone)
     .values({ bindingId: row.bindingId, externalId: row.externalId })

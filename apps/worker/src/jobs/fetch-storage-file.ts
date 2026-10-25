@@ -202,6 +202,8 @@ const program = Effect.fn('fetchStorageFile')(function* (
       externalId: fileId,
       externalUrl: canonicalFileUrl(provider, fileId),
       connectionId: data.connectionId,
+      // The revision read, so a follow later compares against it.
+      externalRevisionId: file.changeToken,
     },
     fileAgainst: [{ kind: 'record', entityId: data.attachTo }],
     actor: { userId: data.actorUserId },

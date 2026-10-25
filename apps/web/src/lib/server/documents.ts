@@ -248,13 +248,46 @@ export const listRecordDocuments = createServerFn()
       ]),
     )
 
-    return rows.map((r) => {
+    // Follow takes a record that holds a binding: a person's tab offers none.
+    const { followableRecord } = await import('../documents/follow')
+    const recordFollows = await followableRecord(data.entityId)
+
+    return rows.map((row) => {
       // Never default to `'manual'`: that would invent a provenance. The id
       // came out of `document` above, so a miss is a bug, and it says so.
-      const source = provenance.get(r.id)
-      if (!source) throw new Error(`No provenance row for document ${r.id}`)
+      const source = provenance.get(row.id)
+      if (!source) throw new Error(`No provenance row for document ${row.id}`)
+      const {
+        followable,
+        followStatus,
+        followSyncedAt,
+        priorRevisions,
+        revisedAt,
+        ...r
+      } = row
       return {
         ...r,
+        /** A followed file's binding; null for a file never followed. */
+        follow:
+          followStatus === null
+            ? null
+            : {
+                status: followStatus,
+                lastSyncedAt:
+                  followSyncedAt === null ? null : followSyncedAt.toISOString(),
+                revisions: priorRevisions + 1,
+                revisedAt:
+                  revisedAt === null ? null : new Date(revisedAt).toISOString(),
+              },
+        /**
+         * Whether the row's `···` offers Follow: a file a connection brought
+         * and no folder binding holds, not gone, not followed right now.
+         */
+        canFollow:
+          recordFollows &&
+          followable &&
+          r.externalStatus !== 'gone' &&
+          (r.bindingId === null || followStatus === 'paused'),
         filename: r.filename ?? 'Untitled file',
         createdAt: r.createdAt.toISOString(),
         uploadedByName: r.uploadedBy ? (names.get(r.uploadedBy) ?? null) : null,

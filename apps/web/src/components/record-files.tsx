@@ -68,6 +68,8 @@ import type { VersionPick } from '#/lib/documents/newer-version'
  * - Link a Drive folder (the add row's `···`, or a pasted folder link) is
  *   offered only with the user's own Drive connection; a bound folder is a
  *   band under our files.
+ * - Follow, in a row's `···`, is offered on a file a storage connection
+ *   brought: its row reads `rev n` and the viewer lists its revisions.
  */
 
 type Documents = Array<RecordDocument>
@@ -521,7 +523,11 @@ export function RecordFiles({
         onOpenChange={(open) => {
           if (!open) setViewingId(null)
         }}
-        sidebar={viewing === null ? null : <FileViewerSidebar doc={viewing} />}
+        sidebar={
+          viewing === null ? null : (
+            <FileViewerSidebar doc={viewing} recordId={entityId} />
+          )
+        }
         foot={
           viewing === null ? null : (
             <FileViewerFoot

@@ -195,7 +195,7 @@ const word = (
  * wrong, then the newer version that replaced it, then where the file lives
  * elsewhere.
  */
-export function stateWord(doc: Stated, inFolder = false): StateWord | null {
+export function stateWord(doc: Stated): StateWord | null {
   if (doc.extractionStatus === 'pending')
     return doc.url !== null && doc.blobSha === null
       ? word('fetching.', 'ink')
@@ -216,8 +216,9 @@ export function stateWord(doc: Stated, inFolder = false): StateWord | null {
   }
   if (doc.extractionStatus === 'unsupported')
     return word('no text', 'graphite', doc.extractionError)
+  // `following` is a followed file's word only (`followLane`); a native
+  // file that is not followed links out like any other.
   const native = googleNative(doc)
-  if (native !== null && !inFolder) return word('following', 'ink')
   if (doc.externalUrl !== null) {
     const where =
       native !== null
@@ -286,5 +287,93 @@ export function folderTree<T extends { readonly sourcePath: string | null }>(
     files: own,
     folders,
     count: own.length + folders.reduce((n, f) => n + f.count, 0),
+  }
+}
+
+/** A followed file's binding, as the Files tab row reads it. */
+export type FollowState = {
+  /** `paused` once unfollowed, or once the file was deleted at the provider. */
+  readonly status: 'active' | 'error' | 'paused'
+  /** The binding's last poll, ISO; null before its first. */
+  readonly lastSyncedAt: string | null
+  /** Revisions kept, the current one included. */
+  readonly revisions: number
+  /** When the current revision became ours, ISO; null while it is the first. */
+  readonly revisedAt: string | null
+}
+
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+]
+
+/** `10 Oct`, read off the ISO string in UTC so server and browser agree. */
+export function dayMonth(iso: string): string {
+  const month = MONTHS.at(Number(iso.slice(5, 7)) - 1) ?? ''
+  return `${String(Number(iso.slice(8, 10)))} ${month}`
+}
+
+type Followed = {
+  readonly follow: FollowState | null
+  readonly externalStatus: 'linked' | 'gone' | null
+  readonly extractionStatus: string
+  readonly createdAt: string
+}
+
+/**
+ * A followed file's two lanes, in place of the end lane and state word;
+ * null for a file that was never followed.
+ * - following: `rev 4 · 10 Oct` · `following`
+ * - a revision arriving, or the first read pending: `rev 5` · `fetching.`
+ * - deleted at the provider: `■ gone · 4 revisions kept`
+ * - unfollowed: `rev 4` · `stopped 12 Oct`, the day of its last poll
+ */
+export function followLane(
+  doc: Followed,
+): { readonly end: string; readonly state: StateWord } | null {
+  const follow = doc.follow
+  if (follow === null) return null
+  const rev = `rev ${String(follow.revisions)}`
+  if (doc.externalStatus === 'gone') {
+    const text = `■ gone · ${String(follow.revisions)} revision${follow.revisions === 1 ? '' : 's'} kept`
+    return {
+      end: '',
+      state: {
+        text,
+        tone: 'warning',
+        href: null,
+        title: 'Deleted in the source. Every revision stays.',
+        wide: true,
+      },
+    }
+  }
+  if (follow.status === 'paused')
+    return {
+      end: rev,
+      state: word(
+        `stopped ${dayMonth(follow.lastSyncedAt ?? doc.createdAt)}`,
+        'graphite',
+      ),
+    }
+  if (follow.status === 'error')
+    return {
+      end: rev,
+      state: word('not syncing', 'destructive', 'The connection failed.'),
+    }
+  if (follow.lastSyncedAt === null || doc.extractionStatus === 'pending')
+    return { end: rev, state: word('fetching.', 'ink') }
+  return {
+    end: `${rev} · ${dayMonth(follow.revisedAt ?? doc.createdAt)}`,
+    state: word('following', 'ink'),
   }
 }

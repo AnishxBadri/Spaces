@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { document, documentRevision, pendingBlob } from '@spaces/db/schema'
-import type { StorageEntry, StorageSource } from '@spaces/sdk'
+import type { StorageEntry, StorageFile, StorageSource } from '@spaces/sdk'
 import { MAX_UPLOAD_BYTES } from '../../documents'
 import { readableOf } from '../../documents/web-stream'
 import { Enqueue } from '../../queue/enqueue'
@@ -131,6 +131,20 @@ export const reviseDocumentProgram = Effect.fn('reviseDocumentProgram')(
       .pipe(Effect.catchTag('NotFound', () => Effect.succeed(null)))
     if (file === null)
       return { _tag: 'skipped', reason: 'gone before it was read' }
+    return yield* advanceToFileProgram(held, file)
+  },
+)
+
+/**
+ * The bytes `getFile` answered against the row that holds them: stored and
+ * advanced to, unless they are the bytes it already has (then only the
+ * token is kept). The read is what the compare-and-set compares with.
+ */
+export const advanceToFileProgram = Effect.fn('advanceToFileProgram')(
+  function* (
+    held: HeldDocument,
+    file: StorageFile,
+  ): Effect.fn.Return<ReviseOutcome, SyncFailure, Enqueue> {
     const blob = yield* putBlobProgram({
       stream: readableOf(file.stream),
       mime: file.mime,

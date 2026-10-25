@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RecordFiles } from '../record-files'
 import { FileRow, removeConfirmOptions } from './file-row'
 import { FolderBand } from './folder-band'
+import { RevisionLedger } from './revision-ledger'
 import { textLine } from './viewer-sidebar'
 import type { RecordDocument } from './types'
 
@@ -62,6 +63,7 @@ const fns = vi.hoisted(() => {
     'deleteDocument',
     'extractKeyTerms',
     'fileDocument',
+    'followDocument',
     'finalizeDocumentUpload',
     'getDocumentDetails',
     'getDocumentDownloadUrl',
@@ -72,6 +74,7 @@ const fns = vi.hoisted(() => {
     'linkDriveFolder',
     'linkFetchStatus',
     'linkFolderStatus',
+    'listDocumentRevisions',
     'listRecordBindings',
     'listSpaces',
     'markNewerVersion',
@@ -88,6 +91,7 @@ const fns = vi.hoisted(() => {
     'summarize',
     'summarizeStatus',
     'unfileDocument',
+    'unfollowDocument',
     'unlinkDriveFolder',
     'visionStatus',
   ] as const
@@ -128,6 +132,9 @@ function doc(over: Partial<RecordDocument>): RecordDocument {
     externalStatus: null,
     sourcePath: null,
     bindingId: null,
+    externalId: null,
+    follow: null,
+    canFollow: false,
     snippet: 'EXTRACTED SNIPPET TEXT',
     uploadedByName: 'Anish',
     lastRun: null,
@@ -696,5 +703,151 @@ describe('Link a Drive folder', () => {
     expect(
       document.querySelector('[aria-label="More ways to add files"]'),
     ).toBeNull()
+  })
+})
+
+const FOLLOWING = {
+  status: 'active',
+  lastSyncedAt: '2026-10-12T09:00:00.000Z',
+  revisions: 4,
+  revisedAt: '2026-10-10T14:02:00.000Z',
+} as const
+
+const SHEET = {
+  filename: 'Cap table',
+  mime: 'application/vnd.google-apps.spreadsheet',
+  kind: 'cap_table',
+  externalUrl: 'https://drive.google.com/file/d/1aBcDeFgHiJkLmNoP9xYz/view',
+  externalId: '1aBcDeFgHiJkLmNoP9xYz',
+  externalStatus: 'linked',
+  bindingId: '00000000-0000-4000-8000-0000000000f1',
+} as const
+
+describe('a followed file', () => {
+  const rowHtml = (over: Partial<RecordDocument>) =>
+    renderToStaticMarkup(
+      <ul>
+        <FileRow
+          doc={doc({ ...SHEET, ...over })}
+          recordId={FLENT}
+          recordName="Flent"
+          onView={() => undefined}
+        />
+      </ul>,
+    )
+
+  it('reads its revision and following, and each state after', () => {
+    const following = rowHtml({ follow: FOLLOWING })
+    expect(following).toContain('rev 4 · 10 Oct')
+    expect(following).toContain('following')
+    expect(following).not.toContain('4.1 MB')
+
+    expect(
+      rowHtml({ follow: FOLLOWING, extractionStatus: 'pending' }),
+    ).toContain('fetching.')
+    expect(rowHtml({ follow: FOLLOWING, externalStatus: 'gone' })).toContain(
+      '■ gone · 4 revisions kept',
+    )
+    const stopped = rowHtml({ follow: { ...FOLLOWING, status: 'paused' } })
+    expect(stopped).toContain('rev 4')
+    expect(stopped).toContain('stopped 12 Oct')
+  })
+
+  it('a native file nobody follows links out instead of saying following', () => {
+    const html = rowHtml({ bindingId: null })
+    expect(html).not.toContain('following')
+    expect(html).toContain('google ↗')
+  })
+
+  it('offers Follow with its hint on a file a connection brought, and follows it from this record', async () => {
+    fns.followDocument.mockResolvedValue({
+      _tag: 'followed',
+      bindingId: SHEET.bindingId,
+    })
+    await mountRow(doc({ ...SHEET, bindingId: null, canFollow: true }))
+    await openMenu('Cap table')
+    const item = byText('[role="menuitem"]', 'Followkeeps revisions')
+    await click(item)
+    expect(fns.followDocument).toHaveBeenCalledWith({
+      data: {
+        documentId: '00000000-0000-4000-8000-0000000000aa',
+        recordId: FLENT,
+      },
+    })
+  })
+
+  it('reads Unfollow on a followed file', async () => {
+    fns.unfollowDocument.mockResolvedValue({ unfollowed: true })
+    await mountRow(doc({ ...SHEET, follow: FOLLOWING }))
+    await openMenu('Cap table')
+    const items = [...document.querySelectorAll('[role="menuitem"]')].map(
+      (el) => el.textContent.trim(),
+    )
+    expect(items).toContain('Unfollow')
+    expect(items).not.toContain('Followkeeps revisions')
+    await click(byText('[role="menuitem"]', 'Unfollow'))
+    expect(fns.unfollowDocument).toHaveBeenCalledWith({
+      data: { documentId: '00000000-0000-4000-8000-0000000000aa' },
+    })
+  })
+})
+
+describe('the revision ledger', () => {
+  const ROWS = [
+    {
+      rev: 3,
+      revisionId: 'rev-0003-head',
+      at: '2026-10-10T14:02:00.000Z',
+      current: true,
+    },
+    {
+      rev: 2,
+      revisionId: 'rev-0002',
+      at: '2026-10-09T08:15:00.000Z',
+      current: false,
+    },
+    {
+      rev: 1,
+      revisionId: 'rev-0001',
+      at: '2026-10-01T10:00:00.000Z',
+      current: false,
+    },
+  ]
+  const render = (onUnfollow: (() => void) | null) =>
+    renderToStaticMarkup(
+      <RevisionLedger
+        doc={doc({ ...SHEET, follow: { ...FOLLOWING, revisions: 3 } })}
+        rows={ROWS}
+        onUnfollow={onUnfollow}
+      />,
+    )
+
+  it('lists every revision newest first, the current one on bone, with its id and time', () => {
+    const html = render(() => undefined)
+    expect(html).toContain('Revisions · 3')
+    expect(html).toContain('following')
+    const order = ['rev 3 · current', 'rev 2', 'rev 1 · linked'].map((t) =>
+      html.indexOf(t),
+    )
+    expect(order.every((i) => i > -1)).toBe(true)
+    expect([...order].sort((a, b) => a - b)).toEqual(order)
+    expect(html).toContain('10 Oct 14:02')
+    expect(html).toContain('rev-0002')
+    const current = html.slice(html.indexOf('data-revision="3"'))
+    expect(current.slice(0, current.indexOf('</li>'))).toContain('bg-bone')
+    const second = html.slice(html.indexOf('data-revision="2"'))
+    expect(second.slice(0, second.indexOf('</li>'))).not.toContain('bg-bone')
+    expect(html).toContain('Drive · 1aBcD…9xYz')
+  })
+
+  it('exposes no edit, delete or restore control: Unfollow is its one button', () => {
+    const html = render(() => undefined)
+    expect(html.match(/<button/g)).toHaveLength(1)
+    expect(html).toContain('>Unfollow</button>')
+    expect(html).not.toMatch(/edit|delete|remove|restore|revert/i)
+    expect(html).not.toContain('<input')
+    expect(html).not.toContain('role="menu')
+    // Stopped, the ledger has no control at all.
+    expect(render(null)).not.toContain('<button')
   })
 })
