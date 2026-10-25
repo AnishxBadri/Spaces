@@ -40,6 +40,18 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 12,
+    // A reset link is admin-issued only (`createResetLinkProgram`): leaving
+    // `sendResetPassword` unset keeps `/request-password-reset` refusing, so
+    // nobody can start a reset for someone else's address.
+    revokeSessionsOnPasswordReset: true,
+  },
+  verification: {
+    // A reset row stores only the hash of `reset-password:<token>`, as an
+    // invite stores only its token's hash.
+    storeIdentifier: {
+      default: 'plain',
+      overrides: { 'reset-password': 'hashed' },
+    },
   },
   databaseHooks: {
     user: {

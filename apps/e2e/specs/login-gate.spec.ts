@@ -20,6 +20,9 @@ test.describe('the login gate', () => {
       .fill('not the password at all')
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page.getByText('Wrong email or password.')).toBeVisible()
+    await expect(
+      page.getByText('Forgot it? An admin can send you a reset link.'),
+    ).toBeVisible()
     await expect(page).toHaveURL(`${main.url}/login`)
     // and still signed out
     await page.goto(`${main.url}/today`)

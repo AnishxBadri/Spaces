@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ResetRouteImport } from './routes/reset'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as AppAskRouteImport } from './routes/_app/ask'
 import { Route as AppCompaniesRouteImport } from './routes/_app/companies'
@@ -98,6 +99,11 @@ const JoinRoute = JoinRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetRoute = ResetRouteImport.update({
+  id: '/reset',
+  path: '/reset',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SetupRoute = SetupRouteImport.update({
@@ -450,6 +456,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/join': typeof JoinRoute
   '/login': typeof LoginRoute
+  '/reset': typeof ResetRoute
   '/setup': typeof SetupRoute
   '/ask': typeof AppAskRoute
   '/companies': typeof AppCompaniesRoute
@@ -522,6 +529,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/join': typeof JoinRoute
   '/login': typeof LoginRoute
+  '/reset': typeof ResetRoute
   '/setup': typeof SetupRoute
   '/ask': typeof AppAskRoute
   '/companies': typeof AppCompaniesRoute
@@ -595,6 +603,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/join': typeof JoinRoute
   '/login': typeof LoginRoute
+  '/reset': typeof ResetRoute
   '/setup': typeof SetupRoute
   '/_app/ask': typeof AppAskRoute
   '/_app/companies': typeof AppCompaniesRoute
@@ -669,6 +678,7 @@ export interface FileRouteTypes {
     | '/'
     | '/join'
     | '/login'
+    | '/reset'
     | '/setup'
     | '/ask'
     | '/companies'
@@ -741,6 +751,7 @@ export interface FileRouteTypes {
     | '/'
     | '/join'
     | '/login'
+    | '/reset'
     | '/setup'
     | '/ask'
     | '/companies'
@@ -813,6 +824,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/join'
     | '/login'
+    | '/reset'
     | '/setup'
     | '/_app/ask'
     | '/_app/companies'
@@ -887,6 +899,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   JoinRoute: typeof JoinRoute
   LoginRoute: typeof LoginRoute
+  ResetRoute: typeof ResetRoute
   SetupRoute: typeof SetupRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiMcpRoute: typeof ApiMcpRoute
@@ -928,6 +941,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset': {
+      id: '/reset'
+      path: '/reset'
+      fullPath: '/reset'
+      preLoaderRoute: typeof ResetRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/setup': {
@@ -1539,6 +1559,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   JoinRoute: JoinRoute,
   LoginRoute: LoginRoute,
+  ResetRoute: ResetRoute,
   SetupRoute: SetupRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiMcpRoute: ApiMcpRoute,

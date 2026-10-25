@@ -53,6 +53,9 @@ const writes = vi.hoisted(() => ({
     url: 'http://localhost/join?token=once',
   })),
   revokeInvite: vi.fn(async () => ({ ok: true })),
+  createResetLink: vi.fn(async () => ({
+    url: 'http://localhost/reset?token=reset-once',
+  })),
   updateTemplate: vi.fn(async () => ({ ok: true })),
   createApiToken: vi.fn(async () => ({
     id: 't9',
@@ -1602,6 +1605,24 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
       data: { role: 'member', email: 'maya@fund.example' },
     })
     expect(dialog()?.textContent).toContain('http://localhost/join?token=once')
+  })
+
+  it('Members: Send a reset link… shows the link once, one use for 24 hours', async () => {
+    await mount('/settings/members')
+    await openMenu('More for Priya')
+    await click(menuItem('Send a reset link…'))
+    expect(writes.createResetLink).toHaveBeenCalledWith({
+      data: { userId: 'u-member' },
+    })
+    expect(dialog()?.querySelector('h2')?.textContent).toBe(
+      'Reset link for Priya',
+    )
+    expect(dialog()?.textContent).toContain(
+      'http://localhost/reset?token=reset-once',
+    )
+    expect(dialog()?.textContent).toContain('Copy link')
+    expect(dialog()?.textContent).toContain('One use · 24 hours')
+    expect(byText('Done', dialog() ?? document)).toBeDefined()
   })
 
   it('Members: a role change applies at once, without a confirm', async () => {

@@ -1,5 +1,6 @@
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
+import { z } from 'zod'
 import { AuthShell, FormError } from '#/components/auth-shell'
 import { KeyHint } from '#/components/page-header'
 import { PasswordInput } from '#/components/password-input'
@@ -10,6 +11,8 @@ import { authClient } from '#/lib/auth-client'
 import { getSession, getSetupState } from '#/lib/server-fns'
 
 export const Route = createFileRoute('/login')({
+  // `reset=done` is where a reset link lands once the password is set.
+  validateSearch: z.object({ reset: z.string().optional() }),
   beforeLoad: async () => {
     const { needsSetup } = await getSetupState()
     if (needsSetup) throw redirect({ to: '/setup' })
@@ -21,7 +24,9 @@ export const Route = createFileRoute('/login')({
 
 function LoginPage() {
   const navigate = useNavigate()
+  const { reset } = Route.useSearch()
   const [error, setError] = useState<string | null>(null)
+  const [forgot, setForgot] = useState(false)
   const [pending, setPending] = useState(false)
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -35,6 +40,7 @@ function LoginPage() {
     })
     setPending(false)
     if (err) {
+      setForgot(err.status !== 429)
       setError(
         err.status === 429
           ? 'Too many attempts. Wait a minute and try again.'
@@ -49,7 +55,12 @@ function LoginPage() {
     <AuthShell
       eyebrow="Sign in"
       title="Welcome back"
-      foot="No account? Ask your admin for an invitation."
+      blurb={reset === 'done' ? 'Password set. Sign in with it.' : null}
+      foot={
+        forgot
+          ? 'Forgot it? An admin can send you a reset link.'
+          : 'No account? Ask your admin for an invitation.'
+      }
     >
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1.5">

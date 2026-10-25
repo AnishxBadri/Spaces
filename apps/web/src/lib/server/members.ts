@@ -187,3 +187,21 @@ export const getInvitePreview = createServerFn()
       workspaceName: ws?.name ?? null,
     }
   })
+
+// ---------- password reset links ----------
+
+/** Admin-issued: the response is the one place the link appears. */
+export const createResetLink = createServerFn({ method: 'POST' })
+  .validator(z.object({ userId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    const { createResetLinkHandler } = await import('../members/reset-link')
+    return createResetLinkHandler(data)
+  })
+
+/** Public — the /reset page runs before any session exists. */
+export const getResetPreview = createServerFn()
+  .validator(z.object({ token: z.string().min(1).max(200) }))
+  .handler(async ({ data }) => {
+    const { resetPreviewHandler } = await import('../members/reset-link')
+    return resetPreviewHandler(data)
+  })

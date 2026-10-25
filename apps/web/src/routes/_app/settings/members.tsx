@@ -3,6 +3,7 @@ import { Copy } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { InitialsMark } from '#/components/record/record-parts'
+import { ResetLinkDialog } from '#/components/settings/reset-link-dialog'
 import {
   SettingsGroupHead,
   SettingsRowMenu,
@@ -25,6 +26,7 @@ import { Select } from '#/components/ui/select'
 import type { SelectItem } from '#/components/ui/select'
 import {
   createInvite,
+  createResetLink,
   revokeInvite,
   setMemberBanned,
   setMemberRole,
@@ -91,6 +93,10 @@ function MembersSection({
 }) {
   const router = useRouter()
   const [inviting, setInviting] = useState(false)
+  const [resetLink, setResetLink] = useState<{
+    name: string
+    url: string
+  } | null>(null)
   const { confirm, confirmDialog } = useConfirm()
 
   /** Suspending signs a member out everywhere, so it asks; restoring does not. */
@@ -114,6 +120,16 @@ function MembersSection({
       await fn()
       toast.success(ok)
       void router.invalidate()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'That did not work')
+    }
+  }
+
+  /** Mints the link first; the window opens only to show it. */
+  async function sendResetLink(m: Member) {
+    try {
+      const { url } = await createResetLink({ data: { userId: m.id } })
+      setResetLink({ name: m.name, url })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'That did not work')
     }
@@ -206,6 +222,11 @@ function MembersSection({
                     >
                       Make {roleOf(m.role) === 'admin' ? 'member' : 'admin'}
                     </DropdownMenuItem>
+                    {m.banned ? null : (
+                      <DropdownMenuItem onSelect={() => void sendResetLink(m)}>
+                        Send a reset link…
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem
                       {...(m.banned ? {} : { variant: 'destructive' as const })}
                       onSelect={() => void setBanned(m)}
@@ -271,6 +292,7 @@ function MembersSection({
           onCreated={() => void router.invalidate()}
         />
       ) : null}
+      <ResetLinkDialog link={resetLink} onClose={() => setResetLink(null)} />
       {confirmDialog}
     </SettingsSection>
   )
