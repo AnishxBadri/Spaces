@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { reasonOf } from '#/components/plugin-status-section'
 import type {
   BrokenConnection,
+  FailingBinding,
   ParkedSource,
   StoppedPlugin,
   WaitingExport,
@@ -51,25 +52,29 @@ const utcClock = (iso: string) => `${iso.slice(11, 16)} UTC`
 /**
  * What stops the machine, one line each with the link that fixes it: a
  * plugin switched on and not running or capped, auto-enrich parked at a
- * source's daily cap, the reader's connections in `error`, and uploads
- * waiting to reach a bound folder. Renders nothing when all runs.
+ * source's daily cap, the reader's connections in `error`, bound folders
+ * that cannot sync, and uploads waiting to reach a bound folder. Renders
+ * nothing when all runs.
  */
 export function NoticesBand({
   stopped,
   broken,
   parked,
   waiting,
+  failing,
 }: {
   stopped: ReadonlyArray<StoppedPlugin>
   broken: ReadonlyArray<BrokenConnection>
   parked: ReadonlyArray<ParkedSource>
   waiting: ReadonlyArray<WaitingExport>
+  failing: ReadonlyArray<FailingBinding>
 }) {
   if (
     stopped.length === 0 &&
     broken.length === 0 &&
     parked.length === 0 &&
-    waiting.length === 0
+    waiting.length === 0 &&
+    failing.length === 0
   )
     return null
   return (
@@ -88,6 +93,29 @@ export function NoticesBand({
             }
           />
         ))}
+        {failing.map((b) => (
+          <NoticeLine
+            key={`failing:${b.bindingId}`}
+            lane="files"
+            what={`${b.title} can’t sync`}
+            why={b.error}
+            fix={
+              b.fixConnectionId === null ? (
+                <Link to="/settings/files" className={fixClass}>
+                  Fix ›
+                </Link>
+              ) : (
+                <Link
+                  to="/settings/files/$connectionId"
+                  params={{ connectionId: b.fixConnectionId }}
+                  className={fixClass}
+                >
+                  Fix ›
+                </Link>
+              )
+            }
+          />
+        ))}
         {waiting.map((w) => (
           <NoticeLine
             key={`waiting:${w.provider}`}
@@ -96,7 +124,7 @@ export function NoticesBand({
             why={null}
             fix={
               <Link to={w.fixTo} className={fixClass}>
-                reconnect ›
+                Files ›
               </Link>
             }
           />

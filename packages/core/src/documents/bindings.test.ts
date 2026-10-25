@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   bindingConflict,
   bindingConflictMessage,
+  folderNameOf,
   isBindableKind,
 } from './bindings'
 import type { ExistingBinding } from './bindings'
@@ -120,5 +121,13 @@ describe('isBindableKind', () => {
       false,
       false,
     ])
+  })
+})
+
+describe('folderNameOf', () => {
+  it('is the last segment of a provider path, the path itself when it has none', () => {
+    expect(folderNameOf('My Drive / Vayu / Legal')).toBe('Legal')
+    expect(folderNameOf('Legal')).toBe('Legal')
+    expect(folderNameOf(' / ')).toBe(' / ')
   })
 })

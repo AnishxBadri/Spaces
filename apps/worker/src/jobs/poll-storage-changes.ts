@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { Enqueue } from '@spaces/core/queue/enqueue'
 import { QUEUES } from '@spaces/core/queue/names'
 import { markBindingFailedProgram } from '@spaces/core/writes/bindings/sync'
+import { providerSaid } from '@spaces/core/writes/bindings/health'
 import {
   dueStorageConnectionsProgram,
   pollConnectionProgram,
@@ -25,8 +26,10 @@ import type { JobDef, JobRetryPolicy } from '../run-job'
  * every deleted one, or one moved out of every bound subtree, marked gone, by
  * core's `pollConnectionProgram`.
  * - One connection's failure is its own line: the rest are still polled.
- * - A refused token marks that connection's bindings `error` and charges the
- *   plugin, as a sync's does; a rate limit waits for the next tick.
+ * - A refused token marks every binding on that connection, folders and
+ *   followed files alike, `error` with the provider's words and charges the
+ *   plugin, as a sync's does; nothing filed is touched. A rate limit waits
+ *   for the next tick.
  * - A store failure fails the run, after every connection had its turn.
  * Nullish data: pg-boss stores `null` for a schedule with no payload.
  */
@@ -99,9 +102,10 @@ const pollOne = Effect.fn('pollStorageChanges.connection')(function* (
     )
   if (opened === null) return said('no storage source to poll with')
 
+  // Folder bindings and followed files alike: the token is the connection's.
   const markAll = (reason: string) =>
     Effect.forEach(
-      connection.bindings,
+      [...connection.bindings, ...connection.files],
       (b) => markBindingFailedProgram(b.id, reason),
       { discard: true },
     ).pipe(
@@ -117,7 +121,9 @@ const pollOne = Effect.fn('pollStorageChanges.connection')(function* (
         return breaker
           .charge(opened.integrationId, `permanent: ${error.reason}`)
           .pipe(
-            Effect.andThen(markAll(error.reason)),
+            Effect.andThen(
+              markAll(providerSaid(connection.provider, error.reason)),
+            ),
             Effect.map((storeFailed) => said(error.reason, storeFailed)),
           )
       case 'NotFound':

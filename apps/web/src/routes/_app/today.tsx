@@ -385,6 +385,7 @@ function TodayLedger({
             broken={attention.broken}
             parked={attention.parked}
             waiting={attention.waiting}
+            failing={attention.failing}
           />
           <NeedsYou
             rows={rows}

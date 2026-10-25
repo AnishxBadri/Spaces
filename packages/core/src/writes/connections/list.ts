@@ -1,6 +1,7 @@
 import { and, asc, countDistinct, eq, ne } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { accountConnection, document, integration } from '@spaces/db/schema'
+import { pauseBindingsOf } from '../bindings/health'
 import type { ConnectionDb } from './token'
 
 /**
@@ -79,6 +80,8 @@ export async function countMembersConnected(
  *   null, so they read as copies with no live source.
  * - An integration bound to it loses its grant (`connection_id` null) and
  *   answers NotConnected until it is bound again.
+ * - A folder binding on it pauses, naming who disconnected, until someone
+ *   re-binds it with their own connection; nothing it copied is deleted.
  */
 export async function forgetConnection(
   userId: string,
@@ -99,6 +102,7 @@ export async function forgetConnection(
         .for('update')
     ).at(0)
     if (owned === undefined) return false
+    await pauseBindingsOf(tx, connectionId, new Date())
     await tx
       .update(document)
       .set({ connectionId: null })

@@ -77,3 +77,14 @@ export function bindingConflictMessage(
       return `${candidate.path} holds ${existing.path}, which is linked to ${existing.targetName}. A folder has one owner.`
   }
 }
+
+/** A bound folder's own name: `Legal` out of `My Drive / Vayu / Legal`. */
+export function folderNameOf(path: string): string {
+  return (
+    path
+      .split('/')
+      .map((s) => s.trim())
+      .filter((s) => s !== '')
+      .at(-1) ?? path
+  )
+}

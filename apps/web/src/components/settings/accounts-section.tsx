@@ -14,6 +14,7 @@ import {
   useSettingsPage,
 } from './settings-section'
 import { oauthClientAnchor } from './connection-apps-section'
+import { BoundFoldersSection } from './bound-folders-section'
 import { MailSyncSettings } from './mail-sync-section'
 import { pluginAnchor } from '#/components/integrations/registry-pane'
 import { Button } from '#/components/ui/button'
@@ -40,6 +41,7 @@ import {
 } from '#/lib/connections/products'
 import type { AccountJob } from '#/lib/connections/products'
 import type {
+  AccountBindings,
   AccountsView,
   ConnectionDisconnectResult,
   ConnectionListRow,
@@ -366,6 +368,12 @@ function disconnectedLine(
   }
 }
 
+/** What a Disconnect does to the folders bound through it, when it has any. */
+function pausesLine(count: number): string | null {
+  if (count === 0) return null
+  return `${String(count)} bound ${count === 1 ? 'folder pauses' : 'folders pause'} until someone re-binds ${count === 1 ? 'it' : 'them'} with their own connection. Nothing already copied is deleted.`
+}
+
 /**
  * The account page (`Options ›`): which products the account is used for —
  * ticking one runs that product's own consent, unticking disconnects it —
@@ -375,18 +383,23 @@ function disconnectedLine(
  * - Google's Testing mode, read off a refresh token that lapses, is one
  *   graphite line under the head: state, never a control.
  * - Sync now is drawn only for a product with a per-connection sync job.
+ * - A storage account lists its bound folders; Disconnect then warns how
+ *   many pause.
  */
 export function AccountSection({
   job,
   connectionId,
   view,
   mail,
+  bindings,
 }: {
   job: AccountPageJob
   connectionId: string
   view: AccountsView
   /** The account's mail sync and its settings; absent or null when none runs. */
   mail?: { connectionId: string; view: MailboxSyncView } | null
+  /** A storage account's binding health; absent or null on other pages. */
+  bindings?: AccountBindings | null
 }) {
   const { isAdmin } = useSettingsPage()
   const router = useRouter()
@@ -406,6 +419,11 @@ export function AccountSection({
     )
   const account = accountOf(row, job, view.connections)
   const provider = PROVIDERS[account.provider].label
+  // Folders bound through these connections: what their Disconnect pauses.
+  const boundOn = (ids: ReadonlyArray<string>) =>
+    (bindings?.bindings ?? []).filter(
+      (b) => b.connectionId !== null && ids.includes(b.connectionId),
+    ).length
 
   /** After a disconnect: stay on a row of this account still on this page, else go back to the list. */
   async function landAfter(gone: ReadonlyArray<string>) {
@@ -434,9 +452,10 @@ export function AccountSection({
     const ok = await confirm({
       title: `Stop using ${account.email} for ${word}?`,
       body:
-        others.length > 0
+        pausesLine(boundOn([held.connectionId])) ??
+        (others.length > 0
           ? `Spaces deletes its ${word} connection. ${wordsOf(others)} stay connected, so ${provider} keeps the access they use.`
-          : `Spaces revokes its access at ${provider} and forgets ${account.email}. Files already copied stay.`,
+          : `Spaces revokes its access at ${provider} and forgets ${account.email}. Files already copied stay.`),
       action: 'Disconnect',
     })
     if (!ok) return
@@ -462,9 +481,10 @@ export function AccountSection({
     const ok = await confirm({
       title: `Disconnect ${account.email} from ${TITLE[job]}?`,
       body:
-        others.length > 0
+        pausesLine(boundOn(account.held.map((r) => r.connectionId))) ??
+        (others.length > 0
           ? `Spaces stops using it for ${words}. ${wordsOf(others)} stay connected.`
-          : `Spaces stops using it for ${words}, revokes its access at ${provider} and forgets the account. Files already copied stay.`,
+          : `Spaces stops using it for ${words}, revokes its access at ${provider} and forgets the account. Files already copied stay.`),
       action: 'Disconnect',
     })
     if (!ok) return
@@ -540,6 +560,7 @@ export function AccountSection({
       {mail ? (
         <MailSyncSettings connectionId={mail.connectionId} view={mail.view} />
       ) : null}
+      {bindings ? <BoundFoldersSection view={bindings} /> : null}
       {confirmDialog}
     </SettingsSection>
   )

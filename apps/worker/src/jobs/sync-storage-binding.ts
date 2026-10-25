@@ -12,6 +12,7 @@ import {
 } from '@spaces/core/writes/bindings/sync'
 import type { SyncTally } from '@spaces/core/writes/bindings/sync'
 import { proposeUnmappedProgram } from '@spaces/core/writes/bindings/move'
+import { providerSaid } from '@spaces/core/writes/bindings/health'
 import type { StorageSourceError } from '@spaces/sdk'
 import { PluginBreaker } from './plugin-breaker'
 import { StorageSources } from './storage-sources'
@@ -126,7 +127,9 @@ const program = Effect.fn('syncStorageBinding')(function* (
         .pipe(Effect.andThen(Effect.fail(new JobRetryable({ reason }))))
     }
     const reason =
-      error._tag === 'AuthExpired' ? error.reason : SYNC_REFUSALS.folderGone
+      error._tag === 'AuthExpired'
+        ? providerSaid(binding.provider, error.reason)
+        : SYNC_REFUSALS.folderGone
     return breaker
       .charge(opened.integrationId, `permanent: ${reason}`)
       .pipe(Effect.andThen(refuse(reason)))

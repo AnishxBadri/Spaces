@@ -9,16 +9,18 @@ import type { AccountJob } from '#/lib/connections/products'
 import { reviewGroupsProgram } from '#/lib/inbox/review-groups'
 import type { ReviewGroup } from '#/lib/inbox/review-groups'
 import { movingProgram } from '#/lib/records/moving'
+import { failingBindingsForProgram } from '#/lib/documents/binding-health'
+import type { FailingBinding } from '#/lib/documents/binding-health'
 import type { MovingSignal } from '#/lib/records/moving'
 
 /**
  * What Today reads beyond the existing lists: open Review cards grouped by
  * source and space, the reader's broken connections, auto-enrich runs parked
- * at a source's cap, and What's moving.
+ * at a source's cap, folder bindings that cannot sync, and What's moving.
  * Outside the server-fn barrel so tests can call the programs without a request.
  */
 
-export type { MovingSignal, ParkedSource, ReviewGroup }
+export type { FailingBinding, MovingSignal, ParkedSource, ReviewGroup }
 
 export class ConnectionsReadFailed extends Schema.TaggedError<ConnectionsReadFailed>()(
   'ConnectionsReadFailed',
@@ -51,6 +53,7 @@ export type TodayAttention = {
   broken: BrokenConnection[]
   parked: ParkedSource[]
   waiting: WaitingExport[]
+  failing: ReadonlyArray<FailingBinding>
 }
 
 /** The files product's short name under a provider: `Drive` under Google. */
@@ -103,17 +106,26 @@ export const brokenConnectionsProgram = Effect.fn('brokenConnectionsProgram')(
 
 export const todayAttentionProgram = Effect.fn('todayAttentionProgram')(
   function* (userId: string, now: Date) {
-    const [review, moving, broken, parked, waiting] = yield* Effect.all(
-      [
-        reviewGroupsProgram(),
-        movingProgram(userId, now),
-        brokenConnectionsProgram(userId),
-        parkedEnrichmentProgram(),
-        waitingExportsForToday(),
-      ],
-      { concurrency: 'unbounded' },
-    )
-    const out: TodayAttention = { review, moving, broken, parked, waiting }
+    const [review, moving, broken, parked, waiting, failing] =
+      yield* Effect.all(
+        [
+          reviewGroupsProgram(),
+          movingProgram(userId, now),
+          brokenConnectionsProgram(userId),
+          parkedEnrichmentProgram(),
+          waitingExportsForToday(),
+          failingBindingsForProgram(userId),
+        ],
+        { concurrency: 'unbounded' },
+      )
+    const out: TodayAttention = {
+      review,
+      moving,
+      broken,
+      parked,
+      waiting,
+      failing,
+    }
     return out
   },
 )

@@ -67,6 +67,12 @@ const writes = vi.hoisted(() => ({
       revoke: 'kept',
     }),
   ),
+  rebindFolder: vi.fn(async () => ({
+    _tag: 'refused',
+    reason:
+      'Google said: notFound · the folder isn’t shared with anish@fund.example · nothing changed',
+  })),
+  rebindStatus: vi.fn(async () => ({})),
   saveEnrichmentOrder: vi.fn(async () => undefined),
   saveEnrichmentAuto: vi.fn(async () => undefined),
   saveEnrichmentReuse: vi.fn(async () => undefined),
@@ -1135,6 +1141,160 @@ describe('the accounts pages, by the job an account does', () => {
     expect(writes.disconnectConnection).toHaveBeenCalledTimes(1)
     expect(writes.disconnectConnection).toHaveBeenCalledWith({
       data: { connectionId: DRIVE },
+    })
+  })
+
+  describe('a storage account’s bound folders', () => {
+    const NOW = '2026-10-12T12:00:00.000Z'
+    const binding = {
+      provider: 'google',
+      targetKind: 'deal',
+      targetObjectSlug: null,
+      error: null,
+      files: 0,
+    }
+    const health = {
+      bindings: [
+        {
+          ...binding,
+          id: '00000000-0000-4000-8000-0000000000e1',
+          folderPath: 'My Drive / Flent / Data room',
+          targetId: '00000000-0000-4000-8000-0000000000f1',
+          targetName: 'Flent',
+          status: 'active',
+          lastSyncedAt: '2026-10-12T11:57:00.000Z',
+          connectionId: DRIVE,
+          files: 128,
+          onAccount: true,
+        },
+        {
+          ...binding,
+          id: '00000000-0000-4000-8000-0000000000e2',
+          folderPath: 'My Drive / Vayu / Legal',
+          targetId: '00000000-0000-4000-8000-0000000000f2',
+          targetName: 'Vayu',
+          status: 'error',
+          error: 'Google said: File not found',
+          lastSyncedAt: '2026-10-10T12:00:00.000Z',
+          connectionId: DRIVE,
+          onAccount: true,
+        },
+        {
+          ...binding,
+          id: '00000000-0000-4000-8000-0000000000e3',
+          folderPath: 'My Drive / Ohmium',
+          targetId: '00000000-0000-4000-8000-0000000000f3',
+          targetName: 'Ohmium',
+          status: 'paused',
+          error: 'Priya disconnected 2026-10-09',
+          lastSyncedAt: null,
+          connectionId: null,
+          onAccount: false,
+        },
+      ],
+      exports: [
+        {
+          targetId: '00000000-0000-4000-8000-0000000000f4',
+          targetName: 'Fund docs',
+          count: 3,
+          since: '2026-10-09T08:00:00.000Z',
+        },
+      ],
+      choices: [
+        {
+          connectionId: DRIVE,
+          email: 'anish@fund.example',
+          label: 'Drive',
+          status: 'active',
+        },
+      ],
+      now: NOW,
+    }
+    const withHealth = async (run: () => Promise<void>) => {
+      const original = loaders['files/$connectionId']
+      loaders['files/$connectionId'] = () => ({
+        view: accounts,
+        bindings: health,
+      })
+      try {
+        await run()
+      } finally {
+        loaders['files/$connectionId'] = original
+      }
+    }
+    const dialog = () => document.querySelector('[role="dialog"]')
+
+    it('lists each folder with its record, its status and the verb that fixes it, then the waiting exports', async () => {
+      await withHealth(async () => {
+        await mount(`/settings/files/${DRIVE}`)
+        expect(text()).toContain('Bound folders')
+        expect(text()).toContain('in sync · 3m · 128 files')
+        expect(text()).toContain('Google said: File not found · 2d')
+        expect(text()).toContain('paused · Priya disconnected 2026-10-09')
+        expect(
+          document
+            .querySelector('a[aria-label="Open Flent"]')
+            ?.getAttribute('href'),
+        ).toBe('/deals/00000000-0000-4000-8000-0000000000f1?tab=files')
+        expect(
+          document.querySelector('button[aria-label="Re-bind Legal"]'),
+        ).not.toBeNull()
+        expect(
+          document.querySelector('button[aria-label="Re-bind Ohmium"]'),
+        ).not.toBeNull()
+        expect(text()).toContain('3 files waiting for a Drive connection')
+        expect(text()).toContain('since 10-09 · Fund docs')
+      })
+    })
+
+    it('draws no Exports ledger when nothing waits', async () => {
+      const original = loaders['files/$connectionId']
+      loaders['files/$connectionId'] = () => ({
+        view: accounts,
+        bindings: { ...health, exports: [] },
+      })
+      try {
+        await mount(`/settings/files/${DRIVE}`)
+        expect(text()).not.toContain('Exports')
+      } finally {
+        loaders['files/$connectionId'] = original
+      }
+    })
+
+    it('Disconnect warns with the count of folders that pause, and deletes nothing', async () => {
+      await withHealth(async () => {
+        await mount(`/settings/files/${DRIVE}`)
+        await click(
+          document.querySelector('button[role="checkbox"][aria-label="Drive"]'),
+        )
+        expect(dialog()?.textContent).toContain(
+          '2 bound folders pause until someone re-binds them with their own connection. Nothing already copied is deleted.',
+        )
+      })
+    })
+
+    it('Re-bind opens a window that checks the folder on the reader’s connection and says a refusal in the provider’s words', async () => {
+      writes.rebindFolder.mockClear()
+      await withHealth(async () => {
+        await mount(`/settings/files/${DRIVE}`)
+        await click(
+          document.querySelector('button[aria-label="Re-bind Legal"]'),
+        )
+        expect(writes.rebindFolder).toHaveBeenCalledWith({
+          data: {
+            bindingId: '00000000-0000-4000-8000-0000000000e2',
+            connectionId: DRIVE,
+            commit: false,
+          },
+        })
+        expect(dialog()?.textContent).toContain('My Drive / Vayu / Legal')
+        expect(dialog()?.textContent).toContain('anish@fund.example · Drive')
+        expect(dialog()?.textContent).toContain(
+          'Google said: notFound · the folder isn’t shared with anish@fund.example · nothing changed',
+        )
+        expect(dialog()?.textContent).toContain('re-lists · no duplicates')
+        expect(dialog()?.textContent).toContain('Try again')
+      })
     })
   })
 

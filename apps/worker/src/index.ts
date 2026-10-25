@@ -25,6 +25,7 @@ import {
   fetchStorageFile,
 } from './jobs/fetch-storage-file'
 import { bindStorageFolder } from './jobs/bind-storage-folder'
+import { rebindStorageFolder } from './jobs/rebind-storage-folder'
 import { fetchRemoteBytes, retainBackfill } from './jobs/restore-bytes'
 import { syncStorageBinding } from './jobs/sync-storage-binding'
 import {
@@ -592,6 +593,7 @@ async function main() {
     readDeck,
     fetchStorageFile,
     bindStorageFolder,
+    rebindStorageFolder,
   ]) {
     const retry = def.retry
     if (retry) {
@@ -651,6 +653,19 @@ async function main() {
     QUEUES.bindStorageFolder,
     { batchSize: 1, includeMetadata: true },
     runJob(bindStorageFolder, {
+      host,
+      layer: Layer.merge(
+        storageSourcesLayer(plugins, { fakes }),
+        fetchStorageEnqueue,
+      ),
+    }),
+  )
+  // A re-bind's folder check, and its commit, which sends the re-list.
+  // Batch of one, for the bind's reason.
+  await boss.work(
+    QUEUES.rebindStorageFolder,
+    { batchSize: 1, includeMetadata: true },
+    runJob(rebindStorageFolder, {
       host,
       layer: Layer.merge(
         storageSourcesLayer(plugins, { fakes }),

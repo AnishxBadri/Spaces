@@ -50,6 +50,14 @@ export const QUEUES = {
    */
   bindStorageFolder: 'storage.bind-folder',
   /**
+   * Re-bind a paused or failing folder binding to another member's
+   * connection: `getFolder` on the new grant first, then — when `commit` —
+   * the binding and its documents repointed and a full sync sent.
+   * Per-attempt `singletonKey` the re-bind window polls; a refusal is the
+   * job's permanent reason, a passed check its summary.
+   */
+  rebindStorageFolder: 'storage.rebind-folder',
+  /**
    * A binding's sync: the bound folder walked with the binder's grant, every
    * file filed on the bound record. `stately` with `singletonKey =
    * bindingId`, so two syncs of one binding never overlap; a re-run files

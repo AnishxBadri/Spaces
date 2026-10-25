@@ -4,7 +4,8 @@ import { requireUser } from './shared'
 
 /**
  * Link a Drive folder (storage bindings): bind, the poll the bind dialog
- * reads, the record's bindings, and Unlink. Each handler is `requireUser()`
+ * reads, the record's bindings, Unlink, and binding health — an account
+ * page's ledgers and Re-bind. Each handler is `requireUser()`
  * plus a bindings program, reached by a dynamic
  * import so Effect and drizzle stay out of the client bundle.
  */
@@ -108,4 +109,57 @@ export const setBindingRetain = createServerFn({ method: 'POST' })
     return Effect.runPromise(
       setBindingRetainProgram(data).pipe(Effect.provide(webEnqueue)),
     )
+  })
+
+export type {
+  AccountBindings,
+  BoundFolderHealth,
+  RebindChoice,
+  RebindQueued,
+  RebindStatus,
+  WaitingExportLine,
+} from '../documents/binding-health'
+
+/**
+ * A storage account page's Bound folders and Exports ledgers, and the
+ * reader's connections a binding can be re-bound with. Null when the
+ * connection is not the reader's.
+ */
+export const getAccountBindings = createServerFn()
+  .validator(z.object({ connectionId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { accountBindingsForProgram } =
+      await import('../documents/binding-health')
+    const { effectFn } = await import('./effect')
+    return effectFn(accountBindingsForProgram)(u.id, data.connectionId)
+  })
+
+/**
+ * Re-bind with my connection: `commit: false` checks the folder on the
+ * reader's connection, `commit: true` checks it again and re-binds. Both are
+ * worker jobs the window polls by `checkId`.
+ */
+export const rebindFolder = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      bindingId: z.string().uuid(),
+      connectionId: z.string().uuid(),
+      commit: z.boolean(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { rebindFolderProgram } = await import('../documents/binding-health')
+    const { effectFn } = await import('./effect')
+    return effectFn(rebindFolderProgram)(u.id, data)
+  })
+
+export const rebindStatus = createServerFn()
+  .validator(z.object({ checkIds: z.array(z.string().uuid()).max(10) }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { rebindStatusProgram } = await import('../documents/binding-health')
+    const { effectFn } = await import('./effect')
+    return effectFn(rebindStatusProgram)(data.checkIds)
   })
