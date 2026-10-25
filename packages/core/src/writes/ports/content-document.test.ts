@@ -1,10 +1,19 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Effect, Exit, Layer } from 'effect'
 import { and, eq } from 'drizzle-orm'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import { db } from '@spaces/db'
 import {
   company,
@@ -200,6 +209,18 @@ const taggedIn = async (documentId: string) =>
         and(eq(link.fromEntityId, documentId), eq(link.relation, 'tagged_in')),
       )
   ).map((r) => r.to)
+
+// Intake temp dirs land under os.tmpdir(), which other suites share on CI; a
+// private TMPDIR keeps the leftover-dir checks about this file alone.
+const sharedTmpdir = process.env.TMPDIR
+beforeAll(() => {
+  process.env.TMPDIR = mkdtempSync(join(tmpdir(), 'spaces-test-'))
+})
+afterAll(() => {
+  rmSync(tmpdir(), { recursive: true, force: true })
+  if (sharedTmpdir === undefined) delete process.env.TMPDIR
+  else process.env.TMPDIR = sharedTmpdir
+})
 
 const intakeTempDirs = async () =>
   (await readdir(tmpdir()).catch(() => [])).filter((n) =>

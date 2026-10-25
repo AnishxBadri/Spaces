@@ -1,12 +1,26 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+} from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 import { Effect, Layer } from 'effect'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import { MAX_UPLOAD_BYTES } from '../../documents'
 import { Enqueue } from '../../queue/enqueue'
 import type { DocumentIntakeInput } from './intake'
@@ -140,6 +154,18 @@ async function taggedInOf(documentId: string): Promise<Array<string>> {
     )
   return rows.map((r) => r.to)
 }
+
+// Intake temp dirs land under os.tmpdir(), which other suites share on CI; a
+// private TMPDIR keeps the leftover-dir checks about this file alone.
+const sharedTmpdir = process.env.TMPDIR
+beforeAll(() => {
+  process.env.TMPDIR = mkdtempSync(join(tmpdir(), 'spaces-test-'))
+})
+afterAll(() => {
+  rmSync(tmpdir(), { recursive: true, force: true })
+  if (sharedTmpdir === undefined) delete process.env.TMPDIR
+  else process.env.TMPDIR = sharedTmpdir
+})
 
 /** Directories this module left behind under the OS temp dir, if any. */
 async function intakeTempDirs(): Promise<Array<string>> {
