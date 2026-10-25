@@ -38,13 +38,14 @@ Plus the UI sweep (the printed sheets landing) and Corrections.
 
 ## Open
 
-- **Clean UI — one shape per element** (`afk`, the next lane): `SPA-349` action grammar and page heads, `SPA-350` one record head, `SPA-351` row ends and dialog feet, `SPA-352` create windows and empty states, `SPA-353` the walk's remaining findings, `SPA-355` orphaned components and tokens, `SPA-356` lib leftovers and dependencies. Bodies in Linear.
+- **30. The canvas lands — the instrument port** (P-SPA-34, the next lane): brings the code in line with the drawn canvas (Paper pages Shell · Today · Lists · Record · Windows · Ask · Settings, the Grammar board, the rules in `docs/product-map.md`). Order: contract amendment → shared pieces one at a time → surfaces two at a time; behaviour slices labelled apart. Bodies drafted in `docs/backlog.md`, uploaded after owner review. It replaces Clean UI `SPA-349`…`SPA-353`, cancelled 2026-10-25 because the canvas superseded them.
+- **Clean UI leftovers** (`afk`): `SPA-355` orphaned components and tokens (run before project 30's shared pieces), `SPA-356` lib leftovers and dependencies. Bodies in Linear.
 - **Project 16** (`afk`, In Progress in Linear): `SPA-188` install, upgrade and rollback docs, `SPA-190` one-click templates. `docs/install.md` and `docs/upgrade.md` exist, so check whether 188 is done.
 
 ## Next, in order
 
-1. **Clean UI**, the remaining design port.
-2. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided; starts after Clean UI.
+1. **Project 30**, the canvas lands: the remaining design port.
+2. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided; starts after project 30.
 3. **Docs consolidation** — `DESIGN.md` and `docs/design-contract.md` merge into one design doc, checked against the Paper library; `CONTEXT.md` rewritten to current state only.
 
 ## Owner calls
