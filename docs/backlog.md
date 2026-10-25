@@ -56,31 +56,7 @@ CONTEXT's Hosting rules end with 'Publish Coolify / Railway / Render / Unraid te
 
 ## 22. Drive as the archive, Box on the same port
 
-#### `storage-15` · hitl · M — Mirror root — Drive fills itself with the tree you'd have built
-
-**Blocked by:** `storage-14`
-
-**What to build**
-
-One workspace-level binding with is_mirror_root, and every upload anywhere projects to 'Space path / Company / Deal / Kind / filename' beneath it — no per-record binding at all. The projection is a pure function of the document's filing (the space's display names walked from its ltree path, the record it is tagged into, its kind); folders are created lazily on the first file so no empty sprawl appears; re-filing moves the file. The projection must sanitise: an entity named with a slash or a 200-character name cannot be a path segment, and two records with the same name at the same level need a deterministic tie-break or the mirror forks. Whose token: the uploader's connection for that provider, else the mirror owner's, else the job queues. Setting a mirror root is admin-only and exclusive by the index storage-8a created.
-
-**Acceptance criteria**
-
-- [ ] the projection is unit-tested from filing alone: a deck on a deal under the energy.hydrogen space lands at Energy/Hydrogen/Ohmium/Series B/Deck/ohmium-deck.pdf, using display names rather than ltree labels
-- [ ] a name containing '/' or exceeding the provider's segment limit is sanitised deterministically, and two same-named records at the same level resolve to distinct, stable segments (test)
-- [ ] an unfiled document lands in a single Unfiled/ folder, never at the root
-- [ ] no folder is created for a company or deal until its first document exists — asserted against the fake's tree after creating a deal with no files
-- [ ] re-filing a document from a company to a deal issues one move, not a delete plus a put
-- [ ] an uploader with no Google connection exports under the mirror owner's connection; with neither, the job queues and the waiting count surfaces
-- [ ] a second is_mirror_root is refused by the index
-- [ ] Gate 5 on the mirror-root settings surface
-- [ ] Full gate pass: tsc, vitest green, lint zero, prettier
-
-**Demo** — Set a fake-Drive folder as the mirror root, upload three files on three different records, and the fake's tree shows exactly the three projected paths and no empty folders.
-
-**Spec** — spec-storage-sources.md (removed) §6; spec-storage-sources.md (removed) §5.2; spec-storage-sources.md (removed) §13
-
-#### `storage-16` · hitl · M — Live files — follow a Sheet, keep its revisions
+#### `storage-16` · afk · M — Live files — follow a Sheet, keep its revisions
 
 **Blocked by:** `storage-10b`, `storage-8a`
 
@@ -103,7 +79,15 @@ The file-grain binding: 'Link and follow' on a Sheet, a shared Excel or any file
 
 **Spec** — spec-storage-sources.md (removed) §5.2; spec-storage-sources.md (removed) §10; spec-storage-sources.md (removed) §13
 
-#### `storage-17` · hitl · M — Binding health — the binder left, the token died
+_Decided 2026-10-24 (owner): build now, on the Files tab as it is on main_ — `SPA-341` shipped, so the printed `RecordFiles` is the surface. The shape, drawn on Paper (Windows · 09 Live files):
+
+- **Follow lives in the file row's `···`**, beside Open · Download · Open in Drive ↗ · Change kind › · Remove…, with the hint `keeps revisions`; on a followed file the same item reads Unfollow. No separate "Link and follow" button.
+- **The row's lane** reads `rev 4 · 10 Oct · following` for a followed file; states: `rev 5 · fetching.` while a revision arrives, `■ gone · 4 revisions kept` after a provider delete, `rev 4 · stopped 12 Oct` after unfollow.
+- **The viewer sidebar's `Revisions · n` ledger replaces Versions** for a followed file: `LabelHead` with `following` on the right, rows `rev n · current` / `rev n` / `rev 1 · linked` with a mono time lane, the current row on bone; the foot carries the provider id (`Drive · 1aBcD…9xYz`) and `Unfollow`. No edit or delete control anywhere.
+- Holdings have no Files tab, so Follow lives on company and deal Files tabs; the demo follows the seeded Sheet from the holding's company.
+- One `(connection, drive)` cursor serves folder bindings and followed files alike; a followed file shares the poll.
+
+#### `storage-17` · afk · M — Binding health — the binder left, the token died
 
 **Blocked by:** `storage-14`, `storage-3b`, `storage-8b`
 
@@ -124,3 +108,13 @@ The failure surfaces §5.5 promises, which today have nowhere to appear. Setting
 **Demo** — Revoke the grant at the fake IdP: Today shows the binding error and Settings → Connections shows the reason; re-bind as a second user who can read the folder and the sync resumes with no duplicates, while a second user who cannot read it is refused by name.
 
 **Spec** — spec-storage-sources.md (removed) §5.5; spec-storage-sources.md (removed) §7; spec-storage-sources.md (removed) §12
+
+_Amended 2026-10-11 (pre-check):_ `SPA-234` is Done. D81 split Connections up: a storage account's page is `/settings/files/$connectionId` (`AccountSection job="files"`), so the bindings list goes there. Binding errors and the waiting-export count are lines in Today's notices band (`NoticesBand`), not Needs-you rows. The dedupe index `document_connection_external_unique` is keyed on `document.connection_id`, so a re-bind must repoint `connection_id` on the binding's documents in the same transaction or the next sync duplicates every file.
+
+_Decided 2026-10-24 (owner): confirmed as amended._ The shape, drawn on Paper (Settings · 10 Binding health):
+
+- **The account page** keeps its head (`anish@fund.example`, Disconnect) and a status line (`Google · Drive · in sync · 3 min`), then a **Bound folders · n** ledger: folder name · record · status · verb. Status is a dot plus mono text — `in sync · 3 min · 128 files`, the provider's words in destructive (`Google said: File not found · 2 days`), or `paused · Priya disconnected 9 Oct`. The verb is `Open ›` on a healthy row and `Re-bind ›` on an errored or paused one. An **Exports** ledger beneath carries `3 files waiting for a Drive connection · since 9 Oct · Fund docs` while anything waits.
+- **Re-bind is a window** (S420): one picker, `With: <connection> · Drive`, limited to the caller's connections for the provider; under it the check result — `■ Can read the folder · 41 files · drive.readonly` or the refusal in the provider's words (`Google said: notFound · the folder isn't shared with tomas@fund.example · nothing changed`); foot `re-lists · no duplicates` · Cancel · Re-bind (Try again after a refusal).
+- **Disconnect** on an account with bindings confirms: `n bound folders pause until someone re-binds them with their own connection. Nothing already copied is deleted.` Cancel · Disconnect.
+- **Today's notices band**: one line per errored binding (`Vayu — Legal can't sync · Google said: File not found` · `Fix ›` opening the account page) and one for files waiting (`3 files waiting for a Drive connection` · `Files ›`); both leave when resolved.
+- Binding row states: in sync · error (token or folder) · paused (binder left) · just re-bound (`re-listing. 41 files`).

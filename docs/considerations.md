@@ -112,6 +112,14 @@ or a yes/no with a confidence — typed decisions, not prose. Vendor-reported:
   it is a cloud API, so sensitive records never reach it.
 - Sources: nexos.ai/blog/what-is-jev, theregister.com/a/5296711.
 
+## Mirror root — 2026-10-24
+
+Cancelled as a slice (`SPA-297`, `storage-15`): one workspace binding under which every upload projects to `Space / Company / Deal / Kind / file`.
+
+- **Why not:** relations live in the app; Drive and Box are not a projection of the graph. A mirror root imposes the app's tree on a drive the user may already organise their own way.
+- **What exists:** the bound folder per record with write-through — upload into Spaces, the file lands in the folder the user chose; `storage_binding.is_mirror_root` and its unique index are in the schema, unused.
+- **Could be:** an opt-in export of the tree, if a user asks; the projection body in the cancelled issue is the spec.
+
 ## Banked compositions — 2026-10-25
 
 Features made of primitives that already exist, so nobody has to build them, only wire them. Revisit each when someone asks.
