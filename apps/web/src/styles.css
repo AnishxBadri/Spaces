@@ -79,7 +79,6 @@
      could never be confused with act; kept under the green primary because
      it still reads unambiguously destructive against everything else. */
   --destructive: oklch(0.48 0.17 12);
-  --destructive-foreground: oklch(1 0 0);
   /* Teal, moved off green (2026-08): the primary owns green now, and a
      success state sharing the action hue would blur two meanings. 4.64:1. */
   --success: oklch(0.55 0.09 190);
@@ -218,7 +217,6 @@
   --color-selected: var(--selected);
   --color-row-hover: var(--row-hover);
   --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-info: var(--info);

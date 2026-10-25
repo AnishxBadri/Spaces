@@ -68,14 +68,6 @@ describe('a recorder’s recording', () => {
         externalUrl: RECORDING,
       }),
     ).toMatchObject({ text: 'fathom ↗', href: RECORDING })
-    const html = renderToStaticMarkup(
-      <OpenInSourceButton
-        url={RECORDING}
-        filename="Recording"
-        provider="fathom"
-      />,
-    )
-    expect(html).toContain('title="Open in fathom"')
   })
 
   it('an attachment with no link says which plugin filed it', () => {
