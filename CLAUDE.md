@@ -3,7 +3,7 @@
 Self-hosted deal management for angel/private-capital investing (product name:
 Spaces). This file is _mechanics only_. Decisions and
 domain language live in `CONTEXT.md` (the decision record — read the relevant
-block before designing anything); synthesis in `docs/ARCHITECTURE.md`; the decision ledger in
+block before designing anything); synthesis in `docs/architecture.md`; the decision ledger in
 `docs/decisions.md`.
 
 ## Where the work is (read before picking anything up)

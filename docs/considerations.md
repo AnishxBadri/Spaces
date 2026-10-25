@@ -111,3 +111,11 @@ or a yes/no with a confidence — typed decisions, not prose. Vendor-reported:
   answers typed questions (Jev first), under the same sensitivity floor —
   it is a cloud API, so sensitive records never reach it.
 - Sources: nexos.ai/blog/what-is-jev, theregister.com/a/5296711.
+
+## Banked compositions — 2026-10-25
+
+Features made of primitives that already exist, so nobody has to build them, only wire them. Revisit each when someone asks.
+
+- **Pass-letter drafting** — a draft note to the founder from the deal's `close_reason` and its assembled context, proposed as a note on the deal. One more prompt on the summarize lane; nothing is ever sent to the founder.
+- **Monday digest** — a weekly roll-up of what changed, what is waiting, and feed items that matched no record (sourcing signal). One scheduled job and one template, sent only when `SMTP_URL` is set; Today stays the notification.
+- **Deal scorecards** — weighted per-partner votes rolled into a score. Needs one value per member rather than per record, so it waits on a second partner asking, and on multi-workspace membership to hold a partner's weight.

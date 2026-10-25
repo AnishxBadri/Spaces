@@ -7,10 +7,8 @@ do not re-derive them.
 
 ## Read first
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — every model and the
-  stack, in one read. Start here.
-- [`docs/CODEBASE.md`](docs/CODEBASE.md) — where things live and how a
-  request flows.
+- [`docs/architecture.md`](docs/architecture.md) — every model, the
+  packages, how a request flows and where things live. Start here.
 - [`CONTEXT.md`](CONTEXT.md) — the decision record, dated. Read the block
   for the area you are touching before designing anything.
 - [`CLAUDE.md`](CLAUDE.md) — the agent card: gates, traps, conventions.

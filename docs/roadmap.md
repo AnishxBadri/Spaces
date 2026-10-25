@@ -46,7 +46,7 @@ Plus the UI sweep (the printed sheets landing) and Corrections.
 
 1. **Clean UI**, the remaining design port.
 2. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided; starts after Clean UI.
-3. **Docs consolidation** — `DESIGN.md` and `docs/design-contract.md` merge into one design doc, checked against the Paper library; `docs/ARCHITECTURE.md` folds into `docs/CODEBASE.md`; `CONTEXT.md` rewritten to current state only.
+3. **Docs consolidation** — `DESIGN.md` and `docs/design-contract.md` merge into one design doc, checked against the Paper library; `CONTEXT.md` rewritten to current state only.
 
 ## Owner calls
 

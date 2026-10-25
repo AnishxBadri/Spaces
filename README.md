@@ -22,7 +22,7 @@
   <a href="#what-you-get">Features</a> ·
   <a href="#bring-your-own-keys">BYOK AI</a> ·
   <a href="#whats-next">Roadmap</a> ·
-  <a href="docs/ARCHITECTURE.md">Architecture</a> ·
+  <a href="docs/architecture.md">Architecture</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
@@ -326,10 +326,9 @@ Turborepo: `apps/web`, `apps/worker`, `apps/e2e`, `apps/site`, `packages/db`,
 `packages/core`, `packages/config`, with `packages/sdk` and `plugins/*`
 arriving with the SDK.
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — every model, the stack,
-  the roadmap, in one read
+- [`docs/architecture.md`](docs/architecture.md) — every model, the packages,
+  how a request flows and where things live, in one read
 - [`CONTEXT.md`](CONTEXT.md) — the decision record, dated
-- [`docs/CODEBASE.md`](docs/CODEBASE.md) — where things live
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup, the gates, how to pick
   up an issue
 

@@ -65,9 +65,8 @@ AGPL-3.0. Can relicense permissively later; reverse is impossible once contribut
 
 # Architecture decisions
 
-> Synthesis view for newcomers: `docs/ARCHITECTURE.md` — every model (workspace,
-> entity graph, objects, research, mandate, deals, templates, financial engine),
-> the stack, and the TagHash-parity map, in one read. This file remains the deep
+> Synthesis view for newcomers: `docs/architecture.md` — every model, the
+> packages and how a request flows, in one read. This file remains the deep
 > decision record.
 
 ## Stack
@@ -620,8 +619,8 @@ CI's `offline` job runs the worker and plugin suites with egress rejected.
 
 ### Architecture week 2026-09-13 → 15 — index
 
-Recorded across this file and three specs; the roadmap in
-`docs/ARCHITECTURE.md` §12 sequences the build.
+Recorded across this file and three specs; the order is
+`docs/roadmap.md`.
 
 | decision                                                                                                                                       | where                                                             |
 | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
@@ -2088,7 +2087,7 @@ suggestions). No category needs a new lane; that's the design check.
 11. **Outbound** — MCP server (AI agents), generic webhooks/API (n8n
     automation), digest delivery channel (Monday brief → Slack/Telegram/
     email; pull-based doctrine, delivered somewhere). The digest is banked:
-    ARCHITECTURE.md §12 _Banked_ holds what composes it and its trigger, and
+    `docs/considerations.md` (Banked compositions) holds what composes it, and
     D28 settles its transport as the optional `SMTP_URL`, nothing POSTed out.
 12. **Feeds (RSS/Atom)** — deliberated 2026-09-02 on the "future" branch,
     recorded 2026-09-07. A feed poller capability: `feed(url, scope,
@@ -2534,7 +2533,7 @@ interactions ahead of a calendar event — our research half makes this richer t
 Affinity's), **pass-letter drafting** from the recorded pass reason (Edda's Decision
 Writer), and deck-reader autofill (already implied by extraction + AI-autofill
 attributes). The meeting-prep brief, pass-letter drafting and deal scorecards are
-registered with the Monday digest in ARCHITECTURE.md §12 _Banked_, with their triggers.
+kept with the Monday digest in `docs/considerations.md` (Banked compositions); the meeting-prep brief shipped as Prep.
 
 ---
 
@@ -2878,8 +2877,7 @@ instance; BYOK-shaped by nature), then integrations
 (each independent): Google Calendar first, Gmail (forward-only), Apollo enrichment (Exa
 alongside as a second `Enricher`), BYOK AI features — each adds its own wizard step when
 it lands. The features banked as compositions of shipped primitives are not restated
-here: ARCHITECTURE.md §12 _Banked_ is the one list, with what composes each and the
-trigger that revives it.
+here: `docs/considerations.md` (Banked compositions) is the one list.
 
 Standing debt:
 
