@@ -305,8 +305,8 @@ context assembler and the Effect-first backend. In progress, in order:
 - **Storage sources** — Drive and Box on one read port. A bound data room.
 - **Researcher lane** — Exa, budgeted and attributed, proposing never writing.
 
-The full sequence, with every decision and its options, is in
-[`docs/roadmap-2026-09.md`](docs/roadmap-2026-09.md). Not on the list: LP
+What is shipped and what comes next is in
+[`docs/roadmap.md`](docs/roadmap.md). Not on the list: LP
 reporting, fund administration, a hosted SaaS. Different product, different
 buyer.
 

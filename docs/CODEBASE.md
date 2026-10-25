@@ -14,7 +14,7 @@ CONTRIBUTING.md         dev setup, the gates, conventions, how to pick up work
 LICENSE                 AGPL-3.0
 CLAUDE.md               agent/dev mechanics card (gates, traps, commands)
 CONTEXT.md              THE decision record — every design block, dated
-DESIGN.md / PRODUCT.md  early shaping docs (CONTEXT.md supersedes on conflict)
+DESIGN.md               early shaping docs (CONTEXT.md supersedes on conflict)
 docs/
   install.md            the operator's install (pinned tag, the two env vars, ./data, the
                         setup token, the TLS overlay, backup) — SPA-188 (ship-10)
@@ -101,7 +101,7 @@ server-fn handler. Effect never crosses into React.
   it iterates `ENTITY_REFS` (`packages/db/src/entity-refs.ts`) for generic repoints
   and keeps a hand-written section per `custom` strategy; no unmerge exists,
   so the snapshot is the only contract).
-- `context/` — **the context assembler** (`docs/spec-ai-substrate.md` §1):
+- `context/` — **the context assembler** (`spec-ai-substrate.md` (removed) §1):
   `types.ts` (the `ContextItem` shape, kinds, hops, edges), `ref.ts` (the
   citation-ref grammar — one builder, one parser), `render.ts` (values →
   the plain-text line a model sees), `rank.ts` (pure ranker: hop × edge ×
@@ -169,24 +169,24 @@ what they are: `deal-board`, `record-timeline`, `tasks-rail`,
 
 ## Feature → files, quick index
 
-| Feature                   | Look at                                                                                                                   |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Deal pipeline/board       | `routes/_app/deals.tsx`, `components/deal-board.tsx`, `lib/server/deals.ts`                                               |
-| Today page                | `routes/_app/today.tsx`, aggregation in `lib/server/timeline.ts` + domain fns                                             |
-| Portfolio                 | `routes/_app/portfolio*.tsx`, `lib/server/portfolio.ts`, `lib/portfolio/*`, `db/schema/portfolio.ts`                      |
-| Invested → holding        | `birthHolding` in `lib/server/shared.ts` (both updateRecord and createDeal paths)                                         |
-| Attribute engine          | `lib/attributes/registry.ts`, `components/attributes/`, `db/schema/attributes.ts`                                         |
-| Identity / dedupe / merge | `lib/entities/*`, `routes/_app/review.tsx`                                                                                |
-| Spaces / taxonomy         | `routes/_app/spaces*.tsx`, `lib/server/spaces.ts`, ltree paths in `db/schema/entities.ts`                                 |
-| Notes / memos             | `routes/_app/notes*.tsx`, `components/editor/`, mentions-sync in `lib/server/notes.ts`                                    |
-| Documents pipeline        | `lib/server/documents.ts` → queue → `worker/jobs/extract-document.ts`; `lib/storage/`                                     |
-| Tasks                     | `components/task-composer.tsx`, `lib/tasks/parse-due.ts`, `lib/server/tasks.ts`                                           |
-| Mandate                   | `routes/_app/mandate.tsx`, `lib/server/mandate.ts`                                                                        |
-| BYOK / vault              | `lib/vault/`, settings surface in `lib/server/settings.ts`                                                                |
-| Custom objects            | `db/schema/objects.ts`, `lib/server/objects.ts`, `routes/_app/o.$objectSlug.tsx`                                          |
-| Saved views               | `db/schema/views.ts`, `lib/views/filter.ts`, `lib/server/views.ts`                                                        |
-| AI context assembly       | `packages/core/src/context/` (ranker) + `writes/context/` (assembler, `SimilarLane`), spec in `docs/spec-ai-substrate.md` |
-| Auth / setup / invites    | `routes/setup.tsx`, `routes/join.tsx`, `lib/auth.ts`, `lib/setup-token.ts`, `lib/server/members.ts`                       |
+| Feature                   | Look at                                                                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Deal pipeline/board       | `routes/_app/deals.tsx`, `components/deal-board.tsx`, `lib/server/deals.ts`                                                    |
+| Today page                | `routes/_app/today.tsx`, aggregation in `lib/server/timeline.ts` + domain fns                                                  |
+| Portfolio                 | `routes/_app/portfolio*.tsx`, `lib/server/portfolio.ts`, `lib/portfolio/*`, `db/schema/portfolio.ts`                           |
+| Invested → holding        | `birthHolding` in `lib/server/shared.ts` (both updateRecord and createDeal paths)                                              |
+| Attribute engine          | `lib/attributes/registry.ts`, `components/attributes/`, `db/schema/attributes.ts`                                              |
+| Identity / dedupe / merge | `lib/entities/*`, `routes/_app/review.tsx`                                                                                     |
+| Spaces / taxonomy         | `routes/_app/spaces*.tsx`, `lib/server/spaces.ts`, ltree paths in `db/schema/entities.ts`                                      |
+| Notes / memos             | `routes/_app/notes*.tsx`, `components/editor/`, mentions-sync in `lib/server/notes.ts`                                         |
+| Documents pipeline        | `lib/server/documents.ts` → queue → `worker/jobs/extract-document.ts`; `lib/storage/`                                          |
+| Tasks                     | `components/task-composer.tsx`, `lib/tasks/parse-due.ts`, `lib/server/tasks.ts`                                                |
+| Mandate                   | `routes/_app/mandate.tsx`, `lib/server/mandate.ts`                                                                             |
+| BYOK / vault              | `lib/vault/`, settings surface in `lib/server/settings.ts`                                                                     |
+| Custom objects            | `db/schema/objects.ts`, `lib/server/objects.ts`, `routes/_app/o.$objectSlug.tsx`                                               |
+| Saved views               | `db/schema/views.ts`, `lib/views/filter.ts`, `lib/server/views.ts`                                                             |
+| AI context assembly       | `packages/core/src/context/` (ranker) + `writes/context/` (assembler, `SimilarLane`), spec in `spec-ai-substrate.md` (removed) |
+| Auth / setup / invites    | `routes/setup.tsx`, `routes/join.tsx`, `lib/auth.ts`, `lib/setup-token.ts`, `lib/server/members.ts`                            |
 
 ## The architectural spine (with pointers into CONTEXT.md)
 

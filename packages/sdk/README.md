@@ -3,7 +3,7 @@
 The plugin contract: what a plugin imports, and the only thing it imports.
 The design is `docs/spec-plugin-sdk.md` (§3 manifest, §4 ports, §5 triggers,
 §6 `definePlugin`); the decisions behind it are D51–D55 in
-`docs/decisions-2026-09.md`.
+`docs/decisions.md`.
 
 Dependencies: `effect`, `zod` and — from sdk-4b — `tldts`, and nothing inside
 this repo (D55). `src/package.test.ts` pins that list; the eslint sdk zone

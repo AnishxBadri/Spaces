@@ -2,14 +2,14 @@
 
 Status: design draft (2026-09-13/14, main-branch deliberation — grilled
 against the code, not yet built). **Amended 2026-09-30 at project 17's
-publish (`docs/decisions-2026-09.md` → Addenda 2026-09-30, D51–D58): kinds
+publish (`docs/decisions.md` → Addenda 2026-09-30, D51–D58): kinds
 are gone — each job declares a trigger and the ports it uses (§3–§5); a job
 calls ports, it does not return claims (§5); plugin signing mechanics (§9).**
 Detailed contract behind the CONTEXT.md
 "Plugin architecture" decision (which reversed backend-paradigm decision 7).
 Builds on: the claim-type lanes (CONTEXT "Machine-write design"), the BYOK
 vault, `resolveEntity()`, the Effect ratchet, the AI substrate
-(`docs/spec-ai-substrate.md` — AI sits _below_ this SDK, never inside it),
+(`spec-ai-substrate.md` (removed) — AI sits _below_ this SDK, never inside it),
 and the hostability contracts. Competitive grounding: Twenty's apps
 framework (§1), Grafana's plugin loader and Backstage's extension points
 (§7), Nextcloud's install-from-running-instance (§9).
@@ -347,7 +347,7 @@ storage area (project 20).
 with the tagged `NotFound`, `CursorExpired`, `RateLimited { retryAfterMs }`
 or `AuthExpired`; `getFile` streams a `ReadableStream<Uint8Array>`; no
 member carries a provider hash. The shapes are in
-`docs/spec-storage-sources.md` §4's as-built note. **The grant rule** is the
+`spec-storage-sources.md` (removed) §4's as-built note. **The grant rule** is the
 manifest's: `manifestSchema` refuses a `provides: 'storage-source'` plugin
 any job whose `uses` names `Facts` or `Ai` (`STORAGE_SOURCE_WITHHELD`),
 naming the rule; every other port in `PORT_NAMES` stays grantable, and

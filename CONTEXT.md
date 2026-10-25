@@ -41,7 +41,7 @@ row that could ever be personal, from the first migration. See _Single user firs
 - ~~No no-code object builder (custom _attributes_ yes, custom _objects_ no).~~
   **Reversed 2026-09-02:** custom objects yes — but strictly as the
   **attribute-bag tier** (see "Two-tier object model" in the attribute engine
-  block and `docs/spec-attribute-engine.md`). ~~The non-goal narrows to: custom
+  block and `spec-attribute-engine.md` (removed)). ~~The non-goal narrows to: custom
   objects never get identity/dedupe/merge/enrichment/interaction machinery.~~
   **Narrowed again 2026-09-13:** fuzzy-name dedupe, merge-as-target and opt-in
   `domain`/`linkedin` identity keys reach every object; only enrichment,
@@ -184,7 +184,7 @@ relational coordinator.** Nine decisions:
 ### Plugin architecture (decided 2026-09-13, reversing paradigm decision 7)
 
 _Decision summary; the contract is `docs/spec-plugin-sdk.md`, storage sources are
-`docs/spec-storage-sources.md`, the AI side is `docs/spec-ai-substrate.md` §9–14._
+`spec-storage-sources.md` (removed), the AI side is `spec-ai-substrate.md` (removed) §9–14._
 
 **Why the reversal.** "Dormant compiled-in" zeroes runtime cost but not the
 other four costs a self-hoster carries for integrations they never enabled:
@@ -295,7 +295,7 @@ provides holds exactly those; it is the privilege boundary, and the job's
 `R` type documents it.
 
 **Amended 2026-09-30 at project 17's publish (owner; D51–D58 in
-`docs/decisions-2026-09.md`, the contract in `docs/spec-plugin-sdk.md`
+`docs/decisions.md`, the contract in `docs/spec-plugin-sdk.md`
 §3–§5, §9).** There are **no plugin kinds**: the six-kind table bundled a
 trigger, an input/output shape and a port grant, and forced one provider to
 ship as several plugins (Gmail is a schedule job plus a webhook job). A job
@@ -564,7 +564,7 @@ migration 0029).** Two things were settled to get it in, and both generalise:
   does (decision D1). Not the connection: a storage binding's writes are
   attributed to the integration that owns the binding, and "whose account" is
   one hop away through `integration.connection_id`.
-  `docs/spec-storage-sources.md` §3.1 is corrected to match.
+  `spec-storage-sources.md` (removed) §3.1 is corrected to match.
 - **Why the vendor leaves the type.** The four vendor-named enums baked
   `gmail`/`apollo`/`clip` into shared types, which is exactly what a
   third-party plugin cannot migrate — a Fireflies plugin would have had to
@@ -623,19 +623,19 @@ CI's `offline` job runs the worker and plugin suites with egress rejected.
 Recorded across this file and three specs; the roadmap in
 `docs/ARCHITECTURE.md` §12 sequences the build.
 
-| decision                                                                                                                                       | where                                                        |
-| ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| plugins leave the image; registry-installed into `/data/plugins`; worker is the only host; SDK = ports; AI is substrate                        | _Plugin architecture_ above · `docs/spec-plugin-sdk.md`      |
-| vendor-named enums collapse into `source_class + source_ref`; `integration` table; typed actor                                                 | `docs/spec-plugin-sdk.md` §8                                 |
-| custom objects gain fuzzy dedupe + merge + opt-in identity keys; no fourth system object; `organization` ghost deleted                         | _Two-tier object model_ · `docs/spec-attribute-engine.md` §9 |
-| tasks stay a non-entity, join Cmd-K as a search lane                                                                                           | _Tasks + Today_                                              |
-| the note model: three axes, memo = flag, kinds frozen at three, `interaction.note_id`, record filing via `tagged_in` + kind toggle             | _The note model_ · _Interactions_                            |
-| documents: file into spaces, `/documents`, unfiled inbox, drop `kind: memo`, storage source ≠ blob backend, derived layers, retain per binding | _Sources are documents_ · `docs/spec-storage-sources.md`     |
-| glossary → concept node with the AI substrate                                                                                                  | _Glossary_                                                   |
-| embeddings never forced, dimension pinned at 768, local opt-in download, core-owned                                                            | _Embeddings_ · `docs/spec-ai-substrate.md` §9                |
-| vault: workspace-only keys in v1, per-user OAuth grants, providers with N plugins, admin-only install                                          | _BYOK_                                                       |
-| deck reader and every AI feature are core compositions, never plugins; gateway URL passthrough instead of Helicone                             | `docs/spec-ai-substrate.md` §11–13                           |
-| monorepo (Turborepo): apps/web · worker · site · extension; packages/db · core · sdk · ui; plugins/*; `turbo prune --docker`                   | `docs/spec-plugin-sdk.md` §2                                 |
+| decision                                                                                                                                       | where                                                             |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| plugins leave the image; registry-installed into `/data/plugins`; worker is the only host; SDK = ports; AI is substrate                        | _Plugin architecture_ above · `docs/spec-plugin-sdk.md`           |
+| vendor-named enums collapse into `source_class + source_ref`; `integration` table; typed actor                                                 | `docs/spec-plugin-sdk.md` §8                                      |
+| custom objects gain fuzzy dedupe + merge + opt-in identity keys; no fourth system object; `organization` ghost deleted                         | _Two-tier object model_ · `spec-attribute-engine.md` (removed) §9 |
+| tasks stay a non-entity, join Cmd-K as a search lane                                                                                           | _Tasks + Today_                                                   |
+| the note model: three axes, memo = flag, kinds frozen at three, `interaction.note_id`, record filing via `tagged_in` + kind toggle             | _The note model_ · _Interactions_                                 |
+| documents: file into spaces, `/documents`, unfiled inbox, drop `kind: memo`, storage source ≠ blob backend, derived layers, retain per binding | _Sources are documents_ · `spec-storage-sources.md` (removed)     |
+| glossary → concept node with the AI substrate                                                                                                  | _Glossary_                                                        |
+| embeddings never forced, dimension pinned at 768, local opt-in download, core-owned                                                            | _Embeddings_ · `spec-ai-substrate.md` (removed) §9                |
+| vault: workspace-only keys in v1, per-user OAuth grants, providers with N plugins, admin-only install                                          | _BYOK_                                                            |
+| deck reader and every AI feature are core compositions, never plugins; gateway URL passthrough instead of Helicone                             | `spec-ai-substrate.md` (removed) §11–13                           |
+| monorepo (Turborepo): apps/web · worker · site · extension; packages/db · core · sdk · ui; plugins/*; `turbo prune --docker`                   | `docs/spec-plugin-sdk.md` §2                                      |
 
 ### Why TanStack Start over Next.js
 
@@ -768,7 +768,7 @@ enrichment machinery~~ — **narrowed 2026-09-13:** fuzzy-name dedupe and
 merge-as-target now cover every object, and a custom object may opt into
 `domain`/`linkedin` identity keys at creation; enrichment, interactions and
 seeded attributes stay core-only (_Two-tier object model_ ·
-`docs/spec-attribute-engine.md` §9). The opinionated core stays code-owned.
+`spec-attribute-engine.md` (removed) §9). The opinionated core stays code-owned.
 
 Rejected: nullable-FK-per-type (N columns and N joins per attach point), and untyped
 `(src_type, src_id)` (no referential integrity, every query hand-checks).
@@ -881,7 +881,7 @@ document(entity_id, blob_sha, filename, mime, url, size_bytes,
   -- integration + a ref once a connector exists, and `document_origin` is
   -- dropped. `memo` is still present in code. `interaction.source` went the same
   -- way in the same migration, so no shared enum in public.* names a vendor. See
-  -- "Sources are documents" below and `docs/spec-storage-sources.md` §2, §11.
+  -- "Sources are documents" below and `spec-storage-sources.md` (removed) §2, §11.
 document_chunk(document_id, idx, text, embedding vector)
 term(entity_id, name, aliases[], definition_md, space_id)
 ```
@@ -1081,7 +1081,7 @@ attribute(id, object_id → object, slug, name, description, type,
 _Rekeyed 2026-09-02, shipped in migrations 0016/0017: the `object_kind` enum
 became a single `object_id` FK to the `object` registry — no dual keying, no
 enum branch in any registry read. `description` landed 2026-09 (migration
-0020). See "Two-tier object model" below and `docs/spec-attribute-engine.md`
+0020). See "Two-tier object model" below and `spec-attribute-engine.md` (removed)
 §9._
 
 - **Unified storage:** all attribute values — system and custom — live in `entity.values`
@@ -1145,7 +1145,7 @@ enum branch in any registry read. `description` landed 2026-09 (migration
   as Companies with a `type` or as a custom object, their call — which only
   holds if the custom route dedupes. Attio's customs keep the old
   exclusions; ours no longer match them here. Full spec:
-  `docs/spec-attribute-engine.md` §9.
+  `spec-attribute-engine.md` (removed) §9.
   - **Identity keys are materialized, not bound later (decided 2026-09-19,
     SPA-85).** Declaring `domain` or `linkedin` at object creation creates
     the backing attribute in the same transaction — slug `domain` type
@@ -1309,7 +1309,7 @@ attribute_event(id, entity_id, attr_slug, from jsonb, to jsonb,
                 default|suggestion|enrichment|import|merge|seed,
                 suggestion_id, refs jsonb, at)
   -- typed actor + door + citation refs shipped 2026-09 (migration 0018,
-  -- `docs/spec-attribute-engine.md` §4): actor_type is NOT NULL and actor_id
+  -- `spec-attribute-engine.md` (removed) §4): actor_type is NOT NULL and actor_id
   -- is set iff actor_type = 'user' (check constraint).
 ```
 
@@ -1621,7 +1621,7 @@ search indexes, and you will ship one and forget the other.
 
 **The documents feature, distilled (2026-09-14/15) — the fund's object
 storage, indexed by the graph instead of by path.** Full spec:
-`docs/spec-storage-sources.md`. Decisions:
+`spec-storage-sources.md` (removed). Decisions:
 
 - Documents file exactly like notes: `link(tagged_in → record)` and —
   **now also** — `entity_space` into a space (doctrine said so, code only
@@ -1847,7 +1847,7 @@ silently garbage** — search degrades quietly rather than erroring. This bites 
   column, rebuild index, re-embed). Embeddings are core, not a plugin: one
   pinned dimension, sensitivity routing, and being a dependency of core
   search all require the substrate to own them. Detail:
-  `docs/spec-ai-substrate.md` §9.
+  `spec-ai-substrate.md` (removed) §9.
 - **Local embeddings are Ollama only (2026-10-06; supersedes the 2026-09-25
   "Ollama first, transformers.js second" ordering).** Ollama is an HTTP
   server both processes already call (the LLM adapter's keyless URL
@@ -2038,13 +2038,13 @@ suggestions). No category needs a new lane; that's the design check.
    rooms already live, picked/synced into the document pipeline. (S3/MinIO
    is our blob backend, not an integration.)
 2. **Email + calendar** — forwarding lane first, full sync later
-   (docs/archive/survey-twenty-email-sync.md is the map; Attio's forward/BCC address is
+   (Attio's forward/BCC address is
    the consent model).
 3. **Call recordings** — Fathom/tl;dv/Granola webhooks → transcript as
    document on participant-matched people; summary as suggestion.
 4. **Enrichment** — the Enricher interface (BYOK block); Exa-class live web
    is the _research_ lane, distinct doctrine from field-fill.
-5. **AI (BYOK)** — the substrate, `docs/spec-ai-substrate.md`.
+5. **AI (BYOK)** — the substrate, `spec-ai-substrate.md` (removed).
 6. **Native forms** — registry-rendered-outward intake: pitch submission
    (structured pre-lead birth), founder update collection, DD
    questionnaires, referral intake. Native first; Typeform/GForms webhook
@@ -2139,7 +2139,7 @@ archive.
   - Fund on Google Workspace -> OAuth app type **Internal** -> no verification, unlimited org users. Push this.
   - Otherwise -> **Testing** mode, up to 100 users, refresh tokens expire in 7 days. Document the annoyance.
   - Operator steps (redirect URI from `APP_URL`, where the client goes) and Box's enterprise-SSO
-    admin consent: `docs/spec-storage-sources.md` §1, "Registering a provider".
+    admin consent: `spec-storage-sources.md` (removed) §1, "Registering a provider".
 - Needs noise filtering — not every thread is a deal. Heuristics + cheap classifier, else the
   pipeline fills with garbage.
 
@@ -2724,10 +2724,7 @@ Decisions worth keeping:
   `getUploadUrl` now returns `{url, headers}` (local returns empty headers), and the
   worker reads via `storage().getBytes()` instead of a direct file path.
 
-15. **Portfolio layer** (decided 2026-08; the full domain vocabulary behind this layer —
-    terms, fund mechanics, ideologies, and what each surveyed vendor covers — lives in
-    `docs/private-capital-glossary.md`, annotated with [P15]/[banked]/[fenced] tags;
-    surveyed against TagHash-class products —
+15. **Portfolio layer** (decided 2026-08; surveyed against TagHash-class products —
     this is the tier where an investing CRM stops being a pipeline tracker; it is also
     where we currently lose any feature comparison). Pure graph + registry + computed
     values: no external dependency, no OAuth, fully in-wheelhouse. Build order is the

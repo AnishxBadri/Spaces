@@ -3,27 +3,22 @@
 Self-hosted deal management for angel/private-capital investing (product name:
 Spaces). This file is _mechanics only_. Decisions and
 domain language live in `CONTEXT.md` (the decision record — read the relevant
-block before designing anything); synthesis in `docs/ARCHITECTURE.md`; ADRs in
-`docs/adr/`.
+block before designing anything); synthesis in `docs/ARCHITECTURE.md`; the decision ledger in
+`docs/decisions.md`.
 
 ## Where the work is (read before picking anything up)
 
 - **Linear, team `Spaces` (SPA)** is the store of record for work that is
-  scheduled. Since 2026-10-09 the live set is projects **21–29** plus
-  **Corrections** (`SPA-215`…`SPA-331`): 27 is the printed design port, and
-  23 split into 23 (meetings and recorders), 28 (spaces, research and
-  watches) and 29 (enrichment). Blocking relations link the open issues;
-  projects 1–20 are shipped and their Done issues archived (free-plan cap).
+  scheduled. Blocking relations link the open issues; shipped issues are
+  archived (free-plan cap).
   An issue body is the spec; do not re-derive it. Two saved views are the
   whole workflow: **grabbable now** (`afk`, no open blockers) and **needs
   me** (`hitl`).
-- `docs/roadmap-2026-09.md` — all 29 projects and their order (1–12 as a
-  shipped list), the milestones of 13–29, the decisions still ahead with
-  their options, open audit findings and the audit's cut list.
-- `docs/roadmap-backlog.md` — every slice of projects 14–29 in full, the
-  source the Linear bodies were pasted from. Projects 19–26 were published
-  2026-10-06, 27–29 on 2026-10-09; amend a body here and in Linear together.
-- `docs/decisions-2026-09.md` — the decisions (D1–D81), all closed. A slice labelled
+- `docs/roadmap.md` — what is shipped, what is open, what comes next.
+- `docs/backlog.md` — the full bodies of the open slices, the repo copy of
+  their Linear issues; amend a body here and in Linear together, and delete
+  it when the slice ships.
+- `docs/decisions.md` — the decisions (D1–D81), all closed. A slice labelled
   `hitl` usually is because of one; read its decision before designing.
 - Labels that change how you work: **`migration`** means the slice runs
   `db:generate`, and the drizzle journal is a hard serialization point — only
@@ -467,7 +462,7 @@ and nothing else, exactly like CI.
   - The void flow is Effect-first through `effectFn()`
     (`apps/web/src/lib/portfolio/reverse.ts`); its tagged errors carry an
     empty `message`, so `ledgerVoidMessage` is what the dialog is shown.
-    See `docs/decisions-2026-09.md`.
+    See `docs/decisions.md`.
 
 ## Browser verification (Chrome MCP)
 

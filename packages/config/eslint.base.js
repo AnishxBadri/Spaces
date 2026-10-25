@@ -249,7 +249,7 @@ const SITE_IMPORTS_NOTHING_INTERNAL = {
     climbsInto(['apps', 'packages', 'plugins', 'web', 'worker', 'e2e']),
   ].join('|'),
   message:
-    '@spaces/site imports nothing internal — no @spaces/* package, no # alias, no relative path into another package. It is marketing and docs, deployed to Vercel and never in the image (docs/spec-plugin-sdk.md §2); copy what it needs to show, or sync it as a file from docs/assets (docs/site.md).',
+    '@spaces/site imports nothing internal — no @spaces/* package, no # alias, no relative path into another package. It is marketing and docs, deployed to Vercel and never in the image (docs/spec-plugin-sdk.md §2); copy what it needs to show, or sync it as a file from docs/assets (apps/site/README.md).',
 }
 // Proved on the real package by packages/sdk/src/fence.test.ts (SPA-191).
 // Third-party imports are the package.json's business, pinned by
