@@ -25,7 +25,7 @@ What is shipped, what is open, and what comes next. Linear (team `Spaces`) holds
 19. Install from the app, no redeploy
 20. Storage sources — connect an account, attach a file
 21. A bound data room
-22. Drive as the archive, Box on the same port (two slices still open, below)
+22. Drive as the archive, Box on the same port
 23. Meetings and recorders
 24. Cmd-K finds, Ask answers
 25. Email — viewed, shared, tracked, composed
@@ -39,7 +39,6 @@ Plus the UI sweep (the printed sheets landing) and Corrections.
 ## Open
 
 - **Clean UI — one shape per element** (`afk`, the next lane): `SPA-349` action grammar and page heads, `SPA-350` one record head, `SPA-351` row ends and dialog feet, `SPA-352` create windows and empty states, `SPA-353` the walk's remaining findings, `SPA-355` orphaned components and tokens, `SPA-356` lib leftovers and dependencies. Bodies in Linear.
-- **Project 22, the last two** (`afk`, decided 2026-10-24): `SPA-291` live files, `SPA-298` binding health; boards on Paper (Windows 09, Settings 10). `SPA-297` mirror root is cancelled (see considerations).
 - **Project 16** (`afk`, In Progress in Linear): `SPA-188` install, upgrade and rollback docs, `SPA-190` one-click templates. `docs/install.md` and `docs/upgrade.md` exist, so check whether 188 is done.
 
 ## Next, in order
