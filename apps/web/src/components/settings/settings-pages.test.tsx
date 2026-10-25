@@ -96,6 +96,9 @@ vi.mock('sonner', () => ({
   }),
 }))
 
+// Importing every settings route cold can pass the 10 s default on a busy runner.
+vi.setConfig({ hookTimeout: 90_000 })
+
 const win = new Window({ url: 'http://localhost/' })
 let createRoot: typeof CreateRoot
 let router: typeof RouterModule
