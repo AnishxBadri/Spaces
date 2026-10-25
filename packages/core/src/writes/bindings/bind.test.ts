@@ -124,6 +124,18 @@ describe('bindFolderProgram', () => {
       .select({ ancestorIds: storageBinding.ancestorIds })
       .from(storageBinding)
     expect(stored).toEqual([{ ancestorIds: ['root', 'ohmium'] }])
+    // A followed file on the same record is not a band.
+    await db.insert(storageBinding).values({
+      connectionId,
+      provider: 'google',
+      grain: 'file',
+      fileId: 'captable',
+      folderPath: 'My Drive / Cap table',
+      targetEntityId: deal,
+      direction: 'pull',
+      boundBy: FIXTURE_ACTOR.id,
+    })
+    expect(await Effect.runPromise(recordBindingsProgram(deal))).toHaveLength(1)
   })
 
   it('refuses a folder inside a bound one, and a parent of a bound one, naming the binding and its target', async () => {

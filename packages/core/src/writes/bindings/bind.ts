@@ -221,7 +221,11 @@ export type RecordBinding = {
   readonly lastSyncedAt: Date | null
 }
 
-/** The bindings on one record, oldest first. */
+/**
+ * The folder bindings on one record, oldest first: the Files tab's bands.
+ * A followed file's binding is not a band; it is reached through the
+ * document it follows.
+ */
 export const recordBindingsProgram = Effect.fn('recordBindingsProgram')(
   function* (
     entityId: string,
@@ -241,7 +245,12 @@ export const recordBindingsProgram = Effect.fn('recordBindingsProgram')(
           lastSyncedAt: storageBinding.lastSyncedAt,
         })
         .from(storageBinding)
-        .where(eq(storageBinding.targetEntityId, entityId))
+        .where(
+          and(
+            eq(storageBinding.targetEntityId, entityId),
+            eq(storageBinding.grain, 'folder'),
+          ),
+        )
         .orderBy(asc(storageBinding.createdAt)),
     )
   },
