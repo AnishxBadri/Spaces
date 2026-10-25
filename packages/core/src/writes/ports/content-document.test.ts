@@ -212,14 +212,12 @@ const taggedIn = async (documentId: string) =>
 
 // Intake temp dirs land under os.tmpdir(), which other suites share on CI; a
 // private TMPDIR keeps the leftover-dir checks about this file alone.
-const sharedTmpdir = process.env.TMPDIR
 beforeAll(() => {
-  process.env.TMPDIR = mkdtempSync(join(tmpdir(), 'spaces-test-'))
+  vi.stubEnv('TMPDIR', mkdtempSync(join(tmpdir(), 'spaces-test-')))
 })
 afterAll(() => {
   rmSync(tmpdir(), { recursive: true, force: true })
-  if (sharedTmpdir === undefined) delete process.env.TMPDIR
-  else process.env.TMPDIR = sharedTmpdir
+  vi.unstubAllEnvs()
 })
 
 const intakeTempDirs = async () =>
