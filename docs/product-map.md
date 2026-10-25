@@ -177,16 +177,27 @@ it. Cards are designed on the first page that needs them.
   holds the rest; where it disagrees with a rule above, the rule above wins and
   the contract is amended after the wave.
 
+- **Settings nav group heads are ruled bands (owner 10-24):** YOU · WORKSPACE · AI ·
+  INTEGRATIONS in ink mono caps with a hairline under, the LabelHead grammar the
+  settings ledgers use; no graphite whisper. Drawn on Settings 09 §8.
+- **Connections (owner 10-24):** a connection is a provider with an admin-registered
+  OAuth app serving a core job (Google, Box, Microsoft later); bundled, never
+  installed. Everything else, recorders included, is a plugin. Integrations nav =
+  Connections · Plugins · Enrichment · Email forwarding. A provider is a sub-page
+  with two Kit tabs, Set up · In use; the first Set up row asks Workspace or
+  personal Gmail. Sync health per use lives on In use; no Gmail plugin page.
+  Reconnect is a Today line. Drawn on Settings 09.
+
 ### Canvas verdicts 10-16 (recommendations taken; not yet in the contract)
 
-- **Lists:** applied filters are chips under the bar; row `···` on hover
+- **Lists** (confirmed): applied filters are chips under the bar; row `···` on hover
   (Add to space · Copy link · Archive); bulk = Enrich… (outline) + Add to
   space, no Tag; first run = one `Name +` row. Column heads sentence case.
 - **Today:** single suggestions decided in place, groups → Open in Review ›;
   Undo on accept, dismiss and Ask cards by holding the write ~5s; no day strip
   without a calendar (amends D79); Needs you above Meetings; head = title +
-  date; readout strip kept, non-zero figures only.
-- **Ask:** Cmd-K one fixed width; scope chips in the composer (amends D70);
+  date; readout strip kept, non-zero figures only, each figure filters Needs you (confirmed; cards compared on Today 08).
+- **Ask:** Cmd-K one fixed size — width and height (confirmed 10-24: e.g. 1060 × 560, results scroll inside, empty/typing/no-results/loading in the same box, preview pane always present, shrinks only with the screen); scope chips in the composer (amends D70);
   a citation previews its passage on hover; stamps are plain rectangles.
 - **Windows:** a second window steps down under its parent (one stacked at
   most); plugin verbs live in the record `···` (amends D63/D64); confirms say

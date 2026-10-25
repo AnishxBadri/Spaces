@@ -561,42 +561,24 @@
 }
 
 /**
- * The open tab of a tab bar: paper with cut shoulders and a 1px ink edge,
- * open at the foot so it joins the body under it with no rule between.
+ * The open tab of a tab bar: paper with a 1px ink edge on three sides, open
+ * at the foot so it joins the body under it with no rule between.
  * - The caller pulls it 1px over the bar's foot rule (`-mb-px`); the paper
  *   pane covers that rule and the ink sides meet it.
  * - Same two layers as `stamp-outline`; `::after` stays free for the focus
  *   reticle.
  */
 @utility tab-open {
-  --tab-cut: 6px;
   position: relative;
   isolation: isolate;
   background: var(--hairline);
-  clip-path: polygon(
-    0 var(--tab-cut),
-    var(--tab-cut) 0,
-    calc(100% - var(--tab-cut)) 0,
-    100% var(--tab-cut),
-    100% 100%,
-    0 100%
-  );
 
   &::before {
-    --tab-inner-cut: calc(var(--tab-cut) - 0.6px);
     content: '';
     position: absolute;
     inset: 1px 1px 0 1px;
     z-index: -1;
     background: var(--paper);
-    clip-path: polygon(
-      0 var(--tab-inner-cut),
-      var(--tab-inner-cut) 0,
-      calc(100% - var(--tab-inner-cut)) 0,
-      100% var(--tab-inner-cut),
-      100% 100%,
-      0 100%
-    );
   }
 }
 
