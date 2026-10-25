@@ -1230,7 +1230,7 @@ describe('the accounts pages, by the job an account does', () => {
         expect(text()).toContain('Bound folders')
         expect(text()).toContain('in sync · 3m · 128 files')
         expect(text()).toContain('Google said: File not found · 2d')
-        expect(text()).toContain('paused · Priya disconnected 2026-10-09')
+        expect(text()).toContain('paused · Priya disconnected 9 Oct')
         expect(
           document
             .querySelector('a[aria-label="Open Flent"]')
@@ -1243,7 +1243,7 @@ describe('the accounts pages, by the job an account does', () => {
           document.querySelector('button[aria-label="Re-bind Ohmium"]'),
         ).not.toBeNull()
         expect(text()).toContain('3 files waiting for a Drive connection')
-        expect(text()).toContain('since 10-09 · Fund docs')
+        expect(text()).toContain('since 9 Oct · Fund docs')
       })
     })
 

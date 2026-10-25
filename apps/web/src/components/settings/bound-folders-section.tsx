@@ -15,6 +15,7 @@ import {
 } from '#/components/ui/dialog'
 import { Label } from '#/components/ui/label'
 import { Select } from '#/components/ui/select'
+import { dayMonth } from '#/lib/documents/files-tab'
 import { recordPath } from '#/lib/record-path'
 import type {
   AccountBindings,
@@ -67,10 +68,14 @@ export function bindingStateOf(
     case 'paused':
       return {
         tone: 'paused',
-        text: `paused · ${b.error ?? 'no connection'}`,
+        text: `paused · ${pausedLine(b.error)}`,
       }
   }
 }
+
+/** `Priya disconnected 2026-10-09` → `Priya disconnected 9 Oct`; the day is stored as ISO. */
+const pausedLine = (error: string | null): string =>
+  (error ?? 'no connection').replace(/\d{4}-\d{2}-\d{2}$/, (d) => dayMonth(d))
 
 const DOT: Record<Tone, string> = {
   ok: 'bg-primary',
@@ -129,7 +134,7 @@ export function BoundFoldersSection({ view }: { view: AccountBindings }) {
                 {view.choices.at(0)?.label ?? 'storage'} connection
               </span>
               <span className="shrink-0 mono text-micro text-graphite">
-                since {e.since.slice(5, 10)} · {e.targetName}
+                since {dayMonth(e.since)} · {e.targetName}
               </span>
             </div>
           ))}
