@@ -9,7 +9,7 @@ import {
   whyOf,
 } from '@spaces/core/import/plan'
 import { NoLandTail } from '#/components/import/import-wizard'
-import { KeyHint, PageHeader } from '#/components/page-header'
+import { PageHeader } from '#/components/page-header'
 import { ReadoutStrip, countReadout } from '#/components/record/record-parts'
 import type { CountCell } from '#/components/record/record-parts'
 import { Badge } from '#/components/ui/badge'
@@ -83,11 +83,12 @@ export function PreviewHeader({
             Back to mapping
           </Button>
           <Button
+            shortcut="⌘↵"
             disabled={!onCommit || backing}
             pending={committing}
             {...(onCommit ? { onClick: onCommit } : {})}
           >
-            Commit {landing.toLocaleString('en-US')} rows <KeyHint>⌘↵</KeyHint>
+            Commit {landing.toLocaleString('en-US')} rows
           </Button>
         </>
       }

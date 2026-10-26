@@ -44,7 +44,7 @@ import {
   RecordTable,
   TableTools,
 } from '#/components/table/record-table'
-import { KeyHint, PageHeader } from '#/components/page-header'
+import { PageHeader } from '#/components/page-header'
 import { ImportAction } from '#/components/import/import-action'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { useListEnrich } from '#/components/table/bulk-enrich-dialog'
@@ -365,7 +365,6 @@ function PeoplePage() {
     <div className="flex flex-col">
       <PageHeader
         title="People"
-        count={allTotal}
         action={
           <>
             <ImportAction objectSlug="people" />
@@ -527,10 +526,9 @@ function CreatePersonDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">
+        <Button size="sm" shortcut={hotkey?.toUpperCase()}>
           <Plus className="size-4" strokeWidth={2} />
           New person
-          {hotkey ? <KeyHint>{hotkey.toUpperCase()}</KeyHint> : null}
         </Button>
       </DialogTrigger>
       <DialogContent

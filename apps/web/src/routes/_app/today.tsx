@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { MeetingDialog } from '#/components/meeting-dialog'
-import { KeyHint, PageHeader } from '#/components/page-header'
+import { PageHeader } from '#/components/page-header'
 import { ReadoutStrip } from '#/components/record/record-parts'
 import { DayStrip, useNow } from '#/components/today/day-strip'
 import { FirstRun } from '#/components/today/first-run'
@@ -326,18 +326,12 @@ function TodayLedger({
         action={
           <>
             {/* The ledger's composer owns T; the button presses it. */}
-            <Button variant="outline" onClick={runBinding('T')}>
+            <Button variant="outline" shortcut="T" onClick={runBinding('T')}>
               New task
-              <KeyHint>T</KeyHint>
             </Button>
             <LogInteractionDialog
               hotkey="l"
-              trigger={
-                <Button>
-                  Log interaction
-                  <KeyHint>L</KeyHint>
-                </Button>
-              }
+              trigger={<Button shortcut="L">Log interaction</Button>}
             />
           </>
         }

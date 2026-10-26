@@ -1,18 +1,8 @@
 import { useRouter } from '@tanstack/react-router'
-import { CheckIcon } from 'lucide-react'
 import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from '../ui/dropdown-menu'
+import { MENU_RULE, MoreMenu } from '../ui/more-menu'
 import { useConfirm } from '../ui/confirm-dialog'
 import type { ConfirmOptions } from '../ui/confirm-dialog'
 import { cellsFor } from '../dither'
@@ -87,18 +77,6 @@ export function StateLane({ state }: { state: StateWord | null }) {
         </a>
       )}
     </span>
-  )
-}
-
-/** The `···` trigger every row ends on. */
-function MenuTrigger({ name }: { name: string }) {
-  return (
-    <DropdownMenuTrigger
-      aria-label={`More for ${name}`}
-      className="focus-ring flex size-6 shrink-0 items-center justify-center rounded-md mono text-ui text-graphite hover:bg-bone hover:text-foreground data-[state=open]:bg-hairline data-[state=open]:text-paper"
-    >
-      <span aria-hidden>···</span>
-    </DropdownMenuTrigger>
   )
 }
 
@@ -204,6 +182,7 @@ export function FileRow({
   return (
     <li
       data-file={doc.id}
+      data-row
       className={cn(
         'flex h-ledger-row items-center gap-3 border-b border-rule px-3',
         className,
@@ -224,98 +203,75 @@ export function FileRow({
         {followed === null ? endLane(doc, today, inFolder) : followed.end}
       </span>
       <StateLane state={followed === null ? stateWord(doc) : followed.state} />
-      <DropdownMenu>
-        <MenuTrigger name={doc.filename} />
-        <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuItem onSelect={() => openFile(doc, onView)}>
-            Open
-          </DropdownMenuItem>
-          {doc.blobSha === null ? null : (
-            <DropdownMenuItem onSelect={() => void downloadDocument(doc.id)}>
-              Download
-            </DropdownMenuItem>
-          )}
-          {doc.externalUrl === null || where === null ? null : (
-            <DropdownMenuItem asChild>
-              <a
-                href={doc.externalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open in {where}
-              </a>
-            </DropdownMenuItem>
-          )}
-          {isFollowing(doc) ? (
-            <DropdownMenuItem
-              disabled={follow.busy}
-              onSelect={() => void follow.toggle(doc)}
-            >
-              Unfollow
-            </DropdownMenuItem>
-          ) : doc.canFollow ? (
-            <DropdownMenuItem
-              disabled={follow.busy}
-              onSelect={() => void follow.toggle(doc)}
-            >
-              Follow
-              <span className="ml-auto mono text-micro text-graphite">
-                keeps revisions
-              </span>
-            </DropdownMenuItem>
-          ) : null}
-          {inFolder ? null : (
-            <>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>Change kind</DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="w-44">
-                  {KIND_ORDER.map((kind) => (
-                    <DropdownMenuItem
-                      key={kind}
-                      onSelect={() => void setKind(kind)}
-                      className={cn(kind === doc.kind && 'bg-selected')}
-                    >
-                      {DOCUMENT_KIND_LABELS[kind]}
-                      {kind === doc.kind ? (
-                        <CheckIcon
-                          aria-label="current"
-                          className="ml-auto size-3 text-foreground"
-                        />
-                      ) : null}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              {older.length === 0 ? null : (
-                <DropdownMenuItem onSelect={() => setVersioning(true)}>
-                  Newer version of…
-                </DropdownMenuItem>
-              )}
-            </>
-          )}
-          {actions.length === 0 ? null : (
-            <>
-              <DropdownMenuSeparator />
-              {actions.map((a) => (
-                <DropdownMenuItem
-                  key={a.label}
-                  disabled={a.busy}
-                  onSelect={a.run}
-                >
-                  {a.busy ? a.busyLabel : a.label}
-                </DropdownMenuItem>
-              ))}
-            </>
-          )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            variant="destructive"
-            onSelect={() => void remove(doc, 'record')}
-          >
-            {inFolder ? 'Remove from record…' : 'Remove…'}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <MoreMenu
+        variant="row"
+        label={doc.filename}
+        items={[
+          { label: 'Open', onSelect: () => openFile(doc, onView) },
+          ...(doc.blobSha === null
+            ? []
+            : [
+                {
+                  label: 'Download',
+                  onSelect: () => void downloadDocument(doc.id),
+                },
+              ]),
+          ...(doc.externalUrl === null || where === null
+            ? []
+            : [{ label: `Open in ${where}`, href: doc.externalUrl }]),
+          ...(isFollowing(doc)
+            ? [
+                {
+                  label: 'Unfollow',
+                  disabled: follow.busy,
+                  onSelect: () => void follow.toggle(doc),
+                },
+              ]
+            : doc.canFollow
+              ? [
+                  {
+                    label: 'Follow',
+                    hint: 'keeps revisions',
+                    disabled: follow.busy,
+                    onSelect: () => void follow.toggle(doc),
+                  },
+                ]
+              : []),
+          ...(inFolder
+            ? []
+            : [
+                {
+                  label: 'Change kind',
+                  items: KIND_ORDER.map((kind) => ({
+                    label: DOCUMENT_KIND_LABELS[kind],
+                    checked: kind === doc.kind,
+                    onCheckedChange: () => void setKind(kind),
+                  })),
+                },
+                ...(older.length === 0
+                  ? []
+                  : [
+                      {
+                        label: 'Newer version of…',
+                        opens: true,
+                        onSelect: () => setVersioning(true),
+                      },
+                    ]),
+              ]),
+          MENU_RULE,
+          ...actions.map((a) => ({
+            label: a.busy ? a.busyLabel : a.label,
+            disabled: a.busy,
+            onSelect: a.run,
+          })),
+          {
+            label: inFolder ? 'Remove from record…' : 'Remove…',
+            destructive: true,
+            opens: true,
+            onSelect: () => void remove(doc, 'record'),
+          },
+        ]}
+      />
       {removeDialog}
       {older.length === 0 ? null : (
         <NewerVersionDialog

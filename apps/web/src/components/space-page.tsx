@@ -13,7 +13,6 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { KeyHint } from './page-header'
 import {
   RailItem,
   RailSection,
@@ -35,13 +34,7 @@ import { TasksRail } from './tasks-rail'
 import { SaveAsTemplateAction } from './templates'
 import { SensitiveToggle } from './sensitive-toggle'
 import { Button } from './ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from './ui/dropdown-menu'
+import { MENU_RULE, MoreMenu } from './ui/more-menu'
 import { Input } from './ui/input'
 import { spaceStamp } from './ui/stamp'
 import {
@@ -68,7 +61,6 @@ import { runBinding, usePageActions } from '#/lib/page-actions'
 import { openAsk } from '#/lib/ask/dock-store'
 import { findQuestion } from '#/lib/ask/find-view'
 import { useWebSources } from '#/lib/ask/web-sources'
-import { formatDay } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 
 /**
@@ -174,7 +166,7 @@ export function SpacePageView({
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
-        stamp={spaceStamp(spc.ancestors.length, spc.archive?.on ?? null)}
+        stamp={spaceStamp(spc.archive?.on ?? null)}
         archived={archived}
         {...(renaming
           ? {
@@ -187,38 +179,30 @@ export function SpacePageView({
               ),
             }
           : {})}
-        crumb={
-          <nav aria-label="Breadcrumb" className="flex items-center gap-2">
-            <Link
-              to="/spaces"
-              className="focus-ring shrink-0 transition-colors hover:text-foreground"
-            >
-              Spaces
-            </Link>
-            {spc.ancestors.map((a) => (
-              <span key={a.id} className="flex min-w-0 items-center gap-2">
-                <span className="text-rule">/</span>
-                <Link
-                  to="/spaces/$spaceId"
-                  params={{ spaceId: a.id }}
-                  className="focus-ring truncate transition-colors hover:text-foreground"
-                >
-                  {a.name}
-                </Link>
-              </span>
-            ))}
-            <span className="text-rule">·</span>
-            <span className="shrink-0">
-              created {formatDay(spc.createdAt, today)}
-            </span>
-            {spc.isSeeded ? (
-              <>
-                <span className="text-rule max-md:hidden">·</span>
-                <span className="shrink-0 max-md:hidden">seeded</span>
-              </>
-            ) : null}
-          </nav>
-        }
+        suffix={{
+          path: (
+            <nav aria-label="Breadcrumb" className="flex items-center gap-2">
+              <Link
+                to="/spaces"
+                className="focus-ring shrink-0 transition-colors hover:text-foreground"
+              >
+                Spaces
+              </Link>
+              {spc.ancestors.map((a) => (
+                <span key={a.id} className="flex min-w-0 items-center gap-2">
+                  <span className="text-rule">/</span>
+                  <Link
+                    to="/spaces/$spaceId"
+                    params={{ spaceId: a.id }}
+                    className="focus-ring truncate transition-colors hover:text-foreground"
+                  >
+                    {a.name}
+                  </Link>
+                </span>
+              ))}
+            </nav>
+          ),
+        }}
         actions={
           <>
             <SensitiveToggle
@@ -226,9 +210,12 @@ export function SpacePageView({
               state={sensitivity}
               as="button"
             />
-            <Button variant="outline" onClick={() => void newNote()}>
+            <Button
+              variant="outline"
+              shortcut="N"
+              onClick={() => void newNote()}
+            >
               Note here
-              <KeyHint>N</KeyHint>
             </Button>
             {/* Absent until a watch engine is installed. */}
             {watching.installed.length > 0 ? (
@@ -429,93 +416,74 @@ function SpaceMenu({
   const navigate = useNavigate()
   const finders = useWebSources()
   useEffect(() => syncStarredSpaceName({ id, name }), [id, name])
-  // Save as template: focus goes to the window it opens, not to ···.
-  const keepFocus = useRef(false)
-  const opening = (open: () => void) => () => {
-    keepFocus.current = true
-    open()
-  }
-  // Rename and New subspace open a field once the menu's focus trap has let
-  // go; opened inside it, the autofocus is pulled back to the item, which
-  // unmounts and leaves focus on the body.
-  const afterClose = useRef<(() => void) | null>(null)
-  const afterClosing = (open: () => void) => () => {
-    afterClose.current = open
-  }
+  // Rename, New subspace, Move to… and Save as template… open a field or a
+  // window, so each runs once the menu's focus trap has let go; opened inside
+  // it, the autofocus is pulled back to the item, which unmounts and leaves
+  // focus on the body.
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" aria-label={`More for ${name}`}>
-          <span aria-hidden className="mono text-ui">
-            ···
-          </span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="w-48"
-        onCloseAutoFocus={(e) => {
-          if (keepFocus.current || afterClose.current) e.preventDefault()
-          keepFocus.current = false
-          afterClose.current?.()
-          afterClose.current = null
-        }}
-      >
-        <DropdownMenuItem onSelect={() => openAsk()}>
-          <MessageSquareText className="size-4" />
-          Ask about this
-        </DropdownMenuItem>
-        {/* Opens Ask with this space and the web in scope. */}
-        <DropdownMenuItem
-          onSelect={() =>
+    <MoreMenu
+      variant="head"
+      label={name}
+      items={[
+        {
+          label: 'Ask about this',
+          icon: <MessageSquareText className="size-4" />,
+          onSelect: () => openAsk(),
+        },
+        // Opens Ask with this space and the web in scope.
+        {
+          label: 'Find companies',
+          icon: <Search className="size-4" />,
+          hint: finders.length > 0 ? undefined : 'Add an Exa key ›',
+          onSelect: () =>
             finders.length > 0
               ? openAsk({ draft: findQuestion(name, criteria), web: true })
-              : void navigate({ to: '/settings/plugins' })
-          }
-        >
-          <Search className="size-4" />
-          Find companies
-          {finders.length > 0 ? null : (
-            <span className="ml-auto mono text-micro text-graphite">
-              Add an Exa key ›
-            </span>
-          )}
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => toggleStarredSpace({ id, name })}>
-          <Star className="size-4" />
-          {starred ? 'Unstar' : 'Star'}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={afterClosing(onRename)}>
-          <Pencil className="size-4" />
-          Rename
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={afterClosing(onSubspace)}>
-          <Plus className="size-4" />
-          New subspace
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={onMove}>
-          <CornerDownRight className="size-4" />
-          Move to…
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={opening(onTemplate)}>
-          <LayoutTemplate className="size-4" />
-          Save as template…
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        {archived ? (
-          <DropdownMenuItem onSelect={onRestore}>
-            <ArchiveRestore className="size-4" />
-            Restore
-          </DropdownMenuItem>
-        ) : (
-          <DropdownMenuItem onSelect={onArchive}>
-            <Archive className="size-4" />
-            Archive
-          </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+              : void navigate({ to: '/settings/plugins' }),
+        },
+        {
+          label: starred ? 'Unstar' : 'Star',
+          icon: <Star className="size-4" />,
+          onSelect: () => toggleStarredSpace({ id, name }),
+        },
+        MENU_RULE,
+        {
+          label: 'Rename',
+          icon: <Pencil className="size-4" />,
+          onSelect: onRename,
+          opens: true,
+        },
+        {
+          label: 'New subspace',
+          icon: <Plus className="size-4" />,
+          onSelect: onSubspace,
+          opens: true,
+        },
+        {
+          label: 'Move to…',
+          icon: <CornerDownRight className="size-4" />,
+          onSelect: onMove,
+          opens: true,
+        },
+        {
+          label: 'Save as template…',
+          icon: <LayoutTemplate className="size-4" />,
+          onSelect: onTemplate,
+          opens: true,
+        },
+        MENU_RULE,
+        archived
+          ? {
+              label: 'Restore',
+              icon: <ArchiveRestore className="size-4" />,
+              onSelect: onRestore,
+            }
+          : {
+              label: 'Archive',
+              icon: <Archive className="size-4" />,
+              onSelect: onArchive,
+            },
+      ]}
+    />
   )
 }
 

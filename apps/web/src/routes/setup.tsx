@@ -1,7 +1,6 @@
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { AuthShell, FieldHint, FormError } from '#/components/auth-shell'
-import { KeyHint } from '#/components/page-header'
 import { PasswordInput } from '#/components/password-input'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
@@ -159,7 +158,6 @@ function AdminStep({ onDone }: { onDone: () => void }) {
 
         <Button type="submit" className="w-full" pending={pending}>
           {pending ? 'Creating…' : 'Create account'}
-          <KeyHint>↵</KeyHint>
         </Button>
       </form>
     </AuthShell>

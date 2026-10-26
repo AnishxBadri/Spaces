@@ -61,6 +61,8 @@ await vi.hoisted(async () => {
 })
 
 vi.mock('#/lib/server-fns', () => ({
+  getRecordEmailVisibility: vi.fn(() => Promise.resolve({ workspace: false })),
+  setRecordEmailVisibility: vi.fn(() => Promise.resolve()),
   writeUpInteraction: vi.fn(),
   listUsers: vi.fn(),
   searchEntities: vi.fn(),
@@ -341,7 +343,7 @@ describe('the Interactions tab', () => {
     expect(el.querySelector('a')?.textContent).toBe('email p')
   })
 
-  it('offers the record override in the head’s ··· to a viewer with private emails here (D67)', async () => {
+  it('offers the record override to a viewer with private emails here, its one item a switch (D67)', async () => {
     const el = await mount(
       <RecordInteractions
         items={[interaction('m', 'email', { ownPrivate: true })]}
@@ -349,12 +351,14 @@ describe('the Interactions tab', () => {
         recordId="00000000-0000-4000-8000-0000000000aa"
       />,
     )
-    expect(
-      el.querySelector('[aria-label="More for interactions"]'),
-    ).not.toBeNull()
+    // A menu of one is that item (A7), and a toggle shows as a switch.
+    expect(el.querySelector('[aria-label="More for interactions"]')).toBeNull()
+    const toggle = el.querySelector('[role="switch"]')
+    expect(toggle?.textContent).toBe('My emails visible to the workspace')
+    expect(toggle?.getAttribute('aria-checked')).toBe('false')
   })
 
-  it('offers no ··· to a viewer whose emails here are none of theirs', async () => {
+  it('offers no override to a viewer whose emails here are none of theirs', async () => {
     const el = await mount(
       <RecordInteractions
         items={[interaction('t', 'email', { privateBody: true })]}
@@ -362,7 +366,7 @@ describe('the Interactions tab', () => {
         recordId="00000000-0000-4000-8000-0000000000aa"
       />,
     )
-    expect(el.querySelector('[aria-label="More for interactions"]')).toBeNull()
+    expect(el.querySelector('[role="switch"]')).toBeNull()
   })
 
   it('draws a 40px row: glyph, subject, participants, the summary clamped at two lines, chips', async () => {

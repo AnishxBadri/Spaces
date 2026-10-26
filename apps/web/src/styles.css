@@ -499,61 +499,48 @@
 }
 
 /**
- * The ink stamp: mono caps in paper on an ink label with cut ends, naming
- * what the page is (`COMPANY 3f2a9c1b`, `SPACE · depth 2`). One per page.
+ * The ink stamp: a plain ink rectangle, 22px, the kind in mono caps in paper
+ * (`COMPANY`, `SPACE`). One per page.
+ * - The 1px border is the fill's own colour, so the outline below swaps the
+ *   ground without moving a pixel.
  */
 @utility stamp {
-  --stamp-cut: 6px;
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
-  height: 1.25rem;
+  gap: 0.375rem;
+  box-sizing: border-box;
+  height: 1.375rem;
   padding-inline: 0.625rem;
+  border: 1px solid var(--hairline);
   font-family: var(--font-mono);
   font-size: var(--text-micro);
-  line-height: var(--text-micro--line-height);
+  line-height: 0.875rem;
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
   background: var(--hairline);
-  color: var(--stamp-ink, var(--paper));
-  clip-path: polygon(
-    var(--stamp-cut) 0,
-    calc(100% - var(--stamp-cut)) 0,
-    100% 50%,
-    calc(100% - var(--stamp-cut)) 100%,
-    var(--stamp-cut) 100%,
-    0 50%
-  );
+  color: var(--paper);
 }
 
 /**
- * An archived thing's stamp: the same shape in outline. Used with `stamp`.
- * - A border would be clipped off the cut ends, so the outline is the ink
- *   label with a paper label 1px inside it, on `::before` under the text.
+ * A row's `···`: hidden until its nearest `data-row` is hovered or holds
+ * focus, and while its menu is open. Outside a row, and on a device with no
+ * hover, it simply shows.
  */
-@utility stamp-outline {
-  --stamp-ink: var(--foreground);
-  position: relative;
-  isolation: isolate;
-
-  &::before {
-    --stamp-inner-cut: calc(var(--stamp-cut) * 0.9);
-    content: '';
-    position: absolute;
-    inset: 1px;
-    z-index: -1;
-    background: var(--paper);
-    clip-path: polygon(
-      var(--stamp-inner-cut) 0,
-      calc(100% - var(--stamp-inner-cut)) 0,
-      100% 50%,
-      calc(100% - var(--stamp-inner-cut)) 100%,
-      var(--stamp-inner-cut) 100%,
-      0 50%
-    );
+@utility row-reveal {
+  @media (hover: hover) {
+    [data-row]:not(:hover, :focus-within) &:not([data-state='open']) {
+      opacity: 0;
+    }
   }
+}
+
+/** An archived thing's stamp: 1px ink on paper. Used with `stamp`. */
+@utility stamp-outline {
+  background: var(--paper);
+  color: var(--foreground);
 }
 
 /**

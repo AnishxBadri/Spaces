@@ -239,9 +239,13 @@ function TermForm({
         <Button size="sm" variant="ghost" type="button" onClick={onCancel}>
           Cancel
         </Button>
-        <Button size="sm" type="submit" disabled={pending || !name.trim()}>
+        <Button
+          size="sm"
+          type="submit"
+          shortcut="⌘↵"
+          disabled={pending || !name.trim()}
+        >
           {pending ? 'Saving…' : existing ? 'Save' : 'Define'}
-          <kbd className="mono text-micro opacity-85">⌘↵</kbd>
         </Button>
       </div>
     </form>

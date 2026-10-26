@@ -374,7 +374,6 @@ function CompaniesPage() {
     <div className="flex flex-col">
       <PageHeader
         title="Companies"
-        count={allTotal}
         action={
           <>
             <ImportAction objectSlug="companies" />

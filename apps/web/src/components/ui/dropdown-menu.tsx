@@ -56,7 +56,7 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "data-[variant=destructive]:focus:text-destructive=destructive]:focus:bg-destructive/20 relative flex h-7 cursor-default items-center gap-2 rounded-none px-2 py-0 text-ui outline-hidden select-none focus:bg-bone focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-graphite data-[variant=destructive]:*:[svg]:text-destructive!",
+        "relative flex h-7 cursor-default items-center gap-2 rounded-none px-2 py-0 text-ui outline-hidden select-none focus:bg-bone focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-graphite data-[variant=destructive]:*:[svg]:text-destructive!",
         className,
       )}
       {...props}
@@ -151,7 +151,7 @@ function DropdownMenuSubTrigger({
       data-slot="dropdown-menu-sub-trigger"
       data-inset={inset}
       className={cn(
-        "flex cursor-default items-center gap-2 rounded-none px-2 py-1.5 text-ui outline-hidden select-none focus:bg-bone focus:text-foreground data-[inset]:pl-8 data-[state=open]:bg-bone data-[state=open]:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-graphite",
+        "flex h-7 cursor-default items-center gap-2 rounded-none px-2 py-0 text-ui outline-hidden select-none focus:bg-bone focus:text-foreground data-[inset]:pl-8 data-[state=open]:bg-bone data-[state=open]:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-graphite",
         className,
       )}
       {...props}

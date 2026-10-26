@@ -121,9 +121,12 @@ export function SpaceMoveDialog({
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button disabled={!target || busy} onClick={() => void move()}>
+          <Button
+            shortcut="⌘↵"
+            disabled={!target || busy}
+            onClick={() => void move()}
+          >
             Move
-            <kbd className="mono text-micro opacity-85">⌘↵</kbd>
           </Button>
         </DialogFooter>
       </DialogContent>

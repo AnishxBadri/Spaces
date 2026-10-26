@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { INSTRUMENT_LABELS, ledgerSentence } from '@spaces/core/import/ledger'
 import { NoLandTail, StepStrip } from '#/components/import/import-wizard'
-import { KeyHint, PageHeader } from '#/components/page-header'
+import { PageHeader } from '#/components/page-header'
 import { ReadoutStrip, countReadout } from '#/components/record/record-parts'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -202,12 +202,12 @@ export function LedgerPreviewStep({
               Back to mapping
             </Button>
             <Button
+              shortcut="⌘↵"
               disabled={!onCommit || landing === 0 || busy}
               pending={committing}
               onClick={onCommit}
             >
-              Commit {landing.toLocaleString('en-US')} rows{' '}
-              <KeyHint>⌘↵</KeyHint>
+              Commit {landing.toLocaleString('en-US')} rows
             </Button>
           </>
         }

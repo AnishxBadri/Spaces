@@ -2,12 +2,7 @@ import { useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from './ui/dropdown-menu'
+import { MoreMenu } from './ui/more-menu'
 import { LabelHead } from './ledger-section'
 import { DocumentPreview } from './document-preview'
 import { AddRow, LinkFetchRow, useLinkFetches } from './record-files-link'
@@ -385,21 +380,21 @@ export function RecordFiles({
         >
           Upload
         </Button>
-        {folderLink.canLink ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              aria-label="More ways to add files"
-              className="focus-ring flex size-[1.625rem] shrink-0 items-center justify-center rounded-md border border-hairline bg-paper mono text-ui hover:bg-bone data-[state=open]:bg-hairline data-[state=open]:text-paper"
-            >
-              <span aria-hidden>···</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem onSelect={() => void folderPicker.open()}>
-                Link a Drive folder…
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
+        <MoreMenu
+          variant="row"
+          label="adding files"
+          items={
+            folderLink.canLink
+              ? [
+                  {
+                    label: 'Link a Drive folder…',
+                    onSelect: () => void folderPicker.open(),
+                    opens: true,
+                  },
+                ]
+              : []
+          }
+        />
       </AddRow>
       {folderPicker.sheet}
       <input

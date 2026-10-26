@@ -54,22 +54,24 @@ function TermPage() {
     <div className="flex min-h-full flex-col">
       <RecordHeader
         stamp={{ kind: 'Term' }}
-        crumb={
-          <>
-            {'Terms / '}
-            {term.space ? (
-              <Link
-                to="/spaces/$spaceId"
-                params={{ spaceId: term.space.id }}
-                className="focus-ring hover:text-foreground"
-              >
-                {term.space.name}
-              </Link>
-            ) : (
-              'Workspace'
-            )}
-          </>
-        }
+        suffix={{
+          path: (
+            <>
+              {'Terms / '}
+              {term.space ? (
+                <Link
+                  to="/spaces/$spaceId"
+                  params={{ spaceId: term.space.id }}
+                  className="focus-ring hover:text-foreground"
+                >
+                  {term.space.name}
+                </Link>
+              ) : (
+                'Workspace'
+              )}
+            </>
+          ),
+        }}
         mark={<DitherMark />}
         name={term.name}
         readouts={[

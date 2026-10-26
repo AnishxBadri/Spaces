@@ -12,7 +12,7 @@ import { useMemo, useState } from 'react'
 import { EmptyState } from '#/components/empty-state'
 import { IconBadge, RecordLinkCell } from '#/components/table/cells'
 import { RecordTable, TableToolbar } from '#/components/table/record-table'
-import { PageHeader } from '#/components/page-header'
+import { HeadCount, PageHeader } from '#/components/page-header'
 import { PortfolioHeadlineStrip } from '#/components/portfolio-headline'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { listHoldings } from '#/lib/server-fns'
@@ -202,8 +202,7 @@ function PortfolioPage() {
   return (
     <div className="flex flex-col">
       <PageHeader
-        title="Portfolio"
-        count={data.holdings.length}
+        title={<HeadCount title="Portfolio" count={data.holdings.length} />}
         description={
           excluded > 0 ? (
             <span>

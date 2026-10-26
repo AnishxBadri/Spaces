@@ -3,11 +3,6 @@ import type { ReactElement, ReactNode } from 'react'
 import { SettingsForm, useInSettingsForm } from './settings-form'
 import type { SettingsCrumb } from './settings-nav'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '#/components/ui/dropdown-menu'
-import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -212,32 +207,5 @@ export function SettingsRow({
         </div>
       ) : null}
     </div>
-  )
-}
-
-/**
- * A ledger row's `···`: its verbs in a menu, in a fixed 24px lane at the row's
- * end so the lane lines up down the ledger. Children are menu items.
- */
-export function SettingsRowMenu({
-  label,
-  children,
-}: {
-  /** The row, as the trigger names it to a screen reader: "More for Maya". */
-  label: string
-  children: ReactNode
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        aria-label={`More for ${label}`}
-        className="focus-ring flex size-6 shrink-0 items-center justify-center rounded-md mono text-ui text-graphite hover:bg-bone hover:text-foreground data-[state=open]:bg-hairline data-[state=open]:text-paper"
-      >
-        <span aria-hidden>···</span>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44">
-        {children}
-      </DropdownMenuContent>
-    </DropdownMenu>
   )
 }

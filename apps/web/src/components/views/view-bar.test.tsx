@@ -134,7 +134,7 @@ async function mount(opts: {
 }
 
 const trigger = () =>
-  document.querySelector('button[aria-label="View menu for Seed, India"]')
+  document.querySelector('button[aria-label="More for the Seed, India view"]')
 
 /** Turn the event loop inside `act` until `done` holds, or fail naming `what`. */
 async function until(what: string, done: () => boolean) {
@@ -171,35 +171,28 @@ const items = () =>
     el.textContent.trim(),
   )
 
-async function choose(label: string) {
-  const item = Array.from(document.querySelectorAll('[role="menuitem"]')).find(
-    (el) => el.textContent.trim() === label,
+/** Click the button reading `label`. */
+async function press(label: string) {
+  const button = Array.from(document.querySelectorAll('button')).find(
+    (b) => b.textContent.trim() === label,
   )
-  if (!(item instanceof HTMLElement)) throw new Error(`no ${label}`)
+  if (!(button instanceof HTMLElement)) throw new Error(`no ${label}`)
   await act(async () => {
-    item.click()
+    button.click()
   })
-  // The close is done when focus is back on the trigger: the menu's focus
-  // scope returns it on a timer, which must not land inside the next open.
-  await until(
-    'closed',
-    () => menu() === null && document.activeElement === trigger(),
-  )
 }
 
 describe('the view menu', () => {
-  it('pins a view someone else owns, then unpins it', async () => {
+  it('pins a view someone else owns, then unpins it, its one verb a button', async () => {
     await mount({ objectId: SEED.objectId, canEdit: false })
-    await openMenu()
-    expect(items()).toEqual(['Pin to sidebar'])
-    await choose('Pin to sidebar')
+    // A menu of one is that item: no `···`, the verb itself.
+    expect(trigger()).toBeNull()
+    await press('Pin to sidebar')
     expect(localStorage.getItem('chassis:pinned-views')).toBe(
       JSON.stringify([SEED.id]),
     )
 
-    await openMenu()
-    expect(items()).toEqual(['Unpin'])
-    await choose('Unpin')
+    await press('Unpin')
     expect(localStorage.getItem('chassis:pinned-views')).toBe('[]')
   })
 

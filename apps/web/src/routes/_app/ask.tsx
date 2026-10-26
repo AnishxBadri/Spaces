@@ -23,12 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '#/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '#/components/ui/dropdown-menu'
+import { MoreMenu } from '#/components/ui/more-menu'
 import { openAsk } from '#/lib/ask/dock-store'
 import { chipKey, withMention } from '#/lib/ask/page-scope'
 import { scopeWords } from '#/lib/ask/types'
@@ -84,8 +79,9 @@ function ThreadRow({
   }
   return (
     <li
+      data-row
       className={cn(
-        'group flex min-h-ledger-row items-center gap-2 border-b border-rule px-3',
+        'flex min-h-ledger-row items-center gap-2 border-b border-rule px-3',
         current && 'bg-selected',
       )}
     >
@@ -119,25 +115,19 @@ function ThreadRow({
           </span>
         </Link>
       )}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            aria-label={`More for ${row.title}`}
-            className="focus-ring shrink-0 rounded-md px-1 mono text-ui text-graphite opacity-0 group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100"
-          >
-            ···
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-40">
-          <DropdownMenuItem onSelect={() => setRenaming(true)}>
-            Rename
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onDelete(row)}>
-            Delete…
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <MoreMenu
+        variant="row"
+        label={row.title}
+        items={[
+          { label: 'Rename', opens: true, onSelect: () => setRenaming(true) },
+          {
+            label: 'Delete…',
+            destructive: true,
+            opens: true,
+            onSelect: () => onDelete(row),
+          },
+        ]}
+      />
     </li>
   )
 }

@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode, Ref } from 'react'
-import { Stamp } from './ui/stamp'
-import type { StampProps } from './ui/stamp'
 import { cn } from '#/lib/utils'
 
 /**
  * The sticky head: once a page or record head's title scrolls out, the head
- * folds to a 40px bar — the title in serif at the ui step, the stamp, and the
- * head's own actions. `PageHeader` and `RecordHeader` own it.
+ * folds to a 40px bar — a record's mark, the title in serif at the title
+ * step, an optional mono meta, and the head's own actions at 26px.
+ * `PageHeader` and `RecordHeader` own it.
  * - Nothing below moves: the bar hangs from a zero-height sticky anchor and
  *   enters on transform and opacity only.
  * - The actions are never rendered twice. The head's own element turns
@@ -71,15 +70,21 @@ export function useHeadFold() {
  * The 40px bar. Always mounted, decorative to assistive tech (the head's h1
  * and its real actions stay the accessible ones), on `z-sticky`, isolated.
  * Enter 180ms, exit 120ms; reduced motion just shows or hides it.
+ * - `mark` is a record's head mark, drawn at 16px in a hairline box. It is a
+ *   second copy of the head's, so it is `inert`: nothing in it takes focus
+ *   or a pointer.
  */
 export function HeadBar({
   fold,
   title,
-  stamp,
+  mark,
+  meta,
 }: {
   fold: HeadFold
   title: ReactNode
-  stamp?: StampProps | undefined
+  mark?: ReactNode
+  /** Mono beside the title, on its baseline. */
+  meta?: ReactNode
 }) {
   return (
     <div
@@ -90,16 +95,31 @@ export function HeadBar({
         aria-hidden
         data-head-bar
         data-folded={fold.folded}
-        className="absolute inset-x-0 top-0 isolate flex h-10 -translate-y-full items-center gap-3 border-b border-hairline bg-paper px-8 opacity-0 transition-[transform,opacity] duration-[120ms] ease-out-quart data-[folded=true]:pointer-events-auto data-[folded=true]:translate-y-0 data-[folded=true]:opacity-100 data-[folded=true]:duration-[180ms] motion-reduce:transition-none"
+        className="absolute inset-x-0 top-0 isolate flex h-10 -translate-y-full items-center gap-3 border-b border-hairline bg-paper px-4 opacity-0 transition-[transform,opacity] duration-[120ms] ease-out-quart data-[folded=true]:pointer-events-auto data-[folded=true]:translate-y-0 data-[folded=true]:opacity-100 data-[folded=true]:duration-[180ms] motion-reduce:transition-none"
         style={
           fold.folded
-            ? { paddingRight: `calc(3rem + ${fold.width}px)` }
+            ? { paddingRight: `calc(2rem + ${fold.width}px)` }
             : undefined
         }
       >
-        {stamp ? <Stamp {...stamp} /> : null}
-        <span className="min-w-0 truncate font-serif text-ui font-semibold">
-          {title}
+        {mark === undefined || mark === null ? null : (
+          <span
+            inert
+            data-head-bar-mark
+            className="pointer-events-none flex size-4 shrink-0 items-center justify-center overflow-hidden border border-hairline"
+          >
+            <span className="flex shrink-0 scale-50">{mark}</span>
+          </span>
+        )}
+        <span className="flex min-w-0 items-baseline gap-2.5">
+          <span className="min-w-0 truncate font-serif text-title font-semibold">
+            {title}
+          </span>
+          {meta === undefined || meta === null ? null : (
+            <span className="shrink-0 mono text-micro text-graphite">
+              {meta}
+            </span>
+          )}
         </span>
       </div>
     </div>
@@ -134,7 +154,9 @@ export function HeadActions({
         data-folded={fold.folded}
         className={cn(
           'flex items-center gap-2',
-          'data-[folded=true]:fixed data-[folded=true]:top-12 data-[folded=true]:right-8 data-[folded=true]:z-sticky data-[folded=true]:h-10 md:data-[folded=true]:top-0',
+          'data-[folded=true]:fixed data-[folded=true]:top-12 data-[folded=true]:right-4 data-[folded=true]:z-sticky data-[folded=true]:h-10 md:data-[folded=true]:top-0',
+          // Folded, every action steps down to 26px to sit inside the bar.
+          'data-[folded=true]:[&_[data-size=icon]]:w-6.5 data-[folded=true]:[&_[data-slot=button]]:h-6.5',
           'data-[folded=true]:animate-in data-[folded=true]:duration-[180ms] data-[folded=true]:fade-in-0 motion-reduce:animate-none',
         )}
       >

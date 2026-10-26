@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { ReactNode } from 'react'
 import { DitherBlock } from '#/components/dither'
-import { KeyHint, PageHeader } from '#/components/page-header'
+import { PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'
 import { Select } from '#/components/ui/select'
 import { Tabs } from '#/components/ui/tabs'
@@ -95,11 +95,12 @@ export function ImportHeader({
             {discarding ? 'Discarding…' : 'Discard'}
           </Button>
           <Button
+            shortcut="⌘↵"
             disabled={!onContinue}
             pending={continuing}
             onClick={onContinue}
           >
-            Continue <KeyHint>⌘↵</KeyHint>
+            Continue
           </Button>
         </>
       }

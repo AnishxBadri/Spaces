@@ -2,7 +2,6 @@ import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import {
   SettingsGroupHead,
-  SettingsRowMenu,
   SettingsSection,
 } from '#/components/settings/settings-section'
 import { Badge } from '#/components/ui/badge'
@@ -11,9 +10,9 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
+import { MoreMenu } from '#/components/ui/more-menu'
 import { updateTemplate } from '#/lib/server-fns'
 import type { listTemplates } from '#/lib/server-fns'
 
@@ -102,7 +101,7 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
           <span className="min-w-0 flex-1">Template</span>
           <span className="w-32 shrink-0">Kind</span>
           <span className="w-56 shrink-0">Offered first on</span>
-          <span className="w-6 shrink-0" />
+          <span className="w-16 shrink-0" />
         </div>
         {live.length === 0 ? (
           <p className="border-b border-rule py-3 text-label text-graphite">
@@ -113,6 +112,7 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
             <div
               key={t.id}
               data-template-row
+              data-row
               className="flex h-12 items-center gap-3 border-b border-rule"
             >
               <span className="min-w-0 flex-1 truncate text-ui font-medium">
@@ -134,15 +134,23 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
                   }
                 />
               </span>
-              <SettingsRowMenu label={t.name}>
-                <DropdownMenuItem
-                  onSelect={() =>
-                    patch(t.id, { archived: true }, `${t.name} archived`)
-                  }
-                >
-                  Archive
-                </DropdownMenuItem>
-              </SettingsRowMenu>
+              <span className="flex w-16 shrink-0 justify-end">
+                <MoreMenu
+                  variant="row"
+                  label={t.name}
+                  items={[
+                    {
+                      label: 'Archive',
+                      onSelect: () =>
+                        void patch(
+                          t.id,
+                          { archived: true },
+                          `${t.name} archived`,
+                        ),
+                    },
+                  ]}
+                />
+              </span>
             </div>
           ))
         )}
@@ -154,6 +162,7 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
           {archived.map((t) => (
             <div
               key={t.id}
+              data-row
               className="flex h-12 items-center gap-3 border-b border-rule"
             >
               <span className="min-w-0 flex-1 truncate text-ui text-graphite line-through">

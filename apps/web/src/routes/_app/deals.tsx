@@ -39,7 +39,7 @@ import {
 } from '#/components/table/record-table'
 import { ListMenu } from '#/components/table/list-menu'
 import { FilterCount, FilterRow, FilterTab } from '#/components/filter-row'
-import { KeyHint, PageHeader } from '#/components/page-header'
+import { PageHeader } from '#/components/page-header'
 import { ImportAction } from '#/components/import/import-action'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
@@ -383,7 +383,6 @@ function DealsPage() {
     <div className="flex flex-col">
       <PageHeader
         title="Deals"
-        count={deals.rows.length}
         action={
           <>
             <ImportAction objectSlug="deals" />
@@ -617,10 +616,9 @@ export function CreateDealDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button size="sm">
+          <Button size="sm" shortcut={hotkey?.toUpperCase()}>
             <Plus className="size-4" strokeWidth={2} />
             {triggerLabel}
-            {hotkey ? <KeyHint>{hotkey.toUpperCase()}</KeyHint> : null}
           </Button>
         )}
       </DialogTrigger>

@@ -324,7 +324,6 @@ function GeoChips({
         >
           <span className="mono text-primary">+</span>
           Add a geography…
-          <kbd className="mono text-micro">↵</kbd>
         </button>
       )}
     </>

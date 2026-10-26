@@ -1,42 +1,58 @@
+import { Lock } from 'lucide-react'
 import { formatDay } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
-import { cn } from '#/lib/utils'
 
 /**
- * The ink stamp: what the page is, in mono caps on an ink label with cut
- * ends — `COMPANY 3f2a9c1b`, `SPACE · depth 2`. One per page, beside the
- * crumb; `RecordHeader` takes exactly one.
- * - An archived thing's stamp is the same shape in outline, carrying the
- *   day it was archived.
+ * The ink stamp: what the page is, the kind alone in mono caps on a plain
+ * ink rectangle — `COMPANY`, `SPACE`. One per page, on its own row above the
+ * title; `RecordHeader` takes exactly one.
+ * - `sensitive` appends a lock and `SENSITIVE`.
+ * - `archived` is the outline: 1px ink on paper, `ARCHIVED` and the day.
  */
-export type StampProps = {
-  /** The kind of thing — `Company`, an object's singular, `Space`. */
-  kind: string
-  /** One identifying fact: the short id the head shows, or `· depth 2`. */
-  fact?: string | undefined
-  /** ISO date or timestamp the thing was archived; draws the outline. */
-  archivedOn?: string | null | undefined
+export type StampProps =
+  | {
+      /** The kind of thing — `Company`, an object's singular, `Space`. */
+      kind: string
+      state?: 'sensitive' | undefined
+    }
+  | {
+      kind: string
+      state: 'archived'
+      /** ISO date or timestamp the thing was archived. */
+      archivedOn: string
+    }
+
+/** A space's stamp: `SPACE`, outlined with the day once archived. */
+export function spaceStamp(archivedOn: string | null = null): StampProps {
+  return archivedOn === null
+    ? { kind: 'Space' }
+    : { kind: 'Space', state: 'archived', archivedOn }
 }
 
-/** A space's stamp: its depth in the tree, a top-level space at 0. */
-export function spaceStamp(
-  depth: number,
-  archivedOn: string | null = null,
-): StampProps {
-  return { kind: 'Space', fact: `· depth ${depth}`, archivedOn }
-}
-
-export function Stamp({ kind, fact, archivedOn }: StampProps) {
+export function Stamp(props: StampProps) {
   const { today } = useClock()
-  const archived = archivedOn !== undefined && archivedOn !== null
+  if (props.state === 'archived') {
+    return (
+      <span data-stamp="archived" className="stamp stamp-outline">
+        Archived
+        <span className="normal-case">
+          {formatDay(props.archivedOn, today)}
+        </span>
+      </span>
+    )
+  }
   return (
     <span
-      data-stamp={archived ? 'archived' : 'live'}
-      className={cn('stamp', archived && 'stamp-outline')}
+      data-stamp={props.state === 'sensitive' ? 'sensitive' : 'live'}
+      className="stamp"
     >
-      {kind}
-      {fact ? ` ${fact}` : ''}
-      {archived ? ` · archived ${formatDay(archivedOn, today)}` : ''}
+      {props.kind}
+      {props.state === 'sensitive' ? (
+        <>
+          <Lock aria-hidden className="size-3" strokeWidth={2} />
+          Sensitive
+        </>
+      ) : null}
     </span>
   )
 }

@@ -165,8 +165,8 @@ const mount = async () => {
 
 const text = (el: Element | null) => (el?.textContent ?? '').trim()
 
-const button = (match: RegExp) => {
-  const found = [...document.querySelectorAll('button')].find((b) =>
+const button = (match: RegExp, scope: ParentNode = document) => {
+  const found = [...scope.querySelectorAll('button')].find((b) =>
     match.test(text(b)),
   )
   if (found === undefined) throw new Error(`no button ${String(match)}`)
@@ -211,7 +211,7 @@ describe('the estimate window', () => {
   it('shows the skips by reason and credits per source; Cancel queues nothing', async () => {
     await mount()
     await click(labelled('Select Co 1'))
-    await click(button(/^Enrich…$/))
+    await click(button(/^Enrich…$/, bar() ?? document))
     expect(fns.estimateBulkEnrich).toHaveBeenCalledWith({
       data: { kind: 'company', target: { ids: [ROWS[0]?.id] } },
     })
@@ -234,7 +234,7 @@ describe('the estimate window', () => {
     await mount()
     await click(labelled('Select Co 1'))
     await click(labelled('Select Co 3'))
-    await click(button(/^Enrich…$/))
+    await click(button(/^Enrich…$/, bar() ?? document))
     await click(button(/^Enrich 34/))
     expect(fns.bulkEnrich).toHaveBeenCalledTimes(1)
     expect(fns.bulkEnrich).toHaveBeenCalledWith({
@@ -268,29 +268,19 @@ describe('the estimate window', () => {
     )
     await mount()
     await click(labelled('Select Co 1'))
-    await click(button(/^Enrich…$/))
+    await click(button(/^Enrich…$/, bar() ?? document))
     expect(text(document.querySelector('[data-estimate-parks]'))).toBe(
       '6 park until 00:00 UTC · Apollo’s daily cap',
     )
   })
 
-  it('the head ··· estimates the list as its view shows it', async () => {
+  it('the head’s Enrich… estimates the list as its view shows it', async () => {
     await mount()
-    const trigger = labelled('More for Companies')
-    if (!(trigger instanceof HTMLElement)) throw new Error('no trigger')
-    await act(async () => {
-      trigger.focus()
-      trigger.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
-      )
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    })
-    const item = [...document.querySelectorAll('[role="menuitem"]')].find(
-      (el) => text(el) === 'Enrich…',
+    // The head's `···` holds one verb, so it is that verb as a button.
+    expect(document.querySelector('[aria-label="More for Companies"]')).toBe(
+      null,
     )
-    if (!(item instanceof HTMLElement)) throw new Error('no Enrich…')
-    await act(async () => item.click())
-    await flush()
+    await click(button(/^Enrich…$/))
     await flush()
     expect(fns.estimateBulkEnrich).toHaveBeenCalledWith({
       data: { kind: 'company', target: { conditions: [], q: 'co' } },

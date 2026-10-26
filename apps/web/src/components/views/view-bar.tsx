@@ -18,15 +18,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '#/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
+import { MENU_RULE, MoreMenu } from '#/components/ui/more-menu'
 import {
   Popover,
   PopoverContent,
@@ -195,6 +189,18 @@ export function ViewBar({
     return saved
   }
 
+  async function deleteActive(view: ViewRow) {
+    try {
+      await deleteView({ data: { id: view.id, ...viewTarget(objectId) } })
+      toast(`${view.name} deleted`)
+      if (pins.includes(view.id)) refreshPins()
+      onApply(null)
+      onSaved()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not delete')
+    }
+  }
+
   const items: Array<TabItem<string>> = [
     { id: ALL, label: 'All', count: total },
     ...views.map((v) => {
@@ -247,65 +253,48 @@ export function ViewBar({
               Update view
             </Button>
           ) : null}
-          {active && (objectId !== null || canEdit(active)) ? (
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  aria-label={`View menu for ${active.name}`}
-                >
-                  ···
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                {objectId !== null ? (
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      const pinned = pins.includes(active.id)
-                      togglePinnedView(active.id)
-                      toast(
-                        pinned
-                          ? `${active.name} unpinned`
-                          : `${active.name} pinned to the sidebar`,
-                      )
-                    }}
-                  >
-                    {pins.includes(active.id) ? 'Unpin' : 'Pin to sidebar'}
-                  </DropdownMenuItem>
-                ) : null}
-                {canEdit(active) ? (
-                  <>
-                    {objectId !== null ? <DropdownMenuSeparator /> : null}
-                    <DropdownMenuItem onSelect={() => setSaving('rename')}>
-                      Rename…
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onSelect={async () => {
-                        try {
-                          await deleteView({
-                            data: { id: active.id, ...viewTarget(objectId) },
-                          })
-                          toast(`${active.name} deleted`)
-                          if (pins.includes(active.id)) refreshPins()
-                          onApply(null)
-                          onSaved()
-                        } catch (err) {
-                          toast.error(
-                            err instanceof Error
-                              ? err.message
-                              : 'Could not delete',
+          {active ? (
+            <MoreMenu
+              variant="row"
+              modal={false}
+              align="start"
+              label={`the ${active.name} view`}
+              items={[
+                ...(objectId !== null
+                  ? [
+                      {
+                        label: pins.includes(active.id)
+                          ? 'Unpin'
+                          : 'Pin to sidebar',
+                        onSelect: () => {
+                          const pinned = pins.includes(active.id)
+                          togglePinnedView(active.id)
+                          toast(
+                            pinned
+                              ? `${active.name} unpinned`
+                              : `${active.name} pinned to the sidebar`,
                           )
-                        }
-                      }}
-                    >
-                      Delete view
-                    </DropdownMenuItem>
-                  </>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                        },
+                      },
+                    ]
+                  : []),
+                MENU_RULE,
+                ...(canEdit(active)
+                  ? [
+                      {
+                        label: 'Rename…',
+                        opens: true,
+                        onSelect: () => setSaving('rename'),
+                      },
+                      {
+                        label: 'Delete view',
+                        destructive: true,
+                        onSelect: () => void deleteActive(active),
+                      },
+                    ]
+                  : []),
+              ]}
+            />
           ) : null}
           <button
             type="button"

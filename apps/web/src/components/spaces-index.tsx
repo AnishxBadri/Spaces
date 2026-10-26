@@ -3,7 +3,7 @@ import { Layers, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { LabelHead, LedgerRow, rowWashClass } from '#/components/ledger-section'
-import { KeyHint, PageHeader } from '#/components/page-header'
+import { HeadCount, PageHeader } from '#/components/page-header'
 import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import {
@@ -87,19 +87,22 @@ export function SpacesIndexPage({
   return (
     <div className="flex min-h-full flex-col">
       <PageHeader
-        title="Spaces"
-        count={
-          spaces.length > 0
-            ? `${spaces.length} space${spaces.length === 1 ? '' : 's'} · ${nested} nested`
-            : null
+        title={
+          <HeadCount
+            title="Spaces"
+            count={
+              spaces.length > 0
+                ? `${spaces.length} space${spaces.length === 1 ? '' : 's'} · ${nested} nested`
+                : null
+            }
+          />
         }
         action={
           /* Always available — the first-run creator below only makes bare
              top-level spaces; scaffold stamping and nesting live here. */
-          <Button onClick={() => setOpen(true)}>
+          <Button shortcut="S" onClick={() => setOpen(true)}>
             <Plus className="size-4" strokeWidth={2} />
             New space
-            <KeyHint>S</KeyHint>
           </Button>
         }
       />
@@ -150,7 +153,7 @@ export function SpacesIndexPage({
                     breakdown
                   </span>
                   <span className="shrink-0 text-graphite">
-                    <KeyHint>S</KeyHint>
+                    <kbd className="mono text-micro">S</kbd>
                   </span>
                 </button>
               </LedgerRow>
@@ -414,7 +417,6 @@ function MarketsCreator() {
         ) : null}
         <Button type="submit" pending={pending} className="w-full">
           {pending ? 'Creating…' : 'Create my map'}
-          <KeyHint>↵</KeyHint>
         </Button>
         <p className="mono text-micro text-graphite">
           three to start · blanks are skipped · duplicates fold into one
@@ -579,7 +581,6 @@ function CreateSpaceDialog({
             </DialogClose>
             <Button type="submit" pending={pending}>
               {pending ? 'Creating…' : 'Create space'}
-              <KeyHint>↵</KeyHint>
             </Button>
           </DialogFooter>
         </form>

@@ -916,8 +916,8 @@ describe('the four acts that break something elsewhere ask first', () => {
 
   it('revoking an API token', async () => {
     await mount('/settings/tokens')
-    await openMenu('More for laptop')
-    await click(menuItem('Revoke…'))
+    // The token's one verb is its own button: a menu of one is that item.
+    await click(byText('Revoke…'))
     expect(dialog()?.textContent).toContain('Revoke laptop?')
     expect(dialog()?.textContent).toContain('It cannot come back')
     expect(focused()).toBe('Keep')
@@ -949,7 +949,7 @@ describe('the four acts that break something elsewhere ask first', () => {
     expect(dialog()?.textContent).toContain('attribute is deleted')
     expect(focused()).toBe('Keep')
     expect(writes.updateObject).not.toHaveBeenCalled()
-    await click(byText('Untick⌘↵', dialog() ?? document))
+    await click(byText('Untick', dialog() ?? document))
     expect(writes.updateObject).toHaveBeenCalledWith({
       data: { id: OBJECT_ID, identityKeys: [] },
     })
@@ -959,7 +959,10 @@ describe('the four acts that break something elsewhere ask first', () => {
     await mount('/settings/members')
     await openMenu('More for Priya')
     await click(menuItem('Suspend access…'))
-    expect(dialog()?.textContent).toContain('Suspend Priya?')
+    // The verb runs once the menu has handed focus back, then asks.
+    await vi.waitFor(() =>
+      expect(dialog()?.textContent).toContain('Suspend Priya?'),
+    )
     expect(dialog()?.textContent).toContain('cannot sign in until restored')
     expect(writes.setMemberBanned).not.toHaveBeenCalled()
   })
@@ -1026,7 +1029,7 @@ describe('General, after the first run (D80)', () => {
     expect(dialog()?.textContent).toContain('3 companies')
     expect(dialog()?.textContent).toContain('1 person')
     expect(writes.removeDemoData).not.toHaveBeenCalled()
-    await click(byText('Remove demo data⌘↵', dialog() ?? document))
+    await click(byText('Remove demo data', dialog() ?? document))
     expect(writes.removeDemoData).toHaveBeenCalledTimes(1)
   })
 
@@ -1594,8 +1597,7 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
     expect(invites.at(0)?.textContent).toContain('Member · expires in 5 days')
     expect(invites.at(1)?.textContent).toContain('Anyone with the link')
     expect(invites.at(1)?.textContent).toContain('one use · expires in 2 days')
-    await openMenu('More for partner@fund.example')
-    await click(menuItem('Revoke invite'))
+    await click(byText('Revoke invite'))
     expect(writes.revokeInvite).toHaveBeenCalledWith({
       data: { id: '00000000-0000-4000-8000-0000000000e4' },
     })
@@ -1621,9 +1623,11 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
     await mount('/settings/members')
     await openMenu('More for Priya')
     await click(menuItem('Send a reset link…'))
-    expect(writes.createResetLink).toHaveBeenCalledWith({
-      data: { userId: 'u-member' },
-    })
+    await vi.waitFor(() =>
+      expect(writes.createResetLink).toHaveBeenCalledWith({
+        data: { userId: 'u-member' },
+      }),
+    )
     expect(dialog()?.querySelector('h2')?.textContent).toBe(
       'Reset link for Priya',
     )
@@ -1650,8 +1654,8 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
     expect(groups()).toEqual(['Templates2', 'Archived1'])
     const rows = Array.from(document.querySelectorAll('[data-template-row]'))
     expect(rows.map((r) => r.textContent)).toEqual([
-      'Seed memoNoteCompaniesDeals+···',
-      'Market mapSpace breakdownSpaces+···',
+      'Seed memoNoteCompaniesDeals+Archive',
+      'Market mapSpace breakdownSpaces+Archive',
     ])
     await openMenu('Where Market map is offered first')
     await click(menuItem('People'))

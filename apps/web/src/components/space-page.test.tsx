@@ -378,13 +378,17 @@ const buttonNamed = (name: RegExp) => {
 const CLOCK_NOW = '2026-10-26T12:00:00.000Z'
 
 describe('the space head', () => {
-  it('draws the stamp, the crumb of ancestors with the created date, the double rule', async () => {
+  it('draws the stamp alone, the path of ancestors after the name, the double rule', async () => {
     await mount('notes')
     const head = header()
-    expect(text(head.querySelector('[data-stamp]'))).toBe('Space · depth 1')
-    const crumb = text(head.querySelector('nav[aria-label="Breadcrumb"]'))
-    expect(crumb).toContain('Proptech')
-    expect(crumb).toContain('created 16 Sep')
+    expect(text(head.querySelector('[data-stamp]'))).toBe('Space')
+    expect(head.querySelector('[data-stamp-row]')?.children).toHaveLength(1)
+    const path = head.querySelector(
+      '[data-suffix] nav[aria-label="Breadcrumb"]',
+    )
+    expect(text(path)).toContain('Spaces')
+    expect(text(path)).toContain('Proptech')
+    expect(text(path)).not.toContain('created')
     expect(head.className).toContain('double-rule')
     expect(text(head.querySelector('h1'))).toBe('Property ops')
   })
@@ -398,7 +402,7 @@ describe('the space head', () => {
 
   it('draws Not sensitive as a toggle button beside Note here, and no Add watch with no engine installed', async () => {
     await mount('notes')
-    expect(headButtons()).toEqual(['Not sensitive', 'Note hereN'])
+    expect(headButtons()).toEqual(['Not sensitive', 'Note here'])
     const toggle = buttonNamed(/^Not sensitive$/)
     expect(toggle.getAttribute('aria-pressed')).toBe('false')
     expect(header().querySelector('[role="switch"]')).toBeNull()
@@ -410,37 +414,13 @@ describe('the space head', () => {
       engines: [exa],
       installed: ['Exa'],
     })
-    expect(headButtons()).toEqual(['Not sensitive', 'Note hereN', 'Add watch'])
+    expect(headButtons()).toEqual(['Not sensitive', 'Note here', 'Add watch'])
   })
 
-  it('reads three readouts, none of them a tab count', async () => {
+  it('draws no readout strip in the head: the readouts are the Overview tab’s', async () => {
     await mount('notes')
-    const strip = header().querySelector('.border-t.border-hairline')
-    const cells = Array.from(strip?.children ?? [])
-    expect(cells).toHaveLength(3)
-    const labels = cells.map((c) => text(c.lastElementChild))
-    expect(labels).toEqual(['In pipeline', 'Last filed', 'Funding stage'])
-    expect(text(cells[0]?.firstElementChild ?? null)).toBe('1 of 3')
-    expect(text(cells[1]?.firstElementChild ?? null)).toBe('6 Oct')
-    for (const tab of ['Companies', 'Notes', 'Files', 'People', 'Records']) {
-      expect(labels).not.toContain(tab)
-    }
-  })
-
-  it('draws the stage bar summing to the companies, bootstrapped last', async () => {
-    await mount('notes')
-    const stages = Array.from(
-      header().querySelectorAll('[data-stage-bar] li[data-stage]'),
-    )
-    expect(stages.map((s) => s.getAttribute('data-stage'))).toEqual([
-      'seed',
-      'series_a',
-      'bootstrapped',
-    ])
-    const sum = stages
-      .map((s) => Number(text(s.querySelector('span'))))
-      .reduce((a, b) => a + b, 0)
-    expect(sum).toBe(spc.companies.length)
+    expect(header().querySelector('[data-readouts]')).toBeNull()
+    expect(header().querySelector('[data-stage-bar]')).toBeNull()
   })
 })
 
@@ -760,6 +740,17 @@ describe('split: New subspace, then Move here (D73)', () => {
 })
 
 describe('the readouts helper', () => {
+  it('reads three readouts, none of them a tab count', () => {
+    const cells = tabs.spaceReadouts(spc, '2026-10-26')
+    expect(cells.map((c) => c.label)).toEqual([
+      'In pipeline',
+      'Last filed',
+      'Funding stage',
+    ])
+    expect(cells[0]?.value).toBe('1 of 3')
+    expect(cells[1]?.value).toBe('6 Oct')
+  })
+
   it('reads a dash when no company is staged', () => {
     const empty: Space = { ...spc, companies: [], lastFiled: null }
     const cells = tabs.spaceReadouts(empty, '2026-10-26')

@@ -8,7 +8,6 @@ import {
   SectionHead,
 } from '#/components/ledger-section'
 import { WriteUpButton } from '#/components/meetings/write-up-button'
-import { KeyHint } from '#/components/page-header'
 import { TaskComposer } from '#/components/task-composer'
 import { Badge } from '#/components/ui/badge'
 import type { BadgeOption } from '#/components/ui/badge'
@@ -423,7 +422,7 @@ export function NeedsYou({
                   Add a task…
                 </span>
                 <span className="flex-1" />
-                <KeyHint>T</KeyHint>
+                <kbd className="shrink-0 mono text-micro text-graphite">T</kbd>
               </button>
             }
           />

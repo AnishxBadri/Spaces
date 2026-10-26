@@ -1,11 +1,9 @@
 import {
   createFileRoute,
-  Link,
   redirect,
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { formatDay } from '@spaces/core/format'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { SaveAsTemplateAction } from '#/components/templates'
@@ -16,7 +14,6 @@ import { AttributeCreateDialog } from '#/components/attributes/attribute-create-
 import { TasksRail } from '#/components/tasks-rail'
 import { RailField } from '#/components/attributes/rail-field'
 import { AiCellsProvider } from '#/components/attributes/ai-cell'
-import { KeyHint } from '#/components/page-header'
 import {
   DetailsAddRow,
   DitherMark,
@@ -220,17 +217,6 @@ function CompanyRecordPage() {
     <div className="flex min-h-full flex-col">
       <RecordHeader
         stamp={{ kind: 'Company' }}
-        crumb={
-          <>
-            <Link to="/companies" className="focus-ring hover:text-foreground">
-              Companies
-            </Link>
-            {' / '}
-            {company.id.slice(0, 8)}
-            {' / added '}
-            {formatDay(company.createdAt, company.readouts.today)}
-          </>
-        }
         actions={
           <>
             <SensitiveToggle entityId={company.id} state={sensitivity} />
@@ -244,9 +230,8 @@ function CompanyRecordPage() {
               seed={{ id: company.id, name: company.name, kind: 'company' }}
               hotkey="l"
               trigger={
-                <Button variant="outline">
+                <Button variant="outline" shortcut="L">
                   Log interaction
-                  <KeyHint>L</KeyHint>
                 </Button>
               }
             />

@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { FilterCount, FilterRow, FilterTab } from '#/components/filter-row'
-import { KeyHint } from '#/components/page-header'
 import {
   NOTES_FILTERS,
   NOTES_FILTER_LABELS,
@@ -78,7 +77,7 @@ export function RecordNotes({
             <span className="min-w-0 flex-1 truncate text-ui text-graphite">
               Write a note…
             </span>
-            <KeyHint>N</KeyHint>
+            <kbd className="shrink-0 mono text-micro text-graphite">N</kbd>
           </button>
         </li>
         {rows.map((n) => (

@@ -1,11 +1,6 @@
 import { useState } from 'react'
 import { formatSince } from '@spaces/core/format'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../ui/dropdown-menu'
+import { MoreMenu } from '../ui/more-menu'
 import { FolderGlyph } from './file-glyph'
 import { FileRow } from './file-row'
 import type { RecordDocument } from './types'
@@ -60,26 +55,25 @@ export function FolderBand({
   const tree = folderTree(folder.path, folder.documents)
   return (
     <section aria-label={tree.name} className="mt-6 border-t border-hairline">
-      <div className="flex h-ledger-row items-center gap-3 border-b border-rule bg-bone px-3">
+      <div
+        data-row
+        className="flex h-ledger-row items-center gap-3 border-b border-rule bg-bone px-3"
+      >
         <FolderGlyph bound />
         <h3 className="min-w-0 truncate text-body font-medium">{tree.name}</h3>
         <span className="flex-1" />
         <span className="shrink-0 mono text-micro text-graphite">
           {folderLane(folder, tree.count)}
         </span>
-        {onUnlink === null ? null : (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              aria-label={`More for ${tree.name}`}
-              className="focus-ring flex size-6 shrink-0 items-center justify-center rounded-md mono text-ui text-graphite hover:bg-paper hover:text-foreground data-[state=open]:bg-hairline data-[state=open]:text-paper"
-            >
-              <span aria-hidden>···</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem onSelect={onUnlink}>Unlink</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        <MoreMenu
+          variant="row"
+          label={tree.name}
+          items={
+            onUnlink === null
+              ? []
+              : [{ label: 'Unlink', opens: true, onSelect: onUnlink }]
+          }
+        />
       </div>
       <ul>
         <FolderContents

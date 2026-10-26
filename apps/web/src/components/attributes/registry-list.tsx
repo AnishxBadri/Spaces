@@ -1,16 +1,11 @@
 import { useRouter } from '@tanstack/react-router'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { readAiConfig } from '@spaces/core/ai/attribute-ai'
 import { AttributeDialog } from './attribute-dialog'
 import { SettingsGroupHead } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '#/components/ui/dropdown-menu'
+import { MoreMenu } from '#/components/ui/more-menu'
 import { reorderAttributes, updateAttribute } from '#/lib/server-fns'
 import type { listRegistry } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
@@ -385,6 +380,7 @@ function AttributeRow({
   return (
     <li
       data-attribute={attr.slug}
+      data-row
       draggable={draggable}
       onDragStart={(e) => {
         if (!draggable) return
@@ -488,40 +484,17 @@ function RowMenu({
   name: string
   verbs: ReadonlyArray<RowVerb>
 }) {
-  const afterClose = useRef<(() => void) | null>(null)
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-xs" aria-label={`More for ${name}`}>
-          <span aria-hidden className="mono text-ui text-graphite">
-            ···
-          </span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="w-40"
-        onCloseAutoFocus={(e) => {
-          const run = afterClose.current
-          if (run === null) return
-          e.preventDefault()
-          afterClose.current = null
-          run()
-        }}
-      >
-        {verbs.map((v) => (
-          <DropdownMenuItem
-            key={v.label}
-            disabled={v.disabled === true}
-            onSelect={() => {
-              afterClose.current = v.onSelect
-            }}
-          >
-            {v.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <MoreMenu
+      variant="row"
+      label={name}
+      items={verbs.map((v) => ({
+        label: v.label,
+        disabled: v.disabled === true,
+        opens: true,
+        onSelect: v.onSelect,
+      }))}
+    />
   )
 }
 

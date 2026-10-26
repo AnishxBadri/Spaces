@@ -1,5 +1,4 @@
 import { readoutDay } from '#/lib/records/readout-format'
-import { formatDay } from '@spaces/core/format'
 import {
   createFileRoute,
   Link,
@@ -13,7 +12,6 @@ import { Button } from '#/components/ui/button'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { RailField } from '#/components/attributes/rail-field'
 import { AiCellsProvider } from '#/components/attributes/ai-cell'
-import { KeyHint } from '#/components/page-header'
 import {
   DitherMark,
   InitialsMark,
@@ -234,17 +232,6 @@ function PersonRecordPage() {
     <div className="flex min-h-full flex-col">
       <RecordHeader
         stamp={{ kind: 'Person' }}
-        crumb={
-          <>
-            <Link to="/people" className="focus-ring hover:text-foreground">
-              People
-            </Link>
-            {' / '}
-            {person.id.slice(0, 8)}
-            {' / added '}
-            {formatDay(person.createdAt, person.readouts.today)}
-          </>
-        }
         actions={
           <>
             <SensitiveToggle entityId={person.id} state={sensitivity} />
@@ -258,9 +245,8 @@ function PersonRecordPage() {
               seed={{ id: person.id, name: person.name, kind: 'person' }}
               hotkey="l"
               trigger={
-                <Button variant="outline">
+                <Button variant="outline" shortcut="L">
                   Log interaction
-                  <KeyHint>L</KeyHint>
                 </Button>
               }
             />
@@ -278,13 +264,7 @@ function PersonRecordPage() {
           />
         }
         name={person.name}
-        badges={
-          nameMeta === '' ? null : (
-            <span className="min-w-0 truncate mono text-micro text-graphite">
-              {nameMeta}
-            </span>
-          )
-        }
+        suffix={nameMeta === '' ? undefined : { role: nameMeta }}
         readouts={[
           {
             label: 'Last contact',

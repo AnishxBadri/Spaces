@@ -1,7 +1,6 @@
 import { Link, useRouter } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { KeyHint } from './page-header'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -478,7 +477,6 @@ export function MoveStageDialog({
           </Button>
           <Button type="button" disabled={!canMove} onClick={confirm}>
             {pickedStage ? `Move to ${pickedStage.label}` : 'Move'}
-            <KeyHint>↵</KeyHint>
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -546,9 +544,8 @@ export function CloseReasonDialog({
             >
               Skip
             </Button>
-            <Button type="submit">
+            <Button type="submit" shortcut="⌘↵">
               Save reason
-              <KeyHint>⌘↵</KeyHint>
             </Button>
           </DialogFooter>
         </form>

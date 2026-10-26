@@ -6,7 +6,6 @@ import { InitialsMark } from '#/components/record/record-parts'
 import { ResetLinkDialog } from '#/components/settings/reset-link-dialog'
 import {
   SettingsGroupHead,
-  SettingsRowMenu,
   SettingsSection,
 } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
@@ -19,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '#/components/ui/dialog'
-import { DropdownMenuItem } from '#/components/ui/dropdown-menu'
+import { MoreMenu } from '#/components/ui/more-menu'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { Select } from '#/components/ui/select'
@@ -163,6 +162,7 @@ function MembersSection({
             <div
               key={m.id}
               data-member-row
+              data-row
               className="flex h-12 items-center gap-3 border-b border-rule"
             >
               <InitialsMark
@@ -211,29 +211,35 @@ function MembersSection({
               </span>
               <span className="flex w-6 shrink-0 justify-end">
                 {editable ? (
-                  <SettingsRowMenu label={m.name}>
-                    <DropdownMenuItem
-                      onSelect={() =>
-                        void setRole(
-                          m,
-                          roleOf(m.role) === 'admin' ? 'member' : 'admin',
-                        )
-                      }
-                    >
-                      Make {roleOf(m.role) === 'admin' ? 'member' : 'admin'}
-                    </DropdownMenuItem>
-                    {m.banned ? null : (
-                      <DropdownMenuItem onSelect={() => void sendResetLink(m)}>
-                        Send a reset link…
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem
-                      {...(m.banned ? {} : { variant: 'destructive' as const })}
-                      onSelect={() => void setBanned(m)}
-                    >
-                      {m.banned ? 'Restore access' : 'Suspend access…'}
-                    </DropdownMenuItem>
-                  </SettingsRowMenu>
+                  <MoreMenu
+                    variant="row"
+                    label={m.name}
+                    items={[
+                      {
+                        label: `Make ${roleOf(m.role) === 'admin' ? 'member' : 'admin'}`,
+                        onSelect: () =>
+                          void setRole(
+                            m,
+                            roleOf(m.role) === 'admin' ? 'member' : 'admin',
+                          ),
+                      },
+                      ...(m.banned
+                        ? []
+                        : [
+                            {
+                              label: 'Send a reset link…',
+                              opens: true,
+                              onSelect: () => void sendResetLink(m),
+                            },
+                          ]),
+                      {
+                        label: m.banned ? 'Restore access' : 'Suspend access…',
+                        destructive: !m.banned,
+                        opens: true,
+                        onSelect: () => void setBanned(m),
+                      },
+                    ]}
+                  />
                 ) : null}
               </span>
             </div>
@@ -248,6 +254,7 @@ function MembersSection({
             <div
               key={inv.id}
               data-invite-row
+              data-row
               className="flex h-12 items-center gap-3 border-b border-rule"
             >
               <span className="min-w-0 flex-1">
@@ -265,20 +272,22 @@ function MembersSection({
                   {expiresIn(inv.expiresAt)}
                 </span>
               </span>
-              <span className="flex w-6 shrink-0 justify-end">
-                <SettingsRowMenu label={inv.email ?? 'the open link'}>
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onSelect={() =>
-                      void act(
-                        () => revokeInvite({ data: { id: inv.id } }),
-                        'Invite revoked',
-                      )
-                    }
-                  >
-                    Revoke invite
-                  </DropdownMenuItem>
-                </SettingsRowMenu>
+              <span className="flex shrink-0 justify-end">
+                <MoreMenu
+                  variant="row"
+                  label={inv.email ?? 'the open link'}
+                  items={[
+                    {
+                      label: 'Revoke invite',
+                      destructive: true,
+                      onSelect: () =>
+                        void act(
+                          () => revokeInvite({ data: { id: inv.id } }),
+                          'Invite revoked',
+                        ),
+                    },
+                  ]}
+                />
               </span>
             </div>
           ))}

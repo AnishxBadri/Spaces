@@ -6,18 +6,12 @@ import {
   Mail,
   Phone,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { optionLabel, refName } from './attributes/value-editor'
 import { EmailModal } from './email-dialog'
 import { badgeClasses } from './ui/badge'
-import { Button } from './ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from './ui/dropdown-menu'
+import { MoreMenu } from './ui/more-menu'
 import type { RegistryEntry, RefNames } from './attributes/value-editor'
 import { FilterCount, FilterRow, FilterTab } from './filter-row'
 import { fmtMoney } from '@spaces/core/portfolio/format'
@@ -246,24 +240,26 @@ function FoldFoot({
 
 /**
  * The head's `···` for a viewer with private emails here: their emails with
- * this record, opened to the workspace or not (the record override). The
- * state is read when the menu opens.
+ * this record, opened to the workspace or not (the record override). Its one
+ * item draws as a switch, absent until the state has been read.
  */
 function EmailVisibilityMenu({ recordId }: { recordId: string }) {
   const router = useRouter()
   const [workspace, setWorkspace] = useState<boolean | null>(null)
 
-  async function load(open: boolean) {
-    if (!open) return
-    try {
-      setWorkspace(
-        (await getRecordEmailVisibility({ data: { entityId: recordId } }))
-          .workspace,
-      )
-    } catch {
-      setWorkspace(null)
+  useEffect(() => {
+    let live = true
+    void getRecordEmailVisibility({ data: { entityId: recordId } })
+      .then((v) => {
+        if (live) setWorkspace(v.workspace)
+      })
+      .catch(() => {
+        if (live) setWorkspace(null)
+      })
+    return () => {
+      live = false
     }
-  }
+  }, [recordId])
 
   async function toggle(next: boolean) {
     setWorkspace(next)
@@ -279,24 +275,18 @@ function EmailVisibilityMenu({ recordId }: { recordId: string }) {
   }
 
   return (
-    <DropdownMenu onOpenChange={(open) => void load(open)}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="More for interactions">
-          <span aria-hidden className="mono text-ui">
-            ···
-          </span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuCheckboxItem
-          checked={workspace === true}
-          disabled={workspace === null}
-          onCheckedChange={(next) => void toggle(next)}
-        >
-          My emails visible to the workspace
-        </DropdownMenuCheckboxItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <MoreMenu
+      variant="head"
+      label="interactions"
+      items={[
+        {
+          label: 'My emails visible to the workspace',
+          checked: workspace === true,
+          disabled: workspace === null,
+          onCheckedChange: (next) => void toggle(next),
+        },
+      ]}
+    />
   )
 }
 

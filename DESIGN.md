@@ -400,12 +400,11 @@ layer:
   dialog tier. sonner's own 400ms slide and its `height` / `box-shadow` transitions are
   overridden in `apps/web/src/styles.css`, which leaves transform and opacity and
   nothing else.
-- **Pending button.** `Button` takes `pending`, publishes it on a context, and `KeyHint`
-  reads it: `Save ⌘↵` becoming `Saving…` drops the keycap for an action that is no
-  longer armed, and reclaims it when the action re-arms. The hint fades on opacity and
-  never unmounts, so the width it holds is the width it keeps — the No-Shift Rule — and
-  it leaves the accessibility tree with the paint
-  (`apps/web/src/components/ui/button.tsx`, `apps/web/src/components/page-header.tsx`).
+- **Pending button.** `Button` takes `pending`: the action disarms, the caller's label
+  swaps (`Save` becoming `Saving…`) and the button holds the width it had while armed,
+  so nothing beside it moves — the No-Shift Rule. No spinner. A key is never printed
+  inside it; `shortcut` puts it in the button's ink tooltip
+  (`apps/web/src/components/ui/button.tsx`).
 
 All four are transform and opacity only, so the one global `prefers-reduced-motion`
 query in `apps/web/src/styles.css` silences every one of them; the crimson hold is a

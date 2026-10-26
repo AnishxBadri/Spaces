@@ -103,8 +103,9 @@ function DialogFooter({
   return (
     <div
       data-slot="dialog-footer"
-      // 52px bone foot: note left, then Cancel beside the primary, which
-      // carries ⌘↵. Cancel is the dialog's one close.
+      // 52px bone foot: note left, then Cancel beside the primary. Neither
+      // prints a key; a primary's ⌘↵ is in its tooltip. Cancel is the
+      // dialog's one close.
       // - The note wraps, never truncates: it is a cost, privacy or
       //   irreversibility line, and a cut one says nothing.
       className={cn(

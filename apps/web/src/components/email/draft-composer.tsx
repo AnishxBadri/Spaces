@@ -4,18 +4,12 @@ import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { parseVariables } from '@spaces/core/templates/variables'
 import { formatTime } from '@spaces/core/format'
-import { KeyHint } from '#/components/page-header'
 import { SaveAsTemplateAction, TemplatePicker } from '#/components/templates'
 import type { TemplateRow } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import { DialogFooter } from '#/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '#/components/ui/dropdown-menu'
+import { MoreMenu } from '#/components/ui/more-menu'
 import {
   Popover,
   PopoverContent,
@@ -315,30 +309,17 @@ export function DraftComposer({
         context="email"
         onPick={(t) => void applyTemplate(t)}
       />
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label="More for this draft"
-          >
-            <span aria-hidden className="mono text-ui">
-              ···
-            </span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          className="w-48"
-          onCloseAutoFocus={(e) => {
-            if (templating) e.preventDefault()
-          }}
-        >
-          <DropdownMenuItem onSelect={() => setTemplating(true)}>
-            Save as template…
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <MoreMenu
+        variant="row"
+        label="this draft"
+        items={[
+          {
+            label: 'Save as template…',
+            opens: true,
+            onSelect: () => setTemplating(true),
+          },
+        ]}
+      />
     </span>
   )
 
@@ -497,22 +478,22 @@ export function DraftComposer({
         ) : sendable ? (
           <Button
             type="button"
+            shortcut="⌘↵"
             pending={sending}
             disabled={busy || sender === null}
             onClick={primary}
           >
             {sending ? 'Sending…' : 'Send'}
-            <KeyHint>⌘↵</KeyHint>
           </Button>
         ) : review === null ? (
           <Button
             type="button"
+            shortcut="⌘↵"
             pending={reviewing}
             disabled={busy || sender === null}
             onClick={primary}
           >
             Review
-            <KeyHint>⌘↵</KeyHint>
           </Button>
         ) : (
           <span data-open-blanks className="mono text-micro text-destructive">

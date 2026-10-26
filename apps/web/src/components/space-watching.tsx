@@ -733,11 +733,11 @@ export function AddWatchDialog({
             <Button variant="outline">Cancel</Button>
           </DialogClose>
           <Button
+            shortcut="⌘↵"
             disabled={engine === undefined || target === null || busy}
             onClick={() => void save()}
           >
             Save watch
-            <kbd className="mono text-micro opacity-85">⌘↵</kbd>
           </Button>
         </DialogFooter>
       </DialogContent>

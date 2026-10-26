@@ -11,7 +11,7 @@ import { DraftComposer } from './draft-composer'
  * The composer: Cc and Bcc closed until asked for, a Bcc chip
  * that reads as hidden, the recipient search with the alias pick on the
  * chip, one save per pause rather than per keystroke, the save a close
- * leaves behind, Trash, ⌘↵ as the one printed key, and Review: a draft with
+ * leaves behind, Trash, ⌘↵ in Send's tooltip and printed nowhere, and Review: a draft with
  * variables shows recipients × variables with blanks flagged, and Send is
  * absent until each blank is filled or accepted. Send hands the draft's id
  * and Review's fills over; a mailbox without `gmail.send` has no Send and
@@ -281,11 +281,11 @@ describe('the autosave', () => {
 })
 
 describe('the foot', () => {
-  it('prints ⌘↵ on Send and no other key', () => {
+  it('prints no key: Send carries ⌘↵ in its tooltip', () => {
     mount()
-    const keys = [...document.querySelectorAll('kbd')].map((k) => k.textContent)
-    expect(keys).toEqual(['⌘↵'])
-    expect(button('Send⌘↵')?.closest('[data-slot="dialog-footer"]')).not.toBe(
+    expect(document.querySelectorAll('kbd')).toHaveLength(0)
+    expect(button('Send')?.getAttribute('data-state')).toBe('closed')
+    expect(button('Send')?.closest('[data-slot="dialog-footer"]')).not.toBe(
       null,
     )
   })
@@ -343,12 +343,12 @@ describe('Review', () => {
   }
   const row = (email: string) =>
     document.querySelector(`[data-review-row="${email}"]`)
-  const sendButton = () => button('Send⌘↵')
+  const sendButton = () => button('Send')
 
   it('sends a draft with no variables without a Review', async () => {
     mount({ ...blankDraft(ID), to: [DANA], bodyMd: 'Thanks Dana' })
     await settle()
-    expect(button('Review⌘↵')).toBeUndefined()
+    expect(button('Review')).toBeUndefined()
     act(() => sendButton()?.click())
     await settle()
     expect(fns.reviewEmailVariables).not.toHaveBeenCalled()
@@ -364,7 +364,7 @@ describe('Review', () => {
     mount(withVariables)
     await settle()
     expect(sendButton()).toBeUndefined()
-    act(() => button('Review⌘↵')?.click())
+    act(() => button('Review')?.click())
     await settle()
     expect(fns.reviewEmailVariables).toHaveBeenCalledWith({
       data: {
@@ -393,7 +393,7 @@ describe('Review', () => {
     fns.reviewEmailVariables.mockResolvedValue(review)
     mount(withVariables)
     await settle()
-    act(() => button('Review⌘↵')?.click())
+    act(() => button('Review')?.click())
     await settle()
     const cell = document.querySelector(
       'input[aria-label="name.first for Arjun Rao"]',
@@ -419,7 +419,7 @@ describe('Review', () => {
     fns.reviewEmailVariables.mockResolvedValue(review)
     mount(withVariables)
     await settle()
-    act(() => button('Review⌘↵')?.click())
+    act(() => button('Review')?.click())
     await settle()
     const tick = document.querySelector(
       '[aria-label="Leave the blanks for Arjun Rao empty"]',
@@ -451,7 +451,7 @@ describe('Review', () => {
     )
     mount({ ...withVariables, bodyMd: 'Hi {{favourite_colour}}' })
     await settle()
-    act(() => button('Review⌘↵')?.click())
+    act(() => button('Review')?.click())
     await settle()
     expect(document.querySelector('[role="alert"]')?.textContent).toBe(
       'No attribute matches {{favourite_colour}}',
@@ -464,7 +464,7 @@ describe('Review', () => {
     fns.reviewEmailVariables.mockResolvedValue(review)
     mount(withVariables)
     await settle()
-    act(() => button('Review⌘↵')?.click())
+    act(() => button('Review')?.click())
     await settle()
     type(
       document.querySelector('input[aria-label="name.first for Arjun Rao"]'),
@@ -472,7 +472,7 @@ describe('Review', () => {
     )
     act(() => button('Back')?.click())
     expect(document.querySelector('section[aria-label="Review"]')).toBeNull()
-    act(() => button('Review⌘↵')?.click())
+    act(() => button('Review')?.click())
     await settle()
     expect(sendButton()).not.toBeUndefined()
   })
@@ -494,7 +494,7 @@ describe('Send', () => {
     })
     mount({ ...blankDraft(ID), to: [DANA], bodyMd: 'Thanks Dana' })
     await settle()
-    expect(button('Send⌘↵')).toBeUndefined()
+    expect(button('Send')).toBeUndefined()
     const line = document.querySelector('[data-send-blocked]')
     expect(line?.textContent).toBe('Reconnect Gmail to send ›')
     expect(line?.getAttribute('href')).toBe(
@@ -521,7 +521,7 @@ describe('Send', () => {
     })
     mount({ ...blankDraft(ID), to: [DANA] })
     await settle()
-    expect(button('Send⌘↵')).toBeUndefined()
+    expect(button('Send')).toBeUndefined()
     expect(
       document.querySelector('[data-send-blocked]')?.getAttribute('href'),
     ).toBe('/settings/email-calendar')
@@ -533,13 +533,13 @@ describe('Send', () => {
     )
     mount({ ...blankDraft(ID), to: [DANA], bodyMd: 'Thanks Dana' })
     await settle()
-    act(() => button('Send⌘↵')?.click())
+    act(() => button('Send')?.click())
     await settle()
     expect(document.querySelector('[role="alert"]')?.textContent).toBe(
       'Gmail answered 503: Backend Error. The draft is kept',
     )
     expect(closed).not.toHaveBeenCalled()
     expect(fns.deleteEmailDraft).not.toHaveBeenCalled()
-    expect(button('Send⌘↵')).not.toBeUndefined()
+    expect(button('Send')).not.toBeUndefined()
   })
 })

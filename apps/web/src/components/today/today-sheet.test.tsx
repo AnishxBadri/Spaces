@@ -165,8 +165,9 @@ describe('Today by sheet 00', () => {
     expect(classOf(html, html.slice(date).split('<')[0])).toContain(
       'normal-case',
     )
-    expect(html).toMatch(/New task<kbd[^>]*>T<\/kbd>/)
-    expect(html).toMatch(/Log interaction<kbd[^>]*>L<\/kbd>/)
+    // The keys are in the buttons' tooltips, never printed inside them.
+    expect(html).toMatch(/data-state="closed"[^>]*>New task<\/button>/)
+    expect(html).toMatch(/data-state="closed"[^>]*>Log interaction<\/button>/)
   })
 
   it('filters the ledger by kind in sentence case, and the fold names the kinds', async () => {

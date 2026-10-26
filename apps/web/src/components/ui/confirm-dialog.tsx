@@ -36,9 +36,9 @@ export type ConfirmOptions = {
  * The destructive confirm: a 440px
  * sheet whose bone head band holds the crimson square and the serif question;
  * on paper under it, one sentence and an optional ledger of what is affected
- * on a rule border; then the 52px bone foot: Keep, and the acting button
- * carrying ⌘↵. Focus lands on Keep; the destructive choice is one key further
- * away.
+ * on a rule border; then the 52px bone foot: Keep, and the acting button,
+ * whose tooltip carries ⌘↵. Focus lands on Keep; the destructive choice is
+ * one key further away.
  */
 export function ConfirmDialog({
   open,
@@ -116,10 +116,10 @@ export function ConfirmDialog({
           {options.action === undefined ? null : (
             <Button
               variant={kind === 'destructive' ? 'destructive' : 'default'}
+              shortcut="⌘↵"
               onClick={onConfirm}
             >
               {options.action}
-              <kbd className="mono text-micro opacity-85">⌘↵</kbd>
             </Button>
           )}
         </DialogFooter>

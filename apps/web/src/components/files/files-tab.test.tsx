@@ -210,8 +210,8 @@ describe('the grouped tab', () => {
     expect(html).toContain('6 · ')
     expect(html).toContain('Upload')
     // No Drive connection in a static render: Link a Drive folder, the
-    // `···`'s one item, is not offered, so the `···` does not render.
-    expect(html).not.toContain('aria-label="More ways to add files"')
+    // add row's one extra verb, is not offered.
+    expect(html).not.toContain('Link a Drive folder…')
   })
 
   it('groups our files under their kind, in sheet order, and hides an empty kind', () => {
@@ -346,7 +346,7 @@ describe('a bound folder', () => {
 })
 
 describe('a folder just linked', () => {
-  it('reads never synced, read-only, and ends on a ··· holding Unlink', () => {
+  it('reads never synced, read-only, and ends on Unlink, its one verb, as a button', () => {
     const html = markup(
       <FolderBand
         recordId={FLENT}
@@ -364,7 +364,10 @@ describe('a folder just linked', () => {
     )
     expect(html).toContain('Acme Data Room')
     expect(html).toContain('never synced · read-only')
-    expect(html).toContain('aria-label="More for Acme Data Room"')
+    expect(html).not.toContain('aria-label="More for Acme Data Room"')
+    expect(html).toMatch(
+      /data-variant="outline" data-size="xs"[^>]*>Unlink<\/button>/,
+    )
   })
 })
 
@@ -541,7 +544,7 @@ describe('the row’s ···', () => {
     )
     expect(dialog?.textContent).toContain('4.1 MB · 41 chunks')
     expect(byText('button', 'Keep')).toBeDefined()
-    await click(byText('button', 'Remove⌘↵'))
+    await click(byText('button', 'Remove'))
     expect(fns.deleteDocument).toHaveBeenCalledWith({ data: { id: 'a2' } })
     expect(fns.unfileDocument).not.toHaveBeenCalled()
   })
@@ -596,8 +599,7 @@ describe('Link a Drive folder', () => {
       },
     })
     await mountTab()
-    await openMenu('', 'More ways to add files')
-    await click(byText('[role="menuitem"]', 'Link a Drive folder…'))
+    await click(byText('button', 'Link a Drive folder…'))
     expect(fns.mintPickerToken).toHaveBeenCalledWith({
       data: {
         provider: 'google',
@@ -642,8 +644,7 @@ describe('Link a Drive folder', () => {
     await mountTab()
     expect(document.body.textContent).toContain('never synced · read-only')
     expect(document.body.textContent).not.toContain('No files.')
-    await openMenu('Acme Data Room')
-    await click(byText('[role="menuitem"]', 'Unlink'))
+    await click(byText('button', 'Unlink'))
     expect(fns.unlinkDriveFolder).toHaveBeenCalledWith({
       data: { bindingId: BOUND.id },
     })
@@ -658,8 +659,7 @@ describe('Link a Drive folder', () => {
       .spyOn(window.location, 'assign')
       .mockImplementation(() => undefined)
     await mountTab()
-    await openMenu('', 'More ways to add files')
-    await click(byText('[role="menuitem"]', 'Link a Drive folder…'))
+    await click(byText('button', 'Link a Drive folder…'))
     await click(
       document.querySelector('[aria-label="Pick Acme Data Room"]') ??
         document.body,
@@ -686,8 +686,7 @@ describe('Link a Drive folder', () => {
   it('shows a folder linked behind a closed window', async () => {
     fns.linkFolderStatus.mockResolvedValue({})
     await mountTab()
-    await openMenu('', 'More ways to add files')
-    await click(byText('[role="menuitem"]', 'Link a Drive folder…'))
+    await click(byText('button', 'Link a Drive folder…'))
     await click(
       document.querySelector('[aria-label="Pick Acme Data Room"]') ??
         document.body,
@@ -709,9 +708,7 @@ describe('Link a Drive folder', () => {
   it('offers nothing without a Drive connection', async () => {
     fns.listRecordBindings.mockResolvedValue({ bindings: [], canLink: false })
     await mountTab()
-    expect(
-      document.querySelector('[aria-label="More ways to add files"]'),
-    ).toBeNull()
+    expect(document.body.textContent).not.toContain('Link a Drive folder…')
   })
 })
 

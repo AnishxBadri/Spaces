@@ -9,7 +9,6 @@ import {
   ValueEditor,
 } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
-import { KeyHint } from '#/components/page-header'
 import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import {
@@ -104,10 +103,9 @@ export function CreateCompanyDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button size="sm">
+          <Button size="sm" shortcut={hotkey?.toUpperCase()}>
             <Plus className="size-4" strokeWidth={2} />
             New company
-            {hotkey ? <KeyHint>{hotkey.toUpperCase()}</KeyHint> : null}
           </Button>
         )}
       </DialogTrigger>

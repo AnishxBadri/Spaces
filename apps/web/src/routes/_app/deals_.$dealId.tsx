@@ -5,7 +5,6 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { formatDay } from '@spaces/core/format'
 import { Compass } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { toast } from 'sonner'
@@ -19,7 +18,6 @@ import {
   LogComposerRow,
   LogInteractionDialog,
 } from '#/components/log-interaction-dialog'
-import { KeyHint } from '#/components/page-header'
 import {
   DitherMark,
   InitialsMark,
@@ -268,17 +266,6 @@ function DealRecordPage() {
 
       <RecordHeader
         stamp={{ kind: 'Deal' }}
-        crumb={
-          <>
-            <Link to="/deals" className="focus-ring hover:text-foreground">
-              Deals
-            </Link>
-            {' / '}
-            {deal.id.slice(0, 8)}
-            {' / added '}
-            {formatDay(deal.createdAt, readouts.today)}
-          </>
-        }
         actions={
           <>
             <SensitiveToggle entityId={deal.id} state={sensitivity} />
@@ -288,21 +275,22 @@ function DealRecordPage() {
               seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
               hotkey="l"
               trigger={
-                <Button variant="outline">
+                <Button variant="outline" shortcut="L">
                   Log interaction
-                  <KeyHint>L</KeyHint>
                 </Button>
               }
             />
             {/* Opens the Tasks section's composer, which `T` binds. */}
-            <Button variant="outline" onClick={runBinding('T')}>
+            <Button variant="outline" shortcut="T" onClick={runBinding('T')}>
               Task
-              <KeyHint>T</KeyHint>
             </Button>
             {liveStages.length > 0 ? (
-              <Button variant="outline" onClick={() => setMoveOpen(true)}>
+              <Button
+                variant="outline"
+                shortcut="M"
+                onClick={() => setMoveOpen(true)}
+              >
                 Move stage
-                <KeyHint>M</KeyHint>
               </Button>
             ) : null}
             <RecordMoreMenu name={deal.name} />

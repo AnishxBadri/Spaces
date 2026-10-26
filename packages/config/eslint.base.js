@@ -9,8 +9,14 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import drizzle from 'eslint-plugin-drizzle'
 import * as astroParser from 'astro-eslint-parser'
 import tsParser from '@typescript-eslint/parser'
-import instrument from './eslint-rules/vocabulary.js'
+import vocabulary from './eslint-rules/vocabulary.js'
+import keys from './eslint-rules/keys.js'
 import comments from './eslint-rules/history.js'
+
+/** The Instrument rules under one plugin name: the vocabulary and A2's keys. */
+const instrument = {
+  rules: { ...vocabulary.rules, ...keys.rules },
+}
 
 // The repo root, absolute so the zones resolve the same from every cwd.
 // - Not named eslint.config.js: ESLint looks its config up from the cwd, and
@@ -247,14 +253,18 @@ export default [
     },
   },
   // The Instrument vocabulary: reads className literals and cn()/cva() string
-  // arguments only, and names the replacement in every message.
-  // The rule source is plain JS loaded directly and exercised by the design
-  // tokens test, so it is not itself linted.
+  // arguments only, and names the replacement in every message. Beside it,
+  // no key printed inside a Button or a menu item (A2).
+  // The rule sources are plain JS loaded directly and exercised by the design
+  // tokens and key tests, so they are not themselves linted.
   { ignores: ['packages/config/eslint-rules/*.js'] },
   {
     files: ['apps/web/src/**/*.tsx'],
     plugins: { instrument },
-    rules: { 'instrument/vocabulary': 'error' },
+    rules: {
+      'instrument/vocabulary': 'error',
+      'instrument/no-key-in-button': 'error',
+    },
   },
   // Comments describe the current code; ids and dates belong in the commit.
   {

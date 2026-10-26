@@ -2,7 +2,6 @@ import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { z } from 'zod'
 import { AuthShell, FormError } from '#/components/auth-shell'
-import { KeyHint } from '#/components/page-header'
 import { PasswordInput } from '#/components/password-input'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
@@ -89,7 +88,6 @@ function LoginPage() {
 
         <Button type="submit" className="w-full" pending={pending}>
           {pending ? 'Signing in…' : 'Sign in'}
-          <KeyHint>↵</KeyHint>
         </Button>
       </form>
     </AuthShell>

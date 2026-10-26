@@ -338,7 +338,7 @@ function ImportBatchPage() {
     return () => window.clearInterval(timer)
   }, [reading, router])
 
-  // ⌘↵ is printed inside Continue and Commit, so it works wherever they do.
+  // ⌘↵ is in Continue's and Commit's tooltips, so it works wherever they do.
   useEffect(() => {
     // A voided batch's re-run asks first, so ⌘↵ does not reach it.
     const armed = receipt

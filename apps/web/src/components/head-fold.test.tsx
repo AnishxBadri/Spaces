@@ -73,11 +73,7 @@ const logged = vi.fn()
 /** A head action that owns its hotkey, as `LogInteractionDialog` does. */
 function LogButton() {
   useHotkey('l', logged)
-  return (
-    <button type="button">
-      Log interaction<kbd>L</kbd>
-    </button>
-  )
+  return <button type="button">Log interaction</button>
 }
 
 let root: Root
@@ -132,11 +128,10 @@ function headStill(): string {
 const record = (
   <div className="flex min-h-full flex-col">
     <RecordHeader
-      stamp={{ kind: 'Company', fact: '3f2a9c1b' }}
-      crumb="Companies"
+      stamp={{ kind: 'Company' }}
+      mark={<span data-mark>F</span>}
       name="Flent"
       actions={<LogButton />}
-      readouts={[{ label: 'Last contact', value: '3d' }]}
     />
     <main data-body>Interactions</main>
   </div>
@@ -170,9 +165,22 @@ describe('the folded head', () => {
 
     titleVisible(false)
     expect(bar.dataset.folded).toBe('true')
-    expect(bar.className.split(' ')).toContain('h-10')
+    expect(bar.className.split(' ')).toEqual(
+      expect.arrayContaining(['h-10', 'px-4']),
+    )
     expect(bar.textContent).toContain('Flent')
-    expect(bar.querySelector('[data-stamp="live"]')).not.toBeNull()
+    // The record's mark at 16px in a hairline box, inert; never the stamp.
+    expect(bar.querySelector('[data-stamp]')).toBeNull()
+    const box = bar.querySelector('[data-head-bar-mark]')
+    expect(box?.hasAttribute('inert')).toBe(true)
+    expect(box?.className.split(' ')).toEqual(
+      expect.arrayContaining(['size-4', 'border', 'border-hairline']),
+    )
+    expect(box?.querySelector('[data-mark]')?.textContent).toBe('F')
+    // The title in serif at the title step.
+    expect(bar.querySelector('.font-serif')?.className.split(' ')).toContain(
+      'text-title',
+    )
 
     titleVisible(true)
     expect(bar.dataset.folded).toBe('false')
@@ -219,6 +227,11 @@ describe('the folded head', () => {
     expect(actions.className).toContain('data-[folded=true]:fixed')
     expect(actions.className).toContain('data-[folded=true]:h-10')
     expect(actions.className).toContain('data-[folded=true]:z-sticky')
+    expect(actions.className).toContain('data-[folded=true]:right-4')
+    // Folded, every action steps down to 26px.
+    expect(actions.className).toContain(
+      'data-[folded=true]:[&_[data-slot=button]]:h-6.5',
+    )
 
     press('l')
     expect(logged).toHaveBeenCalledTimes(1)

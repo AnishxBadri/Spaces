@@ -8,9 +8,10 @@ import type { StampProps } from '#/components/ui/stamp'
 import { cn } from '#/lib/utils'
 
 /**
- * Record page anatomy. Header: the stamp and breadcrumb, actions,
- * serif name + badge, a readout strip of the numbers that matter, the
- * double rule under; scrolled past its name it folds to `HeadBar`.
+ * Record page anatomy. Header: the stamp alone on its row, then the mark,
+ * the serif name, its suffix and badges with the actions bottom-aligned at
+ * the right, the double rule under — no readout strip; scrolled past its
+ * name it folds to `HeadBar`.
  * Body: `RecordBody details=…` — the 320px details column on bone left (the
  * property grid as label–value rows, then the relationship sections), the
  * tab head over one view right. Every part is markup only; the pages keep
@@ -39,20 +40,25 @@ export type RecordReadout = {
   search?: Record<string, string> | undefined
 }
 
+/**
+ * What follows a record's name on its line: a parent path in mono micro
+ * (`Spaces / Fintech`), or a person's role in sans (`Partner · Flent`).
+ */
+export type RecordSuffix = { path: ReactNode } | { role: ReactNode }
+
 export function RecordHeader({
   stamp,
-  crumb,
+  suffix,
   actions,
   mark,
   name,
   nameField,
   archived = false,
   badges,
-  readouts,
 }: {
-  /** The page's one stamp, drawn beside the crumb. */
+  /** The page's one stamp, alone on the row above the name. */
   stamp: StampProps
-  crumb: ReactNode
+  suffix?: RecordSuffix | undefined
   actions?: ReactNode
   mark?: ReactNode
   name: ReactNode
@@ -61,24 +67,47 @@ export function RecordHeader({
   /** An archived record: the name and the double rule go graphite. */
   archived?: boolean
   badges?: ReactNode
+  /** Accepted and not drawn: a record's readouts live in its Overview tab. */
   readouts?: Array<RecordReadout>
 }) {
   const { titleRef, actionsRef, fold } = useHeadFold()
   return (
     <>
-      <HeadBar fold={fold} title={name} stamp={stamp} />
+      <HeadBar fold={fold} title={name} mark={mark} />
       <header
         className={cn(
-          'flex shrink-0 flex-col gap-3.5 px-8 pt-5 double-rule',
+          'flex shrink-0 flex-col gap-3 px-8 pt-5 pb-4 double-rule',
           archived && 'double-rule-archived',
         )}
       >
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <Stamp {...stamp} />
-            <div className="min-w-0 truncate mono text-micro leading-3.5 tracking-[0.08em] text-graphite uppercase">
-              {crumb}
-            </div>
+        <div data-stamp-row className="flex">
+          <Stamp {...stamp} />
+        </div>
+        <div className="flex items-end justify-between gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-3.5">
+            {mark}
+            <h1
+              ref={titleRef}
+              className={cn(
+                'min-w-0 truncate title-serif',
+                nameField !== undefined && 'flex-1',
+                archived && 'text-graphite',
+              )}
+            >
+              {nameField ?? name}
+            </h1>
+            {suffix === undefined ? null : (
+              <span
+                data-suffix
+                className={cn(
+                  'min-w-0 shrink truncate text-graphite',
+                  'path' in suffix ? 'mono text-micro' : 'text-ui',
+                )}
+              >
+                {'path' in suffix ? suffix.path : suffix.role}
+              </span>
+            )}
+            {badges}
           </div>
           {actions ? (
             <HeadActions fold={fold} slotRef={actionsRef}>
@@ -86,25 +115,6 @@ export function RecordHeader({
             </HeadActions>
           ) : null}
         </div>
-        <div className="flex min-w-0 items-center gap-3.5">
-          {mark}
-          <h1
-            ref={titleRef}
-            className={cn(
-              'min-w-0 truncate title-serif',
-              nameField !== undefined && 'flex-1',
-              archived && 'text-graphite',
-            )}
-          >
-            {nameField ?? name}
-          </h1>
-          {badges}
-        </div>
-        {readouts && readouts.length > 0 ? (
-          <ReadoutStrip readouts={readouts} />
-        ) : (
-          <div className="h-1" />
-        )}
       </header>
     </>
   )

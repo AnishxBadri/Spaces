@@ -3,6 +3,7 @@ import { cva } from 'class-variance-authority'
 import type { VariantProps } from 'class-variance-authority'
 import { Slot } from 'radix-ui'
 
+import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip'
 import { cn } from '#/lib/utils.ts'
 
 const buttonVariants = cva(
@@ -39,27 +40,41 @@ const buttonVariants = cva(
 )
 
 /**
- * Whether the button around you is mid-write. `KeyHint` reads it so `Save ⌘↵` becoming
- * `Saving…` does not leave a keycap standing for an action that is no longer
- * armed. A context rather than a `group-data-` class because the hint has to
- * leave the accessibility tree too — a screen reader announcing
- * "Saving… ⌘↵" is the same orphan, just heard instead of seen.
+ * The text a button reads as, for its tooltip: the strings in its children,
+ * icons skipped.
  */
-const ButtonPending = React.createContext(false)
-
-export function useButtonPending(): boolean {
-  return React.useContext(ButtonPending)
+function textOf(node: React.ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(textOf).join('')
+  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+    return textOf(node.props.children)
+  }
+  return ''
 }
 
 /**
- * The key hint's two states. It never unmounts: the No-Shift Rule wants the
- * hint's width reserved while it is gone, so the pending label cannot widen
- * the button and shove its neighbours. Opacity only, on a named transition.
+ * The ink tooltip a key lives in: the label in sans, then the key in mono at
+ * 85%. A key is never printed inside the button itself.
  */
-export function keyHintClasses(pending: boolean): string {
-  return cn(
-    'mono text-micro transition-opacity duration-150 ease-out-quart',
-    pending ? 'opacity-0' : 'opacity-85',
+function ShortcutTip({
+  label,
+  shortcut,
+  children,
+}: {
+  label: string
+  shortcut: string
+  children: React.ReactElement
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent data-shortcut-tip>
+        <span className="flex items-center gap-2.5">
+          {label === '' ? null : <span>{label}</span>}
+          <kbd className="mono opacity-85">{shortcut}</kbd>
+        </span>
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -69,28 +84,63 @@ function Button({
   size = 'default',
   asChild = false,
   pending = false,
+  shortcut,
   disabled,
+  ref,
+  style,
+  children,
   ...props
 }: React.ComponentProps<'button'> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
-    /** A write is in flight: the action is not armed, so its key hint goes. */
+    /**
+     * A write is in flight: the button disarms and holds the width it had
+     * while armed, so the caller's `Saving…` never moves its neighbours.
+     */
     pending?: boolean
+    /** The key that runs this button, shown in its tooltip: `L`, `⌘↵`. */
+    shortcut?: string | undefined
   }) {
   const Comp = asChild ? Slot.Root : 'button'
+  const own = React.useRef<HTMLButtonElement | null>(null)
+  // Measured on every armed commit, because by the render that turns pending
+  // the label has already swapped.
+  const armedWidth = React.useRef<number | null>(null)
+  React.useLayoutEffect(() => {
+    if (!pending && own.current) armedWidth.current = own.current.offsetWidth
+  })
+  const held =
+    pending && armedWidth.current !== null
+      ? { ...style, minWidth: armedWidth.current }
+      : style
 
+  const button = (
+    <Comp
+      data-slot="button"
+      data-variant={variant}
+      data-size={size}
+      data-pending={pending ? '' : undefined}
+      disabled={disabled ?? pending}
+      className={cn(buttonVariants({ variant, size, className }))}
+      ref={(el: HTMLButtonElement | null) => {
+        own.current = el
+        if (typeof ref === 'function') return ref(el)
+        if (ref) ref.current = el
+      }}
+      style={held}
+      {...props}
+    >
+      {children}
+    </Comp>
+  )
+  if (shortcut === undefined) return button
   return (
-    <ButtonPending value={pending}>
-      <Comp
-        data-slot="button"
-        data-variant={variant}
-        data-size={size}
-        data-pending={pending ? '' : undefined}
-        disabled={disabled ?? pending}
-        className={cn(buttonVariants({ variant, size, className }))}
-        {...props}
-      />
-    </ButtonPending>
+    <ShortcutTip
+      label={props['aria-label'] ?? textOf(children).trim()}
+      shortcut={shortcut}
+    >
+      {button}
+    </ShortcutTip>
   )
 }
 

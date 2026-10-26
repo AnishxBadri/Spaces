@@ -35,13 +35,13 @@ import type { UploadPhase } from '#/lib/documents/upload'
 import type { NoteBody } from '@spaces/db/schema/kinds'
 import { SaveAsTemplateAction } from '#/components/templates'
 import { useConfirm } from '#/components/ui/confirm-dialog'
-import { Button } from '#/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
+import { MoreMenu } from '#/components/ui/more-menu'
 import { Input } from '#/components/ui/input'
 import { Segmented } from '#/components/ui/segmented'
 import { Select } from '#/components/ui/select'
@@ -875,8 +875,6 @@ function NoteMoreMenu({
   const navigate = useNavigate()
   const [templating, setTemplating] = useState(false)
   const [busy, setBusy] = useState(false)
-  // Save as template: focus goes to the window it opens, not to ···.
-  const keepFocus = useRef(false)
 
   async function newVersion() {
     if (busy) return
@@ -897,35 +895,22 @@ function NoteMoreMenu({
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon" aria-label="More for this note">
-            <span aria-hidden className="mono text-ui">
-              ···
-            </span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          className="w-48"
-          onCloseAutoFocus={(e) => {
-            if (keepFocus.current) e.preventDefault()
-            keepFocus.current = false
-          }}
-        >
-          <DropdownMenuItem onSelect={() => void newVersion()}>
-            Save as new version
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={() => {
-              keepFocus.current = true
-              setTemplating(true)
-            }}
-          >
-            Save as template…
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <MoreMenu
+        variant="head"
+        label="this note"
+        items={[
+          {
+            label: 'Save as new version',
+            disabled: busy,
+            onSelect: () => void newVersion(),
+          },
+          {
+            label: 'Save as template…',
+            opens: true,
+            onSelect: () => setTemplating(true),
+          },
+        ]}
+      />
       <SaveAsTemplateAction
         entityLabel="note"
         defaultName={title}

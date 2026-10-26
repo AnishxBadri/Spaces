@@ -2,7 +2,6 @@ import { useRouteContext, useRouter } from '@tanstack/react-router'
 import { Plus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { KeyHint } from './page-header'
 import { DitherMark, InitialsMark } from './record/record-parts'
 import { Button } from './ui/button'
 import {
@@ -203,7 +202,6 @@ export function TaskComposer({
           </Switch>
           <Button type="submit" size="sm" pending={pending}>
             {pending ? 'Saving…' : 'Add task'}
-            <KeyHint>↵</KeyHint>
           </Button>
         </div>
       </form>
@@ -274,7 +272,6 @@ export function TaskComposer({
             </DialogClose>
             <Button type="submit" size="sm" pending={pending}>
               {pending ? 'Saving…' : 'Add task'}
-              <KeyHint>↵</KeyHint>
             </Button>
           </div>
         </form>

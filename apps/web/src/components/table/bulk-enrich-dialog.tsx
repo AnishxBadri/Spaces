@@ -244,11 +244,11 @@ export function BulkEnrichDialog({
             <Button variant="outline">Cancel</Button>
           </DialogClose>
           <Button
+            shortcut="⌘↵"
             disabled={estimate === null || estimate.ask === 0 || busy}
             onClick={() => void confirm()}
           >
             Enrich {estimate === null ? '' : n(estimate.ask)}
-            <kbd className="mono text-micro opacity-85">⌘↵</kbd>
           </Button>
         </DialogFooter>
       </DialogContent>

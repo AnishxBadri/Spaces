@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 import { SheetTabs } from './import/import-wizard.tsx'
 import { LedgerSection, SectionHead } from './ledger-section.tsx'
-import { PageHeader } from './page-header.tsx'
+import { HeadCount, PageHeader } from './page-header.tsx'
 import {
   RailSection,
   ReadoutStrip,
@@ -53,7 +53,7 @@ function tsxFiles(dir: string): Array<string> {
   })
 }
 
-const companyStamp = { kind: 'Company', fact: '3f2a9c1b' }
+const companyStamp = { kind: 'Company' }
 
 /** The instant the dates on these sheets are printed against. */
 const NOW = '2026-10-26T12:00:00.000Z'
@@ -66,9 +66,7 @@ describe('the double rule', () => {
   it('draws under every page head and record head, in place of the hairline', () => {
     for (const html of [
       renderToStaticMarkup(<PageHeader title="Companies" />),
-      renderToStaticMarkup(
-        <RecordHeader stamp={companyStamp} crumb="Companies" name="Flent" />,
-      ),
+      renderToStaticMarkup(<RecordHeader stamp={companyStamp} name="Flent" />),
     ]) {
       const head = classesOf(html, 'double-rule')
       expect(head).not.toContain('border-b')
@@ -149,9 +147,24 @@ describe('the readout strip', () => {
 })
 
 describe('the ink stamp', () => {
-  it('is a cut-end label from styles.css, and no tsx spells a clip-path', () => {
-    expect(css).toMatch(/@utility stamp \{[^}]*clip-path: polygon/)
-    expect(css).toMatch(/@utility stamp-outline \{/)
+  /** The `@utility <name> { … }` block from styles.css. */
+  function utility(name: string): string {
+    const at = css.indexOf(`@utility ${name} {`)
+    expect(at, name).toBeGreaterThan(-1)
+    return css.slice(at, css.indexOf('\n}', at))
+  }
+
+  it('is a plain 22px ink rectangle from styles.css, and nothing spells a clip-path', () => {
+    const stamp = utility('stamp')
+    expect(stamp).not.toMatch(/clip-path/)
+    expect(stamp).toMatch(/height: 1\.375rem/)
+    expect(stamp).toMatch(/padding-inline: 0\.625rem/)
+    expect(stamp).toMatch(/line-height: 0\.875rem/)
+    expect(stamp).toMatch(/text-transform: uppercase/)
+    expect(stamp).toMatch(/font-weight: 500/)
+    expect(stamp).toMatch(/background: var\(--hairline\)/)
+    expect(stamp).toMatch(/color: var\(--paper\)/)
+    expect(utility('stamp-outline')).not.toMatch(/clip-path|::before/)
     for (const f of tsxFiles(src)) {
       expect(readFileSync(f, 'utf8'), relative(src, f)).not.toMatch(
         /clip-path|clip-\[/,
@@ -159,65 +172,147 @@ describe('the ink stamp', () => {
     }
   })
 
-  it('names the kind and one fact in ink', () => {
+  it('names the kind alone, in ink', () => {
     const html = renderToStaticMarkup(<Stamp {...companyStamp} />)
     expect(classesOf(html, 'stamp')).not.toContain('stamp-outline')
-    expect(html.replace(/<!-- -->/g, '')).toContain('Company 3f2a9c1b')
+    expect(html).toBe('<span data-stamp="live" class="stamp">Company</span>')
   })
 
-  it('turns to outline with the day when archived', () => {
+  it('appends a lock and Sensitive when sensitive', () => {
+    const html = renderToStaticMarkup(
+      <Stamp kind="Company" state="sensitive" />,
+    )
+    expect(html).toContain('data-stamp="sensitive"')
+    expect(html).toMatch(/>Company<svg[^>]*aria-hidden="true"[^]*Sensitive</)
+  })
+
+  it('turns to outline with Archived and the day when archived', () => {
     const html = renderToStaticMarkup(
       <ClockProvider now={NOW}>
-        <Stamp {...companyStamp} archivedOn="2026-10-08T14:02:00.000Z" />
+        <Stamp
+          kind="Company"
+          state="archived"
+          archivedOn="2026-10-08T14:02:00.000Z"
+        />
       </ClockProvider>,
     )
     expect(classesOf(html, 'stamp')).toContain('stamp-outline')
     expect(html).toContain('data-stamp="archived"')
-    expect(html.replace(/<!-- -->/g, '')).toContain('archived 8 Oct')
+    // The day keeps its case inside the caps stamp: `ARCHIVED 8 Oct`.
+    expect(html).toMatch(/Archived<span class="normal-case">8 Oct</)
   })
 
-  it('stamps a record head once, beside the crumb', () => {
+  it('stamps a record head once, alone on the row above the name', () => {
     const html = renderToStaticMarkup(
       <RecordHeader
         stamp={companyStamp}
-        crumb={<span data-crumb>Companies</span>}
         name="Flent"
+        suffix={{ path: 'Companies' }}
       />,
     )
-    expect(count(headOf(html), /data-stamp=/g)).toBe(1)
-    // The stamp and the crumb share the head's first row.
-    expect(headOf(html)).toMatch(/data-stamp="live"[^]*data-crumb[^]*<h1/)
+    const head = headOf(html)
+    expect(count(head, /data-stamp=/g)).toBe(1)
+    // The stamp row holds the stamp and nothing else, before the h1's row.
+    expect(head).toMatch(
+      /<div data-stamp-row="true" class="flex"><span data-stamp="live" class="stamp">Company<\/span><\/div><div/,
+    )
+    expect(head.indexOf('data-stamp-row')).toBeLessThan(head.indexOf('<h1'))
+    // No heading in the stamp row: the h1 is the head's first heading.
+    expect(head.slice(0, head.indexOf('<h1'))).not.toMatch(/<h[1-6]/)
   })
 
-  it('stamps a space head once with its depth', () => {
+  it('prints a parent path in mono and a role in sans after the name', () => {
+    const path = headOf(
+      renderToStaticMarkup(
+        <RecordHeader
+          stamp={spaceStamp()}
+          name="Payments"
+          suffix={{ path: 'Spaces / Fintech' }}
+        />,
+      ),
+    )
+    expect(path).toMatch(
+      /<\/h1><span data-suffix="true" class="[^"]*\bmono text-micro\b[^"]*">Spaces \/ Fintech</,
+    )
+    const role = headOf(
+      renderToStaticMarkup(
+        <RecordHeader
+          stamp={{ kind: 'Person' }}
+          name="Priya"
+          suffix={{ role: 'Partner · Flent' }}
+        />,
+      ),
+    )
+    expect(classesOf(role, 'text-ui')).toContain('text-graphite')
+    expect(role).not.toMatch(/data-suffix[^>]*mono/)
+  })
+
+  it('draws no readout strip and no crumb, and bottom-aligns the actions with the name', () => {
     const html = renderToStaticMarkup(
       <RecordHeader
-        stamp={spaceStamp(2)}
-        crumb="Spaces / Fintech / Payments"
-        name="Cross-border"
+        stamp={companyStamp}
+        name="Flent"
+        actions={<button type="button">Log interaction</button>}
+        readouts={[{ label: 'Last contact', value: '3d' }]}
       />,
     )
+    expect(html).not.toContain('data-readouts')
+    expect(html).not.toContain('Last contact')
+    expect(headOf(html)).toMatch(
+      /class="flex items-end justify-between gap-2"><div[^]*<h1[^]*data-head-actions-slot/,
+    )
+  })
+
+  it('stamps a space head SPACE, with no depth', () => {
+    const html = renderToStaticMarkup(
+      <RecordHeader stamp={spaceStamp()} name="Cross-border" />,
+    )
     expect(count(headOf(html), /data-stamp=/g)).toBe(1)
-    expect(html.replace(/<!-- -->/g, '')).toContain('Space · depth 2')
+    expect(html).toContain('class="stamp">Space</span>')
+    expect(html).not.toContain('depth')
   })
 
   it('draws an archived space head in outline, the name and the double rule graphite', () => {
     const html = renderToStaticMarkup(
       <ClockProvider now={NOW}>
         <RecordHeader
-          stamp={spaceStamp(1, '2026-10-08T09:00:00.000Z')}
+          stamp={spaceStamp('2026-10-08T09:00:00.000Z')}
           archived
-          crumb="Spaces / Launch"
           name="Small-lift"
         />
       </ClockProvider>,
     )
     expect(html).toMatch(/<header class="[^"]*\bdouble-rule-archived\b/)
     expect(headOf(html)).toContain('data-stamp="archived"')
-    expect(html.replace(/<!-- -->/g, '')).toContain('archived 8 Oct')
+    expect(html).toContain('8 Oct')
     expect(html).toMatch(
       /<h1[^>]*class="[^"]*\btext-graphite\b[^"]*"[^>]*>Small-lift/,
     )
+  })
+})
+
+describe('the page head', () => {
+  it('has no count of its own; a page with no tab bar puts it in the title', () => {
+    const html = renderToStaticMarkup(
+      <PageHeader title={<HeadCount title="Portfolio" count={1204} />} />,
+    )
+    expect(html).toMatch(
+      /<h1[^>]*><span[^>]*>Portfolio<span data-head-count="true"[^>]*>1,204<\/span>/,
+    )
+    // @ts-expect-error The prop is gone: the count is the All tab's.
+    renderToStaticMarkup(<PageHeader title="Companies" count={3} />)
+  })
+
+  it('hangs its Tabs bar under the head, pinned, with no chrome of its own', () => {
+    const html = renderToStaticMarkup(
+      <PageHeader title="Review" tabs={<div data-bar>Tabs</div>} />,
+    )
+    const wrap = classesOf(html, 'top-22')
+    expect(wrap).toEqual(
+      expect.arrayContaining(['shrink-0', 'sticky', 'z-sticky', 'md:top-10']),
+    )
+    expect(wrap).not.toContain('border-b')
+    expect(wrap).not.toContain('h-10')
   })
 })
 

@@ -6,7 +6,6 @@ import { toast } from 'sonner'
 import { cellsFor } from './dither'
 import { FilterCount, FilterRow, FilterTab } from './filter-row'
 import { LabelHead, LedgerFigure, LedgerRow } from './ledger-section'
-import { KeyHint } from './page-header'
 import { DitherMark, InitialsMark } from './record/record-parts'
 import type { RecordReadout } from './record/record-parts'
 import { SpaceSources } from './space-sources'
@@ -571,7 +570,7 @@ function NotesTab({
                 {spc.filed.length === 0 ? 'Write the memo…' : 'File another…'}
               </span>
               <span className="shrink-0 text-graphite">
-                <KeyHint>N</KeyHint>
+                <kbd className="shrink-0 mono text-micro text-graphite">N</kbd>
               </span>
             </button>
           </LedgerRow>

@@ -42,7 +42,7 @@ import {
   RecordTable,
   TableTools,
 } from '#/components/table/record-table'
-import { KeyHint, PageHeader } from '#/components/page-header'
+import { PageHeader } from '#/components/page-header'
 import { ImportAction } from '#/components/import/import-action'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
@@ -419,7 +419,6 @@ function ObjectListPage() {
     <div className="flex flex-col">
       <PageHeader
         title={object.plural}
-        count={allTotal}
         action={
           <>
             <ImportAction objectSlug={object.slug} />
@@ -568,10 +567,9 @@ function CreateRecordDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">
+        <Button size="sm" shortcut={hotkey?.toUpperCase()}>
           <Plus className="size-4" strokeWidth={2} />
           New {object.singular.toLowerCase()}
-          {hotkey ? <KeyHint>{hotkey.toUpperCase()}</KeyHint> : null}
         </Button>
       </DialogTrigger>
       <DialogContent

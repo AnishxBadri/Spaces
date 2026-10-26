@@ -6,7 +6,7 @@ import {
   LedgerRow,
   LedgerSection,
 } from '#/components/ledger-section'
-import { KeyHint, PageHeader } from '#/components/page-header'
+import { PageHeader } from '#/components/page-header'
 import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import { createNote, createNoteFromTemplate, listNotes } from '#/lib/server-fns'
@@ -79,10 +79,9 @@ function NotesPage() {
                   })
                 }}
               />
-              <Button onClick={newNote}>
+              <Button shortcut="N" onClick={newNote}>
                 <Plus className="size-4" strokeWidth={2} />
                 New note
-                <KeyHint>N</KeyHint>
               </Button>
             </>
           ) : null
@@ -95,10 +94,9 @@ function NotesPage() {
           title="No notes yet"
           body="Write in blocks, @mention any company or space, and the graph builds itself — backlinks land on every mentioned record."
           action={
-            <Button onClick={newNote}>
+            <Button shortcut="N" onClick={newNote}>
               <Plus className="size-4" strokeWidth={2} />
               New note
-              <KeyHint>N</KeyHint>
             </Button>
           }
         />

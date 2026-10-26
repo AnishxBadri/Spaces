@@ -18,7 +18,7 @@ import { Button } from '#/components/ui/button'
  *   touches this module.
  * - A typed field (a name, a host, a port, a key) is a draft: it registers
  *   here through `useSettingsDraft`, and the page's one Save bar collects
- *   every dirty draft — "n changes", Discard, Save `⌘↵`.
+ *   every dirty draft — "n changes", Discard, Save (`⌘↵` in its tooltip).
  * - There is no per-section Save. `SettingsSection` opens a form when no page
  *   form is above it, so a section cannot draw a page without the bar.
  */
@@ -156,9 +156,8 @@ function SaveBar({
           >
             Discard
           </Button>
-          <Button size="sm" disabled={saving} onClick={onSave}>
+          <Button size="sm" shortcut="⌘↵" disabled={saving} onClick={onSave}>
             {saving ? 'Saving' : 'Save'}
-            <kbd className="mono text-micro opacity-85">⌘↵</kbd>
           </Button>
         </div>
       </div>

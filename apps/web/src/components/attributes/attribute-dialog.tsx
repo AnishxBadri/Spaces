@@ -36,7 +36,6 @@ import { Segmented } from '#/components/ui/segmented'
 import { Select } from '#/components/ui/select'
 import type { SelectItem } from '#/components/ui/select'
 import { ConfirmDialog } from '#/components/ui/confirm-dialog'
-import { KeyHint } from '#/components/page-header'
 import { optionColor } from '@spaces/core/attributes/colors'
 import { deriveOptionIds } from '@spaces/core/attributes/options'
 import {
@@ -978,7 +977,7 @@ function AttributeForm({
             Cancel
           </Button>
         </DialogClose>
-        <Button type="submit" pending={pending}>
+        <Button type="submit" shortcut="⌘↵" pending={pending}>
           {pending
             ? mode === 'create'
               ? 'Creating…'
@@ -986,7 +985,6 @@ function AttributeForm({
             : mode === 'create'
               ? 'Create attribute'
               : 'Save'}
-          <KeyHint>⌘↵</KeyHint>
         </Button>
       </DialogFooter>
 

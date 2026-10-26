@@ -16,7 +16,6 @@ import { Checkbox } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { Segmented } from '#/components/ui/segmented'
-import { KeyHint } from '#/components/page-header'
 import {
   slugifyNoun,
   suggestPlural,
@@ -338,7 +337,7 @@ function ObjectForm(
             Cancel
           </Button>
         </DialogClose>
-        <Button type="submit" pending={pending}>
+        <Button type="submit" shortcut="⌘↵" pending={pending}>
           {props.mode === 'create' ? (
             <Plus className="size-4" strokeWidth={2} />
           ) : null}
@@ -347,7 +346,6 @@ function ObjectForm(
             : props.mode === 'create'
               ? 'Create object'
               : 'Save'}
-          <KeyHint>⌘↵</KeyHint>
         </Button>
       </DialogFooter>
     </form>

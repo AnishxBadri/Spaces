@@ -1,12 +1,5 @@
 import { Link2, MessageSquareText } from 'lucide-react'
-import { toast } from 'sonner'
-import { Button } from '#/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '#/components/ui/dropdown-menu'
+import { MoreMenu } from '#/components/ui/more-menu'
 import { openAsk } from '#/lib/ask/dock-store'
 
 /**
@@ -15,30 +8,21 @@ import { openAsk } from '#/lib/ask/dock-store'
  */
 export function RecordMoreMenu({ name }: { name: string }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" aria-label={`More for ${name}`}>
-          <span aria-hidden className="mono text-ui">
-            ···
-          </span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem onSelect={() => openAsk()}>
-          <MessageSquareText className="size-4" />
-          Ask about this
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={() => {
-            void navigator.clipboard
-              .writeText(window.location.href)
-              .then(() => toast('Link copied'))
-          }}
-        >
-          <Link2 className="size-4" />
-          Copy link
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <MoreMenu
+      variant="head"
+      label={name}
+      items={[
+        {
+          label: 'Ask about this',
+          icon: <MessageSquareText className="size-4" />,
+          onSelect: () => openAsk(),
+        },
+        {
+          label: 'Copy link',
+          icon: <Link2 className="size-4" />,
+          copy: () => window.location.href,
+        },
+      ]}
+    />
   )
 }

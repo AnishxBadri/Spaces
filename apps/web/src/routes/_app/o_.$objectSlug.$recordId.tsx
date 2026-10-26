@@ -6,7 +6,6 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { formatDay } from '@spaces/core/format'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
@@ -36,7 +35,6 @@ import {
   LogComposerRow,
   LogInteractionDialog,
 } from '#/components/log-interaction-dialog'
-import { KeyHint } from '#/components/page-header'
 import { TasksRail } from '#/components/tasks-rail'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { SummarizeRecordButton } from '#/components/summarize'
@@ -182,22 +180,6 @@ function ObjectRecordPage() {
     <div className="flex min-h-full flex-col">
       <RecordHeader
         stamp={{ kind: record.object.singular }}
-        crumb={
-          <>
-            <Link
-              to="/o/$objectSlug"
-              params={{ objectSlug: record.object.slug }}
-              className="focus-ring hover:text-foreground"
-            >
-              {record.object.plural}
-            </Link>
-            {' / '}
-            {record.id.slice(0, 8)}
-            {' / added '}
-            {formatDay(record.createdAt, record.readouts.today)}
-            {record.createdByName ? ` · ${record.createdByName}` : ''}
-          </>
-        }
         actions={
           <>
             <SensitiveToggle entityId={record.id} state={sensitivity} />
@@ -206,16 +188,14 @@ function ObjectRecordPage() {
               seed={{ id: record.id, name: record.name, kind: 'custom' }}
               hotkey="l"
               trigger={
-                <Button variant="outline">
+                <Button variant="outline" shortcut="L">
                   Log interaction
-                  <KeyHint>L</KeyHint>
                 </Button>
               }
             />
             {/* Opens the Tasks section's composer, which `T` binds. */}
-            <Button variant="outline" onClick={runBinding('T')}>
+            <Button variant="outline" shortcut="T" onClick={runBinding('T')}>
               Task
-              <KeyHint>T</KeyHint>
             </Button>
             <Button variant="outline" onClick={newNoteAboutThis}>
               Note about this

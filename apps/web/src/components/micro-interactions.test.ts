@@ -8,13 +8,12 @@ import {
   REJECT_LEAVE_MS,
   rejectPaneClass,
 } from './record/record-parts.tsx'
-import { keyHintClasses } from './ui/button.tsx'
 
 /**
- * The four micro-interactions: the composer wash, the rejected cell's
- * crimson hold, the toast's 8px rise, and the pending button's dropped key
- * hint. Two are class strings, asserted through their helpers; two are CSS,
- * asserted by reading the stylesheet.
+ * The micro-interactions: the composer wash, the rejected cell's
+ * crimson hold and the toast's 8px rise; the pending button's held width is
+ * `ui/button.test.tsx`'s. The class strings are asserted through their
+ * helpers, the CSS by reading the stylesheet.
  *
  * What the CSS half is really holding is the Compositor Rule and the
  * reduced-motion switch — neither is verifiable in a browser from a test
@@ -153,30 +152,6 @@ describe('the toast (rises 8px in, leaves faster than it arrived)', () => {
       properties(toast).filter((p) => p !== '--y' && p !== 'transition'),
     ).toEqual([])
     expect(toast).not.toMatch(/cubic-bezier|\bease-in-out\b/)
-  })
-})
-
-describe('the pending button (drops its key hint, keeps its width)', () => {
-  it('drops the hint while the write is in flight and brings it back after', () => {
-    expect(keyHintClasses(true)).toMatch(/\bopacity-0\b/)
-    expect(keyHintClasses(false)).toMatch(/\bopacity-85\b/)
-  })
-
-  it('goes on opacity, so the hint never leaves the box it reserved', () => {
-    // The No-Shift Rule: a hint that unmounted would let `Saving…` slide the
-    // button's edge, and everything beside it with it.
-    for (const pending of [true, false]) {
-      expect(keyHintClasses(pending)).not.toMatch(/\bhidden\b/)
-      expect(keyHintClasses(pending)).toMatch(/\btransition-opacity\b/)
-      expect(keyHintClasses(pending)).not.toMatch(/transition-all/)
-    }
-  })
-
-  it('stays mono at the micro step in both states', () => {
-    for (const pending of [true, false]) {
-      expect(keyHintClasses(pending).split(' ')).toContain('mono')
-      expect(keyHintClasses(pending).split(' ')).toContain('text-micro')
-    }
   })
 })
 

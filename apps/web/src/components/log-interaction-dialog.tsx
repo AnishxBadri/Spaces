@@ -2,7 +2,6 @@ import { useRouter } from '@tanstack/react-router'
 import { Phone, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { KeyHint } from '#/components/page-header'
 import { DitherMark, InitialsMark } from '#/components/record/record-parts'
 import { Button } from '#/components/ui/button'
 import {
@@ -208,11 +207,11 @@ export function LogInteractionDialog({
             </Button>
             <Button
               type="submit"
+              shortcut="⌘↵"
               pending={pending === 'log'}
               disabled={pending !== null}
             >
               {pending === 'log' ? 'Logging…' : `Log ${kind}`}
-              <KeyHint>⌘↵</KeyHint>
             </Button>
           </DialogFooter>
         </form>
@@ -330,7 +329,7 @@ export function LogComposerRow(props: React.ComponentProps<'button'>) {
         Log a call, meeting, or note…
       </span>
       <span className="flex-1" />
-      <KeyHint>L</KeyHint>
+      <kbd className="shrink-0 mono text-micro text-graphite">L</kbd>
     </button>
   )
 }

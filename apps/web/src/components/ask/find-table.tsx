@@ -3,12 +3,7 @@ import { useEffect, useReducer, useState } from 'react'
 import { toast } from 'sonner'
 import { PluginMark } from '#/components/integrations/integration-ledger'
 import { Button } from '#/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '#/components/ui/dropdown-menu'
+import { MoreMenu } from '#/components/ui/more-menu'
 import { actOnFindRow } from '#/lib/server-fns'
 import type { AskFindRow, AskFindTable } from '#/lib/server-fns'
 import {
@@ -167,8 +162,9 @@ function FindRow({
   return (
     <tr
       data-standing={row.standing}
+      data-row
       className={cn(
-        'group border-b border-rule last:border-b-0',
+        'border-b border-rule last:border-b-0',
         greyed && 'text-graphite',
       )}
     >
@@ -221,38 +217,31 @@ function FindRow({
               {action === 'add' ? 'Add' : 'File here'}
             </Button>
           )}
-          {menu.length === 0 ? null : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  disabled={pending}
-                  aria-label={`More for ${row.name}`}
-                  className="text-graphite opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
-                >
-                  <span aria-hidden className="mono text-ui">
-                    ···
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                {menu.includes('add-and-file') ? (
-                  <DropdownMenuItem onSelect={() => void act('file')}>
-                    Add and file here
-                  </DropdownMenuItem>
-                ) : null}
-                {menu.includes('dismiss') ? (
-                  <DropdownMenuItem
-                    title={`Never shown again for ${table.space?.name ?? 'this space'}`}
-                    onSelect={() => void act('dismiss')}
-                  >
-                    Dismiss
-                  </DropdownMenuItem>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          <MoreMenu
+            variant="row"
+            label={row.name}
+            items={[
+              ...(menu.includes('add-and-file')
+                ? [
+                    {
+                      label: 'Add and file here',
+                      disabled: pending,
+                      onSelect: () => void act('file'),
+                    },
+                  ]
+                : []),
+              ...(menu.includes('dismiss')
+                ? [
+                    {
+                      label: 'Dismiss',
+                      title: `Never shown again for ${table.space?.name ?? 'this space'}`,
+                      disabled: pending,
+                      onSelect: () => void act('dismiss'),
+                    },
+                  ]
+                : []),
+            ]}
+          />
         </span>
       </td>
     </tr>

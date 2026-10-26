@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
-import { KeyHint, PageHeader } from '#/components/page-header'
+import { PageHeader } from '#/components/page-header'
 import { ReadoutStrip, countReadout } from '#/components/record/record-parts'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -142,11 +142,12 @@ export function ReceiptHeader({
           ) : null}
           {voided ? null : (
             <Button
+              shortcut="⌘↵"
               disabled={!idle || pending !== null}
               pending={pending === 'commit'}
               onClick={onCommit}
             >
-              Commit again <KeyHint>⌘↵</KeyHint>
+              Commit again
             </Button>
           )}
         </>

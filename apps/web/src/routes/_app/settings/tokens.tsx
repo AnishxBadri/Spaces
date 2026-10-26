@@ -4,14 +4,13 @@ import { toast } from 'sonner'
 import {
   SettingsGroupHead,
   SettingsRow,
-  SettingsRowMenu,
   SettingsSection,
   SettingsTip,
 } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { useConfirm } from '#/components/ui/confirm-dialog'
-import { DropdownMenuItem } from '#/components/ui/dropdown-menu'
+import { MoreMenu } from '#/components/ui/more-menu'
 import { Input } from '#/components/ui/input'
 import { createApiToken, listApiTokens, revokeApiToken } from '#/lib/server-fns'
 import {
@@ -190,7 +189,7 @@ function TokensRoute() {
           <span className="w-32 shrink-0">It may</span>
           <span className="w-16 shrink-0">Created</span>
           <span className="w-28 shrink-0">Last used</span>
-          <span className="w-6 shrink-0" />
+          <span className="w-16 shrink-0" />
         </div>
         {tokens.length === 0 ? (
           <p className="border-b border-rule py-3 text-label text-graphite">
@@ -201,6 +200,7 @@ function TokensRoute() {
             <div
               key={t.id}
               data-token-row
+              data-row
               className={cn(
                 'flex h-10 items-center gap-3 border-b border-rule',
                 t.revokedAt && 'text-graphite',
@@ -234,16 +234,20 @@ function TokensRoute() {
                     ? day(t.lastUsedAt)
                     : '—'}
               </span>
-              <span className="flex w-6 shrink-0 justify-end">
+              <span className="flex w-16 shrink-0 justify-end">
                 {t.revokedAt ? null : (
-                  <SettingsRowMenu label={t.name}>
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onSelect={() => void revoke(t)}
-                    >
-                      Revoke…
-                    </DropdownMenuItem>
-                  </SettingsRowMenu>
+                  <MoreMenu
+                    variant="row"
+                    label={t.name}
+                    items={[
+                      {
+                        label: 'Revoke…',
+                        destructive: true,
+                        opens: true,
+                        onSelect: () => void revoke(t),
+                      },
+                    ]}
+                  />
                 )}
               </span>
             </div>

@@ -5,24 +5,22 @@ import {
   PIN_UNDER_HEAD_BAR,
   useHeadFold,
 } from './head-fold'
-import { keyHintClasses, useButtonPending } from './ui/button'
 import { cn } from '#/lib/utils'
 
 /**
- * Page header. Serif title, or a sentence when
- * the page has a state to report; one mono line of what the instrument
- * measured (above as an eyebrow, or below as a readout); actions right,
- * each carrying its key hint inside the button. The double rule under,
- * 32px inset, 28px above — the header owns its own anatomy so every field
- * starts on the same line. Scrolled past its title, it folds to `HeadBar`.
- * - `tabs` is the page's own tab row, under the double rule; scrolled, it
- *   pins under the folded bar rather than riding into it.
- * - `count` is a list's mono count beside its title — `Companies 312`.
+ * Page header. Serif title, or a sentence when the page has a state to
+ * report; one mono line of what the instrument measured (above as an
+ * eyebrow, or below as a readout); `[outline?] [Primary] [···]` right, all
+ * 32px, keys in their tooltips. The double rule under, 32px inset, 28px
+ * above — the header owns its own anatomy so every field starts on the same
+ * line. Scrolled past its title, it folds to `HeadBar`.
+ * - `tabs` is the page's `Tabs` bar, under the double rule; scrolled, it pins
+ *   under the folded bar rather than riding into it. A list's count is on its
+ *   All tab; a page with no tab bar puts it in the title (`HeadCount`).
  */
 export function PageHeader({
   eyebrow,
   title,
-  count,
   description,
   action,
   tabs,
@@ -31,13 +29,10 @@ export function PageHeader({
   /** Mono caps line above the title — "Today · Wednesday · 2026-09-10". */
   eyebrow?: ReactNode
   title: ReactNode
-  /** Mono readout beside the title, on its baseline — a list's size, or
-   *  "26 spaces · 18 nested". A number is formatted; anything else as is. */
-  count?: ReactNode
   /** Mono readout under the title — counts, last touch. Never prose. */
   description?: ReactNode
   action?: ReactNode
-  /** The page's tab row: underline tabs that pin under the folded bar. */
+  /** The page's `Tabs` bar; pins under the folded bar. */
   tabs?: ReactNode
   className?: string
 }) {
@@ -57,21 +52,9 @@ export function PageHeader({
               {eyebrow}
             </div>
           ) : null}
-          <div className="flex min-w-0 items-baseline gap-3">
-            <h1 ref={titleRef} className="title-serif">
-              {title}
-            </h1>
-            {count !== undefined && count !== null && count !== false ? (
-              <span
-                data-head-count
-                className="tabular shrink-0 mono text-label text-graphite"
-              >
-                {typeof count === 'number'
-                  ? count.toLocaleString('en-US')
-                  : count}
-              </span>
-            ) : null}
-          </div>
+          <h1 ref={titleRef} className="title-serif">
+            {title}
+          </h1>
           {description ? (
             <div className="flex flex-wrap items-baseline gap-x-5 mono text-label text-graphite">
               {description}
@@ -85,13 +68,7 @@ export function PageHeader({
         ) : null}
       </header>
       {tabs ? (
-        <div
-          data-head-tabs
-          className={cn(
-            'flex h-10 shrink-0 items-end border-b border-rule bg-paper px-5',
-            PIN_UNDER_HEAD_BAR,
-          )}
-        >
+        <div data-head-tabs className={cn('shrink-0', PIN_UNDER_HEAD_BAR)}>
           {tabs}
         </div>
       ) : null}
@@ -100,19 +77,27 @@ export function PageHeader({
 }
 
 /**
- * A key hint inside a button — mono, never a chip. It drops with the label
- * swap while the button is pending and comes back when the action
- * re-arms; it stays in the DOM throughout, so the width it holds never moves
- * anything next to it, and leaves the accessibility tree with the paint.
+ * A page title with its count on the baseline — `Portfolio 12` — for a page
+ * with no tab bar to carry it. A number is formatted; anything else as is.
  */
-export function KeyHint({ children }: { children: ReactNode }) {
-  const pending = useButtonPending()
+export function HeadCount({
+  title,
+  count,
+}: {
+  title: ReactNode
+  count: ReactNode
+}) {
   return (
-    <kbd
-      className={keyHintClasses(pending)}
-      {...(pending ? { 'aria-hidden': true } : {})}
-    >
-      {children}
-    </kbd>
+    <span className="inline-flex min-w-0 items-baseline gap-3">
+      {title}
+      {count === null || count === undefined || count === false ? null : (
+        <span
+          data-head-count
+          className="tabular shrink-0 mono text-label font-normal text-graphite"
+        >
+          {typeof count === 'number' ? count.toLocaleString('en-US') : count}
+        </span>
+      )}
+    </span>
   )
 }
