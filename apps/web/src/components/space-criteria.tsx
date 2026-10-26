@@ -50,8 +50,10 @@ export function SpaceCriteria({
   }
 
   return (
-    <section aria-label="Criteria" className="flex flex-col gap-1.5 px-3 py-4">
-      <span className="label-caps text-graphite">Criteria</span>
+    <section aria-label="Criteria" className="flex flex-col">
+      <div className="flex h-7 items-center">
+        <h2 className="min-w-0 truncate text-ui text-graphite">Criteria</h2>
+      </div>
       {editing ? (
         <textarea
           autoFocus
@@ -78,7 +80,7 @@ export function SpaceCriteria({
           type="button"
           onClick={open}
           className={cn(
-            'focus-ring -mx-1 max-w-160 px-1 text-left transition-colors hover:bg-bone',
+            'focus-ring -mx-1 max-w-160 px-1 text-left transition-colors hover:bg-bone-deep',
             criteria === null
               ? 'text-ui text-graphite'
               : 'text-prose font-serif leading-6.75 whitespace-pre-wrap',

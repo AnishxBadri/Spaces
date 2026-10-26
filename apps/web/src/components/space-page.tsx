@@ -14,8 +14,8 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
-  RailItem,
-  RailSection,
+  RailGroup,
+  RailGroupRow,
   RecordBody,
   RecordHeader,
 } from './record/record-parts'
@@ -23,14 +23,8 @@ import { SpaceCriteria } from './space-criteria'
 import { SpaceGlossary } from './space-glossary'
 import { SpaceMoveDialog } from './space-move-dialog'
 import { SpaceTabs } from './space-tabs'
-import {
-  AddWatchDialog,
-  WatchingLane,
-  WhatsMovingLane,
-  useAddWatch,
-} from './space-watching'
+import { AddWatchDialog, WatchingLane, useAddWatch } from './space-watching'
 import type { Space } from './space-tabs'
-import { TasksRail } from './tasks-rail'
 import { SaveAsTemplateAction } from './templates'
 import { useSensitiveItem } from './sensitive-toggle'
 import type { SensitivityState } from './sensitive-toggle'
@@ -63,10 +57,10 @@ import { useWebSources } from '#/lib/ask/web-sources'
 
 /**
  * A space reads like a record: the head with its stamp and crumb, `···`
- * its one control; the details column left (Criteria, Watching, What's
- * moving, Map, Tasks); the tabbed view right. The glossary is a window the
- * `···` opens. The route owns which tab is open, and `into` — the subspace a
- * split moves companies into.
+ * its one control; the rail left (Criteria, Watching, Map); the tabbed view
+ * right, Overview first. The glossary is a window the `···` opens. The route
+ * owns which tab is open, and `into` — the subspace a split moves companies
+ * into.
  */
 
 type Term = Awaited<ReturnType<typeof listTerms>>[number]
@@ -277,12 +271,11 @@ export function SpacePageView({
       </Dialog>
 
       <RecordBody
+        groups
         details={
           <>
             {/* What belongs here — the membership rule a watch reads. */}
-            <div className="border-b border-hairline px-3">
-              <SpaceCriteria spaceId={spc.id} criteria={spc.criteria} />
-            </div>
+            <SpaceCriteria spaceId={spc.id} criteria={spc.criteria} />
 
             <WatchingLane
               spaceId={spc.id}
@@ -293,11 +286,10 @@ export function SpacePageView({
                 ? { onAdd: () => setAddingWatch(true) }
                 : {})}
             />
-            <WhatsMovingLane signals={watching.moving} />
 
-            <RailSection label="Map" meta={`${spc.children.length} sub`}>
+            <RailGroup label="Map" count={`${spc.children.length} sub`}>
               {spc.parent ? (
-                <RailItem>
+                <RailGroupRow>
                   <span
                     aria-hidden
                     className="w-3.5 shrink-0 text-center mono text-label text-graphite"
@@ -311,10 +303,10 @@ export function SpacePageView({
                   >
                     {spc.parent.name}
                   </Link>
-                </RailItem>
+                </RailGroupRow>
               ) : null}
               {spc.children.map((c) => (
-                <RailItem key={c.id}>
+                <RailGroupRow key={c.id}>
                   <Layers
                     className="size-3.5 shrink-0 text-graphite"
                     strokeWidth={1.75}
@@ -331,9 +323,9 @@ export function SpacePageView({
                       ? `${c.companies} compan${c.companies === 1 ? 'y' : 'ies'}`
                       : c.memos > 0
                         ? `${c.memos} note${c.memos === 1 ? '' : 's'}`
-                        : '—'}
+                        : ''}
                   </span>
-                </RailItem>
+                </RailGroupRow>
               ))}
               <NewSubspace
                 parentId={spc.id}
@@ -344,18 +336,13 @@ export function SpacePageView({
                 }}
                 onCreated={(id) => void subspaceCreated(id)}
               />
-            </RailSection>
-
-            <TasksRail
-              entityId={spc.id}
-              entityName={spc.name}
-              entityKind="space"
-            />
+            </RailGroup>
           </>
         }
       >
         <SpaceTabs
           spc={spc}
+          signals={watching.moving}
           tab={tab}
           into={into}
           onTabChange={onTabChange}
@@ -626,7 +613,7 @@ function NewSubspace({
   }
 
   return editing ? (
-    <RailItem>
+    <RailGroupRow>
       <Input
         autoFocus
         value={draft}
@@ -643,9 +630,9 @@ function NewSubspace({
         }}
         className="h-7 flex-1 px-2 text-label"
       />
-    </RailItem>
+    </RailGroupRow>
   ) : (
-    <RailItem>
+    <RailGroupRow>
       <button
         type="button"
         onClick={() => setEditing(true)}
@@ -654,6 +641,6 @@ function NewSubspace({
         <Plus className="size-3.5 shrink-0 text-primary" strokeWidth={2.5} />
         <span className="min-w-0 flex-1 truncate">Subspace</span>
       </button>
-    </RailItem>
+    </RailGroupRow>
   )
 }

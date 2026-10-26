@@ -307,9 +307,9 @@ export function PreviewHead({
  * Body. With `details` it is the tabbed record: the rail on bone left,
  * sticking under the folded bar on wide screens, and `children` — the tab
  * head over its view — taking the rest, edge to edge.
- * - `groups`: a record's 300px rail, `p-3` with its `RailGroup`s
- *   `gap-3` apart. Without it, the 320px column of edge-to-edge
- *   `RailSection`s a space keeps.
+ * - `groups`: the 300px rail of a record or a space, `p-3` with its
+ *   `RailGroup`s `gap-3` apart. Without it, a 320px column of edge-to-edge
+ *   `RailSection`s.
  * - Without `details`, the older shape the term and holding pages keep:
  *   the page left, a `rail` right on bone.
  */

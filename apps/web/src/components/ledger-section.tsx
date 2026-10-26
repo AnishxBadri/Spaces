@@ -177,11 +177,14 @@ export function EmptyRow({
  */
 export function FoldRow({
   hidden,
+  detail,
   onShow,
   className,
 }: {
   /** How many rows the fold holds back. */
   hidden: number
+  /** What the held-back rows are, after a `·`: `Seed 3, Pre-seed 2`. */
+  detail?: string | undefined
   onShow: () => void
   className?: string | undefined
 }) {
@@ -196,6 +199,7 @@ export function FoldRow({
       )}
     >
       {hidden} more
+      {detail ? ` · ${detail}` : null}
     </button>
   )
 }

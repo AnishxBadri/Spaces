@@ -17,6 +17,8 @@ type MenuProps = {
   entityId?: string | undefined
   template?: TemplateKind | undefined
   sensitivity?: SensitivityState | undefined
+  /** The record's own rarer verbs, after Copy link: `Record a round…`. */
+  verbs?: ReadonlyArray<MoreMenuEntry> | undefined
   /** From `usePluginEntries`. */
   plugins?: ReadonlyArray<MoreMenuEntry> | undefined
 }
@@ -24,7 +26,8 @@ type MenuProps = {
 /**
  * A record head's boxed `···`, in this order:
  * - Ask about this, which opens Ask docked with the record as its scope
- *   chip; Copy link; Save as template… where the kind has templates;
+ *   chip; Copy link; the record's own `verbs`; Save as template… where the
+ *   kind has templates;
  * - a rule and Sensitive, a switch, where the record carries the flag;
  * - the plugins' actions, each group under its plugin's name.
  */
@@ -48,6 +51,7 @@ function Menu({
   name,
   entityId,
   template,
+  verbs = [],
   plugins = [],
   sensitive,
 }: MenuProps & { sensitive: MoreMenuCheck | null }) {
@@ -67,6 +71,7 @@ function Menu({
       icon: <Link2 className="size-4" />,
       copy: () => window.location.href,
     },
+    ...verbs,
   ]
   if (templated !== null)
     items.push({

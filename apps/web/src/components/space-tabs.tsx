@@ -1,51 +1,47 @@
 import { Link, useRouter } from '@tanstack/react-router'
 import { Boxes, FileText, X } from 'lucide-react'
-import { useId, useState } from 'react'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
-import { cellsFor } from './dither'
 import { FilterCount, FilterRow, FilterTab } from './filter-row'
-import { LabelHead, LedgerFigure, LedgerRow } from './ledger-section'
+import { FoldRow, LabelHead, LedgerFigure, LedgerRow } from './ledger-section'
 import { DitherMark, InitialsMark } from './record/record-parts'
-import type { RecordReadout } from './record/record-parts'
+import { SpaceOverview } from './space-overview'
 import { SpaceSources } from './space-sources'
 import { TagCompanyRow } from './space-tag-row'
 import { Button } from './ui/button'
 import { Checkbox } from './ui/checkbox'
+import { Segmented } from './ui/segmented'
 import { Select } from './ui/select'
 import { Tabs } from './ui/tabs'
 import { SelectionBar } from './table/selection-bar'
 import type { TabItem } from './ui/tabs'
 import {
+  COMPANY_FOLD,
   COMPANY_SORTS,
   SPACE_TABS,
   filterCompanies,
+  foldStages,
   moveTarget,
   sortCompanies,
   spacePeople,
   stageLabel,
-  stageMix,
 } from '#/lib/spaces/page'
-import type {
-  CompanyFilter,
-  CompanySort,
-  SpaceTab,
-  StageSegment,
-} from '#/lib/spaces/page'
+import type { CompanyFilter, CompanySort, SpaceTab } from '#/lib/spaces/page'
 import {
   moveIntoSubspace,
   tagIntoSpace,
   untagFromSpace,
 } from '#/lib/server-fns'
-import type { getSpace } from '#/lib/server-fns'
-import { formatDay, formatWhen } from '@spaces/core/format'
+import type { SpaceSignal, getSpace } from '#/lib/server-fns'
+import { formatWhen } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 /**
- * The space page's view: the tab head over one tab, as a record's body is.
- * Each tab owns its room — a filter row in the underline
- * grammar where it has one, then 40px rows on rules.
+ * The space page's view: the tab head over one tab, as a record's body is,
+ * Overview first. Each tab owns its room — a switch where it has one, then
+ * 40px rows on rules.
  */
 
 export type Space = Awaited<ReturnType<typeof getSpace>>
@@ -55,6 +51,7 @@ type Company = Space['companies'][number]
 const EXIT_MS = 150
 
 const TAB_LABELS: Record<SpaceTab, string> = {
+  overview: 'Overview',
   companies: 'Companies',
   notes: 'Notes',
   files: 'Files',
@@ -62,8 +59,10 @@ const TAB_LABELS: Record<SpaceTab, string> = {
   records: 'Records',
 }
 
-/** Each tab's count: what the tab lists, so an empty one reads 0. */
-export function spaceTabCounts(spc: Space): Record<SpaceTab, number> {
+type CountedTab = Exclude<SpaceTab, 'overview'>
+
+/** Each listing tab's count: what the tab lists, so an empty one reads 0. */
+export function spaceTabCounts(spc: Space): Record<CountedTab, number> {
   return {
     companies: spc.companies.length,
     notes: spc.filed.length + spc.notes.length,
@@ -73,44 +72,17 @@ export function spaceTabCounts(spc: Space): Record<SpaceTab, number> {
   }
 }
 
-/**
- * The head's three readouts, never a tab's count: in pipeline, last filed,
- * and the funding-stage mix as the page's one dither.
- */
-export function spaceReadouts(spc: Space, today: string): Array<RecordReadout> {
-  const inPipeline = spc.companies.filter((c) => c.deals > 0).length
-  const segments = stageMix(
-    spc.companies.map((c) => c.stage),
-    spc.stageOptions,
-  )
-  return [
-    {
-      label: 'In pipeline',
-      value: `${inPipeline} of ${spc.companies.length}`,
-      tone: inPipeline === 0 ? 'muted' : undefined,
-    },
-    {
-      label: 'Last filed',
-      value: spc.lastFiled ? formatDay(spc.lastFiled.on, today) : '—',
-    },
-    segments.length > 0
-      ? {
-          label: 'Funding stage',
-          value: <StageBar segments={segments} />,
-          figure: true,
-        }
-      : { label: 'Funding stage', value: '—' },
-  ]
-}
-
 export function SpaceTabs({
   spc,
+  signals,
   tab,
   into,
   onTabChange,
   onNewNote,
 }: {
   spc: Space
+  /** What's moving on the space's members, for Overview. */
+  signals: ReadonlyArray<SpaceSignal>
   tab: SpaceTab
   /** The subspace a split moves companies into, from the link. */
   into: string | null
@@ -118,11 +90,11 @@ export function SpaceTabs({
   onNewNote: (kind?: 'memo') => void
 }) {
   const counts = spaceTabCounts(spc)
-  const items: Array<TabItem<SpaceTab>> = SPACE_TABS.map((id) => ({
-    id,
-    label: TAB_LABELS[id],
-    count: counts[id],
-  }))
+  const items: Array<TabItem<SpaceTab>> = SPACE_TABS.map((id) =>
+    id === 'overview'
+      ? { id, label: TAB_LABELS[id], uncounted: true }
+      : { id, label: TAB_LABELS[id], count: counts[id] },
+  )
   return (
     <Tabs
       label={spc.name}
@@ -130,7 +102,9 @@ export function SpaceTabs({
       value={tab}
       onValueChange={onTabChange}
     >
-      {tab === 'companies' ? (
+      {tab === 'overview' ? (
+        <SpaceOverview spc={spc} signals={signals} onTab={onTabChange} />
+      ) : tab === 'companies' ? (
         <CompaniesTab spc={spc} into={into} />
       ) : tab === 'notes' ? (
         <NotesTab spc={spc} onNewNote={onNewNote} />
@@ -216,7 +190,7 @@ const LANES = {
 } as const
 
 /**
- * Lowercase mono lane heads over the company rows, on the rows' own lanes:
+ * Sentence-case lane heads over the company rows, on the rows' own lanes:
  * the select box and the mark hold their width, the × its 24px.
  */
 function CompanyLaneHeads({ selectable }: { selectable: boolean }) {
@@ -224,17 +198,17 @@ function CompanyLaneHeads({ selectable }: { selectable: boolean }) {
     <div
       aria-hidden
       data-lane-heads
-      className="flex h-7 items-center gap-3 border-b border-rule px-3 mono text-micro text-graphite"
+      className="flex h-7 items-center gap-3 border-b border-rule px-3 text-label text-graphite"
     >
       {selectable ? <span className="w-3.5 shrink-0" /> : null}
       <span className="w-3.5 shrink-0" />
-      <span className="min-w-0 flex-1 truncate">company</span>
-      <span className={cn(LANES.stage, 'shrink-0')}>funding stage</span>
+      <span className="min-w-0 flex-1 truncate">Company</span>
+      <span className={cn(LANES.stage, 'shrink-0')}>Funding stage</span>
       <span className={cn(LANES.pipeline, 'shrink-0 text-right')}>
-        pipeline
+        Pipeline
       </span>
       <span className={cn(LANES.location, 'shrink-0 text-right max-md:hidden')}>
-        location
+        Location
       </span>
       <span className="w-6 shrink-0" />
     </div>
@@ -242,8 +216,11 @@ function CompanyLaneHeads({ selectable }: { selectable: boolean }) {
 }
 
 /**
- * The Companies tab. Its rows are this space's own filings only — a company
- * filed in a subspace is not listed, so a split can only choose those.
+ * The Companies tab: the All · In pipeline · Watching switch with Sort at
+ * its right, the tag composer, then the rows, folded past `COMPANY_FOLD`
+ * under a foot that counts the rest by stage. Its rows are this space's own
+ * filings only — a company filed in a subspace is not listed, so a split
+ * can only choose those.
  * - Selecting needs a subspace to move into; `into` opens it selecting.
  */
 function CompaniesTab({ spc, into }: { spc: Space; into: string | null }) {
@@ -256,6 +233,7 @@ function CompaniesTab({ spc, into }: { spc: Space; into: string | null }) {
   const [moving, setMoving] = useState(false)
   // Companies mid-untag: faded until the write lands and the row unmounts.
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set())
+  const [unfolded, setUnfolded] = useState(false)
 
   const selectable = spc.children.length > 0
   const selecting = moveTarget(spc.children, null, into) !== null
@@ -264,11 +242,13 @@ function CompaniesTab({ spc, into }: { spc: Space; into: string | null }) {
 
   const inPipeline = spc.companies.filter((c) => c.deals > 0).length
   const watching = spc.companies.length - inPipeline
-  const rows = sortCompanies(
+  const sorted = sortCompanies(
     filterCompanies(spc.companies, filter),
     sort,
     spc.stageOptions,
   )
+  const rows = unfolded ? sorted : sorted.slice(0, COMPANY_FOLD)
+  const folded = sorted.slice(rows.length)
   const taggedIds = new Set(spc.companies.map((c) => c.id))
 
   async function retag(c: Company) {
@@ -351,41 +331,35 @@ function CompaniesTab({ spc, into }: { spc: Space; into: string | null }) {
           onMove={() => void moveHere()}
         />
       ) : (
-        <FilterRow
-          label="Show companies"
-          end={
-            <span className="flex items-center gap-1.5 text-label text-graphite">
-              Sort
-              <Select
-                aria-label="Sort companies"
-                width="content"
-                value={sort}
-                onChange={setSort}
-                items={COMPANY_SORTS.map((s) => ({
-                  value: s.id,
-                  label: s.label,
-                }))}
-                className="h-7 w-auto border-transparent bg-transparent px-1 text-label text-foreground hover:border-transparent"
-              />
-            </span>
-          }
+        <div
+          data-companies-bar
+          className="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-rule px-3"
         >
-          <FilterTab active={filter === 'all'} onClick={() => setFilter('all')}>
-            All <FilterCount n={spc.companies.length} />
-          </FilterTab>
-          <FilterTab
-            active={filter === 'pipeline'}
-            onClick={() => setFilter('pipeline')}
-          >
-            In pipeline <FilterCount n={inPipeline} />
-          </FilterTab>
-          <FilterTab
-            active={filter === 'watching'}
-            onClick={() => setFilter('watching')}
-          >
-            Watching <FilterCount n={watching} />
-          </FilterTab>
-        </FilterRow>
+          <Segmented
+            label="Show companies"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { id: 'all', label: 'All' },
+              { id: 'pipeline', label: 'In pipeline', count: inPipeline },
+              { id: 'watching', label: 'Watching', count: watching },
+            ]}
+          />
+          <span className="flex items-center gap-1.5 text-label text-graphite">
+            Sort
+            <Select
+              aria-label="Sort companies"
+              width="content"
+              value={sort}
+              onChange={setSort}
+              items={COMPANY_SORTS.map((s) => ({
+                value: s.id,
+                label: s.label,
+              }))}
+              className="h-7 w-auto border-transparent bg-transparent px-1 text-label text-foreground hover:border-transparent"
+            />
+          </span>
+        </div>
       )}
       <ol>
         <TagCompanyRow
@@ -477,6 +451,16 @@ function CompaniesTab({ spc, into }: { spc: Space; into: string | null }) {
           </EmptyRow>
         ) : null}
       </ol>
+      {folded.length > 0 ? (
+        <FoldRow
+          hidden={folded.length}
+          detail={foldStages(
+            folded.map((c) => c.stage),
+            spc.stageOptions,
+          )}
+          onShow={() => setUnfolded(true)}
+        />
+      ) : null}
     </div>
   )
 }
@@ -683,73 +667,5 @@ function RecordsTab({ spc }: { spc: Space }) {
         ))
       )}
     </ol>
-  )
-}
-
-// ---------- the funding-stage bar ----------
-
-/**
- * The funding-stage mix: one segment per stage, as wide as its count, its
- * label under it. The page's one dither — density rises with stage and
- * bootstrapped draws lightest; companies with no stage are an outline.
- */
-export function StageBar({ segments }: { segments: Array<StageSegment> }) {
-  const base = useId().replace(/[^a-zA-Z0-9]/g, '')
-  return (
-    <div data-stage-bar className="flex w-full min-w-0 flex-col gap-1">
-      <div className="flex h-2 w-full gap-px" aria-hidden>
-        {segments.map((s, i) =>
-          s.level === 0 ? (
-            <span
-              key={s.id ?? 'none'}
-              className="h-2 min-w-1 basis-0 border border-hairline"
-              style={{ flexGrow: s.count }}
-            />
-          ) : (
-            <svg
-              key={s.id ?? 'none'}
-              height="8"
-              className="h-2 min-w-1 basis-0"
-              style={{ flexGrow: s.count }}
-            >
-              <defs>
-                <pattern
-                  id={`${base}-stage-${i}`}
-                  width="8"
-                  height="8"
-                  patternUnits="userSpaceOnUse"
-                  shapeRendering="crispEdges"
-                >
-                  {cellsFor(s.level).map(([x, y]) => (
-                    <rect
-                      key={`${x}-${y}`}
-                      x={x}
-                      y={y}
-                      width="2"
-                      height="2"
-                      fill="var(--primary)"
-                    />
-                  ))}
-                </pattern>
-              </defs>
-              <rect width="100%" height="8" fill={`url(#${base}-stage-${i})`} />
-            </svg>
-          ),
-        )}
-      </div>
-      <ol className="flex w-full gap-px" aria-label="Funding stages">
-        {segments.map((s) => (
-          <li
-            key={s.id ?? 'none'}
-            data-stage={s.id ?? ''}
-            title={`${s.label} · ${s.count}`}
-            className="min-w-1 basis-0 truncate mono text-micro leading-3.5 text-graphite"
-            style={{ flexGrow: s.count }}
-          >
-            {s.label} <span className="text-foreground">{s.count}</span>
-          </li>
-        ))}
-      </ol>
-    </div>
   )
 }

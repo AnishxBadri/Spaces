@@ -2,10 +2,11 @@ import { z } from 'zod'
 
 /**
  * The space page's pure half: its tabs, the funding-stage mix, and the
- * Companies tab's filter and sort. Client-safe — nothing here reaches `db`.
+ * Companies tab's filter, sort and fold. Client-safe — nothing here reaches `db`.
  */
 
 export const SPACE_TABS = [
+  'overview',
   'companies',
   'notes',
   'files',
@@ -14,8 +15,8 @@ export const SPACE_TABS = [
 ] as const
 export type SpaceTab = (typeof SPACE_TABS)[number]
 
-/** A space opens on Notes, as a record does. */
-export const DEFAULT_SPACE_TAB: SpaceTab = 'notes'
+/** A space opens on Overview every time, as a record does. */
+export const DEFAULT_SPACE_TAB: SpaceTab = 'overview'
 
 /**
  * `?tab=` deep-links a tab; anything else reads as no tab. `?into=` is the
@@ -38,19 +39,6 @@ export function moveTarget(
   const ids = new Set(children.map((c) => c.id))
   if (picked !== null && ids.has(picked)) return picked
   return linked !== null && ids.has(linked) ? linked : null
-}
-
-export function isSpaceTab(value: string | null): value is SpaceTab {
-  return value !== null && SPACE_TABS.some((t) => t === value)
-}
-
-/** The tab to show: the link's, else the one last used here, else Notes. */
-export function openSpaceTab(
-  linked: SpaceTab | undefined,
-  remembered: string | null,
-): SpaceTab {
-  if (linked !== undefined) return linked
-  return isSpaceTab(remembered) ? remembered : DEFAULT_SPACE_TAB
 }
 
 // ---------- the funding-stage mix ----------
@@ -201,6 +189,24 @@ export function sortCompanies<T extends CompanyRow>(
     return i === -1 ? ordered.length : i
   }
   return [...rows].sort((a, b) => rank(a) - rank(b) || byName(a, b))
+}
+
+/** How many company rows the Companies tab lists before its fold. */
+export const COMPANY_FOLD = 10
+
+/**
+ * The fold's detail: the held-back rows counted by stage, most first, ties
+ * in bar order — `Seed 3, Pre-seed 3, Bootstrapped 1`.
+ */
+export function foldStages(
+  stages: ReadonlyArray<string | null>,
+  options: ReadonlyArray<StageOption>,
+): string {
+  return stageMix(stages, options)
+    .map((s, i) => ({ ...s, i }))
+    .sort((a, b) => b.count - a.count || a.i - b.i)
+    .map((s) => `${s.label} ${String(s.count)}`)
+    .join(', ')
 }
 
 // ---------- the People tab ----------

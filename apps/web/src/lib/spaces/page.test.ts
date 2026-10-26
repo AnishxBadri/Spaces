@@ -3,7 +3,7 @@ import { SYSTEM_ATTRIBUTES } from '@spaces/core/attributes/registry'
 import {
   DEFAULT_SPACE_TAB,
   filterCompanies,
-  openSpaceTab,
+  foldStages,
   sortCompanies,
   spacePeople,
   spaceSearch,
@@ -89,12 +89,9 @@ describe('the funding-stage mix', () => {
 })
 
 describe('the tabs', () => {
-  it('opens on Notes, else the remembered tab, and a link wins', () => {
-    expect(DEFAULT_SPACE_TAB).toBe('notes')
-    expect(openSpaceTab(undefined, null)).toBe('notes')
-    expect(openSpaceTab(undefined, 'files')).toBe('files')
-    expect(openSpaceTab(undefined, 'interactions')).toBe('notes')
-    expect(openSpaceTab('companies', 'files')).toBe('companies')
+  it('opens on Overview, with nothing remembered', () => {
+    expect(DEFAULT_SPACE_TAB).toBe('overview')
+    expect(spaceSearch.parse({ tab: 'overview' }).tab).toBe('overview')
   })
 
   it('reads ?tab= and drops what is not a tab', () => {
@@ -144,6 +141,16 @@ describe('the Companies tab', () => {
       'Tenantry',
     ])
     expect(sortCompanies(rows, 'filed', seeded).at(0)?.name).toBe('Arbor')
+  })
+
+  it('counts the folded rows by stage, most first, ties in bar order', () => {
+    expect(
+      foldStages(
+        ['seed', 'pre_seed', 'bootstrapped', 'seed', 'pre_seed', null],
+        seeded,
+      ),
+    ).toBe('Pre-seed 2, Seed 2, Bootstrapped 1, No stage 1')
+    expect(foldStages([], seeded)).toBe('')
   })
 })
 

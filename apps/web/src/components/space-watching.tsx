@@ -1,5 +1,5 @@
-import { Link, useRouter } from '@tanstack/react-router'
-import { Play } from 'lucide-react'
+import { useRouter } from '@tanstack/react-router'
+import { Slot } from 'radix-ui'
 import { useEffect, useReducer, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -8,7 +8,7 @@ import {
   SettingControl,
   settingInputId,
 } from './integrations/integration-settings'
-import { SectionHead } from './ledger-section'
+import { RailGroup, RailGroupRow } from './record/record-parts'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -23,7 +23,6 @@ import { addSpaceWatch, runWatchNow } from '#/lib/server-fns'
 import type {
   FormValue,
   FormValues,
-  SpaceSignal,
   SpaceWatching,
   WatchEngine,
   WatchRow,
@@ -45,16 +44,14 @@ import {
 } from '#/lib/spaces/watch-status'
 import type { WatchStatusState } from '#/lib/spaces/watch-status'
 import type { JobStatusEvent } from '@spaces/core/queue/job-status'
-import { recordPath } from '#/lib/record-path'
 import { formatWhen } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 /**
- * The watching half of the space page's details column: Watching — one
- * 32px row per watch with its live status off the space's job-status
- * stream — and What's moving, the signals on its members. The Add
- * watch window is the head's.
+ * The space rail's Watching group — a row per watch with its live status
+ * off the space's job-status stream — and the Add watch window its `+`
+ * opens.
  */
 
 type Action =
@@ -137,6 +134,13 @@ function useWatchStatus(spaceId: string, watches: ReadonlyArray<WatchRow>) {
 const whenOf = (iso: string | null, now: string) =>
   iso === null ? '—' : formatWhen(iso, now)
 
+/**
+ * The rail's Watching group: `Watching +`, then a row per watch — the
+ * engine and what it looks for, under it how often and when it last ran,
+ * and Run now at the end. With no watch it is the one `Watching +` row; with
+ * no engine enabled it names the installed ones, and with none installed it
+ * draws nothing.
+ */
 export function WatchingLane({
   spaceId,
   watching,
@@ -164,40 +168,31 @@ export function WatchingLane({
     }
   }
 
+  const empty = watching.watches.length === 0
   return (
-    <section aria-label="Watching" className="flex flex-col">
-      {/* Criteria's rule above opens this section. */}
-      <SectionHead
-        title="Watching"
-        count={String(watching.watches.length)}
-        action={
-          onAdd === undefined ? null : (
-            <button
-              type="button"
-              aria-label="Add watch"
-              onClick={onAdd}
-              className="focus-ring text-title text-primary hover:text-foreground"
-            >
-              +
-            </button>
-          )
-        }
-        className="border-t-0"
-      />
-      {watching.watches.length === 0 ? (
-        <ul aria-label="Engines that can watch" data-empty-lane>
-          {watching.installed.map((name) => (
-            <LaneRow key={name}>
+    <RailGroup
+      label="Watching"
+      empty={empty && (onAdd !== undefined || watching.installed.length === 0)}
+      add={
+        onAdd === undefined
+          ? undefined
+          : (trigger) => (
+              <Slot.Root onClick={onAdd} aria-label="Add watch">
+                {trigger}
+              </Slot.Root>
+            )
+      }
+    >
+      {empty
+        ? watching.installed.map((name) => (
+            <RailGroupRow key={name}>
               <PluginMark name={name} offered />
               <span className="min-w-0 flex-1 truncate text-graphite">
                 {name}
               </span>
-            </LaneRow>
-          ))}
-        </ul>
-      ) : (
-        <ul>
-          {watching.watches.map((w) => (
+            </RailGroupRow>
+          ))
+        : watching.watches.map((w) => (
             <WatchLine
               key={w.id}
               watch={w}
@@ -206,44 +201,15 @@ export function WatchingLane({
               onRun={() => void runNow(w)}
             />
           ))}
-        </ul>
-      )}
-    </section>
+    </RailGroup>
   )
 }
 
-/** A lane row: 32px on a rule, the details column's grammar. */
-function LaneRow({
-  children,
-  className,
-  marked = false,
-  ...rest
-}: {
-  children: ReactNode
-  className?: string
-  marked?: boolean
-  'data-watch'?: string
-}) {
-  const ref = useRef<HTMLLIElement>(null)
-  useEffect(() => {
-    if (marked) ref.current?.scrollIntoView({ block: 'nearest' })
-  }, [marked])
-  return (
-    <li
-      ref={ref}
-      data-marked={marked || undefined}
-      className={cn(
-        'flex h-8 items-center gap-2 border-b border-rule px-3 text-ui',
-        marked && 'bg-bone',
-        className,
-      )}
-      {...rest}
-    >
-      {children}
-    </li>
-  )
-}
-
+/**
+ * One watch: `Exa · Orbital fabs` over `weekly · 10:42` and the run's live
+ * cell, Run now at the end. A degraded engine says why in place of the
+ * cadence, and offers no run.
+ */
 function WatchLine({
   watch,
   state,
@@ -256,171 +222,86 @@ function WatchLine({
   onRun: () => void
 }) {
   const { now } = useClock()
+  const ref = useRef<HTMLLIElement>(null)
+  useEffect(() => {
+    if (marked) ref.current?.scrollIntoView({ block: 'nearest' })
+  }, [marked])
   const cell = watchCell(state, watch.id)
   const lastRun = lastRunOf(state, watch.id, watch.lastRunAt)
   const meta = [cadenceWord(watch.cadenceMinutes), whenOf(lastRun, now)].join(
     ' · ',
   )
   return (
-    <LaneRow data-watch={watch.id} marked={marked}>
+    <li
+      ref={ref}
+      data-watch={watch.id}
+      data-marked={marked || undefined}
+      className={cn(
+        'flex min-h-11 min-w-0 items-center gap-2.5 border-b border-rule py-1.5 text-ui',
+        marked && 'bg-bone-deep',
+      )}
+    >
       <span
         className={cn('flex shrink-0', watch.stopped !== null && 'opacity-40')}
-        title={watch.engine}
       >
         <PluginMark name={watch.engine} />
       </span>
-      <span
-        className="min-w-8 flex-1 truncate"
-        title={`${watch.label} · via ${watch.engine}`}
-      >
-        {watch.label}
-      </span>
-      {watch.stopped !== null ? (
-        <span
-          data-stopped
-          className="min-w-0 shrink truncate mono text-micro text-destructive"
-          title={watch.stopped}
-        >
-          {watch.stopped}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-foreground">
+          {watch.engine} · {watch.label}
         </span>
-      ) : (
-        <>
+        {watch.stopped !== null ? (
           <span
-            className="shrink-0 mono text-micro text-graphite"
-            title={lastRun === null ? 'never run' : `last run ${lastRun}`}
+            data-stopped
+            className="truncate mono text-micro text-destructive"
+            title={watch.stopped}
           >
-            {meta}
+            {watch.stopped}
           </span>
-          {cell !== null ? (
+        ) : (
+          <span className="flex min-w-0 items-baseline gap-1 mono text-micro text-graphite">
             <span
-              data-cell
-              role="status"
-              className={cn(
-                'min-w-0 shrink truncate mono text-micro',
-                cell.tone === 'bad'
-                  ? 'text-destructive'
-                  : cell.tone === 'muted'
-                    ? 'text-graphite'
-                    : 'text-foreground',
-              )}
-              title={cell.detail ?? cell.text}
+              className="shrink-0"
+              title={lastRun === null ? 'Never run' : `Last run ${lastRun}`}
             >
-              {cell.text}
+              {meta}
             </span>
-          ) : null}
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label={`Run now: ${watch.label}`}
-            title="Run now"
-            disabled={state.fired.has(watch.id)}
-            onClick={onRun}
-            className="shrink-0"
-          >
-            <Play strokeWidth={2} />
-          </Button>
-        </>
-      )}
-    </LaneRow>
-  )
-}
-
-/** What's moving folds here, behind "+n more". */
-export const MOVING_FOLD = 3
-
-const hostOf = (url: string): string => {
-  try {
-    return new URL(url).host.replace(/^www\./, '')
-  } catch {
-    return url
-  }
-}
-
-export function WhatsMovingLane({
-  signals,
-}: {
-  signals: ReadonlyArray<SpaceSignal>
-}) {
-  const [open, setOpen] = useState(false)
-  const { now } = useClock()
-  const shown = open ? signals : signals.slice(0, MOVING_FOLD)
-  const more = signals.length - shown.length
-  return (
-    <section aria-label="What's moving" className="flex flex-col">
-      <SectionHead title="What's moving" count={String(signals.length)} />
-      <ul>
-        {shown.map((s) => {
-          const href = recordPath({ kind: s.recordKind, id: s.recordId })
-          return (
-            <li
-              key={s.id}
-              data-signal={s.id}
-              className="flex min-h-8 flex-col justify-center border-b border-rule px-3 py-1.5"
-            >
-              <div className="flex items-baseline gap-2">
-                {href ? (
-                  <Link
-                    to={href}
-                    className="focus-ring min-w-0 flex-1 truncate text-ui font-medium hover:underline"
-                  >
-                    {s.recordName}
-                  </Link>
-                ) : (
-                  <span className="min-w-0 flex-1 truncate text-ui font-medium">
-                    {s.recordName}
-                  </span>
-                )}
-                <span className="shrink-0 mono text-micro text-graphite">
-                  {formatWhen(s.observedAt, now)}
+            {cell !== null ? (
+              <>
+                <span aria-hidden>·</span>
+                <span
+                  data-cell
+                  role="status"
+                  className={cn(
+                    'min-w-0 truncate',
+                    cell.tone === 'bad'
+                      ? 'text-destructive'
+                      : cell.tone === 'muted'
+                        ? 'text-graphite'
+                        : 'text-foreground',
+                  )}
+                  title={cell.detail ?? cell.text}
+                >
+                  {cell.text}
                 </span>
-              </div>
-              <p className="flex min-w-0 items-baseline gap-1.5 text-label text-graphite">
-                <span className="min-w-0 truncate">
-                  {s.title ?? s.kind ?? 'signal'}
-                </span>
-                {s.via !== null ? (
-                  <span className="shrink-0">
-                    via{' '}
-                    <Link
-                      to="/spaces/$spaceId"
-                      params={{ spaceId: s.via.id }}
-                      className="focus-ring hover:text-foreground hover:underline"
-                    >
-                      {s.via.name}
-                    </Link>
-                  </span>
-                ) : null}
-                <span className="shrink-0 mono text-micro">{s.source}</span>
-                {s.url !== null ? (
-                  <a
-                    href={s.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    data-ref
-                    className="focus-ring shrink-0 mono text-micro hover:text-foreground hover:underline"
-                  >
-                    {hostOf(s.url)} ↗
-                  </a>
-                ) : s.refs.length > 0 ? (
-                  <span data-ref className="shrink-0 mono text-micro">
-                    {s.refs.length} ref{s.refs.length === 1 ? '' : 's'}
-                  </span>
-                ) : null}
-              </p>
-            </li>
-          )
-        })}
-      </ul>
-      {more > 0 ? (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="focus-ring flex h-8 items-center border-b border-rule px-3 text-left mono text-micro text-graphite hover:text-foreground"
+              </>
+            ) : null}
+          </span>
+        )}
+      </span>
+      {watch.stopped === null ? (
+        <Button
+          variant="ghost"
+          size="xs"
+          aria-label={`Run now: ${watch.label}`}
+          disabled={state.fired.has(watch.id)}
+          onClick={onRun}
+          className="shrink-0"
         >
-          +{more} more
-        </button>
+          Run now
+        </Button>
       ) : null}
-    </section>
+    </li>
   )
 }
 

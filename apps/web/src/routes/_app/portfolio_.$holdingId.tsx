@@ -1,14 +1,16 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { Plus } from 'lucide-react'
+import { HandCoins, Layers } from 'lucide-react'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
-import { LedgerRow, LedgerSection } from '#/components/ledger-section'
-import { useConfirm } from '#/components/ui/confirm-dialog'
+import { EmptyRow } from '#/components/ledger-section'
+import {
+  EventSection,
+  HoldingFigures,
+} from '#/components/holding/holding-ledger'
 import {
   DitherMark,
   RailRow,
-  ReadoutStrip,
   RailSection,
   RecordBody,
   RecordHeadPending,
@@ -40,32 +42,51 @@ import {
   addMark,
   addRound,
   getHolding,
-  voidLedgerEvent,
 } from '#/lib/server-fns'
 import { formatDay } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
-import { cn } from '#/lib/utils'
 import { usePageActions } from '#/lib/page-actions'
 import {
-  fmtMoney,
-  fmtMultiple,
-  fmtPct,
-  fmtXirr,
-} from '@spaces/core/portfolio/format'
+  holdingFigures,
+  holdingSearch,
+  instrumentLabel,
+} from '#/lib/portfolio/figures'
+import { fmtMoney, fmtPct } from '@spaces/core/portfolio/format'
 
+/**
+ * A holding: the company's position, one view with no tab bar. The figures
+ * row and its as-of day top the pane; under it the Checks, Marks,
+ * Distributions and Rounds ledgers; the ownership ledger is the rail.
+ * `?asOf=` reads every figure and the ownership as they stood that day.
+ */
 export const Route = createFileRoute('/_app/portfolio_/$holdingId')({
-  loader: async ({ params }) => getHolding({ data: { id: params.holdingId } }),
+  validateSearch: holdingSearch,
+  loaderDeps: ({ search }) => ({ asOf: search.asOf }),
+  loader: async ({ params, deps }) =>
+    getHolding({
+      data: {
+        id: params.holdingId,
+        ...(deps.asOf === undefined ? {} : { asOf: deps.asOf }),
+      },
+    }),
   pendingComponent: () => <RecordHeadPending kind="Holding" />,
   component: HoldingPage,
 })
 
 type Holding = Awaited<ReturnType<typeof getHolding>>
 
+/** Locale-pinned, so the server and the browser print the same digits. */
+const count = (n: number) => n.toLocaleString('en-US')
+
 function HoldingPage() {
   const h = Route.useLoaderData()
+  const { asOf } = Route.useSearch()
+  const navigate = Route.useNavigate()
   const m = h.metrics.ok ? h.metrics.metrics : null
   const router = useRouter()
   const { today } = useClock()
+  // The rarer entries open from the head's ···, or from an empty section.
+  const [adding, setAdding] = useState<'distribution' | 'round' | null>(null)
   usePageActions(
     [
       {
@@ -99,6 +120,20 @@ function HoldingPage() {
             recordCheck={(trigger) => (
               <AddInvestmentDialog companyId={h.companyId} trigger={trigger} />
             )}
+            more={[
+              {
+                label: 'Record a distribution…',
+                icon: <HandCoins className="size-4" />,
+                onSelect: () => setAdding('distribution'),
+                opens: true,
+              },
+              {
+                label: 'Record a round…',
+                icon: <Layers className="size-4" />,
+                onSelect: () => setAdding('round'),
+                opens: true,
+              },
+            ]}
           />
         }
         mark={<DitherMark />}
@@ -119,143 +154,140 @@ function HoldingPage() {
             // colour unchanged, so a badge the instrument colours for itself
             // goes through the same primitive as the data-coloured ones.
             <Badge option={{ color: 'amber' }} index={0} className="shrink-0">
-              unpriced · {missing.join(', ')}
+              Unpriced · {missing.join(', ')}
             </Badge>
           ) : null
         }
       />
 
+      <AddDistributionDialog
+        holdingId={h.id}
+        open={adding === 'distribution'}
+        onOpenChange={(open) => setAdding(open ? 'distribution' : null)}
+      />
+      <AddRoundDialog
+        companyId={h.companyId}
+        open={adding === 'round'}
+        onOpenChange={(open) => setAdding(open ? 'round' : null)}
+      />
+
       <RecordBody
         rail={
-          <RailSection label="Ownership">
+          <RailSection
+            label="Ownership"
+            meta={
+              h.ownership.kind === 'actual' ? <span>Fully diluted</span> : null
+            }
+          >
             <OwnershipBlock ownership={h.ownership} />
           </RailSection>
         }
       >
-        <ReadoutStrip
-          readouts={
-            m
-              ? [
-                  {
-                    label: 'Invested',
-                    value: fmtMoney(m.costBasis, m.currency),
-                  },
-                  {
-                    label: m.lastMarkDate
-                      ? `Value · marked ${formatDay(m.lastMarkDate, today)}`
-                      : 'Value · at cost, never marked',
-                    value: fmtMoney(m.unrealized, m.currency),
-                  },
-                  {
-                    label: 'Realized',
-                    value: fmtMoney(m.realized, m.currency),
-                  },
-                  { label: 'MOIC', value: fmtMultiple(m.moic) },
-                  { label: 'XIRR', value: fmtXirr(m.grossXirr) },
-                ]
-              : [
-                  {
-                    label: 'Metrics',
-                    value: `need fx for ${missing.join(', ')}`,
-                    tone: 'bad',
-                  },
-                ]
+        <HoldingFigures
+          figures={m === null ? [] : holdingFigures(m, today)}
+          asOf={asOf ?? null}
+          onAsOf={(day) =>
+            void navigate({
+              search: day === null ? {} : { asOf: day },
+              replace: true,
+              resetScroll: false,
+            })
           }
-        />
-        {missing.length > 0 ? (
-          <p className="mono text-micro text-destructive">
-            metrics need fx rates for {missing.join(', ')} —{' '}
-            <Link to="/settings/currency" className="focus-ring underline">
-              add them in Settings
-            </Link>
-          </p>
-        ) : null}
+        >
+          {missing.length > 0 ? (
+            <p className="text-ui text-destructive">
+              Figures need FX rates for {missing.join(', ')} ·{' '}
+              <Link to="/settings/currency" className="focus-ring underline">
+                Add them in Settings
+              </Link>
+            </p>
+          ) : null}
+        </HoldingFigures>
 
-        <EventSection
-          title="Checks"
-          empty="No checks recorded."
-          add={<AddInvestmentDialog companyId={h.companyId} />}
-          table="investment"
-          rows={h.investments.map((r) => ({
-            id: String(r.id),
-            date: String(r.date),
-            kind: 'invest',
-            label: `${String(r.instrument).replace(/_/g, ' ')}${r.vehicle ? ` · ${String(r.vehicle)}` : ''}`,
-            amount: fmtMoney(Number(r.amount), String(r.currency)),
-            detail:
-              r.shares != null
-                ? `${Number(r.shares).toLocaleString()} shares`
-                : r.cap != null
-                  ? `cap ${fmtMoney(Number(r.cap), String(r.currency), { compact: true })}`
+        <div className="flex flex-col gap-8">
+          <EventSection
+            title="Checks"
+            table="investment"
+            rows={h.investments.map((r) => ({
+              id: r.id,
+              date: r.date,
+              label: [instrumentLabel(r.instrument), r.vehicle]
+                .filter((part) => part !== null && part !== '')
+                .join(' · '),
+              amount: fmtMoney(r.amount, r.currency),
+              detail:
+                r.shares !== null
+                  ? `${count(r.shares)} shares`
+                  : r.cap !== null
+                    ? `cap ${fmtMoney(r.cap, r.currency, { compact: true })}`
+                    : '',
+              reversedAt: r.reversedAt,
+              reversesId: r.reversesId,
+              voidedBy: r.voidedBy,
+              voidedOn: r.voidedOn,
+            }))}
+          />
+          <EventSection
+            title="Marks"
+            table="mark"
+            rows={h.marks.map((r) => ({
+              id: r.id,
+              date: r.date,
+              label: labelOf(MARK_BASIS_ITEMS, r.basis),
+              amount: fmtMoney(r.fairValue, r.currency),
+              detail: '',
+              reversedAt: r.reversedAt,
+              reversesId: r.reversesId,
+              voidedBy: r.voidedBy,
+              voidedOn: r.voidedOn,
+            }))}
+          />
+          <EventSection
+            title="Distributions"
+            table="distribution"
+            empty={
+              <EmptyRow
+                name="Distributions"
+                onAdd={() => setAdding('distribution')}
+              />
+            }
+            rows={h.distributions.map((r) => ({
+              id: r.id,
+              date: r.date,
+              label: labelOf(DIST_KIND_ITEMS, r.kind),
+              amount: fmtMoney(r.amount, r.currency),
+              detail:
+                r.sharesSold !== null
+                  ? `${count(r.sharesSold)} shares sold`
                   : '',
-            reversedAt: r.reversedAt === null ? null : String(r.reversedAt),
-            reversesId: r.reversesId === null ? null : String(r.reversesId),
-            voidedBy: r.voidedBy === null ? null : String(r.voidedBy),
-            voidedOn: r.voidedOn === null ? null : String(r.voidedOn),
-          }))}
-        />
-        <EventSection
-          title="Rounds"
-          empty="No rounds recorded — add them to power the ownership ledger."
-          add={<AddRoundDialog companyId={h.companyId} />}
-          rows={h.rounds.map((r) => ({
-            id: String(r.id),
-            date: String(r.date),
-            kind: 'round',
-            label: String(r.kind),
-            amount:
-              r.raised != null
-                ? `raised ${fmtMoney(Number(r.raised), String(r.currency ?? 'USD'), { compact: true })}`
-                : '',
-            detail:
-              r.sharesOutstanding != null
-                ? `${Number(r.sharesOutstanding).toLocaleString()} FD shares`
-                : '',
-            reversedAt: null,
-            reversesId: null,
-            voidedBy: null,
-            voidedOn: null,
-          }))}
-        />
-        <EventSection
-          title="Marks"
-          empty="No mark yet."
-          add={<AddMarkDialog holdingId={h.id} />}
-          table="mark"
-          rows={h.marks.map((r) => ({
-            id: String(r.id),
-            date: String(r.date),
-            kind: 'mark',
-            label: String(r.basis).replace(/_/g, ' '),
-            amount: fmtMoney(Number(r.fairValue), String(r.currency)),
-            detail: '',
-            reversedAt: r.reversedAt === null ? null : String(r.reversedAt),
-            reversesId: r.reversesId === null ? null : String(r.reversesId),
-            voidedBy: r.voidedBy === null ? null : String(r.voidedBy),
-            voidedOn: r.voidedOn === null ? null : String(r.voidedOn),
-          }))}
-        />
-        <EventSection
-          title="Distributions"
-          empty="Nothing realized yet."
-          add={<AddDistributionDialog holdingId={h.id} />}
-          table="distribution"
-          rows={h.distributions.map((r) => ({
-            id: String(r.id),
-            date: String(r.date),
-            kind: 'distrib',
-            label: String(r.kind),
-            amount: `${Number(r.amount) < 0 ? '' : '+'}${fmtMoney(Number(r.amount), String(r.currency))}`,
-            detail:
-              r.sharesSold != null
-                ? `${Number(r.sharesSold).toLocaleString()} shares sold`
-                : '',
-            reversedAt: r.reversedAt === null ? null : String(r.reversedAt),
-            reversesId: r.reversesId === null ? null : String(r.reversesId),
-            voidedBy: r.voidedBy === null ? null : String(r.voidedBy),
-            voidedOn: r.voidedOn === null ? null : String(r.voidedOn),
-          }))}
-        />
+              reversedAt: r.reversedAt,
+              reversesId: r.reversesId,
+              voidedBy: r.voidedBy,
+              voidedOn: r.voidedOn,
+            }))}
+          />
+          <EventSection
+            title="Rounds"
+            empty={<EmptyRow name="Rounds" onAdd={() => setAdding('round')} />}
+            rows={h.rounds.map((r) => ({
+              id: r.id,
+              date: r.date,
+              label: r.kind,
+              amount:
+                r.raised !== null
+                  ? fmtMoney(r.raised, r.currency ?? 'USD', { compact: true })
+                  : '',
+              detail:
+                r.sharesOutstanding !== null
+                  ? `${count(r.sharesOutstanding)} FD shares`
+                  : '',
+              reversedAt: null,
+              reversesId: null,
+              voidedBy: null,
+              voidedOn: null,
+            }))}
+          />
+        </div>
       </RecordBody>
     </div>
   )
@@ -275,6 +307,10 @@ function ExplainedFigure({ figure, why }: { figure: string; why: string }) {
   )
 }
 
+/**
+ * Fully diluted ownership by round: the day, the round, our shares over
+ * the shares outstanding, and the percentage.
+ */
 function OwnershipBlock({ ownership }: { ownership: Holding['ownership'] }) {
   const { today } = useClock()
   if (ownership.kind === 'cost_basis_only') {
@@ -308,17 +344,17 @@ function OwnershipBlock({ ownership }: { ownership: Holding['ownership'] }) {
       {ownership.history.map((p) => (
         <li
           key={p.date}
+          data-ownership
           className="flex h-row items-center gap-3 border-t border-rule"
         >
           <span className="w-20 shrink-0 mono text-micro text-graphite">
             {formatDay(p.date, today)}
           </span>
           <span className="min-w-0 flex-1 truncate text-ui">{p.roundKind}</span>
-          <span className="mono text-micro text-graphite">
-            {p.ourShares.toLocaleString()} /{' '}
-            {p.sharesOutstanding.toLocaleString()}
+          <span className="shrink-0 mono text-micro text-graphite">
+            {count(p.ourShares)} / {count(p.sharesOutstanding)}
           </span>
-          <span className="w-14 shrink-0 numeric text-ui font-medium">
+          <span className="w-14 shrink-0 numeric text-right text-ui font-medium">
             {fmtPct(p.pct)}
           </span>
         </li>
@@ -326,168 +362,17 @@ function OwnershipBlock({ ownership }: { ownership: Holding['ownership'] }) {
     </ol>
   )
 }
-/** The three tables a correction can be appended to. */
-type VoidableTable = 'investment' | 'mark' | 'distribution'
-
-type EventRow = {
-  id: string
-  date: string
-  kind: string
-  label: string
-  amount: string
-  detail: string
-  /** Non-null on a struck original: when the void was written. */
-  reversedAt: string | null
-  /** Non-null on the compensating row: the entry it voids. */
-  reversesId: string | null
-  voidedBy: string | null
-  voidedOn: string | null
-}
-
-/**
- * One append-only ledger per event kind: date, kind, entry, amount, detail.
- * There is no edit and no delete affordance. A wrong entry is voided by a
- * compensating event — the original stays, struck, with its compensating row
- * immediately beneath it naming who voided it and when, so the record of
- * what was believed and when survives the correction.
- *
- * `table` is null for Rounds, which are not summed events and carry no
- * `reverses_id`; that section draws no Void.
- */
-function EventSection({
-  title,
-  empty,
-  add,
-  rows,
-  table,
-}: {
-  title: string
-  empty: string
-  add: React.ReactNode
-  rows: Array<EventRow>
-  table?: VoidableTable | undefined
-}) {
-  const router = useRouter()
-  const { today } = useClock()
-  const { confirm, confirmDialog } = useConfirm()
-  const [busy, setBusy] = useState<string | null>(null)
-
-  async function onVoid(r: EventRow) {
-    if (table === undefined) return
-    const ok = await confirm({
-      title: `Void this ${title.toLowerCase().replace(/s$/, '')}?`,
-      body: 'Nothing is edited and nothing is deleted. A compensating entry is appended, dated as this one is dated, and both stay on the record.',
-      rows: [
-        {
-          name: r.label,
-          meta: `${formatDay(r.date.slice(0, 10), today)} · ${r.amount}`,
-        },
-      ],
-      action: 'Void',
-    })
-    if (!ok) return
-    setBusy(r.id)
-    try {
-      await voidLedgerEvent({ data: { table, id: r.id } })
-      toast('Voided — the correction is on the record')
-      void router.invalidate()
-    } catch (err) {
-      // The server names the refusal ("already voided", "a reversal cannot
-      // be reversed"); never a generic toast.
-      toast(err instanceof Error ? err.message : 'Could not void this entry')
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  const live = rows.filter(
-    (r) => r.reversesId === null && r.reversedAt === null,
-  )
-  return (
-    <LedgerSection
-      label={title}
-      count={`${live.length} entr${live.length === 1 ? 'y' : 'ies'}${
-        rows.length > live.length
-          ? ` · ${rows.length - live.length} voided`
-          : ''
-      }`}
-      link={add}
-    >
-      {confirmDialog}
-      {rows.length === 0 ? (
-        <li className="px-3 py-2 text-label text-graphite">{empty}</li>
-      ) : (
-        rows.map((r, i) => {
-          const struck = r.reversedAt !== null
-          const isReversal = r.reversesId !== null
-          return (
-            <LedgerRow key={r.id} last={i === rows.length - 1}>
-              <span
-                className={cn(
-                  'w-24 shrink-0 mono text-micro text-graphite',
-                  isReversal && 'pl-3',
-                )}
-              >
-                {formatDay(r.date.slice(0, 10), today)}
-              </span>
-              <span
-                className={cn(
-                  'w-16 shrink-0 mono text-micro font-medium uppercase',
-                  (struck || isReversal) && 'text-graphite',
-                )}
-              >
-                {isReversal ? 'void' : r.kind}
-              </span>
-              <span
-                className={cn(
-                  'min-w-0 flex-1 truncate text-body',
-                  struck && 'text-graphite line-through',
-                  isReversal && 'text-graphite',
-                )}
-              >
-                {isReversal
-                  ? `voids the ${r.label}${r.voidedBy ? ` · ${r.voidedBy}` : ''}${
-                      r.voidedOn ? ` · ${formatDay(r.voidedOn, today)}` : ''
-                    }`
-                  : r.label}
-              </span>
-              {r.detail && !isReversal ? (
-                <span className="shrink-0 mono text-micro text-graphite">
-                  {r.detail}
-                </span>
-              ) : null}
-              {table !== undefined && !struck && !isReversal ? (
-                <button
-                  type="button"
-                  disabled={busy === r.id}
-                  onClick={() => void onVoid(r)}
-                  className="focus-ring shrink-0 mono text-micro text-graphite hover:text-destructive hover:underline"
-                >
-                  void
-                </button>
-              ) : null}
-              <span
-                className={cn(
-                  'w-32 shrink-0 numeric text-ui',
-                  struck && 'text-graphite line-through',
-                  isReversal && 'text-graphite',
-                )}
-              >
-                {r.amount}
-              </span>
-            </LedgerRow>
-          )
-        })
-      )}
-    </LedgerSection>
-  )
-}
 
 /* ---------- add-event dialogs: code-owned forms, not the registry ---------- */
 
-function useEventForm(onDone: () => void) {
+/** A window's open state: its own, or the page's when the page opens it. */
+type Opened = { open: boolean; onOpenChange: (open: boolean) => void }
+
+function useEventForm(controlled?: Opened) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [own, setOwn] = useState(false)
+  const open = controlled?.open ?? own
+  const setOpen = controlled?.onOpenChange ?? setOwn
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   async function run(fn: () => Promise<unknown>, doneMsg: string) {
@@ -497,7 +382,6 @@ function useEventForm(onDone: () => void) {
       await fn()
       setOpen(false)
       toast(doneMsg)
-      onDone()
       void router.invalidate()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save')
@@ -506,24 +390,6 @@ function useEventForm(onDone: () => void) {
     }
   }
   return { open, setOpen, pending, error, run }
-}
-
-function AddTrigger({
-  label,
-  ...props
-}: { label: string } & React.ComponentProps<typeof Button>) {
-  // Spreads DialogTrigger's asChild-injected props (onClick, aria-*)
-  // through to the real button — without this the dialog never opens.
-  return (
-    <button
-      type="button"
-      className="focus-ring flex items-center gap-1 mono text-micro text-primary hover:underline"
-      {...props}
-    >
-      <Plus className="size-3" strokeWidth={2} />
-      {label.toLowerCase()}
-    </button>
-  )
 }
 
 function Field({
@@ -571,15 +437,23 @@ const DIST_KIND_ITEMS = [
 ] as const
 type DistKind = (typeof DIST_KIND_ITEMS)[number]['value']
 
+/** A stored value's label from its picker rows, or the value itself. */
+function labelOf(
+  items: ReadonlyArray<{ value: string; label: string }>,
+  value: string,
+): string {
+  return items.find((i) => i.value === value)?.label ?? value
+}
+
 function AddInvestmentDialog({
   companyId,
-  trigger = <AddTrigger label="Add check" />,
+  trigger,
 }: {
   companyId: string
-  /** Its opener: the section's add row, or the head's verb. */
-  trigger?: ReactNode
+  /** Its opener: the head's verb. */
+  trigger: ReactNode
 }) {
-  const f = useEventForm(() => {})
+  const f = useEventForm()
   const [form, setForm] = useState<{
     date: string
     amount: string
@@ -719,8 +593,11 @@ function AddInvestmentDialog({
   )
 }
 
-function AddRoundDialog({ companyId }: { companyId: string }) {
-  const f = useEventForm(() => {})
+function AddRoundDialog({
+  companyId,
+  ...opened
+}: { companyId: string } & Opened) {
+  const f = useEventForm(opened)
   const [form, setForm] = useState({
     date: '',
     kind: '',
@@ -734,9 +611,6 @@ function AddRoundDialog({ companyId }: { companyId: string }) {
     setForm((s) => ({ ...s, [k]: e.target.value }))
   return (
     <Dialog open={f.open} onOpenChange={f.setOpen}>
-      <DialogTrigger asChild>
-        <AddTrigger label="Add round" />
-      </DialogTrigger>
       <DialogContent size="s" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Record a round</DialogTitle>
@@ -848,13 +722,13 @@ function AddRoundDialog({ companyId }: { companyId: string }) {
 
 function AddMarkDialog({
   holdingId,
-  trigger = <AddTrigger label="Add mark" />,
+  trigger,
 }: {
   holdingId: string
-  /** Its opener: the section's add row, or the head's verb. */
-  trigger?: ReactNode
+  /** Its opener: the head's verb. */
+  trigger: ReactNode
 }) {
-  const f = useEventForm(() => {})
+  const f = useEventForm()
   const [form, setForm] = useState<{
     date: string
     fairValue: string
@@ -954,8 +828,11 @@ function AddMarkDialog({
   )
 }
 
-function AddDistributionDialog({ holdingId }: { holdingId: string }) {
-  const f = useEventForm(() => {})
+function AddDistributionDialog({
+  holdingId,
+  ...opened
+}: { holdingId: string } & Opened) {
+  const f = useEventForm(opened)
   const [form, setForm] = useState<{
     date: string
     amount: string
@@ -974,9 +851,6 @@ function AddDistributionDialog({ holdingId }: { holdingId: string }) {
   const isWriteoff = form.kind === 'writeoff'
   return (
     <Dialog open={f.open} onOpenChange={f.setOpen}>
-      <DialogTrigger asChild>
-        <AddTrigger label="Add distribution" />
-      </DialogTrigger>
       <DialogContent size="s" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Record a distribution</DialogTitle>

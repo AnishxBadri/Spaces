@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { TaskComposer } from './task-composer'
 import { Band, EmptyRow } from './ledger-section'
-import { RailSection } from './record/record-parts'
 import { Checkbox } from './ui/checkbox'
 import { listEntityTasks, setTaskDone } from '#/lib/server-fns'
 import { formatDue } from '@spaces/core/format'
@@ -63,7 +62,7 @@ export function recordTasksHref(entityId: string): string {
 }
 
 /**
- * A record Overview's Tasks group: `TASKS … All tasks ›` on a band, a 40px
+ * An Overview's Tasks group, a record's or a space's: `TASKS … All tasks ›` on a band, a 40px
  * row per open task (a 14px checkbox, the task in ink, its due day in a
  * 72px mono lane, crimson once overdue), then `+ Add a task…` with `T` in
  * its end lane. With nothing open it is the one `Tasks +` row, which `T`
@@ -156,90 +155,5 @@ export function TasksBand({
         }
       />
     </section>
-  )
-}
-
-/**
- * Open tasks in a space's rail, ending on a `+ Add a task…` row that `T`
- * opens. Record pages carry theirs in Overview (`TasksBand`).
- */
-export function TasksRail({
-  entityId,
-  entityName,
-  entityKind,
-}: {
-  entityId: string
-  entityName: string
-  entityKind: string
-}) {
-  const { tasks, load, complete } = useEntityTasks(entityId)
-  const { today } = useClock()
-  const preset = { id: entityId, name: entityName, kind: entityKind }
-
-  if (tasks !== null && tasks.length === 0)
-    return (
-      <RailSection label="Tasks" empty>
-        <TaskComposer
-          presetEntity={preset}
-          onCreated={() => void load()}
-          hotkey="t"
-          trigger={<EmptyRow name="Tasks" />}
-        />
-      </RailSection>
-    )
-
-  return (
-    <RailSection
-      label="Tasks"
-      meta={tasks ? <span>{tasks.length} open</span> : null}
-    >
-      {tasks === null ? null : (
-        <ol>
-          {tasks.map((t) => (
-            <li
-              key={t.id}
-              className="flex h-row items-center gap-3 border-t border-rule"
-            >
-              <Checkbox
-                checked={false}
-                onCheckedChange={() => void complete(t.id)}
-                aria-label={`Complete: ${t.content}`}
-              />
-              <span className="min-w-0 flex-1 truncate text-ui">
-                {t.content}
-              </span>
-              {t.dueDate ? (
-                <span
-                  className={cn(
-                    'shrink-0 mono text-micro',
-                    t.dueDate < today ? 'text-destructive' : 'text-graphite',
-                  )}
-                >
-                  {formatDue(t.dueDate, today)}
-                </span>
-              ) : null}
-            </li>
-          ))}
-        </ol>
-      )}
-      <TaskComposer
-        presetEntity={preset}
-        onCreated={() => void load()}
-        hotkey="t"
-        trigger={
-          // A plain button: the dialog trigger hands its props to it.
-          <button
-            type="button"
-            className="focus-ring flex h-row w-full min-w-0 items-center gap-2.5 border-t border-rule text-left text-ui text-graphite transition-colors hover:text-foreground"
-          >
-            <span className="w-3.5 shrink-0 text-center mono text-ui text-primary">
-              +
-            </span>
-            <span className="min-w-0 flex-1 truncate">Add a task…</span>
-            <kbd className="shrink-0 mono text-micro">T</kbd>
-          </button>
-        }
-      />
-    </RailSection>
   )
 }

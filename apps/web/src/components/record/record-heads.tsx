@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { Button } from '#/components/ui/button'
+import type { MoreMenuEntry } from '#/components/ui/more-menu'
 import type { SensitivityState } from '#/components/sensitive-toggle'
 import { jobToast } from '#/lib/integrations/job-status-view'
 import type { LastRun, RecordAction } from '#/lib/server-fns'
@@ -157,23 +158,26 @@ export function TermHeadActions({
 }
 
 /**
- * A holding's head: Record a mark, Record a check, then the `···`. Each
- * verb is its window's trigger, so the page hands the windows in.
+ * A holding's head: Record a mark, Record a check, then the `···`, which
+ * carries the rarer entries (`more`). Each verb is its window's trigger, so
+ * the page hands the windows in.
  */
 export function HoldingHeadActions({
   name,
   recordMark,
   recordCheck,
+  more = [],
 }: {
   name: string
   recordMark: (trigger: ReactNode) => ReactNode
   recordCheck: (trigger: ReactNode) => ReactNode
+  more?: ReadonlyArray<MoreMenuEntry> | undefined
 }) {
   return (
     <>
       {recordMark(<Button variant="outline">Record a mark</Button>)}
       {recordCheck(<Button variant="outline">Record a check</Button>)}
-      <RecordMoreMenu name={name} />
+      <RecordMoreMenu name={name} verbs={more} />
     </>
   )
 }

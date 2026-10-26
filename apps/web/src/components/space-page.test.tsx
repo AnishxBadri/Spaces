@@ -14,20 +14,19 @@ import {
 } from 'vitest'
 
 import type * as PageModule from './space-page'
-import type * as TabsModule from './space-tabs'
+import type * as OverviewModule from './space-overview'
 import type * as FilingModule from './filing-row'
 import type * as RailRowModule from './record/space-rail-row'
 import type { Space } from './space-tabs'
 import type { SensitivityState } from './sensitive-toggle'
-import type * as PrefModule from '#/lib/record-tab-pref'
 import type * as RouterModule from '@tanstack/react-router'
 import type { SpaceTab } from '#/lib/spaces/page'
 import type { SpaceWatching } from '#/lib/server-fns'
 
 /**
  * The space page, mounted under a memory
- * router on a happy-dom `Window`: the head, the three readouts, the details
- * column and the five tabs. Server fns are stubs; the toast is captured so
+ * router on a happy-dom `Window`: the head, the rail, the tabs and the
+ * Overview with its readouts. Server fns are stubs; the toast is captured so
  * the untag's Undo can be pressed.
  */
 
@@ -100,8 +99,7 @@ vi.mock('./task-composer', () => ({
 const win = new Window({ url: 'http://localhost/' })
 let createRoot: typeof CreateRoot
 let page: typeof PageModule
-let tabs: typeof TabsModule
-let pref: typeof PrefModule
+let overview: typeof OverviewModule
 let router: typeof RouterModule
 let filing: typeof FilingModule
 let railRow: typeof RailRowModule
@@ -162,8 +160,7 @@ beforeAll(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   ;({ createRoot } = await import('react-dom/client'))
   page = await import('./space-page')
-  tabs = await import('./space-tabs')
-  pref = await import('#/lib/record-tab-pref')
+  overview = await import('./space-overview')
   router = await import('@tanstack/react-router')
   filing = await import('./filing-row')
   railRow = await import('./record/space-rail-row')
@@ -430,32 +427,38 @@ describe('the space head', () => {
   })
 
   it('draws no readout strip in the head: the readouts are the Overview tab’s', async () => {
-    await mount('notes')
+    await mount('overview')
     expect(header().querySelector('[data-readouts]')).toBeNull()
     expect(header().querySelector('[data-stage-bar]')).toBeNull()
   })
 })
 
-describe('the details column', () => {
-  it("holds Criteria, Watching and What's moving above Map and Tasks, and no Glossary", async () => {
-    await mount('notes')
+describe('the rail', () => {
+  it('holds Criteria, Watching and Map, and no Glossary, Tasks or What’s moving', async () => {
+    await mount('notes', undefined, {
+      ...noWatches,
+      engines: [exa],
+      installed: ['Exa'],
+      watches: [watch('w1', 'Orbital fabs')],
+    })
     const column = document.querySelector('aside[aria-label="Details"]')
-    const heads = Array.from(column?.querySelectorAll('h2') ?? []).map((h) =>
-      text(h),
-    )
-    // Tasks holds nothing here, so it has no head: it is its `Tasks +` row.
-    expect(heads).toEqual(['Watching', "What's moving", 'Map'])
     const sections = Array.from(
       column?.querySelectorAll('section[aria-label]') ?? [],
     ).map((s) => s.getAttribute('aria-label'))
-    expect(sections.slice(0, 3)).toEqual([
-      'Criteria',
-      'Watching',
-      "What's moving",
-    ])
-    expect(sections.at(-1)).toBe('Tasks')
+    expect(sections).toEqual(['Criteria', 'Watching', 'Map'])
+    expect(text(column)).not.toMatch(/Glossary|Tasks|What’s moving/)
     expect(column?.className).toContain('bg-bone')
-    expect(column?.className).toContain('xl:w-80')
+    expect(column?.className).toContain('xl:w-75')
+  })
+
+  it('heads Map with its count of subspaces and ends it on + Subspace', async () => {
+    await mount('notes')
+    const map = lane('Map')
+    expect(text(map.querySelector('h2')?.parentElement ?? null)).toBe(
+      'Map1 sub',
+    )
+    const rows = Array.from(map.querySelectorAll('li')).map((li) => text(li))
+    expect(rows).toEqual(['↑Proptech', 'Leasing2 companies', 'Subspace'])
   })
 
   it('opens the glossary from ···, marking an inherited term with the space it came from', async () => {
@@ -467,32 +470,25 @@ describe('the details column', () => {
     const own = document.querySelector('[data-term="NOI"]')
     expect(text(own)).not.toContain('from')
   })
-
-  it('draws Tasks with none open as its one Tasks + row', async () => {
-    await mount('notes')
-    const row = buttonNamed(/^Tasks\+$/)
-    expect(row.hasAttribute('data-empty-row')).toBe(true)
-    expect(text(row.closest('section'))).toBe('Tasks+')
-  })
 })
 
 describe('the tabs', () => {
-  it('shows five tabs on the 44px bone head, counted when they hold something, empty ones graphite with none', async () => {
+  it('shows Overview first, then five tabs counted when they hold something, empty ones graphite with none', async () => {
     await mount('notes')
     const list = document.querySelector('[role="tablist"]')
     expect(list?.className).toContain('h-11')
     expect(list?.className).toContain('bg-bone')
-    const tabsShown = Array.from(document.querySelectorAll('[role="tab"]')).map(
-      (t) => text(t),
-    )
-    expect(tabsShown).toEqual([
+    const all = Array.from(document.querySelectorAll('[role="tab"]'))
+    expect(all.map((t) => text(t))).toEqual([
+      'Overview',
       'Companies3',
       'Notes2',
       'Files',
       'People1',
       'Records',
     ])
-    const files = Array.from(document.querySelectorAll('[role="tab"]')).at(2)
+    expect(all.at(0)?.className).not.toContain('text-graphite')
+    const files = all.at(3)
     expect(files?.querySelector('[data-tab-count]')).toBeNull()
     expect(files?.className).toContain('text-graphite')
     expect(text(document.querySelector('[aria-selected="true"]'))).toMatch(
@@ -502,27 +498,64 @@ describe('the tabs', () => {
 
   it('hands a tab change to the route', async () => {
     const changed: Array<SpaceTab> = []
-    await mount('notes', (t) => changed.push(t))
+    await mount('overview', (t) => changed.push(t))
     await act(async () => {
       Array.from(document.querySelectorAll<HTMLElement>('[role="tab"]'))
-        .at(0)
+        .at(1)
         ?.click()
     })
     expect(changed).toEqual(['companies'])
   })
+})
 
-  it('remembers the last tab per browser', async () => {
-    const { rememberRecordTab, useLastRecordTab } = pref
-    let seen: string | null = null
-    function Probe() {
-      seen = useLastRecordTab('space')
-      return null
-    }
-    act(() => root.render(<Probe />))
-    expect(seen).toBeNull()
-    act(() => rememberRecordTab('space', 'files'))
-    expect(seen).toBe('files')
-    expect(localStorage.getItem('record-tab:space')).toBe('files')
+describe('the Overview tab', () => {
+  it('reads In pipeline, Last filed and the funding-stage bar', async () => {
+    await mount('overview')
+    const cells = Array.from(document.querySelectorAll('[data-readout]'))
+    expect(cells.map((c) => text(c.lastElementChild))).toEqual([
+      'In pipeline',
+      'Last filed',
+      'Funding stage',
+    ])
+    expect(text(cells.at(0)?.firstElementChild ?? null)).toBe('1 of 3')
+    expect(text(cells.at(1)?.firstElementChild ?? null)).toBe('6 Oct')
+    expect(cells.at(2)?.querySelector('[data-stage-bar]')).not.toBeNull()
+  })
+
+  it('draws Tasks with none open as its one Tasks + row', async () => {
+    await mount('overview')
+    const row = buttonNamed(/^Tasks\+$/)
+    expect(row.hasAttribute('data-empty-row')).toBe(true)
+    expect(row.closest('[data-overview]')).not.toBeNull()
+  })
+
+  it('lists the latest companies, newest filing first, and links to the tab', async () => {
+    const changed: Array<SpaceTab> = []
+    await mount('overview', (t) => changed.push(t))
+    const latest = lane('Latest companies')
+    expect(
+      Array.from(latest.querySelectorAll('[data-company]')).map((li) =>
+        text(li),
+      ),
+    ).toEqual([
+      'TenantrySeed6 Oct',
+      'ArborSeries A1 Oct',
+      'CorbelBootstrapped20 Sep',
+    ])
+    await act(async () => buttonNamed(/^All companies ›$/).click())
+    expect(changed).toEqual(['companies'])
+  })
+
+  it('is Tasks + and Companies + for a space with nothing filed', async () => {
+    await mount('overview', undefined, undefined, {
+      space: { ...spc, companies: [], lastFiled: null },
+    })
+    expect(document.querySelector('[data-overview-readouts]')).toBeNull()
+    expect(
+      Array.from(
+        document.querySelectorAll('[data-overview] [data-empty-row]'),
+      ).map((b) => text(b)),
+    ).toEqual(['Tasks+', 'Companies+'])
   })
 })
 
@@ -560,17 +593,50 @@ describe('the Companies tab', () => {
       text(a.querySelector('.font-medium')),
     )
 
-  it('heads its lanes company · funding stage · pipeline · location, sorted by Funding stage', async () => {
+  it('heads its lanes Company · Funding stage · Pipeline · Location, sorted by Funding stage', async () => {
     await mount('companies')
     const heads = document.querySelector('[data-lane-heads]')
     expect(
       Array.from(heads?.querySelectorAll('span') ?? [])
         .map((s) => text(s))
         .filter(Boolean),
-    ).toEqual(['company', 'funding stage', 'pipeline', 'location'])
+    ).toEqual(['Company', 'Funding stage', 'Pipeline', 'Location'])
     const sort = buttonNamed(/^Sort companies$/)
     expect(text(sort)).toBe('Funding stage')
     expect(text(sort.parentElement)).toBe('SortFunding stage')
+  })
+
+  it('switches All · In pipeline · Watching on a Segmented, counted', async () => {
+    await mount('companies')
+    const group = document.querySelector('[aria-label="Show companies"]')
+    expect(group?.getAttribute('role')).toBe('radiogroup')
+    expect(
+      Array.from(group?.querySelectorAll('[role="radio"]') ?? []).map((b) =>
+        text(b),
+      ),
+    ).toEqual(['All', 'In pipeline1', 'Watching2'])
+  })
+
+  it('folds past ten rows under a foot that counts the rest by stage', async () => {
+    const many = Array.from({ length: 13 }, (_, i) =>
+      company(
+        `m${i}`,
+        `Co ${String(i).padStart(2, '0')}`,
+        i < 10 ? 'seed' : i < 12 ? 'pre_seed' : 'bootstrapped',
+        0,
+        '2026-10-01T09:00:00.000Z',
+      ),
+    )
+    await mount('companies', undefined, undefined, {
+      space: { ...spc, companies: many },
+    })
+    expect(rowNames()).toHaveLength(10)
+    const fold = document.querySelector('[data-fold-row]')
+    expect(text(fold)).toBe('3 more · Seed 2, Bootstrapped 1')
+    if (!(fold instanceof HTMLElement)) throw new Error('no fold')
+    await act(async () => fold.click())
+    expect(rowNames()).toHaveLength(13)
+    expect(document.querySelector('[data-fold-row]')).toBeNull()
   })
 
   it('sorts by funding stage and filters to the pipeline or the watched', async () => {
@@ -755,7 +821,7 @@ describe('split: Split into a subspace, then Move here (D73)', () => {
 
 describe('the readouts helper', () => {
   it('reads three readouts, none of them a tab count', () => {
-    const cells = tabs.spaceReadouts(spc, '2026-10-26')
+    const cells = overview.spaceReadouts(spc, '2026-10-26')
     expect(cells.map((c) => c.label)).toEqual([
       'In pipeline',
       'Last filed',
@@ -765,10 +831,16 @@ describe('the readouts helper', () => {
     expect(cells[1]?.value).toBe('6 Oct')
   })
 
-  it('reads a dash when no company is staged', () => {
+  it('leaves out a readout with nothing to show', () => {
     const empty: Space = { ...spc, companies: [], lastFiled: null }
-    const cells = tabs.spaceReadouts(empty, '2026-10-26')
-    expect(cells.map((c) => c.value)).toEqual(['0 of 0', '—', '—'])
+    expect(overview.spaceReadouts(empty, '2026-10-26')).toEqual([])
+    const watched: Space = {
+      ...spc,
+      companies: spc.companies.map((c) => ({ ...c, deals: 0 })),
+    }
+    expect(
+      overview.spaceReadouts(watched, '2026-10-26').map((c) => c.label),
+    ).toEqual(['Last filed', 'Funding stage'])
   })
 })
 
@@ -879,7 +951,8 @@ describe('the Watching lane', () => {
         watch('w3', 'Launch brokers', { stopped: 'Exa key removed' }),
       ],
     })
-    expect(row('w1').className).toContain('h-8')
+    expect(row('w1').className).toContain('min-h-11')
+    expect(text(row('w1'))).toContain('Exa · Orbital fabs')
     expect(text(row('w1'))).toContain('manual · —')
     expect(text(row('w2'))).toContain('daily · 9 Oct')
     expect(row('w1').querySelector('button[aria-label^="Run now"]')).not.toBe(
@@ -893,9 +966,10 @@ describe('the Watching lane', () => {
       'Exa key removed',
     )
     expect(row('w3').querySelector('.opacity-40')).not.toBe(null)
-    const band = lane('Watching').querySelector('h2')?.parentElement
-    expect(band?.className).toContain('h-11')
-    expect(band?.className).toContain('bg-bone')
+    expect(text(row('w1').querySelector('button'))).toBe('Run now')
+    const head = lane('Watching').querySelector('h2')
+    expect(head?.className).toContain('text-graphite')
+    expect(text(head?.parentElement ?? null)).toBe('Watching+')
   })
 
   it('settles from job_run on open and streams a run: running, then its tally', async () => {
@@ -1018,7 +1092,7 @@ describe('Add watch', () => {
     expect(() => buttonNamed(/^Add watch$/)).toThrow()
   })
 
-  it('is the Watching head’s +, never a head button', async () => {
+  it('is the one Watching + row with no watch, never a head button', async () => {
     await mount('notes', undefined, {
       ...noWatches,
       engines: [exa],
@@ -1026,7 +1100,22 @@ describe('Add watch', () => {
     })
     const add = buttonNamed(/^Add watch$/)
     expect(add.closest('section')?.getAttribute('aria-label')).toBe('Watching')
+    expect(add.hasAttribute('data-empty-row')).toBe(true)
+    expect(text(add)).toBe('Watching+')
+    expect(header().querySelector('[aria-label="Add watch"]')).toBeNull()
+  })
+
+  it('is the Watching head’s + once a watch exists', async () => {
+    await mount('notes', undefined, {
+      ...noWatches,
+      engines: [exa],
+      installed: ['Exa'],
+      watches: [watch('w1', 'Orbital fabs')],
+    })
+    const add = buttonNamed(/^Add to Watching$/)
     expect(text(add)).toBe('+')
+    await act(async () => add.click())
+    expect(text(document.querySelector('[role="dialog"] h2'))).toBe('Add watch')
   })
 })
 
@@ -1050,9 +1139,9 @@ describe("What's moving", () => {
     observedAt,
   })
 
-  it('lists signals on members with record, via subspace and source, folding at three', async () => {
+  it('lists headlines and days on the Overview, unfolding past three from All signals ›', async () => {
     const leasing = { id: spc.children[0].id, name: 'Leasing' }
-    await mount('notes', undefined, {
+    await mount('overview', undefined, {
       ...noWatches,
       moving: [
         signal('s1', 'Varda', '2026-10-10T09:00:00.000Z', leasing),
@@ -1066,14 +1155,12 @@ describe("What's moving", () => {
     const items = () => Array.from(moving.querySelectorAll('[data-signal]'))
     expect(items()).toHaveLength(3)
     const first = items().at(0) ?? null
-    expect(text(first)).toContain('Varda')
-    expect(text(first)).toContain('via Leasing')
-    expect(text(first)).toContain('Exa')
-    expect(text(first?.querySelector('[data-ref]') ?? null)).toBe(
-      'example.com ↗',
-    )
-    expect(text(items().at(1) ?? null)).not.toContain('via')
-    await act(async () => buttonNamed(/^\+2 more$/).click())
+    expect(text(first?.querySelector('a') ?? null)).toBe('Varda raised')
+    expect(text(first)).toContain('Varda · Leasing')
+    expect(text(first)).toContain('10 Oct')
+    expect(text(items().at(1) ?? null)).not.toContain('Leasing')
+    expect(moving.closest('aside')).toBeNull()
+    await act(async () => buttonNamed(/^All signals ›$/).click())
     expect(items().map((li) => li.getAttribute('data-signal'))).toEqual([
       's1',
       's2',
