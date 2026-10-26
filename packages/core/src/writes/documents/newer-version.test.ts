@@ -98,7 +98,7 @@ describe('intake proposes a newer version', () => {
       olderName: 'Seed deck v1.pdf',
       documentKind: 'deck',
     })
-    expect(row.rationale).toMatch(/^Deck filed [A-Z][a-z]{2} \d{2}, \d{4}/)
+    expect(row.rationale).toMatch(/^Deck filed \d{1,2} [A-Z][a-z]{2} \d{4},/)
     // Proposed, never written.
     expect(await supersedesLinks()).toHaveLength(0)
   })

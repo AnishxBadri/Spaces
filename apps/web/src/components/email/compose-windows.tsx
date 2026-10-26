@@ -25,7 +25,8 @@ import {
   listEmailDrafts,
 } from '#/lib/server-fns'
 import type { DraftRecipient, DraftRow, EmailDraftMode } from '#/lib/server-fns'
-import { stamp } from '#/lib/timeline/stamp'
+import { formatWhen } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { DraftComposer, savedLine } from './draft-composer'
 
 /**
@@ -70,6 +71,7 @@ export function DraftsDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
+  const { now } = useClock()
   const [rows, setRows] = useState<Array<DraftRow> | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -157,7 +159,7 @@ export function DraftsDialog({
                         {recipientsLine(r.to)}
                       </span>
                       <span className="w-24 shrink-0 text-right mono text-micro text-graphite">
-                        {stamp(r.updatedAt)}
+                        {formatWhen(r.updatedAt, now)}
                       </span>
                     </button>
                     <button

@@ -4,6 +4,8 @@ import { KeyHint, PageHeader } from '#/components/page-header'
 import { ReadoutStrip, countReadout } from '#/components/record/record-parts'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
+import { formatWhen } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 import { missingRateLine } from '@spaces/core/import/ledger-commit'
 import type { CommitCounts } from '@spaces/core/import/commit'
@@ -359,6 +361,7 @@ export function ReceiptLedger({
   view: ImportReceiptView
   batchId: string
 }) {
+  const { now } = useClock()
   const more = view.matching - view.rows.length
   return (
     <section className="flex flex-col">
@@ -404,7 +407,7 @@ export function ReceiptLedger({
           {view.running
             ? 'live · every 1.5 s'
             : view.committedAt
-              ? `committed ${view.committedAt.slice(0, 10)}`
+              ? `committed ${formatWhen(view.committedAt, now)}`
               : 'stopped'}
         </span>
       </div>

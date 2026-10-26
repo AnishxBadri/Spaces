@@ -1,11 +1,12 @@
 import type { InteractionKind } from '@spaces/db/schema/interactions'
 
 /**
- * The ledger's time lane: `MM-DD HH:MM` in the reader's clock.
- * - One implementation for the timeline row and the write-up's fallback
- *   title, so both print an instant the same way.
+ * The instant in a write-up's fallback title, `MM-DD HH:MM` in the
+ * process's clock.
+ * - The title is stored, so this form stays as titles already carry it;
+ *   never use it for a printed date — that is `formatWhen`.
  */
-export function stamp(iso: string): string {
+export function titleStamp(iso: string): string {
   const d = new Date(iso)
   const p = (n: number) => String(n).padStart(2, '0')
   return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
@@ -30,5 +31,5 @@ export function writeUpTitle(
   const named = subject?.trim()
   return named
     ? named
-    : `${KIND_LABEL[kind]} · ${stamp(occurredAt.toISOString())}`
+    : `${KIND_LABEL[kind]} · ${titleStamp(occurredAt.toISOString())}`
 }

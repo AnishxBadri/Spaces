@@ -2,6 +2,8 @@ import { useRouter } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { Select } from '../ui/select'
+import { formatDay } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { markNewerVersion } from '#/lib/server-fns'
 import { linkReady } from '#/lib/documents/newer-version'
 import type {
@@ -32,6 +34,7 @@ export function NewerVersionSelect({
   /** While the link is being written. */
   disabled?: boolean
 }) {
+  const { today } = useClock()
   if (candidates.length === 0) return null
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -51,7 +54,7 @@ export function NewerVersionSelect({
               <span className="flex min-w-0 items-center gap-2">
                 <span className="min-w-0 truncate">{c.filename}</span>
                 <span className="shrink-0 mono text-micro text-graphite">
-                  {c.createdAt.slice(0, 10)}
+                  {formatDay(c.createdAt, today)}
                 </span>
               </span>
             ),

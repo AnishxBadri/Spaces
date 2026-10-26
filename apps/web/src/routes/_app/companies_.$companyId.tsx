@@ -5,6 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
+import { formatDay } from '@spaces/core/format'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { SaveAsTemplateAction } from '#/components/templates'
@@ -37,7 +38,7 @@ import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
 import { RecordPicture } from '#/components/record/record-picture'
 import { OptionChip } from '#/components/attributes/value-editor'
 import { fmtPct } from '@spaces/core/portfolio/format'
-import { DASH, readoutDay, readoutDayAgo } from '#/lib/records/readout-format'
+import { DASH, readoutDay } from '#/lib/records/readout-format'
 import {
   LogComposerRow,
   LogInteractionDialog,
@@ -227,7 +228,7 @@ function CompanyRecordPage() {
             {' / '}
             {company.id.slice(0, 8)}
             {' / added '}
-            {company.createdAt.slice(0, 10)}
+            {formatDay(company.createdAt, company.readouts.today)}
           </>
         }
         actions={
@@ -288,7 +289,7 @@ function CompanyRecordPage() {
         readouts={[
           {
             label: 'Last contact',
-            value: readoutDayAgo(
+            value: readoutDay(
               company.readouts.lastContact,
               company.readouts.today,
             ),

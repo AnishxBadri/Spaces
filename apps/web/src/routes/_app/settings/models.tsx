@@ -30,6 +30,8 @@ import {
   setSensitivityDefault,
   testAiProvider,
 } from '#/lib/server-fns'
+import { formatWhen } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 type ProviderRow = Awaited<ReturnType<typeof listAiProviders>>[number]
@@ -152,9 +154,9 @@ function SensitivityGroup({ stored }: { stored: AiSensitivity }) {
   )
 }
 
-/** An ISO instant as the ledger prints it: `10-08 09:41`, UTC, no locale. */
-function stamp(iso: string | null): string {
-  return iso ? `${iso.slice(5, 10)} ${iso.slice(11, 16)}` : '—'
+/** An instant as the ledger prints it: `09:41` today, else `8 Oct`. */
+function stamp(iso: string | null, now: string): string {
+  return iso ? formatWhen(iso, now) : '—'
 }
 
 type Status = { word: string; tone: 'ok' | 'bad' | 'none' }
@@ -226,6 +228,7 @@ function ProviderLedgerRow({
   onOpen: (open: boolean) => void
 }) {
   const router = useRouter()
+  const { now } = useClock()
   const [pending, setPending] = useState(false)
   const [result, setResult] = useState<TestResult | null>(null)
 
@@ -277,7 +280,7 @@ function ProviderLedgerRow({
           {keyText(row)}
         </span>
         <span className={cn(LANE.used, 'mono text-micro text-graphite')}>
-          {stamp(row.lastUsedAt)}
+          {stamp(row.lastUsedAt, now)}
         </span>
         <span className={cn(LANE.status, 'flex items-center gap-1.5')}>
           {status.tone === 'none' ? null : (

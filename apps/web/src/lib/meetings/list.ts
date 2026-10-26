@@ -1,4 +1,5 @@
-import { clock, isoDay, shiftDay, weekdayDate } from './day'
+import { formatWeekdayHead, formatWhen } from '@spaces/core/format'
+import { isoDay, shiftDay } from './day'
 import type { DayMeeting, MeetingRsvp } from './day'
 
 /**
@@ -129,16 +130,17 @@ export function byDay<T extends { startsAt: string }>(
   return out
 }
 
-/** An upcoming day's head: `Today · Mon 10-12`, `Tomorrow · …`, else `Wed 10-14`. */
+/** An upcoming day's band: `TODAY · MON 12 OCT`, `TOMORROW · …`, else `WED 14 OCT`. */
 export function dayHead(day: string, today: string): string {
-  if (day === today) return `Today · ${weekdayDate(day)}`
-  if (day === shiftDay(today, 1)) return `Tomorrow · ${weekdayDate(day)}`
-  return weekdayDate(day)
+  const head = formatWeekdayHead(day, today)
+  if (day === today) return `TODAY · ${head}`
+  if (day === shiftDay(today, 1)) return `TOMORROW · ${head}`
+  return head
 }
 
-/** A past row's when-lane: `10-08 09:30`, the reader's clock. */
-export function pastWhen(startsAt: string): string {
-  return `${isoDay(new Date(startsAt)).slice(5)} ${clock(startsAt)}`
+/** A past row's when-lane: the time on `now`'s day, else the day (`8 Oct`). */
+export function pastWhen(startsAt: string, now: string): string {
+  return formatWhen(startsAt, now)
 }
 
 /** A past row's state word: `written`, `via Granola`, `private`, `no write-up`. */

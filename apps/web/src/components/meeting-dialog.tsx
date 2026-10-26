@@ -42,6 +42,7 @@ import {
   RSVP_WORD,
 } from '#/lib/meetings/day'
 import { recordPath } from '#/lib/record-path'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 /** Prep's state in the window: nothing until asked, and never stored. */
@@ -261,6 +262,7 @@ function MeetingWindow({
   onChanged?: () => void
 }) {
   const router = useRouter()
+  const { today } = useClock()
   const [meeting, setMeeting] = useState<MeetingDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [prep, setPrep] = useState<PrepState>({ phase: 'idle' })
@@ -412,7 +414,7 @@ function MeetingWindow({
           {meeting.title ?? 'Meeting'}
         </DialogTitle>
         <DialogDescription>
-          {meetingWhen(meeting.startsAt, meeting.endsAt)}
+          {meetingWhen(meeting.startsAt, meeting.endsAt, today)}
           {meeting.cancelled ? ' · cancelled' : ''}
         </DialogDescription>
         {meeting.conferenceUrl === null || meeting.cancelled ? null : (

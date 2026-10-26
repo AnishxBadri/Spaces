@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react'
+import { formatTime } from '@spaces/core/format'
 import { cellsFor } from '#/components/dither'
 
 /** The working window the strip draws, in hours. */
@@ -32,7 +33,7 @@ export function windowPercent(d: Date): number {
 
 /** The now label: `now · 11:40`. */
 export function nowLabel(d: Date): string {
-  return `now · ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return `now · ${formatTime(d)}`
 }
 
 /**

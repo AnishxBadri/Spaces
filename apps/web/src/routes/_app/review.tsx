@@ -31,6 +31,8 @@ import type {
 } from '#/lib/server-fns'
 import { defaultKeeper } from '#/lib/inbox/keeper'
 import { recordPath } from '#/lib/record-path'
+import { formatDay } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 /**
@@ -469,6 +471,7 @@ function PairCard({
     }
   }
 
+  const { today } = useClock()
   const rows: Array<{
     label: string
     render: (side: InboxSide) => React.ReactNode
@@ -494,7 +497,7 @@ function PairCard({
       label: 'Attached',
       mono: true,
       render: (side) =>
-        `${side.mentionCount} mention${side.mentionCount === 1 ? '' : 's'} · added ${side.createdAt.slice(0, 10)} · ${side.label}`,
+        `${side.mentionCount} mention${side.mentionCount === 1 ? '' : 's'} · added ${formatDay(side.createdAt, today)} · ${side.label}`,
     },
   ]
 

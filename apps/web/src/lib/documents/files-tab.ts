@@ -1,6 +1,6 @@
 import { formatBytes } from '@spaces/core/documents'
 import type { DocumentKind } from '@spaces/core/documents'
-import { formatDurationMs, formatSince } from '@spaces/core/format'
+import { formatDay, formatDurationMs, formatSince } from '@spaces/core/format'
 import { storageLinkProvider } from './storage-link'
 
 /**
@@ -129,25 +129,25 @@ type Laned = Typed & {
 }
 
 /**
- * The mono end lane: `from <path> · 4.1 MB · 09-02 · via gmail`.
+ * The mono end lane: `from <path> · 4.1 MB · 2 Sep · via gmail`.
  * - The provider path only outside a bound folder, whose tree already says it.
  * - `via` names a plugin that filed it, unless the state lane links there.
- * - An email attachment is `via <subject> · 4.1 MB · 09-02`: the email is
+ * - An email attachment is `via <subject> · 4.1 MB · 2 Sep`: the email is
  *   its provenance, not the mailbox.
  */
-export function endLane(doc: Laned, inFolder = false): string {
+export function endLane(doc: Laned, today: string, inFolder = false): string {
   if (doc.email != null)
     return [
       `via ${doc.email.subject || 'Untitled'}`,
       formatBytes(doc.sizeBytes) || null,
-      doc.createdAt.slice(5, 10),
+      formatDay(doc.createdAt, today),
     ]
       .filter((part) => part !== null)
       .join(' · ')
   return [
     !inFolder && doc.sourcePath !== null ? `from ${doc.sourcePath}` : null,
     formatBytes(doc.sizeBytes) || null,
-    doc.createdAt.slice(5, 10),
+    formatDay(doc.createdAt, today),
     doc.sourceCapability !== null && doc.externalUrl === null
       ? `via ${doc.sourceCapability}`
       : null,
@@ -302,27 +302,6 @@ export type FollowState = {
   readonly revisedAt: string | null
 }
 
-const MONTHS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-]
-
-/** `10 Oct`, read off the ISO string in UTC so server and browser agree. */
-export function dayMonth(iso: string): string {
-  const month = MONTHS.at(Number(iso.slice(5, 7)) - 1) ?? ''
-  return `${String(Number(iso.slice(8, 10)))} ${month}`
-}
-
 type Followed = {
   readonly follow: FollowState | null
   readonly externalStatus: 'linked' | 'gone' | null
@@ -340,6 +319,7 @@ type Followed = {
  */
 export function followLane(
   doc: Followed,
+  today: string,
 ): { readonly end: string; readonly state: StateWord } | null {
   const follow = doc.follow
   if (follow === null) return null
@@ -361,7 +341,7 @@ export function followLane(
     return {
       end: rev,
       state: word(
-        `stopped ${dayMonth(follow.lastSyncedAt ?? doc.createdAt)}`,
+        `stopped ${formatDay(follow.lastSyncedAt ?? doc.createdAt, today)}`,
         'graphite',
       ),
     }
@@ -373,7 +353,7 @@ export function followLane(
   if (follow.lastSyncedAt === null || doc.extractionStatus === 'pending')
     return { end: rev, state: word('fetching.', 'ink') }
   return {
-    end: `${rev} · ${dayMonth(follow.revisedAt ?? doc.createdAt)}`,
+    end: `${rev} · ${formatDay(follow.revisedAt ?? doc.createdAt, today)}`,
     state: word('following', 'ink'),
   }
 }

@@ -1,6 +1,8 @@
 import { createLink } from '@tanstack/react-router'
 import type { LucideIcon } from 'lucide-react'
 import type { AnchorHTMLAttributes, ReactNode, Ref } from 'react'
+import { formatAge, formatDay } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 /**
@@ -94,26 +96,24 @@ export function attributeColumnMeta(type: string): { numeric: boolean } {
   }
 }
 
-/** A column's date as its ISO day — UTC, so the server and the browser agree. */
-export function isoDay(value: string | Date | null | undefined): string {
-  if (!value) return ''
-  const d = typeof value === 'string' ? new Date(value) : value
-  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10)
-}
-
 /**
- * A date in a column, ISO and mono. `.numeric` carries both halves of the
- * Tabular Rule — tabular figures and right alignment — so the two cannot be
- * applied apart.
+ * A date in a column, mono: the day (`13 Oct`, `4 Oct 2024`), or with
+ * `age` how long ago (`12d`) under 30 days — the stat-column form.
+ * `.numeric` carries both halves of the Tabular Rule — tabular figures and
+ * right alignment — so the two cannot be applied apart.
  */
 export function DateCell({
   value,
+  age = false,
   className,
 }: {
   value: string | Date | null | undefined
+  age?: boolean
   className?: string
 }) {
-  const text = isoDay(value)
+  const { now, today } = useClock()
+  if (!value) return null
+  const text = age ? formatAge(value, now) : formatDay(value, today)
   if (!text) return null
   return (
     <span className={cn('block px-1 numeric mono text-graphite', className)}>

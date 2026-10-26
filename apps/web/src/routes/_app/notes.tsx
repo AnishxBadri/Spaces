@@ -11,6 +11,8 @@ import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import { createNote, createNoteFromTemplate, listNotes } from '#/lib/server-fns'
 import { useHotkey } from '#/lib/use-hotkey'
+import { formatWhen } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 
 export const Route = createFileRoute('/_app/notes')({
   loader: () => listNotes(),
@@ -34,6 +36,7 @@ function startOfWeekIso(now: Date) {
 function NotesPage() {
   const notes = Route.useLoaderData()
   const navigate = useNavigate()
+  const { now } = useClock()
 
   async function newNote() {
     const { id } = await createNote()
@@ -41,7 +44,7 @@ function NotesPage() {
   }
   useHotkey('n', () => void newNote())
 
-  const weekStart = startOfWeekIso(new Date())
+  const weekStart = startOfWeekIso(new Date(now))
   const thisWeek = notes.filter((n) => n.updatedAt >= weekStart)
   const earlier = notes.filter((n) => n.updatedAt < weekStart)
   const last = notes.at(0)
@@ -57,10 +60,7 @@ function NotesPage() {
             </span>
             <span>{thisWeek.length} this week</span>
             {last ? (
-              <span>
-                last edit {last.updatedAt.slice(5, 10)}{' '}
-                {last.updatedAt.slice(11, 16)}
-              </span>
+              <span>last edit {formatWhen(last.updatedAt, now)}</span>
             ) : null}
           </>
         }
@@ -108,17 +108,17 @@ function NotesPage() {
             <LedgerSection
               label="This week"
               count={thisWeek.length}
-              link={`W${isoWeek(new Date())}`}
+              link={`W${isoWeek(new Date(now))}`}
             >
               {thisWeek.map((n) => (
-                <NoteLedgerRow key={n.id} note={n} />
+                <NoteLedgerRow key={n.id} note={n} now={now} />
               ))}
             </LedgerSection>
           ) : null}
           {earlier.length > 0 ? (
             <LedgerSection label="Earlier" count={earlier.length}>
               {earlier.map((n) => (
-                <NoteLedgerRow key={n.id} note={n} />
+                <NoteLedgerRow key={n.id} note={n} now={now} />
               ))}
             </LedgerSection>
           ) : null}
@@ -128,7 +128,7 @@ function NotesPage() {
   )
 }
 
-function NoteLedgerRow({ note }: { note: NoteRow }) {
+function NoteLedgerRow({ note, now }: { note: NoteRow; now: string }) {
   return (
     <LedgerRow>
       <Link
@@ -152,7 +152,9 @@ function NoteLedgerRow({ note }: { note: NoteRow }) {
         <span className="w-14 shrink-0 mono text-micro text-graphite">
           {note.kind === 'note' ? '' : note.kind}
         </span>
-        <LedgerFigure tone="muted">{note.updatedAt.slice(5, 10)}</LedgerFigure>
+        <LedgerFigure tone="muted">
+          {formatWhen(note.updatedAt, now)}
+        </LedgerFigure>
       </Link>
     </LedgerRow>
   )

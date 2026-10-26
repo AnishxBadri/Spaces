@@ -2,7 +2,7 @@ import { Link, useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { folderNameOf } from '@spaces/core/documents/bindings'
-import { formatSince } from '@spaces/core/format'
+import { formatDay, formatSince } from '@spaces/core/format'
 import { SettingsGroupHead } from './settings-section'
 import { Button } from '#/components/ui/button'
 import {
@@ -15,7 +15,6 @@ import {
 } from '#/components/ui/dialog'
 import { Label } from '#/components/ui/label'
 import { Select } from '#/components/ui/select'
-import { dayMonth } from '#/lib/documents/files-tab'
 import { recordPath } from '#/lib/record-path'
 import type {
   AccountBindings,
@@ -68,14 +67,16 @@ export function bindingStateOf(
     case 'paused':
       return {
         tone: 'paused',
-        text: `paused · ${pausedLine(b.error)}`,
+        text: `paused · ${pausedLine(b.error, now)}`,
       }
   }
 }
 
 /** `Priya disconnected 2026-10-09` → `Priya disconnected 9 Oct`; the day is stored as ISO. */
-const pausedLine = (error: string | null): string =>
-  (error ?? 'no connection').replace(/\d{4}-\d{2}-\d{2}$/, (d) => dayMonth(d))
+const pausedLine = (error: string | null, now: string): string =>
+  (error ?? 'no connection').replace(/\d{4}-\d{2}-\d{2}$/, (d) =>
+    formatDay(d, now),
+  )
 
 const DOT: Record<Tone, string> = {
   ok: 'bg-primary',
@@ -134,7 +135,7 @@ export function BoundFoldersSection({ view }: { view: AccountBindings }) {
                 {view.choices.at(0)?.label ?? 'storage'} connection
               </span>
               <span className="shrink-0 mono text-micro text-graphite">
-                since {dayMonth(e.since)} · {e.targetName}
+                since {formatDay(e.since, view.now)} · {e.targetName}
               </span>
             </div>
           ))}

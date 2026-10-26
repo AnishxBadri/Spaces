@@ -24,7 +24,8 @@ import { Button } from '#/components/ui/button'
 import { RecordTable, TableToolbar } from '#/components/table/record-table'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
-import { formatSince } from '@spaces/core/format'
+import { formatDay, formatSince } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { DOCUMENT_EXTRACTION_LABELS } from '#/lib/documents/registry'
 import { recordPath } from '#/lib/record-path'
 import { listDocuments } from '#/lib/server-fns'
@@ -126,6 +127,7 @@ function DocumentsPage() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [previewing, setPreviewing] = useState<DocumentRow | null>(null)
   const prefs = useTablePrefs(PREFS_KEY)
+  const { today } = useClock()
 
   const columns = useMemo(() => {
     const defs: Array<ColumnDef<DocumentRow, unknown>> = [
@@ -267,13 +269,13 @@ function DocumentsPage() {
         cell: (info) => {
           const r = info.row.original
           return (
-            // The ISO day, as every list prints a date; the age is the hover.
+            // The day, as every list prints a date; the age is the hover.
             // `sinceMs` was measured on the server, so SSR and hydration agree.
             <span
               title={`${formatSince(r.sinceMs)} ago`}
               className="block truncate px-1 numeric mono text-label text-graphite"
             >
-              {r.createdAt.slice(0, 10)}
+              {formatDay(r.createdAt, today)}
             </span>
           )
         },
@@ -291,7 +293,7 @@ function DocumentsPage() {
       }),
     ]
     return defs
-  }, [])
+  }, [today])
 
   const table = useReactTable({
     data: documents,

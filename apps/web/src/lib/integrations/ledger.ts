@@ -12,6 +12,7 @@ import {
   sql,
 } from 'drizzle-orm'
 import { z } from 'zod'
+import { formatAge } from '@spaces/core/format'
 import { db } from '@spaces/db'
 import {
   accountConnection,
@@ -269,14 +270,18 @@ export const stateOf = (
   return 'enabled'
 }
 
-/** `4m ago`, `2h ago`, `3d ago` — from milliseconds elapsed. */
-export const agoOf = (ms: number): string => {
-  const minutes = Math.floor(Math.max(0, ms) / 60_000)
+/**
+ * `4m ago`, `2h ago`, `3d ago` — how long before `now` (epoch ms) `at`
+ * was; from 30 days on, the day it was (`4 Sep`).
+ */
+export const agoOf = (at: Date, now: number): string => {
+  const minutes = Math.floor(Math.max(0, now - at.getTime()) / 60_000)
   if (minutes < 1) return 'just now'
   if (minutes < 60) return `${minutes}m ago`
   const hours = Math.floor(minutes / 60)
   if (hours < 48) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
+  const age = formatAge(at, new Date(now))
+  return age.endsWith('d') ? `${age} ago` : age
 }
 
 const nonNegative = z.number().nonnegative()
@@ -453,7 +458,7 @@ export const latestRunOf = (
       lastAt === null
         ? null
         : {
-            ago: agoOf(now - lastAt.getTime()),
+            ago: agoOf(lastAt, now),
             failed: run?.status === 'failed',
           },
   }
@@ -733,7 +738,7 @@ export const integrationDetailProgram = Effect.fn('integrationDetailProgram')(
         id: r.id,
         job: jobOfQueue(r.queue),
         status: r.status,
-        ago: agoOf(now - r.startedAt.getTime()),
+        ago: agoOf(r.startedAt, now),
         duration: durationOf(r.durationMs),
         line:
           r.status === 'failed'

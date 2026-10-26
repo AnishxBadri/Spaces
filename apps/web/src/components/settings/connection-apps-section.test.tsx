@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import type { ProviderAppRow } from '#/lib/server-fns'
 import { ConnectionAppsSection } from './connection-apps-section'
+import { ClockProvider } from '#/components/clock'
 
 /** Connection apps as the server renders it: one OAuth client group per provider. */
 
@@ -54,29 +55,31 @@ describe('ConnectionAppsSection', () => {
 
   it('reads by sheet 08: sentence-case labels, the stored secret with Replace, members connected', () => {
     const html = renderToStaticMarkup(
-      <ConnectionAppsSection
-        apps={[
-          googleApp,
-          {
-            ...googleApp,
-            provider: 'box',
-            label: 'Box',
-            configured: true,
-            clientId: 'box-client',
-            secretDisplay: '••••a1b2',
-            secretSetAt: '2026-10-07T09:00:00.000Z',
-            redirectUri: 'http://localhost:3000/api/connections/box/callback',
-            membersConnected: 2,
-          },
-        ]}
-      />,
+      <ClockProvider now="2026-10-26T12:00:00.000Z">
+        <ConnectionAppsSection
+          apps={[
+            googleApp,
+            {
+              ...googleApp,
+              provider: 'box',
+              label: 'Box',
+              configured: true,
+              clientId: 'box-client',
+              secretDisplay: '••••a1b2',
+              secretSetAt: '2026-10-07T09:00:00.000Z',
+              redirectUri: 'http://localhost:3000/api/connections/box/callback',
+              membersConnected: 2,
+            },
+          ]}
+        />
+      </ClockProvider>,
     )
     for (const label of ['Redirect address', 'Client ID', 'Client secret'])
       expect(html).toContain(`>${label}</span>`)
     expect(html).not.toContain('OAuth client')
     expect(html).toContain('not set up')
     expect(html).toContain('2 members connected')
-    expect(html).toContain('●●●●</span> set 10-07')
+    expect(html).toContain('●●●●</span> set 7 Oct')
     expect(html).toContain('>Replace</button>')
     expect(html).toContain('>Edit</button>')
     // The unset client asks for both fields.

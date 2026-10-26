@@ -19,7 +19,12 @@ export function statColumns<TRow extends { stats: RowStats }>(): Array<
       header: f.name,
       size: 120,
       meta: { numeric: true },
-      cell: (info) => <DateCell value={info.row.original.stats[f.rowKey]} />,
+      cell: (info) => (
+        <DateCell
+          value={info.row.original.stats[f.rowKey]}
+          age={f.at === 'last'}
+        />
+      ),
     }),
   )
 }

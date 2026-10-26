@@ -124,8 +124,8 @@ describe('deal rules', () => {
 
 describe('todayStamp', () => {
   it('prints weekday, month-day and ISO week', () => {
-    expect(todayStamp('2026-10-09')).toBe('Fri 10-09 · W41')
-    expect(todayStamp('2026-01-01')).toBe('Thu 01-01 · W1')
+    expect(todayStamp('2026-10-09')).toBe('Fri 9 Oct · W41')
+    expect(todayStamp('2026-01-01')).toBe('Thu 1 Jan · W1')
   })
 })
 

@@ -16,6 +16,7 @@ import {
 } from './record/record-parts.tsx'
 import { DialogHeader } from './ui/dialog.tsx'
 import { Stamp, spaceStamp } from './ui/stamp.tsx'
+import { ClockProvider } from './clock.tsx'
 import { Tabs, nextTabIndex } from './ui/tabs.tsx'
 import type { TabItem } from './ui/tabs.tsx'
 
@@ -53,6 +54,9 @@ function tsxFiles(dir: string): Array<string> {
 }
 
 const companyStamp = { kind: 'Company', fact: '3f2a9c1b' }
+
+/** The instant the dates on these sheets are printed against. */
+const NOW = '2026-10-26T12:00:00.000Z'
 
 describe('the double rule', () => {
   it('is a named utility: 2px ink, 2px gap, 1px ink', () => {
@@ -163,11 +167,13 @@ describe('the ink stamp', () => {
 
   it('turns to outline with the day when archived', () => {
     const html = renderToStaticMarkup(
-      <Stamp {...companyStamp} archivedOn="2026-10-08T14:02:00.000Z" />,
+      <ClockProvider now={NOW}>
+        <Stamp {...companyStamp} archivedOn="2026-10-08T14:02:00.000Z" />
+      </ClockProvider>,
     )
     expect(classesOf(html, 'stamp')).toContain('stamp-outline')
     expect(html).toContain('data-stamp="archived"')
-    expect(html.replace(/<!-- -->/g, '')).toContain('archived 10-08')
+    expect(html.replace(/<!-- -->/g, '')).toContain('archived 8 Oct')
   })
 
   it('stamps a record head once, beside the crumb', () => {
@@ -197,16 +203,18 @@ describe('the ink stamp', () => {
 
   it('draws an archived space head in outline, the name and the double rule graphite', () => {
     const html = renderToStaticMarkup(
-      <RecordHeader
-        stamp={spaceStamp(1, '2026-10-08T09:00:00.000Z')}
-        archived
-        crumb="Spaces / Launch"
-        name="Small-lift"
-      />,
+      <ClockProvider now={NOW}>
+        <RecordHeader
+          stamp={spaceStamp(1, '2026-10-08T09:00:00.000Z')}
+          archived
+          crumb="Spaces / Launch"
+          name="Small-lift"
+        />
+      </ClockProvider>,
     )
     expect(html).toMatch(/<header class="[^"]*\bdouble-rule-archived\b/)
     expect(headOf(html)).toContain('data-stamp="archived"')
-    expect(html.replace(/<!-- -->/g, '')).toContain('archived 10-08')
+    expect(html.replace(/<!-- -->/g, '')).toContain('archived 8 Oct')
     expect(html).toMatch(
       /<h1[^>]*class="[^"]*\btext-graphite\b[^"]*"[^>]*>Small-lift/,
     )

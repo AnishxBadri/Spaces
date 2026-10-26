@@ -1,5 +1,6 @@
 import { Window } from 'happy-dom'
 import { act } from 'react'
+import { ClockProvider } from '#/components/clock'
 import type { Root, createRoot as CreateRoot } from 'react-dom/client'
 import {
   afterAll,
@@ -702,7 +703,11 @@ async function mount(path: string, isAdmin = true) {
   })
   await act(async () => {
     await r.load()
-    root.render(<RouterProvider router={r} />)
+    root.render(
+      <ClockProvider now={CLOCK_NOW}>
+        <RouterProvider router={r} />
+      </ClockProvider>,
+    )
   })
   return r
 }
@@ -763,6 +768,9 @@ const byText = (text: string, scope: ParentNode = document) =>
   )
 
 // ---------------------------------------------------------------------------
+
+/** The instant the pages' dates are printed against. */
+const CLOCK_NOW = '2026-10-26T12:00:00.000Z'
 
 describe('every settings page', () => {
   it.each(PATHS)(
@@ -1691,7 +1699,7 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
     const text = document.body.textContent
     for (const label of ['Redirect address', 'Client ID', 'Client secret'])
       expect(text).toContain(label)
-    expect(text).toContain('●●●● set 10-09')
+    expect(text).toContain('●●●● set 9 Oct')
     await click(byText('Replace'))
     await type(input('Google client secret'), 'GOCSPX-new')
     expect(bar()?.textContent).toContain('1 change')
@@ -1734,10 +1742,10 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
     const rows = Array.from(document.querySelectorAll('[data-fx-row]'))
     const clauses = rows.map((r) => r.lastElementChild?.textContent)
     expect(clauses).toEqual([
-      'events from 10-01',
-      'events from 09-15',
-      'events 07-01 to 09-30',
-      'events 04-01 to 06-30',
+      'events from 1 Oct',
+      'events from 15 Sep',
+      'events 1 Jul to 30 Sep',
+      'events 1 Apr to 30 Jun',
     ])
     expect(new Set(rows.map((r) => r.textContent)).size).toBe(rows.length)
     expect(document.body.textContent).not.toContain('superseded')

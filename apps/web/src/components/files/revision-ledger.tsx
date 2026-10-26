@@ -4,7 +4,8 @@ import { isFollowing, useFollow } from './file-row'
 import type { RecordDocument } from './types'
 import { listDocumentRevisions } from '#/lib/server-fns'
 import type { RevisionRow } from '#/lib/server-fns'
-import { dayMonth } from '#/lib/documents/files-tab'
+import { formatWhen } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { storageLinkProvider } from '#/lib/documents/storage-link'
 import { cn } from '#/lib/utils'
 
@@ -47,6 +48,7 @@ export function RevisionLedger({
   /** Unfollow, offered while the file follows; null hides it. */
   onUnfollow?: (() => void) | null
 }) {
+  const { now } = useClock()
   const count = rows?.length ?? doc.follow?.revisions ?? 1
   const where =
     (doc.externalUrl === null
@@ -81,7 +83,7 @@ export function RevisionLedger({
               </span>
             )}
             <span className="tabular shrink-0 mono text-micro text-graphite">
-              {dayMonth(row.at)} {row.at.slice(11, 16)}
+              {formatWhen(row.at, now)}
             </span>
           </li>
         ))}

@@ -14,6 +14,7 @@ import { isFolderLink } from '#/lib/documents/storage-link'
  */
 
 const LINK = 'https://drive.google.com/file/d/pitch/view'
+const TODAY = '2026-10-26'
 
 const row = {
   filename: 'Pitch.pdf',
@@ -33,14 +34,14 @@ const row = {
 
 describe('the Drive row', () => {
   it('prints the provider path verbatim, and nothing when there is none', () => {
-    expect(endLane({ ...row, sourcePath: 'Data room / Legal' })).toBe(
-      'from Data room / Legal · 2.0 KB · 10-07',
+    expect(endLane({ ...row, sourcePath: 'Data room / Legal' }, TODAY)).toBe(
+      'from Data room / Legal · 2.0 KB · 7 Oct',
     )
-    expect(endLane(row)).not.toContain('from')
+    expect(endLane(row, TODAY)).not.toContain('from')
   })
 
   it('links out as `drive ↗` rather than naming the plugin twice', () => {
-    expect(endLane(row)).not.toContain('via')
+    expect(endLane(row, TODAY)).not.toContain('via')
     expect(stateWord(row)).toMatchObject({ text: 'drive ↗', href: LINK })
   })
 
@@ -72,20 +73,23 @@ describe('a recorder’s recording', () => {
 
   it('an attachment with no link says which plugin filed it', () => {
     expect(
-      endLane({ ...row, sourceCapability: 'gmail', externalUrl: null }),
-    ).toBe('2.0 KB · 10-07 · via gmail')
+      endLane({ ...row, sourceCapability: 'gmail', externalUrl: null }, TODAY),
+    ).toBe('2.0 KB · 7 Oct · via gmail')
   })
 
   it('an email attachment names its email, not its mailbox or its subject path', () => {
     expect(
-      endLane({
-        ...row,
-        sourceCapability: 'gmail',
-        sourcePath: 'Re: Seed round',
-        externalUrl: null,
-        email: { subject: 'Re: Seed round' },
-      }),
-    ).toBe('via Re: Seed round · 2.0 KB · 10-07')
+      endLane(
+        {
+          ...row,
+          sourceCapability: 'gmail',
+          sourcePath: 'Re: Seed round',
+          externalUrl: null,
+          email: { subject: 'Re: Seed round' },
+        },
+        TODAY,
+      ),
+    ).toBe('via Re: Seed round · 2.0 KB · 7 Oct')
   })
 })
 

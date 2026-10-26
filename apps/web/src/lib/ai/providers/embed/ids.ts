@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { formatNumber } from '@spaces/core/format'
+import { formatDay, formatNumber } from '@spaces/core/format'
 import { LLM_PROVIDERS, PROVIDERS } from '../ids'
 import type { LlmProvider } from '../ids'
 
@@ -289,8 +289,8 @@ export type EmbeddingPinView = {
   pinnedAt: string
 }
 
-export const pinHeadline = (pin: EmbeddingPinView): string =>
-  `Pinned to ${EMBEDDING_PROVIDER_INFO[pin.provider].label} ${pin.model} at ${pin.dims} dimensions since ${pin.pinnedAt.slice(0, 10)}.`
+export const pinHeadline = (pin: EmbeddingPinView, today: string): string =>
+  `Pinned to ${EMBEDDING_PROVIDER_INFO[pin.provider].label} ${pin.model} at ${pin.dims} dimensions since ${formatDay(pin.pinnedAt, today)}.`
 
 /**
  * Why an existing pin will not move to `target`: a different width. A

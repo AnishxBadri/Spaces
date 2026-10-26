@@ -25,7 +25,8 @@ import {
   formatPhone,
   toE164,
 } from '@spaces/core/attributes/phone'
-import { formatNumber } from '@spaces/core/format'
+import { formatDay, formatNumber } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { fmtMoney } from '@spaces/core/portfolio/format'
 import { listUsers, searchEntities } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
@@ -308,7 +309,7 @@ export function ValueEditor({ def, value, onSave, variant, refNames }: Props) {
 }
 
 /**
- * A date in a table cell or a property row reads as ISO text until clicked,
+ * A date in a table cell or a property row reads as the day until clicked,
  * then hands over to the native control with its picker open.
  * - `<input type="date">` at rest prints a `mm/dd/yyyy` skeleton and a picker
  *   glyph in every empty row, where every other empty value is an em dash.
@@ -318,6 +319,7 @@ function DateCellEditor({ def, value, onSave, variant }: Props) {
   const [editing, setEditing] = useState(false)
   const input = useRef<HTMLInputElement>(null)
   const stored = value == null ? '' : String(value)
+  const { today } = useClock()
 
   useEffect(() => {
     if (!editing) return
@@ -370,7 +372,7 @@ function DateCellEditor({ def, value, onSave, variant }: Props) {
         !stored && 'text-graphite',
       )}
     >
-      {stored ? stored.slice(0, 10) : '—'}
+      {stored ? formatDay(stored.slice(0, 10), today) || stored : '—'}
     </button>
   )
 }

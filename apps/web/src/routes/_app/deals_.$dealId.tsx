@@ -5,6 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
+import { formatDay } from '@spaces/core/format'
 import { Compass } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { toast } from 'sonner'
@@ -50,11 +51,7 @@ import { PluginActions } from '#/components/record/plugin-actions'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { fmtMoney } from '@spaces/core/portfolio/format'
-import {
-  readoutDay,
-  readoutDayUntil,
-  readoutRound,
-} from '#/lib/records/readout-format'
+import { readoutDay, readoutRound } from '#/lib/records/readout-format'
 import { useHotkey } from '#/lib/use-hotkey'
 import { runBinding, usePageActions } from '#/lib/page-actions'
 import {
@@ -279,7 +276,7 @@ function DealRecordPage() {
             {' / '}
             {deal.id.slice(0, 8)}
             {' / added '}
-            {deal.createdAt.slice(0, 10)}
+            {formatDay(deal.createdAt, readouts.today)}
           </>
         }
         actions={
@@ -361,7 +358,7 @@ function DealRecordPage() {
           },
           {
             label: 'Close',
-            value: readoutDayUntil(closeDate, readouts.today),
+            value: readoutDay(closeDate, readouts.today),
             tone:
               closeDate !== null && closeDate < readouts.today
                 ? 'bad'

@@ -101,7 +101,7 @@ async function render(
             audience: ADMIN,
           }}
           filter={filter}
-          today="2026-10-13"
+          now={new Date(2026, 9, 13, 8, 0).toISOString()}
           onOpen={() => {}}
         />
       ),
@@ -117,12 +117,12 @@ const count = (html: string, needle: string) => html.split(needle).length - 1
 describe('MeetingsLedger', () => {
   it('groups upcoming under day heads, each row with Prep, then the past', async () => {
     const html = await render('all')
-    expect(html).toContain('Today · Tue 10-13')
-    expect(html).toContain('Thu 10-15')
+    expect(html).toContain('TODAY · TUE 13 OCT')
+    expect(html).toContain('THU 15 OCT')
     expect(html.indexOf('Flent founder call')).toBeLessThan(
       html.indexOf('Northgate founder call'),
     )
-    expect(html.indexOf('Thu 10-15')).toBeLessThan(html.indexOf('>Past<'))
+    expect(html.indexOf('THU 15 OCT')).toBeLessThan(html.indexOf('>Past<'))
     expect(count(html, '>Prep<')).toBe(3)
     // The reader's own answer is the upcoming row's lane.
     expect(html).toContain('>maybe<')

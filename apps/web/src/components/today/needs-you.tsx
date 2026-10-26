@@ -23,6 +23,7 @@ import {
   NEEDS_YOU_FOLD,
 } from '#/lib/today/needs-you'
 import type { NeedsYouKind } from '#/lib/today/needs-you'
+import { formatAge, formatDay } from '@spaces/core/format'
 import { cn } from '#/lib/utils'
 
 export type StageBadge = {
@@ -268,7 +269,9 @@ function RowBody({
             {row.company}
           </span>
           <span className="min-w-0 truncate mono text-micro text-graphite">
-            {row.lastMark ? `last mark ${row.lastMark}` : 'never marked'}
+            {row.lastMark
+              ? `last mark ${formatDay(row.lastMark, today)}`
+              : 'never marked'}
           </span>
           <span className="flex-1" />
           <span className="shrink-0 mono text-micro text-primary">
@@ -293,7 +296,7 @@ function RowBody({
           </span>
           <span className="flex-1" />
           <LedgerFigure tone="muted">
-            {age === 0 ? 'today' : `${age}d`}
+            {age === 0 ? 'today' : formatAge(g.oldestAt, today)}
           </LedgerFigure>
         </ReviewLink>
       )

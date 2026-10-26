@@ -12,6 +12,8 @@ import type { NoteLanes, NotesFilter } from '#/lib/notes/notes-filter'
 import { viaLabel } from '#/lib/notes/via-mark'
 import type { NoteVia } from '#/lib/notes/via-mark'
 import { useHotkey } from '#/lib/use-hotkey'
+import { formatWhen } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 
 /**
  * A record's Notes tab: the filter row (All · Filed here · From meetings ·
@@ -46,6 +48,7 @@ export function RecordNotes({
 }) {
   useHotkey('n', onNewNote)
   const [own, setOwn] = useState<NotesFilter>('all')
+  const { now } = useClock()
   const filter = held ?? own
   const setFilter = (next: NotesFilter) => {
     setOwn(next)
@@ -95,7 +98,7 @@ export function RecordNotes({
               <span className="shrink-0 mono text-micro text-graphite">
                 {filter === 'all' && n.lane !== 'filed' ? `${n.lane} · ` : ''}
                 {n.via === null ? '' : `${viaLabel(n.via)} · `}
-                {n.kind} · {n.updatedAt.slice(5, 10)}
+                {n.kind} · {formatWhen(n.updatedAt, now)}
               </span>
             </Link>
           </li>

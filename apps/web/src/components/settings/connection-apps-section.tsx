@@ -9,6 +9,8 @@ import {
 } from './settings-section'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
+import { useClock } from '#/components/clock'
+import { formatDay } from '@spaces/core/format'
 import type { ProviderId } from '@spaces/core/providers/registry'
 import type { ProviderAppRow } from '#/lib/server-fns'
 import { setProviderApp } from '#/lib/server-fns'
@@ -51,6 +53,7 @@ function connectedCount(app: ProviderAppRow): string {
  */
 function OAuthClientGroup({ app }: { app: ProviderAppRow }) {
   const router = useRouter()
+  const { today } = useClock()
   const [editingId, setEditingId] = useState(false)
   const [replacing, setReplacing] = useState(false)
   const { draft, set } = useSettingsDraft(
@@ -120,7 +123,9 @@ function OAuthClientGroup({ app }: { app: ProviderAppRow }) {
           <>
             <span className="min-w-0 flex-1 truncate mono text-label">
               <span aria-label="stored secret">●●●●</span>
-              {app.secretSetAt ? ` set ${app.secretSetAt.slice(5, 10)}` : ''}
+              {app.secretSetAt
+                ? ` set ${formatDay(app.secretSetAt, today)}`
+                : ''}
             </span>
             <Button
               size="sm"

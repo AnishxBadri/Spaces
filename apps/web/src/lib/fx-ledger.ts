@@ -1,3 +1,5 @@
+import { formatDay } from '@spaces/core/format'
+
 /**
  * The FX ledger's rows, as Currency & FX prints them.
  * - A currency's newest rate is live and covers events from its date on.
@@ -10,16 +12,17 @@ export type FxRate = { currency: string; date: string; rateToBase: number }
 
 export type FxLedgerRow = FxRate & { live: boolean; appliesTo: string }
 
-/** `2026-07-01` → `07-01`: the From lane carries the year. */
-const monthDay = (iso: string) => iso.slice(5, 10)
-
 function dayBefore(iso: string): string {
   const d = new Date(`${iso}T00:00:00.000Z`)
   d.setUTCDate(d.getUTCDate() - 1)
   return d.toISOString().slice(0, 10)
 }
 
-export function fxLedgerRows(rates: ReadonlyArray<FxRate>): Array<FxLedgerRow> {
+export function fxLedgerRows(
+  rates: ReadonlyArray<FxRate>,
+  today: string,
+): Array<FxLedgerRow> {
+  const monthDay = (iso: string) => formatDay(iso, today)
   const byCurrency = new Map<string, Array<FxRate>>()
   for (const r of rates) {
     const list = byCurrency.get(r.currency) ?? []

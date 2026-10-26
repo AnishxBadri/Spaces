@@ -18,6 +18,8 @@ import type {
 } from '#/lib/server-fns'
 import { SCOPE_DROPPED } from '#/lib/ask/scope'
 import { scopeKey, scopeWords } from '#/lib/ask/types'
+import { dayKey, formatTime, formatWeekday } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 import { AskAnswer, RefChip } from './ask-answer'
 import { PluginMark } from '#/components/integrations/integration-ledger'
@@ -82,16 +84,6 @@ export function applyAskEvent(live: LiveTurn, event: AskEvent): LiveTurn {
   }
 }
 
-const time = (iso: string) => {
-  const d = new Date(iso)
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-const dayOf = (iso: string) => {
-  const d = new Date(iso)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 /** A centred mono divider across the column: a scope change or a day. */
 export function Divider({ children }: { children: ReactNode }) {
   return (
@@ -114,7 +106,7 @@ export function QuestionTurn({ turn }: { turn: AskTurnView }) {
         {turn.body}
       </div>
       <span className="mono text-micro text-graphite">
-        {time(turn.createdAt)}
+        {formatTime(turn.createdAt)}
       </span>
     </div>
   )
@@ -405,6 +397,7 @@ export function AskTurns({
   threadId: string | null
   onRetry: (question: string) => void
 }) {
+  const { today } = useClock()
   const all = live === null ? turns : [...turns, live.question]
   const latestAnswer =
     live === null
@@ -416,9 +409,11 @@ export function AskTurns({
   for (const [i, t] of all.entries()) {
     if (t.role === 'user') {
       const key = scopeKey(t.scope)
-      if (variant === 'page' && dayOf(t.createdAt) !== day) {
-        day = dayOf(t.createdAt)
-        out.push(<Divider key={`day-${t.id}`}>{day}</Divider>)
+      if (variant === 'page' && dayKey(t.createdAt) !== day) {
+        day = dayKey(t.createdAt)
+        out.push(
+          <Divider key={`day-${t.id}`}>{formatWeekday(day, today)}</Divider>,
+        )
       }
       if (scope !== null && key !== scope)
         out.push(

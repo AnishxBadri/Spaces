@@ -106,16 +106,20 @@ describe('the day groups', () => {
 
 describe('a day head', () => {
   it('names today and tomorrow beside the date, and dates the rest', () => {
-    expect(dayHead('2026-10-12', '2026-10-12')).toBe('Today · Mon 10-12')
-    expect(dayHead('2026-10-13', '2026-10-12')).toBe('Tomorrow · Tue 10-13')
-    expect(dayHead('2026-10-20', '2026-10-12')).toBe('Tue 10-20')
+    expect(dayHead('2026-10-12', '2026-10-12')).toBe('TODAY · MON 12 OCT')
+    expect(dayHead('2026-10-13', '2026-10-12')).toBe('TOMORROW · TUE 13 OCT')
+    expect(dayHead('2026-10-20', '2026-10-12')).toBe('TUE 20 OCT')
   })
 })
 
 describe('a past row', () => {
-  it('prints its date and time in the reader’s clock', () => {
-    expect(pastWhen(new Date(2026, 9, 8, 9, 30).toISOString())).toBe(
-      '10-08 09:30',
+  it('prints its time today and its day before, in the reader’s clock', () => {
+    const now = new Date(2026, 9, 12, 15, 0).toISOString()
+    expect(pastWhen(new Date(2026, 9, 12, 9, 30).toISOString(), now)).toBe(
+      '09:30',
+    )
+    expect(pastWhen(new Date(2026, 9, 8, 9, 30).toISOString(), now)).toBe(
+      '8 Oct',
     )
   })
 

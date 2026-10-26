@@ -40,6 +40,8 @@ import {
   renameAskThread,
 } from '#/lib/server-fns'
 import type { AskScopeChip, AskThreadRow } from '#/lib/server-fns'
+import { formatWeekday, formatWeekdayHead } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 /**
@@ -210,6 +212,7 @@ function AskPage() {
   const { thread: threadParam } = Route.useSearch()
   const navigate = useNavigate()
   const router = useRouter()
+  const { today } = useClock()
   const [listOpen, setListOpen] = useState(true)
   const [deleting, setDeleting] = useState<AskThreadRow | null>(null)
   const [draft, setDraft] = useState('')
@@ -282,9 +285,9 @@ function AskPage() {
               <p className="px-3 py-3 text-ui text-graphite">No threads.</p>
             ) : (
               byDay(rows).map((g) => (
-                <section key={g.day} aria-label={g.day}>
+                <section key={g.day} aria-label={formatWeekday(g.day, today)}>
                   <h2 className="flex h-7 items-center border-b border-hairline px-3 mono text-micro text-graphite">
-                    {g.day}
+                    {formatWeekdayHead(g.day, today)}
                   </h2>
                   <ul>
                     {g.rows.map((r) => (

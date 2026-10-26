@@ -11,7 +11,8 @@ import {
   historyCounts,
   interactionLane,
 } from '#/components/record-timeline'
-import { stamp } from '#/lib/timeline/stamp'
+import { formatWhen } from '@spaces/core/format'
+import { ClockProvider } from '#/components/clock'
 import { PropertyFold } from './property-fold'
 import { RecordNotes } from './record-notes'
 
@@ -97,10 +98,14 @@ async function mount(node: ReactNode) {
   document.body.appendChild(host)
   const r = createRoot(host)
   root = r
-  act(() => r.render(node))
+  act(() => r.render(<ClockProvider now={NOW}>{node}</ClockProvider>))
   await flush()
   return host
 }
+
+/** The instant every date in these views is printed against. */
+const NOW = '2026-10-26T12:00:00.000Z'
+const stamp = (iso: string) => formatWhen(iso, NOW)
 
 const button = (label: RegExp) => {
   const found = [...document.querySelectorAll('button')].find((b) =>
@@ -518,7 +523,7 @@ describe('the History tab on a deal', () => {
     const struck = el.querySelectorAll('[data-voided]')
     expect(struck).toHaveLength(1)
     expect(struck.item(0).className).toContain('line-through')
-    expect(el.textContent).toContain('voided 10-04')
+    expect(el.textContent).toContain('voided 4 Oct')
     expect(el.textContent).toContain('$50K SAFE post')
   })
 
@@ -609,13 +614,13 @@ describe('the Notes tab', () => {
         .find((a) => a.textContent.startsWith(title))
         ?.querySelector('.mono')?.textContent
     expect(lane('Granola notes · Maya')).toBe(
-      'via Granola · Maya · note · 10-19',
+      'via Granola · Maya · note · 19 Oct',
     )
-    expect(lane('IC memo')).toBe('note · 10-19')
+    expect(lane('IC memo')).toBe('note · 19 Oct')
     expect(lane('Typed notes · Granola')).toBe(
-      'meeting · via Granola · Anish · note · 10-19',
+      'meeting · via Granola · Anish · note · 19 Oct',
     )
-    expect(lane('Aside')).toBe('mention · note · 10-19')
+    expect(lane('Aside')).toBe('mention · note · 19 Oct')
 
     await click(button(/^From meetings 3$/))
     expect(onFilterChange).toHaveBeenLastCalledWith('meetings')
@@ -625,7 +630,7 @@ describe('the Notes tab', () => {
       'Typed notes · Granola',
     ])
     // A hand-typed write-up carries no mark.
-    expect(lane('Flent — founder call')).toBe('note · 10-19')
+    expect(lane('Flent — founder call')).toBe('note · 19 Oct')
 
     await click(button(/^Mentions 1$/))
     expect(titles()).toEqual(['Aside'])
@@ -657,7 +662,7 @@ describe('a property row’s values', () => {
     expect(el.querySelector('input[type="date"]')).not.toBeNull()
   })
 
-  it('reads a stored date as ISO text', async () => {
+  it('reads a stored date as the day', async () => {
     const el = await mount(
       <ValueEditor
         def={def('date')}
@@ -666,7 +671,7 @@ describe('a property row’s values', () => {
         onSave={() => undefined}
       />,
     )
-    expect(el.textContent).toBe('2026-11-30')
+    expect(el.textContent).toBe('30 Nov')
   })
 
   it('left-aligns a number in the value lane, and right-aligns it in a cell', async () => {

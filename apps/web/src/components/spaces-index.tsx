@@ -18,7 +18,8 @@ import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { Select } from '#/components/ui/select'
 import { useBornRows } from '#/lib/born-rows'
-import { DASH, readoutDayAgo } from '#/lib/records/readout-format'
+import { formatAge, formatDay } from '@spaces/core/format'
+import { DASH } from '#/lib/records/readout-format'
 import { applySpaceTemplate, createSpace, restoreSpace } from '#/lib/server-fns'
 import { spacePaths, treeRows } from '#/lib/spaces/index-tree'
 import type { TreeMark } from '#/lib/spaces/index-tree'
@@ -159,6 +160,7 @@ export function SpacesIndexPage({
         {archived.length > 0 ? (
           <ArchivedFold
             archived={archived}
+            today={today}
             className={spaces.length === 0 ? 'mt-8' : undefined}
           />
         ) : null}
@@ -234,7 +236,7 @@ function MapRow({
         <Lane width={LANES.memos}>{s.memos}</Lane>
         <Lane width={LANES.terms}>{s.terms}</Lane>
         <Lane width={LANES.lastFiled} tone="graphite">
-          {s.lastFiled === null ? null : readoutDayAgo(s.lastFiled, today)}
+          {s.lastFiled === null ? null : formatAge(s.lastFiled, today)}
         </Lane>
       </Link>
     </li>
@@ -248,9 +250,11 @@ function MapRow({
  */
 function ArchivedFold({
   archived,
+  today,
   className,
 }: {
   archived: Array<ArchivedRow>
+  today: string
   className?: string | undefined
 }) {
   const router = useRouter()
@@ -302,7 +306,7 @@ function ArchivedFold({
                 {[
                   a.within === null ? null : `in ${a.within}`,
                   a.spaces > 1 ? `${a.spaces} spaces` : null,
-                  `archived ${a.archivedOn}`,
+                  `archived ${formatDay(a.archivedOn, today)}`,
                 ]
                   .filter((part) => part !== null)
                   .join(' · ')}

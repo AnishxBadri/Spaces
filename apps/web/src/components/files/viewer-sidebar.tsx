@@ -20,6 +20,8 @@ import {
 } from '#/lib/server-fns'
 import { KIND_ORDER } from '#/lib/documents/files-tab'
 import { recordPath } from '#/lib/record-path'
+import { formatDay, formatWhen } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 
 /**
  * The viewer's sidebar on a Files tab: KIND, FILED ON with File on…,
@@ -90,6 +92,7 @@ export function FileViewerSidebar({
   recordId: string
 }) {
   const router = useRouter()
+  const { now, today } = useClock()
   const details = useDocumentDetails(doc.id)
   const [busy, setBusy] = useState(false)
 
@@ -160,7 +163,7 @@ export function FileViewerSidebar({
       {doc.follow === null ? (
         <Section label="Versions" count={1}>
           <Line
-            mark={[doc.createdAt.slice(5, 10), doc.uploadedByName]
+            mark={[formatDay(doc.createdAt, today), doc.uploadedByName]
               .filter((part) => part !== null)
               .join(' · ')}
           >
@@ -178,7 +181,7 @@ export function FileViewerSidebar({
       {details === null || details.mentionedIn.length === 0 ? null : (
         <Section label="Mentioned in" count={details.mentionedIn.length}>
           {details.mentionedIn.map((m) => (
-            <Line key={m.id} mark={`note · ${m.at.slice(5, 10)}`}>
+            <Line key={m.id} mark={`note · ${formatWhen(m.at, now)}`}>
               <Link
                 to="/notes/$noteId"
                 params={{ noteId: m.id }}
@@ -199,7 +202,7 @@ export function FileViewerSidebar({
                 ? 'uploaded'
                 : `uploaded by ${doc.uploadedByName}`
               : `via ${doc.sourceCapability}`,
-            doc.createdAt.slice(0, 10),
+            formatDay(doc.createdAt, today),
           ].join(' · ')}
         </p>
         {doc.sourcePath === null ? null : (

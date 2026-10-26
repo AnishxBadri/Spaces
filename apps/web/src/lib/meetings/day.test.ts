@@ -26,7 +26,7 @@ describe('the local day', () => {
     expect(dayLabel('2026-10-13', '2026-10-13')).toBe('today')
     expect(dayLabel('2026-10-14', '2026-10-13')).toBe('tomorrow')
     expect(dayLabel('2026-10-12', '2026-10-13')).toBe('yesterday')
-    expect(dayLabel('2026-10-20', '2026-10-13')).toBe('Tue 10-20')
+    expect(dayLabel('2026-10-20', '2026-10-13')).toBe('Tue 20 Oct')
   })
 })
 

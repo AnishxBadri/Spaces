@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { parseVariables } from '@spaces/core/templates/variables'
+import { formatTime } from '@spaces/core/format'
 import { KeyHint } from '#/components/page-header'
 import { SaveAsTemplateAction, TemplatePicker } from '#/components/templates'
 import type { TemplateRow } from '#/components/templates'
@@ -75,10 +76,7 @@ const MODE_TABS: ReadonlyArray<{ id: ReplyMode; label: string }> = [
 
 /** `saved 09:16`, in the reader's clock. */
 export function savedLine(iso: string | null): string | null {
-  if (iso === null) return null
-  const d = new Date(iso)
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `saved ${p(d.getHours())}:${p(d.getMinutes())}`
+  return iso === null ? null : `saved ${formatTime(iso)}`
 }
 
 const plural = (n: number, noun: string) =>

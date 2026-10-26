@@ -1,19 +1,11 @@
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
+import { formatWhen } from '@spaces/core/format'
 import type { MetricsResult } from '@spaces/core/portfolio/metrics'
 import type { PortfolioRollup } from '@spaces/core/portfolio/rollup'
 import { LabelHead } from '#/components/ledger-section'
 import { PortfolioHeadlineRail } from '#/components/portfolio-headline'
 import type { MovingSignal } from '#/lib/server-fns'
-import { daysBetween } from '#/lib/today/needs-you'
-
-/** The rail's time lane, date-only so server and client agree. */
-function whenLabel(atIso: string, today: string): string {
-  const d = daysBetween(atIso, today)
-  if (d === 0) return 'today'
-  if (d === 1) return 'yest'
-  return atIso.slice(5, 10)
-}
 
 /** A citation's printed form: the host, without `www.`. */
 function hostOf(url: string): string | null {
@@ -134,7 +126,7 @@ export function WhatsMoving({
                 className="flex items-start gap-2.5 border-b border-rule py-2 last:border-b-0"
               >
                 <span className="w-10 shrink-0 pt-0.5 mono text-micro text-graphite">
-                  {whenLabel(s.observedAt, today)}
+                  {formatWhen(s.observedAt, today)}
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
                   <Link
@@ -232,7 +224,7 @@ export function TeamActivity({
               className="flex items-start gap-3 border-t border-rule py-2"
             >
               <span className="w-11 shrink-0 mono text-micro text-graphite">
-                {whenLabel(a.at, today)}
+                {formatWhen(a.at, today)}
               </span>
               <span className="w-5 shrink-0 mono text-field font-medium">
                 {verbCode(a.verb)}

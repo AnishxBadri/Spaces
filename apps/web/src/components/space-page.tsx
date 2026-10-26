@@ -68,6 +68,8 @@ import { runBinding, usePageActions } from '#/lib/page-actions'
 import { openAsk } from '#/lib/ask/dock-store'
 import { findQuestion } from '#/lib/ask/find-view'
 import { useWebSources } from '#/lib/ask/web-sources'
+import { formatDay } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 
 /**
  * A space reads like a record: the head with its stamp, crumb
@@ -101,6 +103,7 @@ export function SpacePageView({
 }) {
   const navigate = useNavigate()
   const router = useRouter()
+  const { today } = useClock()
   const [renaming, setRenaming] = useState(false)
   const [moving, setMoving] = useState(false)
   const [composing, setComposing] = useState(false)
@@ -206,7 +209,7 @@ export function SpacePageView({
             ))}
             <span className="text-rule">·</span>
             <span className="shrink-0">
-              created {spc.createdAt.slice(0, 10)}
+              created {formatDay(spc.createdAt, today)}
             </span>
             {spc.isSeeded ? (
               <>
@@ -264,7 +267,7 @@ export function SpacePageView({
           </span>
         }
         name={spc.name}
-        readouts={spaceReadouts(spc)}
+        readouts={spaceReadouts(spc, today)}
       />
 
       {archived ? (

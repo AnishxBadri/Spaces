@@ -1,3 +1,4 @@
+import { dayKey } from '@spaces/core/format'
 import { LabelHead, LedgerRow } from '#/components/ledger-section'
 import { MeetingRow, PrepButton } from '#/components/meetings/meeting-row'
 import { WriteUpButton } from '#/components/meetings/write-up-button'
@@ -23,17 +24,18 @@ import type { MeetingFilter } from '#/lib/meetings/list'
 export function MeetingsLedger({
   list,
   filter,
-  today,
+  now,
   onOpen,
 }: {
   list: MeetingsList & { calendar: boolean; audience: SetupAudience }
   filter: MeetingFilter
-  /** The reader's local day, for the Today and Tomorrow heads. */
-  today: string
+  /** The loader's instant, for the Today and Tomorrow heads and the past lane. */
+  now: string
   /** Opens the meeting window; `prep` starts Prep in it. */
   onOpen: (id: string, prep: boolean) => void
 }) {
   const shown = filterMeetings(list, filter)
+  const today = dayKey(now)
   if (shown.upcoming.length === 0 && shown.past.length === 0)
     return (
       <ol>
@@ -82,7 +84,7 @@ export function MeetingsLedger({
               <MeetingRow
                 key={m.id}
                 meeting={m}
-                when={pastWhen(m.startsAt)}
+                when={pastWhen(m.startsAt, now)}
                 lane={writeUpWord(m)}
                 action={
                   needsWriteUp(m) ? (

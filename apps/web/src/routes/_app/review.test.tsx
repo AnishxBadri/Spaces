@@ -155,7 +155,7 @@ describe('the suggestion card', () => {
               documentKind: 'deck',
             },
             rationale:
-              'Deck filed Oct 13, 2026, after the one this record already holds.',
+              'Deck filed 13 Oct 2026, after the one this record already holds.',
             citations: [
               {
                 ref: `doc:${v3}#0`,
@@ -184,7 +184,7 @@ describe('the suggestion card', () => {
     expect(html.split('Seed deck v3.pdf')).toHaveLength(2)
     expect(html.split('Seed deck v2.pdf')).toHaveLength(2)
     expect(html).toContain('is a newer version of')
-    expect(html).toContain('Oct 13, 2026')
+    expect(html).toContain('13 Oct 2026')
     expect(html).toContain('>Mark as newer version</button>')
     expect(html).toContain('>Dismiss</button>')
     expect(html).not.toContain('<svg')
@@ -257,25 +257,28 @@ describe('the suggestion card', () => {
         basis: 'round_price' as const,
       },
     }
-    expect(ledgerEventParts(markPayload)).toEqual({
+    expect(ledgerEventParts(markPayload, '2026-10-26')).toEqual({
       moved: 'ownership moved 12.4% → 9.8%',
-      proposed: 'fair value $1.2M → $1.5M · Mar 01, 2026',
+      proposed: 'fair value $1.2M → $1.5M · 1 Mar',
       verb: 'propose a mark',
     })
     expect(
-      ledgerEventParts({
-        ...common,
-        event: 'round',
-        proposed: {
-          date: '2026-03-01',
-          kind: 'Series B',
-          raised: 4_000_000,
-          currency: 'USD',
+      ledgerEventParts(
+        {
+          ...common,
+          event: 'round',
+          proposed: {
+            date: '2026-03-01',
+            kind: 'Series B',
+            raised: 4_000_000,
+            currency: 'USD',
+          },
         },
-      }),
+        '2026-10-26',
+      ),
     ).toEqual({
       moved: 'ownership moved 12.4% → 9.8%',
-      proposed: 'Series B · $4M · Mar 01, 2026',
+      proposed: 'Series B · $4M · 1 Mar',
       verb: 'propose a round',
     })
     const html = renderToStaticMarkup(

@@ -35,7 +35,8 @@ import {
   slotHeadline,
   slotSearchNote,
 } from '#/lib/ai/providers/embed/ids'
-import { formatNumber } from '@spaces/core/format'
+import { formatDay, formatNumber, formatTime } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import type {
   EmbeddingModelInfo,
   EmbeddingPinView,
@@ -79,6 +80,7 @@ export function EmbeddingsSection({
   backfill: BackfillView
 }) {
   const router = useRouter()
+  const { today } = useClock()
   const { confirm, confirmDialog } = useConfirm()
   const { pin, slot, keys } = settings
   const [provider, setProvider] = useState<EmbeddingProvider>(
@@ -155,8 +157,8 @@ export function EmbeddingsSection({
       })
       toast(
         swapFrom
-          ? `${pinHeadline(pinned)} Catch up re-embeds what is stored.`
-          : pinHeadline(pinned),
+          ? `${pinHeadline(pinned, today)} Catch up re-embeds what is stored.`
+          : pinHeadline(pinned, today),
       )
       void router.invalidate()
     } catch (err) {
@@ -175,7 +177,7 @@ export function EmbeddingsSection({
       <div className="flex flex-col">
         <SettingsGroupHead
           title="Model"
-          action={pin ? `set ${pin.pinnedAt.slice(5, 10)}` : 'not set'}
+          action={pin ? `set ${formatDay(pin.pinnedAt, today)}` : 'not set'}
         />
 
         <SettingsRow
@@ -473,7 +475,7 @@ function runLine(view: PinnedBackfill): string {
     case 'queued':
       return `queued · ${progress}`
     case 'paused':
-      return `paused by the AI cap · resumes ${view.run.resumesAt.slice(0, 16).replace('T', ' ')} utc · ${progress}`
+      return `paused by the AI cap · resumes ${formatTime(view.run.resumesAt)} · ${progress}`
     case 'failed':
     case 'idle':
       return progress

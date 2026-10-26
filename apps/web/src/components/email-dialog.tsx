@@ -36,7 +36,8 @@ import { draftStateOf } from '#/lib/email/compose'
 import type { DraftState } from '#/lib/email/compose'
 import { fileType } from '#/lib/documents/files-tab'
 import { openModalId } from '#/lib/modal-search'
-import { stamp } from '#/lib/timeline/stamp'
+import { formatDay, formatTime } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 
 /**
  * The email window: subject and date in the bone head, the
@@ -387,6 +388,7 @@ function EmailWindow({
   recordId: string | null
   onClose: () => void
 }) {
+  const { today } = useClock()
   const [email, setEmail] = useState<EmailDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [viewer, setViewer] = useState<Awaited<
@@ -600,7 +602,9 @@ function EmailWindow({
   const head = (
     <DialogHeader>
       <DialogTitle>{email.subject || 'Untitled'}</DialogTitle>
-      <DialogDescription>{stamp(email.occurredAt)}</DialogDescription>
+      <DialogDescription>
+        {formatDay(email.occurredAt, today)} · {formatTime(email.occurredAt)}
+      </DialogDescription>
     </DialogHeader>
   )
 

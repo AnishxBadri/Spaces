@@ -100,7 +100,7 @@ describe('reviewVariablesProgram', () => {
       values: {
         'company.name': 'Flent',
         'name.first': 'Dana',
-        'last_interaction.when': 'Oct 12, 2026',
+        'last_interaction.when': '12 Oct 2026',
       },
       blanks: [],
     })

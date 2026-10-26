@@ -1,3 +1,4 @@
+import { formatDay } from '@spaces/core/format'
 import { PROVIDER_IDS } from '@spaces/core/providers/registry'
 import type { ProviderId } from '@spaces/core/providers/registry'
 import type { AccountsView, ConnectionListRow } from './input'
@@ -102,12 +103,15 @@ export function defaultMailAccount(
 
 export type SyncState = {
   readonly tone: 'ok' | 'error' | 'revoked'
-  /** `synced 10-09`, `never synced`, the provider's reason, or `revoked`. */
+  /** `In sync · 9 Oct`, `never synced`, the provider's reason, or `revoked`. */
   readonly text: string
 }
 
 /** One line for a set of rows: an error wins, then revoked, then the latest sync. */
-export function syncStateOf(rows: ReadonlyArray<ConnectionListRow>): SyncState {
+export function syncStateOf(
+  rows: ReadonlyArray<ConnectionListRow>,
+  today: string,
+): SyncState {
   const failed = rows.find((r) => r.status === 'error')
   if (failed !== undefined)
     return {
@@ -124,7 +128,9 @@ export function syncStateOf(rows: ReadonlyArray<ConnectionListRow>): SyncState {
   return {
     tone: 'ok',
     text:
-      latest === undefined ? 'never synced' : `synced ${latest.slice(5, 10)}`,
+      latest === undefined
+        ? 'never synced'
+        : `In sync · ${formatDay(latest, today)}`,
   }
 }
 

@@ -3,6 +3,7 @@ import { MockEmbeddingModelV4 } from 'ai/test'
 import { createOpenAI } from '@ai-sdk/openai'
 import { and, count, eq, isNotNull, lte } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { formatDay } from '@spaces/core/format'
 import { db } from '@spaces/db'
 import { aiUsage, chunk, credential, workspace } from '@spaces/db/schema'
 import type { WorkspaceSettings } from '@spaces/db/schema/workspace'
@@ -286,8 +287,8 @@ describe('the embedding pin', () => {
       dims: 768,
       pinned_at: pinned.pinnedAt,
     })
-    expect(pinHeadline(pinned)).toBe(
-      `Pinned to OpenAI text-embedding-3-small at 768 dimensions since ${pinned.pinnedAt.slice(0, 10)}.`,
+    expect(pinHeadline(pinned, pinned.pinnedAt)).toBe(
+      `Pinned to OpenAI text-embedding-3-small at 768 dimensions since ${formatDay(pinned.pinnedAt, pinned.pinnedAt)}.`,
     )
   })
 

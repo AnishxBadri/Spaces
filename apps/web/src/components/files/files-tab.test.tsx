@@ -1,4 +1,5 @@
 import { act } from 'react'
+import type { ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -9,6 +10,12 @@ import { FolderBand } from './folder-band'
 import { RevisionLedger } from './revision-ledger'
 import { textLine } from './viewer-sidebar'
 import type { RecordDocument } from './types'
+import { ClockProvider } from '#/components/clock'
+
+/** The instant the rows' dates are printed against. */
+const NOW = '2026-10-26T12:00:00.000Z'
+const markup = (node: ReactNode) =>
+  renderToStaticMarkup(<ClockProvider now={NOW}>{node}</ClockProvider>)
 
 /**
  * The Files tab as the printed sheets draw it: our files under their
@@ -194,7 +201,7 @@ const DOCS: Array<RecordDocument> = [
 ]
 
 describe('the grouped tab', () => {
-  const html = renderToStaticMarkup(
+  const html = markup(
     <RecordFiles entityId={FLENT} recordName="Flent" documents={DOCS} />,
   )
 
@@ -220,8 +227,8 @@ describe('the grouped tab', () => {
   })
 
   it('ends each row on its end lane and state word, never the extracted text', () => {
-    expect(html).toContain('4.1 MB · 09-02')
-    expect(html).toContain('42 KB · 09-30 · via gmail')
+    expect(html).toContain('4.1 MB · 2 Sep')
+    expect(html).toContain('42 KB · 30 Sep 2025 · via gmail')
     expect(html).toContain('reading text.')
     expect(html).toContain('■ gone')
     expect(html).toContain('no text')
@@ -256,7 +263,7 @@ describe('the grouped tab', () => {
   })
 
   it('reads one short line when the tab is empty', () => {
-    const empty = renderToStaticMarkup(
+    const empty = markup(
       <RecordFiles entityId={FLENT} recordName="Flent" documents={[]} />,
     )
     expect(empty).toContain('No files.')
@@ -266,7 +273,7 @@ describe('the grouped tab', () => {
 
 describe('a bound folder', () => {
   it('is its own band with Drive’s tree, read-only', () => {
-    const html = renderToStaticMarkup(
+    const html = markup(
       <FolderBand
         recordId={FLENT}
         recordName="Flent"
@@ -300,7 +307,7 @@ describe('a bound folder', () => {
   })
 
   it('marks a file deleted at the source, or moved out of the folder, gone', () => {
-    const html = renderToStaticMarkup(
+    const html = markup(
       <FolderBand
         recordId={FLENT}
         recordName="Flent"
@@ -340,7 +347,7 @@ describe('a bound folder', () => {
 
 describe('a folder just linked', () => {
   it('reads never synced, read-only, and ends on a ··· holding Unlink', () => {
-    const html = renderToStaticMarkup(
+    const html = markup(
       <FolderBand
         recordId={FLENT}
         recordName="Flent"
@@ -448,13 +455,15 @@ async function mountRow(
   act(() =>
     r.render(
       <ul>
-        <FileRow
-          doc={row}
-          recordId={FLENT}
-          recordName="Flent"
-          older={older}
-          onView={() => undefined}
-        />
+        <ClockProvider now={NOW}>
+          <FileRow
+            doc={row}
+            recordId={FLENT}
+            recordName="Flent"
+            older={older}
+            onView={() => undefined}
+          />
+        </ClockProvider>
       </ul>,
     ),
   )
@@ -725,7 +734,7 @@ const SHEET = {
 
 describe('a followed file', () => {
   const rowHtml = (over: Partial<RecordDocument>) =>
-    renderToStaticMarkup(
+    markup(
       <ul>
         <FileRow
           doc={doc({ ...SHEET, ...over })}
@@ -814,7 +823,7 @@ describe('the revision ledger', () => {
     },
   ]
   const render = (onUnfollow: (() => void) | null) =>
-    renderToStaticMarkup(
+    markup(
       <RevisionLedger
         doc={doc({ ...SHEET, follow: { ...FOLLOWING, revisions: 3 } })}
         rows={ROWS}
@@ -822,7 +831,7 @@ describe('the revision ledger', () => {
       />,
     )
 
-  it('lists every revision newest first, the current one on bone, with its id and time', () => {
+  it('lists every revision newest first, the current one on bone, with its id and day', () => {
     const html = render(() => undefined)
     expect(html).toContain('Revisions · 3')
     expect(html).toContain('following')
@@ -831,7 +840,7 @@ describe('the revision ledger', () => {
     )
     expect(order.every((i) => i > -1)).toBe(true)
     expect([...order].sort((a, b) => a - b)).toEqual(order)
-    expect(html).toContain('10 Oct 14:02')
+    expect(html).toContain('>10 Oct<')
     expect(html).toContain('rev-0002')
     const current = html.slice(html.indexOf('data-revision="3"'))
     expect(current.slice(0, current.indexOf('</li>'))).toContain('bg-bone')

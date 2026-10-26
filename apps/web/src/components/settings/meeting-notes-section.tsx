@@ -11,6 +11,8 @@ import { pluginAnchor } from '#/components/integrations/registry-pane'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
+import { useClock } from '#/components/clock'
+import { formatWhen } from '@spaces/core/format'
 import type { MeetingNotesView, RecorderAccountView } from '#/lib/server-fns'
 import {
   connectRecorderKey,
@@ -50,7 +52,10 @@ export function MeetingNotesSection({ view }: { view: MeetingNotesView }) {
 
 const LABEL = { granola: 'Granola' } as const
 
-function statusOf(account: RecorderAccountView): {
+function statusOf(
+  account: RecorderAccountView,
+  now: string,
+): {
   text: string
   error: boolean
 } {
@@ -64,16 +69,17 @@ function statusOf(account: RecorderAccountView): {
     text:
       account.lastSyncAt === null
         ? 'Connected · not synced yet'
-        : `Synced ${account.lastSyncAt.slice(0, 16).replace('T', ' ')}`,
+        : `Synced ${formatWhen(account.lastSyncAt, now)}`,
     error: false,
   }
 }
 
 function RecorderAccount({ account }: { account: RecorderAccountView }) {
   const router = useRouter()
+  const { now } = useClock()
   const [pending, setPending] = useState(false)
   const label = LABEL[account.provider]
-  const status = statusOf(account)
+  const status = statusOf(account, now)
   const ticked = new Set(
     (account.folders ?? []).filter((f) => f.ticked).map((f) => f.id),
   )

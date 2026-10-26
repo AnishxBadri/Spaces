@@ -29,6 +29,8 @@ import type {
   GridCell,
   RecentRun,
 } from '#/lib/server-fns'
+import { formatWhen } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 import { useSettingsDraft } from './settings-form'
 import {
@@ -690,10 +692,8 @@ function GridBlock({ grids }: { grids: ReadonlyArray<FillsWhat> }) {
   )
 }
 
-/** `2026-10-08T09:41:…Z` → `10-08 09:41`. */
-const stampOf = (iso: string) => `${iso.slice(5, 10)} ${iso.slice(11, 16)}`
-
 function RunsBlock({ runs }: { runs: ReadonlyArray<RecentRun> }) {
+  const { now } = useClock()
   return (
     <section data-block="runs" className="flex flex-col">
       <SettingsGroupHead
@@ -712,7 +712,7 @@ function RunsBlock({ runs }: { runs: ReadonlyArray<RecentRun> }) {
               className="flex h-ledger-row items-center gap-3 border-b border-rule px-3"
             >
               <span className="w-24 shrink-0 numeric text-micro text-graphite">
-                {stampOf(run.at)}
+                {formatWhen(run.at, now)}
               </span>
               <span className="w-36 shrink-0 truncate text-ui">
                 <RecordLink run={run} />

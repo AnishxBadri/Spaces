@@ -9,6 +9,8 @@ import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { fmtRate, fxLedgerRows } from '#/lib/fx-ledger'
 import { setFxRate } from '#/lib/server-fns'
+import { formatDay } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 const shell = getRouteApi('/_app/settings')
@@ -38,6 +40,7 @@ function FxSection({
   rates: Array<{ currency: string; date: string; rateToBase: number }>
 }) {
   const router = useRouter()
+  const { today } = useClock()
   const [form, setForm] = useState({ currency: '', date: '', rate: '' })
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -69,7 +72,7 @@ function FxSection({
     }
   }
 
-  const rows = fxLedgerRows(rates)
+  const rows = fxLedgerRows(rates, today)
   const currencies = new Set(rates.map((r) => r.currency)).size
 
   return (
@@ -107,7 +110,7 @@ function FxSection({
               {fmtRate(r.rateToBase)}
             </span>
             <span className="w-28 shrink-0 mono text-micro text-graphite">
-              {r.date}
+              {formatDay(r.date, today)}
             </span>
             <span className="w-44 shrink-0 truncate text-label">
               {r.appliesTo}

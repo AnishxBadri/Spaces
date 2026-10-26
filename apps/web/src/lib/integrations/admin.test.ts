@@ -380,11 +380,14 @@ describe('the ledger', () => {
     })
   })
 
-  it('agoOf reads minutes, hours, days', () => {
-    expect(agoOf(20_000)).toBe('just now')
-    expect(agoOf(4 * 60_000)).toBe('4m ago')
-    expect(agoOf(2 * 3_600_000)).toBe('2h ago')
-    expect(agoOf(72 * 3_600_000)).toBe('3d ago')
+  it('agoOf reads minutes, hours, days, then the day', () => {
+    const now = new Date(2026, 9, 26, 12, 0).getTime()
+    const before = (ms: number) => new Date(now - ms)
+    expect(agoOf(before(20_000), now)).toBe('just now')
+    expect(agoOf(before(4 * 60_000), now)).toBe('4m ago')
+    expect(agoOf(before(2 * 3_600_000), now)).toBe('2h ago')
+    expect(agoOf(before(72 * 3_600_000), now)).toBe('3d ago')
+    expect(agoOf(new Date(2026, 8, 4, 12, 0), now)).toBe('4 Sep')
   })
 })
 

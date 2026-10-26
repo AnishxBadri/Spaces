@@ -18,7 +18,14 @@ import { useBornRows } from '#/lib/born-rows'
 import { recordPath } from '#/lib/record-path'
 import { deleteTask, listTasks, setTaskDone } from '#/lib/server-fns'
 import { focusTab } from '#/lib/tasks/focus'
-import { localToday } from '@spaces/core/tasks/parse-due'
+import {
+  dayKey,
+  formatDay,
+  formatDue,
+  formatWeekday,
+  formatWhen,
+} from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/tasks')({
@@ -52,30 +59,11 @@ type Group = {
   rows: Array<TaskRow>
 }
 
-const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-
-function weekdayOf(iso: string): string {
-  return WEEKDAY[new Date(`${iso}T00:00:00Z`).getUTCDay()]
-}
-
-/** Whole days from today to `iso` — negative when overdue. */
-function daysFrom(today: string, iso: string): number {
-  return Math.round(
-    (new Date(`${iso}T00:00:00Z`).getTime() -
-      new Date(`${today}T00:00:00Z`).getTime()) /
-      86_400_000,
-  )
-}
-
-/** The when-lane: `09-08 · −2d` overdue, `today`, `Fri 09-12` this week,
- *  the ISO date later, `—` when dateless. */
-function whenFigure(due: string | null, today: string, groupKey: string) {
+/** The when-lane: `−2d` overdue, `today`, `Fri` this week, `14 Oct`
+ *  later, `—` when dateless. */
+function whenFigure(due: string | null, today: string) {
   if (!due) return '—'
-  const d = daysFrom(today, due)
-  if (d < 0) return `${due.slice(5)} · −${-d}d`
-  if (d === 0) return 'today'
-  if (groupKey === 'week') return `${weekdayOf(due)} ${due.slice(5)}`
-  return due
+  return due === today ? 'today' : formatDue(due, today)
 }
 
 /** Urgency groups, Attio-style: overdue red, today, this week, later, dateless. */
@@ -86,13 +74,13 @@ function groupTasks(open: Array<TaskRow>, today: string): Array<Group> {
     {
       key: 'today',
       title: 'Today',
-      hint: `${weekdayOf(today)} ${today.slice(5)}`,
+      hint: formatWeekday(today, today),
       rows: [],
     },
     {
       key: 'week',
       title: 'This week',
-      hint: `through ${weekdayOf(eow)} ${eow.slice(5)}`,
+      hint: `through ${formatWeekday(eow, today)}`,
       rows: [],
     },
     { key: 'later', title: 'Later', rows: [] },
@@ -108,12 +96,6 @@ function groupTasks(open: Array<TaskRow>, today: string): Array<Group> {
   return groups.filter((g) => g.rows.length > 0)
 }
 
-/** The local calendar day an ISO timestamp fell on. */
-function localDay(iso: string): string {
-  const d = new Date(iso)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 /**
  * Done is a log, so it groups by when the work closed, not when it was
  * due — the due date stopped mattering the moment the box was checked.
@@ -127,13 +109,13 @@ function groupDone(done: Array<TaskRow>, today: string): Array<Group> {
     {
       key: 'done-week',
       title: 'This week',
-      hint: `since ${since.slice(5)}`,
+      hint: `since ${formatDay(since, today)}`,
       rows: [],
     },
     { key: 'done-earlier', title: 'Earlier', rows: [] },
   ]
   for (const t of done) {
-    const day = t.doneAt ? localDay(t.doneAt) : ''
+    const day = t.doneAt ? dayKey(t.doneAt) : ''
     if (day === today) groups[0].rows.push(t)
     else if (day >= since) groups[1].rows.push(t)
     else groups[2].rows.push(t)
@@ -141,16 +123,9 @@ function groupDone(done: Array<TaskRow>, today: string): Array<Group> {
   return groups.filter((g) => g.rows.length > 0)
 }
 
-/** The when-lane for a closed task: the clock today, then the date. */
+/** The when-lane for a closed task: the clock today, then the day. */
 function doneFigure(doneAt: string | null, today: string): string {
-  if (!doneAt) return '—'
-  const d = new Date(doneAt)
-  const day = localDay(doneAt)
-  if (day === today) {
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-  }
-  if (day.slice(0, 4) === today.slice(0, 4)) return day.slice(5)
-  return day
+  return doneAt ? formatWhen(doneAt, today) : '—'
 }
 
 /** The row's exit: long enough to read the strike, short enough to ignore. */
@@ -196,7 +171,7 @@ function TasksPage() {
   // arrival at the page, or on a reload seconds after a task was added.
   const { washes, bear } = useBornRows()
   const { confirm, confirmDialog } = useConfirm()
-  const today = localToday()
+  const { today } = useClock()
 
   // The tabs are exclusive: Done is a different list, not a disclosure on
   // this one. Reopening the last done task takes the tab away, so the view
@@ -353,7 +328,7 @@ function TasksPage() {
                   figure={
                     viewDone
                       ? doneFigure(t.doneAt, today)
-                      : whenFigure(t.dueDate, today, g.key)
+                      : whenFigure(t.dueDate, today)
                   }
                   done={viewDone}
                   focused={t.id === focusId}

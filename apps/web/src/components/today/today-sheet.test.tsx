@@ -157,7 +157,9 @@ describe('Today by sheet 00', () => {
   it('puts the date line above the title and New task, Log interaction in the head', async () => {
     const html = await renderToday()
     const h1 = html.indexOf('<h1')
-    const date = html.search(/(Sun|Mon|Tue|Wed|Thu|Fri|Sat) \d\d-\d\d · W\d+/)
+    const date = html.search(
+      /(Sun|Mon|Tue|Wed|Thu|Fri|Sat) \d{1,2} [A-Z][a-z]{2} · W\d+/,
+    )
     expect(date).toBeGreaterThan(-1)
     expect(date).toBeLessThan(h1)
     expect(classOf(html, html.slice(date).split('<')[0])).toContain(

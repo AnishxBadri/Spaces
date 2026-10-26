@@ -626,7 +626,7 @@ describe('the preview pane', () => {
     const strip = pane()?.querySelector('[data-readouts]')
     expect(strip?.className).toContain('border-t border-hairline')
     expect([...(strip?.children ?? [])].map((c) => c.textContent)).toEqual([
-      '10-04 · 6dLast contact',
+      '4 OctLast contact',
       '3Moving, 30 days',
       '—Ownership',
     ])

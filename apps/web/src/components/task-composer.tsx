@@ -16,7 +16,9 @@ import { Input } from './ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Switch } from './ui/switch'
 import { createTask, listUsers, searchEntities } from '#/lib/server-fns'
-import { localToday, parseDue } from '@spaces/core/tasks/parse-due'
+import { daysBetween, formatWeekday } from '@spaces/core/format'
+import { parseDue } from '@spaces/core/tasks/parse-due'
+import { useClock } from '#/components/clock'
 import { useHotkey } from '#/lib/use-hotkey'
 import { cn } from '#/lib/utils'
 
@@ -35,17 +37,12 @@ function duePresets(today: string): Array<[string, string | null]> {
  * Natural-language dates parse deterministically; "no date" is legal.
  */
 
-const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-
-/** The chip's reading of a due date: `Today`, `Tomorrow`, else `Fri 09-12`. */
+/** The chip's reading of a due date: `Today`, `Tomorrow`, else `Fri 12 Sep`. */
 function dueLabel(due: string | null, today: string): string {
   if (!due) return 'No date'
   if (due === today) return 'Today'
-  const t = new Date(`${today}T00:00:00Z`)
-  const d = new Date(`${due}T00:00:00Z`)
-  const days = Math.round((d.getTime() - t.getTime()) / 86400000)
-  if (days === 1) return 'Tomorrow'
-  return `${WEEKDAY[d.getUTCDay()]} ${due.slice(5)}`
+  if (daysBetween(today, due) === 1) return 'Tomorrow'
+  return formatWeekday(due, today)
 }
 
 type LinkedRecord = { id: string; name: string; kind: string }
@@ -83,7 +80,7 @@ export function TaskComposer({
   const [keepOpen, setKeepOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const today = localToday()
+  const { today } = useClock()
   // Who the task lands on when the pill is untouched: `assignee_id` is NOT
   // NULL and the server defaults it to the caller, so "nobody" is not a
   // state the pill can honestly offer.

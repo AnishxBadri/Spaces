@@ -19,6 +19,8 @@ import {
   saveNote,
   updateMandateFacts,
 } from '#/lib/server-fns'
+import { formatTime, formatWhen } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 import type { NoteBody } from '@spaces/db/schema/kinds'
 
@@ -55,6 +57,7 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved'
 function MandatePage() {
   const { mandate, note, stageOptions } = Route.useLoaderData()
   const router = useRouter()
+  const { now } = useClock()
   const [creating, setCreating] = useState(false)
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [savedAt, setSavedAt] = useState<string | null>(null)
@@ -104,7 +107,7 @@ function MandatePage() {
         title="Mandate"
         description={
           <>
-            <span>updated {note.updatedAt.slice(0, 10)}</span>
+            <span>updated {formatWhen(note.updatedAt, now)}</span>
             <span>
               {activeStages} stage{activeStages === 1 ? '' : 's'} ·{' '}
               {mandate.geos.length} geo{mandate.geos.length === 1 ? '' : 's'}
@@ -132,7 +135,7 @@ function MandatePage() {
           note={note}
           onState={(s) => {
             setSaveState(s)
-            if (s === 'saved') setSavedAt(new Date().toTimeString().slice(0, 5))
+            if (s === 'saved') setSavedAt(formatTime(new Date()))
           }}
         />
       </div>

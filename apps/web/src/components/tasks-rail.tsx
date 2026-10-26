@@ -5,7 +5,8 @@ import { EmptyRow } from './ledger-section'
 import { RailSection } from './record/record-parts'
 import { Checkbox } from './ui/checkbox'
 import { listEntityTasks, setTaskDone } from '#/lib/server-fns'
-import { localToday } from '@spaces/core/tasks/parse-due'
+import { formatDue } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 type RailTask = {
@@ -66,7 +67,7 @@ export function TasksRail({
     }
   }
 
-  const today = localToday()
+  const { today } = useClock()
 
   if (tasks !== null && tasks.length === 0)
     return (
@@ -126,7 +127,7 @@ export function TasksRail({
                     t.dueDate < today ? 'text-destructive' : 'text-graphite',
                   )}
                 >
-                  {t.dueDate}
+                  {formatDue(t.dueDate, today)}
                 </span>
               ) : null}
             </li>

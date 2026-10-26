@@ -2,7 +2,7 @@ import type { AttributeDef } from '../attributes/registry'
 import { FIRST_NAME_SLUG, LAST_NAME_SLUG } from '../attributes/person-name'
 import { renderValue } from '../context/render'
 import type { NameLookup } from '../context/render'
-import { formatDate } from '../format'
+import { formatFullDay } from '../format'
 
 /**
  * Variables as paths: one grammar for an email and an AI prompt.
@@ -89,7 +89,8 @@ function readerOf(
   if (path === 'name.full') return (r) => blank(r.canonicalName)
   if (path === 'company.name') return (r) => blank(r.company)
   const stat = STAT_PATHS.get(path)
-  if (stat !== undefined) return (r) => blank(formatDate(r.stats[stat]))
+  if (stat !== undefined)
+    return (r) => blank(r.stats[stat] ? formatFullDay(r.stats[stat]) : '')
   if (path.includes('.')) return null
   const def = attributes.find((d) => d.slug === path && !d.archived)
   if (def === undefined) return null

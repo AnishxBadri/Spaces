@@ -93,7 +93,7 @@ describe('resolveVariables', () => {
       '{{company.name}} · {{last_interaction.when}} · {{last_email.when}}',
       dana,
     )
-    expect(r.text).toBe('Flent · Oct 12, 2026 · Oct 12, 2026')
+    expect(r.text).toBe('Flent · 12 Oct 2026 · 12 Oct 2026')
   })
 
   it('reads any live attribute by slug, rendered as the record shows it', () => {

@@ -31,7 +31,8 @@ import { readLedgerEventPayload } from '@spaces/core/ai/ledger-event'
 import type { LedgerEventPayload } from '@spaces/core/ai/ledger-event'
 import type { RefileDocumentPayload } from '@spaces/core/documents/refile'
 import { DOCUMENT_KIND_LABELS } from '@spaces/core/documents'
-import { formatDate, formatNumber } from '@spaces/core/format'
+import { formatDay, formatNumber } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { fmtMoney, fmtPct } from '@spaces/core/portfolio/format'
 import {
   acceptSuggestion,
@@ -448,13 +449,17 @@ function RefileBody({ move }: { move: RefileDocumentPayload }) {
 }
 
 /** An ISO day as the tables print it, read as a calendar day. */
-const ledgerDay = (date: string) => formatDate(`${date}T00:00:00`) || date
+const ledgerDay = (date: string, today: string) =>
+  formatDay(date.slice(0, 10), today) || date
 
 /**
  * The parts of a ledger event's one line: the diff against the holding
  * first, then what would be appended. Exported for the Review test.
  */
-export function ledgerEventParts(ledger: LedgerEventPayload): {
+export function ledgerEventParts(
+  ledger: LedgerEventPayload,
+  today: string,
+): {
   moved: string | null
   proposed: string
   verb: string
@@ -473,7 +478,7 @@ export function ledgerEventParts(ledger: LedgerEventPayload): {
       proposed: [
         r.kind,
         r.raised === undefined ? null : ledgerMoney(r.raised, currency),
-        ledgerDay(r.date),
+        ledgerDay(r.date, today),
       ]
         .filter((p) => p !== null)
         .join(' · '),
@@ -487,7 +492,7 @@ export function ledgerEventParts(ledger: LedgerEventPayload): {
       : ledgerMoney(ledger.before.fairValue, ledger.before.currency)
   return {
     moved,
-    proposed: `fair value ${before} → ${ledgerMoney(m.fairValue, m.currency)} · ${ledgerDay(m.date)}`,
+    proposed: `fair value ${before} → ${ledgerMoney(m.fairValue, m.currency)} · ${ledgerDay(m.date, today)}`,
     verb: 'propose a mark',
   }
 }
@@ -506,7 +511,8 @@ const ledgerMoney = (amount: number, currency: string | null) =>
  * appended, one line. Accepting appends it; nothing on the ledger changes.
  */
 function LedgerEventBody({ ledger }: { ledger: LedgerEventPayload }) {
-  const { moved, proposed, verb } = ledgerEventParts(ledger)
+  const { today } = useClock()
+  const { moved, proposed, verb } = ledgerEventParts(ledger, today)
   return (
     <p className="min-w-0 text-ui break-words">
       <span className="font-medium">{ledger.companyName}</span>
@@ -621,6 +627,7 @@ export function ProposedValue({
   field: SuggestionField
 }): React.ReactNode {
   const v = f.value
+  const { today } = useClock()
   if (v === null || v === '') return <span className="text-graphite">—</span>
   switch (f.type) {
     case 'select':
@@ -649,7 +656,7 @@ export function ProposedValue({
     case 'date':
       return (
         <span className="tabular mono">
-          {typeof v === 'string' ? formatDate(v) || v : String(v)}
+          {typeof v === 'string' ? formatDay(v, today) || v : String(v)}
         </span>
       )
     case 'number':

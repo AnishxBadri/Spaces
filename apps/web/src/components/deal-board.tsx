@@ -15,7 +15,8 @@ import { DitherMark, InitialsMark, RecordMark } from './record/record-parts'
 import { Badge } from './ui/badge'
 import { updateRecord } from '#/lib/server-fns'
 import { fmtMoney } from '@spaces/core/portfolio/format'
-import { localToday } from '@spaces/core/tasks/parse-due'
+import { formatDue } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 /** Cards shown per column before the dashed "+N more" row. */
@@ -66,7 +67,7 @@ export function DealBoard({
   pictures?: Record<string, string | undefined>
 }) {
   const router = useRouter()
-  const today = localToday()
+  const { today } = useClock()
   const [dragOver, setDragOver] = useState<string | null>(null)
   // Columns fold past COLUMN_LIMIT; the dashed row opens them.
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
@@ -131,14 +132,6 @@ export function DealBoard({
     const hit = refNames[id]
     if (!hit) return ''
     return typeof hit === 'string' ? hit : hit.name
-  }
-
-  function daysUntil(iso: string): number {
-    return Math.round(
-      (new Date(`${iso}T00:00:00Z`).getTime() -
-        new Date(`${today}T00:00:00Z`).getTime()) /
-        86_400_000,
-    )
   }
 
   return (
@@ -297,7 +290,7 @@ export function DealBoard({
                         <span className="flex items-center justify-between gap-2 mono text-field text-graphite">
                           <span className="truncate">
                             {close
-                              ? `close ${close.slice(5)} · ${daysUntil(close) < 0 ? '−' : ''}${Math.abs(daysUntil(close))}d`
+                              ? `close ${formatDue(close, today)}`
                               : 'close —'}
                           </span>
                           {owner ? (

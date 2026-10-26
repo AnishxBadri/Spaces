@@ -1,3 +1,5 @@
+import { formatDay } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 /**
@@ -25,6 +27,7 @@ export function spaceStamp(
 }
 
 export function Stamp({ kind, fact, archivedOn }: StampProps) {
+  const { today } = useClock()
   const archived = archivedOn !== undefined && archivedOn !== null
   return (
     <span
@@ -33,7 +36,7 @@ export function Stamp({ kind, fact, archivedOn }: StampProps) {
     >
       {kind}
       {fact ? ` ${fact}` : ''}
-      {archived ? ` · archived ${archivedOn.slice(5, 10)}` : ''}
+      {archived ? ` · archived ${formatDay(archivedOn, today)}` : ''}
     </span>
   )
 }

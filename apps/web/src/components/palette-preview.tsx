@@ -5,7 +5,7 @@ import { fmtPct } from '@spaces/core/portfolio/format'
 import { Button } from './ui/button'
 import { PictureMark, PreviewHead, ReadoutStrip } from './record/record-parts'
 import type { RecordReadout } from './record/record-parts'
-import { DASH, readoutDay, readoutDayAgo } from '#/lib/records/readout-format'
+import { DASH, readoutDay } from '#/lib/records/readout-format'
 import type { KindLane } from '#/lib/search/kind-lanes'
 import type { Passage } from '#/lib/search/passages'
 import type {
@@ -79,7 +79,7 @@ export function previewReadouts(r: PreviewReadouts): Array<RecordReadout> {
       return [
         {
           label: 'Last contact',
-          value: readoutDayAgo(r.readouts.lastContact, r.readouts.today),
+          value: readoutDay(r.readouts.lastContact, r.readouts.today),
         },
         {
           label: 'Moving, 30 days',
@@ -99,7 +99,7 @@ export function previewReadouts(r: PreviewReadouts): Array<RecordReadout> {
       return [
         {
           label: 'Last contact',
-          value: readoutDayAgo(r.readouts.lastContact, r.readouts.today),
+          value: readoutDay(r.readouts.lastContact, r.readouts.today),
         },
         {
           label: 'Last email',
@@ -129,7 +129,7 @@ export function previewReadouts(r: PreviewReadouts): Array<RecordReadout> {
       return [
         {
           label: 'Last contact',
-          value: readoutDayAgo(r.readouts.lastContact, r.readouts.today),
+          value: readoutDay(r.readouts.lastContact, r.readouts.today),
         },
         {
           label: 'Moving, 30 days',

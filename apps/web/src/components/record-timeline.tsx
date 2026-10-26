@@ -26,7 +26,8 @@ import {
   setRecordEmailVisibility,
   writeUpInteraction,
 } from '#/lib/server-fns'
-import { stamp } from '#/lib/timeline/stamp'
+import { formatDay, formatWhen } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import {
   INTERACTION_FILTERS,
   inInteractionFilter,
@@ -456,6 +457,7 @@ function Row({
   end?: React.ReactNode
   last: boolean
 }) {
+  const { now } = useClock()
   return (
     <li
       className={cn(
@@ -464,7 +466,7 @@ function Row({
       )}
     >
       <span className="w-22 shrink-0 mono text-micro text-graphite">
-        {stamp(at)}
+        {formatWhen(at, now)}
       </span>
       <span className="w-18 shrink-0 mono text-micro font-medium text-foreground uppercase">
         {type}
@@ -601,6 +603,7 @@ function InteractionRow({
   highlighted: boolean
 }) {
   const router = useRouter()
+  const { now } = useClock()
   const [pending, setPending] = useState(false)
 
   async function writeUp() {
@@ -718,7 +721,7 @@ function InteractionRow({
         )}
         {lane === '' ? null : <span className="min-w-0 truncate">{lane}</span>}
         <time dateTime={item.at} data-date className="tabular shrink-0">
-          {stamp(item.at)}
+          {formatWhen(item.at, now)}
         </time>
       </span>
     </li>
@@ -734,6 +737,7 @@ const INSTRUMENT_LABELS: Record<string, string> = {
 
 /** A check on the deal's ledger; a voided one struck, with the void's day. */
 function LedgerEntry({ item, last }: { item: LedgerItem; last: boolean }) {
+  const { today } = useClock()
   return (
     <Row
       at={item.at}
@@ -742,7 +746,7 @@ function LedgerEntry({ item, last }: { item: LedgerItem; last: boolean }) {
       end={
         item.voidedAt === null
           ? undefined
-          : `voided ${item.voidedAt.slice(5, 10)}`
+          : `voided ${formatDay(item.voidedAt, today)}`
       }
     >
       <span

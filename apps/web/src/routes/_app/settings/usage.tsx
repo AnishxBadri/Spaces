@@ -8,7 +8,8 @@ import {
 import { ReadoutStrip } from '#/components/record/record-parts'
 import type { RecordReadout } from '#/components/record/record-parts'
 import { SUGGESTION_KIND_WORD } from '#/components/inbox/suggestion-card'
-import { formatNumber } from '@spaces/core/format'
+import { formatNumber, formatWhen } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import {
   getAiCaps,
   getAiRun,
@@ -50,14 +51,9 @@ export const Route = createFileRoute('/_app/settings/usage')({
   component: UsageRoute,
 })
 
-/** An ISO instant as the ledger prints it: `2026-09-23 14:02 UTC`, no locale. */
-function stamp(iso: string | null): string {
-  return iso ? `${iso.slice(0, 16).replace('T', ' ')} UTC` : '—'
-}
-
-/** A run's start in the ledger's At lane: `09-23 14:02`, UTC. */
-function at(iso: string): string {
-  return `${iso.slice(5, 10)} ${iso.slice(11, 16)}`
+/** An instant as the ledger prints it: `14:02` today, else `23 Sep`. */
+function stamp(iso: string | null, now: string): string {
+  return iso ? formatWhen(iso, now) : '—'
 }
 
 /** `1,204 / 312`; a side the provider did not report reads `—`. */
@@ -183,6 +179,7 @@ function resultOf(run: RunItem): string {
 }
 
 function RunRow({ run, open }: { run: RunItem; open: boolean }) {
+  const { now } = useClock()
   const total =
     run.tokensIn === null && run.tokensOut === null
       ? '—'
@@ -208,7 +205,7 @@ function RunRow({ run, open }: { run: RunItem; open: boolean }) {
         {run.who}
       </span>
       <span className="w-24 shrink-0 mono text-micro text-graphite">
-        {at(run.startedAt)}
+        {stamp(run.startedAt, now)}
       </span>
       <span
         title={resultOf(run)}
@@ -229,6 +226,7 @@ function RunRow({ run, open }: { run: RunItem; open: boolean }) {
 /** One run opened: its readout, its steps in order, what it proposed. */
 function RunPanel({ detail }: { detail: RunDetail }) {
   const { run } = detail
+  const { now } = useClock()
   const href = run.record ? recordPath(run.record) : null
   return (
     <div className="mt-5 flex flex-col border border-rule">
@@ -238,8 +236,10 @@ function RunPanel({ detail }: { detail: RunDetail }) {
             Run · {run.task}
           </h3>
           <span className="truncate mono text-micro text-graphite">
-            {run.who} · {stamp(run.startedAt)}
-            {run.finishedAt ? ` → ${stamp(run.finishedAt)}` : ' · unfinished'}
+            {run.who} · {stamp(run.startedAt, now)}
+            {run.finishedAt
+              ? ` → ${stamp(run.finishedAt, now)}`
+              : ' · unfinished'}
           </span>
         </div>
         <Link
@@ -413,6 +413,7 @@ function StepRow({ step, index }: { step: RunStep; index: number }) {
 }
 
 function LoneCalls({ calls }: { calls: ReadonlyArray<LoneCall> }) {
+  const { now } = useClock()
   return (
     <div className="flex flex-col">
       <SettingsGroupHead
@@ -439,7 +440,7 @@ function LoneCalls({ calls }: { calls: ReadonlyArray<LoneCall> }) {
             {c.who}
           </span>
           <span className="w-36 shrink-0 mono text-micro text-graphite">
-            {stamp(c.at)}
+            {stamp(c.at, now)}
           </span>
           <span className="w-28 shrink-0 numeric text-right text-micro">
             {tokens(c.tokensIn, c.tokensOut)}

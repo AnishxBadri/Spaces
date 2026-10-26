@@ -1,4 +1,5 @@
-import { readoutDay, readoutDayAgo } from '#/lib/records/readout-format'
+import { readoutDay } from '#/lib/records/readout-format'
+import { formatDay } from '@spaces/core/format'
 import {
   createFileRoute,
   Link,
@@ -241,7 +242,7 @@ function PersonRecordPage() {
             {' / '}
             {person.id.slice(0, 8)}
             {' / added '}
-            {person.createdAt.slice(0, 10)}
+            {formatDay(person.createdAt, person.readouts.today)}
           </>
         }
         actions={
@@ -287,7 +288,7 @@ function PersonRecordPage() {
         readouts={[
           {
             label: 'Last contact',
-            value: readoutDayAgo(
+            value: readoutDay(
               person.readouts.lastContact,
               person.readouts.today,
             ),

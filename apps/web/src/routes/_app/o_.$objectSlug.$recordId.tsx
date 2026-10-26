@@ -6,6 +6,7 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
+import { formatDay } from '@spaces/core/format'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
@@ -43,7 +44,7 @@ import { Button } from '#/components/ui/button'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { objectIcon } from '#/lib/object-icons'
 import { recordPath } from '#/lib/record-path'
-import { readoutDay, readoutDayAgo } from '#/lib/records/readout-format'
+import { readoutDay } from '#/lib/records/readout-format'
 import { fileInSpaceAction } from '#/lib/file-in-space'
 import { runBinding, usePageActions } from '#/lib/page-actions'
 import {
@@ -193,7 +194,7 @@ function ObjectRecordPage() {
             {' / '}
             {record.id.slice(0, 8)}
             {' / added '}
-            {record.createdAt.slice(0, 10)}
+            {formatDay(record.createdAt, record.readouts.today)}
             {record.createdByName ? ` · ${record.createdByName}` : ''}
           </>
         }
@@ -239,7 +240,7 @@ function ObjectRecordPage() {
         readouts={[
           {
             label: 'Last contact',
-            value: readoutDayAgo(
+            value: readoutDay(
               record.readouts.lastContact,
               record.readouts.today,
             ),

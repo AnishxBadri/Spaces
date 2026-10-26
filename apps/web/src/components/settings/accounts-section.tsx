@@ -48,6 +48,7 @@ import type {
   MailboxSyncView,
 } from '#/lib/server-fns'
 import { disconnectConnection } from '#/lib/server-fns'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 /**
@@ -193,6 +194,7 @@ function AccountRow({
   mark: string
   isDefault: boolean
 }) {
+  const { today } = useClock()
   const first = account.held.at(0)
   return (
     <div className="flex min-h-12 items-center gap-3.5 border-b border-rule px-3 py-2">
@@ -213,7 +215,7 @@ function AccountRow({
       <span className="w-36 shrink-0 truncate mono text-micro text-foreground">
         {wordsOf(account.held)}
       </span>
-      <SyncLane state={syncStateOf(account.held)} />
+      <SyncLane state={syncStateOf(account.held, today)} />
       <span className="flex w-20 shrink-0 justify-end">
         {first !== undefined ? (
           <OptionsLink
@@ -402,6 +404,7 @@ export function AccountSection({
   bindings?: AccountBindings | null
 }) {
   const { isAdmin } = useSettingsPage()
+  const { today } = useClock()
   const router = useRouter()
   const navigate = useNavigate()
   const { pathname } = useLocation()
@@ -524,7 +527,7 @@ export function AccountSection({
       }
     >
       <p className="px-3 pt-3 mono text-micro text-graphite">
-        {provider} · {syncStateOf(account.held).text}
+        {provider} · {syncStateOf(account.held, today).text}
       </p>
       {testingModeOf(account) ? (
         <p className="px-3 pt-1 text-label text-graphite">
@@ -590,10 +593,11 @@ function ProductRow({
   connect: string
   onUntick: (row: ConnectionListRow) => void
 }) {
+  const { today } = useClock()
   const canTick = held !== undefined || offer.kind === 'connect'
   let lane: ReactNode
   if (held !== undefined) {
-    const state = syncStateOf([held])
+    const state = syncStateOf([held], today)
     lane = (
       <>
         <SyncLane state={state} />

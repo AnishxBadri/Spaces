@@ -39,6 +39,8 @@ import {
   untagFromSpace,
 } from '#/lib/server-fns'
 import type { getSpace } from '#/lib/server-fns'
+import { formatDay, formatWhen } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 /**
@@ -76,7 +78,7 @@ export function spaceTabCounts(spc: Space): Record<SpaceTab, number> {
  * The head's three readouts, never a tab's count: in pipeline, last filed,
  * and the funding-stage mix as the page's one dither.
  */
-export function spaceReadouts(spc: Space): Array<RecordReadout> {
+export function spaceReadouts(spc: Space, today: string): Array<RecordReadout> {
   const inPipeline = spc.companies.filter((c) => c.deals > 0).length
   const segments = stageMix(
     spc.companies.map((c) => c.stage),
@@ -90,9 +92,7 @@ export function spaceReadouts(spc: Space): Array<RecordReadout> {
     },
     {
       label: 'Last filed',
-      value: spc.lastFiled
-        ? `${spc.lastFiled.on.slice(5, 10)} · ${spc.lastFiled.days}d`
-        : '—',
+      value: spc.lastFiled ? formatDay(spc.lastFiled.on, today) : '—',
     },
     segments.length > 0
       ? {
@@ -499,6 +499,7 @@ function NotesTab({
   onNewNote: (kind?: 'memo') => void
 }) {
   const [filter, setFilter] = useState<NotesFilter>('all')
+  const { now } = useClock()
   const archived = spc.archive !== null || spc.archivedUnder !== null
   const ink = archived ? 'text-graphite' : undefined
   return (
@@ -539,7 +540,7 @@ function NotesTab({
                     {f.title || `${spc.name} ${f.kind}`}
                   </h3>
                   <span className="shrink-0 mono text-label text-graphite">
-                    {f.kind} · updated {f.updatedAt.slice(5, 10)}
+                    {f.kind} · updated {formatWhen(f.updatedAt, now)}
                   </span>
                 </div>
                 {f.snippet ? (
@@ -603,7 +604,7 @@ function NotesTab({
                   {n.title}
                 </span>
                 <LedgerFigure tone="muted">
-                  {n.updatedAt.slice(5, 10)}
+                  {formatWhen(n.updatedAt, now)}
                 </LedgerFigure>
               </Link>
             </LedgerRow>

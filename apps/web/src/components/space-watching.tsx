@@ -46,6 +46,8 @@ import {
 import type { WatchStatusState } from '#/lib/spaces/watch-status'
 import type { JobStatusEvent } from '@spaces/core/queue/job-status'
 import { recordPath } from '#/lib/record-path'
+import { formatWhen } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 /**
@@ -131,8 +133,9 @@ function useWatchStatus(spaceId: string, watches: ReadonlyArray<WatchRow>) {
   return { state, dispatch }
 }
 
-/** `10-09`, or a dash before the first run. */
-const dayOf = (iso: string | null) => (iso === null ? '—' : iso.slice(5, 10))
+/** `10:42` today, else `9 Oct`; a dash before the first run. */
+const whenOf = (iso: string | null, now: string) =>
+  iso === null ? '—' : formatWhen(iso, now)
 
 export function WatchingLane({
   spaceId,
@@ -237,9 +240,12 @@ function WatchLine({
   marked: boolean
   onRun: () => void
 }) {
+  const { now } = useClock()
   const cell = watchCell(state, watch.id)
   const lastRun = lastRunOf(state, watch.id, watch.lastRunAt)
-  const meta = [cadenceWord(watch.cadenceMinutes), dayOf(lastRun)].join(' · ')
+  const meta = [cadenceWord(watch.cadenceMinutes), whenOf(lastRun, now)].join(
+    ' · ',
+  )
   return (
     <LaneRow data-watch={watch.id} marked={marked}>
       <span
@@ -321,6 +327,7 @@ export function WhatsMovingLane({
   signals: ReadonlyArray<SpaceSignal>
 }) {
   const [open, setOpen] = useState(false)
+  const { now } = useClock()
   const shown = open ? signals : signals.slice(0, MOVING_FOLD)
   const more = signals.length - shown.length
   return (
@@ -349,7 +356,7 @@ export function WhatsMovingLane({
                   </span>
                 )}
                 <span className="shrink-0 mono text-micro text-graphite">
-                  {s.observedAt.slice(5, 10)}
+                  {formatWhen(s.observedAt, now)}
                 </span>
               </div>
               <p className="flex min-w-0 items-baseline gap-1.5 text-label text-graphite">

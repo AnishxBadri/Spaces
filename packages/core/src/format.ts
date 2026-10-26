@@ -1,22 +1,181 @@
-/** Shared display formatters. One instance per format — Intl objects are
- *  expensive to construct, and three routes formatting dates three ways is how
- *  "12 Mar 2026" and "Mar 12, 2026" end up in the same table. */
+/**
+ * Shared display formatters. The date forms are hand-rolled, never `Intl`:
+ * the server and the browser must print the same string or hydration fails,
+ * and one formatter per form is how a table never mixes `12 Mar` with `Mar 12`.
+ *
+ * The date forms (design contract, "Dates"):
+ * - today: the time, `10:42` — or `Today` in a readout;
+ * - this year: the day, `13 Oct`;
+ * - an older year: `4 Oct 2024`.
+ *
+ * `today` and `now` are always handed in from a loader or the server, never
+ * read from the clock here. An instant is read in the process's clock (the
+ * reader's, in the browser); a bare `YYYY-MM-DD` is a calendar day and is
+ * never shifted by a zone.
+ */
 
-const dateFmt = new Intl.DateTimeFormat('en', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-})
+/** A string (ISO day or instant) or a `Date`. */
+export type DateInput = string | Date
+
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+
+const DAY_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/
+
+type Parts = {
+  year: number
+  /** 0-based, as `Date` counts it. */
+  month: number
+  day: number
+  /** Null for a bare calendar day, which has no time. */
+  time: { hours: number; minutes: number } | null
+}
+
+function partsOf(value: DateInput): Parts | null {
+  if (typeof value === 'string') {
+    const m = DAY_ONLY.exec(value)
+    if (m) {
+      return {
+        year: Number(m[1]),
+        month: Number(m[2]) - 1,
+        day: Number(m[3]),
+        time: null,
+      }
+    }
+  }
+  const d = typeof value === 'string' ? new Date(value) : value
+  if (Number.isNaN(d.getTime())) return null
+  return {
+    year: d.getFullYear(),
+    month: d.getMonth(),
+    day: d.getDate(),
+    time: { hours: d.getHours(), minutes: d.getMinutes() },
+  }
+}
+
+const pad = (n: number) => String(n).padStart(2, '0')
+
+const keyOf = (p: Parts) =>
+  `${String(p.year)}-${pad(p.month + 1)}-${pad(p.day)}`
 
 /**
- * `Jul 30, 2026` — the one date format in tables and metadata rows.
- * Locale is pinned to `en` (not the visitor's) so a column of dates is
- * comparable down its own length.
+ * The calendar day of a value as `YYYY-MM-DD` — the key a list groups and
+ * compares by, never a printed form. `''` when the value is not a date.
  */
-export function formatDate(value: string | Date | null | undefined): string {
-  if (!value) return ''
-  const d = typeof value === 'string' ? new Date(value) : value
-  return Number.isNaN(d.getTime()) ? '' : dateFmt.format(d)
+export function dayKey(value: DateInput): string {
+  const p = partsOf(value)
+  return p === null ? '' : keyOf(p)
+}
+
+/** Whole calendar days from `from` to `to`; negative when `to` is earlier. */
+export function daysBetween(from: DateInput, to: DateInput): number {
+  const a = dayKey(from)
+  const b = dayKey(to)
+  if (a === '' || b === '') return 0
+  return Math.round(
+    (Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000,
+  )
+}
+
+/** `10:42` — the time of an instant; `''` for a bare day or a non-date. */
+export function formatTime(value: DateInput): string {
+  const t = partsOf(value)?.time
+  return t ? `${pad(t.hours)}:${pad(t.minutes)}` : ''
+}
+
+/**
+ * `13 Oct` in `today`'s year, `4 Oct 2024` in any other; `''` when the value
+ * is not a date.
+ */
+export function formatDay(value: DateInput, today: DateInput): string {
+  const p = partsOf(value)
+  if (p === null) return ''
+  const day = `${String(p.day)} ${MONTHS[p.month]}`
+  return partsOf(today)?.year === p.year ? day : `${day} ${String(p.year)}`
+}
+
+/**
+ * `4 Oct 2024` whatever the year — for text that is stored or sent, which
+ * outlives the year it was written in.
+ */
+export function formatFullDay(value: DateInput): string {
+  const p = partsOf(value)
+  return p === null
+    ? ''
+    : `${String(p.day)} ${MONTHS[p.month]} ${String(p.year)}`
+}
+
+/**
+ * When something happened: `10:42` on `now`'s day (`Today` with `readout`,
+ * and for a bare day, which has no time), else {@link formatDay}.
+ */
+export function formatWhen(
+  value: DateInput,
+  now: DateInput,
+  opts: { readout?: boolean } = {},
+): string {
+  const p = partsOf(value)
+  if (p === null) return ''
+  if (keyOf(p) !== dayKey(now)) return formatDay(value, now)
+  return opts.readout === true || p.time === null
+    ? 'Today'
+    : `${pad(p.time.hours)}:${pad(p.time.minutes)}`
+}
+
+/**
+ * A due day: `−2d` once it has passed, its weekday (`Fri`) within the next
+ * seven days, else the day (`14 Oct`).
+ */
+export function formatDue(day: DateInput, today: DateInput): string {
+  const n = daysBetween(today, day)
+  if (n < 0) return `−${String(-n)}d`
+  if (n < 7) return weekdayOf(day)
+  return formatDay(day, today)
+}
+
+/**
+ * How old something is: `12d` under 30 days, else the day it happened — the
+ * stat-column form (Last contact, Last email, Last filed).
+ */
+export function formatAge(value: DateInput, now: DateInput): string {
+  if (dayKey(value) === '') return ''
+  const n = daysBetween(value, now)
+  return n < 30 ? `${String(Math.max(0, n))}d` : formatDay(value, now)
+}
+
+/** `Thu` — the weekday of a value; `''` when it is not a date. */
+export function weekdayOf(value: DateInput): string {
+  const p = partsOf(value)
+  if (p === null) return ''
+  return WEEKDAYS[new Date(Date.UTC(p.year, p.month, p.day)).getUTCDay()]
+}
+
+/**
+ * `Thu 15 Oct` — a day in prose, with the year when it is not `today`'s
+ * (`Thu 15 Oct 2024`).
+ */
+export function formatWeekday(value: DateInput, today: DateInput): string {
+  const w = weekdayOf(value)
+  return w === '' ? '' : `${w} ${formatDay(value, today)}`
+}
+
+/** `THU 15 OCT` — the same day as a band label. */
+export function formatWeekdayHead(value: DateInput, today: DateInput): string {
+  return formatWeekday(value, today).toUpperCase()
 }
 
 const numberFmts = new Map<number, Intl.NumberFormat>()

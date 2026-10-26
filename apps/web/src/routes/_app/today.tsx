@@ -45,8 +45,8 @@ import {
   STALE_MARK_DAYS,
   todayStamp,
 } from '#/lib/today/needs-you'
-import { localToday } from '@spaces/core/tasks/parse-due'
-import { isoDay } from '#/lib/meetings/day'
+import { dayKey, formatAge, formatDue } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { modalSearch, openModalId } from '#/lib/modal-search'
 import { GLOBAL_ACTIONS, runBinding, usePageActions } from '#/lib/page-actions'
 
@@ -107,23 +107,19 @@ async function loadToday() {
   }
 }
 
-/** The when-lane of a due row: −2d, today, or the ISO date. */
+/** The when-lane of a due row: `−2d`, `today`, else the due form. */
 function dueFigure(due: string, today: string): string {
-  const d = daysBetween(today, due)
-  if (d === 0) return 'today'
-  if (d < 0) return `−${-d}d`
-  return due
+  return due === today ? 'today' : formatDue(due, today)
 }
 
 type Loaded = Awaited<ReturnType<typeof loadToday>>
 
-/** A past meeting's age in the reader's days: `today`, `2d`. */
+/** A past meeting's age in the reader's days: `today`, `2d`, `4 Sep`. */
 function meetingAge(startsAt: string, now: Date): string {
-  const ago = Math.max(0, daysBetween(isoDay(new Date(startsAt)), isoDay(now)))
-  return ago === 0 ? 'today' : `${ago}d`
+  return dayKey(startsAt) >= dayKey(now) ? 'today' : formatAge(startsAt, now)
 }
 
-/** The date line above the title — `Sat 10-10 · W41`, as written, not caps. */
+/** The date line above the title — `Sat 10 Oct · W41`, as written, not caps. */
 function DateLine({ today }: { today: string }) {
   return (
     <span className="tracking-normal normal-case">{todayStamp(today)}</span>
@@ -143,7 +139,7 @@ function TodayHead({ today, action }: { today: string; action?: ReactNode }) {
 
 function TodayPage() {
   const data = Route.useLoaderData()
-  const today = localToday()
+  const { today } = useClock()
   if (data.empty)
     return (
       <div className="flex min-h-full flex-col">

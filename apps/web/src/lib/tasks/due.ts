@@ -1,7 +1,6 @@
 /**
- * Open tasks by due day, for the sidebar's `3 due`. The server cannot know
- * the reader's day, so it hands back days and the browser counts against
- * its own `localToday()`.
+ * Open tasks by due day, for the sidebar's `3 due`. The read hands back
+ * days, and the shell counts them against its clock's `today`.
  */
 export type DueDay = { readonly day: string; readonly n: number }
 

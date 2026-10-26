@@ -4,6 +4,8 @@
  * Client-safe: the route and its components call these during render.
  */
 
+import { formatWeekday } from '@spaces/core/format'
+
 /** A task due today or earlier, a past meeting nobody wrote up, a deal idle
  *  past its stage median, a stale mark, a group of open Review cards. */
 export const NEEDS_YOU_KINDS = [
@@ -128,12 +130,9 @@ export function isoWeek(iso: string): number {
   return Math.ceil(((d.getTime() - yearStart) / 86_400_000 + 1) / 7)
 }
 
-const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-
-/** The head's date: `Thu 10-09 · W41`. */
+/** The head's date: `Thu 15 Oct · W42`. */
 export function todayStamp(iso: string): string {
-  const weekday = WEEKDAY[new Date(`${iso}T00:00:00Z`).getUTCDay()]
-  return `${weekday} ${iso.slice(5, 10)} · W${isoWeek(iso)}`
+  return `${formatWeekday(iso, iso)} · W${isoWeek(iso)}`
 }
 
 /** The kinds in the order the head's filters and the fold name them. */

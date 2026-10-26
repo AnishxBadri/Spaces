@@ -1,5 +1,6 @@
 import { Window } from 'happy-dom'
 import { act } from 'react'
+import { ClockProvider } from '#/components/clock'
 import type { Root, createRoot as CreateRoot } from 'react-dom/client'
 import {
   afterAll,
@@ -345,7 +346,11 @@ async function mount(
   })
   await act(async () => {
     await r.load()
-    root.render(<RouterProvider router={r} />)
+    root.render(
+      <ClockProvider now={CLOCK_NOW}>
+        <RouterProvider router={r} />
+      </ClockProvider>,
+    )
   })
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -369,6 +374,9 @@ const buttonNamed = (name: RegExp) => {
   return hit
 }
 
+/** The instant the pages' dates are printed against. */
+const CLOCK_NOW = '2026-10-26T12:00:00.000Z'
+
 describe('the space head', () => {
   it('draws the stamp, the crumb of ancestors with the created date, the double rule', async () => {
     await mount('notes')
@@ -376,7 +384,7 @@ describe('the space head', () => {
     expect(text(head.querySelector('[data-stamp]'))).toBe('Space · depth 1')
     const crumb = text(head.querySelector('nav[aria-label="Breadcrumb"]'))
     expect(crumb).toContain('Proptech')
-    expect(crumb).toContain('created 2026-09-16')
+    expect(crumb).toContain('created 16 Sep')
     expect(head.className).toContain('double-rule')
     expect(text(head.querySelector('h1'))).toBe('Property ops')
   })
@@ -413,7 +421,7 @@ describe('the space head', () => {
     const labels = cells.map((c) => text(c.lastElementChild))
     expect(labels).toEqual(['In pipeline', 'Last filed', 'Funding stage'])
     expect(text(cells[0]?.firstElementChild ?? null)).toBe('1 of 3')
-    expect(text(cells[1]?.firstElementChild ?? null)).toBe('10-06 · 2d')
+    expect(text(cells[1]?.firstElementChild ?? null)).toBe('6 Oct')
     for (const tab of ['Companies', 'Notes', 'Files', 'People', 'Records']) {
       expect(labels).not.toContain(tab)
     }
@@ -754,7 +762,7 @@ describe('split: New subspace, then Move here (D73)', () => {
 describe('the readouts helper', () => {
   it('reads a dash when no company is staged', () => {
     const empty: Space = { ...spc, companies: [], lastFiled: null }
-    const cells = tabs.spaceReadouts(empty)
+    const cells = tabs.spaceReadouts(empty, '2026-10-26')
     expect(cells.map((c) => c.value)).toEqual(['0 of 0', '—', '—'])
   })
 })
@@ -868,7 +876,7 @@ describe('the Watching lane', () => {
     })
     expect(row('w1').className).toContain('h-8')
     expect(text(row('w1'))).toContain('manual · —')
-    expect(text(row('w2'))).toContain('daily · 10-09')
+    expect(text(row('w2'))).toContain('daily · 9 Oct')
     expect(row('w1').querySelector('button[aria-label^="Run now"]')).not.toBe(
       null,
     )
@@ -927,7 +935,7 @@ describe('the Watching lane', () => {
     expect(text(row('w1').querySelector('[data-cell]'))).toBe(
       '7 found · 6 cards',
     )
-    expect(text(row('w1'))).toContain('manual · 10-10')
+    expect(text(row('w1'))).toContain('manual · 10 Oct')
   })
 
   it('sends Run now and reads queued until the run arrives', async () => {
@@ -1231,7 +1239,11 @@ async function mountNode(node: React.ReactNode) {
   })
   await act(async () => {
     await r.load()
-    root.render(<RouterProvider router={r} />)
+    root.render(
+      <ClockProvider now={CLOCK_NOW}>
+        <RouterProvider router={r} />
+      </ClockProvider>,
+    )
   })
 }
 

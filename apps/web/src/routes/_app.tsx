@@ -27,7 +27,8 @@ import {
   listObjects,
 } from '#/lib/server-fns'
 import { dueCount } from '#/lib/tasks/due'
-import { localToday } from '@spaces/core/tasks/parse-due'
+import { dayKey } from '@spaces/core/format'
+import { ClockProvider } from '#/components/clock'
 import { useHotkeys } from '#/lib/use-hotkey'
 import { cn } from '#/lib/utils'
 
@@ -46,15 +47,23 @@ export const Route = createFileRoute('/_app')({
       listObjects(),
       listDueTaskDays(),
     ])
-    return { workspace, objects: objects.filter((o) => !o.isSystem), dueDays }
+    // The instant every date under the shell is printed against: read once
+    // here, so the server render and the hydrated browser agree on it.
+    const now = new Date().toISOString()
+    return {
+      workspace,
+      objects: objects.filter((o) => !o.isSystem),
+      dueDays,
+      now,
+    }
   },
   component: AppShell,
 })
 
 function AppShell() {
   const { session } = Route.useRouteContext()
-  const { workspace, objects, dueDays } = Route.useLoaderData()
-  const tasksDue = dueCount(dueDays, localToday())
+  const { workspace, objects, dueDays, now } = Route.useLoaderData()
+  const tasksDue = dueCount(dueDays, dayKey(now))
   const [commandOpen, setCommandOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const collapsed = useChassisCollapsed()
@@ -77,102 +86,104 @@ function AppShell() {
   ])
 
   return (
-    <div className="flex min-h-dvh bg-paper">
-      {/* Desktop sidebar */}
-      {/* Width snaps, never animates: width is not a compositor property.
+    <ClockProvider now={now}>
+      <div className="flex min-h-dvh bg-paper">
+        {/* Desktop sidebar */}
+        {/* Width snaps, never animates: width is not a compositor property.
           The sidebar draws its own hairline edge, so the current row can
           cross it. */}
-      <aside
-        className={cn(
-          'fixed inset-y-0 left-0 hidden md:block',
-          CHASSIS_LAYER,
-          narrow ? 'w-12' : 'w-58',
-        )}
-      >
-        {onSettings ? (
-          <SettingsChassis />
-        ) : (
-          <AppSidebar
-            user={session.user}
-            workspaceName={workspace?.name ?? null}
-            workspaceLogo={workspace?.logo ?? null}
-            objects={objects}
-            tasksDue={tasksDue}
-            onOpenCommand={() => setCommandOpen(true)}
-            collapsed={collapsed}
-            onToggleCollapsed={() => setChassisCollapsed(!collapsed)}
-            onOpenKeyboard={() => setKeyboardOpen(true)}
-          />
-        )}
-      </aside>
-
-      {/* Mobile top bar */}
-      <header className="fixed inset-x-0 top-0 z-sticky flex h-12 items-center gap-3 border-b border-rule bg-paper px-4 md:hidden">
-        <button
-          type="button"
-          aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
-          aria-expanded={mobileNavOpen}
-          onClick={() => setMobileNavOpen((v) => !v)}
-          className="focus-ring -ml-1 flex size-8 items-center justify-center rounded-md text-graphite hover:bg-bone"
-        >
-          {mobileNavOpen ? (
-            <X className="size-4.5" strokeWidth={1.75} />
-          ) : (
-            <Menu className="size-4.5" strokeWidth={1.75} />
+        <aside
+          className={cn(
+            'fixed inset-y-0 left-0 hidden md:block',
+            CHASSIS_LAYER,
+            narrow ? 'w-12' : 'w-58',
           )}
-        </button>
-        <Wordmark />
-      </header>
-
-      {/* Mobile nav drawer */}
-      {mobileNavOpen ? (
-        <div className="fixed inset-0 z-dropdown md:hidden">
-          <div
-            className="absolute inset-0 bg-foreground/20"
-            onClick={() => setMobileNavOpen(false)}
-            aria-hidden
-          />
-          <div className="absolute inset-y-0 top-12 left-0 w-58 shadow-solid">
+        >
+          {onSettings ? (
+            <SettingsChassis />
+          ) : (
             <AppSidebar
-              hideWordmark
               user={session.user}
               workspaceName={workspace?.name ?? null}
               workspaceLogo={workspace?.logo ?? null}
               objects={objects}
               tasksDue={tasksDue}
-              onOpenCommand={() => {
-                setMobileNavOpen(false)
-                setCommandOpen(true)
-              }}
-              onNavigate={() => setMobileNavOpen(false)}
+              onOpenCommand={() => setCommandOpen(true)}
+              collapsed={collapsed}
+              onToggleCollapsed={() => setChassisCollapsed(!collapsed)}
+              onOpenKeyboard={() => setKeyboardOpen(true)}
             />
+          )}
+        </aside>
+
+        {/* Mobile top bar */}
+        <header className="fixed inset-x-0 top-0 z-sticky flex h-12 items-center gap-3 border-b border-rule bg-paper px-4 md:hidden">
+          <button
+            type="button"
+            aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
+            aria-expanded={mobileNavOpen}
+            onClick={() => setMobileNavOpen((v) => !v)}
+            className="focus-ring -ml-1 flex size-8 items-center justify-center rounded-md text-graphite hover:bg-bone"
+          >
+            {mobileNavOpen ? (
+              <X className="size-4.5" strokeWidth={1.75} />
+            ) : (
+              <Menu className="size-4.5" strokeWidth={1.75} />
+            )}
+          </button>
+          <Wordmark />
+        </header>
+
+        {/* Mobile nav drawer */}
+        {mobileNavOpen ? (
+          <div className="fixed inset-0 z-dropdown md:hidden">
+            <div
+              className="absolute inset-0 bg-foreground/20"
+              onClick={() => setMobileNavOpen(false)}
+              aria-hidden
+            />
+            <div className="absolute inset-y-0 top-12 left-0 w-58 shadow-solid">
+              <AppSidebar
+                hideWordmark
+                user={session.user}
+                workspaceName={workspace?.name ?? null}
+                workspaceLogo={workspace?.logo ?? null}
+                objects={objects}
+                tasksDue={tasksDue}
+                onOpenCommand={() => {
+                  setMobileNavOpen(false)
+                  setCommandOpen(true)
+                }}
+                onNavigate={() => setMobileNavOpen(false)}
+              />
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      <main
-        className={cn(
-          'min-w-0 flex-1 pt-12 md:pt-0',
-          narrow ? 'md:pl-12' : 'md:pl-58',
-        )}
-      >
-        <Outlet />
-      </main>
+        <main
+          className={cn(
+            'min-w-0 flex-1 pt-12 md:pt-0',
+            narrow ? 'md:pl-12' : 'md:pl-58',
+          )}
+        >
+          <Outlet />
+        </main>
 
-      <AskDock />
+        <AskDock />
 
-      <CommandPalette
-        open={commandOpen}
-        onOpenChange={setCommandOpen}
-        objects={objects}
-      />
-      {/* Mounted once, here: an upload has to outlive the sheet it was
+        <CommandPalette
+          open={commandOpen}
+          onOpenChange={setCommandOpen}
+          objects={objects}
+        />
+        {/* Mounted once, here: an upload has to outlive the sheet it was
           started from, so closing the dialog leaves in-flight files
           running. */}
-      <UploadDialog />
-      <ComposeWindows />
-      <KeyboardHelp open={keyboardOpen} onOpenChange={setKeyboardOpen} />
-      <Toaster position="bottom-right" />
-    </div>
+        <UploadDialog />
+        <ComposeWindows />
+        <KeyboardHelp open={keyboardOpen} onOpenChange={setKeyboardOpen} />
+        <Toaster position="bottom-right" />
+      </div>
+    </ClockProvider>
   )
 }

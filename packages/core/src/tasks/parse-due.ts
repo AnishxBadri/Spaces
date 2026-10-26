@@ -8,12 +8,6 @@
  * testable; callers pass the user's local date.
  */
 
-/** The user's local calendar date as ISO — the "today" every caller passes. */
-export function localToday(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 const WEEKDAYS = [
   'sunday',
   'monday',

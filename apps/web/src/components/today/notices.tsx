@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
+import { formatTime } from '@spaces/core/format'
 import { reasonOf } from '#/components/plugin-status-section'
 import type {
   BrokenConnection,
@@ -45,9 +46,6 @@ function NoticeLine({
 
 const fixClass =
   'focus-ring shrink-0 mono text-micro text-primary hover:underline'
-
-/** `00:00 UTC` — the reset, read off the ISO instant so server and client agree. */
-const utcClock = (iso: string) => `${iso.slice(11, 16)} UTC`
 
 /**
  * What stops the machine, one line each with the link that fixes it: a
@@ -134,7 +132,7 @@ export function NoticesBand({
             key={`parked:${p.integrationId}`}
             lane="enrich"
             what={`Auto-enrich paused · ${p.source} cap reached`}
-            why={`${String(p.waiting)} waiting · resumes ${utcClock(p.resumesAt)}`}
+            why={`${String(p.waiting)} waiting · resumes ${formatTime(p.resumesAt)}`}
             fix={
               <Link
                 to="/settings/plugins/$integrationId"

@@ -5,7 +5,7 @@ import { document, entity, link } from '@spaces/db/schema'
 import { ref } from '../../context/ref'
 import { DOCUMENT_KIND_LABELS, guessDocumentKind } from '../../documents'
 import type { DocumentKind } from '../../documents'
-import { formatDate } from '../../format'
+import { formatFullDay } from '../../format'
 import { proposeProgram } from '../suggestions/propose'
 import type { Suggestion } from '../suggestions/propose'
 import type { SupersedesPayload } from '../../ai/supersedes'
@@ -139,7 +139,7 @@ const proposeAll = Effect.fn('proposeNewerVersion.proposeAll')(function* (
       entityId: p.recordId,
       kind: 'supersedes',
       payload: p.payload,
-      rationale: `${DOCUMENT_KIND_LABELS[p.payload.documentKind]} filed ${formatDate(p.createdAt)}, after the one this record already holds.`,
+      rationale: `${DOCUMENT_KIND_LABELS[p.payload.documentKind]} filed ${formatFullDay(p.createdAt)}, after the one this record already holds.`,
       refs: [ref.doc(p.payload.newerId, 0), ref.doc(p.payload.olderId, 0)],
       proposedBy: { type: 'system' },
     })

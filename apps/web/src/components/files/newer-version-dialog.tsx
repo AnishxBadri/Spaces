@@ -15,6 +15,8 @@ import { FileGlyph } from './file-glyph'
 import type { RecordDocument } from './types'
 import { markNewerVersion } from '#/lib/server-fns'
 import { fileType } from '#/lib/documents/files-tab'
+import { formatDay } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 /**
@@ -35,6 +37,7 @@ export function NewerVersionDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const router = useRouter()
+  const { today } = useClock()
   const [picked, setPicked] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -99,7 +102,7 @@ export function NewerVersionDialog({
                 <FileGlyph type={fileType(d)} />
                 <span className="min-w-0 flex-1 truncate">{d.filename}</span>
                 <span className="shrink-0 mono text-micro text-graphite">
-                  {d.createdAt.slice(0, 10)}
+                  {formatDay(d.createdAt, today)}
                 </span>
               </button>
             </li>

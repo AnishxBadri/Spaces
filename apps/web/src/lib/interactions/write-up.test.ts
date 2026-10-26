@@ -96,7 +96,8 @@ async function edgesFrom(noteId: string): Promise<Array<string>> {
 describe('writeUpTitle', () => {
   it('names the subject when there is one and the kind and date when there is not', async () => {
     const { writeUpTitle } = await import('./write-up')
-    const { stamp } = await import('#/lib/timeline/stamp')
+    const { titleStamp: stamp } =
+      await import('@spaces/core/interactions/write-up-title')
     const at = new Date('2026-09-18T10:00:00Z')
 
     expect(writeUpTitle('meeting', 'Series B intro', at)).toBe('Series B intro')

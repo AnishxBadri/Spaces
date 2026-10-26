@@ -20,6 +20,8 @@ import {
   isApiScope,
 } from '#/lib/tokens/scopes'
 import type { ApiScope } from '#/lib/tokens/scopes'
+import { formatFullDay, formatTime, formatWhen } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 type TokenRow = Awaited<ReturnType<typeof listApiTokens>>[number]
@@ -49,14 +51,8 @@ const OFFERED: ReadonlyArray<ApiScope> = [
   'capture:write',
 ]
 
-/** A ledger day: `today`, else `MM-DD`; the full instant is the cell's title. */
-function day(iso: string): string {
-  return iso.slice(0, 10) === new Date().toISOString().slice(0, 10)
-    ? 'today'
-    : iso.slice(5, 10)
-}
-
-const stamp = (iso: string) => `${iso.slice(0, 16).replace('T', ' ')} UTC`
+/** A cell's title: the whole instant, `4 Oct 2026 14:02`. */
+const stamp = (iso: string) => `${formatFullDay(iso)} ${formatTime(iso)}`
 
 /** What a token may do, in words: `Read, Propose`. */
 function mayWords(scopes: ReadonlyArray<string>): string {
@@ -69,6 +65,9 @@ function mayWords(scopes: ReadonlyArray<string>): string {
 
 function TokensRoute() {
   const { tokens } = Route.useLoaderData()
+  const { now } = useClock()
+  // A ledger day: the time today, else the day; the cell's title is whole.
+  const day = (iso: string) => formatWhen(iso, now)
   const router = useRouter()
   const [name, setName] = useState('')
   const [scopes, setScopes] = useState<ReadonlyArray<ApiScope>>([])

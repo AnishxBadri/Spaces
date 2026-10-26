@@ -9,6 +9,8 @@ import { Button } from '#/components/ui/button'
 import { Select } from '#/components/ui/select'
 import { Tabs } from '#/components/ui/tabs'
 import { columnLetter } from '@spaces/core/import/mapping'
+import { formatWhen } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 /**
@@ -338,8 +340,8 @@ export function DropZone({
 // ---------------------------------------------------------------------------
 
 /** The section's one commentary line: when, what state, what it wrote. */
-export function previousImportLine(p: PreviousImport): string {
-  return `imported ${p.createdAt.slice(0, 10)} · ${p.filename} · ${p.status} · ${p.rowCount.toLocaleString('en-US')} rows · ${p.written.toLocaleString('en-US')} written`
+export function previousImportLine(p: PreviousImport, now: string): string {
+  return `imported ${formatWhen(p.createdAt, now)} · ${p.filename} · ${p.status} · ${p.rowCount.toLocaleString('en-US')} rows · ${p.written.toLocaleString('en-US')} written`
 }
 
 export function PreviousImportNotice({
@@ -349,11 +351,12 @@ export function PreviousImportNotice({
   previous: PreviousImport
   action?: ReactNode
 }) {
+  const { now } = useClock()
   return (
     <section className="flex flex-wrap items-center gap-3 border border-rule bg-bone px-4 py-3">
       <span className="label-caps text-foreground">Imported before</span>
       <span className="mono text-label text-graphite">
-        {previousImportLine(previous)}
+        {previousImportLine(previous, now)}
       </span>
       <span className="ml-auto flex items-center gap-2">
         <Button variant="outline" size="sm" asChild>

@@ -121,24 +121,34 @@ describe('defaultMailAccount', () => {
 })
 
 describe('syncStateOf', () => {
+  const TODAY = '2026-10-26'
   it('reads an error first, then revoked, then the latest sync', () => {
     expect(
-      syncStateOf([
-        row({ lastSyncAt: '2026-10-09T08:00:00.000Z' }),
-        row({ status: 'error', errorReason: 'invalid_grant' }),
-      ]),
+      syncStateOf(
+        [
+          row({ lastSyncAt: '2026-10-09T08:00:00.000Z' }),
+          row({ status: 'error', errorReason: 'invalid_grant' }),
+        ],
+        TODAY,
+      ),
     ).toEqual({ tone: 'error', text: 'invalid_grant' })
-    expect(syncStateOf([row({ status: 'revoked' })])).toEqual({
+    expect(syncStateOf([row({ status: 'revoked' })], TODAY)).toEqual({
       tone: 'revoked',
       text: 'revoked',
     })
     expect(
-      syncStateOf([
-        row({ lastSyncAt: '2026-10-02T08:00:00.000Z' }),
-        row({ lastSyncAt: '2026-10-09T08:00:00.000Z' }),
-      ]),
-    ).toEqual({ tone: 'ok', text: 'synced 10-09' })
-    expect(syncStateOf([row()])).toEqual({ tone: 'ok', text: 'never synced' })
+      syncStateOf(
+        [
+          row({ lastSyncAt: '2026-10-02T08:00:00.000Z' }),
+          row({ lastSyncAt: '2026-10-09T08:00:00.000Z' }),
+        ],
+        TODAY,
+      ),
+    ).toEqual({ tone: 'ok', text: 'In sync · 9 Oct' })
+    expect(syncStateOf([row()], TODAY)).toEqual({
+      tone: 'ok',
+      text: 'never synced',
+    })
   })
 })
 

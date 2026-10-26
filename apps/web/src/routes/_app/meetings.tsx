@@ -8,7 +8,7 @@ import { MeetingDialog } from '#/components/meeting-dialog'
 import { MeetingsLedger } from '#/components/meetings/meetings-ledger'
 import { PageHeader } from '#/components/page-header'
 import { listMeetings } from '#/lib/server-fns'
-import { isoDay } from '#/lib/meetings/day'
+import { useClock } from '#/components/clock'
 import {
   filterCounts,
   MEETING_FILTER_LABEL,
@@ -75,6 +75,7 @@ function MeetingsPage() {
   const filter: MeetingFilter = search.show ?? 'all'
   const [version, setVersion] = useState(0)
   const list = useMeetingsList(version)
+  const { now } = useClock()
 
   // The window opens from the URL, so a row and `?modal=meeting&id=` agree.
   const meetingId = openModalId(search, 'meeting')
@@ -142,7 +143,7 @@ function MeetingsPage() {
           <MeetingsLedger
             list={loaded}
             filter={filter}
-            today={isoDay(new Date())}
+            now={now}
             onOpen={openMeeting}
           />
         )}

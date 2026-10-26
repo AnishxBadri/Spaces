@@ -38,6 +38,8 @@ import {
   getHolding,
   voidLedgerEvent,
 } from '#/lib/server-fns'
+import { formatDay } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 import { usePageActions } from '#/lib/page-actions'
 import {
@@ -58,6 +60,7 @@ function HoldingPage() {
   const h = Route.useLoaderData()
   const m = h.metrics.ok ? h.metrics.metrics : null
   const router = useRouter()
+  const { today } = useClock()
   usePageActions(
     [
       {
@@ -90,7 +93,7 @@ function HoldingPage() {
             {' / '}
             {h.id.slice(0, 8)}
             {' / holding since '}
-            {h.openedAt.slice(0, 10)}
+            {formatDay(h.openedAt, today)}
             {m?.writtenOff ? ' · written off' : ''}
           </>
         }
@@ -122,7 +125,7 @@ function HoldingPage() {
                 { label: 'Invested', value: fmtMoney(m.costBasis, m.currency) },
                 {
                   label: m.lastMarkDate
-                    ? `Value · marked ${m.lastMarkDate}`
+                    ? `Value · marked ${formatDay(m.lastMarkDate, today)}`
                     : 'Value · at cost, never marked',
                   value: fmtMoney(m.unrealized, m.currency),
                 },
@@ -261,6 +264,7 @@ function ExplainedFigure({ figure, why }: { figure: string; why: string }) {
 }
 
 function OwnershipBlock({ ownership }: { ownership: Holding['ownership'] }) {
+  const { today } = useClock()
   if (ownership.kind === 'cost_basis_only') {
     return (
       <RailRow
@@ -295,7 +299,7 @@ function OwnershipBlock({ ownership }: { ownership: Holding['ownership'] }) {
           className="flex h-row items-center gap-3 border-t border-rule"
         >
           <span className="w-20 shrink-0 mono text-micro text-graphite">
-            {p.date}
+            {formatDay(p.date, today)}
           </span>
           <span className="min-w-0 flex-1 truncate text-ui">{p.roundKind}</span>
           <span className="mono text-micro text-graphite">
@@ -352,6 +356,7 @@ function EventSection({
   table?: VoidableTable | undefined
 }) {
   const router = useRouter()
+  const { today } = useClock()
   const { confirm, confirmDialog } = useConfirm()
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -360,7 +365,12 @@ function EventSection({
     const ok = await confirm({
       title: `Void this ${title.toLowerCase().replace(/s$/, '')}?`,
       body: 'Nothing is edited and nothing is deleted. A compensating entry is appended, dated as this one is dated, and both stay on the record.',
-      rows: [{ name: r.label, meta: `${r.date.slice(0, 10)} · ${r.amount}` }],
+      rows: [
+        {
+          name: r.label,
+          meta: `${formatDay(r.date.slice(0, 10), today)} · ${r.amount}`,
+        },
+      ],
       action: 'Void',
     })
     if (!ok) return
@@ -406,7 +416,7 @@ function EventSection({
                   isReversal && 'pl-3',
                 )}
               >
-                {r.date.slice(0, 10)}
+                {formatDay(r.date.slice(0, 10), today)}
               </span>
               <span
                 className={cn(
@@ -425,7 +435,7 @@ function EventSection({
               >
                 {isReversal
                   ? `voids the ${r.label}${r.voidedBy ? ` · ${r.voidedBy}` : ''}${
-                      r.voidedOn ? ` · ${r.voidedOn}` : ''
+                      r.voidedOn ? ` · ${formatDay(r.voidedOn, today)}` : ''
                     }`
                   : r.label}
               </span>

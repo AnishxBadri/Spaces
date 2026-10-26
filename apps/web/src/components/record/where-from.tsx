@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { formatDay } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import {
   Popover,
   PopoverContent,
@@ -6,11 +8,9 @@ import {
 } from '#/components/ui/popover'
 import type { WhereFrom } from '#/lib/server-fns'
 
-/** `2026-10-04T09:00:00Z` → `10-04`: the day, as the printed sheets write it. */
-export const dayOf = (iso: string): string => iso.slice(5, 10)
-
-/** "Apollo · 10-04 · was 42 on 07-12" — the popover in one line. */
-export function whereFromWords(from: WhereFrom): string {
+/** "Apollo · 4 Oct · was 42 on 12 Jul" — the popover in one line. */
+export function whereFromWords(from: WhereFrom, today: string): string {
+  const dayOf = (iso: string) => formatDay(iso, today)
   return [
     from.source,
     dayOf(from.at),
@@ -35,12 +35,14 @@ export function WhereFromMark({
   from: WhereFrom
 }) {
   const [open, setOpen] = useState(false)
+  const { today } = useClock()
+  const dayOf = (iso: string) => formatDay(iso, today)
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={`${label}: ${whereFromWords(from)}`}
+          aria-label={`${label}: ${whereFromWords(from, today)}`}
           data-where-from
           onPointerEnter={() => setOpen(true)}
           onPointerLeave={() => setOpen(false)}

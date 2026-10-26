@@ -40,6 +40,7 @@ import {
 } from '#/lib/documents/files-tab'
 import type { StateWord } from '#/lib/documents/files-tab'
 import { storageLinkProvider } from '#/lib/documents/storage-link'
+import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 /**
@@ -180,7 +181,8 @@ export function FileRow({
   const { remove, removeDialog } = useRemoveFile(recordId, recordName)
   const [versioning, setVersioning] = useState(false)
   const follow = useFollow(recordId)
-  const followed = followLane(doc)
+  const { today } = useClock()
+  const followed = followLane(doc, today)
 
   async function setKind(kind: DocumentKind) {
     if (kind === doc.kind) return
@@ -219,7 +221,7 @@ export function FileRow({
         {doc.filename}
       </button>
       <span className="min-w-0 shrink truncate mono text-micro text-graphite">
-        {followed === null ? endLane(doc, inFolder) : followed.end}
+        {followed === null ? endLane(doc, today, inFolder) : followed.end}
       </span>
       <StateLane state={followed === null ? stateWord(doc) : followed.state} />
       <DropdownMenu>

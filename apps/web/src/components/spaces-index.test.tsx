@@ -198,9 +198,9 @@ describe('the market map', () => {
     expect(rowNamed('Proptech').querySelector('svg')).not.toBeNull()
   })
 
-  it('prints last filed as day and age, or a dash', async () => {
+  it('prints last filed as an age under 30 days, or a dash', async () => {
     await mount(index())
-    expect(rowNamed('Property ops').textContent).toContain('10-06 · 4d')
+    expect(rowNamed('Property ops').textContent.endsWith('—4d')).toBe(true)
     expect(rowNamed('Fintech').textContent.endsWith('—')).toBe(true)
   })
 })

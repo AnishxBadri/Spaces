@@ -8,6 +8,8 @@ import {
   RecordSection,
 } from '#/components/record/record-parts'
 import { recordPath } from '#/lib/record-path'
+import { formatWhen } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import type { getTermPage } from '#/lib/server-fns'
 
 /**
@@ -42,10 +44,10 @@ export function mentionHref(row: MentionRow): string | null {
 }
 
 /** The mono lane a mention row ends on: what it is, and where or when. */
-function mentionMeta(row: MentionRow): string {
+function mentionMeta(row: MentionRow, now: string): string {
   if (row.kind === 'document')
     return row.parent ? `${row.subKind} · in ${row.parent.name}` : row.subKind
-  return `${row.subKind} · ${row.at.slice(5, 10)}`
+  return `${row.subKind} · ${formatWhen(row.at, now)}`
 }
 
 /**
@@ -90,6 +92,7 @@ export function TermMentions({
 }
 
 function MentionItem({ row }: { row: MentionRow }) {
+  const { now } = useClock()
   const href = mentionHref(row)
   const body = (
     <>
@@ -99,7 +102,7 @@ function MentionItem({ row }: { row: MentionRow }) {
         </span>
         <span className="flex-1" />
         <span className="shrink-0 mono text-micro text-graphite">
-          {mentionMeta(row)}
+          {mentionMeta(row, now)}
         </span>
       </span>
       {row.snippet ? (

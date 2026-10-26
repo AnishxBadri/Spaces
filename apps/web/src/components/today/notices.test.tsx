@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-router'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import { formatTime } from '@spaces/core/format'
 import type {
   FailingBinding,
   ParkedSource,
@@ -55,7 +56,9 @@ describe('NoticesBand — parked auto-enrich', () => {
       },
     ])
     expect(html).toContain('Auto-enrich paused · Apollo cap reached')
-    expect(html).toContain('14 waiting · resumes 00:00 UTC')
+    expect(html).toContain(
+      `14 waiting · resumes ${formatTime('2026-10-11T00:00:00.000Z')}`,
+    )
     expect(html).toContain(
       'href="/settings/plugins/00000000-0000-4000-8000-0000000000a1"',
     )

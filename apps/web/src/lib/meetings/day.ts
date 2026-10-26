@@ -1,4 +1,5 @@
 import type { MeetingRsvp } from '@spaces/db/schema/interactions'
+import { formatTime, formatWeekday } from '@spaces/core/format'
 
 /**
  * The meeting surfaces' pure half, client-safe: the row shapes the server
@@ -62,36 +63,26 @@ export function dayWindow(day: string): { from: string; to: string } {
   }
 }
 
-const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-
-/** A local day as `Tue 10-14`. */
-export function weekdayDate(day: string): string {
-  const [y, m, d] = day.split('-').map(Number)
-  return `${WEEKDAY[new Date(y, m - 1, d).getDay()]} ${day.slice(5)}`
-}
-
-/** The day nav's middle word: `today`, `tomorrow`, `yesterday`, else `Tue 10-14`. */
+/** The day nav's middle word: `today`, `tomorrow`, `yesterday`, else `Tue 14 Oct`. */
 export function dayLabel(day: string, today: string): string {
   if (day === today) return 'today'
   if (day === shiftDay(today, 1)) return 'tomorrow'
   if (day === shiftDay(today, -1)) return 'yesterday'
-  return weekdayDate(day)
-}
-
-/** `HH:MM` in the reader's clock. */
-export function clock(iso: string): string {
-  const d = new Date(iso)
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return formatWeekday(day, today)
 }
 
 /** A row's time lane: `09:30–10:00`. */
 export function timeSpan(startsAt: string, endsAt: string): string {
-  return `${clock(startsAt)}–${clock(endsAt)}`
+  return `${formatTime(startsAt)}–${formatTime(endsAt)}`
 }
 
-/** The dialog head's context: `Tue 10-14 · 09:30–10:00`. */
-export function meetingWhen(startsAt: string, endsAt: string): string {
-  return `${weekdayDate(isoDay(new Date(startsAt)))} · ${timeSpan(startsAt, endsAt)}`
+/** The dialog head's context: `Tue 14 Oct · 09:30–10:00`. */
+export function meetingWhen(
+  startsAt: string,
+  endsAt: string,
+  today: string,
+): string {
+  return `${formatWeekday(startsAt, today)} · ${timeSpan(startsAt, endsAt)}`
 }
 
 /** The RSVP mark printed after a name. Shown, never edited. */
