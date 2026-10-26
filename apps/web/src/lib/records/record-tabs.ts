@@ -6,10 +6,11 @@ import { notesCounts } from '#/lib/notes/notes-filter'
 import type { NoteLanes, NotesFilter } from '#/lib/notes/notes-filter'
 
 /**
- * A record body's tabs: Notes · Interactions · Files · History. There
- * is no Context tab — Ask's answer card carries the sources.
+ * A record body's tabs: Overview · Notes · Interactions · Files · History.
+ * There is no Context tab — Ask's answer card carries the sources.
  */
 export const RECORD_TABS = [
+  'overview',
   'notes',
   'interactions',
   'files',
@@ -17,8 +18,11 @@ export const RECORD_TABS = [
 ] as const
 export type RecordTab = (typeof RECORD_TABS)[number]
 
-/** A record opens on Notes. */
-export const DEFAULT_RECORD_TAB: RecordTab = 'notes'
+/** The tabs that carry a count: every one but Overview. */
+export type CountedRecordTab = Exclude<RecordTab, 'overview'>
+
+/** A record opens on Overview, every time: no tab is remembered per kind. */
+export const DEFAULT_RECORD_TAB: RecordTab = 'overview'
 
 /**
  * `?tab=` deep-links a tab; anything else reads as no tab. `?modal=` opens a
@@ -38,17 +42,9 @@ export function linkedRecordTab(search: {
   return search.modal === undefined ? undefined : 'interactions'
 }
 
-export function isRecordTab(value: string | null): value is RecordTab {
-  return value !== null && RECORD_TABS.some((t) => t === value)
-}
-
-/** The tab to show: the link's, else the one last used here, else Notes. */
-export function openRecordTab(
-  linked: RecordTab | undefined,
-  remembered: string | null,
-): RecordTab {
-  if (linked !== undefined) return linked
-  return isRecordTab(remembered) ? remembered : DEFAULT_RECORD_TAB
+/** The tab to show: the link's, else Overview. */
+export function openRecordTab(linked: RecordTab | undefined): RecordTab {
+  return linked ?? DEFAULT_RECORD_TAB
 }
 
 type TimelineRow =
@@ -71,7 +67,7 @@ export function recordTabCounts({
   documents: ReadonlyArray<unknown>
   notesFilter?: NotesFilter
   interactionFilter?: InteractionFilter
-}): Record<RecordTab, number> {
+}): Record<CountedRecordTab, number> {
   const interactions = timeline.filter((i) => i.type === 'interaction')
   return {
     notes: notesCounts(notes)[notesFilter],

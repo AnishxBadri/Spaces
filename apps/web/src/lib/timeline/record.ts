@@ -4,10 +4,13 @@ import type { SQL } from 'drizzle-orm'
 import { condenseBursts } from '@spaces/core/timeline/bursts'
 import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
+import { normalizeEmail } from '@spaces/sdk/identity'
 import {
+  accountConnection,
   attributeEvent,
   document,
   entity,
+  entityAlias,
   integration,
   interaction,
   interactionDocument,
@@ -163,6 +166,7 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           // The write-up, when there is one. Null is the ordinary case — a
           // meeting logged in twenty seconds has no body.
           noteId: interaction.noteId,
+          threadId: interaction.threadId,
           sourceRef: interaction.sourceRef,
           meta: interaction.meta,
           hasAttachments: hasAttachmentsSql(),
@@ -322,15 +326,25 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
       ),
     )
 
+    // The viewer's own addresses and the people records they are: a row
+    // never lists its viewer among its people, and an email from one of
+    // them is a sent row.
+    const own = myInteractions.length > 0 ? yield* viewerSelf(viewer.id) : null
+
     const attendeesBy = new Map<
       string,
-      Array<{ id: string; name: string; kind: string }>
+      Array<{ id: string; name: string; kind: string; self: boolean }>
     >()
     for (const a of attendees) {
       if (a.entityId === entityId) continue
       attendeesBy.set(a.interactionId, [
         ...(attendeesBy.get(a.interactionId) ?? []),
-        { id: a.entityId, name: a.name, kind: a.kind },
+        {
+          id: a.entityId,
+          name: a.name,
+          kind: a.kind,
+          self: own?.people.has(a.entityId) ?? false,
+        },
       ])
     }
 
@@ -383,6 +397,10 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           kind: i.kind,
           subject: i.subject ?? '',
           noteId: privateBody ? null : i.noteId,
+          /** The mailbox's thread; null for a row that stands alone. */
+          threadId: i.threadId,
+          /** An email the viewer sent: its row reads `To <name>`. */
+          sent: own !== null && sentBy(i.meta, own.addresses),
           /** The write-up exists and is private to someone else. */
           privateBody,
           /** The write-up is the viewer's own and private by default. */
@@ -422,6 +440,62 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
     return items.slice(0, 60)
   },
 )
+
+/**
+ * Who the viewer is in the graph: their addresses (the login and every
+ * connected mailbox), normalized, and the person records holding one of
+ * them as an email alias.
+ */
+const viewerSelf = Effect.fn('viewerSelf')(function* (viewerId: string) {
+  const login = yield* query(() =>
+    db.select({ email: user.email }).from(user).where(eq(user.id, viewerId)),
+  )
+  const mailboxes = yield* query(() =>
+    db
+      .select({ email: accountConnection.externalEmail })
+      .from(accountConnection)
+      .where(eq(accountConnection.userId, viewerId)),
+  )
+  const addresses = new Set(
+    [...login, ...mailboxes].flatMap((r) => {
+      const norm = normalizeEmail(r.email)
+      return norm === null ? [] : [norm]
+    }),
+  )
+  const people =
+    addresses.size === 0
+      ? []
+      : yield* query(() =>
+          db
+            .select({ id: entityAlias.entityId })
+            .from(entityAlias)
+            .innerJoin(entity, eq(entity.id, entityAlias.entityId))
+            .where(
+              and(
+                eq(entityAlias.kind, 'email'),
+                inArray(entityAlias.valueNorm, [...addresses]),
+                eq(entity.kind, 'person'),
+              ),
+            ),
+        )
+  return { addresses, people: new Set(people.map((p) => p.id)) }
+})
+
+/** Whether an email came from one of the viewer's own addresses. */
+export function sentBy(
+  meta: InteractionMeta | null,
+  addresses: ReadonlySet<string>,
+): boolean {
+  if (meta?.kind !== 'email') return false
+  const from = normalizeEmail(fromAddress(meta.from))
+  return from !== null && addresses.has(from)
+}
+
+/** The address inside a `From` header: `Ana <ana@x.com>` → `ana@x.com`. */
+function fromAddress(header: string): string {
+  const angled = /<([^>]+)>/.exec(header)
+  return (angled?.[1] ?? header).trim()
+}
 
 /**
  * Whether an interaction carries an attachment: the "has attachments" filter,

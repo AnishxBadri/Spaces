@@ -13,8 +13,8 @@ import { RailField } from '#/components/attributes/rail-field'
 import { AiCellsProvider } from '#/components/attributes/ai-cell'
 import {
   PropertyGrid,
-  RailItem,
-  RailSection,
+  RailGroup,
+  RailGroupRow,
   RecordBody,
   RecordHeadPending,
   RecordHeader,
@@ -30,6 +30,7 @@ import {
 } from '#/components/record/relation-section'
 import { RecordSpacesSection } from '#/components/record/spaces-section'
 import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
+import { RecordOverview } from '#/components/record/record-overview'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordHistory, RecordInteractions } from '#/components/record-timeline'
@@ -40,7 +41,6 @@ import {
   LogComposerRow,
   LogInteractionDialog,
 } from '#/components/log-interaction-dialog'
-import { TasksRail } from '#/components/tasks-rail'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { objectIcon } from '#/lib/object-icons'
 import { recordPath } from '#/lib/record-path'
@@ -55,13 +55,13 @@ import {
 import { openModalId } from '#/lib/modal-search'
 import { MeetingDialog } from '#/components/meeting-dialog'
 import {
-  countOpenSuggestions,
   createNote,
   getObjectRecord,
   getRecordTimeline,
   listRecordDocuments,
   listRecordDuplicates,
   getEntitySensitivity,
+  listOpenSuggestionTitles,
   listRecordNotes,
   listRegistry,
   listSpaces,
@@ -109,7 +109,7 @@ export const Route = createFileRoute('/_app/o_/$objectSlug/$recordId')({
       // A custom record is an entity like any other, so the lanes need only
       // its id — the object slug is the page's, never the note row's.
       listRecordNotes({ data: { entityId: record.id } }),
-      countOpenSuggestions({ data: { entityId: record.id } }),
+      listOpenSuggestionTitles({ data: { entityId: record.id } }),
       getEntitySensitivity({ data: { entityId: record.id } }),
       listRecordDuplicates({ data: { entityId: record.id } }),
     ])
@@ -148,7 +148,6 @@ function ObjectRecordPage() {
   const go = Route.useNavigate()
   const search = Route.useSearch()
   const [tab, changeTab] = useRecordTab(
-    `o:${record.object.slug}`,
     linkedRecordTab(search),
     (next) =>
       void go({ search: { tab: next }, replace: true, resetScroll: false }),
@@ -227,32 +226,12 @@ function ObjectRecordPage() {
             }}
           />
         }
-        readouts={[
-          {
-            label: 'Last contact',
-            value: readoutDay(
-              record.readouts.lastContact,
-              record.readouts.today,
-            ),
-          },
-          {
-            label: 'Next meeting',
-            value: readoutDay(
-              record.readouts.nextMeeting,
-              record.readouts.today,
-            ),
-          },
-          {
-            label: 'Moving, 30 days',
-            value: `${record.readouts.moving30}`,
-            tone: record.readouts.moving30 === 0 ? 'muted' : undefined,
-          },
-        ]}
       />
 
       <RecordNotices recordId={record.id} duplicates={duplicates} />
 
       <RecordBody
+        groups
         details={
           <>
             <AiCellsProvider entityIds={[record.id]} registry={registry}>
@@ -290,21 +269,19 @@ function ObjectRecordPage() {
                       }}
                     />
                   )}
-                  add={(trigger) => (
+                  create={(opener) => (
                     <AttributeDialog
                       mode="create"
                       objectId={record.object.id}
                       objectLabel={record.object.singular}
                       objectPlural={record.object.plural}
                       onSaved={() => router.invalidate()}
-                      trigger={trigger}
+                      {...opener}
                     />
                   )}
                 />
               </PropertyGrid>
             </AiCellsProvider>
-
-            <WaitingRail entityId={record.id} counts={waiting} />
 
             {/* Each relationship, either half, through the resolver. */}
             <RelationSections
@@ -321,10 +298,10 @@ function ObjectRecordPage() {
             {/* The records that point here outside any relationship, one
                 section per referring object and attribute. */}
             {record.referencedBy.map((group) => (
-              <RailSection
+              <RailGroup
                 key={`${group.label}:${group.attrSlug}`}
                 label={group.label}
-                meta={`${group.items.length} via ${group.via.toLowerCase()}`}
+                count={`${group.items.length} via ${group.via.toLowerCase()}`}
               >
                 {group.items.map((item) => {
                   const href = recordPath({
@@ -333,7 +310,7 @@ function ObjectRecordPage() {
                     objectSlug: item.objectSlug,
                   })
                   return (
-                    <RailItem key={item.id}>
+                    <RailGroupRow key={item.id}>
                       {href ? (
                         <Link
                           to={href}
@@ -346,10 +323,10 @@ function ObjectRecordPage() {
                           {item.name}
                         </span>
                       )}
-                    </RailItem>
+                    </RailGroupRow>
                   )
                 })}
-              </RailSection>
+              </RailGroup>
             ))}
 
             <RecordSpacesSection
@@ -358,12 +335,7 @@ function ObjectRecordPage() {
               allSpaces={allSpaces}
             />
 
-            <TasksRail
-              entityId={record.id}
-              entityName={record.name}
-              entityKind="custom"
-              composer="row"
-            />
+            <WaitingRail entityId={record.id} waiting={waiting} />
           </>
         }
       >
@@ -379,6 +351,48 @@ function ObjectRecordPage() {
             interactionFilter,
           })}
           panels={{
+            overview: (
+              <RecordOverview
+                record={{ id: record.id, name: record.name, kind: 'custom' }}
+                readouts={[
+                  {
+                    label: 'Last contact',
+                    value: readoutDay(
+                      record.readouts.lastContact,
+                      record.readouts.today,
+                    ),
+                  },
+                  {
+                    label: 'Next meeting',
+                    value: readoutDay(
+                      record.readouts.nextMeeting,
+                      record.readouts.today,
+                    ),
+                  },
+                  {
+                    label: 'Moving, 30 days',
+                    value: record.readouts.moving30,
+                  },
+                ]}
+                timeline={timeline}
+                documents={documents}
+                onTab={changeTab}
+                logInteraction={
+                  logs
+                    ? (trigger) => (
+                        <LogInteractionDialog
+                          seed={{
+                            id: record.id,
+                            name: record.name,
+                            kind: 'custom',
+                          }}
+                          trigger={trigger}
+                        />
+                      )
+                    : undefined
+                }
+              />
+            ),
             notes: (
               <RecordNotes
                 notes={notes}

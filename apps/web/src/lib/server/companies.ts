@@ -172,6 +172,24 @@ export const getCompany = createServerFn()
               .where(inArray(entity.id, dealIds))
           ).map((d) => [d.id, jsonString(d.values.stage)]),
     )
+    // The role on each Team row: the person's job title.
+    const teamIds =
+      relations
+        .find((h) => h.derived && h.slug === 'team')
+        ?.items.map((i) => i.id) ?? []
+    const teamRoles: Record<string, string> = Object.fromEntries(
+      teamIds.length === 0
+        ? []
+        : (
+            await db
+              .select({ id: entity.id, values: entity.values })
+              .from(entity)
+              .where(inArray(entity.id, teamIds))
+          ).flatMap((p) => {
+            const role = jsonString(p.values.job_title)
+            return role === null || role === '' ? [] : [[p.id, role]]
+          }),
+    )
     // Names for this company's own reference values (`founders`).
     const referenced = await db
       .select({ id: entity.id, name: entity.canonicalName })
@@ -216,6 +234,7 @@ export const getCompany = createServerFn()
       spaces,
       relations,
       dealStages,
+      teamRoles,
       refNames,
       readouts,
       timeline: timeline.map((t) => ({ ...t, at: t.at.toISOString() })),

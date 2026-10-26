@@ -12,7 +12,6 @@ import { RailField } from '#/components/attributes/rail-field'
 import { AiCellsProvider } from '#/components/attributes/ai-cell'
 import { OptionChip } from '#/components/attributes/value-editor'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
-import { TasksRail } from '#/components/tasks-rail'
 import { MoveStageDialog } from '#/components/deal-board'
 import {
   LogComposerRow,
@@ -21,7 +20,7 @@ import {
 import {
   DitherMark,
   InitialsMark,
-  RailSection,
+  RailGroup,
   RecordBody,
   RecordHeadPending,
   RecordHeader,
@@ -34,7 +33,7 @@ import {
 } from '#/components/record/record-heads'
 import { RecordNotices } from '#/components/record/record-notices'
 import { sensitiveStamp } from '#/components/sensitive-toggle'
-import { DetailsPickRow } from '#/components/record/details-add'
+import { PickPopover } from '#/components/record/details-add'
 import {
   RelationSection,
   RelationSections,
@@ -44,6 +43,7 @@ import {
 import { PropertyFold } from '#/components/record/property-fold'
 import { RecordSpacesSection } from '#/components/record/spaces-section'
 import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
+import { RecordOverview } from '#/components/record/record-overview'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordHistory, RecordInteractions } from '#/components/record-timeline'
@@ -63,7 +63,6 @@ import {
 import { openModalId } from '#/lib/modal-search'
 import { MeetingDialog } from '#/components/meeting-dialog'
 import {
-  countOpenSuggestions,
   createNote,
   getDeal,
   getRecordTimeline,
@@ -71,6 +70,7 @@ import {
   listRecordDocuments,
   listRecordDuplicates,
   getEntitySensitivity,
+  listOpenSuggestionTitles,
   listRecordNotes,
   listRegistry,
   listSpaces,
@@ -105,7 +105,7 @@ export const Route = createFileRoute('/_app/deals_/$dealId')({
       getRecordTimeline({ data: { entityId: params.dealId } }),
       listRecordDocuments({ data: { entityId: params.dealId } }),
       listRecordNotes({ data: { entityId: params.dealId } }),
-      countOpenSuggestions({ data: { entityId: params.dealId } }),
+      listOpenSuggestionTitles({ data: { entityId: params.dealId } }),
       getEntitySensitivity({ data: { entityId: params.dealId } }),
       listRecordActions({ data: { kind: 'deal' } }),
       listRecordDuplicates({ data: { entityId: params.dealId } }),
@@ -152,7 +152,6 @@ function DealRecordPage() {
   const go = Route.useNavigate()
   const search = Route.useSearch()
   const [tab, changeTab] = useRecordTab(
-    'deal',
     linkedRecordTab(search),
     (next) =>
       void go({ search: { tab: next }, replace: true, resetScroll: false }),
@@ -322,45 +321,12 @@ function DealRecordPage() {
             ) : null}
           </>
         }
-        readouts={[
-          {
-            label: 'Our check',
-            value:
-              ourCheck !== null && Number.isFinite(ourCheck)
-                ? fmtMoney(ourCheck, valueCode)
-                : '—',
-            tone: ourCheck === null ? 'muted' : undefined,
-          },
-          {
-            label: 'Round',
-            value: readoutRound(readouts.round),
-          },
-          {
-            label: 'Close',
-            value: readoutDay(closeDate, readouts.today),
-            tone:
-              closeDate !== null && closeDate < readouts.today
-                ? 'bad'
-                : undefined,
-          },
-          {
-            label: 'Days in stage',
-            value:
-              readouts.medianDaysInStage === null
-                ? `${daysInStage}`
-                : `${daysInStage} · med ${Math.round(readouts.medianDaysInStage)}`,
-            tone: readouts.pastTwiceMedian ? 'bad' : undefined,
-          },
-          {
-            label: 'Last contact',
-            value: readoutDay(readouts.lastContact, readouts.today),
-          },
-        ]}
       />
 
       <RecordNotices recordId={deal.id} duplicates={duplicates} />
 
       <RecordBody
+        groups
         details={
           <>
             <AiCellsProvider entityIds={[deal.id]} registry={registry}>
@@ -387,66 +353,70 @@ function DealRecordPage() {
                       }}
                     />
                   )}
-                  add={(trigger) => (
+                  create={(opener) => (
                     <AttributeCreateDialog
                       objectKind="deal"
                       onCreated={() => router.invalidate()}
-                      trigger={trigger}
+                      {...opener}
                     />
                   )}
                 />
               </PropertyGrid>
             </AiCellsProvider>
 
-            <RailSection
+            <RailGroup
               label="Pipeline"
-              meta={
+              count={
                 stageOption
                   ? `${Math.max(1, liveStages.findIndex((o) => o.id === stageOption.id) + 1)} of ${liveStages.length}`
                   : undefined
               }
             >
-              <StageStepper
-                stages={liveStages}
-                currentId={stageOption?.id ?? null}
-                days={daysInStage}
-                median={
-                  readouts.medianDaysInStage === null
-                    ? null
-                    : Math.round(readouts.medianDaysInStage)
-                }
-              />
-            </RailSection>
-
-            <WaitingRail entityId={deal.id} counts={waiting} />
+              <li className="py-2.5">
+                <StageStepper
+                  stages={liveStages}
+                  currentId={stageOption?.id ?? null}
+                  days={daysInStage}
+                  median={
+                    readouts.medianDaysInStage === null
+                      ? null
+                      : Math.round(readouts.medianDaysInStage)
+                  }
+                />
+              </li>
+            </RailGroup>
 
             <RelationSection
               label="Company"
               rows={company}
               mark={() => <DitherMark size={14} />}
-            >
-              {company.length === 0 ? (
-                <DetailsPickRow
-                  label="Add the company…"
-                  placeholder="Company name…"
-                  search={searchCompanies}
-                  onPick={(hit) => save({ company: hit.id })}
-                />
-              ) : null}
-            </RelationSection>
+              add={
+                company.length === 0
+                  ? (trigger) => (
+                      <PickPopover
+                        trigger={trigger}
+                        placeholder="Add the company…"
+                        search={searchCompanies}
+                        onPick={(hit) => save({ company: hit.id })}
+                      />
+                    )
+                  : undefined
+              }
+            />
 
             <RelationSection
               label="People"
               rows={people}
               mark={(p) => <InitialsMark name={p.name} />}
-            >
-              <DetailsPickRow
-                label="Add a person…"
-                placeholder="Person name…"
-                search={searchPeople}
-                onPick={(hit) => save({ people: [...peopleIds, hit.id] })}
-              />
-            </RelationSection>
+              add={(trigger) => (
+                <PickPopover
+                  trigger={trigger}
+                  placeholder="Add a person…"
+                  search={searchPeople}
+                  onPick={(hit) => save({ people: [...peopleIds, hit.id] })}
+                />
+              )}
+            />
 
             <RelationSections
               defs={registry}
@@ -461,12 +431,7 @@ function DealRecordPage() {
               allSpaces={allSpaces}
             />
 
-            <TasksRail
-              entityId={deal.id}
-              entityName={deal.name}
-              entityKind="deal"
-              composer="row"
-            />
+            <WaitingRail entityId={deal.id} waiting={waiting} />
           </>
         }
       >
@@ -482,6 +447,50 @@ function DealRecordPage() {
             interactionFilter,
           })}
           panels={{
+            overview: (
+              <RecordOverview
+                record={{ id: deal.id, name: deal.name, kind: 'deal' }}
+                readouts={[
+                  {
+                    label: 'Our check',
+                    value:
+                      ourCheck !== null && Number.isFinite(ourCheck)
+                        ? fmtMoney(ourCheck, valueCode)
+                        : null,
+                  },
+                  { label: 'Round', value: readoutRound(readouts.round) },
+                  {
+                    label: 'Close',
+                    value: readoutDay(closeDate, readouts.today),
+                    tone:
+                      closeDate !== null && closeDate < readouts.today
+                        ? 'bad'
+                        : undefined,
+                  },
+                  {
+                    label: 'Days in stage',
+                    value:
+                      readouts.medianDaysInStage === null
+                        ? daysInStage
+                        : `${daysInStage} · med ${Math.round(readouts.medianDaysInStage)}`,
+                    tone: readouts.pastTwiceMedian ? 'bad' : undefined,
+                  },
+                  {
+                    label: 'Last contact',
+                    value: readoutDay(readouts.lastContact, readouts.today),
+                  },
+                ]}
+                timeline={timeline}
+                documents={documents}
+                onTab={changeTab}
+                logInteraction={(trigger) => (
+                  <LogInteractionDialog
+                    seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
+                    trigger={trigger}
+                  />
+                )}
+              />
+            ),
             notes: (
               <RecordNotes
                 notes={notes}

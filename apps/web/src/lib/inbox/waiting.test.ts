@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 /**
- * The record rail's "Waiting" lane and the inbox it links into: open
- * suggestions counted per kind on one record in one query, rejected ones gone
- * for good, and `listInboxProgram` narrowed to one record across both lanes.
+ * The record rail's Waiting group and the inbox it links into: open
+ * suggestions on one record counted and titled, rejected ones gone for
+ * good, and `listInboxProgram` narrowed to one record across both lanes.
  * The test database is truncated and reseeded before the file, so there is
  * no cleanup here.
  */
@@ -112,54 +112,53 @@ async function world() {
 let fixture: Awaited<ReturnType<typeof world>> | undefined
 const setup = async () => (fixture ??= await world())
 
-describe('countOpenSuggestionsProgram — the rail lane', () => {
-  it('groups one record’s open suggestions by kind, in the enum’s order', async () => {
+describe('listOpenSuggestionTitlesProgram — the rail’s Waiting rows', () => {
+  it('counts one record’s open suggestions and titles the newest, a patch by its attribute’s name', async () => {
     const { Effect } = await import('effect')
-    const { countOpenSuggestionsProgram } = await import('./queue')
+    const { listOpenSuggestionTitlesProgram } = await import('./queue')
     const f = await setup()
 
-    expect(
-      await Effect.runPromise(countOpenSuggestionsProgram(f.acme)),
-    ).toEqual([
-      { kind: 'attribute_patch', count: 2 },
-      { kind: 'note', count: 1 },
+    const acme = await Effect.runPromise(
+      listOpenSuggestionTitlesProgram(f.acme),
+    )
+    expect(acme.count).toBe(3)
+    expect(acme.items.map((i) => [i.id, i.title])).toEqual([
+      [f.acmeNote, 'Met at demo day'],
+      [f.acmeLocation, 'Location'],
+      [f.acmeFounded, 'Founded'],
     ])
-    // Another record's suggestions never leak into this one's count.
     expect(
-      await Effect.runPromise(countOpenSuggestionsProgram(f.bolt)),
-    ).toEqual([{ kind: 'attribute_patch', count: 1 }])
+      await Effect.runPromise(listOpenSuggestionTitlesProgram(f.idle)),
+    ).toEqual({ count: 0, items: [] })
   })
+})
 
-  it('answers an empty array — no zero rows — for a record with nothing waiting', async () => {
+describe('listOpenSuggestionTitlesProgram — what the count leaves out', () => {
+  const countOf = async (entityId: string) => {
     const { Effect } = await import('effect')
-    const { countOpenSuggestionsProgram } = await import('./queue')
-    const f = await setup()
+    const { listOpenSuggestionTitlesProgram } = await import('./queue')
+    return (await Effect.runPromise(listOpenSuggestionTitlesProgram(entityId)))
+      .count
+  }
 
-    expect(
-      await Effect.runPromise(countOpenSuggestionsProgram(f.idle)),
-    ).toEqual([])
+  it('never counts another record’s suggestions', async () => {
+    const f = await setup()
+    expect(await countOf(f.bolt)).toBe(1)
   })
 
   it('never counts a rejected suggestion again', async () => {
     const { Effect } = await import('effect')
-    const { countOpenSuggestionsProgram } = await import('./queue')
     const { rejectProgram } = await import('#/lib/ai/propose')
     const f = await setup()
 
     await Effect.runPromise(
       rejectProgram(f.acmeNote, { type: 'user', id: f.me }),
     )
-    expect(
-      await Effect.runPromise(countOpenSuggestionsProgram(f.acme)),
-    ).toEqual([{ kind: 'attribute_patch', count: 2 }])
-
-    // Rejecting the kind's last member drops the kind, not to zero but out.
+    expect(await countOf(f.acme)).toBe(2)
     await Effect.runPromise(
       rejectProgram(f.boltLocation, { type: 'user', id: f.me }),
     )
-    expect(
-      await Effect.runPromise(countOpenSuggestionsProgram(f.bolt)),
-    ).toEqual([])
+    expect(await countOf(f.bolt)).toBe(0)
   })
 })
 

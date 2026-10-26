@@ -12,6 +12,8 @@ import {
   DetailsAddRow,
   PropertyCell,
   PropertyGrid,
+  RailGroup,
+  RailGroupRow,
   RailSection,
   RecordBody,
   StageStepper,
@@ -19,10 +21,10 @@ import {
 import { RecordTabs } from './record-tabs.tsx'
 
 /**
- * A record's body: the 320px details column on bone left —
- * the property grid as label–value rows, then the relationship sections —
- * and the tab head over one view right, every tab that holds something
- * counted and an empty one graphite with none.
+ * A record's body: the 300px rail on bone left — the property grid as
+ * label–value rows, then the relationship groups — and the tab head over
+ * one view right: Overview first and uncounted, every other tab that holds
+ * something counted and an empty one graphite with none.
  */
 
 const win = new Window()
@@ -38,19 +40,19 @@ const classes = (el: { className: string } | null) =>
 
 const counts = { notes: 2, interactions: 1, files: 0, history: 7 }
 
-function record(tab: 'notes' | 'files' = 'notes') {
+function record(tab: 'overview' | 'notes' | 'files' = 'notes') {
   return render(
     <RecordBody
+      groups
       details={
         <>
           <PropertyGrid>
             <PropertyCell label="Founded">2019</PropertyCell>
             <PropertyCell label="Business model">B2B</PropertyCell>
           </PropertyGrid>
-          <RailSection label="Team" meta="1">
-            <span>Ishaan</span>
-            <DetailsAddRow>Add a person…</DetailsAddRow>
-          </RailSection>
+          <RailGroup label="Team" count={1} add={(trigger) => trigger}>
+            <RailGroupRow>Ishaan</RailGroupRow>
+          </RailGroup>
         </>
       }
     >
@@ -60,6 +62,7 @@ function record(tab: 'notes' | 'files' = 'notes') {
         counts={counts}
         onTabChange={() => {}}
         panels={{
+          overview: <p data-panel="overview">Overview</p>,
           notes: <p data-panel="notes">Notes</p>,
           interactions: <p data-panel="interactions">Interactions</p>,
           files: <p data-panel="files">Files</p>,
@@ -71,7 +74,7 @@ function record(tab: 'notes' | 'files' = 'notes') {
 }
 
 describe('the details slot', () => {
-  it('is the one column beside the view: 320px of bone on the left', () => {
+  it('is the one column beside the view: 300px of bone on the left', () => {
     const doc = record()
     const body = doc.querySelector('[data-record-body="details"]')
     const asides = doc.querySelectorAll('aside')
@@ -79,7 +82,14 @@ describe('the details slot', () => {
     const details = doc.querySelector('aside[aria-label="Details"]')
     expect(details).not.toBeNull()
     expect(classes(details)).toEqual(
-      expect.arrayContaining(['bg-bone', 'xl:w-80', 'xl:border-r']),
+      expect.arrayContaining([
+        'bg-bone',
+        'xl:w-75',
+        'p-3',
+        'gap-3',
+        'xl:border-r',
+        'border-hairline',
+      ]),
     )
     // Details first, then the view taking the rest.
     expect(body?.firstElementChild).toBe(details)
@@ -146,23 +156,65 @@ describe('the details slot', () => {
     expect(section?.textContent).toBe('Spaces+')
   })
 
-  it('ends a relationship section on its + composer row', () => {
+  it('heads a relationship group in sans graphite with its + at the right, rows on rules', () => {
     const doc = record()
-    const section = doc.querySelector('aside section')
-    expect(section?.querySelector('h2')?.textContent).toBe('Team')
-    const add = section?.lastElementChild
-    expect(add?.tagName).toBe('BUTTON')
-    expect(add?.textContent).toBe('+Add a person…')
+    const section = doc.querySelector('aside section[aria-label="Team"]')
+    const head = section?.querySelector('h2') ?? null
+    expect(head?.textContent).toBe('Team')
+    expect(classes(head)).toEqual(
+      expect.arrayContaining(['text-ui', 'text-graphite']),
+    )
+    const plus = section?.querySelector('button[aria-label="Add to Team"]')
+    expect(plus?.textContent).toBe('+')
+    const row = section?.querySelector('li') ?? null
+    expect(row?.textContent).toBe('Ishaan')
+    expect(classes(row)).toEqual(
+      expect.arrayContaining(['border-b', 'border-rule', 'text-foreground']),
+    )
+  })
+
+  it('draws an empty group as its one Name + row, and nothing with nothing to add', () => {
+    const doc = render(
+      <>
+        <RailGroup label="Spaces" count={0} empty add={(trigger) => trigger} />
+        <RailGroup label="Waiting" count={0} empty />
+      </>,
+    )
+    const sections = doc.querySelectorAll('section')
+    expect(sections).toHaveLength(1)
+    expect(sections[0].textContent).toBe('Spaces+')
+    expect(sections[0].querySelector('[data-empty-row]')).not.toBeNull()
+    expect(doc.body.textContent).not.toMatch(/0/)
+  })
+
+  it('hints the edit keys under the grid only while a cell has the caret', () => {
+    const hint = record().querySelector('[data-edit-hint]')
+    expect(hint?.textContent).toBe('↵ save   esc revert   ⇥ next cell')
+    expect(classes(hint)).toEqual(
+      expect.arrayContaining([
+        'hidden',
+        'group-has-[:is(input,textarea):focus]/grid:block',
+      ]),
+    )
   })
 })
 
 describe('the tab head', () => {
-  it('shows the four tabs with their counts, and no Context', () => {
+  it('shows Overview first and uncounted, then the four tabs with their counts, and no Context', () => {
     const doc = record()
     const tabs = Array.from(doc.querySelectorAll('[role="tab"]')).map(
       (t) => t.textContent,
     )
-    expect(tabs).toEqual(['Notes2', 'Interactions1', 'Files', 'History7'])
+    expect(tabs).toEqual([
+      'Overview',
+      'Notes2',
+      'Interactions1',
+      'Files',
+      'History7',
+    ])
+    const overview = doc.querySelector('[role="tab"]')
+    expect(overview?.hasAttribute('data-empty')).toBe(false)
+    expect(classes(overview)).toContain('text-foreground')
     expect(doc.body.textContent).not.toMatch(/Context/)
     const list = doc.querySelector('[role="tablist"]')
     expect(classes(list)).toEqual(
@@ -172,11 +224,11 @@ describe('the tab head', () => {
 
   it('draws an empty tab graphite with no count, a closed tab with content in ink', () => {
     const tabs = Array.from(record().querySelectorAll('[role="tab"]'))
-    const files = tabs.at(2) ?? null
+    const files = tabs.at(3) ?? null
     expect(files?.hasAttribute('data-empty')).toBe(true)
     expect(classes(files)).toContain('text-graphite')
     expect(classes(files)).not.toContain('opacity-50')
-    const history = tabs.at(3) ?? null
+    const history = tabs.at(4) ?? null
     expect(history?.getAttribute('aria-selected')).toBe('false')
     expect(classes(history)).toContain('text-foreground')
     expect(classes(history)).not.toContain('text-graphite')
@@ -199,11 +251,12 @@ describe('which tab opens', () => {
     expect(recordSearch.parse({})).toEqual({})
   })
 
-  it('takes the link, else the last tab used here, else Notes', () => {
-    expect(openRecordTab('files', 'history')).toBe('files')
-    expect(openRecordTab(undefined, 'history')).toBe('history')
-    expect(openRecordTab(undefined, 'context')).toBe('notes')
-    expect(openRecordTab(undefined, null)).toBe('notes')
+  it('takes the link, else Overview — no tab is remembered per kind', () => {
+    expect(openRecordTab('files')).toBe('files')
+    expect(openRecordTab(undefined)).toBe('overview')
+    expect(recordSearch.parse({ tab: 'overview' })).toEqual({
+      tab: 'overview',
+    })
   })
 
   it('counts what each tab lists', () => {

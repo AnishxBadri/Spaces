@@ -22,7 +22,7 @@ import {
   integration,
   objectDef,
   suggestion,
-  suggestionKind,
+  attribute,
 } from '@spaces/db/schema'
 import type { AttributeOptions } from '@spaces/db/schema/attributes'
 import type { DuplicateReason } from '@spaces/db/schema/entities'
@@ -43,6 +43,7 @@ import { jsonRecord, jsonString } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
 import { entityContext } from './context'
 import { duplicateOf } from '../records/notices'
+import { waitingTitle } from './waiting-title'
 import type { RecordDuplicate } from '../records/notices'
 import { JUDGMENT, JUDGMENT_REF } from './review-groups'
 import type { InboxSide } from './context'
@@ -928,35 +929,136 @@ export const inboxFilterLabelsProgram = Effect.fn('inboxFilterLabelsProgram')(
   },
 )
 
-/** One kind of open suggestion on one record, and how many are waiting. */
-export type OpenSuggestionCount = { kind: SuggestionKind; count: number }
+/** How many waiting suggestions a record's rail lists by title. */
+const WAITING_LISTED = 5
 
-/** The enum's declared order — the order the rail draws its chips in. */
-const KIND_ORDER: ReadonlyArray<SuggestionKind> = suggestionKind.enumValues
+/** One open suggestion on a record, by the title its rail row reads. */
+export type WaitingSuggestion = {
+  id: string
+  kind: SuggestionKind
+  title: string
+}
 
 /**
- * The record rail's "Waiting" lane: open suggestions on one
- * record, grouped by kind, in one query — a record page calls it once from
- * its loader, never once per rail section. `GROUP BY` answers no row for a
- * kind with nothing open, so a record with nothing waiting is an empty
- * array, and the rail draws no section at all. Only `open` counts: a
- * rejected suggestion never comes back, as a dismissed pair never does.
+ * The record rail's Waiting group: how many suggestions are open on one
+ * record, and the newest few by title (`Founders from Apollo +3`), in two
+ * queries a record page's loader makes once. Only `open` counts: a rejected
+ * suggestion never comes back, as a dismissed pair never does. Accept and
+ * reject stay in Review; the rail only points there.
  */
-export const countOpenSuggestionsProgram = Effect.fn(
-  'countOpenSuggestionsProgram',
+export const listOpenSuggestionTitlesProgram = Effect.fn(
+  'listOpenSuggestionTitlesProgram',
 )(function* (
   entityId: string,
-): Effect.fn.Return<Array<OpenSuggestionCount>, InboxQueryFailed> {
+): Effect.fn.Return<
+  { count: number; items: Array<WaitingSuggestion> },
+  InboxQueryFailed
+> {
+  const open = and(
+    eq(suggestion.entityId, entityId),
+    eq(suggestion.status, 'open'),
+  )
+  const total =
+    (yield* query(() =>
+      db.select({ n: count() }).from(suggestion).where(open),
+    )).at(0)?.n ?? 0
+  if (total === 0) return { count: 0, items: [] }
   const rows = yield* query(() =>
     db
-      .select({ kind: suggestion.kind, count: count() })
+      .select({
+        id: suggestion.id,
+        kind: suggestion.kind,
+        payload: suggestion.payload,
+        proposedByType: suggestion.proposedByType,
+        proposedById: suggestion.proposedById,
+      })
       .from(suggestion)
-      .where(
-        and(eq(suggestion.entityId, entityId), eq(suggestion.status, 'open')),
-      )
-      .groupBy(suggestion.kind),
+      .where(open)
+      .orderBy(desc(suggestion.createdAt))
+      .limit(WAITING_LISTED),
   )
-  return rows
-    .filter((r) => r.count > 0)
-    .sort((x, y) => KIND_ORDER.indexOf(x.kind) - KIND_ORDER.indexOf(y.kind))
+
+  // A patch names its first attribute, read off the record's own object.
+  const slugs = [
+    ...new Set(
+      rows.flatMap((r) =>
+        r.kind === 'attribute_patch' ? Object.keys(jsonRecord(r.payload)) : [],
+      ),
+    ),
+  ]
+  const names =
+    slugs.length === 0
+      ? new Map<string, string>()
+      : yield* query(async () => {
+          const head = (
+            await db
+              .select({ kind: entity.kind, objectId: entity.objectId })
+              .from(entity)
+              .where(eq(entity.id, entityId))
+          ).at(0)
+          const core = head === undefined ? null : toObjectKind(head.kind)
+          const objectId =
+            head?.objectId ??
+            (core === null ? null : await objectIdForKindAsync(core))
+          if (objectId === null) return new Map<string, string>()
+          const defs = await db
+            .select({ slug: attribute.slug, name: attribute.name })
+            .from(attribute)
+            .where(
+              and(
+                eq(attribute.objectId, objectId),
+                inArray(attribute.slug, slugs),
+              ),
+            )
+          return new Map(defs.map((d) => [d.slug, d.name]))
+        })
+
+  // An integration's proposal says where it came from: `from Apollo`.
+  const integrationIds = [
+    ...new Set(
+      rows.flatMap((r) =>
+        r.proposedByType === 'integration' &&
+        r.proposedById !== null &&
+        UUID.test(r.proposedById)
+          ? [r.proposedById]
+          : [],
+      ),
+    ),
+  ]
+  const sources = new Map(
+    integrationIds.length === 0
+      ? []
+      : (yield* query(() =>
+          db
+            .select({
+              id: integration.id,
+              capabilityId: integration.capabilityId,
+              manifest: integration.manifest,
+            })
+            .from(integration)
+            .where(inArray(integration.id, integrationIds)),
+        )).map((i) => [
+          i.id,
+          jsonString(jsonRecord(i.manifest).name) ?? i.capabilityId,
+        ]),
+  )
+
+  return {
+    count: total,
+    items: rows.map((r) => ({
+      id: r.id,
+      kind: r.kind,
+      title: waitingTitle(
+        {
+          kind: r.kind,
+          payload: r.payload,
+          source:
+            r.proposedById === null
+              ? null
+              : (sources.get(r.proposedById) ?? null),
+        },
+        (slug) => names.get(slug) ?? slug,
+      ),
+    })),
+  }
 })

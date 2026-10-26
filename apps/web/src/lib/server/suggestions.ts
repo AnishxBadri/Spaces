@@ -14,21 +14,19 @@ import { requireUser } from './shared'
 
 const byId = z.object({ id: z.string().uuid() })
 
-export type { OpenSuggestionCount } from '../inbox/queue'
+export type { WaitingSuggestion } from '../inbox/queue'
 
 /**
- * Open suggestions on one record, grouped by kind — the record
- * rail's "Waiting" chips. One query, called once from each record route's
- * loader beside its other reads. Empty when nothing waits, and the rail then
- * draws no section at all.
+ * Open suggestions on one record by title — the record rail's Waiting
+ * section: the count, and the newest few as `Founders from Apollo +3`.
  */
-export const countOpenSuggestions = createServerFn()
+export const listOpenSuggestionTitles = createServerFn()
   .validator(z.object({ entityId: z.string().uuid() }))
   .handler(async ({ data }) => {
     await requireUser()
-    const { countOpenSuggestionsProgram } = await import('../inbox/queue')
+    const { listOpenSuggestionTitlesProgram } = await import('../inbox/queue')
     const { effectFn } = await import('./effect')
-    return effectFn(countOpenSuggestionsProgram)(data.entityId)
+    return effectFn(listOpenSuggestionTitlesProgram)(data.entityId)
   })
 
 export const acceptSuggestion = createServerFn({ method: 'POST' })

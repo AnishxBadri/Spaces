@@ -7,11 +7,9 @@ import {
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
-import { TasksRail } from '#/components/tasks-rail'
 import { RailField } from '#/components/attributes/rail-field'
 import { AiCellsProvider } from '#/components/attributes/ai-cell'
 import {
-  DetailsAddRow,
   DitherMark,
   InitialsMark,
   PropertyGrid,
@@ -22,7 +20,7 @@ import {
 import { RecordHeadActions } from '#/components/record/record-heads'
 import { RecordNotices } from '#/components/record/record-notices'
 import { sensitiveStamp } from '#/components/sensitive-toggle'
-import { DetailsPickRow } from '#/components/record/details-add'
+import { PickPopover } from '#/components/record/details-add'
 import {
   RelationSection,
   RelationSections,
@@ -32,10 +30,11 @@ import {
 import { PropertyFold } from '#/components/record/property-fold'
 import { RecordSpacesSection } from '#/components/record/spaces-section'
 import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
+import { RecordOverview } from '#/components/record/record-overview'
 import { RecordPicture } from '#/components/record/record-picture'
 import { OptionChip } from '#/components/attributes/value-editor'
 import { fmtPct } from '@spaces/core/portfolio/format'
-import { DASH, readoutDay } from '#/lib/records/readout-format'
+import { readoutDay } from '#/lib/records/readout-format'
 import {
   LogComposerRow,
   LogInteractionDialog,
@@ -58,7 +57,6 @@ import {
 import { openModalId } from '#/lib/modal-search'
 import { MeetingDialog } from '#/components/meeting-dialog'
 import {
-  countOpenSuggestions,
   createNote,
   getCompany,
   getRecordEnrichment,
@@ -67,6 +65,7 @@ import {
   listRecordActions,
   listRecordDocuments,
   listRecordDuplicates,
+  listOpenSuggestionTitles,
   listRecordNotes,
   listRegistry,
   listSpaces,
@@ -105,7 +104,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       getRecordTimeline({ data: { entityId: params.companyId } }),
       listRecordDocuments({ data: { entityId: params.companyId } }),
       listRecordNotes({ data: { entityId: params.companyId } }),
-      countOpenSuggestions({ data: { entityId: params.companyId } }),
+      listOpenSuggestionTitles({ data: { entityId: params.companyId } }),
       getEntitySensitivity({ data: { entityId: params.companyId } }),
       listRecordActions({ data: { kind: 'company' } }),
       getRecordEnrichment({
@@ -160,7 +159,6 @@ function CompanyRecordPage() {
   const go = Route.useNavigate()
   const search = Route.useSearch()
   const [tab, changeTab] = useRecordTab(
-    'company',
     linkedRecordTab(search),
     (next) =>
       void go({ search: { tab: next }, replace: true, resetScroll: false }),
@@ -231,35 +229,6 @@ function CompanyRecordPage() {
           />
         }
         name={company.name}
-        readouts={[
-          {
-            label: 'Last contact',
-            value: readoutDay(
-              company.readouts.lastContact,
-              company.readouts.today,
-            ),
-          },
-          {
-            label: 'Next meeting',
-            value: readoutDay(
-              company.readouts.nextMeeting,
-              company.readouts.today,
-            ),
-          },
-          {
-            label: 'Moving, 30 days',
-            value: `${company.readouts.moving30}`,
-            tone: company.readouts.moving30 === 0 ? 'muted' : undefined,
-          },
-          {
-            label: 'Ownership',
-            value: !company.readouts.ownership
-              ? DASH
-              : company.readouts.ownership.kind === 'implied'
-                ? `~${fmtPct(company.readouts.ownership.pct)}`
-                : fmtPct(company.readouts.ownership.pct),
-          },
-        ]}
       />
 
       <RecordNotices
@@ -269,6 +238,7 @@ function CompanyRecordPage() {
       />
 
       <RecordBody
+        groups
         details={
           <>
             <AiCellsProvider entityIds={[company.id]} registry={registry}>
@@ -303,40 +273,46 @@ function CompanyRecordPage() {
                       }}
                     />
                   )}
-                  add={(trigger) => (
+                  create={(opener) => (
                     <AttributeCreateDialog
                       objectKind="company"
                       onCreated={() => router.invalidate()}
-                      trigger={trigger}
+                      {...opener}
                     />
                   )}
                 />
               </PropertyGrid>
             </AiCellsProvider>
 
-            <WaitingRail entityId={company.id} counts={waiting} />
-
             <RelationSection
               label="Team"
               rows={team}
               mark={(p) => <InitialsMark name={p.name} outline />}
-            >
-              <DetailsPickRow
-                label="Add a person…"
-                placeholder="Person name…"
-                search={searchPeople}
-                onPick={async (hit) => {
-                  await setPersonCompany({
-                    data: {
-                      personId: hit.id,
-                      companyId: company.id,
-                      action: 'link',
-                    },
-                  })
-                  void router.invalidate()
-                }}
-              />
-            </RelationSection>
+              lane={(p) =>
+                p.id in company.teamRoles ? (
+                  <span className="truncate label-caps text-graphite">
+                    {company.teamRoles[p.id]}
+                  </span>
+                ) : null
+              }
+              add={(trigger) => (
+                <PickPopover
+                  trigger={trigger}
+                  placeholder="Add a person…"
+                  search={searchPeople}
+                  onPick={async (hit) => {
+                    await setPersonCompany({
+                      data: {
+                        personId: hit.id,
+                        companyId: company.id,
+                        action: 'link',
+                      },
+                    })
+                    void router.invalidate()
+                  }}
+                />
+              )}
+            />
 
             <RelationSection
               label="Associated deals"
@@ -347,13 +323,14 @@ function CompanyRecordPage() {
                   <OptionChip def={stageDef} id={stage} className="shrink-0" />
                 ) : null
               }}
-            >
-              <CreateDealDialog
-                registry={dealRegistry}
-                presetCompany={{ id: company.id, name: company.name }}
-                trigger={<DetailsAddRow>New deal…</DetailsAddRow>}
-              />
-            </RelationSection>
+              add={(trigger) => (
+                <CreateDealDialog
+                  registry={dealRegistry}
+                  presetCompany={{ id: company.id, name: company.name }}
+                  trigger={trigger}
+                />
+              )}
+            />
 
             <RelationSections
               defs={registry}
@@ -373,12 +350,7 @@ function CompanyRecordPage() {
               allSpaces={allSpaces}
             />
 
-            <TasksRail
-              entityId={company.id}
-              entityName={company.name}
-              entityKind="company"
-              composer="row"
-            />
+            <WaitingRail entityId={company.id} waiting={waiting} />
           </>
         }
       >
@@ -394,6 +366,52 @@ function CompanyRecordPage() {
             interactionFilter,
           })}
           panels={{
+            overview: (
+              <RecordOverview
+                record={{ id: company.id, name: company.name, kind: 'company' }}
+                readouts={[
+                  {
+                    label: 'Last contact',
+                    value: readoutDay(
+                      company.readouts.lastContact,
+                      company.readouts.today,
+                    ),
+                  },
+                  {
+                    label: 'Next meeting',
+                    value: readoutDay(
+                      company.readouts.nextMeeting,
+                      company.readouts.today,
+                    ),
+                  },
+                  {
+                    label: 'Moving, 30 days',
+                    value: company.readouts.moving30,
+                  },
+                  {
+                    label: 'Ownership',
+                    value: !company.readouts.ownership
+                      ? null
+                      : company.readouts.ownership.kind === 'implied'
+                        ? `~${fmtPct(company.readouts.ownership.pct)}`
+                        : fmtPct(company.readouts.ownership.pct),
+                  },
+                ]}
+                timeline={timeline}
+                documents={documents}
+                onTab={changeTab}
+                logInteraction={(trigger) => (
+                  <LogInteractionDialog
+                    seed={{
+                      id: company.id,
+                      name: company.name,
+                      kind: 'company',
+                    }}
+                    trigger={trigger}
+                  />
+                )}
+              />
+            ),
             notes: (
               <RecordNotes
                 notes={notes}

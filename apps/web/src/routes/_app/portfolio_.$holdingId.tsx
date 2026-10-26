@@ -8,6 +8,7 @@ import { useConfirm } from '#/components/ui/confirm-dialog'
 import {
   DitherMark,
   RailRow,
+  ReadoutStrip,
   RailSection,
   RecordBody,
   RecordHeadPending,
@@ -122,28 +123,6 @@ function HoldingPage() {
             </Badge>
           ) : null
         }
-        readouts={
-          m
-            ? [
-                { label: 'Invested', value: fmtMoney(m.costBasis, m.currency) },
-                {
-                  label: m.lastMarkDate
-                    ? `Value · marked ${formatDay(m.lastMarkDate, today)}`
-                    : 'Value · at cost, never marked',
-                  value: fmtMoney(m.unrealized, m.currency),
-                },
-                { label: 'Realized', value: fmtMoney(m.realized, m.currency) },
-                { label: 'MOIC', value: fmtMultiple(m.moic) },
-                { label: 'XIRR', value: fmtXirr(m.grossXirr) },
-              ]
-            : [
-                {
-                  label: 'Metrics',
-                  value: `need fx for ${missing.join(', ')}`,
-                  tone: 'bad',
-                },
-              ]
-        }
       />
 
       <RecordBody
@@ -153,6 +132,36 @@ function HoldingPage() {
           </RailSection>
         }
       >
+        <ReadoutStrip
+          readouts={
+            m
+              ? [
+                  {
+                    label: 'Invested',
+                    value: fmtMoney(m.costBasis, m.currency),
+                  },
+                  {
+                    label: m.lastMarkDate
+                      ? `Value · marked ${formatDay(m.lastMarkDate, today)}`
+                      : 'Value · at cost, never marked',
+                    value: fmtMoney(m.unrealized, m.currency),
+                  },
+                  {
+                    label: 'Realized',
+                    value: fmtMoney(m.realized, m.currency),
+                  },
+                  { label: 'MOIC', value: fmtMultiple(m.moic) },
+                  { label: 'XIRR', value: fmtXirr(m.grossXirr) },
+                ]
+              : [
+                  {
+                    label: 'Metrics',
+                    value: `need fx for ${missing.join(', ')}`,
+                    tone: 'bad',
+                  },
+                ]
+          }
+        />
         {missing.length > 0 ? (
           <p className="mono text-micro text-destructive">
             metrics need fx rates for {missing.join(', ')} —{' '}

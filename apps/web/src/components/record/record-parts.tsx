@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { createContext, useContext } from 'react'
-import type { ComponentProps, ReactNode } from 'react'
+import type { ComponentProps, ReactElement, ReactNode } from 'react'
 import { HeadActions, HeadBar, useHeadFold } from '#/components/head-fold'
 import { EmptyRow, SectionHead } from '#/components/ledger-section'
 import { Twinkle } from '#/components/twinkle'
@@ -13,10 +13,10 @@ import { cn } from '#/lib/utils'
  * the serif name, its suffix and badges with the actions bottom-aligned at
  * the right, the double rule under — no readout strip; scrolled past its
  * name it folds to `HeadBar`.
- * Body: `RecordBody details=…` — the 320px details column on bone left (the
- * property grid as label–value rows, then the relationship sections), the
- * tab head over one view right. Every part is markup only; the pages keep
- * their data and handlers.
+ * Body: `RecordBody details=… groups` — the 300px rail on bone left (the
+ * property grid as label–value rows, then the relationship groups), the
+ * tab head over one view right, Overview first. Every part is markup only;
+ * the pages keep their data and handlers.
  */
 
 /**
@@ -68,8 +68,6 @@ export function RecordHeader({
   /** An archived record: the name and the double rule go graphite. */
   archived?: boolean
   badges?: ReactNode
-  /** Accepted and not drawn: a record's readouts live in its Overview tab. */
-  readouts?: Array<RecordReadout>
 }) {
   const { titleRef, actionsRef, fold } = useHeadFold()
   return (
@@ -306,20 +304,25 @@ export function PreviewHead({
 }
 
 /**
- * Body. With `details` it is the tabbed record: the 320px details
- * column on bone left, sticking under the folded bar on wide screens, and
- * `children` — the tab head over its view — taking the rest, edge to edge.
- * - Without it, the older shape the term and holding pages keep: the page
- *   left, a `rail` right on bone.
+ * Body. With `details` it is the tabbed record: the rail on bone left,
+ * sticking under the folded bar on wide screens, and `children` — the tab
+ * head over its view — taking the rest, edge to edge.
+ * - `groups`: a record's 300px rail, `p-3` with its `RailGroup`s
+ *   `gap-3` apart. Without it, the 320px column of edge-to-edge
+ *   `RailSection`s a space keeps.
+ * - Without `details`, the older shape the term and holding pages keep:
+ *   the page left, a `rail` right on bone.
  */
 export function RecordBody({
   children,
   rail,
   details,
+  groups = false,
 }: {
   children: ReactNode
   rail?: ReactNode
   details?: ReactNode
+  groups?: boolean | undefined
 }) {
   if (details !== undefined) {
     return (
@@ -329,7 +332,10 @@ export function RecordBody({
       >
         <aside
           aria-label="Details"
-          className="flex w-full shrink-0 flex-col border-b border-hairline bg-bone xl:sticky xl:top-10 xl:max-h-[calc(100dvh-2.5rem)] xl:w-80 xl:overflow-y-auto xl:border-r xl:border-b-0"
+          className={cn(
+            'flex w-full shrink-0 flex-col border-b border-hairline bg-bone xl:sticky xl:top-10 xl:max-h-[calc(100dvh-2.5rem)] xl:overflow-y-auto xl:border-r xl:border-b-0',
+            groups ? 'gap-3 p-3 xl:w-75' : 'xl:w-80',
+          )}
         >
           {details}
         </aside>
@@ -380,8 +386,17 @@ export function RecordSection({
  */
 export function PropertyGrid({ children }: { children: ReactNode }) {
   return (
-    <div data-property-grid className="flex flex-col border border-rule">
-      {children}
+    <div className="group/grid flex flex-col gap-1">
+      <div data-property-grid className="flex flex-col border border-rule">
+        {children}
+      </div>
+      {/* Shown only while a cell's field has the caret. */}
+      <p
+        data-edit-hint
+        className="hidden mono text-micro whitespace-pre text-graphite group-has-[:is(input,textarea):focus]/grid:block"
+      >
+        {'↵ save   esc revert   ⇥ next cell'}
+      </p>
     </div>
   )
 }
@@ -516,6 +531,76 @@ export function RailSection({
       </div>
       {children}
     </section>
+  )
+}
+
+/**
+ * A group in a record's rail — Team, Associated deals, Spaces, Waiting: its
+ * name in sans graphite with a `+` (or, with nothing to add, its count) at
+ * the right, then its rows on rules.
+ * - `add` wraps a trigger in whatever adds a row (a popover, a window):
+ *   the head's `+`, or the group's one `Name +` row while it is empty.
+ * - Empty with nothing to add, the group draws nothing.
+ */
+export function RailGroup({
+  label,
+  count,
+  empty = false,
+  add,
+  children,
+}: {
+  label: string
+  count?: ReactNode
+  empty?: boolean | undefined
+  add?: ((trigger: ReactElement) => ReactNode) | undefined
+  children?: ReactNode
+}) {
+  if (empty)
+    return add ? (
+      <section aria-label={label} className="flex flex-col">
+        {add(<EmptyRow name={label} />)}
+      </section>
+    ) : null
+  return (
+    <section aria-label={label} className="flex flex-col">
+      <div className="flex h-7 items-center justify-between gap-3">
+        <h2 className="min-w-0 truncate text-ui text-graphite">{label}</h2>
+        {add ? (
+          add(
+            <button
+              type="button"
+              aria-label={`Add to ${label}`}
+              className="focus-ring flex size-6 shrink-0 items-center justify-center text-title text-graphite transition-colors duration-150 ease-out-quart hover:text-foreground"
+            >
+              +
+            </button>,
+          )
+        ) : count === undefined ? null : (
+          <span className="tabular mono text-micro text-graphite">{count}</span>
+        )}
+      </div>
+      <ul className="flex flex-col border-t border-rule">{children}</ul>
+    </section>
+  )
+}
+
+/** One row of a `RailGroup`: 32px, sans ink, on a rule. */
+export function RailGroupRow({
+  children,
+  className,
+}: {
+  children: ReactNode
+  className?: string | undefined
+}) {
+  return (
+    <li
+      className={cn(
+        'group/row flex h-8 min-w-0 items-center gap-2.5 border-b border-rule text-ui text-foreground',
+        className,
+      )}
+    >
+      {children}
+    </li>
   )
 }
 

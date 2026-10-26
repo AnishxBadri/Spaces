@@ -253,11 +253,9 @@ describe('the ink stamp', () => {
         stamp={companyStamp}
         name="Flent"
         actions={<button type="button">Log interaction</button>}
-        readouts={[{ label: 'Last contact', value: '3d' }]}
       />,
     )
     expect(html).not.toContain('data-readouts')
-    expect(html).not.toContain('Last contact')
     expect(headOf(html)).toMatch(
       /class="flex items-end justify-between gap-2"><div[^]*<h1[^]*data-head-actions-slot/,
     )

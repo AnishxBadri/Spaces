@@ -140,7 +140,8 @@ const interaction = (
     summary: string | null
     snippet: string | null
     categories: Array<'intro' | 'pitch' | 'update'>
-    attendees: Array<{ id: string; name: string; kind: string }>
+    attendees: Array<{ id: string; name: string; kind: string; self: boolean }>
+    sent: boolean
   }> = {},
 ): Items[number] => ({
   type: 'interaction',
@@ -148,6 +149,8 @@ const interaction = (
   kind,
   subject: `${kind} ${id}`,
   noteId: null,
+  threadId: null,
+  sent: false,
   privateBody: false,
   ownPrivate: false,
   at: '2026-10-01T10:00:00.000Z',
@@ -188,56 +191,81 @@ const check = (id: string, voidedAt: string | null): Items[number] => ({
 
 describe('the empties fold', () => {
   const defs = [
-    { slug: 'description', value: 'Satellites' },
-    { slug: 'founders', value: [] },
-    { slug: 'twitter', value: null },
-    { slug: 'location', value: '  ' },
+    { slug: 'description', name: 'Description', type: 'text', value: 'Sats' },
+    { slug: 'founders', name: 'Founders', type: 'record_reference', value: [] },
+    { slug: 'twitter', name: 'Twitter', type: 'url', value: null },
+    { slug: 'location', name: 'Location', type: 'text', value: '  ' },
   ]
-  const render = (d: (typeof defs)[number]) => (
+  type Def = (typeof defs)[number]
+  const render = (d: Def) => (
     <p key={d.slug} data-row={d.slug}>
-      {d.slug}: {Array.isArray(d.value) ? '' : (d.value ?? '—')}
+      {d.slug}
     </p>
   )
+  const rows = (el: HTMLElement) =>
+    [...el.querySelectorAll('[data-row]')].map((r) =>
+      r.getAttribute('data-row'),
+    )
 
-  it('shows the filled values and folds three empties into a bone foot', async () => {
+  it('shows the filled values and folds the empties into one n empty + row', async () => {
     const el = await mount(
       <PropertyFold defs={defs} valueOf={(d) => d.value} render={render} />,
     )
-    const rows = () =>
-      [...el.querySelectorAll('[data-row]')].map((r) =>
-        r.getAttribute('data-row'),
-      )
-    expect(rows()).toEqual(['description'])
+    expect(rows(el)).toEqual(['description'])
     const foot = el.querySelector('[data-property-foot]')
     expect(foot?.className.split(' ')).toEqual(
-      expect.arrayContaining(['h-8', 'bg-bone', 'pl-2.5', 'pr-1']),
+      expect.arrayContaining(['h-8', 'bg-bone', 'text-label', 'text-graphite']),
     )
-    expect(el.textContent).not.toMatch(/Show all/)
-    const toggle = button(/^3 empty$/)
-    expect(toggle.className.split(' ')).toEqual(
-      expect.arrayContaining(['text-label', 'text-graphite']),
-    )
-    expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    await click(toggle)
-    expect(rows()).toEqual(['description', 'founders', 'twitter', 'location'])
+    expect(foot?.textContent).toBe('3 empty+')
+    expect(foot?.getAttribute('aria-label')).toBe('Add an attribute')
   })
 
-  it('ends the foot on a 24px + that the caller wraps in the add', async () => {
+  it('opens a search of the empties, name and mono type, and picks one into the grid', async () => {
+    const el = await mount(
+      <PropertyFold defs={defs} valueOf={(d) => d.value} render={render} />,
+    )
+    const foot = el.querySelector('[data-property-foot]')
+    if (foot === null) throw new Error('no foot')
+    await click(foot)
+    const input = document.querySelector<HTMLInputElement>(
+      'input[placeholder="Add an attribute…"]',
+    )
+    expect(input).not.toBeNull()
+    const offered = [
+      ...document.querySelectorAll('[aria-label="Empty attributes"] button'),
+    ].map((b) => b.textContent)
+    expect(offered).toEqual([
+      'Foundersrecord reference',
+      'Twitterurl',
+      'Locationtext',
+    ])
+    expect(document.body.textContent).not.toMatch(/New attribute…/)
+    await click(button(/^Twitterurl$/))
+    expect(rows(el)).toEqual(['description', 'twitter'])
+  })
+
+  it("ends the popover on New attribute…, which opens the caller's window", async () => {
+    const seen: Array<boolean> = []
     const el = await mount(
       <PropertyFold
         defs={defs}
         valueOf={(d) => d.value}
         render={render}
-        add={(trigger) => <span data-add>{trigger}</span>}
+        create={({ open }) => {
+          seen.push(open)
+          return open ? <p data-creating /> : null
+        }}
       />,
     )
-    const plus = el.querySelector('[data-add] button')
-    expect(plus?.getAttribute('aria-label')).toBe('Add attribute')
-    expect(plus?.textContent).toBe('+')
-    expect(plus?.className).toContain('size-6')
+    const foot = el.querySelector('[data-property-foot]')
+    if (foot === null) throw new Error('no foot')
+    await click(foot)
+    await click(button(/^New attribute…$/))
+    expect(seen.at(-1)).toBe(true)
+    expect(el.querySelector('[data-creating]')).not.toBeNull()
   })
 
-  it('draws no foot when nothing is empty and nothing adds', async () => {
+  it('draws no row when nothing is empty and nothing creates', async () => {
     const el = await mount(
       <PropertyFold
         defs={defs.slice(0, 1)}
@@ -245,20 +273,19 @@ describe('the empties fold', () => {
         render={render}
       />,
     )
-    expect(el.querySelector('button')).toBeNull()
     expect(el.querySelector('[data-property-foot]')).toBeNull()
   })
 
-  it('keeps the foot for the + alone when nothing is empty', async () => {
-    const withAdd = await mount(
+  it('keeps the row for the + alone when nothing is empty, with no 0', async () => {
+    const el = await mount(
       <PropertyFold
         defs={defs.slice(0, 1)}
         valueOf={(d) => d.value}
         render={render}
-        add={(trigger) => trigger}
+        create={() => null}
       />,
     )
-    expect(withAdd.querySelector('[data-property-foot]')?.textContent).toBe('+')
+    expect(el.querySelector('[data-property-foot]')?.textContent).toBe('+')
   })
 })
 
@@ -378,8 +405,9 @@ describe('the Interactions tab', () => {
             snippet: 'Hi all, attached is',
             categories: ['update', 'pitch'],
             attendees: [
-              { id: 'p1', name: 'Ada Lovelace', kind: 'person' },
-              { id: 'c1', name: 'Acme', kind: 'company' },
+              { id: 'p1', name: 'Ada Lovelace', kind: 'person', self: false },
+              { id: 'c1', name: 'Acme', kind: 'company', self: false },
+              { id: 'me', name: 'Anish Badri', kind: 'person', self: true },
             ],
           }),
         ]}
@@ -390,6 +418,7 @@ describe('the Interactions tab', () => {
     expect(row?.className).toContain('min-h-ledger-row')
     expect(row?.querySelector('svg[aria-label="email"]')).not.toBeNull()
     expect(row?.querySelector('a')?.textContent).toBe('email s')
+    // The viewer is never among a row's people.
     expect(row?.querySelector('[data-participants]')?.textContent).toBe(
       'Ada Lovelace · Acme',
     )

@@ -81,15 +81,6 @@ function TermPage() {
         }
         mark={<DitherMark />}
         name={term.name}
-        readouts={[
-          {
-            label: 'Also',
-            value: term.aliases.length > 0 ? term.aliases.join(' · ') : '—',
-            tone: term.aliases.length > 0 ? undefined : 'muted',
-          },
-          { label: 'Mentions', value: `${mentions.total}` },
-          { label: 'Companies reached', value: `${companies.total}` },
-        ]}
       />
 
       <RecordBody

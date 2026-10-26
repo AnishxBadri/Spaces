@@ -32,6 +32,11 @@ export type TabItem<T extends string> = {
    * where the 0 is the news. Every other tab hides its 0.
    */
   showZero?: boolean | undefined
+  /**
+   * Holds something that has no number (a record's Overview): ink when
+   * closed, like a counted tab, with no count printed.
+   */
+  uncounted?: boolean | undefined
   /** Drawn after the count: a view's unsaved-changes square. */
   suffix?: ReactNode
 }
@@ -142,7 +147,7 @@ export function Tabs<T extends string>({
               // graphite when empty.
               open
                 ? 'tab-open top-px h-10 text-foreground'
-                : counted
+                : counted || t.uncounted === true
                   ? 'h-9.75 text-foreground'
                   : 'h-9.75 text-graphite hover:text-foreground',
             )}

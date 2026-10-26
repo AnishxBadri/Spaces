@@ -15,8 +15,8 @@ import {
   DitherMark,
   InitialsMark,
   PropertyGrid,
-  RailItem,
-  RailSection,
+  RailGroup,
+  RailGroupRow,
   RecordBody,
   RecordHeadPending,
   RecordHeader,
@@ -24,7 +24,7 @@ import {
 import { RecordHeadActions } from '#/components/record/record-heads'
 import { RecordNotices } from '#/components/record/record-notices'
 import { sensitiveStamp } from '#/components/sensitive-toggle'
-import { DetailsPickRow } from '#/components/record/details-add'
+import { PickPopover } from '#/components/record/details-add'
 import {
   RelationSection,
   RelationSections,
@@ -34,6 +34,7 @@ import {
 import { PropertyFold } from '#/components/record/property-fold'
 import { RecordSpacesSection } from '#/components/record/spaces-section'
 import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
+import { RecordOverview } from '#/components/record/record-overview'
 import { RecordPicture } from '#/components/record/record-picture'
 import {
   LogComposerRow,
@@ -44,7 +45,6 @@ import { RecordFiles } from '#/components/record-files'
 import { RecordHistory, RecordInteractions } from '#/components/record-timeline'
 import type { InteractionFilter } from '#/lib/timeline/interaction-filter'
 import type { NotesFilter } from '#/lib/notes/notes-filter'
-import { TasksRail } from '#/components/tasks-rail'
 import { WaitingRail } from '#/components/record/waiting-rail'
 import { recordPath } from '#/lib/record-path'
 import { collisionToast } from '#/lib/attributes/collision-toast'
@@ -60,7 +60,6 @@ import {
 import { openModalId } from '#/lib/modal-search'
 import { MeetingDialog } from '#/components/meeting-dialog'
 import {
-  countOpenSuggestions,
   createNote,
   getEntitySensitivity,
   getPerson,
@@ -69,6 +68,7 @@ import {
   listRecordActions,
   listRecordDocuments,
   listRecordDuplicates,
+  listOpenSuggestionTitles,
   listRecordNotes,
   listRegistry,
   listSpaces,
@@ -105,7 +105,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       getRecordTimeline({ data: { entityId: params.personId } }),
       listRecordDocuments({ data: { entityId: params.personId } }),
       listRecordNotes({ data: { entityId: params.personId } }),
-      countOpenSuggestions({ data: { entityId: params.personId } }),
+      listOpenSuggestionTitles({ data: { entityId: params.personId } }),
       getEntitySensitivity({ data: { entityId: params.personId } }),
       listRecordActions({ data: { kind: 'person' } }),
       getRecordEnrichment({
@@ -156,7 +156,6 @@ function PersonRecordPage() {
   const go = Route.useNavigate()
   const search = Route.useSearch()
   const [tab, changeTab] = useRecordTab(
-    'person',
     linkedRecordTab(search),
     (next) =>
       void go({ search: { tab: next }, replace: true, resetScroll: false }),
@@ -253,33 +252,6 @@ function PersonRecordPage() {
         }
         name={person.name}
         suffix={nameMeta === '' ? undefined : { role: nameMeta }}
-        readouts={[
-          {
-            label: 'Last contact',
-            value: readoutDay(
-              person.readouts.lastContact,
-              person.readouts.today,
-            ),
-          },
-          {
-            label: 'Last email',
-            value: readoutDay(person.readouts.lastEmail, person.readouts.today),
-          },
-          {
-            label: 'Next meeting',
-            value: readoutDay(
-              person.readouts.nextMeeting,
-              person.readouts.today,
-            ),
-          },
-          {
-            label: 'First contact',
-            value: readoutDay(
-              person.readouts.firstContact,
-              person.readouts.today,
-            ),
-          },
-        ]}
       />
 
       <RecordNotices
@@ -289,6 +261,7 @@ function PersonRecordPage() {
       />
 
       <RecordBody
+        groups
         details={
           <>
             <AiCellsProvider entityIds={[person.id]} registry={registry}>
@@ -323,11 +296,11 @@ function PersonRecordPage() {
                       }}
                     />
                   )}
-                  add={(trigger) => (
+                  create={(opener) => (
                     <AttributeCreateDialog
                       objectKind="person"
                       onCreated={() => router.invalidate()}
-                      trigger={trigger}
+                      {...opener}
                     />
                   )}
                 />
@@ -346,34 +319,39 @@ function PersonRecordPage() {
                   </span>
                 ) : null
               }
-            >
-              <DetailsPickRow
-                label="Add a company…"
-                placeholder="Company name…"
-                search={searchCompanies}
-                onPick={async (hit) => {
-                  await setPersonCompany({
-                    data: {
-                      personId: person.id,
-                      companyId: hit.id,
-                      action: 'link',
-                    },
-                  })
-                  void router.invalidate()
-                }}
-              />
-            </RelationSection>
+              add={(trigger) => (
+                <PickPopover
+                  trigger={trigger}
+                  placeholder="Add a company…"
+                  search={searchCompanies}
+                  onPick={async (hit) => {
+                    await setPersonCompany({
+                      data: {
+                        personId: person.id,
+                        companyId: hit.id,
+                        action: 'link',
+                      },
+                    })
+                    void router.invalidate()
+                  }}
+                />
+              )}
+            />
 
-            <RelationSection label="Deals" rows={deals}>
-              <DetailsPickRow
-                label="Add to a deal…"
-                placeholder="Deal name…"
-                search={searchDeals}
-                onPick={(hit) =>
-                  saveRelation('deals', [...deals.map((d) => d.id), hit.id])
-                }
-              />
-            </RelationSection>
+            <RelationSection
+              label="Deals"
+              rows={deals}
+              add={(trigger) => (
+                <PickPopover
+                  trigger={trigger}
+                  placeholder="Add to a deal…"
+                  search={searchDeals}
+                  onPick={(hit) =>
+                    saveRelation('deals', [...deals.map((d) => d.id), hit.id])
+                  }
+                />
+              )}
+            />
 
             <RelationSections
               defs={registry}
@@ -385,10 +363,10 @@ function PersonRecordPage() {
             {/* Inbound record-references outside any relationship, one
                 section per attribute — heading and grouping are both data. */}
             {person.referencedBy.map((group) => (
-              <RailSection
+              <RailGroup
                 key={`${group.label}:${group.attrSlug}`}
                 label={group.label}
-                meta={`${group.items.length} via ${group.via.toLowerCase()}`}
+                count={`${group.items.length} via ${group.via.toLowerCase()}`}
               >
                 {group.items.map((item) => {
                   const href = recordPath({
@@ -397,7 +375,7 @@ function PersonRecordPage() {
                     objectSlug: item.objectSlug,
                   })
                   return (
-                    <RailItem key={item.id}>
+                    <RailGroupRow key={item.id}>
                       {href ? (
                         <Link
                           to={href}
@@ -410,13 +388,11 @@ function PersonRecordPage() {
                           {item.name}
                         </span>
                       )}
-                    </RailItem>
+                    </RailGroupRow>
                   )
                 })}
-              </RailSection>
+              </RailGroup>
             ))}
-
-            <WaitingRail entityId={person.id} counts={waiting} />
 
             <RecordSpacesSection
               entityId={person.id}
@@ -424,12 +400,7 @@ function PersonRecordPage() {
               allSpaces={allSpaces}
             />
 
-            <TasksRail
-              entityId={person.id}
-              entityName={person.name}
-              entityKind="person"
-              composer="row"
-            />
+            <WaitingRail entityId={person.id} waiting={waiting} />
           </>
         }
       >
@@ -445,6 +416,50 @@ function PersonRecordPage() {
             interactionFilter,
           })}
           panels={{
+            overview: (
+              <RecordOverview
+                record={{ id: person.id, name: person.name, kind: 'person' }}
+                readouts={[
+                  {
+                    label: 'Last contact',
+                    value: readoutDay(
+                      person.readouts.lastContact,
+                      person.readouts.today,
+                    ),
+                  },
+                  {
+                    label: 'Last email',
+                    value: readoutDay(
+                      person.readouts.lastEmail,
+                      person.readouts.today,
+                    ),
+                  },
+                  {
+                    label: 'Next meeting',
+                    value: readoutDay(
+                      person.readouts.nextMeeting,
+                      person.readouts.today,
+                    ),
+                  },
+                  {
+                    label: 'First contact',
+                    value: readoutDay(
+                      person.readouts.firstContact,
+                      person.readouts.today,
+                    ),
+                  },
+                ]}
+                timeline={timeline}
+                documents={documents}
+                onTab={changeTab}
+                logInteraction={(trigger) => (
+                  <LogInteractionDialog
+                    seed={{ id: person.id, name: person.name, kind: 'person' }}
+                    trigger={trigger}
+                  />
+                )}
+              />
+            ),
             notes: (
               <RecordNotes
                 notes={notes}

@@ -1,17 +1,12 @@
-import { Link, useRouter, useSearch } from '@tanstack/react-router'
-import {
-  CalendarDays,
-  ChevronDown,
-  ChevronRight,
-  Mail,
-  Phone,
-} from 'lucide-react'
+import { useRouter, useSearch } from '@tanstack/react-router'
+import { ChevronDown, ChevronRight, Mail } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { optionLabel, refName } from './attributes/value-editor'
 import { EmailModal } from './email-dialog'
 import { badgeClasses } from './ui/badge'
 import { MoreMenu } from './ui/more-menu'
+import { KIND_GLYPHS, ThreadSubject } from './record/thread-row'
 import type { RegistryEntry, RefNames } from './attributes/value-editor'
 import { FilterCount, FilterRow, FilterTab } from './filter-row'
 import { fmtMoney } from '@spaces/core/portfolio/format'
@@ -29,6 +24,7 @@ import {
 } from '#/lib/timeline/interaction-filter'
 import type { InteractionFilter } from '#/lib/timeline/interaction-filter'
 import { openModalId } from '#/lib/modal-search'
+import { threadPeople } from '#/lib/timeline/threads'
 import { cn } from '#/lib/utils'
 import type { getRecordTimeline } from '#/lib/server-fns'
 
@@ -556,12 +552,6 @@ export function interactionLane(item: {
     .join(' · ')
 }
 
-const KIND_GLYPHS: Record<string, typeof Mail> = {
-  email: Mail,
-  meeting: CalendarDays,
-  call: Phone,
-}
-
 /** The line under an email's subject: its summary, else the snippet, unmarked. */
 export function interactionLine(item: {
   summary: string | null
@@ -611,6 +601,7 @@ function InteractionRow({
   }
 
   const Glyph = KIND_GLYPHS[item.kind] ?? Mail
+  const people = threadPeople(item)
   const line = interactionLine(item)
   const lane = item.privateBody
     ? ['body private', interactionLane(item)]
@@ -634,38 +625,15 @@ function InteractionRow({
       />
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-2">
-          {item.kind === 'email' ? (
-            <Link
-              to="."
-              search={(prev) => ({ ...prev, modal: 'email', id: item.id })}
-              resetScroll={false}
-              className="focus-ring min-w-0 shrink truncate text-ui text-foreground hover:underline"
-            >
-              {item.subject || 'Untitled'}
-            </Link>
-          ) : item.noteId ? (
-            <Link
-              to="/notes/$noteId"
-              params={{ noteId: item.noteId }}
-              className="focus-ring min-w-0 shrink truncate text-ui text-foreground hover:underline"
-            >
-              {item.subject || 'Untitled'}
-            </Link>
-          ) : item.subject ? (
-            <span className="min-w-0 shrink truncate text-ui text-foreground">
-              {item.subject}
-            </span>
-          ) : (
-            <span className="shrink-0 text-ui text-graphite">Untitled</span>
-          )}
-          {item.attendees.length > 0 ? (
+          <ThreadSubject item={item} />
+          {people === '' ? null : (
             <span
               data-participants
               className="min-w-0 flex-1 truncate text-label text-graphite"
             >
-              {item.attendees.map((a) => a.name).join(' · ')}
+              {people}
             </span>
-          ) : null}
+          )}
           {item.categories.length > 0 ? (
             <span className="ml-auto flex shrink-0 gap-1">
               {item.categories.map((c) => (

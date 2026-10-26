@@ -1,64 +1,57 @@
 import { Link } from '@tanstack/react-router'
-import { Sparkles } from 'lucide-react'
-import { RailSection } from '#/components/record/record-parts'
-import type { OpenSuggestionCount, SuggestionKind } from '#/lib/server-fns'
+import { RailGroup, RailGroupRow } from '#/components/record/record-parts'
+import type { WaitingSuggestion } from '#/lib/server-fns'
 
 /**
- * The record rail's "Waiting" lane: open suggestions on this
- * record, one chip per kind, each a link into `/review` scoped to the record
- * and its suggestion lane. Grouped by kind rather than listed, so fifty open
- * suggestions are still at most five chips — one wrapped row.
+ * The record rail's Waiting group: how many suggestions are open on this
+ * record, the newest few by title (`✦ Founders from Apollo +3`), each a
+ * link into `/review` scoped to the record, and `n more in Review ›` when
+ * more wait than are listed.
  *
  * **A pointer, never a verb.** Accept and reject live in Review only, so
  * bulk accept has one path rather than two to keep in step. Do not add an
  * action here — link to Review instead.
  *
- * Nothing waiting → no section, no zero: the component answers `null`.
+ * Nothing waiting → no group, no zero.
  */
-
-const WORD: Record<SuggestionKind, [one: string, many: string]> = {
-  attribute_patch: ['proposed', 'proposed'],
-  note: ['note', 'notes'],
-  ledger_event: ['ledger event', 'ledger events'],
-  identity: ['identity', 'identities'],
-  document_kind: ['document kind', 'document kinds'],
-  space_tag: ['space', 'spaces'],
-  task: ['task', 'tasks'],
-  add_record: ['new company', 'new companies'],
-  file_record: ['filing', 'filings'],
-  supersedes: ['newer version', 'newer versions'],
-  refile_document: ['re-file', 're-files'],
-}
-
-export function suggestionChipWord(kind: SuggestionKind, n: number): string {
-  const [one, many] = WORD[kind]
-  return n === 1 ? one : many
-}
-
 export function WaitingRail({
   entityId,
-  counts,
+  waiting,
 }: {
   entityId: string
-  counts: ReadonlyArray<OpenSuggestionCount>
+  waiting: { count: number; items: ReadonlyArray<WaitingSuggestion> }
 }) {
-  if (counts.length === 0) return null
+  if (waiting.count === 0) return null
+  const more = waiting.count - waiting.items.length
   return (
-    <RailSection label="Waiting">
-      <div className="flex flex-wrap gap-1.5">
-        {counts.map((c) => (
+    <RailGroup label="Waiting" count={waiting.count}>
+      {waiting.items.map((s) => (
+        <RailGroupRow key={s.id}>
           <Link
-            key={c.kind}
             to="/review"
             search={{ record: entityId, lane: 'suggestions' }}
-            className="mention-chip focus-ring"
+            className="group/link focus-ring flex min-w-0 flex-1 items-center gap-2"
           >
-            <Sparkles size={12} strokeWidth={1.75} aria-hidden />
-            <span className="tabular mono">{c.count}</span>
-            {suggestionChipWord(c.kind, c.count)}
+            <span aria-hidden className="shrink-0 text-primary">
+              ✦
+            </span>
+            <span className="min-w-0 flex-1 truncate group-hover/link:underline">
+              {s.title}
+            </span>
           </Link>
-        ))}
-      </div>
-    </RailSection>
+        </RailGroupRow>
+      ))}
+      {more > 0 ? (
+        <RailGroupRow>
+          <Link
+            to="/review"
+            search={{ record: entityId, lane: 'suggestions' }}
+            className="focus-ring min-w-0 flex-1 truncate text-label text-graphite hover:text-foreground"
+          >
+            {more} more in Review ›
+          </Link>
+        </RailGroupRow>
+      ) : null}
+    </RailGroup>
   )
 }

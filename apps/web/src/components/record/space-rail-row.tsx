@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { Layers, X } from 'lucide-react'
-import { RailItem } from '#/components/record/record-parts'
+import { RailGroupRow } from '#/components/record/record-parts'
 import { cn } from '#/lib/utils'
 
 /**
@@ -15,7 +15,7 @@ export function SpaceRailRow({
   onRemove: () => void
 }) {
   return (
-    <RailItem className="group">
+    <RailGroupRow className="group">
       <Layers className="size-3.5 shrink-0 text-graphite" strokeWidth={1.75} />
       <Link
         to="/spaces/$spaceId"
@@ -39,6 +39,6 @@ export function SpaceRailRow({
           <X className="size-3" strokeWidth={2} />
         </button>
       )}
-    </RailItem>
+    </RailGroupRow>
   )
 }

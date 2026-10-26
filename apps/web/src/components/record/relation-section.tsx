@@ -1,10 +1,10 @@
 import { Link } from '@tanstack/react-router'
 import { useCallback } from 'react'
-import type { ReactNode } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { isDerived } from '@spaces/core/attributes/relationship'
 import type { AttributeOptions } from '@spaces/core/attributes/registry'
-import { DetailsPickRow } from '#/components/record/details-add'
-import { RailItem, RailSection } from '#/components/record/record-parts'
+import { PickPopover } from '#/components/record/details-add'
+import { RailGroup, RailGroupRow } from '#/components/record/record-parts'
 import { recordPath } from '#/lib/record-path'
 import { searchEntities } from '#/lib/server-fns'
 
@@ -51,36 +51,38 @@ export function relationRows(
 }
 
 /**
- * A relationship section in the details column: the count once in the head,
- * each row the link to the far record, ending on its lane.
- * - `children` is the section's composer row; with no rows it is the
- *   section's one `Name +` row.
+ * A relationship group in the rail: its name with `+` at the right, each
+ * row the link to the far record, ending on its lane; empty, the group's
+ * one `Name +` row.
+ * - `add` wraps the `+` (or that row) in whatever adds a record — a
+ *   `PickPopover`, a create window. Without it the head carries the count.
  */
 export function RelationSection({
   label,
   rows,
   mark,
   lane,
-  children,
+  add,
 }: {
   label: string
   rows: ReadonlyArray<RelationRow>
   mark?: (row: RelationRow) => ReactNode
   lane?: (row: RelationRow, index: number) => ReactNode
-  children?: ReactNode
+  add?: ((trigger: ReactElement) => ReactNode) | undefined
 }) {
   return (
-    <RailSection
+    <RailGroup
       label={label}
-      meta={`${rows.length}`}
-      empty={rows.length === 0 && Boolean(children)}
+      count={rows.length}
+      empty={rows.length === 0}
+      add={add}
     >
       {rows.map((row, i) => {
         const href = recordPath(row)
         const body = (
           <>
             {mark ? mark(row) : null}
-            <span className="min-w-0 flex-1 truncate group-hover/row:underline">
+            <span className="min-w-0 flex-1 truncate group-hover/link:underline">
               {row.name}
             </span>
             {lane ? (
@@ -91,11 +93,11 @@ export function RelationSection({
           </>
         )
         return (
-          <RailItem key={row.id}>
+          <RailGroupRow key={row.id}>
             {href ? (
               <Link
                 to={href}
-                className="group/row focus-ring flex min-w-0 flex-1 items-center gap-2.5"
+                className="group/link focus-ring flex min-w-0 flex-1 items-center gap-2.5"
               >
                 {body}
               </Link>
@@ -104,11 +106,10 @@ export function RelationSection({
                 {body}
               </span>
             )}
-          </RailItem>
+          </RailGroupRow>
         )
       })}
-      {children}
-    </RailSection>
+    </RailGroup>
   )
 }
 
@@ -121,11 +122,11 @@ type PairDef = {
 }
 
 /**
- * A section for every relationship attribute a page draws no section of its
+ * A group for every relationship attribute a page draws no group of its
  * own for, either half, read through the resolver. A derived half whose
  * owner is archived stores nothing and is left out.
- * - The add row writes this record's half; `setValues` puts a derived
- *   half's write on its owner.
+ * - The `+` writes this record's half; `setValues` puts a derived half's
+ *   write on its owner.
  */
 export function RelationSections({
   defs,
@@ -188,17 +189,26 @@ function PairSection({
     [rows, targetKind, targetObjectId],
   )
   return (
-    <RelationSection label={def.name} rows={rows}>
-      {multi || rows.length === 0 ? (
-        <DetailsPickRow
-          label={`Add to ${def.name.toLowerCase()}…`}
-          placeholder="Name…"
-          search={search}
-          onPick={(hit) =>
-            onAdd(def.slug, multi ? [...rows.map((r) => r.id), hit.id] : hit.id)
-          }
-        />
-      ) : null}
-    </RelationSection>
+    <RelationSection
+      label={def.name}
+      rows={rows}
+      add={
+        multi || rows.length === 0
+          ? (trigger) => (
+              <PickPopover
+                trigger={trigger}
+                placeholder={`Add to ${def.name.toLowerCase()}…`}
+                search={search}
+                onPick={(hit) =>
+                  onAdd(
+                    def.slug,
+                    multi ? [...rows.map((r) => r.id), hit.id] : hit.id,
+                  )
+                }
+              />
+            )
+          : undefined
+      }
+    />
   )
 }

@@ -1,18 +1,17 @@
 import type { ReactNode } from 'react'
 import { Tabs } from '#/components/ui/tabs'
 import type { TabItem } from '#/components/ui/tabs'
-import { rememberRecordTab, useLastRecordTab } from '#/lib/record-tab-pref'
 import { RECORD_TABS, openRecordTab } from '#/lib/records/record-tabs'
-import type { RecordTab } from '#/lib/records/record-tabs'
+import type { CountedRecordTab, RecordTab } from '#/lib/records/record-tabs'
 
 /**
- * A record's view: the 44px bone tab head — Notes · Interactions ·
- * Files · History, each with its mono count, empty ones grey at 0 — pinned
- * under the folded bar, over the open tab's view. The space page's head,
- * with a record's four tabs.
+ * A record's view: the 44px bone tab head — Overview · Notes · Interactions
+ * · Files · History, each but Overview with its mono count, empty ones
+ * graphite with none — pinned under the folded bar, over the open tab's view.
  */
 
 const LABELS: Record<RecordTab, string> = {
+  overview: 'Overview',
   notes: 'Notes',
   interactions: 'Interactions',
   files: 'Files',
@@ -29,16 +28,16 @@ export function RecordTabs({
   /** Names the tablist: the record's name. */
   label: string
   tab: RecordTab
-  counts: Record<RecordTab, number>
+  counts: Record<CountedRecordTab, number>
   onTabChange: (tab: RecordTab) => void
   /** Each tab's view; only the open one mounts. */
   panels: Record<RecordTab, ReactNode>
 }) {
-  const items: Array<TabItem<RecordTab>> = RECORD_TABS.map((id) => ({
-    id,
-    label: LABELS[id],
-    count: counts[id],
-  }))
+  const items: Array<TabItem<RecordTab>> = RECORD_TABS.map((id) =>
+    id === 'overview'
+      ? { id, label: LABELS[id], uncounted: true }
+      : { id, label: LABELS[id], count: counts[id] },
+  )
   return (
     <Tabs
       label={label}
@@ -54,21 +53,11 @@ export function RecordTabs({
 
 /**
  * The open tab and its setter. `?tab=` wins; without one the record opens
- * on the tab last used on this kind of record in this browser, else Notes.
- * - `kind` keys the memory: `company`, `person`, `deal`, `o:<object slug>`.
- * - `go` writes the tab into the link, replacing the entry.
+ * on Overview. `go` writes the tab into the link, replacing the entry.
  */
 export function useRecordTab(
-  kind: string,
   linked: RecordTab | undefined,
   go: (tab: RecordTab) => void,
 ): [RecordTab, (tab: RecordTab) => void] {
-  const tab = openRecordTab(linked, useLastRecordTab(kind))
-  return [
-    tab,
-    (next) => {
-      rememberRecordTab(kind, next)
-      go(next)
-    },
-  ]
+  return [openRecordTab(linked), go]
 }

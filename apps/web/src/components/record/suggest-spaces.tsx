@@ -10,20 +10,25 @@ import {
 import type { SuggestSpacesStatus } from '#/lib/server-fns'
 
 /**
- * "Suggest spaces" — the Spaces rail's one AI verb. Pressing it
- * enqueues one classify run for this record; the run proposes a `space_tag`
- * suggestion per space it places the record in, and those land in Review
- * and on this rail's "Waiting" chips — this control draws no
- * pending state of its own beyond its label.
+ * "Suggest spaces" — the Spaces group's one AI verb, the last row of its
+ * `+` popover. Pressing it enqueues one classify run for this record; the
+ * run proposes a `space_tag` suggestion per space it places the record in,
+ * and those land in Review and in this rail's Waiting group.
  *
- * **Absent while the classify lane is unrouted.** The gate is the lane routed at either scope, not at this
- * record's resolved sensitivity: a record under a sensitive space on a
- * cloud-routed lane still sees the action, and pressing it is refused with
- * a toast naming the space, which is how a person learns why. The run is a
- * worker job, polled while it runs, as Read deck and Summarize are; when it
- * settles the rail reloads, so the Waiting chip appears in place.
+ * **Absent while the classify lane is unrouted.** The gate is the lane
+ * routed at either scope, not at this record's resolved sensitivity: a
+ * record under a sensitive space on a cloud-routed lane still sees the
+ * action, and pressing it is refused with a toast naming the space, which is
+ * how a person learns why. The run is a worker job, polled while it runs;
+ * when it settles the rail reloads, so its Waiting rows appear in place.
+ * The hook lives with the group, not the popover, so the poll outlives a
+ * closed popover.
  */
-export function SuggestSpacesAction({ entityId }: { entityId: string }) {
+export function useSuggestSpaces(entityId: string): {
+  routed: boolean
+  running: boolean
+  press: () => Promise<void>
+} {
   const router = useRouter()
   const [routed, setRouted] = useState(false)
   const [running, setRunning] = useState(false)
@@ -109,14 +114,24 @@ export function SuggestSpacesAction({ entityId }: { entityId: string }) {
     }
   }
 
-  if (!routed) return null
+  return { routed, running, press }
+}
+
+/** The popover's last row: `✦ Suggest spaces`, `Suggesting spaces…` while it runs. */
+export function SuggestSpacesRow({
+  running,
+  onPress,
+}: {
+  running: boolean
+  onPress: () => void
+}) {
   return (
     <button
       type="button"
       disabled={running}
-      onClick={() => void press()}
+      onClick={onPress}
       title="Ask the classify lane which spaces this record belongs in; each lands in Review as a suggestion"
-      className="focus-ring mt-1 flex h-7 items-center gap-1.5 text-label text-graphite hover:text-foreground disabled:opacity-60"
+      className="focus-ring-inset flex h-8 items-center gap-2 bg-bone px-3 text-left text-ui text-foreground hover:underline disabled:text-graphite"
     >
       <Sparkles className="size-3" strokeWidth={1.75} aria-hidden />
       {running ? 'Suggesting spaces…' : 'Suggest spaces'}
