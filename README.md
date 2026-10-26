@@ -51,7 +51,7 @@ phones home.
 ## Why self-host
 
 - **Funds do not put deal terms, decks and cap tables in someone else's SaaS.**
-  Two containers on a box you control, one `./data` directory to back up.
+  Three containers on a box you control, one `./data` directory to back up.
 - **Confidential decks never leave the building.** Point the AI at a local
   Ollama and deep-tech or defence material stays off third-party APIs.
 - **Provider terms sit between you and the provider.** Enrichment and AI keys
@@ -137,7 +137,7 @@ you accept it.
 
 ## Self-hosting
 
-Two containers, two volumes, one command. The image is multi-arch
+Three containers, two volumes, one command. The image is multi-arch
 (`linux/amd64`, `linux/arm64`), published to GHCR and Docker Hub on every
 release, signed with cosign, and pinned by tag. There is no `latest`.
 
@@ -250,9 +250,10 @@ cosign verify ghcr.io/anishxbadri/spaces:0.1.0 \
 
 ### Scaling out and checking health
 
-The shipped compose runs one `ROLE=all` container. To split the web server
-from the worker, overlay `docker-compose.split.yml`. The two halves talk only
-through Postgres.
+The shipped compose runs the web server (`app`) and the worker (`worker`) as
+two containers from the same image, so a crashed worker never takes the web
+server down. The two halves talk only through Postgres. A host that runs only
+one container sets `ROLE=all` to run both in it.
 
 `GET /api/health` is unauthenticated and thin: a status, the database, and
 how long ago the worker last beat.
@@ -281,7 +282,8 @@ Then save Ollama at `http://ollama:11434` under Settings → AI → Providers.
 
 ### One-click templates
 
-The same two containers, written for four platforms, under
+The same app as one `ROLE=all` container plus Postgres, written for four
+platforms, under
 [deploy/](deploy/README.md): [Coolify](deploy/coolify/spaces.yaml),
 [Railway](deploy/railway/template.json), [Render](deploy/render/render.yaml)
 and [Unraid](deploy/unraid/spaces.xml). Each pins the published tag,

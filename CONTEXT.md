@@ -71,7 +71,7 @@ AGPL-3.0. Can relicense permissively later; reverse is impossible once contribut
 
 ## Stack
 
-One language, TypeScript, one codebase. Two processes (web, worker), two containers (app, db).
+One language, TypeScript, one codebase. Two processes (web, worker), three containers (app, worker, db) — the worker has its own so its crash or OOM never takes the web app down; `ROLE=all` folds both processes into one container for hosts that run only one.
 
 | Layer      | Choice                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

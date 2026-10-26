@@ -279,6 +279,10 @@ jobs:
               image: spaces:ci
               environment:
                 MASTER_KEY: ${MASTER_KEY}
+            worker:
+              image: spaces:ci
+              environment:
+                MASTER_KEY: ${MASTER_KEY}
           YAML
           docker compose -f docker-compose.yml -f docker-compose.ci.yml \
             up -d --wait --wait-timeout 300
@@ -374,7 +378,7 @@ jobs:
 
       # Hostability contract 4: a ROLE starts its own process and nothing
       # else. Both containers share a database of their own, created empty
-      # here, so no heartbeat the compose `app`'s worker ever wrote can answer
+      # here, so no heartbeat the compose `worker` ever wrote can answer
       # for them: ROLE=web alone must report the worker `absent` (no
       # worker_heartbeat row at all), and ROLE=worker — which serves no HTTP —
       # is proven through the heartbeat, by the image's own HEALTHCHECK
@@ -537,7 +541,7 @@ jobs:
           [ "$(docker inspect -f '{{.State.ExitCode}}' sup)" -eq 0 ]
           docker rm -f sup
 
-      # Hostability contract 4 in the two-container shape (SPA-185): the
+      # Hostability contract 4 in the shipped compose (SPA-185): the
       # ROLE=worker container's HEALTHCHECK is the bundled health entry, and it
       # is what notices a worker that stopped working. The process is frozen
       # (SIGSTOP from the host, so the container keeps running and nothing
@@ -545,25 +549,12 @@ jobs:
       # which proves supervision, not health. Its heartbeat ages past 60s, the
       # check fails three times, and Docker calls it unhealthy; the web
       # container, whose check is HTTP, stays healthy throughout.
-      - name: Split roles — a stopped worker goes unhealthy, web stays healthy
+      - name: Shipped compose — a stopped worker goes unhealthy, web stays healthy
         run: |
           set -euo pipefail
           docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v
           sudo mkdir -p data && sudo chown 1000:1000 data
-          cat > docker-compose.split-ci.yml <<'YAML'
-          services:
-            app:
-              image: spaces:ci
-              pull_policy: never
-              environment:
-                MASTER_KEY: ${MASTER_KEY}
-            worker:
-              image: spaces:ci
-              pull_policy: never
-              environment:
-                MASTER_KEY: ${MASTER_KEY}
-          YAML
-          SPLIT=(-f docker-compose.yml -f docker-compose.split.yml -f docker-compose.split-ci.yml)
+          SPLIT=(-f docker-compose.yml -f docker-compose.ci.yml)
           docker compose "${SPLIT[@]}" up -d --no-build --wait --wait-timeout 300
           docker compose "${SPLIT[@]}" ps
           W="$(docker compose "${SPLIT[@]}" ps -q worker)"
@@ -584,7 +575,6 @@ jobs:
         if: always()
         run: |
           docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v || true
-          docker compose -f docker-compose.yml -f docker-compose.split.yml -f docker-compose.split-ci.yml down -v 2>/dev/null || true
           docker rm -f sup unpriv nochown roleweb roleworker 2>/dev/null || true
 
   # Upload → preview in a real browser against the image built for this
@@ -665,6 +655,8 @@ jobs:
           cat > docker-compose.ci.yml <<'YML'
           services:
             app:
+              image: spaces:ci
+            worker:
               image: spaces:ci
           YML
           docker compose up -d --wait --wait-timeout 300
@@ -773,8 +765,8 @@ jobs:
           set -e
           echo "$OUT"
           [ "$CODE" -ne 0 ]
-          grep -F 'docker compose stop app' <<<"$OUT"
-          docker compose stop app
+          grep -F 'docker compose stop app worker' <<<"$OUT"
+          docker compose stop app worker
           set +e
           OUT="$(./scripts/restore.sh "$BACKUP_DIR" 2>&1)"; CODE=$?
           set -e

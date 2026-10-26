@@ -34,8 +34,9 @@ image: ghcr.io/anishxbadri/spaces:0.1.0
 Set it to the release you want. Releases are published as the exact version
 (`0.1.0`) and the major.minor (`0.1`); there is no `latest`. Pinning the
 exact version means an upgrade only ever happens when you edit this line.
-If you use the TLS or split overlay, change the same line there too; each
-overlay spells the image out so it stands on its own.
+The `worker` service reuses this line, so the two halves cannot drift apart.
+If you use the TLS overlay, change the same line there too; it spells the
+image out so it stands on its own.
 
 ## 3. Pull and up
 
@@ -85,13 +86,13 @@ nothing, and read columns that no longer mean what it thinks.
 
 ## Rollback
 
-Stop the app, put the previous tag back in `docker-compose.yml`, restore,
+Stop the app and the worker, put the previous tag back in `docker-compose.yml`, restore,
 start. `restore.sh` refuses to load a dump underneath a running app and
 refuses to overwrite a database that still holds a workspace unless you say
 so, which after an upgrade is exactly the situation:
 
 ```bash
-docker compose stop app
+docker compose stop app worker
 sudo ./scripts/restore.sh ./backups/20260929-204042 --force
 docker compose up -d
 ```

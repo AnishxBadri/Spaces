@@ -521,7 +521,7 @@ export const CLOSING: Stage = {
 }
 
 export const CLOSING_COPY = {
-  title: 'Two containers. One backup. Yours.',
+  title: 'Three containers. One backup. Yours.',
   // As the design sets it: the compose file's URL is elided to fit the card,
   // and the guide it links to spells it out.
   install: [

@@ -1,7 +1,7 @@
 # Install
 
-Spaces runs as two containers from one compose file: the app image and a
-Postgres with pgvector. Nothing is built on your box. The image is pulled from
+Spaces runs as three containers from one compose file: the web app and the
+background worker, both from the same image, and a Postgres with pgvector. Nothing is built on your box. The image is pulled from
 a published, pinned tag.
 
 Every command on this page was run, in this order, on a machine holding only
@@ -87,7 +87,7 @@ Everything else is optional and has a default:
 | `MASTER_KEY`             | generated on first boot     | the key every stored credential is encrypted with; see _What lives in ./data_                                                                                      |
 | `STORAGE_DRIVER`         | `local`                     | `s3` puts blobs in a bucket instead of `./data` (`S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`)       |
 | `BETTER_AUTH_SECRET`     | derived from the master key | set it only if you want the session-signing secret rotated separately                                                                                              |
-| `ROLE`                   | `all`                       | `web` or `worker` for the split-role overlay, below                                                                                                                |
+| `ROLE`                   | `all`                       | the shipped compose sets `web` and `worker`; `all` runs both in one container, for hosts that run only one (see _Web and worker_, below)                           |
 | `SPACES_PLUGINS`         | unset                       | plugins to install on first boot (`apollo,rss`) from the image's registry snapshot; one already installed is skipped, and removing the variable uninstalls nothing |
 | `SPACES_CREDENTIAL_<ID>` | unset                       | seeds a plugin's workspace key once, when none is stored (`SPACES_CREDENTIAL_APOLLO`); a key changed in Settings wins from then on                                 |
 
@@ -292,22 +292,22 @@ and credentials nobody can decrypt.
 
 Restoring, and rolling back an upgrade, is [upgrade.md](upgrade.md#rollback).
 
-## Split roles (optional)
+## Web and worker
 
-The shipped compose runs web and worker as two processes in one container,
-which is right for one box. To run them apart, overlay the split file:
+The shipped compose runs the web app (`app`, `ROLE=web`) and the background
+worker (`worker`, `ROLE=worker`) as two containers from the same image, on the
+same `./data` and the same `DATABASE_URL`; the two talk only through Postgres.
+A worker that crashes or runs out of memory restarts on its own without
+taking the web app down. `docker compose ps` shows both `healthy`. The worker
+container runs no HTTP server, so its healthcheck reads its own heartbeat row
+instead: stop the worker process and that container goes `unhealthy` within a
+minute while the web container stays `healthy`. Both containers run
+migrations on boot; the worker waits for the web container to be healthy, so
+only one of them ever applies them.
 
-```bash
-curl -fsSLO https://raw.githubusercontent.com/AnishxBadri/Spaces/main/docker-compose.split.yml
-docker compose -f docker-compose.yml -f docker-compose.split.yml up -d
-```
-
-`app` becomes `ROLE=web` and a `worker` service joins it on the same
-`./data` and the same `DATABASE_URL`; the two talk only through Postgres.
-`docker compose ps` shows both `healthy`. The worker container runs no HTTP
-server, so its healthcheck reads its own heartbeat row instead: stop the
-worker process and that container goes `unhealthy` within a minute while the
-web container stays `healthy`.
+A host that can run only one container (Unraid, a single PaaS service) sets
+`ROLE=all` instead, which runs both processes in one container; that is what
+the one-click templates do.
 
 ## Checking that the worker is running
 
@@ -326,8 +326,8 @@ row every 15 seconds and `/api/health` reports it:
 `worker.status` is `ok`, `stale` (no beat for 60 seconds) or `absent` (no row
 yet). A stale or absent worker does not change the HTTP code: the web
 container must never be restarted because the worker died. Only an
-unreachable database answers `503` with `"status": "degraded"`. In the
-single-container default, either process dying stops the container and
+unreachable database answers `503` with `"status": "degraded"`. With
+`ROLE=all`, either process dying stops the container and
 `restart: unless-stopped` brings it back.
 
 ## Not covered here

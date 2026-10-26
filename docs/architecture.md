@@ -20,7 +20,7 @@ Worker ── jobs · plugins ─────┘
                               └── ./data: blobs (local or S3) · secret.key · plugins/
 ```
 
-- Two Node processes (web, worker), one database, one `./data` directory. Production is two containers, app and Postgres; TLS comes from an optional Caddy overlay.
+- Two Node processes (web, worker), one database, one `./data` directory. Production is three containers, web app, worker and Postgres, all but Postgres from one image; `ROLE=all` runs web and worker in one container for single-container hosts. TLS comes from an optional Caddy overlay.
 - Required env is `DATABASE_URL` and `APP_URL`. Migrations run at boot. Backup is the database and `./data` together, or neither.
 - **Plugins are not in the image.** They install from the running app into `./data/plugins`; only the worker runs them, and they write only through the SDK's ports. The web process reads their manifests and never runs their code. Contract: `docs/spec-plugin-sdk.md`.
 

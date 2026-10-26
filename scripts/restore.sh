@@ -131,11 +131,14 @@ maint() {
 
 # --- refusals, each naming what to do instead -------------------------------
 
-if [ -n "$(compose ps --status running --quiet app 2>/dev/null || true)" ]; then
+# Each service is asked on its own: a stack without a `worker` service makes
+# `ps app worker` fail outright, which would read as nothing running.
+running() { [ -n "$(compose ps --status running --quiet "$1" 2>/dev/null || true)" ]; }
+if running app || running worker; then
   echo '[restore] the app is running. Loading a dump underneath a live app' >&2
   echo '[restore] gives you a database half of one workspace and half of' >&2
   echo '[restore] another. Stop it first, then re-run this script:' >&2
-  die "  docker compose stop app"
+  die "  docker compose stop app worker"
 fi
 
 compose up -d --wait --wait-timeout 120 db >/dev/null ||

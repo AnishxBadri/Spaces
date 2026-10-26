@@ -126,15 +126,19 @@ journal_of() {
 use_image() {
   local dir
   dir="$(journal_dir_for "$1")"
+  # Both halves run the image under test, and both migrate on boot, so the
+  # journal override goes to both.
   {
     echo 'services:'
-    echo '  app:'
-    echo "    image: $1"
-    echo '    pull_policy: never'
-    if [ -n "$dir" ]; then
-      echo '    volumes:'
-      echo "      - $dir:/app/packages/db/drizzle:ro"
-    fi
+    for svc in app worker; do
+      echo "  $svc:"
+      echo "    image: $1"
+      echo '    pull_policy: never'
+      if [ -n "$dir" ]; then
+        echo '    volumes:'
+        echo "      - $dir:/app/packages/db/drizzle:ro"
+      fi
+    done
   } >"$WORK/image.yml"
 }
 old_journal_mount=()
@@ -155,6 +159,7 @@ wait_health() {
 }
 collect_logs() {
   docker compose logs --no-color app >"$OUT/${CURRENT_LOG:-app}.log" 2>&1 || true
+  docker compose logs --no-color worker >"$OUT/${CURRENT_LOG:-app}-worker.log" 2>&1 || true
   docker compose logs --no-color db >"$OUT/db.log" 2>&1 || true
 }
 sig() {
@@ -242,7 +247,7 @@ collect_logs
 # --- 4. the new image against the same volume ------------------------------------
 CURRENT_LOG=new-image
 say "step 4: booting $TO against the same volume and the same ./data"
-docker compose stop app >>"$LOG" 2>&1
+docker compose stop app worker >>"$LOG" 2>&1
 use_image "$TO"
 T0=$(date +%s%3N)
 if ! docker compose up -d --wait --wait-timeout 300 >>"$LOG" 2>&1 || ! wait_health; then
@@ -265,7 +270,7 @@ collect_logs
 
 # --- 6. the reverse: the old image against the upgraded database ------------------
 say "step 6: the old image against the upgraded database"
-docker compose stop app >>"$LOG" 2>&1
+docker compose stop app worker >>"$LOG" 2>&1
 mkdir -p "$WORK/olddata"
 set +e
 REFUSAL="$(timeout 180 docker run --rm --network "$NET" -e DATABASE_URL="$PGURL" \

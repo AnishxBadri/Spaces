@@ -75,4 +75,4 @@ gh attestation verify oci://ghcr.io/anishxbadri/spaces@<digest> --repo AnishxBad
 
 ## What it adds up to
 
-An angel or a two-partner fund gets, in one box they run: a market map and research that compound, a spreadsheet-grade CRM that already speaks investing, and a financial core that answers what you invested, what you own, what it is worth and what it has returned. It is computed from an event ledger an auditor would recognise. Fund administration (capital calls, waterfalls, LP portals) is a different product for a different buyer, and staying out of it keeps this one two containers small.
+An angel or a two-partner fund gets, in one box they run: a market map and research that compound, a spreadsheet-grade CRM that already speaks investing, and a financial core that answers what you invested, what you own, what it is worth and what it has returned. It is computed from an event ledger an auditor would recognise. Fund administration (capital calls, waterfalls, LP portals) is a different product for a different buyer, and staying out of it keeps this one three containers small.

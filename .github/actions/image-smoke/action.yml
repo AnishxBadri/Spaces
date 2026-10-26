@@ -42,6 +42,9 @@ runs:
           app:
             image: ${IMAGE}
             pull_policy: never
+          worker:
+            image: ${IMAGE}
+            pull_policy: never
         YAML
         echo "COMPOSE_FILE=docker-compose.yml:docker-compose.ci.yml" >> "$GITHUB_ENV"
         COMPOSE_FILE=docker-compose.yml:docker-compose.ci.yml \

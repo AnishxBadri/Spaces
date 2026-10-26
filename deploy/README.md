@@ -1,7 +1,10 @@
 # One-click templates
 
-The same two-container shape as `docker-compose.yml`, written the way four
-platforms ask for it. Every template pins `ghcr.io/anishxbadri/spaces:0.1.0`
+The app as one container plus Postgres, written the way four platforms ask
+for it. `docker-compose.yml` runs the web server and the worker as two
+containers; these templates leave `ROLE` at its default, `all`, which runs
+both in the one app container, because not every platform here makes a
+second service from the same image easy. Every template pins `ghcr.io/anishxbadri/spaces:0.1.0`
 and never `latest`; upgrading is changing that tag after a backup
 ([docs/upgrade.md](../docs/upgrade.md)).
 

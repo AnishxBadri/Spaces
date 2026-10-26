@@ -2,7 +2,7 @@
 layout: ../../layouts/Docs.astro
 eyebrow: Docs · Self-host
 title: Self-host Spaces
-description: Two containers, one directory, about five minutes. What you need, the compose file, first run, HTTPS, backups, upgrades and every setting the app reads.
+description: Three containers, one directory, about five minutes. What you need, the compose file, first run, HTTPS, backups, upgrades and every setting the app reads.
 ---
 
 ## Requirements
@@ -26,20 +26,39 @@ This is the whole file, less its comments:
 
 ```yaml
 name: spaces
+
+x-env: &env
+  DATABASE_URL: postgresql://${POSTGRES_USER:-spaces}:${POSTGRES_PASSWORD:-spaces}@db:5432/${POSTGRES_DB:-spaces}
+  APP_URL: ${APP_URL:-http://localhost:3000}
+  # MASTER_KEY:
+  # STORAGE_DRIVER: local
+
 services:
   app:
-    image: ghcr.io/anishxbadri/spaces:0.1.0
+    image: &image ghcr.io/anishxbadri/spaces:0.1.0
     ports:
       - '3000:3000'
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-spaces}:${POSTGRES_PASSWORD:-spaces}@db:5432/${POSTGRES_DB:-spaces}
-      APP_URL: ${APP_URL:-http://localhost:3000}
-      # MASTER_KEY:
-      # STORAGE_DRIVER: local
+      <<: *env
+      ROLE: web
     volumes:
       - ./data:/data
     depends_on:
       db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    image: *image
+    environment:
+      <<: *env
+      ROLE: worker
+    volumes:
+      - ./data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+      app:
         condition: service_healthy
     restart: unless-stopped
 
@@ -70,7 +89,7 @@ volumes:
   ollama_models:
 ```
 
-Two containers start: `app`, which runs the web server and the background worker, and `db`, Postgres 17 with pgvector. Postgres is not published on the host. The third service, `ollama`, starts only when you ask for it.
+Three containers start: `app`, the web server; `worker`, the background worker, from the same image and sharing `./data`; and `db`, Postgres 17 with pgvector. A worker that crashes restarts on its own without taking the web server down. Postgres is not published on the host. The `ollama` service starts only when you ask for it. Settings in the shared `x-env` block reach both `app` and `worker`.
 
 Settings go in a `.env` file beside the compose file, which Compose reads on its own. Set a database password before the first boot, because Postgres takes it from the environment only when it creates the volume:
 
@@ -167,7 +186,7 @@ On the HTTPS stack, pass both compose files: `--file docker-compose.yml --file d
 ### Restore
 
 ```sh
-docker compose stop app
+docker compose stop app worker
 ./scripts/restore.sh backups/20260930-030000
 docker compose up -d
 ```
@@ -203,8 +222,8 @@ Only `DATABASE_URL` and `APP_URL` are required, and the compose file sets both. 
 | `S3_ENDPOINT`          | AWS                         | The endpoint for R2, B2, MinIO or Garage, e.g. `https://<account>.r2.cloudflarestorage.com`. Leave unset for AWS.                           |
 | `S3_REGION`            | `us-east-1`                 | `auto` works for R2.                                                                                                                        |
 | `S3_FORCE_PATH_STYLE`  | `true`                      | Right for R2, B2, MinIO and Garage. Set `false` only for AWS virtual-hosted style.                                                          |
-| `ROLE`                 | `all`                       | `all` runs web and worker in one container. `web` and `worker` split them; see `docker-compose.split.yml`.                                  |
-| `POSTGRES_USER`        | `spaces`                    | Read by the compose file for both containers.                                                                                               |
+| `ROLE`                 | `all`                       | The compose file sets `web` on `app` and `worker` on `worker`. `all` runs both in one container, for hosts that run only one.               |
+| `POSTGRES_USER`        | `spaces`                    | Read by the compose file for every container.                                                                                               |
 | `POSTGRES_PASSWORD`    | `spaces`                    | Read by the compose file. Set it before the first boot.                                                                                     |
 | `POSTGRES_DB`          | `spaces`                    | Read by the compose file.                                                                                                                   |
 
@@ -212,7 +231,7 @@ With `STORAGE_DRIVER=s3`, `./data` still holds `secret.key`, so it still needs b
 
 ## Local models with Ollama
 
-The compose file carries an optional Ollama service under a profile, so the default stays at two containers:
+The compose file carries an optional Ollama service under a profile, so the default stays at three containers:
 
 ```sh
 docker compose --profile ollama up -d
