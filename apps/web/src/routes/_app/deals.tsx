@@ -443,6 +443,7 @@ function DealsPage() {
             total={deals.rows.length}
             activeId={activeId ?? null}
             snapshot={vs.snapshot}
+            plural="Deals"
             onApply={(v) => {
               vs.apply(v)
               selectView(v?.id ?? null)

@@ -1,10 +1,9 @@
 import { flexRender } from '@tanstack/react-table'
 import type { Column, Header, RowData, Table } from '@tanstack/react-table'
-import { ArrowUpDown, ChevronsUpDown, Columns3, Plus } from 'lucide-react'
-import { useRef } from 'react'
-import type { ReactNode } from 'react'
+import { ChevronsUpDown, Plus } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import type { ComponentProps, ReactNode, RefObject } from 'react'
 import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
-import { Button } from '#/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -18,6 +17,7 @@ import { Checkbox } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
 import { Tabs } from '#/components/ui/tabs'
 import type { TabItem } from '#/components/ui/tabs'
+import { ListZeroRow } from './list-states'
 import type { RowSelection } from './selection-bar'
 import { cn } from '#/lib/utils'
 
@@ -25,6 +25,8 @@ declare module '@tanstack/react-table' {
   // A column of comparable figures: its head right-aligns over `numeric` cells.
   interface ColumnMeta<TData extends RowData, TValue> {
     numeric?: boolean
+    /** An attribute a model fills: its head carries the `AI` tag. */
+    ai?: boolean
   }
 }
 
@@ -59,6 +61,20 @@ const TRAILING_WIDTH = 40
 const grouped = (n: number) => n.toLocaleString('en-US')
 
 /**
+ * What sits pinned between the folded head bar and the column head: nothing
+ * (a shelf, whose bar scrolls away), a list's 44px view bar, or the bar with
+ * its 36px filter-chips row under it.
+ */
+export type TablePin = 'head' | 'bar' | 'chips'
+
+const HEAD_PIN: Record<TablePin, string> = {
+  head: PIN_UNDER_HEAD_BAR,
+  // The folded bar's line (top-22 / md:top-10) plus 44px, then plus 36px.
+  bar: 'sticky top-33 z-sticky md:top-21',
+  chips: 'sticky top-42 z-sticky md:top-30',
+}
+
+/**
  * What a paged surface tells its foot. Absent on every unpaged
  * surface, which keeps reading `getPreFilteredRowModel()` — those tables
  * hold every row they could show, so the pre-filtered model *is* the truth
@@ -85,6 +101,8 @@ export type TablePage = {
 export type ColumnAction = {
   label: string
   onSelect: () => void
+  /** Opens a window: runs once the menu has let go of focus. */
+  opens?: boolean | undefined
 }
 
 /**
@@ -107,6 +125,8 @@ export function RecordTable<T>({
   page,
   columnActions,
   select,
+  notice,
+  pinUnder = 'head',
 }: {
   table: Table<T>
   /** Column pinned to the left edge while the rest scrolls under it. */
@@ -128,11 +148,19 @@ export function RecordTable<T>({
    */
   onRowClick?: (row: T) => void
   /**
-   * Set only where the rows arrive a page at a time. The foot then counts
-   * against the server's total and ends on "load N more" instead of "end" —
-   * the same 32px lane, the same two slots, no second table chrome.
+   * Set only where the rows arrive a page at a time. The foot shows only
+   * while another page exists: what is loaded of the server's total, and
+   * `Load N more`.
    */
   page?: TablePage
+  /**
+   * Drawn in place of the rows: the list still loading, failed, or a filter
+   * that matched nothing with its way out. Absent, an empty table says
+   * `Nothing matches that filter.` alone.
+   */
+  notice?: ReactNode
+  /** What is pinned above the column head; the folded head bar alone by default. */
+  pinUnder?: TablePin
   /** The surface's verbs for one column, by its id; none when omitted. */
   columnActions?: (columnId: string) => ReadonlyArray<ColumnAction>
   /** Row checkboxes; absent, the table has none. */
@@ -141,6 +169,22 @@ export function RecordTable<T>({
   const headRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const rows = table.getRowModel().rows
+  const more = useMoreToTheRight(bodyRef, table.getTotalSize())
+  const resizing = table.getState().columnSizingInfo.isResizingColumn
+  // The dragged column's right edge, from the body's left: where the guide
+  // runs while the drag lasts.
+  const guideAt =
+    resizing === false
+      ? null
+      : (() => {
+          const cols = table.getVisibleLeafColumns()
+          const at = cols.findIndex((c) => c.id === resizing)
+          if (at === -1) return null
+          return cols
+            .slice(0, at + 1)
+            .reduce((x, c) => x + c.getSize(), select ? SELECT_WIDTH : 0)
+        })()
+  const instead = notice ?? (rows.length === 0 ? <ListZeroRow /> : null)
   const keys = select ? rows.map((r) => select.keyOf(r.original)) : []
   const allChecked =
     select !== undefined &&
@@ -168,7 +212,7 @@ export function RecordTable<T>({
           const body = bodyRef.current
           if (body && e.deltaX !== 0) body.scrollLeft += e.deltaX
         }}
-        className={cn('overflow-hidden bg-paper', PIN_UNDER_HEAD_BAR)}
+        className={cn('overflow-hidden bg-paper', HEAD_PIN[pinUnder])}
       >
         <table
           role="presentation"
@@ -210,126 +254,171 @@ export function RecordTable<T>({
         </table>
       </div>
 
-      <div
-        ref={bodyRef}
-        data-table-body
-        onScroll={(e) => {
-          const head = headRef.current
-          if (head) head.scrollLeft = e.currentTarget.scrollLeft
-        }}
-        className="overflow-x-auto overflow-y-hidden"
-      >
-        <table
-          role="presentation"
-          className="table-fixed border-collapse text-ui"
-          style={tableStyle}
+      <div className="relative">
+        <div
+          ref={bodyRef}
+          data-table-body
+          onScroll={(e) => {
+            const head = headRef.current
+            if (head) head.scrollLeft = e.currentTarget.scrollLeft
+            more.check()
+          }}
+          className="relative overflow-x-auto overflow-y-hidden"
         >
-          <tbody role="rowgroup">
-            {rows.map((row) => (
-              <tr
-                key={row.id}
-                role="row"
-                onClick={
-                  onRowClick ? () => onRowClick(row.original) : undefined
-                }
-                className={cn(
-                  'group h-row border-b border-rule transition-colors duration-150 ease-out-quart hover:bg-row-hover',
-                  onRowClick && 'cursor-pointer',
-                )}
-              >
-                {select ? (
-                  <SelectCell
-                    checked={select.rows.has(select.keyOf(row.original))}
-                    visible={select.rows.active}
-                    name={select.nameOf(row.original)}
-                    onChange={(on) =>
-                      select.rows.set([select.keyOf(row.original)], on)
-                    }
-                  />
-                ) : null}
-                {row.getVisibleCells().map((cell) => (
-                  <td
-                    key={cell.id}
-                    role="cell"
-                    style={{ width: cell.column.getSize() }}
-                    className={cn(
-                      'h-row px-1 py-0 align-middle',
-                      cell.column.id === stickyColumnId &&
-                        // Opaque at rest and on hover: a translucent tint here
-                        // would let the scrolled-under columns bleed through.
-                        'sticky z-10 bg-paper transition-colors duration-150 ease-out-quart group-hover:bg-row-hover',
-                      cell.column.id === stickyColumnId && stickyLeft,
-                    )}
-                  >
-                    {/* The row bound: the 36px row less its 1px rule. Content that
-                        would grow the row is clipped instead. */}
-                    <div
-                      data-cell
-                      className="flex h-full max-h-[calc(var(--spacing-row)-1px)] min-w-0 flex-col justify-center overflow-hidden"
+          {guideAt === null ? null : (
+            <div
+              aria-hidden
+              data-resize-guide
+              className="pointer-events-none absolute inset-y-0 z-20 border-l border-dashed border-foreground"
+              style={{ left: guideAt - 1 }}
+            />
+          )}
+          <table
+            role="presentation"
+            className="table-fixed border-collapse text-ui"
+            style={tableStyle}
+          >
+            <tbody role="rowgroup">
+              {instead !== null
+                ? null
+                : rows.map((row) => (
+                    <tr
+                      key={row.id}
+                      role="row"
+                      onClick={
+                        onRowClick ? () => onRowClick(row.original) : undefined
+                      }
+                      className={cn(
+                        'group h-row border-b border-rule transition-colors duration-150 ease-out-quart hover:bg-row-hover',
+                        onRowClick && 'cursor-pointer',
+                      )}
                     >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </div>
-                  </td>
-                ))}
-                <td role="cell" />
-              </tr>
-            ))}
-          </tbody>
-          {rows.length > 0 ? (
-            // The foot: how much of the ledger is on the page, and where it ends.
-            <tfoot role="rowgroup">
-              <tr role="row" className="h-8 border-t border-hairline">
-                <td
-                  role="cell"
-                  colSpan={
-                    table.getVisibleLeafColumns().length + 1 + (select ? 1 : 0)
-                  }
-                  className="px-2 align-middle"
+                      {select ? (
+                        <SelectCell
+                          checked={select.rows.has(select.keyOf(row.original))}
+                          visible={select.rows.active}
+                          name={select.nameOf(row.original)}
+                          onChange={(on) =>
+                            select.rows.set([select.keyOf(row.original)], on)
+                          }
+                        />
+                      ) : null}
+                      {row.getVisibleCells().map((cell) => (
+                        <td
+                          key={cell.id}
+                          role="cell"
+                          style={{ width: cell.column.getSize() }}
+                          className={cn(
+                            'h-row px-1 py-0 align-middle',
+                            cell.column.id === stickyColumnId &&
+                              // Opaque at rest and on hover: a translucent tint here
+                              // would let the scrolled-under columns bleed through.
+                              'sticky z-10 bg-paper transition-colors duration-150 ease-out-quart group-hover:bg-row-hover',
+                            cell.column.id === stickyColumnId && STICKY_RULE,
+                            cell.column.id === stickyColumnId && stickyLeft,
+                          )}
+                        >
+                          {/* The row bound: the 36px row less its 1px rule. Content that
+                        would grow the row is clipped instead. */}
+                          <div
+                            data-cell
+                            className="flex h-full max-h-[calc(var(--spacing-row)-1px)] min-w-0 flex-col justify-center overflow-hidden"
+                          >
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext(),
+                            )}
+                          </div>
+                        </td>
+                      ))}
+                      <td role="cell" />
+                    </tr>
+                  ))}
+            </tbody>
+            {instead === null && page?.hasMore === true ? (
+              // The foot, while paging: how much of the list is loaded, and more.
+              <tfoot role="rowgroup">
+                <tr
+                  role="row"
+                  data-table-foot
+                  className="h-8 border-t border-hairline"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="field-label text-graphite">
-                      {grouped(rows.length)} of{' '}
-                      {grouped(
-                        page
-                          ? page.total
-                          : table.getPreFilteredRowModel().rows.length,
-                      )}
-                    </span>
-                    {page?.hasMore ? (
+                  <td
+                    role="cell"
+                    colSpan={
+                      table.getVisibleLeafColumns().length +
+                      1 +
+                      (select ? 1 : 0)
+                    }
+                    className="px-2 align-middle"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="field-label text-graphite">
+                        {grouped(rows.length)} of {grouped(page.total)}
+                      </span>
                       <button
                         type="button"
                         onClick={page.onLoadMore}
                         disabled={page.loading}
-                        className="focus-ring mono text-micro text-graphite transition-colors duration-150 ease-out-quart hover:text-foreground disabled:text-graphite"
+                        className="focus-ring rounded-md text-label text-foreground underline-offset-4 hover:underline disabled:text-graphite disabled:no-underline"
                       >
                         {page.loading
-                          ? 'loading…'
-                          : `load ${grouped(page.step)} more`}
+                          ? 'Loading…'
+                          : `Load ${grouped(page.step)} more`}
                       </button>
-                    ) : (
-                      <span className="mono text-micro text-graphite">end</span>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            </tfoot>
-          ) : null}
-        </table>
+                    </div>
+                  </td>
+                </tr>
+              </tfoot>
+            ) : null}
+          </table>
 
-        {rows.length === 0 ? (
-          // Pinned to the left of the scroll viewport: centring it on the table's
-          // full width would park the message off-screen once the grid is wider
-          // than the pane and the user has scrolled.
-          <p className="sticky left-0 w-full px-3 py-6 text-center text-ui text-graphite">
-            Nothing matches that filter.
-          </p>
+          {instead}
+        </div>
+        {more.right ? (
+          <div
+            aria-hidden
+            data-table-fade
+            className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-linear-to-l from-paper to-transparent"
+          />
         ) : null}
       </div>
     </div>
   )
+}
+
+/** The rule on the pinned column's right edge; a border would stay behind
+ *  in a collapsed table while the cell scrolls over it. */
+const STICKY_RULE =
+  'after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-rule'
+
+/**
+ * Whether the sideways scroller holds more to the right than it shows: the
+ * table's right edge fades while it does. Rechecked on scroll, on resize and
+ * when the columns' total width moves.
+ */
+function useMoreToTheRight(
+  ref: RefObject<HTMLDivElement | null>,
+  width: number,
+): { right: boolean; check: () => void } {
+  const [right, setRight] = useState(false)
+  const check = () => {
+    const el = ref.current
+    if (!el) return
+    setRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
+  }
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const update = () =>
+      setRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
+    update()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [ref, width])
+  return { right, check }
 }
 
 /** One row's checkbox, shown on hover, focus, or while any row is checked. */
@@ -393,6 +482,7 @@ function HeaderCell<T>({
   actions: ReadonlyArray<ColumnAction>
 }) {
   const { column } = header
+  const afterClose = useRef<(() => void) | null>(null)
   const sorted = column.getIsSorted()
   const numeric = column.columnDef.meta?.numeric === true
   const title =
@@ -424,6 +514,7 @@ function HeaderCell<T>({
         numeric ? 'text-right' : 'text-left',
         sticky && 'sticky z-20 bg-paper',
         sticky && stickyLeft,
+        sticky && STICKY_RULE,
       )}
     >
       {column.getCanSort() || column.getCanHide() || actions.length > 0 ? (
@@ -444,6 +535,7 @@ function HeaderCell<T>({
             <span className="truncate">
               {flexRender(column.columnDef.header, header.getContext())}
             </span>
+            {column.columnDef.meta?.ai === true ? <AiTag /> : null}
             {sorted === 'asc' ? (
               <span className="shrink-0">↑</span>
             ) : sorted === 'desc' ? (
@@ -451,7 +543,17 @@ function HeaderCell<T>({
             ) : null}
             {numeric ? null : <SortChevron className="ml-auto" />}
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-50">
+          <DropdownMenuContent
+            align="start"
+            className="w-50"
+            onCloseAutoFocus={(e) => {
+              const run = afterClose.current
+              if (run === null) return
+              e.preventDefault()
+              afterClose.current = null
+              run()
+            }}
+          >
             {column.getCanSort() ? (
               <>
                 <DropdownMenuItem onSelect={() => column.toggleSorting(false)}>
@@ -486,15 +588,24 @@ function HeaderCell<T>({
               <DropdownMenuSeparator />
             ) : null}
             {actions.map((a) => (
-              <DropdownMenuItem key={a.label} onSelect={a.onSelect}>
+              <DropdownMenuItem
+                key={a.label}
+                onSelect={() => {
+                  if (a.opens === true) afterClose.current = a.onSelect
+                  else a.onSelect()
+                }}
+              >
                 {a.label}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
       ) : (
-        <span className="block truncate">
-          {flexRender(column.columnDef.header, header.getContext())}
+        <span className="flex items-center gap-1.5 truncate">
+          <span className="truncate">
+            {flexRender(column.columnDef.header, header.getContext())}
+          </span>
+          {column.columnDef.meta?.ai === true ? <AiTag /> : null}
         </span>
       )}
 
@@ -525,7 +636,42 @@ function HeaderCell<T>({
 }
 
 /**
- * The right lane of a list's bar: Sort · Columns · the text box, in that
+ * A bar tool — Filter, Sort, Columns: plain sans ink at rest with no icon,
+ * an outline box carrying its state while it is doing something
+ * (`Filter 1`, `Sort Last contact ↓`, `Columns 9/15`).
+ */
+export function ToolButton({
+  active,
+  className,
+  ...props
+}: ComponentProps<'button'> & { active: boolean }) {
+  return (
+    <button
+      type="button"
+      data-tool-active={active}
+      {...props}
+      className={cn(
+        'focus-ring flex h-6.5 shrink-0 items-center gap-1.5 rounded-md border px-2 text-ui whitespace-nowrap text-foreground transition-colors duration-150 ease-out-quart',
+        active
+          ? 'border-hairline bg-paper hover:bg-bone'
+          : 'border-transparent hover:bg-paper data-[state=open]:bg-paper',
+        className,
+      )}
+    />
+  )
+}
+
+/** The tag on an AI attribute's column head. */
+function AiTag() {
+  return (
+    <span className="shrink-0 border border-rule px-1 mono text-field text-graphite">
+      AI
+    </span>
+  )
+}
+
+/**
+ * The right lane of a list's bar: Sort · Columns · the search box, in that
  * order, after the views' Filter. One lane for every list, object or shelf.
  */
 export function TableTools<T>({
@@ -550,7 +696,7 @@ export function TableTools<T>({
         onChange={(e) => onFilterChange(e.target.value)}
         placeholder={filterPlaceholder}
         aria-label={filterLabel}
-        className="ml-1 h-7 w-52 bg-paper text-ui"
+        className="ml-1 h-6.5 w-45 bg-paper text-ui"
       />
     </>
   )
@@ -573,15 +719,14 @@ export function SortMenu<T>({ table }: { table: Table<T> }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="xs" variant={active ? 'outline' : 'ghost'}>
-          <ArrowUpDown className="size-3" strokeWidth={2} />
+        <ToolButton active={active !== undefined}>
           Sort
           {active ? (
-            <span className="text-graphite">
+            <span>
               {columnTitle(active)} {desc ? '↓' : '↑'}
             </span>
           ) : null}
-        </Button>
+        </ToolButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
@@ -624,15 +769,14 @@ export function ColumnsMenu<T>({ table }: { table: Table<T> }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="xs" variant={hiddenCount > 0 ? 'outline' : 'ghost'}>
-          <Columns3 className="size-3" strokeWidth={2} />
+        <ToolButton active={hiddenCount > 0}>
           Columns
           {hiddenCount > 0 ? (
-            <span className="tabular text-graphite">
+            <span className="tabular mono text-micro">
               {hideable.length - hiddenCount}/{hideable.length}
             </span>
           ) : null}
-        </Button>
+        </ToolButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
@@ -646,9 +790,9 @@ export function ColumnsMenu<T>({ table }: { table: Table<T> }) {
             <button
               type="button"
               onClick={() => table.resetColumnVisibility()}
-              className="focus-ring mono text-field text-graphite hover:text-foreground"
+              className="focus-ring rounded-md text-label text-graphite hover:text-foreground"
             >
-              reset
+              Reset
             </button>
           ) : null}
         </div>

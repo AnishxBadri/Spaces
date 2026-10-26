@@ -65,7 +65,7 @@ export function columnRunConfirm(
   ]
   if (estimate.calls === 0)
     return {
-      title: `Nothing to run on “${estimate.viewName}”`,
+      title: `Nothing to run on ${estimate.viewName}`,
       body:
         estimate.total === 0
           ? 'The view holds no records.'
@@ -75,9 +75,9 @@ export function columnRunConfirm(
       kind: 'primary',
     }
   return {
-    title: `Run ${estimate.attributeName} on “${estimate.viewName}”?`,
-    body: `One call per record the saved view holds without a proposal. Each answer lands in Review as a suggestion under one header; nothing is written until it is accepted. The run stops at today’s AI cap.`,
+    title: `Run ${estimate.attributeName} on ${estimate.viewName}?`,
     rows,
+    note: 'Lands in Review · stops at today’s cap',
     action: `Run ${count(estimate.calls)}`,
     kind: 'primary',
   }

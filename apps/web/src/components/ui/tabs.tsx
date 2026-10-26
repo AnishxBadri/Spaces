@@ -27,6 +27,13 @@ export type TabItem<T extends string> = {
   label: ReactNode
   /** The mono count beside the label; none is printed at 0. */
   count?: number | undefined
+  /**
+   * Print a 0 count too: a filtered view whose filter matched nothing,
+   * where the 0 is the news. Every other tab hides its 0.
+   */
+  showZero?: boolean | undefined
+  /** Drawn after the count: a view's unsaved-changes square. */
+  suffix?: ReactNode
 }
 
 /** Where a key moves the selection from `current` among `count` tabs, or
@@ -108,8 +115,9 @@ export function Tabs<T extends string>({
     >
       {items.map((t, i) => {
         const open = i === selected
-        const empty = t.count === 0
-        const counted = t.count !== undefined && t.count > 0
+        const counted =
+          t.count !== undefined && (t.count > 0 || t.showZero === true)
+        const empty = t.count === 0 && !counted
         return (
           <button
             key={t.id}
@@ -148,6 +156,7 @@ export function Tabs<T extends string>({
                 {t.count}
               </span>
             ) : null}
+            {t.suffix}
           </button>
         )
       })}

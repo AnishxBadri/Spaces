@@ -1,6 +1,5 @@
 import { useRouter } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -103,10 +102,7 @@ export function CreateCompanyDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button size="sm" shortcut={hotkey?.toUpperCase()}>
-            <Plus className="size-4" strokeWidth={2} />
-            New company
-          </Button>
+          <Button shortcut={hotkey?.toUpperCase()}>New company</Button>
         )}
       </DialogTrigger>
       <DialogContent

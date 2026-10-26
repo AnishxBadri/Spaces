@@ -5,8 +5,8 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Plus, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -14,7 +14,7 @@ import {
 } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { ViewBar } from '#/components/views/view-bar'
+import { ViewBar, viewBarPin } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
 import { useColumnRun } from '#/components/views/column-run'
 import { cn } from '#/lib/utils'
@@ -28,14 +28,15 @@ import {
 } from '#/components/attributes/value-editor'
 import { AiCell, AiCellsProvider } from '#/components/attributes/ai-cell'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
-import { EmptyState } from '#/components/empty-state'
+import { EmptyRow } from '#/components/ledger-section'
+import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
 import { RecordMark } from '#/components/record/record-parts'
 import { TemplatePicker } from '#/components/templates'
 import {
-  attributeColumnMeta,
   DateCell,
   InitialBadge,
   RecordLinkCell,
+  registryColumnMeta,
 } from '#/components/table/cells'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { identityFirst } from '#/lib/attributes/identity-first'
@@ -45,7 +46,14 @@ import {
   TableTools,
 } from '#/components/table/record-table'
 import { PageHeader } from '#/components/page-header'
-import { ImportAction } from '#/components/import/import-action'
+import { useImportVerb } from '#/components/import/import-action'
+import { ListMenu } from '#/components/table/list-menu'
+import {
+  ListErrorRow,
+  ListLoadingRow,
+  ListZeroRow,
+} from '#/components/table/list-states'
+import { useEditAttribute } from '#/components/table/edit-attribute'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { useListEnrich } from '#/components/table/bulk-enrich-dialog'
 import { statColumns } from '#/components/table/stat-columns'
@@ -226,7 +234,7 @@ function PeoplePage() {
     placeholderData: keepPreviousData,
   })
   const pages = records.data?.pages
-  const loaded = useMemo(() => pages ?? [initial], [pages, initial])
+  const loaded = useMemo(() => pages ?? [], [pages])
   const rows = useMemo(() => loaded.flatMap((p) => p.rows), [loaded])
   // Names for the reference cells (Companies among them), every loaded page.
   const refNames = useMemo(() => {
@@ -251,6 +259,14 @@ function PeoplePage() {
     rows,
     view: { conditions: vs.conditions, q },
     refresh,
+  })
+  const importVerb = useImportVerb('people')
+  const editAttribute = useEditAttribute({
+    registry,
+    objectLabel: 'person',
+    objectPlural: 'People',
+    fillFrom: 'person',
+    onSaved: refresh,
   })
   const selectView = (id: string | null) =>
     void navigate({ to: '/people', search: id === null ? {} : { view: id } })
@@ -311,9 +327,13 @@ function PeoplePage() {
           id: `attr:${def.slug}`,
           header: def.name,
           size: def.type === 'text' ? 180 : 140,
-          meta: attributeColumnMeta(def.type),
+          meta: registryColumnMeta(def),
           cell: (info) => (
-            <AiCell def={def} entityId={info.row.original.id}>
+            <AiCell
+              def={def}
+              entityId={info.row.original.id}
+              value={info.getValue()}
+            >
               <ValueEditor
                 def={def}
                 value={info.getValue()}
@@ -361,37 +381,61 @@ function PeoplePage() {
     columnResizeMode: 'onChange',
   })
 
+  // First run: the list holds nothing at all, so there is nothing to view,
+  // filter or sort — one row that creates, and the head's `···`.
+  const firstRun = allTotal === 0 && rows.length === 0
+  const filtered = vs.conditions.length > 0 || q !== ''
+  const notice = records.isError ? (
+    <ListErrorRow plural="People" onRetry={() => void records.refetch()} />
+  ) : records.data === undefined ? (
+    <ListLoadingRow plural="People" />
+  ) : rows.length === 0 ? (
+    <ListZeroRow
+      onClear={
+        filtered
+          ? () => {
+              vs.setConditions([])
+              setGlobalFilter('')
+            }
+          : undefined
+      }
+    />
+  ) : undefined
+  const listMenu = <ListMenu label="People" verbs={[importVerb, enrich.verb]} />
+
   return (
     <div className="flex flex-col">
       <PageHeader
         title="People"
         action={
-          <>
-            <ImportAction objectSlug="people" />
-            <CreatePersonDialog
-              companies={companies}
-              registry={registry}
-              hotkey="c"
-            />
-            {enrich.menu}
-          </>
+          firstRun ? (
+            listMenu
+          ) : (
+            <>
+              <CreatePersonDialog
+                companies={companies}
+                registry={registry}
+                hotkey="c"
+              />
+              {listMenu}
+            </>
+          )
         }
       />
-      {rows.length === 0 && vs.conditions.length === 0 && q === '' ? (
-        <div className="px-8 pb-8">
-          <EmptyState
-            icon={Users}
-            title="No people yet"
-            body="Add someone by name and email. Email is identity — the same person arriving from two directions becomes one record."
-            action={
-              <CreatePersonDialog companies={companies} registry={registry} />
-            }
-            hint="Gmail and calendar sync will create these automatically later — through the same dedupe gate."
+      {firstRun ? (
+        <div className="px-8 pt-6 pb-8">
+          <CreatePersonDialog
+            companies={companies}
+            registry={registry}
+            hotkey="c"
+            trigger={<EmptyRow name="People" />}
           />
         </div>
       ) : (
         <>
-          {enrich.selectionBar ?? (
+          {enrich.selectionBar ? (
+            <div className={PIN_UNDER_HEAD_BAR}>{enrich.selectionBar}</div>
+          ) : (
             <ViewBar
               objectId={objectId}
               registry={filterRegistry}
@@ -408,28 +452,39 @@ function PeoplePage() {
               onFilterChange={vs.setConditions}
               onSaved={() => void router.invalidate()}
               canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+              plural="People"
+              pinned
+              refNames={refNames}
               tools={
                 <TableTools
                   table={table}
                   filter={globalFilter}
                   onFilterChange={setGlobalFilter}
-                  filterPlaceholder="Filter by name or email…"
-                  filterLabel="Filter people"
+                  filterPlaceholder="Search people"
+                  filterLabel="Search people"
                 />
               }
             />
           )}
           <div className="px-8 pb-8">
             <AiCellsProvider
+              table
               entityIds={table.getRowModel().rows.map((r) => r.original.id)}
               registry={registry}
             >
               <RecordTable
-                columnActions={columnRun.columnActions}
+                columnActions={(id) => [
+                  ...columnRun.columnActions(id),
+                  ...editAttribute.columnActions(id),
+                ]}
                 table={table}
                 label="People"
                 select={enrich.select}
                 stickyColumnId="name"
+                notice={notice}
+                pinUnder={
+                  enrich.selectionBar ? 'bar' : viewBarPin(vs.conditions)
+                }
                 page={{
                   total,
                   hasMore: records.hasNextPage,
@@ -448,6 +503,7 @@ function PeoplePage() {
             </AiCellsProvider>
           </div>
           {columnRun.dialog}
+          {editAttribute.dialog}
         </>
       )}
       {enrich.dialog}
@@ -459,11 +515,14 @@ function CreatePersonDialog({
   companies,
   registry,
   hotkey,
+  trigger,
 }: {
   companies: Array<{ id: string; name: string }>
   registry: Array<RegistryEntry>
-  /** Bare key that opens it from the page — printed in the trigger. */
+  /** Bare key that opens it from the page — in the trigger's tooltip. */
   hotkey?: string
+  /** The control that opens it; the head's New person button by default. */
+  trigger?: ReactNode
 }) {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -526,10 +585,9 @@ function CreatePersonDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" shortcut={hotkey?.toUpperCase()}>
-          <Plus className="size-4" strokeWidth={2} />
-          New person
-        </Button>
+        {trigger ?? (
+          <Button shortcut={hotkey?.toUpperCase()}>New person</Button>
+        )}
       </DialogTrigger>
       <DialogContent
         size="m"

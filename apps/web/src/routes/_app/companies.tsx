@@ -5,7 +5,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Building2, Layers } from 'lucide-react'
+import { Layers } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   keepPreviousData,
@@ -14,20 +14,21 @@ import {
 } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { ViewBar } from '#/components/views/view-bar'
+import { ViewBar, viewBarPin } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
 import { useColumnRun } from '#/components/views/column-run'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { ValueEditor } from '#/components/attributes/value-editor'
 import { AiCell, AiCellsProvider } from '#/components/attributes/ai-cell'
-import { EmptyState } from '#/components/empty-state'
+import { EmptyRow } from '#/components/ledger-section'
+import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
 import { DitherMark, RecordMark } from '#/components/record/record-parts'
 import { CreateCompanyDialog } from '#/components/create-company-dialog'
 import {
-  attributeColumnMeta,
   ChipLink,
   DateCell,
   RecordLinkCell,
+  registryColumnMeta,
 } from '#/components/table/cells'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { identityFirst } from '#/lib/attributes/identity-first'
@@ -37,7 +38,14 @@ import {
   TableTools,
 } from '#/components/table/record-table'
 import { PageHeader } from '#/components/page-header'
-import { ImportAction } from '#/components/import/import-action'
+import { useImportVerb } from '#/components/import/import-action'
+import { ListMenu } from '#/components/table/list-menu'
+import {
+  ListErrorRow,
+  ListLoadingRow,
+  ListZeroRow,
+} from '#/components/table/list-states'
+import { useEditAttribute } from '#/components/table/edit-attribute'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { useListEnrich } from '#/components/table/bulk-enrich-dialog'
 import { statColumns } from '#/components/table/stat-columns'
@@ -206,7 +214,7 @@ function CompaniesPage() {
     placeholderData: keepPreviousData,
   })
   const pages = records.data?.pages
-  const loaded = useMemo(() => pages ?? [initial], [pages, initial])
+  const loaded = useMemo(() => pages ?? [], [pages])
   const rows = useMemo(() => loaded.flatMap((p) => p.rows), [loaded])
   const total = loaded.at(-1)?.total ?? 0
   const refNames = useMemo(() => {
@@ -235,6 +243,14 @@ function CompaniesPage() {
     rows,
     view: { conditions: vs.conditions, q },
     refresh,
+  })
+  const importVerb = useImportVerb('companies')
+  const editAttribute = useEditAttribute({
+    registry,
+    objectLabel: 'company',
+    objectPlural: 'Companies',
+    fillFrom: 'company',
+    onSaved: refresh,
   })
   const selectView = (id: string | null) =>
     void navigate({
@@ -273,7 +289,7 @@ function CompaniesPage() {
     const defs: Array<ColumnDef<Row, unknown>> = [
       col.accessor('name', {
         id: 'name',
-        header: 'Company',
+        header: 'Name',
         size: 220,
         enableHiding: false,
         cell: (info) => (
@@ -298,9 +314,13 @@ function CompaniesPage() {
           id: `attr:${def.slug}`,
           header: def.name,
           size: def.type === 'text' ? 200 : 140,
-          meta: attributeColumnMeta(def.type),
+          meta: registryColumnMeta(def),
           cell: (info) => (
-            <AiCell def={def} entityId={info.row.original.id}>
+            <AiCell
+              def={def}
+              entityId={info.row.original.id}
+              value={info.getValue()}
+            >
               <ValueEditor
                 def={def}
                 value={info.getValue()}
@@ -370,30 +390,58 @@ function CompaniesPage() {
     columnResizeMode: 'onChange',
   })
 
+  // First run: the list holds nothing at all, so there is nothing to view,
+  // filter or sort — one row that creates, and the head's `···`.
+  const firstRun = allTotal === 0 && rows.length === 0
+  const filtered = vs.conditions.length > 0 || q !== ''
+  const notice = records.isError ? (
+    <ListErrorRow plural="Companies" onRetry={() => void records.refetch()} />
+  ) : records.data === undefined ? (
+    <ListLoadingRow plural="Companies" />
+  ) : rows.length === 0 ? (
+    <ListZeroRow
+      onClear={
+        filtered
+          ? () => {
+              vs.setConditions([])
+              setGlobalFilter('')
+            }
+          : undefined
+      }
+    />
+  ) : undefined
+  const listMenu = (
+    <ListMenu label="Companies" verbs={[importVerb, enrich.verb]} />
+  )
+
   return (
     <div className="flex flex-col">
       <PageHeader
         title="Companies"
         action={
-          <>
-            <ImportAction objectSlug="companies" />
-            <CreateCompanyDialog registry={registry} hotkey="c" />
-            {enrich.menu}
-          </>
+          firstRun ? (
+            listMenu
+          ) : (
+            <>
+              <CreateCompanyDialog registry={registry} hotkey="c" />
+              {listMenu}
+            </>
+          )
         }
       />
-      {rows.length === 0 && vs.conditions.length === 0 && q === '' ? (
-        <div className="px-8 pb-8">
-          <EmptyState
-            icon={Building2}
-            title="No companies yet"
-            body="Add one by name or domain. The domain is identity — the same company arriving twice becomes one record, not two."
-            action={<CreateCompanyDialog registry={registry} />}
+      {firstRun ? (
+        <div className="px-8 pt-6 pb-8">
+          <CreateCompanyDialog
+            registry={registry}
+            hotkey="c"
+            trigger={<EmptyRow name="Companies" />}
           />
         </div>
       ) : (
         <>
-          {enrich.selectionBar ?? (
+          {enrich.selectionBar ? (
+            <div className={PIN_UNDER_HEAD_BAR}>{enrich.selectionBar}</div>
+          ) : (
             <ViewBar
               objectId={objectId}
               registry={filterRegistry}
@@ -410,28 +458,39 @@ function CompaniesPage() {
               onFilterChange={vs.setConditions}
               onSaved={() => void router.invalidate()}
               canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+              plural="Companies"
+              pinned
+              refNames={refNames}
               tools={
                 <TableTools
                   table={table}
                   filter={globalFilter}
                   onFilterChange={setGlobalFilter}
-                  filterPlaceholder="Filter by name or domain…"
-                  filterLabel="Filter companies"
+                  filterPlaceholder="Search companies"
+                  filterLabel="Search companies"
                 />
               }
             />
           )}
           <div className="px-8 pb-8">
             <AiCellsProvider
+              table
               entityIds={table.getRowModel().rows.map((r) => r.original.id)}
               registry={registry}
             >
               <RecordTable
-                columnActions={columnRun.columnActions}
+                columnActions={(id) => [
+                  ...columnRun.columnActions(id),
+                  ...editAttribute.columnActions(id),
+                ]}
                 table={table}
                 label="Companies"
                 select={enrich.select}
                 stickyColumnId="name"
+                notice={notice}
+                pinUnder={
+                  enrich.selectionBar ? 'bar' : viewBarPin(vs.conditions)
+                }
                 page={{
                   total,
                   hasMore: records.hasNextPage,
@@ -450,6 +509,7 @@ function CompaniesPage() {
             </AiCellsProvider>
           </div>
           {columnRun.dialog}
+          {editAttribute.dialog}
         </>
       )}
       {enrich.dialog}

@@ -7,7 +7,10 @@ import {
   getCoreRowModel,
   useReactTable,
 } from '@tanstack/react-table'
+import type { ReactNode } from 'react'
 import { RecordTable, TableToolbar } from './record-table'
+import type { TablePage } from './record-table'
+import { ListErrorRow, ListLoadingRow, ListZeroRow } from './list-states'
 import { declared } from '#/test/tailwind-css'
 
 /**
@@ -72,9 +75,17 @@ const columns = [
   }),
 ]
 
-function Grid() {
+function Grid({
+  page,
+  notice,
+  rows = ROWS,
+}: {
+  page?: TablePage
+  notice?: ReactNode
+  rows?: Array<Row>
+} = {}) {
   const table = useReactTable({
-    data: ROWS,
+    data: rows,
     columns,
     getCoreRowModel: getCoreRowModel(),
   })
@@ -91,7 +102,13 @@ function Grid() {
         filterPlaceholder="Filter by company…"
         filterLabel="Filter holdings"
       />
-      <RecordTable table={table} label="Portfolio" stickyColumnId="name" />
+      <RecordTable
+        table={table}
+        label="Portfolio"
+        stickyColumnId="name"
+        {...(page ? { page } : {})}
+        notice={notice}
+      />
     </>
   )
 }
@@ -106,13 +123,22 @@ afterEach(() => {
   host = null
 })
 
-function mount() {
+function mount(props: Parameters<typeof Grid>[0] = {}) {
   host = document.createElement('div')
   document.body.appendChild(host)
   const r = createRoot(host)
   root = r
-  act(() => r.render(<Grid />))
+  act(() => r.render(<Grid {...props} />))
 }
+
+const paging = (over: Partial<TablePage> = {}): TablePage => ({
+  total: 120,
+  hasMore: true,
+  loading: false,
+  step: 50,
+  onLoadMore: () => {},
+  ...over,
+})
 
 function one(selector: string): HTMLElement {
   const el = document.querySelector(selector)
@@ -215,5 +241,100 @@ describe("a shelf's bar", () => {
     expect(controls).toEqual(['Sort', 'Columns', 'Filter holdings'])
     // The tools sit outside the tablist: only tabs are its children.
     expect(one('[role="tablist"]').querySelectorAll('button')).toHaveLength(1)
+  })
+})
+
+describe('the foot', () => {
+  it('is absent on a table that does not page', () => {
+    mount()
+    expect(document.querySelector('[data-table-foot]')).toBeNull()
+  })
+
+  it('is absent once every page is loaded — no `end`', () => {
+    mount({ page: paging({ hasMore: false }) })
+    expect(document.querySelector('[data-table-foot]')).toBeNull()
+    expect(document.body.textContent).not.toContain('end')
+  })
+
+  it('shows while paging: loaded of total, and Load 50 more', () => {
+    let asked = 0
+    mount({ page: paging({ onLoadMore: () => asked++ }) })
+    const foot = one('[data-table-foot]')
+    expect(foot.textContent).toContain('2 of 120')
+    const more = [...foot.querySelectorAll('button')].find(
+      (b) => b.textContent === 'Load 50 more',
+    )
+    if (!more) throw new Error('no Load 50 more')
+    act(() => more.click())
+    expect(asked).toBe(1)
+  })
+
+  it('reads Loading… while the next page is in flight', () => {
+    mount({ page: paging({ loading: true }) })
+    expect(one('[data-table-foot]').textContent).toContain('Loading…')
+  })
+})
+
+describe('the body states', () => {
+  it('loading: a Twinkle row naming the list, in place of the rows', () => {
+    mount({ notice: <ListLoadingRow plural="Companies" />, rows: [] })
+    const row = one('[data-list-state="loading"]')
+    expect(row.textContent).toBe('Loading companies')
+    expect(row.querySelector('[data-twinkle]')).not.toBeNull()
+    expect(document.querySelectorAll('tbody tr')).toHaveLength(0)
+  })
+
+  it('error: a destructive square, what failed, and Retry', () => {
+    let retried = 0
+    mount({
+      notice: <ListErrorRow plural="Companies" onRetry={() => retried++} />,
+    })
+    const row = one('[data-list-state="error"]')
+    expect(row.querySelector('.bg-destructive')).not.toBeNull()
+    expect(row.textContent).toContain(
+      'Could not load companies · the database did not answer',
+    )
+    // The rows give way to the error, and so does the foot.
+    expect(document.querySelectorAll('tbody tr')).toHaveLength(0)
+    const retry = row.querySelector('button')
+    if (!retry) throw new Error('no Retry')
+    expect(retry.textContent).toBe('Retry')
+    act(() => retry.click())
+    expect(retried).toBe(1)
+  })
+
+  it('zero results: the sentence, and Clear filter in pine', () => {
+    let cleared = 0
+    mount({ notice: <ListZeroRow onClear={() => cleared++} />, rows: [] })
+    const row = one('[data-list-state="zero"]')
+    expect(row.textContent).toBe('Nothing matches that filter.Clear filter')
+    const clear = row.querySelector('button')
+    if (!clear) throw new Error('no Clear filter')
+    expect(classes(clear)).toContain('text-primary')
+    act(() => clear.click())
+    expect(cleared).toBe(1)
+  })
+
+  it('an empty table with no notice says the sentence alone', () => {
+    mount({ rows: [] })
+    expect(one('[data-list-state="zero"]').textContent).toBe(
+      'Nothing matches that filter.',
+    )
+  })
+})
+
+describe('the pinned column', () => {
+  it('carries a rule on its right edge, head and body', () => {
+    mount()
+    const head = [...document.querySelectorAll('thead th')].find((h) =>
+      h.textContent.includes('Company'),
+    )
+    const cell = document.querySelector('tbody td')
+    for (const el of [head, cell]) {
+      if (!el) throw new Error('no pinned cell')
+      expect(classes(el)).toEqual(
+        expect.arrayContaining(['sticky', 'after:bg-rule', 'after:right-0']),
+      )
+    }
   })
 })

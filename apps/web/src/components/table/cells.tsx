@@ -1,7 +1,9 @@
 import { createLink } from '@tanstack/react-router'
 import type { LucideIcon } from 'lucide-react'
 import type { AnchorHTMLAttributes, ReactNode, Ref } from 'react'
+import { readAiConfig } from '@spaces/core/ai/attribute-ai'
 import { formatAge, formatDay } from '@spaces/core/format'
+import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
@@ -94,6 +96,17 @@ export function attributeColumnMeta(type: string): { numeric: boolean } {
   return {
     numeric: type === 'number' || type === 'currency' || type === 'date',
   }
+}
+
+/**
+ * A registry column's meta on a record list: the figures alignment, and
+ * the `AI` tag on the head of an attribute a model fills.
+ */
+export function registryColumnMeta(def: RegistryEntry): {
+  numeric: boolean
+  ai: boolean
+} {
+  return { ...attributeColumnMeta(def.type), ai: readAiConfig(def) !== null }
 }
 
 /**

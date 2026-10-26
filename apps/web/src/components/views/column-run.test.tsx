@@ -80,6 +80,9 @@ describe('the confirm', () => {
       perCall: { tokens: 1200, from: 'attribute' },
       tokens: 33600,
     })
+    expect(o.title).toBe('Run Why now? on Screening · Bay Area?')
+    expect(o.body).toBeUndefined()
+    expect(o.note).toBe('Lands in Review · stops at today’s cap')
     expect(o.action).toBe('Run 28')
     expect(o.rows?.map((r) => r.meta)).toEqual([
       '30',

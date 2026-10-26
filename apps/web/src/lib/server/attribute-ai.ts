@@ -18,6 +18,7 @@ const byCell = z.object({
 })
 
 export type {
+  AiWrittenCell,
   AttributeRunEnqueued,
   AttributeRunRefusal,
   AttributeRunStatus,
@@ -56,6 +57,16 @@ export const openCellProposals = createServerFn()
     const { openCellProposalsProgram } = await import('../ai/attribute-run')
     const { effectFn } = await import('./effect')
     return effectFn(openCellProposalsProgram)(data.entityIds)
+  })
+
+/** The latest accepted AI value per (record, slug), for the records on screen. */
+export const aiWrittenCells = createServerFn()
+  .validator(z.object({ entityIds: z.array(z.string().uuid()).max(500) }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { aiWrittenCellsProgram } = await import('../ai/attribute-run')
+    const { effectFn } = await import('./effect')
+    return effectFn(aiWrittenCellsProgram)(data.entityIds)
   })
 
 export type { ColumnRunEnqueued, ColumnRunEstimate } from '../ai/column-run'

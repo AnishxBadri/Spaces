@@ -13,7 +13,11 @@ import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { readAiConfig } from '@spaces/core/ai/attribute-ai'
 import type { AiAttributeLane } from '@spaces/core/ai/attribute-ai'
+import { formatDay } from '@spaces/core/format'
+import { sameJson } from '@spaces/core/views/filter'
+import { useClock } from '#/components/clock'
 import {
+  aiWrittenCells,
   attributeCellStatus,
   isLaneRouted,
   openCellProposals,
@@ -41,13 +45,21 @@ import type { RegistryEntry } from './value-editor'
  * `AiCellsProvider` reads once for every record a surface shows — the
  * routed lanes and the open proposals — so a table page is two requests,
  * not one per cell. A pressed cell polls its own job until it settles.
+ *
+ * **In a table** (`table`) a cell reads its state after its value: `Proposed ›`
+ * in pine while a proposal waits, and `AI · 12 Oct` while the value is still
+ * the one a model proposed and a person accepted — one more read per page.
  */
+
+type Written = { value: unknown; at: string }
 
 type AiCells = {
   routed: ReadonlySet<AiAttributeLane>
   proposed: ReadonlySet<string>
   running: ReadonlySet<string>
   press: (entityId: string, def: RegistryEntry) => void
+  /** Set in a table: the accepted AI values, by `entity:slug`. */
+  written: ReadonlyMap<string, Written> | null
 }
 
 const Ctx = createContext<AiCells | null>(null)
@@ -59,10 +71,13 @@ const runKey = (entityId: string, attributeId: string) =>
 export function AiCellsProvider({
   entityIds,
   registry,
+  table = false,
   children,
 }: {
   entityIds: ReadonlyArray<string>
   registry: ReadonlyArray<RegistryEntry>
+  /** A record table: cells also read whether a model wrote their value. */
+  table?: boolean | undefined
   children: ReactNode
 }) {
   const router = useRouter()
@@ -82,6 +97,9 @@ export function AiCellsProvider({
     () => new Set(),
   )
   const [proposed, setProposed] = useState<ReadonlySet<string>>(() => new Set())
+  const [written, setWritten] = useState<ReadonlyMap<string, Written>>(
+    () => new Map(),
+  )
   const [running, setRunning] = useState<ReadonlyMap<string, RegistryEntry>>(
     () => new Map(),
   )
@@ -111,16 +129,28 @@ export function AiCellsProvider({
 
   const refresh = useCallback(async () => {
     if (lanes.length === 0 || idsKey === '') return
+    const ids = idsKey.split(',')
     try {
-      const rows = await openCellProposals({
-        data: { entityIds: idsKey.split(',') },
-      })
-      if (live.current)
-        setProposed(new Set(rows.map((r) => proposedKey(r.entityId, r.slug))))
+      const [rows, accepted] = await Promise.all([
+        openCellProposals({ data: { entityIds: ids } }),
+        table
+          ? aiWrittenCells({ data: { entityIds: ids } })
+          : Promise.resolve([]),
+      ])
+      if (!live.current) return
+      setProposed(new Set(rows.map((r) => proposedKey(r.entityId, r.slug))))
+      setWritten(
+        new Map(
+          accepted.map((w) => [
+            proposedKey(w.entityId, w.slug),
+            { value: w.value, at: w.at },
+          ]),
+        ),
+      )
     } catch {
       // The cells keep their last known state.
     }
-  }, [lanes.length, idsKey])
+  }, [lanes.length, idsKey, table])
 
   useEffect(() => {
     void refresh()
@@ -196,8 +226,14 @@ export function AiCellsProvider({
   )
 
   const value = useMemo<AiCells>(
-    () => ({ routed, proposed, running: new Set(running.keys()), press }),
-    [routed, proposed, running, press],
+    () => ({
+      routed,
+      proposed,
+      running: new Set(running.keys()),
+      press,
+      written: table ? written : null,
+    }),
+    [routed, proposed, running, press, table, written],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
@@ -209,18 +245,62 @@ export function AiCellsProvider({
 export function AiCell({
   def,
   entityId,
+  value,
   children,
 }: {
   def: RegistryEntry
   entityId: string
+  /** The cell's value, in a table: whether it is still the one AI wrote. */
+  value?: unknown
   children: ReactNode
 }) {
   const cells = useContext(Ctx)
+  const { today } = useClock()
   const ai = readAiConfig(def)
   if (cells === null || ai === null || def.id === undefined) return children
   const isProposed = cells.proposed.has(proposedKey(entityId, def.slug))
   const isRunning = cells.running.has(runKey(entityId, def.id))
   const routed = cells.routed.has(ai.lane)
+  if (cells.written !== null) {
+    const w = cells.written.get(proposedKey(entityId, def.slug))
+    const byAi =
+      w !== undefined &&
+      value !== undefined &&
+      value !== null &&
+      sameJson(w.value, value)
+    if (!isProposed && !byAi && !routed) return children
+    return (
+      <div className="flex min-w-0 items-center gap-1.5">
+        <div className="min-w-0 flex-1">{children}</div>
+        {isProposed ? (
+          <Link
+            to="/review"
+            search={{ record: entityId, lane: 'suggestions' }}
+            title={`A proposed ${def.name} is waiting in Review`}
+            onClick={(e) => e.stopPropagation()}
+            className="focus-ring shrink-0 rounded-md text-label whitespace-nowrap text-primary underline-offset-4 hover:underline"
+          >
+            Proposed ›
+          </Link>
+        ) : byAi ? (
+          <span
+            data-ai-written
+            title={`${def.name} was proposed by AI and accepted`}
+            className="shrink-0 mono text-micro whitespace-nowrap text-graphite"
+          >
+            AI · {formatDay(w.at, today)}
+          </span>
+        ) : (
+          <AskButton
+            def={def}
+            lane={ai.lane}
+            running={isRunning}
+            onPress={() => cells.press(entityId, def)}
+          />
+        )}
+      </div>
+    )
+  }
   if (!isProposed && !routed) return children
   return (
     <div className="flex min-w-0 items-center gap-1">
@@ -237,24 +317,46 @@ export function AiCell({
           proposed
         </Link>
       ) : (
-        <button
-          type="button"
-          disabled={isRunning}
-          aria-label={`Ask AI for ${def.name}`}
-          title={
-            isRunning
-              ? `Asking for ${def.name}…`
-              : `Ask the ${ai.lane} lane for ${def.name}; the answer lands in Review as a suggestion`
-          }
-          onClick={(e) => {
-            e.stopPropagation()
-            cells.press(entityId, def)
-          }}
-          className="focus-ring flex size-6 shrink-0 items-center justify-center rounded-md text-graphite transition-colors duration-150 ease-out-quart hover:bg-bone hover:text-foreground disabled:animate-pulse disabled:hover:bg-transparent"
-        >
-          <Sparkles className="size-3" strokeWidth={1.75} aria-hidden />
-        </button>
+        <AskButton
+          def={def}
+          lane={ai.lane}
+          running={isRunning}
+          onPress={() => cells.press(entityId, def)}
+        />
       )}
     </div>
+  )
+}
+
+/** The cell's trigger: ask the attribute's lane for this record's value. */
+function AskButton({
+  def,
+  lane,
+  running,
+  onPress,
+}: {
+  def: RegistryEntry
+  lane: AiAttributeLane
+  running: boolean
+  onPress: () => void
+}) {
+  return (
+    <button
+      type="button"
+      disabled={running}
+      aria-label={`Ask AI for ${def.name}`}
+      title={
+        running
+          ? `Asking for ${def.name}…`
+          : `Ask the ${lane} lane for ${def.name}; the answer lands in Review as a suggestion`
+      }
+      onClick={(e) => {
+        e.stopPropagation()
+        onPress()
+      }}
+      className="focus-ring flex size-6 shrink-0 items-center justify-center rounded-md text-graphite transition-colors duration-150 ease-out-quart hover:bg-bone hover:text-foreground disabled:animate-pulse disabled:hover:bg-transparent"
+    >
+      <Sparkles className="size-3" strokeWidth={1.75} aria-hidden />
+    </button>
   )
 }

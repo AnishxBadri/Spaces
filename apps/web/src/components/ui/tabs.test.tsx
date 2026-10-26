@@ -125,6 +125,33 @@ describe('an empty tab', () => {
     expect(tab(doc, 'Mine').textContent).toBe('Mine')
   })
 
+  it('prints its 0 only when the caller says the 0 is news, then the suffix', () => {
+    const doc = win.document
+    doc.body.innerHTML = renderToStaticMarkup(
+      <Tabs
+        label="Views"
+        items={[
+          { id: 'a', label: 'All', count: 0 },
+          {
+            id: 'b',
+            label: 'Seed',
+            count: 0,
+            showZero: true,
+            suffix: <span data-dirty />,
+          },
+        ]}
+        value="b"
+        onValueChange={() => {}}
+      />,
+    )
+    expect(tab(doc, 'All').querySelector('[data-tab-count]')).toBeNull()
+    const seed = tab(doc, 'Seed')
+    expect(seed.querySelector('[data-tab-count]')?.textContent).toBe('0')
+    expect(seed.hasAttribute('data-empty')).toBe(false)
+    // The suffix follows the count.
+    expect(seed.lastElementChild.hasAttribute('data-dirty')).toBe(true)
+  })
+
   it('never dims its text with opacity — graphite is the second colour', () => {
     const doc = render('notes')
     for (const t of Array.from(doc.querySelectorAll('[role="tab"]'))) {

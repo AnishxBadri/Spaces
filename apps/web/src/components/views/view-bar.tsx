@@ -1,5 +1,5 @@
-import { Check, Filter, Plus, Save, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { Command as CommandPrimitive } from 'cmdk'
+import { useEffect, useId, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   keepPreviousData,
@@ -8,12 +8,19 @@ import {
 } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ValueEditor } from '#/components/attributes/value-editor'
-import type { RegistryEntry } from '#/components/attributes/value-editor'
+import type {
+  RefNames,
+  RegistryEntry,
+} from '#/components/attributes/value-editor'
+import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
+import { ToolButton } from '#/components/table/record-table'
+import type { TablePin } from '#/components/table/record-table'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
   DialogClose,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -27,7 +34,7 @@ import {
   PopoverTrigger,
 } from '#/components/ui/popover'
 import { Segmented } from '#/components/ui/segmented'
-import { Select } from '#/components/ui/select'
+import { Select, selectClasses } from '#/components/ui/select'
 import { Tabs } from '#/components/ui/tabs'
 import type { TabItem } from '#/components/ui/tabs'
 import {
@@ -52,21 +59,32 @@ import type {
 import { viewTarget } from '@spaces/core/views/target'
 import type { ViewRow, ViewSort } from '@spaces/core/writes/views/store'
 import type { ViewCount } from '#/lib/views/counts'
+import { FilterChips } from './filter-chips'
 
 /**
  * Views on an object list: the saved views as real tabs on the bone bar —
- * `All` with the list's total, each view with its count, `+ view` — and on
- * the same bar's right the Filter popover and the table's own tools. The page
- * owns its table state and hands the bar a snapshot to compare and to save.
+ * `All` with the list's total, each view with its count, `Save view…` — and
+ * on the same bar's right Filter · Sort · Columns and the search box. Under
+ * the bar, while the filter holds conditions, the chips row. The page owns
+ * its table state and hands the bar a snapshot to compare and to save.
  * `?view=` in the URL makes a view linkable.
- * - The active view's `···` menu pins it to the sidebar (an object list's
- *   views only — the sidebar lists them under their object) and, for a view
- *   the user may edit, renames or deletes it.
+ * - `pinned`, the bar and its chips stick under the folded head bar, and
+ *   the table's column head pins under them (`viewBarPin`).
+ * - A dirty view — its snapshot moved off the saved one — carries a pine
+ *   square after its count, prints its count at 0, and offers Update view.
+ * - The active view's `···` pins it to the sidebar (an object list's views
+ *   only — the sidebar lists them under their object) and, for a view the
+ *   user may edit, renames or deletes it.
  * - Object surfaces only: a shelf is not one, and has no saved views.
  */
 
 /** The `All` tab's id; a view id is a uuid, so the two never meet. */
 const ALL = 'all'
+
+/** What the column head pins under, for the filter the bar is showing. */
+export function viewBarPin(conditions: ReadonlyArray<Condition>): TablePin {
+  return conditions.length > 0 ? 'chips' : 'bar'
+}
 
 export type ViewSnapshot = {
   filter: Array<Condition>
@@ -89,6 +107,9 @@ export function ViewBar({
   onFilterChange,
   onSaved,
   canEdit,
+  plural,
+  refNames,
+  pinned = false,
 }: {
   /**
    * The object row this list's records belong to, or null on a surface that
@@ -108,7 +129,7 @@ export function ViewBar({
   counts?: Record<string, ViewCount>
   /** Every record on the list, unfiltered: the `All` tab's count. */
   total?: number | undefined
-  /** The table's tools, right of Filter on the same bar. */
+  /** The table's tools — Sort, Columns, the search box — right of Filter. */
   tools?: ReactNode
   /** the view the page is currently showing, from `?view=` */
   activeId: string | null
@@ -121,6 +142,12 @@ export function ViewBar({
   onFilterChange: (next: Array<Condition>) => void
   onSaved: () => void
   canEdit: (v: ViewRow) => boolean
+  /** What the list is called — `Companies`; the Save view window's context. */
+  plural: string
+  /** Names for reference values, so a chip reads a name, not an id. */
+  refNames?: RefNames | undefined
+  /** Stick under the folded head bar while the list scrolls. */
+  pinned?: boolean | undefined
 }) {
   const active = views.find((v) => v.id === activeId) ?? null
   const dirty =
@@ -135,6 +162,13 @@ export function ViewBar({
       snapshot,
     )
   const [saving, setSaving] = useState<'new' | 'rename' | null>(null)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [picking, setPicking] = useState(false)
+  /** The Filter popover, on the attribute picker or on the conditions. */
+  const openFilter = (pick: boolean) => {
+    setPicking(pick)
+    setFilterOpen(true)
+  }
   const pins = usePinnedViews()
   const queryClient = useQueryClient()
   /** A rename or a delete shows in the sidebar's pinned rows at once. */
@@ -205,152 +239,177 @@ export function ViewBar({
     { id: ALL, label: 'All', count: total },
     ...views.map((v) => {
       const count = countOf(v.id)
+      const moved = v.id === activeId && dirty
       return {
         id: v.id,
         label: (
           <ViewLabel
             name={v.name}
-            dirty={v.id === activeId && dirty}
             shared={v.visibility === 'shared'}
             count={count}
           />
         ),
         count:
           count === undefined || count.count === null ? undefined : count.count,
+        // A filtered view that matched nothing says so: its 0 is the news.
+        showZero: moved,
+        suffix: moved ? (
+          <span
+            data-view-dirty
+            aria-label="unsaved changes"
+            className="size-1.5 shrink-0 bg-primary"
+          />
+        ) : undefined,
       }
     }),
   ]
 
   return (
-    <Tabs
-      label="Views"
-      items={items}
-      value={active?.id ?? ALL}
-      onValueChange={(id) =>
-        onApply(id === ALL ? null : (views.find((v) => v.id === id) ?? null))
-      }
-      trail={
-        <>
-          {active && dirty && canEdit(active) ? (
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={() => {
-                persist({
-                  id: active.id,
-                  name: active.name,
-                  visibility: active.visibility,
-                })
-                  .then(() => toast(`${active.name} updated`))
-                  .catch((err: unknown) =>
-                    toast.error(
-                      err instanceof Error ? err.message : 'Could not save',
-                    ),
-                  )
-              }}
-            >
-              <Save className="size-3" strokeWidth={2} />
-              Update view
-            </Button>
-          ) : null}
-          {active ? (
-            <MoreMenu
-              variant="row"
-              modal={false}
-              align="start"
-              label={`the ${active.name} view`}
-              items={[
-                ...(objectId !== null
-                  ? [
-                      {
-                        label: pins.includes(active.id)
-                          ? 'Unpin'
-                          : 'Pin to sidebar',
-                        onSelect: () => {
-                          const pinned = pins.includes(active.id)
-                          togglePinnedView(active.id)
-                          toast(
-                            pinned
-                              ? `${active.name} unpinned`
-                              : `${active.name} pinned to the sidebar`,
-                          )
+    <div data-view-bar className={pinned ? PIN_UNDER_HEAD_BAR : undefined}>
+      <Tabs
+        label="Views"
+        items={items}
+        value={active?.id ?? ALL}
+        onValueChange={(id) =>
+          onApply(id === ALL ? null : (views.find((v) => v.id === id) ?? null))
+        }
+        trail={
+          <>
+            {active && dirty && canEdit(active) ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  persist({
+                    id: active.id,
+                    name: active.name,
+                    visibility: active.visibility,
+                  })
+                    .then(() => toast(`${active.name} updated`))
+                    .catch((err: unknown) =>
+                      toast.error(
+                        err instanceof Error ? err.message : 'Could not save',
+                      ),
+                    )
+                }}
+              >
+                Update view
+              </Button>
+            ) : null}
+            {active ? (
+              <MoreMenu
+                variant="row"
+                modal={false}
+                align="start"
+                label={`the ${active.name} view`}
+                items={[
+                  ...(objectId !== null
+                    ? [
+                        {
+                          label: pins.includes(active.id)
+                            ? 'Unpin from sidebar'
+                            : 'Pin to sidebar',
+                          onSelect: () => {
+                            const wasPinned = pins.includes(active.id)
+                            togglePinnedView(active.id)
+                            toast(
+                              wasPinned
+                                ? `${active.name} unpinned`
+                                : `${active.name} pinned to the sidebar`,
+                            )
+                          },
                         },
-                      },
-                    ]
-                  : []),
-                MENU_RULE,
-                ...(canEdit(active)
-                  ? [
-                      {
-                        label: 'Rename…',
-                        opens: true,
-                        onSelect: () => setSaving('rename'),
-                      },
-                      {
-                        label: 'Delete view',
-                        destructive: true,
-                        onSelect: () => void deleteActive(active),
-                      },
-                    ]
-                  : []),
-              ]}
+                      ]
+                    : []),
+                  MENU_RULE,
+                  ...(canEdit(active)
+                    ? [
+                        {
+                          label: 'Rename…',
+                          opens: true,
+                          onSelect: () => setSaving('rename'),
+                        },
+                        {
+                          label: 'Delete view',
+                          destructive: true,
+                          onSelect: () => void deleteActive(active),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setSaving('new')}
+              title="Save the current filter, sort and columns as a view"
+              className="focus-ring flex h-6.5 shrink-0 items-center rounded-md px-2 mono text-micro text-primary transition-colors duration-150 ease-out-quart hover:bg-paper"
+            >
+              Save view…
+            </button>
+            <span className="flex-1" />
+
+            <FilterPopover
+              registry={registry}
+              conditions={snapshot.filter}
+              onChange={onFilterChange}
+              open={filterOpen}
+              onOpenChange={(o) => {
+                if (o) setPicking(snapshot.filter.length === 0)
+                setFilterOpen(o)
+              }}
+              picking={picking}
+              onPicking={setPicking}
             />
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setSaving('new')}
-            title="Save the current filter, sort and columns as a view"
-            className="focus-ring flex h-7 shrink-0 items-center rounded-md px-2 mono text-micro text-primary transition-colors duration-150 ease-out-quart hover:bg-paper"
-          >
-            + view
-          </button>
-          <span className="flex-1" />
+            {tools}
 
-          <FilterPopover
-            registry={registry}
-            conditions={snapshot.filter}
-            onChange={onFilterChange}
-          />
-          {tools}
-
-          <SaveViewDialog
-            open={saving !== null}
-            onOpenChange={(o) => {
-              if (!o) setSaving(null)
-            }}
-            initial={
-              saving === 'rename' && active
-                ? { name: active.name, visibility: active.visibility }
-                : { name: '', visibility: 'private' }
-            }
-            title={saving === 'rename' ? 'Rename view' : 'Save view'}
-            onSubmit={async (v) => {
-              await persist(
-                saving === 'rename' && active ? { id: active.id, ...v } : v,
-              )
-              toast(`${v.name} saved`)
-              setSaving(null)
-            }}
-          />
-        </>
-      }
-    />
+            <SaveViewDialog
+              open={saving !== null}
+              onOpenChange={(o) => {
+                if (!o) setSaving(null)
+              }}
+              initial={
+                saving === 'rename' && active
+                  ? { name: active.name, visibility: active.visibility }
+                  : { name: '', visibility: 'private' }
+              }
+              title={saving === 'rename' ? 'Rename view' : 'Save view'}
+              context={plural}
+              onSubmit={async (v) => {
+                await persist(
+                  saving === 'rename' && active ? { id: active.id, ...v } : v,
+                )
+                toast(`${v.name} saved`)
+                setSaving(null)
+              }}
+            />
+          </>
+        }
+      />
+      {snapshot.filter.length > 0 ? (
+        <FilterChips
+          registry={registry}
+          conditions={snapshot.filter}
+          refNames={refNames}
+          onChange={onFilterChange}
+          onAdd={() => openFilter(true)}
+          onEdit={() => openFilter(false)}
+        />
+      ) : null}
+    </div>
   )
 }
 
 /**
- * A view tab's label: the name, a dash where the view cannot be counted,
- * and the pine dot while its conditions differ from the saved ones. The
- * reasons are the tab's hover.
+ * A view tab's label: the name, and a dash where the view cannot be
+ * counted. The reasons are the tab's hover.
  */
 function ViewLabel({
   name,
-  dirty,
   shared,
   count,
 }: {
   name: string
-  dirty: boolean
   shared: boolean
   /** undefined: this surface is not counted, so the tab prints no slot */
   count: ViewCount | undefined
@@ -372,15 +431,14 @@ function ViewLabel({
           –
         </span>
       ) : null}
-      {dirty ? (
-        <span aria-label="unsaved changes" className="size-1.5 bg-primary" />
-      ) : null}
     </span>
   )
 }
 
 /**
- * Conditions editor: attribute → op → value. The value control is the
+ * Conditions editor. Empty, it opens straight into the attribute picker, and
+ * a pick makes the condition and puts focus on its operator. A condition
+ * row reads `[attribute ▾] [is ▾] [value ▾] ×`; the value control is the
  * record's own editor for that type, so a select condition picks from the
  * same options a record does.
  */
@@ -388,133 +446,198 @@ function FilterPopover({
   registry,
   conditions,
   onChange,
+  open,
+  onOpenChange,
+  picking,
+  onPicking,
 }: {
   registry: Array<RegistryEntry>
   conditions: Array<Condition>
   onChange: (next: Array<Condition>) => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  /** The attribute picker is showing in place of the conditions. */
+  picking: boolean
+  onPicking: (picking: boolean) => void
 }) {
+  const base = useId()
+  const opId = (i: number) => `${base}-op-${String(i)}`
+  const [focusOp, setFocusOp] = useState<number | null>(null)
   const bySlug = useMemo(
     () => new Map(registry.map((d) => [d.slug, d])),
     [registry],
   )
   const update = (i: number, patch: Partial<Condition>) =>
     onChange(conditions.map((c, j) => (j === i ? { ...c, ...patch } : c)))
-  const first = registry.at(0)
 
+  // A picked attribute's row has rendered: its operator takes the focus.
+  useEffect(() => {
+    if (focusOp === null) return
+    document.getElementById(`${base}-op-${String(focusOp)}`)?.focus()
+    setFocusOp(null)
+  }, [focusOp, base])
+
+  function pick(def: RegistryEntry) {
+    onChange([...conditions, { slug: def.slug, op: opsFor(def.type)[0] }])
+    onPicking(false)
+    setFocusOp(conditions.length)
+  }
+
+  const showPicker = picking || conditions.length === 0
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <Button size="xs" variant={conditions.length > 0 ? 'outline' : 'ghost'}>
-          <Filter className="size-3" strokeWidth={2} />
+        <ToolButton active={conditions.length > 0}>
           Filter
           {conditions.length > 0 ? (
-            <span className="tabular text-graphite">{conditions.length}</span>
+            <span className="tabular mono text-micro">{conditions.length}</span>
           ) : null}
-        </Button>
+        </ToolButton>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[28rem] p-3">
-        <div className="space-y-2">
-          {conditions.length === 0 ? (
-            <p className="text-ui text-graphite">
-              No conditions. Every record shows.
-            </p>
-          ) : null}
-          {conditions.map((c, i) => {
-            const def = bySlug.get(c.slug)
-            const ops = def ? opsFor(def.type) : []
-            return (
-              <div key={i} className="flex items-center gap-1.5">
-                {/*
-                  The one picker that sits inside a scroll container: the
-                  conditions list scrolls when a view has more of them than
-                  the popover is tall, so the trigger takes the inset reticle
-                  (an offset one would be clipped by the scroller). Its sheet
-                  sizes to the attribute names, not to the fixed 160px trigger
-                  (fixed, because a trigger that resizes with its value is a
-                  shift).
-                */}
-                <Select
-                  aria-label="Attribute"
-                  value={c.slug}
-                  onChange={(slug) => {
-                    const d = bySlug.get(slug)
-                    update(i, {
-                      slug,
-                      op: d ? opsFor(d.type)[0] : 'is',
-                      value: undefined,
-                    })
-                  }}
-                  items={registry.map((d) => ({
-                    value: d.slug,
-                    label: d.name,
-                  }))}
-                  width="content"
-                  inset
-                  searchPlaceholder="Search attributes…"
-                  emptyLabel="No attribute matches."
-                  className="w-40 shrink-0 bg-transparent"
-                />
-                {/* The items are typed `ConditionOp` by `opsFor`, so the picker
-                    hands back the op the stored condition holds. */}
-                <Select
-                  aria-label="Operator"
-                  value={c.op}
-                  onChange={(op) => update(i, { op })}
-                  items={ops.map((op) => ({
-                    value: op,
-                    label: OP_LABELS[op],
-                  }))}
-                  width="content"
-                  className="w-36 shrink-0 bg-transparent"
-                />
-                {def && !isUnary(c.op) ? (
-                  <div className="min-w-0 flex-1">
-                    <ConditionValueEditor
-                      def={def}
-                      op={c.op}
-                      value={c.value}
-                      onChange={(value) => update(i, { value })}
+      <PopoverContent
+        align="end"
+        className={showPicker ? 'w-60 p-0' : 'w-[28rem] p-0'}
+      >
+        {showPicker ? (
+          <AttributePicker registry={registry} onPick={pick} />
+        ) : (
+          <div data-filter-conditions>
+            <div className="space-y-1.5 p-3">
+              {conditions.map((c, i) => {
+                const def = bySlug.get(c.slug)
+                const ops = def ? opsFor(def.type) : []
+                return (
+                  <div key={i} className="flex items-center gap-1.5">
+                    {/*
+                      The conditions list can outgrow the popover and
+                      scroll, so the trigger takes the inset reticle (an
+                      offset one would be clipped by the scroller). Fixed
+                      width: a trigger that resizes with its value shifts.
+                    */}
+                    <Select
+                      aria-label="Attribute"
+                      value={c.slug}
+                      onChange={(slug) => {
+                        const d = bySlug.get(slug)
+                        update(i, {
+                          slug,
+                          op: d ? opsFor(d.type)[0] : 'is',
+                          value: undefined,
+                        })
+                      }}
+                      items={registry.map((d) => ({
+                        value: d.slug,
+                        label: d.name,
+                      }))}
+                      width="content"
+                      inset
+                      searchPlaceholder="Search attributes…"
+                      emptyLabel="No attribute matches."
+                      className="w-40 shrink-0 bg-transparent"
                     />
+                    {/* The items are typed `ConditionOp` by `opsFor`, so the
+                        picker hands back the op the stored condition holds. */}
+                    <Select
+                      id={opId(i)}
+                      aria-label="Operator"
+                      value={c.op}
+                      onChange={(op) => update(i, { op })}
+                      items={ops.map((op) => ({
+                        value: op,
+                        label: OP_LABELS[op],
+                      }))}
+                      width="content"
+                      className="w-36 shrink-0 bg-transparent"
+                    />
+                    {def && !isUnary(c.op) ? (
+                      <div className="min-w-0 flex-1">
+                        <ConditionValueEditor
+                          def={def}
+                          op={c.op}
+                          value={c.value}
+                          onChange={(value) => update(i, { value })}
+                        />
+                      </div>
+                    ) : (
+                      <span className="flex-1" />
+                    )}
+                    <button
+                      type="button"
+                      aria-label="Remove condition"
+                      onClick={() =>
+                        onChange(conditions.filter((_, j) => j !== i))
+                      }
+                      className="focus-ring flex size-7 shrink-0 items-center justify-center rounded-md text-ui text-graphite hover:bg-bone hover:text-foreground"
+                    >
+                      ×
+                    </button>
                   </div>
-                ) : (
-                  <span className="flex-1" />
-                )}
-                <button
-                  type="button"
-                  aria-label="Remove condition"
-                  onClick={() => onChange(conditions.filter((_, j) => j !== i))}
-                  className="focus-ring flex size-7 shrink-0 items-center justify-center rounded-md text-graphite hover:bg-bone hover:text-foreground"
-                >
-                  <X className="size-3.5" strokeWidth={2} />
-                </button>
-              </div>
-            )
-          })}
-          <div className="flex items-center justify-between pt-1">
-            <Button
-              size="xs"
-              variant="outline"
-              disabled={!first}
-              onClick={() =>
-                first &&
-                onChange([
-                  ...conditions,
-                  { slug: first.slug, op: opsFor(first.type)[0] },
-                ])
-              }
-            >
-              <Plus className="size-3" strokeWidth={2} />
-              Add condition
-            </Button>
-            {conditions.length > 0 ? (
-              <Button size="xs" variant="ghost" onClick={() => onChange([])}>
-                Clear
+                )
+              })}
+            </div>
+            <div className="flex h-11 items-center justify-between border-t border-rule bg-bone px-3">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={registry.length === 0}
+                onClick={() => onPicking(true)}
+              >
+                Add condition
               </Button>
-            ) : null}
+              <button
+                type="button"
+                onClick={() => onChange([])}
+                className="focus-ring rounded-md text-label text-graphite transition-colors duration-150 ease-out-quart hover:text-foreground"
+              >
+                Clear
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </PopoverContent>
     </Popover>
+  )
+}
+
+/** The attributes a new condition can be on, searchable; a pick adds it. */
+function AttributePicker({
+  registry,
+  onPick,
+}: {
+  registry: ReadonlyArray<RegistryEntry>
+  onPick: (def: RegistryEntry) => void
+}) {
+  const item = selectClasses({ width: 'content' }).item
+  return (
+    <CommandPrimitive data-attribute-picker label="Filter on" loop>
+      <div className="flex h-8 items-center gap-2 border-b border-rule px-2.5">
+        <span aria-hidden className="mono text-micro text-primary">
+          ›
+        </span>
+        <CommandPrimitive.Input
+          autoFocus
+          placeholder="Filter on…"
+          aria-label="Filter on"
+          className="h-full min-w-0 flex-1 bg-transparent text-ui outline-none placeholder:text-graphite"
+        />
+      </div>
+      <CommandPrimitive.List className="max-h-72 scroll-py-1 overflow-y-auto p-1">
+        <CommandPrimitive.Empty className="px-2.5 py-4 text-label text-graphite">
+          No attribute matches.
+        </CommandPrimitive.Empty>
+        {registry.map((d) => (
+          <CommandPrimitive.Item
+            key={d.slug}
+            value={d.slug}
+            keywords={[d.name]}
+            onSelect={() => onPick(d)}
+            className={item}
+          >
+            <span className="min-w-0 flex-1 truncate">{d.name}</span>
+          </CommandPrimitive.Item>
+        ))}
+      </CommandPrimitive.List>
+    </CommandPrimitive>
   )
 }
 
@@ -575,12 +698,15 @@ function SaveViewDialog({
   onOpenChange,
   initial,
   title,
+  context,
   onSubmit,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   initial: { name: string; visibility: 'shared' | 'private' }
   title: string
+  /** The list's plural, in the head beside the title. */
+  context: string
   onSubmit: (v: {
     name: string
     visibility: 'shared' | 'private'
@@ -594,6 +720,7 @@ function SaveViewDialog({
             key={`${initial.name}:${initial.visibility}`}
             initial={initial}
             title={title}
+            context={context}
             onSubmit={onSubmit}
           />
         ) : null}
@@ -605,10 +732,12 @@ function SaveViewDialog({
 function SaveViewForm({
   initial,
   title,
+  context,
   onSubmit,
 }: {
   initial: { name: string; visibility: 'shared' | 'private' }
   title: string
+  context: string
   onSubmit: (v: {
     name: string
     visibility: 'shared' | 'private'
@@ -648,6 +777,7 @@ function SaveViewForm({
     >
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
+        <DialogDescription>{context}</DialogDescription>
       </DialogHeader>
       <div className="space-y-1.5">
         <Label htmlFor="view-name">Name</Label>
@@ -677,12 +807,11 @@ function SaveViewForm({
       ) : null}
       <DialogFooter>
         <DialogClose asChild>
-          <Button type="button" variant="ghost">
+          <Button type="button" variant="outline">
             Cancel
           </Button>
         </DialogClose>
-        <Button type="submit" disabled={pending}>
-          <Check className="size-4" strokeWidth={2} />
+        <Button type="submit" pending={pending} shortcut="⌘↵">
           {pending ? 'Saving…' : 'Save'}
         </Button>
       </DialogFooter>

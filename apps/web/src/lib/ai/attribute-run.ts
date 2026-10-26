@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm'
 import { z } from 'zod'
 import type { LanguageModel } from 'ai'
 import { db } from '@spaces/db'
@@ -23,6 +23,7 @@ import { liveOptions } from '@spaces/core/attributes/options'
 import type { AttributeDef } from '@spaces/core/attributes/registry'
 import { QUEUES } from '@spaces/core/queue/names'
 import { jsonRecord, jsonValue } from '@spaces/core/json'
+import type { Json } from '@spaces/core/json'
 import { enqueue, jobsByKey } from '#/lib/queue'
 import type { QueuedJob } from '#/lib/queue'
 import { recordContextProgram } from '@spaces/core/writes/context/record'
@@ -875,6 +876,63 @@ export const openCellProposalsProgram = Effect.fn('openCellProposals')(
     return out
   },
 )
+
+/** A cell whose value a model proposed and a person accepted, and when. */
+export type AiWrittenCell = {
+  entityId: string
+  slug: string
+  /** The accepted value, to tell whether the cell still holds it. */
+  value: Json
+  /** ISO instant of the acceptance. */
+  at: string
+}
+
+/**
+ * The latest accepted AI proposal per (record, attribute slug), for the
+ * records a table page shows — what its cell marks `AI · 12 Oct` while the
+ * value still matches. A proposal no run made (a plugin's) is not AI.
+ */
+export const aiWrittenCellsProgram = Effect.fn('aiWrittenCells')(function* (
+  entityIds: ReadonlyArray<string>,
+): Effect.fn.Return<Array<AiWrittenCell>, AttributeRunQueryFailed> {
+  const rows = yield* query(() =>
+    entityIds.length === 0
+      ? Promise.resolve([])
+      : db
+          .select({
+            entityId: suggestion.entityId,
+            payload: suggestion.payload,
+            decidedAt: suggestion.decidedAt,
+          })
+          .from(suggestion)
+          .where(
+            and(
+              inArray(suggestion.entityId, [...entityIds]),
+              eq(suggestion.kind, 'attribute_patch'),
+              eq(suggestion.status, 'accepted'),
+              isNotNull(suggestion.runId),
+            ),
+          )
+          .orderBy(desc(suggestion.decidedAt)),
+  )
+  const seen = new Set<string>()
+  const out: Array<AiWrittenCell> = []
+  for (const r of rows) {
+    if (r.entityId === null || r.decidedAt === null) continue
+    for (const [slug, field] of Object.entries(jsonRecord(r.payload))) {
+      const key = `${r.entityId}:${slug}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push({
+        entityId: r.entityId,
+        slug,
+        value: jsonRecord(field).value ?? null,
+        at: r.decidedAt.toISOString(),
+      })
+    }
+  }
+  return out
+})
 
 // ---------- the registry proposal, decided ----------
 

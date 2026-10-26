@@ -16,6 +16,7 @@ import {
 import { bulkEnrich, estimateBulkEnrich } from '#/lib/server-fns'
 import type { Condition } from '@spaces/core/views/filter'
 import { ListMenu } from './list-menu'
+import type { ListVerb } from './list-menu'
 import type { TableSelect } from './record-table'
 import { SelectionBar, useRowSelection } from './selection-bar'
 
@@ -261,8 +262,9 @@ const FILL_AT = [10, 25, 45, 70]
 
 /**
  * Enrich… on a record list: the row checkboxes, the selection bar with
- * Enrich… as its pine verb, the list head's `···` (Enrich… over the view),
- * and the window either opens.
+ * Enrich… as its pine verb, the head's Enrich… over the view — as `verb`
+ * for a `ListMenu` that holds others, or `menu` on its own — and the window
+ * either opens.
  */
 export function useListEnrich<T extends { id: string; name: string }>({
   kind,
@@ -282,6 +284,7 @@ export function useListEnrich<T extends { id: string; name: string }>({
 }): {
   select: TableSelect<T>
   selectionBar: ReactNode
+  verb: ListVerb
   menu: ReactNode
   dialog: ReactNode
 } {
@@ -303,6 +306,7 @@ export function useListEnrich<T extends { id: string; name: string }>({
       timers.current.push(window.setTimeout(refresh, s * 1000))
   }
 
+  const verb: ListVerb = { label: 'Enrich…', onSelect: () => setTarget(view) }
   return {
     select: { rows: selection, keyOf: (r) => r.id, nameOf: (r) => r.name },
     selectionBar:
@@ -324,12 +328,8 @@ export function useListEnrich<T extends { id: string; name: string }>({
           </Button>
         </SelectionBar>
       ) : null,
-    menu: (
-      <ListMenu
-        label={label}
-        verbs={[{ label: 'Enrich…', onSelect: () => setTarget(view) }]}
-      />
-    ),
+    verb,
+    menu: <ListMenu label={label} verbs={[verb]} />,
     dialog:
       target === null ? null : (
         <BulkEnrichDialog
