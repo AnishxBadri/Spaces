@@ -1135,7 +1135,8 @@ The Clean UI leftovers (`SPA-355`, `SPA-356`) have their bodies in Linear only; 
 4. **Plugins** (`integrations/registry-pane.tsx`): the Available filter becomes a Segmented with counts (not `Tabs`).
 5. **Every settings page head:** one outline 32px action at most. Re-check the per-object page (`New relationship` + `New attribute` + `···` becomes `New attribute` + `···`, with `New relationship…` in the `···`).
 6. **Objects and templates:** a row click opens Edit; the rules lane prints `filter` and `sort` only when set.
-7. **Accounts:**
+7. **Settings ledger column heads** (`Person`, `Role`, and the other settings ledgers' lane heads) become sans 12 graphite in sentence case, like the list table's heads. They still print in mono.
+8. **Accounts:**
    - Sync readouts read `In sync · 9 Oct` (dates were done in `port-2`; check the strings).
    - The Testing-mode sentence on the account page goes; it moves into `port-B3`'s Set up tab.
 
