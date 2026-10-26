@@ -15,11 +15,11 @@ Worker (pg-boss · extraction · AI jobs) ────┘      data, jobs, searc
                                             └── ./data   uploads · secret.key
 ```
 
-Spaces is two Node processes sharing one database and one directory. In production they run in one container, `app`, beside a second container for Postgres. That is the whole install.
+Spaces is two Node processes sharing one database and one directory. In production each runs in its own container from the same image, `app` for the web server and `worker` for the worker, beside a third container for Postgres. That is the whole install.
 
 **Web.** TanStack Start and React 19. The browser talks to the server through typed server functions; there is no separate API tier to run. The web process never does heavy work inline. Anything that would block a request goes on a queue for the worker.
 
-**Worker.** A pg-boss host in its own process. It extracts text from uploaded PDF, DOCX, PPTX and XLSX files, re-verifies each file's hash as it reads it, and runs every AI job: classification, summaries, embeddings. If either process dies, the container exits and Compose restarts it, so a dead worker cannot hide behind a healthy web server. Set `ROLE=web` and `ROLE=worker` to run them in separate containers.
+**Worker.** A pg-boss host in its own process. It extracts text from uploaded PDF, DOCX, PPTX and XLSX files, re-verifies each file's hash as it reads it, and runs every AI job: classification, summaries, embeddings. A worker that crashes or runs out of memory restarts on its own without taking the web server down, and a worker that stops working shows as unhealthy because its healthcheck reads its own heartbeat. A host that runs only one container sets `ROLE=all` to run both processes in it; then either one dying stops the container and it restarts.
 
 **Postgres 17 with pgvector.** One stateful service carries the relational data, the job queue, full-text and typo-tolerant search (`tsvector`, `pg_trgm`), the space hierarchy (`ltree`) and the embeddings (`pgvector`). Search is one query that ranks names, note bodies, document text and vector matches together.
 
