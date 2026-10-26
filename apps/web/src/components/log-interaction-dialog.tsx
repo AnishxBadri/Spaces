@@ -116,7 +116,7 @@ export function LogInteractionDialog({
         )}
       </DialogTrigger>
       <DialogContent
-        className="sm:max-w-[35rem]"
+        size="m"
         // No record in view, no description: say so rather than leave Radix
         // looking for one.
         {...(seed ? {} : { 'aria-describedby': undefined })}

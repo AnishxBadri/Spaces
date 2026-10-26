@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Popover as PopoverPrimitive } from 'radix-ui'
 
+import { useWindowSheet } from '#/components/ui/dialog.tsx'
 import { cn } from '#/lib/utils.ts'
 
 function Popover({
@@ -28,10 +29,13 @@ function PopoverContent({
   sideOffset = 4,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+  // Inside a window the sheet stays within the window's edges.
+  const sheet = useWindowSheet()
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
         data-slot="popover-content"
+        {...(sheet === null ? {} : { collisionBoundary: sheet })}
         align={align}
         sideOffset={sideOffset}
         className={cn(

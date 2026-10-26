@@ -594,6 +594,54 @@
 }
 
 /**
+ * A window lands: it fades in while its solid offset grows 0→3px in three
+ * steps over 180ms, never scaling. Under reduced motion the base layer's
+ * switch makes it instant.
+ */
+@keyframes window-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes window-offset {
+  from {
+    box-shadow: 0 0 0 0 var(--hairline);
+  }
+  to {
+    box-shadow: 3px 3px 0 0 var(--hairline);
+  }
+}
+
+@utility window-land {
+  animation:
+    window-fade 180ms var(--ease-out-quart),
+    window-offset 180ms steps(3, jump-end);
+}
+
+/**
+ * The Twinkle: each dot is lit for 6 of 16 steps of 150ms, its phase set by
+ * its Bayer rank (`twinkleDelay`), so the lit set walks the matrix in a 2.4s
+ * loop. Opacity only; under reduced motion the component drops the
+ * animation and each dot holds its first-step opacity.
+ */
+@keyframes twinkle {
+  0% {
+    opacity: 1;
+  }
+  37.5% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@utility twinkle-dot {
+  animation: twinkle 2400ms step-end infinite;
+}
+
+/**
  * Composer wash (DESIGN.md §5, Micro-interactions — SPA-53). A row a composer
  * just created lands washed in bone, and the wash fades out over 250ms: the
  * eye is told where the new row went without the list moving a pixel.
@@ -743,6 +791,114 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
+  }
+}
+
+/**
+ * Toast anatomy: a 36px ink row, 12px in, paper text at the UI step, no
+ * shadow. The selectors carry the toaster for the reason the motion rules
+ * above do.
+ * - No icon box: a plain toast leaves sonner's empty one behind.
+ * - An error is crimson and carries its `×` at the end of the row.
+ */
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'] {
+  min-height: var(--row-h);
+  padding: 8px 12px;
+  gap: 12px;
+  box-shadow: none;
+  font-family: var(--font-sans);
+  font-size: var(--text-ui);
+  line-height: var(--text-ui--line-height);
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'] [data-title] {
+  font-weight: 400;
+  line-height: var(--text-ui--line-height);
+}
+[data-sonner-toaster]
+  [data-sonner-toast][data-styled='true']
+  [data-description] {
+  color: var(--rule);
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'] [data-icon] {
+  margin: 0;
+}
+[data-sonner-toaster]
+  [data-sonner-toast][data-styled='true']
+  [data-icon]:empty {
+  display: none;
+}
+[data-sonner-toaster] [data-sonner-toast][data-type='error'] {
+  --normal-bg: var(--destructive);
+  --normal-border: var(--destructive);
+}
+[data-sonner-toaster]
+  [data-sonner-toast][data-styled='true']
+  [data-close-button] {
+  position: static;
+  order: 1;
+  margin-left: auto;
+  width: 20px;
+  height: 20px;
+  transform: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--normal-text);
+  font-size: var(--text-body);
+}
+[data-sonner-toaster]
+  [data-sonner-toast][data-styled='true']:hover
+  [data-close-button]:hover {
+  background: transparent;
+}
+
+/**
+ * The action (`Undo`): sans, underlined, paper, with a 1px paper line under
+ * it that drains over the toast's hold — `--toast-duration`, the Toaster's
+ * `TOAST_MS`. It pauses while sonner holds the toast (pointer over the
+ * stack), and stands full and still under reduced motion.
+ */
+@keyframes toast-drain {
+  to {
+    transform: scaleX(0);
+  }
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'] [data-action] {
+  position: relative;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--normal-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-ui);
+  font-weight: 400;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+[data-sonner-toaster]
+  [data-sonner-toast][data-styled='true']
+  [data-action]::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -5px;
+  height: 1px;
+  background: var(--normal-text);
+  transform-origin: left;
+  animation: toast-drain var(--toast-duration) linear forwards;
+}
+[data-sonner-toaster]
+  [data-sonner-toast][data-expanded='true']
+  [data-action]::after {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-sonner-toaster]
+    [data-sonner-toast][data-styled='true']
+    [data-action]::after {
+    animation: none;
   }
 }
 

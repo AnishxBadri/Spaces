@@ -2,6 +2,7 @@ import * as React from 'react'
 import { CheckIcon, ChevronRightIcon } from 'lucide-react'
 import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui'
 
+import { useWindowSheet } from '#/components/ui/dialog.tsx'
 import { cn } from '#/lib/utils.ts'
 
 function DropdownMenu({
@@ -26,10 +27,13 @@ function DropdownMenuContent({
   sideOffset = 4,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+  // Inside a window the menu stays within the window's edges.
+  const sheet = useWindowSheet()
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
         data-slot="dropdown-menu-content"
+        {...(sheet === null ? {} : { collisionBoundary: sheet })}
         sideOffset={sideOffset}
         className={cn(
           'z-dropdown max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-none border border-hairline bg-paper p-1 text-foreground ease-out-quart shadow-dither data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:duration-100 data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:duration-150 data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',

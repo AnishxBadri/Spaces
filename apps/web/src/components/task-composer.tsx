@@ -220,7 +220,7 @@ export function TaskComposer({
       </DialogTrigger>
       {/* Quick task: no title bar — the input is the title. 48px prompt row
           with a pine +, chips under it, a bone foot. */}
-      <DialogContent className="top-[20%] translate-y-0 p-0 sm:max-w-[32.5rem]">
+      <DialogContent size="s" className="top-[20%] translate-y-0 p-0">
         <DialogTitle className="sr-only">Create task</DialogTitle>
         <form
           onSubmit={(e) => {

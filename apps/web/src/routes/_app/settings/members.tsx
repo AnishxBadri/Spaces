@@ -362,7 +362,7 @@ function InviteDialog({
 
   return (
     <Dialog open={open} onOpenChange={change}>
-      <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
+      <DialogContent size="s" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Invite</DialogTitle>
         </DialogHeader>

@@ -920,9 +920,9 @@ describe('the four acts that break something elsewhere ask first', () => {
     await click(byText('Revoke…'))
     expect(dialog()?.textContent).toContain('Revoke laptop?')
     expect(dialog()?.textContent).toContain('It cannot come back')
-    expect(focused()).toBe('Keep')
+    expect(focused()).toBe('Cancel')
     expect(writes.revokeApiToken).not.toHaveBeenCalled()
-    await click(byText('Keep', dialog() ?? document))
+    await click(byText('Cancel', dialog() ?? document))
     expect(writes.revokeApiToken).not.toHaveBeenCalled()
   })
 
@@ -935,7 +935,7 @@ describe('the four acts that break something elsewhere ask first', () => {
       expect(dialog()?.textContent).toContain('Archive Funds?'),
     )
     expect(dialog()?.textContent).toContain('pickers skip it')
-    expect(focused()).toBe('Keep')
+    expect(focused()).toBe('Cancel')
     expect(writes.updateObject).not.toHaveBeenCalled()
   })
 
@@ -947,7 +947,7 @@ describe('the four acts that break something elsewhere ask first', () => {
     await click(domain)
     expect(dialog()?.textContent).toContain('Stop matching funds on')
     expect(dialog()?.textContent).toContain('attribute is deleted')
-    expect(focused()).toBe('Keep')
+    expect(focused()).toBe('Cancel')
     expect(writes.updateObject).not.toHaveBeenCalled()
     await click(byText('Untick', dialog() ?? document))
     expect(writes.updateObject).toHaveBeenCalledWith({

@@ -72,7 +72,7 @@ export function ObjectDialog(
       {props.trigger ? (
         <DialogTrigger asChild>{props.trigger}</DialogTrigger>
       ) : null}
-      <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
+      <DialogContent size="s" aria-describedby={undefined}>
         {open ? (
           <ObjectForm
             {...props}

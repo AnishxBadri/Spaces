@@ -387,7 +387,7 @@ export function MoveStageDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && onCancel()}>
-      <DialogContent className="sm:max-w-[30rem]">
+      <DialogContent size="s">
         <DialogHeader>
           <DialogTitle>Move stage</DialogTitle>
           <DialogDescription>{dealName}</DialogDescription>
@@ -503,7 +503,7 @@ export function CloseReasonDialog({
   const [reason, setReason] = useState('')
   return (
     <Dialog open onOpenChange={(o) => !o && onCancel()}>
-      <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
+      <DialogContent size="s" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>
             {dealName} → {stageLabel}

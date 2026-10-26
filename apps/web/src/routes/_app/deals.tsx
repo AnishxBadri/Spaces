@@ -623,7 +623,8 @@ export function CreateDealDialog({
         )}
       </DialogTrigger>
       <DialogContent
-        className="max-h-[85vh] overflow-y-auto sm:max-w-2xl"
+        size="m"
+        className="max-h-[85vh] overflow-y-auto"
         aria-describedby={undefined}
       >
         <DialogHeader>

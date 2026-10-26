@@ -235,7 +235,7 @@ export function MeetingDialog({
 }) {
   return (
     <Dialog open={id !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-[42rem]">
+      <DialogContent size="l">
         {id === null ? null : (
           <MeetingWindow
             key={id}

@@ -325,7 +325,7 @@ function RebindWindow({
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
-      <DialogContent>
+      <DialogContent size="m">
         <DialogHeader>
           <DialogTitle>Re-bind</DialogTitle>
           <DialogDescription>{binding.folderPath}</DialogDescription>

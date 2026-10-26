@@ -102,7 +102,7 @@ export function DraftsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[80vh] flex-col sm:max-w-[52rem]">
+      <DialogContent size="l">
         <DialogHeader>
           <DialogTitle>Drafts</DialogTitle>
           <DialogDescription>
@@ -241,7 +241,7 @@ function ComposeDialog({
         if (!open) onClose()
       }}
     >
-      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-[48rem]">
+      <DialogContent size="l">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription className={saved === null ? 'sr-only' : ''}>

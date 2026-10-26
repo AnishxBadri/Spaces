@@ -543,7 +543,7 @@ describe('the row’s ···', () => {
       'It is filed only on Flent, so it leaves the server.',
     )
     expect(dialog?.textContent).toContain('4.1 MB · 41 chunks')
-    expect(byText('button', 'Keep')).toBeDefined()
+    expect(byText('button', 'Cancel')).toBeDefined()
     await click(byText('button', 'Remove'))
     expect(fns.deleteDocument).toHaveBeenCalledWith({ data: { id: 'a2' } })
     expect(fns.unfileDocument).not.toHaveBeenCalled()

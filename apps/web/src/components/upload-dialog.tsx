@@ -1,5 +1,5 @@
 import { useRouter } from '@tanstack/react-router'
-import { File as FileIcon, Check, Loader2, X } from 'lucide-react'
+import { File as FileIcon, Check, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
@@ -13,6 +13,7 @@ import {
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Segmented } from '#/components/ui/segmented'
+import { Twinkle } from '#/components/twinkle'
 import { Select } from '#/components/ui/select'
 import {
   formatBytes,
@@ -201,7 +202,7 @@ export function UploadDialog() {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[35rem]">
+      <DialogContent size="m">
         <DialogHeader>
           <DialogTitle>Upload a file</DialogTitle>
           <DialogDescription>
@@ -255,10 +256,7 @@ export function UploadDialog() {
                           strokeWidth={2}
                         />
                       ) : (
-                        <Loader2
-                          className="size-3 animate-spin text-graphite motion-reduce:animate-none"
-                          strokeWidth={1.75}
-                        />
+                        <Twinkle />
                       )}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{u.name}</span>

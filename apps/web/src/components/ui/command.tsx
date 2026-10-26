@@ -53,7 +53,10 @@ function CommandDialog({
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
+      {/* A size exception: Cmd-K owns its own width, and widens for its
+          preview pane. */}
       <DialogContent
+        size="m"
         className={cn('overflow-hidden p-0 sm:max-w-[40rem]', className)}
         {...(overlayClassName === undefined ? {} : { overlayClassName })}
       >

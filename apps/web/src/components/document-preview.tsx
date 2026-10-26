@@ -1,4 +1,4 @@
-import { Download, ExternalLink, FileWarning, Loader2 } from 'lucide-react'
+import { Download, ExternalLink, FileWarning } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { PDFDocumentProxy } from 'unpdf/pdfjs'
@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { FileGlyph } from './files/file-glyph'
+import { Twinkle } from './twinkle'
 import { detectFormat } from '@spaces/core/documents/extract'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
 import type { DocumentKind } from '@spaces/core/documents'
@@ -113,14 +114,7 @@ export function DocumentPreview({
   useAskSubject(doc === null ? null : fileChip(doc))
   return (
     <Dialog open={Boolean(doc)} onOpenChange={onOpenChange}>
-      <DialogContent
-        className={cn(
-          'flex h-[85vh] flex-col gap-0 overflow-hidden p-0',
-          sidebar === null
-            ? 'max-w-4xl sm:max-w-4xl'
-            : 'max-w-6xl sm:max-w-6xl',
-        )}
-      >
+      <DialogContent size="viewer" className="gap-0 overflow-hidden">
         {doc ? (
           <PreviewBody
             doc={doc}
@@ -379,13 +373,11 @@ function Notice({ children }: { children: React.ReactNode }) {
   )
 }
 
-function Spinner({ label }: { label: string }) {
+/** The pane while the file is on its way: the Twinkle over one line. */
+function Working({ label }: { label: string }) {
   return (
-    <div className="flex h-full items-center justify-center gap-2 text-ui text-graphite">
-      <Loader2
-        className="size-4 animate-spin motion-reduce:animate-none"
-        strokeWidth={1.75}
-      />
+    <div className="flex h-full flex-col items-center justify-center gap-3 text-ui text-graphite">
+      <Twinkle size={29} />
       {label}
     </div>
   )
@@ -485,8 +477,8 @@ function BytesPending({
   if (state.error !== null)
     return <Notice>Could not load the file — {state.error}</Notice>
   if (state.fetchingFrom !== null)
-    return <Spinner label={`Fetching from ${state.fetchingFrom}…`} />
-  return <Spinner label={label} />
+    return <Working label={`Fetching from ${state.fetchingFrom}…`} />
+  return <Working label={label} />
 }
 
 /** The parsed PDF, held across pages so paging never re-parses the file. */
@@ -748,7 +740,7 @@ function ImagePreview({ doc, type }: { doc: Doc; type: string }) {
 
   if (bytes === null)
     return <BytesPending state={blob} label="Loading image…" />
-  if (!url) return <Spinner label="Loading image…" />
+  if (!url) return <Working label="Loading image…" />
 
   return (
     <div className="flex h-full items-center justify-center p-4">
@@ -792,9 +784,9 @@ function TextPreview({
 
   if (doc.extractionStatus === 'pending')
     return (
-      <Spinner label={blobless ? 'Fetching the page…' : 'Extracting text…'} />
+      <Working label={blobless ? 'Fetching the page…' : 'Extracting text…'} />
     )
-  if (loading) return <Spinner label="Loading…" />
+  if (loading) return <Working label="Loading…" />
 
   if (!text) {
     return (

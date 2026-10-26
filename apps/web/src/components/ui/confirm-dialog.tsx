@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { Button } from '#/components/ui/button.tsx'
@@ -26,19 +26,20 @@ export type ConfirmOptions = {
    * server has already refused (the mandate's note).
    */
   action?: string
-  /** The safe way out. */
+  /** The safe way out; `Cancel` when omitted. */
   keep?: string
+  /** The foot's mono line: what cannot be taken back ("Can't be undone"). */
+  note?: string
   /** Destructive is the default — that is what confirms are for. */
   kind?: 'destructive' | 'primary'
 }
 
 /**
- * The destructive confirm: a 440px
- * sheet whose bone head band holds the crimson square and the serif question;
- * on paper under it, one sentence and an optional ledger of what is affected
- * on a rule border; then the 52px bone foot: Keep, and the acting button,
- * whose tooltip carries ⌘↵. Focus lands on Keep; the destructive choice is
- * one key further away.
+ * The destructive confirm: an S window whose bone head band holds the serif
+ * question; on paper under it, one sentence and an optional ledger of what is
+ * affected on a rule border; then the 52px bone foot: the note, Cancel, and
+ * the acting button, whose tooltip carries ⌘↵. Focus lands on Cancel; the
+ * destructive choice is one key further away.
  */
 export function ConfirmDialog({
   open,
@@ -54,10 +55,15 @@ export function ConfirmDialog({
   const kind = options.kind ?? 'destructive'
   const rows = options.rows ?? []
   const hasBody = Boolean(options.body) || rows.length > 0
+  const keep = useRef<HTMLButtonElement>(null)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-[27.5rem]"
+        size="s"
+        onOpenAutoFocus={(e) => {
+          e.preventDefault()
+          keep.current?.focus()
+        }}
         onKeyDown={(e) => {
           if (
             options.action !== undefined &&
@@ -72,13 +78,6 @@ export function ConfirmDialog({
         <DialogHeader
           className={cn('flex-nowrap items-center', !hasBody && 'mb-0')}
         >
-          <span
-            aria-hidden
-            className={cn(
-              'size-2 shrink-0',
-              kind === 'destructive' ? 'bg-destructive' : 'bg-primary',
-            )}
-          />
           <DialogTitle>{options.title}</DialogTitle>
         </DialogHeader>
         {hasBody ? (
@@ -109,9 +108,14 @@ export function ConfirmDialog({
             ) : null}
           </div>
         ) : null}
-        <DialogFooter className="border-rule">
+        <DialogFooter
+          className="border-rule"
+          {...(options.note === undefined ? {} : { note: options.note })}
+        >
           <DialogClose asChild>
-            <Button variant="outline">{options.keep ?? 'Keep'}</Button>
+            <Button ref={keep} variant="outline">
+              {options.keep ?? 'Cancel'}
+            </Button>
           </DialogClose>
           {options.action === undefined ? null : (
             <Button
@@ -131,7 +135,7 @@ export function ConfirmDialog({
 /**
  * `const { confirm, confirmDialog } = useConfirm()` — render `confirmDialog`
  * once, then `if (!(await confirm({...}))) return` in place of
- * `window.confirm`. Resolves false on esc, the overlay, and Keep.
+ * `window.confirm`. Resolves false on esc, the overlay, and Cancel.
  */
 export function useConfirm() {
   const [pending, setPending] = useState<{

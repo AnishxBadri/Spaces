@@ -4,7 +4,6 @@ import {
   Download,
   Eye,
   FileText,
-  Loader2,
   Trash2,
   Upload,
 } from 'lucide-react'
@@ -15,6 +14,7 @@ import { Button } from './ui/button'
 import { useConfirm } from './ui/confirm-dialog'
 import { DocumentPreview } from './document-preview'
 import { OpenSourceButton } from './document-source'
+import { Twinkle } from './twinkle'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
 import { formatSince } from '@spaces/core/format'
 import type {
@@ -183,10 +183,7 @@ export function SpaceSources({
                   strokeWidth={1.75}
                 />
               ) : (
-                <Loader2
-                  className="size-3.5 animate-spin text-graphite motion-reduce:animate-none"
-                  strokeWidth={1.75}
-                />
+                <Twinkle />
               )}
             </span>
             <span className="min-w-0 flex-1 truncate text-body text-graphite">

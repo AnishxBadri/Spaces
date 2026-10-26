@@ -54,7 +54,7 @@ export function RelationshipDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl" aria-describedby={undefined}>
+      <DialogContent size="m" aria-describedby={undefined}>
         {open ? (
           <RelationshipForm
             objectId={objectId}

@@ -171,7 +171,7 @@ export function SaveAsTemplateAction({
         </button>
       )}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
+        <DialogContent size="s" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Save as template</DialogTitle>
           </DialogHeader>

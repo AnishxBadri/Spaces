@@ -115,7 +115,7 @@ function mount(initial: DraftState = blankDraft(ID)) {
   act(() =>
     root.render(
       <Dialog open>
-        <DialogContent>
+        <DialogContent size="l">
           <DraftComposer initial={initial} onClose={closed} />
         </DialogContent>
       </Dialog>,

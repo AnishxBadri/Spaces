@@ -588,7 +588,7 @@ function SaveViewDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
+      <DialogContent size="s" aria-describedby={undefined}>
         {open ? (
           <SaveViewForm
             key={`${initial.name}:${initial.visibility}`}

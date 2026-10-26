@@ -43,7 +43,6 @@ export function backfillConfirmOptions(
         : []),
     ],
     action: 'Backfill',
-    keep: 'Cancel',
     kind: 'primary',
   }
 }

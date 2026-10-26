@@ -282,8 +282,12 @@ export function AttributeDialog(props: Props) {
       {/* Two panes on one sheet: the type list left with
           its › search, the form right, a 44px head and a 52px bone foot.
           One height for every type — the type list's — so switching type
-          never resizes the sheet; a longer form scrolls in its pane. */}
-      <DialogContent className="flex h-[33.25rem] max-h-[85vh] flex-col overflow-hidden p-0 sm:max-w-[41.25rem]">
+          never resizes the sheet; a longer form scrolls in its pane.
+          A size exception: the fixed height wants its own width too. */}
+      <DialogContent
+        size="l"
+        className="h-[33.25rem] overflow-hidden p-0 sm:max-w-[41.25rem]"
+      >
         {/* Remount per open so a cancelled draft never leaks into the next. */}
         {open ? (
           <AttributeForm
@@ -1000,7 +1004,6 @@ function AttributeForm({
           title: `Show ${name.trim() || attr?.name} in ${pendingCode ?? ''}?`,
           body: `Every amount already stored will read as ${pendingCode ?? ''}. Nothing is converted.`,
           action: `Change to ${pendingCode ?? ''}`,
-          keep: 'Cancel',
         }}
         onConfirm={() => {
           const c = pendingCode

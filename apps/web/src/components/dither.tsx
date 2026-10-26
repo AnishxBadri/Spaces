@@ -1,11 +1,11 @@
 import { cn } from '#/lib/utils'
 
 /**
- * Texture — the Dither Rule. One bit, pine or ink,
- * never under text, never animated. Allowed in empty states, chart fills,
- * fallback marks, thumbnails and loading. Cells are 2px; a 4×4 Bayer matrix
- * decides which cells a given density fills, so two blocks of the same
- * density are identical and nothing shimmers.
+ * Texture — the Dither Rule. One bit, pine or ink, never under text, and
+ * animated only for a working state (`Twinkle`). Allowed in empty states,
+ * chart fills, fallback marks, thumbnails and loading. Cells are 2px; a 4×4
+ * Bayer matrix decides which cells a given density fills, so two blocks of
+ * the same density are identical and nothing shimmers.
  */
 
 /** 4×4 Bayer thresholds, 0–15: fill a cell when its threshold < level. */
@@ -150,8 +150,8 @@ export function DitherBlock({
 
 /**
  * Loading — a density ramp, not a shimmer: dense on the left, sparse on the
- * right, ink. Static by design (the Dither Rule forbids animation); the
- * ramp itself says "filling in".
+ * right, ink. Static by design (only a working state moves, and that is
+ * the `Twinkle`); the ramp itself says "filling in".
  */
 export function DensityRamp({
   width = 240,

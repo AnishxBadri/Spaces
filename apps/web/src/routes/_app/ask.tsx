@@ -162,7 +162,7 @@ function DeleteThread({
         }`
   return (
     <Dialog open={row !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
+      <DialogContent size="s" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Delete “{row?.title}”?</DialogTitle>
         </DialogHeader>

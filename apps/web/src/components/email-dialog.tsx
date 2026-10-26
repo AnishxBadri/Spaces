@@ -63,7 +63,7 @@ export function EmailDialog({
 }) {
   return (
     <Dialog open={id !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-[48rem]">
+      <DialogContent size="l">
         {id === null ? null : (
           <EmailWindow
             key={id}
@@ -309,7 +309,7 @@ export function WidenDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[70vh] flex-col sm:max-w-md">
+      <DialogContent size="s" className="flex max-h-[70vh] flex-col">
         <DialogHeader>
           <DialogTitle>Visible to</DialogTitle>
         </DialogHeader>

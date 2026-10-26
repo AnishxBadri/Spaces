@@ -449,7 +449,7 @@ export function FakePickList({
         if (!open) onResult({ kind: 'cancel' })
       }}
     >
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent size="m">
         <DialogHeader>
           <DialogTitle>{folders ? 'Link a Drive folder' : LABEL}</DialogTitle>
           <DialogDescription>fake Drive</DialogDescription>

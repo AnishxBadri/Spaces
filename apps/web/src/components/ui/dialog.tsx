@@ -37,7 +37,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        'fixed inset-0 z-modal bg-black/50 ease-out-quart data-[state=closed]:animate-out data-[state=closed]:duration-[120ms] data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:duration-[180ms] data-[state=open]:fade-in-0',
+        'fixed inset-0 z-modal bg-hairline/50 ease-out-quart data-[state=closed]:animate-out data-[state=closed]:duration-[120ms] data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:duration-[180ms] data-[state=open]:fade-in-0',
         className,
       )}
       {...props}
@@ -45,31 +45,110 @@ function DialogOverlay({
   )
 }
 
+/** The four window widths: a confirm, a form, a reading window, the file viewer. */
+export type WindowSize = 's' | 'm' | 'l' | 'viewer'
+
+const WINDOW_SIZE: Record<WindowSize, string> = {
+  s: 'sm:max-w-[27.5rem]',
+  m: 'sm:max-w-[35rem]',
+  l: 'sm:max-w-[48rem] max-h-[85vh] flex flex-col',
+  viewer: 'sm:max-w-[72rem] h-[85vh] p-0 flex flex-col',
+}
+
+/** How far a window opened from a window sits below its parent's top edge. */
+export const STACK_STEP_PX = 56
+
+/** Windows open at once: a parent and the one it opened. */
+export const MAX_WINDOWS = 2
+
+/** The window a nested one opens from: how deep it is, and its sheet. */
+type WindowFrame = { depth: number; sheet: HTMLElement | null }
+
+const WindowStack = React.createContext<WindowFrame>({ depth: 0, sheet: null })
+
+/**
+ * The sheet of the window this sits in, or null outside one: a popover in a
+ * window keeps inside it.
+ */
+function useWindowSheet(): HTMLElement | null {
+  return React.useContext(WindowStack).sheet
+}
+
+/**
+ * A window; `size` is its width, which a caller never spells.
+ * - Opened from inside another window it steps down under its parent:
+ *   `STACK_STEP_PX` below the parent's top, over a lighter scrim of its own.
+ * - A third window is refused: in development opening one throws.
+ * - Esc closes the top window only (Radix's dismissable layers).
+ */
 function DialogContent({
+  size,
   className,
   overlayClassName,
+  style,
+  ref,
   children,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  size: WindowSize
   /** The scrim's ground, when the window asks for its own. */
   overlayClassName?: string
 }) {
+  const parent = React.useContext(WindowStack)
+  if (import.meta.env.DEV && parent.depth >= MAX_WINDOWS)
+    throw new Error(
+      `A window was opened from a stacked window: at most ${MAX_WINDOWS} are open at once.`,
+    )
+  const nested = parent.depth > 0
+  const [sheet, setSheet] = React.useState<HTMLElement | null>(null)
+  const [top, setTop] = React.useState<number | null>(null)
+  // Measured before paint, so a stacked window never lands centred first.
+  React.useLayoutEffect(() => {
+    if (!nested || parent.sheet === null) return
+    setTop(parent.sheet.getBoundingClientRect().top + STACK_STEP_PX)
+  }, [nested, parent.sheet])
+  const sheetRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      setSheet(node)
+      if (typeof ref === 'function') ref(node)
+      else if (ref) ref.current = node
+    },
+    [ref],
+  )
+  const frame = React.useMemo(
+    () => ({ depth: parent.depth + 1, sheet }),
+    [parent.depth, sheet],
+  )
   return (
     <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay className={overlayClassName} />
+      <DialogOverlay
+        className={cn(nested && 'bg-hairline/30', overlayClassName)}
+      />
       <DialogPrimitive.Content
+        ref={sheetRef}
         data-slot="dialog-content"
+        data-window-depth={frame.depth}
         className={cn(
           // Overlay anatomy: paper sheet, 1px ink, the solid shadow of a
           // window over the scrim (dither would vanish there). The 20px body
           // padding is the sheet's; DialogHeader and DialogFooter break out
-          // of it to run edge to edge.
-          'fixed top-[50%] left-[50%] z-modal flex w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col rounded-none border border-hairline bg-paper p-5 shadow-solid ease-out-quart outline-none data-[state=closed]:animate-out data-[state=closed]:duration-[120ms] data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:duration-[180ms] data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
+          // of it to run edge to edge. It lands by its solid offset growing
+          // 0→3px in three steps (`window-land`), never by scaling.
+          'fixed top-[50%] left-[50%] z-modal flex w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col rounded-none border border-hairline bg-paper p-5 shadow-solid ease-out-quart outline-none data-[state=closed]:animate-out data-[state=closed]:duration-[120ms] data-[state=closed]:fade-out-0 data-[state=open]:window-land',
+          WINDOW_SIZE[size],
+          nested && 'translate-y-0',
           className,
         )}
+        // Stepped down, it stops 16px short of the viewport's foot rather
+        // than running off it.
+        style={
+          top === null
+            ? style
+            : { ...style, top, maxHeight: `calc(100vh - ${top + 16}px)` }
+        }
         {...props}
       >
-        {children}
+        <WindowStack.Provider value={frame}>{children}</WindowStack.Provider>
       </DialogPrimitive.Content>
     </DialogPortal>
   )
@@ -161,4 +240,5 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
+  useWindowSheet,
 }

@@ -79,7 +79,7 @@ export function LinkFolderDialog({
 
   return (
     <Dialog open={path !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[34rem]">
+      <DialogContent size="m">
         <DialogHeader className="flex-nowrap items-center">
           <FolderGlyph bound className="-my-1 shrink-0" />
           <DialogTitle className="min-w-0 truncate font-mono text-ui font-normal">

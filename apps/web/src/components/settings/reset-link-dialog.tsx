@@ -35,7 +35,7 @@ export function ResetLinkDialog({
         if (!open) onClose()
       }}
     >
-      <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
+      <DialogContent size="s" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Reset link for {link?.name}</DialogTitle>
         </DialogHeader>

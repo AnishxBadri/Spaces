@@ -42,7 +42,6 @@ export function columnRunConfirm(
     return {
       title: `Run ${attributeName} on this view?`,
       body: 'Counting the view’s records…',
-      keep: 'Cancel',
       kind: 'primary',
     }
   if (!estimate.ok)
@@ -80,7 +79,6 @@ export function columnRunConfirm(
     body: `One call per record the saved view holds without a proposal. Each answer lands in Review as a suggestion under one header; nothing is written until it is accepted. The run stops at today’s AI cap.`,
     rows,
     action: `Run ${count(estimate.calls)}`,
-    keep: 'Cancel',
     kind: 'primary',
   }
 }

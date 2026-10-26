@@ -26,7 +26,7 @@ export function KeyboardHelp({
   const mod = isMac ? '⌘' : 'Ctrl'
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[40rem]" aria-describedby={undefined}>
+      <DialogContent size="l" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Keyboard</DialogTitle>
         </DialogHeader>

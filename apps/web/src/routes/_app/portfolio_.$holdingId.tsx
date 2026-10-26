@@ -573,7 +573,7 @@ function AddInvestmentDialog({ companyId }: { companyId: string }) {
       <DialogTrigger asChild>
         <AddTrigger label="Add check" />
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
+      <DialogContent size="s" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Record a check</DialogTitle>
         </DialogHeader>
@@ -708,7 +708,7 @@ function AddRoundDialog({ companyId }: { companyId: string }) {
       <DialogTrigger asChild>
         <AddTrigger label="Add round" />
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
+      <DialogContent size="s" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Record a round</DialogTitle>
         </DialogHeader>
@@ -837,7 +837,7 @@ function AddMarkDialog({ holdingId }: { holdingId: string }) {
       <DialogTrigger asChild>
         <AddTrigger label="Add mark" />
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
+      <DialogContent size="s" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Record a mark</DialogTitle>
         </DialogHeader>
@@ -943,7 +943,7 @@ function AddDistributionDialog({ holdingId }: { holdingId: string }) {
       <DialogTrigger asChild>
         <AddTrigger label="Add distribution" />
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
+      <DialogContent size="s" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Record a distribution</DialogTitle>
         </DialogHeader>
