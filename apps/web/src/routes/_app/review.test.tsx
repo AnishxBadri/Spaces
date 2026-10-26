@@ -114,6 +114,7 @@ describe('the suggestion card', () => {
               ],
               fields: null,
               origin: { via: 'app' },
+              source: null,
               createdAt: '2026-09-23T00:00:00.000Z',
               runId: null,
             }}
@@ -132,7 +133,7 @@ describe('the suggestion card', () => {
       // payload is what the row shows, under the kind's word.
       expect(html).toContain(`payload-of-${kind}`)
       expect(html).toContain(SUGGESTION_KIND_WORD[kind])
-      expect(html).not.toContain('produced by this run')
+      expect(html).not.toContain('Produced by this run')
     }
   })
 
@@ -172,6 +173,7 @@ describe('the suggestion card', () => {
             ],
             fields: null,
             origin: { via: 'app' },
+            source: null,
             createdAt: '2026-10-13T00:00:00.000Z',
             runId: null,
           }}
@@ -212,6 +214,7 @@ describe('the suggestion card', () => {
             citations: [],
             fields: null,
             origin: { via: 'integration' },
+            source: null,
             createdAt: '2026-10-16T00:00:00.000Z',
             runId: null,
           }}
@@ -292,6 +295,7 @@ describe('the suggestion card', () => {
             citations: [],
             fields: null,
             origin: { via: 'app' },
+            source: null,
             createdAt: '2026-10-16T00:00:00.000Z',
             runId: null,
           }}
@@ -324,6 +328,7 @@ describe('the suggestion card', () => {
             citations: [],
             fields: null,
             origin: { via: 'app' },
+            source: null,
             createdAt: '2026-09-27T00:00:00.000Z',
             runId,
           }}
@@ -333,7 +338,7 @@ describe('the suggestion card', () => {
         />
       </ul>,
     )
-    expect(html).toContain('produced by this run')
+    expect(html).toContain('Produced by this run')
     expect(html).toContain(`href="${usageRunHref(runId)}"`)
   })
 
@@ -357,9 +362,12 @@ describe('the suggestion card', () => {
                 options: null,
                 isSystem: true,
                 value: 2019,
+                current: null,
+                confidence: null,
               },
             ],
             origin: { via: 'app' },
+            source: null,
             createdAt: '2026-09-23T00:00:00.000Z',
             runId: null,
           }}
@@ -390,6 +398,7 @@ describe('the suggestion card', () => {
               citations: [],
               fields: null,
               origin,
+              source: null,
               runId: null,
               createdAt: '2026-09-23T00:00:00.000Z',
             }}
@@ -427,6 +436,7 @@ describe('the suggestion card', () => {
             citations: [],
             fields: null,
             origin: { via: 'app' },
+            source: null,
             createdAt: '2026-09-23T00:00:00.000Z',
             runId: null,
           }}
@@ -479,6 +489,8 @@ describe('bulk accept on the suggestion card', () => {
         options: null,
         isSystem: true,
         value: 'Oslo',
+        current: null,
+        confidence: null,
       },
       {
         slug: 'founded_year',
@@ -487,9 +499,12 @@ describe('bulk accept on the suggestion card', () => {
         options: null,
         isSystem: true,
         value: 2021,
+        current: null,
+        confidence: null,
       },
     ],
     origin: { via: 'app' },
+    source: null,
     createdAt: '2026-09-23T00:00:00.000Z',
     runId: null,
   }
@@ -594,6 +609,7 @@ describe('the discovery group', () => {
     citations: [],
     fields: null,
     origin: { via: 'integration' },
+    source: null,
     createdAt: '2026-10-10T00:00:00.000Z',
     runId: null,
   })

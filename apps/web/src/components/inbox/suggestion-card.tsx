@@ -1,10 +1,8 @@
-import { useRouter } from '@tanstack/react-router'
-import { Boxes, Check, CheckCheck, X } from 'lucide-react'
+import { Link, useRouter } from '@tanstack/react-router'
+import { Check, CheckCheck } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { OptionChip } from '#/components/attributes/value-editor'
-import { KIND_ICONS } from '#/components/editor/mention'
-import { ChipLink } from '#/components/table/cells'
 import { Button } from '#/components/ui/button'
 import { checkboxClasses } from '#/components/ui/checkbox'
 import { readOptionProposals } from '@spaces/core/ai/attribute-ai'
@@ -51,9 +49,10 @@ import { recordPath } from '#/lib/record-path'
 import { cn } from '#/lib/utils'
 
 /**
- * The suggestion card — every open suggestion on one record, one row per
- * suggestion, each accepted or rejected on its own. The card is the pair
- * card's container; the row is rationale, citations and a decision.
+ * The suggestion card — every open suggestion on one record under its serif
+ * name, one entry per suggestion, each accepted or dismissed on its own. The
+ * entry is a mono line, the proposal, the rationale and citations, and a
+ * bone foot with the decision.
  *
  * Generic over `suggestion.kind`: a kind with a body in `SUGGESTION_BODIES`
  * draws it, every other kind prints its payload in the same row shape. The
@@ -99,14 +98,10 @@ type SuggestionBody = (props: BodyProps) => React.ReactNode
  * `PayloadBody` exists for, never a crash.
  */
 const SUGGESTION_BODIES: Partial<Record<SuggestionKind, SuggestionBody>> = {
+  // Fields draw as the entry's grid; this body is what a patch with none
+  // draws instead.
   attribute_patch: ({ item, actions }) =>
-    item.fields ? (
-      <PatchBody
-        suggestionId={item.id}
-        fields={item.fields}
-        actions={actions}
-      />
-    ) : readOptionProposals(item.rationale).length > 0 ? (
+    readOptionProposals(item.rationale).length > 0 ? (
       // A registry proposal — an empty patch naming an option an AI
       // attribute's classify run wanted. "Add option" is its explicit write.
       <OptionProposalBody suggestionId={item.id} rationale={item.rationale} />
@@ -204,23 +199,21 @@ const SUGGESTION_BODIES: Partial<Record<SuggestionKind, SuggestionBody>> = {
 }
 
 /**
- * The decision's words, per kind. A discovery card's reject is a dismissal,
- * permanent for its space, so it says so.
+ * The decision's words, per kind: the verb, and `Dismiss` for the other
+ * way. A discovery card's dismissal is permanent for its space, so its
+ * tooltip says so.
  */
 type DecisionWords = {
   accept: string
   reject: string
-  /** The reject button's tooltip; null for none. */
+  /** The dismiss button's tooltip; null for none. */
   rejectTitle: string | null
-  /** Whether the two buttons carry their check and cross. */
-  icons: boolean
 }
 
 const DECIDE: DecisionWords = {
   accept: 'Accept',
-  reject: 'Reject',
+  reject: 'Dismiss',
   rejectTitle: null,
-  icons: true,
 }
 
 const DISMISS_TITLE =
@@ -232,36 +225,30 @@ export function decisionWords(kind: SuggestionKind): DecisionWords {
       accept: 'Add and file here',
       reject: 'Dismiss',
       rejectTitle: DISMISS_TITLE,
-      icons: true,
     }
   if (kind === 'file_record')
     return {
       accept: 'File here',
       reject: 'Dismiss',
       rejectTitle: DISMISS_TITLE,
-      icons: true,
     }
   if (kind === 'ledger_event')
     return {
       accept: 'Accept',
       reject: 'Dismiss',
       rejectTitle: null,
-      icons: true,
     }
   if (kind === 'refile_document')
     return {
       accept: 'Re-file',
       reject: 'Dismiss',
       rejectTitle: null,
-      icons: true,
     }
-  // The Action Grammar's foot: Dismiss · the verb, no icons.
   if (kind === 'supersedes')
     return {
       accept: 'Mark as newer version',
       reject: 'Dismiss',
       rejectTitle: 'Dismiss for good: this pair is not suggested again',
-      icons: false,
     }
   return DECIDE
 }
@@ -569,53 +556,6 @@ function DiscoveryBody({
   )
 }
 
-function PatchBody({
-  suggestionId,
-  fields,
-  actions,
-}: {
-  suggestionId: string
-  fields: Array<SuggestionField>
-  actions: FieldActions | null
-}) {
-  return (
-    <dl className="flex min-w-0 flex-col gap-2">
-      {fields.map((f) => {
-        const failure = actions?.failureOf(suggestionId, f.slug) ?? null
-        return (
-          <div key={f.slug} className="flex min-w-0 flex-col gap-0.5">
-            <dt className="flex min-w-0 items-center justify-between gap-2">
-              <span className="truncate field-label text-graphite">
-                {f.name}
-              </span>
-              {actions ? (
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  disabled={actions.pending}
-                  title={`Accept ${f.name} on every record that proposes it`}
-                  onClick={() => actions.onAcceptColumn(f)}
-                >
-                  <CheckCheck className="size-3" strokeWidth={2} />
-                  Accept column
-                </Button>
-              ) : null}
-            </dt>
-            <dd className="flex min-w-0 items-center text-ui">
-              <ProposedValue field={f} />
-            </dd>
-            {failure ? (
-              <dd role="alert" className="text-label text-destructive">
-                {failure}
-              </dd>
-            ) : null}
-          </div>
-        )
-      })}
-    </dl>
-  )
-}
-
 /**
  * A proposed value, drawn the way the record table's cell for that type
  * reads: option chips for select/status, mono for measured things, the
@@ -708,8 +648,11 @@ export function ProposedValue({
 }
 
 /**
- * One suggestion: what is proposed, why, from what — and the decision. Pure
- * over its props, so the renderer map is testable without a router.
+ * One suggestion: the mono line of what and from where, what is proposed,
+ * why — and the decision on a bone foot. Pure over its props, so the
+ * renderer map is testable without a router.
+ * - A field change draws its grid (`Proposed · Current · Confidence ·
+ *   Source`); every other kind draws its body.
  */
 export function SuggestionEntry({
   item,
@@ -728,27 +671,40 @@ export function SuggestionEntry({
   /** The last batch's refusal for the suggestion as a whole (not a patch). */
   failure?: string | null
 }): React.ReactNode {
+  const { today } = useClock()
   const Body = suggestionBodyFor(item.kind)
   const words = decisionWords(item.kind)
-  // A newer-version body already names both documents its refs cite.
+  const grid = item.kind === 'attribute_patch' && item.fields !== null
+  // A newer-version body already names both documents its refs cite; a
+  // grid prints the first citation in its Source lane.
   const citations =
     item.kind === 'supersedes' && readSupersedesPayload(item.payload) !== null
       ? []
-      : item.citations
+      : grid
+        ? item.citations.slice(1)
+        : item.citations
   return (
-    <li className="flex flex-col gap-3 border-b border-rule px-5 py-3 last:border-b-0 sm:flex-row sm:items-start sm:gap-5">
-      <div className="flex min-w-0 flex-col gap-1 sm:w-64 sm:shrink-0">
-        <Body item={item} actions={actions} />
+    <li
+      data-suggestion
+      className="flex flex-col border-b border-rule last:border-b-0"
+    >
+      <div className="flex flex-col gap-3 px-5 pt-3 pb-4">
+        <p data-suggestion-meta className="mono text-micro text-graphite">
+          {suggestionMeta(item, today)}
+        </p>
+        {grid && item.fields !== null ? (
+          <FieldGrid item={item} fields={item.fields} actions={actions} />
+        ) : (
+          <Body item={item} actions={actions} />
+        )}
         {failure ? (
           <p role="alert" className="text-label text-destructive">
             {failure}
           </p>
         ) : null}
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <p className="text-ui text-graphite">
-          {item.rationale ?? 'No rationale given.'}
-        </p>
+        {item.rationale === null ? null : (
+          <p className="text-ui text-graphite">{item.rationale}</p>
+        )}
         {/* A proposal from outside the app says which door it came
             through, so it never reads as one of the app's own. */}
         {item.origin.via === 'mcp' ? (
@@ -756,7 +712,7 @@ export function SuggestionEntry({
             Proposed over MCP by token{' '}
             <span className="mono">{item.origin.token}</span>
           </p>
-        ) : item.origin.via === 'integration' ? (
+        ) : item.origin.via === 'integration' && item.source === null ? (
           <p className="text-label text-graphite">Proposed by an integration</p>
         ) : null}
         {citations.length > 0 ? (
@@ -782,23 +738,24 @@ export function SuggestionEntry({
             href={usageRunHref(item.runId)}
             className="focus-ring self-start mono text-micro text-graphite hover:text-foreground hover:underline"
           >
-            produced by this run ›
+            Produced by this run ›
           </a>
         )}
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div
+        data-suggestion-foot
+        className="flex min-h-11 items-center justify-end gap-2 border-t border-rule bg-bone px-5 py-2"
+      >
         <Button
-          size="xs"
-          variant={isDiscovery(item.kind) ? 'ghost' : 'outline'}
+          size="sm"
+          variant="outline"
           disabled={pending}
           onClick={onReject}
           {...(words.rejectTitle === null ? {} : { title: words.rejectTitle })}
         >
-          {words.icons ? <X className="size-3" strokeWidth={2} /> : null}
           {words.reject}
         </Button>
-        <Button size="xs" disabled={pending} onClick={onAccept}>
-          {words.icons ? <Check className="size-3" strokeWidth={2} /> : null}
+        <Button size="sm" disabled={pending} onClick={onAccept}>
           {words.accept}
         </Button>
       </div>
@@ -806,17 +763,134 @@ export function SuggestionEntry({
   )
 }
 
-/** The record the card is about, as a chip; plain text when it has no page. */
-function RecordChip({ record }: { record: SuggestionRow['record'] }) {
-  const Icon = KIND_ICONS[record.kind] ?? Boxes
+/**
+ * The entry's one mono line: what it changes, who proposed it, the day —
+ * `Funding stage · via Apollo · 14 Oct`.
+ */
+export function suggestionMeta(item: SuggestionItem, today: string): string {
+  const what =
+    item.kind === 'attribute_patch' && item.fields !== null
+      ? item.fields.map((f) => f.name).join(', ')
+      : SUGGESTION_KIND_WORD[item.kind]
+  return [
+    what,
+    item.source === null ? null : `via ${item.source}`,
+    formatDay(item.createdAt, today),
+  ]
+    .filter((p) => p !== null && p !== '')
+    .join(' · ')
+}
+
+/** A confidence in `0..1` as the grid prints it: `82%`. */
+const percent = (c: number | null): string =>
+  c === null ? '—' : `${Math.round(c * 100)}%`
+
+/** The grid's lane heads, sans 12 graphite. */
+const GRID_HEADS = ['Proposed', 'Current', 'Confidence', 'Source'] as const
+
+/**
+ * A field change as a grid: one row per field — the proposed value, what the
+ * record holds now, the proposer's confidence and the first source cited —
+ * with Accept column at the row's end when the card offers it.
+ */
+function FieldGrid({
+  item,
+  fields,
+  actions,
+}: {
+  item: SuggestionItem
+  fields: Array<SuggestionField>
+  actions: FieldActions | null
+}) {
+  const source = item.citations.at(0)?.label ?? item.source ?? '—'
+  // One field names itself in the mono line; several get a Field lane.
+  const named = fields.length > 1
+  const cols = cn(
+    'grid min-w-0 items-center gap-x-4',
+    named
+      ? 'grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1.4fr)_5rem_minmax(0,1.2fr)]'
+      : 'grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_5rem_minmax(0,1.2fr)]',
+  )
+  return (
+    <div data-field-grid className="flex min-w-0 flex-col">
+      <div
+        className={cn(
+          cols,
+          'h-7 border-b border-hairline text-label text-graphite',
+        )}
+      >
+        {named ? <span>Field</span> : null}
+        {GRID_HEADS.map((h) => (
+          <span key={h} className="truncate">
+            {h}
+          </span>
+        ))}
+      </div>
+      {fields.map((f) => {
+        const failure = actions?.failureOf(item.id, f.slug) ?? null
+        return (
+          <div key={f.slug} className="flex flex-col border-b border-rule">
+            <div className={cn(cols, 'min-h-9 py-1.5 text-ui')}>
+              {named ? (
+                <span className="truncate text-label text-graphite">
+                  {f.name}
+                </span>
+              ) : null}
+              <span className="flex min-w-0 items-center">
+                <ProposedValue field={f} />
+              </span>
+              <span className="flex min-w-0 items-center text-graphite">
+                <ProposedValue field={{ ...f, value: f.current }} />
+              </span>
+              <span className="tabular mono text-label">
+                {percent(f.confidence)}
+              </span>
+              <span
+                className="truncate mono text-micro text-graphite"
+                title={source}
+              >
+                {source}
+              </span>
+            </div>
+            {actions ? (
+              <div className="flex justify-end pb-1.5">
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  disabled={actions.pending}
+                  title={`Accept ${f.name} on every record that proposes it`}
+                  onClick={() => actions.onAcceptColumn(f)}
+                >
+                  <CheckCheck className="size-3" strokeWidth={2} />
+                  Accept column
+                </Button>
+              </div>
+            ) : null}
+            {failure ? (
+              <p role="alert" className="pb-1.5 text-label text-destructive">
+                {failure}
+              </p>
+            ) : null}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/** The record the card is about, by its serif name; plain when it has no page. */
+function RecordName({ record }: { record: SuggestionRow['record'] }) {
   const href = recordPath(record)
-  return href ? (
-    <ChipLink to={href} icon={Icon} label={record.name} />
-  ) : (
-    <span className="flex min-w-0 items-center gap-1 border border-rule bg-paper px-1.5 py-0.5 text-label font-medium">
-      <Icon className="size-2.5 shrink-0" strokeWidth={1.75} />
-      <span className="truncate">{record.name}</span>
-    </span>
+  return (
+    <h2 className="min-w-0 truncate font-serif text-lg leading-5.5 font-semibold">
+      {href ? (
+        <Link to={href} className="focus-ring hover:underline">
+          {record.name}
+        </Link>
+      ) : (
+        record.name
+      )}
+    </h2>
   )
 }
 
@@ -912,7 +986,7 @@ export function SuggestionCard({ card }: { card: SuggestionRow }) {
       toast(
         verb === 'accept'
           ? `Accepted on ${card.record.name}`
-          : 'Rejected — will not be suggested again',
+          : 'Dismissed — will not be suggested again',
       )
       void router.invalidate()
     } catch (err) {
@@ -924,16 +998,20 @@ export function SuggestionCard({ card }: { card: SuggestionRow }) {
   }
 
   return (
-    <li className="flex flex-col border border-hairline bg-paper shadow-solid">
+    <li
+      data-suggestion-card
+      className="flex flex-col border border-hairline bg-paper"
+    >
       <div className="flex min-h-11 items-center gap-3 border-b border-hairline px-5 py-2.5">
         {/* A captured page's card is headed by the page. */}
         {card.page === null ? (
-          <RecordChip record={card.record} />
+          <RecordName record={card.record} />
         ) : (
           <CapturedPageHeading page={card.page} />
         )}
-        <span className="label-caps text-graphite">Suggestions</span>
-        <span className="mono text-micro text-graphite">{n}</span>
+        {n > 1 ? (
+          <span className="tabular mono text-micro text-graphite">{n}</span>
+        ) : null}
         {/* Discovery cards and newer versions are decided one by one. */}
         {card.suggestions.every(
           (s) => isDiscovery(s.kind) || s.kind === 'supersedes',

@@ -1,7 +1,9 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { FileText, Plus } from 'lucide-react'
+import { useState } from 'react'
 import { EmptyState } from '#/components/empty-state'
 import {
+  FoldRow,
   LedgerFigure,
   LedgerRow,
   LedgerSection,
@@ -11,7 +13,7 @@ import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import { createNote, createNoteFromTemplate, listNotes } from '#/lib/server-fns'
 import { useHotkey } from '#/lib/use-hotkey'
-import { formatWhen } from '@spaces/core/format'
+import { formatDay } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 
 export const Route = createFileRoute('/_app/notes')({
@@ -29,14 +31,19 @@ function startOfWeekIso(now: Date) {
   return d.toISOString()
 }
 
+/** How many rows `Earlier` shows before its fold. */
+const EARLIER_SHOWN = 20
+
 /**
- * Notes are a ledger split by recency: what moved this week, then the rest.
- * Every row ends on a mono date lane; the snippet takes what is left.
+ * Notes are a ledger split by recency: what moved this week, then the rest,
+ * folded past `EARLIER_SHOWN`. Every row ends on a mono day lane; the
+ * snippet takes what is left.
  */
 function NotesPage() {
   const notes = Route.useLoaderData()
   const navigate = useNavigate()
   const { now } = useClock()
+  const [unfolded, setUnfolded] = useState(false)
 
   async function newNote() {
     const { id } = await createNote()
@@ -54,21 +61,19 @@ function NotesPage() {
       <PageHeader
         title="Notes"
         description={
-          <>
+          notes.length > 0 ? (
             <span>
               {notes.length} note{notes.length === 1 ? '' : 's'}
+              {last ? ` · last edit ${formatDay(last.updatedAt, now)}` : ''}
             </span>
-            <span>{thisWeek.length} this week</span>
-            {last ? (
-              <span>last edit {formatWhen(last.updatedAt, now)}</span>
-            ) : null}
-          </>
+          ) : undefined
         }
         action={
           notes.length > 0 ? (
             <>
               <TemplatePicker
                 kind="note"
+                trigger={<Button variant="outline">From template</Button>}
                 onPick={async (t) => {
                   const { id } = await createNoteFromTemplate({
                     data: { templateId: t.id },
@@ -103,11 +108,7 @@ function NotesPage() {
       ) : (
         <div className="flex flex-col gap-8 px-8 pt-6 pb-8">
           {thisWeek.length > 0 ? (
-            <LedgerSection
-              label="This week"
-              count={thisWeek.length}
-              link={`W${isoWeek(new Date(now))}`}
-            >
+            <LedgerSection label="This week" count={thisWeek.length}>
               {thisWeek.map((n) => (
                 <NoteLedgerRow key={n.id} note={n} now={now} />
               ))}
@@ -115,9 +116,20 @@ function NotesPage() {
           ) : null}
           {earlier.length > 0 ? (
             <LedgerSection label="Earlier" count={earlier.length}>
-              {earlier.map((n) => (
-                <NoteLedgerRow key={n.id} note={n} now={now} />
-              ))}
+              {(unfolded ? earlier : earlier.slice(0, EARLIER_SHOWN)).map(
+                (n) => (
+                  <NoteLedgerRow key={n.id} note={n} now={now} />
+                ),
+              )}
+              {!unfolded && earlier.length > EARLIER_SHOWN ? (
+                <li>
+                  <FoldRow
+                    hidden={earlier.length - EARLIER_SHOWN}
+                    onShow={() => setUnfolded(true)}
+                    className="border-t-0"
+                  />
+                </li>
+              ) : null}
             </LedgerSection>
           ) : null}
         </div>
@@ -134,37 +146,24 @@ function NoteLedgerRow({ note, now }: { note: NoteRow; now: string }) {
         params={{ noteId: note.id }}
         className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 px-3 transition-colors hover:bg-bone"
       >
-        <FileText
-          className="size-3.5 shrink-0 text-foreground"
-          strokeWidth={1.75}
-        />
+        <span aria-hidden className="w-3.5 shrink-0 text-center text-ui">
+          ¶
+        </span>
         <span className="max-w-[40%] shrink-0 truncate text-body font-medium">
           {note.title}
         </span>
         <span className="min-w-0 flex-1 truncate text-ui text-graphite">
           {note.snippet || 'Empty so far'}
         </span>
-        {/* The kind lane: quiet, lowercase, and blank for the default — a
-            ledger says "memo" or "scratch" because those are the exceptions,
-            and prints nothing where there is nothing to say. */}
-        <span className="w-14 shrink-0 mono text-micro text-graphite">
-          {note.kind === 'note' ? '' : note.kind}
+        {/* The kind lane, blank for the default: a ledger says MEMO or
+            SCRATCH because those are the exceptions. */}
+        <span data-kind-lane className="w-16 shrink-0 label-caps text-graphite">
+          {note.kind === 'note' ? '' : note.kind.toUpperCase()}
         </span>
         <LedgerFigure tone="muted">
-          {formatWhen(note.updatedAt, now)}
+          {formatDay(note.updatedAt, now)}
         </LedgerFigure>
       </Link>
     </LedgerRow>
   )
-}
-
-/** ISO-8601 week number — the mono `W37` on the section head. */
-function isoWeek(date: Date) {
-  const d = new Date(
-    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
-  )
-  const day = d.getUTCDay() || 7
-  d.setUTCDate(d.getUTCDate() + 4 - day)
-  const yearStart = Date.UTC(d.getUTCFullYear(), 0, 1)
-  return Math.ceil(((d.getTime() - yearStart) / 86400000 + 1) / 7)
 }

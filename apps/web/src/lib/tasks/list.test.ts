@@ -45,7 +45,11 @@ async function seed() {
   return { oldest: oldest?.id ?? '', open: open.id }
 }
 
-async function list(input: { includeDone?: boolean; focus?: string }) {
+async function list(input: {
+  includeDone?: boolean
+  focus?: string
+  record?: string
+}) {
   const { Effect } = await import('effect')
   const { listTasksProgram } = await import('./list')
   return Effect.runPromise(listTasksProgram(input))
@@ -93,5 +97,57 @@ describe('listTasks with a focused task', () => {
     const { oldest } = seeded
     const result = await list({ focus: oldest })
     expect(result.done).toEqual([])
+  })
+})
+
+describe('listTasks narrowed to a record', () => {
+  it('lists only the tasks linked to the record, open and done, and names it', async () => {
+    const { db } = await import('@spaces/db')
+    const { entity } = await import('@spaces/db/schema')
+    const { task, taskEntity } = await import('@spaces/db/schema/tasks')
+    const actor = await actorId()
+    const [flent, other] = await db
+      .insert(entity)
+      .values([
+        { kind: 'company', canonicalName: 'Flent' },
+        { kind: 'company', canonicalName: 'Other Co' },
+      ])
+      .returning({ id: entity.id })
+    const rows = await db
+      .insert(task)
+      .values([
+        { content: 'Chase Flent', assigneeId: actor, createdBy: actor },
+        {
+          content: 'Closed on Flent',
+          assigneeId: actor,
+          createdBy: actor,
+          doneAt: new Date(),
+        },
+        { content: 'Chase Other', assigneeId: actor, createdBy: actor },
+        { content: 'Unlinked', assigneeId: actor, createdBy: actor },
+      ])
+      .returning({ id: task.id, content: task.content })
+    const id = (content: string) =>
+      rows.find((r) => r.content === content)?.id ?? ''
+    await db.insert(taskEntity).values([
+      { taskId: id('Chase Flent'), entityId: flent.id },
+      { taskId: id('Closed on Flent'), entityId: flent.id },
+      { taskId: id('Chase Other'), entityId: other.id },
+    ])
+
+    const narrowed = await list({ includeDone: true, record: flent.id })
+    expect(narrowed.open.map((t) => t.content)).toEqual(['Chase Flent'])
+    expect(narrowed.done.map((t) => t.content)).toEqual(['Closed on Flent'])
+    expect(narrowed.record).toEqual({
+      id: flent.id,
+      name: 'Flent',
+      kind: 'company',
+    })
+
+    const everything = await list({ includeDone: true })
+    expect(everything.record).toBeNull()
+    expect(everything.open.map((t) => t.content)).toEqual(
+      expect.arrayContaining(['Chase Flent', 'Chase Other', 'Unlinked']),
+    )
   })
 })

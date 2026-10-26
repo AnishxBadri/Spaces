@@ -36,10 +36,10 @@ export function MeetingRow({
   onOpen,
 }: {
   meeting: DayMeeting
-  /** The time lane: `09:30–10:00`, or a past row's `10-08 09:30`. */
+  /** The time lane: `09:30–10:00`, or a past row's `8 Oct`. */
   when: string
-  /** The state word the row ends on. */
-  lane: string
+  /** The state word the row ends on; omitted, the action ends the row. */
+  lane?: string | undefined
   /** Prep or Write, when the row has one. */
   action?: ReactNode
   onOpen: () => void
@@ -80,9 +80,11 @@ export function MeetingRow({
         ))}
       </button>
       {action ?? null}
-      <span className="w-28 shrink-0 truncate text-right mono text-micro text-graphite">
-        {lane}
-      </span>
+      {lane === undefined ? null : (
+        <span className="w-28 shrink-0 truncate text-right mono text-micro text-graphite">
+          {lane}
+        </span>
+      )}
     </LedgerRow>
   )
 }

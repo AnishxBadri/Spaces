@@ -2,15 +2,14 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { z } from 'zod'
 import { DensityRamp } from '#/components/dither'
-import { FilterCount, FilterRow, FilterTab } from '#/components/filter-row'
 import { LedgerRow } from '#/components/ledger-section'
 import { MeetingDialog } from '#/components/meeting-dialog'
 import { MeetingsLedger } from '#/components/meetings/meetings-ledger'
 import { PageHeader } from '#/components/page-header'
+import { Tabs } from '#/components/ui/tabs'
 import { listMeetings } from '#/lib/server-fns'
 import { useClock } from '#/components/clock'
 import {
-  filterCounts,
   MEETING_FILTER_LABEL,
   MEETING_FILTERS,
   upcomingHorizon,
@@ -101,20 +100,27 @@ function MeetingsPage() {
     })
 
   const loaded = list === null || list === 'failed' ? null : list
-  const counts = loaded === null ? null : filterCounts(loaded)
+  // The counts are the server's, over every meeting — not the rows sent.
+  const counts = loaded === null ? null : loaded.counts
 
   return (
     <div className="flex min-h-full flex-col">
-      <PageHeader title="Meetings" />
+      <PageHeader
+        title="Meetings"
+        tabs={
+          <Tabs
+            label="Meetings"
+            value={filter}
+            onValueChange={choose}
+            items={MEETING_FILTERS.map((f) => ({
+              id: f,
+              label: MEETING_FILTER_LABEL[f],
+              ...(counts === null ? {} : { count: counts[f] }),
+            }))}
+          />
+        }
+      />
       <div className="flex flex-col px-8 pb-10">
-        <FilterRow label="Meetings">
-          {MEETING_FILTERS.map((f) => (
-            <FilterTab key={f} active={filter === f} onClick={() => choose(f)}>
-              {MEETING_FILTER_LABEL[f]}
-              {counts === null ? null : <FilterCount n={counts[f]} />}
-            </FilterTab>
-          ))}
-        </FilterRow>
         {list === 'failed' ? (
           <ol>
             <LedgerRow>
@@ -122,14 +128,14 @@ function MeetingsPage() {
                 data-meetings-failed
                 className="mono text-micro text-graphite"
               >
-                read failed
+                Read failed
               </span>
               <button
                 type="button"
                 onClick={() => setVersion((v) => v + 1)}
                 className="focus-ring mono text-micro text-foreground hover:underline"
               >
-                retry ›
+                Retry
               </button>
             </LedgerRow>
           </ol>

@@ -283,7 +283,11 @@ const writeUp = alias(entity, 'e')
  * - Every meeting row is visible to every member; canRead decides only
  *   whether the reader may read the write-up, which reads `private`.
  * - `mine` matches the participants against the reader's login address and
- *   every connected account's.
+ *   every connected account's, case-blind; the counts match the same way.
+ * - The filter counts and `earlier` are counted over every meeting, so a
+ *   tab reads true past the cut.
+ * - A row's `tasks` counts the task suggestions citing it, open or
+ *   accepted.
  */
 export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
   reader: MeetingReader,
@@ -300,7 +304,23 @@ export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
     bodySource: writeUp.sourceRef,
   }
   const needsWriteUpSql = sql`(${interaction.noteId} is null and coalesce(${interaction.meta} ->> 'status', '') <> 'cancelled')`
-  const [upcoming, past, accounts] = yield* Effect.all([
+  const accounts = yield* query(() =>
+    db
+      .select({ email: accountConnection.externalEmail })
+      .from(accountConnection)
+      .where(eq(accountConnection.userId, reader.id)),
+  )
+  const mineSet = new Set(
+    [reader.email, ...accounts.map((a) => a.email)].map((e) => e.toLowerCase()),
+  )
+  const mineEmails = sql`array[${sql.join(
+    [...mineSet].map((e) => sql`${e}`),
+    sql`, `,
+  )}]::text[]`
+  const mineSql = sql`(lower(coalesce(${interaction.meta} ->> 'organizer', '')) = any(${mineEmails}) or exists (select 1 from jsonb_object_keys(case when jsonb_typeof(${interaction.meta} -> 'rsvp') = 'object' then ${interaction.meta} -> 'rsvp' else '{}'::jsonb end) k where lower(k) = any(${mineEmails})))`
+  const upcomingSql = sql`(${interaction.occurredAt} > ${now} and ${interaction.occurredAt} < ${until})`
+  const pastSql = sql`(${interaction.occurredAt} <= ${now})`
+  const [upcoming, past, tally] = yield* Effect.all([
     query(() =>
       db
         .select(columns)
@@ -331,17 +351,22 @@ export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
           desc(interaction.occurredAt),
           desc(interaction.id),
         )
-        .limit(PAST_LIMIT + 1),
+        .limit(PAST_LIMIT),
     ),
     query(() =>
       db
-        .select({ email: accountConnection.externalEmail })
-        .from(accountConnection)
-        .where(eq(accountConnection.userId, reader.id)),
+        .select({
+          upcoming: sql<number>`count(*) filter (where ${upcomingSql})::int`,
+          past: sql<number>`count(*) filter (where ${pastSql})::int`,
+          unwritten: sql<number>`count(*) filter (where ${pastSql} and ${needsWriteUpSql})::int`,
+          mine: sql<number>`count(*) filter (where (${upcomingSql} or ${pastSql}) and ${mineSql})::int`,
+        })
+        .from(interaction)
+        .where(eq(interaction.kind, 'meeting')),
     ),
   ])
-  const kept = past.slice(0, PAST_LIMIT)
-  const rows = [...upcoming, ...kept]
+  const counts = tally.at(0) ?? { upcoming: 0, past: 0, unwritten: 0, mine: 0 }
+  const rows = [...upcoming, ...past]
   const sources = [
     ...new Set(
       rows.flatMap((r) => (r.bodySource === null ? [] : [r.bodySource])),
@@ -363,6 +388,24 @@ export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
             .where(inArray(integration.id, sources)),
         ),
   ])
+  // The write-ups' action items, by the meeting they cite.
+  const citing = rows.map((r) => ref.interaction(r.id))
+  const taskRows =
+    citing.length === 0
+      ? []
+      : yield* query(() =>
+          db.execute<{ ref: string; n: number }>(
+            sql`select r.ref, count(*)::int as n
+              from ${suggestion} cross join lateral unnest(${suggestion.refs}) as r(ref)
+              where ${suggestion.kind} = 'task' and ${suggestion.status} <> 'rejected'
+                and r.ref in (${sql.join(
+                  citing.map((c) => sql`${c}`),
+                  sql`, `,
+                )})
+              group by r.ref`,
+          ),
+        ).pipe(Effect.map((r) => r.rows))
+  const tasksOf = new Map(taskRows.map((t) => [t.ref, t.n]))
   const nameOf = new Map(
     names.map((i) => [
       i.id,
@@ -372,9 +415,6 @@ export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
       ),
     ]),
   )
-  const mineSet = new Set(
-    [reader.email, ...accounts.map((a) => a.email)].map((e) => e.toLowerCase()),
-  )
   const listed = rows.map((r, i): ListedMeeting => {
     const meta = meetingMeta(r.meta)
     const own = Object.entries(meta?.rsvp ?? {}).find(([email]) =>
@@ -383,6 +423,10 @@ export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
     const organizer = meta?.organizer?.toLowerCase() ?? null
     return {
       ...hydrated[i],
+      // The reader is never among a row's people.
+      participants: hydrated[i].participants.filter(
+        (p) => !mineSet.has(p.email.toLowerCase()),
+      ),
       mine: own !== undefined || (organizer !== null && mineSet.has(organizer)),
       myRsvp: own?.[1] ?? null,
       writeUp:
@@ -391,12 +435,20 @@ export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
         r.noteId !== null && r.bodyReadable && r.bodySource !== null
           ? (nameOf.get(r.bodySource) ?? null)
           : null,
+      tasks: tasksOf.get(ref.interaction(r.id)) ?? 0,
     }
   })
   return {
     upcoming: listed.slice(0, upcoming.length),
     past: listed.slice(upcoming.length),
-    more: past.length > PAST_LIMIT,
+    earlier: Math.max(0, counts.past - past.length),
+    counts: {
+      all: counts.upcoming + counts.past,
+      upcoming: counts.upcoming,
+      past: counts.past,
+      unwritten: counts.unwritten,
+      mine: counts.mine,
+    },
   }
 })
 

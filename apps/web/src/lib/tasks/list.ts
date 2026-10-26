@@ -66,6 +66,8 @@ export type ListTasksInput = {
   includeDone?: boolean | undefined
   /** A task the payload must carry even outside the Done window. */
   focus?: string | undefined
+  /** Only the tasks linked to this record. */
+  record?: string | undefined
 }
 
 const linkedEntitiesProgram = Effect.fn('linkedEntitiesProgram')(function* (
@@ -108,23 +110,47 @@ const selectTasks = () =>
     .innerJoin(user, eq(user.id, task.assigneeId))
     .$dynamic()
 
+/** The record a `record` filter names, by its name; null for an unknown id. */
+export type TaskScope = { id: string; name: string; kind: string }
+
 export const listTasksProgram = Effect.fn('listTasksProgram')(function* ({
   includeDone,
   focus,
+  record,
 }: ListTasksInput) {
+  // The Done window is the record's own 50 when the list is narrowed to it,
+  // not the workspace's 50 filtered after the cut.
+  const linked =
+    record === undefined
+      ? undefined
+      : sql`exists (select 1 from ${taskEntity} where ${taskEntity.taskId} = ${task.id} and ${taskEntity.entityId} = ${record})`
   const open = yield* query(() =>
     selectTasks()
-      .where(isNull(task.doneAt))
+      .where(and(isNull(task.doneAt), linked))
       .orderBy(asc(task.dueDate), asc(task.createdAt)),
   )
   const recent = includeDone
     ? yield* query(() =>
         selectTasks()
-          .where(isNotNull(task.doneAt))
+          .where(and(isNotNull(task.doneAt), linked))
           .orderBy(desc(task.doneAt))
           .limit(DONE_WINDOW),
       )
     : []
+  const scope: TaskScope | null =
+    record === undefined
+      ? null
+      : ((yield* query(() =>
+          db
+            .select({
+              id: entity.id,
+              name: entity.canonicalName,
+              kind: entity.kind,
+            })
+            .from(entity)
+            .where(eq(entity.id, record))
+            .limit(1),
+        )).at(0) ?? null)
   // An open task is always in `open` — only Done is capped. A closed one
   // outside the window is fetched by id and appended: it is older than every
   // row the window holds, so `done_at desc` still reads true. An unknown id
@@ -136,7 +162,7 @@ export const listTasksProgram = Effect.fn('listTasksProgram')(function* ({
     !recent.some((t) => t.id === focus)
       ? yield* query(() =>
           selectTasks()
-            .where(and(eq(task.id, focus), isNotNull(task.doneAt)))
+            .where(and(eq(task.id, focus), isNotNull(task.doneAt), linked))
             .limit(1),
         )
       : []
@@ -149,7 +175,11 @@ export const listTasksProgram = Effect.fn('listTasksProgram')(function* ({
     createdAt: t.createdAt.toISOString(),
     entities: links.get(t.id) ?? [],
   })
-  return { open: open.map(serialize), done: done.map(serialize) }
+  return {
+    open: open.map(serialize),
+    done: done.map(serialize),
+    record: scope,
+  }
 })
 
 /**

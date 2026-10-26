@@ -1,9 +1,9 @@
 import { Link, useRouter } from '@tanstack/react-router'
-import { Layers, Plus } from 'lucide-react'
+import { Layers } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { LabelHead, LedgerRow, rowWashClass } from '#/components/ledger-section'
-import { HeadCount, PageHeader } from '#/components/page-header'
+import { LedgerRow, rowWashClass } from '#/components/ledger-section'
+import { PageHeader } from '#/components/page-header'
 import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import {
@@ -86,24 +86,17 @@ export function SpacesIndexPage({
 
   return (
     <div className="flex min-h-full flex-col">
+      {/* No head button: the composer row at the list's end is the one
+          way to a new space, and `S` opens it. */}
       <PageHeader
-        title={
-          <HeadCount
-            title="Spaces"
-            count={
-              spaces.length > 0
-                ? `${spaces.length} space${spaces.length === 1 ? '' : 's'} · ${nested} nested`
-                : null
-            }
-          />
-        }
-        action={
-          /* Always available — the first-run creator below only makes bare
-             top-level spaces; scaffold stamping and nesting live here. */
-          <Button shortcut="S" onClick={() => setOpen(true)}>
-            <Plus className="size-4" strokeWidth={2} />
-            New space
-          </Button>
+        title="Spaces"
+        description={
+          spaces.length > 0 ? (
+            <span data-spaces-meta>
+              {spaces.length} space{spaces.length === 1 ? '' : 's'} · {nested}{' '}
+              nested
+            </span>
+          ) : undefined
         }
       />
 
@@ -112,21 +105,24 @@ export function SpacesIndexPage({
           <MarketsCreator />
         ) : (
           <section className="flex flex-col">
-            <LabelHead label="Market map">
-              <span
-                aria-hidden
-                className="flex gap-2.5 mono text-micro text-graphite max-md:hidden"
-              >
-                <span className={cn(LANES.companies, 'text-right')}>
-                  companies
-                </span>
-                <span className={cn(LANES.memos, 'text-right')}>memos</span>
-                <span className={cn(LANES.terms, 'text-right')}>terms</span>
-                <span className={cn(LANES.lastFiled, 'text-right')}>
-                  last filed
-                </span>
+            <div
+              data-lane-heads
+              className="flex h-7 items-center gap-2.5 border-b border-hairline px-3 text-label text-graphite"
+            >
+              <span className="min-w-0 flex-1">Space</span>
+              <span className={cn(LANES.companies, 'text-right max-md:hidden')}>
+                Companies
               </span>
-            </LabelHead>
+              <span className={cn(LANES.memos, 'text-right max-md:hidden')}>
+                Memos
+              </span>
+              <span className={cn(LANES.terms, 'text-right max-md:hidden')}>
+                Terms
+              </span>
+              <span className={cn(LANES.lastFiled, 'text-right max-md:hidden')}>
+                Last filed
+              </span>
+            </div>
             <ol>
               {treeRows(spaces).map((s) => (
                 <MapRow
@@ -142,19 +138,22 @@ export function SpacesIndexPage({
               <LedgerRow last>
                 <button
                   type="button"
+                  data-composer-row
                   onClick={() => setOpen(true)}
                   className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-2.5 px-3 text-left transition-colors hover:bg-bone"
                 >
-                  <span className="w-3.5 shrink-0 text-center mono text-ui text-primary">
+                  <span
+                    aria-hidden
+                    className="w-3.5 shrink-0 text-center mono text-ui text-primary"
+                  >
                     +
                   </span>
                   <span className="min-w-0 flex-1 truncate text-body text-graphite">
-                    New space… nest it under a parent, or stamp a saved
-                    breakdown
+                    New space…
                   </span>
-                  <span className="shrink-0 text-graphite">
-                    <kbd className="mono text-micro">S</kbd>
-                  </span>
+                  <kbd className="shrink-0 mono text-micro text-graphite">
+                    S
+                  </kbd>
                 </button>
               </LedgerRow>
             </ol>
@@ -247,7 +246,7 @@ function MapRow({
 }
 
 /**
- * `n archived · show` — archived spaces are out of the tree but findable
+ * `n archived · Show` — archived spaces are out of the tree but findable
  * here, each with Restore. A row is an archive head: Restore brings back
  * every space archived with it.
  */
@@ -281,16 +280,16 @@ function ArchivedFold({
     <div className={cn('flex flex-col border-t border-rule', className)}>
       <div className="flex h-8 items-center gap-2.5 px-3">
         <span aria-hidden className="w-3.5 shrink-0" />
-        <span className="mono text-micro text-graphite">
+        <span className="text-label text-graphite">
           {archived.length} archived
         </span>
         <button
           type="button"
           aria-expanded={shown}
           onClick={() => setShown((v) => !v)}
-          className="focus-ring rounded-md mono text-micro text-primary hover:underline"
+          className="focus-ring rounded-md text-label text-foreground underline-offset-2 hover:underline"
         >
-          {shown ? 'hide' : 'show'}
+          {shown ? 'Hide' : 'Show'}
         </button>
       </div>
       {shown ? (
@@ -307,9 +306,9 @@ function ArchivedFold({
               </Link>
               <span className="min-w-0 flex-1 truncate mono text-micro text-graphite">
                 {[
-                  a.within === null ? null : `in ${a.within}`,
+                  a.within === null ? null : `In ${a.within}`,
                   a.spaces > 1 ? `${a.spaces} spaces` : null,
-                  `archived ${formatDay(a.archivedOn, today)}`,
+                  `Archived ${formatDay(a.archivedOn, today)}`,
                 ]
                   .filter((part) => part !== null)
                   .join(' · ')}
@@ -419,7 +418,7 @@ function MarketsCreator() {
           {pending ? 'Creating…' : 'Create my map'}
         </Button>
         <p className="mono text-micro text-graphite">
-          three to start · blanks are skipped · duplicates fold into one
+          Three to start · blanks are skipped · duplicates fold into one
         </p>
       </form>
     </div>

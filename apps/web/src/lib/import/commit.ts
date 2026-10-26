@@ -757,7 +757,8 @@ export type ImportReceiptView = {
   /** Rows the filter matches in all. */
   matching: number
   filter: ReceiptFilter
-  object: { kind: ObjectKind | null; plural: string }
+  /** The object written into; `slug` builds a custom object's list path. */
+  object: { kind: ObjectKind | null; plural: string; slug: string | null }
   /** A ledger batch's half: its strip, missing rates and void note. */
   ledger: LedgerReceipt | null
 }
@@ -928,6 +929,7 @@ export const loadImportReceiptProgram = Effect.fn('loadImportReceiptProgram')(
       object: {
         kind: object ? coreKindOf(object) : null,
         plural: object?.plural ?? 'records',
+        slug: object?.slug ?? null,
       },
       ledger,
     }

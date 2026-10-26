@@ -1,3 +1,9 @@
+import {
+  RouterProvider,
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+} from '@tanstack/react-router'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import {
@@ -5,6 +11,7 @@ import {
   ReceiptHeader,
   VoidLine,
   ledgerReceiptSentence,
+  receiptDestination,
   receiptSentence,
 } from './commit-receipt'
 import type { ImportReceiptView } from '#/lib/import/commit'
@@ -24,10 +31,29 @@ const view = (over: Partial<ImportReceiptView> = {}): ImportReceiptView => ({
   rows: [],
   matching: 0,
   filter: 'all',
-  object: { kind: 'company', plural: 'Companies' },
+  object: { kind: 'company', plural: 'Companies', slug: 'companies' },
   ledger: null,
   ...over,
 })
+
+/** The receipt head under a router: its primary is a link. */
+async function header(v: ImportReceiptView): Promise<string> {
+  const router = createRouter({
+    routeTree: createRootRoute({
+      component: () => (
+        <ReceiptHeader
+          view={v}
+          filename="companies.csv"
+          onRetry={() => {}}
+          pending={null}
+        />
+      ),
+    }),
+    history: createMemoryHistory({ initialEntries: ['/import/b'] }),
+  })
+  await router.load()
+  return renderToStaticMarkup(<RouterProvider router={router} />)
+}
 
 /** The opening tag of the button whose label starts `label`. */
 function button(html: string, label: string): string {
@@ -52,37 +78,34 @@ describe('the receipt header', () => {
     ).toBe('12 written · 1 attached · 1 failed · 33 to go.')
   })
 
-  it('prints the last run’s line — a re-run says 0 written — and offers the retry', () => {
-    const html = renderToStaticMarkup(
-      <ReceiptHeader
-        view={view()}
-        filename="companies.csv"
-        onCommit={() => {}}
-        onRetry={() => {}}
-        pending={null}
-      />,
-    )
+  it('prints the last run’s line, offers the retry, and opens the list it wrote — no Commit again', async () => {
+    const html = await header(view())
     expect(html).toContain('46 written · 0 attached · 1 failed.')
     expect(html).toContain(
       'last run 0 written · 0 attached · 0 failed · 46 unchanged · 1.2 s',
     )
     expect(button(html, 'Retry failed rows')).not.toContain('disabled=""')
-    expect(button(html, 'Commit again')).not.toContain('disabled=""')
+    expect(html).toMatch(/<a[^>]*href="\/companies"[^>]*>Open companies<\/a>/)
+    expect(html).not.toContain('Commit again')
+    expect(html).not.toContain('⌘↵')
   })
 
-  it('disarms both actions while a run is live', () => {
-    const html = renderToStaticMarkup(
-      <ReceiptHeader
-        view={view({ running: true })}
-        filename="companies.csv"
-        onCommit={() => {}}
-        onRetry={() => {}}
-        pending={null}
-      />,
-    )
+  it('disarms the retry while a run is live', async () => {
+    const html = await header(view({ running: true }))
     expect(html).toContain('committing')
     expect(button(html, 'Retry failed rows')).toContain('disabled=""')
-    expect(button(html, 'Commit again')).toContain('disabled=""')
+  })
+
+  it('opens the list the batch wrote into: a custom object by its slug, a ledger the portfolio', () => {
+    expect(receiptDestination(view())).toEqual({
+      to: '/companies',
+      label: 'Open companies',
+    })
+    expect(
+      receiptDestination(
+        view({ object: { kind: null, plural: 'Funds', slug: 'funds' } }),
+      ),
+    ).toEqual({ to: '/o/funds', label: 'Open funds' })
   })
 })
 
@@ -104,7 +127,7 @@ describe('a ledger receipt (SPA-171)', () => {
     voided: false,
   }
 
-  it('titles what landed and reads as the ledger', () => {
+  it('titles what landed and reads as the ledger', async () => {
     expect(
       ledgerReceiptSentence(
         ledger.counts,
@@ -112,16 +135,9 @@ describe('a ledger receipt (SPA-171)', () => {
         false,
       ),
     ).toBe('11 holdings · 12 investments · 9 rounds · 8 marks · 1 failed.')
-    const html = renderToStaticMarkup(
-      <ReceiptHeader
-        view={view({ ledger })}
-        filename="portfolio-tracker.csv"
-        onCommit={() => {}}
-        onRetry={() => {}}
-        pending={null}
-      />,
-    )
+    const html = await header(view({ ledger }))
     expect(html).toContain('Import · Ledger')
+    expect(html).toContain('Open portfolio')
   })
 
   it('prints the void line with its action only while something is left to void', () => {
@@ -157,19 +173,8 @@ describe('a ledger receipt (SPA-171)', () => {
     ).not.toContain('void batch')
   })
 
-  it('after a void, the re-run is a quiet Re-import › under the voided line, not Commit again (SPA-173)', () => {
-    const header = (l: LedgerReceipt) =>
-      renderToStaticMarkup(
-        <ReceiptHeader
-          view={view({ ledger: l })}
-          filename="portfolio-tracker.csv"
-          onCommit={() => {}}
-          onRetry={() => {}}
-          pending={null}
-        />,
-      )
-    const before = header(ledger)
-    expect(button(before, 'Commit again')).not.toContain('disabled=""')
+  it('after a void, the re-run is a quiet Re-import › under the voided line, never in the head (SPA-173)', async () => {
+    const before = await header(view({ ledger }))
     expect(before).not.toContain('Re-import')
 
     const voided: LedgerReceipt = {
@@ -178,7 +183,7 @@ describe('a ledger receipt (SPA-171)', () => {
       voidable: false,
       voided: true,
     }
-    const after = header(voided)
+    const after = await header(view({ ledger: voided }))
     expect(after).not.toContain('Commit again')
     expect(after).not.toContain('Re-import')
     const line = renderToStaticMarkup(

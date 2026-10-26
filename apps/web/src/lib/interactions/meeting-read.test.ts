@@ -328,7 +328,7 @@ describe('meetingListProgram', () => {
       cancelled,
     ])
     expect(list.past.find((m) => m.id === cancelled)?.cancelled).toBe(true)
-    expect(list.more).toBe(false)
+    expect(list.earlier).toBe(0)
     expect(
       list.upcoming.find((m) => m.id === sooner)?.records.map((r) => r.name),
     ).toEqual(['Flent'])
@@ -463,6 +463,93 @@ describe('meetingListProgram', () => {
     expect(of(byAccount)).toEqual({ mine: true, myRsvp: 'accepted' })
     expect(of(organized)).toEqual({ mine: true, myRsvp: null })
     expect(of(theirs)).toEqual({ mine: false, myRsvp: null })
+  })
+  it('counts every tab on the server, counts each write-up’s tasks, and leaves the reader out of the people', async () => {
+    const login = `${crypto.randomUUID()}@fund.example`
+    const [partner] = await db
+      .insert(user)
+      .values({
+        id: crypto.randomUUID(),
+        name: 'Counting Partner',
+        email: login,
+        emailVerified: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning({ id: user.id })
+    const counter = { id: partner.id, email: login }
+    const before = await run(meetingListProgram(counter, now, until))
+    const flent = await aCompany('Flent')
+    const at = (iso: string, over: Partial<MeetingMeta> = {}) =>
+      meta({
+        ends_at: new Date(Date.parse(iso) + 1_800_000).toISOString(),
+        ...over,
+      })
+    // Upcoming and the reader's: they answered, in another case.
+    const ahead = await aMeeting({
+      subject: 'Ahead',
+      at: '2027-03-20T10:00:00.000Z',
+      meta: at('2027-03-20T10:00:00.000Z', {
+        rsvp: { 'ana@flent.io': 'accepted', [login.toUpperCase()]: 'accepted' },
+      }),
+      records: [],
+    })
+    // Past, unwritten.
+    await aMeeting({
+      subject: 'Unwritten',
+      at: '2027-03-10T10:00:00.000Z',
+      meta: at('2027-03-10T10:00:00.000Z'),
+      records: [],
+    })
+    // Past, written, and the reader organized it.
+    const written = await aMeeting({
+      subject: 'Written',
+      at: '2027-03-11T10:00:00.000Z',
+      meta: at('2027-03-11T10:00:00.000Z', { organizer: login }),
+      records: [],
+      noteId: await aNote({ title: 'Write-up', authorId: FIXTURE_ACTOR.id }),
+    })
+    // Past and cancelled: no write-up owed.
+    await aMeeting({
+      subject: 'Dropped',
+      at: '2027-03-12T10:00:00.000Z',
+      meta: at('2027-03-12T10:00:00.000Z', { status: 'cancelled' }),
+      records: [],
+    })
+    const task = (status: 'open' | 'accepted' | 'rejected') => ({
+      entityId: flent,
+      kind: 'task' as const,
+      payload: { title: `A ${status} task`, due: null, entity_id: flent },
+      refs: [`interaction:${written}`],
+      proposedByType: 'system' as const,
+      status,
+      ...(status === 'open'
+        ? {}
+        : { decidedBy: FIXTURE_ACTOR.id, decidedAt: new Date() }),
+    })
+    await db
+      .insert(suggestion)
+      .values([task('open'), task('accepted'), task('rejected')])
+
+    const after = await run(meetingListProgram(counter, now, until))
+    const grew = (k: keyof typeof after.counts) =>
+      after.counts[k] - before.counts[k]
+    expect({
+      all: grew('all'),
+      upcoming: grew('upcoming'),
+      past: grew('past'),
+      unwritten: grew('unwritten'),
+      mine: grew('mine'),
+    }).toEqual({ all: 4, upcoming: 1, past: 3, unwritten: 1, mine: 2 })
+    expect(after.counts.all).toBe(after.counts.upcoming + after.counts.past)
+    expect(after.earlier).toBe(after.counts.past - after.past.length)
+    // Dismissed proposals leave the count; open and accepted stay.
+    expect(after.past.find((m) => m.id === written)?.tasks).toBe(2)
+    expect(
+      after.upcoming
+        .find((m) => m.id === ahead)
+        ?.participants.map((p) => p.email),
+    ).toEqual(['ana@flent.io'])
   })
 })
 

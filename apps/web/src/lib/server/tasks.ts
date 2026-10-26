@@ -38,7 +38,8 @@ export const createTask = createServerFn({ method: 'POST' })
   })
 
 /**
- * Open tasks, and — with `includeDone` — the Done window. `focus` is the
+ * Open tasks, and — with `includeDone` — the Done window; `record` narrows
+ * both to the tasks linked to one record. `focus` is the
  * task a `/tasks?task=<id>` link lands on; the payload carries it even when
  * it closed too long ago to sit in the window. The read states its own
  * invariants and lives outside the server-fn modules so a test can call it
@@ -50,6 +51,7 @@ export const listTasks = createServerFn()
       .object({
         includeDone: z.boolean().optional(),
         focus: z.string().uuid().optional(),
+        record: z.string().uuid().optional(),
       })
       .optional(),
   )
@@ -60,6 +62,7 @@ export const listTasks = createServerFn()
     return effectFn(listTasksProgram)({
       includeDone: data?.includeDone,
       focus: data?.focus,
+      record: data?.record,
     })
   })
 
@@ -99,6 +102,26 @@ export const setTaskDone = createServerFn({ method: 'POST' })
       .set({ doneAt: data.done ? new Date() : null })
       .where(eq(task.id, data.id))
     return { ok: true }
+  })
+
+/** A task's due day, set or cleared from its row's `···`. */
+export const setTaskDue = createServerFn({ method: 'POST' })
+  .validator(z.object({ id: z.string().uuid(), dueDate: isoDate.nullable() }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { setTaskDueProgram } = await import('#/lib/tasks/edit')
+    const { effectFn } = await import('./effect')
+    return effectFn(setTaskDueProgram)(data.id, data.dueDate)
+  })
+
+/** Hand a task to another member, from its row's `···`. */
+export const setTaskAssignee = createServerFn({ method: 'POST' })
+  .validator(z.object({ id: z.string().uuid(), assigneeId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { setTaskAssigneeProgram } = await import('#/lib/tasks/edit')
+    const { effectFn } = await import('./effect')
+    return effectFn(setTaskAssigneeProgram)(data.id, data.assigneeId)
   })
 
 export const deleteTask = createServerFn({ method: 'POST' })

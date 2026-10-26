@@ -37,13 +37,14 @@ import type {
  * caps line and the one mono foot line; a row carries values.
  */
 
-const BADGE: Record<ImportVerdict, { color: string; label: string }> = {
-  attach: { color: 'blue', label: 'attach' },
-  create: { color: 'emerald', label: 'create' },
-  collide: { color: 'amber', label: 'collide' },
-  'no-land': { color: 'rose', label: 'no land' },
-  merged: { color: 'slate', label: 'merged' },
-  skip: { color: 'slate', label: 'skip' },
+/** A row's verdict as its square badge, in sentence case: `No land`. */
+export const BADGE: Record<ImportVerdict, { color: string; label: string }> = {
+  attach: { color: 'blue', label: 'Attach' },
+  create: { color: 'emerald', label: 'Create' },
+  collide: { color: 'amber', label: 'Collide' },
+  'no-land': { color: 'rose', label: 'No land' },
+  merged: { color: 'slate', label: 'Merged' },
+  skip: { color: 'slate', label: 'Skip' },
 }
 
 // ---------------------------------------------------------------------------

@@ -339,13 +339,10 @@ function ImportBatchPage() {
   }, [reading, router])
 
   // ⌘↵ is in Continue's and Commit's tooltips, so it works wherever they do.
+  // The receipt has no Commit: a re-run is Retry failed rows, or a voided
+  // ledger batch's Re-import, which asks first.
   useEffect(() => {
-    // A voided batch's re-run asks first, so ⌘↵ does not reach it.
-    const armed = receipt
-      ? !receipt.running &&
-        committing === null &&
-        !(receipt.ledger?.voided ?? false)
-      : canCommit && !busy
+    const armed = receipt === null && canCommit && !busy
     if (!canContinue && !armed) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -389,7 +386,6 @@ function ImportBatchPage() {
         <ReceiptHeader
           view={receipt}
           filename={batch.filename}
-          onCommit={() => commit(false)}
           onRetry={() => commit(true)}
           pending={committing}
         />

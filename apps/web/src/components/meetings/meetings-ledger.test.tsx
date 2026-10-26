@@ -11,10 +11,10 @@ import type { MeetingFilter } from '#/lib/meetings/list'
 import { MeetingsLedger } from './meetings-ledger'
 
 /**
- * The Meetings page's list: upcoming under day heads with
- * Prep, the past with Write on what nobody wrote up and the write-up state
- * on the rest, a cancelled meeting struck in place, and each filter
- * narrowing it.
+ * The Meetings page's list: upcoming under day heads with their start and
+ * Prep, the past with `■ No write-up` and Write on what nobody wrote up and
+ * the write-up state on the rest, a cancelled meeting struck in place, the
+ * `n earlier` foot, and each filter narrowing it.
  */
 
 const ADMIN: SetupAudience = { isAdmin: true, admins: ['Anish'] }
@@ -34,6 +34,7 @@ const aMeeting = (over: Partial<ListedMeeting>): ListedMeeting => ({
   myRsvp: null,
   writeUp: 'none',
   via: null,
+  tasks: 0,
   ...over,
 })
 
@@ -73,6 +74,7 @@ const PAST = [
     noteId: 'n1',
     via: 'Granola',
     mine: true,
+    tasks: 2,
   }),
   aMeeting({
     title: 'Dropped call',
@@ -87,6 +89,7 @@ async function render(
     upcoming: Array<ListedMeeting>
     past: Array<ListedMeeting>
     calendar: boolean
+    earlier: number
   }> = {},
 ) {
   const router = createRouter({
@@ -96,7 +99,8 @@ async function render(
           list={{
             upcoming: over.upcoming ?? UPCOMING,
             past: over.past ?? PAST,
-            more: false,
+            earlier: over.earlier ?? 0,
+            counts: { all: 0, upcoming: 0, past: 0, unwritten: 0, mine: 0 },
             calendar: over.calendar ?? true,
             audience: ADMIN,
           }}
@@ -115,30 +119,41 @@ async function render(
 const count = (html: string, needle: string) => html.split(needle).length - 1
 
 describe('MeetingsLedger', () => {
-  it('groups upcoming under day heads, each row with Prep, then the past', async () => {
+  it('groups upcoming under day heads, each row its start, attendees and Prep, then the past', async () => {
     const html = await render('all')
     expect(html).toContain('TODAY · TUE 13 OCT')
-    expect(html).toContain('THU 15 OCT')
+    expect(html).toContain('>THU 15 OCT<')
+    expect(html).not.toContain('TOMORROW')
     expect(html.indexOf('Flent founder call')).toBeLessThan(
       html.indexOf('Northgate founder call'),
     )
-    expect(html.indexOf('THU 15 OCT')).toBeLessThan(html.indexOf('>Past<'))
+    expect(html.indexOf('THU 15 OCT')).toBeLessThan(html.indexOf('>PAST<'))
     expect(count(html, '>Prep<')).toBe(3)
-    // The reader's own answer is the upcoming row's lane.
-    expect(html).toContain('>maybe<')
+    // The start, not the span; the attendee with their mark.
+    expect(html).toContain('>09:30<')
+    expect(html).not.toContain('09:30–10:00')
+    expect(html).toMatch(/Ana Reyes <span[^>]*>✓</)
   })
 
-  it('carries Write on the unwritten past row only, the state word on the rest, and strikes a cancelled one in place', async () => {
+  it('carries ■ No write-up and Write on the unwritten past row only, the write-up and its tasks on the rest, and strikes a cancelled one in place', async () => {
     const html = await render('past')
     expect(count(html, '>Write<')).toBe(1)
-    expect(html).toContain('>no write-up<')
-    expect(html).toContain('>via Granola<')
-    expect(html).toContain('>cancelled<')
+    expect(html).toContain('>■ No write-up<')
+    expect(html).toMatch(/text-warning[^>]*>■/)
+    // The recorder's mark, then the write-up and the tasks it proposed.
+    expect(html).toMatch(/title="Granola".*>G<\/span>.*Write-up · 2 tasks/)
+    expect(html).toContain('>Cancelled<')
     expect(html).toMatch(/line-through[^>]*>Dropped call</)
     expect(html.indexOf('Granola call')).toBeLessThan(
       html.indexOf('Dropped call'),
     )
     expect(html).not.toContain('>Prep<')
+  })
+
+  it('ends the past on what the cut left out', async () => {
+    expect(await render('all', { earlier: 8 })).toContain('>8 earlier<')
+    expect(await render('all')).not.toContain('earlier<')
+    expect(await render('upcoming', { earlier: 8 })).not.toContain('earlier<')
   })
 
   it('narrows to what each filter names', async () => {

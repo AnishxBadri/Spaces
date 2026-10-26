@@ -163,14 +163,25 @@ const buttonNamed = (name: string) => {
 }
 
 describe('the market map', () => {
-  it('heads the list with a caps label on a hairline and lowercase lanes', async () => {
+  it('is the title and its meta with no head button, the lanes headed in sans on an ink rule', async () => {
     await mount(index())
-    const head = document.querySelector('section > div')
+    expect(document.querySelector('h1')?.textContent).toBe('Spaces')
+    expect(document.querySelector('[data-spaces-meta]')?.textContent).toBe(
+      '5 spaces · 3 nested',
+    )
+    expect(document.querySelector('header button')).toBeNull()
+    const head = document.querySelector('[data-lane-heads]')
     expect(head?.className).toContain('border-hairline')
-    expect(head?.className).not.toContain('bg-bone')
-    expect(head?.querySelector('h2')?.className).toContain('label-caps')
-    expect(head?.textContent).toContain('companiesmemostermslast filed')
-    expect(document.body.textContent).toContain('5 spaces · 3 nested')
+    expect(head?.className).toContain('text-label')
+    expect(head?.textContent).toBe('SpaceCompaniesMemosTermsLast filed')
+    expect(document.body.textContent).not.toContain('Market map')
+  })
+
+  it('ends on the composer row, New space… with its key', async () => {
+    await mount(index())
+    expect(document.querySelector('[data-composer-row]')?.textContent).toBe(
+      '+New space…S',
+    )
   })
 
   it('draws 36px rows, ruled only under a top-level group', async () => {
@@ -225,7 +236,7 @@ describe('the archived fold', () => {
     )
     expect(document.body.textContent).toContain('1 archived')
     expect(document.body.textContent).not.toContain('Launch')
-    await act(async () => buttonNamed('show').click())
+    await act(async () => buttonNamed('Show').click())
     expect(document.body.textContent).toContain('Launch')
     await act(async () => buttonNamed('Restore').click())
     expect(fns.restoreSpace).toHaveBeenCalledWith({ data: { id: 'launch' } })
@@ -237,10 +248,8 @@ describe('the New space window', () => {
 
   it('has a title only, the three fields, and Cancel closes it', async () => {
     await mount(index())
-    const open = [...document.querySelectorAll('button')].find(
-      (b) => b.closest('header') !== null,
-    )
-    if (!open) throw new Error('no New space in the head')
+    const open = document.querySelector('[data-composer-row]')
+    if (!(open instanceof HTMLElement)) throw new Error('no composer row')
     await act(async () => open.click())
     const d = dialog()
     expect(d?.querySelector('h2')?.textContent).toBe('New space')

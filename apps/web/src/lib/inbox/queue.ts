@@ -106,6 +106,10 @@ export type SuggestionField = {
   options: AttributeOptions | null
   isSystem: boolean
   value: Json
+  /** What the record holds for the attribute now; null when it holds nothing. */
+  current: Json
+  /** The proposer's confidence in `0..1`; null when it gave none. */
+  confidence: number | null
 }
 
 /**
@@ -137,6 +141,11 @@ export type SuggestionItem = {
    */
   fields: Array<SuggestionField> | null
   origin: SuggestionOrigin
+  /**
+   * The proposer by name — the plugin (`Apollo`) or the MCP token; null
+   * for an in-app proposal.
+   */
+  source: string | null
   createdAt: string
   /** The run that produced it — the card's "produced by this run". */
   runId: string | null
@@ -368,7 +377,10 @@ const listDuplicateLane = Effect.fn('listDuplicateLane')(function* (
   )
 })
 
-/** The fields of an `attribute_patch` payload, against the live registry. */
+/**
+ * The fields of an `attribute_patch` payload, against the live registry and
+ * what the record holds now.
+ */
 function patchFields(
   payload: Json,
   registry: ReadonlyArray<{
@@ -378,6 +390,7 @@ function patchFields(
     options: AttributeOptions
     isSystem: boolean
   }>,
+  held: Record<string, Json>,
 ): Array<SuggestionField> | null {
   const envelope = jsonRecord(payload)
   const fields: Array<SuggestionField> = []
@@ -394,6 +407,9 @@ function patchFields(
       options: def.options,
       isSystem: def.isSystem,
       value: field.value,
+      current: held[slug] ?? null,
+      confidence:
+        typeof field.confidence === 'number' ? field.confidence : null,
     })
   }
   return fields.length > 0 ? fields : null
@@ -453,6 +469,7 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
         objectId: entity.objectId,
         objectSlug: objectDef.slug,
         objectSingular: objectDef.singular,
+        values: entity.values,
       })
       .from(entity)
       .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
@@ -531,11 +548,11 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
             .where(inArray(apiToken.id, tokenIds)),
         )).map((t) => [t.id, t.name]),
   )
-  // A discovery group's head names the plugins that found its cards.
+  // A card names the plugin that proposed it; a discovery group's head
+  // names every plugin that found its cards.
   const integrationIds = [
     ...new Set(
       open.flatMap((s) =>
-        isDiscoveryKind(s.kind) &&
         s.proposedByType === 'integration' &&
         s.proposedById !== null &&
         UUID.test(s.proposedById)
@@ -587,6 +604,13 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
           `),
         )).rows.map((r) => [r.id, r.path]),
   )
+
+  const sourceOf = (s: (typeof open)[number]): string | null =>
+    s.proposedByType !== 'integration' || s.proposedById === null
+      ? null
+      : (integrationName.get(s.proposedById) ??
+        tokenName.get(s.proposedById) ??
+        null)
 
   const originOf = (s: (typeof open)[number]): SuggestionOrigin => {
     if (s.proposedByType !== 'integration') return { via: 'app' }
@@ -695,6 +719,7 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
         citations: citationsOf.get(s.id) ?? [],
         fields: null,
         origin: originOf(s),
+        source: sourceOf(s),
         createdAt: s.createdAt.toISOString(),
         runId: s.runId,
       }
@@ -730,8 +755,11 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
       rationale: s.rationale,
       citations: citationsOf.get(s.id) ?? [],
       fields:
-        s.kind === 'attribute_patch' ? patchFields(s.payload, registry) : null,
+        s.kind === 'attribute_patch'
+          ? patchFields(s.payload, registry, jsonRecord(head.values))
+          : null,
       origin: originOf(s),
+      source: sourceOf(s),
       createdAt: s.createdAt.toISOString(),
       runId: s.runId,
     }

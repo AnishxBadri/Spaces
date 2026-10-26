@@ -1,4 +1,5 @@
-import { dayKey } from '@spaces/core/format'
+import { dayKey, formatTime } from '@spaces/core/format'
+import { PluginMark } from '#/components/integrations/integration-ledger'
 import { LabelHead, LedgerRow } from '#/components/ledger-section'
 import { MeetingRow, PrepButton } from '#/components/meetings/meeting-row'
 import { WriteUpButton } from '#/components/meetings/write-up-button'
@@ -8,13 +9,11 @@ import type {
   MeetingsList,
   SetupAudience,
 } from '#/lib/server-fns'
-import { RSVP_WORD, timeSpan } from '#/lib/meetings/day'
 import {
   byDay,
   dayHead,
   filterMeetings,
   needsWriteUp,
-  PAST_SHOWN_NOTE,
   pastWhen,
   writeUpWord,
 } from '#/lib/meetings/list'
@@ -29,13 +28,15 @@ export function MeetingsLedger({
 }: {
   list: MeetingsList & { calendar: boolean; audience: SetupAudience }
   filter: MeetingFilter
-  /** The loader's instant, for the Today and Tomorrow heads and the past lane. */
+  /** The loader's instant, for the Today head and the past lane. */
   now: string
   /** Opens the meeting window; `prep` starts Prep in it. */
   onOpen: (id: string, prep: boolean) => void
 }) {
   const shown = filterMeetings(list, filter)
   const today = dayKey(now)
+  // What the cut left out, under the past it belongs to.
+  const earlier = filter === 'all' || filter === 'past' ? list.earlier : 0
   if (shown.upcoming.length === 0 && shown.past.length === 0)
     return (
       <ol>
@@ -78,28 +79,24 @@ export function MeetingsLedger({
       ))}
       {shown.past.length > 0 ? (
         <section aria-label="Past" className="flex flex-col">
-          <LabelHead label="Past" />
+          <LabelHead label="PAST" />
           <ol>
             {shown.past.map((m) => (
               <MeetingRow
                 key={m.id}
                 meeting={m}
                 when={pastWhen(m.startsAt, now)}
-                lane={writeUpWord(m)}
-                action={
-                  needsWriteUp(m) ? (
-                    <WriteUpButton interactionId={m.id} />
-                  ) : null
-                }
+                action={<PastLane meeting={m} />}
                 onOpen={() => onOpen(m.id, false)}
               />
             ))}
-            {list.more ? (
-              <LedgerRow last>
-                <span className="mono text-micro text-graphite">
-                  {PAST_SHOWN_NOTE}
-                </span>
-              </LedgerRow>
+            {earlier > 0 ? (
+              <li
+                data-meetings-earlier
+                className="flex h-ledger-row items-center px-3 text-label text-graphite"
+              >
+                {earlier.toLocaleString('en-US')} earlier
+              </li>
             ) : null}
           </ol>
         </section>
@@ -108,7 +105,40 @@ export function MeetingsLedger({
   )
 }
 
-/** An upcoming row: Prep opens the window with Prep running. */
+/**
+ * A past row's end: `■ No write-up` with Write, the recorder's mark beside
+ * `Write-up · 2 tasks`, or the state word alone.
+ */
+function PastLane({ meeting: m }: { meeting: ListedMeeting }) {
+  const word = writeUpWord(m)
+  if (needsWriteUp(m))
+    return (
+      <>
+        <span
+          data-meeting-state
+          className="shrink-0 mono text-micro text-warning"
+        >
+          ■ {word}
+        </span>
+        <WriteUpButton interactionId={m.id} />
+      </>
+    )
+  return (
+    <span
+      data-meeting-state
+      className="flex w-40 shrink-0 items-center justify-end gap-2 truncate mono text-micro text-graphite"
+    >
+      {m.via === null ? null : (
+        <span title={m.via} className="flex">
+          <PluginMark name={m.via} />
+        </span>
+      )}
+      {word}
+    </span>
+  )
+}
+
+/** An upcoming row: its start, and Prep, which opens the window running. */
 function UpcomingRow({
   meeting,
   onOpen,
@@ -119,16 +149,16 @@ function UpcomingRow({
   return (
     <MeetingRow
       meeting={meeting}
-      when={timeSpan(meeting.startsAt, meeting.endsAt)}
-      lane={
-        meeting.cancelled
-          ? 'cancelled'
-          : meeting.myRsvp === null
-            ? ''
-            : RSVP_WORD[meeting.myRsvp]
-      }
+      when={formatTime(meeting.startsAt)}
       action={
-        meeting.cancelled ? null : (
+        meeting.cancelled ? (
+          <span
+            data-meeting-state
+            className="shrink-0 mono text-micro text-graphite"
+          >
+            Cancelled
+          </span>
+        ) : (
           <PrepButton onPrep={() => onOpen(meeting.id, true)} />
         )
       }

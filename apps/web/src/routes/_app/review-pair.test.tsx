@@ -97,4 +97,21 @@ describe('the pair card’s default keeper', () => {
     expect(heads(html)).toEqual(['true Keep · A', 'false Merge in · B'])
     expect(html.indexOf('>First Co<')).toBeLessThan(html.indexOf('>Second Co<'))
   })
+
+  it('titles the pair A ⇄ B with why and when, hides a row empty on both sides, and says Dismiss', () => {
+    const html = render(pairOf(emptyA, richB))
+    expect(html).toContain(
+      '<h2 class="min-w-0 truncate font-serif text-lg leading-5.5 font-semibold">Garuda Autonomy ⇄ Garuda Autonomy Pvt Ltd</h2>',
+    )
+    expect(html).toContain('Names 92% alike · 11 Oct')
+    expect(html).toContain('No unmerge · a snapshot of B is kept')
+    expect(html).toContain('aria-label="Swap which record stays"')
+    // Neither side is seen under another name: the row is not drawn.
+    expect(html).not.toContain('Also seen as')
+    expect(html).toContain('>Spaces<')
+    expect(html).toMatch(/<button[^>]*>Dismiss<\/button>/)
+    expect(html).not.toContain('Not the same')
+    expect(html).not.toContain('Reject')
+    expect(html).not.toContain('shadow-solid')
+  })
 })

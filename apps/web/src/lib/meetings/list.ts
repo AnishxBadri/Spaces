@@ -24,24 +24,25 @@ export type ListedMeeting = DayMeeting & {
   writeUp: WriteUpState
   /** The integration that wrote the write-up ("Granola"); null when a person did. */
   via: string | null
+  /** Action items the write-up proposed, decided or still open; dismissed ones leave. */
+  tasks: number
 }
 
 /**
  * The list read: `upcoming` earliest first; `past` with the meetings that
- * still need a write-up first, then newest first. `more` says the past was
- * cut at its limit.
+ * still need a write-up first, then newest first, cut at `PAST_LIMIT`.
+ * - `earlier`: the past meetings the cut left out.
+ * - `counts`: each filter's count over every meeting, not just the rows sent.
  */
 export type MeetingsList = {
   upcoming: Array<ListedMeeting>
   past: Array<ListedMeeting>
-  more: boolean
+  earlier: number
+  counts: Record<MeetingFilter, number>
 }
 
 /** How many past meetings the list reads at once. */
 export const PAST_LIMIT = 300
-
-/** The line under a past list cut at `PAST_LIMIT`. */
-export const PAST_SHOWN_NOTE = `latest ${PAST_LIMIT} past meetings shown`
 
 export const MEETING_FILTERS = [
   'all',
@@ -87,23 +88,6 @@ export function filterMeetings(
   }
 }
 
-/** Each filter's count, for its tab. The tabs carry the counts, nothing else. */
-export function filterCounts(
-  list: Pick<MeetingsList, 'upcoming' | 'past'>,
-): Record<MeetingFilter, number> {
-  const count = (f: MeetingFilter) => {
-    const shown = filterMeetings(list, f)
-    return shown.upcoming.length + shown.past.length
-  }
-  return {
-    all: count('all'),
-    upcoming: count('upcoming'),
-    past: count('past'),
-    unwritten: count('unwritten'),
-    mine: count('mine'),
-  }
-}
-
 /**
  * The end of "this week and next": the local Monday after next, at
  * midnight. Weeks start on Monday, as the date line's `W41` does.
@@ -130,12 +114,10 @@ export function byDay<T extends { startsAt: string }>(
   return out
 }
 
-/** An upcoming day's band: `TODAY · MON 12 OCT`, `TOMORROW · …`, else `WED 14 OCT`. */
+/** An upcoming day's band: `TODAY · MON 12 OCT`, else `WED 14 OCT`. */
 export function dayHead(day: string, today: string): string {
   const head = formatWeekdayHead(day, today)
-  if (day === today) return `TODAY · ${head}`
-  if (day === shiftDay(today, 1)) return `TOMORROW · ${head}`
-  return head
+  return day === today ? `TODAY · ${head}` : head
 }
 
 /** A past row's when-lane: the time on `now`'s day, else the day (`8 Oct`). */
@@ -143,11 +125,16 @@ export function pastWhen(startsAt: string, now: string): string {
   return formatWhen(startsAt, now)
 }
 
-/** A past row's state word: `written`, `via Granola`, `private`, `no write-up`. */
+/**
+ * A past row's state: `Cancelled`, `No write-up`, `Private`, or `Write-up`
+ * with the tasks it proposed (`Write-up · 2 tasks`).
+ */
 export function writeUpWord(m: ListedMeeting): string {
-  if (m.cancelled) return 'cancelled'
-  if (m.writeUp === 'private') return 'private'
+  if (m.cancelled) return 'Cancelled'
+  if (m.writeUp === 'private') return 'Private'
   if (m.writeUp === 'written')
-    return m.via === null ? 'written' : `via ${m.via}`
-  return 'no write-up'
+    return m.tasks === 0
+      ? 'Write-up'
+      : `Write-up · ${m.tasks} task${m.tasks === 1 ? '' : 's'}`
+  return 'No write-up'
 }

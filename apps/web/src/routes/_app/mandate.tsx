@@ -19,7 +19,7 @@ import {
   saveNote,
   updateMandateFacts,
 } from '#/lib/server-fns'
-import { formatTime, formatWhen } from '@spaces/core/format'
+import { formatDay, formatNumber, formatTime } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 import type { NoteBody } from '@spaces/db/schema/kinds'
@@ -65,7 +65,7 @@ function MandatePage() {
   if (!mandate) {
     return (
       <div className="flex min-h-full flex-col">
-        <PageHeader title="Mandate" description={<span>not written</span>} />
+        <PageHeader title="Mandate" description={<span>Not written</span>} />
         <EmptyState
           title="State your mandate"
           body="Where you invest, at what stage, at what check size, and why. Deals outside it get a quiet flag, never a block — edge cases are the job."
@@ -94,11 +94,11 @@ function MandatePage() {
   const activeStages = mandate.stages.length
   const status =
     saveState === 'saving'
-      ? 'saving…'
+      ? 'Saving…'
       : saveState === 'dirty'
-        ? 'unsaved'
+        ? 'Unsaved'
         : saveState === 'saved' && savedAt
-          ? `saved · ${savedAt}`
+          ? `Saved ${savedAt}`
           : ''
 
   return (
@@ -106,16 +106,15 @@ function MandatePage() {
       <PageHeader
         title="Mandate"
         description={
-          <>
-            <span>updated {formatWhen(note.updatedAt, now)}</span>
-            <span>
-              {activeStages} stage{activeStages === 1 ? '' : 's'} ·{' '}
-              {mandate.geos.length} geo{mandate.geos.length === 1 ? '' : 's'}
-            </span>
-          </>
+          <span data-mandate-meta>
+            Updated {formatDay(note.updatedAt, now)} · {activeStages} stage
+            {activeStages === 1 ? '' : 's'} · {mandate.geos.length} geo
+            {mandate.geos.length === 1 ? '' : 's'}
+          </span>
         }
         action={
           <span
+            data-save-state
             className="mono text-micro text-graphite"
             role="status"
             aria-live="polite"
@@ -147,8 +146,8 @@ function MandatePage() {
 
 type Mandate = NonNullable<Awaited<ReturnType<typeof getMandate>>>
 
-/** One row of the grid: 96px lowercase mono label, values, a mono note on
- *  the right. */
+/** One row of the grid: a 96px sans label, values, a mono note on the
+ *  right. */
 function FactRow({
   label,
   note,
@@ -167,7 +166,7 @@ function FactRow({
         !last && 'border-b border-rule',
       )}
     >
-      <div className="w-24 shrink-0 field-label text-graphite">{label}</div>
+      <div className="w-24 shrink-0 text-label text-graphite">{label}</div>
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
         {children}
       </div>
@@ -218,12 +217,16 @@ function FactsGrid({
         {stages.map((opt) => {
           const active = mandate.stages.includes(opt.id)
           return (
+            // Chosen stages wear their tint; the rest sit on bone.
             <Badge
               key={opt.id}
               asChild
               option={opt}
               index={0}
               unselected={!active}
+              className={
+                active ? undefined : 'border-solid border-transparent bg-bone'
+              }
             >
               <button
                 type="button"
@@ -247,7 +250,7 @@ function FactsGrid({
         <GeoChips geos={mandate.geos} onSave={(geos) => save({ geos })} />
       </FactRow>
 
-      <FactRow label="Check size" note="whole units" last>
+      <FactRow label="Check size" last>
         <CheckSizeInputs
           checkMin={mandate.checkMin}
           checkMax={mandate.checkMax}
@@ -259,6 +262,11 @@ function FactsGrid({
   )
 }
 
+/**
+ * The geographies as `India ×` chips, then an inline field and a pine `+`
+ * that add one; ↵ adds too. A name already there (any case) is not added
+ * twice.
+ */
 function GeoChips({
   geos,
   onSave,
@@ -266,13 +274,11 @@ function GeoChips({
   geos: Array<string>
   onSave: (geos: Array<string>) => void
 }) {
-  const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')
 
   function add() {
     const v = draft.trim()
     setDraft('')
-    setAdding(false)
     if (!v) return
     if (geos.some((g) => g.toLowerCase() === v.toLowerCase())) return
     onSave([...geos, v])
@@ -283,7 +289,8 @@ function GeoChips({
       {geos.map((g) => (
         <span
           key={g}
-          className="flex h-[1.375rem] items-center gap-2 border border-rule bg-paper px-2 text-label font-medium"
+          data-geo-chip
+          className="flex h-5.5 items-center gap-2 border border-rule bg-paper px-2 text-label font-medium"
         >
           {g}
           <button
@@ -296,36 +303,31 @@ function GeoChips({
           </button>
         </span>
       ))}
-      {adding ? (
+      <span className="flex items-center gap-1">
         <input
-          autoFocus
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          onBlur={add}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
               add()
             }
-            if (e.key === 'Escape') {
-              setDraft('')
-              setAdding(false)
-            }
+            if (e.key === 'Escape') setDraft('')
           }}
-          placeholder="India, US…"
-          aria-label="Add geography"
-          className="focus-ring h-[1.375rem] w-44 border border-rule bg-transparent px-2 text-label outline-none placeholder:text-graphite"
+          placeholder="Singapore…"
+          aria-label="Add a geography"
+          className="focus-ring h-5.5 w-32 border border-rule bg-transparent px-2 text-label outline-none placeholder:text-graphite"
         />
-      ) : (
         <button
           type="button"
-          onClick={() => setAdding(true)}
-          className="focus-ring flex h-[1.375rem] items-center gap-1.5 border border-dashed border-rule px-2 text-label text-graphite transition-colors hover:border-hairline hover:text-foreground"
+          aria-label="Add geography"
+          title="Add geography"
+          onClick={add}
+          className="focus-ring flex h-5.5 w-5.5 items-center justify-center mono text-ui text-primary hover:bg-bone"
         >
-          <span className="mono text-primary">+</span>
-          Add a geography…
+          +
         </button>
-      )}
+      </span>
     </>
   )
 }
@@ -345,8 +347,9 @@ function CheckSizeInputs({
     currency?: string | null
   }) => void
 }) {
-  const [min, setMin] = useState(checkMin?.toString() ?? '')
-  const [max, setMax] = useState(checkMax?.toString() ?? '')
+  // Grouped as they print: `100,000`. A commit reads the digits back.
+  const [min, setMin] = useState(formatNumber(checkMin, 0))
+  const [max, setMax] = useState(formatNumber(checkMax, 0))
   const [cur, setCur] = useState(currency ?? '')
 
   function commit() {
@@ -354,11 +357,11 @@ function CheckSizeInputs({
       const n = Number(s.replace(/[,\s]/g, ''))
       return s.trim() === '' || !Number.isFinite(n) ? null : Math.round(n)
     }
-    onSave({
-      checkMin: parse(min),
-      checkMax: parse(max),
-      currency: cur.trim() || null,
-    })
+    const lo = parse(min)
+    const hi = parse(max)
+    setMin(formatNumber(lo, 0))
+    setMax(formatNumber(hi, 0))
+    onSave({ checkMin: lo, checkMax: hi, currency: cur.trim() || null })
   }
 
   const input =

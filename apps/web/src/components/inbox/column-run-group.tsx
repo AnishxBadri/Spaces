@@ -65,7 +65,7 @@ export function ColumnRunGroup({ group }: { group: ColumnRunRow }) {
 
   return (
     <li className="flex flex-col gap-3">
-      <div className="flex flex-col border border-hairline bg-paper shadow-solid">
+      <div className="flex flex-col border border-hairline bg-paper">
         <div className="flex min-h-11 flex-wrap items-center gap-3 px-5 py-2.5">
           <Columns3 className="size-3.5 text-graphite" strokeWidth={1.75} />
           <span className="label-caps text-graphite">From this column run</span>

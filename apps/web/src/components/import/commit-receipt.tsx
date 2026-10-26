@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { PageHeader } from '#/components/page-header'
 import { ReadoutStrip, countReadout } from '#/components/record/record-parts'
+import { BADGE } from '#/components/import/preview-ledger'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { formatWhen } from '@spaces/core/format'
@@ -9,7 +10,6 @@ import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 import { missingRateLine } from '@spaces/core/import/ledger-commit'
 import type { CommitCounts } from '@spaces/core/import/commit'
-import type { ImportVerdict } from '@spaces/core/import/plan'
 import type {
   ImportReceiptView,
   ReceiptFilter,
@@ -32,15 +32,6 @@ import type {
  * — HOLDINGS · INVESTMENTS · ROUNDS · MARKS · FAILED · REMAINING — and a
  * row's outcome is the events it appended, linking to the holding.
  */
-
-const BADGE: Record<ImportVerdict, { color: string; label: string }> = {
-  attach: { color: 'blue', label: 'attach' },
-  create: { color: 'emerald', label: 'create' },
-  collide: { color: 'amber', label: 'collide' },
-  'no-land': { color: 'rose', label: 'no land' },
-  merged: { color: 'slate', label: 'merged' },
-  skip: { color: 'slate', label: 'skip' },
-}
 
 /** The page title: `46 written · 0 attached · 1 failed.`, or where a run is. */
 export function receiptSentence(
@@ -91,25 +82,49 @@ function seconds(ms: number): string {
     : `${Math.round(ms / 1000)} s`
 }
 
+/**
+ * Where the receipt's primary goes: the list the batch wrote into, or the
+ * portfolio for a ledger batch.
+ */
+export function receiptDestination(view: ImportReceiptView): {
+  to: string
+  label: string
+} {
+  if (view.ledger) return { to: '/portfolio', label: 'Open portfolio' }
+  const label = `Open ${view.object.plural.toLowerCase()}`
+  switch (view.object.kind) {
+    case 'company':
+      return { to: '/companies', label }
+    case 'person':
+      return { to: '/people', label }
+    case 'deal':
+      return { to: '/deals', label }
+    default:
+      return view.object.slug === null
+        ? { to: '/companies', label: 'Open companies' }
+        : { to: `/o/${view.object.slug}`, label }
+  }
+}
+
+/**
+ * The receipt's head: `[Retry failed rows]` while a row failed, then the
+ * list the batch wrote into. A voided ledger batch re-runs from its void
+ * line (`VoidLine`), never from here.
+ */
 export function ReceiptHeader({
   view,
   filename,
-  onCommit,
   onRetry,
   pending,
 }: {
   view: ImportReceiptView
   filename: string
-  /** Commit again — a committed batch writes nothing, and says so. */
-  onCommit: () => void
   onRetry: () => void
   pending: 'commit' | 'retry' | null
 }) {
   const last = view.lastRun
   const idle = !view.running
-  // Once voided, a re-run is not the primary action: it moves under the
-  // voided line as a quiet `Re-import ›` (`VoidLine`).
-  const voided = view.ledger?.voided ?? false
+  const open = receiptDestination(view)
   return (
     <PageHeader
       eyebrow={view.ledger ? 'Import · Ledger' : 'Import · Records'}
@@ -140,16 +155,9 @@ export function ReceiptHeader({
               Retry failed rows
             </Button>
           ) : null}
-          {voided ? null : (
-            <Button
-              shortcut="⌘↵"
-              disabled={!idle || pending !== null}
-              pending={pending === 'commit'}
-              onClick={onCommit}
-            >
-              Commit again
-            </Button>
-          )}
+          <Button asChild>
+            <Link to={open.to}>{open.label}</Link>
+          </Button>
         </>
       }
     />

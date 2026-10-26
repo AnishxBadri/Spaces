@@ -51,7 +51,6 @@ export function TaskComposer({
   presetEntity,
   onCreated,
   hotkey,
-  variant = 'dialog',
 }: {
   trigger?: React.ReactNode
   /** Record page rails pass their record — pre-linked, removable. */
@@ -62,9 +61,6 @@ export function TaskComposer({
   /** A bare key that opens the composer from anywhere on the page — the
    *  key hint printed in the trigger must be true. Ignored while typing. */
   hotkey?: string
-  /** `band` renders the composer inline as the bone band under a page
-   *  header; `dialog` (default) opens it from a trigger. */
-  variant?: 'dialog' | 'band'
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -88,10 +84,9 @@ export function TaskComposer({
   useHotkey(hotkey, () => setOpen(true))
 
   /**
-   * `keep` means the same thing in both variants: the sheet stays, the
-   * chips stay, only the text clears — so a run of tasks against one
-   * record keeps its date and its links. ⇧↵ is the one-shot version of
-   * the switch.
+   * `keep`: the sheet stays, the chips stay, only the text clears — so a
+   * run of tasks against one record keeps its date and its links. ⇧↵ is
+   * the one-shot version of the switch.
    */
   async function save(keep = keepOpen) {
     if (!content.trim()) {
@@ -114,7 +109,7 @@ export function TaskComposer({
       if (!keep) {
         setDue(null)
         if (!presetEntity) setRecords([])
-        if (variant === 'dialog') setOpen(false)
+        setOpen(false)
       }
       onCreated?.(created.id)
       void router.invalidate()
@@ -141,72 +136,10 @@ export function TaskComposer({
   const chips = (
     <>
       <DuePill due={due} today={today} onChange={setDue} />
-      {variant === 'band' ? (
-        <>
-          {duePresets(today).map(([label, value]) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => setDue(value)}
-              className="focus-ring flex h-6 items-center border border-rule bg-paper px-2 mono text-micro text-graphite transition-colors hover:border-hairline hover:text-foreground"
-            >
-              {label}
-            </button>
-          ))}
-          <span aria-hidden className="mx-1 h-4 w-px bg-rule" />
-        </>
-      ) : null}
       <AssigneePill assignee={assignee} me={me} onChange={setAssignee} />
       <RecordsPill records={records} onChange={setRecords} />
     </>
   )
-
-  if (variant === 'band') {
-    return (
-      <form
-        className="flex shrink-0 flex-col gap-2 border-b border-hairline bg-bone px-8 py-4"
-        onSubmit={(e) => {
-          e.preventDefault()
-          void save()
-        }}
-      >
-        <div className="focus-ring-within flex h-9 items-center gap-2.5 rounded-md border border-hairline bg-paper px-3">
-          <span className="mono text-ui text-primary">+</span>
-          <input
-            className="h-full min-w-0 flex-1 bg-transparent text-body outline-none placeholder:text-graphite"
-            placeholder="Add a task…"
-            aria-label="New task"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && e.shiftKey) {
-                e.preventDefault()
-                void save(true)
-              }
-            }}
-          />
-          <span className="hidden shrink-0 mono text-micro text-graphite md:inline">
-            ↵ add · ⇧↵ add & keep open
-          </span>
-        </div>
-        {error ? (
-          <p role="alert" className="text-label text-destructive">
-            {error}
-          </p>
-        ) : null}
-        <div className="flex flex-wrap items-center gap-2">
-          {chips}
-          <span className="flex-1" />
-          <Switch checked={keepOpen} onCheckedChange={setKeepOpen}>
-            Keep open
-          </Switch>
-          <Button type="submit" size="sm" pending={pending}>
-            {pending ? 'Saving…' : 'Add task'}
-          </Button>
-        </div>
-      </form>
-    )
-  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -314,15 +247,6 @@ function DuePill({
   onChange: (d: string | null) => void
 }) {
   const [open, setOpen] = useState(false)
-  const [text, setText] = useState('')
-  const parsed = parseDue(text, today)
-
-  function pick(d: string | null) {
-    onChange(d)
-    setText('')
-    setOpen(false)
-  }
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -333,50 +257,87 @@ function DuePill({
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 p-2">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (parsed) pick(parsed)
+        <DueField
+          due={due}
+          today={today}
+          onPick={(d) => {
+            onChange(d)
+            setOpen(false)
           }}
-        >
-          <Input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Next Tuesday, in 3 months…"
-            autoFocus
-          />
-        </form>
-        <p
-          className={cn(
-            'mt-1 px-1 text-label',
-            text && !parsed ? 'text-destructive' : 'text-graphite',
-          )}
-        >
-          {text
-            ? (parsed ?? 'Not a date I understand — try "in 2 weeks"')
-            : 'Type a date, or pick:'}
-        </p>
-        <div className="mt-2 flex flex-wrap gap-1">
-          {duePresets(today).map(([label, value]) => (
-            <button
-              key={label}
-              type="button"
-              className="focus-ring h-6 border border-rule bg-paper px-2 mono text-micro text-graphite hover:border-hairline hover:text-foreground"
-              onClick={() => pick(value)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <input
-          type="date"
-          className="mt-2 w-full rounded-md border border-rule bg-transparent px-2 py-1 text-label"
-          value={due ?? ''}
-          onChange={(e) => pick(e.target.value || null)}
-          aria-label="Pick a date"
         />
       </PopoverContent>
     </Popover>
+  )
+}
+
+/**
+ * Picking a due day: a typed date that parses deterministically, the four
+ * presets, or the native calendar. The composer's pill and a task row's
+ * `Due date…` window both draw it.
+ */
+export function DueField({
+  due,
+  today,
+  onPick,
+}: {
+  due: string | null
+  today: string
+  onPick: (d: string | null) => void
+}) {
+  const [text, setText] = useState('')
+  const parsed = parseDue(text, today)
+
+  function pick(d: string | null) {
+    setText('')
+    onPick(d)
+  }
+
+  return (
+    <div className="flex flex-col">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (parsed) pick(parsed)
+        }}
+      >
+        <Input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Next Tuesday, in 3 months…"
+          aria-label="Due date"
+          autoFocus
+        />
+      </form>
+      <p
+        className={cn(
+          'mt-1 px-1 text-label',
+          text && !parsed ? 'text-destructive' : 'text-graphite',
+        )}
+      >
+        {text
+          ? (parsed ?? 'Not a date I understand — try "in 2 weeks"')
+          : 'Type a date, or pick:'}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-1">
+        {duePresets(today).map(([label, value]) => (
+          <button
+            key={label}
+            type="button"
+            className="focus-ring h-6 border border-rule bg-paper px-2 mono text-micro text-graphite hover:border-hairline hover:text-foreground"
+            onClick={() => pick(value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <input
+        type="date"
+        className="mt-2 w-full rounded-md border border-rule bg-transparent px-2 py-1 text-label"
+        value={due ?? ''}
+        onChange={(e) => pick(e.target.value || null)}
+        aria-label="Pick a date"
+      />
+    </div>
   )
 }
 
@@ -395,23 +356,8 @@ function AssigneePill({
   onChange: (a: { id: string; name: string } | null) => void
 }) {
   const [open, setOpen] = useState(false)
-  const [users, setUsers] = useState<Array<{ id: string; name: string }>>([])
-  useEffect(() => {
-    if (!open || users.length > 0) return
-    listUsers()
-      .then((u) => setUsers(u.map((x) => ({ id: x.id, name: x.name }))))
-      .catch(() => toast.error('Could not load teammates'))
-  }, [open, users.length])
-
   const effective = assignee ?? me
   const isMe = effective.id === me.id
-  // Me first — the common case should not need a read of the list.
-  const ordered = [
-    me,
-    ...users
-      .filter((u) => u.id !== me.id)
-      .sort((a, b) => a.name.localeCompare(b.name)),
-  ]
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -427,32 +373,103 @@ function AssigneePill({
       </PopoverTrigger>
       <PopoverContent align="start" className="w-56 p-1">
         <p className="px-2 pt-1 pb-1.5 label-caps text-graphite">Assign to</p>
-        {users.length === 0 ? (
-          <p className="px-2 py-1.5 text-label text-graphite">Loading…</p>
-        ) : (
-          ordered.map((u) => (
-            <button
-              key={u.id}
-              type="button"
-              className={cn(
-                'focus-ring flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-ui hover:bg-bone',
-                u.id === effective.id && 'bg-selected',
-              )}
-              onClick={() => {
-                onChange(u.id === me.id ? null : u)
-                setOpen(false)
-              }}
-            >
-              <InitialsMark name={u.name} size="xs" />
-              {u.name}
-              {u.id === me.id ? (
-                <span className="text-label text-graphite">you</span>
-              ) : null}
-            </button>
-          ))
-        )}
+        {open ? (
+          <MemberList
+            selected={effective.id}
+            me={me}
+            onPick={(u) => {
+              onChange(u.id === me.id ? null : u)
+              setOpen(false)
+            }}
+          />
+        ) : null}
       </PopoverContent>
     </Popover>
+  )
+}
+
+/**
+ * The members a task can land on, the reader first — the common case should
+ * not need a read of the list. Loads on mount; the composer's pill and a
+ * task row's `Assign…` window both draw it.
+ */
+export function MemberList({
+  selected,
+  me,
+  onPick,
+}: {
+  selected: string
+  me: { id: string; name: string }
+  onPick: (u: { id: string; name: string }) => void
+}) {
+  const [users, setUsers] = useState<Array<{ id: string; name: string }>>([])
+  useEffect(() => {
+    let alive = true
+    listUsers()
+      .then((u) => {
+        if (alive) setUsers(u.map((x) => ({ id: x.id, name: x.name })))
+      })
+      .catch(() => toast.error('Could not load teammates'))
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const ordered = [
+    me,
+    ...users
+      .filter((u) => u.id !== me.id)
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  ]
+
+  if (users.length === 0)
+    return <p className="px-2 py-1.5 text-label text-graphite">Loading…</p>
+  return (
+    <div className="flex flex-col">
+      {ordered.map((u) => (
+        <button
+          key={u.id}
+          type="button"
+          className={cn(
+            'focus-ring flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-ui hover:bg-bone',
+            u.id === selected && 'bg-selected',
+          )}
+          onClick={() => onPick(u)}
+        >
+          <InitialsMark name={u.name} size="xs" />
+          {u.name}
+          {u.id === me.id ? (
+            <span className="text-label text-graphite">You</span>
+          ) : null}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * The composer as a list's last row: `+ Add a task…`, its key in the end
+ * lane. A plain button, so the dialog trigger hands it its props.
+ */
+export function TaskComposerRow(props: React.ComponentProps<'button'>) {
+  return (
+    <button
+      type="button"
+      data-composer-row
+      {...props}
+      className="focus-ring-inset flex h-ledger-row w-full min-w-0 items-center gap-3 px-3 text-left transition-colors duration-150 ease-out-quart hover:bg-bone"
+    >
+      <span
+        aria-hidden
+        className="w-3.5 shrink-0 text-center mono text-ui text-primary"
+      >
+        +
+      </span>
+      <span className="min-w-0 flex-1 truncate text-body text-graphite">
+        Add a task…
+      </span>
+      <kbd className="shrink-0 mono text-micro text-graphite">T</kbd>
+    </button>
   )
 }
 

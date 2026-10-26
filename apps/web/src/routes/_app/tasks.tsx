@@ -1,44 +1,71 @@
-import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { CheckSquare, Trash2 } from 'lucide-react'
+import {
+  createFileRoute,
+  Link,
+  useRouteContext,
+  useRouter,
+} from '@tanstack/react-router'
+import { CheckSquare, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { EmptyState } from '#/components/empty-state'
-import {
-  LedgerFigure,
-  LedgerRow,
-  LedgerSection,
-} from '#/components/ledger-section'
+import { LabelHead, LedgerFigure } from '#/components/ledger-section'
 import { PageHeader } from '#/components/page-header'
-import { TaskComposer } from '#/components/task-composer'
+import {
+  DueField,
+  MemberList,
+  TaskComposer,
+  TaskComposerRow,
+} from '#/components/task-composer'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { useConfirm } from '#/components/ui/confirm-dialog'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '#/components/ui/dialog'
+import { MENU_RULE, MoreMenu } from '#/components/ui/more-menu'
+import type { MoreMenuEntry } from '#/components/ui/more-menu'
+import { Segmented } from '#/components/ui/segmented'
 import { useBornRows } from '#/lib/born-rows'
 import { recordPath } from '#/lib/record-path'
-import { deleteTask, listTasks, setTaskDone } from '#/lib/server-fns'
+import {
+  deleteTask,
+  listTasks,
+  setTaskAssignee,
+  setTaskDone,
+  setTaskDue,
+} from '#/lib/server-fns'
 import { focusTab } from '#/lib/tasks/focus'
 import {
   dayKey,
   formatDay,
   formatDue,
-  formatWeekday,
+  formatWeekdayHead,
   formatWhen,
 } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/tasks')({
-  // `?task=` is the row a Cmd-K hit lands on. A malformed
-  // id catches to undefined: the page renders unfocused, with no error.
+  // `?task=` is the row a Cmd-K hit lands on; `?record=` narrows the list to
+  // one record's tasks. A malformed id catches to undefined: the page renders
+  // unfocused and unnarrowed, with no error.
   validateSearch: z.object({
     task: z.string().uuid().optional().catch(undefined),
+    record: z.string().uuid().optional().catch(undefined),
   }),
   // The focused id is a loader dep because Done is a 50-row window: a hit on
   // a task closed long ago is fetched by id, not hoped for in the window.
-  loaderDeps: ({ search }) => ({ task: search.task }),
+  loaderDeps: ({ search }) => ({ task: search.task, record: search.record }),
   loader: ({ deps }) =>
-    listTasks({ data: { includeDone: true, focus: deps.task } }),
+    listTasks({
+      data: { includeDone: true, focus: deps.task, record: deps.record },
+    }),
   component: TasksPage,
 })
 
@@ -52,39 +79,29 @@ function endOfWeek(today: string): string {
 
 type Group = {
   key: string
-  title: string
-  tone?: string
-  /** The mono note after the count — the group's frame of reference. */
-  hint?: string
+  /** The group's head in mono caps. */
+  label: string
+  tone?: 'bad'
   rows: Array<TaskRow>
 }
 
-/** The when-lane: `−2d` overdue, `today`, `Fri` this week, `14 Oct`
- *  later, `—` when dateless. */
-function whenFigure(due: string | null, today: string) {
-  if (!due) return '—'
-  return due === today ? 'today' : formatDue(due, today)
-}
-
-/** Urgency groups, Attio-style: overdue red, today, this week, later, dateless. */
+/** Urgency groups: overdue, today, this week, later, then dateless. */
 function groupTasks(open: Array<TaskRow>, today: string): Array<Group> {
   const eow = endOfWeek(today)
   const groups: Array<Group> = [
-    { key: 'overdue', title: 'Overdue', tone: 'text-destructive', rows: [] },
+    { key: 'overdue', label: 'OVERDUE', tone: 'bad', rows: [] },
     {
       key: 'today',
-      title: 'Today',
-      hint: formatWeekday(today, today),
+      label: `TODAY · ${formatWeekdayHead(today, today)}`,
       rows: [],
     },
     {
       key: 'week',
-      title: 'This week',
-      hint: `through ${formatWeekday(eow, today)}`,
+      label: `THIS WEEK · THROUGH ${formatWeekdayHead(eow, today)}`,
       rows: [],
     },
-    { key: 'later', title: 'Later', rows: [] },
-    { key: 'nodate', title: 'No date', hint: 'dateless is legal', rows: [] },
+    { key: 'later', label: 'LATER', rows: [] },
+    { key: 'nodate', label: 'NO DATE', rows: [] },
   ]
   for (const t of open) {
     if (!t.dueDate) groups[4].rows.push(t)
@@ -105,14 +122,13 @@ function groupDone(done: Array<TaskRow>, today: string): Array<Group> {
   weekAgo.setUTCDate(weekAgo.getUTCDate() - 6)
   const since = weekAgo.toISOString().slice(0, 10)
   const groups: Array<Group> = [
-    { key: 'done-today', title: 'Today', rows: [] },
+    { key: 'done-today', label: 'TODAY', rows: [] },
     {
       key: 'done-week',
-      title: 'This week',
-      hint: `since ${formatDay(since, today)}`,
+      label: `THIS WEEK · SINCE ${formatDay(since, today).toUpperCase()}`,
       rows: [],
     },
-    { key: 'done-earlier', title: 'Earlier', rows: [] },
+    { key: 'done-earlier', label: 'EARLIER', rows: [] },
   ]
   for (const t of done) {
     const day = t.doneAt ? dayKey(t.doneAt) : ''
@@ -123,31 +139,32 @@ function groupDone(done: Array<TaskRow>, today: string): Array<Group> {
   return groups.filter((g) => g.rows.length > 0)
 }
 
-/** The when-lane for a closed task: the clock today, then the day. */
-function doneFigure(doneAt: string | null, today: string): string {
-  return doneAt ? formatWhen(doneAt, today) : '—'
-}
-
 /** The row's exit: long enough to read the strike, short enough to ignore. */
 const EXIT_MS = 150
+
+type View = 'open' | 'done'
+
+/** Which window a row's `···` opened, and on which task. */
+type Editing = { kind: 'due' | 'assign'; task: TaskRow } | null
 
 function TasksPage() {
   const data = Route.useLoaderData()
   const { task: focusId } = Route.useSearch()
   const navigate = Route.useNavigate()
   const router = useRouter()
-  // A focused task picks the tab it lives on: a closed one opens Done
+  const me = useRouteContext({ from: '/_app' }).session.user
+  // A focused task picks the view it lives in: a closed one opens Done
   // instead of rendering nothing.
-  const [showDone, setShowDone] = useState(
-    () => focusTab(focusId, data) === 'done',
+  const [view, setView] = useState<View>(() =>
+    focusTab(focusId, data) === 'done' ? 'done' : 'open',
   )
   // A new focus on a page already mounted — Cmd-K from /tasks itself — picks
-  // its tab during render, so the wrong tab never paints first.
-  const [tabFocus, setTabFocus] = useState(focusId)
-  if (tabFocus !== focusId) {
-    setTabFocus(focusId)
+  // its view during render, so the wrong one never paints first.
+  const [viewFocus, setViewFocus] = useState(focusId)
+  if (viewFocus !== focusId) {
+    setViewFocus(focusId)
     const tab = focusTab(focusId, data)
-    if (tab !== null) setShowDone(tab === 'done')
+    if (tab !== null) setView(tab)
   }
 
   /**
@@ -166,19 +183,24 @@ function TasksPage() {
   // Rows mid-exit. The write waits for the transition so completing a task
   // reads as the row leaving, not as the list flinching.
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set())
-  // Rows this page's composer band created — the only ones the wash touches.
-  // Everything the loader handed us was already here, so nothing washes on
-  // arrival at the page, or on a reload seconds after a task was added.
+  // Rows this page's composer created — the only ones the wash touches.
   const { washes, bear } = useBornRows()
   const { confirm, confirmDialog } = useConfirm()
+  const [editing, setEditing] = useState<Editing>(null)
   const { today } = useClock()
 
-  // The tabs are exclusive: Done is a different list, not a disclosure on
-  // this one. Reopening the last done task takes the tab away, so the view
-  // falls back rather than stranding the page on an empty log.
-  const viewDone = showDone && data.done.length > 0
-  const openGroups = groupTasks(data.open, today)
-  const groups = viewDone ? groupDone(data.done, today) : openGroups
+  const viewDone = view === 'done'
+  const groups = viewDone
+    ? groupDone(data.done, today)
+    : groupTasks(data.open, today)
+
+  function settle(id: string) {
+    setLeaving((s) => {
+      const next = new Set(s)
+      next.delete(id)
+      return next
+    })
+  }
 
   async function write(id: string, done: boolean) {
     try {
@@ -187,11 +209,7 @@ function TasksPage() {
     } catch {
       toast.error('Could not update the task')
     } finally {
-      setLeaving((s) => {
-        const next = new Set(s)
-        next.delete(id)
-        return next
-      })
+      settle(id)
     }
   }
 
@@ -215,11 +233,7 @@ function TasksPage() {
     } catch {
       toast.error('Could not delete the task')
     } finally {
-      setLeaving((s) => {
-        const next = new Set(s)
-        next.delete(id)
-        return next
-      })
+      settle(id)
     }
   }
 
@@ -235,67 +249,74 @@ function TasksPage() {
     window.setTimeout(() => void erase(t.id), EXIT_MS)
   }
 
-  const overdue = openGroups.find((g) => g.key === 'overdue')?.rows.length ?? 0
-  const dueToday = openGroups.find((g) => g.key === 'today')?.rows.length ?? 0
-  const empty = data.open.length === 0 && data.done.length === 0
+  async function edit(run: () => Promise<unknown>, failed: string) {
+    setEditing(null)
+    try {
+      await run()
+      void router.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : failed)
+    }
+  }
+
+  function menuFor(t: TaskRow): Array<MoreMenuEntry> {
+    const first = t.entities.at(0)
+    const path = first === undefined ? null : recordPath(first)
+    return [
+      ...(first !== undefined && path !== null
+        ? [
+            {
+              label: `Open ${first.name}`,
+              onSelect: () => void router.navigate({ to: path }),
+            },
+          ]
+        : []),
+      {
+        label: 'Due date…',
+        opens: true,
+        onSelect: () => setEditing({ kind: 'due', task: t }),
+      },
+      {
+        label: 'Assign…',
+        opens: true,
+        onSelect: () => setEditing({ kind: 'assign', task: t }),
+      },
+      {
+        label: 'Copy link',
+        copy: () => `${window.location.origin}/tasks?task=${t.id}`,
+      },
+      MENU_RULE,
+      {
+        label: 'Delete task',
+        destructive: true,
+        opens: true,
+        onSelect: () => void remove(t),
+      },
+    ]
+  }
+
+  const scope = data.record
+  const empty =
+    scope === null && data.open.length === 0 && data.done.length === 0
+
+  // The composer is the list's last row; on a narrowed list it links the
+  // record. Adding from the Done log returns to Open, where the task is.
+  const composer = (
+    <TaskComposer
+      hotkey="t"
+      {...(scope === null ? {} : { presetEntity: scope })}
+      onCreated={(id) => {
+        clearFocus()
+        bear(id)
+        setView('open')
+      }}
+      trigger={<TaskComposerRow />}
+    />
+  )
 
   return (
     <div className="flex min-h-full flex-col">
-      <PageHeader
-        title="Tasks"
-        description={
-          <>
-            <span>{data.open.length} open</span>
-            <span className={overdue > 0 ? 'text-destructive' : undefined}>
-              {overdue} overdue
-            </span>
-            <span>{dueToday} today</span>
-            <span>{data.done.length} done</span>
-          </>
-        }
-        action={
-          data.done.length > 0 ? (
-            <div className="-mb-4 flex items-center" role="group">
-              <HeaderTab
-                active={!viewDone}
-                onClick={() => {
-                  clearFocus()
-                  setShowDone(false)
-                }}
-              >
-                Open
-              </HeaderTab>
-              <HeaderTab
-                active={viewDone}
-                onClick={() => {
-                  clearFocus()
-                  setShowDone(true)
-                }}
-              >
-                Done
-                <span className="font-normal tracking-normal normal-case">
-                  {data.done.length}
-                </span>
-              </HeaderTab>
-            </div>
-          ) : undefined
-        }
-      />
-
-      {/* The one way to add things, everywhere: the composer band under the
-          header, not a corner button. Hidden when empty — the empty
-          state carries its own composer action. Adding from the Done log
-          returns to Open, where the new task actually is. */}
-      {empty ? null : (
-        <TaskComposer
-          variant="band"
-          onCreated={(id) => {
-            clearFocus()
-            bear(id)
-            setShowDone(false)
-          }}
-        />
-      )}
+      <PageHeader title="Tasks" />
 
       {empty ? (
         <EmptyState
@@ -304,104 +325,206 @@ function TasksPage() {
           body={
             'Tasks put dates on judgment calls — "revisit when their round closes", "chase the data room", "re-mark after the bridge". Link them to records so they show up where you work.'
           }
-          action={<TaskComposer />}
+          action={<TaskComposer hotkey="t" />}
         />
       ) : (
-        <div className="flex flex-col gap-8 px-8 py-6">
-          {groups.length === 0 ? (
-            <p className="text-ui text-graphite">
-              {viewDone ? 'Nothing closed yet.' : 'Nothing open. Enjoy it.'}
-            </p>
-          ) : null}
-          {groups.map((g) => (
-            <LedgerSection
-              key={g.key}
-              label={<span className={g.tone}>{g.title}</span>}
-              count={
-                g.hint ? `${g.rows.length} · ${g.hint}` : `${g.rows.length}`
-              }
-            >
-              {g.rows.map((t, i) => (
-                <TaskItem
-                  key={t.id}
-                  task={t}
-                  figure={
-                    viewDone
-                      ? doneFigure(t.doneAt, today)
-                      : whenFigure(t.dueDate, today)
+        <>
+          <div
+            data-tasks-band
+            className="flex h-11 shrink-0 items-center gap-3 border-b border-rule bg-bone px-8"
+          >
+            {scope === null ? null : <ScopeChip name={scope.name} />}
+            <span className="flex-1" />
+            <Segmented
+              label="Tasks"
+              value={view}
+              onChange={(v) => {
+                clearFocus()
+                setView(v)
+              }}
+              options={[
+                { id: 'open', label: 'Open', count: data.open.length },
+                { id: 'done', label: 'Done', count: data.done.length },
+              ]}
+            />
+          </div>
+          <div className="flex flex-col gap-8 px-8 py-6">
+            {groups.length === 0 ? (
+              <ol className="border-t border-rule">
+                <li>{composer}</li>
+              </ol>
+            ) : null}
+            {groups.map((g, gi) => (
+              <section
+                key={g.key}
+                aria-label={g.label}
+                className="flex flex-col"
+              >
+                <LabelHead
+                  label={
+                    <span
+                      className={
+                        g.tone === 'bad' ? 'text-destructive' : undefined
+                      }
+                    >
+                      {g.label}
+                    </span>
                   }
-                  done={viewDone}
-                  focused={t.id === focusId}
-                  overdue={g.key === 'overdue'}
-                  leaving={leaving.has(t.id)}
-                  wash={washes(t.id)}
-                  last={i === g.rows.length - 1}
-                  onToggle={() => toggle(t.id, !viewDone)}
-                  onDelete={() => void remove(t)}
                 />
-              ))}
-            </LedgerSection>
-          ))}
-        </div>
+                <ol>
+                  {g.rows.map((t) => (
+                    <TaskItem
+                      key={t.id}
+                      task={t}
+                      meId={me.id}
+                      figure={
+                        viewDone
+                          ? t.doneAt
+                            ? formatWhen(t.doneAt, today)
+                            : ''
+                          : t.dueDate
+                            ? formatDue(t.dueDate, today)
+                            : ''
+                      }
+                      done={viewDone}
+                      focused={t.id === focusId}
+                      overdue={g.key === 'overdue'}
+                      leaving={leaving.has(t.id)}
+                      wash={washes(t.id)}
+                      menu={menuFor(t)}
+                      onToggle={() => toggle(t.id, !viewDone)}
+                    />
+                  ))}
+                  {gi === groups.length - 1 ? <li>{composer}</li> : null}
+                </ol>
+              </section>
+            ))}
+          </div>
+        </>
       )}
+      <EditWindow
+        editing={editing}
+        today={today}
+        me={me}
+        onClose={() => setEditing(null)}
+        onDue={(t, dueDate) =>
+          void edit(
+            () => setTaskDue({ data: { id: t.id, dueDate } }),
+            'Could not set the due date',
+          )
+        }
+        onAssign={(t, assigneeId) =>
+          void edit(
+            () => setTaskAssignee({ data: { id: t.id, assigneeId } }),
+            'Could not assign the task',
+          )
+        }
+      />
       {confirmDialog}
     </div>
   )
 }
 
-/** Header tabs: caps mono, pine rule under the current one (the view-tab
- *  treatment). Sits on the header's hairline. */
-function HeaderTab({
-  active,
-  onClick,
-  children,
+/**
+ * `on Flent ×` — the list is narrowed to one record's tasks; the × clears
+ * the param back to every task.
+ */
+function ScopeChip({ name }: { name: string }) {
+  return (
+    <span data-task-scope className="mention-chip cursor-default">
+      On {name}
+      <Link
+        to="/tasks"
+        search={{}}
+        aria-label={`Show every task, not just ${name}'s`}
+        className="focus-ring -mr-0.5 text-graphite hover:text-foreground"
+      >
+        <X className="size-3" strokeWidth={2} />
+      </Link>
+    </span>
+  )
+}
+
+/** A row's `Due date…` and `Assign…` windows. */
+function EditWindow({
+  editing,
+  today,
+  me,
+  onClose,
+  onDue,
+  onAssign,
 }: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
+  editing: Editing
+  today: string
+  me: { id: string; name: string }
+  onClose: () => void
+  onDue: (t: TaskRow, dueDate: string | null) => void
+  onAssign: (t: TaskRow, assigneeId: string) => void
 }) {
   return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        'focus-ring-inset flex h-9 items-center gap-1.5 border-b-2 px-3 label-caps transition-colors duration-150 ease-out-quart',
-        active
-          ? 'border-primary text-foreground'
-          : 'border-transparent text-graphite hover:text-foreground',
-      )}
+    <Dialog
+      open={editing !== null}
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
     >
-      {children}
-    </button>
+      <DialogContent size="s" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>
+            {editing?.kind === 'assign' ? 'Assign' : 'Due date'}
+          </DialogTitle>
+        </DialogHeader>
+        {editing === null ? null : editing.kind === 'due' ? (
+          <DueField
+            due={editing.task.dueDate}
+            today={today}
+            onPick={(d) => onDue(editing.task, d)}
+          />
+        ) : (
+          <MemberList
+            selected={editing.task.assigneeId}
+            me={me}
+            onPick={(u) => onAssign(editing.task, u.id)}
+          />
+        )}
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
 function TaskItem({
   task: t,
+  meId,
   done,
   focused,
   overdue,
   figure,
-  last,
   leaving,
   wash,
+  menu,
   onToggle,
-  onDelete,
 }: {
   task: TaskRow
+  /** The reader: their own name is never printed on a row. */
+  meId: string
   done?: boolean
   /** The `?task=` row: scrolls into view and takes focus on its checkbox. */
   focused?: boolean
   overdue?: boolean
   figure: string
-  last?: boolean | undefined
   /** Mid-exit: struck through and fading, write pending. */
   leaving?: boolean | undefined
-  /** Added by the composer band in this session — lands on the bone wash. */
+  /** Added by the composer in this session — lands on the bone wash. */
   wash?: boolean | undefined
+  menu: ReadonlyArray<MoreMenuEntry>
   onToggle: () => void
-  onDelete: () => void
 }) {
   const box = useRef<HTMLButtonElement>(null)
   // Focus lands on the row's own checkbox, so its `focus-ring` reticle is
@@ -420,14 +543,15 @@ function TaskItem({
   }, [focused])
 
   return (
-    // The row reads check → what → where → who → when; the date holds the
-    // right lane alone. A leaving row fades on opacity only — the list
-    // keeps its height until the write lands and the row unmounts.
-    <LedgerRow
-      last={last}
-      wash={wash}
+    // check → what → where → who, then the figure and the `···`. A leaving
+    // row fades on opacity only — the list keeps its height until the write
+    // lands and the row unmounts.
+    <li
+      data-row
+      data-task-row
       className={cn(
-        'group transition-opacity duration-150 ease-out-quart',
+        'flex h-ledger-row items-center gap-3 border-b border-rule px-3 transition-opacity duration-150 ease-out-quart',
+        wash === true && 'row-wash',
         leaving && 'pointer-events-none opacity-0',
       )}
     >
@@ -445,44 +569,37 @@ function TaskItem({
       >
         {t.content}
       </span>
-      {t.entities.map((e) => {
-        // One route table for the whole app (`recordPath`). A kind with no
-        // record page — a document, a term — stays plain text: a wrong-kind
-        // route is worse than no link.
-        const path = recordPath(e)
-        return path ? (
-          <Link
-            key={e.id}
-            to={path}
-            className="focus-ring shrink-0 truncate mono text-micro text-graphite hover:text-foreground"
-          >
-            {e.name}
-          </Link>
-        ) : (
-          <span
-            key={e.id}
-            className="shrink-0 truncate mono text-micro text-graphite"
-          >
-            {e.name}
-          </span>
-        )
-      })}
+      {t.entities.map((e) => (
+        <RecordName key={e.id} entity={e} />
+      ))}
       <span className="flex-1" />
-      <Button
-        size="icon-xs"
-        variant="ghost"
-        aria-label={`Delete task: ${t.content}`}
-        onClick={onDelete}
-        className="shrink-0 text-graphite opacity-0 group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100"
-      >
-        <Trash2 />
-      </Button>
-      <span className="shrink-0 mono text-micro text-graphite">
-        {t.assigneeName}
-      </span>
+      {t.assigneeId === meId ? null : (
+        <span className="shrink-0 truncate text-label text-graphite">
+          {t.assigneeName}
+        </span>
+      )}
       <LedgerFigure wide tone={overdue ? 'bad' : done ? 'muted' : undefined}>
         {figure}
       </LedgerFigure>
-    </LedgerRow>
+      <MoreMenu variant="row" label={t.content} items={menu} />
+    </li>
+  )
+}
+
+/**
+ * A linked record in graphite. One route table for the whole app
+ * (`recordPath`); a kind with no record page stays plain text.
+ */
+function RecordName({ entity: e }: { entity: TaskRow['entities'][number] }) {
+  const path = recordPath(e)
+  return path ? (
+    <Link
+      to={path}
+      className="focus-ring shrink-0 truncate text-ui text-graphite hover:text-foreground"
+    >
+      {e.name}
+    </Link>
+  ) : (
+    <span className="shrink-0 truncate text-ui text-graphite">{e.name}</span>
   )
 }

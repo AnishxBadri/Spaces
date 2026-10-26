@@ -304,7 +304,7 @@ export function DiscoveryGroup({ group }: { group: DiscoveryRow }) {
   }
 
   return (
-    <li className="flex flex-col border border-hairline bg-paper shadow-solid">
+    <li className="flex flex-col border border-hairline bg-paper">
       <DiscoveryHead group={group} />
       <ul className="flex flex-col">
         {group.suggestions.map((s) => {

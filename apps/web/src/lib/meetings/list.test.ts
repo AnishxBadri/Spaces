@@ -3,7 +3,6 @@ import { isoDay } from './day'
 import {
   byDay,
   dayHead,
-  filterCounts,
   filterMeetings,
   pastWhen,
   upcomingHorizon,
@@ -28,6 +27,7 @@ const aMeeting = (over: Partial<ListedMeeting> = {}): ListedMeeting => ({
   myRsvp: null,
   writeUp: 'none',
   via: null,
+  tasks: 0,
   ...over,
 })
 
@@ -63,16 +63,6 @@ describe('the filters', () => {
       past: [written],
     })
   })
-
-  it('counts each tab from the same narrowing', () => {
-    expect(filterCounts(list)).toEqual({
-      all: 6,
-      upcoming: 2,
-      past: 4,
-      unwritten: 1,
-      mine: 2,
-    })
-  })
 })
 
 describe('the upcoming horizon', () => {
@@ -105,9 +95,9 @@ describe('the day groups', () => {
 })
 
 describe('a day head', () => {
-  it('names today and tomorrow beside the date, and dates the rest', () => {
+  it('names today beside the date, and dates the rest', () => {
     expect(dayHead('2026-10-12', '2026-10-12')).toBe('TODAY · MON 12 OCT')
-    expect(dayHead('2026-10-13', '2026-10-12')).toBe('TOMORROW · TUE 13 OCT')
+    expect(dayHead('2026-10-13', '2026-10-12')).toBe('TUE 13 OCT')
     expect(dayHead('2026-10-20', '2026-10-12')).toBe('TUE 20 OCT')
   })
 })
@@ -123,13 +113,16 @@ describe('a past row', () => {
     )
   })
 
-  it('ends on its write-up state', () => {
-    expect(writeUpWord(aMeeting())).toBe('no write-up')
-    expect(writeUpWord(aMeeting({ writeUp: 'written' }))).toBe('written')
-    expect(writeUpWord(aMeeting({ writeUp: 'written', via: 'Granola' }))).toBe(
-      'via Granola',
+  it('ends on its write-up state, with the tasks the write-up proposed', () => {
+    expect(writeUpWord(aMeeting())).toBe('No write-up')
+    expect(writeUpWord(aMeeting({ writeUp: 'written' }))).toBe('Write-up')
+    expect(
+      writeUpWord(aMeeting({ writeUp: 'written', via: 'Granola', tasks: 2 })),
+    ).toBe('Write-up · 2 tasks')
+    expect(writeUpWord(aMeeting({ writeUp: 'written', tasks: 1 }))).toBe(
+      'Write-up · 1 task',
     )
-    expect(writeUpWord(aMeeting({ writeUp: 'private' }))).toBe('private')
-    expect(writeUpWord(aMeeting({ cancelled: true }))).toBe('cancelled')
+    expect(writeUpWord(aMeeting({ writeUp: 'private' }))).toBe('Private')
+    expect(writeUpWord(aMeeting({ cancelled: true }))).toBe('Cancelled')
   })
 })

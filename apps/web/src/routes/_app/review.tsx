@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { Check, Inbox, Search, X } from 'lucide-react'
+import { ArrowLeftRight, Check, Inbox, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -11,6 +11,7 @@ import { AskThreadGroup } from '#/components/inbox/ask-thread-group'
 import { PageHeader } from '#/components/page-header'
 import { PluginStatusSection } from '#/components/plugin-status-section'
 import { Button } from '#/components/ui/button'
+import { Tabs } from '#/components/ui/tabs'
 import {
   dismissDuplicate,
   listInbox,
@@ -135,9 +136,9 @@ function isSuggestionRow(row: QueueRow): row is SuggestionRow {
  * blank screen.
  */
 const RENDERERS: Record<InboxKind, InboxRenderer> = {
-  duplicate_candidate: ({ row, index, total }) =>
+  duplicate_candidate: ({ row }) =>
     isDuplicateCandidate(row) ? (
-      <PairCard pair={row} index={index} total={total} />
+      <PairCard pair={row} />
     ) : (
       <PayloadFallback row={row} />
     ),
@@ -177,7 +178,7 @@ export function rendererFor(kind: string): InboxRenderer {
 /** What an unknown kind renders as: the row, legible, and nothing thrown. */
 export function PayloadFallback({ row }: { row: QueueRow }): React.ReactNode {
   return (
-    <li className="flex flex-col border border-hairline bg-paper shadow-solid">
+    <li className="flex flex-col border border-hairline bg-paper">
       <div className="flex min-h-11 items-baseline gap-3 border-b border-hairline px-5 py-2.5">
         <h2 className="font-serif text-lg leading-5.5 font-semibold">
           Unrecognized item
@@ -191,14 +192,12 @@ export function PayloadFallback({ row }: { row: QueueRow }): React.ReactNode {
   )
 }
 
+/** Why the sweep paired them, in the card's mono line: `Same domain`. */
 function reasonLabel(pair: DuplicateCandidateRow): string {
-  if (pair.reason.shared) {
-    return `Both claim the same ${pair.reason.shared}: ${pair.reason.value}`
-  }
-  if (pair.reason.name_similarity) {
-    return `Names are ${Math.round(pair.score * 100)}% similar`
-  }
-  return 'Flagged as possibly the same'
+  if (pair.reason.shared) return `Same ${pair.reason.shared}`
+  if (pair.reason.name_similarity)
+    return `Names ${Math.round(pair.score * 100)}% alike`
+  return 'Possibly the same'
 }
 
 /**
@@ -236,55 +235,34 @@ function InboxPage() {
     key === 'all'
       ? rows.length
       : rows.filter((r) => laneOf(r.kind) === key).length
-  const suggestionCount = rows.reduce(
-    (n, r) =>
-      r.kind === 'suggestion' || r.kind === 'discovery'
-        ? n + r.suggestions.length
-        : r.kind === 'column_run' || r.kind === 'ask_cards'
-          ? n + r.cards.reduce((m, c) => m + c.suggestions.length, 0)
-          : n,
-    0,
-  )
+  // A narrowed queue says so as a chip on the bar, the axis beside the
+  // lanes; its × clears it.
+  const chips =
+    scope || filter ? (
+      <span className="ml-auto flex items-center gap-2">
+        {scope ? <ScopeChip name={scope.name} /> : null}
+        {filter ? <FilterChip filter={filter} /> : null}
+      </span>
+    ) : undefined
 
   return (
     <div className="flex min-h-full flex-col">
       <PageHeader
         title="Review"
-        description={
-          <>
-            {scope ? <ScopeChip name={scope.name} /> : null}
-            {filter ? <FilterChip filter={filter} /> : null}
-            <span>{rows.length} open</span>
-            {suggestionCount > 0 ? (
-              <span>
-                {suggestionCount} suggestion{suggestionCount === 1 ? '' : 's'}
-              </span>
-            ) : null}
-            <span>you make the call</span>
-            <span>rejected and dismissed never come back</span>
-          </>
-        }
         action={<ScanAction />}
         tabs={
-          rows.length > 0 ? (
-            <div
-              className="-mb-px flex items-end"
-              role="group"
-              aria-label="Lanes"
-            >
-              {LANES.map((l) => (
-                <HeaderTab
-                  key={l.key}
-                  active={lane === l.key}
-                  onClick={() => setLane(l.key)}
-                >
-                  {l.label}
-                  <span className="font-normal tracking-normal normal-case">
-                    {countOf(l.key)}
-                  </span>
-                </HeaderTab>
-              ))}
-            </div>
+          rows.length > 0 || chips !== undefined ? (
+            <Tabs
+              label="Lanes"
+              value={lane}
+              onValueChange={setLane}
+              items={LANES.map((l) => ({
+                id: l.key,
+                label: l.label,
+                count: countOf(l.key),
+              }))}
+              {...(chips === undefined ? {} : { trail: chips })}
+            />
           ) : undefined
         }
       />
@@ -335,7 +313,7 @@ function InboxPage() {
 function ScopeChip({ name }: { name: string }) {
   return (
     <span className="mention-chip cursor-default">
-      on {name}
+      On {name}
       <Link
         to="/review"
         search={{}}
@@ -354,12 +332,12 @@ function ScopeChip({ name }: { name: string }) {
  */
 function FilterChip({ filter }: { filter: InboxFilterLabels }) {
   const words = [
-    filter.source === null ? null : `via ${filter.source}`,
-    filter.space === null ? null : `in ${filter.space}`,
+    filter.source === null ? null : `Via ${filter.source}`,
+    filter.space === null ? null : `In ${filter.space}`,
   ]
     .filter((w) => w !== null)
     .join(' · ')
-  const name = words === '' ? 'filtered' : words
+  const name = words === '' ? 'Filtered' : words
   return (
     <span className="mention-chip cursor-default">
       {name}
@@ -372,33 +350,6 @@ function FilterChip({ filter }: { filter: InboxFilterLabels }) {
         <X className="size-3" strokeWidth={2} />
       </Link>
     </span>
-  )
-}
-
-/** The view-tab treatment of `tasks.tsx`, copied rather than reinvented. */
-function HeaderTab({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        'focus-ring-inset flex h-9 items-center gap-1.5 border-b-2 px-3 label-caps transition-colors duration-150 ease-out-quart',
-        active
-          ? 'border-primary text-foreground'
-          : 'border-transparent text-graphite hover:text-foreground',
-      )}
-    >
-      {children}
-    </button>
   )
 }
 
@@ -427,7 +378,6 @@ function ScanAction() {
 
   return (
     <Button variant="outline" pending={pending} onClick={() => void scan()}>
-      <Search className="size-3" strokeWidth={2} />
       Scan for duplicates
     </Button>
   )
@@ -438,25 +388,100 @@ export function InboxItem({ row, index, total }: RowProps): React.ReactNode {
   return rendererFor(row.kind)({ row, index, total })
 }
 
-function PairCard({
-  pair,
-  index,
-  total,
+/** A row of the pair card: its label, and how each side reads there. */
+type PairField = {
+  label: string
+  value: (side: InboxSide) => React.ReactNode
+  /** Whether a side holds anything here; a row empty on both sides hides. */
+  has: (side: InboxSide) => boolean
+  mono?: boolean
+}
+
+const pairFields = (today: string): ReadonlyArray<PairField> => [
+  { label: 'Name', value: (side) => sideName(side), has: () => true },
+  {
+    label: 'Domain',
+    mono: true,
+    value: (side) => sideDomain(side),
+    has: (side) => sideDomain(side) !== null,
+  },
+  {
+    label: 'Also seen as',
+    value: (side) => side.otherNames.join(' · '),
+    has: (side) => side.otherNames.length > 0,
+  },
+  {
+    label: 'Spaces',
+    value: (side) => side.spaces.join(' · '),
+    has: (side) => side.spaces.length > 0,
+  },
+  {
+    label: 'Mentions',
+    mono: true,
+    value: (side) => side.mentionCount,
+    has: (side) => side.mentionCount > 0,
+  },
+  {
+    label: 'Added',
+    mono: true,
+    value: (side) => `${formatDay(side.createdAt, today)} · ${side.label}`,
+    has: () => true,
+  },
+]
+
+/** A side's head cell: `☑ Keep · A` or `☐ Merge in · B`. */
+function SideHead({
+  letter,
+  keep,
+  onKeep,
 }: {
-  pair: DuplicateCandidateRow
-  index: number
-  total: number
+  letter: 'A' | 'B'
+  keep: boolean
+  onKeep: () => void
 }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={keep}
+      onClick={onKeep}
+      className={cn(
+        'focus-ring-inset flex min-w-0 flex-1 items-center gap-2 px-4 text-left transition-colors duration-150 ease-out-quart',
+        keep ? 'bg-selected' : 'hover:bg-bone',
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          'flex size-3.5 shrink-0 items-center justify-center border border-hairline',
+          keep ? 'bg-primary text-paper' : 'bg-paper',
+        )}
+      >
+        {keep ? <Check className="size-2.5" strokeWidth={2.5} /> : null}
+      </span>
+      <span className="text-label text-foreground">
+        {keep ? 'Keep' : 'Merge in'} · {letter}
+      </span>
+    </button>
+  )
+}
+
+/**
+ * Two records that may be one: `A ⇄ B` and why, a field grid with the
+ * keeper ticked (the swap between the heads exchanges it), and a bone foot
+ * whose note says what cannot be undone.
+ */
+function PairCard({ pair }: { pair: DuplicateCandidateRow }) {
   const router = useRouter()
   const [pending, setPending] = useState(false)
   // The richer record is A: the left column, pre-ticked, because a merge has
   // no unmerge. A tie leaves the pair as it came. (defaultKeeper)
   const [left, right] =
     defaultKeeper(pair.a, pair.b) === 'a' ? [pair.a, pair.b] : [pair.b, pair.a]
-  // Which side stays: A by default; the column head toggles it.
+  // Which side stays: A by default; the swap exchanges it.
   const [keep, setKeep] = useState<'a' | 'b'>('a')
   const winner = keep === 'a' ? left : right
   const loser = keep === 'a' ? right : left
+  const [kept, merged] = keep === 'a' ? ['A', 'B'] : ['B', 'A']
 
   async function act(fn: () => Promise<unknown>, message: string) {
     setPending(true)
@@ -472,109 +497,77 @@ function PairCard({
   }
 
   const { today } = useClock()
-  const rows: Array<{
-    label: string
-    render: (side: InboxSide) => React.ReactNode
-    mono?: boolean
-  }> = [
-    { label: 'Name', render: (side) => sideName(side) },
-    {
-      label: 'Domain',
-      mono: true,
-      render: (side) => sideDomain(side),
-    },
-    {
-      label: 'Also seen as',
-      render: (side) =>
-        side.otherNames.length > 0 ? side.otherNames.join(' · ') : '—',
-    },
-    {
-      label: 'Spaces',
-      render: (side) =>
-        side.spaces.length > 0 ? side.spaces.join(' · ') : '—',
-    },
-    {
-      label: 'Attached',
-      mono: true,
-      render: (side) =>
-        `${side.mentionCount} mention${side.mentionCount === 1 ? '' : 's'} · added ${formatDay(side.createdAt, today)} · ${side.label}`,
-    },
-  ]
+  const fields = pairFields(today).filter((f) => f.has(left) || f.has(right))
 
   return (
-    <li className="flex flex-col border border-hairline bg-paper shadow-solid">
-      <div className="flex min-h-11 items-baseline gap-3 border-b border-hairline px-5 py-2.5">
-        <h2 className="font-serif text-lg leading-5.5 font-semibold">
-          {/* The noun is the object registry's `singular`, verbatim and
-              cased as the operator wrote it — an object named "LP" must not
-              read "Same lp?". Research kinds have no object row. */}
-          Same {left.objectSingular ?? 'record'}?
+    <li
+      data-pair-card
+      className="flex flex-col border border-hairline bg-paper"
+    >
+      <div className="flex min-h-11 flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-hairline px-5 py-2.5">
+        <h2 className="min-w-0 truncate font-serif text-lg leading-5.5 font-semibold">
+          {left.name} ⇄ {right.name}
         </h2>
-        <span className="mono text-micro text-graphite">
-          pair {index + 1} of {total} · {reasonLabel(pair).toLowerCase()}
+        <span data-pair-meta className="mono text-micro text-graphite">
+          {reasonLabel(pair)} · {formatDay(pair.latestAt, today)}
         </span>
       </div>
       <div className="flex flex-col overflow-x-auto">
         <div className="flex h-10 border-b border-hairline">
-          <div className="flex w-35 shrink-0 items-center px-5 field-label text-graphite">
-            field
+          <div className="flex w-35 shrink-0 items-center px-5 text-label text-graphite">
+            Field
           </div>
-          {(['a', 'b'] as const).map((k) => {
-            const on = keep === k
-            return (
-              <button
-                key={k}
-                type="button"
-                aria-pressed={on}
-                onClick={() => setKeep(k)}
-                className={cn(
-                  'focus-ring-inset flex min-w-0 flex-1 items-center gap-2 border-l border-rule px-4 text-left transition-colors',
-                  on ? 'bg-selected' : 'hover:bg-bone',
-                )}
-              >
-                <span
-                  aria-hidden
-                  className={cn(
-                    'flex size-3.5 shrink-0 items-center justify-center border border-hairline',
-                    on ? 'bg-primary text-paper' : 'bg-paper',
-                  )}
-                >
-                  {on ? <Check className="size-2.5" strokeWidth={2.5} /> : null}
-                </span>
-                <span className="field-label text-foreground">
-                  {on ? 'Keep' : 'Merge in'} · {k.toUpperCase()}
-                </span>
-              </button>
-            )
-          })}
+          <SideHead
+            letter="A"
+            keep={keep === 'a'}
+            onKeep={() => setKeep('a')}
+          />
+          <button
+            type="button"
+            aria-label="Swap which record stays"
+            title="Swap which record stays"
+            onClick={() => setKeep((k) => (k === 'a' ? 'b' : 'a'))}
+            className="focus-ring-inset flex w-10 shrink-0 items-center justify-center border-x border-rule text-graphite transition-colors duration-150 ease-out-quart hover:bg-bone hover:text-foreground"
+          >
+            <ArrowLeftRight className="size-3.5" strokeWidth={1.75} />
+          </button>
+          <SideHead
+            letter="B"
+            keep={keep === 'b'}
+            onKeep={() => setKeep('b')}
+          />
         </div>
-        {rows.map((row) => (
-          <div key={row.label} className="flex min-h-9 border-b border-rule">
-            <div className="flex w-35 shrink-0 items-center px-5 field-label text-graphite">
+        {fields.map((row) => (
+          <div
+            key={row.label}
+            data-pair-field
+            className="flex min-h-9 border-b border-rule"
+          >
+            <div className="flex w-35 shrink-0 items-center px-5 text-label text-graphite">
               {row.label}
             </div>
-            {[left, right].map((side, si) => {
-              const isWinner = side.id === winner.id
-              return (
-                <div
-                  key={side.id}
-                  className={cn(
-                    'flex min-w-0 flex-1 items-center border-l border-rule px-4 py-2',
-                    row.mono ? 'mono text-label' : 'text-ui',
-                    isWinner ? 'text-foreground' : 'text-graphite',
-                    si === 0 && row.label === 'Name' && 'font-medium',
-                  )}
-                >
-                  <span className="min-w-0 truncate">{row.render(side)}</span>
-                </div>
-              )
-            })}
+            {[left, right].map((side, si) => (
+              <div
+                key={side.id}
+                className={cn(
+                  'flex min-w-0 flex-1 items-center px-4 py-2',
+                  si === 1 && 'border-l border-rule pl-14',
+                  row.mono ? 'mono text-label' : 'text-ui',
+                  side.id === winner.id ? 'text-foreground' : 'text-graphite',
+                  row.label === 'Name' && 'font-medium',
+                )}
+              >
+                <span className="min-w-0 truncate">
+                  {row.has(side) ? row.value(side) : '—'}
+                </span>
+              </div>
+            ))}
           </div>
         ))}
       </div>
       <div className="flex min-h-13 flex-wrap items-center gap-x-4 gap-y-2 border-t border-rule bg-bone px-5 py-2.5">
-        <span className="mono text-micro text-graphite">
-          a snapshot of {keep === 'a' ? 'B' : 'A'} is kept · there is no unmerge
+        <span data-pair-note className="mono text-micro text-graphite">
+          No unmerge · a snapshot of {merged} is kept
         </span>
         <span className="flex-1" />
         <Button
@@ -587,8 +580,7 @@ function PairCard({
             )
           }
         >
-          <X className="size-3" strokeWidth={2} />
-          Not the same
+          Dismiss
         </Button>
         <Button
           disabled={pending}
@@ -602,7 +594,7 @@ function PairCard({
             )
           }
         >
-          Merge {keep === 'a' ? 'B into A' : 'A into B'}
+          Merge {merged} into {kept}
         </Button>
       </div>
     </li>
@@ -616,9 +608,9 @@ function PairCard({
  *   like the alias lane, so both columns print the colliding domain.
  * - Core pairs only take the first branch: a company's domain *is* an alias.
  */
-function sideDomain(side: InboxSide): string {
+function sideDomain(side: InboxSide): string | null {
   if (side.domains.length > 0) return side.domains.join(' · ')
-  return side.identityDomain ?? '—'
+  return side.identityDomain
 }
 
 /**
