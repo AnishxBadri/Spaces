@@ -18,6 +18,8 @@
  *   only while no surface writes a colour value down. `bg-[var(--token)]` passes.
  * - Arbitrary `shadow-[…]` / `shadow-(…)`: elevation is `shadow-dither` or
  *   `shadow-solid`, picked by the primitive from the sheet's kind.
+ * - `lowercase`: nothing starts lowercase (the Casing Rule), so no label,
+ *   column head or property label is transformed into it.
  */
 
 /**
@@ -50,6 +52,13 @@ const BANS = [
   // Type scale — named steps only.
   { re: /^text-xs$/, use: 'text-label' },
   { re: /^text-sm$/, use: 'text-ui' },
+
+  // Casing — nothing starts lowercase. A label is sentence case in its
+  // source string; a mono data word keeps the case the instrument wrote.
+  {
+    re: /^lowercase$/,
+    use: 'the string in sentence case, untransformed: text-label text-graphite for a label, label-caps for a kind or band',
+  },
 
   // Radius — Instrument has exactly two (2px, or square).
   {

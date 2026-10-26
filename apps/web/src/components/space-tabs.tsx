@@ -127,7 +127,6 @@ export function SpaceTabs({
   return (
     <Tabs
       label={spc.name}
-      size="head"
       items={items}
       value={tab}
       onValueChange={onTabChange}

@@ -1,7 +1,8 @@
 import { Link } from '@tanstack/react-router'
+import { createContext, useContext } from 'react'
 import type { ComponentProps, ReactNode } from 'react'
 import { HeadActions, HeadBar, useHeadFold } from '#/components/head-fold'
-import { SectionHead } from '#/components/ledger-section'
+import { EmptyRow, SectionHead } from '#/components/ledger-section'
 import { Stamp } from '#/components/ui/stamp'
 import type { StampProps } from '#/components/ui/stamp'
 import { cn } from '#/lib/utils'
@@ -334,13 +335,14 @@ export function RecordSection({
 }
 
 /**
- * The property grid at the head of the details column: one label–value row
- * per attribute on rules, the label in lowercase mono, the value lane
- * left-aligned. Cells are `PropertyCell`s (RailField renders one).
+ * The property grid at the head of the details column: a box on a rule, one
+ * label–value row per attribute with a rule between — a bone label cell in
+ * sans graphite beside a paper value cell. Cells are `PropertyCell`s
+ * (RailField renders one).
  */
 export function PropertyGrid({ children }: { children: ReactNode }) {
   return (
-    <div data-property-grid className="flex flex-col border-b border-hairline">
+    <div data-property-grid className="flex flex-col border border-rule">
       {children}
     </div>
   )
@@ -393,46 +395,70 @@ export function PropertyCell({
   return (
     <div
       className={cn(
-        'relative flex min-h-[2.125rem] flex-col justify-center border-b border-rule px-6 py-1 last:border-b-0',
+        'relative flex min-w-0 items-stretch border-b border-rule last:border-b-0',
         className,
       )}
     >
       {reject === 'rest' ? null : (
         <span aria-hidden className={rejectPaneClass(reject)} />
       )}
-      {/* Both lanes are at least the 32px value box and centre on it, so a
-          value that grows (wrapped chips) keeps its label on the first line.
-          128px holds the longest system label (`business model` + the edit
-          pencil); a longer one wraps rather than truncates. */}
-      <div className="flex min-w-0 items-start gap-3">
-        <div
-          data-property-label
-          className="flex min-h-8 w-32 shrink-0 items-center gap-1 mono text-micro break-words text-graphite lowercase"
-        >
-          {label}
-        </div>
-        <div className="flex min-h-8 min-w-0 flex-1 flex-col justify-center">
-          {children}
-        </div>
+      {/* The label cell runs the row's full height, so a value that grows
+          (wrapped chips) keeps its label on the first line; a long label
+          wraps rather than truncates. */}
+      <div
+        data-property-label
+        className="flex w-28 shrink-0 items-start gap-1 border-r border-rule bg-bone px-2.5 py-2 text-label break-words text-graphite"
+      >
+        {label}
       </div>
-      {below}
+      {/* The field editor is its own 32px box with an 8px inset, so the
+          cell adds 2px: its text lands on the label's 10px. */}
+      <div
+        data-property-value
+        className="flex min-h-8 min-w-0 flex-1 flex-col justify-center bg-paper px-0.5 text-ui"
+      >
+        {children}
+        {below ? <div className="px-2 pb-1">{below}</div> : null}
+      </div>
     </div>
   )
 }
 
-/** A rail section on bone: sentence-case title at the title step, mono
- *  meta right, rows on rules. The rail is already bone, so no band. */
+/** The name of the empty `RailSection` a composer row sits in, if any. */
+const EmptySection = createContext<string | null>(null)
+
+/**
+ * A rail section on bone: sentence-case title at the title step, mono
+ * meta right, rows on rules. The rail is already bone, so no band.
+ * - `empty`: the section holds nothing, so it is one `Name +` row — the
+ *   head goes and the section's `DetailsAddRow` draws as its `EmptyRow`.
+ */
 export function RailSection({
   label,
   meta,
+  empty = false,
   children,
   className,
 }: {
-  label: ReactNode
+  label: string
   meta?: ReactNode
+  empty?: boolean | undefined
   children: ReactNode
   className?: string
 }) {
+  if (empty)
+    return (
+      <section
+        aria-label={label}
+        className={cn(
+          // The row's own 12px inset lands its name on the titles' 24px.
+          'flex flex-col border-b border-hairline px-3 last:border-b-0',
+          className,
+        )}
+      >
+        <EmptySection.Provider value={label}>{children}</EmptySection.Provider>
+      </section>
+    )
   return (
     <section
       className={cn(
@@ -455,7 +481,7 @@ export function RailSection({
   )
 }
 
-/** A 36px readout row in the rail: lowercase mono label left, mono value
+/** A 36px readout row in the rail: sans graphite label left, mono value
  *  right. */
 export function RailRow({
   label,
@@ -473,7 +499,7 @@ export function RailRow({
         className,
       )}
     >
-      <span className="field-label text-graphite">{label}</span>
+      <span className="text-label text-graphite">{label}</span>
       <span className="min-w-0 truncate mono text-ui font-medium">{value}</span>
     </div>
   )
@@ -497,13 +523,15 @@ export function RailItem({
 /**
  * The composer row a details section ends on: `+ Add …` in graphite. A
  * plain button that spreads its props, so a dialog trigger can hand it its
- * own.
+ * own. In an empty section it is that section's `EmptyRow` instead.
  */
 export function DetailsAddRow({
   children,
   className,
   ...props
 }: ComponentProps<'button'>) {
+  const empty = useContext(EmptySection)
+  if (empty !== null) return <EmptyRow {...props} name={empty} />
   return (
     <button
       type="button"
@@ -519,11 +547,6 @@ export function DetailsAddRow({
       <span className="min-w-0 flex-1 truncate">{children}</span>
     </button>
   )
-}
-
-/** Quiet line for an empty rail section. */
-export function RailEmpty({ children }: { children: ReactNode }) {
-  return <p className="py-1 text-label text-graphite">{children}</p>
 }
 
 /**

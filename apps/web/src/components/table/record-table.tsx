@@ -364,6 +364,20 @@ function SelectCell({
   )
 }
 
+/** The head menu's affordance, shown on hover, focus or while open. */
+function SortChevron({ className }: { className: string }) {
+  return (
+    <ChevronsUpDown
+      className={cn(
+        'size-3 shrink-0 opacity-0 transition-opacity duration-150 ease-out-quart group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100 group-data-[state=open]/sort:opacity-100',
+        className,
+      )}
+      strokeWidth={2}
+      aria-hidden
+    />
+  )
+}
+
 function HeaderCell<T>({
   header,
   table,
@@ -406,7 +420,7 @@ function HeaderCell<T>({
             : 'none'
       }
       className={cn(
-        'relative h-8 px-2 align-middle field-label text-graphite',
+        'relative h-8 px-2 align-middle text-label font-normal text-graphite',
         numeric ? 'text-right' : 'text-left',
         sticky && 'sticky z-20 bg-paper',
         sticky && stickyLeft,
@@ -414,32 +428,28 @@ function HeaderCell<T>({
     >
       {column.getCanSort() || column.getCanHide() || actions.length > 0 ? (
         // Header cells are buttons: the menu carries sort both ways and hide.
-        // The sort direction reads as a mono arrow after the label; the
+        // The sorted head is ink with its arrow after the label; the
         // chevron only appears on hover, so a resting header stays quiet.
         <DropdownMenu>
           <DropdownMenuTrigger
             title={`${title} column`}
             className={cn(
-              // `lowercase` again: a button resets the th's text-transform.
-              'group/sort focus-ring-inset -mx-2 flex h-8 w-[calc(100%+1rem)] items-center gap-1.5 truncate px-2 lowercase transition-colors duration-150 ease-out-quart hover:bg-bone data-[state=open]:bg-bone',
-              // A figures column reads from the right, label last.
-              numeric ? 'flex-row-reverse text-right' : 'text-left',
+              'group/sort focus-ring-inset -mx-2 flex h-8 w-[calc(100%+1rem)] items-center gap-1.5 truncate px-2 transition-colors duration-150 ease-out-quart hover:bg-bone data-[state=open]:bg-bone',
+              numeric ? 'text-right' : 'text-left',
               sorted && 'text-foreground',
             )}
           >
+            {/* A figures column reads from the right: the chevron leads. */}
+            {numeric ? <SortChevron className="mr-auto" /> : null}
             <span className="truncate">
               {flexRender(column.columnDef.header, header.getContext())}
             </span>
             {sorted === 'asc' ? (
-              <span className="shrink-0 mono text-micro">↑</span>
+              <span className="shrink-0">↑</span>
             ) : sorted === 'desc' ? (
-              <span className="shrink-0 mono text-micro">↓</span>
+              <span className="shrink-0">↓</span>
             ) : null}
-            <ChevronsUpDown
-              className="ml-auto size-3 shrink-0 opacity-0 transition-opacity duration-150 ease-out-quart group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100 group-data-[state=open]/sort:opacity-100"
-              strokeWidth={2}
-              aria-hidden
-            />
+            {numeric ? null : <SortChevron className="ml-auto" />}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-50">
             {column.getCanSort() ? (
@@ -686,7 +696,6 @@ export function TableToolbar<T, TKey extends string>({
   return (
     <Tabs
       label={label}
-      size="head"
       items={tabs}
       value={value}
       onValueChange={onValueChange}

@@ -11,8 +11,8 @@ import {
 } from '#/components/settings/settings-section'
 import { LedgerRow } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
-import { Radio } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
+import { Segmented } from '#/components/ui/segmented'
 import { Select } from '#/components/ui/select'
 import type { SelectItem } from '#/components/ui/select'
 import { AI_SENSITIVITIES, MODELS_GRID_LANES } from '#/lib/ai/lanes'
@@ -95,10 +95,10 @@ const SENSITIVITY_CHOICE: Record<
 }
 
 /**
- * Sensitivity — the workspace floor (`sensitivity_default`), as radios. It
- * can only raise a record's sensitivity: Sensitive sends every call to the
- * local lanes; Normal leaves each record's own flag and its spaces to
- * decide. A choice saves at once.
+ * Sensitivity — the workspace floor (`sensitivity_default`), a `Segmented`
+ * with the chosen floor's line under it. It can only raise a record's
+ * sensitivity: Sensitive sends every call to the local lanes; Normal leaves
+ * each record's own flag and its spaces to decide. A choice saves at once.
  */
 function SensitivityGroup({ stored }: { stored: AiSensitivity }) {
   const router = useRouter()
@@ -129,39 +129,23 @@ function SensitivityGroup({ stored }: { stored: AiSensitivity }) {
         action="a record can be raised, never lowered"
       />
       <div className="flex items-start gap-6 border-b border-rule py-3">
-        <span
-          id="sensitivity-floor"
-          className="w-[13.125rem] shrink-0 text-ui font-medium"
-        >
+        <span className="w-[13.125rem] shrink-0 text-ui font-medium">
           Treat every record as
         </span>
-        <div
-          role="radiogroup"
-          aria-labelledby="sensitivity-floor"
-          className="flex flex-col gap-2.5"
-        >
-          {AI_SENSITIVITIES.map((s) => {
-            const id = `sensitivity-${s}`
-            return (
-              <div key={s} className="flex items-start gap-2.5">
-                <Radio
-                  id={id}
-                  checked={stored === s}
-                  disabled={pending}
-                  onSelect={() => void choose(s)}
-                  className="mt-[0.1875rem]"
-                />
-                <label htmlFor={id} className="flex flex-col">
-                  <span className="text-ui text-foreground">
-                    {SENSITIVITY_CHOICE[s].label}
-                  </span>
-                  <span className="text-label text-graphite">
-                    {SENSITIVITY_CHOICE[s].line}
-                  </span>
-                </label>
-              </div>
-            )
-          })}
+        <div className="flex flex-col gap-1.5">
+          <Segmented
+            label="Treat every record as"
+            value={stored}
+            disabled={pending}
+            options={AI_SENSITIVITIES.map((s) => ({
+              id: s,
+              label: SENSITIVITY_CHOICE[s].label,
+            }))}
+            onChange={(s) => void choose(s)}
+          />
+          <span className="text-label text-graphite">
+            {SENSITIVITY_CHOICE[stored].line}
+          </span>
         </div>
       </div>
     </div>

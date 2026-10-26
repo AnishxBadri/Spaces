@@ -3,7 +3,6 @@ import type { ReactNode } from 'react'
 import { Highlighted } from '#/components/command-palette'
 import {
   InitialsMark,
-  RailEmpty,
   RailItem,
   RailSection,
   RecordSection,
@@ -130,7 +129,9 @@ function MentionItem({ row }: { row: MentionRow }) {
 
 /**
  * Companies reached through the mentions — filed on, or named by, an item
- * that mentions the term. Ranked by how many items reach each one.
+ * that mentions the term. Ranked by how many items reach each one. Absent
+ * when none is: nothing adds a company here, so an empty row would offer a
+ * way in that does not exist.
  */
 export function CompaniesReached({
   rows,
@@ -139,34 +140,31 @@ export function CompaniesReached({
   rows: Array<CompanyRow>
   total: number
 }) {
+  if (rows.length === 0) return null
   return (
     <RailSection
       label="Companies reached"
       meta={rows.length < total ? `${rows.length} of ${total}` : `${total}`}
     >
-      {rows.length === 0 ? (
-        <RailEmpty>No company yet.</RailEmpty>
-      ) : (
-        rows.map((c) => (
-          <RailItem key={c.id}>
-            <InitialsMark name={c.name} />
-            <Link
-              to="/companies/$companyId"
-              params={{ companyId: c.id }}
-              className="focus-ring min-w-0 truncate hover:underline"
-            >
-              {c.name}
-            </Link>
-            <span className="flex-1" />
-            <span
-              className="tabular shrink-0 mono text-micro text-graphite"
-              title={`${plural(c.reach, 'mention reaches', 'mentions reach')} it`}
-            >
-              {c.reach}
-            </span>
-          </RailItem>
-        ))
-      )}
+      {rows.map((c) => (
+        <RailItem key={c.id}>
+          <InitialsMark name={c.name} />
+          <Link
+            to="/companies/$companyId"
+            params={{ companyId: c.id }}
+            className="focus-ring min-w-0 truncate hover:underline"
+          >
+            {c.name}
+          </Link>
+          <span className="flex-1" />
+          <span
+            className="tabular shrink-0 mono text-micro text-graphite"
+            title={`${plural(c.reach, 'mention reaches', 'mentions reach')} it`}
+          >
+            {c.reach}
+          </span>
+        </RailItem>
+      ))}
     </RailSection>
   )
 }

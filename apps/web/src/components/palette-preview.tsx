@@ -266,9 +266,7 @@ function RecordPane({
               data-field={f.slug}
               className="grid min-h-7.5 grid-cols-[7.5rem_1fr] items-center gap-3 border-b border-rule"
             >
-              <dt className="truncate mono text-micro text-graphite lowercase">
-                {f.label}
-              </dt>
+              <dt className="truncate text-label text-graphite">{f.label}</dt>
               <dd className="min-w-0 truncate text-ui">{f.value}</dd>
             </div>
           ))}

@@ -366,7 +366,6 @@ export function DraftComposer({
             value={draft.mode}
             onValueChange={pickMode}
             label="Reply mode"
-            size="head"
             trail={
               <span className="ml-auto flex items-center gap-1">
                 {saved === null ? null : (

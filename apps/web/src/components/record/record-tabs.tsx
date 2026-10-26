@@ -42,7 +42,6 @@ export function RecordTabs({
   return (
     <Tabs
       label={label}
-      size="head"
       pinned
       items={items}
       value={tab}

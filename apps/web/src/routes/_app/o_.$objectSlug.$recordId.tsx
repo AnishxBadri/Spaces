@@ -12,7 +12,6 @@ import { AttributeDialog } from '#/components/attributes/attribute-dialog'
 import { RailField } from '#/components/attributes/rail-field'
 import { AiCellsProvider } from '#/components/attributes/ai-cell'
 import {
-  PropertyCell,
   PropertyGrid,
   RailItem,
   RailSection,
@@ -298,21 +297,17 @@ function ObjectRecordPage() {
                       }}
                     />
                   )}
+                  add={(trigger) => (
+                    <AttributeDialog
+                      mode="create"
+                      objectId={record.object.id}
+                      objectLabel={record.object.singular}
+                      objectPlural={record.object.plural}
+                      onSaved={() => router.invalidate()}
+                      trigger={trigger}
+                    />
+                  )}
                 />
-                <PropertyCell label="">
-                  <AttributeDialog
-                    mode="create"
-                    objectId={record.object.id}
-                    objectLabel={record.object.singular}
-                    objectPlural={record.object.plural}
-                    onSaved={() => router.invalidate()}
-                    trigger={
-                      <button className="focus-ring self-start mono text-micro text-graphite hover:text-foreground">
-                        + add attribute
-                      </button>
-                    }
-                  />
-                </PropertyCell>
               </PropertyGrid>
             </AiCellsProvider>
 

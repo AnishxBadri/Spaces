@@ -140,14 +140,12 @@ export function LogInteractionDialog({
             }
           }}
         >
-          {/* Segmented type: ink for the chosen one, a digit in each. */}
           <Segmented
-            size="sm"
             label="Interaction kind"
             value={kind}
             options={[
-              { id: 'call', label: 'Call', hint: '1' },
-              { id: 'meeting', label: 'Meeting', hint: '2' },
+              { id: 'call', label: 'Call' },
+              { id: 'meeting', label: 'Meeting' },
             ]}
             onChange={setKind}
           />

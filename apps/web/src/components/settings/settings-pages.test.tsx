@@ -1320,7 +1320,7 @@ describe('the accounts pages, by the job an account does', () => {
 })
 
 describe('the AI pages, as D81 splits them', () => {
-  it('Models opens on the sensitivity floor as radios, and choosing Sensitive writes it at once', async () => {
+  it('Models opens on the sensitivity floor as a Segmented, and choosing Sensitive writes it at once', async () => {
     await mount('/settings/models')
     const heads = Array.from(document.querySelectorAll('h3')).map((h) =>
       h.textContent.trim(),
@@ -1332,12 +1332,14 @@ describe('the AI pages, as D81 splits them', () => {
     const radios = Array.from(
       document.querySelectorAll('[role="radiogroup"] button[role="radio"]'),
     )
+    expect(radios.map((r) => r.textContent)).toEqual(['Normal', 'Sensitive'])
     expect(radios.map((r) => r.getAttribute('aria-checked'))).toEqual([
       'true',
       'false',
     ])
+    // The chosen floor's line, and only that one.
     expect(document.body.textContent).toContain('Any routed model may read it.')
-    expect(document.body.textContent).toContain(
+    expect(document.body.textContent).not.toContain(
       'Only local models read it, and no plugin sees it.',
     )
     await click(radios.at(1))

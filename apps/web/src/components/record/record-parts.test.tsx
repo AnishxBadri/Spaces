@@ -21,8 +21,8 @@ import { RecordTabs } from './record-tabs.tsx'
 /**
  * A record's body: the 320px details column on bone left —
  * the property grid as label–value rows, then the relationship sections —
- * and the tab head over one view right, every tab counted and an empty one
- * grey at 0.
+ * and the tab head over one view right, every tab that holds something
+ * counted and an empty one graphite with none.
  */
 
 const win = new Window()
@@ -89,10 +89,13 @@ describe('the details slot', () => {
     expect(details?.querySelector('[role="tablist"]')).toBeNull()
   })
 
-  it('holds the property grid as single label–value rows, labels in lowercase mono', () => {
+  it('holds the property grid as a ruled box of label–value rows, labels in sans graphite on bone', () => {
     const doc = record()
     const grid = doc.querySelector('[data-property-grid]')
     expect(classes(grid)).not.toContain('md:grid-cols-2')
+    expect(classes(grid)).toEqual(
+      expect.arrayContaining(['border', 'border-rule']),
+    )
     const labels = Array.from(doc.querySelectorAll('[data-property-label]'))
     expect(labels.map((l) => l.textContent)).toEqual([
       'Founded',
@@ -100,17 +103,47 @@ describe('the details slot', () => {
     ])
     for (const l of labels) {
       expect(classes(l)).toEqual(
-        expect.arrayContaining(['mono', 'lowercase', 'text-graphite']),
+        expect.arrayContaining([
+          'w-28',
+          'bg-bone',
+          'border-r',
+          'border-rule',
+          'px-2.5',
+          'py-2',
+          'text-label',
+          'text-graphite',
+        ]),
       )
+      expect(classes(l)).not.toContain('mono')
+      expect(classes(l)).not.toContain('lowercase')
       expect(classes(l)).not.toContain('field-label')
-      // The lane holds `business model` whole; a longer name wraps, never
-      // truncates.
-      expect(classes(l)).toContain('w-32')
+      // A long name wraps, never truncates.
       expect(l.outerHTML).not.toContain('truncate')
-      // The value follows in the same row, left-aligned.
+      // The value follows in the same row on paper, left-aligned.
       const value = l.nextElementSibling
+      expect(classes(value)).toEqual(
+        expect.arrayContaining(['bg-paper', 'text-ui']),
+      )
       expect(classes(value)).not.toContain('text-right')
+      // Rows are separated by a rule.
+      expect(classes(l.parentElement)).toEqual(
+        expect.arrayContaining(['border-b', 'border-rule']),
+      )
     }
+  })
+
+  it('draws an empty rail section as its one Name + row, no head and no sentence', () => {
+    const doc = render(
+      <RailSection label="Spaces" meta="0" empty>
+        <DetailsAddRow>Add to a space…</DetailsAddRow>
+      </RailSection>,
+    )
+    const section = doc.querySelector('section')
+    expect(section?.getAttribute('aria-label')).toBe('Spaces')
+    expect(section?.querySelector('h2')).toBeNull()
+    const row = section?.querySelector('[data-empty-row]')
+    expect(row?.textContent).toBe('Spaces+')
+    expect(section?.textContent).toBe('Spaces+')
   })
 
   it('ends a relationship section on its + composer row', () => {
@@ -129,7 +162,7 @@ describe('the tab head', () => {
     const tabs = Array.from(doc.querySelectorAll('[role="tab"]')).map(
       (t) => t.textContent,
     )
-    expect(tabs).toEqual(['Notes2', 'Interactions1', 'Files0', 'History7'])
+    expect(tabs).toEqual(['Notes2', 'Interactions1', 'Files', 'History7'])
     expect(doc.body.textContent).not.toMatch(/Context/)
     const list = doc.querySelector('[role="tablist"]')
     expect(classes(list)).toEqual(
@@ -137,7 +170,7 @@ describe('the tab head', () => {
     )
   })
 
-  it('draws an empty tab graphite at 0, a closed tab with content in ink', () => {
+  it('draws an empty tab graphite with no count, a closed tab with content in ink', () => {
     const tabs = Array.from(record().querySelectorAll('[role="tab"]'))
     const files = tabs.at(2) ?? null
     expect(files?.hasAttribute('data-empty')).toBe(true)
@@ -154,7 +187,7 @@ describe('the tab head', () => {
     expect(doc.querySelectorAll('[data-panel]')).toHaveLength(1)
     expect(doc.querySelector('[data-panel="files"]')).not.toBeNull()
     expect(doc.querySelector('[aria-selected="true"]')?.textContent).toBe(
-      'Files0',
+      'Files',
     )
   })
 })

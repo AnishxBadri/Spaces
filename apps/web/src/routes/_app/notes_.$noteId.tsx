@@ -483,7 +483,6 @@ function KindToggle({
 
   return (
     <Segmented
-      size="sm"
       label="Note kind"
       value={kind}
       disabled={pending}

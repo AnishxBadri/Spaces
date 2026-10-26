@@ -15,6 +15,7 @@ import {
 import { Checkbox } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
+import { Segmented } from '#/components/ui/segmented'
 import { KeyHint } from '#/components/page-header'
 import {
   slugifyNoun,
@@ -236,36 +237,21 @@ function ObjectForm(
 
       <div className="flex flex-col gap-1.5">
         <Label>Icon · 1-bit</Label>
-        {/* Square tiles on a rule; the chosen one is ink with a paper mark. */}
-        <div
-          role="radiogroup"
-          aria-label="Icon"
-          className="flex flex-wrap gap-1.5"
-        >
-          {OBJECT_ICON_NAMES.map((name) => {
+        <Segmented
+          label="Icon"
+          // No stored icon draws the box everywhere, so it reads chosen.
+          value={icon ?? 'boxes'}
+          options={OBJECT_ICON_NAMES.map((name) => {
             const Icon = OBJECT_ICONS[name]
-            const on = icon === name
-            return (
-              <button
-                key={name}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                aria-label={name}
-                title={name}
-                onClick={() => setIcon(name)}
-                className={cn(
-                  'focus-ring flex size-8 touch-manipulation items-center justify-center border transition-colors duration-150 ease-out-quart',
-                  on
-                    ? 'border-hairline bg-hairline text-paper'
-                    : 'border-rule text-foreground hover:border-hairline',
-                )}
-              >
-                <Icon className="size-3.5" strokeWidth={1.75} />
-              </button>
-            )
+            return {
+              id: name,
+              name,
+              tip: name,
+              label: <Icon className="size-3.5" strokeWidth={1.75} />,
+            }
           })}
-        </div>
+          onChange={setIcon}
+        />
       </div>
 
       {/* Identity keys. Declaring one materializes its backing

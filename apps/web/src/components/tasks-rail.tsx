@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { TaskComposer } from './task-composer'
-import { RailEmpty, RailSection } from './record/record-parts'
+import { EmptyRow } from './ledger-section'
+import { RailSection } from './record/record-parts'
 import { Checkbox } from './ui/checkbox'
 import { listEntityTasks, setTaskDone } from '#/lib/server-fns'
 import { localToday } from '@spaces/core/tasks/parse-due'
@@ -67,6 +68,18 @@ export function TasksRail({
 
   const today = localToday()
 
+  if (tasks !== null && tasks.length === 0)
+    return (
+      <RailSection label="Tasks" empty>
+        <TaskComposer
+          presetEntity={{ id: entityId, name: entityName, kind: entityKind }}
+          onCreated={load}
+          {...(composer === 'row' ? { hotkey: 't' } : {})}
+          trigger={<EmptyRow name="Tasks" />}
+        />
+      </RailSection>
+    )
+
   return (
     <RailSection
       label="Tasks"
@@ -91,9 +104,7 @@ export function TasksRail({
         </>
       }
     >
-      {tasks === null ? null : tasks.length === 0 ? (
-        <RailEmpty>None open.</RailEmpty>
-      ) : (
+      {tasks === null ? null : (
         <ol>
           {tasks.map((t) => (
             <li

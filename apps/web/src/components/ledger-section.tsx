@@ -1,28 +1,45 @@
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { cn } from '#/lib/utils'
+
+/**
+ * What a section head carries at its right edge: its count in mono ink, or
+ * a `Segmented` whose segments carry the counts — never both (the
+ * Separation Rule).
+ */
+type HeadEnd =
+  | {
+      /** Mono readout at the band's right — "5 · 2 overdue". */
+      count?: ReactNode
+      switch?: never
+    }
+  | {
+      /** A `Segmented` at the band's right, its segments counted. */
+      switch: ReactNode
+      count?: never
+    }
 
 /**
  * The section head band (the Separation Rule): a hairline opens the section,
  * then 44px of bone with a rule under. Title in sentence case at the title
- * step, a mono count beside it, the head's one action right. `LedgerSection`,
- * `RecordSection` and a group inside a settings section all draw this band.
+ * step left; the head's one action, then the count or the switch, right.
+ * `LedgerSection`, `RecordSection` and a group inside a settings section
+ * all draw this band.
  */
 export function SectionHead({
   title,
   count,
+  switch: segmented,
   action,
   as: Heading = 'h2',
   className,
 }: {
   title: ReactNode
-  /** Mono readout beside the title — "5 · 2 overdue". */
-  count?: ReactNode
   /** The head's one action, mono, right. */
   action?: ReactNode
   /** `h3` for a group inside a section that already has a heading. */
   as?: 'h2' | 'h3' | undefined
   className?: string | undefined
-}) {
+} & HeadEnd) {
   return (
     <div
       className={cn(
@@ -30,19 +47,25 @@ export function SectionHead({
         className,
       )}
     >
-      <div className="flex min-w-0 items-baseline gap-3">
-        <Heading className="min-w-0 truncate text-title font-medium text-foreground">
-          {title}
-        </Heading>
-        {count ? (
-          <span className="shrink-0 mono text-micro text-graphite">
-            {count}
-          </span>
-        ) : null}
-      </div>
-      {action ? (
-        <div className="flex shrink-0 items-baseline gap-3 mono text-micro text-graphite">
-          {action}
+      <Heading className="min-w-0 truncate text-title font-medium text-foreground">
+        {title}
+      </Heading>
+      {action || count || segmented ? (
+        <div className="flex shrink-0 items-center gap-3">
+          {action ? (
+            <div className="flex items-baseline gap-3 mono text-micro text-graphite">
+              {action}
+            </div>
+          ) : null}
+          {segmented ?? null}
+          {count ? (
+            <span
+              data-section-count
+              className="tabular mono text-micro text-foreground"
+            >
+              {count}
+            </span>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -50,9 +73,10 @@ export function SectionHead({
 }
 
 /**
- * A mono caps label on a hairline — the head of a ledger that is the page's
- * one list (the market map), where a bone band would be a second head under
- * the page's own. 28px; lane heads ride right as `children`.
+ * A mono caps label in ink on paper, a hairline under it — the head of a
+ * ledger that is the page's one list (the market map), where a bone band
+ * would be a second head under the page's own. 28px; lane heads ride right
+ * as `children`.
  */
 export function LabelHead({
   label,
@@ -60,18 +84,18 @@ export function LabelHead({
   className,
 }: {
   label: ReactNode
-  /** Lowercase mono lane heads, aligned with the rows' fixed lanes. */
+  /** Sans lane heads, aligned with the rows' fixed lanes. */
   children?: ReactNode
   className?: string | undefined
 }) {
   return (
     <div
       className={cn(
-        'flex h-7 shrink-0 items-center gap-2.5 border-b border-hairline px-3',
+        'flex h-7 shrink-0 items-center gap-2.5 border-b border-hairline bg-paper px-3',
         className,
       )}
     >
-      <h2 className="min-w-0 flex-1 truncate label-caps text-graphite">
+      <h2 className="min-w-0 flex-1 truncate label-caps text-foreground">
         {label}
       </h2>
       {children}
@@ -80,8 +104,105 @@ export function LabelHead({
 }
 
 /**
- * Ledger section. The bone head band (title + mono count left, one
- * mono link right), then 40px rows on rules; the last row may be a
+ * A group head inside a pane: 28px of bone on a rule, its label in mono
+ * caps graphite, an optional way out at the right (`All interactions ›`).
+ * A page section opens on a `SectionHead`; a group inside one opens here.
+ */
+export function Band({
+  label,
+  link,
+  className,
+}: {
+  label: ReactNode
+  /** Sans graphite, right — a link to where the group's full list lives. */
+  link?: ReactNode
+  className?: string | undefined
+}) {
+  return (
+    <div
+      data-band
+      className={cn(
+        'flex h-7 shrink-0 items-center justify-between gap-3 border-b border-rule bg-bone px-3',
+        className,
+      )}
+    >
+      <h3 className="min-w-0 truncate label-caps text-graphite">{label}</h3>
+      {link ? (
+        <div className="flex shrink-0 items-center text-label text-graphite">
+          {link}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * An empty section: one `Name +` row on bone, the name in graphite and the
+ * whole row the way in — no sentence, no composer, no 0. Rows stack with a
+ * rule between them. A plain button that spreads its props, so a dialog
+ * trigger can hand it its own.
+ */
+export function EmptyRow({
+  name,
+  onAdd,
+  className,
+  ...props
+}: {
+  /** The section's own name — `Tasks`, `Spaces`. */
+  name: string
+  onAdd?: (() => void) | undefined
+} & Omit<ComponentProps<'button'>, 'children' | 'name'>) {
+  return (
+    <button
+      type="button"
+      data-empty-row
+      {...(onAdd !== undefined ? { onClick: onAdd } : {})}
+      {...props}
+      className={cn(
+        'focus-ring-inset flex h-row w-full min-w-0 items-center justify-between gap-3 border-b border-rule bg-bone px-3 text-left text-ui text-graphite transition-colors duration-150 ease-out-quart last:border-b-0 hover:text-foreground',
+        className,
+      )}
+    >
+      <span className="min-w-0 truncate">{name}</span>
+      <span aria-hidden className="shrink-0 text-title">
+        +
+      </span>
+    </button>
+  )
+}
+
+/**
+ * The foot of a list cut short: `25 more` on a rule, which unfolds the
+ * rest in place.
+ */
+export function FoldRow({
+  hidden,
+  onShow,
+  className,
+}: {
+  /** How many rows the fold holds back. */
+  hidden: number
+  onShow: () => void
+  className?: string | undefined
+}) {
+  return (
+    <button
+      type="button"
+      data-fold-row
+      onClick={onShow}
+      className={cn(
+        'focus-ring-inset flex h-ledger-row w-full items-center border-t border-rule px-3 text-left text-label text-graphite transition-colors duration-150 ease-out-quart hover:text-foreground',
+        className,
+      )}
+    >
+      {hidden} more
+    </button>
+  )
+}
+
+/**
+ * Ledger section. The bone head band (title left; one mono link, then the
+ * mono count, right), then 40px rows on rules; the last row may be a
  * composer. The section is a list, so the rows are `<li>`s and the caller
  * decides what a row is (a link, a task with its checkbox, a composer
  * trigger).
@@ -94,7 +215,7 @@ export function LedgerSection({
   className,
 }: {
   label: ReactNode
-  /** Mono readout after the label — "5 · 2 overdue". */
+  /** Mono readout at the head's right — "5 · 2 overdue". */
   count?: ReactNode
   /** The one way out of the section, mono, right. */
   link?: ReactNode

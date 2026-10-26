@@ -22,7 +22,6 @@ import { KeyHint } from '#/components/page-header'
 import {
   DitherMark,
   InitialsMark,
-  PropertyCell,
   RailSection,
   RecordBody,
   RecordHeader,
@@ -410,18 +409,14 @@ function DealRecordPage() {
                       }}
                     />
                   )}
+                  add={(trigger) => (
+                    <AttributeCreateDialog
+                      objectKind="deal"
+                      onCreated={() => router.invalidate()}
+                      trigger={trigger}
+                    />
+                  )}
                 />
-                <PropertyCell label="">
-                  <AttributeCreateDialog
-                    objectKind="deal"
-                    onCreated={() => router.invalidate()}
-                    trigger={
-                      <button className="focus-ring self-start mono text-micro text-graphite hover:text-foreground">
-                        + add attribute
-                      </button>
-                    }
-                  />
-                </PropertyCell>
               </PropertyGrid>
             </AiCellsProvider>
 
@@ -465,7 +460,6 @@ function DealRecordPage() {
             <RelationSection
               label="People"
               rows={people}
-              empty="No one yet."
               mark={(p) => <InitialsMark name={p.name} />}
             >
               <DetailsPickRow

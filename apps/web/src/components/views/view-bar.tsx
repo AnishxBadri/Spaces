@@ -32,6 +32,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '#/components/ui/popover'
+import { Segmented } from '#/components/ui/segmented'
 import { Select } from '#/components/ui/select'
 import { Tabs } from '#/components/ui/tabs'
 import type { TabItem } from '#/components/ui/tabs'
@@ -41,7 +42,6 @@ import {
   usePinnedViews,
 } from '#/lib/chassis-prefs'
 import { countViews, deleteView, saveView } from '#/lib/server-fns'
-import { cn } from '#/lib/utils'
 import {
   OP_LABELS,
   isUnary,
@@ -218,7 +218,6 @@ export function ViewBar({
   return (
     <Tabs
       label="Views"
-      size="head"
       items={items}
       value={active?.id ?? ALL}
       onValueChange={(id) =>
@@ -673,29 +672,15 @@ function SaveViewForm({
           onChange={(e) => setName(e.target.value)}
         />
       </div>
-      <div
-        role="radiogroup"
-        aria-label="Visibility"
-        className="flex h-8 w-fit items-center border border-hairline"
-      >
-        {(['private', 'shared'] as const).map((v) => (
-          <button
-            key={v}
-            type="button"
-            role="radio"
-            aria-checked={visibility === v}
-            onClick={() => setVisibility(v)}
-            className={cn(
-              'focus-ring-inset h-full px-2.5 text-ui font-medium capitalize transition-colors duration-150 ease-out-quart',
-              visibility === v
-                ? 'bg-hairline text-paper'
-                : 'text-graphite hover:bg-bone hover:text-foreground',
-            )}
-          >
-            {v}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        label="Visibility"
+        value={visibility}
+        options={[
+          { id: 'private', label: 'Private' },
+          { id: 'shared', label: 'Shared' },
+        ]}
+        onChange={setVisibility}
+      />
       {error ? (
         <p role="alert" className="text-ui text-destructive">
           {error}

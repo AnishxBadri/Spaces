@@ -1,12 +1,19 @@
+import type { ReactNode } from 'react'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '#/components/ui/tooltip'
 import { cn } from '#/lib/utils'
 
 /**
- * The segmented control: two or three mutually exclusive choices drawn as
- * one hairline box, the chosen one inked.
+ * The segmented control: a bounded set of mutually exclusive choices in one
+ * 28px bone-deep box, the chosen segment raised on paper. The nested switch
+ * under a tab bar, a window's kind, a filter whose segments carry counts.
  *
  * A radiogroup, not a row of toggle buttons: exactly one is chosen at all
  * times, which is what `role="radio"` + `aria-checked` says and what
- * `aria-pressed` does not.
+ * `aria-pressed` does not. The reticle frames the whole box, not a segment.
  *
  * Generic over the option ids so a caller with a union type — a note kind,
  * an interaction kind — gets that union back in `onChange` instead of a
@@ -14,66 +21,76 @@ import { cn } from '#/lib/utils'
  */
 export type SegmentedOption<T extends string> = {
   id: T
-  label: string
-  /** The digit printed inside the segment — a key the page listens for. */
-  hint?: string
+  /** The words, or a mark that `name` then names. */
+  label: ReactNode
+  /** The segment's accessible name when `label` is a mark. */
+  name?: string | undefined
+  /** Mono count after the label; none is printed at 0. */
+  count?: number | undefined
+  /** A tooltip on the segment — the key the page listens for, a mark's name. */
+  tip?: string | undefined
 }
 
 export function Segmented<T extends string>({
   value,
   options,
   onChange,
-  size = 'md',
   disabled,
   label,
   className,
 }: {
   value: T
-  options: Array<SegmentedOption<T>>
+  options: ReadonlyArray<SegmentedOption<T>>
   onChange: (id: T) => void
-  /** `sm` is the 26px chrome height; `md` the 32px control height. */
-  size?: 'sm' | 'md'
   disabled?: boolean | undefined
   /** Names the group for screen readers when no visible label sits beside it. */
   label?: string | undefined
   className?: string | undefined
 }) {
-  const sm = size === 'sm'
   return (
     <div
       role="radiogroup"
       aria-label={label}
       className={cn(
-        'flex w-fit items-center border border-hairline',
-        sm ? 'h-7' : 'h-8',
+        'focus-ring-within flex h-7 w-fit items-stretch gap-0.5 rounded-md border border-rule bg-bone-deep p-0.5',
         className,
       )}
     >
-      {options.map((o, i) => (
-        <button
-          key={o.id}
-          type="button"
-          role="radio"
-          aria-checked={value === o.id}
-          disabled={disabled}
-          onClick={() => onChange(o.id)}
-          className={cn(
-            'focus-ring-inset flex h-full shrink-0 items-center gap-2 font-medium whitespace-nowrap transition-colors duration-150 ease-out-quart disabled:opacity-60',
-            sm ? 'px-3 text-label' : 'px-2.5 text-ui',
-            i > 0 && 'border-l border-hairline',
-            value === o.id
-              ? 'bg-hairline text-paper'
-              : 'text-graphite hover:bg-bone hover:text-foreground',
-          )}
-        >
-          {o.label}
-          {o.hint ? (
-            <span className="mono text-micro font-normal opacity-70">
-              {o.hint}
-            </span>
-          ) : null}
-        </button>
-      ))}
+      {options.map((o) => {
+        const on = value === o.id
+        const segment = (
+          <button
+            key={o.id}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            {...(o.name !== undefined ? { 'aria-label': o.name } : {})}
+            disabled={disabled}
+            onClick={() => onChange(o.id)}
+            className={cn(
+              'flex shrink-0 items-center justify-center gap-1.5 rounded-md border px-2.5 text-label whitespace-nowrap transition-colors duration-150 ease-out-quart outline-none disabled:opacity-50',
+              on
+                ? 'border-rule bg-paper text-foreground'
+                : 'border-transparent text-graphite hover:bg-bone-deep hover:text-foreground',
+            )}
+          >
+            {o.label}
+            {o.count !== undefined && o.count > 0 ? (
+              <span data-segment-count className="tabular mono text-micro">
+                {o.count}
+              </span>
+            ) : null}
+          </button>
+        )
+        return o.tip === undefined ? (
+          segment
+        ) : (
+          <Tooltip key={o.id}>
+            <TooltipTrigger asChild>{segment}</TooltipTrigger>
+            <TooltipContent>{o.tip}</TooltipContent>
+          </Tooltip>
+        )
+      })}
     </div>
   )
 }

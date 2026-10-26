@@ -20,7 +20,6 @@ import {
   DetailsAddRow,
   DitherMark,
   InitialsMark,
-  PropertyCell,
   PropertyGrid,
   RecordBody,
   RecordHeader,
@@ -352,18 +351,14 @@ function CompanyRecordPage() {
                       }}
                     />
                   )}
+                  add={(trigger) => (
+                    <AttributeCreateDialog
+                      objectKind="company"
+                      onCreated={() => router.invalidate()}
+                      trigger={trigger}
+                    />
+                  )}
                 />
-                <PropertyCell label="">
-                  <AttributeCreateDialog
-                    objectKind="company"
-                    onCreated={() => router.invalidate()}
-                    trigger={
-                      <button className="focus-ring self-start mono text-micro text-graphite hover:text-foreground">
-                        + add attribute
-                      </button>
-                    }
-                  />
-                </PropertyCell>
               </PropertyGrid>
             </AiCellsProvider>
 
@@ -372,7 +367,6 @@ function CompanyRecordPage() {
             <RelationSection
               label="Team"
               rows={team}
-              empty="No one yet."
               mark={(p) => <InitialsMark name={p.name} outline />}
             >
               <DetailsPickRow
@@ -395,7 +389,6 @@ function CompanyRecordPage() {
             <RelationSection
               label="Associated deals"
               rows={deals}
-              empty="Watching only."
               lane={(d) => {
                 const stage = company.dealStages[d.id]
                 return stage && stageDef ? (

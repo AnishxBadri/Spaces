@@ -192,7 +192,7 @@ describe('the empties fold', () => {
     </p>
   )
 
-  it('shows the filled values and folds three empties under one row', async () => {
+  it('shows the filled values and folds three empties into a bone foot', async () => {
     const el = await mount(
       <PropertyFold defs={defs} valueOf={(d) => d.value} render={render} />,
     )
@@ -201,13 +201,36 @@ describe('the empties fold', () => {
         r.getAttribute('data-row'),
       )
     expect(rows()).toEqual(['description'])
-    const toggle = button(/^Show all · 3 empty$/)
+    const foot = el.querySelector('[data-property-foot]')
+    expect(foot?.className.split(' ')).toEqual(
+      expect.arrayContaining(['h-8', 'bg-bone', 'pl-2.5', 'pr-1']),
+    )
+    expect(el.textContent).not.toMatch(/Show all/)
+    const toggle = button(/^3 empty$/)
+    expect(toggle.className.split(' ')).toEqual(
+      expect.arrayContaining(['text-label', 'text-graphite']),
+    )
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     await click(toggle)
     expect(rows()).toEqual(['description', 'founders', 'twitter', 'location'])
   })
 
-  it('draws no fold row when nothing is empty', async () => {
+  it('ends the foot on a 24px + that the caller wraps in the add', async () => {
+    const el = await mount(
+      <PropertyFold
+        defs={defs}
+        valueOf={(d) => d.value}
+        render={render}
+        add={(trigger) => <span data-add>{trigger}</span>}
+      />,
+    )
+    const plus = el.querySelector('[data-add] button')
+    expect(plus?.getAttribute('aria-label')).toBe('Add attribute')
+    expect(plus?.textContent).toBe('+')
+    expect(plus?.className).toContain('size-6')
+  })
+
+  it('draws no foot when nothing is empty and nothing adds', async () => {
     const el = await mount(
       <PropertyFold
         defs={defs.slice(0, 1)}
@@ -216,6 +239,19 @@ describe('the empties fold', () => {
       />,
     )
     expect(el.querySelector('button')).toBeNull()
+    expect(el.querySelector('[data-property-foot]')).toBeNull()
+  })
+
+  it('keeps the foot for the + alone when nothing is empty', async () => {
+    const withAdd = await mount(
+      <PropertyFold
+        defs={defs.slice(0, 1)}
+        valueOf={(d) => d.value}
+        render={render}
+        add={(trigger) => trigger}
+      />,
+    )
+    expect(withAdd.querySelector('[data-property-foot]')?.textContent).toBe('+')
   })
 })
 

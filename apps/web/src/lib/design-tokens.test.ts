@@ -134,6 +134,15 @@ describe('instrument/vocabulary', () => {
     expect(lint('<div className={cn("bg-muted")} />')).toHaveLength(1)
   })
 
+  it('refuses a lowercase transform: nothing starts lowercase', () => {
+    for (const cls of ['lowercase', 'hover:lowercase', 'md:lowercase']) {
+      const messages = lint(`<span className="field-label ${cls}" />`)
+      expect(messages, cls).toHaveLength(1)
+      expect(messages[0]?.message).toContain('text-label text-graphite')
+    }
+    expect(lint('<span className="label-caps text-graphite" />')).toEqual([])
+  })
+
   it('allows bg-background only where the document ground is painted', () => {
     expect(lint('<div className="bg-background" />')).toHaveLength(1)
     expect(
@@ -299,13 +308,15 @@ describe('the named type steps', () => {
     expect(css).toContain('--text-field--line-height: 0.75rem;')
   })
 
-  it('carry a field-label utility: lowercase mono at the micro step, 400', () => {
+  it('carry a field-label utility: mono at the micro step, 400, in its own case', () => {
     const utility = /@utility field-label \{([^}]*)\}/.exec(css)?.[1] ?? ''
     expect(utility).toContain('font-family: var(--font-mono);')
     expect(utility).toContain('font-size: var(--text-micro);')
     expect(utility).toContain('line-height: var(--text-micro--line-height);')
     expect(utility).toContain('font-weight: 400;')
-    expect(utility).toContain('text-transform: lowercase;')
+    // A data word keeps the case the instrument wrote; nothing starts
+    // lowercase by transform.
+    expect(utility).not.toContain('text-transform')
   })
 
   it('keep label-caps the CAPS tier: tracked and uppercase', () => {

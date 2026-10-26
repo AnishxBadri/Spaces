@@ -4,16 +4,14 @@ import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
 import { cn } from '#/lib/utils'
 
 /**
- * Real tabs: a bone bar on a hairline foot;
- * the open tab is paper with a straight ink edge, joined to the body under it with
- * no rule between, and the others sit on the bone in ink. Each tab may carry
- * its mono count, and an empty tab stays visible, graphite at 0: the
- * head stays the index.
+ * Real tabs: one 44px bone bar on a hairline foot; the open tab is paper
+ * with a straight ink edge, joined to the body under it with no rule
+ * between. Labels are sentence-case sans. A tab that holds something
+ * carries its mono count in ink; an empty one stays in the bar with no
+ * count, graphite until hovered.
  * - Keyboard: ←→ move and wrap, Home/End jump, and moving selects (automatic
  *   activation). Only the open tab is in the tab order.
- * - Filter rows under a tab keep the underline grammar; this is the tab head.
- * - `size="head"` is a record body's 44px head, the height of a section's
- *   bone band; the default bar is 36px.
+ * - A nested switch under the bar is a `Segmented`, never a second tab row.
  * - `pinned` keeps the head under the folded `HeadBar` while its body
  *   scrolls.
  * - `trail` sits on the same bone bar after the tabs, outside the tablist:
@@ -27,7 +25,7 @@ import { cn } from '#/lib/utils'
 export type TabItem<T extends string> = {
   id: T
   label: ReactNode
-  /** The mono count beside the label; `0` reads graphite. */
+  /** The mono count beside the label; none is printed at 0. */
   count?: number | undefined
 }
 
@@ -59,7 +57,6 @@ export function Tabs<T extends string>({
   onValueChange,
   label,
   disabled,
-  size = 'bar',
   pinned = false,
   trail,
   children,
@@ -71,7 +68,6 @@ export function Tabs<T extends string>({
   /** Names the tablist for screen readers. */
   label: string
   disabled?: boolean | undefined
-  size?: 'bar' | 'head' | undefined
   /** Stick under the folded head bar while the page scrolls. */
   pinned?: boolean | undefined
   /** Controls on the bar after the tabs; never inside the tablist. */
@@ -100,8 +96,7 @@ export function Tabs<T extends string>({
 
   // No overflow clip: the open tab hangs 1px over this foot rule.
   const bar = cn(
-    'flex items-end border-b border-hairline bg-bone pt-1',
-    size === 'head' && 'h-11 px-3',
+    'flex h-11 items-end border-b border-hairline bg-bone px-3 pt-1',
     pinned && PIN_UNDER_HEAD_BAR,
   )
   const list = (
@@ -114,6 +109,7 @@ export function Tabs<T extends string>({
       {items.map((t, i) => {
         const open = i === selected
         const empty = t.count === 0
+        const counted = t.count !== undefined && t.count > 0
         return (
           <button
             key={t.id}
@@ -132,24 +128,22 @@ export function Tabs<T extends string>({
               if (!open) onValueChange(t.id)
             }}
             className={cn(
-              'focus-ring-inset flex shrink-0 items-center gap-2 px-3 label-caps whitespace-nowrap transition-[color] duration-150 ease-out-quart disabled:opacity-50',
-              size === 'head' ? 'h-9.75' : 'h-8',
-              // Closed: ink when it holds something, graphite when empty.
+              'focus-ring-inset flex shrink-0 items-center gap-2 px-3 text-ui whitespace-nowrap transition-[color] duration-150 ease-out-quart disabled:opacity-50',
+              // Open: a pixel taller and a pixel low, so its paper covers
+              // the bar's foot rule. Closed: ink when it holds something,
+              // graphite when empty.
               open
-                ? 'tab-open -mb-px text-foreground'
-                : t.count !== undefined && t.count > 0
-                  ? 'text-foreground'
-                  : 'text-graphite hover:text-foreground',
+                ? 'tab-open top-px h-10 text-foreground'
+                : counted
+                  ? 'h-9.75 text-foreground'
+                  : 'h-9.75 text-graphite hover:text-foreground',
             )}
           >
             {t.label}
-            {t.count !== undefined ? (
+            {counted ? (
               <span
                 data-tab-count
-                className={cn(
-                  'tabular mono text-micro font-normal',
-                  t.count > 0 ? 'text-foreground' : 'text-graphite',
-                )}
+                className="tabular mono text-micro text-foreground"
               >
                 {t.count}
               </span>

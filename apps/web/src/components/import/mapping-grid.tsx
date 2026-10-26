@@ -267,7 +267,6 @@ function DateOrderChoice({
     <div className="flex items-center justify-between gap-2 border-t border-rule px-2.5 py-2">
       <span className="field-label text-graphite">Dates</span>
       <Segmented
-        size="sm"
         label="Date order"
         disabled={disabled}
         value={value ?? 'none'}

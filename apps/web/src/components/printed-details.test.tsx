@@ -245,21 +245,21 @@ describe('real tabs', () => {
     expect(bar).toEqual(expect.arrayContaining(['border-b', 'border-hairline']))
     expect(count(html, /\btab-open\b/g)).toBe(1)
     const open = classesOf(html, 'tab-open')
-    // Pulled 1px over the bar's foot: no rule under the open tab.
-    expect(open).toContain('-mb-px')
+    // A pixel taller and a pixel low, over the bar's foot: no rule under
+    // the open tab.
+    expect(open).toEqual(expect.arrayContaining(['h-10', 'top-px']))
     expect(open).not.toContain('border-b')
     expect(html).toMatch(/aria-selected="true"[^>]*class="[^"]*tab-open/)
   })
 
-  it('keeps an empty tab visible, graphite at 0', () => {
+  it('keeps an empty tab visible, graphite with no count', () => {
     const html = render('notes')
-    expect(html).toMatch(/Files<span data-tab-count="true" class="[^"]*">0</)
+    expect(html).toMatch(/>Files<\/button>/)
     const counts = [
       ...html.matchAll(/data-tab-count="true" class="([^"]*)">(\d+)</g),
     ].map((m) => ({ cls: m[1], n: m[2] }))
-    expect(counts.map((c) => c.n)).toEqual(['4', '0', '2'])
-    expect(counts[0]?.cls).toContain('text-foreground')
-    expect(counts[1]?.cls).toContain('text-graphite')
+    expect(counts.map((c) => c.n)).toEqual(['4', '2'])
+    for (const c of counts) expect(c.cls).toContain('text-foreground')
   })
 
   it('ties the body to the open tab', () => {

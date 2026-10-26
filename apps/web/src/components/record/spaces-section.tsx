@@ -1,7 +1,7 @@
 import { useRouter } from '@tanstack/react-router'
 import { useCallback } from 'react'
 import { DetailsPickRow } from '#/components/record/details-add'
-import { RailEmpty, RailSection } from '#/components/record/record-parts'
+import { RailSection } from '#/components/record/record-parts'
 import { SpaceRailRow } from '#/components/record/space-rail-row'
 import { SuggestSpacesAction } from '#/components/record/suggest-spaces'
 import { tagIntoSpace, untagFromSpace } from '#/lib/server-fns'
@@ -39,8 +39,11 @@ export function RecordSpacesSection({
     [spaces, allSpaces],
   )
   return (
-    <RailSection label="Spaces" meta={`${spaces.length}`}>
-      {spaces.length === 0 ? <RailEmpty>Not filed.</RailEmpty> : null}
+    <RailSection
+      label="Spaces"
+      meta={`${spaces.length}`}
+      empty={spaces.length === 0}
+    >
       {spaces.map((s) => (
         <SpaceRailRow
           key={s.id}

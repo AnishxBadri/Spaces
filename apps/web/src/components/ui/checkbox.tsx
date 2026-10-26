@@ -82,38 +82,4 @@ export function radioClasses({
   )
 }
 
-/**
- * A radio: one choice of a set, for a single-choice pin or floor. A
- * `<button role="radio">` for the same reasons as `Checkbox`; the caller
- * draws the `radiogroup` around the set and owns each label.
- */
-function Radio({
-  checked,
-  onSelect,
-  className,
-  ...props
-}: Omit<
-  React.ComponentProps<'button'>,
-  'type' | 'role' | 'aria-checked' | 'onChange' | 'onSelect' | 'children'
-> & {
-  checked: boolean
-  onSelect: () => void
-}) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={checked}
-      data-slot="radio"
-      onClick={() => {
-        if (!checked) onSelect()
-      }}
-      className={radioClasses({ checked, className })}
-      {...props}
-    >
-      {checked ? <span aria-hidden className="size-1.5 bg-primary" /> : null}
-    </button>
-  )
-}
-
-export { Checkbox, Radio }
+export { Checkbox }

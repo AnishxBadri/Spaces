@@ -4,11 +4,7 @@ import type { ReactNode } from 'react'
 import { isDerived } from '@spaces/core/attributes/relationship'
 import type { AttributeOptions } from '@spaces/core/attributes/registry'
 import { DetailsPickRow } from '#/components/record/details-add'
-import {
-  RailEmpty,
-  RailItem,
-  RailSection,
-} from '#/components/record/record-parts'
+import { RailItem, RailSection } from '#/components/record/record-parts'
 import { recordPath } from '#/lib/record-path'
 import { searchEntities } from '#/lib/server-fns'
 
@@ -57,29 +53,28 @@ export function relationRows(
 /**
  * A relationship section in the details column: the count once in the head,
  * each row the link to the far record, ending on its lane.
- * - `children` is the section's composer row.
+ * - `children` is the section's composer row; with no rows it is the
+ *   section's one `Name +` row.
  */
 export function RelationSection({
   label,
   rows,
-  empty,
   mark,
   lane,
   children,
 }: {
   label: string
   rows: ReadonlyArray<RelationRow>
-  /** The empty line; absent when the composer row says enough. */
-  empty?: string
   mark?: (row: RelationRow) => ReactNode
   lane?: (row: RelationRow, index: number) => ReactNode
   children?: ReactNode
 }) {
   return (
-    <RailSection label={label} meta={`${rows.length}`}>
-      {rows.length === 0 && empty !== undefined ? (
-        <RailEmpty>{empty}</RailEmpty>
-      ) : null}
+    <RailSection
+      label={label}
+      meta={`${rows.length}`}
+      empty={rows.length === 0 && Boolean(children)}
+    >
       {rows.map((row, i) => {
         const href = recordPath(row)
         const body = (
@@ -193,7 +188,7 @@ function PairSection({
     [rows, targetKind, targetObjectId],
   )
   return (
-    <RelationSection label={def.name} rows={rows} empty="None yet.">
+    <RelationSection label={def.name} rows={rows}>
       {multi || rows.length === 0 ? (
         <DetailsPickRow
           label={`Add to ${def.name.toLowerCase()}…`}

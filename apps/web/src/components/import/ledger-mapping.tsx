@@ -373,7 +373,6 @@ function InstrumentRow({
           <span className="tabular mono text-micro text-graphite">{rows}</span>
         </span>
         <Segmented
-          size="sm"
           label={`Instrument for ${shown}`}
           disabled={disabled}
           value={value.resolution ?? 'none'}
@@ -538,7 +537,6 @@ function DecisionsPanel({
           note={`${s.dates.flips} date${s.dates.flips === 1 ? '' : 's'} flip`}
         >
           <Segmented
-            size="sm"
             label="Date order"
             disabled={disabled}
             value={order ?? 'none'}

@@ -409,7 +409,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Group and section labels, tabs, stamps: mono, caps, tracked. */
+/* Kinds, stamps, and band or group labels: mono, caps, tracked. */
 @utility label-caps {
   font-family: var(--font-mono);
   font-size: 0.6875rem;
@@ -420,10 +420,9 @@
 }
 
 /**
- * What the instrument labels inside a structure, whole: column and lane
- * heads, field labels in forms and windows, readout labels, state words.
- * Lowercase mono at the micro step, untracked — the same face as a record's
- * property labels. A group or section label is `label-caps` instead.
+ * A mono data word in an end lane — `fetching.`, `following`, `■ gone` —
+ * at the micro step, untracked, in the case the instrument wrote it. A
+ * label is sans 12 graphite (`text-label text-graphite`), never this.
  */
 @utility field-label {
   font-family: var(--font-mono);
@@ -431,7 +430,6 @@
   line-height: var(--text-micro--line-height);
   font-weight: 400;
   letter-spacing: 0;
-  text-transform: lowercase;
 }
 
 /* Page and record titles: serif, because a human named the thing. */

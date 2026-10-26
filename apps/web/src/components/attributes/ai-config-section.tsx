@@ -167,7 +167,6 @@ function AiConfigEditor({
       <div className="flex flex-wrap items-center gap-3">
         <Segmented
           label={`${attr.name} mode`}
-          size="sm"
           value={mode}
           options={modes.map((m) => ({ id: m, label: AI_MODE_LABEL[m] }))}
           onChange={setMode}

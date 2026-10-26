@@ -443,13 +443,8 @@ describe('the details column', () => {
     const heads = Array.from(column?.querySelectorAll('h2') ?? []).map((h) =>
       text(h),
     )
-    expect(heads).toEqual([
-      'Watching',
-      "What's moving",
-      'Map',
-      'Glossary',
-      'Tasks',
-    ])
+    // Tasks holds nothing here, so it has no head: it is its `Tasks +` row.
+    expect(heads).toEqual(['Watching', "What's moving", 'Map', 'Glossary'])
     const sections = Array.from(
       column?.querySelectorAll('section[aria-label]') ?? [],
     ).map((s) => s.getAttribute('aria-label'))
@@ -458,6 +453,7 @@ describe('the details column', () => {
       'Watching',
       "What's moving",
     ])
+    expect(sections.at(-1)).toBe('Tasks')
     expect(column?.className).toContain('bg-bone')
     expect(column?.className).toContain('xl:w-80')
   })
@@ -470,14 +466,16 @@ describe('the details column', () => {
     expect(text(own)).not.toContain('from')
   })
 
-  it('ends Tasks on an add row that T opens', async () => {
+  it('draws Tasks with none open as its one Tasks + row', async () => {
     await mount('notes')
-    expect(text(buttonNamed(/Add a task/))).toContain('T')
+    const row = buttonNamed(/^Tasks\+$/)
+    expect(row.hasAttribute('data-empty-row')).toBe(true)
+    expect(text(row.closest('section'))).toBe('Tasks+')
   })
 })
 
 describe('the tabs', () => {
-  it('shows five tabs with counts on the 44px bone head, empty ones grey at 0', async () => {
+  it('shows five tabs on the 44px bone head, counted when they hold something, empty ones graphite with none', async () => {
     await mount('notes')
     const list = document.querySelector('[role="tablist"]')
     expect(list?.className).toContain('h-11')
@@ -488,14 +486,13 @@ describe('the tabs', () => {
     expect(tabsShown).toEqual([
       'Companies3',
       'Notes2',
-      'Files0',
+      'Files',
       'People1',
-      'Records0',
+      'Records',
     ])
     const files = Array.from(document.querySelectorAll('[role="tab"]')).at(2)
-    expect(files?.querySelector('[data-tab-count]')?.className).toContain(
-      'text-graphite',
-    )
+    expect(files?.querySelector('[data-tab-count]')).toBeNull()
+    expect(files?.className).toContain('text-graphite')
     expect(text(document.querySelector('[aria-selected="true"]'))).toMatch(
       /^Notes/,
     )
@@ -883,9 +880,9 @@ describe('the Watching lane', () => {
       'Exa key removed',
     )
     expect(row('w3').querySelector('.opacity-40')).not.toBe(null)
-    const head = lane('Watching').querySelector('h2')?.parentElement
-    expect(head?.parentElement?.className).toContain('h-11')
-    expect(head?.parentElement?.className).toContain('bg-bone')
+    const band = lane('Watching').querySelector('h2')?.parentElement
+    expect(band?.className).toContain('h-11')
+    expect(band?.className).toContain('bg-bone')
   })
 
   it('settles from job_run on open and streams a run: running, then its tally', async () => {
