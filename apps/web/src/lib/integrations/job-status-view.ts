@@ -3,7 +3,7 @@ import type { JobStatusEvent } from '@spaces/core/queue/job-status'
 import type { JobStatusRow } from './job-status'
 
 /**
- * The record head's view of its plugin jobs, from the status stream: pure,
+ * A record page's view of its plugin jobs, from the status stream: pure,
  * so the page and its tests share one reducer.
  * - `init` replaces everything known; `status` applies one row on top, and
  *   an older row never overwrites a newer one.
@@ -143,5 +143,54 @@ export const jobStatusFigure = (
       return { text: 'skipped', tone: 'muted', detail: row.summary }
     case 'succeeded':
       return { text: 'done', tone: undefined, detail: row.summary }
+  }
+}
+
+/** The ink toast a job leaves when it closes on an open record page. */
+export type JobToast = {
+  readonly message: string
+  /** `bad` is the crimson error toast, which stays until dismissed. */
+  readonly tone: 'done' | 'bad'
+  /** It left work in Review: the toast offers `Review`. */
+  readonly review: boolean
+}
+
+/**
+ * What a closed plugin job says, named for its plugin: `Exa found 5 · brief
+ * in Review`. A summary that sends the reader to Review offers the link.
+ */
+export const jobToast = (
+  event: JobStatusEvent,
+  plugin: string,
+): JobToast | null => {
+  switch (event.status) {
+    case 'running':
+      return null
+    case 'failed':
+      return {
+        message:
+          event.error === null
+            ? `${plugin} failed`
+            : `${plugin} failed · ${event.error}`,
+        tone: 'bad',
+        review: false,
+      }
+    case 'skipped':
+      return {
+        message:
+          event.summary === null
+            ? `${plugin} skipped`
+            : `${plugin} skipped · ${event.summary}`,
+        tone: 'done',
+        review: false,
+      }
+    case 'succeeded': {
+      const said = event.summary ?? 'done'
+      return {
+        message: `${plugin} ${said}`,
+        tone: 'done',
+        review: /\bReview\b/.test(said),
+      }
+    }
   }
 }

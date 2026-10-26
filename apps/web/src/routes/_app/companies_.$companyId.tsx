@@ -6,10 +6,6 @@ import {
 } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
-import { SaveAsTemplateAction } from '#/components/templates'
-import { SensitiveToggle } from '#/components/sensitive-toggle'
-import { SummarizeRecordButton } from '#/components/summarize'
-import { Button } from '#/components/ui/button'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { TasksRail } from '#/components/tasks-rail'
 import { RailField } from '#/components/attributes/rail-field'
@@ -20,8 +16,12 @@ import {
   InitialsMark,
   PropertyGrid,
   RecordBody,
+  RecordHeadPending,
   RecordHeader,
 } from '#/components/record/record-parts'
+import { RecordHeadActions } from '#/components/record/record-heads'
+import { RecordNotices } from '#/components/record/record-notices'
+import { sensitiveStamp } from '#/components/sensitive-toggle'
 import { DetailsPickRow } from '#/components/record/details-add'
 import {
   RelationSection,
@@ -46,10 +46,8 @@ import { RecordHistory, RecordInteractions } from '#/components/record-timeline'
 import type { InteractionFilter } from '#/lib/timeline/interaction-filter'
 import type { NotesFilter } from '#/lib/notes/notes-filter'
 import { WaitingRail } from '#/components/record/waiting-rail'
-import { PluginActions } from '#/components/record/plugin-actions'
 import { CreateDealDialog } from '#/routes/_app/deals'
 import { collisionToast } from '#/lib/attributes/collision-toast'
-import { jsonStrings } from '@spaces/core/json'
 import { fileInSpaceAction } from '#/lib/file-in-space'
 import { runBinding, usePageActions } from '#/lib/page-actions'
 import {
@@ -68,15 +66,14 @@ import {
   getRecordTimeline,
   listRecordActions,
   listRecordDocuments,
+  listRecordDuplicates,
   listRecordNotes,
   listRegistry,
   listSpaces,
   searchEntities,
   setPersonCompany,
   updateRecord,
-  saveRecordAsTemplate,
 } from '#/lib/server-fns'
-import { RecordMoreMenu } from '#/components/record/record-more-menu'
 
 /**
  * A company's page: the head and readouts, then the details column —
@@ -98,6 +95,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       sensitivity,
       pluginActions,
       enrichment,
+      duplicates,
     ] = await Promise.all([
       getCompany({ data: { id: params.companyId } }),
       listSpaces(),
@@ -113,6 +111,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       getRecordEnrichment({
         data: { entityId: params.companyId, kind: 'company' },
       }),
+      listRecordDuplicates({ data: { entityId: params.companyId } }),
     ])
     // Merged-away records redirect to their survivor — stale URLs keep working.
     if (companyData.mergedIntoId) {
@@ -133,8 +132,10 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       sensitivity,
       pluginActions,
       enrichment,
+      duplicates,
     }
   },
+  pendingComponent: () => <RecordHeadPending kind="Company" />,
   component: CompanyRecordPage,
 })
 
@@ -151,6 +152,7 @@ function CompanyRecordPage() {
     sensitivity,
     pluginActions,
     enrichment,
+    duplicates,
   } = Route.useLoaderData()
   const stageDef = dealRegistry.find((d) => d.slug === 'stage')
   const router = useRouter()
@@ -169,11 +171,6 @@ function CompanyRecordPage() {
   const [interactionFilter, setInteractionFilter] =
     useState<InteractionFilter>('all')
 
-  // Identity is an attribute: the first domain names the record.
-  const firstDomain = jsonStrings(company.values.domains).at(0)
-  const nameAliases = company.aliases.filter(
-    (a) => a.kind === 'name' && a.value !== company.name,
-  )
   // Both sides of each relationship come from the one resolver.
   const team = relationRows(company.relations, 'team', true)
   const deals = relationRows(company.relations, 'associated_deals', true)
@@ -216,38 +213,15 @@ function CompanyRecordPage() {
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
-        stamp={{ kind: 'Company' }}
+        stamp={sensitiveStamp('Company', sensitivity)}
         actions={
-          <>
-            <SensitiveToggle entityId={company.id} state={sensitivity} />
-            <SummarizeRecordButton recordId={company.id} />
-            <PluginActions
-              entityId={company.id}
-              actions={pluginActions}
-              enrich={enrichment}
-            />
-            <LogInteractionDialog
-              seed={{ id: company.id, name: company.name, kind: 'company' }}
-              hotkey="l"
-              trigger={
-                <Button variant="outline" shortcut="L">
-                  Log interaction
-                </Button>
-              }
-            />
-            <Button variant="outline" onClick={newNoteAboutThis}>
-              Note about this
-            </Button>
-            <SaveAsTemplateAction
-              entityLabel="company"
-              onSave={async (name) => {
-                await saveRecordAsTemplate({
-                  data: { recordId: company.id, name },
-                })
-              }}
-            />
-            <RecordMoreMenu name={company.name} />
-          </>
+          <RecordHeadActions
+            record={{ id: company.id, name: company.name, kind: 'company' }}
+            enrich={enrichment}
+            sensitivity={sensitivity}
+            template="company"
+            pluginActions={pluginActions}
+          />
         }
         mark={
           <RecordPicture
@@ -257,20 +231,6 @@ function CompanyRecordPage() {
           />
         }
         name={company.name}
-        badges={
-          firstDomain || nameAliases.length > 0 ? (
-            <span className="min-w-0 truncate mono text-micro text-graphite">
-              {[
-                firstDomain,
-                nameAliases.length > 0
-                  ? `also ${nameAliases.map((a) => a.value).join(' · ')}`
-                  : undefined,
-              ]
-                .filter((part) => part !== undefined)
-                .join(' · ')}
-            </span>
-          ) : null
-        }
         readouts={[
           {
             label: 'Last contact',
@@ -300,6 +260,12 @@ function CompanyRecordPage() {
                 : fmtPct(company.readouts.ownership.pct),
           },
         ]}
+      />
+
+      <RecordNotices
+        recordId={company.id}
+        duplicates={duplicates}
+        parked={enrichment.parked}
       />
 
       <RecordBody

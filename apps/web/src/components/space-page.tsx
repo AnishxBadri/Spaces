@@ -4,8 +4,8 @@ import {
   ArchiveRestore,
   CornerDownRight,
   Layers,
+  BookOpen,
   LayoutTemplate,
-  MessageSquareText,
   Pencil,
   Plus,
   Search,
@@ -32,11 +32,14 @@ import {
 import type { Space } from './space-tabs'
 import { TasksRail } from './tasks-rail'
 import { SaveAsTemplateAction } from './templates'
-import { SensitiveToggle } from './sensitive-toggle'
+import { useSensitiveItem } from './sensitive-toggle'
+import type { SensitivityState } from './sensitive-toggle'
 import { Button } from './ui/button'
+import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 import { MENU_RULE, MoreMenu } from './ui/more-menu'
 import { Input } from './ui/input'
 import { spaceStamp } from './ui/stamp'
+import type { StampProps } from './ui/stamp'
 import {
   archiveSpace,
   createNote,
@@ -45,11 +48,7 @@ import {
   restoreSpace,
   saveSpaceAsTemplate,
 } from '#/lib/server-fns'
-import type {
-  SpaceWatching,
-  getEntitySensitivity,
-  listTerms,
-} from '#/lib/server-fns'
+import type { SpaceWatching, listTerms } from '#/lib/server-fns'
 import {
   syncStarredSpaceName,
   toggleStarredSpace,
@@ -64,14 +63,14 @@ import { useWebSources } from '#/lib/ask/web-sources'
 import { useClock } from '#/components/clock'
 
 /**
- * A space reads like a record: the head with its stamp, crumb
- * and three readouts; the details column left (Criteria, Watching, What's
- * moving, Map, Glossary, Tasks); the tabbed view right. The route owns which
- * tab is open, and `into` — the subspace a split moves companies into.
+ * A space reads like a record: the head with its stamp and crumb, `···`
+ * its one control; the details column left (Criteria, Watching, What's
+ * moving, Map, Tasks); the tabbed view right. The glossary is a window the
+ * `···` opens. The route owns which tab is open, and `into` — the subspace a
+ * split moves companies into.
  */
 
 type Term = Awaited<ReturnType<typeof listTerms>>[number]
-type Sensitivity = Awaited<ReturnType<typeof getEntitySensitivity>>
 
 export function SpacePageView({
   spc,
@@ -85,7 +84,7 @@ export function SpacePageView({
 }: {
   spc: Space
   terms: Array<Term>
-  sensitivity: Sensitivity
+  sensitivity: SensitivityState
   watching: SpaceWatching
   tab: SpaceTab
   into: string | null
@@ -99,10 +98,11 @@ export function SpacePageView({
   const [renaming, setRenaming] = useState(false)
   const [moving, setMoving] = useState(false)
   const [composing, setComposing] = useState(false)
-  // ··· New subspace is a split: the new child becomes Move here's target.
+  // ··· Split into a subspace: the new child becomes Move here's target.
   const [splitting, setSplitting] = useState(false)
   const [templating, setTemplating] = useState(false)
   const [addingWatch, setAddingWatch] = useState(false)
+  const [glossary, setGlossary] = useState(false)
   const saveWatch = useAddWatch(spc.id)
   const archived = spc.archive !== null || spc.archivedUnder !== null
 
@@ -166,7 +166,7 @@ export function SpacePageView({
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
-        stamp={spaceStamp(spc.archive?.on ?? null)}
+        stamp={stampOf(spc.archive?.on ?? null, sensitivity)}
         archived={archived}
         {...(renaming
           ? {
@@ -204,45 +204,23 @@ export function SpacePageView({
           ),
         }}
         actions={
-          <>
-            <SensitiveToggle
-              entityId={spc.id}
-              state={sensitivity}
-              as="button"
-            />
-            <Button
-              variant="outline"
-              shortcut="N"
-              onClick={() => void newNote()}
-            >
-              Note here
-            </Button>
-            {/* Absent until a watch engine is installed. */}
-            {watching.installed.length > 0 ? (
-              <Button
-                variant="outline"
-                disabled={watching.engines.length === 0}
-                onClick={() => setAddingWatch(true)}
-              >
-                Add watch
-              </Button>
-            ) : null}
-            <SpaceMenu
-              id={spc.id}
-              name={spc.name}
-              criteria={spc.criteria}
-              archived={spc.archive !== null}
-              onRename={() => setRenaming(true)}
-              onSubspace={() => {
-                setSplitting(true)
-                setComposing(true)
-              }}
-              onMove={() => setMoving(true)}
-              onTemplate={() => setTemplating(true)}
-              onArchive={() => void archive()}
-              onRestore={() => void restore()}
-            />
-          </>
+          <SpaceMenu
+            id={spc.id}
+            name={spc.name}
+            criteria={spc.criteria}
+            archived={spc.archive !== null}
+            sensitivity={sensitivity}
+            onRename={() => setRenaming(true)}
+            onSubspace={() => {
+              setSplitting(true)
+              setComposing(true)
+            }}
+            onMove={() => setMoving(true)}
+            onTemplate={() => setTemplating(true)}
+            onGlossary={() => setGlossary(true)}
+            onArchive={() => void archive()}
+            onRestore={() => void restore()}
+          />
         }
         mark={
           /* The space mark: a paper tile on a hairline, never a circle. */
@@ -294,6 +272,13 @@ export function SpacePageView({
         onSave={saveWatch}
       />
 
+      <Dialog open={glossary} onOpenChange={setGlossary}>
+        <DialogContent size="m" aria-describedby={undefined}>
+          <DialogTitle className="sr-only">Glossary</DialogTitle>
+          <SpaceGlossary spaceId={spc.id} terms={terms} />
+        </DialogContent>
+      </Dialog>
+
       <RecordBody
         details={
           <>
@@ -306,6 +291,10 @@ export function SpacePageView({
               spaceId={spc.id}
               watching={watching}
               marked={markedWatch}
+              // Absent until an installed watch engine is enabled.
+              {...(watching.engines.length > 0
+                ? { onAdd: () => setAddingWatch(true) }
+                : {})}
             />
             <WhatsMovingLane signals={watching.moving} />
 
@@ -360,8 +349,6 @@ export function SpacePageView({
               />
             </RailSection>
 
-            <SpaceGlossary spaceId={spc.id} terms={terms} />
-
             <TasksRail
               entityId={spc.id}
               entityName={spc.name}
@@ -383,21 +370,34 @@ export function SpacePageView({
   )
 }
 
+/** A space's stamp: outlined once archived, locked while sensitive. */
+function stampOf(
+  archivedOn: string | null,
+  sensitivity: SensitivityState,
+): StampProps {
+  if (archivedOn !== null || sensitivity.sensitivity !== 'sensitive')
+    return spaceStamp(archivedOn)
+  return { kind: 'Space', state: 'sensitive' }
+}
+
 /**
- * The head's `···`: Star (kept per browser, which puts this space under
- * Spaces on the chassis), then Rename · New subspace · Move to… · Save as
- * template… · Archive.
+ * The head's `···`, the space head's one control: Find companies · Star
+ * (kept per browser, which puts this space under Spaces on the chassis) ·
+ * Rename · Move to… · Split into a subspace… · Save as template… ·
+ * Glossary…, then Sensitive, then Archive.
  * A star follows a rename here, the one place the name is read.
  */
-function SpaceMenu({
+export function SpaceMenu({
   id,
   name,
   criteria,
   archived,
+  sensitivity,
   onRename,
   onSubspace,
   onMove,
   onTemplate,
+  onGlossary,
   onArchive,
   onRestore,
 }: {
@@ -405,31 +405,29 @@ function SpaceMenu({
   name: string
   criteria: string | null
   archived: boolean
+  sensitivity: SensitivityState
   onRename: () => void
   onSubspace: () => void
   onMove: () => void
   onTemplate: () => void
+  onGlossary: () => void
   onArchive: () => void
   onRestore: () => void
 }) {
   const starred = useStarredSpaces().some((s) => s.id === id)
   const navigate = useNavigate()
   const finders = useWebSources()
+  const sensitive = useSensitiveItem(id, sensitivity)
   useEffect(() => syncStarredSpaceName({ id, name }), [id, name])
-  // Rename, New subspace, Move to… and Save as template… open a field or a
-  // window, so each runs once the menu's focus trap has let go; opened inside
-  // it, the autofocus is pulled back to the item, which unmounts and leaves
-  // focus on the body.
+  // Rename, Split, Move to…, Save as template… and Glossary… open a field or
+  // a window, so each runs once the menu's focus trap has let go; opened
+  // inside it, the autofocus is pulled back to the item, which unmounts and
+  // leaves focus on the body.
   return (
     <MoreMenu
       variant="head"
       label={name}
       items={[
-        {
-          label: 'Ask about this',
-          icon: <MessageSquareText className="size-4" />,
-          onSelect: () => openAsk(),
-        },
         // Opens Ask with this space and the web in scope.
         {
           label: 'Find companies',
@@ -453,15 +451,15 @@ function SpaceMenu({
           opens: true,
         },
         {
-          label: 'New subspace',
-          icon: <Plus className="size-4" />,
-          onSelect: onSubspace,
-          opens: true,
-        },
-        {
           label: 'Move to…',
           icon: <CornerDownRight className="size-4" />,
           onSelect: onMove,
+          opens: true,
+        },
+        {
+          label: 'Split into a subspace…',
+          icon: <Plus className="size-4" />,
+          onSelect: onSubspace,
           opens: true,
         },
         {
@@ -470,6 +468,14 @@ function SpaceMenu({
           onSelect: onTemplate,
           opens: true,
         },
+        {
+          label: 'Glossary…',
+          icon: <BookOpen className="size-4" />,
+          onSelect: onGlossary,
+          opens: true,
+        },
+        MENU_RULE,
+        sensitive,
         MENU_RULE,
         archived
           ? {
@@ -597,7 +603,7 @@ function NewSubspace({
   onCreated,
 }: {
   parentId: string
-  /** Open from the rail's row or the head's ··· New subspace. */
+  /** Open from the rail's row or the head's ··· Split into a subspace. */
   editing: boolean
   onEditingChange: (editing: boolean) => void
   /** The child exists; the page closes the field and reloads. */

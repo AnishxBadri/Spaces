@@ -10,6 +10,7 @@ import {
   jobStatusFigure,
   jobStatusFired,
   jobStatusInit,
+  jobToast,
 } from './job-status-view'
 
 /**
@@ -127,5 +128,36 @@ describe('the record head job status', () => {
     ])
     expect(decodeStatus('{')).toBeNull()
     expect(decodeInit(JSON.stringify({ rows: [{ status: 'odd' }] }))).toBeNull()
+  })
+})
+
+describe('the completion toast', () => {
+  it('names the plugin and says what it did', () => {
+    expect(jobToast(event('r1', 'succeeded'), 'Apollo')).toEqual({
+      message: 'Apollo filled 2 fields',
+      tone: 'done',
+      review: false,
+    })
+  })
+
+  it('offers Review when the summary sends the reader there', () => {
+    const found = {
+      ...event('r1', 'succeeded'),
+      summary: 'found 5 · brief in Review',
+    }
+    expect(jobToast(found, 'Exa')).toEqual({
+      message: 'Exa found 5 · brief in Review',
+      tone: 'done',
+      review: true,
+    })
+  })
+
+  it('is the error toast on a failure, and says nothing while running', () => {
+    expect(jobToast(event('r1', 'failed'), 'Apollo')).toEqual({
+      message: 'Apollo failed · permanent: Apollo said 403',
+      tone: 'bad',
+      review: false,
+    })
+    expect(jobToast(event('r1', 'running'), 'Apollo')).toBeNull()
   })
 })

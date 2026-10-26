@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Button } from './ui/button'
 import {
   getEntitySensitivity,
   isLaneRouted,
@@ -9,8 +8,8 @@ import {
 } from '#/lib/server-fns'
 
 /**
- * Summarize — the control on a Files-tab row (a document) and in a record's
- * header (the record itself), shaped like Read deck (`useDeckReader`).
+ * Summarize — the control on a Files-tab row (a document), shaped like Read
+ * deck (`useDeckReader`).
  * - The gate is asked once per record: the synthesize lane routed, a live
  *   credential, and a local model when the record resolves sensitive.
  * - The run is a polled worker job ending in a toast: the suggestion is in
@@ -128,24 +127,4 @@ export function useSummarizer(
       onSummarize: () => void start(sourceId),
     }
   }
-}
-
-/**
- * The record header's control: summarize what is filed on this record. No
- * button until the lane is routed at the record's sensitivity.
- */
-export function SummarizeRecordButton({ recordId }: { recordId: string }) {
-  const summarizerFor = useSummarizer(recordId, [recordId])
-  const summarizer = summarizerFor(recordId)
-  if (summarizer === null) return null
-  return (
-    <Button
-      variant="outline"
-      disabled={summarizer.summarizing}
-      onClick={summarizer.onSummarize}
-      title="Draft a note from this record’s notes and documents, as a suggestion"
-    >
-      {summarizer.summarizing ? 'Summarizing…' : 'Summarize'}
-    </Button>
-  )
 }

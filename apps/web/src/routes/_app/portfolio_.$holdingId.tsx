@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { LedgerRow, LedgerSection } from '#/components/ledger-section'
 import { useConfirm } from '#/components/ui/confirm-dialog'
@@ -9,8 +10,10 @@ import {
   RailRow,
   RailSection,
   RecordBody,
+  RecordHeadPending,
   RecordHeader,
 } from '#/components/record/record-parts'
+import { HoldingHeadActions } from '#/components/record/record-heads'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import {
@@ -51,6 +54,7 @@ import {
 
 export const Route = createFileRoute('/_app/portfolio_/$holdingId')({
   loader: async ({ params }) => getHolding({ data: { id: params.holdingId } }),
+  pendingComponent: () => <RecordHeadPending kind="Holding" />,
   component: HoldingPage,
 })
 
@@ -86,17 +90,28 @@ function HoldingPage() {
       <RecordHeader
         stamp={{ kind: 'Holding' }}
         actions={
-          <Button variant="outline" asChild>
-            <Link
-              to="/companies/$companyId"
-              params={{ companyId: h.companyId }}
-            >
-              Company record ›
-            </Link>
-          </Button>
+          <HoldingHeadActions
+            name={h.companyName}
+            recordMark={(trigger) => (
+              <AddMarkDialog holdingId={h.id} trigger={trigger} />
+            )}
+            recordCheck={(trigger) => (
+              <AddInvestmentDialog companyId={h.companyId} trigger={trigger} />
+            )}
+          />
         }
         mark={<DitherMark />}
-        name={h.companyName}
+        name={
+          // The holding is the company's position: its title is the way
+          // to the company.
+          <Link
+            to="/companies/$companyId"
+            params={{ companyId: h.companyId }}
+            className="focus-ring hover:underline"
+          >
+            {h.companyName}
+          </Link>
+        }
         badges={
           missing.length > 0 ? (
             // Amber is named, not resolved: `optionColor` returns a stored
@@ -547,7 +562,14 @@ const DIST_KIND_ITEMS = [
 ] as const
 type DistKind = (typeof DIST_KIND_ITEMS)[number]['value']
 
-function AddInvestmentDialog({ companyId }: { companyId: string }) {
+function AddInvestmentDialog({
+  companyId,
+  trigger = <AddTrigger label="Add check" />,
+}: {
+  companyId: string
+  /** Its opener: the section's add row, or the head's verb. */
+  trigger?: ReactNode
+}) {
   const f = useEventForm(() => {})
   const [form, setForm] = useState<{
     date: string
@@ -570,9 +592,7 @@ function AddInvestmentDialog({ companyId }: { companyId: string }) {
     setForm((s) => ({ ...s, [k]: e.target.value }))
   return (
     <Dialog open={f.open} onOpenChange={f.setOpen}>
-      <DialogTrigger asChild>
-        <AddTrigger label="Add check" />
-      </DialogTrigger>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent size="s" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Record a check</DialogTitle>
@@ -817,7 +837,14 @@ function AddRoundDialog({ companyId }: { companyId: string }) {
   )
 }
 
-function AddMarkDialog({ holdingId }: { holdingId: string }) {
+function AddMarkDialog({
+  holdingId,
+  trigger = <AddTrigger label="Add mark" />,
+}: {
+  holdingId: string
+  /** Its opener: the section's add row, or the head's verb. */
+  trigger?: ReactNode
+}) {
   const f = useEventForm(() => {})
   const [form, setForm] = useState<{
     date: string
@@ -834,9 +861,7 @@ function AddMarkDialog({ holdingId }: { holdingId: string }) {
     setForm((s) => ({ ...s, [k]: e.target.value }))
   return (
     <Dialog open={f.open} onOpenChange={f.setOpen}>
-      <DialogTrigger asChild>
-        <AddTrigger label="Add mark" />
-      </DialogTrigger>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent size="s" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Record a mark</DialogTitle>

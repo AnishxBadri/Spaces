@@ -8,7 +8,6 @@ import {
 } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
-import { Button } from '#/components/ui/button'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { RailField } from '#/components/attributes/rail-field'
 import { AiCellsProvider } from '#/components/attributes/ai-cell'
@@ -19,8 +18,12 @@ import {
   RailItem,
   RailSection,
   RecordBody,
+  RecordHeadPending,
   RecordHeader,
 } from '#/components/record/record-parts'
+import { RecordHeadActions } from '#/components/record/record-heads'
+import { RecordNotices } from '#/components/record/record-notices'
+import { sensitiveStamp } from '#/components/sensitive-toggle'
 import { DetailsPickRow } from '#/components/record/details-add'
 import {
   RelationSection,
@@ -36,8 +39,6 @@ import {
   LogComposerRow,
   LogInteractionDialog,
 } from '#/components/log-interaction-dialog'
-import { SensitiveToggle } from '#/components/sensitive-toggle'
-import { SummarizeRecordButton } from '#/components/summarize'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordHistory, RecordInteractions } from '#/components/record-timeline'
@@ -45,10 +46,9 @@ import type { InteractionFilter } from '#/lib/timeline/interaction-filter'
 import type { NotesFilter } from '#/lib/notes/notes-filter'
 import { TasksRail } from '#/components/tasks-rail'
 import { WaitingRail } from '#/components/record/waiting-rail'
-import { PluginActions } from '#/components/record/plugin-actions'
 import { recordPath } from '#/lib/record-path'
 import { collisionToast } from '#/lib/attributes/collision-toast'
-import { jsonString, jsonStrings } from '@spaces/core/json'
+import { jsonString } from '@spaces/core/json'
 import { isNamePart } from '@spaces/core/attributes/person-name'
 import { fileInSpaceAction } from '#/lib/file-in-space'
 import { runBinding, usePageActions } from '#/lib/page-actions'
@@ -68,6 +68,7 @@ import {
   getRecordTimeline,
   listRecordActions,
   listRecordDocuments,
+  listRecordDuplicates,
   listRecordNotes,
   listRegistry,
   listSpaces,
@@ -75,7 +76,6 @@ import {
   setPersonCompany,
   updateRecord,
 } from '#/lib/server-fns'
-import { RecordMoreMenu } from '#/components/record/record-more-menu'
 
 /**
  * A person's page: the head and readouts, then the details column —
@@ -96,6 +96,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       sensitivity,
       pluginActions,
       enrichment,
+      duplicates,
     ] = await Promise.all([
       getPerson({ data: { id: params.personId } }),
       listSpaces(),
@@ -110,6 +111,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       getRecordEnrichment({
         data: { entityId: params.personId, kind: 'person' },
       }),
+      listRecordDuplicates({ data: { entityId: params.personId } }),
     ])
     if (personData.mergedIntoId) {
       throw redirect({
@@ -128,8 +130,10 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       sensitivity,
       pluginActions,
       enrichment,
+      duplicates,
     }
   },
+  pendingComponent: () => <RecordHeadPending kind="Person" />,
   component: PersonRecordPage,
 })
 
@@ -145,6 +149,7 @@ function PersonRecordPage() {
     sensitivity,
     pluginActions,
     enrichment,
+    duplicates,
   } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
@@ -162,15 +167,13 @@ function PersonRecordPage() {
   const [interactionFilter, setInteractionFilter] =
     useState<InteractionFilter>('all')
 
-  // Identity is an attribute: the first email names the record.
-  const firstEmail = jsonStrings(person.values.emails).at(0)
   const role = jsonString(person.values.job_title)
   // Both sides of each relationship come from the one resolver.
   const companies = relationRows(person.relations, 'companies', false)
   const deals = relationRows(person.relations, 'deals', true)
   const values = withDerived(person.values, person.relations)
-  // Beside the name: `role · company`, then the first email.
-  const nameMeta = [role, companies.at(0)?.name, firstEmail]
+  // Beside the name: `role · company`.
+  const nameMeta = [role, companies.at(0)?.name]
     .filter((part) => part !== null && part !== undefined && part !== '')
     .join(' · ')
   // The name's parts lead the grid; the head is their join.
@@ -231,30 +234,15 @@ function PersonRecordPage() {
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
-        stamp={{ kind: 'Person' }}
+        stamp={sensitiveStamp('Person', sensitivity)}
         actions={
-          <>
-            <SensitiveToggle entityId={person.id} state={sensitivity} />
-            <SummarizeRecordButton recordId={person.id} />
-            <PluginActions
-              entityId={person.id}
-              actions={pluginActions}
-              enrich={enrichment}
-            />
-            <LogInteractionDialog
-              seed={{ id: person.id, name: person.name, kind: 'person' }}
-              hotkey="l"
-              trigger={
-                <Button variant="outline" shortcut="L">
-                  Log interaction
-                </Button>
-              }
-            />
-            <Button variant="outline" onClick={newNoteAboutThis}>
-              Note about this
-            </Button>
-            <RecordMoreMenu name={person.name} />
-          </>
+          <RecordHeadActions
+            record={{ id: person.id, name: person.name, kind: 'person' }}
+            enrich={enrichment}
+            sensitivity={sensitivity}
+            template="person"
+            pluginActions={pluginActions}
+          />
         }
         mark={
           <RecordPicture
@@ -292,6 +280,12 @@ function PersonRecordPage() {
             ),
           },
         ]}
+      />
+
+      <RecordNotices
+        recordId={person.id}
+        duplicates={duplicates}
+        parked={enrichment.parked}
       />
 
       <RecordBody

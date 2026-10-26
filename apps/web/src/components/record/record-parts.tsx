@@ -3,6 +3,7 @@ import { createContext, useContext } from 'react'
 import type { ComponentProps, ReactNode } from 'react'
 import { HeadActions, HeadBar, useHeadFold } from '#/components/head-fold'
 import { EmptyRow, SectionHead } from '#/components/ledger-section'
+import { Twinkle } from '#/components/twinkle'
 import { Stamp } from '#/components/ui/stamp'
 import type { StampProps } from '#/components/ui/stamp'
 import { cn } from '#/lib/utils'
@@ -76,7 +77,7 @@ export function RecordHeader({
       <HeadBar fold={fold} title={name} mark={mark} />
       <header
         className={cn(
-          'flex shrink-0 flex-col gap-3 px-8 pt-5 pb-4 double-rule',
+          'flex shrink-0 flex-col gap-3 px-6 pt-5 pb-4 double-rule',
           archived && 'double-rule-archived',
         )}
       >
@@ -117,6 +118,33 @@ export function RecordHeader({
         </div>
       </header>
     </>
+  )
+}
+
+/**
+ * A record head while its page loads, for a route's `pendingComponent`: the
+ * stamp, the mark twinkling, the title graphite, and no verbs.
+ */
+export function RecordHeadPending({ kind }: { kind: string }) {
+  return (
+    <div className="flex min-h-full flex-col">
+      <header
+        data-record-pending
+        className="flex shrink-0 flex-col gap-3 px-6 pt-5 pb-4 double-rule"
+      >
+        <div data-stamp-row className="flex">
+          <Stamp kind={kind} />
+        </div>
+        <div className="flex min-w-0 items-center gap-3.5">
+          <span className="flex size-7 shrink-0 items-center justify-center border border-hairline bg-paper">
+            <Twinkle label={`Loading the ${kind.toLowerCase()}`} />
+          </span>
+          <h1 className="min-w-0 truncate title-serif text-graphite">
+            Loading…
+          </h1>
+        </div>
+      </header>
+    </div>
   )
 }
 

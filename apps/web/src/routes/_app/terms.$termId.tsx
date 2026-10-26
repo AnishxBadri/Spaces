@@ -5,12 +5,13 @@ import {
   useNavigate,
 } from '@tanstack/react-router'
 import { toast } from 'sonner'
-import { Button } from '#/components/ui/button'
 import {
   DitherMark,
   RecordBody,
+  RecordHeadPending,
   RecordHeader,
 } from '#/components/record/record-parts'
+import { TermHeadActions } from '#/components/record/record-heads'
 import {
   CoMentioned,
   CompaniesReached,
@@ -19,11 +20,10 @@ import {
 import { createNote, getTermPage } from '#/lib/server-fns'
 
 /**
- * A term's page — the concept node. The record shape: caps mono crumb, serif
- * name, a readout strip, the body left and the bone rail right. There is no
- * actions menu — nothing is filed, tagged or attached
- * into a term — and the term is edited where it is defined, in its space's
- * glossary.
+ * A term's page — the concept node. The record shape: the stamp, the serif
+ * name with its `Terms / <space>` path, Write a note and the `···`, the body
+ * left and the bone rail right. Nothing is filed, tagged or attached into a
+ * term, and the term is edited where it is defined, in its space's glossary.
  */
 export const Route = createFileRoute('/_app/terms/$termId')({
   loader: async ({ params }) => {
@@ -31,6 +31,7 @@ export const Route = createFileRoute('/_app/terms/$termId')({
     if (!page) throw notFound()
     return page
   },
+  pendingComponent: () => <RecordHeadPending kind="Term" />,
   component: TermPage,
 })
 
@@ -72,6 +73,12 @@ function TermPage() {
             </>
           ),
         }}
+        actions={
+          <TermHeadActions
+            name={term.name}
+            onWriteNote={() => void writeNote()}
+          />
+        }
         mark={<DitherMark />}
         name={term.name}
         readouts={[
@@ -99,13 +106,7 @@ function TermPage() {
             <span className="text-graphite">No definition yet.</span>
           )}
         </p>
-        <TermMentions
-          rows={mentions.rows}
-          total={mentions.total}
-          action={
-            <Button onClick={() => void writeNote()}>Write a note</Button>
-          }
-        />
+        <TermMentions rows={mentions.rows} total={mentions.total} />
       </RecordBody>
     </div>
   )

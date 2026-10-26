@@ -42,6 +42,8 @@ import type { ResolvedRef } from '@spaces/core/writes/context/names'
 import { jsonRecord, jsonString } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
 import { entityContext } from './context'
+import { duplicateOf } from '../records/notices'
+import type { RecordDuplicate } from '../records/notices'
 import { JUDGMENT, JUDGMENT_REF } from './review-groups'
 import type { InboxSide } from './context'
 
@@ -832,6 +834,20 @@ export const listInboxProgram = Effect.fn('listInboxProgram')(function* (
     x.latestAt === y.latestAt ? 0 : x.latestAt < y.latestAt ? 1 : -1,
   )
 })
+
+/**
+ * The open sweep pairs `entityId` is either side of, read from its side —
+ * the record notices band's "Possibly the same as" lines. The duplicate
+ * lane's own query, so the band and Review never disagree.
+ */
+export const recordDuplicatesProgram = Effect.fn('recordDuplicatesProgram')(
+  function* (
+    entityId: string,
+  ): Effect.fn.Return<Array<RecordDuplicate>, InboxQueryFailed> {
+    const pairs = yield* listDuplicateLane({ record: entityId })
+    return pairs.map((pair) => duplicateOf(pair, entityId))
+  },
+)
 
 /** The record the inbox is scoped to, named for the header's chip. */
 export type InboxScopeRecord = { id: string; name: string }

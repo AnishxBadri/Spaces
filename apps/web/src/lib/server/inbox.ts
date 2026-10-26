@@ -39,6 +39,7 @@ export type {
 /** One side of a pair: the record plus everything the card compares. */
 export type { InboxSide } from '../inbox/context'
 export type { SuggestionKind } from '@spaces/core/writes/suggestions/propose'
+export type { RecordDuplicate } from '../records/notices'
 
 /**
  * The queue, optionally scoped to one record (the record rail's "Waiting"
@@ -79,6 +80,16 @@ export const listInbox = createServerFn()
         : effectFn(inboxFilterLabelsProgram)(source, space),
     ])
     return { rows, scope, filter }
+  })
+
+/** The open duplicate pairs a record is in, for its notices band. */
+export const listRecordDuplicates = createServerFn()
+  .validator(z.object({ entityId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { recordDuplicatesProgram } = await import('../inbox/queue')
+    const { effectFn } = await import('./effect')
+    return effectFn(recordDuplicatesProgram)(data.entityId)
   })
 
 export const mergeDuplicate = createServerFn({ method: 'POST' })

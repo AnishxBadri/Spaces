@@ -18,6 +18,7 @@ import type * as TabsModule from './space-tabs'
 import type * as FilingModule from './filing-row'
 import type * as RailRowModule from './record/space-rail-row'
 import type { Space } from './space-tabs'
+import type { SensitivityState } from './sensitive-toggle'
 import type * as PrefModule from '#/lib/record-tab-pref'
 import type * as RouterModule from '@tanstack/react-router'
 import type { SpaceTab } from '#/lib/spaces/page'
@@ -312,7 +313,11 @@ async function mount(
   tab: SpaceTab,
   onTabChange = (_: SpaceTab) => {},
   watching: SpaceWatching = noWatches,
-  opts: { into?: string; space?: Space } = {},
+  opts: {
+    into?: string
+    space?: Space
+    sensitivity?: SensitivityState
+  } = {},
 ) {
   const shown = opts.space ?? spc
   const { SpacePageView } = page
@@ -331,7 +336,7 @@ async function mount(
       <SpacePageView
         spc={shown}
         terms={terms}
-        sensitivity={{ sensitivity: 'normal', own: false }}
+        sensitivity={opts.sensitivity ?? { sensitivity: 'normal', own: false }}
         watching={served.current}
         tab={tab}
         into={opts.into ?? null}
@@ -400,21 +405,28 @@ describe('the space head', () => {
       )
       .map((b) => text(b))
 
-  it('draws Not sensitive as a toggle button beside Note here, and no Add watch with no engine installed', async () => {
-    await mount('notes')
-    expect(headButtons()).toEqual(['Not sensitive', 'Note here'])
-    const toggle = buttonNamed(/^Not sensitive$/)
-    expect(toggle.getAttribute('aria-pressed')).toBe('false')
-    expect(header().querySelector('[role="switch"]')).toBeNull()
-  })
-
-  it('adds Add watch once a watch engine is installed', async () => {
+  it('is ··· only: no Sensitive, Note here or Add watch, even with an engine installed', async () => {
     await mount('notes', undefined, {
       ...noWatches,
       engines: [exa],
       installed: ['Exa'],
     })
-    expect(headButtons()).toEqual(['Not sensitive', 'Note here', 'Add watch'])
+    expect(headButtons()).toEqual([])
+    expect(buttonNamed(/^More for Property ops$/)).not.toBeNull()
+    expect(header().querySelector('[role="switch"]')).toBeNull()
+  })
+
+  it('locks the stamp while the space is sensitive', async () => {
+    await mount('notes', undefined, noWatches, {
+      sensitivity: {
+        sensitivity: 'sensitive',
+        via: { kind: 'own' },
+        own: true,
+      },
+    })
+    const stamp = header().querySelector('[data-stamp]')
+    expect(stamp?.getAttribute('data-stamp')).toBe('sensitive')
+    expect(text(stamp)).toBe('SpaceSensitive')
   })
 
   it('draws no readout strip in the head: the readouts are the Overview tab’s', async () => {
@@ -425,14 +437,14 @@ describe('the space head', () => {
 })
 
 describe('the details column', () => {
-  it("holds Criteria, Watching and What's moving above Map, Glossary and Tasks", async () => {
+  it("holds Criteria, Watching and What's moving above Map and Tasks, and no Glossary", async () => {
     await mount('notes')
     const column = document.querySelector('aside[aria-label="Details"]')
     const heads = Array.from(column?.querySelectorAll('h2') ?? []).map((h) =>
       text(h),
     )
     // Tasks holds nothing here, so it has no head: it is its `Tasks +` row.
-    expect(heads).toEqual(['Watching', "What's moving", 'Map', 'Glossary'])
+    expect(heads).toEqual(['Watching', "What's moving", 'Map'])
     const sections = Array.from(
       column?.querySelectorAll('section[aria-label]') ?? [],
     ).map((s) => s.getAttribute('aria-label'))
@@ -446,8 +458,10 @@ describe('the details column', () => {
     expect(column?.className).toContain('xl:w-80')
   })
 
-  it('marks an inherited term with the space it came from', async () => {
+  it('opens the glossary from ···, marking an inherited term with the space it came from', async () => {
     await mount('notes')
+    expect(document.querySelector('[data-term="NOI"]')).toBeNull()
+    await chooseFromMenu('Glossary…')
     const inherited = document.querySelector('[data-term="Cap rate"]')
     expect(text(inherited)).toContain('from Proptech')
     const own = document.querySelector('[data-term="NOI"]')
@@ -605,7 +619,7 @@ describe('the Companies tab', () => {
   })
 })
 
-describe('split: New subspace, then Move here (D73)', () => {
+describe('split: Split into a subspace, then Move here (D73)', () => {
   const LEASING = '00000000-0000-4000-8000-000000000003'
   const bar = () => document.querySelector('[data-selection-bar]')
   const boxes = () =>
@@ -633,8 +647,8 @@ describe('split: New subspace, then Move here (D73)', () => {
     })
     const item = Array.from(
       document.querySelectorAll('[role="menuitem"]'),
-    ).find((el) => text(el) === 'New subspace')
-    if (!(item instanceof HTMLElement)) throw new Error('no New subspace')
+    ).find((el) => text(el) === 'Split into a subspace…')
+    if (!(item instanceof HTMLElement)) throw new Error('no Split')
     await act(async () => item.click())
     await settle()
     const field = document.querySelector('input[aria-label="Subspace name"]')
@@ -999,9 +1013,20 @@ describe('Add watch', () => {
     expect(() => buttonNamed(/^Add watch$/)).toThrow()
   })
 
-  it('is off while no installed engine is enabled', async () => {
+  it('is absent while no installed engine is enabled', async () => {
     await mount('notes', undefined, { ...noWatches, installed: ['Exa'] })
-    expect(buttonNamed(/^Add watch$/).disabled).toBe(true)
+    expect(() => buttonNamed(/^Add watch$/)).toThrow()
+  })
+
+  it('is the Watching head’s +, never a head button', async () => {
+    await mount('notes', undefined, {
+      ...noWatches,
+      engines: [exa],
+      installed: ['Exa'],
+    })
+    const add = buttonNamed(/^Add watch$/)
+    expect(add.closest('section')?.getAttribute('aria-label')).toBe('Watching')
+    expect(text(add)).toBe('+')
   })
 })
 

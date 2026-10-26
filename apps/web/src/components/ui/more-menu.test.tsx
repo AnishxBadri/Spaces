@@ -5,7 +5,7 @@ import type { Root } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { MENU_RULE, MoreMenu } from './more-menu'
+import { MENU_RULE, MoreMenu, menuLayout } from './more-menu'
 import type { MoreMenuEntry } from './more-menu'
 
 /**
@@ -206,5 +206,38 @@ describe('MoreMenu', () => {
     await flush()
     expect(writeText).toHaveBeenCalledWith('http://localhost/companies/x')
     expect(rows()).toEqual(['Ask about this', 'Copied'])
+  })
+})
+
+describe('menuLayout with groups', () => {
+  const item = (label: string) => ({ label, onSelect: noop })
+
+  it('keeps a group over its items, after a rule', () => {
+    const laid = menuLayout([
+      item('Copy link'),
+      MENU_RULE,
+      { group: 'Exa' },
+      item('Find similar'),
+    ])
+    expect(
+      laid.map((e) =>
+        typeof e === 'string' ? e : 'group' in e ? `[${e.group}]` : e.label,
+      ),
+    ).toEqual(['Copy link', MENU_RULE, '[Exa]', 'Find similar'])
+  })
+
+  it('drops a group that heads nothing, and the rule before it', () => {
+    const laid = menuLayout([
+      item('Copy link'),
+      MENU_RULE,
+      { group: 'Exa' },
+      MENU_RULE,
+      { group: 'Apollo' },
+    ])
+    expect(laid).toEqual(
+      [item('Copy link')].map((e) =>
+        expect.objectContaining({ label: e.label }),
+      ),
+    )
   })
 })

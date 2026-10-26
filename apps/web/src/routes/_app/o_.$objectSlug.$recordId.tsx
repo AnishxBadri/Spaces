@@ -16,8 +16,13 @@ import {
   RailItem,
   RailSection,
   RecordBody,
+  RecordHeadPending,
   RecordHeader,
 } from '#/components/record/record-parts'
+import { RecordHeadActions } from '#/components/record/record-heads'
+import { RecordNotices } from '#/components/record/record-notices'
+import { sensitiveStamp } from '#/components/sensitive-toggle'
+import { linksPeople } from '#/lib/records/head'
 import { PropertyFold } from '#/components/record/property-fold'
 import {
   RelationSections,
@@ -36,9 +41,6 @@ import {
   LogInteractionDialog,
 } from '#/components/log-interaction-dialog'
 import { TasksRail } from '#/components/tasks-rail'
-import { SensitiveToggle } from '#/components/sensitive-toggle'
-import { SummarizeRecordButton } from '#/components/summarize'
-import { Button } from '#/components/ui/button'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { objectIcon } from '#/lib/object-icons'
 import { recordPath } from '#/lib/record-path'
@@ -58,20 +60,20 @@ import {
   getObjectRecord,
   getRecordTimeline,
   listRecordDocuments,
+  listRecordDuplicates,
   getEntitySensitivity,
   listRecordNotes,
   listRegistry,
   listSpaces,
   updateRecord,
 } from '#/lib/server-fns'
-import { RecordMoreMenu } from '#/components/record/record-more-menu'
 
 /**
  * The registry-generated record page for a custom object: a
  * company's anatomy minus enrichment. The details column holds the grid
  * from the registry, the records that point here, Spaces and Tasks; the
- * head logs an interaction (`L`) and adds a task (`T`). A record merged
- * away redirects to its winner from the loader.
+ * head logs an interaction (`L`) when the object links people. A record
+ * merged away redirects to its winner from the loader.
  */
 export const Route = createFileRoute('/_app/o_/$objectSlug/$recordId')({
   validateSearch: recordSearch,
@@ -87,21 +89,30 @@ export const Route = createFileRoute('/_app/o_/$objectSlug/$recordId')({
           recordId: record.mergedIntoId,
         },
       })
-    const [registry, timeline, documents, spaces, notes, waiting, sensitivity] =
-      await Promise.all([
-        // Derived halves too: their rows read the resolver's value.
-        listRegistry({
-          data: { objectId: record.object.id, includeDerived: true },
-        }),
-        getRecordTimeline({ data: { entityId: record.id } }),
-        listRecordDocuments({ data: { entityId: record.id } }),
-        listSpaces(),
-        // A custom record is an entity like any other, so the lanes need only
-        // its id — the object slug is the page's, never the note row's.
-        listRecordNotes({ data: { entityId: record.id } }),
-        countOpenSuggestions({ data: { entityId: record.id } }),
-        getEntitySensitivity({ data: { entityId: record.id } }),
-      ])
+    const [
+      registry,
+      timeline,
+      documents,
+      spaces,
+      notes,
+      waiting,
+      sensitivity,
+      duplicates,
+    ] = await Promise.all([
+      // Derived halves too: their rows read the resolver's value.
+      listRegistry({
+        data: { objectId: record.object.id, includeDerived: true },
+      }),
+      getRecordTimeline({ data: { entityId: record.id } }),
+      listRecordDocuments({ data: { entityId: record.id } }),
+      listSpaces(),
+      // A custom record is an entity like any other, so the lanes need only
+      // its id — the object slug is the page's, never the note row's.
+      listRecordNotes({ data: { entityId: record.id } }),
+      countOpenSuggestions({ data: { entityId: record.id } }),
+      getEntitySensitivity({ data: { entityId: record.id } }),
+      listRecordDuplicates({ data: { entityId: record.id } }),
+    ])
     return {
       record,
       registry,
@@ -111,8 +122,10 @@ export const Route = createFileRoute('/_app/o_/$objectSlug/$recordId')({
       notes,
       waiting,
       sensitivity,
+      duplicates,
     }
   },
+  pendingComponent: () => <RecordHeadPending kind="Record" />,
   component: ObjectRecordPage,
 })
 
@@ -126,6 +139,7 @@ function ObjectRecordPage() {
     notes,
     waiting,
     sensitivity,
+    duplicates,
   } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
@@ -163,9 +177,21 @@ function ObjectRecordPage() {
     }
   }
 
+  // Interactions are logged with people: only an object that links them
+  // logs one.
+  const logs = linksPeople(registry)
   usePageActions(
     [
-      { id: 'log', label: 'Log interaction', key: 'L', run: runBinding('L') },
+      ...(logs
+        ? [
+            {
+              id: 'log',
+              label: 'Log interaction',
+              key: 'L',
+              run: runBinding('L'),
+            },
+          ]
+        : []),
       { id: 'task', label: 'Add task', key: 'T', run: runBinding('T') },
       fileInSpaceAction({
         id: record.id,
@@ -179,29 +205,13 @@ function ObjectRecordPage() {
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
-        stamp={{ kind: record.object.singular }}
+        stamp={sensitiveStamp(record.object.singular, sensitivity)}
         actions={
-          <>
-            <SensitiveToggle entityId={record.id} state={sensitivity} />
-            <SummarizeRecordButton recordId={record.id} />
-            <LogInteractionDialog
-              seed={{ id: record.id, name: record.name, kind: 'custom' }}
-              hotkey="l"
-              trigger={
-                <Button variant="outline" shortcut="L">
-                  Log interaction
-                </Button>
-              }
-            />
-            {/* Opens the Tasks section's composer, which `T` binds. */}
-            <Button variant="outline" shortcut="T" onClick={runBinding('T')}>
-              Task
-            </Button>
-            <Button variant="outline" onClick={newNoteAboutThis}>
-              Note about this
-            </Button>
-            <RecordMoreMenu name={record.name} />
-          </>
+          <RecordHeadActions
+            record={{ id: record.id, name: record.name, kind: 'custom' }}
+            log={logs}
+            sensitivity={sensitivity}
+          />
         }
         mark={
           <span className="flex size-7 shrink-0 items-center justify-center border border-hairline bg-paper">
@@ -239,6 +249,8 @@ function ObjectRecordPage() {
           },
         ]}
       />
+
+      <RecordNotices recordId={record.id} duplicates={duplicates} />
 
       <RecordBody
         details={

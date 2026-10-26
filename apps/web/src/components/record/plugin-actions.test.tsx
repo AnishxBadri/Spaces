@@ -1,154 +1,90 @@
-import {
-  RouterProvider,
-  createMemoryHistory,
-  createRootRoute,
-  createRouter,
-} from '@tanstack/react-router'
-import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import type { RecordAction } from '#/lib/server-fns'
-import { PluginActions } from './plugin-actions.tsx'
+import { enrichTitle, enrichToast, offeredActions } from './plugin-actions.tsx'
 import type { RecordEnrichView } from './plugin-actions.tsx'
 
 /**
- * The record head's plugin controls: one outline button per action the loader
- * handed it, labelled as the manifest declares, and nothing at all when no
- * runnable plugin declares one on this kind.
+ * The host's Enrich and the plugins' actions, as data: which actions a head
+ * offers, what Enrich's tooltip says, and the toast a finished run leaves.
+ * The rendered head is `record-heads.test.tsx`'s.
  */
 
-const enrich: RecordAction = {
+const action = (over: Partial<RecordAction>): RecordAction => ({
   integrationId: 'f1f0b6f2-7c1e-4f0a-9d2a-000000000001',
   pluginId: 'apollo',
   pluginName: 'Apollo',
   actionId: 'enrich-company',
   label: 'Enrich',
   queue: 'plugin.apollo.enrichCompany',
-}
+  ...over,
+})
 
-describe('PluginActions', () => {
-  it('renders the declared action as a record-head button', () => {
-    const html = renderToStaticMarkup(
-      <PluginActions
-        entityId="f1f0b6f2-7c1e-4f0a-9d2a-0000000000aa"
-        actions={[enrich]}
-      />,
-    )
-    expect(html.match(/<button/g)).toHaveLength(1)
-    expect(html).toContain('>Enrich</button>')
-    expect(html).toContain('data-variant="outline"')
-    expect(html).toContain('title="Enrich with Apollo"')
+const view = (over: Partial<RecordEnrichView>): RecordEnrichView => ({
+  sources: ['Website'],
+  onlyFree: true,
+  sensitive: false,
+  last: null,
+  whereFrom: {},
+  parked: null,
+  audience: { isAdmin: true, admins: ['Anish'] },
+  kind: 'company',
+  ...over,
+})
+
+describe('offeredActions', () => {
+  const similar = action({
+    pluginId: 'exa',
+    pluginName: 'Exa',
+    actionId: 'find-similar',
+    label: 'Find similar',
+    queue: 'plugin.exa.findSimilar',
   })
 
-  it('renders nothing when no plugin offers an action', () => {
-    expect(
-      renderToStaticMarkup(
-        <PluginActions
-          entityId="f1f0b6f2-7c1e-4f0a-9d2a-0000000000aa"
-          actions={[]}
-        />,
-      ),
-    ).toBe('')
+  it('drops a source’s own Enrich where the host’s Enrich asks every source', () => {
+    expect(offeredActions([action({}), similar], true)).toEqual([similar])
+  })
+
+  it('offers everything where no host Enrich runs', () => {
+    expect(offeredActions([action({}), similar], false)).toHaveLength(2)
   })
 })
 
-/**
- * The host's Enrich: one button asking every source in order,
- * the line beside it naming them, then how the last run went.
- */
-describe('the host Enrich', () => {
-  const ENTITY = 'f1f0b6f2-7c1e-4f0a-9d2a-0000000000aa'
-  const admin = { isAdmin: true, admins: ['Anish'] }
-  const view = (over: Partial<RecordEnrichView>): RecordEnrichView => ({
-    sources: ['Website'],
-    onlyFree: true,
-    sensitive: false,
-    last: null,
-    whereFrom: {},
-    audience: admin,
-    kind: 'company',
-    ...over,
+describe('enrichTitle', () => {
+  it('names the sources it asks, in order', () => {
+    expect(enrichTitle(view({ sources: ['Website', 'Apollo'] }))).toBe(
+      'Enrich from Website, then Apollo',
+    )
   })
 
-  async function render(
-    enrichView: RecordEnrichView,
-    actions: ReadonlyArray<RecordAction> = [],
-  ) {
-    const router = createRouter({
-      routeTree: createRootRoute({
-        component: () => (
-          <PluginActions
-            entityId={ENTITY}
-            actions={actions}
-            enrich={enrichView}
-          />
-        ),
+  it('says what a sensitive record keeps to', () => {
+    expect(enrichTitle(view({ sensitive: true }))).toBe(
+      'Enrich from Website · sensitive: Website only',
+    )
+    expect(enrichTitle(view({ sensitive: true, onlyFree: false }))).toContain(
+      'sensitive: local sources only',
+    )
+  })
+})
+
+describe('enrichToast', () => {
+  it('says how the run went, and offers Review when it left a card', () => {
+    expect(
+      enrichToast({
+        words: '6 fields · 1 to Review',
+        tone: 'done',
+        review: true,
       }),
-      history: createMemoryHistory({ initialEntries: ['/'] }),
+    ).toEqual({
+      message: 'Enrich · 6 fields · 1 to Review',
+      tone: 'done',
+      review: true,
     })
-    await router.load()
-    return renderToStaticMarkup(<RouterProvider router={router} />)
-  }
-
-  it('asks the Website and offers more sources in place when only it is on', async () => {
-    const html = await render(view({}))
-    expect(html).toContain('>Enrich</button>')
-    expect(html).toContain('>Website, then </span>')
-    expect(html).toContain('href="/settings/enrichment"')
-    expect(html).toContain('More sources ›')
-    expect(html).not.toContain('Free sources only')
-
-    const member = await render(
-      view({ audience: { isAdmin: false, admins: ['Anish'] } }),
-    )
-    expect(member).toContain('>Enrich</button>')
-    expect(member).toContain('Ask Anish to set up more enrichment sources')
   })
 
-  it('never asks a company for a model: the Website needs none', async () => {
-    const html = await render(view({}))
-    expect(html).not.toContain('needs a model')
-    expect(html).not.toContain('href="/settings/models"')
-    expect(await render(view({ sources: [], kind: 'person' }))).not.toContain(
-      '<button',
-    )
-  })
-
-  it('draws one Enrich naming every source in order, in place of a source’s own', async () => {
-    const html = await render(
-      view({ sources: ['Website', 'Apollo'], onlyFree: false }),
-      [enrich],
-    )
-    expect(html.match(/>Enrich<\/button>/g)).toHaveLength(1)
-    expect(html).toContain('Website, then Apollo')
-    expect(html).not.toContain('More sources')
-  })
-
-  it('shows how the last run went: counts with Review, a limit with its reset, sensitive', async () => {
-    const done = await render(
-      view({
-        sources: ['Website', 'Apollo'],
-        onlyFree: false,
-        last: { words: '6 fields · 1 to Review', tone: 'done', review: true },
-      }),
-    )
-    expect(done).toContain('6 fields · 1 to Review')
-    expect(done).toContain('data-enrich-line="done"')
-    expect(done).toContain('href="/review"')
-
-    const capped = await render(
-      view({
-        onlyFree: false,
-        last: {
-          words: 'Apollo limit reached · runs at 00:00 UTC',
-          tone: 'warn',
-          review: false,
-        },
-      }),
-    )
-    expect(capped).toContain('Apollo limit reached · runs at 00:00 UTC')
-
-    const sensitive = await render(view({ sensitive: true }))
-    expect(sensitive).toContain('sensitive · Website only')
+  it('is the error toast when the run failed', () => {
+    expect(
+      enrichToast({ words: 'timeout', tone: 'bad', review: false }).tone,
+    ).toBe('bad')
   })
 })

@@ -141,11 +141,14 @@ export function WatchingLane({
   spaceId,
   watching,
   marked = null,
+  onAdd,
 }: {
   spaceId: string
   watching: Pick<SpaceWatching, 'watches' | 'installed'>
   /** A watch to mark and scroll to: "Already watching this" lands here. */
   marked?: string | null
+  /** Opens Add watch from the head's `+`; absent with no engine to add. */
+  onAdd?: (() => void) | undefined
 }) {
   const { state, dispatch } = useWatchStatus(spaceId, watching.watches)
 
@@ -167,6 +170,18 @@ export function WatchingLane({
       <SectionHead
         title="Watching"
         count={String(watching.watches.length)}
+        action={
+          onAdd === undefined ? null : (
+            <button
+              type="button"
+              aria-label="Add watch"
+              onClick={onAdd}
+              className="focus-ring text-title text-primary hover:text-foreground"
+            >
+              +
+            </button>
+          )
+        }
         className="border-t-0"
       />
       {watching.watches.length === 0 ? (

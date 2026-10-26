@@ -23,10 +23,17 @@ import {
   InitialsMark,
   RailSection,
   RecordBody,
+  RecordHeadPending,
   RecordHeader,
   PropertyGrid,
   StageStepper,
 } from '#/components/record/record-parts'
+import {
+  MoveStageVerb,
+  RecordHeadActions,
+} from '#/components/record/record-heads'
+import { RecordNotices } from '#/components/record/record-notices'
+import { sensitiveStamp } from '#/components/sensitive-toggle'
 import { DetailsPickRow } from '#/components/record/details-add'
 import {
   RelationSection,
@@ -43,11 +50,7 @@ import { RecordHistory, RecordInteractions } from '#/components/record-timeline'
 import type { InteractionFilter } from '#/lib/timeline/interaction-filter'
 import type { NotesFilter } from '#/lib/notes/notes-filter'
 import { WaitingRail } from '#/components/record/waiting-rail'
-import { SensitiveToggle } from '#/components/sensitive-toggle'
-import { SummarizeRecordButton } from '#/components/summarize'
-import { PluginActions } from '#/components/record/plugin-actions'
 import { Badge } from '#/components/ui/badge'
-import { Button } from '#/components/ui/button'
 import { fmtMoney } from '@spaces/core/portfolio/format'
 import { readoutDay, readoutRound } from '#/lib/records/readout-format'
 import { useHotkey } from '#/lib/use-hotkey'
@@ -66,6 +69,7 @@ import {
   getRecordTimeline,
   listRecordActions,
   listRecordDocuments,
+  listRecordDuplicates,
   getEntitySensitivity,
   listRecordNotes,
   listRegistry,
@@ -73,7 +77,6 @@ import {
   searchEntities,
   updateRecord,
 } from '#/lib/server-fns'
-import { RecordMoreMenu } from '#/components/record/record-more-menu'
 
 /**
  * A deal's page: the head and readouts, then the details column —
@@ -93,6 +96,7 @@ export const Route = createFileRoute('/_app/deals_/$dealId')({
       waiting,
       sensitivity,
       pluginActions,
+      duplicates,
     ] = await Promise.all([
       getDeal({ data: { id: params.dealId } }),
       listSpaces(),
@@ -104,6 +108,7 @@ export const Route = createFileRoute('/_app/deals_/$dealId')({
       countOpenSuggestions({ data: { entityId: params.dealId } }),
       getEntitySensitivity({ data: { entityId: params.dealId } }),
       listRecordActions({ data: { kind: 'deal' } }),
+      listRecordDuplicates({ data: { entityId: params.dealId } }),
     ])
     if (deal.mergedIntoId) {
       throw redirect({
@@ -121,8 +126,10 @@ export const Route = createFileRoute('/_app/deals_/$dealId')({
       waiting,
       sensitivity,
       pluginActions,
+      duplicates,
     }
   },
+  pendingComponent: () => <RecordHeadPending kind="Deal" />,
   component: DealRecordPage,
 })
 
@@ -137,6 +144,7 @@ function DealRecordPage() {
     waiting,
     sensitivity,
     pluginActions,
+    duplicates,
   } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
@@ -265,36 +273,19 @@ function DealRecordPage() {
       ) : null}
 
       <RecordHeader
-        stamp={{ kind: 'Deal' }}
+        stamp={sensitiveStamp('Deal', sensitivity)}
         actions={
-          <>
-            <SensitiveToggle entityId={deal.id} state={sensitivity} />
-            <SummarizeRecordButton recordId={deal.id} />
-            <PluginActions entityId={deal.id} actions={pluginActions} />
-            <LogInteractionDialog
-              seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
-              hotkey="l"
-              trigger={
-                <Button variant="outline" shortcut="L">
-                  Log interaction
-                </Button>
-              }
-            />
-            {/* Opens the Tasks section's composer, which `T` binds. */}
-            <Button variant="outline" shortcut="T" onClick={runBinding('T')}>
-              Task
-            </Button>
-            {liveStages.length > 0 ? (
-              <Button
-                variant="outline"
-                shortcut="M"
-                onClick={() => setMoveOpen(true)}
-              >
-                Move stage
-              </Button>
-            ) : null}
-            <RecordMoreMenu name={deal.name} />
-          </>
+          <RecordHeadActions
+            record={{ id: deal.id, name: deal.name, kind: 'deal' }}
+            verbs={
+              liveStages.length > 0 ? (
+                <MoveStageVerb onMove={() => setMoveOpen(true)} />
+              ) : null
+            }
+            sensitivity={sensitivity}
+            template="deal"
+            pluginActions={pluginActions}
+          />
         }
         mark={<DitherMark />}
         name={deal.name}
@@ -366,6 +357,8 @@ function DealRecordPage() {
           },
         ]}
       />
+
+      <RecordNotices recordId={deal.id} duplicates={duplicates} />
 
       <RecordBody
         details={

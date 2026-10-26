@@ -31,6 +31,8 @@ import {
   enrichmentRow,
   linksForEntity,
 } from '@spaces/core/writes/enrichment/apply'
+import { parkedEnrichmentProgram } from '@spaces/core/writes/enrichment/parked'
+import type { ParkedEnrich } from '../records/notices'
 import { EnrichmentPageFailed } from './enrichment-page'
 
 /**
@@ -69,6 +71,8 @@ export type RecordEnrichment = {
   readonly last: LastRun | null
   /** By attribute slug. */
   readonly whereFrom: { readonly [slug: string]: WhereFrom }
+  /** A source's daily cap holds this record's run until its reset. */
+  readonly parked: ParkedEnrich | null
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
@@ -301,12 +305,26 @@ export const recordEnrichmentProgram = Effect.fn('recordEnrichmentProgram')(
           }),
       ),
     )
+    const parked = yield* parkedEnrichmentProgram(entityId).pipe(
+      Effect.mapError(
+        (cause) =>
+          new EnrichmentPageFailed({
+            message: 'Could not read the record’s parked enrichment',
+            cause,
+          }),
+      ),
+    )
+    const first = parked.at(0)
     return {
       sources: asked.names,
       onlyFree: asked.onlyFree,
       sensitive: sensitivity.sensitivity === 'sensitive',
       last: yield* lastRunProgram(entityId),
       whereFrom: yield* whereFromProgram(entityId),
+      parked:
+        first === undefined
+          ? null
+          : { source: first.source, resumesAt: first.resumesAt },
     }
   },
 )

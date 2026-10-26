@@ -6,6 +6,7 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -26,6 +27,8 @@ import { cn } from '#/lib/utils'
  * - An item that `opens` a window or a field runs once the menu has let go of
  *   focus, and focus is not handed back to the trigger.
  * - `copy` swaps its label to `Copied` for 1.2s and keeps the menu open.
+ * - A `group` heads the items after it in mono caps (a plugin's name); it is
+ *   dropped when nothing follows it.
  */
 
 type ItemBase = {
@@ -70,7 +73,13 @@ export type MoreMenuItem =
 /** A rule between two groups of items. */
 export const MENU_RULE = 'rule'
 
-export type MoreMenuEntry = MoreMenuItem | typeof MENU_RULE
+/** The mono caps head of the items after it: `EXA`. */
+export type MoreMenuGroup = { group: string }
+
+export type MoreMenuEntry = MoreMenuItem | MoreMenuGroup | typeof MENU_RULE
+
+const isItem = (e: MoreMenuEntry): e is MoreMenuItem =>
+  e !== MENU_RULE && !('group' in e)
 
 const COPIED_MS = 1200
 
@@ -81,10 +90,11 @@ function enabled(item: MoreMenuItem): boolean {
 }
 
 function isDestructive(entry: MoreMenuEntry): boolean {
-  return (
-    entry !== MENU_RULE && 'onSelect' in entry && entry.destructive === true
-  )
+  return isItem(entry) && 'onSelect' in entry && entry.destructive === true
 }
+
+const isBreak = (e: MoreMenuEntry | undefined): boolean =>
+  e === undefined || e === MENU_RULE || 'group' in e
 
 /**
  * The entries in the order they draw: the rest with their rules (none
@@ -94,13 +104,17 @@ export function menuLayout(
   entries: ReadonlyArray<MoreMenuEntry>,
 ): Array<MoreMenuEntry> {
   const rest: Array<MoreMenuEntry> = []
+  const isGroup = (e: MoreMenuEntry | undefined) =>
+    e !== undefined && e !== MENU_RULE && 'group' in e
   for (const e of entries.filter((x) => !isDestructive(x))) {
+    // A group that heads nothing goes before whatever follows it.
+    if (!isItem(e)) while (isGroup(rest.at(-1))) rest.pop()
     if (e === MENU_RULE && (rest.length === 0 || rest.at(-1) === MENU_RULE)) {
       continue
     }
     rest.push(e)
   }
-  if (rest.at(-1) === MENU_RULE) rest.pop()
+  while (rest.length > 0 && isBreak(rest.at(-1))) rest.pop()
   const destructive = entries.filter(isDestructive)
   if (destructive.length === 0) return rest
   return rest.length === 0 ? destructive : [...rest, MENU_RULE, ...destructive]
@@ -152,7 +166,7 @@ export function MoreMenu({
 }) {
   const afterClose = useRef<(() => void) | null>(null)
   const [copied, copy] = useCopied()
-  const live = items.filter((e): e is MoreMenuItem => e !== MENU_RULE)
+  const live = items.filter(isItem)
   if (!live.some(enabled)) return null
 
   const row = variant === 'row'
@@ -313,6 +327,14 @@ export function MoreMenu({
         {menuLayout(items).map((e, i) =>
           e === MENU_RULE ? (
             <DropdownMenuSeparator key={`rule.${i}`} />
+          ) : 'group' in e ? (
+            <DropdownMenuLabel
+              key={`group.${i}`}
+              data-menu-group
+              className="mono text-micro font-normal tracking-[0.08em] text-graphite uppercase"
+            >
+              {e.group}
+            </DropdownMenuLabel>
           ) : (
             renderItem(e, `${i}.${e.label}`)
           ),

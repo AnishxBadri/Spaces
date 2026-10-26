@@ -12,6 +12,7 @@ import { QUEUES } from '../../queue/names'
  *   `enrichment.run` whose `startAfter` is still ahead and whose data names
  *   the source it waits on. No second store to drift from the queue.
  * - Empty, never a failure, before the worker has made the queue schema.
+ * - Given an `entityId`, only that record's parked run: its notices band.
  */
 
 export class ParkedReadFailed extends Schema.TaggedError<ParkedReadFailed>()(
@@ -36,7 +37,9 @@ const row = z.object({
 })
 
 export const parkedEnrichmentProgram = Effect.fn('parkedEnrichmentProgram')(
-  function* (): Effect.fn.Return<Array<ParkedSource>, ParkedReadFailed> {
+  function* (
+    entityId?: string,
+  ): Effect.fn.Return<Array<ParkedSource>, ParkedReadFailed> {
     const now = new Date(yield* Clock.currentTimeMillis)
     const rows = yield* Effect.tryPromise({
       try: async () => {
@@ -54,6 +57,7 @@ export const parkedEnrichmentProgram = Effect.fn('parkedEnrichmentProgram')(
           where j.name = ${QUEUES.enrichmentRun}
             and j.state = 'created'
             and j.start_after > ${now.toISOString()}::timestamptz
+            ${entityId === undefined ? sql`` : sql`and j.data ->> 'entityId' = ${entityId}`}
           group by 1, 2
           order by 2`)
         return result.rows.map((r): ParkedSource => {
