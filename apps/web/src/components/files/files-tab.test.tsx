@@ -205,29 +205,32 @@ describe('the grouped tab', () => {
     <RecordFiles entityId={FLENT} recordName="Flent" documents={DOCS} />,
   )
 
-  it('opens on the add row with the count and size', () => {
+  it('opens on the add row: the field, Upload, and no totals', () => {
     expect(html).toContain('placeholder="Drop files, or paste a Drive link…"')
-    expect(html).toContain('6 · ')
-    expect(html).toContain('Upload')
-    // No Drive connection in a static render: Link a Drive folder, the
-    // add row's one extra verb, is not offered.
-    expect(html).not.toContain('Link a Drive folder…')
+    expect(html).toContain('>Upload</button>')
+    expect(html).not.toContain('6 · ')
+    // No Drive connection in a static render: the add row's ··· is absent.
+    expect(html).not.toContain('aria-label="More for adding files"')
+    expect(html).not.toContain('Link a folder…')
+    expect(html).not.toContain('Attach from Drive')
   })
 
   it('groups our files under their kind, in sheet order, and hides an empty kind', () => {
-    const deck = html.indexOf('Deck · 2')
-    const cap = html.indexOf('Cap table · 1')
-    const legal = html.indexOf('Legal · 3')
+    const band = (label: string) =>
+      html.indexOf(`label-caps text-graphite">${label}</h3>`)
+    const deck = band('Deck 2')
+    const cap = band('Cap table 1')
+    const legal = band('Legal 3')
     expect(deck).toBeGreaterThan(-1)
     expect(cap).toBeGreaterThan(deck)
     expect(legal).toBeGreaterThan(cap)
-    expect(html).not.toContain('Diligence ·')
-    expect(html).not.toContain('Article ·')
-    expect(html).not.toContain('Other ·')
+    expect(html).not.toContain('>Diligence ')
+    expect(html).not.toContain('>Article ')
+    expect(html).not.toContain('>Other ')
   })
 
   it('ends each row on its end lane and state word, never the extracted text', () => {
-    expect(html).toContain('4.1 MB · 2 Sep')
+    expect(html).toContain('4.1 MB · 2 Sep 2025')
     expect(html).toContain('42 KB · 30 Sep 2025 · via gmail')
     expect(html).toContain('reading text.')
     expect(html).toContain('■ gone')
@@ -248,25 +251,28 @@ describe('the grouped tab', () => {
     expect(v3).toContain('justify-end mono text-micro"></span>')
   })
 
-  it('dims an older version with the pointer to its successor; the newer reads nothing extra', () => {
+  it('greys an older version and ends it on its successor’s version; the newer reads nothing extra', () => {
     const v2 = html.slice(
-      html.indexOf('flent-seed-deck-v2.pdf'),
-      html.indexOf('flent-cap-table-sept.xlsx'),
+      html.indexOf('data-file="a2"'),
+      html.indexOf('data-file="a3"'),
     )
-    expect(v2).toContain('Replaced by → flent-seed-deck-v3.pdf')
-    expect(v2).toContain('text-graphite')
+    expect(v2).toContain('4.1 MB · 2 Sep 2025 · → v2')
+    expect(v2).toMatch(/data-superseded=""[^>]*text-graphite/)
+    expect(v2).not.toContain('Replaced by')
     const v3 = html.slice(
-      html.indexOf('flent-seed-deck-v3.pdf'),
-      html.indexOf('flent-seed-deck-v2.pdf'),
+      html.indexOf('data-file="a1"'),
+      html.indexOf('data-file="a2"'),
     )
-    expect(v3).not.toContain('Replaced by')
+    expect(v3).not.toContain('→ v')
+    expect(v3).not.toContain('data-superseded')
   })
 
-  it('reads one short line when the tab is empty', () => {
+  it('prints no absence sentence when the tab is empty, only its add row', () => {
     const empty = markup(
       <RecordFiles entityId={FLENT} recordName="Flent" documents={[]} />,
     )
-    expect(empty).toContain('No files.')
+    expect(empty).not.toContain('No files')
+    expect(empty).toContain('placeholder="Drop files, or paste a Drive link…"')
     expect(empty).not.toContain(' · ')
   })
 })
@@ -576,7 +582,13 @@ async function mountTab() {
   await flush()
 }
 
-describe('Link a Drive folder', () => {
+/** Link a folder…, from the add row's `···`. */
+async function linkAFolder() {
+  await openMenu('adding files')
+  await click(byText('[role="menuitem"]', 'Link a folder…'))
+}
+
+describe('Link a folder', () => {
   beforeEach(() => {
     fns.pickerReadiness.mockResolvedValue({ _tag: 'ready' })
     fns.listRecordBindings.mockResolvedValue({ bindings: [], canLink: true })
@@ -599,7 +611,7 @@ describe('Link a Drive folder', () => {
       },
     })
     await mountTab()
-    await click(byText('button', 'Link a Drive folder…'))
+    await linkAFolder()
     expect(fns.mintPickerToken).toHaveBeenCalledWith({
       data: {
         provider: 'google',
@@ -659,7 +671,7 @@ describe('Link a Drive folder', () => {
       .spyOn(window.location, 'assign')
       .mockImplementation(() => undefined)
     await mountTab()
-    await click(byText('button', 'Link a Drive folder…'))
+    await linkAFolder()
     await click(
       document.querySelector('[aria-label="Pick Acme Data Room"]') ??
         document.body,
@@ -686,7 +698,7 @@ describe('Link a Drive folder', () => {
   it('shows a folder linked behind a closed window', async () => {
     fns.linkFolderStatus.mockResolvedValue({})
     await mountTab()
-    await click(byText('button', 'Link a Drive folder…'))
+    await linkAFolder()
     await click(
       document.querySelector('[aria-label="Pick Acme Data Room"]') ??
         document.body,
@@ -705,10 +717,29 @@ describe('Link a Drive folder', () => {
     expect(document.body.textContent).toContain('never synced · read-only')
   })
 
-  it('offers nothing without a Drive connection', async () => {
+  it('holds Attach from Drive and Link a folder… in the add row’s ···', async () => {
+    await mountTab()
+    await openMenu('adding files')
+    const items = [...document.querySelectorAll('[role="menuitem"]')].map(
+      (el) => el.textContent.trim(),
+    )
+    expect(items).toEqual(['Attach from Drive', 'Link a folder…'])
+  })
+
+  it('draws no ··· without a Drive connection', async () => {
+    fns.pickerReadiness.mockResolvedValue({
+      _tag: 'connect',
+      href: '/api/connections/google/start?product=drive',
+      label: 'Connect Drive',
+    })
     fns.listRecordBindings.mockResolvedValue({ bindings: [], canLink: false })
     await mountTab()
-    expect(document.body.textContent).not.toContain('Link a Drive folder…')
+    expect(
+      document.querySelector('[aria-label="More for adding files"]'),
+    ).toBeNull()
+    expect(document.body.textContent).not.toContain('Attach from Drive')
+    expect(document.body.textContent).not.toContain('Link a folder…')
+    expect(document.body.textContent).not.toContain('Connect Drive')
   })
 })
 

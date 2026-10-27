@@ -221,7 +221,7 @@ export function useLinkFetches(
 }
 
 const FOLDER_REFUSAL =
-  'That’s a folder. Link a Drive folder instead to keep it in sync.'
+  'That’s a folder. Link a folder instead to keep it in sync.'
 
 /** One pasted link or picked file that has not become a row yet. */
 export function LinkFetchRow({
@@ -232,7 +232,7 @@ export function LinkFetchRow({
 }: {
   fetch: LinkFetch
   onDismiss: () => void
-  /** Opens Link a Drive folder for a refused folder link. */
+  /** Opens Link a folder for a refused folder link. */
   onLinkFolder?: ((url: string) => void) | null
   /** The "Newer version of" field, under the name; null when none applies. */
   version?: ReactNode
@@ -314,16 +314,13 @@ export function LinkFetchRow({
 /**
  * The add row that opens the Files tab: `+ Drop files, or paste a Drive
  * link…`. A Drive link pasted or entered is fetched; any other link is saved
- * as a page. The tab's count and buttons ride at its end.
+ * as a page. Upload and the `···` ride at its end.
  */
 export function AddRow({
   onLink,
-  meta = null,
   children = null,
 }: {
   onLink: (url: string) => void
-  /** Mono beside the buttons: the tab's `n · 31 MB`. */
-  meta?: ReactNode
   children?: ReactNode
 }) {
   const [value, setValue] = useState('')
@@ -362,9 +359,6 @@ export function AddRow({
           className="focus-ring-inset h-7 min-w-0 flex-1 bg-transparent text-ui placeholder:text-graphite"
         />
       </form>
-      {meta === null ? null : (
-        <span className="shrink-0 mono text-micro text-graphite">{meta}</span>
-      )}
       {children}
     </div>
   )

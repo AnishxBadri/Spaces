@@ -17,6 +17,7 @@ import {
   interactionEntity,
   link,
   note,
+  space,
 } from '@spaces/db/schema'
 import type { InteractionMeta } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
@@ -75,6 +76,9 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
         })
         .from(integration),
     )
+    const capabilityOf = new Map(
+      integrations.map((i) => [i.id, i.capabilityId]),
+    )
     const integrationNames = new Map(
       integrations.map((i) => [
         i.id,
@@ -91,6 +95,7 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           id: activity.id,
           verb: activity.verb,
           actorId: activity.actorId,
+          objectId: activity.objectEntityId,
           meta: activity.meta,
           at: activity.at,
         })
@@ -117,14 +122,22 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
     ).pipe(Effect.mapError((cause) => new TimelineQueryFailed({ cause })))
     let at = 0
     const changesOf: Array<
-      Array<{ slug: string; to: Json | null; citations: Array<ResolvedRef> }>
+      Array<{
+        slug: string
+        from: Json | null
+        to: Json | null
+        citations: Array<ResolvedRef>
+      }>
     > = bursts.map((b) =>
       b.changes.map((c) => ({
         slug: c.slug,
+        from: c.from,
         to: c.to,
         citations: resolved.slice(at, (at += c.refs.length)),
       })),
     )
+
+    const facts = yield* macroFactsProgram(macros, capabilityOf)
 
     // Whose interactions this timeline reads. A record reads its own; a deal
     // also reads its company's and its contacts': a thread reaches a deal by
@@ -331,6 +344,14 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
     // them is a sent row.
     const own = myInteractions.length > 0 ? yield* viewerSelf(viewer.id) : null
 
+    // The interactions with an edge to this record itself, not one a deal
+    // reads through its company or people: only those can be unlinked here.
+    const linked = new Set(
+      attendees
+        .filter((a) => a.entityId === entityId)
+        .map((a) => a.interactionId),
+    )
+
     const attendeesBy = new Map<
       string,
       Array<{ id: string; name: string; kind: string; self: boolean }>
@@ -367,6 +388,8 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
             : (integrationNames.get(
                 jsonString(jsonRecord(m.meta).integrationId) ?? '',
               ) ?? null),
+          /** What the History row's figure lane reads. */
+          facts: facts.get(m.id) ?? NO_FACTS,
           at: m.at.toISOString(),
         })),
       ...bursts.map((b, i) => ({
@@ -399,6 +422,8 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           noteId: privateBody ? null : i.noteId,
           /** The mailbox's thread; null for a row that stands alone. */
           threadId: i.threadId,
+          /** Filed on this record by its own edge, so it can be unlinked here. */
+          linked: linked.has(i.id),
           /** An email the viewer sent: its row reads `To <name>`. */
           sent: own !== null && sentBy(i.meta, own.addresses),
           /** The write-up exists and is private to someone else. */
@@ -442,11 +467,143 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
 )
 
 /**
+ * The facts a History row's figure lane prints, read off `activity.meta`
+ * and the activity's object: a money figure, a document's name, a space's
+ * path, a merged record's name, how many attributes an enrichment wrote,
+ * and whether an integration made the record from an email.
+ */
+export type MacroFacts = {
+  amount: number | null
+  currency: string | null
+  document: string | null
+  space: string | null
+  merged: string | null
+  fields: number | null
+  fromEmail: boolean
+}
+
+const NO_FACTS: MacroFacts = {
+  amount: null,
+  currency: null,
+  document: null,
+  space: null,
+  merged: null,
+  fields: null,
+  fromEmail: false,
+}
+
+/** A number stored as a jsonb number or a numeric string. */
+function jsonNumber(v: Json | undefined): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null
+  if (typeof v !== 'string' || v.trim() === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+const macroFactsProgram = Effect.fn('macroFacts')(function* (
+  macros: ReadonlyArray<{
+    id: string
+    verb: string
+    objectId: string | null
+    meta: { [k: string]: Json }
+  }>,
+  capabilityOf: ReadonlyMap<string, string>,
+) {
+  const objectsOf = (test: (verb: string) => boolean) => [
+    ...new Set(
+      macros.flatMap((m) =>
+        test(m.verb) && m.objectId !== null ? [m.objectId] : [],
+      ),
+    ),
+  ]
+  const docIds = objectsOf((v) => v.startsWith('document.'))
+  const mergedIds = objectsOf((v) => v === 'entity.merged')
+  const spaced = objectsOf((v) => v.startsWith('space.'))
+
+  const docs =
+    docIds.length > 0
+      ? yield* query(() =>
+          db
+            .select({ id: document.entityId, name: document.filename })
+            .from(document)
+            .where(inArray(document.entityId, docIds)),
+        )
+      : []
+  const merged =
+    mergedIds.length > 0
+      ? yield* query(() =>
+          db
+            .select({ id: entity.id, name: entity.canonicalName })
+            .from(entity)
+            .where(inArray(entity.id, mergedIds)),
+        )
+      : []
+  // The whole tree, small by nature: a path climbs through parents.
+  const spaces =
+    spaced.length > 0
+      ? yield* query(() =>
+          db
+            .select({
+              id: space.entityId,
+              parentId: space.parentId,
+              name: entity.canonicalName,
+            })
+            .from(space)
+            .innerJoin(entity, eq(entity.id, space.entityId)),
+        )
+      : []
+  const spaceById = new Map(spaces.map((s) => [s.id, s]))
+  const pathOf = (id: string): string | null => {
+    const names: Array<string> = []
+    const seen = new Set<string>()
+    let at = spaceById.get(id)
+    while (at !== undefined && !seen.has(at.id)) {
+      seen.add(at.id)
+      names.unshift(at.name)
+      at = at.parentId === null ? undefined : spaceById.get(at.parentId)
+    }
+    return names.length === 0 ? null : names.join(' › ')
+  }
+  const docName = new Map(docs.map((d) => [d.id, d.name]))
+  const mergedName = new Map(merged.map((m) => [m.id, m.name]))
+
+  return new Map(
+    macros.map((m): [string, MacroFacts] => {
+      const meta = jsonRecord(m.meta)
+      const object = m.objectId
+      const integrationId = jsonString(meta.integrationId)
+      const capability =
+        integrationId === null ? undefined : capabilityOf.get(integrationId)
+      return [
+        m.id,
+        {
+          amount: jsonNumber(meta.amount),
+          currency: jsonString(meta.currency),
+          document:
+            (object === null ? undefined : docName.get(object)) ??
+            jsonString(meta.filename),
+          space:
+            object !== null && m.verb.startsWith('space.')
+              ? pathOf(object)
+              : null,
+          merged: object === null ? null : (mergedName.get(object) ?? null),
+          fields: m.verb === 'entity.enriched' ? jsonNumber(meta.fields) : null,
+          fromEmail:
+            m.verb.endsWith('.created') &&
+            capability !== undefined &&
+            /mail/i.test(capability),
+        },
+      ]
+    }),
+  )
+})
+
+/**
  * Who the viewer is in the graph: their addresses (the login and every
  * connected mailbox), normalized, and the person records holding one of
  * them as an email alias.
  */
-const viewerSelf = Effect.fn('viewerSelf')(function* (viewerId: string) {
+export const viewerSelf = Effect.fn('viewerSelf')(function* (viewerId: string) {
   const login = yield* query(() =>
     db.select({ email: user.email }).from(user).where(eq(user.id, viewerId)),
   )

@@ -1,42 +1,57 @@
-import { useRouter, useSearch } from '@tanstack/react-router'
-import { ChevronDown, ChevronRight, Mail } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useNavigate, useRouter, useSearch } from '@tanstack/react-router'
+import { Layers } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { toast } from 'sonner'
-import { optionLabel, refName } from './attributes/value-editor'
+import { OptionChip, optionLabel, refName } from './attributes/value-editor'
 import { EmailModal } from './email-dialog'
-import { badgeClasses } from './ui/badge'
-import { MoreMenu } from './ui/more-menu'
-import { KIND_GLYPHS, ThreadSubject } from './record/thread-row'
+import { Band, EmptyRow, FoldRow } from './ledger-section'
+import { PickPopover } from './record/details-add'
+import { ThreadRow } from './record/thread-row'
+import { useConfirm } from './ui/confirm-dialog'
+import { MENU_RULE, MoreMenu } from './ui/more-menu'
+import type { MoreMenuEntry } from './ui/more-menu'
+import { Segmented } from './ui/segmented'
+import { Switch } from './ui/switch'
 import type { RegistryEntry, RefNames } from './attributes/value-editor'
-import { FilterCount, FilterRow, FilterTab } from './filter-row'
 import { fmtMoney } from '@spaces/core/portfolio/format'
-import {
-  getRecordEmailVisibility,
-  setRecordEmailVisibility,
-  writeUpInteraction,
-} from '#/lib/server-fns'
-import { formatDay, formatWhen } from '@spaces/core/format'
+import { formatDay } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 import {
-  INTERACTION_FILTERS,
-  inInteractionFilter,
-  interactionCounts,
-} from '#/lib/timeline/interaction-filter'
-import type { InteractionFilter } from '#/lib/timeline/interaction-filter'
-import { openModalId } from '#/lib/modal-search'
-import { threadPeople } from '#/lib/timeline/threads'
-import { cn } from '#/lib/utils'
+  fileInteractionOnEntity,
+  getRecordEmailVisibility,
+  searchEntities,
+  setRecordEmailVisibility,
+  unlinkInteractionFromEntity,
+  writeUpInteraction,
+} from '#/lib/server-fns'
 import type { getRecordTimeline } from '#/lib/server-fns'
+import { openModalId } from '#/lib/modal-search'
+import {
+  THREAD_KINDS,
+  threadCounts,
+  threadShown,
+  threadsOf,
+} from '#/lib/timeline/threads'
+import type { Thread, ThreadKind } from '#/lib/timeline/threads'
+import { byWeek } from '#/lib/timeline/weeks'
+import { cn } from '#/lib/utils'
 
 /**
- * The record ledger: one row per entry on a rule —
- * mono time lane, mono type lane, then the body in sans. Macro verbs,
- * interactions, and attribute-change bursts ("changed 3 attributes",
- * expandable to attr → new value) share the same three lanes so the eye
- * reads down a column.
+ * A record's Interactions and History tabs.
+ * - Interactions: a toolbar (the kinds as a `Segmented`, `With files` as a
+ *   switch), then one `ThreadRow` per thread under week bands, each ending
+ *   on its `···`. The head's `Log interaction` is the composer.
+ * - History: 40px rows under week bands — a glyph, a sentence, a mono figure
+ *   and the day — paged at 25. An attribute burst opens in place.
  */
 
 type Items = Awaited<ReturnType<typeof getRecordTimeline>>
+type Item = Items[number]
+type InteractionItem = Extract<Item, { type: 'interaction' }>
+type MacroItem = Extract<Item, { type: 'macro' }>
+type BurstItem = Extract<Item, { type: 'attrs' }>
+type LedgerItem = Extract<Item, { type: 'ledger' }>
 
 /**
  * A burst names who attended to the values (the typed actor): a person by
@@ -106,6 +121,7 @@ export const VERB_LABELS: Record<string, string> = {
   'distribution.batch_voided': 'voided a batch of distributions',
 }
 
+/** Each verb's kind, which picks the glyph its History row wears. */
 export const VERB_TYPES: Record<string, string> = {
   'record.created': 'born',
   'company.created': 'born',
@@ -143,101 +159,68 @@ export const VERB_TYPES: Record<string, string> = {
   'distribution.batch_voided': 'void',
 }
 
-/** How much history a record shows before the fold. */
-export const HISTORY_FOLD = 6
+/**
+ * The glyph lane: mark ■, stage ▤, enrich ✦, file ▯, a burst ›, merge ⇄,
+ * a space its layers; the ledger's other verbs wear the mark's square.
+ */
+export const HISTORY_GLYPHS: Record<string, string> = {
+  born: '+',
+  deal: '+',
+  note: '¶',
+  file: '▯',
+  merge: '⇄',
+  rename: '›',
+  term: '¶',
+  mandate: '¶',
+  signal: '✦',
+  enrich: '✦',
+  holding: '■',
+  writeoff: '■',
+  invest: '■',
+  round: '■',
+  mark: '■',
+  distrib: '■',
+  void: '■',
+  stage: '▤',
+  edit: '›',
+}
 
-/** How many interactions a record shows before the fold. */
+/** How many History rows show before the fold. */
+export const HISTORY_PAGE = 25
+
+/** How many threads show before the fold. */
 export const INTERACTIONS_FOLD = 20
-
-type Item = Items[number]
-type InteractionItem = Extract<Item, { type: 'interaction' }>
-type LedgerItem = Extract<Item, { type: 'ledger' }>
 
 /**
  * A record's ledger split into its two tabs: the conversations, and the
  * bookkeeping (stage moves, attribute bursts, filings, the portfolio's
- * verbs). One flat list gave a call the weight of `tagged into a space`.
+ * verbs).
  */
-export function splitLedger(items: Items): {
+function splitLedger(items: Items): {
   interactions: Array<InteractionItem>
-  history: Items
+  history: Array<Exclude<Item, InteractionItem>>
 } {
   return {
     interactions: items.filter(
       (i): i is InteractionItem => i.type === 'interaction',
     ),
-    history: items.filter((i) => i.type !== 'interaction'),
+    history: items.filter(
+      (i): i is Exclude<Item, InteractionItem> => i.type !== 'interaction',
+    ),
   }
 }
 
-const INTERACTION_FILTER_LABELS: Record<InteractionFilter, string> = {
+const KIND_LABELS: Record<ThreadKind, string> = {
   all: 'All',
   email: 'Email',
-  meeting: 'Meeting',
-  call: 'Call',
-  attachments: 'Has attachments',
-}
-
-/** The History tab's filters on a deal. */
-export const HISTORY_FILTERS = ['all', 'stage', 'attributes', 'ledger'] as const
-export type HistoryFilter = (typeof HISTORY_FILTERS)[number]
-
-const HISTORY_FILTER_LABELS: Record<HistoryFilter, string> = {
-  all: 'All',
-  stage: 'Stage',
-  attributes: 'Attributes',
-  ledger: 'Ledger',
-}
-
-/** The portfolio's verbs: a check, a mark, a distribution, a round, a holding. */
-const LEDGER_VERB = /^(investment|mark|distribution|round|holding)\./
-
-/** Which History filter an entry belongs to besides All; null for none. */
-export function historyKind(item: Item): Exclude<HistoryFilter, 'all'> | null {
-  if (item.type === 'ledger') return 'ledger'
-  if (item.type === 'attrs')
-    return item.changes.some((c) => c.slug === 'stage') ? 'stage' : 'attributes'
-  if (item.type === 'macro' && LEDGER_VERB.test(item.verb)) return 'ledger'
-  return null
-}
-
-/** How many entries each History filter lists. */
-export function historyCounts(history: Items): Record<HistoryFilter, number> {
-  const of = (k: HistoryFilter) =>
-    history.filter((i) => historyKind(i) === k).length
-  return {
-    all: history.length,
-    stage: of('stage'),
-    attributes: of('attributes'),
-    ledger: of('ledger'),
-  }
-}
-
-/** `20 of 34 · more ›` — the foot of a list folded at its cap. */
-function FoldFoot({
-  shown,
-  total,
-  onMore,
-}: {
-  shown: number
-  total: number
-  onMore: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onMore}
-      className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 px-3 text-left mono text-micro text-graphite hover:text-foreground"
-    >
-      {shown} of {total} · more ›
-    </button>
-  )
+  meeting: 'Meetings',
+  call: 'Calls',
 }
 
 /**
- * The head's `···` for a viewer with private emails here: their emails with
- * this record, opened to the workspace or not (the record override). Its one
- * item draws as a switch, absent until the state has been read.
+ * The toolbar's `···` for a viewer with private emails here: their emails
+ * with this record, opened to the workspace or not (the record override).
+ * Its one item draws as a switch, absent until the state has been read.
  */
 function EmailVisibilityMenu({ recordId }: { recordId: string }) {
   const router = useRouter()
@@ -287,402 +270,435 @@ function EmailVisibilityMenu({ recordId }: { recordId: string }) {
 }
 
 /**
- * The Interactions tab: the kind filters, the composer row, then calls, emails and meetings, folded past
- * `INTERACTIONS_FOLD`. The filter is the view's own state, as the space
- * page's Notes filter is, unless the page holds it for the tab head's count.
- * - `recordId` lets the email window widen for this record, and puts the
- *   override in the head's `···` once the viewer has private emails here.
+ * The Interactions tab.
+ * - `record` lets the email window widen for this record, names it in
+ *   `Unlink from <record>…`, and puts the override in the toolbar once the
+ *   viewer has private emails here.
  * - The email `?modal=email&id=` opens stays highlighted behind its window,
  *   unfolded to when it sits past the fold.
+ * - Empty, it is one `Interactions +` row, which `logInteraction` wraps in
+ *   the log window.
  */
 export function RecordInteractions({
   items,
-  registry,
-  refNames,
-  composer,
-  recordId,
-  filter: held,
-  onFilterChange,
+  record,
+  logInteraction,
 }: {
   items: Items
-  registry: Array<RegistryEntry>
-  refNames?: RefNames | undefined
-  /** The composer row — a `LogInteractionDialog` trigger. */
-  composer?: React.ReactNode
-  /** The record the tab is on. */
-  recordId?: string
-  /** The filter, when the page holds it. */
-  filter?: InteractionFilter
-  onFilterChange?: (filter: InteractionFilter) => void
+  record?: { id: string; name: string } | undefined
+  logInteraction?: ((trigger: ReactElement) => ReactNode) | undefined
 }) {
   const { interactions } = splitLedger(items)
-  const [own, setOwn] = useState<InteractionFilter>('all')
-  const filter = held ?? own
-  const setFilter = (next: InteractionFilter) => {
-    setOwn(next)
-    onFilterChange?.(next)
-  }
+  const { today } = useClock()
+  const [kind, setKind] = useState<ThreadKind>('all')
+  const [withFiles, setWithFiles] = useState(false)
   const [unfolded, setUnfolded] = useState(false)
   const opened = openModalId(useSearch({ strict: false }), 'email')
-  const counts = interactionCounts(interactions)
-  const listed = interactions.filter((i) => inInteractionFilter(i, filter))
-  const openedAt = listed.findIndex((i) => i.id === opened)
+  const threads = threadsOf(interactions)
+  if (threads.length === 0)
+    return logInteraction ? (
+      <>{logInteraction(<EmptyRow name="Interactions" />)}</>
+    ) : (
+      <EmptyRow name="Interactions" />
+    )
+
+  const counts = threadCounts(threads)
+  const listed = threads.filter((t) => threadShown(t, kind, withFiles))
+  const openedAt = listed.findIndex((t) => t.row.id === opened)
   const shown =
     unfolded || openedAt >= INTERACTIONS_FOLD
       ? listed
       : listed.slice(0, INTERACTIONS_FOLD)
+  const bands = byWeek(
+    shown.map((t) => ({ ...t, at: t.row.at })),
+    today,
+  )
   return (
     <div className="flex flex-col">
-      <FilterRow
-        label="Show interactions"
-        end={
-          recordId !== undefined &&
+      <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-rule px-3">
+        <Segmented
+          label="Show interactions"
+          value={kind}
+          onChange={setKind}
+          options={THREAD_KINDS.map((k) =>
+            k === 'all'
+              ? { id: k, label: KIND_LABELS[k] }
+              : { id: k, label: KIND_LABELS[k], count: counts[k] },
+          )}
+        />
+        <div className="flex shrink-0 items-center gap-3">
+          <Switch checked={withFiles} onCheckedChange={setWithFiles}>
+            With files
+            {counts.files > 0 ? (
+              <span className="tabular mono text-micro text-graphite">
+                {counts.files}
+              </span>
+            ) : null}
+          </Switch>
+          {record !== undefined &&
           interactions.some((i) => i.kind === 'email' && i.ownPrivate) ? (
-            <EmailVisibilityMenu recordId={recordId} />
-          ) : undefined
-        }
-      >
-        {INTERACTION_FILTERS.map((f) => (
-          <FilterTab key={f} active={filter === f} onClick={() => setFilter(f)}>
-            {INTERACTION_FILTER_LABELS[f]} <FilterCount n={counts[f]} />
-          </FilterTab>
-        ))}
-      </FilterRow>
-      {composer}
-      <RecordTimeline
-        items={shown}
-        registry={registry}
-        refNames={refNames}
-        empty={composer ? null : 'None logged.'}
-        last={shown.length === listed.length}
-        highlight={opened}
-      />
+            <EmailVisibilityMenu recordId={record.id} />
+          ) : null}
+        </div>
+      </div>
+      {bands.map((b) => (
+        <section key={b.band} aria-label={b.band} className="flex flex-col">
+          <Band label={b.band} />
+          <ul>
+            {b.rows.map((t) => (
+              <ThreadRow
+                key={t.row.id}
+                item={t.row}
+                messages={t.messages}
+                tab="interactions"
+                highlighted={t.row.id === opened}
+                menu={<ThreadMenu thread={t} record={record} />}
+              />
+            ))}
+          </ul>
+        </section>
+      ))}
+      {listed.length === 0 ? (
+        <p className="px-3 py-2 text-label text-graphite">
+          Nothing matches that filter.
+        </p>
+      ) : null}
       {shown.length < listed.length ? (
-        <FoldFoot
-          shown={shown.length}
-          total={listed.length}
-          onMore={() => setUnfolded(true)}
+        <FoldRow
+          hidden={listed.length - shown.length}
+          onShow={() => setUnfolded(true)}
         />
       ) : null}
-      <EmailModal recordId={recordId ?? null} />
+      <EmailModal recordId={record?.id ?? null} />
     </div>
   )
 }
 
-/**
- * The History tab, folded past `HISTORY_FOLD` so the surface is bounded.
- * `filters` draws All · Stage ·
- * Attributes · Ledger over it (a deal's).
- */
-export function RecordHistory({
-  items,
-  registry,
-  refNames,
-  filters = false,
-}: {
-  items: Items
-  registry: Array<RegistryEntry>
-  refNames?: RefNames | undefined
-  filters?: boolean
-}) {
-  const { history } = splitLedger(items)
-  const [filter, setFilter] = useState<HistoryFilter>('all')
-  const [unfolded, setUnfolded] = useState(false)
-  const listed =
-    filter === 'all'
-      ? history
-      : history.filter((i) => historyKind(i) === filter)
-  const shown =
-    unfolded || listed.length <= HISTORY_FOLD
-      ? listed
-      : listed.slice(0, HISTORY_FOLD)
-  const counts = historyCounts(history)
-  return (
-    <div className="flex flex-col">
-      {filters ? (
-        <FilterRow label="Show history">
-          {HISTORY_FILTERS.map((f) => (
-            <FilterTab
-              key={f}
-              active={filter === f}
-              onClick={() => setFilter(f)}
-            >
-              {HISTORY_FILTER_LABELS[f]} <FilterCount n={counts[f]} />
-            </FilterTab>
-          ))}
-        </FilterRow>
-      ) : null}
-      <RecordTimeline
-        items={shown}
-        registry={registry}
-        refNames={refNames}
-        last={shown.length === listed.length}
-      />
-      {shown.length < listed.length ? (
-        <FoldFoot
-          shown={shown.length}
-          total={listed.length}
-          onMore={() => setUnfolded(true)}
-        />
-      ) : null}
-    </div>
-  )
-}
-
-function Row({
-  at,
-  type,
-  children,
-  end,
-  last,
-}: {
-  at: string
-  type: string
-  children: React.ReactNode
-  /** The fixed mono lane the row ends on. */
-  end?: React.ReactNode
-  last: boolean
-}) {
-  const { now } = useClock()
-  return (
-    <li
-      className={cn(
-        'group/row flex items-start gap-4 px-3 py-2',
-        !last && 'border-b border-rule',
-      )}
-    >
-      <span className="w-22 shrink-0 mono text-micro text-graphite">
-        {formatWhen(at, now)}
-      </span>
-      <span className="w-18 shrink-0 mono text-micro font-medium text-foreground uppercase">
-        {type}
-      </span>
-      <div className="min-w-0 flex-1 text-ui leading-4.5">{children}</div>
-      {end === undefined ? null : (
-        <span
-          data-end-lane
-          className="flex w-48 shrink-0 items-center justify-end gap-2 mono text-micro text-graphite"
-        >
-          {end}
-        </span>
-      )}
-    </li>
-  )
-}
-
-export function RecordTimeline({
-  items,
-  registry,
-  refNames,
-  empty = 'Nothing yet.',
-  last: lastRow = true,
-  highlight = null,
-}: {
-  items: Items
-  registry: Array<RegistryEntry>
-  refNames?: RefNames | undefined
-  /** The line an empty list shows; `null` shows nothing (a composer row is already there). */
-  empty?: string | null
-  /** False when a fold row follows, so the last entry keeps its rule. */
-  last?: boolean
-  /** The interaction whose window is open over the list. */
-  highlight?: string | null
-}) {
-  if (items.length === 0) {
-    return empty === null ? null : (
-      <p className="px-3 py-2 text-label text-graphite">{empty}</p>
-    )
-  }
-  return (
-    <ul>
-      {items.map((item, i) => {
-        const last = lastRow && i === items.length - 1
-        if (item.type === 'macro') {
-          return (
-            <Row
-              key={item.id}
-              at={item.at}
-              type={VERB_TYPES[item.verb] ?? item.verb.split('.')[0]}
-              last={last}
-            >
-              <span className="font-medium">{item.actorName ?? 'System'}</span>{' '}
-              {VERB_LABELS[item.verb] ?? item.verb}
-            </Row>
-          )
-        }
-        if (item.type === 'interaction') {
-          return (
-            <InteractionRow
-              key={item.id}
-              item={item}
-              last={last}
-              highlighted={item.id === highlight}
-            />
-          )
-        }
-        if (item.type === 'ledger') {
-          return <LedgerEntry key={item.id} item={item} last={last} />
-        }
-        return (
-          <AttrBurst
-            key={item.id}
-            item={item}
-            registry={registry}
-            refNames={refNames}
-            last={last}
-          />
-        )
-      })}
-    </ul>
-  )
-}
-
-/** The end lane of an interaction: `via Anish · ⧉ 2 · accepted`. */
-export function interactionLane(item: {
-  via: string | null
-  attachments: number
-  answer: string | null
-}): string {
-  return [
-    item.via === null ? null : `via ${item.via}`,
-    item.attachments > 0 ? `⧉ ${item.attachments}` : null,
-    item.answer,
-  ]
-    .filter((part) => part !== null)
-    .join(' · ')
-}
-
-/** The line under an email's subject: its summary, else the snippet, unmarked. */
-export function interactionLine(item: {
-  summary: string | null
-  snippet: string | null
-}): { text: string; from: 'summary' | 'snippet' } | null {
-  if (item.summary !== null) return { text: item.summary, from: 'summary' }
-  if (item.snippet !== null) return { text: item.snippet, from: 'snippet' }
-  return null
+/** The page's own address, with `search` in place of its query. */
+function hereWith(search: Record<string, string>): string {
+  const url = new URL(window.location.href)
+  url.search = new URLSearchParams(search).toString()
+  return url.toString()
 }
 
 /**
- * One interaction on the ledger: kind glyph, subject in ink
- * and participants in graphite, the summary clamped at two lines with the
- * snippet as its unmarked fallback and the category chips, then the mono end
- * lane — `via`, attachments, the answer and the date.
- * - An email opens its window from the subject (`?modal=email&id=`);
- *   any other written-up row opens its note; one that is not offers
- *   `Write up` as a row action, shown on hover and focus.
- * - A body private to someone else keeps its subject and says
- *   `body private`; its summary, snippet and chips are never sent.
+ * A thread row's `···`: Open · Write up · Copy link · File on a deal… ·
+ * rule · Unlink from <record>….
+ * - Open is the email's window, the meeting's, or the write-up.
+ * - Write up is offered while there is no body and the body is not private.
+ * - Unlink only where this record holds its own edge, not one a deal reads
+ *   through its company or people.
  */
-function InteractionRow({
-  item,
-  last,
-  highlighted,
+function ThreadMenu({
+  thread,
+  record,
 }: {
-  item: InteractionItem
-  last: boolean
-  highlighted: boolean
+  thread: Thread<InteractionItem>
+  record: { id: string; name: string } | undefined
 }) {
+  const item = thread.row
   const router = useRouter()
-  const { now } = useClock()
-  const [pending, setPending] = useState(false)
+  const navigate = useNavigate()
+  const { confirm, confirmDialog } = useConfirm()
+  const [filing, setFiling] = useState(false)
+  const [writing, setWriting] = useState(false)
+  const searchDeals = useCallback(
+    async (q: string) => {
+      const rows = await searchEntities({ data: { q, kinds: ['deal'] } })
+      return rows.filter((r) => r.id !== record?.id)
+    },
+    [record?.id],
+  )
+
+  const windowOf: 'email' | 'meeting' | null =
+    item.kind === 'email' ? 'email' : item.kind === 'meeting' ? 'meeting' : null
+
+  function open() {
+    if (windowOf !== null) {
+      void navigate({
+        to: '.',
+        search: (prev) => ({
+          ...prev,
+          tab: 'interactions' as const,
+          modal: windowOf,
+          id: item.id,
+        }),
+        resetScroll: false,
+      })
+      return
+    }
+    if (item.noteId !== null)
+      void navigate({ to: '/notes/$noteId', params: { noteId: item.noteId } })
+  }
 
   async function writeUp() {
-    setPending(true)
+    setWriting(true)
     try {
       const { noteId } = await writeUpInteraction({
         data: { interactionId: item.id },
       })
       void router.invalidate()
-      await router.navigate({ to: '/notes/$noteId', params: { noteId } })
+      void navigate({ to: '/notes/$noteId', params: { noteId } })
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Could not write it up')
-      setPending(false)
+    } finally {
+      setWriting(false)
     }
   }
 
-  const Glyph = KIND_GLYPHS[item.kind] ?? Mail
-  const people = threadPeople(item)
-  const line = interactionLine(item)
-  const lane = item.privateBody
-    ? ['body private', interactionLane(item)]
-        .filter((part) => part !== '')
-        .join(' · ')
-    : interactionLane(item)
+  const link = () =>
+    windowOf !== null
+      ? hereWith({ tab: 'interactions', modal: windowOf, id: item.id })
+      : item.noteId !== null
+        ? new URL(`/notes/${item.noteId}`, window.location.href).toString()
+        : hereWith({ tab: 'interactions' })
+
+  async function unlink(from: { id: string; name: string }) {
+    const ok = await confirm({
+      title: `Unlink from ${from.name}?`,
+      body: `${item.subject || 'This interaction'} leaves ${from.name}. It stays on every other record it is filed on.`,
+      action: 'Unlink',
+    })
+    if (!ok) return
+    try {
+      await unlinkInteractionFromEntity({
+        data: { interactionId: item.id, entityId: from.id },
+      })
+      await router.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not unlink')
+    }
+  }
+
+  const items: Array<MoreMenuEntry> = [
+    ...(windowOf !== null || item.noteId !== null
+      ? [{ label: 'Open', onSelect: open }]
+      : []),
+    ...(item.noteId === null && !item.privateBody
+      ? [
+          {
+            label: writing ? 'Writing up…' : 'Write up',
+            disabled: writing,
+            onSelect: () => void writeUp(),
+          },
+        ]
+      : []),
+    { label: 'Copy link', copy: link },
+    { label: 'File on a deal…', opens: true, onSelect: () => setFiling(true) },
+    MENU_RULE,
+    ...(record !== undefined && item.linked
+      ? [
+          {
+            label: `Unlink from ${record.name}…`,
+            destructive: true,
+            opens: true,
+            onSelect: () => void unlink(record),
+          },
+        ]
+      : []),
+  ]
 
   return (
+    <>
+      <MoreMenu
+        variant="row"
+        label={item.subject || 'interaction'}
+        items={items}
+      />
+      <PickPopover
+        open={filing}
+        onOpenChange={setFiling}
+        trigger={<span aria-hidden className="size-0" />}
+        placeholder="File on a deal…"
+        search={searchDeals}
+        onPick={async (deal) => {
+          const { filed } = await fileInteractionOnEntity({
+            data: { interactionId: item.id, entityId: deal.id },
+          })
+          toast(filed ? `Filed on ${deal.name}` : `Already on ${deal.name}`)
+          void router.invalidate()
+        }}
+      />
+      {confirmDialog}
+    </>
+  )
+}
+
+type HistoryItem = Exclude<Item, InteractionItem>
+
+/**
+ * The figure a macro row ends on, from its facts: a money figure, how many
+ * attributes an enrichment wrote, the document, the merged record, the
+ * space's path, or `from an email`. Null for a verb with nothing to add.
+ */
+export function macroFigure(item: Pick<MacroItem, 'facts'>): string | null {
+  const f = item.facts
+  if (f.amount !== null && f.currency !== null)
+    return fmtMoney(f.amount, f.currency, { compact: true })
+  if (f.fields !== null)
+    return `${String(f.fields)} attribute${f.fields === 1 ? '' : 's'}`
+  if (f.document !== null) return f.document
+  if (f.merged !== null) return f.merged
+  if (f.space !== null) return f.space
+  return f.fromEmail ? 'from an email' : null
+}
+
+/** A burst's figure: the first two attributes by name, then `+n`. */
+export function burstFigure(names: ReadonlyArray<string>): string {
+  const shown = names.slice(0, 2)
+  const rest = names.length - shown.length
+  return rest > 0 ? `${shown.join(', ')}, +${String(rest)}` : shown.join(', ')
+}
+
+/**
+ * The History tab: week bands of 40px rows, paged at 25 with a fold.
+ * `registry` names the attributes a burst changed and reads its options.
+ */
+export function RecordHistory({
+  items,
+  registry,
+  refNames,
+}: {
+  items: Items
+  registry: Array<RegistryEntry>
+  refNames?: RefNames | undefined
+}) {
+  const { history } = splitLedger(items)
+  const { today } = useClock()
+  const [unfolded, setUnfolded] = useState(false)
+  // Nothing to add by hand, so no `History +` row: an empty tab is empty.
+  if (history.length === 0) return null
+  const shown = unfolded ? history : history.slice(0, HISTORY_PAGE)
+  return (
+    <div className="flex flex-col">
+      {byWeek(shown, today).map((b) => (
+        <section key={b.band} aria-label={b.band} className="flex flex-col">
+          <Band label={b.band} />
+          <ul>
+            {b.rows.map((item) => (
+              <HistoryEntry
+                key={item.id}
+                item={item}
+                registry={registry}
+                refNames={refNames}
+              />
+            ))}
+          </ul>
+        </section>
+      ))}
+      {shown.length < history.length ? (
+        <FoldRow
+          hidden={history.length - shown.length}
+          onShow={() => setUnfolded(true)}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function HistoryEntry({
+  item,
+  registry,
+  refNames,
+}: {
+  item: HistoryItem
+  registry: Array<RegistryEntry>
+  refNames: RefNames | undefined
+}) {
+  if (item.type === 'macro')
+    return (
+      <Row
+        at={item.at}
+        kind={VERB_TYPES[item.verb] ?? 'edit'}
+        figure={macroFigure(item)}
+      >
+        {item.actorName ?? 'System'} {VERB_LABELS[item.verb] ?? item.verb}
+      </Row>
+    )
+  if (item.type === 'ledger') return <LedgerEntry item={item} />
+  return <AttrBurst item={item} registry={registry} refNames={refNames} />
+}
+
+/** One History row: the glyph, the sentence, the mono figure, the day. */
+function Row({
+  at,
+  kind,
+  children,
+  figure,
+  struck = false,
+}: {
+  at: string
+  kind: string
+  children: ReactNode
+  figure: ReactNode
+  struck?: boolean
+}) {
+  const { today } = useClock()
+  return (
     <li
-      data-highlighted={highlighted ? '' : undefined}
+      data-history={kind}
+      className="flex h-ledger-row items-center gap-3 border-b border-rule px-3"
+    >
+      <Glyph kind={kind} />
+      <span
+        className={cn(
+          'min-w-0 flex-1 truncate text-ui',
+          struck ? 'text-graphite line-through' : 'text-foreground',
+        )}
+      >
+        {children}
+      </span>
+      <Figure struck={struck}>{figure}</Figure>
+      <Day at={at} today={today} />
+    </li>
+  )
+}
+
+/** The 16px glyph lane; a space wears its layers. */
+function Glyph({ kind }: { kind: string }) {
+  return (
+    <span
+      aria-hidden
+      data-glyph={kind}
+      className="flex w-4 shrink-0 justify-center mono text-ui text-graphite"
+    >
+      {kind === 'space' ? (
+        <Layers className="size-3.5" strokeWidth={1.75} />
+      ) : (
+        (HISTORY_GLYPHS[kind] ?? '·')
+      )}
+    </span>
+  )
+}
+
+function Figure({
+  children,
+  struck = false,
+}: {
+  children: ReactNode
+  struck?: boolean
+}) {
+  return children === null ? null : (
+    <span
+      data-figure
       className={cn(
-        'group/row flex min-h-ledger-row items-start gap-3 px-3 py-2.5',
-        !last && 'border-b border-rule',
-        highlighted && 'bg-bone',
+        'flex max-w-80 min-w-0 shrink-0 items-center gap-1.5 truncate mono text-micro',
+        struck ? 'text-graphite line-through' : 'text-foreground',
       )}
     >
-      <Glyph
-        role="img"
-        aria-label={item.kind}
-        className="mt-0.75 size-3.5 shrink-0 text-graphite"
-      />
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-baseline gap-2">
-          <ThreadSubject item={item} />
-          {people === '' ? null : (
-            <span
-              data-participants
-              className="min-w-0 flex-1 truncate text-label text-graphite"
-            >
-              {people}
-            </span>
-          )}
-          {item.categories.length > 0 ? (
-            <span className="ml-auto flex shrink-0 gap-1">
-              {item.categories.map((c) => (
-                <span
-                  key={c}
-                  data-category
-                  className={badgeClasses({
-                    className: 'bg-bone text-graphite',
-                  })}
-                >
-                  {c}
-                </span>
-              ))}
-            </span>
-          ) : null}
-        </div>
-        {line === null ? null : (
-          <p
-            data-line={line.from}
-            className="mt-0.5 line-clamp-2 text-label text-foreground"
-          >
-            {line.text}
-          </p>
-        )}
-      </div>
-      <span
-        data-end-lane
-        className="flex w-60 shrink-0 items-center justify-end gap-2 mono text-micro leading-5 text-graphite"
-      >
-        {item.noteId || item.privateBody ? null : (
-          <button
-            type="button"
-            onClick={() => void writeUp()}
-            disabled={pending}
-            className={cn(
-              'focus-ring shrink-0 font-sans text-label text-foreground hover:underline',
-              !pending &&
-                'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100',
-            )}
-          >
-            {pending ? 'Writing up…' : 'Write up'}
-          </button>
-        )}
-        {lane === '' ? null : <span className="min-w-0 truncate">{lane}</span>}
-        <time dateTime={item.at} data-date className="tabular shrink-0">
-          {formatWhen(item.at, now)}
-        </time>
-      </span>
-    </li>
+      {children}
+    </span>
+  )
+}
+
+function Day({ at, today }: { at: string; today: string }) {
+  return (
+    <time
+      dateTime={at}
+      className="w-18 shrink-0 text-right mono text-micro text-graphite"
+    >
+      {formatDay(at, today)}
+    </time>
   )
 }
 
@@ -694,111 +710,115 @@ const INSTRUMENT_LABELS: Record<string, string> = {
 }
 
 /** A check on the deal's ledger; a voided one struck, with the void's day. */
-function LedgerEntry({ item, last }: { item: LedgerItem; last: boolean }) {
+function LedgerEntry({ item }: { item: LedgerItem }) {
   const { today } = useClock()
+  const voided = item.voidedAt !== null
   return (
     <Row
       at={item.at}
-      type={VERB_TYPES[item.verb] ?? 'invest'}
-      last={last}
-      end={
-        item.voidedAt === null
-          ? undefined
-          : `voided ${formatDay(item.voidedAt, today)}`
-      }
+      kind={VERB_TYPES[item.verb] ?? 'invest'}
+      struck={voided}
+      figure={`${fmtMoney(item.amount, item.currency, { compact: true })} ${INSTRUMENT_LABELS[item.instrument] ?? item.instrument}`}
     >
-      <span
-        data-voided={item.voidedAt === null ? undefined : ''}
-        className={cn(item.voidedAt !== null && 'text-graphite line-through')}
-      >
-        <span className="font-medium">{item.actorName ?? 'System'}</span>{' '}
-        {VERB_LABELS[item.verb] ?? item.verb} ·{' '}
-        <span className="mono text-micro">
-          {fmtMoney(item.amount, item.currency, { compact: true })}{' '}
-          {INSTRUMENT_LABELS[item.instrument] ?? item.instrument}
-        </span>
+      <span data-voided={voided ? '' : undefined}>
+        {item.actorName ?? 'System'} {VERB_LABELS[item.verb] ?? item.verb}
       </span>
+      {item.voidedAt === null ? null : (
+        <span className="ml-2 inline-block mono text-micro text-graphite">
+          voided {formatDay(item.voidedAt, today)}
+        </span>
+      )}
     </Row>
   )
 }
 
+/**
+ * An attribute burst: `Priya Raman changed 3 attributes` with their names in
+ * the figure, or a stage move with `Diligence → Term sheet`. Opened, it is a
+ * bone head row over one row per change: the label, then `90 → 120` in mono
+ * (options as badges).
+ */
 function AttrBurst({
   item,
   registry,
   refNames,
-  last,
 }: {
-  item: Extract<Items[number], { type: 'attrs' }>
+  item: BurstItem
   registry: Array<RegistryEntry>
-  refNames?: RefNames | undefined
-  last: boolean
+  refNames: RefNames | undefined
 }) {
   const [open, setOpen] = useState(false)
+  const { today } = useClock()
   const bySlug = new Map(registry.map((d) => [d.slug, d]))
-
-  function renderValue(slug: string, to: unknown): string {
-    if (to == null) return '—'
-    const def = bySlug.get(slug)
-    if (!def) return String(to)
-    if (def.type === 'select' || def.type === 'status')
-      return optionLabel(def, to)
-    if (def.type === 'multi_select' && Array.isArray(to))
-      return to.map((v) => optionLabel(def, v)).join(', ')
-    if (def.type === 'record_reference' || def.type === 'actor_reference') {
-      const ids = Array.isArray(to) ? to : [to]
-      return ids.map((id) => refName(refNames, String(id))).join(', ')
-    }
-    return String(to)
-  }
-
-  // A burst that moved the stage is a stage entry; its type lane says so.
+  const nameOf = (slug: string) => bySlug.get(slug)?.name ?? slug
   const stage = item.changes.find((c) => c.slug === 'stage')
-  const type = stage ? 'stage' : item.source === 'merge' ? 'merge' : 'edit'
+  const stageDef = bySlug.get('stage')
+  const kind = stage ? 'stage' : item.source === 'merge' ? 'merge' : 'edit'
+  const n = item.changes.length
+  const sentence = `${burstActorLabel(item)} ${
+    item.source === 'merge' ? 'rewrote' : 'changed'
+  } ${stage && n === 1 ? 'the stage' : `${String(n)} attribute${n === 1 ? '' : 's'}`}`
+
+  const figure =
+    stage && n === 1 ? (
+      <ChangeValue
+        def={stageDef}
+        from={stage.from}
+        to={stage.to}
+        refNames={refNames}
+      />
+    ) : (
+      burstFigure(item.changes.map((c) => nameOf(c.slug)))
+    )
 
   return (
-    <Row at={item.at} type={type} last={last}>
+    <li data-history={kind} className="flex flex-col border-b border-rule">
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="focus-ring flex items-center gap-1.5 text-left text-ui"
-      >
-        <span>
-          <span className="font-medium">{burstActorLabel(item)}</span>{' '}
-          {item.source === 'merge' ? 'rewrote' : 'changed'}{' '}
-          {stage ? (
-            <>
-              stage to{' '}
-              <span className="font-medium">
-                {renderValue('stage', stage.to)}
-              </span>
-              {item.changes.length > 1
-                ? ` and ${item.changes.length - 1} more`
-                : ''}
-            </>
-          ) : (
-            <span className="mono text-micro">
-              {item.changes.length} attribute
-              {item.changes.length === 1 ? '' : 's'}
-            </span>
-          )}
-        </span>
-        {open ? (
-          <ChevronDown className="size-3 text-graphite" />
-        ) : (
-          <ChevronRight className="size-3 text-graphite" />
+        className={cn(
+          'focus-ring-inset flex h-ledger-row w-full items-center gap-3 px-3 text-left',
+          open ? 'bg-bone' : 'hover:bg-bone',
         )}
+      >
+        {open ? (
+          <span
+            aria-hidden
+            className="flex w-4 shrink-0 justify-center mono text-ui text-graphite"
+          >
+            ⌄
+          </span>
+        ) : (
+          <Glyph kind={kind} />
+        )}
+        <span className="min-w-0 flex-1 truncate text-ui text-foreground">
+          {sentence}
+        </span>
+        {open ? null : <Figure>{figure}</Figure>}
+        <Day at={item.at} today={today} />
       </button>
       {open ? (
-        <dl className="mt-1.5 flex flex-col gap-0.5 border-l border-rule pl-3">
+        <dl className="flex flex-col">
           {item.changes.map((c, i) => (
-            <div key={i} className="flex items-baseline gap-3">
-              <dt className="w-24 shrink-0 truncate field-label text-graphite">
-                {bySlug.get(c.slug)?.name ?? c.slug}
+            <div
+              key={i}
+              data-change={c.slug}
+              className="flex h-ledger-row items-center gap-3 border-t border-rule px-3"
+            >
+              <span aria-hidden className="w-4 shrink-0" />
+              <dt className="w-40 shrink-0 truncate text-label text-graphite">
+                {nameOf(c.slug)}
               </dt>
-              <dd className="min-w-0 truncate text-label">
-                {renderValue(c.slug, c.to)}
+              <dd className="flex min-w-0 flex-1 items-center gap-3 mono text-micro text-foreground">
+                <ChangeValue
+                  def={bySlug.get(c.slug)}
+                  from={c.from}
+                  to={c.to}
+                  refNames={refNames}
+                />
                 {c.citations.length > 0 ? (
-                  <span className="ml-2 mono text-micro text-graphite">
+                  <span className="min-w-0 truncate text-graphite">
                     {c.citations.map((r, j) => (
                       <span
                         key={j}
@@ -816,6 +836,63 @@ function AttrBurst({
           ))}
         </dl>
       ) : null}
-    </Row>
+    </li>
+  )
+}
+
+/** A value as History prints it: an option's label, a record's name, text. */
+function valueText(
+  def: RegistryEntry | undefined,
+  value: unknown,
+  refNames: RefNames | undefined,
+): string {
+  if (value == null) return '—'
+  if (def === undefined) return String(value)
+  if (def.type === 'select' || def.type === 'status')
+    return optionLabel(def, value)
+  if (def.type === 'multi_select' && Array.isArray(value))
+    return value.map((v) => optionLabel(def, v)).join(', ')
+  if (def.type === 'record_reference' || def.type === 'actor_reference') {
+    const ids = Array.isArray(value) ? value : [value]
+    return ids.map((id) => refName(refNames, String(id))).join(', ')
+  }
+  return String(value)
+}
+
+/**
+ * `from → to`: an option's new value is its badge, the old one its label;
+ * a first write prints the new value alone.
+ */
+function ChangeValue({
+  def,
+  from,
+  to,
+  refNames,
+}: {
+  def: RegistryEntry | undefined
+  from: unknown
+  to: unknown
+  refNames: RefNames | undefined
+}) {
+  const option =
+    def !== undefined &&
+    (def.type === 'select' || def.type === 'status') &&
+    to != null
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      {from == null ? null : (
+        <>
+          <span className="min-w-0 truncate">
+            {valueText(def, from, refNames)}
+          </span>
+          <span aria-hidden>→</span>
+        </>
+      )}
+      {option ? (
+        <OptionChip def={def} id={to} className="font-sans" />
+      ) : (
+        <span className="min-w-0 truncate">{valueText(def, to, refNames)}</span>
+      )}
+    </span>
   )
 }

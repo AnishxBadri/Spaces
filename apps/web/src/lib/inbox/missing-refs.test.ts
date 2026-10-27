@@ -94,7 +94,7 @@ describe('resolveRefs — deleted targets, in the app', () => {
     )
     if (burst?.type !== 'attrs') throw new Error('no suggestion burst')
     expect(burst.changes).toEqual([
-      { slug: 'location', to: 'Berlin', citations: missing },
+      { slug: 'location', from: null, to: 'Berlin', citations: missing },
     ])
   })
 })

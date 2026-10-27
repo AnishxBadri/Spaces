@@ -70,29 +70,6 @@ function GoogleMark({ type }: { type: FileType }) {
   )
 }
 
-/** Drive's triangle, in ink — on the Drive buttons and a bound folder. */
-export function DriveMark({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      aria-hidden
-      className={cn('size-3 shrink-0', className)}
-    >
-      <path
-        d="M5.6 2h4.8l4.8 8.3-2.4 4.2H3.2L.8 10.3Z"
-        fill="none"
-        stroke="currentColor"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M5.6 2l4.8 8.3H.8M10.4 2 5.6 10.3l2.4 4.2"
-        stroke="currentColor"
-        fill="none"
-      />
-    </svg>
-  )
-}
-
 export function FileGlyph({
   type,
   pending = false,

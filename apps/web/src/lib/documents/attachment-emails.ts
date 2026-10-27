@@ -2,11 +2,22 @@ import { Effect, Schema } from 'effect'
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { canRead } from '@spaces/core/read-policy'
 import { noteWidenedSql } from '@spaces/core/writes/read/can-read-sql'
+import { jsonRecord, jsonString } from '@spaces/core/json'
 import { db } from '@spaces/db'
-import { interaction, interactionDocument, note } from '@spaces/db/schema'
+import {
+  integration,
+  interaction,
+  interactionDocument,
+  note,
+} from '@spaces/db/schema'
 
 /** The email a file came attached to, as the Files row names it. */
-export type AttachmentEmail = { interactionId: string; subject: string | null }
+export type AttachmentEmail = {
+  interactionId: string
+  subject: string | null
+  /** The mailbox it came through, by its plugin's name: `via Gmail`. */
+  mailbox: string | null
+}
 
 /** The earliest email the viewer may read, per document. */
 export type AttachmentEmails = Map<string, AttachmentEmail>
@@ -34,6 +45,8 @@ export const attachmentEmailsProgram = Effect.fn('attachmentEmails')(function* (
           documentId: interactionDocument.documentId,
           interactionId: interaction.id,
           subject: interaction.subject,
+          manifest: integration.manifest,
+          capabilityId: integration.capabilityId,
           visibility: note.visibility,
           authorId: note.authorId,
           widened: noteWidenedSql(viewer.id),
@@ -44,6 +57,7 @@ export const attachmentEmailsProgram = Effect.fn('attachmentEmails')(function* (
           eq(interaction.id, interactionDocument.interactionId),
         )
         .leftJoin(note, eq(note.entityId, interaction.noteId))
+        .leftJoin(integration, eq(integration.id, interaction.sourceRef))
         .where(
           and(
             inArray(interactionDocument.documentId, [...documentIds]),
@@ -59,6 +73,10 @@ export const attachmentEmailsProgram = Effect.fn('attachmentEmails')(function* (
       out.set(r.documentId, {
         interactionId: r.interactionId,
         subject: r.subject,
+        mailbox:
+          r.manifest === null
+            ? r.capabilityId
+            : (jsonString(jsonRecord(r.manifest).name) ?? r.capabilityId),
       })
   return out
 })

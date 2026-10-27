@@ -6,7 +6,7 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { RailField } from '#/components/attributes/rail-field'
@@ -36,15 +36,10 @@ import { RecordSpacesSection } from '#/components/record/spaces-section'
 import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
 import { RecordOverview } from '#/components/record/record-overview'
 import { RecordPicture } from '#/components/record/record-picture'
-import {
-  LogComposerRow,
-  LogInteractionDialog,
-} from '#/components/log-interaction-dialog'
+import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordHistory, RecordInteractions } from '#/components/record-timeline'
-import type { InteractionFilter } from '#/lib/timeline/interaction-filter'
-import type { NotesFilter } from '#/lib/notes/notes-filter'
 import { WaitingRail } from '#/components/record/waiting-rail'
 import { recordPath } from '#/lib/record-path'
 import { collisionToast } from '#/lib/attributes/collision-toast'
@@ -160,11 +155,6 @@ function PersonRecordPage() {
     (next) =>
       void go({ search: { tab: next }, replace: true, resetScroll: false }),
   )
-  // The Notes and Interactions filters, held here so the tab head's counts
-  // follow them.
-  const [notesFilter, setNotesFilter] = useState<NotesFilter>('all')
-  const [interactionFilter, setInteractionFilter] =
-    useState<InteractionFilter>('all')
 
   const role = jsonString(person.values.job_title)
   // Both sides of each relationship come from the one resolver.
@@ -408,13 +398,7 @@ function PersonRecordPage() {
           label={person.name}
           tab={tab}
           onTabChange={changeTab}
-          counts={recordTabCounts({
-            notes,
-            timeline,
-            documents,
-            notesFilter,
-            interactionFilter,
-          })}
+          counts={recordTabCounts({ notes, timeline, documents })}
           panels={{
             overview: (
               <RecordOverview
@@ -460,27 +444,17 @@ function PersonRecordPage() {
                 )}
               />
             ),
-            notes: (
-              <RecordNotes
-                notes={notes}
-                filter={notesFilter}
-                onFilterChange={setNotesFilter}
-                onNewNote={newNoteAboutThis}
-              />
-            ),
+            notes: <RecordNotes notes={notes} onNewNote={newNoteAboutThis} />,
             interactions: (
               <RecordInteractions
-                filter={interactionFilter}
-                onFilterChange={setInteractionFilter}
                 items={timeline}
-                registry={registry}
-                recordId={person.id}
-                composer={
+                record={{ id: person.id, name: person.name }}
+                logInteraction={(trigger) => (
                   <LogInteractionDialog
                     seed={{ id: person.id, name: person.name, kind: 'person' }}
-                    trigger={<LogComposerRow />}
+                    trigger={trigger}
                   />
-                }
+                )}
               />
             ),
             files: (

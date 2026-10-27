@@ -125,35 +125,74 @@ type Laned = Typed & {
   readonly sourceCapability: string | null
   readonly sourcePath: string | null
   /** The readable email it came attached to; omitted by lists that have none. */
-  readonly email?: { readonly subject: string | null } | null
+  readonly email?: { readonly mailbox: string | null } | null
 }
 
 /**
  * The mono end lane: `from <path> · 4.1 MB · 2 Sep · via gmail`.
  * - The provider path only outside a bound folder, whose tree already says it.
  * - `via` names a plugin that filed it, unless the state lane links there.
- * - An email attachment is `via <subject> · 4.1 MB · 2 Sep`: the email is
- *   its provenance, not the mailbox.
+ * - An email attachment is `42 KB · 9 Oct · via Gmail`: the mailbox it came
+ *   through, never the subject the mailbox filed it under.
+ * - A superseded file ends on its successor's version: `· → v3`.
  */
-export function endLane(doc: Laned, today: string, inFolder = false): string {
-  if (doc.email != null)
-    return [
-      `via ${doc.email.subject || 'Untitled'}`,
-      formatBytes(doc.sizeBytes) || null,
-      formatDay(doc.createdAt, today),
-    ]
-      .filter((part) => part !== null)
-      .join(' · ')
+export function endLane(
+  doc: Laned,
+  today: string,
+  inFolder = false,
+  successor: number | null = null,
+): string {
+  const via =
+    doc.email != null
+      ? `via ${doc.email.mailbox ?? 'email'}`
+      : doc.sourceCapability !== null && doc.externalUrl === null
+        ? `via ${doc.sourceCapability}`
+        : null
   return [
-    !inFolder && doc.sourcePath !== null ? `from ${doc.sourcePath}` : null,
+    doc.email == null && !inFolder && doc.sourcePath !== null
+      ? `from ${doc.sourcePath}`
+      : null,
     formatBytes(doc.sizeBytes) || null,
     formatDay(doc.createdAt, today),
-    doc.sourceCapability !== null && doc.externalUrl === null
-      ? `via ${doc.sourceCapability}`
-      : null,
+    via,
+    successor === null ? null : `→ v${String(successor)}`,
   ]
     .filter((part) => part !== null)
     .join(' · ')
+}
+
+/**
+ * Each file's place in its supersedes chain on this record: a file nothing
+ * older leads to is v1, and each newer one is one past the longest chain
+ * behind it.
+ */
+export function versionNumbers(
+  docs: ReadonlyArray<{
+    readonly id: string
+    readonly replacedBy?: { readonly id: string } | null
+  }>,
+): Map<string, number> {
+  const olderOf = new Map<string, Array<string>>()
+  for (const d of docs)
+    if (d.replacedBy != null)
+      olderOf.set(d.replacedBy.id, [
+        ...(olderOf.get(d.replacedBy.id) ?? []),
+        d.id,
+      ])
+  const out = new Map<string, number>()
+  // `path` breaks a cycle a bad link could make.
+  const versionOf = (id: string, path: ReadonlySet<string>): number => {
+    const known = out.get(id)
+    if (known !== undefined) return known
+    const next = new Set([...path, id])
+    const older = (olderOf.get(id) ?? []).filter((o) => !path.has(o))
+    const v = 1 + Math.max(0, ...older.map((o) => versionOf(o, next)))
+    out.set(id, v)
+    return v
+  }
+  for (const id of new Set([...docs.map((d) => d.id), ...olderOf.keys()]))
+    versionOf(id, new Set())
+  return out
 }
 
 export type StateWord = {
@@ -169,7 +208,7 @@ export type StateWord = {
 
 type Stated = Typed & {
   /** The newer version that supersedes this file. */
-  readonly replacedBy?: { readonly id: string; readonly name: string } | null
+  readonly replacedBy?: { readonly id: string } | null
   readonly blobSha: string | null
   readonly url: string | null
   readonly extractionStatus: string
@@ -192,8 +231,8 @@ const word = (
 /**
  * The lowercase mono state word a filed row ends on; null when nothing is
  * happening. The first that holds wins: in-flight work, then what went
- * wrong, then the newer version that replaced it, then where the file lives
- * elsewhere.
+ * wrong; a superseded file has none (its end lane reads `→ v3`); then where
+ * the file lives elsewhere.
  */
 export function stateWord(doc: Stated): StateWord | null {
   if (doc.extractionStatus === 'pending')
@@ -210,10 +249,8 @@ export function stateWord(doc: Stated): StateWord | null {
         .filter((part) => part !== null)
         .join(' · '),
     )
-  if (doc.replacedBy != null) {
-    const text = `Replaced by → ${doc.replacedBy.name}`
-    return { text, tone: 'graphite', href: null, title: text, wide: true }
-  }
+  // Superseded: the end lane points at the newer version, and that is all.
+  if (doc.replacedBy != null) return null
   if (doc.extractionStatus === 'unsupported')
     return word('no text', 'graphite', doc.extractionError)
   // `following` is a followed file's word only (`followLane`); a native
@@ -312,7 +349,7 @@ type Followed = {
 /**
  * A followed file's two lanes, in place of the end lane and state word;
  * null for a file that was never followed.
- * - following: `rev 4 · 10 Oct` · `following`
+ * - following: `rev 4 · 10 Oct · following`, the end lane alone
  * - a revision arriving, or the first read pending: `rev 5` · `fetching.`
  * - deleted at the provider: `■ gone · 4 revisions kept`
  * - unfollowed: `rev 4` · `stopped 12 Oct`, the day of its last poll
@@ -320,7 +357,7 @@ type Followed = {
 export function followLane(
   doc: Followed,
   today: string,
-): { readonly end: string; readonly state: StateWord } | null {
+): { readonly end: string; readonly state: StateWord | null } | null {
   const follow = doc.follow
   if (follow === null) return null
   const rev = `rev ${String(follow.revisions)}`
@@ -353,7 +390,7 @@ export function followLane(
   if (follow.lastSyncedAt === null || doc.extractionStatus === 'pending')
     return { end: rev, state: word('fetching.', 'ink') }
   return {
-    end: `${rev} · ${formatDay(follow.revisedAt ?? doc.createdAt, today)}`,
-    state: word('following', 'ink'),
+    end: `${rev} · ${formatDay(follow.revisedAt ?? doc.createdAt, today)} · following`,
+    state: null,
   }
 }

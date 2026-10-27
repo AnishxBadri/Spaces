@@ -17,6 +17,8 @@ import type { Json } from '@spaces/db/json'
  */
 export type BurstEventRow = {
   attrSlug: string
+  /** The value before the change; null or absent for a first write. */
+  from?: Json | null
   to: Json | null
   actorType: string
   actorId: string | null
@@ -38,6 +40,7 @@ export type Burst<TRow extends BurstEventRow> = {
   at: string
   changes: Array<{
     slug: string
+    from: Json | null
     to: TRow['to']
     /** The event's citation refs, carried through for the reader to resolve. */
     refs: ReadonlyArray<string>
@@ -74,7 +77,12 @@ export function condenseBursts<TRow extends BurstEventRow>(
       last.source === ev.source &&
       new Date(last.at).getTime() - ev.at.getTime() < gapMs
     ) {
-      last.changes.push({ slug: ev.attrSlug, to: ev.to, refs: ev.refs ?? [] })
+      last.changes.push({
+        slug: ev.attrSlug,
+        from: ev.from ?? null,
+        to: ev.to,
+        refs: ev.refs ?? [],
+      })
     } else {
       bursts.push({
         type: 'attrs',
@@ -83,7 +91,14 @@ export function condenseBursts<TRow extends BurstEventRow>(
         actorRef: ev.actorRef ?? null,
         source: ev.source,
         at: ev.at.toISOString(),
-        changes: [{ slug: ev.attrSlug, to: ev.to, refs: ev.refs ?? [] }],
+        changes: [
+          {
+            slug: ev.attrSlug,
+            from: ev.from ?? null,
+            to: ev.to,
+            refs: ev.refs ?? [],
+          },
+        ],
       })
     }
   }

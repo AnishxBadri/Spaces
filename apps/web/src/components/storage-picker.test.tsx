@@ -1,20 +1,20 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
-import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LinkFetchRow, useLinkFetches } from './record-files-link'
 import {
-  PickerButton,
-  StoragePicker,
+  attachFromDriveItem,
   readGooglePick,
   usePickerReadiness,
+  usePickerSession,
 } from './storage-picker'
 
 /**
  * The picker host under the fake providers: three files picked are one
  * attach of three, and three pending rows; a cancel attaches nothing and
- * leaves nothing behind. And the button in each state the mint can be in.
+ * leaves nothing behind. And the add row's item in each state the mint can
+ * be in.
  * - A happy-dom window's DOM globals are installed by hand before React
  *   loads: the happy-dom environment would also replace `URL`, which the
  *   database setup file needs as node's.
@@ -81,13 +81,20 @@ vi.mock('@tanstack/react-router', () => ({
 function Harness() {
   const links = useLinkFetches(RECORD)
   const [readiness, setReadiness] = usePickerReadiness()
+  const picker = usePickerSession({
+    mode: 'files',
+    onPicked: (files) => void links.attachPicked(files),
+    onBlocked: setReadiness,
+  })
+  const item = attachFromDriveItem(readiness, picker)
   return (
     <div>
-      <StoragePicker
-        readiness={readiness}
-        setReadiness={setReadiness}
-        onPicked={(files) => void links.attachPicked(files)}
-      />
+      {item === null ? null : (
+        <button type="button" onClick={item.onSelect}>
+          {item.label}
+        </button>
+      )}
+      {picker.sheet}
       <ul>
         {links.fetches.map((f) => (
           <LinkFetchRow
@@ -199,48 +206,46 @@ describe('StoragePicker under the fake providers', () => {
   })
 })
 
-describe('PickerButton', () => {
-  const render = (readiness: Parameters<typeof PickerButton>[0]['readiness']) =>
-    renderToStaticMarkup(
-      <PickerButton
-        readiness={readiness}
-        opening={false}
-        onOpen={() => undefined}
-      />,
-    )
+describe('attachFromDriveItem', () => {
+  const picker = { open: () => Promise.resolve(), opening: false }
+  const item = (readiness: Parameters<typeof attachFromDriveItem>[0]) =>
+    attachFromDriveItem(readiness, picker)
 
-  it('offers Connect with no connection, and Google’s re-consent without drive.file', () => {
-    const connect = render({
-      _tag: 'connect',
-      href: '/api/connections/google/start?product=drive',
-      label: 'Connect Drive',
-    })
-    expect(connect).toContain(
-      'href="/api/connections/google/start?product=drive"',
-    )
-    expect(connect).toContain('Connect Drive')
-    const consent = render({
-      _tag: 'consent',
-      href: '/api/connections/google/start?product=drive&amp;scopes=drive.file',
-    })
-    expect(consent).toContain('scopes=drive.file')
-    expect(consent).toContain('Attach from Drive…')
+  it('is absent with no Drive connection, before the answer, and while the picker is not set up', () => {
+    expect(
+      item({
+        _tag: 'connect',
+        href: '/api/connections/google/start?product=drive',
+        label: 'Connect Drive',
+      }),
+    ).toBeNull()
+    expect(item(null)).toBeNull()
+    for (const settingsHref of ['/settings/plugins/row', null] as const)
+      expect(
+        item({
+          _tag: 'unconfigured',
+          reason: 'needs Picker API key and Picker app id',
+          integrationId: 'row',
+          settingsHref,
+        }),
+      ).toBeNull()
   })
 
-  it('draws Picker not set up disabled until an admin adds the key, for admin and member alike', () => {
-    const unconfigured = {
-      _tag: 'unconfigured' as const,
-      reason: 'needs Picker API key and Picker app id',
-      integrationId: 'row',
-    }
-    for (const settingsHref of ['/settings/plugins/row', null] as const) {
-      const html = render({ ...unconfigured, settingsHref })
-      expect(html).toContain('Picker not set up')
-      expect(html).toContain('aria-disabled="true"')
-      expect(html).not.toContain('href=')
-      expect(html).not.toMatch(/<button/)
-    }
-    expect(render({ _tag: 'ready' })).toContain('Attach from Drive')
+  it('opens the picker once ready, and Google’s re-consent when it asks once more', () => {
+    expect(item({ _tag: 'ready' })?.label).toBe('Attach from Drive')
+    const assign = vi
+      .spyOn(window.location, 'assign')
+      .mockImplementation(() => undefined)
+    const consent = item({
+      _tag: 'consent',
+      href: '/api/connections/google/start?product=drive&scopes=drive.file',
+    })
+    expect(consent?.label).toBe('Attach from Drive…')
+    consent?.onSelect()
+    expect(assign).toHaveBeenCalledWith(
+      '/api/connections/google/start?product=drive&scopes=drive.file',
+    )
+    assign.mockRestore()
   })
 })
 

@@ -3,11 +3,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { MoreMenu } from './ui/more-menu'
-import { LabelHead } from './ledger-section'
+import { Band } from './ledger-section'
 import { DocumentPreview } from './document-preview'
 import { AddRow, LinkFetchRow, useLinkFetches } from './record-files-link'
 import {
-  StoragePicker,
+  attachFromDriveItem,
   usePickerReadiness,
   usePickerSession,
 } from './storage-picker'
@@ -45,7 +45,7 @@ import { uploadDocument } from '#/lib/documents/upload'
 import { droppedUrl } from '#/lib/documents/uri-list'
 import { storageLinkProvider } from '#/lib/documents/storage-link'
 import { offersReadDeck } from '#/lib/documents/read-deck-gate'
-import { KIND_ORDER } from '#/lib/documents/files-tab'
+import { KIND_ORDER, versionNumbers } from '#/lib/documents/files-tab'
 import { linkReady, versionCandidates } from '#/lib/documents/newer-version'
 import type { VersionPick } from '#/lib/documents/newer-version'
 
@@ -60,9 +60,10 @@ import type { VersionPick } from '#/lib/documents/newer-version'
  * - An upload or picked Drive file of a kind the record already holds offers
  *   "Newer version of" on its row, and its row stays as `filed.` until
  *   the pick is made or dismissed; the link is written after the birth.
- * - Link a Drive folder (the add row's `···`, or a pasted folder link) is
- *   offered only with the user's own Drive connection; a bound folder is a
- *   band under our files.
+ * - The add row's `···` holds Attach from Drive and Link a folder…, and
+ *   draws only with the user's own Drive connection; a pasted folder link
+ *   offers the same link. A bound folder is a band under our files.
+ * - A superseded file is graphite and ends on its successor: `→ v3`.
  * - Follow, in a row's `···`, is offered on a file a storage connection
  *   brought: its row reads `rev n` and the viewer lists its revisions.
  */
@@ -104,6 +105,11 @@ export function RecordFiles({
       versionCandidates(docsRef.current, guessDocumentKind(f.name)).length > 0,
   )
   const [readiness, setReadiness] = usePickerReadiness()
+  const filePicker = usePickerSession({
+    mode: 'files',
+    onPicked: (files) => void links.attachPicked(files),
+    onBlocked: setReadiness,
+  })
   const { remove, removeDialog } = useRemoveFile(entityId, recordName)
   const folderLink = useFolderLink(entityId)
   const folderPicker = usePickerSession({
@@ -317,12 +323,8 @@ export function RecordFiles({
     uploads: pending.filter((p) => p.kind === kind),
     rows: ours.filter((d) => d.kind === kind),
   })).filter((g) => g.uploads.length + g.rows.length > 0)
-  const empty =
-    documents.length === 0 &&
-    pending.length === 0 &&
-    links.fetches.length === 0 &&
-    folders.length === 0
-  const totalBytes = documents.reduce((n, d) => n + (d.sizeBytes ?? 0), 0)
+  const versions = versionNumbers(documents)
+  const attach = attachFromDriveItem(readiness, filePicker)
   // The live row, so the viewer follows a kind change or a re-read.
   const viewing = documents.find((d) => d.id === viewingId) ?? null
 
@@ -359,19 +361,7 @@ export function RecordFiles({
           : 'relative flex min-h-72 flex-col'
       }
     >
-      <AddRow
-        onLink={(url) => void handleLink(url)}
-        meta={
-          documents.length === 0
-            ? null
-            : `${String(documents.length)} · ${formatBytes(totalBytes)}`
-        }
-      >
-        <StoragePicker
-          readiness={readiness}
-          setReadiness={setReadiness}
-          onPicked={(files) => void links.attachPicked(files)}
-        />
+      <AddRow onLink={(url) => void handleLink(url)}>
         <Button
           type="button"
           size="sm"
@@ -383,19 +373,21 @@ export function RecordFiles({
         <MoreMenu
           variant="row"
           label="adding files"
-          items={
-            folderLink.canLink
+          items={[
+            ...(attach === null ? [] : [attach]),
+            ...(folderLink.canLink
               ? [
                   {
-                    label: 'Link a Drive folder…',
+                    label: 'Link a folder…',
                     onSelect: () => void folderPicker.open(),
                     opens: true,
                   },
                 ]
-              : []
-          }
+              : []),
+          ]}
         />
       </AddRow>
+      {filePicker.sheet}
       {folderPicker.sheet}
       <input
         ref={inputRef}
@@ -410,7 +402,7 @@ export function RecordFiles({
 
       {links.fetches.length === 0 ? null : (
         <section>
-          <LabelHead label={`Just added · ${String(links.fetches.length)}`} />
+          <Band label={`Just added ${String(links.fetches.length)}`} />
           <ul>
             {links.fetches.map((f) => (
               <LinkFetchRow
@@ -444,8 +436,8 @@ export function RecordFiles({
 
       {groups.map((g) => (
         <section key={g.kind}>
-          <LabelHead
-            label={`${DOCUMENT_KIND_LABELS[g.kind]} · ${String(g.uploads.length + g.rows.length)}`}
+          <Band
+            label={`${DOCUMENT_KIND_LABELS[g.kind]} ${String(g.uploads.length + g.rows.length)}`}
           />
           <ul>
             {g.uploads.map((p) => (
@@ -481,22 +473,17 @@ export function RecordFiles({
                     d.replacedBy?.id !== doc.id &&
                     doc.replacedBy?.id !== d.id,
                 )}
+                successor={
+                  doc.replacedBy === null
+                    ? null
+                    : (versions.get(doc.replacedBy.id) ?? null)
+                }
                 onView={() => setViewingId(doc.id)}
               />
             ))}
           </ul>
         </section>
       ))}
-
-      {empty ? (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="focus-ring-inset m-3 flex h-ledger-row items-center justify-center border border-dashed border-rule text-ui text-graphite hover:bg-bone"
-        >
-          No files.
-        </button>
-      ) : null}
 
       {folders.map((f) => (
         <FolderBand

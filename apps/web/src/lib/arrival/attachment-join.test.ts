@@ -361,7 +361,7 @@ describe('an attachment is private with its email’s body (D67)', () => {
       (
         await Effect.runPromise(attachmentEmailsProgram(FIXTURE_ACTOR, [doc]))
       ).get(doc),
-    ).toEqual({ interactionId: email, subject: 'Re: Seed round' })
+    ).toMatchObject({ interactionId: email, subject: 'Re: Seed round' })
     const ownRow = (
       await Effect.runPromise(recordTimelineProgram(acme, FIXTURE_ACTOR))
     ).find((i) => i.id === email)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { VERB_LABELS, VERB_TYPES } from './record-timeline'
+import { HISTORY_GLYPHS, VERB_LABELS, VERB_TYPES } from './record-timeline'
 
 /**
  * Every verb a producer writes to `activity` renders as a sentence, never as
@@ -48,14 +48,12 @@ const PRODUCED = [
 ]
 
 describe('record ledger verbs', () => {
-  it.each(PRODUCED)('renders %s as a sentence with a type lane', (verb) => {
+  it.each(PRODUCED)('renders %s as a sentence with a glyph', (verb) => {
     expect(VERB_LABELS[verb], `label for ${verb}`).toBeTruthy()
-    expect(VERB_TYPES[verb], `type lane for ${verb}`).toBeTruthy()
-  })
-
-  it('keeps every type lane short enough for the 72px lane', () => {
-    for (const [verb, type] of Object.entries(VERB_TYPES)) {
-      expect(type.length, `${verb} → ${type}`).toBeLessThanOrEqual(8)
-    }
+    const kind = VERB_TYPES[verb]
+    expect(kind, `kind for ${verb}`).toBeTruthy()
+    // A space wears its layers icon; every other kind a mono glyph.
+    if (kind !== 'space')
+      expect(HISTORY_GLYPHS[kind], `glyph for ${verb}`).toBeTruthy()
   })
 })

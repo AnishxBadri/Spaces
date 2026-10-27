@@ -34,13 +34,8 @@ import { RecordOverview } from '#/components/record/record-overview'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordHistory, RecordInteractions } from '#/components/record-timeline'
-import type { InteractionFilter } from '#/lib/timeline/interaction-filter'
-import type { NotesFilter } from '#/lib/notes/notes-filter'
 import { WaitingRail } from '#/components/record/waiting-rail'
-import {
-  LogComposerRow,
-  LogInteractionDialog,
-} from '#/components/log-interaction-dialog'
+import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { objectIcon } from '#/lib/object-icons'
 import { recordPath } from '#/lib/record-path'
@@ -152,11 +147,6 @@ function ObjectRecordPage() {
     (next) =>
       void go({ search: { tab: next }, replace: true, resetScroll: false }),
   )
-  // The Notes and Interactions filters, held here so the tab head's counts
-  // follow them.
-  const [notesFilter, setNotesFilter] = useState<NotesFilter>('all')
-  const [interactionFilter, setInteractionFilter] =
-    useState<InteractionFilter>('all')
 
   async function newNoteAboutThis() {
     try {
@@ -343,13 +333,7 @@ function ObjectRecordPage() {
           label={record.name}
           tab={tab}
           onTabChange={changeTab}
-          counts={recordTabCounts({
-            notes,
-            timeline,
-            documents,
-            notesFilter,
-            interactionFilter,
-          })}
+          counts={recordTabCounts({ notes, timeline, documents })}
           panels={{
             overview: (
               <RecordOverview
@@ -393,28 +377,17 @@ function ObjectRecordPage() {
                 }
               />
             ),
-            notes: (
-              <RecordNotes
-                notes={notes}
-                filter={notesFilter}
-                onFilterChange={setNotesFilter}
-                onNewNote={newNoteAboutThis}
-              />
-            ),
+            notes: <RecordNotes notes={notes} onNewNote={newNoteAboutThis} />,
             interactions: (
               <RecordInteractions
-                filter={interactionFilter}
-                onFilterChange={setInteractionFilter}
                 items={timeline}
-                registry={registry}
-                recordId={record.id}
-                refNames={record.refNames}
-                composer={
+                record={{ id: record.id, name: record.name }}
+                logInteraction={(trigger) => (
                   <LogInteractionDialog
                     seed={{ id: record.id, name: record.name, kind: 'custom' }}
-                    trigger={<LogComposerRow />}
+                    trigger={trigger}
                   />
-                }
+                )}
               />
             ),
             files: (

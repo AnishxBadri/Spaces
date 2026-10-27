@@ -268,7 +268,7 @@ describe('which tab opens', () => {
           mentions: [{ id: 'b' }, { id: 'c' }],
         },
         timeline: [
-          { type: 'interaction', kind: 'email', hasAttachments: false },
+          { type: 'interaction', id: 'e', threadId: null },
           { type: 'macro' },
           { type: 'attrs' },
         ],
@@ -277,41 +277,31 @@ describe('which tab opens', () => {
     ).toEqual({ notes: 3, interactions: 1, files: 0, history: 2 })
   })
 
-  it('counts the Interactions tab under its filter', () => {
+  it('counts Interactions by thread, not by message', () => {
     const timeline = [
-      { type: 'interaction', kind: 'email', hasAttachments: true },
-      { type: 'interaction', kind: 'email', hasAttachments: false },
-      { type: 'interaction', kind: 'meeting', hasAttachments: false },
+      { type: 'interaction', id: 'a', threadId: 't1' },
+      { type: 'interaction', id: 'b', threadId: 't1' },
+      { type: 'interaction', id: 'c', threadId: null },
       { type: 'macro' },
     ] as const
-    const under = (interactionFilter: 'all' | 'email' | 'attachments') =>
-      recordTabCounts({
-        notes: { filed: [], fromMeetings: [], mentions: [] },
-        timeline,
-        documents: [],
-        interactionFilter,
-      })
-    expect(under('all').interactions).toBe(3)
-    expect(under('email').interactions).toBe(2)
-    expect(under('attachments').interactions).toBe(1)
-    // History counts what is not an interaction, whatever the filter.
-    expect(under('email').history).toBe(1)
+    const tabs = recordTabCounts({
+      notes: { filed: [], fromMeetings: [], mentions: [] },
+      timeline,
+      documents: [],
+    })
+    expect(tabs.interactions).toBe(2)
+    expect(tabs.history).toBe(1)
   })
 
-  it('counts the Notes tab under its filter, a filed meeting note once under All', () => {
+  it('counts every note once, with no filter to follow', () => {
     const notes = {
       filed: [{ id: 'memo' }, { id: 'granola' }],
       fromMeetings: [{ id: 'granola' }, { id: 'write-up' }],
       mentions: [{ id: 'aside' }],
     }
-    const under = (
-      notesFilter: 'all' | 'filed' | 'meetings' | 'mentions',
-    ): number =>
-      recordTabCounts({ notes, timeline: [], documents: [], notesFilter }).notes
-    expect(under('all')).toBe(4)
-    expect(under('filed')).toBe(2)
-    expect(under('meetings')).toBe(2)
-    expect(under('mentions')).toBe(1)
+    expect(recordTabCounts({ notes, timeline: [], documents: [] }).notes).toBe(
+      4,
+    )
   })
 })
 

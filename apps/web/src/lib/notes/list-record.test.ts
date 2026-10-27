@@ -221,6 +221,57 @@ describe('listRecordNotesProgram', () => {
     expect(lanes.mentions).toEqual([])
   })
 
+  it('carries the author (never the viewer), the excerpt and the newer version', async () => {
+    const { db } = await import('@spaces/db')
+    const { link, note } = await import('@spaces/db/schema')
+    const { eq } = await import('drizzle-orm')
+    const { listRecordNotesProgram } = await import('./list-record')
+
+    const tag = randomUUID().slice(0, 8)
+    const me = await actorId()
+    const other = await anotherUser(tag)
+    const companyId = await aCompany(tag)
+
+    const v1 = await aNote({
+      title: `Memo v1 ${tag}`,
+      authorId: other,
+      kind: 'memo',
+      filedAgainst: companyId,
+    })
+    const v2 = await aNote({
+      title: `Memo v2 ${tag}`,
+      authorId: me,
+      kind: 'memo',
+      filedAgainst: companyId,
+    })
+    await db
+      .update(note)
+      .set({
+        bodyMd: '## Thesis\n\n**Strong** team, see [deck](https://x.io).',
+      })
+      .where(eq(note.entityId, v1))
+    await db.insert(link).values({
+      fromEntityId: v2,
+      toEntityId: v1,
+      relation: 'supersedes',
+      source: 'manual',
+    })
+
+    const lanes = await Effect.runPromise(listRecordNotesProgram(me, companyId))
+    const byId = new Map(lanes.filed.map((n) => [n.id, n]))
+    expect(byId.get(v1)).toMatchObject({
+      author: 'The Other Partner',
+      excerpt: 'Thesis Strong team, see deck.',
+      supersededBy: v2,
+      attendees: [],
+    })
+    expect(byId.get(v2)).toMatchObject({
+      author: null,
+      excerpt: null,
+      supersededBy: null,
+    })
+  })
+
   it('answers three empty lanes for a record nothing points at', async () => {
     const { listRecordNotesProgram } = await import('./list-record')
     const tag = randomUUID().slice(0, 8)

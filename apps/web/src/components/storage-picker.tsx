@@ -11,8 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog'
-import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
-import { DriveMark } from './files/file-glyph'
+import type { MoreMenuAction } from './ui/more-menu'
 import { filesTabPath } from './files/use-folder-link'
 import { mintPickerToken, pickerReadiness } from '#/lib/server-fns'
 import type {
@@ -190,7 +189,7 @@ const LABEL = 'Attach from Drive'
 
 /**
  * The user's Drive picker state, asked once on mount. Held by the Files
- * tab, which draws the Drive button and the link row from it.
+ * tab, whose add row's `···` offers Attach from Drive from it.
  */
 export function usePickerReadiness(): [
   Readiness | null,
@@ -312,110 +311,32 @@ export function usePickerSession({
   return { open, opening, sheet }
 }
 
-/** The Files tab's "Attach from Drive", in whatever state the user's Drive is in. */
-export function StoragePicker({
-  readiness,
-  setReadiness,
-  onPicked,
-}: {
-  readiness: Readiness | null
-  setReadiness: (next: Readiness) => void
-  onPicked: (files: ReadonlyArray<PickedFile>) => void
-}) {
-  const picker = usePickerSession({
-    mode: 'files',
-    onPicked,
-    onBlocked: setReadiness,
-  })
-  return (
-    <>
-      <PickerButton
-        readiness={readiness}
-        opening={picker.opening}
-        onOpen={() => void picker.open()}
-      />
-      {picker.sheet}
-    </>
-  )
-}
-
-const BUTTON = 'shrink-0'
-
 /**
- * The Drive button, saying what it will do by readiness: Connect Drive
- * with no connection, Attach from Drive… when Google asks once more,
- * `Picker not set up` disabled until an admin adds the picker key.
+ * The Files tab's "Attach from Drive", as an item of the add row's `···`:
+ * the picker once Drive is connected, Google's re-consent when it asks once
+ * more. Null with no Drive connection, before the answer, and while the
+ * picker is not set up — a missing setup is never a control.
  */
-export function PickerButton({
-  readiness,
-  opening,
-  onOpen,
-}: {
-  readiness: Readiness | null
-  opening: boolean
-  onOpen: () => void
-}) {
-  const disabled = (label: string, reason: string) => (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span
-          tabIndex={0}
-          aria-disabled="true"
-          className="focus-ring inline-flex h-[1.625rem] shrink-0 cursor-default items-center rounded-md border border-rule bg-bone-deep px-2 text-label text-graphite"
-        >
-          {label}
-        </span>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-64">{reason}</TooltipContent>
-    </Tooltip>
-  )
-
+export function attachFromDriveItem(
+  readiness: Readiness | null,
+  picker: { open: () => Promise<void>; opening: boolean },
+): MoreMenuAction | null {
   switch (readiness?._tag) {
-    case 'connect':
-      return (
-        <Button asChild size="sm" variant="outline" className={BUTTON}>
-          <a href={readiness.href}>
-            <DriveMark />
-            {readiness.label}
-          </a>
-        </Button>
-      )
-    case 'consent':
-      return (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button asChild size="sm" variant="outline" className={BUTTON}>
-              <a href={readiness.href}>
-                <DriveMark />
-                {`${LABEL}…`}
-              </a>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-64">
-            Google asks once more, for the files you pick.
-          </TooltipContent>
-        </Tooltip>
-      )
-    case 'unconfigured':
-      return disabled('Picker not set up', readiness.reason)
-    case 'refused':
-      return disabled(LABEL, readiness.reason)
     case 'ready':
-    case undefined:
-      return (
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className={BUTTON}
-          pending={opening}
-          disabled={opening}
-          onClick={onOpen}
-        >
-          <DriveMark />
-          {LABEL}
-        </Button>
-      )
+      return {
+        label: LABEL,
+        disabled: picker.opening,
+        opens: true,
+        onSelect: () => void picker.open(),
+      }
+    case 'consent':
+      return {
+        label: `${LABEL}…`,
+        title: 'Google asks once more, for the files you pick.',
+        onSelect: () => window.location.assign(readiness.href),
+      }
+    default:
+      return null
   }
 }
 
@@ -451,7 +372,7 @@ export function FakePickList({
     >
       <DialogContent size="m">
         <DialogHeader>
-          <DialogTitle>{folders ? 'Link a Drive folder' : LABEL}</DialogTitle>
+          <DialogTitle>{folders ? 'Link a folder' : LABEL}</DialogTitle>
           <DialogDescription>fake Drive</DialogDescription>
         </DialogHeader>
         <ul className="-mx-5 -my-5 max-h-80 overflow-y-auto">

@@ -141,6 +141,7 @@ export function FileRow({
   inFolder = false,
   actions = [],
   older = [],
+  successor = null,
   className,
   onView,
 }: {
@@ -152,6 +153,8 @@ export function FileRow({
   actions?: ReadonlyArray<FileAction>
   /** Files this one may be the newer version of; none hides the item. */
   older?: ReadonlyArray<RecordDocument>
+  /** The version number of the file that supersedes this one. */
+  successor?: number | null
   className?: string | undefined
   onView: () => void
 }) {
@@ -183,8 +186,10 @@ export function FileRow({
     <li
       data-file={doc.id}
       data-row
+      data-superseded={doc.replacedBy === null ? undefined : ''}
       className={cn(
         'flex h-ledger-row items-center gap-3 border-b border-rule px-3',
+        doc.replacedBy !== null && 'text-graphite',
         className,
       )}
     >
@@ -192,15 +197,22 @@ export function FileRow({
       <button
         type="button"
         onClick={() => openFile(doc, onView)}
-        className={cn(
-          'focus-ring min-w-0 flex-1 truncate text-left text-body hover:underline',
-          doc.replacedBy !== null && 'text-graphite',
-        )}
+        className="focus-ring min-w-0 flex-1 truncate text-left text-body hover:underline"
       >
         {doc.filename}
       </button>
-      <span className="min-w-0 shrink truncate mono text-micro text-graphite">
-        {followed === null ? endLane(doc, today, inFolder) : followed.end}
+      <span
+        data-file-end
+        className="min-w-0 shrink truncate mono text-micro text-graphite"
+      >
+        {followed === null
+          ? endLane(
+              doc,
+              today,
+              inFolder,
+              doc.replacedBy === null ? null : successor,
+            )
+          : followed.end}
       </span>
       <StateLane state={followed === null ? stateWord(doc) : followed.state} />
       <MoreMenu

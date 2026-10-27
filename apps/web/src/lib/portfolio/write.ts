@@ -237,6 +237,8 @@ export const addInvestmentProgram = Effect.fn('addInvestmentProgram')(
         actorId: input.actorId,
         verb: 'investment.added',
         subjectEntityId: input.companyId,
+        // The figure the record's History prints.
+        meta: { amount: input.amount, currency: input.currency },
       })
       return { id: row.id, holdingId: h.id, holdingCreated: h.created }
     })
@@ -284,7 +286,11 @@ export const addMarkProgram = Effect.fn('addMarkProgram')(function* (
       actorId: input.actorId,
       verb: 'mark.added',
       subjectEntityId: companyId,
-      meta: provenance(input.suggestionId),
+      meta: {
+        ...provenance(input.suggestionId),
+        amount: input.fairValue,
+        currency: input.currency,
+      },
     })
     return { id: row.id }
   })
@@ -338,6 +344,7 @@ export const addDistributionProgram = Effect.fn('addDistributionProgram')(
             ? 'holding.writtenoff'
             : 'distribution.added',
         subjectEntityId: companyId,
+        meta: { amount: input.amount, currency: input.currency },
       })
       return { id: row.id }
     })

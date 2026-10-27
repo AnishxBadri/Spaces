@@ -13,10 +13,7 @@ import { AiCellsProvider } from '#/components/attributes/ai-cell'
 import { OptionChip } from '#/components/attributes/value-editor'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { MoveStageDialog } from '#/components/deal-board'
-import {
-  LogComposerRow,
-  LogInteractionDialog,
-} from '#/components/log-interaction-dialog'
+import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import {
   DitherMark,
   InitialsMark,
@@ -47,8 +44,6 @@ import { RecordOverview } from '#/components/record/record-overview'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordHistory, RecordInteractions } from '#/components/record-timeline'
-import type { InteractionFilter } from '#/lib/timeline/interaction-filter'
-import type { NotesFilter } from '#/lib/notes/notes-filter'
 import { WaitingRail } from '#/components/record/waiting-rail'
 import { Badge } from '#/components/ui/badge'
 import { fmtMoney } from '@spaces/core/portfolio/format'
@@ -156,11 +151,6 @@ function DealRecordPage() {
     (next) =>
       void go({ search: { tab: next }, replace: true, resetScroll: false }),
   )
-  // The Notes and Interactions filters, held here so the tab head's counts
-  // follow them.
-  const [notesFilter, setNotesFilter] = useState<NotesFilter>('all')
-  const [interactionFilter, setInteractionFilter] =
-    useState<InteractionFilter>('all')
   useHotkey(
     'm',
     useCallback(() => setMoveOpen(true), []),
@@ -439,13 +429,7 @@ function DealRecordPage() {
           label={deal.name}
           tab={tab}
           onTabChange={changeTab}
-          counts={recordTabCounts({
-            notes,
-            timeline,
-            documents,
-            notesFilter,
-            interactionFilter,
-          })}
+          counts={recordTabCounts({ notes, timeline, documents })}
           panels={{
             overview: (
               <RecordOverview
@@ -491,28 +475,17 @@ function DealRecordPage() {
                 )}
               />
             ),
-            notes: (
-              <RecordNotes
-                notes={notes}
-                filter={notesFilter}
-                onFilterChange={setNotesFilter}
-                onNewNote={newNoteAboutThis}
-              />
-            ),
+            notes: <RecordNotes notes={notes} onNewNote={newNoteAboutThis} />,
             interactions: (
               <RecordInteractions
-                filter={interactionFilter}
-                onFilterChange={setInteractionFilter}
                 items={timeline}
-                registry={registry}
-                recordId={deal.id}
-                refNames={refNames}
-                composer={
+                record={{ id: deal.id, name: deal.name }}
+                logInteraction={(trigger) => (
                   <LogInteractionDialog
                     seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
-                    trigger={<LogComposerRow />}
+                    trigger={trigger}
                   />
-                }
+                )}
               />
             ),
             files: (
@@ -527,7 +500,6 @@ function DealRecordPage() {
                 items={timeline}
                 registry={registry}
                 refNames={refNames}
-                filters
               />
             ),
           }}

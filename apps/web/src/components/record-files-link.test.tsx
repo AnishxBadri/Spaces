@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { OpenInSourceButton } from './document-source.tsx'
 import { LinkFetchRow } from './record-files-link.tsx'
 import type { LinkFetch } from './record-files-link.tsx'
-import { endLane, stateWord } from '#/lib/documents/files-tab'
+import { endLane, stateWord, versionNumbers } from '#/lib/documents/files-tab'
 import { isFolderLink } from '#/lib/documents/storage-link'
 
 /**
@@ -77,7 +77,7 @@ describe('a recorder’s recording', () => {
     ).toBe('2.0 KB · 7 Oct · via gmail')
   })
 
-  it('an email attachment names its email, not its mailbox or its subject path', () => {
+  it('an email attachment ends on its mailbox, never its subject path', () => {
     expect(
       endLane(
         {
@@ -85,11 +85,28 @@ describe('a recorder’s recording', () => {
           sourceCapability: 'gmail',
           sourcePath: 'Re: Seed round',
           externalUrl: null,
-          email: { subject: 'Re: Seed round' },
+          email: { mailbox: 'Gmail' },
         },
         TODAY,
       ),
-    ).toBe('via Re: Seed round · 2.0 KB · 7 Oct')
+    ).toBe('2.0 KB · 7 Oct · via Gmail')
+  })
+
+  it('a superseded file ends on its successor’s version', () => {
+    expect(endLane(row, TODAY, false, 3)).toBe('2.0 KB · 7 Oct · → v3')
+    expect(
+      versionNumbers([
+        { id: 'v1', replacedBy: { id: 'v2' } },
+        { id: 'v2', replacedBy: { id: 'v3' } },
+        { id: 'v3', replacedBy: null },
+      ]),
+    ).toEqual(
+      new Map([
+        ['v1', 1],
+        ['v2', 2],
+        ['v3', 3],
+      ]),
+    )
   })
 })
 
@@ -138,7 +155,7 @@ describe('LinkFetchRow', () => {
     expect(isFolderLink(folder)).toBe(true)
     expect(isFolderLink(LINK)).toBe(false)
     const html = render({ kind: 'folder', url: folder })
-    expect(html).toContain('Link a Drive folder instead to keep it in sync.')
+    expect(html).toContain('Link a folder instead to keep it in sync.')
     expect(html).toContain('Link folder…')
     expect(html).toContain('Dismiss')
   })

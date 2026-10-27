@@ -4,7 +4,7 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { RailField } from '#/components/attributes/rail-field'
@@ -35,15 +35,10 @@ import { RecordPicture } from '#/components/record/record-picture'
 import { OptionChip } from '#/components/attributes/value-editor'
 import { fmtPct } from '@spaces/core/portfolio/format'
 import { readoutDay } from '#/lib/records/readout-format'
-import {
-  LogComposerRow,
-  LogInteractionDialog,
-} from '#/components/log-interaction-dialog'
+import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordHistory, RecordInteractions } from '#/components/record-timeline'
-import type { InteractionFilter } from '#/lib/timeline/interaction-filter'
-import type { NotesFilter } from '#/lib/notes/notes-filter'
 import { WaitingRail } from '#/components/record/waiting-rail'
 import { CreateDealDialog } from '#/routes/_app/deals'
 import { collisionToast } from '#/lib/attributes/collision-toast'
@@ -163,11 +158,6 @@ function CompanyRecordPage() {
     (next) =>
       void go({ search: { tab: next }, replace: true, resetScroll: false }),
   )
-  // The Notes and Interactions filters, held here so the tab head's counts
-  // follow them.
-  const [notesFilter, setNotesFilter] = useState<NotesFilter>('all')
-  const [interactionFilter, setInteractionFilter] =
-    useState<InteractionFilter>('all')
 
   // Both sides of each relationship come from the one resolver.
   const team = relationRows(company.relations, 'team', true)
@@ -358,13 +348,7 @@ function CompanyRecordPage() {
           label={company.name}
           tab={tab}
           onTabChange={changeTab}
-          counts={recordTabCounts({
-            notes,
-            timeline,
-            documents,
-            notesFilter,
-            interactionFilter,
-          })}
+          counts={recordTabCounts({ notes, timeline, documents })}
           panels={{
             overview: (
               <RecordOverview
@@ -412,31 +396,21 @@ function CompanyRecordPage() {
                 )}
               />
             ),
-            notes: (
-              <RecordNotes
-                notes={notes}
-                filter={notesFilter}
-                onFilterChange={setNotesFilter}
-                onNewNote={newNoteAboutThis}
-              />
-            ),
+            notes: <RecordNotes notes={notes} onNewNote={newNoteAboutThis} />,
             interactions: (
               <RecordInteractions
-                filter={interactionFilter}
-                onFilterChange={setInteractionFilter}
                 items={timeline}
-                registry={registry}
-                recordId={company.id}
-                composer={
+                record={{ id: company.id, name: company.name }}
+                logInteraction={(trigger) => (
                   <LogInteractionDialog
                     seed={{
                       id: company.id,
                       name: company.name,
                       kind: 'company',
                     }}
-                    trigger={<LogComposerRow />}
+                    trigger={trigger}
                   />
-                }
+                )}
               />
             ),
             files: (

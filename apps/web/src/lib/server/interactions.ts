@@ -60,3 +60,44 @@ export const writeUpInteraction = createServerFn({ method: 'POST' })
       throw new Error(writeUpMessage(failure))
     }
   })
+
+const interactionEdgeInput = z.object({
+  interactionId: z.string().uuid(),
+  entityId: z.string().uuid(),
+})
+
+/** File on a deal… from a thread's row: one more record it belongs to. */
+export const fileInteractionOnEntity = createServerFn({ method: 'POST' })
+  .validator(interactionEdgeInput)
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { fileInteractionOnEntityProgram, interactionEdgeMessage } =
+      await import('../interactions/file-on')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(fileInteractionOnEntityProgram)(
+        data.interactionId,
+        data.entityId,
+      )
+    } catch (failure) {
+      throw new Error(interactionEdgeMessage(failure))
+    }
+  })
+
+/** Unlink from <record>… from a thread's row: that one edge goes. */
+export const unlinkInteractionFromEntity = createServerFn({ method: 'POST' })
+  .validator(interactionEdgeInput)
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { unlinkInteractionFromEntityProgram, interactionEdgeMessage } =
+      await import('../interactions/file-on')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(unlinkInteractionFromEntityProgram)(
+        data.interactionId,
+        data.entityId,
+      )
+    } catch (failure) {
+      throw new Error(interactionEdgeMessage(failure))
+    }
+  })

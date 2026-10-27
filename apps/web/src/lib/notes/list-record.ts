@@ -1,6 +1,7 @@
 import { Effect, Schema } from 'effect'
-import { and, desc, eq, inArray, isNull, or } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
+import { user } from '@spaces/db/schema/auth'
 import {
   entity,
   interaction,
@@ -11,8 +12,10 @@ import {
 } from '@spaces/db/schema'
 import { byMemoThenRecent } from './ordering'
 import type { NoteKind } from './ordering'
+import { noteExcerpt } from './excerpt'
 import { notesViaProgram } from './via'
 import type { NoteVia } from './via-mark'
+import { viewerSelf } from '#/lib/timeline/record'
 
 /**
  * The notes of one record, in three lanes — the record-page twin of
@@ -26,6 +29,10 @@ import type { NoteVia } from './via-mark'
  *   May overlap Filed here.
  * - **Mentions this** — `link(mentions)` and nothing else: a note in either
  *   other lane shows there, since an edge is not a second note.
+ *
+ * Each note carries what its row prints: the author, or a meeting note's
+ * attendees (never the viewer), an excerpt of its body, and the newer note
+ * that supersedes it.
  *
  * Every lane applies `canRead` **in SQL** rather than filtering a row set
  * the database already sent — a teammate's private note must not reach the
@@ -45,6 +52,14 @@ export type RecordNote = {
   updatedAt: string
   /** "via <tool> · <author>" for a note a recorder filed. */
   via: NoteVia | null
+  /** Who wrote it; null when it is the viewer, who is never listed. */
+  author: string | null
+  /** A meeting note's attendees by name, the viewer left out. */
+  attendees: Array<string>
+  /** About the first 160 characters of its body, markdown stripped. */
+  excerpt: string | null
+  /** The newer note that supersedes this one; null for a current note. */
+  supersededBy: string | null
 }
 
 export type RecordNotes = {
@@ -64,6 +79,9 @@ const noteColumns = {
   title: note.title,
   kind: note.kind,
   updatedAt: note.updatedAt,
+  authorId: note.authorId,
+  // Enough of the body for an excerpt once the markdown is stripped.
+  body: sql<string>`left(${note.bodyMd}, 800)`,
 }
 
 /** canRead in SQL: shared, or private-and-mine. */
@@ -127,7 +145,11 @@ const meetingLane = Effect.fn('listRecordNotes.meetingLane')(function* (
     isNull(entity.mergedIntoId),
     readable(userId),
   )
-  const columns = { ...noteColumns, at: interaction.occurredAt }
+  const columns = {
+    ...noteColumns,
+    at: interaction.occurredAt,
+    interactionId: interaction.id,
+  }
   const [writeUps, carried] = yield* Effect.all(
     [
       query(() =>
@@ -174,6 +196,92 @@ const meetingLane = Effect.fn('listRecordNotes.meetingLane')(function* (
     })
 })
 
+/** The authors' names, and each meeting's attendees without the viewer. */
+const rowPeople = Effect.fn('listRecordNotes.people')(function* (
+  userId: string,
+  rows: ReadonlyArray<{ authorId: string | null; interactionId?: string }>,
+) {
+  const authorIds = [
+    ...new Set(rows.flatMap((r) => (r.authorId === null ? [] : [r.authorId]))),
+  ]
+  const meetingIds = [
+    ...new Set(
+      rows.flatMap((r) =>
+        r.interactionId === undefined ? [] : [r.interactionId],
+      ),
+    ),
+  ]
+  const authors =
+    authorIds.length > 0
+      ? yield* query(() =>
+          db
+            .select({ id: user.id, name: user.name })
+            .from(user)
+            .where(inArray(user.id, authorIds)),
+        )
+      : []
+  const present =
+    meetingIds.length > 0
+      ? yield* query(() =>
+          db
+            .select({
+              interactionId: interactionEntity.interactionId,
+              id: entity.id,
+              name: entity.canonicalName,
+            })
+            .from(interactionEntity)
+            .innerJoin(entity, eq(entity.id, interactionEntity.entityId))
+            .where(
+              and(
+                inArray(interactionEntity.interactionId, meetingIds),
+                eq(entity.kind, 'person'),
+              ),
+            )
+            .orderBy(entity.canonicalName),
+        )
+      : []
+  const self =
+    present.length > 0
+      ? (yield* viewerSelf(userId).pipe(
+          Effect.mapError((cause) => new NoteListFailed({ cause })),
+        )).people
+      : new Set<string>()
+  const attendees = new Map<string, Array<string>>()
+  for (const p of present) {
+    if (self.has(p.id)) continue
+    attendees.set(p.interactionId, [
+      ...(attendees.get(p.interactionId) ?? []),
+      p.name,
+    ])
+  }
+  return { authors: new Map(authors.map((a) => [a.id, a.name])), attendees }
+})
+
+/** Each superseded note's newest successor: `link(supersedes)` newer → older. */
+const supersededBy = Effect.fn('listRecordNotes.supersededBy')(function* (
+  noteIds: ReadonlyArray<string>,
+) {
+  if (noteIds.length === 0) return new Map<string, string>()
+  const rows = yield* query(() =>
+    db
+      .selectDistinctOn([link.toEntityId], {
+        older: link.toEntityId,
+        newer: link.fromEntityId,
+      })
+      .from(link)
+      .innerJoin(entity, eq(entity.id, link.fromEntityId))
+      .where(
+        and(
+          eq(link.relation, 'supersedes'),
+          inArray(link.toEntityId, [...new Set(noteIds)]),
+          isNull(entity.mergedIntoId),
+        ),
+      )
+      .orderBy(link.toEntityId, desc(link.createdAt)),
+  )
+  return new Map(rows.map((r) => [r.older, r.newer]))
+})
+
 export const listRecordNotesProgram = Effect.fn('listRecordNotesProgram')(
   function* (
     userId: string,
@@ -190,13 +298,31 @@ export const listRecordNotesProgram = Effect.fn('listRecordNotesProgram')(
     const via = yield* notesViaProgram(
       [...filedRows, ...meetingRows].map((r) => r.id),
     ).pipe(Effect.mapError((cause) => new NoteListFailed({ cause })))
+    const people = yield* rowPeople(userId, [
+      ...filedRows,
+      ...meetingRows,
+      ...mentionRows,
+    ])
+    const newer = yield* supersededBy(
+      [...filedRows, ...meetingRows, ...mentionRows].map((r) => r.id),
+    )
 
-    const shape = (r: (typeof filedRows)[number]): RecordNote => ({
+    const shape = (
+      r: (typeof filedRows)[number] & { interactionId?: string },
+    ): RecordNote => ({
       id: r.id,
       title: r.title || 'Untitled',
       kind: r.kind,
       updatedAt: r.updatedAt.toISOString(),
       via: via.get(r.id) ?? null,
+      author:
+        r.authorId === userId ? null : (people.authors.get(r.authorId) ?? null),
+      attendees:
+        r.interactionId === undefined
+          ? []
+          : (people.attendees.get(r.interactionId) ?? []),
+      excerpt: noteExcerpt(r.body),
+      supersededBy: newer.get(r.id) ?? null,
     })
 
     const filed = filedRows.map(shape).sort(byMemoThenRecent)

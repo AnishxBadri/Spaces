@@ -1,9 +1,8 @@
 import { z } from 'zod'
 import { modalSearchShape } from '#/lib/modal-search'
-import { inInteractionFilter } from '#/lib/timeline/interaction-filter'
-import type { InteractionFilter } from '#/lib/timeline/interaction-filter'
-import { notesCounts } from '#/lib/notes/notes-filter'
-import type { NoteLanes, NotesFilter } from '#/lib/notes/notes-filter'
+import { recordNotesCount } from '#/lib/notes/record-groups'
+import type { NoteLanes } from '#/lib/notes/record-groups'
+import { threadCount } from '#/lib/timeline/threads'
 
 /**
  * A record body's tabs: Overview · Notes · Interactions · Files · History.
@@ -48,32 +47,29 @@ export function openRecordTab(linked: RecordTab | undefined): RecordTab {
 }
 
 type TimelineRow =
-  | { type: 'interaction'; kind: string; hasAttachments: boolean }
+  | { type: 'interaction'; id: string; threadId: string | null }
   | { type: 'macro' | 'attrs' | 'ledger' }
 
 /**
- * Each tab's count: what the tab lists, so an empty one reads 0. The Notes
- * and Interactions counts follow their tab's filter.
+ * Each tab's count: what the tab lists, so an empty one reads 0. Notes
+ * counts each note once, Interactions each thread once.
  */
 export function recordTabCounts({
   notes,
   timeline,
   documents,
-  notesFilter = 'all',
-  interactionFilter = 'all',
 }: {
   notes: NoteLanes<{ id: string }>
   timeline: ReadonlyArray<TimelineRow>
   documents: ReadonlyArray<unknown>
-  notesFilter?: NotesFilter
-  interactionFilter?: InteractionFilter
 }): Record<CountedRecordTab, number> {
-  const interactions = timeline.filter((i) => i.type === 'interaction')
+  const interactions = timeline.filter(
+    (i): i is Extract<TimelineRow, { type: 'interaction' }> =>
+      i.type === 'interaction',
+  )
   return {
-    notes: notesCounts(notes)[notesFilter],
-    interactions: interactions.filter((i) =>
-      inInteractionFilter(i, interactionFilter),
-    ).length,
+    notes: recordNotesCount(notes),
+    interactions: threadCount(interactions),
     files: documents.length,
     history: timeline.length - interactions.length,
   }

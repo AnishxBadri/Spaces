@@ -312,24 +312,3 @@ function AttendeePicker({
     </div>
   )
 }
-
-/**
- * The Interactions tab's composer row, a `LogInteractionDialog` trigger.
- * The `L` it prints is the head's binding.
- */
-export function LogComposerRow(props: React.ComponentProps<'button'>) {
-  return (
-    <button
-      type="button"
-      {...props}
-      className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 border-b border-rule px-3 text-left"
-    >
-      <span className="mono text-micro text-primary">+</span>
-      <span className="min-w-0 truncate text-ui text-graphite">
-        Log a call, meeting, or note…
-      </span>
-      <span className="flex-1" />
-      <kbd className="shrink-0 mono text-micro text-graphite">L</kbd>
-    </button>
-  )
-}

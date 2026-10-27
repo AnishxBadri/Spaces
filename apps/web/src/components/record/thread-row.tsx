@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { CalendarDays, Mail, Paperclip, Phone } from 'lucide-react'
 import { formatDay } from '@spaces/core/format'
@@ -97,6 +98,8 @@ export function ThreadRow({
   messages = 1,
   last = false,
   tab,
+  highlighted = false,
+  menu = null,
 }: {
   item: ThreadItem
   /** The tab an email's window opens over. */
@@ -104,6 +107,10 @@ export function ThreadRow({
   /** How many messages the thread holds; a count prints above 1. */
   messages?: number
   last?: boolean
+  /** The thread whose window is open over the list: on bone behind it. */
+  highlighted?: boolean | undefined
+  /** The row's `···`, after the day; shown on hover. */
+  menu?: ReactNode
 }) {
   const { today } = useClock()
   const Glyph = KIND_GLYPHS[item.kind] ?? Mail
@@ -111,9 +118,12 @@ export function ThreadRow({
   return (
     <li
       data-thread={item.id}
+      data-row
+      data-highlighted={highlighted ? '' : undefined}
       className={cn(
         'flex flex-col px-3 py-2.25',
         !last && 'border-b border-rule',
+        highlighted && 'bg-bone',
       )}
     >
       <div className="flex h-5 min-w-0 items-center gap-3">
@@ -163,6 +173,9 @@ export function ThreadRow({
         >
           {formatDay(item.at, today)}
         </time>
+        {menu === null ? null : (
+          <span className="flex w-6 shrink-0 justify-end">{menu}</span>
+        )}
       </div>
       {item.summary === null || item.privateBody ? null : (
         <p

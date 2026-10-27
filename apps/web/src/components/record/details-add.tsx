@@ -175,6 +175,8 @@ export function DetailsPickRow({
  * matches under it with an optional mono lane, ↵ or a click adds the
  * highlighted one and closes, and `foot` rows after the matches.
  * - `eager` lists matches for an empty field too (a short list, like spaces).
+ * - `open` and `onOpenChange` hand the open state to a caller whose own
+ *   control opens it (a row's `···` item), the trigger then only an anchor.
  */
 export function PickPopover<THit extends PickHit>({
   trigger,
@@ -184,6 +186,8 @@ export function PickPopover<THit extends PickHit>({
   lane,
   foot,
   eager = false,
+  open: held,
+  onOpenChange,
 }: {
   trigger: ReactElement
   placeholder: string
@@ -193,8 +197,15 @@ export function PickPopover<THit extends PickHit>({
   lane?: ((hit: THit) => ReactNode) | undefined
   foot?: ((close: () => void) => ReactNode) | undefined
   eager?: boolean | undefined
+  open?: boolean | undefined
+  onOpenChange?: ((open: boolean) => void) | undefined
 }) {
-  const [open, setOpen] = useState(false)
+  const [own, setOwn] = useState(false)
+  const open = held ?? own
+  const setOpen = (next: boolean) => {
+    setOwn(next)
+    onOpenChange?.(next)
+  }
   const [q, setQ] = useState('')
   const [hits, setHits] = useState<ReadonlyArray<THit>>([])
   const [active, setActive] = useState(0)
