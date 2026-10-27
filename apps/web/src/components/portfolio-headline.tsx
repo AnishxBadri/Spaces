@@ -52,7 +52,7 @@ export function PortfolioHeadlineStrip({
   )
 }
 
-/** Today: the rail's caps rows — Invested, Value, MOIC — money exact. */
+/** Today: the rail's 32px rows — Invested, Value, MOIC — money exact. */
 export function PortfolioHeadlineRail({
   rollup,
   baseCurrency,
@@ -63,8 +63,11 @@ export function PortfolioHeadlineRail({
   return (
     <>
       {portfolioRailHeadline(rollup).map((f) => (
-        <div key={f.key} className="flex items-baseline justify-between">
-          <span className="field-label text-graphite">{f.label}</span>
+        <div
+          key={f.key}
+          className="flex h-8 items-center justify-between gap-3 border-b border-rule"
+        >
+          <span className="text-label text-graphite">{f.label}</span>
           <span className="mono text-ui text-foreground">
             {formatFigure(f, baseCurrency, false)}
           </span>

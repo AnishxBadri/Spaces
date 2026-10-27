@@ -44,7 +44,10 @@ export function LogInteractionDialog({
    * Omitted where no record is in view (Today): the room starts empty.
    */
   seed?: Attendee
-  /** custom trigger element — must forward props (plain DOM elements do) */
+  /**
+   * Custom trigger element — must forward props (plain DOM elements do).
+   * `null` draws no trigger: the hotkey and Cmd-K are the only ways in.
+   */
   trigger?: React.ReactNode
   /** bare key that opens the dialog from the page — printed in the trigger */
   hotkey?: string
@@ -107,14 +110,16 @@ export function LogInteractionDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button size="xs" variant="outline">
-            <Phone className="size-3" strokeWidth={1.75} />
-            Log meeting
-          </Button>
-        )}
-      </DialogTrigger>
+      {trigger === null ? null : (
+        <DialogTrigger asChild>
+          {trigger ?? (
+            <Button size="xs" variant="outline">
+              <Phone className="size-3" strokeWidth={1.75} />
+              Log meeting
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
       <DialogContent
         size="m"
         // No record in view, no description: say so rather than leave Radix

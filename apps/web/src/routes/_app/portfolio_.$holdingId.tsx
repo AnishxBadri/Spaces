@@ -720,15 +720,21 @@ function AddRoundDialog({
   )
 }
 
-function AddMarkDialog({
+/**
+ * Record a mark on one holding. Opened by its `trigger`, or — with no
+ * trigger, as Today's mark row opens it — held open by the caller.
+ */
+export function AddMarkDialog({
   holdingId,
   trigger,
+  opened,
 }: {
   holdingId: string
   /** Its opener: the head's verb. */
-  trigger: ReactNode
+  trigger?: ReactNode
+  opened?: Opened | undefined
 }) {
-  const f = useEventForm()
+  const f = useEventForm(opened)
   const [form, setForm] = useState<{
     date: string
     fairValue: string
@@ -744,7 +750,9 @@ function AddMarkDialog({
     setForm((s) => ({ ...s, [k]: e.target.value }))
   return (
     <Dialog open={f.open} onOpenChange={f.setOpen}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      {trigger === undefined ? null : (
+        <DialogTrigger asChild>{trigger}</DialogTrigger>
+      )}
       <DialogContent size="s" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Record a mark</DialogTitle>

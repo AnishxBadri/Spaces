@@ -78,16 +78,18 @@ function DitherPattern({
 }
 
 /**
- * The empty-state block: a pine density ramp falling away toward the
- * bottom, with a paper sheet set into it. 160×120 by default.
+ * The empty-state block: a density ramp falling away toward the bottom,
+ * pine unless `ink`, with a paper sheet set into it. 160×120 by default.
  */
 export function DitherBlock({
   width = 160,
   height = 120,
+  tone = 'pine',
   className,
 }: {
   width?: number
   height?: number
+  tone?: 'pine' | 'ink'
   className?: string
 }) {
   const bands = [16, 12, 9, 6, 4, 2]
@@ -110,9 +112,9 @@ export function DitherBlock({
         {bands.map((level, i) => (
           <DitherPattern
             key={level}
-            id={`dither-ramp-${i}`}
+            id={`dither-ramp-${tone}-${i}`}
             level={level}
-            fill="var(--primary)"
+            fill={tone === 'ink' ? 'var(--hairline)' : 'var(--primary)'}
           />
         ))}
       </defs>
@@ -123,7 +125,7 @@ export function DitherBlock({
           y={Math.round(i * bandH)}
           width={width}
           height={Math.ceil(bandH)}
-          fill={`url(#dither-ramp-${i})`}
+          fill={`url(#dither-ramp-${tone}-${i})`}
         />
       ))}
       <rect

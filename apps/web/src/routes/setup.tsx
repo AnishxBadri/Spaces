@@ -190,8 +190,8 @@ function DemoStep() {
     <AuthShell
       eyebrow="Setup · step 2 of 2"
       title="Start with demo data?"
-      blurb="A worked example in data-center cooling — a small space tree, three companies, a memo, and a glossary. Obviously fictional, and removed in one step from Settings → General."
-      foot="3 companies · 1 memo · 1 space tree · removable"
+      blurb="Three fictional companies in data-center cooling, a memo and a small space tree."
+      foot="Removed in one step from Settings › General"
     >
       <div className="flex flex-col gap-4">
         {error ? <FormError>{error}</FormError> : null}

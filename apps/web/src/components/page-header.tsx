@@ -21,6 +21,7 @@ import { cn } from '#/lib/utils'
 export function PageHeader({
   eyebrow,
   title,
+  foldMeta,
   description,
   action,
   tabs,
@@ -29,6 +30,8 @@ export function PageHeader({
   /** Mono caps line above the title — "Today · Wednesday · 2026-09-10". */
   eyebrow?: ReactNode
   title: ReactNode
+  /** Mono beside the title once the head folds: Today's `Thu 15 Oct`. */
+  foldMeta?: ReactNode
   /** Mono readout under the title — counts, last touch. Never prose. */
   description?: ReactNode
   action?: ReactNode
@@ -39,7 +42,7 @@ export function PageHeader({
   const { titleRef, actionsRef, fold } = useHeadFold()
   return (
     <>
-      <HeadBar fold={fold} title={title} />
+      <HeadBar fold={fold} title={title} meta={foldMeta} />
       <header
         className={cn(
           'flex shrink-0 items-end justify-between gap-4 px-8 pt-7 pb-4 double-rule',

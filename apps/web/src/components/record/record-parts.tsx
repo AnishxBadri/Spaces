@@ -39,6 +39,8 @@ export type RecordReadout = {
   to?: string | undefined
   /** Search params for `to`, when the count is of a filtered list. */
   search?: Record<string, string> | undefined
+  /** A toggle on the page's list rather than a link: the cell is a button. */
+  press?: { pressed: boolean; onPress: () => void } | undefined
 }
 
 /**
@@ -151,16 +153,21 @@ export function RecordHeadPending({ kind }: { kind: string }) {
  * value in mono over a sentence-case label. The record head draws it, so do
  * Cmd-K's preview of a record and Today's head.
  * - A cell with `to` is a link to the list it counted; hover inks the label.
+ * - A cell with `press` is a toggle button (`aria-pressed`) on the page's own
+ *   list; pressed, its label inks.
  * - `pane` sets the values a size down, so three fit the preview pane's
  *   width without clipping a day and its age.
+ * - `fixed` cells are 240px each rather than sharing the width.
  */
 export function ReadoutStrip({
   readouts,
   size = 'page',
+  fixed = false,
   className,
 }: {
   readouts: ReadonlyArray<RecordReadout>
   size?: 'page' | 'pane' | undefined
+  fixed?: boolean | undefined
   className?: string | undefined
 }) {
   return (
@@ -175,7 +182,11 @@ export function ReadoutStrip({
         const cls = cn(
           'flex min-w-28 basis-0 flex-col justify-center gap-0.5 border-r border-rule first:pl-0 last:border-r-0',
           size === 'pane' ? 'px-3' : 'px-4',
-          r.figure ? 'max-w-110 flex-2' : 'max-w-55 flex-1',
+          fixed
+            ? 'w-60 flex-none'
+            : r.figure
+              ? 'max-w-110 flex-2'
+              : 'max-w-55 flex-1',
         )
         const inner = (
           <>
@@ -201,13 +212,27 @@ export function ReadoutStrip({
             <span
               className={cn(
                 'truncate text-label text-graphite',
-                r.to !== undefined && 'group-hover:text-foreground',
+                (r.to !== undefined || r.press !== undefined) &&
+                  'group-hover:text-foreground',
+                r.press?.pressed === true && 'text-foreground',
               )}
             >
               {r.label}
             </span>
           </>
         )
+        if (r.press !== undefined)
+          return (
+            <button
+              key={i}
+              type="button"
+              aria-pressed={r.press.pressed}
+              onClick={r.press.onPress}
+              className={cn(cls, 'group focus-ring-inset text-left')}
+            >
+              {inner}
+            </button>
+          )
         return r.to === undefined ? (
           <div key={i} className={cls}>
             {inner}

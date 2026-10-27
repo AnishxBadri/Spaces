@@ -30,6 +30,7 @@ import {
   objectDef,
   suggestion,
 } from '@spaces/db/schema'
+import { user as member } from '@spaces/db/schema/auth'
 import type {
   InteractionMeta,
   MeetingMeta,
@@ -99,12 +100,16 @@ const meetingMeta = (meta: InteractionMeta | null): MeetingMeta | null =>
 const endOf = (startsAt: Date, meta: MeetingMeta | null): string =>
   meta?.ends_at ?? startsAt.toISOString()
 
+/** A linked record with what the reads need beyond `MeetingRecord`. */
+type LinkedRecord = MeetingRecord & {
+  emails: Array<string>
+  sensitive: boolean
+}
+
 /** Records edged to each interaction, live ones only, by name. */
 const recordsOf = (ids: ReadonlyArray<string>) =>
   ids.length === 0
-    ? Effect.succeed(
-        new Map<string, Array<MeetingRecord & { emails: Array<string> }>>(),
-      )
+    ? Effect.succeed(new Map<string, Array<LinkedRecord>>())
     : Effect.gen(function* () {
         const rows = yield* query(() =>
           db
@@ -114,6 +119,7 @@ const recordsOf = (ids: ReadonlyArray<string>) =>
               kind: entity.kind,
               name: entity.canonicalName,
               objectSlug: objectDef.slug,
+              sensitive: entity.sensitive,
               emails: sql<Array<string>>`coalesce((
                 select array_agg(lower(a.value_norm)) from ${entityAlias} a
                 where a.entity_id = ${entity.id} and a.kind = 'email'
@@ -130,10 +136,7 @@ const recordsOf = (ids: ReadonlyArray<string>) =>
             )
             .orderBy(asc(entity.canonicalName)),
         )
-        const out = new Map<
-          string,
-          Array<MeetingRecord & { emails: Array<string> }>
-        >()
+        const out = new Map<string, Array<LinkedRecord>>()
         for (const r of rows) {
           const list = out.get(r.interactionId) ?? []
           list.push({
@@ -142,6 +145,7 @@ const recordsOf = (ids: ReadonlyArray<string>) =>
             name: r.name,
             objectSlug: r.objectSlug,
             emails: r.emails,
+            sensitive: r.sensitive,
           })
           out.set(r.interactionId, list)
         }
@@ -173,9 +177,7 @@ export function participantsOf(
   )
 }
 
-const stripEmails = (
-  r: MeetingRecord & { emails: ReadonlyArray<string> },
-): MeetingRecord => ({
+const stripEmails = (r: LinkedRecord): MeetingRecord => ({
   id: r.id,
   kind: r.kind,
   name: r.name,
@@ -460,8 +462,24 @@ export type UnwrittenMeeting = {
   id: string
   title: string | null
   startsAt: string
-  /** The first linked record's name, for the row's mono lane. */
+  /** The first linked record's name, for the row's context. */
   record: string | null
+  /** The first participant outside the workspace, by name or address. */
+  who: string | null
+  /** The name of a linked record AI never reads; null when none is. */
+  sensitive: string | null
+}
+
+/**
+ * The first participant whose address is not a member's or a member's
+ * connected account: the person the meeting was with.
+ */
+export function firstExternal(
+  participants: ReadonlyArray<MeetingParticipant>,
+  internal: ReadonlySet<string>,
+): string | null {
+  const hit = participants.find((p) => !internal.has(p.email.toLowerCase()))
+  return hit === undefined ? null : (hit.name ?? hit.email)
 }
 
 export const unwrittenMeetingsProgram = Effect.fn('unwrittenMeetingsProgram')(
@@ -495,15 +513,33 @@ export const unwrittenMeetingsProgram = Effect.fn('unwrittenMeetingsProgram')(
         Date.parse(endOf(r.occurredAt, meta)) <= now.getTime()
       )
     })
-    const records = yield* recordsOf(ended.map((r) => r.id))
+    const [records, members, accounts] = yield* Effect.all([
+      recordsOf(ended.map((r) => r.id)),
+      ended.length === 0
+        ? Effect.succeed([])
+        : query(() => db.select({ email: member.email }).from(member)),
+      ended.length === 0
+        ? Effect.succeed([])
+        : query(() =>
+            db
+              .select({ email: accountConnection.externalEmail })
+              .from(accountConnection),
+          ),
+    ])
+    const internal = new Set(
+      [...members, ...accounts].map((m) => m.email.toLowerCase()),
+    )
     return ended.map((r) => {
       const linked = records.get(r.id) ?? []
       const named = linked.find((l) => l.kind !== 'person') ?? linked.at(0)
+      const people = participantsOf(meetingMeta(r.meta), linked)
       return {
         id: r.id,
         title: r.subject,
         startsAt: r.occurredAt.toISOString(),
         record: named?.name ?? null,
+        who: firstExternal(people, internal),
+        sensitive: linked.find((l) => l.sensitive)?.name ?? null,
       }
     })
   },

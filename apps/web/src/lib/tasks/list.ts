@@ -50,6 +50,8 @@ type LinkedEntity = {
   name: string
   kind: string
   objectSlug: string | null
+  /** AI never reads it; Today marks the row with a lock. */
+  sensitive: boolean
 }
 
 const taskColumns = {
@@ -83,6 +85,7 @@ const linkedEntitiesProgram = Effect.fn('linkedEntitiesProgram')(function* (
         name: entity.canonicalName,
         kind: entity.kind,
         objectSlug: objectDef.slug,
+        sensitive: entity.sensitive,
       })
       .from(taskEntity)
       .innerJoin(entity, eq(entity.id, taskEntity.entityId))
@@ -96,6 +99,7 @@ const linkedEntitiesProgram = Effect.fn('linkedEntitiesProgram')(function* (
       name: r.name,
       kind: r.kind,
       objectSlug: r.objectSlug,
+      sensitive: r.sensitive,
     })
     map.set(r.taskId, list)
   }

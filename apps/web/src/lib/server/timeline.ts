@@ -7,6 +7,7 @@ import { user } from '@spaces/db/schema/auth'
 import { entity } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { recordTimelineProgram } from '../timeline/record'
+import { jsonString } from '@spaces/core/json'
 import { requireUser } from './shared'
 
 /**
@@ -34,6 +35,7 @@ export const getWorkspaceActivity = createServerFn().handler(async () => {
       subjectId: activity.subjectEntityId,
       subjectName: entity.canonicalName,
       subjectKind: entity.kind,
+      meta: activity.meta,
     })
     .from(activity)
     .leftJoin(user, eq(user.id, activity.actorId))
@@ -48,5 +50,7 @@ export const getWorkspaceActivity = createServerFn().handler(async () => {
     subjectId: r.subjectId,
     subjectName: r.subjectName,
     subjectKind: r.subjectKind,
+    // What the verb acted on when it is not a record: a filed file's name.
+    objectName: jsonString(r.meta.filename),
   }))
 })

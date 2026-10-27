@@ -1,6 +1,6 @@
 /**
  * Today's attention rules, pure: which deals are idle, how the Needs you
- * ledger is ordered and folded, and the head's date stamp.
+ * ledger is ordered, filtered and folded, and the head's date stamps.
  * Client-safe: the route and its components call these during render.
  */
 
@@ -21,7 +21,7 @@ export type NeedsYouKind = (typeof NEEDS_YOU_KINDS)[number]
 export const IDLE_DEAL_DAYS = 21
 /** A holding not marked for this long is stale. */
 export const STALE_MARK_DAYS = 180
-/** The ledger shows this many rows before "show all ›". */
+/** The ledger shows this many rows before `Show all ›`. */
 export const NEEDS_YOU_FOLD = 8
 
 /** One ledger row as the order sees it; `weight` is its size within its kind. */
@@ -44,17 +44,50 @@ export function byUrgency<T extends Ranked>(rows: ReadonlyArray<T>): T[] {
   )
 }
 
-/** The rows a tab shows: every kind under `all`, else that kind alone. */
-export function inTab<T extends Ranked>(
+/** A readout's filter on the ledger: the rows its figure counted. */
+export const READOUT_FILTERS = ['overdue', 'pastMedian', 'oldestMark'] as const
+export type ReadoutFilter = (typeof READOUT_FILTERS)[number]
+
+/** What the ledger shows: every row, one kind, or a readout's rows. */
+export type NeedsFilter = NeedsYouKind | ReadoutFilter | 'all'
+
+/** A row a filter can test: a task carries whether it is late. */
+type Filterable = Ranked & { late?: boolean }
+
+/**
+ * The rows a filter shows: every kind under `all`, else that kind alone.
+ * A readout keeps the rows its figure counted — Overdue the late tasks,
+ * Deals past stage median the deal rows, Oldest mark the mark rows.
+ */
+export function inFilter<T extends Filterable>(
   rows: ReadonlyArray<T>,
-  tab: NeedsYouKind | 'all',
+  filter: NeedsFilter,
 ): T[] {
-  return tab === 'all' ? [...rows] : rows.filter((r) => r.kind === tab)
+  switch (filter) {
+    case 'all':
+      return [...rows]
+    case 'overdue':
+      return rows.filter((r) => r.kind === 'task' && r.late === true)
+    case 'pastMedian':
+      return rows.filter((r) => r.kind === 'deal')
+    case 'oldestMark':
+      return rows.filter((r) => r.kind === 'mark')
+    default:
+      return rows.filter((r) => r.kind === filter)
+  }
 }
 
-/** The rows drawn: the first `NEEDS_YOU_FOLD` unless the fold is open. */
+/** The fold opens itself rather than hide fewer than this many rows. */
+export const FOLD_MIN_HIDDEN = 3
+
+/**
+ * The rows drawn: the first `NEEDS_YOU_FOLD` unless the fold is open, or
+ * unless folding would hide fewer than `FOLD_MIN_HIDDEN` — a fold that
+ * saves a row or two costs more than it hides.
+ */
 export function folded<T>(rows: ReadonlyArray<T>, open: boolean): T[] {
-  return open ? [...rows] : rows.slice(0, NEEDS_YOU_FOLD)
+  if (open || rows.length - NEEDS_YOU_FOLD < FOLD_MIN_HIDDEN) return [...rows]
+  return rows.slice(0, NEEDS_YOU_FOLD)
 }
 
 export type DealDays = {
@@ -83,27 +116,16 @@ export function daysPastMedian(
   return deal.days - median
 }
 
-/** Active-stage deals in their stage longer than the stage's median. */
-export function dealsPastMedian(
-  deals: ReadonlyArray<DealDays>,
-  medians: Readonly<Record<string, number>>,
-  active: ReadonlySet<string>,
-): DealDays[] {
-  return deals.filter((d) => {
-    const past = daysPastMedian(d, medians)
-    return active.has(d.stage) && past !== null && past > 0
-  })
-}
-
 /**
- * The deals Needs you lists: idle (past `IDLE_DEAL_DAYS`) and past their
+ * The deals Needs you lists and the readout counts, one set so the two
+ * agree: active-stage deals idle past `IDLE_DEAL_DAYS` and past their
  * stage median. A stage with no median yet leaves idleness alone to decide.
  */
-export function idleDeals(
-  deals: ReadonlyArray<DealDays>,
+export function dealsPastMedian<T extends DealDays>(
+  deals: ReadonlyArray<T>,
   medians: Readonly<Record<string, number>>,
   active: ReadonlySet<string>,
-): DealDays[] {
+): T[] {
   return deals.filter((d) => {
     if (!active.has(d.stage) || d.days === null || d.days <= IDLE_DEAL_DAYS)
       return false
@@ -135,11 +157,22 @@ export function todayStamp(iso: string): string {
   return `${formatWeekday(iso, iso)} · W${isoWeek(iso)}`
 }
 
+/** The folded head's date beside `Today`: `Thu 15 Oct`. */
+export function todayFoldStamp(iso: string): string {
+  return formatWeekday(iso, iso)
+}
+
+/** A due day as the figure lane prints it: `−2d` once passed, else `Today`. */
+export function dueFigure(due: string, today: string): string {
+  const n = daysBetween(today, due)
+  return n < 0 ? `−${String(-n)}d` : 'Today'
+}
+
 /** The kinds in the order the head's filters and the fold name them. */
 export const FILTER_ORDER: ReadonlyArray<NeedsYouKind> = [
   'task',
-  'meeting',
   'review',
+  'meeting',
   'deal',
   'mark',
 ]
@@ -152,12 +185,12 @@ const KIND_NOUN: Record<NeedsYouKind, readonly [string, string]> = {
   mark: ['mark', 'marks'],
 }
 
-/** The fold's line: `+ 6 more · 3 tasks · 2 review · 1 deal`. */
+/** The fold's line: `6 more · 3 tasks · 2 review · 1 deal`. */
 export function foldSummary(hidden: ReadonlyArray<Ranked>): string {
   const parts = FILTER_ORDER.flatMap((k) => {
     const n = hidden.filter((r) => r.kind === k).length
     if (n === 0) return []
     return [`${n} ${KIND_NOUN[k][n === 1 ? 0 : 1]}`]
   })
-  return [`+ ${hidden.length} more`, ...parts].join(' · ')
+  return [`${hidden.length} more`, ...parts].join(' · ')
 }

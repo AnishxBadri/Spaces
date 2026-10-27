@@ -220,8 +220,37 @@ describe('unwrittenMeetingsProgram', () => {
         title: 'Flent intro',
         startsAt: '2027-03-12T09:00:00.000Z',
         record: 'Flent',
+        who: 'ana@flent.io',
+        sensitive: null,
       },
     ])
+  })
+
+  it('names the first participant outside the workspace and a sensitive record', async () => {
+    const flent = await aCompany('Flent')
+    await db.update(entity).set({ sensitive: true }).where(eq(entity.id, flent))
+    const ben = await aPerson('Ben Okafor', 'ben@flent.io')
+    const [member] = await db
+      .select({ email: user.email })
+      .from(user)
+      .where(eq(user.id, FIXTURE_ACTOR.id))
+    await aMeeting({
+      subject: 'Flent follow-up',
+      at: '2027-03-12T09:00:00.000Z',
+      // The member organizes; the reader is never who the meeting was with.
+      meta: meta({
+        ends_at: '2027-03-12T09:30:00.000Z',
+        organizer: member.email,
+        rsvp: { [member.email]: 'accepted', 'ben@flent.io': 'accepted' },
+      }),
+      records: [flent, ben],
+    })
+    // The file's other meetings share the database; read this one.
+    const row = (
+      await run(unwrittenMeetingsProgram(new Date('2027-03-13T12:00:00.000Z')))
+    ).find((m) => m.title === 'Flent follow-up')
+    expect(row?.who).toBe('Ben Okafor')
+    expect(row?.sensitive).toBe('Flent')
   })
 })
 

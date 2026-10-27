@@ -239,6 +239,7 @@ export async function loadPortfolio(
         companyId: holding.companyId,
         openedAt: holding.openedAt,
         companyName: entity.canonicalName,
+        sensitive: entity.sensitive,
       })
       .from(holding)
       .innerJoin(entity, eq(entity.id, holding.companyId))

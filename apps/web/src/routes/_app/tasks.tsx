@@ -11,35 +11,15 @@ import { z } from 'zod'
 import { EmptyState } from '#/components/empty-state'
 import { LabelHead, LedgerFigure } from '#/components/ledger-section'
 import { PageHeader } from '#/components/page-header'
-import {
-  DueField,
-  MemberList,
-  TaskComposer,
-  TaskComposerRow,
-} from '#/components/task-composer'
-import { Button } from '#/components/ui/button'
+import { useTaskMenu } from '#/components/tasks/task-menu'
+import { TaskComposer, TaskComposerRow } from '#/components/task-composer'
 import { Checkbox } from '#/components/ui/checkbox'
-import { useConfirm } from '#/components/ui/confirm-dialog'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '#/components/ui/dialog'
-import { MENU_RULE, MoreMenu } from '#/components/ui/more-menu'
+import { MoreMenu } from '#/components/ui/more-menu'
 import type { MoreMenuEntry } from '#/components/ui/more-menu'
 import { Segmented } from '#/components/ui/segmented'
 import { useBornRows } from '#/lib/born-rows'
 import { recordPath } from '#/lib/record-path'
-import {
-  deleteTask,
-  listTasks,
-  setTaskAssignee,
-  setTaskDone,
-  setTaskDue,
-} from '#/lib/server-fns'
+import { deleteTask, listTasks, setTaskDone } from '#/lib/server-fns'
 import { focusTab } from '#/lib/tasks/focus'
 import {
   dayKey,
@@ -144,9 +124,6 @@ const EXIT_MS = 150
 
 type View = 'open' | 'done'
 
-/** Which window a row's `···` opened, and on which task. */
-type Editing = { kind: 'due' | 'assign'; task: TaskRow } | null
-
 function TasksPage() {
   const data = Route.useLoaderData()
   const { task: focusId } = Route.useSearch()
@@ -185,8 +162,6 @@ function TasksPage() {
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set())
   // Rows this page's composer created — the only ones the wash touches.
   const { washes, bear } = useBornRows()
-  const { confirm, confirmDialog } = useConfirm()
-  const [editing, setEditing] = useState<Editing>(null)
   const { today } = useClock()
 
   const viewDone = view === 'done'
@@ -237,63 +212,17 @@ function TasksPage() {
     }
   }
 
-  async function remove(t: TaskRow) {
-    clearFocus()
-    const ok = await confirm({
-      title: 'Delete this task?',
-      body: `"${t.content}" leaves the workspace. This cannot be undone.`,
-      action: 'Delete',
-    })
-    if (!ok) return
-    setLeaving((s) => new Set(s).add(t.id))
-    window.setTimeout(() => void erase(t.id), EXIT_MS)
-  }
-
-  async function edit(run: () => Promise<unknown>, failed: string) {
-    setEditing(null)
-    try {
-      await run()
-      void router.invalidate()
-    } catch (err) {
-      toast.error(err instanceof Error && err.message ? err.message : failed)
-    }
-  }
-
-  function menuFor(t: TaskRow): Array<MoreMenuEntry> {
-    const first = t.entities.at(0)
-    const path = first === undefined ? null : recordPath(first)
-    return [
-      ...(first !== undefined && path !== null
-        ? [
-            {
-              label: `Open ${first.name}`,
-              onSelect: () => void router.navigate({ to: path }),
-            },
-          ]
-        : []),
-      {
-        label: 'Due date…',
-        opens: true,
-        onSelect: () => setEditing({ kind: 'due', task: t }),
-      },
-      {
-        label: 'Assign…',
-        opens: true,
-        onSelect: () => setEditing({ kind: 'assign', task: t }),
-      },
-      {
-        label: 'Copy link',
-        copy: () => `${window.location.origin}/tasks?task=${t.id}`,
-      },
-      MENU_RULE,
-      {
-        label: 'Delete task',
-        destructive: true,
-        opens: true,
-        onSelect: () => void remove(t),
-      },
-    ]
-  }
+  // The row's `···`, shared with Today; a confirmed delete fades the row
+  // out before the write, as completing one does.
+  const { menuFor, windows } = useTaskMenu({
+    me,
+    today,
+    onDelete: (t) => {
+      clearFocus()
+      setLeaving((s) => new Set(s).add(t.id))
+      window.setTimeout(() => void erase(t.id), EXIT_MS)
+    },
+  })
 
   const scope = data.record
   const empty =
@@ -402,25 +331,7 @@ function TasksPage() {
           </div>
         </>
       )}
-      <EditWindow
-        editing={editing}
-        today={today}
-        me={me}
-        onClose={() => setEditing(null)}
-        onDue={(t, dueDate) =>
-          void edit(
-            () => setTaskDue({ data: { id: t.id, dueDate } }),
-            'Could not set the due date',
-          )
-        }
-        onAssign={(t, assigneeId) =>
-          void edit(
-            () => setTaskAssignee({ data: { id: t.id, assigneeId } }),
-            'Could not assign the task',
-          )
-        }
-      />
-      {confirmDialog}
+      {windows}
     </div>
   )
 }
@@ -442,60 +353,6 @@ function ScopeChip({ name }: { name: string }) {
         <X className="size-3" strokeWidth={2} />
       </Link>
     </span>
-  )
-}
-
-/** A row's `Due date…` and `Assign…` windows. */
-function EditWindow({
-  editing,
-  today,
-  me,
-  onClose,
-  onDue,
-  onAssign,
-}: {
-  editing: Editing
-  today: string
-  me: { id: string; name: string }
-  onClose: () => void
-  onDue: (t: TaskRow, dueDate: string | null) => void
-  onAssign: (t: TaskRow, assigneeId: string) => void
-}) {
-  return (
-    <Dialog
-      open={editing !== null}
-      onOpenChange={(open) => {
-        if (!open) onClose()
-      }}
-    >
-      <DialogContent size="s" aria-describedby={undefined}>
-        <DialogHeader>
-          <DialogTitle>
-            {editing?.kind === 'assign' ? 'Assign' : 'Due date'}
-          </DialogTitle>
-        </DialogHeader>
-        {editing === null ? null : editing.kind === 'due' ? (
-          <DueField
-            due={editing.task.dueDate}
-            today={today}
-            onPick={(d) => onDue(editing.task, d)}
-          />
-        ) : (
-          <MemberList
-            selected={editing.task.assigneeId}
-            me={me}
-            onPick={(u) => onAssign(editing.task, u.id)}
-          />
-        )}
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button type="button" variant="outline">
-              Cancel
-            </Button>
-          </DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   )
 }
 
