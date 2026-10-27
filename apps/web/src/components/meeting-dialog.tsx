@@ -225,6 +225,7 @@ export function MeetingDialog({
   prepOnOpen = false,
   onOpenChange,
   onChanged,
+  onPrepRunning,
 }: {
   id: string | null
   /** Start Prep once the meeting is read: the row's Prep. */
@@ -232,6 +233,8 @@ export function MeetingDialog({
   onOpenChange: (open: boolean) => void
   /** A write landed: the caller re-reads what it shows. */
   onChanged?: () => void
+  /** Prep started or stopped, so the row behind can say it is running. */
+  onPrepRunning?: (running: boolean) => void
 }) {
   return (
     <Dialog open={id !== null} onOpenChange={onOpenChange}>
@@ -243,6 +246,7 @@ export function MeetingDialog({
             prepOnOpen={prepOnOpen}
             onClose={() => onOpenChange(false)}
             {...(onChanged === undefined ? {} : { onChanged })}
+            {...(onPrepRunning === undefined ? {} : { onPrepRunning })}
           />
         )}
       </DialogContent>
@@ -255,11 +259,13 @@ function MeetingWindow({
   prepOnOpen,
   onClose,
   onChanged,
+  onPrepRunning,
 }: {
   id: string
   prepOnOpen: boolean
   onClose: () => void
   onChanged?: () => void
+  onPrepRunning?: (running: boolean) => void
 }) {
   const router = useRouter()
   const { today } = useClock()
@@ -299,6 +305,14 @@ function MeetingWindow({
   useEffect(() => {
     void load()
   }, [load])
+
+  // Closing the window stops Prep, so it reports stopped as it unmounts.
+  const running = prep.phase === 'running'
+  useEffect(() => {
+    if (!running) return
+    onPrepRunning?.(true)
+    return () => onPrepRunning?.(false)
+  }, [running, onPrepRunning])
 
   const changed = () => {
     void load()

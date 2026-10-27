@@ -177,6 +177,35 @@ describe('dayMeetingsProgram', () => {
     expect(day).toHaveLength(1)
     expect(day[0].cancelled).toBe(true)
   })
+
+  it('names who outside the workspace each meeting is with, never a member', async () => {
+    const [me] = await db
+      .select({ email: user.email })
+      .from(user)
+      .where(eq(user.id, FIXTURE_ACTOR.id))
+    const priya = await aPerson('Priya Raman', 'priya@vayu.in')
+    await aMeeting({
+      subject: 'Vayu',
+      at: '2026-11-05T11:00:00.000Z',
+      meta: meta({
+        organizer: me.email,
+        rsvp: {
+          [me.email]: 'accepted',
+          'priya@vayu.in': 'accepted',
+          'raj@vayu.in': 'tentative',
+        },
+      }),
+      records: [priya],
+    })
+    const day = await run(
+      dayMeetingsProgram(
+        new Date('2026-11-05T00:00:00.000Z'),
+        new Date('2026-11-06T00:00:00.000Z'),
+      ),
+    )
+    // The member organizes and is left out; an unnamed address is itself.
+    expect(day[0].external).toEqual(['Priya Raman', 'raj@vayu.in'])
+  })
 })
 
 describe('unwrittenMeetingsProgram', () => {

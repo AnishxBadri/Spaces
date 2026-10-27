@@ -27,7 +27,7 @@ export type MeetingRecord = {
 
 export type ArtifactRole = 'attachment' | 'transcript' | 'recording_link'
 
-/** One row of Today's Meetings section. */
+/** One meeting row, the base of Today's and the Meetings page's. */
 export type DayMeeting = {
   id: string
   title: string | null
@@ -39,6 +39,12 @@ export type DayMeeting = {
   /** The artifact roles on the row, each once. */
   artifacts: ReadonlyArray<ArtifactRole>
   noteId: string | null
+}
+
+/** One row of Today's Meetings section and a block on its day strip. */
+export type TodayMeeting = DayMeeting & {
+  /** Participants outside the workspace, by name or address, in participant order. */
+  external: ReadonlyArray<string>
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -63,12 +69,48 @@ export function dayWindow(day: string): { from: string; to: string } {
   }
 }
 
-/** The day nav's middle word: `today`, `tomorrow`, `yesterday`, else `Tue 14 Oct`. */
+/** The day nav's middle word: `Today`, else the day, `Wed 14 Oct`. */
 export function dayLabel(day: string, today: string): string {
+  return day === today ? 'Today' : formatWeekday(day, today)
+}
+
+/** Where a day sits against today: what the strip dithers and a row offers. */
+export type DayTense = 'past' | 'today' | 'future'
+
+export function dayTense(day: string, today: string): DayTense {
   if (day === today) return 'today'
-  if (day === shiftDay(today, 1)) return 'tomorrow'
-  if (day === shiftDay(today, -1)) return 'yesterday'
-  return formatWeekday(day, today)
+  return day < today ? 'past' : 'future'
+}
+
+/** The who lane: the first person outside the workspace, `Priya Raman +1`. */
+export function whoLine(external: ReadonlyArray<string>): string | null {
+  const first = external.at(0)
+  if (first === undefined) return null
+  return external.length === 1
+    ? first
+    : `${first} +${String(external.length - 1)}`
+}
+
+/**
+ * A strip block's label: the first linked record that is not a person, else
+ * the first person outside the workspace, else the title.
+ */
+export function stripLabel(m: TodayMeeting): string {
+  return (
+    m.records.find((r) => r.kind !== 'person')?.name ??
+    m.external.at(0) ??
+    m.title ??
+    'Meeting'
+  )
+}
+
+/** The wait until the next meeting starts: `45m`, `2h`, `2h 20m`. */
+export function waitFor(ms: number): string {
+  const minutes = Math.max(1, Math.ceil(ms / 60_000))
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h === 0) return `${String(m)}m`
+  return m === 0 ? `${String(h)}h` : `${String(h)}h ${String(m)}m`
 }
 
 /** A row's time lane: `09:30–10:00`. */
@@ -104,14 +146,6 @@ export const RSVP_WORD: Record<MeetingRsvp, string> = {
 /** A participant's printed name: the record's, else the address. */
 export function participantName(p: MeetingParticipant): string {
   return p.name ?? p.email
-}
-
-/** The artifact marks a row ends on: `transcript · recording`. */
-export function artifactMarks(roles: ReadonlyArray<ArtifactRole>): string {
-  const words: Array<string> = []
-  if (roles.includes('transcript')) words.push('transcript')
-  if (roles.includes('recording_link')) words.push('recording')
-  return words.join(' · ')
 }
 
 /** Whether a meeting is still ahead of `now`: what earns it Prep. */

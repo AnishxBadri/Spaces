@@ -43,11 +43,13 @@ import { ref } from '@spaces/core/context/ref'
 import { canRead } from '@spaces/core/read-policy'
 import { recomputeInteractionStats } from '@spaces/core/writes/interactions/stats'
 import { canReadNoteSql } from '@spaces/core/writes/read/search'
+import { participantName } from '#/lib/meetings/day'
 import type {
   ArtifactRole,
   DayMeeting,
   MeetingParticipant,
   MeetingRecord,
+  TodayMeeting,
 } from '#/lib/meetings/day'
 import { PAST_LIMIT } from '#/lib/meetings/list'
 import type { ListedMeeting, MeetingsList } from '#/lib/meetings/list'
@@ -241,15 +243,29 @@ const hydrate = (rows: ReadonlyArray<MeetingBase>) =>
     })
   })
 
+/** Every member's address and every connected account's, lowercased. */
+const internalAddresses = () =>
+  Effect.gen(function* () {
+    const [members, accounts] = yield* Effect.all([
+      query(() => db.select({ email: member.email }).from(member)),
+      query(() =>
+        db
+          .select({ email: accountConnection.externalEmail })
+          .from(accountConnection),
+      ),
+    ])
+    return new Set([...members, ...accounts].map((m) => m.email.toLowerCase()))
+  })
+
 /**
- * The meetings that start inside `[from, to)`, earliest first. External
- * meetings only, because internal ones are never stored; a cancelled one
- * stays, marked.
+ * The meetings that start inside `[from, to)`, earliest first, each with who
+ * outside the workspace it is with. External meetings only, because internal
+ * ones are never stored; a cancelled one stays, marked.
  */
 export const dayMeetingsProgram = Effect.fn('dayMeetingsProgram')(function* (
   from: Date,
   to: Date,
-): Effect.fn.Return<Array<DayMeeting>, MeetingReadFailed> {
+): Effect.fn.Return<Array<TodayMeeting>, MeetingReadFailed> {
   const rows = yield* query(() =>
     db
       .select({
@@ -269,7 +285,16 @@ export const dayMeetingsProgram = Effect.fn('dayMeetingsProgram')(function* (
       )
       .orderBy(asc(interaction.occurredAt), asc(interaction.id)),
   )
-  return yield* hydrate(rows)
+  const [meetings, internal] = yield* Effect.all([
+    hydrate(rows),
+    rows.length === 0 ? Effect.succeed(new Set<string>()) : internalAddresses(),
+  ])
+  return meetings.map((m): TodayMeeting => ({
+    ...m,
+    external: m.participants
+      .filter((p) => !internal.has(p.email.toLowerCase()))
+      .map(participantName),
+  }))
 })
 
 /** Who reads the list: canRead's id, and the address their invites name. */
@@ -513,22 +538,12 @@ export const unwrittenMeetingsProgram = Effect.fn('unwrittenMeetingsProgram')(
         Date.parse(endOf(r.occurredAt, meta)) <= now.getTime()
       )
     })
-    const [records, members, accounts] = yield* Effect.all([
+    const [records, internal] = yield* Effect.all([
       recordsOf(ended.map((r) => r.id)),
       ended.length === 0
-        ? Effect.succeed([])
-        : query(() => db.select({ email: member.email }).from(member)),
-      ended.length === 0
-        ? Effect.succeed([])
-        : query(() =>
-            db
-              .select({ email: accountConnection.externalEmail })
-              .from(accountConnection),
-          ),
+        ? Effect.succeed(new Set<string>())
+        : internalAddresses(),
     ])
-    const internal = new Set(
-      [...members, ...accounts].map((m) => m.email.toLowerCase()),
-    )
     return ended.map((r) => {
       const linked = records.get(r.id) ?? []
       const named = linked.find((l) => l.kind !== 'person') ?? linked.at(0)

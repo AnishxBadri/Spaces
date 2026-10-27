@@ -12,6 +12,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import { Route as TodayRoute } from '#/routes/_app/today'
 import { DayStrip, nowLabel, windowPercent } from './day-strip'
+import type { DayStripMeeting } from './day-strip'
 import { todayReadouts } from './readouts'
 
 /**
@@ -204,7 +205,7 @@ describe('Today', () => {
     const meetings = html.indexOf('aria-label="Meetings"')
     expect(needs).toBeGreaterThan(-1)
     expect(meetings).toBeGreaterThan(needs)
-    expect(html).toContain('No calendar connected · ')
+    expect(html).toContain('No calendar connected')
   })
 
   it('filters by kind in a Segmented, and the fold names the kinds', async () => {
@@ -247,11 +248,33 @@ describe('Today', () => {
 })
 
 describe('the day strip', () => {
+  const strip = (day: string, meetings: ReadonlyArray<DayStripMeeting> = []) =>
+    renderToStaticMarkup(
+      <DayStrip
+        day={day}
+        today="2026-10-13"
+        meetings={meetings}
+        onOpen={() => {}}
+      />,
+    )
+
   it('spans the working window 08–20', () => {
-    const html = renderToStaticMarkup(<DayStrip />)
+    const html = strip('2026-10-13')
     for (const h of ['08', '10', '12', '14', '16', '18', '20'])
       expect(html).toContain(`>${h}<`)
     for (const h of ['00', '06', '21']) expect(html).not.toContain(`>${h}<`)
+  })
+
+  it('dithers a past day whole with no now-dot, and a future day not at all', () => {
+    const past = strip('2026-10-12')
+    expect(past).toContain('data-day-strip="past"')
+    expect(past).toMatch(/data-elapsed[^>]*width="100%"/)
+    expect(past).not.toContain('data-now')
+
+    const ahead = strip('2026-10-14')
+    expect(ahead).toContain('data-day-strip="future"')
+    expect(ahead).not.toContain('data-elapsed')
+    expect(ahead).not.toContain('data-now')
   })
 
   it('places now on the window and prints it beside the dot', () => {
@@ -262,20 +285,27 @@ describe('the day strip', () => {
     // Outside the window the dot rests on its edge.
     expect(windowPercent(at(6, 30))).toBe(0)
     expect(windowPercent(at(22))).toBe(100)
-    expect(nowLabel(at(11, 40))).toBe('now · 11:40')
-    expect(nowLabel(at(9, 5))).toBe('now · 09:05')
+    expect(nowLabel(at(11, 40))).toBe('Now · 11:40')
+    expect(nowLabel(at(9, 5))).toBe('Now · 09:05')
   })
 
-  it('draws a meeting as a named block', () => {
-    const day = (h: number) => new Date(2026, 9, 10, h).toISOString()
-    const html = renderToStaticMarkup(
-      <DayStrip
-        meetings={[
-          { id: 'm', title: 'Northgate', startsAt: day(17), endsAt: day(18) },
-        ]}
-      />,
-    )
+  it('draws a meeting as a labelled block that opens its window', () => {
+    const day = (h: number) => new Date(2026, 9, 14, h).toISOString()
+    const html = strip('2026-10-14', [
+      {
+        id: 'm',
+        label: 'Northgate',
+        title: 'Northgate catch-up',
+        who: 'Priya Raman +1',
+        startsAt: day(17),
+        endsAt: day(18),
+      },
+    ])
     expect(html).toMatch(/data-meeting[^>]*>Northgate</)
+    expect(html).toMatch(
+      /<button[^>]*data-meeting-block[^>]*aria-label="Northgate catch-up · 17:00–18:00"/,
+    )
+    expect(html).toContain('hover:outline-foreground')
   })
 })
 

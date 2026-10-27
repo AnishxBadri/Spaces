@@ -8,6 +8,7 @@ export type {
   MeetingParticipant,
   MeetingRecord,
   PrepEvent,
+  TodayMeeting,
 } from '../meetings/day'
 export type {
   MeetingArtifact,

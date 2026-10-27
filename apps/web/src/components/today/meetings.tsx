@@ -1,25 +1,26 @@
 import { Link } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
-import { LabelHead, LedgerRow } from '#/components/ledger-section'
-import { DensityRamp } from '#/components/dither'
-import { NeedsSetup } from '#/components/needs-setup'
+import { Fragment, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
+import { LedgerRow, SectionHead } from '#/components/ledger-section'
 import { nowLabel, useNow } from '#/components/today/day-strip'
-import { MeetingRow, PrepButton } from '#/components/meetings/meeting-row'
+import { TodayMeetingRow } from '#/components/today/today-meeting-row'
+import { Twinkle } from '#/components/twinkle'
+import { Button } from '#/components/ui/button'
 import { listDayMeetings } from '#/lib/server-fns'
-import type { DayMeeting, SetupAudience } from '#/lib/server-fns'
+import type { SetupAudience, TodayMeeting } from '#/lib/server-fns'
 import {
-  artifactMarks,
   dayLabel,
+  dayTense,
   dayWindow,
   isUpcoming,
   nowIndex,
   shiftDay,
-  timeSpan,
+  waitFor,
 } from '#/lib/meetings/day'
-import { cn } from '#/lib/utils'
+import { adminNames } from '#/lib/setup/whats-set-up'
 
 /** A day's meetings: null while read, `failed` when the read failed. */
-export type DayMeetings = ReadonlyArray<DayMeeting> | 'failed' | null
+export type DayMeetings = ReadonlyArray<TodayMeeting> | 'failed' | null
 
 /**
  * One local day's meetings, read in the browser so the day and the times are
@@ -33,7 +34,7 @@ export function useDayMeetings(
   const [state, setState] = useState<{
     day: string
     version: number
-    meetings: ReadonlyArray<DayMeeting> | 'failed'
+    meetings: ReadonlyArray<TodayMeeting> | 'failed'
   } | null>(null)
   useEffect(() => {
     if (day === null) return
@@ -56,7 +57,14 @@ export function useDayMeetings(
   return state.meetings
 }
 
-/** `‹ today ›`: the day before, the day shown, the day after. */
+/** A sans link or button in the head, ink. */
+const headLink =
+  'focus-ring shrink-0 font-sans text-label text-foreground hover:underline'
+
+/**
+ * The head's right: `‹ Today ›`, and away from today `Back to today` before
+ * `‹ Wed 14 Oct ›`; then `All meetings ›`.
+ */
 function DayNav({
   day,
   today,
@@ -69,82 +77,73 @@ function DayNav({
   const step =
     'focus-ring px-1 text-graphite transition-colors duration-150 ease-out-quart hover:text-foreground'
   return (
-    <div
-      role="group"
-      aria-label="Day"
-      className="flex shrink-0 items-baseline mono text-micro"
-    >
-      <button
-        type="button"
-        aria-label="Previous day"
-        className={step}
-        onClick={() => onDay(shiftDay(day, -1))}
-      >
-        ‹
-      </button>
-      {day === today ? (
-        <span className="px-1 text-foreground">{dayLabel(day, today)}</span>
-      ) : (
-        <button
-          type="button"
-          title="Back to today"
-          className={cn(step, 'text-foreground')}
-          onClick={() => onDay(today)}
-        >
-          {dayLabel(day, today)}
+    <>
+      {day === today ? null : (
+        <button type="button" className={headLink} onClick={() => onDay(today)}>
+          Back to today
         </button>
       )}
-      <button
-        type="button"
-        aria-label="Next day"
-        className={step}
-        onClick={() => onDay(shiftDay(day, 1))}
-      >
-        ›
-      </button>
-    </div>
-  )
-}
-
-/** The pine rule between what has started and what is ahead. */
-function NowRule({ now }: { now: Date }) {
-  return (
-    <li data-now-rule aria-hidden className="relative h-0">
-      <span className="absolute inset-x-0 -top-px border-t border-primary" />
-      <span className="absolute -top-2 right-3 bg-paper pl-2 mono text-field text-primary">
-        {nowLabel(now)}
+      <span role="group" aria-label="Day" className="flex items-baseline">
+        <button
+          type="button"
+          aria-label="Previous day"
+          className={step}
+          onClick={() => onDay(shiftDay(day, -1))}
+        >
+          ‹
+        </button>
+        <span data-day className="px-1 text-foreground">
+          {dayLabel(day, today)}
+        </span>
+        <button
+          type="button"
+          aria-label="Next day"
+          className={step}
+          onClick={() => onDay(shiftDay(day, 1))}
+        >
+          ›
+        </button>
       </span>
-    </li>
-  )
-}
-
-function TodayMeetingRow({
-  meeting,
-  now,
-  onOpen,
-}: {
-  meeting: DayMeeting
-  now: Date | null
-  onOpen: (id: string, prep: boolean) => void
-}) {
-  const ahead = now !== null && !meeting.cancelled && isUpcoming(meeting, now)
-  return (
-    <MeetingRow
-      meeting={meeting}
-      when={timeSpan(meeting.startsAt, meeting.endsAt)}
-      lane={meeting.cancelled ? 'cancelled' : artifactMarks(meeting.artifacts)}
-      action={
-        ahead ? <PrepButton onPrep={() => onOpen(meeting.id, true)} /> : null
-      }
-      onOpen={() => onOpen(meeting.id, false)}
-    />
+      <Link to="/meetings" className={headLink}>
+        All meetings ›
+      </Link>
+    </>
   )
 }
 
 /**
- * Today's Meetings: one day with `‹ today ›`, a now-rule on today, Prep on
- * what is ahead, and "all meetings ›" to the Meetings page. With no calendar
- * connected it is the one line that says so.
+ * Between what has started and what is ahead: a pine square, `Now · 11:40`,
+ * a hairline, and the wait to the next meeting when there is one.
+ */
+function NowRule({ now, next }: { now: Date; next: TodayMeeting | null }) {
+  return (
+    <li
+      data-now-rule
+      className="flex h-6 items-center gap-2 border-b border-rule px-3"
+    >
+      <span aria-hidden className="size-1.5 shrink-0 bg-primary" />
+      <span className="shrink-0 mono text-micro text-foreground">
+        {nowLabel(now)}
+      </span>
+      <span aria-hidden className="flex-1 border-t border-hairline" />
+      {next === null ? null : (
+        <span className="shrink-0 mono text-micro text-graphite">
+          Next in {waitFor(Date.parse(next.startsAt) - now.getTime())}
+        </span>
+      )}
+    </li>
+  )
+}
+
+/** A line under the head that is not a meeting: a state, said once. */
+function StateRow({ children }: { children: ReactNode }) {
+  return <LedgerRow className="gap-2">{children}</LedgerRow>
+}
+
+/**
+ * Today's Meetings: one day with `‹ Today ›`, a now-rule on today, Write
+ * after a meeting and Prep before one, and `All meetings ›` to the Meetings
+ * page. With no calendar connected it is the one line that says so.
  * - External meetings only: internal ones are never stored.
  * - The head's count is the day's count, and nothing else prints it.
  */
@@ -155,6 +154,7 @@ export function MeetingsSection({
   day,
   onDay,
   meetings,
+  preparing,
   onOpen,
   onRetry,
 }: {
@@ -164,6 +164,8 @@ export function MeetingsSection({
   day: string
   onDay: (day: string) => void
   meetings: DayMeetings
+  /** The meeting whose Prep is running in its window; null when none. */
+  preparing: string | null
   /** Opens the meeting window; `prep` starts Prep in it. */
   onOpen: (id: string, prep: boolean) => void
   /** Reads the day again after a failed read. */
@@ -173,104 +175,95 @@ export function MeetingsSection({
   if (!calendar)
     return (
       <section aria-label="Meetings" className="flex flex-col">
-        <LabelHead label="Meetings" />
-        <div className="flex h-ledger-row items-center px-3">
-          <NeedsSetup
-            needs="No calendar connected"
-            action="Connect Google"
-            to="/settings/email-calendar"
-            thing="Google"
-            audience={audience}
-          />
-        </div>
+        <SectionHead title="Meetings" />
+        <ol>
+          <StateRow>
+            {audience.isAdmin ? (
+              <>
+                <span
+                  data-needs-setup="admin"
+                  className="min-w-0 truncate text-ui text-graphite"
+                >
+                  No calendar connected
+                </span>
+                <Link
+                  to="/settings/email-calendar"
+                  className="focus-ring shrink-0 text-label text-foreground hover:underline"
+                >
+                  Connect Google ›
+                </Link>
+              </>
+            ) : (
+              <span
+                data-needs-setup="member"
+                className="min-w-0 truncate text-ui text-graphite"
+              >
+                Ask {adminNames(audience.admins)} to connect Google
+              </span>
+            )}
+          </StateRow>
+        </ol>
       </section>
     )
   const rows = meetings === 'failed' ? null : meetings
+  const tense = dayTense(day, today)
   const rule =
-    rows !== null && now !== null && day === today ? nowIndex(rows, now) : null
+    rows !== null && now !== null && tense === 'today'
+      ? nowIndex(rows, now)
+      : null
+  const next =
+    rows === null || now === null
+      ? null
+      : (rows.find((m) => !m.cancelled && isUpcoming(m, now)) ?? null)
+  const nowRule =
+    now === null ? null : <NowRule key="now-rule" now={now} next={next} />
   return (
     <section aria-label="Meetings" className="flex flex-col">
-      <LabelHead
-        label={
-          <>
-            Meetings
-            {rows === null ? null : (
-              <span className="ml-2.5 mono text-micro tracking-normal text-graphite">
-                {rows.length}
-              </span>
-            )}
-          </>
-        }
-      >
-        <DayNav day={day} today={today} onDay={onDay} />
-        <Link
-          to="/meetings"
-          className="focus-ring shrink-0 mono text-micro text-foreground hover:underline"
-        >
-          all meetings ›
-        </Link>
-      </LabelHead>
+      <SectionHead
+        title="Meetings"
+        count={rows === null || rows.length === 0 ? undefined : rows.length}
+        action={<DayNav day={day} today={today} onDay={onDay} />}
+      />
       <ol>
         {meetings === 'failed' ? (
-          <LedgerRow>
+          <StateRow>
+            <span aria-hidden className="size-1.5 shrink-0 bg-destructive" />
             <span
               data-meetings-failed
-              className="mono text-micro text-graphite"
+              className="min-w-0 flex-1 truncate text-ui text-foreground"
             >
-              read failed
+              Could not read the calendar · Google did not answer
             </span>
-            <button
-              type="button"
-              onClick={onRetry}
-              className="focus-ring mono text-micro text-foreground hover:underline"
-            >
-              retry ›
-            </button>
-          </LedgerRow>
+            <Button variant="outline" size="sm" onClick={onRetry}>
+              Retry
+            </Button>
+          </StateRow>
         ) : rows === null ? (
-          <LedgerRow>
-            <DensityRamp width={120} />
-          </LedgerRow>
+          <StateRow>
+            <Twinkle label="Reading meetings" />
+          </StateRow>
         ) : rows.length === 0 ? (
-          <LedgerRow>
-            <span className="text-ui text-graphite">No meetings.</span>
-          </LedgerRow>
+          <StateRow>
+            <span className="text-ui text-graphite">No meetings</span>
+          </StateRow>
         ) : (
           rows.map((m, i) => (
-            <MeetingRowWithRule
-              key={m.id}
-              meeting={m}
-              now={now}
-              rule={rule === i}
-              onOpen={onOpen}
-            />
+            <Fragment key={m.id}>
+              {rule === i ? nowRule : null}
+              <TodayMeetingRow
+                meeting={m}
+                tense={tense}
+                now={now}
+                preparing={preparing === m.id}
+                onOpen={onOpen}
+              />
+            </Fragment>
           ))
         )}
-        {rule !== null && rows !== null && rule === rows.length ? (
-          now === null ? null : (
-            <NowRule now={now} />
-          )
-        ) : null}
+        {rows !== null && rows.length > 0 && rule === rows.length
+          ? nowRule
+          : null}
       </ol>
     </section>
-  )
-}
-
-function MeetingRowWithRule({
-  meeting,
-  now,
-  rule,
-  onOpen,
-}: {
-  meeting: DayMeeting
-  now: Date | null
-  rule: boolean
-  onOpen: (id: string, prep: boolean) => void
-}) {
-  return (
-    <>
-      {rule && now !== null ? <NowRule now={now} /> : null}
-      <TodayMeetingRow meeting={meeting} now={now} onOpen={onOpen} />
-    </>
   )
 }

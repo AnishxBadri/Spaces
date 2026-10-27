@@ -3,7 +3,7 @@ import {
   useRouteContext,
   useRouter,
 } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { MeetingDialog } from '#/components/meeting-dialog'
@@ -11,6 +11,7 @@ import { PageHeader } from '#/components/page-header'
 import { ReadoutStrip } from '#/components/record/record-parts'
 import { useTaskMenu } from '#/components/tasks/task-menu'
 import { DayStrip, useNow } from '#/components/today/day-strip'
+import type { DayStripMeeting } from '#/components/today/day-strip'
 import { FirstRun } from '#/components/today/first-run'
 import { MeetingsSection, useDayMeetings } from '#/components/today/meetings'
 import { NeedsYou } from '#/components/today/needs-you'
@@ -45,6 +46,7 @@ import {
   todayStamp,
 } from '#/lib/today/needs-you'
 import type { NeedsFilter, ReadoutFilter } from '#/lib/today/needs-you'
+import { stripLabel, whoLine } from '#/lib/meetings/day'
 import { useSettled } from '#/lib/today/use-settled'
 import { dayKey, formatAge, formatTime } from '@spaces/core/format'
 import { fmtMoney } from '@spaces/core/portfolio/format'
@@ -216,15 +218,16 @@ function TodayLedger({
     }
   }
 
-  // The section's day moves with ‹ ›; the strip always shows today.
+  // The section's day moves with ‹ ›, and the strip follows it.
   const [day, setDay] = useState(today)
   const [version, setVersion] = useState(0)
-  const todays = useDayMeetings(meetings.calendar ? today : null, version)
-  const other = useDayMeetings(
-    meetings.calendar && day !== today ? day : null,
-    version,
+  const shown = useDayMeetings(meetings.calendar ? day : null, version)
+  // The meeting whose Prep runs in its window, for its row's action lane.
+  const [preparing, setPreparing] = useState<string | null>(null)
+  const onPrepRunning = useCallback(
+    (running: boolean) => setPreparing(running ? meetingId : null),
+    [meetingId],
   )
-  const shown = day === today ? todays : other
   // A meeting's day is the reader's, so its figure waits for the browser clock.
   const now = useNow()
 
@@ -349,11 +352,13 @@ function TodayLedger({
     }
   }
 
-  const calendarDay = (todays === null || todays === 'failed' ? [] : todays)
+  const stripDay = (shown === null || shown === 'failed' ? [] : shown)
     .filter((m) => !m.cancelled)
-    .map((m) => ({
+    .map((m): DayStripMeeting => ({
       id: m.id,
+      label: stripLabel(m),
       title: m.title ?? 'Meeting',
+      who: whoLine(m.external),
       startsAt: m.startsAt,
       endsAt: m.endsAt,
     }))
@@ -363,7 +368,14 @@ function TodayLedger({
       <TodayHead today={today} />
       {/* No visible trigger: `L` and Cmd-K open it. */}
       <LogInteractionDialog hotkey="l" trigger={null} />
-      {meetings.calendar ? <DayStrip meetings={calendarDay} /> : null}
+      {meetings.calendar ? (
+        <DayStrip
+          day={day}
+          today={today}
+          meetings={stripDay}
+          onOpen={(id) => openMeeting(id)}
+        />
+      ) : null}
       {readouts.length > 0 ? (
         <div className="border-b border-hairline px-8">
           <ReadoutStrip
@@ -420,6 +432,7 @@ function TodayLedger({
             day={day}
             onDay={setDay}
             meetings={shown}
+            preparing={preparing}
             onOpen={openMeeting}
             onRetry={() => setVersion((v) => v + 1)}
           />
@@ -462,6 +475,7 @@ function TodayLedger({
       <MeetingDialog
         id={meetingId}
         prepOnOpen={prepFor !== null && prepFor === meetingId}
+        onPrepRunning={onPrepRunning}
         onOpenChange={(open) => {
           if (!open) closeMeeting()
         }}

@@ -6,31 +6,36 @@ import {
 } from '@tanstack/react-router'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { formatTime } from '@spaces/core/format'
 import type {
+  BrokenConnection,
   FailingBinding,
   ParkedSource,
+  StoppedPlugin,
   WaitingExport,
 } from '#/lib/server-fns'
 import { NoticesBand } from './notices'
 
 /**
- * The notices band's auto-enrich line: one per source at its daily cap, with
- * the records waiting and when they resume; the write-through line, one per
- * provider with uploads not yet in their bound folder; and one line per bound
- * folder that cannot sync.
+ * The notices band: bone, one 34px line per thing that stops the machine —
+ * an amber or rose square, the sentence, and a sentence-case fix link in
+ * mono ink. The auto-enrich line, one per source at its daily cap; the
+ * write-through line, one per provider with uploads not yet in their bound
+ * folder; one line per bound folder that cannot sync; a broken connection;
+ * a plugin that stopped.
  */
 
 async function render(
   parked: ReadonlyArray<ParkedSource>,
   waiting: ReadonlyArray<WaitingExport> = [],
   failing: ReadonlyArray<FailingBinding> = [],
+  stopped: ReadonlyArray<StoppedPlugin> = [],
+  broken: ReadonlyArray<BrokenConnection> = [],
 ) {
   const root = createRootRoute({
     component: () => (
       <NoticesBand
-        stopped={[]}
-        broken={[]}
+        stopped={stopped}
+        broken={broken}
         parked={parked}
         waiting={waiting}
         failing={failing}
@@ -46,7 +51,7 @@ async function render(
 }
 
 describe('NoticesBand — parked auto-enrich', () => {
-  it('reads paused, the source, the count and the reset', async () => {
+  it('reads paused, the source, the count and the UTC reset, with Enrichment', async () => {
     const html = await render([
       {
         integrationId: '00000000-0000-4000-8000-0000000000a1',
@@ -55,13 +60,12 @@ describe('NoticesBand — parked auto-enrich', () => {
         resumesAt: '2026-10-11T00:00:00.000Z',
       },
     ])
-    expect(html).toContain('Auto-enrich paused · Apollo cap reached')
     expect(html).toContain(
-      `14 waiting · resumes ${formatTime('2026-10-11T00:00:00.000Z')}`,
+      'Auto-enrich paused · Apollo limit reached · 14 waiting · runs at 00:00 UTC',
     )
-    expect(html).toContain(
-      'href="/settings/plugins/00000000-0000-4000-8000-0000000000a1"',
-    )
+    expect(html).toContain('href="/settings/enrichment"')
+    expect(html).toContain('>Enrichment ›<')
+    expect(html).toContain('data-notice="warn"')
   })
 
   it('renders nothing when nothing is parked or stopped', async () => {
@@ -127,5 +131,59 @@ describe('NoticesBand — bound folders that cannot sync', () => {
     )
     expect(two.match(/can’t sync/g)).toHaveLength(2)
     expect(await render([], [], [])).not.toContain('Notices')
+  })
+})
+
+describe('NoticesBand — the line', () => {
+  const BROKEN: BrokenConnection = {
+    connectionId: '00000000-0000-4000-8000-0000000000d1',
+    label: 'Gmail',
+    externalEmail: 'anish@fund.example',
+    errorReason: 'Google said: token expired',
+    fixTo: '/settings/email-calendar',
+  }
+  const TRIPPED: StoppedPlugin = {
+    integrationId: '00000000-0000-4000-8000-0000000000e1',
+    pluginId: 'apollo',
+    state: 'tripped',
+    lastError: null,
+  }
+
+  it('says a broken connection in one sentence, rose, with Reconnect', async () => {
+    const html = await render([], [], [], [], [BROKEN])
+    expect(html).toContain('Gmail stopped syncing · Google said: token expired')
+    expect(html).toContain('data-notice="bad"')
+    expect(html).toContain('>Reconnect ›<')
+  })
+
+  it('names a stopped plugin in sentence case, rose, with Fix', async () => {
+    const html = await render([], [], [], [TRIPPED])
+    expect(html).toContain('Plugin apollo stopped · stopped by the breaker')
+    expect(html).toContain('data-notice="bad"')
+    expect(html).toContain('>Fix ›<')
+  })
+
+  it('draws a square on bone, never a lowercase lane or a pine link', async () => {
+    const html = await render(
+      [
+        {
+          integrationId: 'i1',
+          source: 'Apollo',
+          waiting: 1,
+          resumesAt: '2026-10-11T00:00:00.000Z',
+        },
+      ],
+      [],
+      [],
+      [TRIPPED],
+      [BROKEN],
+    )
+    expect(html).toContain('bg-bone')
+    expect(html.match(/size-1\.5/g)).toHaveLength(3)
+    expect(html).not.toContain('text-primary')
+    expect(html).not.toMatch(/>(account|plugin|enrich|files)</)
+    // Every fix link starts uppercase.
+    const links = [...html.matchAll(/<a [^>]*>([^<]*)</g)].map((m) => m[1])
+    expect(links).toEqual(['Reconnect ›', 'Enrichment ›', 'Fix ›'])
   })
 })

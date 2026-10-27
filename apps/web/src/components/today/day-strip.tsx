@@ -1,6 +1,12 @@
 import { useEffect, useId, useState } from 'react'
 import { formatTime } from '@spaces/core/format'
 import { cellsFor } from '#/components/dither'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '#/components/ui/tooltip'
+import { dayTense } from '#/lib/meetings/day'
 
 /** The working window the strip draws, in hours. */
 export const DAY_START = 8
@@ -13,10 +19,14 @@ const LABELS = Array.from(
 /** Elapsed time's density: Bayer 6 of 16, ink. */
 const ELAPSED_LEVEL = 6
 
-/** A meeting on the strip: an ink block under its name. */
+/** A meeting on the strip: an ink block under its label. */
 export type DayStripMeeting = {
   id: string
+  /** The first linked record, else who, else the title (`stripLabel`). */
+  label: string
   title: string
+  /** `Priya Raman +1`; null when nobody outside the workspace is on it. */
+  who: string | null
   /** ISO instants; the block is clipped to the window. */
   startsAt: string
   endsAt: string
@@ -31,9 +41,9 @@ export function windowPercent(d: Date): number {
   return Math.min(100, Math.max(0, at))
 }
 
-/** The now label: `now · 11:40`. */
+/** The now label: `Now · 11:40`. */
 export function nowLabel(d: Date): string {
-  return `now · ${formatTime(d)}`
+  return `Now · ${formatTime(d)}`
 }
 
 /**
@@ -58,49 +68,95 @@ function anchor(at: number): string {
   return '-translate-x-1/2'
 }
 
+/** One meeting's ink block: its time and title on hover, the window on click. */
+function Block({
+  meeting,
+  from,
+  to,
+  onOpen,
+}: {
+  meeting: DayStripMeeting
+  from: number
+  to: number
+  onOpen: (id: string) => void
+}) {
+  const span = `${formatTime(meeting.startsAt)}–${formatTime(meeting.endsAt)}`
+  return (
+    <>
+      <span
+        data-meeting
+        aria-hidden
+        className="pointer-events-none absolute top-1.5 max-w-40 truncate mono text-field text-foreground"
+        style={{ left: `${from}%` }}
+      >
+        {meeting.label}
+      </span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            data-meeting-block
+            aria-label={`${meeting.title} · ${span}`}
+            onClick={() => onOpen(meeting.id)}
+            className="focus-ring absolute top-5.5 z-10 h-4.5 bg-foreground outline-offset-1 hover:outline hover:outline-foreground"
+            style={{ left: `${from}%`, width: `${to - from}%` }}
+          />
+        </TooltipTrigger>
+        <TooltipContent>
+          <span className="flex flex-col">
+            <span className="mono">{span}</span>
+            <span>
+              {meeting.who === null
+                ? meeting.title
+                : `${meeting.title} · ${meeting.who}`}
+            </span>
+          </span>
+        </TooltipContent>
+      </Tooltip>
+    </>
+  )
+}
+
 /**
- * Today's working hours, 08–20, as a band under the head: the elapsed part
- * dithered up to a pine now-dot with `now · hh:mm` beside it.
- * - `meetings` are ink blocks with their names; Today passes them once a
- *   calendar source feeds the day.
+ * The working hours of the day Meetings shows, 08–20, as a band under the
+ * head: ink blocks for its meetings, labelled, each opening its window.
+ * - Today dithers the elapsed part up to a pine now-dot with `Now · hh:mm`;
+ *   a past day is dithered whole with no dot; a future day has no dither.
  * - Dither cells stay 2px: the svg has no viewBox, so its user units are pixels.
  */
 export function DayStrip({
-  meetings = [],
+  day,
+  today,
+  meetings,
+  onOpen,
 }: {
-  meetings?: ReadonlyArray<DayStripMeeting>
+  day: string
+  today: string
+  meetings: ReadonlyArray<DayStripMeeting>
+  onOpen: (id: string) => void
 }) {
-  const now = useNow()
+  const clock = useNow()
   const pattern = useId()
+  const tense = dayTense(day, today)
+  const now = tense === 'today' ? clock : null
   const at = now === null ? null : windowPercent(now)
+  const dithered = tense === 'past' ? 100 : (at ?? 0)
   return (
-    <div data-day-strip className="h-16 shrink-0 px-8">
+    <div data-day-strip={tense} className="h-16 shrink-0 px-8">
       <div className="relative h-full">
         {meetings.map((m) => {
           const from = windowPercent(new Date(m.startsAt))
           const to = windowPercent(new Date(m.endsAt))
           if (to <= from) return null
           return (
-            <span key={m.id}>
-              <span
-                data-meeting
-                className="absolute top-1.5 max-w-40 truncate mono text-field text-foreground"
-                style={{ left: `${from}%` }}
-              >
-                {m.title}
-              </span>
-              <span
-                className="absolute top-5.5 h-4.5 bg-foreground"
-                style={{ left: `${from}%`, width: `${to - from}%` }}
-              />
-            </span>
+            <Block key={m.id} meeting={m} from={from} to={to} onOpen={onOpen} />
           )
         })}
         <svg
           aria-hidden
           width="100%"
           height="18"
-          className="absolute inset-x-0 top-5.5"
+          className="pointer-events-none absolute inset-x-0 top-5.5"
         >
           <defs>
             <pattern
@@ -122,11 +178,12 @@ export function DayStrip({
               ))}
             </pattern>
           </defs>
-          {at === null || at === 0 ? null : (
+          {dithered === 0 ? null : (
             <rect
+              data-elapsed
               x="0"
               y="0"
-              width={`${at}%`}
+              width={`${dithered}%`}
               height="18"
               fill={`url(#${pattern})`}
             />
@@ -137,7 +194,7 @@ export function DayStrip({
           <>
             <span
               data-now
-              className="absolute top-6.75 size-2 -translate-x-1/2 bg-primary"
+              className="absolute top-6.75 z-10 size-2 -translate-x-1/2 bg-primary"
               style={{ left: `${at}%` }}
             />
             <span
