@@ -118,15 +118,6 @@ export function timeSpan(startsAt: string, endsAt: string): string {
   return `${formatTime(startsAt)}–${formatTime(endsAt)}`
 }
 
-/** The dialog head's context: `Tue 14 Oct · 09:30–10:00`. */
-export function meetingWhen(
-  startsAt: string,
-  endsAt: string,
-  today: string,
-): string {
-  return `${formatWeekday(startsAt, today)} · ${timeSpan(startsAt, endsAt)}`
-}
-
 /** The RSVP mark printed after a name. Shown, never edited. */
 export const RSVP_MARK: Record<MeetingRsvp, string> = {
   accepted: '✓',
