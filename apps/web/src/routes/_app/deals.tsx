@@ -7,7 +7,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
-import { Handshake, Plus } from 'lucide-react'
+import { Handshake } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -17,18 +17,13 @@ import { useColumnRun } from '#/components/views/column-run'
 import { matchesConditions } from '@spaces/core/views/filter'
 import { DealBoard } from '#/components/deal-board'
 import type { BoardStage } from '#/components/deal-board'
-import {
-  fieldSpanClass,
-  liveOptions,
-  optionLabel,
-  ValueEditor,
-} from '#/components/attributes/value-editor'
+import { optionLabel, ValueEditor } from '#/components/attributes/value-editor'
 import { AiCell, AiCellsProvider } from '#/components/attributes/ai-cell'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { EmptyRow } from '#/components/ledger-section'
 import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
-import { TemplatePicker } from '#/components/templates'
+import { CreateDealDialog } from '#/components/create-deal-dialog'
 import {
   attributeColumnMeta,
   IconBadge,
@@ -46,18 +41,6 @@ import { statColumns } from '#/components/table/stat-columns'
 import { PageHeader } from '#/components/page-header'
 import { useImportVerb } from '#/components/import/import-action'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
-import { Button } from '#/components/ui/button'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '#/components/ui/dialog'
-import { Input } from '#/components/ui/input'
-import { Label } from '#/components/ui/label'
 import {
   Popover,
   PopoverContent,
@@ -66,7 +49,6 @@ import {
 import { Segmented } from '#/components/ui/segmented'
 import {
   countViews,
-  createDeal,
   dealFunnelStats,
   getSession,
   listDealsTable,
@@ -75,8 +57,7 @@ import {
   updateRecord,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
-import { useHotkey } from '#/lib/use-hotkey'
-import { jsonRecord, jsonString } from '@spaces/core/json'
+import { jsonString } from '@spaces/core/json'
 
 /**
  * **This list does not page, deliberately.** It groups by stage on the
@@ -678,224 +659,4 @@ function StageChip({
       </PopoverContent>
     </Popover>
   )
-}
-
-export function CreateDealDialog({
-  registry,
-  presetCompany,
-  triggerLabel = 'New deal',
-  trigger,
-  hotkey,
-}: {
-  registry: Array<RegistryEntry>
-  presetCompany?: { id: string; name: string }
-  triggerLabel?: string
-  /** A trigger of the caller's own — must forward props (plain DOM elements do). */
-  trigger?: React.ReactNode
-  /** Bare key that opens it from the page — printed in the default trigger. */
-  hotkey?: string
-}) {
-  const router = useRouter()
-  const [open, setOpen] = useState(false)
-  useHotkey(hotkey, () => setOpen(true))
-  const [error, setError] = useState<string | null>(null)
-  const [pending, setPending] = useState(false)
-  const [name, setName] = useState('')
-  const [companyId, setCompanyId] = useState<string | null>(
-    presetCompany?.id ?? null,
-  )
-  const [companyName, setCompanyName] = useState(presetCompany?.name ?? '')
-  const companyDef = registry.find((d) => d.slug === 'company')
-  const stageDef = registry.find((d) => d.slug === 'stage')
-  // Born on the first live stage: a retired Pre-lead would be rejected.
-  const [stage, setStage] = useState<string>(
-    () =>
-      (stageDef ? liveOptions(stageDef).at(0)?.id : undefined) ?? 'pre_lead',
-  )
-  const [values, setValues] = useState<Record<string, unknown>>({})
-  // The judgment fields worth setting at birth; refs and owner stay on the
-  // record page.
-  const extraDefs = registry.filter((d) =>
-    ['value', 'source', 'close_date'].includes(d.slug),
-  )
-
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError(null)
-    if (!companyId) return setError('Pick the company — a deal needs one.')
-    const dealName = name.trim() || `${companyName || 'New'} deal`
-    setPending(true)
-    try {
-      const { id } = await createDeal({
-        data: {
-          companyId,
-          name: dealName,
-          stage,
-          value: typeof values.value === 'number' ? values.value : undefined,
-          source: typeof values.source === 'string' ? values.source : undefined,
-        },
-      })
-      if (values.close_date != null) {
-        await updateRecord({
-          data: { id, patch: { close_date: values.close_date } },
-        })
-      }
-      setOpen(false)
-      setName('')
-      setValues({})
-      if (!presetCompany) {
-        setCompanyId(null)
-        setCompanyName('')
-      }
-      toast(`${dealName} created`)
-      void router.invalidate()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create the deal')
-    } finally {
-      setPending(false)
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button size="sm" shortcut={hotkey?.toUpperCase()}>
-            <Plus className="size-4" strokeWidth={2} />
-            {triggerLabel}
-          </Button>
-        )}
-      </DialogTrigger>
-      <DialogContent
-        size="m"
-        className="max-h-[85vh] overflow-y-auto"
-        aria-describedby={undefined}
-      >
-        <DialogHeader>
-          <DialogTitle>New deal</DialogTitle>
-        </DialogHeader>
-        {/* Pre-fills the fields below, visibly and editably — never writes. */}
-        <div className="flex justify-end">
-          <TemplatePicker
-            kind="record"
-            objectKind="deal"
-            context="deal"
-            onPick={(t) => {
-              const tv = jsonRecord(jsonRecord(t.body).values)
-              if (typeof tv.stage === 'string') setStage(tv.stage)
-              setValues((s) => ({ ...tv, ...s }))
-            }}
-          />
-        </div>
-        <form
-          onSubmit={onSubmit}
-          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
-          noValidate
-        >
-          {companyDef && !presetCompany ? (
-            <div className="space-y-1.5">
-              <Label>Company</Label>
-              <ValueEditor
-                def={companyDef}
-                value={companyId}
-                variant="field"
-                refNames={
-                  companyId ? { [companyId]: { name: companyName } } : {}
-                }
-                onSave={(v) => setCompanyId(typeof v === 'string' ? v : null)}
-              />
-              <CompanyNameCapture
-                companyId={companyId}
-                onName={(n) => {
-                  setCompanyName(n)
-                  setName((cur) => (cur.trim() ? cur : `${n} deal`))
-                }}
-              />
-            </div>
-          ) : null}
-          <div className="space-y-1.5">
-            <Label htmlFor="deal-name">Name</Label>
-            <Input
-              id="deal-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={
-                companyName ? `${companyName} deal` : 'Pixxel — Series B'
-              }
-            />
-          </div>
-          {stageDef ? (
-            <div className="space-y-1.5">
-              <Label>Stage</Label>
-              <ValueEditor
-                def={stageDef}
-                value={stage}
-                variant="field"
-                onSave={(v) => setStage(String(v ?? 'pre_lead'))}
-              />
-            </div>
-          ) : null}
-
-          {extraDefs.map((def) => (
-            <div
-              key={def.slug}
-              className={cn('space-y-1.5', fieldSpanClass(def))}
-            >
-              <Label>{def.name}</Label>
-              <ValueEditor
-                def={def}
-                value={values[def.slug] ?? null}
-                variant="field"
-                onSave={(v) => setValues((s) => ({ ...s, [def.slug]: v }))}
-              />
-            </div>
-          ))}
-
-          {error ? (
-            <p role="alert" className="text-ui text-destructive sm:col-span-2">
-              {error}
-            </p>
-          ) : null}
-
-          <DialogFooter className="sm:col-span-2">
-            <DialogClose asChild>
-              <Button type="button" variant="outline">
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button type="submit" disabled={pending}>
-              {pending ? 'Creating…' : 'Create deal'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-/** Resolves a picked company id to its name for auto-naming the deal. */
-function CompanyNameCapture({
-  companyId,
-  onName,
-}: {
-  companyId: string | null
-  onName: (name: string) => void
-}) {
-  useEffect(() => {
-    if (!companyId) return
-    let alive = true
-    void import('#/lib/server-fns').then(async ({ getCompany }) => {
-      try {
-        const c = await getCompany({ data: { id: companyId } })
-        if (alive) onName(c.name)
-      } catch {
-        /* name stays blank; user types one */
-      }
-    })
-    return () => {
-      alive = false
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId])
-  return null
 }

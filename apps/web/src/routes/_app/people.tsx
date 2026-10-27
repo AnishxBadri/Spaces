@@ -6,7 +6,6 @@ import {
 } from '@tanstack/react-table'
 import type { ColumnDef } from '@tanstack/react-table'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -17,21 +16,13 @@ import { z } from 'zod'
 import { ViewBar, viewBarPin } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
 import { useColumnRun } from '#/components/views/column-run'
-import { cn } from '#/lib/utils'
-import { useHotkey } from '#/lib/use-hotkey'
-import { jsonRecord } from '@spaces/core/json'
 import { RECORD_PAGE_SIZE } from '#/lib/views/page-size'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
-import {
-  fieldSpanClass,
-  ValueEditor,
-} from '#/components/attributes/value-editor'
+import { ValueEditor } from '#/components/attributes/value-editor'
 import { AiCell, AiCellsProvider } from '#/components/attributes/ai-cell'
-import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { EmptyRow } from '#/components/ledger-section'
 import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
 import { RecordMark } from '#/components/record/record-parts'
-import { TemplatePicker } from '#/components/templates'
 import {
   DateCell,
   InitialBadge,
@@ -61,21 +52,8 @@ import { inverseColumns } from '#/components/table/inverse-columns'
 import { INTERACTION_STAT_FILTERS } from '#/lib/views/stat-fields'
 import { inverseCountFilters } from '#/lib/views/inverse-fields'
 import { isDerived } from '@spaces/core/attributes/relationship'
-import { Button } from '#/components/ui/button'
+import { CreatePersonDialog } from '#/components/create-person-dialog'
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '#/components/ui/dialog'
-import { Input } from '#/components/ui/input'
-import { Label } from '#/components/ui/label'
-import { Select } from '#/components/ui/select'
-import {
-  createPerson,
   countViews,
   getSession,
   listCompanies,
@@ -515,191 +493,5 @@ function PeoplePage() {
       )}
       {actions.dialogs}
     </div>
-  )
-}
-
-function CreatePersonDialog({
-  companies,
-  registry,
-  hotkey,
-  trigger,
-}: {
-  companies: Array<{ id: string; name: string }>
-  registry: Array<RegistryEntry>
-  /** Bare key that opens it from the page — in the trigger's tooltip. */
-  hotkey?: string
-  /** The control that opens it; the head's New person button by default. */
-  trigger?: ReactNode
-}) {
-  const router = useRouter()
-  const queryClient = useQueryClient()
-  const [open, setOpen] = useState(false)
-  useHotkey(hotkey, () => setOpen(true))
-  const [error, setError] = useState<string | null>(null)
-  const [pending, setPending] = useState(false)
-  const [values, setValues] = useState<Record<string, unknown>>({})
-  // Submitted through `FormData`: the picker mirrors its value into a
-  // hidden `company` input.
-  const [company, setCompany] = useState('')
-
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError(null)
-    const form = new FormData(e.currentTarget)
-    const name = String(form.get('name')).trim()
-    const email = String(form.get('email')).trim()
-    const companyId = String(form.get('company') || '')
-    if (!name) {
-      setError('Name the person.')
-      return
-    }
-    setPending(true)
-    try {
-      // Initial values ride the create call: the server writes them before
-      // defaults fill the blanks, so a value typed here always wins.
-      const result = await createPerson({
-        data: {
-          name,
-          ...(email ? { email } : {}),
-          ...(companyId ? { companyId } : {}),
-          values: Object.fromEntries(
-            Object.entries(values).filter(
-              ([, v]) => v !== null && v !== undefined,
-            ),
-          ),
-        },
-      })
-      setOpen(false)
-      setValues({})
-      setCompany('')
-      if (result.action === 'attached') {
-        toast(`Matched existing person — ${result.name}`, {
-          description: `Same ${result.matchedOn}. No duplicate created.`,
-        })
-      } else {
-        toast(`${result.name} added`)
-      }
-      void router.invalidate()
-      // The rows come from a keyed query, not from the loader alone.
-      void queryClient.invalidateQueries({ queryKey: ['people-records'] })
-    } catch {
-      setError('Could not add the person.')
-    } finally {
-      setPending(false)
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button shortcut={hotkey?.toUpperCase()}>New person</Button>
-        )}
-      </DialogTrigger>
-      <DialogContent
-        size="m"
-        className="max-h-[85vh] overflow-y-auto"
-        aria-describedby={undefined}
-      >
-        <DialogHeader>
-          <DialogTitle>New person</DialogTitle>
-        </DialogHeader>
-        {/* Pre-fills the fields below, visibly and editably — never writes. */}
-        <div className="flex justify-end">
-          <TemplatePicker
-            kind="record"
-            objectKind="person"
-            context="person"
-            onPick={(t) => {
-              const tv = jsonRecord(jsonRecord(t.body).values)
-              setValues((s) => ({ ...tv, ...s }))
-            }}
-          />
-        </div>
-        <form
-          onSubmit={onSubmit}
-          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
-          noValidate
-        >
-          <div className="space-y-1.5">
-            <Label htmlFor="person-name">Name</Label>
-            <Input
-              id="person-name"
-              name="name"
-              required
-              autoFocus
-              placeholder="Awais Ahmed"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="person-email">Email</Label>
-            <Input
-              id="person-email"
-              name="email"
-              type="email"
-              placeholder="awais@pixxel.space"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="person-company">Company</Label>
-            <Select
-              id="person-company"
-              name="company"
-              value={company}
-              onChange={setCompany}
-              items={[
-                { value: '', label: 'None' },
-                ...companies.map((c) => ({ value: c.id, label: c.name })),
-              ]}
-              width="content"
-              placeholder="None"
-              searchPlaceholder="Search companies…"
-              emptyLabel="No company matches."
-              className="bg-transparent text-body"
-            />
-          </div>
-
-          {/* Companies has its picker above and Email its field, the key the
-              create matches on; `createPerson` writes both. */}
-          {registry
-            .filter(
-              (def) =>
-                def.slug !== 'companies' &&
-                def.options?.identityKey === undefined,
-            )
-            .map((def) => (
-              <div
-                key={def.slug}
-                className={cn('space-y-1.5', fieldSpanClass(def))}
-              >
-                <Label>{def.name}</Label>
-                <ValueEditor
-                  def={def}
-                  value={values[def.slug] ?? null}
-                  variant="field"
-                  onSave={(v) => setValues((s) => ({ ...s, [def.slug]: v }))}
-                />
-              </div>
-            ))}
-
-          {error ? (
-            <p role="alert" className="text-ui text-destructive sm:col-span-2">
-              {error}
-            </p>
-          ) : null}
-
-          <DialogFooter className="sm:col-span-2">
-            <DialogClose asChild>
-              <Button type="button" variant="outline">
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button type="submit" disabled={pending}>
-              {pending ? 'Adding\u2026' : 'Create person'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   )
 }

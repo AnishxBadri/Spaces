@@ -594,6 +594,7 @@ describe('Link a folder', () => {
     fns.listRecordBindings.mockResolvedValue({ bindings: [], canLink: true })
     fns.mintPickerToken.mockResolvedValue({
       _tag: 'fake',
+      account: 'tomas@fund.example',
       files: [
         { id: 'root', name: 'My Drive', path: null },
         { id: 'dataroom', name: 'Acme Data Room', path: 'My Drive' },
@@ -626,7 +627,7 @@ describe('Link a folder', () => {
 
     const dialog = document.querySelector('[role="dialog"]')
     expect(dialog?.textContent).toContain('Acme Data Room')
-    expect(dialog?.textContent).toContain('read-only · files under this folder')
+    expect(dialog?.textContent).toContain('Read-only · files under this folder')
     await click(byText('button', 'Link folder'))
     expect(fns.linkDriveFolder).toHaveBeenCalledWith({
       data: {

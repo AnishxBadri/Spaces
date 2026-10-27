@@ -440,6 +440,8 @@ describe('the move window', () => {
       ['sl', null, false],
       ['r', null, false],
     ])
-    expect(rows.at(0)?.name).toBe('Move to root')
+    expect(rows.at(0)?.name).toBe('Top level')
+    // Top-level spaces sit beside it, their children one step in.
+    expect(rows.map((r) => r.depth)).toEqual([0, 0, 1, 2, 1, 1])
   })
 })

@@ -107,6 +107,7 @@ export function RecordFiles({
   const [readiness, setReadiness] = usePickerReadiness()
   const filePicker = usePickerSession({
     mode: 'files',
+    recordName,
     onPicked: (files) => void links.attachPicked(files),
     onBlocked: setReadiness,
   })

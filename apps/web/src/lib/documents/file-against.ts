@@ -66,10 +66,15 @@ export function fileAgainstFor(target: UploadTarget): FileAgainst {
   }
 }
 
-/** What the dialog's foot says one drop will do. */
+/** Where the dropzone says one drop lands. */
 export function filingNote(target: UploadTarget | null): string {
-  if (target === null) return 'choose one first'
-  return target.kind === 'unfiled'
-    ? 'files unfiled — no record, no space'
-    : `files against ${target.name}`
+  if (target === null) return 'Choose one first'
+  switch (target.kind) {
+    case 'unfiled':
+      return 'Unfiled'
+    case 'record':
+      return `Files on ${target.name}`
+    case 'space':
+      return `Files in ${target.name}`
+  }
 }

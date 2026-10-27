@@ -1,9 +1,9 @@
 import { useRouter } from '@tanstack/react-router'
 import { Phone, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { DitherMark, InitialsMark } from '#/components/record/record-parts'
 import { Button } from '#/components/ui/button'
+import { Checkbox } from '#/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import { Label } from '#/components/ui/label'
 import { Segmented } from '#/components/ui/segmented'
 import { logInteraction, searchEntities } from '#/lib/server-fns'
 import { useHotkey } from '#/lib/use-hotkey'
+import { cn } from '#/lib/utils'
 
 /**
  * Manual interaction logging — the calendar primitive, hand-fed. Twenty
@@ -49,7 +50,7 @@ export function LogInteractionDialog({
    * `null` draws no trigger: the hotkey and Cmd-K are the only ways in.
    */
   trigger?: React.ReactNode
-  /** bare key that opens the dialog from the page — printed in the trigger */
+  /** Bare key that opens the dialog from the page. */
   hotkey?: string
 }) {
   const router = useRouter()
@@ -61,24 +62,17 @@ export function LogInteractionDialog({
   const [attendees, setAttendees] = useState<Array<Attendee>>(
     seed ? [seed] : [],
   )
+  // The one variant of the one commit: the same log, plus its note, with
+  // the editor as the landing.
+  const [writeUp, setWriteUp] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  /**
-   * Which of the two footer buttons is mid-write. One flag rather than two
-   * booleans: only one of them can be in flight, and the other has to read
-   * as disarmed rather than merely idle while it is.
-   */
-  const [pending, setPending] = useState<'log' | 'writeUp' | null>(null)
+  const [pending, setPending] = useState(false)
 
-  /**
-   * Both footer buttons, one write. `writeUp` is the whole difference: the
-   * server creates the body note and answers with its id, and the caller
-   * lands in the editor instead of staying where it was.
-   */
-  async function submit(writeUp: boolean) {
+  async function submit() {
     setError(null)
     if (!subject.trim()) return setError('What was it about?')
     if (attendees.length === 0) return setError('Who was involved?')
-    setPending(writeUp ? 'writeUp' : 'log')
+    setPending(true)
     try {
       const logged = await logInteraction({
         data: {
@@ -93,6 +87,7 @@ export function LogInteractionDialog({
       setSubject('')
       setOccurredAt(localNow())
       setAttendees(seed ? [seed] : [])
+      setWriteUp(false)
       toast(`${kind === 'meeting' ? 'Meeting' : 'Call'} logged`)
       void router.invalidate()
       if (logged.noteId) {
@@ -104,7 +99,7 @@ export function LogInteractionDialog({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not log it')
     } finally {
-      setPending(null)
+      setPending(false)
     }
   }
 
@@ -133,7 +128,7 @@ export function LogInteractionDialog({
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            void submit(false)
+            void submit()
           }}
           className="space-y-4"
           noValidate
@@ -154,7 +149,7 @@ export function LogInteractionDialog({
             onChange={setKind}
           />
 
-          <div className="grid grid-cols-[minmax(0,1fr)_12rem] gap-4">
+          <div className="grid grid-cols-[minmax(0,1fr)_11rem] gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="int-subject">About</Label>
               <Input
@@ -177,7 +172,7 @@ export function LogInteractionDialog({
             </div>
           </div>
 
-          <AttendeePicker attendees={attendees} onChange={setAttendees} />
+          <AttendeeField attendees={attendees} onChange={setAttendees} />
 
           {error ? (
             <p role="alert" className="text-ui text-destructive">
@@ -185,9 +180,11 @@ export function LogInteractionDialog({
             </p>
           ) : null}
 
-          <DialogFooter
-            note={`lands in ${attendees.length} ledger${attendees.length === 1 ? '' : 's'}`}
-          >
+          <DialogFooter>
+            <label className="mr-auto flex items-center gap-2 text-ui">
+              <Checkbox checked={writeUp} onCheckedChange={setWriteUp} />
+              Write it up next
+            </label>
             <Button
               type="button"
               variant="outline"
@@ -195,28 +192,13 @@ export function LogInteractionDialog({
             >
               Cancel
             </Button>
-            {/*
-              The second door out of the dialog: the same interaction, plus
-              the note it deserves, with the editor as the landing. Outline,
-              because the twenty-second log is still the primary act and
-              ⌘↵ still means that one.
-            */}
-            <Button
-              type="button"
-              variant="outline"
-              pending={pending === 'writeUp'}
-              disabled={pending !== null}
-              onClick={() => void submit(true)}
-            >
-              {pending === 'writeUp' ? 'Writing up…' : 'Log and write up'}
-            </Button>
             <Button
               type="submit"
               shortcut="⌘↵"
-              pending={pending === 'log'}
-              disabled={pending !== null}
+              pending={pending}
+              disabled={pending}
             >
-              {pending === 'log' ? 'Logging…' : `Log ${kind}`}
+              {kind === 'meeting' ? 'Log meeting' : 'Log call'}
             </Button>
           </DialogFooter>
         </form>
@@ -225,15 +207,23 @@ export function LogInteractionDialog({
   )
 }
 
-function AttendeePicker({
+/**
+ * Who was in the room: the chips and the search in one field. A chip is the
+ * name and its ×; the suggestions open under the field in a dithered sheet,
+ * each with its kind. ↑↓ walk them, ↵ adds one, ⌫ in an empty search takes
+ * the last chip back.
+ */
+function AttendeeField({
   attendees,
   onChange,
 }: {
   attendees: Array<Attendee>
   onChange: (a: Array<Attendee>) => void
 }) {
+  const input = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Array<Attendee>>([])
+  const [active, setActive] = useState(0)
 
   useEffect(() => {
     if (!query.trim()) return setResults([])
@@ -243,8 +233,9 @@ function AttendeePicker({
         const r = await searchEntities({
           data: { q: query, kinds: ['person', 'company', 'deal'] },
         })
-        if (alive)
-          setResults(r.filter((x) => !attendees.some((a) => a.id === x.id)))
+        if (!alive) return
+        setResults(r.filter((x) => !attendees.some((a) => a.id === x.id)))
+        setActive(0)
       })()
     }, 200)
     return () => {
@@ -253,67 +244,110 @@ function AttendeePicker({
     }
   }, [query, attendees])
 
+  function add(r: Attendee) {
+    onChange([...attendees, r])
+    setQuery('')
+    setResults([])
+    input.current?.focus()
+  }
+
   return (
     <div className="space-y-1.5">
       <Label htmlFor="int-attendees">Who was involved</Label>
-      <div className="flex flex-wrap gap-1.5">
-        {attendees.map((a) => (
-          <span
-            key={a.id}
-            className="flex h-6 items-center gap-1.5 border border-rule bg-paper px-2 text-label"
-          >
-            {a.kind === 'person' ? (
-              <InitialsMark name={a.name} size="xs" />
-            ) : (
-              <DitherMark size={12} />
-            )}
-            {a.name}
-            {attendees.length > 1 ? (
+      <div className="relative">
+        <div
+          data-attendee-field
+          onClick={() => input.current?.focus()}
+          className="focus-ring-within flex min-h-8 flex-wrap items-center gap-1 rounded-md border border-rule bg-paper p-1"
+        >
+          {attendees.map((a) => (
+            <span
+              key={a.id}
+              data-attendee={a.id}
+              className="flex h-6 items-center gap-1.5 border border-rule bg-paper pr-1.5 pl-2 text-label"
+            >
+              {a.name}
               <button
                 type="button"
                 aria-label={`Remove ${a.name}`}
-                onClick={() => onChange(attendees.filter((x) => x.id !== a.id))}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onChange(attendees.filter((x) => x.id !== a.id))
+                }}
                 className="focus-ring text-graphite hover:text-foreground"
               >
                 <X className="size-2.5" strokeWidth={2} />
               </button>
-            ) : null}
-          </span>
-        ))}
-      </div>
-      <Input
-        id="int-attendees"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Add people, companies, deals…"
-        className="h-8 text-ui"
-      />
-      {results.length > 0 ? (
-        <ul className="max-h-40 overflow-y-auto border border-hairline bg-paper shadow-dither">
-          {results.map((r) => (
-            <li key={r.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  onChange([...attendees, r])
-                  setQuery('')
-                }}
-                className="focus-ring-inset flex h-8 w-full items-center gap-2.5 px-2.5 text-left text-ui hover:bg-bone"
-              >
-                {r.kind === 'person' ? (
-                  <InitialsMark name={r.name} size="xs" outline />
-                ) : (
-                  <DitherMark size={14} />
-                )}
-                {r.name}
-                <span className="ml-auto mono text-micro text-graphite">
-                  {r.kind}
-                </span>
-              </button>
-            </li>
+            </span>
           ))}
-        </ul>
-      ) : null}
+          <input
+            ref={input}
+            id="int-attendees"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Backspace' && query === '') {
+                onChange(attendees.slice(0, -1))
+                return
+              }
+              if (results.length === 0) return
+              if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                setActive((i) => (i + 1) % results.length)
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                setActive((i) => (i - 1 + results.length) % results.length)
+              } else if (e.key === 'Enter' && !(e.metaKey || e.ctrlKey)) {
+                // ↵ adds the highlighted suggestion, never submits the log.
+                e.preventDefault()
+                const r = results.at(active)
+                if (r) add(r)
+              } else if (e.key === 'Escape') {
+                // The sheet closes first; a second Esc closes the window.
+                e.preventDefault()
+                e.stopPropagation()
+                setResults([])
+              }
+            }}
+            role="combobox"
+            aria-expanded={results.length > 0}
+            aria-controls="int-attendee-results"
+            autoComplete="off"
+            placeholder={
+              attendees.length === 0 ? 'Add people, companies, deals…' : ''
+            }
+            className="h-6 min-w-32 flex-1 bg-transparent px-1.5 text-ui outline-none placeholder:text-graphite"
+          />
+        </div>
+        {results.length > 0 ? (
+          <ul
+            id="int-attendee-results"
+            role="listbox"
+            aria-label="Suggestions"
+            className="absolute inset-x-0 top-full z-dropdown mt-1 max-h-40 overflow-y-auto border border-hairline bg-paper shadow-dither"
+          >
+            {results.map((r, i) => (
+              <li key={r.id} role="option" aria-selected={i === active}>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onMouseEnter={() => setActive(i)}
+                  onClick={() => add(r)}
+                  className={cn(
+                    'flex h-7 w-full items-center gap-2.5 px-2.5 text-left text-ui',
+                    i === active && 'bg-bone',
+                  )}
+                >
+                  <span className="min-w-0 flex-1 truncate">{r.name}</span>
+                  <span className="shrink-0 label-caps text-graphite">
+                    {r.kind}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
     </div>
   )
 }

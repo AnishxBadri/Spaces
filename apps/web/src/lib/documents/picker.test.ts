@@ -195,6 +195,8 @@ describe('mintPickerTokenProgram', () => {
     await aConnection(['openid', 'email', 'drive.file'])
     const outcome = await mint({ returnTo: RETURN, fake: true })
     if (outcome._tag !== 'fake') throw new Error(outcome._tag)
+    // The account the list is titled with: the user's own connection.
+    expect(outcome.account).toMatch(/@fund\.example$/)
     expect(outcome.files).toContainEqual({
       id: 'deck',
       name: 'Acme deck.pdf',

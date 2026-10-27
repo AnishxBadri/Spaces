@@ -83,6 +83,7 @@ function Harness() {
   const [readiness, setReadiness] = usePickerReadiness()
   const picker = usePickerSession({
     mode: 'files',
+    recordName: 'Acme',
     onPicked: (files) => void links.attachPicked(files),
     onBlocked: setReadiness,
   })
@@ -114,7 +115,11 @@ let host: HTMLElement | null = null
 beforeEach(() => {
   vi.clearAllMocks()
   fns.pickerReadiness.mockResolvedValue({ _tag: 'ready' })
-  fns.mintPickerToken.mockResolvedValue({ _tag: 'fake', files: FILES })
+  fns.mintPickerToken.mockResolvedValue({
+    _tag: 'fake',
+    account: 'tomas@fund.example',
+    files: FILES,
+  })
   fns.linkFetchStatus.mockResolvedValue({})
   fns.attachFromPicker.mockImplementation(
     ({ data }: { data: { files: Array<{ id: string; name: string }> } }) =>
@@ -162,7 +167,14 @@ const openFakePicker = async () => {
   await mount()
   await click(button('Attach from Drive'))
   expect(fns.mintPickerToken).toHaveBeenCalledTimes(1)
-  expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+  const sheet = document.querySelector('[role="dialog"]')
+  expect(sheet).not.toBeNull()
+  // Titled with the account it lists; the foot says where the copies go.
+  expect(sheet?.textContent).toContain('Attach from Drive')
+  expect(sheet?.textContent).toContain('tomas@fund.example')
+  expect(sheet?.textContent).toContain(
+    'Copied onto Acme · shared with the workspace',
+  )
 }
 
 const fetching = () => document.body.textContent.split('fetching.').length - 1

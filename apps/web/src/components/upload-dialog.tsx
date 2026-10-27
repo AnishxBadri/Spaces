@@ -1,12 +1,11 @@
 import { useRouter } from '@tanstack/react-router'
-import { File as FileIcon, Check, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -93,9 +92,9 @@ type Upload = {
 }
 
 const PHASE_LABELS: Record<UploadPhase, string> = {
-  hashing: 'Reading…',
-  uploading: 'Uploading…',
-  filing: 'Filing…',
+  hashing: 'Reading text',
+  uploading: 'Uploading',
+  filing: 'Filing',
 }
 
 const MODES: Array<{ id: FilingMode; label: string }> = [
@@ -205,14 +204,11 @@ export function UploadDialog() {
       <DialogContent size="m">
         <DialogHeader>
           <DialogTitle>Upload a file</DialogTitle>
-          <DialogDescription>
-            stays on this server · up to {formatBytes(MAX_UPLOAD_BYTES)}
-          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <p className="field-label text-graphite">File against</p>
+            <p className="text-label text-graphite">File against</p>
             <Segmented
               label="File against"
               value={mode}
@@ -228,12 +224,6 @@ export function UploadDialog() {
             {mode === 'space' ? (
               <SpacePicker picked={picked} onPick={setPicked} />
             ) : null}
-            {mode === 'unfiled' ? (
-              <p className="text-label text-graphite">
-                It lands unfiled, with no record and no space. File it later
-                from the row — the file and its text stay either way.
-              </p>
-            ) : null}
           </div>
 
           {uploads.length > 0 ? (
@@ -241,32 +231,32 @@ export function UploadDialog() {
               {uploads.map((u) => (
                 <li
                   key={u.key}
+                  data-upload={u.name}
                   className="flex min-h-9 flex-col justify-center gap-1 border-b border-rule py-1 text-ui"
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className="flex size-[1.375rem] shrink-0 items-center justify-center border border-hairline bg-paper">
-                      {u.error ? (
-                        <FileIcon
-                          className="size-3 text-destructive"
-                          strokeWidth={1.75}
-                        />
-                      ) : u.done ? (
-                        <Check
-                          className="size-3 text-primary"
-                          strokeWidth={2}
-                        />
-                      ) : (
-                        <Twinkle />
-                      )}
+                    <span className="flex size-3.5 shrink-0 items-center justify-center">
+                      {u.error || u.done ? null : <Twinkle />}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{u.name}</span>
                     <span
                       className={cn(
-                        'mono text-micro',
-                        u.error ? 'text-destructive' : 'text-graphite',
+                        'shrink-0 text-label',
+                        u.error
+                          ? 'text-destructive'
+                          : u.done
+                            ? 'text-foreground'
+                            : 'text-graphite',
                       )}
                     >
-                      {u.error ?? (u.done ? 'filed' : PHASE_LABELS[u.phase])}
+                      {u.error ??
+                        (u.done ? (
+                          <>
+                            <span className="text-primary">✓</span> Filed
+                          </>
+                        ) : (
+                          PHASE_LABELS[u.phase]
+                        ))}
                     </span>
                   </div>
                   <UploadVersion
@@ -299,7 +289,7 @@ export function UploadDialog() {
               'focus-ring flex h-18 w-full flex-col items-center justify-center gap-1 border border-dashed transition-colors disabled:opacity-50',
               dragging
                 ? 'border-primary bg-selected text-primary'
-                : 'border-hairline bg-paper text-foreground hover:bg-bone',
+                : 'border-rule bg-paper text-foreground hover:bg-bone',
             )}
           >
             <span className="text-ui">
@@ -330,11 +320,7 @@ export function UploadDialog() {
         </div>
 
         <DialogFooter
-          note={
-            working.length > 0
-              ? `${String(working.length)} uploading · continues in the background`
-              : 'one target for every file in the drop'
-          }
+          note={`Stays on this server · up to ${formatBytes(MAX_UPLOAD_BYTES)}`}
         >
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
@@ -361,8 +347,8 @@ function UploadVersion({
   if (upload.linked) {
     const older = candidates.find((c) => c.id === upload.olderId)
     return older === undefined ? null : (
-      <p className="min-w-0 truncate pl-8 text-label text-graphite">
-        Newer version of {older.filename}
+      <p className="min-w-0 truncate pl-6 text-label text-graphite">
+        Replaces {older.filename}
       </p>
     )
   }
@@ -372,7 +358,7 @@ function UploadVersion({
     olderId: upload.olderId,
   }
   return (
-    <div className="pl-8">
+    <div className="pl-6">
       <NewerVersionSelect
         candidates={candidates}
         value={upload.olderId}
@@ -459,7 +445,7 @@ function LinkField({ target }: { target: UploadTarget | null }) {
 
   return (
     <div className="space-y-1.5">
-      <p className="field-label text-graphite">Or paste a link</p>
+      <p className="text-label text-graphite">Or paste a link</p>
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <Input
@@ -484,10 +470,6 @@ function LinkField({ target }: { target: UploadTarget | null }) {
           {saving ? 'Saving…' : 'Save'}
         </Button>
       </div>
-      <p className="text-label text-graphite">
-        The page is fetched in the background and its text is searchable like
-        any other document. Nothing on a private network is fetched.
-      </p>
     </div>
   )
 }
@@ -573,7 +555,7 @@ function RecordPicker({
                 className="focus-ring-inset flex h-8 w-full items-center gap-2.5 px-2.5 text-left text-ui hover:bg-bone"
               >
                 <span className="min-w-0 flex-1 truncate">{r.name}</span>
-                <span className="mono text-micro text-graphite">{r.kind}</span>
+                <span className="label-caps text-graphite">{r.kind}</span>
               </button>
             </li>
           ))}

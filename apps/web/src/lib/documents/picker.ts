@@ -92,7 +92,12 @@ export type MintPickerOutcome =
       readonly scriptUrl: string
       readonly views: ReadonlyArray<PickerView>
     }
-  | { readonly _tag: 'fake'; readonly files: ReadonlyArray<FakePickerFile> }
+  | {
+      readonly _tag: 'fake'
+      /** The connected account the files are listed from. */
+      readonly account: string
+      readonly files: ReadonlyArray<FakePickerFile>
+    }
 
 /** The connection holds a scope that does not read a picked file: no token leaves. */
 export class PickerScopeTooBroad extends Schema.TaggedError<PickerScopeTooBroad>()(
@@ -154,6 +159,8 @@ const preflight = Effect.fn('picker.preflight')(function* (
   | {
       readonly _tag: 'clear'
       readonly connectionId: string
+      /** The connected account, which the in-app pick list is titled with. */
+      readonly account: string
       readonly settings: Settings | null
     }
   | PickerBlocked,
@@ -173,7 +180,7 @@ const preflight = Effect.fn('picker.preflight')(function* (
     options.returnTo,
   ).pipe(Effect.mapError((e) => new PickerMintFailed({ cause: e.cause })))
   if (connection._tag !== 'active') return connection
-  const { id, scopes } = connection.connection
+  const { id, scopes, externalEmail } = connection.connection
 
   const check = yield* hasScopes(id, spec.scopes).pipe(
     Effect.mapError((cause) => new PickerMintFailed({ cause })),
@@ -196,7 +203,12 @@ const preflight = Effect.fn('picker.preflight')(function* (
       scopes: broader,
       message: `The picker opens only on a ${spec.target.label} connection whose scopes read the files you pick; this one also holds ${broader.join(', ')}. Paste a link instead.`,
     })
-  return { _tag: 'clear', connectionId: id, settings }
+  return {
+    _tag: 'clear',
+    connectionId: id,
+    account: externalEmail,
+    settings,
+  }
 })
 
 /** Whether the picker can open for this user, without minting anything. */
@@ -234,6 +246,7 @@ export const mintPickerTokenProgram = Effect.fn('mintPickerTokenProgram')(
       )
       return {
         _tag: 'fake',
+        account: found.account,
         files:
           mode === 'folders'
             ? fakePickerFolders(FAKE_DRIVE_SEED)

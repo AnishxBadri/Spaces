@@ -22,9 +22,9 @@ function refusal(
 }
 
 /**
- * The move window's rows, in tree order under a "Move to root" row: the
- * moving space and its descendants refused with the reason, its parent
- * marked current.
+ * The move window's rows: `Top level`, then the tree in order, the moving
+ * space and its descendants refused with the reason, its parent marked
+ * current.
  */
 export function moveTargets(
   tree: ReadonlyArray<TreeRow>,
@@ -32,7 +32,7 @@ export function moveTargets(
 ): Array<MoveTarget> {
   const root: MoveTarget = {
     id: null,
-    name: 'Move to root',
+    name: 'Top level',
     depth: 0,
     refused: null,
     current: moving.parentId === null,
@@ -42,8 +42,8 @@ export function moveTargets(
     ...tree.map((s): MoveTarget => ({
       id: s.id,
       name: s.name,
-      // The root row sits at depth 0, so the tree hangs one step under it.
-      depth: s.depth + 1,
+      // Top-level spaces sit beside `Top level`, not under it.
+      depth: s.depth,
       refused: refusal(s, moving),
       current: s.id === moving.parentId,
     })),

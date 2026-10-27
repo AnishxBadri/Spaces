@@ -23,9 +23,9 @@ type Moving = {
 }
 
 /**
- * Move to… — a window over the scrim listing the tree, the space and its
- * descendants greyed with the reason and its parent marked "now here". One
- * pick, then Move.
+ * Move to… — a window over the scrim listing the tree under `Top level`, the
+ * space and its descendants greyed with the reason and its parent marked
+ * `Now here`. One pick, on bone, then Move.
  */
 export function SpaceMoveDialog({
   open,
@@ -73,7 +73,7 @@ export function SpaceMoveDialog({
       void router.invalidate()
       toast(
         target.id === null
-          ? `${moving.name} moved to the root`
+          ? `${moving.name} moved to the top level`
           : `${moving.name} moved under ${target.name}`,
       )
     } catch (err) {
@@ -85,15 +85,7 @@ export function SpaceMoveDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        size="s"
-        onKeyDown={(e) => {
-          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-            e.preventDefault()
-            void move()
-          }
-        }}
-      >
+      <DialogContent size="s">
         <DialogHeader>
           <DialogTitle>Move {moving.name}</DialogTitle>
         </DialogHeader>
@@ -111,21 +103,11 @@ export function SpaceMoveDialog({
             />
           ))}
         </ul>
-        <DialogFooter
-          note={
-            target
-              ? `under ${target.id === null ? 'the root' : target.name}`
-              : null
-          }
-        >
+        <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button
-            shortcut="⌘↵"
-            disabled={!target || busy}
-            onClick={() => void move()}
-          >
+          <Button disabled={!target || busy} onClick={() => void move()}>
             Move
           </Button>
         </DialogFooter>
@@ -164,9 +146,7 @@ function MoveRow({
         {row.refused ? (
           <span className="shrink-0 mono text-micro">{row.refused}</span>
         ) : row.current ? (
-          <span className="shrink-0 mono text-micro text-graphite">
-            now here
-          </span>
+          <span className="shrink-0 text-label text-graphite">Now here</span>
         ) : null}
       </button>
     </li>

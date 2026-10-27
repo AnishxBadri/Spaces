@@ -10,13 +10,15 @@ import {
   DialogTitle,
 } from '../ui/dialog'
 import { Segmented } from '../ui/segmented'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 import { FolderGlyph } from './file-glyph'
 import { formatBytes } from '@spaces/core/documents'
 
 /**
- * Link a Drive folder: a window titled with the Drive path in mono —
- * where the files land, what is inside, and the three options whose hints
- * survive the invariant-line test (cost, privacy, consequence).
+ * Link a folder: a window titled with the Drive path in mono — where the
+ * files land, what is inside, and the three options. Map subfolders explains
+ * itself in a tooltip; Keep and Sensitive keep their lines, which carry
+ * storage and privacy.
  * - Presentational: the caller binds and says how it went; a refusal (the
  *   folder already has an owner) stays in the window, above the foot.
  * - The dialog sets no direction: a binding made here reads, Drive → us.
@@ -100,20 +102,23 @@ export function LinkFolderDialog({
             </div>
           )}
         </dl>
-        <div className="flex gap-2.5 border-b border-rule py-3">
+        <div className="flex items-center gap-2.5 border-b border-rule py-3">
           <Checkbox
             id="link-folder-map"
             checked={mapSubfolders}
             onCheckedChange={setMapSubfolders}
-            className="mt-0.5"
           />
-          <label htmlFor="link-folder-map" className="flex flex-col gap-0.5">
-            <span className="text-ui">Map subfolders</span>
-            <span className="text-label text-graphite">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <label htmlFor="link-folder-map" className="text-ui">
+                Map subfolders
+              </label>
+            </TooltipTrigger>
+            <TooltipContent>
               Folder names set the kind. A folder named like a deal files on
               that deal.
-            </span>
-          </label>
+            </TooltipContent>
+          </Tooltip>
         </div>
         <div className="flex flex-col gap-1.5 border-b border-rule py-3">
           <span className="text-ui">Keep</span>
@@ -121,7 +126,6 @@ export function LinkFolderDialog({
             value={keep}
             onChange={setKeep}
             label="Keep"
-            className="w-full [&>button]:flex-1"
             options={[
               { id: 'full', label: 'Full copies' },
               { id: 'text', label: 'Text only' },
@@ -129,8 +133,8 @@ export function LinkFolderDialog({
           />
           <span className="mono text-micro text-graphite">
             {keep === 'full'
-              ? `${size === null ? '' : `${size} `}on this server · previews work offline`
-              : 'text on this server · previews need Drive'}
+              ? `${size === null ? 'On' : `${size} on`} this server · previews work offline`
+              : 'Text on this server · previews need Drive'}
           </span>
         </div>
         <div className="flex gap-2.5 pt-3">
@@ -155,7 +159,7 @@ export function LinkFolderDialog({
             {refusal}
           </p>
         )}
-        <DialogFooter note="read-only · files under this folder">
+        <DialogFooter note="Read-only · files under this folder">
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>

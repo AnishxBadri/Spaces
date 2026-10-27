@@ -12,7 +12,6 @@ import {
 import type { ColumnDef } from '@tanstack/react-table'
 import { Layers } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -24,12 +23,8 @@ import { ViewBar, viewBarPin } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
 import { useColumnRun } from '#/components/views/column-run'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
-import {
-  fieldSpanClass,
-  ValueEditor,
-} from '#/components/attributes/value-editor'
+import { ValueEditor } from '#/components/attributes/value-editor'
 import { AiCell, AiCellsProvider } from '#/components/attributes/ai-cell'
-import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { EmptyRow } from '#/components/ledger-section'
 import {
   ChipLink,
@@ -55,18 +50,7 @@ import {
 } from '#/components/table/list-states'
 import { useEditAttribute } from '#/components/table/edit-attribute'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
-import { Button } from '#/components/ui/button'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '#/components/ui/dialog'
-import { Input } from '#/components/ui/input'
-import { Label } from '#/components/ui/label'
+import { CreateRecordDialog } from '#/components/create-record-dialog'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { objectIcon } from '#/lib/object-icons'
 import { inverseColumns } from '#/components/table/inverse-columns'
@@ -75,7 +59,6 @@ import { isDerived } from '@spaces/core/attributes/relationship'
 import { RECORD_PAGE_SIZE } from '#/lib/views/page-size'
 import {
   countViews,
-  createObjectRecord,
   getObject,
   getSession,
   listObjectRecords,
@@ -83,8 +66,6 @@ import {
   listViews,
   updateRecord,
 } from '#/lib/server-fns'
-import { cn } from '#/lib/utils'
-import { useHotkey } from '#/lib/use-hotkey'
 
 /**
  * The registry-generated list page for a custom object: if this
@@ -567,137 +548,5 @@ function ObjectListPage() {
       )}
       {actions.dialogs}
     </div>
-  )
-}
-
-/** Name first (core-owned, required at birth), then the registry's fields. */
-function CreateRecordDialog({
-  object,
-  registry,
-  refNames,
-  hotkey,
-  trigger,
-}: {
-  object: { id: string; singular: string; plural: string }
-  registry: Array<RegistryEntry>
-  refNames: Record<string, { name: string }>
-  /** Bare key that opens it from the page — in the trigger's tooltip. */
-  hotkey?: string
-  /** The control that opens it; the head's New button by default. */
-  trigger?: ReactNode
-}) {
-  const router = useRouter()
-  const queryClient = useQueryClient()
-  const [open, setOpen] = useState(false)
-  useHotkey(hotkey, () => setOpen(true))
-  const [error, setError] = useState<string | null>(null)
-  const [pending, setPending] = useState(false)
-  const [name, setName] = useState('')
-  const [values, setValues] = useState<Record<string, unknown>>({})
-
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError(null)
-    if (!name.trim())
-      return setError(`Name the ${object.singular.toLowerCase()}.`)
-    setPending(true)
-    try {
-      const result = await createObjectRecord({
-        data: {
-          objectId: object.id,
-          name: name.trim(),
-          values: Object.fromEntries(
-            Object.entries(values).filter(
-              ([, v]) => v !== null && v !== undefined,
-            ),
-          ),
-        },
-      })
-      setOpen(false)
-      setName('')
-      setValues({})
-      // A record born onto a domain another record already claims is the
-      // same collision an edit makes; the birth toast gives way to the one
-      // that says something.
-      const collision = collisionToast(result, object.singular)
-      if (collision)
-        toast(collision.title, { description: collision.description })
-      else toast(`${name.trim()} added`)
-      void router.invalidate()
-      // The rows come from a keyed query, not from the loader alone.
-      void queryClient.invalidateQueries({ queryKey: ['object-records'] })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not add it.')
-    } finally {
-      setPending(false)
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button shortcut={hotkey?.toUpperCase()}>
-            New {object.singular.toLowerCase()}
-          </Button>
-        )}
-      </DialogTrigger>
-      <DialogContent
-        size="m"
-        className="max-h-[85vh] overflow-y-auto"
-        aria-describedby={undefined}
-      >
-        <DialogHeader>
-          <DialogTitle>New {object.singular.toLowerCase()}</DialogTitle>
-        </DialogHeader>
-        <form
-          onSubmit={onSubmit}
-          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
-          noValidate
-        >
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="record-name">Name</Label>
-            <Input
-              id="record-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoFocus
-              spellCheck={false}
-              autoComplete="off"
-            />
-          </div>
-          {registry.map((def) => (
-            <div
-              key={def.slug}
-              className={cn('space-y-1.5', fieldSpanClass(def))}
-            >
-              <Label>{def.name}</Label>
-              <ValueEditor
-                def={def}
-                value={values[def.slug] ?? null}
-                variant="field"
-                refNames={refNames}
-                onSave={(v) => setValues((s) => ({ ...s, [def.slug]: v }))}
-              />
-            </div>
-          ))}
-          {error ? (
-            <p role="alert" className="text-ui text-destructive sm:col-span-2">
-              {error}
-            </p>
-          ) : null}
-          <DialogFooter className="sm:col-span-2">
-            <DialogClose asChild>
-              <Button type="button" variant="outline">
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button type="submit" disabled={pending}>
-              {pending ? 'Adding…' : `Create ${object.singular.toLowerCase()}`}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   )
 }

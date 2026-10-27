@@ -183,7 +183,11 @@ export type Readiness = Awaited<ReturnType<typeof pickerReadiness>>
 
 type Session =
   | { readonly kind: 'google'; readonly session: GoogleSession }
-  | { readonly kind: 'fake'; readonly files: ReadonlyArray<FakePickerFile> }
+  | {
+      readonly kind: 'fake'
+      readonly account: string
+      readonly files: ReadonlyArray<FakePickerFile>
+    }
 
 const LABEL = 'Attach from Drive'
 
@@ -220,10 +224,13 @@ export function usePickerReadiness(): [
  */
 export function usePickerSession({
   mode,
+  recordName,
   onPicked,
   onBlocked = () => undefined,
 }: {
   mode: PickerMode
+  /** The record the files are copied onto, named in the pick list's foot. */
+  recordName?: string
   onPicked: (files: ReadonlyArray<PickedFile>) => void
   onBlocked?: (readiness: Readiness) => void
 }): { open: () => Promise<void>; opening: boolean; sheet: ReactNode } {
@@ -279,7 +286,11 @@ export function usePickerSession({
           setSession({ kind: 'google', session: outcome })
           return
         case 'fake':
-          setSession({ kind: 'fake', files: outcome.files })
+          setSession({
+            kind: 'fake',
+            account: outcome.account,
+            files: outcome.files,
+          })
           return
         case 'connect':
         case 'consent':
@@ -306,7 +317,13 @@ export function usePickerSession({
 
   const sheet =
     session?.kind === 'fake' ? (
-      <FakePickList files={session.files} mode={mode} onResult={settle} />
+      <FakePickList
+        files={session.files}
+        account={session.account}
+        mode={mode}
+        {...(recordName === undefined ? {} : { recordName })}
+        onResult={settle}
+      />
     ) : null
   return { open, opening, sheet }
 }
@@ -340,13 +357,21 @@ export function attachFromDriveItem(
   }
 }
 
-/** The fake picker: the fake Drive's files as a pick list, in our own sheet. */
+/**
+ * The fake picker: the fake Drive's files as a pick list, in our own sheet,
+ * titled with the account it lists. Attaching copies the picked files onto
+ * the record, where the whole workspace reads them; the foot says so.
+ */
 export function FakePickList({
   files,
+  account,
+  recordName = 'this record',
   mode = 'files',
   onResult,
 }: {
   files: ReadonlyArray<FakePickerFile>
+  account: string
+  recordName?: string
   /** `folders`: one folder is picked, to link. */
   mode?: PickerMode
   onResult: (result: PickResult) => void
@@ -373,7 +398,7 @@ export function FakePickList({
       <DialogContent size="m">
         <DialogHeader>
           <DialogTitle>{folders ? 'Link a folder' : LABEL}</DialogTitle>
-          <DialogDescription>fake Drive</DialogDescription>
+          <DialogDescription>{account}</DialogDescription>
         </DialogHeader>
         <ul className="-mx-5 -my-5 max-h-80 overflow-y-auto">
           {files.map((f) => (
@@ -399,9 +424,7 @@ export function FakePickList({
           note={
             folders
               ? null
-              : chosen.length === 0
-                ? 'nothing picked'
-                : `${chosen.length} picked · copied onto this record`
+              : `Copied onto ${recordName} · shared with the workspace`
           }
         >
           <Button

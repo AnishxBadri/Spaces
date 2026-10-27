@@ -173,7 +173,11 @@ describe('the upload dialog’s three filing states', () => {
     // picked" filed as unfiled. The drop zone reads this null and disarms.
     expect(uploadTarget('record', null)).toBeNull()
     expect(uploadTarget('space', null)).toBeNull()
-    expect(filingNote(null)).toBe('choose one first')
+    expect(filingNote(null)).toBe('Choose one first')
+    expect(filingNote({ kind: 'record', entityId: 'acme', name: 'Acme' })).toBe(
+      'Files on Acme',
+    )
+    expect(filingNote({ kind: 'unfiled' })).toBe('Unfiled')
 
     // Unfiled needs no pick — it is an answer, not a missing one.
     expect(uploadTarget('unfiled', null)).toEqual({ kind: 'unfiled' })
