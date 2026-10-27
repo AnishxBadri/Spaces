@@ -1222,7 +1222,7 @@ The Clean UI leftovers (`SPA-355`, `SPA-356`) have their bodies in Linear only; 
 
 **Blocked by:** `port-St1`, and the owner's answer on bundling.
 
-**Decision needed first.** Gmail, Google Calendar, Google Drive and Box become **bundled capabilities**: signed plugin code shipped in the image, always installed, never uninstallable, enabled per use from the provider page. The alternative is folding them into core. The recommendation is bundled plugins, because they keep the SDK seam and `source_ref` provenance. Record it as an amendment to D51 (or as D82), with D81 updated.
+**Decided by the owner 2026-10-28: bundled plugins.** Gmail, Google Calendar, Google Drive and Box become **bundled capabilities**: signed plugin code shipped in the image, always installed, never uninstallable, enabled per use from the provider page. The alternative is folding them into core. The recommendation is bundled plugins, because they keep the SDK seam and `source_ref` provenance. Record it as an amendment to D51 (or as D82), with D81 updated.
 
 **What to build** (no migration; choices go in `workspace.settings` jsonb, `providers.google = { audience, consent }`):
 
@@ -1281,7 +1281,7 @@ The Clean UI leftovers (`SPA-355`, `SPA-356`) have their bodies in Linear only; 
 
 **Blocked by:** `port-R1`, and the owner's yes. **Migration: one at a time across sessions.**
 
-**Decision needed first.** A4 puts `Archive` in every record's `···`, and the Lists row `···` carries it too, but only spaces can be archived today. Should every record get archive and restore (recommended), or does Archive stay space-only and leave the menus?
+**Decided by the owner 2026-10-28: yes, every record gets archive and restore.** A4 puts `Archive` in every record's `···`, and the Lists row `···` carries it too, but only spaces can be archived today. Should every record get archive and restore (recommended), or does Archive stay space-only and leave the menus?
 
 **What to build** (if yes):
 
