@@ -7,13 +7,17 @@ import {
   getCoreRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { useListEnrich } from './bulk-enrich-dialog'
+import { useListActions } from './list-actions'
+import { ListMenu } from './list-menu'
 import { RecordTable } from './record-table'
 
 /**
- * Enrich… on a record list: the row checkboxes raise the selection bar, its
- * Enrich… opens the estimate window, Cancel queues nothing and Enrich n
- * sends the checked ids once; the head's `···` estimates the whole view.
+ * A record list's actions: the row checkboxes raise the selection bar
+ * (`n selected · [Add to space] [Enrich…] · Clear`); Enrich… opens the
+ * estimate window, Cancel queues nothing and Enrich n sends the checked ids
+ * once; Add to space files them in one call and the toast's Undo untags the
+ * ones it filed; each row's `···` holds Open in a new tab · Add to space… ·
+ * Enrich… · Copy link; a kind enrichment does not read has no Enrich….
  * - happy-dom's DOM globals are installed by hand before React loads, as in
  *   the other window tests: the environment would also replace `URL`.
  */
@@ -57,14 +61,24 @@ await vi.hoisted(async () => {
 const fns = vi.hoisted(() => ({
   estimateBulkEnrich: vi.fn(),
   bulkEnrich: vi.fn(),
+  listSpaces: vi.fn(),
+  tagManyIntoSpace: vi.fn(),
+  untagFromSpace: vi.fn(),
 }))
 vi.mock('#/lib/server-fns', () => fns)
+
+const toasts = vi.hoisted(() => ({
+  toast: Object.assign(vi.fn(), { error: vi.fn(), message: vi.fn() }),
+}))
+vi.mock('sonner', () => toasts)
 
 type Row = { id: string; name: string }
 const ROWS: Array<Row> = Array.from({ length: 3 }, (_, i) => ({
   id: `00000000-0000-4000-8000-00000000000${String(i + 1)}`,
   name: `Co ${String(i + 1)}`,
 }))
+const PROPTECH = '00000000-0000-4000-8000-0000000000a1'
+const OPS = '00000000-0000-4000-8000-0000000000a2'
 
 const none = { sensitive: 0, reuse: 0, key: 0, queued: 0 }
 const estimate = (over: Record<string, unknown> = {}) => ({
@@ -103,12 +117,15 @@ const col = createColumnHelper<Row>()
 const columns = [col.accessor('name', { id: 'name', header: 'Company' })]
 const refresh = vi.fn()
 
-function Harness() {
-  const enrich = useListEnrich({
-    kind: 'company',
+function Harness({ enrich }: { enrich: boolean }) {
+  const actions = useListActions({
     label: 'Companies',
+    noun: { one: 'company', many: 'companies' },
     rows: ROWS,
-    view: { conditions: [], q: 'co' },
+    hrefOf: (r) => `/companies/${r.id}`,
+    enrich: enrich
+      ? { kind: 'company', view: { conditions: [], q: 'co' } }
+      : null,
     refresh,
   })
   const table = useReactTable({
@@ -118,15 +135,18 @@ function Harness() {
   })
   return (
     <div>
-      {enrich.menu}
-      {enrich.selectionBar}
+      {actions.enrichVerb ? (
+        <ListMenu label="Companies" verbs={[actions.enrichVerb]} />
+      ) : null}
+      {actions.selectionBar}
       <RecordTable
         table={table}
         label="Companies"
         stickyColumnId="name"
-        select={enrich.select}
+        select={actions.select}
+        rowEnd={actions.rowMenu}
       />
-      {enrich.dialog}
+      {actions.dialogs}
     </div>
   )
 }
@@ -143,23 +163,29 @@ beforeEach(() => {
     already: 0,
     resumesAt: null,
   })
+  fns.listSpaces.mockResolvedValue([
+    { id: PROPTECH, name: 'Proptech', parentId: null, companies: 4 },
+    { id: OPS, name: 'Property ops', parentId: PROPTECH, companies: 2 },
+  ])
+  fns.untagFromSpace.mockResolvedValue({ ok: true })
 })
 
 afterEach(() => {
   act(() => root?.unmount())
   host?.remove()
+  document.body.replaceChildren()
   root = null
   host = null
 })
 
 const flush = () => act(() => new Promise((r) => setTimeout(r, 0)))
 
-const mount = async () => {
+const mount = async (enrich = true) => {
   host = document.createElement('div')
   document.body.appendChild(host)
   const r = createRoot(host)
   root = r
-  act(() => r.render(<Harness />))
+  act(() => r.render(<Harness enrich={enrich} />))
   await flush()
 }
 
@@ -188,43 +214,97 @@ const click = async (el: Element) => {
 
 const bar = () => document.querySelector('[data-selection-bar]')
 const dialog = () => document.querySelector('[role="dialog"]')
+const barButtons = () =>
+  [...(bar()?.querySelectorAll('button') ?? [])].map((b) => text(b))
+
+async function rowMenu(name: string): Promise<Array<string>> {
+  const trigger = labelled(`More for ${name}`)
+  if (!(trigger instanceof HTMLElement)) throw new Error('no trigger')
+  await act(async () => {
+    trigger.focus()
+    trigger.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+    )
+  })
+  await flush()
+  return [...document.querySelectorAll('[role="menuitem"]')].map((el) =>
+    text(el),
+  )
+}
 
 describe('the selection bar', () => {
-  it('appears with the count once a row is checked, and leaves on clear', async () => {
+  it('n selected, then Add to space and Enrich…, and Clear on the right', async () => {
     await mount()
     expect(bar()).toBeNull()
     await click(labelled('Select Co 1'))
     await click(labelled('Select Co 2'))
-    expect(text(bar())).toContain('2 selected')
-    await click(button(/^clear$/))
+    expect(text(bar())).toMatch(/^2 selected/)
+    expect(barButtons()).toEqual(['Add to space', 'Enrich…', 'Clear'])
+    await click(button(/^Clear$/))
     expect(bar()).toBeNull()
   })
 
   it('the head box checks every loaded row', async () => {
     await mount()
     await click(labelled('Select every loaded row of Companies'))
-    expect(text(bar())).toContain('3 selected')
+    expect(text(bar())).toMatch(/^3 selected/)
+  })
+
+  it('a kind enrichment does not read has no Enrich…', async () => {
+    await mount(false)
+    await click(labelled('Select Co 1'))
+    expect(barButtons()).toEqual(['Add to space', 'Clear'])
+    expect(await rowMenu('Co 1')).toEqual([
+      'Open in a new tab',
+      'Add to space…',
+      'Copy link',
+    ])
+  })
+})
+
+describe('the row ···', () => {
+  it('Open in a new tab · Add to space… · Enrich… · Copy link, and no Delete', async () => {
+    await mount()
+    expect(await rowMenu('Co 2')).toEqual([
+      'Open in a new tab',
+      'Add to space…',
+      'Enrich…',
+      'Copy link',
+    ])
+    const open = [...document.querySelectorAll('[role="menuitem"]')].find(
+      (el) => text(el) === 'Open in a new tab',
+    )
+    expect(open?.getAttribute('href')).toBe(`/companies/${ROWS[1]?.id}`)
+    expect(open?.getAttribute('target')).toBe('_blank')
   })
 })
 
 describe('the estimate window', () => {
-  it('shows the skips by reason and credits per source; Cancel queues nothing', async () => {
+  it('rows to ask and skipped, the split on hover, the credits in the foot; Cancel queues nothing', async () => {
     await mount()
     await click(labelled('Select Co 1'))
     await click(button(/^Enrich…$/, bar() ?? document))
     expect(fns.estimateBulkEnrich).toHaveBeenCalledWith({
       data: { kind: 'company', target: { ids: [ROWS[0]?.id] } },
     })
-    const summary = document.querySelector('[data-estimate-summary]')
-    expect(text(summary)).toBe(
-      '34 to ask · 6 skipped · about 34 Apollo credits of 100 left today',
+    expect(text(document.querySelector('[data-estimate-scope]'))).toBe(
+      'Selected',
     )
-    const body = text(dialog())
-    expect(body).toContain(
-      'skipped · 2 sensitive · 2 enriched in the last 90 days · 2 no domain',
+    const rows = [...document.querySelectorAll('[data-estimate-row]')].map(
+      (r) => text(r),
     )
-    expect(body).toContain('free')
-    expect(body).toContain('about 34 credits of 100 left today')
+    expect(rows).toEqual([
+      'To ask34',
+      'Skipped, sensitive2',
+      'Already enriched in the last 90 days2',
+      'No domain2',
+    ])
+    expect(
+      document
+        .querySelector('[data-estimate-row="ask"]')
+        ?.getAttribute('title'),
+    ).toBe('Website 36 · free\nApollo 34 · about 34 credits of 100 left today')
+    expect(text(dialog())).toContain('About 34 credits · 100 left today')
     await click(button(/^Cancel$/))
     expect(dialog()).toBeNull()
     expect(fns.bulkEnrich).not.toHaveBeenCalled()
@@ -285,6 +365,51 @@ describe('the estimate window', () => {
     expect(fns.estimateBulkEnrich).toHaveBeenCalledWith({
       data: { kind: 'company', target: { conditions: [], q: 'co' } },
     })
-    expect(dialog()).not.toBeNull()
+    expect(text(document.querySelector('[data-estimate-scope]'))).toBe(
+      'This view',
+    )
+  })
+})
+
+describe('Add to space', () => {
+  it('files the checked rows in one call; the toast’s Undo untags the ones it filed', async () => {
+    // Co 1 was already there: only Co 2 is new.
+    fns.tagManyIntoSpace.mockResolvedValue({ tagged: [ROWS[1]?.id] })
+    await mount()
+    await click(labelled('Select Co 1'))
+    await click(labelled('Select Co 2'))
+    await click(button(/^Add to space$/, bar() ?? document))
+    await flush()
+    expect(text(dialog()?.querySelector('h2') ?? null)).toBe(
+      'Add 2 companies to a space',
+    )
+    expect(button(/^Add 2$/).disabled).toBe(true)
+    await click(document.querySelector('[role="combobox"]') ?? document.body)
+    const option = [...document.querySelectorAll('[cmdk-item]')].find(
+      (el) => text(el) === 'Proptech › Property ops',
+    )
+    if (option === undefined) throw new Error('no Property ops option')
+    await click(option)
+    await click(button(/^Add 2$/))
+    expect(fns.tagManyIntoSpace).toHaveBeenCalledTimes(1)
+    expect(fns.tagManyIntoSpace).toHaveBeenCalledWith({
+      data: { spaceId: OPS, entityIds: [ROWS[0]?.id, ROWS[1]?.id] },
+    })
+    expect(dialog()).toBeNull()
+    expect(bar()).toBeNull()
+    const [message, options] = toasts.toast.mock.calls.at(-1) ?? []
+    expect(message).toBe('1 company added to Property ops')
+    const action: unknown = Reflect.get(Object(options), 'action')
+    expect(Reflect.get(Object(action), 'label')).toBe('Undo')
+    const undo: unknown = Reflect.get(Object(action), 'onClick')
+    if (typeof undo !== 'function') throw new Error('no Undo')
+    await act(async () => {
+      undo()
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(fns.untagFromSpace).toHaveBeenCalledTimes(1)
+    expect(fns.untagFromSpace).toHaveBeenCalledWith({
+      data: { entityId: ROWS[1]?.id, spaceId: OPS },
+    })
   })
 })

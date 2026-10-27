@@ -30,6 +30,8 @@ function formatFigure(
 /**
  * Portfolio: the head's readout strip, money compact — the table carries the
  * rest. The book's gross XIRR closes it; Today's rail does not print it.
+ * - Only a figure with a value prints: a zero or a missing one is not a
+ *   readout, and with none left there is no strip.
  */
 export function PortfolioHeadlineStrip({
   rollup,
@@ -38,16 +40,22 @@ export function PortfolioHeadlineStrip({
   rollup: PortfolioRollup
   baseCurrency: string
 }) {
+  const readouts = [
+    ...portfolioHeadline(rollup)
+      .filter((f) => f.amount !== null && f.amount !== 0)
+      .map((f) => ({
+        label: f.label,
+        value: formatFigure(f, baseCurrency, true),
+      })),
+    ...(rollup.grossXirr === null
+      ? []
+      : [{ label: 'XIRR', value: fmtXirr(rollup.grossXirr) }]),
+  ]
+  if (readouts.length === 0) return null
   return (
     <ReadoutStrip
       className="border-t-0 border-b border-hairline px-8"
-      readouts={[
-        ...portfolioHeadline(rollup).map((f) => ({
-          label: f.label,
-          value: formatFigure(f, baseCurrency, true),
-        })),
-        { label: 'XIRR', value: fmtXirr(rollup.grossXirr) },
-      ]}
+      readouts={readouts}
     />
   )
 }

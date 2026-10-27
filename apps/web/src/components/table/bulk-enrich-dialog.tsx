@@ -1,9 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { BULK_SKIPS, skippedTotal } from '@spaces/core/enrichment/estimate'
-import type { BulkSkip, SkipCounts } from '@spaces/core/enrichment/estimate'
-import { DensityRamp } from '#/components/dither'
+import { Twinkle } from '#/components/twinkle'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
@@ -14,19 +11,17 @@ import {
   DialogTitle,
 } from '#/components/ui/dialog'
 import { bulkEnrich, estimateBulkEnrich } from '#/lib/server-fns'
+import { cn } from '#/lib/utils'
 import type { Condition } from '@spaces/core/views/filter'
-import { ListMenu } from './list-menu'
-import type { ListVerb } from './list-menu'
-import type { TableSelect } from './record-table'
-import { SelectionBar, useRowSelection } from './selection-bar'
 
 /**
- * Enrich… from a list: a window with the estimate per source — to ask,
- * skipped by reason, credits against what is left today — and one pine
- * Enrich n. Opening it reads; nothing is queued until the button.
+ * Enrich… from a list: a window with the estimate — to ask, then the skips
+ * by reason, the split per source on the To ask row's hover — the credits it
+ * costs in the foot, and one pine Enrich n. Opening it reads; nothing is
+ * queued until the button.
  */
 
-type Kind = 'company' | 'person'
+export type EnrichKind = 'company' | 'person'
 
 /** The checked rows, or the list's view for the `···` menu. */
 export type BulkTarget =
@@ -37,50 +32,74 @@ type Estimate = Awaited<ReturnType<typeof estimateBulkEnrich>>
 
 const n = (v: number) => v.toLocaleString('en-US')
 
-const NOUN: Record<Kind, { one: string; many: string; key: string }> = {
-  company: { one: 'company', many: 'companies', key: 'no domain' },
-  person: { one: 'person', many: 'people', key: 'no email or LinkedIn' },
+const NOUN: Record<EnrichKind, { one: string; many: string; key: string }> = {
+  company: { one: 'company', many: 'companies', key: 'No domain' },
+  person: { one: 'person', many: 'people', key: 'No email or LinkedIn' },
 }
 
-const skipWords = (
-  kind: Kind,
-  reuseDays: number,
-): Record<BulkSkip, string> => ({
-  sensitive: 'sensitive',
-  reuse: `enriched in the last ${n(reuseDays)} days`,
-  key: NOUN[kind].key,
-  queued: 'already queued',
-})
+/** `Already enriched this week`, or the window the reuse skips counted. */
+const reuseWords = (days: number): string =>
+  days <= 7
+    ? 'Already enriched this week'
+    : `Already enriched in the last ${n(days)} days`
 
-/** `2 sensitive · 1 no domain` — the nonzero reasons, in check order. */
-const skipLine = (
-  counts: SkipCounts,
-  words: Record<BulkSkip, string>,
-): string =>
-  BULK_SKIPS.filter((k) => counts[k] > 0)
-    .map((k) => `${n(counts[k])} ${words[k]}`)
-    .join(' · ')
-
-const creditWords = (s: Estimate['sources'][number]): string =>
-  s.local
-    ? 'free'
-    : s.left === null
-      ? `about ${n(s.credits)} credits · no daily cap`
-      : `about ${n(s.credits)} credits of ${n(s.left)} left today`
-
-/** `34 to ask · 6 skipped · about 34 Apollo credits of 100 left today` */
-const summaryLine = (e: Estimate): string =>
+/** One source's share, for the To ask row's hover. */
+const sourceLine = (s: Estimate['sources'][number]): string =>
   [
-    `${n(e.ask)} to ask`,
-    `${n(skippedTotal(e.skipped))} skipped`,
-    ...e.sources
-      .filter((s) => !s.local && s.ask > 0)
-      .map((s) =>
-        s.left === null
-          ? `about ${n(s.credits)} ${s.name} credits`
-          : `about ${n(s.credits)} ${s.name} credits of ${n(s.left)} left today`,
-      ),
+    `${s.name} ${n(s.ask)}`,
+    s.local
+      ? 'free'
+      : s.left === null
+        ? `about ${n(s.credits)} credits`
+        : `about ${n(s.credits)} credits of ${n(s.left)} left today`,
   ].join(' · ')
+
+/**
+ * The foot's cost over the paid sources that would be asked —
+ * `About 34 credits · 100 left today` — and nothing when every one is free.
+ */
+export function creditNote(e: Estimate): string | null {
+  const paid = e.sources.filter((s) => !s.local && s.ask > 0)
+  const credits = paid.reduce((sum, s) => sum + s.credits, 0)
+  if (credits === 0) return null
+  const capped = paid.filter((s) => s.left !== null)
+  const left = capped.reduce((sum, s) => sum + (s.left ?? 0), 0)
+  return capped.length === 0
+    ? `About ${n(credits)} credits`
+    : `About ${n(credits)} credits · ${n(left)} left today`
+}
+
+type EstimateRow = { id: string; label: string; value: number; tip?: string }
+
+/**
+ * To ask, then the skips: sensitive and already enriched always, a missing
+ * key and already queued only when they hold something.
+ */
+function estimateRows(e: Estimate, kind: EnrichKind): Array<EstimateRow> {
+  const rows: Array<EstimateRow> = [
+    {
+      id: 'ask',
+      label: 'To ask',
+      value: e.ask,
+      tip: e.sources.map(sourceLine).join('\n'),
+    },
+    {
+      id: 'sensitive',
+      label: 'Skipped, sensitive',
+      value: e.skipped.sensitive,
+    },
+    { id: 'reuse', label: reuseWords(e.reuseDays), value: e.skipped.reuse },
+  ]
+  if (e.skipped.key > 0)
+    rows.push({ id: 'key', label: NOUN[kind].key, value: e.skipped.key })
+  if (e.skipped.queued > 0)
+    rows.push({
+      id: 'queued',
+      label: 'Already queued',
+      value: e.skipped.queued,
+    })
+  return rows
+}
 
 export function BulkEnrichDialog({
   open,
@@ -91,7 +110,7 @@ export function BulkEnrichDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  kind: Kind
+  kind: EnrichKind
   target: BulkTarget
   /** After Enrich n has queued: the list clears and refreshes. */
   onSent: () => void
@@ -154,7 +173,6 @@ export function BulkEnrichDialog({
   }
 
   const count = estimate?.total ?? ('ids' in target ? target.ids.length : null)
-  const words = skipWords(kind, estimate?.reuseDays ?? 0)
   const parkedBy = estimate?.sources.filter((s) => s.parks > 0) ?? []
 
   return (
@@ -175,7 +193,9 @@ export function BulkEnrichDialog({
               ? ' this view'
               : ` ${n(count)} ${count === 1 ? noun.one : noun.many}`}
           </DialogTitle>
-          <span className="mono text-micro text-graphite">estimate</span>
+          <span data-estimate-scope className="mono text-micro text-graphite">
+            {'ids' in target ? 'Selected' : 'This view'}
+          </span>
         </DialogHeader>
 
         {failed !== null ? (
@@ -183,8 +203,8 @@ export function BulkEnrichDialog({
             {failed}
           </p>
         ) : estimate === null ? (
-          <div className="flex h-24 items-center justify-center">
-            <DensityRamp />
+          <div role="status" className="flex h-24 items-center justify-center">
+            <Twinkle />
           </div>
         ) : estimate.sources.length === 0 ? (
           <p className="text-ui text-graphite">
@@ -193,41 +213,32 @@ export function BulkEnrichDialog({
           </p>
         ) : (
           <div className="flex flex-col">
-            <p data-estimate-summary className="mono text-label">
-              {summaryLine(estimate)}
-            </p>
+            <ul className="flex flex-col border-t border-rule">
+              {estimateRows(estimate, kind).map((r) => (
+                <li
+                  key={r.id}
+                  data-estimate-row={r.id}
+                  {...(r.tip === undefined ? {} : { title: r.tip })}
+                  className="flex h-9 items-center justify-between gap-4 border-b border-rule"
+                >
+                  <span className="text-ui">{r.label}</span>
+                  <span
+                    className={cn(
+                      'numeric mono text-ui',
+                      r.value === 0 && 'text-graphite',
+                    )}
+                  >
+                    {n(r.value)}
+                  </span>
+                </li>
+              ))}
+            </ul>
             {!('ids' in target) && estimate.matched > estimate.total ? (
-              <p className="mt-1 mono text-micro text-graphite">
-                the first {n(estimate.total)} of {n(estimate.matched)} in this
+              <p className="mt-2 mono text-micro text-graphite">
+                The first {n(estimate.total)} of {n(estimate.matched)} in this
                 view
               </p>
             ) : null}
-            <ul className="mt-4 flex flex-col border-t border-rule">
-              {estimate.sources.map((s) => {
-                const skips = skipLine(s.skipped, words)
-                return (
-                  <li
-                    key={s.id}
-                    className="flex min-h-11 items-center gap-4 border-b border-rule py-1.5"
-                  >
-                    <span className="w-24 shrink-0 truncate text-ui font-medium">
-                      {s.name}
-                    </span>
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="mono text-label">{n(s.ask)} to ask</span>
-                      {skips ? (
-                        <span className="mono text-micro text-graphite">
-                          skipped · {skips}
-                        </span>
-                      ) : null}
-                    </div>
-                    <span className="shrink-0 text-right mono text-label text-graphite">
-                      {creditWords(s)}
-                    </span>
-                  </li>
-                )
-              })}
-            </ul>
             {parkedBy.map((s) => (
               <p
                 key={s.id}
@@ -240,7 +251,7 @@ export function BulkEnrichDialog({
           </div>
         )}
 
-        <DialogFooter note="Nothing is spent until Enrich.">
+        <DialogFooter note={estimate === null ? null : creditNote(estimate)}>
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
@@ -255,92 +266,4 @@ export function BulkEnrichDialog({
       </DialogContent>
     </Dialog>
   )
-}
-
-/** Seconds after Enrich n at which the list re-reads, while the runs land. */
-const FILL_AT = [10, 25, 45, 70]
-
-/**
- * Enrich… on a record list: the row checkboxes, the selection bar with
- * Enrich… as its pine verb, the head's Enrich… over the view — as `verb`
- * for a `ListMenu` that holds others, or `menu` on its own — and the window
- * either opens.
- */
-export function useListEnrich<T extends { id: string; name: string }>({
-  kind,
-  label,
-  rows,
-  view,
-  refresh,
-}: {
-  kind: Kind
-  /** The list's name — "Companies". */
-  label: string
-  /** The loaded rows. */
-  rows: ReadonlyArray<T>
-  /** The view as the list shows it: what the `···` Enrich… runs over. */
-  view: { conditions: Array<Condition>; q: string }
-  refresh: () => void
-}): {
-  select: TableSelect<T>
-  selectionBar: ReactNode
-  verb: ListVerb
-  menu: ReactNode
-  dialog: ReactNode
-} {
-  const selection = useRowSelection()
-  const [target, setTarget] = useState<BulkTarget | null>(null)
-  const chosen = selection.among(rows.map((r) => r.id))
-  const timers = useRef<Array<number>>([])
-  useEffect(() => {
-    const pending = timers.current
-    return () => {
-      for (const t of pending) window.clearTimeout(t)
-    }
-  }, [])
-
-  function sent() {
-    selection.clear()
-    refresh()
-    for (const s of FILL_AT)
-      timers.current.push(window.setTimeout(refresh, s * 1000))
-  }
-
-  const verb: ListVerb = { label: 'Enrich…', onSelect: () => setTarget(view) }
-  return {
-    select: { rows: selection, keyOf: (r) => r.id, nameOf: (r) => r.name },
-    selectionBar:
-      chosen.length > 0 ? (
-        <SelectionBar
-          label={`Selected ${label.toLowerCase()}`}
-          count={chosen.length}
-        >
-          <span className="flex-1" />
-          <button
-            type="button"
-            onClick={selection.clear}
-            className="focus-ring mono text-label text-graphite transition-colors duration-150 ease-out-quart hover:text-foreground"
-          >
-            clear
-          </button>
-          <Button size="sm" onClick={() => setTarget({ ids: chosen })}>
-            Enrich…
-          </Button>
-        </SelectionBar>
-      ) : null,
-    verb,
-    menu: <ListMenu label={label} verbs={[verb]} />,
-    dialog:
-      target === null ? null : (
-        <BulkEnrichDialog
-          open
-          onOpenChange={(open) => {
-            if (!open) setTarget(null)
-          }}
-          kind={kind}
-          target={target}
-          onSent={sent}
-        />
-      ),
-  }
 }

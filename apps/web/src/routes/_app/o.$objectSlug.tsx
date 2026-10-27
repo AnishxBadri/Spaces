@@ -46,6 +46,8 @@ import {
 import { PageHeader } from '#/components/page-header'
 import { useImportVerb } from '#/components/import/import-action'
 import { ListMenu } from '#/components/table/list-menu'
+import { useListActions } from '#/components/table/list-actions'
+import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
 import {
   ListErrorRow,
   ListLoadingRow,
@@ -277,6 +279,18 @@ function ObjectListPage() {
     void router.invalidate()
     void queryClient.invalidateQueries({ queryKey: ['object-records'] })
   }, [router, queryClient])
+  // The selection bar and the row `···`; enrichment reads no custom kind.
+  const actions = useListActions({
+    label: object.plural,
+    noun: {
+      one: object.singular.toLowerCase(),
+      many: object.plural.toLowerCase(),
+    },
+    rows,
+    hrefOf: (r) => `/o/${object.slug}/${r.id}`,
+    enrich: null,
+    refresh,
+  })
   const importVerb = useImportVerb(object.slug)
   const editAttribute = useEditAttribute({
     registry,
@@ -474,35 +488,39 @@ function ObjectListPage() {
         </div>
       ) : (
         <>
-          <ViewBar
-            objectId={object.id}
-            registry={filterRegistry}
-            views={views}
-            counts={counts}
-            total={allTotal}
-            activeId={activeId ?? null}
-            snapshot={vs.snapshot}
-            onApply={(v) => {
-              vs.apply(v)
-              selectView(v?.id ?? null)
-            }}
-            selectView={selectView}
-            onFilterChange={vs.setConditions}
-            onSaved={() => void router.invalidate()}
-            canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
-            plural={object.plural}
-            pinned
-            refNames={refNames}
-            tools={
-              <TableTools
-                table={table}
-                filter={globalFilter}
-                onFilterChange={setGlobalFilter}
-                filterPlaceholder={`Search ${object.plural.toLowerCase()}`}
-                filterLabel={`Search ${object.plural.toLowerCase()}`}
-              />
-            }
-          />
+          {actions.selectionBar ? (
+            <div className={PIN_UNDER_HEAD_BAR}>{actions.selectionBar}</div>
+          ) : (
+            <ViewBar
+              objectId={object.id}
+              registry={filterRegistry}
+              views={views}
+              counts={counts}
+              total={allTotal}
+              activeId={activeId ?? null}
+              snapshot={vs.snapshot}
+              onApply={(v) => {
+                vs.apply(v)
+                selectView(v?.id ?? null)
+              }}
+              selectView={selectView}
+              onFilterChange={vs.setConditions}
+              onSaved={() => void router.invalidate()}
+              canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+              plural={object.plural}
+              pinned
+              refNames={refNames}
+              tools={
+                <TableTools
+                  table={table}
+                  filter={globalFilter}
+                  onFilterChange={setGlobalFilter}
+                  filterPlaceholder={`Search ${object.plural.toLowerCase()}`}
+                  filterLabel={`Search ${object.plural.toLowerCase()}`}
+                />
+              }
+            />
+          )}
           <div className="px-8 pb-8">
             <AiCellsProvider
               table
@@ -518,7 +536,11 @@ function ObjectListPage() {
                 label={object.plural}
                 stickyColumnId="name"
                 notice={notice}
-                pinUnder={viewBarPin(vs.conditions)}
+                select={actions.select}
+                rowEnd={actions.rowMenu}
+                pinUnder={
+                  actions.selectionBar ? 'bar' : viewBarPin(vs.conditions)
+                }
                 page={{
                   total,
                   hasMore: records.hasNextPage,
@@ -543,6 +565,7 @@ function ObjectListPage() {
           {editAttribute.dialog}
         </>
       )}
+      {actions.dialogs}
     </div>
   )
 }

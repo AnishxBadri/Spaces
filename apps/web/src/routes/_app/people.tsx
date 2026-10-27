@@ -55,7 +55,7 @@ import {
 } from '#/components/table/list-states'
 import { useEditAttribute } from '#/components/table/edit-attribute'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
-import { useListEnrich } from '#/components/table/bulk-enrich-dialog'
+import { useListActions } from '#/components/table/list-actions'
 import { statColumns } from '#/components/table/stat-columns'
 import { inverseColumns } from '#/components/table/inverse-columns'
 import { INTERACTION_STAT_FILTERS } from '#/lib/views/stat-fields'
@@ -252,12 +252,13 @@ function PeoplePage() {
     void router.invalidate()
     void queryClient.invalidateQueries({ queryKey: ['people-records'] })
   }, [router, queryClient])
-  // Enrich… from the selection bar or the head's ···, behind an estimate.
-  const enrich = useListEnrich({
-    kind: 'person',
+  // The selection bar, the row `···` and Enrich… over the view.
+  const actions = useListActions({
     label: 'People',
+    noun: { one: 'person', many: 'people' },
     rows,
-    view: { conditions: vs.conditions, q },
+    hrefOf: (r) => `/people/${r.id}`,
+    enrich: { kind: 'person', view: { conditions: vs.conditions, q } },
     refresh,
   })
   const importVerb = useImportVerb('people')
@@ -401,7 +402,12 @@ function PeoplePage() {
       }
     />
   ) : undefined
-  const listMenu = <ListMenu label="People" verbs={[importVerb, enrich.verb]} />
+  const listMenu = (
+    <ListMenu
+      label="People"
+      verbs={[importVerb, ...(actions.enrichVerb ? [actions.enrichVerb] : [])]}
+    />
+  )
 
   return (
     <div className="flex flex-col">
@@ -433,8 +439,8 @@ function PeoplePage() {
         </div>
       ) : (
         <>
-          {enrich.selectionBar ? (
-            <div className={PIN_UNDER_HEAD_BAR}>{enrich.selectionBar}</div>
+          {actions.selectionBar ? (
+            <div className={PIN_UNDER_HEAD_BAR}>{actions.selectionBar}</div>
           ) : (
             <ViewBar
               objectId={objectId}
@@ -479,11 +485,12 @@ function PeoplePage() {
                 ]}
                 table={table}
                 label="People"
-                select={enrich.select}
+                select={actions.select}
+                rowEnd={actions.rowMenu}
                 stickyColumnId="name"
                 notice={notice}
                 pinUnder={
-                  enrich.selectionBar ? 'bar' : viewBarPin(vs.conditions)
+                  actions.selectionBar ? 'bar' : viewBarPin(vs.conditions)
                 }
                 page={{
                   total,
@@ -506,7 +513,7 @@ function PeoplePage() {
           {editAttribute.dialog}
         </>
       )}
-      {enrich.dialog}
+      {actions.dialogs}
     </div>
   )
 }

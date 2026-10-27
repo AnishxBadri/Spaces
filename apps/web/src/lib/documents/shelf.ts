@@ -244,3 +244,33 @@ export const countUnfiledProgram = Effect.fn('countUnfiledProgram')(
     return rows.at(0)?.value ?? 0
   },
 )
+
+/**
+ * The shelf's two tab counts, whichever tab is open: every document the
+ * viewer may read, and the unfiled ones (`countUnfiledProgram`, Today's
+ * badge, so the tab and the badge cannot disagree).
+ */
+export const shelfCountsProgram = Effect.fn('shelfCountsProgram')(
+  function* (viewer: {
+    id: string
+  }): Effect.fn.Return<{ all: number; unfiled: number }, DocumentShelfFailed> {
+    const [all, unfiled] = yield* Effect.all(
+      [
+        Effect.tryPromise({
+          try: () =>
+            db
+              .select({ value: count() })
+              .from(document)
+              .innerJoin(entity, eq(entity.id, document.entityId))
+              .where(
+                and(isNull(entity.mergedIntoId), canReadDocumentSql(viewer.id)),
+              ),
+          catch: (cause) => new DocumentShelfFailed({ cause }),
+        }),
+        countUnfiledProgram(viewer),
+      ],
+      { concurrency: 'unbounded' },
+    )
+    return { all: all.at(0)?.value ?? 0, unfiled }
+  },
+)

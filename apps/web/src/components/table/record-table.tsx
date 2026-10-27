@@ -127,6 +127,8 @@ export function RecordTable<T>({
   select,
   notice,
   pinUnder = 'head',
+  rowEnd,
+  rowEndWidth = TRAILING_WIDTH,
 }: {
   table: Table<T>
   /** Column pinned to the left edge while the rest scrolls under it. */
@@ -165,6 +167,13 @@ export function RecordTable<T>({
   columnActions?: (columnId: string) => ReadonlyArray<ColumnAction>
   /** Row checkboxes; absent, the table has none. */
   select?: TableSelect<T>
+  /**
+   * What a row ends on, in the trailing lane: its `···` (shown on hover),
+   * or a shelf's exception lane.
+   */
+  rowEnd?: (row: T) => ReactNode
+  /** The trailing lane's width when a row ends on more than a `···`. */
+  rowEndWidth?: number
 }) {
   const headRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -195,7 +204,7 @@ export function RecordTable<T>({
   // Both tables: the columns at their widths plus the trailing lane, never
   // narrower than the pane — the trailing lane takes the slack.
   const tableStyle = {
-    width: table.getTotalSize() + (select ? SELECT_WIDTH : 0) + TRAILING_WIDTH,
+    width: table.getTotalSize() + (select ? SELECT_WIDTH : 0) + rowEndWidth,
     minWidth: '100%',
   }
 
@@ -245,7 +254,11 @@ export function RecordTable<T>({
                     actions={columnActions?.(header.column.id) ?? []}
                   />
                 ))}
-                <th role="columnheader" className="px-1 text-left">
+                <th
+                  role="columnheader"
+                  style={rowEnd ? { minWidth: rowEndWidth } : undefined}
+                  className="px-1 text-left"
+                >
                   {addColumn ?? null}
                 </th>
               </tr>
@@ -285,6 +298,7 @@ export function RecordTable<T>({
                     <tr
                       key={row.id}
                       role="row"
+                      data-row
                       onClick={
                         onRowClick ? () => onRowClick(row.original) : undefined
                       }
@@ -331,7 +345,19 @@ export function RecordTable<T>({
                           </div>
                         </td>
                       ))}
-                      <td role="cell" />
+                      {rowEnd ? (
+                        <td
+                          role="cell"
+                          data-row-end
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ minWidth: rowEndWidth }}
+                          className="h-row px-1 py-0 align-middle"
+                        >
+                          {rowEnd(row.original)}
+                        </td>
+                      ) : (
+                        <td role="cell" />
+                      )}
                     </tr>
                   ))}
             </tbody>
@@ -680,17 +706,21 @@ export function TableTools<T>({
   onFilterChange,
   filterPlaceholder,
   filterLabel,
+  beforeSearch,
 }: {
   table: Table<T>
   filter: string
   onFilterChange: (value: string) => void
   filterPlaceholder: string
   filterLabel: string
+  /** A list's own switch between Columns and the search box. */
+  beforeSearch?: ReactNode
 }) {
   return (
     <>
       <SortMenu table={table} />
       <ColumnsMenu table={table} />
+      {beforeSearch}
       <Input
         value={filter}
         onChange={(e) => onFilterChange(e.target.value)}

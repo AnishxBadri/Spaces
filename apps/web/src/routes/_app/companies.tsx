@@ -47,7 +47,7 @@ import {
 } from '#/components/table/list-states'
 import { useEditAttribute } from '#/components/table/edit-attribute'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
-import { useListEnrich } from '#/components/table/bulk-enrich-dialog'
+import { useListActions } from '#/components/table/list-actions'
 import { statColumns } from '#/components/table/stat-columns'
 import { inverseColumns } from '#/components/table/inverse-columns'
 import { INTERACTION_STAT_FILTERS } from '#/lib/views/stat-fields'
@@ -236,12 +236,13 @@ function CompaniesPage() {
     void router.invalidate()
     void queryClient.invalidateQueries({ queryKey: ['company-records'] })
   }, [router, queryClient])
-  // Enrich… from the selection bar or the head's ···, behind an estimate.
-  const enrich = useListEnrich({
-    kind: 'company',
+  // The selection bar, the row `···` and Enrich… over the view.
+  const actions = useListActions({
     label: 'Companies',
+    noun: { one: 'company', many: 'companies' },
     rows,
-    view: { conditions: vs.conditions, q },
+    hrefOf: (r) => `/companies/${r.id}`,
+    enrich: { kind: 'company', view: { conditions: vs.conditions, q } },
     refresh,
   })
   const importVerb = useImportVerb('companies')
@@ -411,7 +412,10 @@ function CompaniesPage() {
     />
   ) : undefined
   const listMenu = (
-    <ListMenu label="Companies" verbs={[importVerb, enrich.verb]} />
+    <ListMenu
+      label="Companies"
+      verbs={[importVerb, ...(actions.enrichVerb ? [actions.enrichVerb] : [])]}
+    />
   )
 
   return (
@@ -439,8 +443,8 @@ function CompaniesPage() {
         </div>
       ) : (
         <>
-          {enrich.selectionBar ? (
-            <div className={PIN_UNDER_HEAD_BAR}>{enrich.selectionBar}</div>
+          {actions.selectionBar ? (
+            <div className={PIN_UNDER_HEAD_BAR}>{actions.selectionBar}</div>
           ) : (
             <ViewBar
               objectId={objectId}
@@ -485,11 +489,12 @@ function CompaniesPage() {
                 ]}
                 table={table}
                 label="Companies"
-                select={enrich.select}
+                select={actions.select}
+                rowEnd={actions.rowMenu}
                 stickyColumnId="name"
                 notice={notice}
                 pinUnder={
-                  enrich.selectionBar ? 'bar' : viewBarPin(vs.conditions)
+                  actions.selectionBar ? 'bar' : viewBarPin(vs.conditions)
                 }
                 page={{
                   total,
@@ -512,7 +517,7 @@ function CompaniesPage() {
           {editAttribute.dialog}
         </>
       )}
-      {enrich.dialog}
+      {actions.dialogs}
     </div>
   )
 }

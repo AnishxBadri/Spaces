@@ -6,17 +6,24 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import type { ColumnDef, SortingState } from '@tanstack/react-table'
+import type { ColumnDef, SortingState, Table } from '@tanstack/react-table'
 import { Briefcase } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { EmptyState } from '#/components/empty-state'
+import { RecordCheckDialog } from '#/components/holding/record-check-dialog'
+import { EmptyRow } from '#/components/ledger-section'
 import { IconBadge, RecordLinkCell } from '#/components/table/cells'
-import { RecordTable, TableToolbar } from '#/components/table/record-table'
+import { RecordTable } from '#/components/table/record-table'
 import { HeadCount, PageHeader } from '#/components/page-header'
 import { PortfolioHeadlineStrip } from '#/components/portfolio-headline'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
+import { Button } from '#/components/ui/button'
+import { Input } from '#/components/ui/input'
+import { MENU_RULE, MoreMenu } from '#/components/ui/more-menu'
+import type { MoreMenuEntry } from '#/components/ui/more-menu'
+import { useClock } from '#/components/clock'
 import { listHoldings } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
+import { formatDay } from '@spaces/core/format'
 import {
   fmtMoney,
   fmtMultiple,
@@ -31,6 +38,9 @@ import {
  * would compute a fund's position from whichever rows arrived first. If this
  * outgrows one fetch, the totals become their own server aggregate before the
  * rows become a page — never the other way round.
+ *
+ * One view and no tab bar: the title carries the count, and Search, Sort and
+ * Columns are rare enough to live in the head's `···`.
  */
 export const Route = createFileRoute('/_app/portfolio')({
   loader: async () => listHoldings(),
@@ -54,11 +64,64 @@ function ownershipText(r: HoldingRow): string {
   return '—'
 }
 
+/** The column's own label, for a menu that names it. */
+const titleOf = (c: { id: string; columnDef: { header?: unknown } }) =>
+  typeof c.columnDef.header === 'string' ? c.columnDef.header : c.id
+
+/**
+ * The head `···`: Search… first, then Sort and Columns as submenus — the
+ * same single sort and the same show and hide the bar's tools give a list.
+ */
+function headMenu(
+  table: Table<HoldingRow>,
+  onSearch: () => void,
+): Array<MoreMenuEntry> {
+  const current = table.getState().sorting.at(0)
+  const hideable = table.getAllLeafColumns().filter((c) => c.getCanHide())
+  return [
+    { label: 'Search…', opens: true, onSelect: onSearch },
+    MENU_RULE,
+    {
+      label: 'Sort',
+      items: [
+        ...table
+          .getVisibleLeafColumns()
+          .filter((c) => c.getCanSort())
+          .map((c) => {
+            const on = c.id === current?.id
+            const desc = current?.desc === true
+            return {
+              label: titleOf(c),
+              ...(on ? { hint: desc ? '↓' : '↑' } : {}),
+              // A second pick of the sorted column turns it round.
+              onSelect: () => c.toggleSorting(on && !desc),
+            }
+          }),
+        ...(current === undefined
+          ? []
+          : [
+              { label: 'Clear sort', onSelect: () => table.resetSorting(true) },
+            ]),
+      ],
+    },
+    {
+      label: 'Columns',
+      items: hideable.map((c) => ({
+        label: titleOf(c),
+        checked: c.getIsVisible(),
+        onCheckedChange: (v: boolean) => c.toggleVisibility(v),
+      })),
+    },
+  ]
+}
+
 function PortfolioPage() {
   const data = Route.useLoaderData()
   const [globalFilter, setGlobalFilter] = useState('')
+  const [searching, setSearching] = useState(false)
   const [sorting, setSorting] = useState<SortingState>([])
   const prefs = useTablePrefs(PREFS_KEY)
+  const { today } = useClock()
 
   const columns = useMemo(() => {
     const defs: Array<ColumnDef<HoldingRow, unknown>> = [
@@ -161,17 +224,20 @@ function PortfolioPage() {
         meta: { numeric: true },
         cell: (info) => {
           const m = metricsOf(info.row.original)
-          // The mark's own ISO day, as every date in a list prints.
           return (
             <Figure muted>
-              {m?.writtenOff ? 'written off' : (m?.lastMarkDate ?? '—')}
+              {m?.writtenOff
+                ? 'written off'
+                : m?.lastMarkDate
+                  ? formatDay(m.lastMarkDate, today)
+                  : '—'}
             </Figure>
           )
         },
       }),
     ]
     return defs
-  }, [])
+  }, [today])
 
   const table = useReactTable({
     data: data.holdings,
@@ -198,11 +264,18 @@ function PortfolioPage() {
 
   const rollup = data.rollup
   const excluded = rollup.excludedForMissingRates.length
+  const firstRun = data.holdings.length === 0
+  const showSearch = searching || globalFilter !== ''
 
   return (
     <div className="flex flex-col">
       <PageHeader
-        title={<HeadCount title="Portfolio" count={data.holdings.length} />}
+        title={
+          <HeadCount
+            title="Portfolio"
+            count={firstRun ? null : data.holdings.length}
+          />
+        }
         description={
           excluded > 0 ? (
             <span>
@@ -217,14 +290,24 @@ function PortfolioPage() {
             </span>
           ) : undefined
         }
+        action={
+          firstRun ? undefined : (
+            <>
+              <RecordCheckDialog
+                trigger={<Button variant="outline">Record a check</Button>}
+              />
+              <MoreMenu
+                variant="head"
+                label="Portfolio"
+                items={headMenu(table, () => setSearching(true))}
+              />
+            </>
+          )
+        }
       />
-      {data.holdings.length === 0 ? (
-        <div className="px-8 pb-8">
-          <EmptyState
-            icon={Briefcase}
-            title="No holdings yet"
-            body="A holding is born when a deal reaches Invested — or record a check directly from a company page. Existing positions arrive via the bootstrap import."
-          />
+      {firstRun ? (
+        <div className="px-8 pt-6 pb-8">
+          <RecordCheckDialog trigger={<EmptyRow name="Holdings" />} />
         </div>
       ) : (
         <>
@@ -232,17 +315,27 @@ function PortfolioPage() {
             rollup={rollup}
             baseCurrency={data.baseCurrency}
           />
-          <TableToolbar
-            table={table}
-            label="Holdings"
-            tabs={[{ id: 'all', label: 'All', count: data.holdings.length }]}
-            value="all"
-            onValueChange={() => {}}
-            filter={globalFilter}
-            onFilterChange={setGlobalFilter}
-            filterPlaceholder="Filter by company…"
-            filterLabel="Filter holdings"
-          />
+          {showSearch ? (
+            <div className="flex h-11 items-center border-b border-rule bg-bone px-8">
+              <Input
+                autoFocus
+                value={globalFilter}
+                onChange={(e) => setGlobalFilter(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Escape') return
+                  e.preventDefault()
+                  setGlobalFilter('')
+                  setSearching(false)
+                }}
+                onBlur={() => {
+                  if (globalFilter === '') setSearching(false)
+                }}
+                placeholder="Search holdings"
+                aria-label="Search holdings"
+                className="h-6.5 w-45 bg-paper text-ui"
+              />
+            </div>
+          ) : null}
           <div className="px-8 pb-8">
             <RecordTable
               table={table}

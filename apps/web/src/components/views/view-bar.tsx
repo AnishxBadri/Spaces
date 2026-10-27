@@ -99,6 +99,7 @@ export function ViewBar({
   views,
   counts,
   total,
+  lead,
   tools,
   activeId,
   snapshot,
@@ -129,6 +130,8 @@ export function ViewBar({
   counts?: Record<string, ViewCount>
   /** Every record on the list, unfiltered: the `All` tab's count. */
   total?: number | undefined
+  /** A list's own chip, left of Filter: Deals' Stage. */
+  lead?: ReactNode
   /** The table's tools — Sort, Columns, the search box — right of Filter. */
   tools?: ReactNode
   /** the view the page is currently showing, from `?view=` */
@@ -348,7 +351,7 @@ export function ViewBar({
               Save view…
             </button>
             <span className="flex-1" />
-
+            {lead}
             <FilterPopover
               registry={registry}
               conditions={snapshot.filter}

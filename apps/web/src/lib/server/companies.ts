@@ -334,3 +334,28 @@ export const untagFromSpace = createServerFn({ method: 'POST' })
     await restampUntagged(data.entityId, data.spaceId)
     return { ok: true }
   })
+
+/**
+ * Add to space from a list's selection: one transaction over the hand tag.
+ * `tagged` names only the records this call filed — Undo untags those.
+ */
+export const tagManyIntoSpace = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      spaceId: z.string().uuid(),
+      entityIds: z.array(z.string().uuid()).min(1).max(1000),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { tagManyMessage, tagManyProgram } =
+      await import('../spaces/tag-many')
+    const { effectFn } = await import('./effect')
+    const result = await effectFn(tagManyProgram)(u.id, data).catch(
+      (failure: unknown) => {
+        throw new Error(tagManyMessage(failure))
+      },
+    )
+    for (const emit of result.emits) await emitDomainEvent(emit)
+    return { tagged: result.tagged }
+  })

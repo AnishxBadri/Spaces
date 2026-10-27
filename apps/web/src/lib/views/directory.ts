@@ -119,7 +119,9 @@ const NO_STATS: RowStats = {
  * Last contact, last email and next meeting for the page's rows, read from
  * `interaction_stat` — one primary-key range over the page's ids.
  */
-async function statsFor(ids: Array<string>): Promise<Map<string, RowStats>> {
+export async function statsFor(
+  ids: Array<string>,
+): Promise<Map<string, RowStats>> {
   if (ids.length === 0) return new Map()
   const rows = await db
     .select({

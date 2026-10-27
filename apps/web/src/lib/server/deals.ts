@@ -7,6 +7,7 @@ import { entity, link } from '@spaces/db/schema'
 import { mandate } from '@spaces/db/schema/workspace'
 import { jsonString } from '@spaces/core/json'
 import type { EntityValues } from '@spaces/db/schema/entities'
+import type { RowStats } from '#/lib/views/stat-fields'
 import { requireUser } from './shared'
 import { recordSpaces } from '#/lib/spaces/filed-in'
 
@@ -39,11 +40,14 @@ type DealTableRow = {
   name: string
   values: EntityValues
   createdAt: string
+  /** Last contact and the rest, from `interaction_stat`. */
+  stats: RowStats
 }
 
 /**
  * Deal rows with referenced records resolved for display: values hold
- * uuids; the table wants names. One pass over reference links.
+ * uuids; the table wants names. One pass over reference links, and one over
+ * the interaction stats for Last contact.
  */
 export const listDealsTable = createServerFn().handler(async () => {
   await requireUser()
@@ -84,6 +88,8 @@ export const listDealsTable = createServerFn().handler(async () => {
     refNames.set(r.toId, { id: r.toId, name: r.name, kind: r.kind })
 
   const users = await db.select({ id: user.id, name: user.name }).from(user)
+  const { statsFor } = await import('../views/directory')
+  const stats = await statsFor(dealIds)
   // The board card draws its company's picture in place of the mark.
   const { pictureUrlsFor } = await import('../records/pictures')
   const pictures = await pictureUrlsFor(
@@ -91,11 +97,16 @@ export const listDealsTable = createServerFn().handler(async () => {
   )
 
   return {
-    rows: rows.map((r) => ({
+    rows: rows.map((r): DealTableRow => ({
       id: r.id,
       name: r.name,
       values: r.values,
       createdAt: r.createdAt.toISOString(),
+      stats: stats.get(r.id) ?? {
+        lastContact: null,
+        lastEmail: null,
+        nextMeeting: null,
+      },
     })),
     refNames: Object.fromEntries(refNames),
     userNames: Object.fromEntries(users.map((u) => [u.id, u.name])),

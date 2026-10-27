@@ -337,6 +337,14 @@ export const countUnfiledDocuments = createServerFn().handler(async () => {
   return effectFn(countUnfiledProgram)(u)
 })
 
+/** The shelf's `All n · Unfiled n` tab counts, whichever tab is open. */
+export const countShelfDocuments = createServerFn().handler(async () => {
+  const u = await requireUser()
+  const { shelfCountsProgram } = await import('../documents/shelf')
+  const { effectFn } = await import('./effect')
+  return effectFn(shelfCountsProgram)(u)
+})
+
 /**
  * Not a document private to someone else: the by-id reads' gate. A dynamic
  * import, so drizzle stays out of the client bundle.

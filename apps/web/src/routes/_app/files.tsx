@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -7,9 +7,10 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
-import { FileText, Layers, Upload } from 'lucide-react'
+import { Layers, Upload } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import { DocumentPreview } from '#/components/document-preview'
 import {
   GoneMarker,
@@ -18,17 +19,21 @@ import {
 } from '#/components/document-source'
 import { DocumentTile } from '#/components/document-tile'
 import { KIND_ICONS } from '#/components/editor/mention'
-import { EmptyState } from '#/components/empty-state'
+import { EmptyRow } from '#/components/ledger-section'
 import { PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'
 import { RecordTable, TableToolbar } from '#/components/table/record-table'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
-import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
+import { formatBytes } from '@spaces/core/documents'
 import { formatDay, formatSince } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 import { DOCUMENT_EXTRACTION_LABELS } from '#/lib/documents/registry'
 import { recordPath } from '#/lib/record-path'
-import { listDocuments } from '#/lib/server-fns'
+import {
+  countShelfDocuments,
+  listDocuments,
+  reExtractDocument,
+} from '#/lib/server-fns'
 import { openUploadDialog } from '#/lib/upload-dialog-store'
 import { filesSearch } from '#/lib/documents/to-files'
 
@@ -40,12 +45,14 @@ import { filesSearch } from '#/lib/documents/to-files'
  * object row behind them. So its columns are hand-declared with
  * `createColumnHelper` over `RecordTable` like `/portfolio`, and it has **no
  * `ViewBar`**: saved views address objects, and a shelf is not one. Its one
- * filter is `All · Unfiled`, as tabs on the bar, plus the text box.
+ * filter is `All · Unfiled`, as tabs on the bar with both counts, plus the
+ * text box.
  *
  * A row opens the preview rather than navigating: a document has no page, by
  * decision — inspection, not a destination. The filename is a real button
  * inside the sticky cell so the
- * keyboard reaches it, exactly where `/portfolio` puts its link.
+ * keyboard reaches it, exactly where `/portfolio` puts its link. A row ends
+ * on its exception lane: still extracting, or failed with Re-read.
  *
  * `?filed=unfiled` is the unfiled inbox: a filter on the shelf, not a route —
  * a search param, so reload, back/forward and Today's badge land on the same
@@ -57,9 +64,13 @@ import { filesSearch } from '#/lib/documents/to-files'
 export const Route = createFileRoute('/_app/files')({
   validateSearch: filesSearch,
   loaderDeps: ({ search }) => ({ filed: search.filed }),
-  loader: async ({ deps }) => ({
-    documents: await listDocuments({ data: { filed: deps.filed } }),
-  }),
+  loader: async ({ deps }) => {
+    const [documents, counts] = await Promise.all([
+      listDocuments({ data: { filed: deps.filed } }),
+      countShelfDocuments(),
+    ])
+    return { documents, counts }
+  },
   component: DocumentsPage,
 })
 
@@ -68,6 +79,9 @@ type DocumentRow = Awaited<ReturnType<typeof listDocuments>>[number]
 const col = createColumnHelper<DocumentRow>()
 // FROZEN: renaming resets saved column layouts with no recovery path.
 const PREFS_KEY = 'dealos.documents-table.v1'
+
+/** The exception lane's width: `Failed` and its Re-read. */
+const EXCEPTION_WIDTH = 150
 
 /**
  * How many chips fit a 36px row before the count takes over. Three names plus
@@ -82,45 +96,8 @@ function chipSortKey(names: Array<string>): string {
   return names.join(' ').toLowerCase()
 }
 
-/**
- * Who put the bytes here. `manual` covers upload, url and clip — all three
- * are a person choosing a file in a surface we ship — so it reads "Upload";
- * an integration is named, because "integration" tells the reader nothing
- * they could act on and "gmail" is the word they installed.
- */
-function originText(r: DocumentRow): string {
-  if (r.sourceClass === 'integration')
-    return r.sourceCapability ?? 'Integration'
-  return 'Upload'
-}
-
-/**
- * The Source column's text: the origin alone, or for a storage source the
- * provider and its path there — "Drive · Data room / Legal".
- * - The path prints verbatim: it is also a write-back address, and shortening
- *   it would make the two disagree.
- * - A null path is the origin on its own, never an empty cell or a dash.
- */
-function sourceText(r: DocumentRow): string {
-  const origin = originText(r)
-  return r.sourcePath === null ? origin : `${origin} · ${r.sourcePath}`
-}
-
-/**
- * The status word, and whether it is the bad kind. The word itself comes from
- * `DOCUMENT_EXTRACTION_LABELS`, which is also what the Filter popover's
- * Extraction options read — the cell and the filter naming the same state
- * differently is the drift that map exists to prevent.
- */
-function extractionText(r: DocumentRow): { text: string; bad: boolean } {
-  return {
-    text: DOCUMENT_EXTRACTION_LABELS[r.extractionStatus],
-    bad: r.extractionStatus === 'failed',
-  }
-}
-
 function DocumentsPage() {
-  const { documents } = Route.useLoaderData()
+  const { documents, counts } = Route.useLoaderData()
   const { filed } = Route.useSearch()
   const navigate = Route.useNavigate()
   const [globalFilter, setGlobalFilter] = useState('')
@@ -134,37 +111,48 @@ function DocumentsPage() {
       col.accessor((r) => r.filename, {
         id: 'filename',
         header: 'File',
-        size: 240,
+        size: 260,
         enableHiding: false,
         cell: (info) => {
           const r = info.row.original
           return (
-            <button
-              type="button"
-              // The row click does the same thing; without this, clicking the
-              // button fires both handlers for one intent.
-              onClick={(e) => {
-                e.stopPropagation()
-                setPreviewing(r)
-              }}
-              title={`Preview ${r.filename}`}
-              className="focus-ring-inset flex h-full w-full min-w-0 items-center gap-2 px-1 text-left font-medium hover:underline"
-            >
-              <DocumentTile kind={r.kind} filename={r.filename} />
-              <span className="truncate">{r.filename}</span>
-            </button>
+            <div className="flex h-full min-w-0 items-center gap-1.5">
+              <button
+                type="button"
+                // The row click does the same thing; without this, clicking
+                // the button fires both handlers for one intent.
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setPreviewing(r)
+                }}
+                title={`Preview ${r.filename}`}
+                className="focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-2 px-1 text-left font-medium group-hover:underline hover:underline"
+              >
+                <DocumentTile kind={r.kind} filename={r.filename} />
+                <span className="truncate">{r.filename}</span>
+              </button>
+              {r.externalStatus === 'gone' ? <GoneMarker /> : null}
+              {/* Only a row a source linked has somewhere to open: an
+                  upload has no external URL, so it gets no action rather
+                  than a dead one. A clip's and a capture's `external_url`
+                  are null by construction, so the two never meet. */}
+              {r.externalUrl === null ? null : (
+                <OpenInSourceButton
+                  url={r.externalUrl}
+                  filename={r.filename}
+                  className="row-reveal"
+                />
+              )}
+              {r.url === null ? null : (
+                <OpenSourceButton
+                  url={r.url}
+                  filename={r.filename}
+                  className="row-reveal"
+                />
+              )}
+            </div>
           )
         },
-      }),
-      col.accessor((r) => DOCUMENT_KIND_LABELS[r.kind], {
-        id: 'kind',
-        header: 'Kind',
-        size: 80,
-        cell: (info) => (
-          <span className="block truncate px-1">
-            {DOCUMENT_KIND_LABELS[info.row.original.kind]}
-          </span>
-        ),
       }),
       col.accessor((r) => chipSortKey(r.records.map((x) => x.name)), {
         id: 'records',
@@ -196,68 +184,16 @@ function DocumentsPage() {
           />
         ),
       }),
-      col.accessor((r) => sourceText(r), {
-        id: 'source',
-        header: 'Source',
-        // Not `origin`: a stored width or hidden flag under the old id is not
-        // read, so the column comes back at its default once, on purpose.
-        size: 150,
+      col.accessor((r) => r.uploadedByName ?? '', {
+        id: 'addedBy',
+        header: 'Added by',
+        size: 130,
         cell: (info) => {
-          const r = info.row.original
-          return (
-            <div className="flex min-w-0 items-center gap-1.5 px-1">
-              <span
-                title={sourceText(r)}
-                className="min-w-0 truncate text-graphite"
-              >
-                {sourceText(r)}
-              </span>
-              {r.externalStatus === 'gone' ? <GoneMarker /> : null}
-              {/* Only a row a source actually linked has somewhere to open:
-                  an upload, a clip and a url have no external URL, so they
-                  get no action rather than a dead one. */}
-              {r.externalUrl === null ? null : (
-                <OpenInSourceButton
-                  url={r.externalUrl}
-                  filename={r.filename}
-                  className="ml-auto opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                />
-              )}
-              {/* The page a row came from: a clipped article (an address,
-                  no bytes) or a capture (both). Never rendered beside the
-                  button above: a clip's and a capture's `external_url` are
-                  null by construction. */}
-              {r.url !== null ? (
-                <OpenSourceButton
-                  url={r.url}
-                  filename={r.filename}
-                  className="ml-auto opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                />
-              ) : null}
-            </div>
-          )
-        },
-      }),
-      col.accessor((r) => extractionText(r).text, {
-        id: 'extraction',
-        header: 'Extraction',
-        size: 110,
-        cell: (info) => {
-          const r = info.row.original
-          const { text, bad } = extractionText(r)
-          const cls = bad
-            ? 'block truncate px-1 mono text-label text-destructive'
-            : 'block truncate px-1 mono text-label text-graphite'
-          // The reason is the title rather than the cell: a stack trace from
-          // a broken PDF is a paragraph, and a 36px row is not. Two branches
-          // rather than one `?? undefined`, because a document that extracted
-          // cleanly has no reason and must not get an empty tooltip.
-          return r.extractionError === null ? (
-            <span className={cls}>{text}</span>
+          const name = info.row.original.uploadedByName
+          return name === null ? (
+            <span className="px-1 text-graphite">—</span>
           ) : (
-            <span title={r.extractionError} className={cls}>
-              {text}
-            </span>
+            <span className="block truncate px-1">{name}</span>
           )
         },
       }),
@@ -332,7 +268,6 @@ function DocumentsPage() {
     <div className="flex flex-col">
       <PageHeader
         title="Files"
-        {...(filed === 'all' ? { count: documents.length } : {})}
         action={
           /* The upload door on the shelf that lists what it produces. The
              dialog lives in the app shell; the chassis and ⌘K open it too. */
@@ -342,13 +277,10 @@ function DocumentsPage() {
           </Button>
         }
       />
-      {documents.length === 0 && filed === 'all' ? (
-        <div className="px-8 pb-8">
-          <EmptyState
-            icon={FileText}
-            title="No files yet"
-            body="Upload one here and leave it unfiled until you know whose it is, or drop it on a company's Files tab."
-          />
+      {counts.all === 0 ? (
+        // First run: nothing on the shelf — one row that uploads.
+        <div className="px-8 pt-6 pb-8">
+          <EmptyRow name="Files" onAdd={openUploadDialog} />
         </div>
       ) : (
         <>
@@ -356,15 +288,15 @@ function DocumentsPage() {
             table={table}
             label="Files by filing"
             tabs={[
-              { id: 'all', label: 'All' },
-              { id: 'unfiled', label: 'Unfiled' },
+              { id: 'all', label: 'All', count: counts.all },
+              { id: 'unfiled', label: 'Unfiled', count: counts.unfiled },
             ]}
             value={filed}
             onValueChange={setFiled}
             filter={globalFilter}
             onFilterChange={setGlobalFilter}
-            filterPlaceholder="Filter by name or text…"
-            filterLabel="Filter files"
+            filterPlaceholder="Search files"
+            filterLabel="Search files"
           />
           <div className="px-8 pb-8">
             {documents.length === 0 ? (
@@ -378,6 +310,8 @@ function DocumentsPage() {
                 label="Files"
                 stickyColumnId="filename"
                 onRowClick={setPreviewing}
+                rowEnd={(r) => <ExceptionLane doc={r} />}
+                rowEndWidth={EXCEPTION_WIDTH}
               />
             )}
           </div>
@@ -388,6 +322,63 @@ function DocumentsPage() {
         onOpenChange={(open) => !open && setPreviewing(null)}
       />
     </div>
+  )
+}
+
+/**
+ * A row's exception lane: `Extracting…` while the text is being read,
+ * `Failed` with Re-read when it could not be — the reason on hover — and
+ * nothing for a file that read cleanly.
+ */
+function ExceptionLane({ doc }: { doc: DocumentRow }) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  if (doc.extractionStatus === 'pending')
+    return (
+      <span
+        data-exception="pending"
+        className="block truncate px-1 mono text-label text-graphite"
+      >
+        {DOCUMENT_EXTRACTION_LABELS.pending}
+      </span>
+    )
+  if (doc.extractionStatus !== 'failed') return null
+
+  async function reRead() {
+    setBusy(true)
+    try {
+      const { queued } = await reExtractDocument({
+        data: { documentId: doc.id },
+      })
+      // Pending either way and re-queueable; a down worker is said, not hidden.
+      if (!queued) toast.message('Queued when the worker is back')
+      await router.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not re-read')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <span data-exception="failed" className="flex items-center gap-2 px-1">
+      <span
+        {...(doc.extractionError === null
+          ? {}
+          : { title: doc.extractionError })}
+        className="mono text-label text-destructive"
+      >
+        {DOCUMENT_EXTRACTION_LABELS.failed}
+      </span>
+      <Button
+        size="xs"
+        variant="outline"
+        pending={busy}
+        onClick={() => void reRead()}
+      >
+        Re-read
+      </Button>
+    </span>
   )
 }
 

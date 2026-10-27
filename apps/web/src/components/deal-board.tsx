@@ -10,11 +10,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog'
-import { DitherMark, InitialsMark, RecordMark } from './record/record-parts'
+import { DitherMark, RecordMark } from './record/record-parts'
 import { Badge } from './ui/badge'
 import { updateRecord } from '#/lib/server-fns'
 import { fmtMoney } from '@spaces/core/portfolio/format'
-import { formatDue } from '@spaces/core/format'
+import { daysBetween, formatDay } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
@@ -27,7 +27,17 @@ const COLUMN_LIMIT = 8
  * attribute-event log, the Invested→holding hook, and stage analytics all
  * fire identically to a table edit. No dnd library: cards are links, drags
  * are stage changes, nothing else.
+ * - A column head: the stage badge and its count, then the column's value
+ *   and its median days in stage, on an ink rule.
+ * - A card: the name; value · source with the days in stage (destructive
+ *   past twice the median); the close day and the days to it, when set.
  */
+
+/** `Close 15 Nov · 31d`, or `· −3d` once the day has passed. */
+export function closeLine(close: string, today: string): string {
+  const n = daysBetween(today, close)
+  return `Close ${formatDay(close, today)} · ${n < 0 ? `−${String(-n)}` : String(n)}d`
+}
 
 export type BoardDeal = {
   id: string
@@ -47,15 +57,14 @@ export type BoardStage = {
 export function DealBoard({
   deals,
   stages,
-  refNames,
   valueCurrency = 'USD',
   medianDaysInStage = {},
   daysInStage = {},
   pictures = {},
+  sourceLabel = () => null,
 }: {
   deals: Array<BoardDeal>
   stages: Array<BoardStage>
-  refNames: Record<string, { name: string } | string | undefined>
   /** options.code of the deal value attribute — never hardcode a symbol. */
   valueCurrency?: string
   /** Median days live deals have sat in each stage (funnel stats). */
@@ -64,6 +73,8 @@ export function DealBoard({
   daysInStage?: Record<string, number | null | undefined>
   /** Each referenced company's picture URL, drawn in place of the card's mark. */
   pictures?: Record<string, string | undefined>
+  /** The source option's label for a card's stored value. */
+  sourceLabel?: (raw: unknown) => string | null
 }) {
   const router = useRouter()
   const { today } = useClock()
@@ -126,13 +137,6 @@ export function DealBoard({
     void commitMove(dealId, stageId)
   }
 
-  function nameOf(id: unknown): string {
-    if (typeof id !== 'string' || !id) return ''
-    const hit = refNames[id]
-    if (!hit) return ''
-    return typeof hit === 'string' ? hit : hit.name
-  }
-
   return (
     <>
       {closing ? (
@@ -185,9 +189,8 @@ export function DealBoard({
                 if (id) moveTo(id, stage.id)
               }}
             >
-              {/* The column head is a mini readout strip: badge, count, Σ,
-                  median — hairline under. */}
               <div
+                data-board-head
                 className="flex flex-col gap-1 border-b border-hairline pb-2"
                 title={stage.archived ? 'Archived stage' : undefined}
               >
@@ -201,20 +204,19 @@ export function DealBoard({
                     {stage.label}
                     {stage.archived ? ' · archived' : ''}
                   </Badge>
-                  <span className="mono text-micro text-foreground">
+                  <span className="tabular mono text-micro text-foreground">
                     {cards.length}
                   </span>
                 </div>
-                <div className="flex justify-between gap-2 mono text-field text-graphite">
-                  <span>
-                    Σ{' '}
+                <div className="flex h-4 justify-between gap-2 mono text-micro text-graphite">
+                  <span className="tabular">
                     {sum > 0
                       ? fmtMoney(sum, valueCurrency, { compact: true })
-                      : '—'}
+                      : ''}
                   </span>
-                  <span>
+                  <span className="tabular">
                     {cards.length > 0 && medianDays !== undefined
-                      ? `med ${Math.round(medianDays)}d`
+                      ? `Median ${String(Math.round(medianDays))}d`
                       : ''}
                   </span>
                 </div>
@@ -232,8 +234,16 @@ export function DealBoard({
                     typeof d.values.close_date === 'string'
                       ? d.values.close_date
                       : null
-                  const owner = nameOf(d.values.owner)
-                  const company = nameOf(d.values.company)
+                  const lead = [
+                    typeof d.values.value === 'number'
+                      ? fmtMoney(d.values.value, valueCurrency, {
+                          compact: true,
+                        })
+                      : null,
+                    sourceLabel(d.values.source),
+                  ]
+                    .filter((x) => x !== null && x !== '')
+                    .join(' · ')
                   return (
                     <li
                       key={d.id}
@@ -263,22 +273,16 @@ export function DealBoard({
                           </span>
                         </span>
                         <span className="flex items-baseline justify-between gap-2 mono text-micro">
-                          <span className="min-w-0 truncate text-graphite">
-                            {[
-                              company,
-                              typeof d.values.value === 'number'
-                                ? fmtMoney(d.values.value, valueCurrency, {
-                                    compact: true,
-                                  })
-                                : null,
-                            ]
-                              .filter(Boolean)
-                              .join(' · ') || '—'}
+                          <span
+                            data-card-lead
+                            className="min-w-0 truncate text-graphite"
+                          >
+                            {lead}
                           </span>
                           {days !== null && days !== undefined ? (
                             <span
                               className={cn(
-                                'shrink-0',
+                                'tabular shrink-0',
                                 late ? 'text-destructive' : 'text-foreground',
                               )}
                             >
@@ -286,16 +290,14 @@ export function DealBoard({
                             </span>
                           ) : null}
                         </span>
-                        <span className="flex items-center justify-between gap-2 mono text-field text-graphite">
-                          <span className="truncate">
-                            {close
-                              ? `close ${formatDue(close, today)}`
-                              : 'close —'}
+                        {close === null ? null : (
+                          <span
+                            data-card-close
+                            className="truncate mono text-micro text-graphite"
+                          >
+                            {closeLine(close, today)}
                           </span>
-                          {owner ? (
-                            <InitialsMark name={owner} size="xs" />
-                          ) : null}
-                        </span>
+                        )}
                       </Link>
                     </li>
                   )
@@ -316,9 +318,10 @@ export function DealBoard({
                 {dragOver === stage.id ? (
                   <li
                     aria-hidden
+                    data-drop-target
                     className="flex h-18 items-center justify-center border border-dashed border-primary bg-selected mono text-micro text-primary"
                   >
-                    drop → {stage.label}
+                    Drop → {stage.label}
                   </li>
                 ) : null}
               </ol>

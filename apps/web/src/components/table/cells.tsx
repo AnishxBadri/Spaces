@@ -22,7 +22,10 @@ type AnchorProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
   ref?: Ref<HTMLAnchorElement>
 }
 
-/** The row's identity cell: badge + name, navigating to the record. */
+/**
+ * The row's identity cell: badge + name, navigating to the record; the name
+ * underlines while its row is hovered.
+ */
 export const RecordLinkCell = createLink(function RecordLinkAnchor({
   name,
   badge,
@@ -33,7 +36,7 @@ export const RecordLinkCell = createLink(function RecordLinkAnchor({
     <a
       {...props}
       className={cn(
-        'focus-ring-inset flex h-full min-w-0 items-center gap-2 px-1 font-medium hover:underline',
+        'focus-ring-inset flex h-full min-w-0 items-center gap-2 px-1 font-medium group-hover:underline hover:underline',
         className,
       )}
     >
