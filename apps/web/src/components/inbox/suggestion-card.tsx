@@ -46,6 +46,7 @@ import type {
   SuggestionRow,
 } from '#/lib/server-fns'
 import { recordPath } from '#/lib/record-path'
+import { heldDecisions } from '#/lib/held-decisions'
 import { cn } from '#/lib/utils'
 
 /**
@@ -908,6 +909,10 @@ export function batchSummary(outcomes: ReadonlyArray<BatchOutcome>): string {
     : `${applied} applied, ${failed} failed`
 }
 
+/** A column accept's hold, by its field and, for a run's Accept all, the run. */
+export const columnHoldKey = (slug: string, runId: string | null): string =>
+  runId === null ? `column:${slug}` : `column:${slug}:${runId}`
+
 /** Key for one item's refusal: the suggestion, and its field if it had one. */
 const failureKey = (suggestionId: string, slug?: string) =>
   slug === undefined ? suggestionId : `${suggestionId}:${slug}`
@@ -947,17 +952,22 @@ export function SuggestionCard({ card }: { card: SuggestionRow }) {
   )
   const n = card.suggestions.length
 
+  // A batch's refusals draw inline under their field.
+  function noteFailures(outcomes: ReadonlyArray<BatchOutcome>) {
+    setFailures(
+      new Map(
+        outcomes.flatMap((o) =>
+          o.ok ? [] : [[failureKey(o.suggestionId, o.slug), o.message]],
+        ),
+      ),
+    )
+  }
+
   async function runBatch(run: () => Promise<Array<BatchOutcome>>) {
     setPending('batch')
     try {
       const outcomes = await run()
-      setFailures(
-        new Map(
-          outcomes.flatMap((o) =>
-            o.ok ? [] : [[failureKey(o.suggestionId, o.slug), o.message]],
-          ),
-        ),
-      )
+      noteFailures(outcomes)
       const summary = batchSummary(outcomes)
       if (outcomes.some((o) => o.ok)) toast(summary)
       else toast.error(summary)
@@ -973,28 +983,34 @@ export function SuggestionCard({ card }: { card: SuggestionRow }) {
     pending: pending !== null,
     failureOf: (id, slug) => failures.get(failureKey(id, slug)) ?? null,
     onAcceptColumn: (f) =>
-      void runBatch(() =>
-        acceptSuggestionColumn({ data: { attributeSlug: f.slug } }),
-      ),
+      heldDecisions.hold(columnHoldKey(f.slug, null), {
+        decision: { verb: 'accept-column', attributeSlug: f.slug, runId: null },
+        label: `${f.name} accepted on every record`,
+        commit: async () => {
+          const outcomes = await acceptSuggestionColumn({
+            data: { attributeSlug: f.slug },
+          })
+          noteFailures(outcomes)
+          // The hold's toast said accepted; only a shortfall speaks again.
+          if (outcomes.some((o) => !o.ok)) toast.error(batchSummary(outcomes))
+        },
+      }),
   }
 
-  async function decide(id: string, verb: 'accept' | 'reject') {
-    setPending(id)
-    try {
-      if (verb === 'accept') await acceptSuggestion({ data: { id } })
-      else await rejectSuggestion({ data: { id } })
-      toast(
+  // Held, not written: the entry leaves, the toast holds Undo, and the
+  // server fn runs when the hold runs out.
+  function decide(id: string, verb: 'accept' | 'reject') {
+    heldDecisions.hold(id, {
+      decision: { verb: verb === 'accept' ? 'accept' : 'dismiss', id },
+      label:
         verb === 'accept'
           ? `Accepted on ${card.record.name}`
-          : 'Dismissed — will not be suggested again',
-      )
-      void router.invalidate()
-    } catch (err) {
-      // The validator's own sentence; the row stays for another look.
-      toast.error(err instanceof Error ? err.message : 'Action failed')
-    } finally {
-      setPending(null)
-    }
+          : `Dismissed on ${card.record.name}`,
+      commit: () =>
+        verb === 'accept'
+          ? acceptSuggestion({ data: { id } })
+          : rejectSuggestion({ data: { id } }),
+    })
   }
 
   return (
@@ -1034,8 +1050,8 @@ export function SuggestionCard({ card }: { card: SuggestionRow }) {
             key={s.id}
             item={s}
             pending={pending !== null}
-            onAccept={() => void decide(s.id, 'accept')}
-            onReject={() => void decide(s.id, 'reject')}
+            onAccept={() => decide(s.id, 'accept')}
+            onReject={() => decide(s.id, 'reject')}
             actions={actions}
             failure={failures.get(failureKey(s.id)) ?? null}
           />

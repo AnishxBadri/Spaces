@@ -34,6 +34,7 @@ import {
 } from './ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import { authClient } from '#/lib/auth-client'
+import { heldDecisions } from '#/lib/held-decisions'
 import {
   PINNED_SHOWN,
   PINNED_VIEWS_QUERY,
@@ -262,6 +263,8 @@ export function AppSidebar({
   const [pinsOpen, setPinsOpen] = useState<ReadonlyArray<string>>([])
 
   async function signOut() {
+    // Held decisions are written as this user, so before the session goes.
+    await heldDecisions.flush()
     await authClient.signOut()
     void navigate({ to: '/login' })
   }

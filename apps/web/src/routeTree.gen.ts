@@ -34,6 +34,7 @@ import { Route as AppSpacesRouteImport } from './routes/_app/spaces'
 import { Route as AppTasksRouteImport } from './routes/_app/tasks'
 import { Route as AppTodayRouteImport } from './routes/_app/today'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiHeldDecisionsRouteImport } from './routes/api/held-decisions'
 import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as AppCompaniesCompanyIdRouteImport } from './routes/_app/companies_.$companyId'
 import { Route as AppDealsDealIdRouteImport } from './routes/_app/deals_.$dealId'
@@ -204,6 +205,11 @@ const AppTodayRoute = AppTodayRouteImport.update({
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHeldDecisionsRoute = ApiHeldDecisionsRouteImport.update({
+  id: '/api/held-decisions',
+  path: '/api/held-decisions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMcpRoute = ApiMcpRouteImport.update({
@@ -477,6 +483,7 @@ export interface FileRoutesByFullPath {
   '/tasks': typeof AppTasksRoute
   '/today': typeof AppTodayRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/held-decisions': typeof ApiHeldDecisionsRoute
   '/api/mcp': typeof ApiMcpRoute
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/deals/$dealId': typeof AppDealsDealIdRoute
@@ -549,6 +556,7 @@ export interface FileRoutesByTo {
   '/tasks': typeof AppTasksRoute
   '/today': typeof AppTodayRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/held-decisions': typeof ApiHeldDecisionsRoute
   '/api/mcp': typeof ApiMcpRoute
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/deals/$dealId': typeof AppDealsDealIdRoute
@@ -624,6 +632,7 @@ export interface FileRoutesById {
   '/_app/tasks': typeof AppTasksRoute
   '/_app/today': typeof AppTodayRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/held-decisions': typeof ApiHeldDecisionsRoute
   '/api/mcp': typeof ApiMcpRoute
   '/_app/companies_/$companyId': typeof AppCompaniesCompanyIdRoute
   '/_app/deals_/$dealId': typeof AppDealsDealIdRoute
@@ -699,6 +708,7 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/today'
     | '/api/health'
+    | '/api/held-decisions'
     | '/api/mcp'
     | '/companies/$companyId'
     | '/deals/$dealId'
@@ -771,6 +781,7 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/today'
     | '/api/health'
+    | '/api/held-decisions'
     | '/api/mcp'
     | '/companies/$companyId'
     | '/deals/$dealId'
@@ -845,6 +856,7 @@ export interface FileRouteTypes {
     | '/_app/tasks'
     | '/_app/today'
     | '/api/health'
+    | '/api/held-decisions'
     | '/api/mcp'
     | '/_app/companies_/$companyId'
     | '/_app/deals_/$dealId'
@@ -902,6 +914,7 @@ export interface RootRouteChildren {
   ResetRoute: typeof ResetRoute
   SetupRoute: typeof SetupRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  ApiHeldDecisionsRoute: typeof ApiHeldDecisionsRoute
   ApiMcpRoute: typeof ApiMcpRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBlobKeyRoute: typeof ApiBlobKeyRoute
@@ -1088,6 +1101,13 @@ declare module '@tanstack/react-router' {
       path: '/api/health'
       fullPath: '/api/health'
       preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/held-decisions': {
+      id: '/api/held-decisions'
+      path: '/api/held-decisions'
+      fullPath: '/api/held-decisions'
+      preLoaderRoute: typeof ApiHeldDecisionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/mcp': {
@@ -1562,6 +1582,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetRoute: ResetRoute,
   SetupRoute: SetupRoute,
   ApiHealthRoute: ApiHealthRoute,
+  ApiHeldDecisionsRoute: ApiHeldDecisionsRoute,
   ApiMcpRoute: ApiMcpRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBlobKeyRoute: ApiBlobKeyRoute,

@@ -33,7 +33,8 @@ const underPrefix = (path: string) =>
  * Raw by design, and mounted today. The job-status stream is SSE; the
  * webhook ingress verifies an HMAC over the exact raw body; a connect leg is
  * a browser redirect to and from the provider, with a cookie; the workspace
- * logo is image bytes an `<img>` loads.
+ * logo is image bytes an `<img>` loads; the held decisions arrive in one
+ * `sendBeacon` as the page goes.
  */
 const RAW = [
   '/api/auth/$',
@@ -41,6 +42,7 @@ const RAW = [
   '/api/connections/$provider/callback',
   '/api/connections/$provider/start',
   '/api/health',
+  '/api/held-decisions',
   '/api/job-status/$entityId',
   '/api/mcp',
   '/api/webhooks/$id',

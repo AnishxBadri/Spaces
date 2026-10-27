@@ -124,9 +124,15 @@ export const dismissDuplicate = createServerFn({ method: 'POST' })
   .validator(z.object({ candidateId: z.string().uuid() }))
   .handler(async ({ data }) => {
     const u = await requireUser()
-    await db
-      .update(duplicateCandidate)
-      .set({ status: 'dismissed', resolvedBy: u.id, resolvedAt: new Date() })
-      .where(eq(duplicateCandidate.id, data.candidateId))
+    const { dismissDuplicateProgram } = await import('../inbox/held-commit')
+    const { effectFn } = await import('./effect')
+    // A pair merged or dismissed meanwhile is left as it stands.
+    await effectFn(dismissDuplicateProgram)(data.candidateId, u.id).catch(
+      (err: unknown) => {
+        throw new Error(
+          err instanceof Error ? err.message : 'Could not dismiss the pair',
+        )
+      },
+    )
     return { ok: true }
   })

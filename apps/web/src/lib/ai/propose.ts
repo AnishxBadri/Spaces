@@ -56,6 +56,7 @@ import type {
 } from '@spaces/core/writes/suggestions/propose'
 import type { CaptureObject } from '@spaces/core/writes/ai/capture-read'
 import type { DomainEvent } from '@spaces/sdk'
+import { alreadyDecidedMessage } from '#/lib/inbox/held'
 import { dealLinked } from '@spaces/core/writes/events/dispatch'
 import {
   SupersedesRefused,
@@ -139,7 +140,7 @@ const isKind = (k: string): k is SuggestionKind => k in KIND_LABEL
 export function suggestionMessage(failure: unknown): string {
   if (failure instanceof SuggestionInvalid) return failure.message
   if (failure instanceof SuggestionNotOpen)
-    return `This suggestion was already ${failure.status}`
+    return alreadyDecidedMessage(failure.status)
   if (failure instanceof SuggestionNotFound)
     return 'That suggestion no longer exists'
   if (failure instanceof UnsupportedSuggestionKind)

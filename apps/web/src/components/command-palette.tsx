@@ -41,6 +41,7 @@ import {
   CommandList,
 } from './ui/command'
 import { authClient } from '#/lib/auth-client'
+import { heldDecisions } from '#/lib/held-decisions'
 import { fileInSpaceAction } from '#/lib/file-in-space'
 import { objectIcon } from '#/lib/object-icons'
 import {
@@ -688,7 +689,7 @@ export function PaletteBody({
               Find
             </span>
           ) : (
-            <span data-mode className="stamp-outline stamp">
+            <span data-mode className="stamp stamp-outline">
               {mode.step.mode} ›
             </span>
           )
@@ -1010,7 +1011,11 @@ export function CommandPalette({
         icon: LogOut,
         words: 'log out session',
         run: () => {
-          void authClient.signOut().then(() => navigate({ to: '/login' }))
+          // Held decisions are written as this user, so before the session goes.
+          void heldDecisions
+            .flush()
+            .then(() => authClient.signOut())
+            .then(() => navigate({ to: '/login' }))
         },
       },
     ],

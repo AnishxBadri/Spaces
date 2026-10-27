@@ -1,7 +1,7 @@
 import { useRouter } from '@tanstack/react-router'
 import { Check, X } from 'lucide-react'
 import { useCallback, useEffect, useReducer, useState } from 'react'
-import { toast } from 'sonner'
+import { heldDecisions } from '#/lib/held-decisions'
 import { PluginMark } from '#/components/integrations/integration-ledger'
 import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
@@ -250,9 +250,13 @@ function AcceptedEntry({
   )
 }
 
+/**
+ * The group, its held cards already left out by the queue's filter
+ * (`withoutHeld`). A group with nothing left draws nothing but stays mounted,
+ * so an accept's after-state can draw once its write lands.
+ */
 export function DiscoveryGroup({ group }: { group: DiscoveryRow }) {
   const router = useRouter()
-  const [pending, setPending] = useState<string | null>(null)
   // Accepted cards, by suggestion id, with the company each one created —
   // kept here so a refresh for another row does not cut the after-state short.
   const [accepted, setAccepted] = useState<
@@ -272,36 +276,41 @@ export function DiscoveryGroup({ group }: { group: DiscoveryRow }) {
   )
   const live = new Set(group.suggestions.map((s) => s.id))
 
-  async function accept(item: SuggestionItem) {
-    setPending(item.id)
-    try {
-      const out = await acceptSuggestion({ data: { id: item.id } })
-      setAccepted((m) =>
-        new Map(m).set(item.id, {
-          item,
-          added:
-            out.added !== null && out.added.created ? out.added.entityId : null,
-        }),
-      )
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Action failed')
-    } finally {
-      setPending(null)
-    }
+  const nameOf = (item: SuggestionItem) =>
+    discoveryCardOf(item)?.name ?? 'The card'
+
+  // Both verbs are held: the row leaves, the toast holds Undo, and the
+  // server fn runs when the hold runs out.
+  function accept(item: SuggestionItem) {
+    heldDecisions.hold(item.id, {
+      decision: { verb: 'accept', id: item.id },
+      label: `${nameOf(item)} accepted into ${group.space.name}`,
+      // The row comes back as its after-state, and `settle` refreshes.
+      invalidate: false,
+      commit: async () => {
+        const out = await acceptSuggestion({ data: { id: item.id } })
+        setAccepted((m) =>
+          new Map(m).set(item.id, {
+            item,
+            added:
+              out.added !== null && out.added.created
+                ? out.added.entityId
+                : null,
+          }),
+        )
+      },
+    })
   }
 
-  async function dismiss(item: SuggestionItem) {
-    setPending(item.id)
-    try {
-      await rejectSuggestion({ data: { id: item.id } })
-      toast('Dismissed')
-      void router.invalidate()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Action failed')
-    } finally {
-      setPending(null)
-    }
+  function dismiss(item: SuggestionItem) {
+    heldDecisions.hold(item.id, {
+      decision: { verb: 'dismiss', id: item.id },
+      label: `${nameOf(item)} dismissed from ${group.space.name}`,
+      commit: () => rejectSuggestion({ data: { id: item.id } }),
+    })
   }
+
+  if (group.suggestions.length === 0 && accepted.size === 0) return null
 
   return (
     <li className="flex flex-col border border-hairline bg-paper">
@@ -313,10 +322,10 @@ export function DiscoveryGroup({ group }: { group: DiscoveryRow }) {
             <DiscoveryEntry
               key={s.id}
               item={s}
-              pending={pending !== null}
+              pending={false}
               after={null}
-              onAccept={() => void accept(s)}
-              onDismiss={() => void dismiss(s)}
+              onAccept={() => accept(s)}
+              onDismiss={() => dismiss(s)}
             />
           ) : (
             <AcceptedEntry

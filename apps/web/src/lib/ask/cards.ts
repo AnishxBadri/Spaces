@@ -1,3 +1,4 @@
+import type { HeldVerb } from '#/lib/inbox/held'
 import type { AskCardKind, AskRef } from './types'
 
 /**
@@ -65,6 +66,25 @@ export type AskCardView = {
 /** A card the renderer will draw: one with evidence. Null refuses it. */
 export function renderableCard(card: AskCardView): AskCardView | null {
   return card.evidence.length > 0 ? card : null
+}
+
+/**
+ * An open card as it reads while its decision is held: applied or skipped,
+ * before the write. Any other card, or any other verb, reads as it stands.
+ */
+export function heldOutcome(card: AskCardView, verb: HeldVerb): AskCardView {
+  if (card.outcome !== 'open') return card
+  switch (verb) {
+    case 'apply-card':
+    case 'accept':
+      return { ...card, outcome: 'applied' }
+    case 'skip-card':
+    case 'dismiss':
+      return { ...card, outcome: 'skipped' }
+    case 'accept-column':
+    case 'dismiss-duplicate':
+      return card
+  }
 }
 
 /** The mono state word an outcome reads as; null while it can be decided. */

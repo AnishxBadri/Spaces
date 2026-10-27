@@ -3,9 +3,10 @@ import {
   createFileRoute,
   redirect,
   useNavigate,
+  useRouter,
 } from '@tanstack/react-router'
 import { Menu, X } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { AppSidebar, CHASSIS_LAYER, NAV_ITEMS } from '#/components/app-sidebar'
 import {
   SettingsChassis,
@@ -19,6 +20,7 @@ import { UploadDialog } from '#/components/upload-dialog'
 import { ComposeWindows } from '#/components/email/compose-windows'
 import { Wordmark } from '#/components/wordmark'
 import { Toaster } from '#/components/ui/sonner'
+import { useHeldDecisionsHost } from '#/lib/held-decisions'
 import { setChassisCollapsed, useChassisCollapsed } from '#/lib/chassis-store'
 import {
   getSession,
@@ -69,6 +71,10 @@ function AppShell() {
   const collapsed = useChassisCollapsed()
   const [keyboardOpen, setKeyboardOpen] = useState(false)
   const navigate = useNavigate()
+  const router = useRouter()
+  // Held decisions outlive the page they were made on: the store and its
+  // Toaster live here, so navigating neither cancels nor commits early.
+  useHeldDecisionsHost(useCallback(() => router.invalidate(), [router]))
   // Settings takes the chassis over; it never folds to marks.
   const onSettings = useSettingsTakeover()
   const narrow = collapsed && !onSettings

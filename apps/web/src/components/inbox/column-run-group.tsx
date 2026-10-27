@@ -1,11 +1,15 @@
-import { useRouter } from '@tanstack/react-router'
 import { CheckCheck, Columns3 } from 'lucide-react'
-import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
+import { heldDecisions } from '#/lib/held-decisions'
 import { acceptSuggestionColumn } from '#/lib/server-fns'
 import type { ColumnRunRow, ColumnRunSummary } from '#/lib/server-fns'
-import { SuggestionCard, batchSummary, usageRunHref } from './suggestion-card'
+import {
+  SuggestionCard,
+  batchSummary,
+  columnHoldKey,
+  usageRunHref,
+} from './suggestion-card'
 
 /**
  * A column run in the review inbox: every open suggestion one run
@@ -41,26 +45,28 @@ export function columnRunStatusLine(
 }
 
 export function ColumnRunGroup({ group }: { group: ColumnRunRow }) {
-  const router = useRouter()
-  const [pending, setPending] = useState(false)
   const open = group.cards.reduce((n, c) => n + c.suggestions.length, 0)
   const slug = group.attributeSlug
+  const runId = group.run.id
 
-  async function acceptAll(attributeSlug: string) {
-    setPending(true)
-    try {
-      const outcomes = await acceptSuggestionColumn({
-        data: { attributeSlug, runId: group.run.id },
-      })
-      const summary = batchSummary(outcomes)
-      if (outcomes.some((o) => o.ok)) toast(summary)
-      else toast.error(summary)
-      void router.invalidate()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Action failed')
-    } finally {
-      setPending(false)
-    }
+  // Held, not written: the run's rows leave, the toast holds Undo, and the
+  // accept runs when the hold runs out.
+  function acceptAll(attributeSlug: string) {
+    // A registry proposal proposes no value, so Accept all leaves it.
+    const taken = group.cards
+      .flatMap((c) => c.suggestions)
+      .filter((s) => s.fields?.some((f) => f.slug === attributeSlug)).length
+    heldDecisions.hold(columnHoldKey(attributeSlug, runId), {
+      decision: { verb: 'accept-column', attributeSlug, runId },
+      label: `${String(taken)} accepted on ${titleOf(group.run.task)}`,
+      commit: async () => {
+        const outcomes = await acceptSuggestionColumn({
+          data: { attributeSlug, runId },
+        })
+        // The hold's toast said accepted; only a shortfall speaks again.
+        if (outcomes.some((o) => !o.ok)) toast.error(batchSummary(outcomes))
+      },
+    })
   }
 
   return (
@@ -79,9 +85,8 @@ export function ColumnRunGroup({ group }: { group: ColumnRunRow }) {
             <Button
               size="xs"
               className="ml-auto"
-              disabled={pending}
               title="Accept this run’s value on every record below, field by field"
-              onClick={() => void acceptAll(slug)}
+              onClick={() => acceptAll(slug)}
             >
               <CheckCheck className="size-3" strokeWidth={2} />
               Accept all

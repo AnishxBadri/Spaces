@@ -31,6 +31,8 @@ import type {
   SuggestionRow,
 } from '#/lib/server-fns'
 import { defaultKeeper } from '#/lib/inbox/keeper'
+import { hasOpenItems, withoutHeld } from '#/lib/inbox/held'
+import { heldDecisions, useHeldView } from '#/lib/held-decisions'
 import { recordPath } from '#/lib/record-path'
 import { formatDay } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
@@ -224,13 +226,19 @@ const LANE_PARAM: Record<'all' | 'suggestions' | 'duplicates', Lane> = {
 }
 
 function InboxPage() {
-  const { rows, scope, filter, stoppedPlugins } = Route.useLoaderData()
+  const loaded = Route.useLoaderData()
+  const { scope, filter, stoppedPlugins } = loaded
   const search = Route.useSearch()
   const [lane, setLane] = useState<Lane>(
     search.lane ? LANE_PARAM[search.lane] : 'all',
   )
-  const visible =
-    lane === 'all' ? rows : rows.filter((row) => laneOf(row.kind) === lane)
+  // Held decisions leave the queue for their undo window. `kept` still
+  // mounts an emptied discovery group; `rows` is what counts.
+  const kept = withoutHeld(loaded.rows, useHeldView())
+  const rows = kept.filter(hasOpenItems)
+  const inLane = (row: QueueRow) => lane === 'all' || laneOf(row.kind) === lane
+  const visible = rows.filter(inLane)
+  const mounted = kept.filter(inLane)
   const countOf = (key: Lane) =>
     key === 'all'
       ? rows.length
@@ -286,10 +294,11 @@ function InboxPage() {
           title="Nothing in this lane"
           body="The other lane still has open items — switch to All to see them."
         />
-      ) : (
-        <ul className="flex max-w-220 flex-col gap-6 px-8 pt-6 pb-8">
-          {visible.map((row) => {
-            const same = visible.filter((r) => r.kind === row.kind)
+      ) : null}
+      {mounted.length === 0 ? null : (
+        <ul className="flex max-w-220 flex-col gap-6 px-8 pt-6 pb-8 empty:hidden">
+          {mounted.map((row) => {
+            const same = mounted.filter((r) => r.kind === row.kind)
             return (
               <InboxItem
                 key={`${row.kind}:${row.id}`}
@@ -573,11 +582,15 @@ function PairCard({ pair }: { pair: DuplicateCandidateRow }) {
         <Button
           variant="outline"
           disabled={pending}
+          // Held: the pair leaves, the toast holds Undo. A merge is not held;
+          // its note above is the confirmation.
           onClick={() =>
-            act(
-              () => dismissDuplicate({ data: { candidateId: pair.id } }),
-              'Dismissed — will not be suggested again',
-            )
+            heldDecisions.hold(pair.id, {
+              decision: { verb: 'dismiss-duplicate', candidateId: pair.id },
+              label: `${left.name} ⇄ ${right.name} dismissed`,
+              commit: () =>
+                dismissDuplicate({ data: { candidateId: pair.id } }),
+            })
           }
         >
           Dismiss

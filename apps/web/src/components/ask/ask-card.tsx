@@ -1,10 +1,15 @@
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
-import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
 import { applyAskCard, skipAskCard } from '#/lib/server-fns'
 import type { AskCardView } from '#/lib/server-fns'
-import { cardEntry, outcomeWord, renderableCard } from '#/lib/ask/cards'
+import {
+  cardEntry,
+  heldOutcome,
+  outcomeWord,
+  renderableCard,
+} from '#/lib/ask/cards'
+import { heldDecisions, useHeldEntry } from '#/lib/held-decisions'
 import { RefChip } from './ask-answer'
 
 /**
@@ -25,28 +30,32 @@ export function AskCard({
   waiting?: boolean
 }) {
   const [view, setView] = useState(card)
-  const [pending, setPending] = useState<'apply' | 'skip' | null>(null)
-  const shown = renderableCard(view)
-  if (shown === null)
+  const held = useHeldEntry(card.id)
+  const rendered = renderableCard(view)
+  if (rendered === null)
     return (
       <p className="mono text-micro text-graphite">
         A card with no evidence was left out.
       </p>
     )
+  // During the hold the card reads as decided; Undo returns it to open.
+  const shown = held === undefined ? rendered : heldOutcome(rendered, held.verb)
 
   const suggestionId = shown.id
-  async function decide(verb: 'apply' | 'skip') {
-    setPending(verb)
-    try {
-      const next = await (verb === 'apply' ? applyAskCard : skipAskCard)({
-        data: { suggestionId },
-      })
-      setView(next)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not do that')
-    } finally {
-      setPending(null)
-    }
+  function decide(verb: 'apply' | 'skip') {
+    heldDecisions.hold(suggestionId, {
+      decision:
+        verb === 'apply'
+          ? { verb: 'apply-card', suggestionId }
+          : { verb: 'skip-card', suggestionId },
+      label: `${verb === 'apply' ? 'Applied' : 'Skipped'} on ${shown.record.name}`,
+      commit: async () => {
+        const next = await (verb === 'apply' ? applyAskCard : skipAskCard)({
+          data: { suggestionId },
+        })
+        setView(next)
+      },
+    })
   }
 
   const word = outcomeWord(shown)
@@ -103,18 +112,11 @@ export function AskCard({
               <Button
                 variant="outline"
                 size="sm"
-                pending={pending === 'skip'}
-                disabled={pending !== null}
-                onClick={() => void decide('skip')}
+                onClick={() => decide('skip')}
               >
                 Skip
               </Button>
-              <Button
-                size="sm"
-                pending={pending === 'apply'}
-                disabled={pending !== null}
-                onClick={() => void decide('apply')}
-              >
+              <Button size="sm" onClick={() => decide('apply')}>
                 Apply
               </Button>
             </>
