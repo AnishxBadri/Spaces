@@ -2,6 +2,7 @@ import { Effect } from 'effect'
 import { sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { SearchQueryFailed } from '@spaces/core/writes/read/search'
+import { passageDaySql } from './passages'
 
 /**
  * A Records row's kind lane: `company · seed · Proptech › Property ops`.
@@ -11,11 +12,13 @@ import { SearchQueryFailed } from '@spaces/core/writes/read/search'
  *   stage, a deal's pipeline stage, as their option labels.
  * - `space` is the first space it was filed in, with its ancestors, and
  *   never an archived one.
+ * - `day` is a note's last edit or a file's arrival (`passageDaySql`).
  */
 export type KindLane = {
   singular: string | null
   stage: string | null
   space: string | null
+  day: string | null
 }
 
 /** The attribute that holds each kind's stage word. */
@@ -26,6 +29,7 @@ type LaneRow = {
   singular: string | null
   stage: string | null
   space: string | null
+  day: string | null
 }
 
 export const kindLanesProgram = Effect.fn('kindLanesProgram')(function* (
@@ -58,7 +62,8 @@ export const kindLanesProgram = Effect.fn('kindLanesProgram')(function* (
                 ) filed
                 join space fs on fs.entity_id = filed.space_id
                 join space anc on anc.path @> fs.path
-                join entity ae on ae.id = anc.entity_id) as space
+                join entity ae on ae.id = anc.entity_id) as space,
+               ${passageDaySql(sql`e`)} as day
         from entity e
         left join object o on o.id = e.object_id
         where e.id in (${sql.join(
@@ -71,7 +76,7 @@ export const kindLanesProgram = Effect.fn('kindLanesProgram')(function* (
   return new Map(
     result.rows.map((r) => [
       r.id,
-      { singular: r.singular, stage: r.stage, space: r.space },
+      { singular: r.singular, stage: r.stage, space: r.space, day: r.day },
     ]),
   )
 })

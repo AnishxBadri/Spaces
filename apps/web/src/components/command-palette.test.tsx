@@ -35,6 +35,8 @@ const taskHit = (done: boolean, dueDate: string | null): SearchHit => ({
   task: { dueDate, done },
 })
 
+const TODAY = '2026-10-10'
+
 const companyHit: SearchHit = {
   rowKind: 'entity',
   id: '5f0c1a52-3e0b-4a8e-9b61-000000000001',
@@ -53,44 +55,46 @@ describe('the palette task row', () => {
     expect(hrefFor(companyHit)).toBe(`/companies/${companyHit.id}`)
   })
 
-  it('draws a checkbox icon and the due date in the mono lane', () => {
+  it('draws a checkbox icon and the due day in the mono lane', () => {
     const html = renderToStaticMarkup(
-      <HitLine hit={taskHit(false, '2026-10-01')} />,
+      <HitLine hit={taskHit(false, '2026-10-01')} today={TODAY} />,
     )
     expect(html).toContain('lucide-square-check')
-    expect(html).toMatch(/class="[^"]*mono[^"]*">2026-10-01</)
+    expect(html).toMatch(/class="[^"]*mono[^"]*">1 Oct</)
     expect(html).not.toContain('line-through')
-    // The snippet is text with the match set in a span — never markup.
-    expect(html).toContain(
-      '<span class="font-medium text-foreground">runway</span>',
-    )
+    // The inline snippet column is gone: the name and the lane only.
+    expect(html).not.toContain('runway»')
+    expect(html).not.toContain('>how much <')
   })
 
-  it('says a dateless task has no date', () => {
-    const html = renderToStaticMarkup(<HitLine hit={taskHit(false, null)} />)
-    expect(html).toMatch(/class="[^"]*mono[^"]*">no date</)
+  it('prints no lane for a dateless task', () => {
+    const html = renderToStaticMarkup(
+      <HitLine hit={taskHit(false, null)} today={TODAY} />,
+    )
+    expect(html).not.toContain('data-lane')
   })
 
   it('strikes a done task through', () => {
     const html = renderToStaticMarkup(
-      <HitLine hit={taskHit(true, '2026-09-01')} />,
+      <HitLine hit={taskHit(true, '2026-09-01')} today={TODAY} />,
     )
     expect(html).toMatch(
       /class="[^"]*line-through[^"]*">Ask the founders how much runway is left</,
     )
   })
 
-  it('leaves an entity row as it was', () => {
-    const html = renderToStaticMarkup(<HitLine hit={companyHit} />)
+  it('draws an entity row with its kind glyph', () => {
+    const html = renderToStaticMarkup(
+      <HitLine hit={companyHit} today={TODAY} />,
+    )
     expect(html).toContain('lucide-building')
     expect(html).not.toContain('lucide-square-check')
-    expect(html).toMatch(/class="[^"]*mono[^"]*">company</)
   })
 
   it('draws a record’s stored picture in place of its kind icon', () => {
     const picture = 'http://localhost:3000/api/blob/abc?exp=1&sig=x'
     const html = renderToStaticMarkup(
-      <HitLine hit={{ ...companyHit, picture }} />,
+      <HitLine hit={{ ...companyHit, picture }} today={TODAY} />,
     )
     expect(html).toContain(`src="${picture.replaceAll('&', '&amp;')}"`)
     expect(html).toContain('object-cover')
@@ -98,29 +102,30 @@ describe('the palette task row', () => {
   })
 })
 
-describe('the kind lane', () => {
-  it('prints the kind, the stage word and the first filed space, not the plural slug', () => {
+describe('the record lane', () => {
+  const lane = {
+    singular: 'Company',
+    stage: 'Seed',
+    space: 'Proptech › Property ops',
+    day: null,
+  }
+  it('prints a company’s first space path and a deal’s stage, and nothing else', () => {
+    expect(hitMeta({ ...companyHit, lane }, TODAY)).toBe(
+      'Proptech › Property ops',
+    )
     expect(
-      hitMeta({
-        ...companyHit,
-        objectSlug: 'companies',
-        lane: {
-          singular: 'Company',
-          stage: 'Seed',
-          space: 'Proptech › Property ops',
+      hitMeta(
+        {
+          ...companyHit,
+          kind: 'deal',
+          lane: { ...lane, singular: 'Deal', stage: 'Diligence', space: null },
         },
-      }),
-    ).toBe('company · seed · Proptech › Property ops')
-    expect(
-      hitMeta({
-        ...companyHit,
-        kind: 'deal',
-        objectSlug: 'deals',
-        lane: { singular: 'Deal', stage: 'Diligence', space: null },
-      }),
-    ).toBe('deal · diligence')
-    // No lane read: the kind alone, never the slug.
-    expect(hitMeta({ ...companyHit, objectSlug: 'companies' })).toBe('company')
+        TODAY,
+      ),
+    ).toBe('Diligence')
+    expect(hitMeta({ ...companyHit, kind: 'person', lane }, TODAY)).toBeNull()
+    // No lane read, no lane.
+    expect(hitMeta(companyHit, TODAY)).toBeNull()
   })
 })
 
@@ -150,6 +155,14 @@ describe('Records and Passages', () => {
       ['Vayu — first call', 'note', 'the «Vayu» thesis', null],
       ['Vayu deck.pdf', 'document', '', null],
     ])
+    // A note's day rides on its kind lane.
+    const note = splitHits([
+      {
+        ...hit('n', 'note', null),
+        lane: { singular: null, stage: null, space: null, day: '2026-10-04' },
+      },
+    ]).passages.at(0)
+    expect(note?.day).toBe('2026-10-04')
   })
 
   it('lists the lexical passages first, then the semantic lane’s new ones', () => {
@@ -182,26 +195,31 @@ const deckPassage: Passage = {
     name: 'Coldplate Systems',
     objectSlug: null,
   },
+  day: null,
 }
 
 describe('the palette passage row', () => {
-  it('names the file and its page, and goes to the record the file is filed on', () => {
-    expect(passageMeta(deckPassage)).toBe('Coldplate Series A.pdf · p.5')
-    expect(passageMeta({ ...deckPassage, page: null })).toBe(
+  it('names the file and its page, a note by title and day, and goes to the record the file is filed on', () => {
+    expect(passageMeta(deckPassage, TODAY)).toBe('Coldplate Series A.pdf · p.5')
+    expect(passageMeta({ ...deckPassage, page: null }, TODAY)).toBe(
       'Coldplate Series A.pdf',
     )
     expect(passageHref(deckPassage)).toBe(
       '/companies/5f0c1a52-3e0b-4a8e-9b61-000000000003',
     )
     expect(passageHref({ ...deckPassage, parent: null })).toBeNull()
-    expect(
-      passageMeta({
-        ...deckPassage,
-        kind: 'note',
-        name: 'IC call',
-        page: null,
-      }),
-    ).toBe('note · IC call')
+    const note = {
+      ...deckPassage,
+      kind: 'note',
+      name: 'IC call',
+      page: null,
+      day: '2026-10-04T09:30:00.000Z',
+    }
+    expect(passageMeta(note, TODAY)).toBe('IC call · 4 Oct')
+    expect(passageMeta({ ...note, day: '2025-03-01' }, TODAY)).toBe(
+      'IC call · 1 Mar 2025',
+    )
+    expect(passageMeta({ ...note, day: null }, TODAY)).toBe('IC call')
   })
 
   it("keeps cmdk's own filter off, so the server's order is the order shown", () => {

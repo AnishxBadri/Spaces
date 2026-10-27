@@ -279,51 +279,41 @@ export function countReadout({
 }
 
 /**
- * A head at preview size, for Cmd-K's pane: the stamp and crumb, then the
- * name in serif. A `record` head closes on the double rule, as the record
- * page's does; anything else on a hairline.
+ * A head at preview size, for Cmd-K's pane: the stamp, then the glyph and
+ * the name in serif, what sits under the name, and the double rule, as the
+ * record page's head closes.
  */
 export function PreviewHead({
-  record = false,
   stamp,
-  crumb,
+  working = false,
   mark,
   name,
   children,
 }: {
-  record?: boolean
-  stamp: string
-  crumb: string
+  /** The kind; an object's head has none. */
+  stamp?: string | undefined
+  /** Still reading: the Twinkle at the head's right. */
+  working?: boolean
   mark?: ReactNode
   name: string
-  /** Under the name: a record's readout strip. */
+  /** Under the name: a company's domain. */
   children?: ReactNode
 }) {
   return (
-    <div
-      className={cn(
-        'flex flex-col gap-3 px-5 pt-4',
-        record ? 'double-rule' : 'border-b border-hairline',
-      )}
-    >
-      <div className="flex min-w-0 items-center gap-3">
-        <Stamp kind={stamp} />
-        {crumb ? (
-          <span
-            data-crumb
-            className="min-w-0 truncate mono text-micro tracking-[0.08em] text-graphite uppercase"
-          >
-            {crumb}
-          </span>
-        ) : null}
-      </div>
-      <div className="flex min-w-0 items-center gap-3">
+    <div className="flex flex-col gap-2 px-5 pt-4 pb-3 double-rule">
+      {stamp !== undefined || working ? (
+        <div className="flex items-center justify-between gap-3">
+          {stamp === undefined ? <span /> : <Stamp kind={stamp} />}
+          {working ? <Twinkle label="Loading" /> : null}
+        </div>
+      ) : null}
+      <div className="flex min-w-0 items-center gap-2">
         {mark}
         <h2 className="min-w-0 truncate font-serif text-page font-semibold">
           {name || 'Untitled'}
         </h2>
       </div>
-      {children ?? <div className="h-1" />}
+      {children}
     </div>
   )
 }

@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 import { eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
-import { chunk, entity, note, view } from '@spaces/db/schema'
+import { chunk, entity, link, note, view } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import {
@@ -72,6 +72,10 @@ describe('a record preview', () => {
       kind: 'company',
       readouts: { today: '2026-10-10', lastContact: null, moving30: 0 },
     })
+    // The domain heads the pane; the grid does not repeat it.
+    expect(preview.domain).toBe('flent.example')
+    expect(slugs).not.toContain('domains')
+    expect(preview.stages).toBeNull()
   })
 
   it('stops at six, in registry order', async () => {
@@ -114,9 +118,14 @@ describe('a record preview', () => {
       'founders',
     ])
     expect(preview.fields).toHaveLength(PREVIEW_FIELDS)
-    expect(preview.fields.find((f) => f.slug === 'funding_stage')?.value).toBe(
-      stage.label,
-    )
+    expect(preview.fields.find((f) => f.slug === 'funding_stage')).toEqual({
+      slug: 'funding_stage',
+      label: 'Funding stage',
+      value: stage.label,
+      display: 'badge',
+      option: stage,
+      index: 0,
+    })
     // A reference prints the record's name, as the assembler renders it.
     expect(preview.fields.find((f) => f.slug === 'founders')?.value).toBe(
       'Will Bruey',
@@ -124,8 +133,45 @@ describe('a record preview', () => {
   })
 })
 
+describe('a deal preview', () => {
+  it('carries its live stages with the current one, and prints money as money', async () => {
+    const objectId = await objectIdForKindAsync('deal')
+    const row = (
+      await db
+        .insert(entity)
+        .values({ kind: 'deal', canonicalName: 'Flent — Seed', objectId })
+        .returning({ id: entity.id })
+    ).at(0)
+    if (!row) throw new Error('entity insert returned nothing')
+    const registry = await getRegistryByObjectId(objectId)
+    const options = registry.find((d) => d.slug === 'stage')?.options.options
+    const second = options?.at(1)
+    if (!options || !second) throw new Error('no stage options')
+    await setValues({
+      entityId: row.id,
+      patch: { stage: second.id, value: 1500000 },
+      actor: { type: 'user', id: FIXTURE_ACTOR.id },
+    })
+    const preview = await Effect.runPromise(
+      recordPreviewProgram(reader, row.id, NOW),
+    )
+    expect(preview.stages).toEqual({
+      current: second.id,
+      options: options.filter((o) => o.archived !== true),
+    })
+    expect(preview.fields.find((f) => f.slug === 'stage')).toMatchObject({
+      display: 'badge',
+      index: 1,
+    })
+    expect(preview.fields.find((f) => f.slug === 'value')?.display).toBe(
+      'money',
+    )
+    expect(preview.domain).toBeNull()
+  })
+})
+
 describe('an object preview', () => {
-  it('lists the saved views with the chips’ counts', async () => {
+  it('carries the list’s record total and the saved views with the chips’ counts', async () => {
     const objectId = await objectIdForKindAsync('company')
     const a = await company('Alpha', 'alpha.example')
     await company('Beta', 'beta.example')
@@ -161,7 +207,11 @@ describe('an object preview', () => {
     const preview = await Effect.runPromise(
       objectPreviewProgram(reader, 'companies'),
     )
-    expect(preview).toMatchObject({ slug: 'companies', path: '/companies' })
+    expect(preview).toMatchObject({
+      slug: 'companies',
+      path: '/companies',
+      total: companies.length,
+    })
     expect(
       preview?.views.map((v) => [v.name, v.count, v.href.split('?')[0]]),
     ).toEqual([
@@ -232,6 +282,8 @@ describe('a passage preview', () => {
     expect(preview).toEqual({
       page: 5,
       pages: 14,
+      on: null,
+      day: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
       parts: [
         { text: 'Bengaluru and Pune, FY22 – FY26E.', matched: false },
         {
@@ -269,5 +321,43 @@ describe('a passage preview', () => {
       }),
     )
     expect(preview.parts).toEqual([])
+    // Nor where it lives, nor when.
+    expect(preview.on).toBeNull()
+    expect(preview.day).toBeNull()
+  })
+
+  it('names the record a note is filed on and the note’s last edit', async () => {
+    const co = await company('Halcyon', 'halcyon.example')
+    const id = await entityOf('note', 'IC call')
+    await db.insert(note).values({
+      entityId: id,
+      title: 'IC call',
+      bodyMd: 'storage at grid scale',
+      kind: 'note',
+      authorId: FIXTURE_ACTOR.id,
+      updatedAt: new Date('2026-10-04T09:30:00Z'),
+    })
+    await db
+      .insert(link)
+      .values({ fromEntityId: id, toEntityId: co, relation: 'tagged_in' })
+    await db.insert(chunk).values({
+      entityId: id,
+      sourceKind: 'note',
+      idx: 0,
+      text: 'storage at grid scale',
+    })
+    const preview = await Effect.runPromise(
+      passagePreviewProgram(FIXTURE_ACTOR.id, {
+        id,
+        page: null,
+        snippet: 'storage at grid scale',
+      }),
+    )
+    expect(preview.on).toMatchObject({
+      id: co,
+      kind: 'company',
+      name: 'Halcyon',
+    })
+    expect(preview.day).toBe('2026-10-04T09:30:00.000Z')
   })
 })

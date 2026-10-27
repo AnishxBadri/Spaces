@@ -1,7 +1,10 @@
 import { Effect, Schema } from 'effect'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { objectDef } from '@spaces/db/schema'
+import { entity, objectDef } from '@spaces/db/schema'
+import type { SelectOption } from '@spaces/db/schema'
+import { jsonString, jsonStrings } from '@spaces/core/json'
+import { getRegistryByObjectId } from '@spaces/core/writes/attributes/values'
 import { canReadNoteSql } from '@spaces/core/writes/read/search'
 import { renderWikiLinks } from '@spaces/core/context/wiki-link'
 import { excerpt } from '@spaces/core/context/excerpt'
@@ -19,16 +22,23 @@ import type {
   PersonReadouts,
   RecordReadouts,
 } from '#/lib/records/readouts'
-import { countViewsProgram } from '#/lib/views/counts'
+import { countViewsProgram, scopeOf } from '#/lib/views/counts'
+import { listScope } from '#/lib/views/scope'
+import { passageDaySql } from './passages'
+import { documentParentsProgram } from './query'
+import type { SearchParent } from './query'
 
 /**
  * Cmd-K's preview pane: what a highlighted result shows.
  * - A record is `get_record`'s read as the user (canRead included) plus the
- *   readouts its head prints; the fields are its first six filled attributes.
- * - An object is its saved views with their counts: the views directory and
- *   the chips' count program, never a second count.
+ *   readouts its head prints; the fields are its first six filled attributes,
+ *   a company's domain apart in the head, a deal's stages for Move stage.
+ * - An object is its record total, as the list page scopes it, and its saved
+ *   views with the chips' counts: the views directory and the chips' count
+ *   program, never a second count.
  * - A passage is its page's text with the nearest chunk set off, behind the
- *   same note predicate the semantic lane filters by.
+ *   same note predicate the semantic lane filters by, and the record it is
+ *   filed on with its day.
  * Outside the server-fn module so a test can call it without a request.
  */
 
@@ -53,7 +63,27 @@ export type PreviewReadouts =
   | { kind: 'deal'; readouts: DealReadouts }
   | { kind: 'custom'; readouts: RecordReadouts }
 
-export type PreviewField = { slug: string; label: string; value: string }
+/**
+ * One filled attribute as the pane prints it: money in mono, a single
+ * select or status option as its badge, anything else as text.
+ */
+export type PreviewField =
+  | { slug: string; label: string; value: string; display: 'text' | 'money' }
+  | {
+      slug: string
+      label: string
+      value: string
+      display: 'badge'
+      /** The option row and its position: what the badge's hue is read from. */
+      option: SelectOption
+      index: number
+    }
+
+/** A deal's live stages and where it stands, for the pane's Move stage. */
+export type PreviewStages = {
+  current: string | null
+  options: Array<SelectOption>
+}
 
 export type RecordPreview = {
   id: string
@@ -61,10 +91,14 @@ export type RecordPreview = {
   name: string
   /** The object's singular, for the stamp; null for a note or a file. */
   singular: string | null
-  /** The spaces it is filed in, for the crumb. */
+  /** The spaces it is filed in, for File in a space. */
   spaces: Array<{ id: string; name: string }>
+  /** A company's first domain, printed under its name; null elsewhere. */
+  domain: string | null
   readouts: PreviewReadouts | null
   fields: Array<PreviewField>
+  /** A deal's stages; null for every other kind. */
+  stages: PreviewStages | null
 }
 
 const readoutsFor = Effect.fn('readoutsFor')(function* (
@@ -98,25 +132,65 @@ const readoutsFor = Effect.fn('readoutsFor')(function* (
 export const recordPreviewProgram = Effect.fn('recordPreviewProgram')(
   function* (reader: { id: string }, id: string, now: Date) {
     const record = yield* getRecordProgram(reader, id)
+    const objectId = record.object?.id ?? null
+    const registry =
+      objectId === null
+        ? []
+        : yield* query(() => getRegistryByObjectId(objectId))
+    const optionsOf = (slug: string) =>
+      registry.find((d) => d.slug === slug)?.options.options ?? []
+    const domainAttr = record.attributes.find(
+      (a) => a.type === 'domain' && a.text !== null,
+    )
+    const domain =
+      record.kind === 'company' && domainAttr
+        ? (jsonString(domainAttr.value) ?? jsonStrings(domainAttr.value).at(0))
+        : undefined
     const fields: Array<PreviewField> = []
     for (const a of record.attributes) {
       if (fields.length === PREVIEW_FIELDS) break
       // `text` is `Name: value`, and null when the attribute is empty.
       if (a.text === null) continue
-      fields.push({
+      // The head prints the domain; the grid does not repeat it.
+      if (domain !== undefined && a === domainAttr) continue
+      const base = {
         slug: a.slug,
         label: a.name,
         value: a.text.slice(a.name.length + 2),
-      })
+      }
+      const picked = jsonString(a.value)
+      const options =
+        (a.type === 'select' || a.type === 'status') && picked !== null
+          ? optionsOf(a.slug)
+          : []
+      const index = options.findIndex((o) => o.id === picked)
+      const option = options.at(index)
+      if (index >= 0 && option)
+        fields.push({ ...base, display: 'badge', option, index })
+      else
+        fields.push({
+          ...base,
+          display: a.type === 'currency' ? 'money' : 'text',
+        })
     }
+    const stage = record.attributes.find((a) => a.slug === 'stage')
     const out: RecordPreview = {
       id: record.id,
       kind: record.kind,
       name: record.name,
       singular: record.object?.singular ?? null,
       spaces: record.spaces,
+      domain: domain ?? null,
       readouts: yield* readoutsFor(record.kind, record.id, now),
       fields,
+      stages:
+        record.kind === 'deal'
+          ? {
+              current: stage ? jsonString(stage.value) : null,
+              // Move stage never offers a retired stage.
+              options: optionsOf('stage').filter((o) => o.archived !== true),
+            }
+          : null,
     }
     return out
   },
@@ -134,6 +208,8 @@ export type ObjectPreview = {
   slug: string
   plural: string
   path: string
+  /** Every record the object's list lists, before any view: `All 28`. */
+  total: number
   views: Array<ObjectPreviewView>
 }
 
@@ -161,10 +237,19 @@ export const objectPreviewProgram = Effect.fn('objectPreviewProgram')(
       views.map((v) => v.id),
       reader.id,
     )
+    // The list page's own scope, so `All` never contradicts the table.
+    const total = yield* query(() =>
+      db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(entity)
+        .where(listScope(scopeOf(object)))
+        .then((rows) => rows.at(0)?.n ?? 0),
+    )
     const out: ObjectPreview = {
       slug: object.slug,
       plural: object.plural,
       path,
+      total,
       views: views.map((v) => ({
         id: v.id,
         name: v.name,
@@ -185,6 +270,10 @@ export type PassagePreview = {
   /** The source's last page, when it has pages. */
   pages: number | null
   parts: Array<PagePart>
+  /** The record or space the note or file is filed on. */
+  on: SearchParent | null
+  /** A note's last edit, a file's arrival: ISO instant. */
+  day: string | null
 }
 
 type ChunkRow = { idx: number; text: string; page: number | null }
@@ -231,6 +320,20 @@ export const passagePreviewProgram = Effect.fn('passagePreviewProgram')(
     const numbered = rows
       .map((r) => r.page)
       .filter((p): p is number => p !== null)
+    // Nothing readable, nothing said about where it lives either.
+    const readable = rows.length > 0
+    const parents = readable
+      ? yield* documentParentsProgram([passage.id])
+      : new Map<string, SearchParent>()
+    const day = readable
+      ? ((yield* query(() =>
+          db.execute<{ day: string | null }>(sql`
+            select ${passageDaySql(sql`e`)} as day
+            from entity e
+            where e.id = ${passage.id}
+          `),
+        )).rows.at(0)?.day ?? null)
+      : null
     const out: PassagePreview = {
       page: passage.page,
       pages: numbered.length === 0 ? null : Math.max(...numbered),
@@ -238,6 +341,8 @@ export const passagePreviewProgram = Effect.fn('passagePreviewProgram')(
         text: renderWikiLinks(r.text),
         matched: r === matched,
       })),
+      on: parents.get(passage.id) ?? null,
+      day,
     }
     return out
   },

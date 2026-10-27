@@ -32,6 +32,20 @@ export type Passage = {
   page: number | null
   /** A document's destination: the record or space it is filed against. */
   parent: SearchParent | null
+  /** A note's last edit or a file's arrival, ISO; the row's lane prints it. */
+  day: string | null
+}
+
+/**
+ * A passage's day as an ISO instant, for the entity aliased `e`: a note's
+ * last edit, a file's arrival; null for any other kind.
+ */
+export function passageDaySql(e: SQL): SQL {
+  return sql`to_char(
+    case ${e}.kind
+      when 'note' then (select n.updated_at from note n where n.entity_id = ${e}.id)
+      when 'document' then ${e}.created_at
+    end at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`
 }
 
 type PassageRow = {
@@ -41,6 +55,7 @@ type PassageRow = {
   object_slug: string | null
   snippet: string | null
   page: number | null
+  day: string | null
 }
 
 export function passagesStatement(userId: string, vector: QueryVector): SQL {
@@ -51,7 +66,8 @@ export function passagesStatement(userId: string, vector: QueryVector): SQL {
              e.canonical_name as name,
              o.slug as object_slug,
              s.snippet,
-             s.page
+             s.page,
+             ${passageDaySql(sql`e`)} as day
       from sem_hits s
       join entity e on e.id = s.id
       left join object o on o.id = e.object_id
@@ -89,6 +105,7 @@ export const searchPassagesProgram = Effect.fn('searchPassagesProgram')(
       snippet: excerpt(r.snippet ?? ''),
       page: r.page,
       parent: parents.get(r.id) ?? null,
+      day: r.day,
     }))
   },
 )

@@ -1,9 +1,25 @@
-import { File, Pilcrow } from 'lucide-react'
+import {
+  BookA,
+  Boxes,
+  Building2,
+  File,
+  FileText,
+  Kanban,
+  Layers,
+  Paperclip,
+  Pilcrow,
+  Users,
+} from 'lucide-react'
 import { forwardRef } from 'react'
 import type { KeyboardEvent } from 'react'
+import type { LucideIcon } from 'lucide-react'
+import { formatDay } from '@spaces/core/format'
 import { fmtPct } from '@spaces/core/portfolio/format'
+import { useClock } from './clock'
+import { Twinkle } from './twinkle'
+import { Badge } from './ui/badge'
 import { Button } from './ui/button'
-import { PictureMark, PreviewHead, ReadoutStrip } from './record/record-parts'
+import { PictureMark, PreviewHead } from './record/record-parts'
 import type { RecordReadout } from './record/record-parts'
 import { DASH, readoutDay } from '#/lib/records/readout-format'
 import type { KindLane } from '#/lib/search/kind-lanes'
@@ -15,13 +31,18 @@ import type {
   RecordPreview,
 } from '#/lib/search/preview'
 import type { SearchHit } from '#/lib/search/query'
+import { cn } from '#/lib/utils'
 
 /**
- * Cmd-K's preview pane: the highlighted result, right of the list.
- * - A record: its stamp, name and readout strip, then its first
- *   six filled attributes as label–value rows.
- * - An object: its saved views with their counts.
- * - A passage: its page's text, the matched chunk set off.
+ * Cmd-K's preview pane: the highlighted result, right of the list. Always
+ * mounted, and blank bone when nothing previewable is highlighted.
+ * - A record: its stamp, glyph and name, a company's domain, the double
+ *   rule, its readouts two-up (only those with a value), then its first six
+ *   filled attributes as a label grid.
+ * - An object: its glyph and name, `All` with the record total, then its
+ *   saved views with their counts.
+ * - A passage: its file and page, the page's context with the match set off
+ *   in serif, and the record it is filed on with its day.
  * - → from the input focuses the pane's actions; ↑↓ moves among them and
  *   ← returns to the list.
  */
@@ -40,6 +61,7 @@ export type PreviewTarget =
       readonly key: string
       readonly slug: string
       readonly label: string
+      readonly icon: LucideIcon
       /** The object's list. */
       readonly href: string
     }
@@ -70,6 +92,18 @@ export type PaneAction = {
   readonly id: string
   readonly label: string
   readonly run: () => void
+}
+
+/** Each kind's glyph, in the list and in the pane alike. */
+export const KIND_ICONS: Record<string, LucideIcon> = {
+  company: Building2,
+  person: Users,
+  deal: Kanban,
+  space: Layers,
+  note: FileText,
+  document: Paperclip,
+  custom: Boxes,
+  term: BookA,
 }
 
 /** The record head's readouts, as each record page prints them. */
@@ -140,6 +174,21 @@ export function previewReadouts(r: PreviewReadouts): Array<RecordReadout> {
   }
 }
 
+/** The readouts the pane prints: a dash says nothing, so it is left out. */
+export function filledReadouts(r: PreviewReadouts): Array<RecordReadout> {
+  return previewReadouts(r).filter(
+    (x) => typeof x.value !== 'string' || (x.value !== DASH && x.value !== ''),
+  )
+}
+
+/** `Page 4 of 9`, or `Page 4` before the file's length is known. */
+export function pageOf(page: number | null, pages: number | null): string {
+  if (page === null) return ''
+  return pages === null
+    ? `Page ${String(page)}`
+    : `Page ${String(page)} of ${String(pages)}`
+}
+
 const KIND_LABELS: Partial<Record<string, string>> = {
   note: 'Note',
   document: 'File',
@@ -171,24 +220,28 @@ function onPaneKeyDown(e: KeyboardEvent<HTMLElement>, onBack: () => void) {
 }
 
 type PaneProps = {
-  target: PreviewTarget
+  /** Null: nothing previewable is highlighted, and the pane is blank. */
+  target: PreviewTarget | null
   data: PreviewData | undefined
   actions: ReadonlyArray<PaneAction>
   onBack: () => void
 }
 
-/** The pane: 420px of bone right of the list, ruled off by a hairline. */
+/**
+ * The pane: 40% of the window, 280 to 420px, bone, ruled off by a hairline.
+ * It never unmounts, so the list beside it never changes width.
+ */
 export const PreviewPane = forwardRef<HTMLElement, PaneProps>(
   function PreviewPane({ target, data, actions, onBack }, ref) {
     return (
       <aside
         ref={ref}
-        data-preview={target.kind}
+        data-preview={target?.kind ?? 'none'}
         aria-label="Preview"
         onKeyDown={(e) => onPaneKeyDown(e, onBack)}
-        className="flex max-h-[420px] w-105 shrink-0 flex-col overflow-y-auto border-l border-hairline bg-bone"
+        className="flex max-w-[420px] min-w-[280px] shrink-0 basis-[40%] flex-col overflow-y-auto border-l border-hairline bg-bone"
       >
-        {target.kind === 'record' ? (
+        {target === null ? null : target.kind === 'record' ? (
           <RecordPane
             hit={target.hit}
             data={data?.kind === 'record' ? data.data : undefined}
@@ -197,6 +250,7 @@ export const PreviewPane = forwardRef<HTMLElement, PaneProps>(
         ) : target.kind === 'object' ? (
           <ObjectPane
             label={target.label}
+            icon={target.icon}
             data={data?.kind === 'object' ? data.data : undefined}
             actions={actions}
           />
@@ -223,7 +277,7 @@ function Actions({ actions }: { actions: ReadonlyArray<PaneAction> }) {
         <Button
           key={a.id}
           type="button"
-          size="xs"
+          size="sm"
           variant="outline"
           data-pane-action={a.id}
           onClick={a.run}
@@ -232,6 +286,14 @@ function Actions({ actions }: { actions: ReadonlyArray<PaneAction> }) {
         </Button>
       ))}
     </div>
+  )
+}
+
+function Glyph({ icon: Icon }: { icon: LucideIcon }) {
+  return (
+    <span className="flex size-4 shrink-0 items-center justify-center">
+      <Icon aria-hidden className="size-3.5 text-graphite" strokeWidth={1.75} />
+    </span>
   )
 }
 
@@ -244,30 +306,77 @@ function RecordPane({
   data: RecordPreview | undefined
   actions: ReadonlyArray<PaneAction>
 }) {
-  const readouts = data?.readouts ? previewReadouts(data.readouts) : []
+  const readouts = data?.readouts ? filledReadouts(data.readouts) : []
   return (
     <>
       <PreviewHead
-        record
         stamp={data?.singular ?? KIND_LABELS[hit.kind] ?? hit.kind}
-        crumb={(data?.spaces ?? []).map((s) => s.name).join(' · ')}
-        mark={hit.picture ? <PictureMark src={hit.picture} size={22} /> : null}
+        mark={
+          hit.picture ? (
+            <PictureMark src={hit.picture} size={16} />
+          ) : (
+            <Glyph icon={KIND_ICONS[hit.kind] ?? FileText} />
+          )
+        }
         name={data?.name ?? hit.name}
+        working={data === undefined}
       >
-        {readouts.length > 0 ? (
-          <ReadoutStrip readouts={readouts} size="pane" />
+        {data?.domain ? (
+          <span data-domain className="truncate mono text-micro text-graphite">
+            {data.domain}
+          </span>
         ) : null}
       </PreviewHead>
+      {readouts.length > 0 ? (
+        <div data-readouts className="grid grid-cols-2 border-b border-rule">
+          {readouts.map((r, i) => (
+            <div
+              key={i}
+              className="flex min-w-0 flex-col gap-0.5 border-r border-b border-rule px-5 py-2 even:border-r-0"
+            >
+              <span
+                className={cn(
+                  'truncate mono text-title',
+                  r.tone === 'bad' && 'text-destructive',
+                  r.tone === 'muted' && 'text-graphite',
+                )}
+              >
+                {r.value}
+              </span>
+              <span className="truncate text-label text-graphite">
+                {r.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
       {data && data.fields.length > 0 ? (
-        <dl className="flex flex-col px-5 pt-1">
+        <dl className="mt-3 flex flex-col border-t border-rule">
           {data.fields.map((f) => (
             <div
               key={f.slug}
               data-field={f.slug}
-              className="grid min-h-7.5 grid-cols-[7.5rem_1fr] items-center gap-3 border-b border-rule"
+              className="grid min-h-7.5 grid-cols-[112px_1fr] border-b border-rule"
             >
-              <dt className="truncate text-label text-graphite">{f.label}</dt>
-              <dd className="min-w-0 truncate text-ui">{f.value}</dd>
+              <dt className="flex items-center truncate bg-bone px-5 text-label text-graphite">
+                {f.label}
+              </dt>
+              <dd className="flex min-w-0 items-center border-l border-rule bg-paper px-3">
+                {f.display === 'badge' ? (
+                  <Badge option={f.option} index={f.index}>
+                    {f.value}
+                  </Badge>
+                ) : (
+                  <span
+                    className={cn(
+                      'truncate',
+                      f.display === 'money' ? 'mono text-label' : 'text-ui',
+                    )}
+                  >
+                    {f.value}
+                  </span>
+                )}
+              </dd>
             </div>
           ))}
         </dl>
@@ -279,43 +388,52 @@ function RecordPane({
 
 function ObjectPane({
   label,
+  icon,
   data,
   actions,
 }: {
   label: string
+  icon: LucideIcon
   data: ObjectPreview | null | undefined
   actions: ReadonlyArray<PaneAction>
 }) {
-  const count = data ? data.views.length : null
+  const rows =
+    data === null || data === undefined
+      ? []
+      : [
+          { id: 'all', name: 'All', count: data.total },
+          ...data.views.map((v) => ({
+            id: `view:${v.id}`,
+            name: v.name,
+            count: v.count,
+          })),
+        ]
   return (
     <>
       <PreviewHead
-        stamp="Object"
-        crumb={
-          count === null ? '' : `${count} saved view${count === 1 ? '' : 's'}`
-        }
+        mark={<Glyph icon={icon} />}
         name={data?.plural ?? label}
+        working={data === undefined}
       />
-      {data && data.views.length > 0 ? (
-        <ul className="flex flex-col pt-1">
-          {data.views.map((v) => {
-            const run = actions.find((a) => a.id === `view:${v.id}`)?.run
+      {rows.length > 0 ? (
+        <ul className="flex flex-col">
+          {rows.map((v) => {
+            const run = actions.find((a) => a.id === v.id)?.run
             return (
               <li key={v.id}>
                 <button
                   type="button"
-                  data-pane-action={`view:${v.id}`}
+                  data-pane-action={v.id}
                   data-view={v.id}
                   onClick={run}
-                  className="flex h-9 w-full items-center gap-3 border-b border-rule px-5 text-left text-ui outline-none hover:bg-paper focus-visible:bg-selected"
+                  className="flex h-row w-full items-center gap-3 border-b border-rule px-5 text-left text-ui outline-none hover:bg-paper focus-visible:bg-selected"
                 >
                   <span className="min-w-0 flex-1 truncate">{v.name}</span>
                   <span
-                    className={
-                      v.count === null
-                        ? 'shrink-0 mono text-micro text-graphite'
-                        : 'shrink-0 mono text-micro'
-                    }
+                    className={cn(
+                      'shrink-0 mono text-micro',
+                      v.count === null && 'text-graphite',
+                    )}
                   >
                     {v.count === null ? DASH : v.count}
                   </span>
@@ -325,7 +443,11 @@ function ObjectPane({
           })}
         </ul>
       ) : null}
-      <Actions actions={actions.filter((a) => !a.id.startsWith('view:'))} />
+      <Actions
+        actions={actions.filter(
+          (a) => a.id !== 'all' && !a.id.startsWith('view:'),
+        )}
+      />
     </>
   )
 }
@@ -339,6 +461,7 @@ function PassagePane({
   data: PassagePreview | undefined
   actions: ReadonlyArray<PaneAction>
 }) {
+  const { today } = useClock()
   const Icon = passage.kind === 'document' ? File : Pilcrow
   // Until the page arrives, the snippet the row carries stands in for it.
   const parts =
@@ -350,13 +473,13 @@ function PassagePane({
             matched: true,
           },
         ]
-  const pageOf =
-    passage.page === null
-      ? null
-      : data?.pages
-        ? `p.${String(passage.page)} of ${String(data.pages)}`
-        : `p.${String(passage.page)}`
-  const on = passage.kind === 'document' ? (passage.parent?.name ?? null) : null
+  const page = pageOf(passage.page, data?.pages ?? null)
+  const on = data?.on?.name ?? passage.parent?.name ?? null
+  const dayIso = data?.day ?? passage.day
+  const day = dayIso === null ? '' : formatDay(dayIso, today)
+  const where = [on === null ? null : `On ${on}`, day || null]
+    .filter((x) => x !== null)
+    .join(' · ')
   return (
     <>
       <div className="flex min-w-0 items-center gap-2 px-5 pt-4">
@@ -365,12 +488,15 @@ function PassagePane({
           className="size-3.5 shrink-0 text-graphite"
           strokeWidth={1.75}
         />
-        <span className="min-w-0 truncate mono text-micro">{passage.name}</span>
-        {pageOf ? (
+        <span className="min-w-0 flex-1 truncate mono text-micro">
+          {passage.name}
+        </span>
+        {page ? (
           <span data-page-of className="shrink-0 mono text-micro text-graphite">
-            {pageOf}
+            {page}
           </span>
         ) : null}
+        {data === undefined ? <Twinkle label="Loading" /> : null}
       </div>
       <div data-page className="flex flex-col gap-2 px-5 py-3">
         {parts.map((part, i) =>
@@ -389,8 +515,10 @@ function PassagePane({
           ),
         )}
       </div>
-      {on ? (
-        <div className="px-5 pb-3 mono text-micro text-graphite">on {on}</div>
+      {where ? (
+        <div data-on className="px-5 pb-3 mono text-micro text-graphite">
+          {where}
+        </div>
       ) : null}
       <Actions actions={actions} />
     </>

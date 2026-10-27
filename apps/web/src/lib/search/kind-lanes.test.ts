@@ -1,7 +1,7 @@
 import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
-import { entity, entitySpace, space } from '@spaces/db/schema'
+import { entity, entitySpace, note, space } from '@spaces/db/schema'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import {
   getRegistryByObjectId,
@@ -13,7 +13,8 @@ import { kindLanesProgram } from './kind-lanes'
 
 /**
  * A Records row's kind lane: the object's singular, the stage word
- * and the first live space the record was filed in, with its ancestors.
+ * and the first live space the record was filed in, with its ancestors;
+ * a note's or a file's day.
  */
 
 async function newSpace(
@@ -86,6 +87,7 @@ describe('kindLanesProgram', () => {
       singular: 'Company',
       stage: 'Seed',
       space: 'Proptech › Property ops',
+      day: null,
     })
   })
 
@@ -103,7 +105,34 @@ describe('kindLanesProgram', () => {
       singular: 'Company',
       stage: null,
       space: null,
+      day: null,
     })
     expect((await Effect.runPromise(kindLanesProgram([]))).size).toBe(0)
+  })
+
+  it('carries a note’s last edit and a file’s arrival as the day', async () => {
+    const rows = await db
+      .insert(entity)
+      .values([
+        { kind: 'note', canonicalName: 'IC call' },
+        {
+          kind: 'document',
+          canonicalName: 'deck.pdf',
+          createdAt: new Date('2026-09-02T08:00:00Z'),
+        },
+      ])
+      .returning({ id: entity.id })
+    const n = rows.at(0)
+    const d = rows.at(1)
+    if (!n || !d) throw new Error('entity insert returned nothing')
+    await db.insert(note).values({
+      entityId: n.id,
+      title: 'IC call',
+      authorId: FIXTURE_ACTOR.id,
+      updatedAt: new Date('2026-10-04T09:30:00Z'),
+    })
+    const lanes = await Effect.runPromise(kindLanesProgram([n.id, d.id]))
+    expect(lanes.get(n.id)?.day).toBe('2026-10-04T09:30:00.000Z')
+    expect(lanes.get(d.id)?.day).toBe('2026-09-02T08:00:00.000Z')
   })
 })

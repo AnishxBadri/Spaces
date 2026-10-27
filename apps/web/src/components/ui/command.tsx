@@ -53,11 +53,10 @@ function CommandDialog({
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
-      {/* A size exception: Cmd-K owns its own width, and widens for its
-          preview pane. */}
+      {/* A size exception: Cmd-K owns its own size, its caller's className. */}
       <DialogContent
         size="m"
-        className={cn('overflow-hidden p-0 sm:max-w-[40rem]', className)}
+        className={cn('overflow-hidden p-0 sm:max-w-none', className)}
         {...(overlayClassName === undefined ? {} : { overlayClassName })}
       >
         <Command {...(shouldFilter === undefined ? {} : { shouldFilter })}>
@@ -80,11 +79,11 @@ function CommandInput({
   aside?: React.ReactNode
 }) {
   return (
-    // The prompt: the mode, then the query, the right lane after. 48px,
-    // hairline under (the palette's head).
+    // The prompt: the mode, then the query, the right lane after. 52px of
+    // bone, hairline under (the palette's head).
     <div
       data-slot="command-input-wrapper"
-      className="flex h-12 items-center gap-3 border-b border-hairline px-4"
+      className="flex h-13 shrink-0 items-center gap-3 border-b border-hairline bg-bone px-4"
     >
       {mode ?? (
         <span aria-hidden className="mono text-ui text-primary">
@@ -94,7 +93,7 @@ function CommandInput({
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(
-          'flex h-12 w-full min-w-0 bg-transparent text-title outline-hidden placeholder:text-graphite disabled:cursor-not-allowed disabled:opacity-50',
+          'flex h-full w-full min-w-0 bg-transparent text-title outline-hidden placeholder:text-graphite disabled:cursor-not-allowed disabled:opacity-50',
           className,
         )}
         {...props}

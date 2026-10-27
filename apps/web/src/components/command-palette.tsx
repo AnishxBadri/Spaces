@@ -1,30 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useRouter } from '@tanstack/react-router'
-import {
-  BookA,
-  Boxes,
-  Building2,
-  Check,
-  CheckSquare,
-  ChevronRight,
-  File,
-  FileText,
-  Kanban,
-  Layers,
-  LogOut,
-  Paperclip,
-  Pilcrow,
-  Settings,
-  Table2,
-  Users,
-} from 'lucide-react'
+import { CheckSquare, LogOut, Settings, Table2 } from 'lucide-react'
 import { useCommandState } from 'cmdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
+import { toast } from 'sonner'
+import { formatDay } from '@spaces/core/format'
 import { NAV_ITEMS } from './app-sidebar'
-import { DensityRamp } from './dither'
+import { useClock } from './clock'
 import { DocumentPreview } from './document-preview'
-import { PreviewPane } from './palette-preview'
+import { KIND_ICONS, PreviewPane } from './palette-preview'
 import type {
   PaneAction,
   PreviewData,
@@ -33,6 +19,7 @@ import type {
   PreviewTarget,
 } from './palette-preview'
 import { SETTINGS_CRUMBS, SETTINGS_SECTIONS } from './settings/settings-nav'
+import { Twinkle } from './twinkle'
 import {
   CommandDialog,
   CommandGroup,
@@ -49,7 +36,12 @@ import {
   latestPageAction,
   usePageActionsList,
 } from '#/lib/page-actions'
-import type { ActionStep, PageAction, StepChoice } from '#/lib/page-actions'
+import type {
+  ActionStep,
+  PageAction,
+  StepChoice,
+  StepCreate,
+} from '#/lib/page-actions'
 import { recordPath } from '#/lib/record-path'
 import {
   getDocumentPreview,
@@ -59,9 +51,11 @@ import {
   previewRecord,
   searchAll,
   searchPassages,
+  updateRecord,
 } from '#/lib/server-fns'
 import { PictureMark } from '#/components/record/record-parts'
 import type { Passage } from '#/lib/search/passages'
+import type { PreviewStages } from '#/lib/search/preview'
 import type { JumpView } from '#/lib/views/jump'
 import { searchWaves } from '#/lib/search/waves'
 import { openAsk } from '#/lib/ask/dock-store'
@@ -69,19 +63,20 @@ import { cn } from '#/lib/utils'
 
 /**
  * Cmd-K finds and goes; Ask answers.
+ * - One fixed size in every state (`PALETTE_SIZE`): the input, then the list
+ *   beside an always-mounted preview pane, then the foot.
  * - Four groups in order: Jump to, Actions, Records, Passages. A group with
  *   nothing in it is absent.
  * - Nothing typed on a record or a space shows only its verbs, under
- *   `Actions · on <name>`, the subject named in the input. Anywhere else
- *   nothing typed shows only the input. Never recent items.
+ *   `Actions`, the subject named in the input. Anywhere else nothing typed
+ *   shows only the input. Never recent items.
  * - Records is the lexical statement's records and tasks, in its name-first
  *   order. Passages is its notes and files, then the semantic lane's second
  *   wave once typing pauses (`searchWaves`): a note or a deck never sits in
  *   Records.
+ * - Nothing found offers `Ask "<query>"`, which Tab does from any row.
  * - A verb with a `step` asks its answer in the same palette under its mode
- *   label; ⌫ on the empty input returns to Find with the query restored.
- * - Highlighting a record, an object or a passage opens `PreviewPane` and
- *   widens the window; anything else runs the list full width.
+ *   stamp; ⌫ on the empty input returns to Find with the query restored.
  * - Only our own bindings are printed, and ↵ in the foot alone: never esc
  *   or ⌘K.
  * - cmdk's filtering is off: the server ranked these.
@@ -89,16 +84,12 @@ import { cn } from '#/lib/utils'
 
 type Hit = PreviewHit
 
-const KIND_ICONS: Record<string, LucideIcon> = {
-  company: Building2,
-  person: Users,
-  deal: Kanban,
-  space: Layers,
-  note: FileText,
-  document: Paperclip,
-  custom: Boxes,
-  term: BookA,
-}
+/**
+ * The window: one box for every state, so nothing jumps as it changes —
+ * `min(1060px, 100vw − 2rem)` by `min(560px, 100dvh − 4rem)`.
+ */
+export const PALETTE_SIZE =
+  'h-[min(560px,calc(100dvh-4rem))] w-[min(1060px,calc(100vw-2rem))] max-w-none sm:max-w-none'
 
 /**
  * Documents have no page — a hit lands on the record it is filed against.
@@ -149,20 +140,17 @@ export function Highlighted({ text }: { text: string }) {
 }
 
 /**
- * A record row's kind lane — `company · seed · Proptech › Property ops`: the
- * kind, its stage word, the first space it is filed in. A task's is its due
- * date.
+ * A record row's lane: a company's first space path, a deal's stage, a
+ * task's due day; nothing for any other kind.
  */
-export function hitMeta(hit: Hit): string {
-  if (hit.rowKind === 'task') return hit.task.dueDate ?? 'no date'
-  const lane = hit.lane ?? null
-  return [
-    (lane?.singular ?? hit.kind).toLowerCase(),
-    lane?.stage?.toLowerCase() ?? null,
-    lane?.space ?? null,
-  ]
-    .filter((part) => part !== null && part !== '')
-    .join(' · ')
+export function hitMeta(hit: Hit, today: string): string | null {
+  if (hit.rowKind === 'task')
+    return hit.task.dueDate === null
+      ? null
+      : formatDay(hit.task.dueDate, today) || null
+  if (hit.kind === 'company') return hit.lane?.space ?? null
+  if (hit.kind === 'deal') return hit.lane?.stage ?? null
+  return null
 }
 
 /** The kinds the fused statement returns that are passages, not records. */
@@ -188,6 +176,7 @@ export function splitHits(hits: ReadonlyArray<Hit>): {
         snippet: hit.snippet ?? '',
         page: null,
         parent: hit.parent,
+        day: hit.lane?.day ?? null,
       })
     else records.push(hit)
   }
@@ -203,39 +192,54 @@ export function mergePassages(
   return [...lexical, ...semantic.filter((p) => !seen.has(p.id))]
 }
 
-/** A passage's path lane: the file and its page, or the record it is on. */
-export function passageMeta(p: Passage): string {
+/** A passage's lane: `<title> · <day>` for a note, `<name> · p.N` for a file. */
+export function passageMeta(p: Passage, today: string): string {
   if (p.kind === 'document')
     return p.page === null ? p.name : `${p.name} · p.${String(p.page)}`
-  return `${p.objectSlug ?? p.kind} · ${p.name}`
+  const title = p.name || 'Untitled'
+  const day = p.day === null ? '' : formatDay(p.day, today)
+  return day ? `${title} · ${day}` : title
 }
 
-/** Every row: 36px, ruled under, the selection in bone. */
-const ROW = 'h-9 min-h-9 gap-3 border-b border-rule px-4 py-0'
+/** Every row: the row height, ruled under; highlighted, bone with its name medium. */
+const ROW =
+  'h-row min-h-row gap-3 border-b border-rule px-4 py-0 data-[selected=true]:[&_[data-name]]:font-medium'
 
-/** The kind glyph's slot, so names start on one line. */
-function Glyph({ icon: Icon }: { icon: LucideIcon }) {
+/** The 16px glyph slot, so names start on one line. */
+function GlyphSlot({ children }: { children?: ReactNode }) {
   return (
-    <Icon
+    <span
       aria-hidden
-      className="size-3.5 shrink-0 text-graphite"
-      strokeWidth={1.75}
-    />
+      className="flex size-4 shrink-0 items-center justify-center mono text-ui text-graphite"
+    >
+      {children}
+    </span>
   )
 }
 
-/** The row's right lanes: the path in graphite, then the printed key. */
+function Glyph({ icon: Icon }: { icon: LucideIcon }) {
+  return (
+    <GlyphSlot>
+      <Icon className="size-3.5 text-graphite" strokeWidth={1.75} />
+    </GlyphSlot>
+  )
+}
+
+/** The row's right lanes: the path in graphite, then the binding. */
 function Lanes({
   meta,
   keys,
 }: {
-  meta?: string | undefined
+  meta?: string | null | undefined
   keys?: string | undefined
 }) {
   return (
     <>
       {meta ? (
-        <span className="max-w-[45%] shrink-0 truncate mono text-micro text-graphite">
+        <span
+          data-lane
+          className="max-w-[45%] shrink-0 truncate mono text-micro text-graphite"
+        >
           {meta}
         </span>
       ) : null}
@@ -250,31 +254,31 @@ function Lanes({
 
 /**
  * A record row's content: the kind glyph (or the record's picture), the
- * name in ink, the path in graphite. A task is struck through once done.
+ * name in ink, the lane in graphite. A task is struck through once done.
  */
-export function HitLine({ hit }: { hit: Hit }) {
+export function HitLine({ hit, today }: { hit: Hit; today: string }) {
   const icon =
-    hit.rowKind === 'task' ? CheckSquare : (KIND_ICONS[hit.kind] ?? FileText)
+    hit.rowKind === 'task' ? CheckSquare : (KIND_ICONS[hit.kind] ?? Table2)
   const done = hit.rowKind === 'task' && hit.task.done
   return (
     <>
       {hit.rowKind === 'entity' && hit.picture ? (
-        <PictureMark src={hit.picture} size={14} />
+        <GlyphSlot>
+          <PictureMark src={hit.picture} size={14} />
+        </GlyphSlot>
       ) : (
         <Glyph icon={icon} />
       )}
       <span
+        data-name
         className={cn(
-          'min-w-0 shrink truncate',
+          'min-w-0 flex-1 truncate',
           done && 'text-graphite line-through',
         )}
       >
         {hit.name || 'Untitled'}
       </span>
-      <span className="min-w-0 flex-1 truncate text-label text-graphite">
-        {hit.snippet ? <Highlighted text={hit.snippet} /> : null}
-      </span>
-      <Lanes meta={hitMeta(hit)} />
+      <Lanes meta={hitMeta(hit, today)} />
     </>
   )
 }
@@ -283,9 +287,13 @@ export function HitLine({ hit }: { hit: Hit }) {
 export type JumpTarget = {
   readonly id: string
   readonly label: string
-  readonly meta: string
+  /** What a query may match besides the label; never drawn. */
+  readonly words: string
   readonly href: string
+  /** The binding, the lane of a page or an object. */
   readonly key?: string
+  /** A saved view's lane: its object's plural. */
+  readonly lane?: string
   readonly icon: LucideIcon
   /** An object's slug: highlighting it previews its saved views. */
   readonly preview?: string
@@ -302,7 +310,7 @@ export function jumpTargets(
     ...NAV_ITEMS.map((item): JumpTarget => ({
       id: `nav:${item.to}`,
       label: item.label,
-      meta: item.group === 'objects' ? 'object' : 'page',
+      words: item.group === 'objects' ? 'object' : 'page',
       href: item.to,
       key: item.key,
       icon: item.icon,
@@ -311,7 +319,7 @@ export function jumpTargets(
     ...objects.map((o): JumpTarget => ({
       id: `object:${o.slug}`,
       label: o.plural,
-      meta: 'object',
+      words: 'object',
       href: `/o/${o.slug}`,
       icon: objectIcon(o),
       preview: o.slug,
@@ -319,14 +327,15 @@ export function jumpTargets(
     ...views.map((v): JumpTarget => ({
       id: `view:${v.id}`,
       label: v.name,
-      meta: `view · ${v.objectPlural}`,
+      words: `view ${v.objectPlural}`,
       href: `${v.path}?view=${v.id}`,
+      lane: v.objectPlural,
       icon: Table2,
     })),
     {
       id: 'settings',
       label: 'Settings',
-      meta: 'settings',
+      words: 'settings',
       href: '/settings',
       key: 'G ,',
       icon: Settings,
@@ -334,7 +343,7 @@ export function jumpTargets(
     ...SETTINGS_SECTIONS.map((s): JumpTarget => ({
       id: `settings:${s.to}`,
       label: s.label,
-      meta: `settings · ${SETTINGS_CRUMBS[s.group]}`,
+      words: `settings ${SETTINGS_CRUMBS[s.group]}`,
       href: s.to,
       icon: Settings,
     })),
@@ -356,7 +365,7 @@ const actionText = (a: PageAction) => `${a.label} ${a.words ?? ''}`
 /**
  * What the highlighted row previews, from cmdk's selected value: a record,
  * an object under Jump to, or a passage. Anything else — a page, a view,
- * settings, a verb, a task — opens no pane.
+ * settings, a verb, a task — leaves the pane blank.
  */
 export function previewTarget(
   value: string,
@@ -373,6 +382,7 @@ export function previewTarget(
           key: value,
           slug: j.preview,
           label: j.label,
+          icon: j.icon,
           href: j.href,
         }
   }
@@ -410,6 +420,42 @@ async function loadPreview(
   }
 }
 
+/**
+ * A deal's Move stage, asked in the palette: its live stages, the current
+ * one checked. A pick writes the stage through `updateRecord` and checks it
+ * in place of the old one.
+ */
+export function moveStageStep(
+  deal: { id: string; name: string },
+  stages: PreviewStages,
+  write: (stageId: string) => Promise<unknown> = (stage) =>
+    updateRecord({ data: { id: deal.id, patch: { stage } } }),
+): ActionStep {
+  return {
+    mode: 'Move stage',
+    subject: deal.name,
+    placeholder: 'Find a stage…',
+    heading: 'Stages',
+    exclusive: true,
+    choices: async () =>
+      stages.options.map((o) =>
+        o.id === stages.current
+          ? { id: o.id, label: o.label, meta: 'Current', done: true }
+          : { id: o.id, label: o.label },
+      ),
+    pick: async (choice) => {
+      try {
+        await write(choice.id)
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Could not move it')
+        throw err
+      }
+      toast(`Moved ${deal.name} to ${choice.label}`)
+      return { ...choice, meta: 'Current', done: true }
+    },
+  }
+}
+
 type Mode =
   | { readonly kind: 'find' }
   | {
@@ -442,9 +488,33 @@ export type PaletteBodyProps = {
   onAsk?: ((text: string) => void) | undefined
 }
 
+/** The foot's key list, sentence case: `↑↓ Move · ↵ Open · → Actions`. */
+export function footKeys({
+  finding,
+  enter,
+  paneActions,
+  ask,
+}: {
+  finding: boolean
+  enter: string
+  paneActions: boolean
+  ask: boolean
+}): string {
+  if (!finding) return '↑↓ Move · ⌫ Back to find'
+  return [
+    '↑↓ Move',
+    enter,
+    paneActions ? '→ Actions' : null,
+    ask ? 'Tab Ask' : null,
+  ]
+    .filter((x) => x !== null)
+    .join(' · ')
+}
+
 /**
- * The palette's input, groups and foot — everything inside the window, so
- * it mounts fresh on every opening and a test can mount it in a `Command`.
+ * The palette's input, groups, pane and foot — everything inside the
+ * window, so it mounts fresh on every opening and a test can mount it in a
+ * `Command`.
  */
 export function PaletteBody({
   pageActions,
@@ -461,6 +531,7 @@ export function PaletteBody({
   onOpenFile,
   onAsk,
 }: PaletteBodyProps) {
+  const { today } = useClock()
   const [query, setQuery] = useState('')
   const [mode, setMode] = useState<Mode>({ kind: 'find' })
   const [records, setRecords] = useState<ReadonlyArray<Hit>>([])
@@ -552,8 +623,27 @@ export function PaletteBody({
       return
     }
     setChoices((prev) =>
-      prev === null ? prev : prev.map((c) => (c.id === now.id ? now : c)),
+      prev === null
+        ? prev
+        : prev.map((c) =>
+            c.id === now.id
+              ? now
+              : step.exclusive && c.done
+                ? { id: c.id, label: c.label }
+                : c,
+          ),
     )
+    onStepDone()
+  }
+
+  async function make(create: StepCreate) {
+    let made: StepChoice
+    try {
+      made = await create.make()
+    } catch {
+      return
+    }
+    setChoices((prev) => [...(prev ?? []), made])
     onStepDone()
   }
 
@@ -573,7 +663,7 @@ export function PaletteBody({
         ...extraActions.filter((a) => !pageIds.has(a.id)),
       ].filter((a) => matchesQuery(typed, actionText(a)))
   const jumps = typed
-    ? jump.filter((j) => matchesQuery(typed, `${j.label} ${j.meta}`))
+    ? jump.filter((j) => matchesQuery(typed, `${j.label} ${j.words}`))
     : []
   const fused = splitHits(typed.length >= 2 ? records : [])
   const shownRecords = fused.records
@@ -585,6 +675,7 @@ export function PaletteBody({
   const settled =
     typed.length < 2 || (recordsFor === typed && passagesFor === typed)
   const nothingFound =
+    finding &&
     typed !== '' &&
     jumps.length === 0 &&
     actions.length === 0 &&
@@ -596,8 +687,12 @@ export function PaletteBody({
     mode.kind === 'step' && choices !== null
       ? choices.filter((c) => !typed || matchesQuery(typed, c.label))
       : []
+  const stepCreate =
+    mode.kind === 'step' && choices !== null && typed !== ''
+      ? (mode.step.create?.(typed, stepChoices) ?? null)
+      : null
 
-  // The preview pane follows the highlight; nothing previewable, no pane.
+  // The pane follows the highlight, and is blank on anything it cannot show.
   // cmdk holds no value until a row mounts, whatever its type says.
   const selected = useCommandState((s): string | undefined => s.value)
   const target =
@@ -621,7 +716,7 @@ export function PaletteBody({
   const preview = target ? previews.get(target.key) : undefined
   const pane = useRef<HTMLElement>(null)
 
-  /** → and the foot's actions: focus the pane's first action. */
+  /** → : focus the pane's first action. */
   function focusPane(): boolean {
     const first = pane.current?.querySelector<HTMLElement>('[data-pane-action]')
     first?.focus()
@@ -641,6 +736,14 @@ export function PaletteBody({
       const data = preview?.kind === 'record' ? preview.data : undefined
       const out: Array<PaneAction> = []
       if (href) out.push({ id: 'open', label: 'Open', run: () => onGo(href) })
+      if (data?.stages && data.stages.options.length > 0) {
+        const step = moveStageStep(data, data.stages)
+        out.push({
+          id: 'move-stage',
+          label: 'Move stage…',
+          run: () => startStep(step),
+        })
+      }
       if (data && data.singular !== null) {
         const verb = fileInSpaceAction({
           id: data.id,
@@ -659,6 +762,9 @@ export function PaletteBody({
     if (t.kind === 'object') {
       const data = preview?.kind === 'object' ? preview.data : undefined
       return [
+        ...(data
+          ? [{ id: 'all', label: 'All', run: () => onGo(data.path) }]
+          : []),
         ...(data ?? { views: [] }).views.map((v) => ({
           id: `view:${v.id}`,
           label: v.name,
@@ -680,6 +786,14 @@ export function PaletteBody({
     return href ? [{ id: 'open', label: 'Open', run: () => onGo(href) }] : []
   }
 
+  const shownPaneActions = target ? paneActions(target) : []
+  const filePage =
+    target?.kind === 'passage' &&
+    target.passage.kind === 'document' &&
+    target.passage.page !== null
+      ? target.passage.page
+      : null
+
   return (
     <>
       <CommandInput
@@ -698,7 +812,7 @@ export function PaletteBody({
           finding
             ? scope === null
               ? undefined
-              : `on ${scope}`
+              : `On ${scope}`
             : mode.step.subject
         }
         placeholder={
@@ -725,39 +839,52 @@ export function PaletteBody({
             e.preventDefault()
         }}
       />
-      <div className="flex min-h-0">
-        <CommandList className="max-h-[420px] min-w-0 flex-1 p-0">
+      <div data-body className="flex min-h-0 flex-1">
+        <CommandList className="max-h-none min-w-0 flex-1 overflow-y-auto p-0">
           {mode.kind === 'step' ? (
-            stepChoices.length > 0 ? (
-              <PaletteGroup
-                id="step"
-                heading={mode.step.heading}
-                count={stepChoices.length}
-              >
-                {stepChoices.map((c) => (
-                  <CommandItem
-                    key={c.id}
-                    value={`choice:${c.id}`}
-                    onSelect={() => void pick(mode.step, c)}
-                    className={cn(ROW, c.done && 'text-graphite')}
-                  >
-                    <span className="flex w-3.5 shrink-0 justify-center">
-                      {c.done ? (
-                        <Check
-                          aria-hidden
-                          className="size-3.5 text-graphite"
-                          strokeWidth={1.75}
-                        />
-                      ) : null}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">{c.label}</span>
-                    <Lanes {...(c.meta ? { meta: c.meta } : {})} />
-                  </CommandItem>
-                ))}
-              </PaletteGroup>
-            ) : choices !== null ? (
-              <NothingFound />
-            ) : null
+            <>
+              {stepChoices.length > 0 ? (
+                <PaletteGroup
+                  id="step"
+                  heading={mode.step.heading}
+                  count={stepChoices.length}
+                >
+                  {stepChoices.map((c) => (
+                    <CommandItem
+                      key={c.id}
+                      value={`choice:${c.id}`}
+                      onSelect={() => void pick(mode.step, c)}
+                      className={ROW}
+                    >
+                      <GlyphSlot>{c.done ? '✓' : null}</GlyphSlot>
+                      <span data-name className="min-w-0 flex-1 truncate">
+                        {c.label}
+                      </span>
+                      <Lanes meta={c.meta} />
+                    </CommandItem>
+                  ))}
+                </PaletteGroup>
+              ) : null}
+              {stepCreate ? (
+                <CommandItem
+                  data-create
+                  value="create"
+                  onSelect={() => void make(stepCreate)}
+                  className={ROW}
+                >
+                  <GlyphSlot>+</GlyphSlot>
+                  <span data-name className="min-w-0 flex-1 truncate">
+                    {stepCreate.label}
+                  </span>
+                  <Lanes meta={stepCreate.lane} />
+                </CommandItem>
+              ) : null}
+              {choices !== null &&
+              stepChoices.length === 0 &&
+              stepCreate === null ? (
+                <NothingFound />
+              ) : null}
+            </>
           ) : (
             <>
               {jumps.length > 0 ? (
@@ -770,11 +897,10 @@ export function PaletteBody({
                       className={ROW}
                     >
                       <Glyph icon={j.icon} />
-                      <span className="min-w-0 flex-1 truncate">{j.label}</span>
-                      <Lanes
-                        meta={j.meta}
-                        {...(j.key ? { keys: j.key } : {})}
-                      />
+                      <span data-name className="min-w-0 flex-1 truncate">
+                        {j.label}
+                      </span>
+                      <Lanes meta={j.lane} keys={j.key} />
                     </CommandItem>
                   ))}
                 </PaletteGroup>
@@ -782,11 +908,7 @@ export function PaletteBody({
               {actions.length > 0 ? (
                 <PaletteGroup
                   id="actions"
-                  heading={
-                    !typed && scope !== null
-                      ? `Actions · on ${scope}`
-                      : 'Actions'
-                  }
+                  heading="Actions"
                   count={actions.length}
                 >
                   {actions.map((a) => (
@@ -796,8 +918,10 @@ export function PaletteBody({
                       onSelect={() => act(a)}
                       className={ROW}
                     >
-                      <Glyph icon={a.icon ?? ChevronRight} />
-                      <span className="min-w-0 flex-1 truncate">{a.label}</span>
+                      <GlyphSlot>›</GlyphSlot>
+                      <span data-name className="min-w-0 flex-1 truncate">
+                        {a.label}
+                      </span>
                       <Lanes meta={a.meta} keys={a.key} />
                     </CommandItem>
                   ))}
@@ -826,7 +950,7 @@ export function PaletteBody({
                         }
                         className={ROW}
                       >
-                        <HitLine hit={hit} />
+                        <HitLine hit={hit} today={today} />
                       </CommandItem>
                     )
                   })}
@@ -853,8 +977,11 @@ export function PaletteBody({
                         }
                         className={ROW}
                       >
-                        <Glyph icon={p.kind === 'note' ? Pilcrow : File} />
-                        <span className="min-w-0 flex-1 truncate">
+                        <Glyph icon={KIND_ICONS[p.kind] ?? Table2} />
+                        <span
+                          data-name
+                          className="min-w-0 flex-1 truncate font-serif"
+                        >
                           “
                           {p.snippet ? (
                             <Highlighted text={p.snippet} />
@@ -863,51 +990,53 @@ export function PaletteBody({
                           )}
                           ”
                         </span>
-                        <Lanes meta={passageMeta(p)} />
+                        <Lanes meta={passageMeta(p, today)} />
                       </CommandItem>
                     )
                   })}
                 </PaletteGroup>
               ) : null}
-              {nothingFound ? <NothingFound /> : null}
+              {nothingFound ? (
+                <>
+                  <NothingFound />
+                  {onAsk ? (
+                    <CommandItem
+                      data-ask
+                      value="ask"
+                      onSelect={() => onAsk(query)}
+                      className={ROW}
+                    >
+                      <GlyphSlot>›</GlyphSlot>
+                      <span data-name className="min-w-0 flex-1 truncate">
+                        Ask "{typed}"
+                      </span>
+                      <Lanes keys="Tab" />
+                    </CommandItem>
+                  ) : null}
+                </>
+              ) : null}
             </>
           )}
         </CommandList>
-        {target ? (
-          <PreviewPane
-            ref={pane}
-            target={target}
-            data={preview}
-            actions={paneActions(target)}
-            onBack={backToList}
-          />
-        ) : null}
+        <PreviewPane
+          ref={pane}
+          target={target}
+          data={preview}
+          actions={shownPaneActions}
+          onBack={backToList}
+        />
       </div>
       <div
         data-foot
-        className="flex h-8 items-center justify-between gap-3 border-t border-rule bg-bone px-4 mono text-micro text-graphite"
+        className="flex h-8 shrink-0 items-center gap-3 border-t border-rule bg-bone px-4 mono text-micro text-graphite"
       >
-        <span>
-          {finding
-            ? `↑↓ move · ↵ open${onAsk ? ' · tab ask' : ''}`
-            : '↑↓ move · ⌫ back to find'}
-          {target ? (
-            <>
-              {' · '}
-              <button
-                type="button"
-                data-foot-actions
-                onClick={focusPane}
-                className="focus-ring hover:text-foreground"
-              >
-                → actions
-              </button>
-            </>
-          ) : null}
-        </span>
-        {finding ? null : (
-          <span className="min-w-0 truncate">{mode.step.hint}</span>
-        )}
+        {footKeys({
+          finding,
+          enter:
+            filePage === null ? '↵ Open' : `↵ Open at p.${String(filePage)}`,
+          paneActions: shownPaneActions.length > 0,
+          ask: onAsk !== undefined && typed !== '' && !nothingFound,
+        })}
       </div>
     </>
   )
@@ -915,16 +1044,19 @@ export function PaletteBody({
 
 function NothingFound() {
   return (
-    <div className="flex h-9 items-center px-4 text-ui text-graphite">
+    <div
+      data-nothing
+      className="flex h-row items-center border-b border-rule px-4 text-ui text-graphite"
+    >
       Nothing found
     </div>
   )
 }
 
 /**
- * A group under its 44px bone head: the caps label, then the count — or,
- * while its wave is out, the density ramp and "still looking." in place of
- * a spinner row.
+ * A group under its 28px bone head: the caps label, then the count — or,
+ * while its wave is out, the Twinkle and `Still looking` in place of a
+ * spinner row.
  */
 function PaletteGroup({
   id,
@@ -937,14 +1069,14 @@ function PaletteGroup({
   heading: string
   count: number
   running?: boolean
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
     <CommandGroup
       data-group={id}
-      // The palette's own head: 44px of bone, ruled under. Rows rule their
+      // The palette's own head: 28px of bone, ruled under. Rows rule their
       // own foot, so a later head needs no rule over it.
-      className="[&_[cmdk-group-heading]]:h-11 [&_[cmdk-group-heading]]:justify-between [&_[cmdk-group-heading]]:gap-3 [&_[cmdk-group-heading]]:border-b [&_[cmdk-group-heading]]:border-rule [&_[cmdk-group-heading]]:bg-bone [&_[cmdk-group-heading]]:px-4 [&_[cmdk-group-heading]]:leading-none [&_[cmdk-group]:not([hidden])_~&]:pt-0"
+      className="[&_[cmdk-group-heading]]:h-7 [&_[cmdk-group-heading]]:justify-between [&_[cmdk-group-heading]]:gap-3 [&_[cmdk-group-heading]]:border-b [&_[cmdk-group-heading]]:border-rule [&_[cmdk-group-heading]]:bg-bone [&_[cmdk-group-heading]]:px-4 [&_[cmdk-group-heading]]:leading-none [&_[cmdk-group]:not([hidden])_~&]:pt-0"
       heading={
         <>
           <span>{heading}</span>
@@ -953,8 +1085,8 @@ function PaletteGroup({
               data-running
               className="flex items-center gap-2 tracking-normal normal-case"
             >
-              <DensityRamp width={72} height={6} />
-              still looking.
+              <Twinkle />
+              Still looking
             </span>
           ) : (
             <span className="tracking-normal">{count}</span>
@@ -1076,9 +1208,8 @@ export function CommandPalette({
         title="Command palette"
         description="Find a record, a page or an action from the keyboard"
         shouldFilter={false}
-        // The palette widens while the preview pane is open; its scrim is
-        // bone-deep, never a blur.
-        className="sm:has-[[data-preview]]:max-w-[66rem]"
+        // One box in every state; its scrim is bone-deep, never a blur.
+        className={PALETTE_SIZE}
         overlayClassName="bg-bone-deep/60"
       >
         <PaletteBody

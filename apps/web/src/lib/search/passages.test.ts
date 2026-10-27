@@ -151,6 +151,10 @@ describe('Records and Passages', () => {
           // Inserted bare, with no object row.
           objectSlug: null,
         },
+        // A file's day is its arrival.
+        day: expect.stringMatching(
+          /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+        ),
       },
     ])
   })

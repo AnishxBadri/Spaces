@@ -34,8 +34,6 @@ export type ActionStep = {
   /** What the step acts on, printed at the input's right. */
   readonly subject: string
   readonly placeholder: string
-  /** The foot's right lane: what a pick does. */
-  readonly hint: string
   /** The group head over the choices. */
   readonly heading: string
   readonly choices: () => Promise<ReadonlyArray<StepChoice>>
@@ -44,6 +42,24 @@ export type ActionStep = {
    * redraws it and stays open for another. Rejects when nothing was written.
    */
   readonly pick: (choice: StepChoice) => Promise<StepChoice>
+  /** One answer holds at a time: a pick unchecks whatever was checked. */
+  readonly exclusive?: true
+  /**
+   * A new answer named by the query, offered when no answer is exactly it;
+   * null offers none. `shown` is the choices the query matched, best first.
+   */
+  readonly create?: (
+    query: string,
+    shown: ReadonlyArray<StepChoice>,
+  ) => StepCreate | null
+}
+
+/** The row that makes a new answer: `+ New space "Fintech"` · `Under Climate`. */
+export type StepCreate = {
+  readonly label: string
+  readonly lane: string
+  /** Resolves with the new answer, written and checked; rejects when not. */
+  readonly make: () => Promise<StepChoice>
 }
 
 type ActionFields = {

@@ -122,6 +122,7 @@ const DECK: Passage = {
     name: 'Halcyon Grid',
     objectSlug: null,
   },
+  day: null,
 }
 
 const dealVerbs = (onMove: () => void): Array<PageAction> => [
@@ -257,20 +258,20 @@ describe('the palette, nothing typed', () => {
     expect(input().placeholder).toBe('Find a record, a page, an action')
   })
 
-  it("on a record lists that record's verbs only under ACTIONS · ON <name>, the first in bone", () => {
+  it("on a record lists that record's verbs only under ACTIONS n, the first in bone", () => {
     mount({ pageActions: dealVerbs(() => {}), scope: 'Flent' })
     expect(groups()).toEqual(['actions'])
     expect(
       host.querySelector('[data-group="actions"] [cmdk-group-heading]')
         ?.textContent,
-    ).toBe('Actions · on Flent3')
+    ).toBe('Actions3')
     expect(
       host.querySelector('[data-slot="command-input-wrapper"]')?.textContent,
-    ).toContain('on Flent')
+    ).toContain('On Flent')
     expect(rowsIn('actions')).toEqual([
-      'Move stageM',
-      'Log interactionL',
-      'Hallmark this deal',
+      '›Move stageM',
+      '›Log interactionL',
+      '›Hallmark this deal',
     ])
     const first = host.querySelector('[data-group="actions"] [cmdk-item]')
     expect(first?.getAttribute('data-selected')).toBe('true')
@@ -278,7 +279,7 @@ describe('the palette, nothing typed', () => {
     expect(host.textContent).not.toContain('Upload a file')
   })
 
-  it('on a space lists its verbs under ACTIONS · ON <space>, the first in bone', () => {
+  it('on a space lists its verbs under ACTIONS n, the first in bone', () => {
     mount({
       scope: 'Proptech',
       pageActions: [
@@ -290,11 +291,11 @@ describe('the palette, nothing typed', () => {
     expect(
       host.querySelector('[data-group="actions"] [cmdk-group-heading]')
         ?.textContent,
-    ).toBe('Actions · on Proptech2')
+    ).toBe('Actions2')
     expect(
       host.querySelector('[data-slot="command-input-wrapper"]')?.textContent,
-    ).toContain('on Proptech')
-    expect(rowsIn('actions')).toEqual(['Note hereN', 'Add a taskT'])
+    ).toContain('On Proptech')
+    expect(rowsIn('actions')).toEqual(['›Note hereN', '›Add a taskT'])
     const first = host.querySelector('[data-group="actions"] [cmdk-item]')
     expect(first?.getAttribute('data-selected')).toBe('true')
   })
@@ -312,7 +313,10 @@ describe('the palette, nothing typed', () => {
         },
       ],
     })
-    expect(rowsIn('actions')).toEqual(['Add taskT', 'File in a space…in 2 now'])
+    expect(rowsIn('actions')).toEqual([
+      '›Add taskT',
+      '›File in a space…in 2 now',
+    ])
   })
 
   it('on a page with verbs but no record shows only the input until something is typed', () => {
@@ -324,10 +328,10 @@ describe('the palette, nothing typed', () => {
     expect(groups()).toEqual([])
     expect(
       host.querySelector('[data-slot="command-input-wrapper"]')?.textContent,
-    ).not.toContain('on ')
+    ).not.toContain('On ')
     type('add')
     expect(groups()).toEqual(['actions'])
-    expect(rowsIn('actions')).toEqual(['Add a taskT'])
+    expect(rowsIn('actions')).toEqual(['›Add a taskT'])
   })
 })
 
@@ -347,8 +351,9 @@ describe('the palette, typed', () => {
     type('hal')
     // Local groups answer at once; Records waits for the pause.
     expect(groups()).toEqual(['jump', 'actions'])
-    expect(rowsIn('jump')).toEqual(['Halcyon pipelineview · Deals'])
-    expect(rowsIn('actions')).toEqual(['Hallmark this deal'])
+    // Jump to's lane: a saved view prints its object's plural.
+    expect(rowsIn('jump')).toEqual(['Halcyon pipelineDeals'])
+    expect(rowsIn('actions')).toEqual(['›Hallmark this deal'])
 
     await wait(180)
     expect(asked).toEqual(['hal'])
@@ -360,8 +365,10 @@ describe('the palette, typed', () => {
     expect(groups()).toEqual(['jump', 'actions', 'records', 'passages'])
     const head = host.querySelector('[data-group="passages"]')
     expect(head?.querySelector('[data-running]')?.textContent).toBe(
-      'still looking.',
+      'Still looking',
     )
+    // The working state is the Twinkle, never a spinner.
+    expect(head?.querySelector('[data-running] [data-twinkle]')).not.toBeNull()
     expect(rowsIn('passages')).toEqual([])
 
     await act(async () => {
@@ -400,11 +407,17 @@ describe('the palette, typed', () => {
     type('vayu')
     await wait(180)
     expect(groups()).toEqual(['records', 'passages'])
-    expect(rowsIn('records')).toEqual(['Vayu Orbitalcompany'])
+    expect(rowsIn('records')).toEqual(['Vayu Orbital'])
     expect(rowsIn('passages')).toEqual([
-      '“the Vayu thesis, mentions Vayu Orbital”note · Vayu — first call',
+      '“the Vayu thesis, mentions Vayu Orbital”Vayu — first call',
       '“Vayu deck.pdf”Vayu deck.pdf',
     ])
+    // Passages are set in serif, clamped to one line.
+    const quote = host.querySelector(
+      '[data-group="passages"] [cmdk-item] [data-name]',
+    )
+    expect(quote?.className).toContain('font-serif')
+    expect(quote?.className).toContain('truncate')
     expect(host.textContent).not.toContain('[[')
 
     await wait(420)
@@ -434,9 +447,9 @@ describe('the palette, typed', () => {
       ],
     })
     type('a')
-    expect(rowsIn('actions')).toEqual(['Add a taskT', 'Upload a file…'])
+    expect(rowsIn('actions')).toEqual(['›Add a taskT', '›Upload a file…'])
     type('up')
-    expect(rowsIn('actions')).toEqual(['Upload a file…'])
+    expect(rowsIn('actions')).toEqual(['›Upload a file…'])
   })
 })
 
@@ -448,28 +461,35 @@ describe('the palette grammar', () => {
     }
     forbidden(host.textContent)
     expect(host.querySelector('[data-foot]')?.textContent).toBe(
-      '↑↓ move · ↵ open',
+      '↑↓ Move · ↵ Open',
     )
     type('hal')
     await wait(700)
     forbidden(host.textContent)
-    // A highlighted record or object adds `→ actions`; nothing else changes.
+    // A highlighted record or object adds `→ Actions`; nothing else changes.
     expect(host.querySelector('[data-foot]')?.textContent).toMatch(
-      /^↑↓ move · ↵ open( · → actions)?$/,
+      /^↑↓ Move · ↵ Open( · → Actions)?$/,
     )
+    // The foot is a key list, never a button carrying a key.
+    expect(host.querySelector('[data-foot] button')).toBeNull()
   })
 
-  it('draws 36px rows under 44px bone heads', async () => {
+  it('draws row-height rows under 28px bone heads, the highlighted name medium', async () => {
     mount({ pageActions: dealVerbs(() => {}), records: async () => [HALCYON] })
     type('hal')
     await wait(200)
-    for (const row of host.querySelectorAll('[cmdk-item]'))
-      expect(row.className).toMatch(/\bh-9\b/)
+    for (const row of host.querySelectorAll('[cmdk-item]')) {
+      expect(row.className).toMatch(/\bh-row\b/)
+      expect(row.className).toContain(
+        'data-[selected=true]:[&_[data-name]]:font-medium',
+      )
+    }
     for (const group of host.querySelectorAll('[cmdk-group]')) {
-      expect(group.className).toContain('[&_[cmdk-group-heading]]:h-11')
+      expect(group.className).toContain('[&_[cmdk-group-heading]]:h-7')
       expect(group.className).toContain('[&_[cmdk-group-heading]]:bg-bone')
       // The shared primitive's 24px head is merged away, not stacked.
       expect(group.className).not.toContain('[&_[cmdk-group-heading]]:h-6')
+      expect(group.className).not.toContain('[&_[cmdk-group-heading]]:h-11')
     }
   })
 })
@@ -486,6 +506,8 @@ describe('an action that asks one more answer', () => {
     { id: 's3', label: 'Climate', meta: '4 companies' },
   ]
 
+  const made: Array<string> = []
+
   function fileIn(pick: (c: StepChoice) => Promise<StepChoice>): PageAction {
     return {
       id: 'file-in-space',
@@ -495,9 +517,24 @@ describe('an action that asks one more answer', () => {
         subject: 'Flent',
         placeholder: 'Find a space…',
         heading: 'Spaces',
-        hint: 'files Flent, stays open for another',
         choices: async () => choices,
         pick,
+        create: (query, shown) =>
+          shown.some((c) => c.label.toLowerCase() === query.toLowerCase())
+            ? null
+            : {
+                label: `New space "${query}"`,
+                lane: 'Under Proptech',
+                make: async () => {
+                  made.push(query)
+                  return {
+                    id: 's9',
+                    label: `Proptech › ${query}`,
+                    meta: 'Filed here',
+                    done: true,
+                  }
+                },
+              },
       },
     }
   }
@@ -524,16 +561,19 @@ describe('an action that asks one more answer', () => {
     expect(input().placeholder).toBe('Find a space…')
     expect(groups()).toEqual(['step'])
     expect(rowsIn('step')).toEqual([
-      'Proptech › Property opsfiled here',
+      '✓Proptech › Property opsfiled here',
       'Proptech › Rental tech12 companies',
       'Climate4 companies',
     ])
     expect(host.querySelector('[data-foot]')?.textContent).toBe(
-      '↑↓ move · ⌫ back to findfiles Flent, stays open for another',
+      '↑↓ Move · ⌫ Back to find',
     )
 
     type('rent')
     expect(rowsIn('step')).toEqual(['Proptech › Rental tech12 companies'])
+    expect(host.querySelector('[data-create]')?.textContent).toBe(
+      '+New space "rent"Under Proptech',
+    )
     // ⌫ with text in the input edits the text; it does not leave the step.
     press('Backspace')
     expect(modeLabel()).toBe('File in ›')
@@ -544,7 +584,7 @@ describe('an action that asks one more answer', () => {
     expect(picked).toEqual(['s2'])
     expect(done).toHaveBeenCalledOnce()
     // It stays open for another, the space now checked.
-    expect(rowsIn('step').at(1)).toBe('Proptech › Rental techfiled here')
+    expect(rowsIn('step').at(1)).toBe('✓Proptech › Rental techfiled here')
     // An already-filed space does nothing.
     click(host.querySelector('[data-group="step"] [cmdk-item]'))
     await wait(0)
@@ -553,6 +593,27 @@ describe('an action that asks one more answer', () => {
     press('Backspace')
     expect(modeLabel()).toBe('Find')
     expect(input().value).toBe('fil')
+  })
+
+  it('makes a space named by the query when none is, files it, and checks it in the list', async () => {
+    made.length = 0
+    const done = vi.fn()
+    mount({
+      pageActions: [fileIn(async (c) => c)],
+      onStepDone: done,
+    })
+    type('fil')
+    click(host.querySelector('[data-group="actions"] [cmdk-item]'))
+    await wait(0)
+    type('Fintech')
+    expect(rowsIn('step')).toEqual([])
+    // Nothing matches: no Nothing found, the create row instead.
+    expect(host.textContent).not.toContain('Nothing found')
+    click(host.querySelector('[data-create]'))
+    await wait(0)
+    expect(made).toEqual(['Fintech'])
+    expect(done).toHaveBeenCalledOnce()
+    expect(rowsIn('step')).toEqual(['✓Proptech › FintechFiled here'])
   })
 })
 
@@ -576,14 +637,43 @@ describe('the preview pane', () => {
         ownership: null,
       },
     },
+    domain: 'halcyon.example',
     fields: [
-      { slug: 'description', label: 'Description', value: 'Grid storage' },
-      { slug: 'funding_stage', label: 'Funding stage', value: 'Seed' },
-      { slug: 'location', label: 'Location', value: 'Oslo' },
-      { slug: 'founded_year', label: 'Founded year', value: '2021' },
-      { slug: 'linkedin', label: 'LinkedIn', value: 'linkedin.com/halcyon' },
-      { slug: 'founders', label: 'Founders', value: 'Ada Lind' },
+      {
+        slug: 'description',
+        label: 'Description',
+        value: 'Grid storage',
+        display: 'text',
+      },
+      {
+        slug: 'funding_stage',
+        label: 'Funding stage',
+        value: 'Seed',
+        display: 'badge',
+        option: { id: 'seed', label: 'Seed' },
+        index: 1,
+      },
+      { slug: 'location', label: 'Location', value: 'Oslo', display: 'text' },
+      {
+        slug: 'raised',
+        label: 'Raised',
+        value: '4.2M USD',
+        display: 'money',
+      },
+      {
+        slug: 'linkedin',
+        label: 'LinkedIn',
+        value: 'linkedin.com/halcyon',
+        display: 'text',
+      },
+      {
+        slug: 'founders',
+        label: 'Founders',
+        value: 'Ada Lind',
+        display: 'text',
+      },
     ],
+    stages: null,
   }
   const HALDANE_PREVIEW: RecordPreview = {
     ...HALCYON_PREVIEW,
@@ -602,7 +692,7 @@ describe('the preview pane', () => {
     }
   }
 
-  it('opens on a highlighted record: its readout strip in variant B and six filled fields', async () => {
+  it('shows a highlighted record: stamp, serif name, domain, the readouts with a value two-up, and the field grid', async () => {
     const asked: Array<string> = []
     mount({
       records: async () => [HALCYON, HALDANE],
@@ -610,25 +700,31 @@ describe('the preview pane', () => {
     })
     type('hal')
     await wait(180)
-    // The saved view under Jump to is highlighted first: nothing to preview.
-    expect(pane()).toBeNull()
-    expect(foot()).toBe('↑↓ move · ↵ open')
+    // The saved view under Jump to is highlighted first: the pane is
+    // mounted, and blank bone.
+    expect(pane()?.getAttribute('data-preview')).toBe('none')
+    expect(pane()?.textContent).toBe('')
+    expect(pane()?.className).toContain('bg-bone')
+    expect(foot()).toBe('↑↓ Move · ↵ Open')
 
     press('ArrowDown')
     await wait(0)
     expect(pane()?.getAttribute('data-preview')).toBe('record')
-    expect(pane()?.querySelector('h2')?.textContent).toBe('Halcyon Grid')
+    const name = pane()?.querySelector('h2')
+    expect(name?.textContent).toBe('Halcyon Grid')
+    expect(name?.className).toContain('font-serif')
+    expect(name?.className).toContain('text-page')
     expect(pane()?.querySelector('[data-stamp]')?.textContent).toBe('Company')
-    expect(pane()?.querySelector('[data-crumb]')?.textContent).toBe(
-      'Climate · Grid software',
+    expect(pane()?.querySelector('[data-domain]')?.textContent).toBe(
+      'halcyon.example',
     )
-    // The record head's own strip: equal cells, value over label.
+    expect(pane()?.querySelector('.double-rule')).not.toBeNull()
+    // Two-up, and only the readouts with a value: Ownership's dash is gone.
     const strip = pane()?.querySelector('[data-readouts]')
-    expect(strip?.className).toContain('border-t border-hairline')
+    expect(strip?.className).toContain('grid-cols-2')
     expect([...(strip?.children ?? [])].map((c) => c.textContent)).toEqual([
       '4 OctLast contact',
       '3Moving, 30 days',
-      '—Ownership',
     ])
     expect(
       [...(pane()?.querySelectorAll('[data-field]') ?? [])].map(
@@ -638,11 +734,23 @@ describe('the preview pane', () => {
       'DescriptionGrid storage',
       'Funding stageSeed',
       'LocationOslo',
-      'Founded year2021',
+      'Raised4.2M USD',
       'LinkedInlinkedin.com/halcyon',
       'FoundersAda Lind',
     ])
-    expect(foot()).toBe('↑↓ move · ↵ open · → actions')
+    // The stage is its badge, money is mono, the label column bone.
+    const field = (slug: string) =>
+      pane()?.querySelector(`[data-field="${slug}"]`)
+    expect(
+      field('funding_stage')?.querySelector('[data-slot="badge"]'),
+    ).not.toBeNull()
+    expect(field('raised')?.querySelector('dd span')?.className).toContain(
+      'mono',
+    )
+    expect(field('location')?.querySelector('dt')?.className).toContain(
+      'bg-bone',
+    )
+    expect(foot()).toBe('↑↓ Move · ↵ Open · → Actions')
     // The pane prints no universal key either.
     expect(pane()?.textContent).not.toMatch(/\besc\b|↵|⌘K/i)
   })
@@ -665,12 +773,13 @@ describe('the preview pane', () => {
     expect(asked).toEqual([HALCYON.id, HALDANE.id])
   })
 
-  it('opens on an object under Jump to with its saved views and counts, and closes when the highlight leaves it', async () => {
+  it('shows an object under Jump to with its All total, saved views and counts, and blanks when the highlight leaves it', async () => {
     const asked: Array<string> = []
     const DEALS: ObjectPreview = {
       slug: 'deals',
       plural: 'Deals',
       path: '/deals',
+      total: 28,
       views: [
         {
           id: 'v1',
@@ -694,22 +803,30 @@ describe('the preview pane', () => {
     })
     type('deals')
     await wait(0)
-    expect(rowsIn('jump').at(0)).toBe('DealsobjectG D')
+    // Jump to's lane is the key only.
+    expect(rowsIn('jump').at(0)).toBe('DealsG D')
     expect(pane()?.getAttribute('data-preview')).toBe('object')
     expect(asked).toEqual(['deals'])
+    expect(pane()?.querySelector('h2')?.textContent).toBe('Deals')
     expect(
       [...(pane()?.querySelectorAll('[data-view]') ?? [])].map(
         (v) => v.textContent,
       ),
-    ).toEqual(['Halcyon pipeline4', 'Late stage12', 'Set to close—'])
-    click(pane()?.querySelector('[data-view="v2"]'))
-    expect(went).toEqual(['/deals?view=v2'])
+    ).toEqual(['All28', 'Halcyon pipeline4', 'Late stage12', 'Set to close—'])
+    expect(
+      [...(pane()?.querySelectorAll('[data-pane-actions] button') ?? [])].map(
+        (b) => b.textContent,
+      ),
+    ).toEqual(['Open Deals'])
+    click(pane()?.querySelector('[data-view="view:v2"]'))
+    click(pane()?.querySelector('[data-view="all"]'))
+    expect(went).toEqual(['/deals?view=v2', '/deals'])
 
-    // A saved view is no object: the pane closes, the list runs full width.
+    // A saved view is no object: the pane goes blank, its width unchanged.
     press('ArrowDown')
     await wait(0)
-    expect(pane()).toBeNull()
-    expect(foot()).toBe('↑↓ move · ↵ open')
+    expect(pane()?.getAttribute('data-preview')).toBe('none')
+    expect(foot()).toBe('↑↓ Move · ↵ Open')
     press('ArrowUp')
     await wait(0)
     expect(pane()?.getAttribute('data-preview')).toBe('object')
@@ -731,7 +848,7 @@ describe('the preview pane', () => {
     const rows = rowsIn('jump').length
     expect(rows).toBeGreaterThan(1)
     for (let i = 0; i < rows; i++) {
-      expect(pane()).toBeNull()
+      expect(pane()?.getAttribute('data-preview')).toBe('none')
       press('ArrowDown')
       await wait(0)
     }
@@ -747,6 +864,13 @@ describe('the preview pane', () => {
         { text: 'Sited beside substations.', matched: false },
         { text: 'halcyon-class storage at grid scale', matched: true },
       ],
+      on: {
+        id: 'c-halcyon',
+        kind: 'company',
+        name: 'Halcyon Grid',
+        objectSlug: null,
+      },
+      day: '2026-10-04T09:00:00.000Z',
     }
     const opened: Array<[string, number | null]> = []
     mount({
@@ -765,7 +889,7 @@ describe('the preview pane', () => {
     expect(pane()?.getAttribute('data-preview')).toBe('passage')
     expect(asked).toEqual([{ id: DECK.id, page: 4 }])
     expect(pane()?.querySelector('[data-page-of]')?.textContent).toBe(
-      'p.4 of 9',
+      'Page 4 of 9',
     )
     expect(pane()?.querySelector('[data-matched]')?.textContent).toBe(
       'halcyon-class storage at grid scale',
@@ -773,20 +897,29 @@ describe('the preview pane', () => {
     expect(pane()?.querySelector('[data-page]')?.textContent).toContain(
       'Sited beside substations.',
     )
-    expect(pane()?.textContent).toContain('on Halcyon Grid')
+    expect(pane()?.querySelector('[data-matched]')?.className).toContain(
+      'font-serif',
+    )
+    expect(pane()?.querySelector('[data-on]')?.textContent).toBe(
+      'On Halcyon Grid · 4 Oct',
+    )
+    expect(
+      pane()?.querySelector('[data-pane-action="open"]')?.textContent,
+    ).toBe('Open at p.4')
+    expect(foot()).toBe('↑↓ Move · ↵ Open at p.4 · → Actions')
 
     press('Enter')
     expect(opened).toEqual([[DECK.id, 4]])
   })
 
-  it('→ focuses the pane’s actions, ↑↓ moves among them, ← returns to the list; the foot’s actions does the same', async () => {
+  it('→ focuses the pane’s actions, ↑↓ moves among them, ← returns to the list', async () => {
     mount({
       records: async () => [HALCYON],
       loaders: { record: recordLoader([]) },
     })
     type('halcyon g')
     await wait(180)
-    if (pane() === null) {
+    if (pane()?.getAttribute('data-preview') !== 'record') {
       press('ArrowDown')
       await wait(0)
     }
@@ -817,11 +950,6 @@ describe('the preview pane', () => {
       )
     })
     expect(document.activeElement).toBe(input())
-
-    click(host.querySelector('[data-foot-actions]'))
-    expect(document.activeElement?.getAttribute('data-pane-action')).toBe(
-      'open',
-    )
   })
 })
 
@@ -882,9 +1010,109 @@ describe('Tab hands the query to Ask (D70)', () => {
     mount({ onAsk: (text) => asked.push(text) })
     type('which series a deals went quiet')
     await wait(180)
-    expect(host.querySelector('[data-foot]')?.textContent).toContain('tab ask')
+    expect(host.querySelector('[data-foot]')?.textContent).toContain('Tab Ask')
     press('Tab')
     expect(asked).toEqual(['which series a deals went quiet'])
     expect(host.querySelector('[data-turn]')).toBeNull()
+  })
+})
+
+describe('nothing found', () => {
+  it('offers Ask "<query>" with Tab in its lane, runs it on select, and drops Tab Ask from the foot', async () => {
+    const asked: Array<string> = []
+    mount({ onAsk: (text) => asked.push(text) })
+    type('zzqx')
+    await wait(180)
+    expect(host.querySelector('[data-foot]')?.textContent).toContain('Tab Ask')
+    await wait(420)
+    await wait(0)
+    expect(host.querySelector('[data-nothing]')?.textContent).toBe(
+      'Nothing found',
+    )
+    const row = host.querySelector('[data-ask]')
+    expect(row?.textContent).toBe('›Ask "zzqx"Tab')
+    expect(row?.getAttribute('data-selected')).toBe('true')
+    expect(host.querySelector('[data-foot]')?.textContent).toBe(
+      '↑↓ Move · ↵ Open',
+    )
+    click(row)
+    expect(asked).toEqual(['zzqx'])
+  })
+})
+
+describe('a deal in the pane', () => {
+  it('offers Move stage…, which asks the stage in the palette with the current one checked', async () => {
+    const deal: SearchHit = {
+      ...company('d-halcyon', 'Halcyon Grid — Seed'),
+      kind: 'deal',
+      objectSlug: 'deals',
+    }
+    const preview: RecordPreview = {
+      id: deal.id,
+      kind: 'deal',
+      name: deal.name,
+      singular: 'Deal',
+      spaces: [],
+      domain: null,
+      readouts: null,
+      fields: [],
+      stages: {
+        current: 'diligence',
+        options: [
+          { id: 'sourced', label: 'Sourced' },
+          { id: 'diligence', label: 'Diligence' },
+          { id: 'ic', label: 'IC' },
+        ],
+      },
+    }
+    mount({
+      records: async () => [deal],
+      loaders: { record: async () => preview },
+    })
+    type('halcyon g')
+    await wait(180)
+    if (
+      host.querySelector('[data-preview]')?.getAttribute('data-preview') !==
+      'record'
+    ) {
+      press('ArrowDown')
+      await wait(0)
+    }
+    const actions = [
+      ...host.querySelectorAll('[data-preview] [data-pane-action]'),
+    ].map((a) => a.textContent)
+    expect(actions).toEqual(['Open', 'Move stage…', 'File in a space…'])
+    click(host.querySelector('[data-pane-action="move-stage"]'))
+    await wait(0)
+    expect(modeLabel()).toBe('Move stage ›')
+    expect(rowsIn('step')).toEqual(['Sourced', '✓DiligenceCurrent', 'IC'])
+  })
+
+  it('moves the stage on a pick and checks it in place of the old one', async () => {
+    const wrote: Array<string> = []
+    const step = palette.moveStageStep(
+      { id: 'd1', name: 'Halcyon Grid — Seed' },
+      {
+        current: 'sourced',
+        options: [
+          { id: 'sourced', label: 'Sourced' },
+          { id: 'ic', label: 'IC' },
+        ],
+      },
+      async (stage) => {
+        wrote.push(stage)
+      },
+    )
+    mount({
+      scope: 'Halcyon Grid — Seed',
+      pageActions: [{ id: 'move', label: 'Move stage…', step }],
+    })
+    click(host.querySelector('[data-group="actions"] [cmdk-item]'))
+    await wait(0)
+    expect(rowsIn('step')).toEqual(['✓SourcedCurrent', 'IC'])
+    click([...host.querySelectorAll('[data-group="step"] [cmdk-item]')].at(1))
+    await wait(0)
+    expect(wrote).toEqual(['ic'])
+    expect(rowsIn('step')).toEqual(['Sourced', '✓ICCurrent'])
   })
 })
