@@ -6,13 +6,12 @@ export type {
   FailingBinding,
   MovingSignal,
   ParkedSource,
-  ReviewGroup,
   TodayAttention,
   WaitingExport,
 } from '../today/attention'
 
 /**
- * Today's own reads: Review grouped by source and space, the reader's broken
+ * Today's own reads: the open Review queue, the reader's broken
  * connections, uploads waiting to write through, and What's moving on the
  * reader's companies.
  * The program is imported inside the handler so its database code never

@@ -56,6 +56,7 @@ const holding = (id: string, currency: string) => ({
 
 const attention = {
   review: [],
+  filedIn: {},
   moving: [],
   broken: [],
   parked: [],

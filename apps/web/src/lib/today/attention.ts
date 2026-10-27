@@ -6,21 +6,23 @@ import type { ParkedSource } from '@spaces/core/writes/enrichment/parked'
 import { waitingExportsProgram } from '@spaces/core/writes/bindings/export'
 import { JOB_PAGE, PRODUCTS, productOf } from '#/lib/connections/products'
 import type { AccountJob } from '#/lib/connections/products'
-import { reviewGroupsProgram } from '#/lib/inbox/review-groups'
-import type { ReviewGroup } from '#/lib/inbox/review-groups'
+import { filedInProgram } from '#/lib/inbox/filed-in'
+import { listInboxProgram } from '#/lib/inbox/queue'
+import type { InboxRow } from '#/lib/inbox/queue'
 import { movingProgram } from '#/lib/records/moving'
 import { failingBindingsForProgram } from '#/lib/documents/binding-health'
 import type { FailingBinding } from '#/lib/documents/binding-health'
 import type { MovingSignal } from '#/lib/records/moving'
 
 /**
- * What Today reads beyond the existing lists: open Review cards grouped by
- * source and space, the reader's broken connections, auto-enrich runs parked
- * at a source's cap, folder bindings that cannot sync, and What's moving.
+ * What Today reads beyond the existing lists: the open Review queue (flattened
+ * into rows on the client, after the held decisions leave it), the reader's
+ * broken connections, auto-enrich runs parked at a source's cap, folder
+ * bindings that cannot sync, and What's moving.
  * Outside the server-fn barrel so tests can call the programs without a request.
  */
 
-export type { FailingBinding, MovingSignal, ParkedSource, ReviewGroup }
+export type { FailingBinding, MovingSignal, ParkedSource }
 
 export class ConnectionsReadFailed extends Schema.TaggedError<ConnectionsReadFailed>()(
   'ConnectionsReadFailed',
@@ -48,7 +50,10 @@ export type WaitingExport = {
 }
 
 export type TodayAttention = {
-  review: ReviewGroup[]
+  /** The whole queue, the reader's Ask threads gathered under each thread. */
+  review: InboxRow[]
+  /** A file-here card's record by id: the path of the space it is filed in now. */
+  filedIn: Record<string, string>
   moving: MovingSignal[]
   broken: BrokenConnection[]
   parked: ParkedSource[]
@@ -104,12 +109,18 @@ export const brokenConnectionsProgram = Effect.fn('brokenConnectionsProgram')(
   },
 )
 
+const reviewProgram = Effect.fn('todayReview')(function* (viewer: string) {
+  const review = yield* listInboxProgram({ record: null, viewer })
+  const filedIn = yield* filedInProgram(review)
+  return { review, filedIn }
+})
+
 export const todayAttentionProgram = Effect.fn('todayAttentionProgram')(
   function* (userId: string, now: Date) {
-    const [review, moving, broken, parked, waiting, failing] =
+    const [{ review, filedIn }, moving, broken, parked, waiting, failing] =
       yield* Effect.all(
         [
-          reviewGroupsProgram(),
+          reviewProgram(userId),
           movingProgram(userId, now),
           brokenConnectionsProgram(userId),
           parkedEnrichmentProgram(),
@@ -120,6 +131,7 @@ export const todayAttentionProgram = Effect.fn('todayAttentionProgram')(
       )
     const out: TodayAttention = {
       review,
+      filedIn,
       moving,
       broken,
       parked,

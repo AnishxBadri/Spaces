@@ -23,6 +23,7 @@ import {
   objectDef,
   suggestion,
   attribute,
+  user,
 } from '@spaces/db/schema'
 import type { AttributeOptions } from '@spaces/db/schema/attributes'
 import type { DuplicateReason } from '@spaces/db/schema/entities'
@@ -197,6 +198,8 @@ export type ColumnRunSummary = {
   /** Rows the model was asked about so far — the run's steps. */
   rowsRun: number
   startedAt: string
+  /** The person who started it; null for a run no person pressed. */
+  author: string | null
 }
 
 /**
@@ -637,8 +640,16 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
               error: aiRun.error,
               rowsRun: sql<number>`jsonb_array_length(${aiRun.steps})::int`,
               startedAt: aiRun.startedAt,
+              author: user.name,
             })
             .from(aiRun)
+            .leftJoin(
+              user,
+              and(
+                eq(aiRun.startedByType, 'user'),
+                eq(user.id, aiRun.startedById),
+              ),
+            )
             .where(inArray(aiRun.id, runIds)),
         )
   const columnRuns = new Map<string, ColumnRunSummary>(

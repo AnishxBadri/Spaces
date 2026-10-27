@@ -93,8 +93,9 @@ describe('the suggestion card', () => {
 
   it('renders every suggestion_kind without throwing', async () => {
     const { suggestionKind } = await import('@spaces/db/schema')
-    const { SuggestionEntry, SUGGESTION_KIND_WORD, decisionWords } =
+    const { SuggestionEntry, SUGGESTION_KIND_WORD } =
       await import('#/components/inbox/suggestion-card')
+    const { decisionWords } = await import('#/lib/inbox/decision-words')
     for (const kind of suggestionKind.enumValues) {
       const html = renderToStaticMarkup(
         <ul>
@@ -127,8 +128,9 @@ describe('the suggestion card', () => {
       expect(html).toContain(`because ${kind}`)
       expect(html).toContain('deck.pdf · chunk 1')
       // A discovery card's verbs are its own: "File here", "Dismiss".
-      expect(html).toContain(decisionWords(kind).accept)
-      expect(html).toContain(decisionWords(kind).reject)
+      const words = decisionWords({ kind, payload: {} })
+      expect(html).toContain(words.accept)
+      expect(html).toContain(words.reject)
       // No sub-renderer, or a patch whose fields could not be read: the
       // payload is what the row shows, under the kind's word.
       expect(html).toContain(`payload-of-${kind}`)
@@ -309,7 +311,7 @@ describe('the suggestion card', () => {
     expect(html).toContain('fair value $1.2M → $1.5M')
     expect(html).toContain(', propose a mark')
     expect(html).not.toContain('<pre')
-    expect(html).toContain('Accept</button>')
+    expect(html).toContain('Record mark</button>')
     expect(html).toContain('Dismiss</button>')
   })
 
@@ -662,7 +664,7 @@ describe('the discovery group', () => {
     // No title: the chip reads as the page's host.
     expect(add).toContain('href="https://www.blog.example/post"')
     expect(add).toContain('>blog.example</a>')
-    expect(add).toContain('Add and file here')
+    expect(add).toContain('Add and file')
     expect(add).toContain('Dismiss')
     expect(add).toContain('never suggested in this space again')
     // One watch found it: the head's `via` says so; no "found by" line.
@@ -677,7 +679,7 @@ describe('the discovery group', () => {
       }),
     )
     expect(file).toContain('File here')
-    expect(file).not.toContain('Add and file here')
+    expect(file).not.toContain('Add and file')
     expect(file).toContain('found by 2 watches')
   })
 
@@ -696,7 +698,7 @@ describe('the discovery group', () => {
       </ul>,
     )
     expect(html).toContain('Added · enriching')
-    expect(html).not.toContain('Add and file here')
+    expect(html).not.toContain('Add and file')
     expect(html).not.toContain('Dismiss')
   })
 })

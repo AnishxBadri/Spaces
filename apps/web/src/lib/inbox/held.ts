@@ -20,6 +20,12 @@ export const heldDecisionSchema = z.discriminatedUnion('verb', [
   z.object({ verb: z.literal('dismiss-duplicate'), candidateId: uuid }),
   z.object({ verb: z.literal('apply-card'), suggestionId: uuid }),
   z.object({ verb: z.literal('skip-card'), suggestionId: uuid }),
+  // A registry proposal's Add option: the option, then the proposal closes.
+  z.object({
+    verb: z.literal('add-option'),
+    suggestionId: uuid,
+    label: z.string().trim().min(1).max(60),
+  }),
 ])
 
 export type HeldDecision = z.infer<typeof heldDecisionSchema>
@@ -66,6 +72,7 @@ export function heldView(decisions: Iterable<HeldDecision>): HeldView {
         break
       case 'apply-card':
       case 'skip-card':
+      case 'add-option':
         ids.add(d.suggestionId)
         break
       case 'accept-column':

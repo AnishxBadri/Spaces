@@ -10,6 +10,10 @@ import {
   rejectProgram,
   suggestionMessage,
 } from '#/lib/ai/propose'
+import {
+  addProposedOptionProgram,
+  attributeRunMessage,
+} from '#/lib/ai/attribute-run'
 import { applyCardProgram, skipCardProgram } from '#/lib/ask/card-store'
 import { askMessage } from '#/lib/ask/threads'
 import { heldBeaconSchema } from './held'
@@ -65,13 +69,17 @@ export type HeldOutcome =
 const done = (already: boolean): HeldOutcome => ({ ok: true, already })
 const refused = (message: string): HeldOutcome => ({ ok: false, message })
 
+/** Who a held decision runs as; an option is a registry change, admins only. */
+export type HeldActor = { id: string; admin: boolean }
+
 /**
- * Run one held decision as `actorId`, never failing: a decision another hand
+ * Run one held decision as the actor, never failing: a decision another hand
  * made first is `already`, a refusal carries the sentence the server fn
  * would have thrown.
  */
 export const runHeldDecisionProgram = Effect.fn('runHeldDecisionProgram')(
-  function* (decision: HeldDecision, actorId: string) {
+  function* (decision: HeldDecision, by: HeldActor) {
+    const actorId = by.id
     const actor = { type: 'user', id: actorId } as const
     switch (decision.verb) {
       case 'accept':
@@ -115,6 +123,19 @@ export const runHeldDecisionProgram = Effect.fn('runHeldDecisionProgram')(
           ? done(false)
           : refused(askMessage(r.failure))
       }
+      case 'add-option': {
+        if (!by.admin) return refused('Admins only')
+        const r = yield* Effect.result(
+          addProposedOptionProgram(
+            decision.suggestionId,
+            decision.label,
+            actorId,
+          ),
+        )
+        return r._tag === 'Success'
+          ? done(false)
+          : refused(attributeRunMessage(r.failure))
+      }
     }
   },
 )
@@ -145,7 +166,10 @@ export const heldDecisionsResponseProgram = Effect.fn(
     if (body === null || !body.success)
       return new Response('Bad request', { status: 400 })
     const outcomes = yield* Effect.forEach(body.data.decisions, (d) =>
-      runHeldDecisionProgram(d, session.user.id),
+      runHeldDecisionProgram(d, {
+        id: session.user.id,
+        admin: session.user.role === 'admin',
+      }),
     )
     return json({ outcomes }, 200)
   },

@@ -105,6 +105,7 @@ describe('withoutHeld', () => {
           rowsRun: 2,
           error: null,
           startedAt: '2026-10-20T10:00:00.000Z',
+          author: null,
         },
         attributeSlug: 'location',
         cards: [card('r1', [item('s1', { runId: 'run1' })])],

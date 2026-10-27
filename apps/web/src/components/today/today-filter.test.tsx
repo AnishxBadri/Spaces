@@ -120,6 +120,7 @@ function loaded() {
     stoppedPlugins: [],
     attention: Promise.resolve({
       review: [],
+      filedIn: {},
       moving: [],
       broken: [],
       parked: [],

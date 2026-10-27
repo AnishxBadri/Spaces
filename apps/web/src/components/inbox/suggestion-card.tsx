@@ -40,11 +40,13 @@ import {
 } from '#/lib/server-fns'
 import type {
   BatchOutcome,
+  CapturedPage,
   SuggestionField,
   SuggestionItem,
   SuggestionKind,
   SuggestionRow,
 } from '#/lib/server-fns'
+import { decisionWords } from '#/lib/inbox/decision-words'
 import { recordPath } from '#/lib/record-path'
 import { heldDecisions } from '#/lib/held-decisions'
 import { cn } from '#/lib/utils'
@@ -197,61 +199,6 @@ const SUGGESTION_BODIES: Partial<Record<SuggestionKind, SuggestionBody>> = {
       <PayloadBody item={item} actions={actions} />
     )
   },
-}
-
-/**
- * The decision's words, per kind: the verb, and `Dismiss` for the other
- * way. A discovery card's dismissal is permanent for its space, so its
- * tooltip says so.
- */
-type DecisionWords = {
-  accept: string
-  reject: string
-  /** The dismiss button's tooltip; null for none. */
-  rejectTitle: string | null
-}
-
-const DECIDE: DecisionWords = {
-  accept: 'Accept',
-  reject: 'Dismiss',
-  rejectTitle: null,
-}
-
-const DISMISS_TITLE =
-  'Dismiss for good: this domain is never suggested in this space again'
-
-export function decisionWords(kind: SuggestionKind): DecisionWords {
-  if (kind === 'add_record')
-    return {
-      accept: 'Add and file here',
-      reject: 'Dismiss',
-      rejectTitle: DISMISS_TITLE,
-    }
-  if (kind === 'file_record')
-    return {
-      accept: 'File here',
-      reject: 'Dismiss',
-      rejectTitle: DISMISS_TITLE,
-    }
-  if (kind === 'ledger_event')
-    return {
-      accept: 'Accept',
-      reject: 'Dismiss',
-      rejectTitle: null,
-    }
-  if (kind === 'refile_document')
-    return {
-      accept: 'Re-file',
-      reject: 'Dismiss',
-      rejectTitle: null,
-    }
-  if (kind === 'supersedes')
-    return {
-      accept: 'Mark as newer version',
-      reject: 'Dismiss',
-      rejectTitle: 'Dismiss for good: this pair is not suggested again',
-    }
-  return DECIDE
 }
 
 const isDiscovery = (kind: SuggestionKind) =>
@@ -662,6 +609,7 @@ export function SuggestionEntry({
   onReject,
   actions = null,
   failure = null,
+  page = null,
 }: {
   item: SuggestionItem
   pending: boolean
@@ -671,10 +619,12 @@ export function SuggestionEntry({
   actions?: FieldActions | null
   /** The last batch's refusal for the suggestion as a whole (not a patch). */
   failure?: string | null
+  /** The captured page the card is headed by, which names a person's verb. */
+  page?: CapturedPage | null
 }): React.ReactNode {
   const { today } = useClock()
   const Body = suggestionBodyFor(item.kind)
-  const words = decisionWords(item.kind)
+  const words = decisionWords(item, page)
   const grid = item.kind === 'attribute_patch' && item.fields !== null
   // A newer-version body already names both documents its refs cite; a
   // grid prints the first citation in its Source lane.
@@ -1054,6 +1004,7 @@ export function SuggestionCard({ card }: { card: SuggestionRow }) {
             onReject={() => decide(s.id, 'reject')}
             actions={actions}
             failure={failures.get(failureKey(s.id)) ?? null}
+            page={card.page}
           />
         ))}
       </ul>

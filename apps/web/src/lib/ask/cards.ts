@@ -83,6 +83,7 @@ export function heldOutcome(card: AskCardView, verb: HeldVerb): AskCardView {
       return { ...card, outcome: 'skipped' }
     case 'accept-column':
     case 'dismiss-duplicate':
+    case 'add-option':
       return card
   }
 }

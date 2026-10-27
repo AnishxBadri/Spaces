@@ -7,37 +7,27 @@ import {
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import { NeedsYou } from './needs-you'
-import type { NeedsYouRow } from './needs-you'
-import type { ReviewGroup } from '#/lib/server-fns'
+import type { NeedsYouRow, ProposalActions } from './needs-you'
 import type { NeedsFilter } from '#/lib/today/needs-you'
+import { flattenInbox } from '#/lib/today/proposals'
+import type { Proposal } from '#/lib/today/proposals'
+import type {
+  InboxRow,
+  InboxSide,
+  SuggestionItem,
+  SuggestionRow,
+} from '#/lib/server-fns'
 
 /**
  * The Needs-you rows: one set of lanes for every kind — kind, mark, body,
- * action, who, figure, `···` — and a Review group that opens Review on its
- * source and space.
+ * action, who, figure, `···` — and Review as one row per proposal, whose
+ * verbs take the who and figure lanes on hover.
  */
 
 // The composer reads the session from the app route; it is not under test.
 vi.mock('#/components/task-composer', () => ({
   TaskComposer: () => null,
 }))
-
-const SPACE = '00000000-0000-4000-8000-000000000001'
-const EXA = '00000000-0000-4000-8000-0000000000e1'
-
-const group = (over: Partial<ReviewGroup>): ReviewGroup => ({
-  key: `Exa|${SPACE}|discovery`,
-  spaceId: SPACE,
-  spaceLabel: 'Proptech / Property ops',
-  source: 'Exa',
-  sourceRef: EXA,
-  toAdd: 3,
-  toFile: 1,
-  toReview: 0,
-  total: 4,
-  oldestAt: '2026-10-08T09:00:00.000Z',
-  ...over,
-})
 
 const task = (
   over: Partial<Extract<NeedsYouRow, { kind: 'task' }>> = {},
@@ -96,12 +86,24 @@ const meeting: NeedsYouRow = {
   figure: '2d',
 }
 
+const ACTIONS: ProposalActions = {
+  decide: () => {},
+  acceptAll: () => {},
+  canAddOption: true,
+  since: () => '2d',
+}
+
 async function render(
   rows: ReadonlyArray<NeedsYouRow>,
   {
     filter = 'all',
     loading = false,
-  }: { filter?: NeedsFilter; loading?: boolean } = {},
+    actions = ACTIONS,
+  }: {
+    filter?: NeedsFilter
+    loading?: boolean
+    actions?: ProposalActions
+  } = {},
 ) {
   const root = createRootRoute({
     component: () => (
@@ -119,6 +121,7 @@ async function render(
         ]}
         onCreated={() => {}}
         washes={() => false}
+        actions={actions}
       />
     ),
   })
@@ -188,53 +191,304 @@ describe('the Needs-you lanes', () => {
     expect(html).toMatch(/w-30[^>]*>Priya Raman</)
     expect(html).toMatch(/>2d</)
   })
+})
 
-  it("counts a space's add and file cards and opens Review on that source and space", async () => {
-    const g = group({})
+const SPACE = '00000000-0000-4000-8000-0000000000a1'
+const PERSON = '00000000-0000-4000-8000-0000000000c1'
+
+const suggestion = (over: Partial<SuggestionItem>): SuggestionItem => ({
+  id: 's1',
+  kind: 'attribute_patch',
+  payload: {},
+  rationale: null,
+  citations: [],
+  fields: null,
+  origin: { via: 'app' },
+  source: null,
+  createdAt: '2026-10-20T10:00:00.000Z',
+  runId: null,
+  ...over,
+})
+
+const card = (
+  item: SuggestionItem,
+  page: SuggestionRow['page'] = null,
+): SuggestionRow => ({
+  kind: 'suggestion',
+  id: 'r1',
+  record: {
+    id: 'r1',
+    name: 'Exponent',
+    kind: 'company',
+    objectSlug: null,
+    objectSingular: null,
+  },
+  page,
+  suggestions: [item],
+  latestAt: item.createdAt,
+})
+
+const discovery = (item: SuggestionItem): InboxRow => ({
+  kind: 'discovery',
+  id: SPACE,
+  space: { id: SPACE, name: 'Property ops', path: 'Proptech / Property ops' },
+  via: ['Exa'],
+  suggestions: [item],
+  latestAt: item.createdAt,
+})
+
+/** The queue's rows as Today's Review rows. */
+const reviewRows = (rows: ReadonlyArray<InboxRow>): NeedsYouRow[] =>
+  flattenInbox(rows, { today: '2026-10-28', filedIn: {} }).map(
+    (p: Proposal): NeedsYouRow => ({
+      kind: 'review',
+      key: `review:${p.key}`,
+      weight: 0,
+      sensitive: null,
+      proposal: p,
+      figure: '2d',
+    }),
+  )
+
+/** The verbs a row shows on hover, in order. */
+function verbsOf(html: string): string[] {
+  const at = html.indexOf('data-verbs')
+  if (at === -1) throw new Error('no verbs')
+  const end = html.indexOf('</li>', at)
+  return [...html.slice(at, end).matchAll(/>([^<>]+)<\/(?:button|a)>/g)].map(
+    (m) => m[1],
+  )
+}
+
+describe('a proposal row', () => {
+  it('reads subject, line and who, and opens Review on its record', async () => {
     const html = rowOf(
-      await render([
-        {
-          kind: 'review',
-          key: `review:${g.key}`,
-          weight: g.total,
-          sensitive: null,
-          group: g,
-          figure: '2d',
-        },
-      ]),
+      await render(
+        reviewRows([
+          card(
+            suggestion({
+              source: 'Apollo',
+              fields: [
+                {
+                  slug: 'funding_stage',
+                  name: 'Funding stage',
+                  type: 'select',
+                  options: { options: [{ id: 'a', label: 'Series A' }] },
+                  isSystem: false,
+                  value: 'a',
+                  current: null,
+                  confidence: null,
+                },
+              ],
+            }),
+          ),
+        ]),
+      ),
       'review',
     )
-    expect(html).toContain('Proptech / Property ops')
-    expect(html).toContain('3 to add · 1 to file')
-    expect(html).toMatch(/w-30[^>]*>Via Exa</)
-    expect(html).toContain(`href="/review?source=${EXA}&amp;space=${SPACE}"`)
+    expect(html).toMatch(/w-16[^>]*>review</)
+    expect(html).toMatch(/text-body text-foreground[^>]*>Exponent</)
+    expect(html).toMatch(/text-label[^>]*>Funding stage → Series A</)
+    expect(html).toMatch(/w-30[^>]*>Via Apollo</)
+    expect(html).toContain('href="/review?record=r1"')
+    // The verbs take the who and figure lanes on hover, on bone.
+    expect(html).toMatch(/data-verbs[^>]*group-hover:flex/)
+    expect(html).toMatch(/w-30[^"]*group-hover:invisible/)
+    expect(html).not.toContain('<svg')
   })
 
-  it('opens Review on Judgment alone for a row filed nowhere', async () => {
-    const g = group({
-      key: 'judgment|',
-      spaceId: null,
-      spaceLabel: null,
-      source: 'Judgment',
-      sourceRef: 'judgment',
-      toAdd: 0,
-      toFile: 0,
-      toReview: 2,
-      total: 2,
+  it.each<[string, SuggestionItem, SuggestionRow['page'], string]>([
+    ['attribute_patch', suggestion({}), null, 'Accept'],
+    ['document_kind', suggestion({ kind: 'document_kind' }), null, 'Accept'],
+    [
+      'supersedes',
+      suggestion({ kind: 'supersedes' }),
+      null,
+      'Mark as newer version',
+    ],
+    ['space_tag', suggestion({ kind: 'space_tag' }), null, 'Add to space'],
+    ['note', suggestion({ kind: 'note' }), null, 'Add note'],
+    ['ledger_event', suggestion({ kind: 'ledger_event' }), null, 'Record mark'],
+    [
+      'captured identity',
+      suggestion({ kind: 'identity', payload: { name: 'Priya Raman' } }),
+      { title: 'Priya Raman — LinkedIn', url: null },
+      'File on Priya Raman',
+    ],
+    ['task', suggestion({ kind: 'task' }), null, 'Add task'],
+    [
+      'option proposal',
+      suggestion({
+        fields: [],
+        rationale: 'Proposed new option "Climate" for Sector (sector).',
+      }),
+      null,
+      'Add option',
+    ],
+  ])(
+    'offers Dismiss and its primary: %s',
+    async (_kind, item, page, primary) => {
+      const html = await render(reviewRows([card(item, page)]))
+      expect(verbsOf(html)).toEqual(['Dismiss', primary])
+    },
+  )
+
+  it("offers a member no Add option: the registry is an admin's", async () => {
+    const html = await render(
+      reviewRows([
+        card(
+          suggestion({
+            fields: [],
+            rationale: 'Proposed new option "Climate" for Sector (sector).',
+          }),
+        ),
+      ]),
+      { actions: { ...ACTIONS, canAddOption: false } },
+    )
+    expect(verbsOf(html)).toEqual(['Dismiss'])
+  })
+
+  it('offers a duplicate Not the same, and Compare into Review', async () => {
+    const side = (id: string, name: string): InboxSide => ({
+      id,
+      name,
+      kind: 'company',
+      createdAt: '2026-10-01T00:00:00.000Z',
+      objectSlug: 'company',
+      objectSingular: 'Company',
+      sourceClass: 'manual',
+      sourceCapability: null,
+      label: 'manual',
+      domains: [],
+      identityDomain: null,
+      otherNames: [],
+      mentionCount: 0,
+      valueCount: 0,
+      spaces: [],
     })
-    const html = await render([
-      {
-        kind: 'review',
-        key: `review:${g.key}`,
-        weight: g.total,
-        sensitive: null,
-        group: g,
-        figure: null,
+    const html = await render(
+      reviewRows([
+        {
+          kind: 'duplicate_candidate',
+          id: 'p1',
+          score: 0.9,
+          reason: { shared: 'domain' },
+          latestAt: '2026-10-19T00:00:00.000Z',
+          a: side('a1', 'Acme'),
+          b: side('b1', 'Acme Inc'),
+        },
+      ]),
+    )
+    expect(html).toContain('Acme ⇄ Acme Inc')
+    expect(html).toContain('Possibly the same · domain on both')
+    expect(verbsOf(html)).toEqual(['Not the same', 'Compare'])
+    expect(html).toContain('href="/review?record=a1&amp;lane=duplicates"')
+  })
+
+  it("draws a watch's space as a group: ▸, its counts, Open in Review", async () => {
+    const add = suggestion({
+      kind: 'add_record',
+      source: 'Exa',
+      payload: {
+        spaceId: SPACE,
+        domain: 'rentwise.com',
+        name: 'Rentwise',
+        evidence: [],
+        aliases: [],
+        subspaceHint: null,
       },
-    ])
-    expect(html).toContain('2 to review')
-    expect(html).toContain('href="/review?source=judgment"')
-    expect(html).not.toContain('space=')
+    })
+    const html = rowOf(await render(reviewRows([discovery(add)])), 'review')
+    expect(html).toContain('aria-expanded="false"')
+    expect(html).toContain('▸')
+    expect(html).toMatch(/>Proptech \/ Property ops</)
+    expect(html).toMatch(/>1 to add</)
+    expect(html).toMatch(/w-30[^>]*>Via Exa</)
+    expect(verbsOf(html)).toEqual(['Open in Review ›'])
+    expect(html).toContain(`href="/review?space=${SPACE}"`)
+  })
+
+  it('draws a column run with Accept all and an Ask thread with Open thread', async () => {
+    const patch = suggestion({
+      id: 'c1',
+      runId: 'run1',
+      fields: [
+        {
+          slug: 'hq',
+          name: 'HQ',
+          type: 'text',
+          options: null,
+          isSystem: false,
+          value: 'Pune',
+          current: null,
+          confidence: null,
+        },
+      ],
+    })
+    const run = await render(
+      reviewRows([
+        {
+          kind: 'column_run',
+          id: 'run1',
+          run: {
+            id: 'run1',
+            task: 'Column run · HQ',
+            status: 'done',
+            error: null,
+            rowsRun: 1,
+            startedAt: '2026-10-20T10:00:00.000Z',
+            author: 'Anika Rao',
+          },
+          attributeSlug: 'hq',
+          cards: [card(patch)],
+          latestAt: '2026-10-20T10:00:00.000Z',
+        },
+      ]),
+    )
+    expect(run).toMatch(/w-30[^>]*>Anika Rao</)
+    expect(verbsOf(run)).toEqual(['Open in Review ›', 'Accept all 1'])
+
+    const ask = await render(
+      reviewRows([
+        {
+          kind: 'ask_cards',
+          id: 'th1',
+          title: 'Who leads Exponent?',
+          cards: [card(suggestion({ id: 'k1' }))],
+          latestAt: '2026-10-20T10:00:00.000Z',
+        },
+      ]),
+    )
+    expect(ask).toMatch(/w-30[^>]*>Via Ask</)
+    expect(verbsOf(ask)).toEqual(['Open thread ›'])
+    expect(ask).toContain('href="/ask?thread=th1"')
+  })
+
+  it('counts top-level rows in the Review segment, not their children', async () => {
+    const two = (id: string) =>
+      suggestion({
+        id,
+        kind: 'file_record',
+        payload: {
+          spaceId: SPACE,
+          domain: `${id}.com`,
+          name: id,
+          evidence: [],
+          entityId: PERSON,
+        },
+      })
+    const group: InboxRow = {
+      kind: 'discovery',
+      id: SPACE,
+      space: { id: SPACE, name: 'Property ops', path: 'Property ops' },
+      via: [],
+      suggestions: [two('x'), two('y')],
+      latestAt: '2026-10-20T10:00:00.000Z',
+    }
+    const html = await render(
+      reviewRows([group, card(suggestion({ id: 'z' }))]),
+    )
+    expect(html).toMatch(/>Review<span data-segment-count[^>]*>2</)
   })
 })
 

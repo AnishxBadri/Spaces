@@ -14,8 +14,9 @@ import { DayStrip, useNow } from '#/components/today/day-strip'
 import type { DayStripMeeting } from '#/components/today/day-strip'
 import { FirstRun } from '#/components/today/first-run'
 import { MeetingsSection, useDayMeetings } from '#/components/today/meetings'
+import { acceptRun, decideProposal } from '#/components/today/decide'
 import { NeedsYou } from '#/components/today/needs-you'
-import type { NeedsYouRow } from '#/components/today/needs-you'
+import type { NeedsYouRow, ProposalActions } from '#/components/today/needs-you'
 import { NoticesBand } from '#/components/today/notices'
 import { PortfolioRail, WhatsMoving } from '#/components/today/rail'
 import { todayReadouts } from '#/components/today/readouts'
@@ -47,7 +48,10 @@ import {
 } from '#/lib/today/needs-you'
 import type { NeedsFilter, ReadoutFilter } from '#/lib/today/needs-you'
 import { stripLabel, whoLine } from '#/lib/meetings/day'
+import { flattenInbox } from '#/lib/today/proposals'
 import { useSettled } from '#/lib/today/use-settled'
+import { useHeldView } from '#/lib/held-decisions'
+import { withoutHeld } from '#/lib/inbox/held'
 import { dayKey, formatAge, formatTime } from '@spaces/core/format'
 import { fmtMoney } from '@spaces/core/portfolio/format'
 import { useClock } from '#/components/clock'
@@ -272,7 +276,25 @@ function TodayLedger({
   // One set for the readout and the rows, so the two counts agree.
   const pastMedian = dealsPastMedian(funnel.daysInStage, medians, activeStages)
 
-  const review = attention.state === 'done' ? attention.value.review : []
+  // Held decisions leave the queue for their undo window, as on Review.
+  const held = useHeldView()
+  const proposals =
+    attention.state === 'done'
+      ? flattenInbox(withoutHeld(attention.value.review, held), {
+          today,
+          filedIn: attention.value.filedIn,
+        })
+      : []
+  const since = (at: string) => (now === null ? null : sinceFigure(at, now))
+  const actions: ProposalActions = {
+    decide: decideProposal,
+    acceptAll: (group) => {
+      if (group.of.kind === 'column_run')
+        acceptRun(group.of, () => void router.navigate({ to: '/review' }))
+    },
+    canAddOption: me.role === 'admin',
+    since,
+  }
   const rows = byUrgency<NeedsYouRow>([
     ...dueTasks.map((t): NeedsYouRow => ({
       kind: 'task',
@@ -311,13 +333,14 @@ function TodayLedger({
         age,
       }
     }),
-    ...review.map((g): NeedsYouRow => ({
+    ...proposals.map((p): NeedsYouRow => ({
       kind: 'review',
-      key: `review:${g.key}`,
-      weight: g.total,
+      key: `review:${p.key}`,
+      // Oldest first: what has waited longest leads.
+      weight: -Date.parse(p.at),
       sensitive: null,
-      group: g,
-      figure: now === null ? null : sinceFigure(g.oldestAt, now),
+      proposal: p,
+      figure: since(p.at),
     })),
     ...meetings.unwritten.map((m): NeedsYouRow => ({
       kind: 'meeting',
@@ -424,6 +447,7 @@ function TodayLedger({
             taskMenu={taskMenu.menuFor}
             onCreated={bear}
             washes={washes}
+            actions={actions}
           />
           <MeetingsSection
             calendar={meetings.calendar}

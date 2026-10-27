@@ -1,12 +1,13 @@
 import { Link, useRouter } from '@tanstack/react-router'
 import { Lock } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { Fragment, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactElement, ReactNode } from 'react'
 import { ReferenceBar, SectionHead } from '#/components/ledger-section'
 import { WriteUpButton } from '#/components/meetings/write-up-button'
 import { TaskComposer } from '#/components/task-composer'
 import type { MenuTask } from '#/components/tasks/task-menu'
 import { Twinkle } from '#/components/twinkle'
+import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { MoreMenu } from '#/components/ui/more-menu'
 import type { MoreMenuEntry } from '#/components/ui/more-menu'
@@ -17,7 +18,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '#/components/ui/tooltip'
-import type { ReviewGroup } from '#/lib/server-fns'
 import {
   FILTER_ORDER,
   folded,
@@ -29,6 +29,11 @@ import type {
   NeedsYouKind,
   ReadoutFilter,
 } from '#/lib/today/needs-you'
+import type {
+  Proposal,
+  ProposalGroup,
+  ProposalLeaf,
+} from '#/lib/today/proposals'
 import { useHotkeys } from '#/lib/use-hotkey'
 import { cn } from '#/lib/utils'
 
@@ -77,8 +82,9 @@ export type NeedsYouRow =
     })
   | (RowBase & {
       kind: 'review'
-      group: ReviewGroup
-      /** The oldest card's age, or its time today; null until the clock is read. */
+      /** One proposal, or a group of them over its children. */
+      proposal: Proposal
+      /** Its age, or its time today; null until the clock is read. */
       figure: string | null
     })
   | (RowBase & {
@@ -197,6 +203,221 @@ function KeyTip({
 const rowTarget =
   'focus-ring-inset flex min-w-0 flex-1 items-center gap-3 self-stretch text-left'
 
+/** What a Review row's verbs reach. */
+export type ProposalActions = {
+  decide: (leaf: ProposalLeaf, verb: 'accept' | 'dismiss') => void
+  acceptAll: (group: ProposalGroup) => void
+  /** The reader may add an option to an attribute, for everyone. */
+  canAddOption: boolean
+  /** A child's figure: its age, or its time today; null until the clock is read. */
+  since: (at: string) => string | null
+}
+
+const verbLink =
+  'focus-ring shrink-0 text-label whitespace-nowrap text-foreground hover:underline'
+
+/**
+ * The who and figure lanes, which the row's verbs replace while it is
+ * hovered or holds the reticle; the row goes bone with them.
+ */
+function VerbLanes({
+  who,
+  figure,
+  verbs,
+}: {
+  who: string | null
+  figure: string | null
+  verbs: ReactNode
+}) {
+  return (
+    <span className="relative flex shrink-0 items-center gap-3 self-stretch">
+      <span
+        className={cn(
+          LANE.who,
+          'group-focus-within:invisible group-hover:invisible',
+        )}
+      >
+        {who}
+      </span>
+      <span
+        className={cn(
+          LANE.figure,
+          'text-graphite group-focus-within:invisible group-hover:invisible',
+        )}
+      >
+        {figure}
+      </span>
+      <span
+        data-verbs
+        className="absolute inset-y-0 right-0 hidden items-center gap-2 bg-bone pl-3 group-focus-within:flex group-hover:flex"
+      >
+        {verbs}
+      </span>
+    </span>
+  )
+}
+
+/** A proposal's two verbs: Dismiss, then its primary. */
+function LeafVerbs({
+  leaf,
+  actions,
+}: {
+  leaf: ProposalLeaf
+  actions: ProposalActions
+}) {
+  const t = leaf.target
+  return (
+    <>
+      <Button
+        size="xs"
+        variant="ghost"
+        shortcut="D"
+        {...(leaf.dismissTitle === null
+          ? {}
+          : { 'aria-label': leaf.dismissTitle })}
+        onClick={() => actions.decide(leaf, 'dismiss')}
+      >
+        {leaf.dismiss}
+      </Button>
+      {t.kind === 'duplicate' ? (
+        <Button asChild size="xs" shortcut="A">
+          <Link to="/review" search={leaf.review}>
+            {leaf.primary}
+          </Link>
+        </Button>
+      ) : t.option !== null && !actions.canAddOption ? null : (
+        <Button
+          size="xs"
+          shortcut="A"
+          onClick={() => actions.decide(leaf, 'accept')}
+        >
+          {leaf.primary}
+        </Button>
+      )}
+    </>
+  )
+}
+
+/** One proposal's lanes; a group's child draws a rule in its mark slot. */
+function LeafLanes({
+  leaf,
+  figure,
+  lock,
+  actions,
+  child = false,
+}: {
+  leaf: ProposalLeaf
+  figure: string | null
+  lock: ReactNode
+  actions: ProposalActions
+  child?: boolean
+}) {
+  return (
+    <>
+      {child ? (
+        <span aria-hidden className={cn(LANE.mark, 'self-stretch')}>
+          <span data-child-rule className="h-full border-l border-rule" />
+        </span>
+      ) : (
+        <span className={LANE.mark}>{lock}</span>
+      )}
+      <Link to="/review" search={leaf.review} className={rowTarget}>
+        <Body primary={leaf.subject} context={leaf.line} />
+      </Link>
+      <span className={LANE.action} />
+      <VerbLanes
+        who={leaf.who}
+        figure={figure}
+        verbs={<LeafVerbs leaf={leaf} actions={actions} />}
+      />
+      <span className={LANE.more} />
+    </>
+  )
+}
+
+/** A group's way out: Review on its space or run, or the Ask thread. */
+function GroupVerbs({
+  group,
+  actions,
+}: {
+  group: ProposalGroup
+  actions: ProposalActions
+}) {
+  const of = group.of
+  switch (of.kind) {
+    case 'discovery':
+      return (
+        <Link to="/review" search={{ space: of.spaceId }} className={verbLink}>
+          Open in Review ›
+        </Link>
+      )
+    case 'column_run':
+      return (
+        <>
+          <Link to="/review" className={verbLink}>
+            Open in Review ›
+          </Link>
+          {of.attributeSlug === null || of.taken === 0 ? null : (
+            <Button
+              size="xs"
+              shortcut="A"
+              onClick={() => actions.acceptAll(group)}
+            >
+              Accept all {of.taken}
+            </Button>
+          )}
+        </>
+      )
+    case 'ask_cards':
+      return (
+        <Link to="/ask" search={{ thread: of.threadId }} className={verbLink}>
+          Open thread ›
+        </Link>
+      )
+  }
+}
+
+/** A group's lanes: ▸/▾ in the mark slot; the body opens its children. */
+function GroupLanes({
+  group,
+  figure,
+  open,
+  onToggle,
+  actions,
+}: {
+  group: ProposalGroup
+  figure: string | null
+  open: boolean
+  onToggle: () => void
+  actions: ProposalActions
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        className={rowTarget}
+      >
+        <span
+          aria-hidden
+          className={cn(LANE.mark, 'mono text-micro text-graphite')}
+        >
+          {open ? '▾' : '▸'}
+        </span>
+        <Body primary={group.subject} context={group.line} />
+      </button>
+      <span className={LANE.action} />
+      <VerbLanes
+        who={group.who}
+        figure={figure}
+        verbs={<GroupVerbs group={group} actions={actions} />}
+      />
+      <span className={LANE.more} />
+    </>
+  )
+}
+
 /** The lanes of one row after the kind lane. */
 function RowLanes({
   row,
@@ -204,6 +425,9 @@ function RowLanes({
   onOpen,
   menu,
   dealScale,
+  actions,
+  expanded,
+  onToggle,
 }: {
   row: NeedsYouRow
   /** The longest deal's days: the length that fills a reference bar. */
@@ -211,6 +435,10 @@ function RowLanes({
   onComplete: (id: string) => void
   onOpen: (row: NeedsYouRow) => void
   menu: (task: MenuTask) => Array<MoreMenuEntry>
+  actions: ProposalActions
+  /** A group row's children are showing. */
+  expanded: boolean
+  onToggle: () => void
 }) {
   const lock =
     row.sensitive === null ? null : <SensitiveMark name={row.sensitive} />
@@ -310,33 +538,23 @@ function RowLanes({
           <span className={LANE.more} />
         </>
       )
-    case 'review': {
-      const g = row.group
-      return (
-        <>
-          <span className={LANE.mark}>{lock}</span>
-          <Link
-            to="/review"
-            search={{
-              ...(g.sourceRef === null ? {} : { source: g.sourceRef }),
-              ...(g.spaceId === null ? {} : { space: g.spaceId }),
-            }}
-            className={rowTarget}
-          >
-            <Body
-              primary={g.spaceLabel ?? 'Not filed'}
-              context={reviewCounts(g)}
-            />
-            <span className={LANE.action} />
-            <span className={LANE.who}>Via {g.source}</span>
-            <span className={cn(LANE.figure, 'text-graphite')}>
-              {row.figure}
-            </span>
-          </Link>
-          <span className={LANE.more} />
-        </>
+    case 'review':
+      return row.proposal.kind === 'group' ? (
+        <GroupLanes
+          group={row.proposal}
+          figure={row.figure}
+          open={expanded}
+          onToggle={onToggle}
+          actions={actions}
+        />
+      ) : (
+        <LeafLanes
+          leaf={row.proposal}
+          figure={row.figure}
+          lock={lock}
+          actions={actions}
+        />
       )
-    }
     case 'meeting':
       return (
         <>
@@ -359,17 +577,6 @@ function RowLanes({
   }
 }
 
-/** `3 to add · 1 to file · 2 to review`, leaving out the zeros. */
-export function reviewCounts(g: ReviewGroup): string {
-  return [
-    g.toAdd > 0 ? `${g.toAdd} to add` : null,
-    g.toFile > 0 ? `${g.toFile} to file` : null,
-    g.toReview > 0 ? `${g.toReview} to review` : null,
-  ]
-    .filter((s) => s !== null)
-    .join(' · ')
-}
-
 /** The rows' kind segments: one per kind with rows, its count beside it. */
 function kindSegments(
   rows: ReadonlyArray<NeedsYouRow>,
@@ -380,6 +587,9 @@ function kindSegments(
   })
 }
 
+const rowClass =
+  'group focus-ring-inset flex h-ledger-row items-center gap-3 border-b border-rule px-3 transition-colors duration-150 ease-out-quart hover:bg-bone'
+
 /**
  * Needs you: one ledger in urgency order. The head is the title and a
  * Segmented by kind (a readout's filter rides after `All` while it is on);
@@ -387,8 +597,10 @@ function kindSegments(
  * the list folds at eight and ends in the task composer.
  * - The caller orders the rows (`byUrgency`) and owns the filter, so a
  *   readout on the page can set it.
- * - `J`/`K` move the reticle; on a focused row `↵` opens it and, on a task,
- *   `X` completes it.
+ * - A Review row is one proposal, decided in place by its hover verbs, or a
+ *   group whose ▸ opens its children under it.
+ * - `J`/`K` move the reticle; on a focused row `↵` opens it, `X` completes
+ *   a task, and on a proposal `A` is its primary and `D` dismisses it.
  */
 export function NeedsYou({
   rows,
@@ -401,6 +613,7 @@ export function NeedsYou({
   taskMenu,
   onCreated,
   washes,
+  actions,
 }: {
   rows: ReadonlyArray<NeedsYouRow>
   filter: NeedsFilter
@@ -415,10 +628,13 @@ export function NeedsYou({
   taskMenu: (task: MenuTask) => Array<MoreMenuEntry>
   onCreated: (id: string) => void
   washes: (id: string) => boolean
+  actions: ProposalActions
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const items = useRef(new Map<string, HTMLLIElement>())
+  // Groups showing their children, by row key.
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
+  const list = useRef<HTMLOListElement>(null)
   const inView = inFilter(rows, filter)
   const shown = folded(inView, open)
   const hidden = inView.slice(shown.length)
@@ -441,65 +657,107 @@ export function NeedsYou({
     ...kindSegments(rows),
   ]
 
-  /** Opens a row the way a click on its body would. */
-  function openRow(row: NeedsYouRow) {
+  const toggle = (key: string) =>
+    setExpanded((was) => {
+      const next = new Set(was)
+      if (!next.delete(key)) next.add(key)
+      return next
+    })
+
+  /** What a key does on a proposal: ↵ opens it in Review, A and D decide it. */
+  function leafKeys(leaf: ProposalLeaf): Map<string, () => void> {
+    const review = () =>
+      void router.navigate({ to: '/review', search: leaf.review })
+    const t = leaf.target
+    const primary =
+      t.kind === 'duplicate'
+        ? review
+        : t.option !== null && !actions.canAddOption
+          ? null
+          : () => actions.decide(leaf, 'accept')
+    return new Map([
+      ['Enter', review],
+      ['d', () => actions.decide(leaf, 'dismiss')],
+      ...(primary === null ? [] : [['a', primary] as const]),
+    ])
+  }
+
+  /** What a key does on a row: ↵ opens it the way a click on its body would. */
+  function rowKeys(row: NeedsYouRow): Map<string, () => void> {
     switch (row.kind) {
       case 'task':
-        void router.navigate({ to: '/tasks', search: { task: row.task.id } })
-        return
+        return new Map([
+          [
+            'Enter',
+            () =>
+              void router.navigate({
+                to: '/tasks',
+                search: { task: row.task.id },
+              }),
+          ],
+          ['x', () => onComplete(row.task.id)],
+        ])
       case 'deal':
-        void router.navigate({
-          to: '/deals/$dealId',
-          params: { dealId: row.id },
-        })
-        return
-      case 'review':
-        void router.navigate({
-          to: '/review',
-          search: {
-            ...(row.group.sourceRef === null
-              ? {}
-              : { source: row.group.sourceRef }),
-            ...(row.group.spaceId === null ? {} : { space: row.group.spaceId }),
-          },
-        })
-        return
+        return new Map([
+          [
+            'Enter',
+            () =>
+              void router.navigate({
+                to: '/deals/$dealId',
+                params: { dealId: row.id },
+              }),
+          ],
+        ])
+      case 'review': {
+        const p = row.proposal
+        if (p.kind === 'leaf') return leafKeys(p)
+        const of = p.of
+        return new Map([
+          ['Enter', () => toggle(row.key)],
+          ...(of.kind === 'column_run' &&
+          of.attributeSlug !== null &&
+          of.taken > 0
+            ? [['a', () => actions.acceptAll(p)] as const]
+            : []),
+        ])
+      }
       case 'mark':
       case 'meeting':
-        onOpen(row)
+        return new Map([['Enter', () => onOpen(row)]])
     }
   }
 
-  /** The reticle: J and K focus the next or previous row. */
+  /** The reticle: J and K focus the next or previous row, children too. */
   function move(step: 1 | -1) {
-    const at = shown.findIndex(
-      (r) => items.current.get(r.key) === document.activeElement,
-    )
+    const items =
+      list.current === null
+        ? []
+        : [...list.current.querySelectorAll<HTMLLIElement>('li[data-row]')]
+    const at = items.findIndex((el) => el === document.activeElement)
     const next =
       at === -1
         ? step === 1
           ? 0
-          : shown.length - 1
-        : Math.min(shown.length - 1, Math.max(0, at + step))
-    const row = shown.at(next)
-    if (row !== undefined) items.current.get(row.key)?.focus()
+          : items.length - 1
+        : Math.min(items.length - 1, Math.max(0, at + step))
+    items.at(next)?.focus()
   }
   useHotkeys([
     ['j', () => move(1)],
     ['k', () => move(-1)],
   ])
 
-  function onRowKey(e: KeyboardEvent<HTMLLIElement>, row: NeedsYouRow) {
+  function onRowKey(
+    e: KeyboardEvent<HTMLLIElement>,
+    keys: Map<string, () => void>,
+  ) {
     // Only the row itself: a key on a control inside it is the control's.
     if (e.target !== e.currentTarget || e.metaKey || e.ctrlKey || e.altKey)
       return
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      openRow(row)
-    } else if (e.key.toLowerCase() === 'x' && row.kind === 'task') {
-      e.preventDefault()
-      onComplete(row.task.id)
-    }
+    const run = keys.get(e.key === 'Enter' ? e.key : e.key.toLowerCase())
+    if (run === undefined) return
+    e.preventDefault()
+    run()
   }
 
   return (
@@ -518,33 +776,61 @@ export function NeedsYou({
           />
         }
       />
-      <ol>
-        {shown.map((r) => (
-          <li
-            key={r.key}
-            data-row
-            data-needs-row={r.kind}
-            tabIndex={-1}
-            ref={(el) => {
-              if (el === null) items.current.delete(r.key)
-              else items.current.set(r.key, el)
-            }}
-            onKeyDown={(e) => onRowKey(e, r)}
-            className={cn(
-              'group focus-ring-inset flex h-ledger-row items-center gap-3 border-b border-rule px-3 transition-colors duration-150 ease-out-quart hover:bg-bone',
-              r.kind === 'task' && washes(r.task.id) && 'row-wash',
-            )}
-          >
-            <span className={LANE.kind}>{r.kind}</span>
-            <RowLanes
-              row={r}
-              dealScale={dealScale}
-              onComplete={onComplete}
-              onOpen={onOpen}
-              menu={taskMenu}
-            />
-          </li>
-        ))}
+      <ol ref={list}>
+        {shown.map((r) => {
+          const children =
+            r.kind === 'review' &&
+            r.proposal.kind === 'group' &&
+            expanded.has(r.key)
+              ? r.proposal.children
+              : []
+          return (
+            <Fragment key={r.key}>
+              <li
+                data-row
+                data-needs-row={r.kind}
+                tabIndex={-1}
+                onKeyDown={(e) => onRowKey(e, rowKeys(r))}
+                className={cn(
+                  rowClass,
+                  r.kind === 'review' && 'focus-within:bg-bone',
+                  r.kind === 'task' && washes(r.task.id) && 'row-wash',
+                )}
+              >
+                <span className={LANE.kind}>{r.kind}</span>
+                <RowLanes
+                  row={r}
+                  dealScale={dealScale}
+                  onComplete={onComplete}
+                  onOpen={onOpen}
+                  menu={taskMenu}
+                  actions={actions}
+                  expanded={expanded.has(r.key)}
+                  onToggle={() => toggle(r.key)}
+                />
+              </li>
+              {children.map((c) => (
+                <li
+                  key={c.key}
+                  data-row
+                  data-needs-child
+                  tabIndex={-1}
+                  onKeyDown={(e) => onRowKey(e, leafKeys(c))}
+                  className={cn(rowClass, 'focus-within:bg-bone')}
+                >
+                  <span className={LANE.kind} />
+                  <LeafLanes
+                    leaf={c}
+                    figure={actions.since(c.at)}
+                    lock={null}
+                    actions={actions}
+                    child
+                  />
+                </li>
+              ))}
+            </Fragment>
+          )
+        })}
         {loading && (filter === 'all' || filter === 'review') ? (
           <li
             data-needs-loading

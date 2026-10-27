@@ -29,7 +29,7 @@ import {
   settled,
 } from '#/lib/inbox/discovery-view'
 import type { AfterState } from '#/lib/inbox/discovery-view'
-import { decisionWords } from './suggestion-card'
+import { decisionWords } from '#/lib/inbox/decision-words'
 
 /**
  * A space's discovery cards in Review: a bone head — the space's
@@ -106,7 +106,7 @@ export function DiscoveryEntry({
   onDismiss: () => void
 }) {
   const card = discoveryCardOf(item)
-  const words = decisionWords(item.kind)
+  const words = decisionWords(item)
   const found = card === null ? null : foundByLine(card.watches)
   return (
     <li className="flex min-h-10 flex-col gap-2 border-b border-rule px-3 py-2 last:border-b-0 sm:flex-row sm:items-center sm:gap-4">
