@@ -217,6 +217,8 @@ describe('the meeting window', () => {
     expect(mine.note).toEqual({
       id: f.writeUp,
       title: 'Flent — founder call',
+      body: expect.any(String),
+      at: expect.any(String),
       openIn: { provider: 'Granola', url: GRANOLA_URL },
       via: { tool: 'Granola', author: OWNER.name },
     })

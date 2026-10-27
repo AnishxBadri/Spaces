@@ -5,6 +5,8 @@ import {
   checkVariables,
   parseVariables,
   resolveVariables,
+  variablePaths,
+  variableSegments,
 } from './variables'
 import type { VariableContext, VariableRecord } from './variables'
 
@@ -151,5 +153,30 @@ describe('resolveVariables', () => {
     expect(checkVariables(['name.first', 'nope'], ATTRIBUTES)?.path).toBe(
       'nope',
     )
+  })
+})
+
+describe('the picker and the review', () => {
+  it('offers the families, then the live attributes, every one a path the checker accepts', () => {
+    const paths = variablePaths(ATTRIBUTES).map((p) => p.path)
+    expect(paths.slice(0, 2)).toEqual(['name.first', 'name.last'])
+    expect(paths).toContain('job_title')
+    expect(paths).not.toContain('old_field')
+    expect(checkVariables(paths, ATTRIBUTES)).toBeNull()
+  })
+
+  it('cuts a body into its text and its variables, in order', () => {
+    expect(
+      variableSegments('Hi {{name.first}}, about {{company.name}}.'),
+    ).toEqual([
+      { kind: 'text', text: 'Hi ' },
+      { kind: 'variable', path: 'name.first' },
+      { kind: 'text', text: ', about ' },
+      { kind: 'variable', path: 'company.name' },
+      { kind: 'text', text: '.' },
+    ])
+    expect(variableSegments('No variables')).toEqual([
+      { kind: 'text', text: 'No variables' },
+    ])
   })
 })

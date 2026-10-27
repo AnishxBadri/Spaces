@@ -209,7 +209,10 @@ describe('a draft', () => {
     await run(saveDraftProgram(ME, draft))
     const back = await run(getDraftProgram(ME, draft.id))
     expect(back.attachments).toEqual([
-      { documentId: shared, name: 'flent-ic-note.pdf' },
+      expect.objectContaining({
+        documentId: shared,
+        name: 'flent-ic-note.pdf',
+      }),
     ])
   })
 
@@ -302,7 +305,10 @@ describe('a forward', () => {
     expect(modes.forward.bodyMd).toContain('From: dana@flent.example')
     expect(modes.forward.bodyMd).toContain('Attaching the September cap table.')
     expect(modes.forward.attachments).toEqual([
-      { documentId: file, name: 'flent-cap-table-sept.xlsx' },
+      expect.objectContaining({
+        documentId: file,
+        name: 'flent-cap-table-sept.xlsx',
+      }),
     ])
   })
 

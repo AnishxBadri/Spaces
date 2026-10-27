@@ -103,8 +103,8 @@ describe('email templates', () => {
       subject: 'Intro: {{company.name}}',
       bodyMd: 'Hi {{name.first}},\n\nThe deck is attached.',
       attachments: [
-        { documentId: deck, name: 'deck.pdf' },
-        { documentId: memo, name: 'memo.pdf' },
+        expect.objectContaining({ documentId: deck, name: 'deck.pdf' }),
+        expect.objectContaining({ documentId: memo, name: 'memo.pdf' }),
       ],
     })
 

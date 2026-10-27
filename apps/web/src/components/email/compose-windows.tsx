@@ -2,6 +2,7 @@ import { Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { LabelHead, LedgerRow } from '#/components/ledger-section'
 import { DensityRamp } from '#/components/dither'
+import { Twinkle } from '#/components/twinkle'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
@@ -251,7 +252,9 @@ function ComposeDialog({
         {loaded === null ? (
           <>
             {error === null ? (
-              <DensityRamp width={160} />
+              <div className="flex min-h-48 flex-1 items-center justify-center">
+                <Twinkle size={29} />
+              </div>
             ) : (
               <p className="text-ui text-destructive">{error}</p>
             )}

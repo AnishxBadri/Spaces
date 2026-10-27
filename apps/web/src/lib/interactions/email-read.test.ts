@@ -234,6 +234,50 @@ describe('the email window', () => {
     expect(JSON.stringify(email)).not.toContain('Q3 closed')
   })
 
+  it('lists the earlier messages of its thread, each preview read through canRead', async () => {
+    const at = (minutesAgo: number) =>
+      new Date(Date.now() - minutesAgo * 60_000).toUTCString()
+    const sent = async (integrationId: string, minutesAgo: number) => {
+      const messageId = `${randomUUID()}@acme-robotics.example`
+      const raw = htmlEmail({ messageId, to: OWNER, date: at(minutesAgo) })
+      expect((await sync(integrationId, raw)).outcome).toBe('created')
+      const row = await rowOf(messageId)
+      if (row === null) throw new Error('not synced')
+      await db
+        .update(interaction)
+        .set({ threadId: 'thread-acme', occurredAt: new Date(at(minutesAgo)) })
+        .where(eq(interaction.id, row.id))
+      return row.id
+    }
+    // Oldest in Priya's mailbox (private to her), then one in mine, then the
+    // message the window opens on.
+    const theirsId = await sent(theirs, 90)
+    const mineId = await sent(mine, 60)
+    const opened = await sent(mine, 30)
+
+    const email = await Effect.runPromise(
+      emailDetailProgram(FIXTURE_ACTOR, opened),
+    )
+    expect(email.thread.messages).toBe(3)
+    expect(email.thread.earlier.map((l) => l.id)).toEqual([theirsId, mineId])
+    const [private_, readable] = email.thread.earlier
+    // Headers stay visible to all; the body's preview does not.
+    expect(private_).toMatchObject({
+      who: 'Jane Founder',
+      sent: false,
+      preview: null,
+      attachments: 0,
+    })
+    expect(readable.preview).toContain('Q3 closed ahead of plan.')
+    expect(JSON.stringify(private_)).not.toContain('Q3 closed')
+
+    // Opened on the earliest, there is nothing earlier and the count stays.
+    const first = await Effect.runPromise(
+      emailDetailProgram(FIXTURE_ACTOR, theirsId),
+    )
+    expect(first.thread).toEqual({ messages: 3, earlier: [] })
+  })
+
   it('refuses an id that is not an email', async () => {
     const exit = await Effect.runPromiseExit(
       emailDetailProgram(FIXTURE_ACTOR, randomUUID()),

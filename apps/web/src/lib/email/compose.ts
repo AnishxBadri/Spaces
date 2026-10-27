@@ -93,11 +93,6 @@ export function switchMode(
   }
 }
 
-/** Every address the draft is going to, Bcc included. */
-export function recipientCount(draft: DraftState): number {
-  return draft.to.length + draft.cc.length + draft.bcc.length
-}
-
 /** `alias` added to a line, unless the line already holds it. */
 export function addRecipient(
   line: ReadonlyArray<DraftRecipient>,

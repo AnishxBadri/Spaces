@@ -21,6 +21,7 @@ import {
 import { KIND_ORDER } from '#/lib/documents/files-tab'
 import { recordPath } from '#/lib/record-path'
 import { formatDay, formatWhen } from '@spaces/core/format'
+import { cn } from '#/lib/utils'
 import { useClock } from '#/components/clock'
 
 /**
@@ -94,6 +95,7 @@ export function FileViewerSidebar({
   const router = useRouter()
   const { now, today } = useClock()
   const details = useDocumentDetails(doc.id)
+  const sourceEmail = details?.email ?? null
   const [busy, setBusy] = useState(false)
 
   const run = useCallback(
@@ -161,15 +163,7 @@ export function FileViewerSidebar({
       </Section>
 
       {doc.follow === null ? (
-        <Section label="Versions" count={1}>
-          <Line
-            mark={[formatDay(doc.createdAt, today), doc.uploadedByName]
-              .filter((part) => part !== null)
-              .join(' · ')}
-          >
-            v1 · this one
-          </Line>
-        </Section>
+        <Versions doc={doc} details={details} today={today} />
       ) : (
         <FollowedRevisions doc={doc} recordId={recordId} />
       )}
@@ -195,29 +189,124 @@ export function FileViewerSidebar({
       )}
 
       <Section label="Source">
-        <p className="mono text-micro">
-          {[
-            doc.sourceCapability === null
-              ? doc.uploadedByName === null
-                ? 'uploaded'
-                : `uploaded by ${doc.uploadedByName}`
-              : `via ${doc.sourceCapability}`,
-            formatDay(doc.createdAt, today),
-          ].join(' · ')}
+        {sourceEmail === null ? null : (
+          <Link
+            to="."
+            search={(prev) => ({
+              ...prev,
+              tab: 'interactions',
+              modal: 'email',
+              id: sourceEmail.id,
+            })}
+            resetScroll={false}
+            data-source-email
+            className="focus-ring truncate text-ui hover:underline"
+          >
+            {sourceEmail.subject}
+          </Link>
+        )}
+        <p data-source-line className="text-label text-graphite">
+          {sourceLine(doc, today)}
         </p>
         {doc.sourcePath === null ? null : (
           <p className="truncate mono text-micro text-graphite">
-            from {doc.sourcePath}
+            From {doc.sourcePath}
           </p>
         )}
         {doc.blobSha === null ? null : (
           <p className="mono text-micro text-graphite">
-            sha {doc.blobSha.slice(0, 4)}…{doc.blobSha.slice(-4)} · stays on
+            Sha {doc.blobSha.slice(0, 4)}…{doc.blobSha.slice(-4)} · stays on
             this server
           </p>
         )}
       </Section>
     </>
+  )
+}
+
+/** The lanes that bring files, as the source line names them. */
+const LANE_NAMES: Record<string, string> = {
+  gmail: 'Gmail',
+  'google-drive': 'Drive',
+  'google-calendar': 'Google Calendar',
+  'core.mailbox': 'Forwarding',
+}
+
+/** A capability as a reader says it: `Gmail`, else its id in sentence case. */
+export function laneName(capability: string): string {
+  return (
+    LANE_NAMES[capability] ??
+    capability.charAt(0).toUpperCase() + capability.slice(1)
+  )
+}
+
+/** `Via Gmail · Anish · 13 Oct`, or `Uploaded · Anish · 13 Oct`. */
+export function sourceLine(
+  doc: Pick<
+    RecordDocument,
+    'sourceCapability' | 'uploadedByName' | 'createdAt'
+  >,
+  today: string,
+): string {
+  return [
+    doc.sourceCapability === null
+      ? 'Uploaded'
+      : `Via ${laneName(doc.sourceCapability)}`,
+    doc.uploadedByName,
+    formatDay(doc.createdAt, today),
+  ]
+    .filter((part) => part !== null && part !== '')
+    .join(' · ')
+}
+
+/**
+ * The replace chain, newest first: each version's day and uploader, the
+ * one open on bone. Until the details land it is this file alone.
+ */
+function Versions({
+  doc,
+  details,
+  today,
+}: {
+  doc: RecordDocument
+  details: Details
+  today: string
+}) {
+  const versions = details?.versions ?? [
+    {
+      id: doc.id,
+      name: doc.filename,
+      at: doc.createdAt,
+      uploader: doc.uploadedByName,
+      current: true,
+    },
+  ]
+  return (
+    <Section label="Versions" count={versions.length}>
+      <ol className="-mx-4 flex flex-col">
+        {versions.map((v, i) => (
+          <li
+            key={v.id}
+            data-version={v.id}
+            {...(v.current ? { 'data-current': true } : {})}
+            className={cn(
+              'flex min-h-7 items-center justify-between gap-3 px-4',
+              v.current && 'bg-bone',
+            )}
+          >
+            <span className="min-w-0 truncate text-ui">
+              {`v${String(versions.length - i)}`}
+              {versions.length > 1 ? ` · ${v.name}` : ''}
+            </span>
+            <span className="shrink-0 mono text-micro text-graphite">
+              {[formatDay(v.at, today), v.uploader]
+                .filter((part) => part !== null)
+                .join(' · ')}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </Section>
   )
 }
 
@@ -316,25 +405,43 @@ function FileOn({
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72">
-        <RecordPicker
-          disabled={disabled}
+        <FilingPickers
           filedIds={filedIds}
-          onPick={(entityId) => {
-            onPick({ kind: 'record', entityId })
-            setOpen(false)
-          }}
-        />
-        <SpacePicker
-          open={open}
           disabled={disabled}
-          filedIds={filedIds}
-          onPick={(entityId) => {
-            onPick({ kind: 'space', entityId })
+          onPick={(target) => {
+            onPick(target)
             setOpen(false)
           }}
         />
       </PopoverContent>
     </Popover>
+  )
+}
+
+/** The record search over the space tree: where a file can be filed. */
+export function FilingPickers({
+  filedIds,
+  disabled,
+  onPick,
+}: {
+  filedIds: Array<string>
+  disabled: boolean
+  onPick: (target: FilingTarget) => void
+}) {
+  return (
+    <>
+      <RecordPicker
+        disabled={disabled}
+        filedIds={filedIds}
+        onPick={(entityId) => onPick({ kind: 'record', entityId })}
+      />
+      <SpacePicker
+        open
+        disabled={disabled}
+        filedIds={filedIds}
+        onPick={(entityId) => onPick({ kind: 'space', entityId })}
+      />
+    </>
   )
 }
 

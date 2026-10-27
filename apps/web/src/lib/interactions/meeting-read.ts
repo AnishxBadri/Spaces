@@ -587,6 +587,8 @@ export type MeetingArtifact = {
   name: string
   /** Where a recording link opens: the provider's own page. */
   url: string | null
+  /** Private to the viewer: their own transcript. */
+  private: boolean
 }
 
 /** An open suggestion that cites this meeting, decided inline. */
@@ -595,6 +597,8 @@ export type MeetingSuggestion = {
   kind: string
   /** What it proposes, in a line: the task's or the note's title. */
   summary: string
+  /** A task's due day, `YYYY-MM-DD`; null for a dateless task or another kind. */
+  due: string | null
 }
 
 /** A note the meeting carries beyond its write-up, readable by the viewer. */
@@ -624,6 +628,10 @@ export type MeetingDetail = {
   note: {
     id: string
     title: string | null
+    /** The write-up's text, shown inline; null when the reader may not see it. */
+    body: string | null
+    /** ISO instant it was written. */
+    at: string
     openIn: RecorderLink | null
     via: NoteVia | null
   } | null
@@ -742,6 +750,8 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
             db
               .select({
                 title: note.title,
+                bodyMd: note.bodyMd,
+                createdAt: entity.createdAt,
                 visibility: note.visibility,
                 authorId: note.authorId,
                 sourceRef: entity.sourceRef,
@@ -816,6 +826,8 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
           : {
               id: noteId,
               title: readableBody ? body.title || 'Untitled' : null,
+              body: readableBody ? body.bodyMd : null,
+              at: (body?.createdAt ?? row.occurredAt).toISOString(),
               openIn: links.get(noteId) ?? null,
               via: via.get(noteId) ?? null,
             },
@@ -835,11 +847,16 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
           role: a.role,
           name: a.filename ?? a.name,
           url: a.url ?? a.externalUrl,
+          private: a.visibility === 'private',
         })),
       suggestions: open.map((s) => ({
         id: s.id,
         kind: s.kind,
         summary: suggestionSummary(s.kind, s.payload),
+        due:
+          s.kind === 'task'
+            ? (taskPayloadSchema.safeParse(s.payload).data?.due ?? null)
+            : null,
       })),
     }
   },

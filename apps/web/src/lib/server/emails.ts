@@ -11,6 +11,7 @@ export type {
   EmailBody,
   EmailDetail,
   EmailParticipant,
+  EmailThreadLine,
 } from '../interactions/email-read'
 export type { EmailPrivacy } from '../interactions/email-privacy'
 export type {
@@ -22,7 +23,10 @@ export type {
   ReplyOpening,
 } from '../interactions/email-drafts'
 export type { DraftRecipient, EmailDraftMode } from '@spaces/db/schema/drafts'
-export type { VariableReview } from '../interactions/email-variables'
+export type {
+  VariableOption,
+  VariableReview,
+} from '../interactions/email-variables'
 export type { EmailSender, Sent } from '../interactions/email-send'
 
 /**
@@ -227,6 +231,15 @@ export const reviewEmailVariables = createServerFn({ method: 'POST' })
       throw new Error(variableMessage(failure))
     }
   })
+
+/** The Variable picker's paths: the shared grammar's families and the person's attributes. */
+export const listEmailVariables = createServerFn().handler(async () => {
+  await requireUser()
+  const { variableOptionsProgram } =
+    await import('../interactions/email-variables')
+  const { effectFn } = await import('./effect')
+  return effectFn(variableOptionsProgram)()
+})
 
 /** Whether the composer may send: the viewer's Gmail, or the account to reconnect. */
 export const getEmailSender = createServerFn()

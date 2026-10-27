@@ -1,4 +1,4 @@
-import { Download, ExternalLink, FileWarning } from 'lucide-react'
+import { FileWarning } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { PDFDocumentProxy } from 'unpdf/pdfjs'
@@ -13,6 +13,8 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { FileGlyph } from './files/file-glyph'
+import { followWord } from './files/revision-ledger'
+import type { RecordDocument } from './files/types'
 import { Twinkle } from './twinkle'
 import { detectFormat } from '@spaces/core/documents/extract'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
@@ -22,6 +24,8 @@ import { addMention, openAsk } from '#/lib/ask/dock-store'
 import { useAskSubject } from '#/lib/ask/page-scope'
 import type { AskScopeChip } from '#/lib/ask/types'
 import { fileType } from '#/lib/documents/files-tab'
+import type { FileType } from '#/lib/documents/files-tab'
+import { storageLinkProvider } from '#/lib/documents/storage-link'
 import { cn } from '#/lib/utils'
 
 /**
@@ -56,6 +60,61 @@ type Doc = {
   url: string | null
   /** The newer version that supersedes this file; the head says so. */
   replacedBy?: { id: string; name: string } | null
+  /** A followed file's binding: the head reads its provider and revision. */
+  follow?: RecordDocument['follow'] | undefined
+  externalUrl?: string | null | undefined
+  externalStatus?: RecordDocument['externalStatus'] | undefined
+}
+
+const FOLLOWED_TYPE_WORD: Partial<Record<FileType, string>> = {
+  'google-sheet': 'Sheet',
+  xls: 'Sheet',
+  'google-doc': 'Doc',
+  doc: 'Doc',
+  'google-slides': 'Slides',
+  ppt: 'Slides',
+  pdf: 'PDF',
+}
+
+/**
+ * The head's mono line: `Deck · 4.2 MB · 14 pages`, or for a followed file
+ * `Sheet · Drive · rev 4 · following`.
+ */
+export function viewerHeadLine(
+  doc: Doc,
+  format: string | null,
+  pages: number,
+): string {
+  const kind =
+    doc.kind === undefined
+      ? format
+        ? format.toUpperCase()
+        : (doc.mime ?? 'Unknown type')
+      : DOCUMENT_KIND_LABELS[doc.kind]
+  const follow = doc.follow ?? null
+  if (follow !== null) {
+    const where =
+      doc.externalUrl == null
+        ? null
+        : (storageLinkProvider(doc.externalUrl)?.label ?? null)
+    // A followed file is the provider's live file: it is named by what it is.
+    const type = fileType({ ...doc, externalUrl: doc.externalUrl ?? null })
+    return [
+      FOLLOWED_TYPE_WORD[type] ?? kind,
+      where,
+      `rev ${String(follow.revisions)}`,
+      followWord({ follow, externalStatus: doc.externalStatus ?? null }),
+    ]
+      .filter((part) => part !== null)
+      .join(' · ')
+  }
+  return [
+    kind,
+    doc.sizeBytes ? formatBytes(doc.sizeBytes) : null,
+    pages > 0 ? `${String(pages)} page${pages === 1 ? '' : 's'}` : null,
+  ]
+    .filter((part) => part !== null)
+    .join(' · ')
 }
 
 /** A file as Ask's scope chip: its chunks seed the turn. */
@@ -197,20 +256,8 @@ function PreviewBody({
         >
           {doc.filename}
         </DialogTitle>
-        <DialogDescription className="shrink-0">
-          {[
-            doc.kind === undefined
-              ? format
-                ? format.toUpperCase()
-                : (doc.mime ?? 'Unknown type')
-              : DOCUMENT_KIND_LABELS[doc.kind].toLowerCase(),
-            doc.sizeBytes ? formatBytes(doc.sizeBytes) : null,
-            isPdf && pages > 0
-              ? `${String(pages)} page${pages === 1 ? '' : 's'}`
-              : null,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
+        <DialogDescription data-viewer-head className="shrink-0">
+          {viewerHeadLine(doc, format, isPdf ? pages : 0)}
         </DialogDescription>
         {doc.replacedBy == null ? null : (
           <span className="min-w-0 truncate mono text-micro text-graphite">
@@ -291,7 +338,6 @@ function PreviewBody({
                   rel="noopener noreferrer"
                   title={doc.url}
                 >
-                  <ExternalLink className="size-3" strokeWidth={2} />
                   Open source
                 </a>
               </Button>
@@ -304,7 +350,6 @@ function PreviewBody({
               disabled={downloading}
               onClick={() => void download()}
             >
-              <Download className="size-3" strokeWidth={2} />
               Download
             </Button>
           )}
@@ -634,8 +679,11 @@ function PdfPreview({
           )}
         />
         {pdf ? (
-          <p className="mt-3 text-center mono text-micro text-graphite">
-            page {page} of {pdf.numPages}
+          <p
+            data-page-caption
+            className="mt-3 text-center mono text-micro text-graphite"
+          >
+            Page {page} of {pdf.numPages}
           </p>
         ) : null}
       </div>

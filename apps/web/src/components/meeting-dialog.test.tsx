@@ -90,11 +90,16 @@ vi.mock('@tanstack/react-router', () => ({
   ),
 }))
 
+const HOUR = 3_600_000
+/** An instant `hours` from now: Prep is only for a meeting still ahead. */
+const fromNow = (hours: number) =>
+  new Date(Date.now() + hours * HOUR).toISOString()
+
 const DETAIL: MeetingDetail = {
   id: ID,
   title: 'Flent intro',
-  startsAt: '2026-10-14T09:30:00.000Z',
-  endsAt: '2026-10-14T10:00:00.000Z',
+  startsAt: fromNow(2),
+  endsAt: fromNow(2.5),
   cancelled: false,
   conferenceUrl: 'https://meet.google.com/abc-defg-hij',
   participants: [
@@ -110,12 +115,14 @@ const DETAIL: MeetingDetail = {
       role: 'transcript',
       name: 'intro transcript.txt',
       url: null,
+      private: false,
     },
     {
       documentId: 'd2',
       role: 'recording_link',
       name: 'Recording',
       url: 'https://fathom.video/calls/42',
+      private: false,
     },
   ],
   suggestions: [],
@@ -171,9 +178,9 @@ describe('the meeting window', () => {
     const text = dialog()?.textContent ?? ''
     expect(text).toContain('Flent intro')
     expect(text).toContain('Ana Reyes')
-    expect(text).toContain('✓ accepted')
+    expect(text).toContain('✓ Accepted')
     expect(text).toContain('ben@flent.io')
-    expect(text).toContain('? maybe')
+    expect(text).toContain('? Maybe')
     expect(dialog()?.querySelector('select, input[type="radio"]')).toBeNull()
     const google = [...document.querySelectorAll('a')].find(
       (a) => a.textContent === 'Open in Google ›',
@@ -181,7 +188,7 @@ describe('the meeting window', () => {
     expect(google?.getAttribute('href')).toContain('calendar.google.com')
     // The conference link is the head's one action.
     const join = [...document.querySelectorAll('a')].find(
-      (a) => a.textContent === 'join call ›',
+      (a) => a.textContent === 'Join call ›',
     )
     expect(join?.getAttribute('href')).toBe(
       'https://meet.google.com/abc-defg-hij',
@@ -214,12 +221,14 @@ describe('the meeting window', () => {
     expect(fns.getDocumentPreview).toHaveBeenCalledWith({ data: { id: 'd1' } })
   })
 
-  it("offers Open note and Open in Granola for a recorder's write-up, and its second note, each marked via Granola", async () => {
+  it("reads a recorder's write-up inline with Open in Granola, and its second note as a bordered row, each marked Via Granola", async () => {
     fns.getMeeting.mockResolvedValue({
       ...DETAIL,
       note: {
         id: NOTE,
         title: 'Flent intro',
+        body: 'Raising a $3M seed.\n\nNext: data room.',
+        at: '2026-10-14T16:02:00.000Z',
         openIn: { provider: 'Granola', url: 'https://notes.granola.ai/d/n1' },
         via: { tool: 'Granola', author: 'Anish' },
       },
@@ -248,9 +257,60 @@ describe('the meeting window', () => {
     )
     const writeUp = dialog()?.querySelector('[aria-label="Write-up"]')
     expect(writeUp?.textContent).toContain('Flent intro')
+    expect(writeUp?.querySelector('[data-write-up-body]')?.textContent).toBe(
+      'Raising a $3M seed.\n\nNext: data room.',
+    )
     expect(writeUp?.textContent).toContain('Granola notes · Priya')
-    expect(writeUp?.textContent).toContain('via Granola · Anish')
-    expect(writeUp?.textContent).toContain('via Granola · Priya')
+    expect(writeUp?.querySelector('[data-write-up-line]')?.textContent).toMatch(
+      /^Via Granola · Anish · /,
+    )
+    expect(writeUp?.textContent).toContain('Via Granola · Priya')
+  })
+
+  it('is one Write-up + row with nothing written', async () => {
+    fns.getMeeting.mockResolvedValue({ ...DETAIL, artifacts: [] })
+    await open()
+    const writeUp = dialog()?.querySelector('[aria-label="Write-up"]')
+    expect(writeUp?.querySelector('[data-empty-row]')?.textContent).toBe(
+      'Write-up+',
+    )
+  })
+
+  it('lists task suggestions as action items, with Add task and Skip', async () => {
+    fns.getMeeting.mockResolvedValue({
+      ...DETAIL,
+      suggestions: [
+        { id: 's1', kind: 'task', summary: 'Send the deck', due: null },
+      ],
+    })
+    fns.acceptSuggestion.mockResolvedValue({ ok: true })
+    await open()
+    const items = dialog()?.querySelector('[aria-label="Action items"]')
+    expect(items?.textContent).toContain('1 in Review')
+    expect(items?.textContent).toContain('Send the deck')
+    await act(async () => buttons('Add task')[0].click())
+    await settle()
+    expect(fns.acceptSuggestion).toHaveBeenCalledWith({ data: { id: 's1' } })
+  })
+
+  it('offers no Prep once the meeting has started, not even from the row', async () => {
+    fns.getMeeting.mockResolvedValue({
+      ...DETAIL,
+      startsAt: fromNow(-1),
+      endsAt: fromNow(-0.5),
+    })
+    act(() =>
+      root.render(<MeetingDialog id={ID} prepOnOpen onOpenChange={() => {}} />),
+    )
+    await settle()
+    expect(buttons('Prep')).toHaveLength(0)
+    expect(fns.prepMeeting).not.toHaveBeenCalled()
+    // Over, there is no call to join either.
+    expect(
+      [...document.querySelectorAll('a')].some(
+        (a) => a.textContent === 'Join call ›',
+      ),
+    ).toBe(false)
   })
 
   it('streams Prep on demand, keeps nothing, and saves the brief it showed as a note', async () => {
@@ -273,16 +333,19 @@ describe('the meeting window', () => {
     expect(prep?.textContent).toContain('Anthropic · claude-opus-5')
     expect(prep?.textContent).toContain('Flent is raising (Call notes).')
 
+    expect(
+      document.querySelector('[data-slot="dialog-footer"]')?.textContent,
+    ).toContain('Not kept unless saved')
     fns.savePrepAsNote.mockResolvedValue({ noteId: NOTE })
     await act(async () => buttons('Save as note')[0].click())
     await settle()
     expect(fns.savePrepAsNote).toHaveBeenCalledWith({
       data: { interactionId: ID, markdown: 'Flent is raising (Call notes).' },
     })
-    expect(navigate).toHaveBeenCalledWith({
-      to: '/notes/$noteId',
-      params: { noteId: NOTE },
-    })
+    // It stays put: the label says it is saved, and nothing navigates.
+    expect(navigate).not.toHaveBeenCalled()
+    expect(buttons('Saved as note')).toHaveLength(1)
+    expect(buttons('Saved as note')[0].disabled).toBe(true)
 
     // Opened again, the window shows no Prep until asked.
     await open(null)

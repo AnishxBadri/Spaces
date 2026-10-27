@@ -70,7 +70,13 @@ export function draftMessage(failure: unknown): string {
 }
 
 /** A file the draft carries, named for its chip. */
-export type DraftDocument = { documentId: string; name: string }
+export type DraftDocument = {
+  documentId: string
+  name: string
+  /** For the chip's type glyph and size; null when unknown. */
+  mime: string | null
+  sizeBytes: number | null
+}
 
 /** What the composer edits. */
 export type DraftFields = {
@@ -135,7 +141,12 @@ export const namedDocuments = Effect.fn('draftDocuments')(function* (
   if (ids.length === 0) return []
   const rows = yield* query(() =>
     db
-      .select({ documentId: document.entityId, name: entity.canonicalName })
+      .select({
+        documentId: document.entityId,
+        name: entity.canonicalName,
+        mime: document.mime,
+        sizeBytes: document.sizeBytes,
+      })
       .from(document)
       .innerJoin(entity, eq(entity.id, document.entityId))
       .where(

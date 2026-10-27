@@ -85,6 +85,55 @@ describe('documentDetailsProgram', () => {
     ])
   })
 
+  it('walks the replace chain both ways, newest first, leaving out a version the viewer may not read', async () => {
+    const { db } = await import('@spaces/db')
+    const { document, link } = await import('@spaces/db/schema')
+    const actor = await actorId()
+    const file = async (
+      name: string,
+      createdAt: string,
+      visibility: 'shared' | 'private' = 'shared',
+    ) => {
+      const id = await anEntity('document', name)
+      await db.insert(document).values({
+        entityId: id,
+        filename: name,
+        uploadedBy: actor,
+        authorId: actor,
+        visibility,
+        createdAt: new Date(createdAt),
+      })
+      return id
+    }
+    const v1 = await file('deck v1.pdf', '2026-09-01T10:00:00Z')
+    const v2 = await file('deck v2.pdf', '2026-09-20T10:00:00Z')
+    const v3 = await file('deck v3.pdf', '2026-10-05T10:00:00Z', 'private')
+    const supersedes = (newer: string, older: string) =>
+      db.insert(link).values({
+        fromEntityId: newer,
+        toEntityId: older,
+        relation: 'supersedes',
+        createdBy: actor,
+      })
+    await supersedes(v2, v1)
+    await supersedes(v3, v2)
+
+    // Opened on the middle one, the walk reaches both ends.
+    const mine = await details(actor, v2)
+    expect(mine?.versions.map((v) => [v.name, v.current])).toEqual([
+      ['deck v3.pdf', false],
+      ['deck v2.pdf', true],
+      ['deck v1.pdf', false],
+    ])
+    expect(mine?.versions[0]?.at).toBe('2026-10-05T10:00:00.000Z')
+
+    const theirs = await details('someone-else', v1)
+    expect(theirs?.versions.map((v) => v.name)).toEqual([
+      'deck v2.pdf',
+      'deck v1.pdf',
+    ])
+  })
+
   it('reads nothing for a file with no text, and null for no file', async () => {
     const { db } = await import('@spaces/db')
     const { document } = await import('@spaces/db/schema')

@@ -1,25 +1,98 @@
-import { LabelHead, LedgerRow } from '#/components/ledger-section'
+import { useState } from 'react'
+import { variableSegments } from '@spaces/core/templates/variables'
 import { Checkbox } from '#/components/ui/checkbox'
 import { openBlanks } from '#/lib/email/compose'
 import type { ReviewChoices } from '#/lib/email/compose'
 import type { VariableReview } from '#/lib/server-fns'
+import { cn } from '#/lib/utils'
 
 /**
- * Review, the composer's second stage: recipients × the variables the
- * draft uses, each resolved for that recipient.
- * - A blank is flagged in its row and filled in place, or the row's blanks
- *   are accepted to go out empty.
- * - Send stays off the foot until no row is flagged (`openBlanks`).
+ * Review, the composer's second stage: the recipients on the left, and on
+ * the right the copy one of them receives, each variable resolved for them.
+ * - A resolved variable sits on the selection wash; a blank is an amber
+ *   chip until it is filled for that copy or left blank.
+ * - A recipient with an open blank is flagged with a square and a count;
+ *   Send stays off the foot until none is (`openBlanks`).
  */
-export function VariableReviewTable({
+
+type Row = VariableReview['rows'][number]
+
+/** The variable's text in this copy, or null while it is an open blank. */
+function valueIn(
+  row: Row,
+  path: string,
+  choices: ReviewChoices,
+): { text: string; filled: boolean } | null {
+  const resolved = row.values[path] ?? null
+  if (resolved !== null) return { text: resolved, filled: false }
+  const fill = choices.fills[row.email]?.[path] ?? ''
+  if (fill.trim() !== '') return { text: fill, filled: true }
+  return choices.accepted.includes(row.email)
+    ? { text: '', filled: true }
+    : null
+}
+
+/** One recipient's copy of `text`, the variables drawn as chips. */
+function Copy({
+  text,
+  row,
+  choices,
+}: {
+  text: string
+  row: Row
+  choices: ReviewChoices
+}) {
+  return (
+    <>
+      {variableSegments(text).map((s, i) => {
+        if (s.kind === 'text') return <span key={i}>{s.text}</span>
+        const v = valueIn(row, s.path, choices)
+        if (v === null)
+          return (
+            <span
+              key={i}
+              data-blank={s.path}
+              className="rounded-md border border-warning bg-paper px-1 mono text-micro text-foreground"
+            >
+              {s.path}
+            </span>
+          )
+        if (v.text === '') return null
+        return (
+          <span
+            key={i}
+            data-resolved={s.path}
+            className="rounded-md bg-selected px-0.5"
+          >
+            {v.text}
+          </span>
+        )
+      })}
+    </>
+  )
+}
+
+export function ReviewPanes({
   review,
   choices,
   onChange,
+  subject,
+  bodyMd,
 }: {
   review: VariableReview
   choices: ReviewChoices
   onChange: (next: ReviewChoices) => void
+  subject: string
+  bodyMd: string
 }) {
+  const firstFlagged =
+    review.rows.find((r) => openBlanks(r, choices).length > 0) ??
+    review.rows.at(0)
+  const [picked, setPicked] = useState<string | null>(
+    firstFlagged?.email ?? null,
+  )
+  const row = review.rows.find((r) => r.email === picked) ?? null
+
   const fill = (email: string, path: string, value: string) =>
     onChange({
       ...choices,
@@ -37,80 +110,86 @@ export function VariableReviewTable({
     })
 
   return (
-    <section aria-label="Review" className="flex flex-col px-5 py-4">
-      <LabelHead label="Recipient">
-        {review.paths.map((p) => (
-          <span
-            key={p}
-            data-variable={p}
-            className="w-36 shrink-0 truncate mono text-micro text-graphite"
-          >
-            {`{{${p}}}`}
-          </span>
-        ))}
-        <span className="w-24 shrink-0 text-right label-caps text-graphite">
-          Leave blank
-        </span>
-      </LabelHead>
-      {review.rows.length === 0 ? (
-        <p className="px-3 py-2 text-ui text-graphite">No recipients.</p>
-      ) : (
-        <ol>
-          {review.rows.map((row, i) => {
-            const open = openBlanks(row, choices)
-            const label = row.name ?? row.email
-            return (
-              <LedgerRow key={row.email} last={i === review.rows.length - 1}>
-                <span
-                  data-review-row={row.email}
-                  {...(open.length > 0 ? { 'data-flagged': true } : {})}
-                  className="flex min-w-0 flex-1 items-center gap-2"
-                >
-                  {open.length > 0 ? (
-                    <span
-                      aria-hidden
-                      className="size-1.5 shrink-0 bg-destructive"
-                    />
-                  ) : null}
-                  <span className="min-w-0 truncate text-ui">{label}</span>
-                  {open.length > 0 ? (
-                    <span className="shrink-0 mono text-micro text-destructive">
-                      {open.length === 1
-                        ? '1 blank'
-                        : `${String(open.length)} blanks`}
-                    </span>
-                  ) : null}
+    <section aria-label="Review" className="flex min-h-80 flex-1">
+      <ol
+        aria-label="Recipients"
+        className="w-50 shrink-0 overflow-y-auto border-r border-rule bg-bone"
+      >
+        {review.rows.map((r) => {
+          const open = openBlanks(r, choices)
+          return (
+            <li key={r.email}>
+              <button
+                type="button"
+                data-review-row={r.email}
+                {...(open.length > 0 ? { 'data-flagged': true } : {})}
+                aria-current={r.email === picked ? 'true' : undefined}
+                onClick={() => setPicked(r.email)}
+                className={cn(
+                  'focus-ring-inset flex h-9 w-full items-center gap-2 border-b border-rule px-3 text-left text-ui hover:bg-bone-deep',
+                  r.email === picked && 'bg-paper',
+                )}
+              >
+                {open.length > 0 ? (
+                  <span aria-hidden className="size-1.5 shrink-0 bg-warning" />
+                ) : null}
+                <span className="min-w-0 flex-1 truncate">
+                  {r.name ?? r.email}
                 </span>
-                {review.paths.map((p) => {
-                  const value = row.values[p] ?? null
-                  return value === null ? (
-                    <input
-                      key={p}
-                      aria-label={`${p} for ${label}`}
-                      placeholder="blank"
-                      value={choices.fills[row.email]?.[p] ?? ''}
-                      onChange={(e) => fill(row.email, p, e.target.value)}
-                      className="h-6 w-36 shrink-0 border-b border-dashed border-rule bg-transparent text-ui outline-none placeholder:text-graphite focus:border-foreground"
-                    />
-                  ) : (
-                    <span key={p} className="w-36 shrink-0 truncate text-ui">
-                      {value}
-                    </span>
-                  )
-                })}
-                <span className="flex w-24 shrink-0 justify-end">
-                  {row.blanks.length > 0 ? (
+                {open.length > 0 ? (
+                  <span className="shrink-0 mono text-micro text-graphite">
+                    {open.length}
+                  </span>
+                ) : null}
+              </button>
+            </li>
+          )
+        })}
+      </ol>
+      {row === null ? (
+        <p className="flex-1 px-5 py-4 text-ui text-graphite">No recipients.</p>
+      ) : (
+        <div
+          data-review-copy={row.email}
+          className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4"
+        >
+          <p className="text-ui font-medium">
+            <Copy text={subject} row={row} choices={choices} />
+          </p>
+          <div className="text-prose font-serif leading-6.75 whitespace-pre-wrap">
+            <Copy text={bodyMd} row={row} choices={choices} />
+          </div>
+          {row.blanks.length === 0 ? null : (
+            <ol className="flex flex-col border-t border-rule">
+              {row.blanks.map((path) => (
+                <li
+                  key={path}
+                  data-fill-row={path}
+                  className="flex h-10 items-center gap-3 border-b border-rule"
+                >
+                  <span className="w-32 shrink-0 truncate mono text-micro text-graphite">
+                    {path}
+                  </span>
+                  <input
+                    aria-label={`${path} for ${row.name ?? row.email}`}
+                    placeholder="For this copy only…"
+                    value={choices.fills[row.email]?.[path] ?? ''}
+                    onChange={(e) => fill(row.email, path, e.target.value)}
+                    className="h-7 min-w-0 flex-1 border-b border-dashed border-rule bg-transparent text-ui outline-none placeholder:text-graphite focus:border-foreground"
+                  />
+                  <label className="flex shrink-0 items-center gap-2 text-label text-graphite">
                     <Checkbox
-                      aria-label={`Leave the blanks for ${label} empty`}
+                      aria-label={`Leave the blanks for ${row.name ?? row.email} empty`}
                       checked={choices.accepted.includes(row.email)}
                       onCheckedChange={(on) => accept(row.email, on)}
                     />
-                  ) : null}
-                </span>
-              </LedgerRow>
-            )
-          })}
-        </ol>
+                    Leave blank
+                  </label>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
       )}
     </section>
   )

@@ -61,6 +61,55 @@ export function parseVariables(text: string): Array<VariablePath> {
   return [...seen]
 }
 
+/** The paths every person has, before any attribute: what a picker offers first. */
+export const VARIABLE_FAMILIES: ReadonlyArray<{
+  path: VariablePath
+  label: string
+}> = [
+  { path: 'name.first', label: 'First name' },
+  { path: 'name.last', label: 'Last name' },
+  { path: 'name.full', label: 'Full name' },
+  { path: 'company.name', label: 'Company' },
+  { path: 'last_interaction.when', label: 'Last interaction' },
+  { path: 'last_email.when', label: 'Last email' },
+  { path: 'next_meeting.when', label: 'Next meeting' },
+]
+
+/**
+ * Every path a draft may write, in the order a picker lists them: the
+ * families, then each live attribute whose slug is a path. Each one passes
+ * `checkVariables` against the same attributes.
+ */
+export function variablePaths(
+  attributes: ReadonlyArray<AttributeDef>,
+): Array<{ path: VariablePath; label: string }> {
+  const family = new Set(VARIABLE_FAMILIES.map((f) => f.path))
+  return [
+    ...VARIABLE_FAMILIES,
+    ...attributes
+      .filter((d) => !d.archived && PATH.test(d.slug) && !family.has(d.slug))
+      .map((d) => ({ path: d.slug, label: d.name })),
+  ]
+}
+
+/** `text` cut into its plain runs and its `{{path}}` tokens, in order. */
+export function variableSegments(
+  text: string,
+): Array<{ kind: 'text'; text: string } | { kind: 'variable'; path: string }> {
+  const out: Array<
+    { kind: 'text'; text: string } | { kind: 'variable'; path: string }
+  > = []
+  let at = 0
+  for (const m of text.matchAll(TOKEN)) {
+    const start = m.index
+    if (start > at) out.push({ kind: 'text', text: text.slice(at, start) })
+    out.push({ kind: 'variable', path: m[1] })
+    at = start + m[0].length
+  }
+  if (at < text.length) out.push({ kind: 'text', text: text.slice(at) })
+  return out
+}
+
 const STAT_PATHS = new Map<VariablePath, keyof VariableStats>([
   ['last_interaction.when', 'last_interaction'],
   ['last_email.when', 'last_email'],

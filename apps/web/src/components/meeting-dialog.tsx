@@ -2,12 +2,13 @@ import { Link, useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
+import { dayKey, formatDay, formatTime } from '@spaces/core/format'
 import { DocumentPreview } from '#/components/document-preview'
-import { LabelHead, LedgerRow } from '#/components/ledger-section'
-import { OpenIn, ViaMark } from '#/components/open-in'
-import { DensityRamp } from '#/components/dither'
+import { EmptyRow, LabelHead, LedgerRow } from '#/components/ledger-section'
+import { OpenIn } from '#/components/open-in'
 import { DetailsPickRow } from '#/components/record/details-add'
 import type { PickHit } from '#/components/record/details-add'
+import { Twinkle } from '#/components/twinkle'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
@@ -30,17 +31,18 @@ import {
 } from '#/lib/server-fns'
 import type {
   MeetingArtifact,
+  MeetingCarriedNote,
   MeetingDetail,
   MeetingSuggestion,
   PrepEvent,
 } from '#/lib/server-fns'
 import {
   googleDayUrl,
-  meetingWhen,
   participantName,
   RSVP_MARK,
-  RSVP_WORD,
+  timeSpan,
 } from '#/lib/meetings/day'
+import type { NoteVia } from '#/lib/notes/via-mark'
 import { recordPath } from '#/lib/record-path'
 import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
@@ -83,10 +85,39 @@ export function applyPrepEvent(state: PrepState, event: PrepEvent): PrepState {
   }
 }
 
+/** An answer as the participants lane prints it: `✓ Accepted`. */
+const RSVP_LABEL: Record<
+  MeetingDetail['participants'][number]['rsvp'],
+  string
+> = {
+  accepted: 'Accepted',
+  declined: 'Declined',
+  tentative: 'Maybe',
+  needs_action: 'No answer',
+}
+
 const ROLE_WORD: Record<MeetingArtifact['role'], string> = {
-  transcript: 'transcript',
-  recording_link: 'recording',
-  attachment: 'attachment',
+  transcript: 'Transcript',
+  recording_link: 'Recording',
+  attachment: 'Attachment',
+}
+
+/** `16:02` on the reader's day, else `13 Oct`. */
+const stamp = (iso: string, today: string) =>
+  dayKey(iso) === today ? formatTime(iso) : formatDay(iso, today)
+
+/** `Via Granola · Anish · 16:02`; the time alone for a note typed here. */
+export function writeUpLine(
+  via: NoteVia | null,
+  at: string,
+  today: string,
+): string {
+  return [
+    via === null ? null : `Via ${via.tool} · ${via.author}`,
+    stamp(at, today),
+  ]
+    .filter((part) => part !== null)
+    .join(' · ')
 }
 
 /** A group inside the window: a mono caps label on a hairline. */
@@ -107,22 +138,17 @@ function Group({
   )
 }
 
-function Empty({ children }: { children: ReactNode }) {
-  return (
-    <LedgerRow last>
-      <span className="text-ui text-graphite">{children}</span>
-    </LedgerRow>
-  )
-}
-
 const rowLink =
   'focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 px-3 text-left hover:bg-bone'
 
-function SuggestionRow({
+/** A task the meeting proposed: its due day, then Skip and Add task. */
+function ActionItem({
   s,
+  today,
   onDecided,
 }: {
   s: MeetingSuggestion
+  today: string
   onDecided: () => void
 }) {
   const [pending, setPending] = useState<'accept' | 'reject' | null>(null)
@@ -139,10 +165,12 @@ function SuggestionRow({
   }
   return (
     <LedgerRow>
-      <span className="w-20 shrink-0 mono text-micro text-graphite">
-        {s.kind}
-      </span>
       <span className="min-w-0 flex-1 truncate text-body">{s.summary}</span>
+      {s.due === null ? null : (
+        <span className="shrink-0 mono text-micro text-graphite">
+          {formatDay(s.due, today)}
+        </span>
+      )}
       <Button
         variant="ghost"
         size="sm"
@@ -150,7 +178,7 @@ function SuggestionRow({
         disabled={pending !== null}
         onClick={() => void decide('reject')}
       >
-        Reject
+        Skip
       </Button>
       <Button
         variant="outline"
@@ -159,7 +187,7 @@ function SuggestionRow({
         disabled={pending !== null}
         onClick={() => void decide('accept')}
       >
-        Accept
+        Add task
       </Button>
     </LedgerRow>
   )
@@ -189,7 +217,7 @@ function PrepBody({ prep }: { prep: PrepState }) {
       return (
         <li className="flex flex-col gap-2 px-3 py-2.5">
           {prep.line === null ? (
-            <DensityRamp width={120} />
+            <Twinkle size={14} />
           ) : (
             <span
               data-prep-route
@@ -212,13 +240,89 @@ function PrepBody({ prep }: { prep: PrepState }) {
   }
 }
 
+/** A note beyond the write-up, or an artifact, as one bordered row. */
+function CarriedRow({
+  children,
+  end,
+}: {
+  children: ReactNode
+  end?: ReactNode
+}) {
+  return (
+    <li className="flex min-h-10 items-center gap-3 border border-rule px-3">
+      {children}
+      {end}
+    </li>
+  )
+}
+
+function NoteRow({ n }: { n: MeetingCarriedNote }) {
+  return (
+    <CarriedRow end={<OpenIn link={n.openIn} />}>
+      <Link
+        to="/notes/$noteId"
+        params={{ noteId: n.id }}
+        className="focus-ring min-w-0 flex-1 truncate text-body hover:underline"
+      >
+        {n.title}
+      </Link>
+      {n.via === null ? null : (
+        <span className="shrink-0 mono text-micro text-graphite">
+          {`Via ${n.via.tool} · ${n.via.author}`}
+        </span>
+      )}
+    </CarriedRow>
+  )
+}
+
+function ArtifactRow({
+  a,
+  onOpen,
+}: {
+  a: MeetingArtifact
+  onOpen: (a: MeetingArtifact) => void
+}) {
+  return (
+    <CarriedRow>
+      <span className="w-20 shrink-0 label-caps text-graphite">
+        {ROLE_WORD[a.role]}
+      </span>
+      {a.role === 'recording_link' ? (
+        a.url === null ? (
+          <span className="min-w-0 flex-1 truncate text-body">{a.name}</span>
+        ) : (
+          <a
+            href={a.url}
+            target="_blank"
+            rel="noreferrer"
+            title="Opens the recording where it is kept"
+            className="focus-ring min-w-0 flex-1 truncate text-body hover:underline"
+          >
+            {a.name}
+          </a>
+        )
+      ) : (
+        <button
+          type="button"
+          onClick={() => onOpen(a)}
+          className="focus-ring min-w-0 flex-1 truncate text-left text-body hover:underline"
+        >
+          {a.name}
+        </button>
+      )}
+    </CarriedRow>
+  )
+}
+
 /**
- * The meeting window: time and the conference link in the head;
- * participants with their RSVP, shown and never edited; linked records with
- * a pin to add one; the write-up; artifacts by role; open suggestions that
- * cite the meeting; and Prep, streamed on demand and never stored.
+ * The meeting window: when, and the call to join while it is ahead;
+ * participants with their answers, shown and never edited; linked records
+ * with a pin; the write-up read in place; the tasks it proposed; what is
+ * private to the reader; and Prep, before the start only, streamed and
+ * never stored unless saved.
  * - Opens from a Meetings row and from `?modal=meeting&id=`.
- * - Cancel is the one close; Prep, then Save as note, is the one commit.
+ * - Cancel is the one close; Prep, then Save as note, is the one commit,
+ *   and Save as note stays put, reading `Saved as note` once it is.
  */
 export function MeetingDialog({
   id,
@@ -268,11 +372,12 @@ function MeetingWindow({
   onPrepRunning?: (running: boolean) => void
 }) {
   const router = useRouter()
-  const { today } = useClock()
+  const { now, today } = useClock()
   const [meeting, setMeeting] = useState<MeetingDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [prep, setPrep] = useState<PrepState>({ phase: 'idle' })
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   const [writing, setWriting] = useState(false)
   const [viewer, setViewer] = useState<Awaited<
     ReturnType<typeof getDocumentPreview>
@@ -320,6 +425,7 @@ function MeetingWindow({
   }
 
   const runPrep = useCallback(async () => {
+    setSaved(false)
     setPrep({ phase: 'running', line: null, sensitive: false, text: '' })
     try {
       const stream = await prepMeeting({ data: { interactionId: id } })
@@ -343,24 +449,24 @@ function MeetingWindow({
     }
   }, [id])
 
+  // Prep is for a meeting still ahead: once it has started there is none.
+  const ahead = meeting !== null && now < meeting.startsAt
   useEffect(() => {
-    if (prepOnOpen && meeting !== null && !started.current) {
+    if (prepOnOpen && ahead && !started.current) {
       started.current = true
       void runPrep()
     }
-  }, [prepOnOpen, meeting, runPrep])
+  }, [prepOnOpen, ahead, runPrep])
 
   async function saveAsNote(markdown: string) {
     setSaving(true)
     try {
-      const { noteId } = await savePrepAsNote({
-        data: { interactionId: id, markdown },
-      })
-      toast('Saved as a note')
-      onClose()
-      await router.navigate({ to: '/notes/$noteId', params: { noteId } })
+      await savePrepAsNote({ data: { interactionId: id, markdown } })
+      setSaved(true)
+      onChanged?.()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not save it')
+    } finally {
       setSaving(false)
     }
   }
@@ -406,7 +512,9 @@ function MeetingWindow({
           The meeting is being read
         </DialogDescription>
         {error === null ? (
-          <DensityRamp width={160} />
+          <div className="flex min-h-48 flex-1 items-center justify-center">
+            <Twinkle size={29} />
+          </div>
         ) : (
           <p className="text-ui text-destructive">{error}</p>
         )}
@@ -418,7 +526,17 @@ function MeetingWindow({
       </>
     )
 
-  const asked = prep.phase !== 'idle'
+  const joinable =
+    meeting.conferenceUrl !== null && !meeting.cancelled && now < meeting.endsAt
+  const tasks = meeting.suggestions.filter((s) => s.kind === 'task')
+  const sharedNotes = meeting.notes.filter((n) => !n.private)
+  const privateNotes = meeting.notes.filter((n) => n.private)
+  const sharedArtifacts = meeting.artifacts.filter((a) => !a.private)
+  const privateArtifacts = meeting.artifacts.filter((a) => a.private)
+  const carried = sharedNotes.length + sharedArtifacts.length > 0
+  const writeUpNote = meeting.note
+  const done = prep.phase === 'done' && prep.markdown !== ''
+
   return (
     <>
       <DialogHeader>
@@ -428,20 +546,21 @@ function MeetingWindow({
           {meeting.title ?? 'Meeting'}
         </DialogTitle>
         <DialogDescription>
-          {meetingWhen(meeting.startsAt, meeting.endsAt, today)}
-          {meeting.cancelled ? ' · cancelled' : ''}
+          {formatDay(meeting.startsAt, today)} ·{' '}
+          {timeSpan(meeting.startsAt, meeting.endsAt)}
+          {meeting.cancelled ? ' · Cancelled' : ''}
         </DialogDescription>
-        {meeting.conferenceUrl === null || meeting.cancelled ? null : (
+        {joinable && meeting.conferenceUrl !== null ? (
           <a
             href={meeting.conferenceUrl}
             target="_blank"
             rel="noreferrer"
             title="Opens the call in a new tab"
-            className="focus-ring ml-auto mono text-micro text-primary hover:underline"
+            className="focus-ring ml-auto text-ui text-primary hover:underline"
           >
-            join call ›
+            Join call ›
           </a>
-        )}
+        ) : null}
       </DialogHeader>
 
       <div className="-mx-5 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-5">
@@ -453,34 +572,30 @@ function MeetingWindow({
               target="_blank"
               rel="noreferrer"
               title="Answers change in Google Calendar"
-              className="focus-ring shrink-0 mono text-micro text-foreground hover:underline"
+              className="focus-ring shrink-0 text-label text-foreground hover:underline"
             >
               Open in Google ›
             </a>
           }
         >
-          {meeting.participants.length === 0 ? (
-            <Empty>No participants.</Empty>
-          ) : (
-            meeting.participants.map((p) => (
-              <LedgerRow key={p.email}>
-                <span className="min-w-0 flex-1 truncate text-body">
-                  {participantName(p)}
+          {meeting.participants.map((p) => (
+            <LedgerRow key={p.email}>
+              <span className="min-w-0 flex-1 truncate text-body">
+                {participantName(p)}
+              </span>
+              {p.name === null ? null : (
+                <span className="min-w-0 truncate mono text-micro text-graphite">
+                  {p.email}
                 </span>
-                {p.name === null ? null : (
-                  <span className="min-w-0 truncate mono text-micro text-graphite">
-                    {p.email}
-                  </span>
-                )}
-                <span
-                  data-rsvp={p.rsvp}
-                  className="w-24 shrink-0 text-right mono text-micro text-graphite"
-                >
-                  {RSVP_MARK[p.rsvp]} {RSVP_WORD[p.rsvp]}
-                </span>
-              </LedgerRow>
-            ))
-          )}
+              )}
+              <span
+                data-rsvp={p.rsvp}
+                className="w-24 shrink-0 text-right mono text-micro text-graphite"
+              >
+                {RSVP_MARK[p.rsvp]} {RSVP_LABEL[p.rsvp]}
+              </span>
+            </LedgerRow>
+          ))}
         </Group>
 
         <Group label="Linked records">
@@ -497,7 +612,7 @@ function MeetingWindow({
                     <span className="min-w-0 truncate text-body">{r.name}</span>
                   </Link>
                 )}
-                <span className="w-16 shrink-0 text-right mono text-micro text-graphite">
+                <span className="w-16 shrink-0 text-right label-caps text-graphite">
                   {r.kind}
                 </span>
               </LedgerRow>
@@ -518,124 +633,131 @@ function MeetingWindow({
           </li>
         </Group>
 
-        <Group label="Write-up">
-          {meeting.note === null ? (
-            <LedgerRow last={meeting.notes.length === 0}>
-              <span className="min-w-0 flex-1 text-ui text-graphite">
-                Not written up.
+        {writeUpNote === null ? (
+          <section aria-label="Write-up" className="flex flex-col gap-2">
+            <EmptyRow
+              name="Write-up"
+              disabled={writing}
+              onAdd={() => void writeUp()}
+            />
+            {carried ? (
+              <ul className="flex flex-col gap-1.5">
+                {sharedNotes.map((n) => (
+                  <NoteRow key={n.id} n={n} />
+                ))}
+                {sharedArtifacts.map((a) => (
+                  <ArtifactRow
+                    key={a.documentId}
+                    a={a}
+                    onOpen={(x) => void openArtifact(x)}
+                  />
+                ))}
+              </ul>
+            ) : null}
+          </section>
+        ) : (
+          <section aria-label="Write-up" className="flex flex-col">
+            <LabelHead label="Write-up">
+              <span
+                data-write-up-line
+                className="shrink-0 mono text-micro text-graphite"
+              >
+                {writeUpLine(writeUpNote.via, writeUpNote.at, today)}
               </span>
-              <Button
-                variant="outline"
-                size="sm"
-                pending={writing}
-                disabled={writing}
-                onClick={() => void writeUp()}
-              >
-                Write up
-              </Button>
-            </LedgerRow>
-          ) : (
-            <LedgerRow last={meeting.notes.length === 0}>
-              <Link
-                to="/notes/$noteId"
-                params={{ noteId: meeting.note.id }}
-                className={rowLink}
-              >
-                <span className="min-w-0 truncate text-body">
-                  {meeting.note.title ?? 'Open note'}
-                </span>
-              </Link>
-              <ViaMark via={meeting.note.via} />
-              <OpenIn link={meeting.note.openIn} />
-            </LedgerRow>
-          )}
-          {meeting.notes.map((n, i) => (
-            <LedgerRow key={n.id} last={i === meeting.notes.length - 1}>
-              <Link
-                to="/notes/$noteId"
-                params={{ noteId: n.id }}
-                className={rowLink}
-              >
-                <span className="min-w-0 truncate text-body">{n.title}</span>
-              </Link>
-              {n.private ? (
-                <span className="shrink-0 mono text-micro text-graphite">
-                  private
-                </span>
-              ) : null}
-              <ViaMark via={n.via} />
-              <OpenIn link={n.openIn} />
-            </LedgerRow>
-          ))}
-        </Group>
-
-        <Group label="Artifacts">
-          {meeting.artifacts.length === 0 ? (
-            <Empty>No transcript or recording.</Empty>
-          ) : (
-            meeting.artifacts.map((a) => (
-              <LedgerRow key={a.documentId}>
-                <span className="w-20 shrink-0 mono text-micro text-graphite">
-                  {ROLE_WORD[a.role]}
-                </span>
-                {a.role === 'recording_link' ? (
-                  a.url === null ? (
-                    <span className="min-w-0 flex-1 truncate text-body">
-                      {a.name}
-                    </span>
-                  ) : (
-                    <a
-                      href={a.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      title="Opens the recording where it is kept"
-                      className={rowLink}
-                    >
-                      <span className="min-w-0 truncate text-body">
-                        {a.name}
-                      </span>
-                    </a>
-                  )
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void openArtifact(a)}
-                    className={rowLink}
+              <OpenIn link={writeUpNote.openIn} />
+            </LabelHead>
+            <div className="flex flex-col gap-3 px-3 py-3">
+              {writeUpNote.title === null ? (
+                <p className="text-ui text-graphite">Private to its author.</p>
+              ) : (
+                <>
+                  <Link
+                    to="/notes/$noteId"
+                    params={{ noteId: writeUpNote.id }}
+                    className="focus-ring self-start text-ui text-foreground hover:underline"
                   >
-                    <span className="min-w-0 truncate text-body">{a.name}</span>
-                  </button>
-                )}
-              </LedgerRow>
-            ))
-          )}
-        </Group>
+                    {writeUpNote.title}
+                  </Link>
+                  {writeUpNote.body === null ||
+                  writeUpNote.body.trim() === '' ? null : (
+                    <div
+                      data-write-up-body
+                      className="text-prose font-serif leading-6.75 whitespace-pre-wrap text-foreground"
+                    >
+                      {writeUpNote.body}
+                    </div>
+                  )}
+                </>
+              )}
+              {carried ? (
+                <ul className="flex flex-col gap-1.5">
+                  {sharedNotes.map((n) => (
+                    <NoteRow key={n.id} n={n} />
+                  ))}
+                  {sharedArtifacts.map((a) => (
+                    <ArtifactRow
+                      key={a.documentId}
+                      a={a}
+                      onOpen={(x) => void openArtifact(x)}
+                    />
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          </section>
+        )}
 
-        {meeting.suggestions.length === 0 ? null : (
-          <Group label="Suggestions">
-            {meeting.suggestions.map((s) => (
-              <SuggestionRow key={s.id} s={s} onDecided={changed} />
+        {tasks.length === 0 ? null : (
+          <Group
+            label="Action items"
+            action={
+              <span className="shrink-0 mono text-micro text-graphite">
+                {tasks.length} in Review
+              </span>
+            }
+          >
+            {tasks.map((s) => (
+              <ActionItem key={s.id} s={s} today={today} onDecided={changed} />
             ))}
           </Group>
         )}
 
-        {asked ? (
+        {privateNotes.length + privateArtifacts.length === 0 ? null : (
+          <section aria-label="Private to you" className="flex flex-col">
+            <LabelHead label="Private to you" />
+            <ul className="flex flex-col gap-1.5 pt-2">
+              {privateArtifacts.map((a) => (
+                <ArtifactRow
+                  key={a.documentId}
+                  a={a}
+                  onOpen={(x) => void openArtifact(x)}
+                />
+              ))}
+              {privateNotes.map((n) => (
+                <NoteRow key={n.id} n={n} />
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {ahead && prep.phase !== 'idle' ? (
           <Group label="Prep">
             <PrepBody prep={prep} />
           </Group>
         ) : null}
       </div>
 
-      <DialogFooter>
+      <DialogFooter {...(done ? { note: 'Not kept unless saved' } : {})}>
         <Button variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        {prep.phase === 'done' && prep.markdown !== '' ? (
+        {!ahead ? null : done ? (
           <Button
             pending={saving}
-            disabled={saving}
+            disabled={saving || saved}
             onClick={() => void saveAsNote(prep.markdown)}
           >
-            Save as note
+            {saved ? 'Saved as note' : 'Save as note'}
           </Button>
         ) : meeting.records.length === 0 ? null : (
           <Button
@@ -644,7 +766,7 @@ function MeetingWindow({
             disabled={prep.phase === 'running'}
             onClick={() => void runPrep()}
           >
-            {prep.phase === 'running' ? 'Prepping…' : 'Prep'}
+            Prep
           </Button>
         )}
       </DialogFooter>

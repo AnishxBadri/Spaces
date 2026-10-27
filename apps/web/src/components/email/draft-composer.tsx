@@ -1,11 +1,14 @@
-import { Paperclip, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
+import { formatBytes } from '@spaces/core/documents'
 import { parseVariables } from '@spaces/core/templates/variables'
 import { formatTime } from '@spaces/core/format'
+import { FileGlyph } from '#/components/files/file-glyph'
 import { SaveAsTemplateAction, TemplatePicker } from '#/components/templates'
 import type { TemplateRow } from '#/components/templates'
+import { Twinkle } from '#/components/twinkle'
 import { Button } from '#/components/ui/button'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import { DialogFooter } from '#/components/ui/dialog'
@@ -15,12 +18,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '#/components/ui/popover'
-import { Tabs } from '#/components/ui/tabs'
+import { Segmented } from '#/components/ui/segmented'
+import { fileType } from '#/lib/documents/files-tab'
 import { uploadDocument } from '#/lib/documents/upload'
 import {
   NO_CHOICES,
   openBlanks,
-  recipientCount,
   saveInput,
   switchMode,
   useDraftAutosave,
@@ -30,6 +33,7 @@ import {
   deleteEmailDraft,
   getEmailSender,
   getEmailTemplate,
+  listEmailVariables,
   listRecordDocuments,
   reviewEmailVariables,
   saveEmailAsTemplate,
@@ -40,37 +44,39 @@ import type {
   DraftDocument,
   EmailSender,
   ReplyOpening,
+  VariableOption,
   VariableReview,
 } from '#/lib/server-fns'
+import { cn } from '#/lib/utils'
 import { AddressRow, RecipientLine } from './recipient-line'
-import { VariableReviewTable } from './variable-review'
+import { ReviewPanes } from './variable-review'
 
 /**
- * The composer (inline under a message, or in its own window): the
- * address block, the subject, the body and the files, then the foot.
+ * The composer (inline under a message, or in its own window): the mode,
+ * the address block, the subject, the body and the files, the tool row,
+ * then the foot.
  * - Cc and Bcc open from the address block and are closed when empty.
- * - Autosaved after `AUTOSAVE_MS` of quiet; Cancel and closing keep the row.
- * - Trash deletes it. ⌘↵ anywhere in the composer is the primary, the one
- *   printed key.
- * - A draft with `{{variables}}` reviews before it sends: the primary is
- *   Review, and Send appears once no recipient's row has an open blank.
+ * - Autosaved after `AUTOSAVE_MS` of quiet; Cancel and closing keep the row;
+ *   `Delete draft…` in the tool row's `···` deletes it.
+ * - A draft with `{{variables}}` is reviewed before it sends: the primary is
+ *   Review and send, and Send appears once no recipient has an open blank.
  * - Send saves the draft, then hands its id and Review's fills to the
- *   Gmail plugin and waits; a failure keeps the draft and shows Gmail's
- *   words. Without a mailbox that may send, the primary is the line that
- *   says which account to reconnect.
+ *   Gmail plugin and waits, the draft greyed; a failure keeps the draft and
+ *   says why. A mailbox that asks to sign in again makes the primary
+ *   Reconnect Gmail. ⌘↵ is the primary, in its tooltip.
  */
 
 type ReplyMode = keyof ReplyOpening['modes']
 
-const MODE_TABS: ReadonlyArray<{ id: ReplyMode; label: string }> = [
+const MODE_OPTIONS: ReadonlyArray<{ id: ReplyMode; label: string }> = [
   { id: 'reply', label: 'Reply' },
   { id: 'reply_all', label: 'Reply all' },
   { id: 'forward', label: 'Forward' },
 ]
 
-/** `saved 09:16`, in the reader's clock. */
+/** `Saved 09:16`, in the reader's clock. */
 export function savedLine(iso: string | null): string | null {
-  return iso === null ? null : `saved ${formatTime(iso)}`
+  return iso === null ? null : `Saved ${formatTime(iso)}`
 }
 
 const plural = (n: number, noun: string) =>
@@ -94,35 +100,39 @@ const COULD_NOT_READ: EmailSender = {
   href: null,
 }
 
-/** In the primary's place when there is nothing to send with. */
-function SendBlocked({ sender }: { sender: EmailSender }) {
-  if (sender._tag === 'ready') return null
-  const href =
-    sender._tag === 'reconnect'
-      ? `/settings/email-calendar/${sender.connectionId}`
-      : sender.href
-  const words =
-    sender._tag === 'reconnect' ? 'Reconnect Gmail to send' : sender.reason
-  return href === null ? (
+const reconnectHref = (connectionId: string) =>
+  `/settings/email-calendar/${connectionId}`
+
+/** In the primary's place when there is no mailbox to send with. */
+function SendBlocked({
+  sender,
+}: {
+  sender: Extract<EmailSender, { _tag: 'unavailable' }>
+}) {
+  return sender.href === null ? (
     <span data-send-blocked className="mono text-micro text-graphite">
-      {words}
+      {sender.reason}
     </span>
   ) : (
     <a
       data-send-blocked
-      href={href}
+      href={sender.href}
       className="focus-ring mono text-micro text-primary hover:underline"
     >
-      {words} ›
+      {sender.reason} ›
     </a>
   )
 }
+
+/** What the last send said: why it did not go, and whether to reconnect. */
+type Failure = { message: string; reconnect: string | null }
 
 export function DraftComposer({
   initial,
   savedAt: initialSavedAt = null,
   modes = null,
   recordId = null,
+  recordName = null,
   above,
   onSaved,
   onClose,
@@ -130,11 +140,13 @@ export function DraftComposer({
   initial: DraftState
   /** When the row was last saved; null for a draft not yet written. */
   savedAt?: string | null
-  /** A reply's three starts; given, the mode is a row of tabs. */
+  /** A reply's three starts; given, the mode is a Segmented. */
   modes?: ReplyOpening['modes'] | null
   /** The record it was opened from: whose files Attach offers. */
   recordId?: string | null
-  /** What sits over the address block: the folded message, inline. */
+  /** That record's name, for `or a file from <record>`. */
+  recordName?: string | null
+  /** What sits over the address block: the quoted parent, inline. */
   above?: ReactNode
   onSaved?: (at: string) => void
   onClose: () => void
@@ -142,9 +154,11 @@ export function DraftComposer({
   const [draft, setDraft] = useState(initial)
   const [dirty, setDirty] = useState(false)
   const [savedAt, setSavedAt] = useState(initialSavedAt)
+  const [saving, setSaving] = useState(false)
   const [ccOpen, setCcOpen] = useState(initial.cc.length > 0)
   const [bccOpen, setBccOpen] = useState(initial.bcc.length > 0)
   const [sending, setSending] = useState(false)
+  const [failure, setFailure] = useState<Failure | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [review, setReview] = useState<VariableReview | null>(null)
   const [choices, setChoices] = useState<ReviewChoices>(NO_CHOICES)
@@ -153,8 +167,10 @@ export function DraftComposer({
   const [sender, setSender] = useState<EmailSender | null>(null)
   const { confirm, confirmDialog } = useConfirm()
   const inflight = useRef<Promise<void>>(Promise.resolve())
+  const body = useRef<HTMLTextAreaElement>(null)
 
   const save = (d: DraftState): Promise<void> => {
+    setSaving(true)
     const run = saveEmailDraft({ data: saveInput(d) })
       .then((r) => {
         setSavedAt(r.updatedAt)
@@ -164,6 +180,7 @@ export function DraftComposer({
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : 'Could not save')
       })
+      .finally(() => setSaving(false))
     inflight.current = run
     return run
   }
@@ -197,6 +214,21 @@ export function DraftComposer({
     setReview(null)
   }
 
+  /** `{{path}}` written where the caret is in the body. */
+  function insertVariable(path: string) {
+    const token = `{{${path}}}`
+    const el = body.current
+    const start = el?.selectionStart ?? draft.bodyMd.length
+    const end = el?.selectionEnd ?? start
+    edit({
+      bodyMd: draft.bodyMd.slice(0, start) + token + draft.bodyMd.slice(end),
+    })
+    requestAnimationFrame(() => {
+      el?.focus()
+      el?.setSelectionRange(start + token.length, start + token.length)
+    })
+  }
+
   async function cancel() {
     await autosave.flush()
     onClose()
@@ -204,6 +236,7 @@ export function DraftComposer({
 
   async function send() {
     setSending(true)
+    setFailure(null)
     autosave.cancel()
     await inflight.current
     try {
@@ -220,7 +253,21 @@ export function DraftComposer({
       toast(sent.sent === 1 ? 'Sent' : `Sent ${plural(sent.sent, 'email')}`)
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send')
+      // A refused token reads the mailbox again: it now asks to reconnect.
+      const now = await getEmailSender({ data: { parentId } }).catch(() => null)
+      if (now !== null) setSender(now)
+      setFailure(
+        now?._tag === 'reconnect'
+          ? {
+              message: 'Gmail asks you to sign in again · the draft is kept',
+              reconnect: now.connectionId,
+            }
+          : {
+              // The server's sentence already says the draft is kept.
+              message: err instanceof Error ? err.message : 'Could not send',
+              reconnect: null,
+            },
+      )
       setSending(false)
     }
   }
@@ -272,7 +319,16 @@ export function DraftComposer({
     }
   }
 
-  async function trash() {
+  async function deleteDraft() {
+    if (
+      !(await confirm({
+        title: 'Delete this draft?',
+        body: 'What you wrote here goes.',
+        action: 'Delete',
+        kind: 'destructive',
+      }))
+    )
+      return
     autosave.cancel()
     await inflight.current
     try {
@@ -283,9 +339,7 @@ export function DraftComposer({
     }
   }
 
-  const n = recipientCount(draft)
-  const files = draft.attachments.length
-  const saved = savedLine(savedAt)
+  const saved = saving ? 'Saving…' : savedLine(savedAt)
   const variables =
     parseVariables(`${draft.subject}\n${draft.bodyMd}`).length > 0
   const open =
@@ -294,39 +348,42 @@ export function DraftComposer({
       : review.rows.reduce((sum, r) => sum + openBlanks(r, choices).length, 0)
   const sendable = review === null ? !variables : open === 0
   const busy = sending || reviewing
-  const blocked = sender !== null && sender._tag !== 'ready'
+  const reconnect =
+    failure?.reconnect ??
+    (sender?._tag === 'reconnect' ? sender.connectionId : null)
+  const fromOriginal = new Set(
+    draft.mode === 'forward' && modes !== null
+      ? modes.forward.attachments.map((a) => a.documentId)
+      : [],
+  )
 
   function primary() {
-    if (busy || blocked || sender === null) return
+    if (busy || sender === null || sender._tag !== 'ready') return
     if (sendable) void send()
     else if (review === null) void startReview()
   }
 
-  const tools = (
-    <span className="flex shrink-0 items-center gap-1">
-      <TemplatePicker
-        kind="email"
-        context="email"
-        onPick={(t) => void applyTemplate(t)}
-      />
-      <MoreMenu
-        variant="row"
-        label="this draft"
-        items={[
-          {
-            label: 'Save as template…',
-            opens: true,
-            onSelect: () => setTemplating(true),
-          },
-        ]}
-      />
+  const note: ReactNode = sending ? (
+    <span data-sending className="flex items-center gap-2">
+      <Twinkle size={14} />
+      Through your Gmail
     </span>
-  )
+  ) : failure !== null ? (
+    <span data-send-failed className="text-destructive">
+      ■ Not sent · {failure.message}
+    </span>
+  ) : review !== null ? (
+    "Can't be unsent · goes at once"
+  ) : null
 
   return (
     <>
       <div
-        className="-mx-5 flex min-h-0 flex-1 flex-col overflow-y-auto"
+        className={cn(
+          '-mx-5 flex min-h-0 flex-1 flex-col overflow-y-auto',
+          sending && 'pointer-events-none opacity-50',
+        )}
+        {...(sending ? { 'aria-busy': true } : {})}
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
             e.preventDefault()
@@ -335,36 +392,31 @@ export function DraftComposer({
         }}
       >
         {review === null ? above : null}
-        {modes === null || draft.mode === 'new' ? (
-          <div className="flex h-9 shrink-0 items-center justify-end border-b border-rule px-3">
-            {tools}
-          </div>
-        ) : (
-          <Tabs
-            items={MODE_TABS}
-            value={draft.mode}
-            onValueChange={pickMode}
-            label="Reply mode"
-            trail={
-              <span className="ml-auto flex items-center gap-1">
-                {saved === null ? null : (
-                  <span
-                    data-saved
-                    className="pr-2 mono text-micro text-graphite"
-                  >
-                    {saved}
-                  </span>
-                )}
-                {tools}
+        {modes === null || draft.mode === 'new' ? null : (
+          <div className="flex h-11 shrink-0 items-center gap-3 border-b border-rule px-5">
+            <Segmented
+              label="Reply mode"
+              value={draft.mode}
+              options={MODE_OPTIONS}
+              onChange={pickMode}
+            />
+            {saved === null ? null : (
+              <span
+                data-saved
+                className="ml-auto mono text-micro text-graphite"
+              >
+                {saved}
               </span>
-            }
-          />
+            )}
+          </div>
         )}
         {review === null ? null : (
-          <VariableReviewTable
+          <ReviewPanes
             review={review}
             choices={choices}
             onChange={setChoices}
+            subject={draft.subject}
+            bodyMd={draft.bodyMd}
           />
         )}
         <div
@@ -380,24 +432,23 @@ export function DraftComposer({
               autoFocus={draft.to.length === 0}
               trail={
                 ccOpen && bccOpen ? undefined : (
-                  <span className="flex shrink-0 items-center gap-1 mono text-micro text-graphite">
+                  <span className="flex shrink-0 items-center gap-2.5 text-label text-graphite">
                     {ccOpen ? null : (
                       <button
                         type="button"
                         onClick={() => setCcOpen(true)}
                         className="focus-ring hover:text-foreground"
                       >
-                        cc
+                        Cc
                       </button>
                     )}
-                    {ccOpen || bccOpen ? null : <span aria-hidden>·</span>}
                     {bccOpen ? null : (
                       <button
                         type="button"
                         onClick={() => setBccOpen(true)}
                         className="focus-ring hover:text-foreground"
                       >
-                        bcc
+                        Bcc
                       </button>
                     )}
                   </span>
@@ -429,6 +480,7 @@ export function DraftComposer({
             </AddressRow>
           </section>
           <textarea
+            ref={body}
             aria-label="Message"
             value={draft.bodyMd}
             autoFocus={draft.to.length > 0}
@@ -437,9 +489,48 @@ export function DraftComposer({
           />
           <Attachments
             files={draft.attachments}
+            fromOriginal={fromOriginal}
             recordId={recordId}
+            recordName={recordName}
             onChange={(attachments) => edit({ attachments })}
           />
+          <div
+            data-tool-row
+            className="flex h-9 shrink-0 items-center gap-1 border-t border-rule px-3"
+          >
+            <TemplatePicker
+              kind="email"
+              context="email"
+              align="start"
+              onPick={(t) => void applyTemplate(t)}
+              trigger={
+                <button
+                  type="button"
+                  className="focus-ring flex h-7 items-center rounded-md px-2 text-label text-graphite hover:bg-bone hover:text-foreground"
+                >
+                  Template
+                </button>
+              }
+            />
+            <VariablePicker onPick={insertVariable} />
+            <MoreMenu
+              variant="row"
+              label="this draft"
+              items={[
+                {
+                  label: 'Save as template…',
+                  opens: true,
+                  onSelect: () => setTemplating(true),
+                },
+                {
+                  label: 'Delete draft…',
+                  opens: true,
+                  destructive: true,
+                  onSelect: () => void deleteDraft(),
+                },
+              ]}
+            />
+          </div>
         </div>
         {error === null ? null : (
           <p role="alert" className="px-5 pb-3 text-ui text-destructive">
@@ -447,33 +538,33 @@ export function DraftComposer({
           </p>
         )}
       </div>
-      <DialogFooter>
-        <Button
-          type="button"
-          variant="ghost"
-          className="mr-auto"
-          onClick={() => void trash()}
-        >
-          Trash
-        </Button>
-        <span className="mono text-micro text-graphite">
-          {plural(n, 'recipient')}
-          {files > 0 ? ` · ${plural(files, 'file')}` : ''}
-        </span>
+      <DialogFooter note={note}>
         {review === null ? (
-          <Button type="button" variant="outline" onClick={() => void cancel()}>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={sending}
+            onClick={() => void cancel()}
+          >
             Cancel
           </Button>
         ) : (
           <Button
             type="button"
             variant="outline"
+            disabled={sending}
             onClick={() => setReview(null)}
           >
-            Back
+            Back to draft
           </Button>
         )}
-        {sender !== null && blocked ? (
+        {reconnect !== null ? (
+          <Button asChild>
+            <a data-reconnect href={reconnectHref(reconnect)}>
+              Reconnect Gmail
+            </a>
+          </Button>
+        ) : sender !== null && sender._tag === 'unavailable' ? (
           <SendBlocked sender={sender} />
         ) : sendable ? (
           <Button
@@ -483,7 +574,7 @@ export function DraftComposer({
             disabled={busy || sender === null}
             onClick={primary}
           >
-            {sending ? 'Sending…' : 'Send'}
+            Send
           </Button>
         ) : review === null ? (
           <Button
@@ -493,13 +584,9 @@ export function DraftComposer({
             disabled={busy || sender === null}
             onClick={primary}
           >
-            Review
+            Review and send
           </Button>
-        ) : (
-          <span data-open-blanks className="mono text-micro text-destructive">
-            {open === 1 ? '1 blank to fill' : `${String(open)} blanks to fill`}
-          </span>
-        )}
+        ) : null}
       </DialogFooter>
       {templating ? (
         <SaveAsTemplateAction
@@ -524,23 +611,94 @@ export function DraftComposer({
   )
 }
 
-type RecordFile = { id: string; filename: string | null }
+/**
+ * `Variable`: the paths of the shared grammar — the person's name parts,
+ * their company, the stats, then their attributes — and a pick writes
+ * `{{path}}` into the body.
+ */
+function VariablePicker({ onPick }: { onPick: (path: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [options, setOptions] = useState<Array<VariableOption> | null>(null)
+
+  useEffect(() => {
+    if (!open || options !== null) return
+    let live = true
+    listEmailVariables()
+      .then((rows) => {
+        if (live) setOptions(rows)
+      })
+      .catch(() => {
+        if (live) setOptions([])
+      })
+    return () => {
+      live = false
+    }
+  }, [open, options])
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="focus-ring flex h-7 items-center rounded-md px-2 text-label text-graphite hover:bg-bone hover:text-foreground"
+        >
+          Variable
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="flex max-h-72 w-64 flex-col overflow-y-auto p-1"
+      >
+        {options === null ? (
+          <span className="flex h-7 items-center px-2">
+            <Twinkle size={14} />
+          </span>
+        ) : (
+          options.map((o) => (
+            <button
+              key={o.path}
+              type="button"
+              data-variable-option={o.path}
+              onClick={() => {
+                onPick(o.path)
+                setOpen(false)
+              }}
+              className="focus-ring-inset flex h-7 shrink-0 items-center gap-3 px-2 text-left text-ui hover:bg-bone"
+            >
+              <span className="min-w-0 flex-1 truncate">{o.label}</span>
+              <span className="shrink-0 mono text-micro text-graphite">
+                {o.path}
+              </span>
+            </button>
+          ))
+        )}
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 /**
- * The files the draft carries, and Attach: one of the record's files, or an
- * upload — filed on that record when there is one.
+ * The files the draft carries — a glyph, the name and a mono size, `From
+ * original` on a forward's own — and Attach: one of the record's files, or
+ * an upload, filed on that record when there is one.
  */
 function Attachments({
   files,
+  fromOriginal,
   recordId,
+  recordName,
   onChange,
 }: {
   files: ReadonlyArray<DraftDocument>
+  fromOriginal: ReadonlySet<string>
   recordId: string | null
+  recordName: string | null
   onChange: (next: Array<DraftDocument>) => void
 }) {
   const [open, setOpen] = useState(false)
-  const [recordFiles, setRecordFiles] = useState<Array<RecordFile> | null>(null)
+  const [recordFiles, setRecordFiles] = useState<Array<DraftDocument> | null>(
+    null,
+  )
   const [uploading, setUploading] = useState(false)
   const picker = useRef<HTMLInputElement>(null)
 
@@ -549,7 +707,15 @@ function Attachments({
     let live = true
     listRecordDocuments({ data: { entityId: recordId } })
       .then((rows) => {
-        if (live) setRecordFiles(rows)
+        if (live)
+          setRecordFiles(
+            rows.map((r) => ({
+              documentId: r.id,
+              name: r.filename,
+              mime: r.mime,
+              sizeBytes: r.sizeBytes,
+            })),
+          )
       })
       .catch(() => {
         if (live) setRecordFiles([])
@@ -575,7 +741,12 @@ function Attachments({
           recordId === null ? [] : [{ kind: 'record', entityId: recordId }],
         onPhase: () => {},
       })
-      add({ documentId: born.id, name: file.name })
+      add({
+        documentId: born.id,
+        name: file.name,
+        mime: file.type === '' ? null : file.type,
+        sizeBytes: file.size,
+      })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Upload failed')
     } finally {
@@ -584,7 +755,7 @@ function Attachments({
   }
 
   const offered = (recordFiles ?? []).filter(
-    (f) => !files.some((a) => a.documentId === f.id),
+    (f) => !files.some((a) => a.documentId === f.documentId),
   )
 
   return (
@@ -595,8 +766,24 @@ function Attachments({
           data-attachment={f.documentId}
           className="flex h-6 items-center gap-1.5 border border-rule bg-paper px-2 text-ui"
         >
-          <Paperclip className="size-3 text-graphite" strokeWidth={1.75} />
+          <FileGlyph
+            type={fileType({
+              filename: f.name,
+              mime: f.mime,
+              externalUrl: null,
+            })}
+          />
           {f.name}
+          {f.sizeBytes === null ? null : (
+            <span className="mono text-micro text-graphite">
+              {formatBytes(f.sizeBytes)}
+            </span>
+          )}
+          {fromOriginal.has(f.documentId) ? (
+            <span data-from-original className="mono text-micro text-graphite">
+              From original
+            </span>
+          ) : null}
           <button
             type="button"
             aria-label={`Remove ${f.name}`}
@@ -616,21 +803,30 @@ function Attachments({
             disabled={uploading}
             className="focus-ring flex h-6 items-center gap-1 border border-dashed border-rule px-2 text-ui text-graphite hover:text-foreground"
           >
-            {uploading ? 'Uploading…' : '+ Attach'}
+            {uploading ? (
+              <>
+                <Twinkle size={14} />
+                Uploading
+              </>
+            ) : recordName === null ? (
+              '+ Attach'
+            ) : (
+              `+ Attach · or a file from ${recordName}`
+            )}
           </button>
         </PopoverTrigger>
         <PopoverContent align="start" className="flex flex-col gap-1 p-1">
           {offered.map((f) => (
             <button
-              key={f.id}
+              key={f.documentId}
               type="button"
               onClick={() => {
-                add({ documentId: f.id, name: f.filename ?? 'Untitled' })
+                add(f)
                 setOpen(false)
               }}
               className="focus-ring-inset flex h-7 items-center px-2 text-left text-ui hover:bg-bone"
             >
-              <span className="truncate">{f.filename ?? 'Untitled'}</span>
+              <span className="truncate">{f.name}</span>
             </button>
           ))}
           <button

@@ -1,8 +1,11 @@
 import { Effect, Schema } from 'effect'
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { simpleParser } from 'mailparser'
 import { normalizeEmail } from '@spaces/sdk/identity'
 import { canRead } from '@spaces/core/read-policy'
+import { clean, emailListing } from '@spaces/core/interactions/email-listing'
+import type { EmailCategory } from '@spaces/core/interactions/email-listing'
 import {
   canReadDocumentSql,
   noteWidenedSql,
@@ -20,6 +23,7 @@ import {
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { sanitizeEmailHtml } from '#/lib/email/sanitize'
+import { sentBy, viewerSelf } from '#/lib/timeline/record'
 import { emailPrivacyProgram } from './email-privacy'
 import type { EmailPrivacy } from './email-privacy'
 
@@ -31,6 +35,9 @@ import type { EmailPrivacy } from './email-privacy'
  *   who it is visible to, unless its owner widened it to the reader.
  * - The body is the stored MIME's HTML, sanitized; else its text part; else
  *   the body note's text when the bytes were never kept.
+ * - The thread's other messages by `thread_id` come as one line each; a
+ *   line's preview passes the same `canRead`, so a private sibling shows
+ *   its sender and date and nothing of its body.
  */
 
 export class EmailReadFailed extends Schema.TaggedError<EmailReadFailed>()(
@@ -70,6 +77,31 @@ export type EmailAttachment = {
   sizeBytes: number | null
   /** The capability of the lane that brought the file: `core.mailbox`, `gmail`. */
   lane: string | null
+  /** The member whose mailbox or upload brought it; null when none is known. */
+  uploader: string | null
+  /** ISO instant the file was kept. */
+  addedAt: string
+}
+
+/** An earlier message of the thread, folded to one line. */
+export type EmailThreadLine = {
+  id: string
+  /** The sender, or the first recipient on a message the viewer sent. */
+  who: string
+  /** The viewer sent it: the line reads `To <who>`. */
+  sent: boolean
+  /** The summary, the snippet or the body's start; null when the body is not the reader's. */
+  preview: string | null
+  attachments: number
+  /** ISO instant. */
+  occurredAt: string
+}
+
+export type EmailThread = {
+  /** Every message the thread holds, this one included. */
+  messages: number
+  /** The messages before this one, oldest first. */
+  earlier: Array<EmailThreadLine>
 }
 
 export type EmailDetail = {
@@ -88,7 +120,14 @@ export type EmailDetail = {
   attachments: Array<EmailAttachment>
   /** Who reads a body private by default; null for a shared one. */
   privacy: EmailPrivacy | null
+  /** The classify lane's labels; empty while the body is not the reader's. */
+  categories: Array<EmailCategory>
+  thread: EmailThread
+  /** The record the window was opened from, by name: whose files a reply attaches. */
+  record: { id: string; name: string } | null
 }
+
+const uploader = alias(user, 'uploader')
 
 const query = <T>(run: () => Promise<T>) =>
   Effect.tryPromise({
@@ -153,6 +192,7 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
         subject: interaction.subject,
         occurredAt: interaction.occurredAt,
         meta: interaction.meta,
+        threadId: interaction.threadId,
         noteId: interaction.noteId,
         bodyMd: note.bodyMd,
         visibility: note.visibility,
@@ -203,6 +243,8 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
             mime: document.mime,
             sizeBytes: document.sizeBytes,
             lane: integration.capabilityId,
+            uploader: uploader.name,
+            addedAt: document.createdAt,
           })
           .from(interactionDocument)
           .innerJoin(
@@ -211,6 +253,7 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
           )
           .innerJoin(entity, eq(entity.id, interactionDocument.documentId))
           .leftJoin(integration, eq(integration.id, document.sourceRef))
+          .leftJoin(uploader, eq(uploader.id, document.uploadedBy))
           .where(
             and(
               eq(interactionDocument.interactionId, id),
@@ -220,7 +263,13 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
           )
           .orderBy(asc(entity.canonicalName))
           .then((rows) =>
-            rows.map((r) => ({ ...r, filename: r.filename ?? r.name })),
+            rows.map((r) => ({
+              ...r,
+              filename: r.filename ?? r.name,
+              // A synced file has no uploader: the mailbox it came through is.
+              uploader: r.uploader ?? row.authorName,
+              addedAt: r.addedAt.toISOString(),
+            })),
           ),
       )
     : []
@@ -237,6 +286,17 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
         ).pipe(Effect.mapError((e) => new EmailReadFailed({ cause: e.cause })))
       : null
 
+  const thread = yield* threadOf(viewer, row, names)
+  const record =
+    recordId === null
+      ? undefined
+      : (yield* query(() =>
+          db
+            .select({ id: entity.id, name: entity.canonicalName })
+            .from(entity)
+            .where(and(eq(entity.id, recordId), isNull(entity.mergedIntoId))),
+        )).at(0)
+
   return {
     id: row.id,
     subject: row.subject,
@@ -249,5 +309,91 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
     body,
     attachments,
     privacy,
+    categories: emailListing(row.meta, readable).categories,
+    thread,
+    record: record ?? null,
   }
+})
+
+/** How long a thread line's preview runs before it is cut on a word. */
+const PREVIEW_MAX = 140
+
+/**
+ * The thread around one message: its size and the earlier messages as
+ * lines. Each preview is read through `canRead` on that message's own body
+ * note, and so is its attachment count: a private sibling counts none.
+ */
+const threadOf = Effect.fn('emailThread')(function* (
+  viewer: { id: string },
+  row: { id: string; threadId: string | null; occurredAt: Date },
+  known: ReadonlyMap<string, string>,
+) {
+  const alone: EmailThread = { messages: 1, earlier: [] }
+  if (row.threadId === null) return alone
+  const threadId = row.threadId
+  const siblings = yield* query(() =>
+    db
+      .select({
+        id: interaction.id,
+        occurredAt: interaction.occurredAt,
+        meta: interaction.meta,
+        bodyMd: note.bodyMd,
+        visibility: note.visibility,
+        authorId: note.authorId,
+        widened: noteWidenedSql(viewer.id),
+        attachments: sql<number>`(
+          select count(*)::int from ${interactionDocument}
+          where ${interactionDocument.interactionId} = ${interaction.id}
+            and ${interactionDocument.role} = 'attachment'
+        )`,
+      })
+      .from(interaction)
+      .leftJoin(note, eq(note.entityId, interaction.noteId))
+      .where(
+        and(
+          eq(interaction.threadId, threadId),
+          eq(interaction.kind, 'email'),
+          ne(interaction.id, row.id),
+        ),
+      )
+      .orderBy(asc(interaction.occurredAt)),
+  )
+  if (siblings.length === 0) return alone
+  const own = yield* viewerSelf(viewer.id).pipe(
+    Effect.mapError((cause) => new EmailReadFailed({ cause })),
+  )
+  const earlier = siblings.filter((s) => s.occurredAt <= row.occurredAt)
+  const metas = earlier.map((s) => (s.meta?.kind === 'email' ? s.meta : null))
+  const more = yield* namesOf(
+    metas.flatMap((m) => (m === null ? [] : [m.from, ...m.to])),
+  )
+  const nameOf = (email: string) => {
+    const key = normalizeEmail(email) ?? ''
+    return known.get(key) ?? more.get(key) ?? email
+  }
+  const lines = earlier.map((s, i): EmailThreadLine => {
+    const meta = metas.at(i) ?? null
+    const readable = canRead(viewer, {
+      visibility: s.visibility,
+      authorId: s.authorId,
+      widened: s.widened,
+    })
+    const first = meta?.to.at(0)
+    const sent = first !== undefined && sentBy(s.meta, own.addresses)
+    const listing = emailListing(s.meta, readable)
+    return {
+      id: s.id,
+      who: sent ? nameOf(first) : meta === null ? 'Unknown' : nameOf(meta.from),
+      sent,
+      preview: readable
+        ? clean(
+            listing.summary ?? listing.snippet ?? s.bodyMd ?? undefined,
+            PREVIEW_MAX,
+          )
+        : null,
+      attachments: readable ? Number(s.attachments) : 0,
+      occurredAt: s.occurredAt.toISOString(),
+    }
+  })
+  return { messages: siblings.length + 1, earlier: lines }
 })

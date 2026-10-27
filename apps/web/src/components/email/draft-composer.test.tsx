@@ -11,11 +11,12 @@ import { DraftComposer } from './draft-composer'
  * The composer: Cc and Bcc closed until asked for, a Bcc chip
  * that reads as hidden, the recipient search with the alias pick on the
  * chip, one save per pause rather than per keystroke, the save a close
- * leaves behind, Trash, ⌘↵ in Send's tooltip and printed nowhere, and Review: a draft with
- * variables shows recipients × variables with blanks flagged, and Send is
- * absent until each blank is filled or accepted. Send hands the draft's id
- * and Review's fills over; a mailbox without `gmail.send` has no Send and
- * names the account to reconnect; a failure keeps the composer open.
+ * leaves behind, a foot of Cancel and the primary with ⌘↵ in its tooltip and
+ * printed nowhere, the tool row's Variable, and Review: each recipient's copy
+ * rendered with its blanks flagged, and Send absent until each blank is
+ * filled or accepted. Send hands the draft's id and Review's fills over; a
+ * mailbox without `gmail.send` makes the primary Reconnect Gmail; a failure
+ * keeps the composer open and says why.
  */
 
 await vi.hoisted(async () => {
@@ -68,6 +69,7 @@ const fns = vi.hoisted(() => ({
   saveEmailAsTemplate: vi.fn(),
   listTemplates: vi.fn(),
   getEmailSender: vi.fn(),
+  listEmailVariables: vi.fn(),
   sendEmailDraft: vi.fn(),
 }))
 vi.mock('#/lib/server-fns', () => fns)
@@ -155,10 +157,10 @@ describe('the address block', () => {
     expect(lineInput('To')).not.toBeNull()
     expect(lineInput('Cc')).toBeNull()
     expect(lineInput('Bcc')).toBeNull()
-    act(() => button('bcc')?.click())
+    act(() => button('Bcc')?.click())
     expect(lineInput('Bcc')).not.toBeNull()
     expect(lineInput('Cc')).toBeNull()
-    act(() => button('cc')?.click())
+    act(() => button('Cc')?.click())
     expect(lineInput('Cc')).not.toBeNull()
   })
 
@@ -290,20 +292,50 @@ describe('the foot', () => {
     )
   })
 
-  it('Trash deletes the row and closes, and leaves nothing to save', async () => {
-    vi.useFakeTimers()
-    mount()
-    type(body(), 'never mind')
-    act(() => button('Trash')?.click())
-    await settle()
-    expect(fns.deleteEmailDraft).toHaveBeenCalledWith({ data: { id: ID } })
-    expect(closed).toHaveBeenCalledTimes(1)
-    act(() => root.unmount())
-    root = createRoot(host)
-    act(() => {
-      vi.advanceTimersByTime(5000)
+  it('is Cancel and the primary: no Trash, no recipient count', async () => {
+    mount({
+      ...blankDraft(ID),
+      to: [{ email: 'dana@flent.example' }],
     })
-    expect(fns.saveEmailDraft).not.toHaveBeenCalled()
+    await settle()
+    const foot = document.querySelector('[data-slot="dialog-footer"]')
+    expect(
+      [...(foot?.querySelectorAll('button') ?? [])].map((b) =>
+        b.textContent.trim(),
+      ),
+    ).toEqual(['Cancel', 'Send'])
+    expect(foot?.textContent).not.toMatch(/recipient/)
+    expect(button('Trash')).toBeUndefined()
+  })
+
+  it('carries Template, Variable and the draft’s ··· in the tool row above the foot', () => {
+    mount()
+    const tools = document.querySelector('[data-tool-row]')
+    expect(tools?.textContent).toContain('Template')
+    expect(tools?.textContent).toContain('Variable')
+    expect(
+      tools?.querySelector('[aria-label="More for this draft"]'),
+    ).not.toBeNull()
+  })
+
+  it('Variable writes a {{path}} from the shared grammar into the body', async () => {
+    fns.listEmailVariables.mockResolvedValue([
+      { path: 'name.first', label: 'First name' },
+      { path: 'company.name', label: 'Company' },
+    ])
+    mount()
+    type(body(), 'Hi ')
+    act(() => button('Variable')?.click())
+    await settle()
+    const option = document.querySelector('[data-variable-option="name.first"]')
+    if (!(option instanceof HTMLElement)) throw new Error('no option')
+    act(() => option.click())
+    expect(
+      document.querySelector<HTMLTextAreaElement>(
+        'textarea[aria-label="Message"]',
+      )?.value,
+    ).toBe('Hi {{name.first}}')
+    expect(button('Review and send')).not.toBeUndefined()
   })
 })
 
@@ -348,7 +380,7 @@ describe('Review', () => {
   it('sends a draft with no variables without a Review', async () => {
     mount({ ...blankDraft(ID), to: [DANA], bodyMd: 'Thanks Dana' })
     await settle()
-    expect(button('Review')).toBeUndefined()
+    expect(button('Review and send')).toBeUndefined()
     act(() => sendButton()?.click())
     await settle()
     expect(fns.reviewEmailVariables).not.toHaveBeenCalled()
@@ -364,7 +396,7 @@ describe('Review', () => {
     mount(withVariables)
     await settle()
     expect(sendButton()).toBeUndefined()
-    act(() => button('Review')?.click())
+    act(() => button('Review and send')?.click())
     await settle()
     expect(fns.reviewEmailVariables).toHaveBeenCalledWith({
       data: {
@@ -375,25 +407,45 @@ describe('Review', () => {
         bodyMd: 'Hi {{name.first}},',
       },
     })
-    const heads = [...document.querySelectorAll('[data-variable]')].map(
-      (h) => h.textContent,
-    )
-    expect(heads).toContain('{{company.name}}')
-    expect(heads).toContain('{{name.first}}')
     expect(row(DANA.email)?.hasAttribute('data-flagged')).toBe(false)
     expect(row(ARJUN.email)?.hasAttribute('data-flagged')).toBe(true)
-    expect(row(ARJUN.email)?.textContent).toContain('1 blank')
+    expect(row(ARJUN.email)?.textContent).toBe('Arjun Rao1')
     expect(sendButton()).toBeUndefined()
-    expect(document.querySelector('[data-open-blanks]')?.textContent).toBe(
-      '1 blank to fill',
-    )
+    expect(
+      document.querySelector('[data-slot="dialog-footer"]')?.textContent,
+    ).toContain("Can't be unsent · goes at once")
+  })
+
+  it('renders the copy each recipient gets: resolved on the wash, a blank amber', async () => {
+    fns.reviewEmailVariables.mockResolvedValue(review)
+    mount(withVariables)
+    await settle()
+    act(() => button('Review and send')?.click())
+    await settle()
+    // The flagged copy opens first.
+    const copy = () => document.querySelector('[data-review-copy]')
+    expect(copy()?.getAttribute('data-review-copy')).toBe(ARJUN.email)
+    expect(
+      copy()?.querySelector('[data-resolved="company.name"]')?.textContent,
+    ).toBe('Northgate')
+    expect(copy()?.querySelector('[data-blank="name.first"]')).not.toBeNull()
+    expect(
+      copy()?.querySelector('[data-fill-row="name.first"]')?.textContent,
+    ).toContain('Leave blank')
+    const dana = row(DANA.email)
+    if (!(dana instanceof HTMLElement)) throw new Error('no row')
+    act(() => dana.click())
+    expect(copy()?.getAttribute('data-review-copy')).toBe(DANA.email)
+    expect(copy()?.textContent).toContain('Intro: Flent')
+    expect(copy()?.textContent).toContain('Hi Dana,')
+    expect(copy()?.querySelector('[data-blank]')).toBeNull()
   })
 
   it('shows Send once the blank is filled, and sends the fill with the draft', async () => {
     fns.reviewEmailVariables.mockResolvedValue(review)
     mount(withVariables)
     await settle()
-    act(() => button('Review')?.click())
+    act(() => button('Review and send')?.click())
     await settle()
     const cell = document.querySelector(
       'input[aria-label="name.first for Arjun Rao"]',
@@ -419,7 +471,7 @@ describe('Review', () => {
     fns.reviewEmailVariables.mockResolvedValue(review)
     mount(withVariables)
     await settle()
-    act(() => button('Review')?.click())
+    act(() => button('Review and send')?.click())
     await settle()
     const tick = document.querySelector(
       '[aria-label="Leave the blanks for Arjun Rao empty"]',
@@ -451,7 +503,7 @@ describe('Review', () => {
     )
     mount({ ...withVariables, bodyMd: 'Hi {{favourite_colour}}' })
     await settle()
-    act(() => button('Review')?.click())
+    act(() => button('Review and send')?.click())
     await settle()
     expect(document.querySelector('[role="alert"]')?.textContent).toBe(
       'No attribute matches {{favourite_colour}}',
@@ -464,15 +516,15 @@ describe('Review', () => {
     fns.reviewEmailVariables.mockResolvedValue(review)
     mount(withVariables)
     await settle()
-    act(() => button('Review')?.click())
+    act(() => button('Review and send')?.click())
     await settle()
     type(
       document.querySelector('input[aria-label="name.first for Arjun Rao"]'),
       'Arjun',
     )
-    act(() => button('Back')?.click())
+    act(() => button('Back to draft')?.click())
     expect(document.querySelector('section[aria-label="Review"]')).toBeNull()
-    act(() => button('Review')?.click())
+    act(() => button('Review and send')?.click())
     await settle()
     expect(sendButton()).not.toBeUndefined()
   })
@@ -486,7 +538,7 @@ describe('Send', () => {
   }
   const CONNECTION = '00000000-0000-4000-8000-0000000000c1'
 
-  it('is absent when the mailbox lacks gmail.send, and the line names Gmail and its account page', async () => {
+  it('is Reconnect Gmail when the mailbox lacks gmail.send, opening its account page', async () => {
     fns.getEmailSender.mockResolvedValue({
       _tag: 'reconnect',
       from: 'anish@fund.example',
@@ -495,9 +547,9 @@ describe('Send', () => {
     mount({ ...blankDraft(ID), to: [DANA], bodyMd: 'Thanks Dana' })
     await settle()
     expect(button('Send')).toBeUndefined()
-    const line = document.querySelector('[data-send-blocked]')
-    expect(line?.textContent).toBe('Reconnect Gmail to send ›')
-    expect(line?.getAttribute('href')).toBe(
+    const primary = document.querySelector('[data-reconnect]')
+    expect(primary?.textContent).toBe('Reconnect Gmail')
+    expect(primary?.getAttribute('href')).toBe(
       `/settings/email-calendar/${CONNECTION}`,
     )
     act(() => {
@@ -535,11 +587,55 @@ describe('Send', () => {
     await settle()
     act(() => button('Send')?.click())
     await settle()
-    expect(document.querySelector('[role="alert"]')?.textContent).toBe(
-      'Gmail answered 503: Backend Error. The draft is kept',
+    expect(document.querySelector('[data-send-failed]')?.textContent).toBe(
+      '■ Not sent · Gmail answered 503: Backend Error. The draft is kept',
     )
     expect(closed).not.toHaveBeenCalled()
     expect(fns.deleteEmailDraft).not.toHaveBeenCalled()
     expect(button('Send')).not.toBeUndefined()
+  })
+
+  it('greys the draft while it goes, says it goes through Gmail, and holds Cancel', async () => {
+    let finish: (v: {
+      sent: number
+      interactionIds: Array<string>
+    }) => void = () => {}
+    fns.sendEmailDraft.mockReturnValue(
+      new Promise((r) => {
+        finish = r
+      }),
+    )
+    mount({ ...blankDraft(ID), to: [DANA], bodyMd: 'Thanks Dana' })
+    await settle()
+    act(() => button('Send')?.click())
+    await settle()
+    expect(document.querySelector('[data-sending]')?.textContent).toBe(
+      'Through your Gmail',
+    )
+    expect(document.querySelector('[aria-busy="true"]')).not.toBeNull()
+    expect(button('Cancel')?.disabled).toBe(true)
+    await act(async () => finish({ sent: 1, interactionIds: ['i1'] }))
+    await settle()
+    expect(closed).toHaveBeenCalledTimes(1)
+  })
+
+  it('asks to reconnect when Gmail refuses the token, and keeps the draft', async () => {
+    fns.sendEmailDraft.mockRejectedValue(new Error('Gmail refused the token'))
+    mount({ ...blankDraft(ID), to: [DANA], bodyMd: 'Thanks Dana' })
+    await settle()
+    fns.getEmailSender.mockResolvedValue({
+      _tag: 'reconnect',
+      from: 'anish@fund.example',
+      connectionId: CONNECTION,
+    })
+    act(() => button('Send')?.click())
+    await settle()
+    expect(document.querySelector('[data-send-failed]')?.textContent).toBe(
+      '■ Not sent · Gmail asks you to sign in again · the draft is kept',
+    )
+    expect(document.querySelector('[data-reconnect]')?.textContent).toBe(
+      'Reconnect Gmail',
+    )
+    expect(fns.deleteEmailDraft).not.toHaveBeenCalled()
   })
 })

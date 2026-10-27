@@ -6,6 +6,7 @@ import {
   checkVariables,
   parseVariables,
   resolveVariables,
+  variablePaths,
 } from '@spaces/core/templates/variables'
 import type {
   VariableContext,
@@ -216,6 +217,17 @@ export function distinctRecipients(
     return true
   })
 }
+
+/** A path the composer's Variable picker offers: what it writes and its name. */
+export type VariableOption = { path: VariablePath; label: string }
+
+/** The picker's list: the families, then the person's live attributes. */
+export const variableOptionsProgram = Effect.fn('variableOptionsProgram')(
+  function* (): Effect.fn.Return<Array<VariableOption>, DraftFailed> {
+    const attributes = yield* query(() => getRegistry('person'))
+    return variablePaths(attributes)
+  },
+)
 
 export const reviewVariablesProgram = Effect.fn('reviewVariablesProgram')(
   function* (
