@@ -10,15 +10,21 @@ import {
   renderableCard,
 } from '#/lib/ask/cards'
 import { heldDecisions, useHeldEntry } from '#/lib/held-decisions'
+import { useClock } from '#/components/clock'
+import { Twinkle } from '#/components/twinkle'
+import { cn } from '#/lib/utils'
 import { RefChip } from './ask-answer'
 
 /**
  * Ask's action cards beside an answer: the proposal, its evidence, and one
  * pine Apply with Skip as the outline secondary.
  * - A decided card shows its outcome as a mono state word, never a disabled
- *   button.
+ *   button; while the hold runs it reads as decided, and Undo is the
+ *   toast's.
+ * - Once the hold runs out the write is in flight: `Applying…`, Skip off.
  * - A card without evidence is refused: one line says so, never the card.
- * - A proposed card (still streaming) has no verbs until it is stored.
+ * - A proposed card (still streaming) is dashed and has no verbs until it
+ *   is stored.
  */
 
 export function AskCard({
@@ -30,7 +36,10 @@ export function AskCard({
   waiting?: boolean
 }) {
   const [view, setView] = useState(card)
+  // Set while the held write runs, after the hold has run out.
+  const [writing, setWriting] = useState<'apply' | 'skip' | null>(null)
   const held = useHeldEntry(card.id)
+  const { today } = useClock()
   const rendered = renderableCard(view)
   if (rendered === null)
     return (
@@ -50,20 +59,28 @@ export function AskCard({
           : { verb: 'skip-card', suggestionId },
       label: `${verb === 'apply' ? 'Applied' : 'Skipped'} on ${shown.record.name}`,
       commit: async () => {
-        const next = await (verb === 'apply' ? applyAskCard : skipAskCard)({
-          data: { suggestionId },
-        })
-        setView(next)
+        setWriting(verb)
+        try {
+          const next = await (verb === 'apply' ? applyAskCard : skipAskCard)({
+            data: { suggestionId },
+          })
+          setView(next)
+        } finally {
+          setWriting(null)
+        }
       },
     })
   }
 
-  const word = outcomeWord(shown)
+  const word = outcomeWord(shown, today)
   return (
     <li
       data-card={shown.kind}
       data-outcome={shown.outcome}
-      className="flex flex-col border border-rule bg-paper"
+      className={cn(
+        'flex flex-col border border-rule bg-paper',
+        shown.outcome === 'proposed' && 'border-dashed',
+      )}
     >
       <div className="flex flex-col gap-1 px-3 py-2.5">
         <div className="flex min-w-0 items-baseline gap-2">
@@ -95,7 +112,17 @@ export function AskCard({
       </div>
       {shown.outcome === 'proposed' ? null : (
         <div className="flex min-h-10 items-center justify-end gap-3 border-t border-rule bg-bone px-3 py-1.5">
-          {word !== null ? (
+          {writing === 'apply' ? (
+            <>
+              <span className="mr-auto flex items-center gap-2 mono text-micro text-graphite">
+                <Twinkle />
+                Applying…
+              </span>
+              <Button variant="outline" size="sm" disabled>
+                Skip
+              </Button>
+            </>
+          ) : word !== null ? (
             <span className="mr-auto mono text-micro text-graphite">
               {word}
             </span>
@@ -104,9 +131,9 @@ export function AskCard({
               {waiting ? (
                 <Link
                   to="/review"
-                  className="focus-ring mr-auto mono text-micro text-graphite hover:text-foreground"
+                  className="focus-ring mr-auto text-label text-graphite hover:text-foreground"
                 >
-                  waiting in Review ›
+                  Waiting in Review ›
                 </Link>
               ) : null}
               <Button

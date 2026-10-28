@@ -252,3 +252,29 @@ export function answerMarkdown(blocks: ReadonlyArray<AnswerBlock>): string {
     }, [])
     .join('\n\n')
 }
+
+/** A cell that reads as a figure: money, a count, a percent, a multiple. */
+const FIGURE = /^[−-]?[$€£₹]?\s?\d[\d.,]*\s?(%|×|x|[KMBkmb]|Cr|L)?$/
+
+const cellText = (cell: ReadonlyArray<AnswerSegment>): string =>
+  cell
+    .map((s) => (s.kind === 'text' ? s.text : ''))
+    .join('')
+    .trim()
+
+/**
+ * The columns of a table whose every filled body cell is a figure; those
+ * print mono and right-aligned. A column with no filled cell is not one.
+ */
+export function numericColumns(
+  block: Extract<AnswerBlock, { kind: 'table' }>,
+): ReadonlySet<number> {
+  const out = new Set<number>()
+  for (const [c] of block.head.entries()) {
+    const filled = block.rows
+      .map((row) => cellText(row.at(c) ?? []))
+      .filter((t) => t !== '' && t !== '—')
+    if (filled.length > 0 && filled.every((t) => FIGURE.test(t))) out.add(c)
+  }
+  return out
+}

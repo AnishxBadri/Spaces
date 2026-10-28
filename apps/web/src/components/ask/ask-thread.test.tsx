@@ -5,8 +5,10 @@ import type {
   AskCardView,
   AskFindRow,
   AskSavedWatch,
+  AskScopeChip,
   AskTurnView,
 } from '#/lib/ask/types'
+import type { LiveTurn } from './ask-thread'
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({
@@ -34,6 +36,8 @@ vi.mock('#/lib/server-fns', () => ({
   actOnFindRow: vi.fn(),
   getSaveWatchSetup: vi.fn(),
   saveFindAsWatch: vi.fn(),
+  previewAskRef: vi.fn(),
+  searchAll: vi.fn(),
 }))
 
 const { AskTurns, AskComposer, applyAskEvent, settledThread } =
@@ -103,6 +107,7 @@ const render = (
         variant={variant}
         threadId="th"
         onRetry={() => {}}
+        onStop={() => {}}
       />,
     ),
   )
@@ -164,7 +169,8 @@ describe('AskTurns', () => {
     const dividers = [...host.querySelectorAll('[role="separator"]')].map(
       (d) => d.textContent,
     )
-    expect(dividers).toEqual(['Scope · Whole workspace'])
+    expect(dividers).toHaveLength(1)
+    expect(dividers.at(0)).toMatch(/^Scope now Whole workspace · \d{2}:\d{2}$/)
   })
 
   it('prints the terminal states: hidden, no provider, refused, stopped, empty', () => {
@@ -182,7 +188,15 @@ describe('AskTurns', () => {
         route: 'Refused · Sensitive material is not sent to Anthropic',
       }),
       question('q4', 'd'),
-      answer('a4', { state: 'stopped', body: 'Partial' }),
+      answer('a4', {
+        state: 'stopped',
+        body: 'Partial',
+        calls: [
+          { tool: 'query_records', state: 'done', input: 'deals', found: 2 },
+          { tool: 'get_record', state: 'done', input: 'Acme', found: 1 },
+          { tool: 'get_context', state: 'failed', input: 'Acme', found: null },
+        ],
+      }),
       question('q5', 'e'),
       answer('a5', {
         state: 'empty',
@@ -203,8 +217,8 @@ describe('AskTurns', () => {
     expect(host.querySelector('a[href="/settings/models"]')?.textContent).toBe(
       'Add a model ›',
     )
-    expect(text).toContain('Refused · Sensitive material')
-    expect(text).toContain('stopped')
+    expect(text).toContain('Sensitive space · nothing sent')
+    expect(text).toContain('Stopped · 2 of 3 calls')
     expect(text).toContain('Nothing found.')
     expect(text).toContain('“zeppelins”')
   })
@@ -221,14 +235,13 @@ describe('AskTurns', () => {
 })
 
 describe('AskComposer', () => {
-  it('prints ⌘↵ once in its end lane, never esc or a bare ↵, and no key inside Send', () => {
+  it('prints ⌘↵ once in its end lane, never esc or a bare ↵, and has no Send button', () => {
     const host = parse(
       renderToStaticMarkup(
         <AskComposer
           value="hi"
           onChange={() => {}}
           onSend={() => {}}
-          onStop={() => {}}
           streaming={false}
           focus={0}
         />,
@@ -238,10 +251,168 @@ describe('AskComposer', () => {
     expect(text.match(/⌘↵/g)).toHaveLength(1)
     expect(text.toLowerCase()).not.toContain('esc')
     expect(text.replace('⌘↵', '')).not.toContain('↵')
-    const send = [...host.querySelectorAll('button')].find(
-      (b) => b.textContent === 'Send',
+    expect(host.querySelectorAll('button')).toHaveLength(0)
+  })
+
+  it('holds the chips inside its one box, and prints nothing with none', () => {
+    const chips = (scope: ReadonlyArray<AskScopeChip>) =>
+      parse(
+        renderToStaticMarkup(
+          <AskComposer
+            value=""
+            onChange={() => {}}
+            onSend={() => {}}
+            scope={scope}
+            onRemoveChip={() => {}}
+            webSources={['Exa']}
+            streaming={false}
+            focus={0}
+          />,
+        ),
+      )
+    const host = chips([
+      { kind: 'record', id: ACME, name: 'Exponent', href: `/deals/${ACME}` },
+      { kind: 'web', id: null, name: 'Web', href: null },
+    ])
+    const box = host.querySelector('[data-composer]')
+    expect(box?.querySelectorAll('[data-chip]')).toHaveLength(2)
+    expect(box?.querySelector('[data-chip="web"]')?.className).toContain(
+      'bg-bone',
     )
-    expect(send).toBeDefined()
+    expect(
+      [...(box?.querySelectorAll('[data-chip]') ?? [])].map(
+        (c) => c.textContent,
+      ),
+    ).toEqual(['Exponent', 'Web · Exa'])
+    expect(
+      [...(box?.querySelectorAll('[data-chip] button') ?? [])].map((b) =>
+        b.getAttribute('title'),
+      ),
+    ).toEqual(['Ask beyond Exponent', 'Leave the web out'])
+    const none = chips([])
+    expect(none.querySelector('[data-chips]')).toBeNull()
+    expect(none.textContent).not.toContain('Whole workspace')
+  })
+})
+
+describe('the live turn', () => {
+  const live = (over: Partial<LiveTurn>): LiveTurn => ({
+    question: question('q', 'Who went quiet?'),
+    answerId: 'a',
+    route: 'Anthropic · claude-opus-5',
+    text: '',
+    calls: [],
+    cards: [],
+    phase: 'streaming',
+    ...over,
+  })
+  const renderLive = (l: LiveTurn) =>
+    parse(
+      renderToStaticMarkup(
+        <AskTurns
+          turns={[]}
+          live={l}
+          variant="dock"
+          threadId="th"
+          onRetry={() => {}}
+          onStop={() => {}}
+        />,
+      ),
+    )
+
+  it('puts Stop in the turn as an outline button at its right, with a Twinkle and what it is reading', () => {
+    const host = renderLive(
+      live({
+        calls: [
+          {
+            id: 'c1',
+            call: {
+              tool: 'query_records',
+              state: 'done',
+              input: 'deals',
+              found: 4,
+            },
+          },
+          {
+            id: 'c2',
+            call: {
+              tool: 'get_record',
+              state: 'running',
+              input: 'Acme',
+              found: null,
+            },
+          },
+        ],
+      }),
+    )
+    const answerTurn = host.querySelector('[data-turn="assistant"]')
+    const stop = answerTurn?.querySelector('button')
+    expect(stop?.textContent).toBe('Stop')
+    expect(stop?.getAttribute('data-variant')).toBe('outline')
+    expect(stop?.className).toContain('ml-auto')
+    const thinking = answerTurn?.querySelector('[data-thinking]')
+    expect(thinking?.querySelector('[data-twinkle]')).not.toBeNull()
+    expect(thinking?.textContent).toBe('Reading 4 sources')
+    expect(answerTurn?.textContent).toContain('Running')
+  })
+
+  it('has no Stop once the turn has stopped', () => {
+    const host = renderLive(live({ phase: 'stopped', text: 'Partial' }))
+    expect(host.querySelector('button')).toBeNull()
+    expect(host.textContent).toContain('Stopped')
+  })
+})
+
+describe('the notice row', () => {
+  it('renders for a sensitive turn, a capped one and a refused one', () => {
+    const host = render([
+      question('q1', 'a'),
+      answer('a1', {
+        body: `Acme went quiet [record:${ACME}].`,
+        refs: [
+          {
+            ref: `record:${ACME}`,
+            label: 'Acme',
+            href: `/deals/${ACME}`,
+            entityId: ACME,
+          },
+        ],
+        route:
+          'Sensitive (inherited from Fund II) · answered locally by Ollama · llama3.2',
+      }),
+      question('q2', 'b'),
+      answer('a2', {
+        state: 'capped',
+        route:
+          'Daily AI cap reached · 200,412 of 200,000 tokens · resets 00:00 UTC',
+      }),
+      question('q3', 'c'),
+      answer('a3', {
+        state: 'refused',
+        route: 'Refused · Sensitive material is not sent to Anthropic',
+      }),
+    ])
+    const notices = [...host.querySelectorAll('[data-notice]')]
+    expect(notices.map((n) => n.getAttribute('data-notice'))).toEqual([
+      'warning',
+      'destructive',
+      'destructive',
+    ])
+    expect(notices.at(0)?.textContent).toBe(
+      'Sensitive space in scope · answered on the local model',
+    )
+    expect(notices.at(1)?.textContent).toContain('Daily AI cap reached')
+    expect(notices.at(1)?.querySelector('a')?.getAttribute('href')).toBe(
+      '/settings/usage',
+    )
+    expect(notices.at(2)?.textContent).toContain(
+      'Sensitive space · nothing sent',
+    )
+    expect(notices.at(2)?.querySelector('a')?.textContent).toBe(
+      'Add a local model ›',
+    )
+    // The foot keeps Provider · model.
+    expect(host.textContent).toContain('Ollama · llama3.2')
   })
 })
 
@@ -308,7 +479,8 @@ describe('action cards', () => {
       },
     ],
     outcome: 'open',
-    moved: false,
+    by: null,
+    moved: null,
     ...over,
   })
   const withCards = (cards: ReadonlyArray<AskCardView>) =>
@@ -336,9 +508,25 @@ describe('action cards', () => {
       card({ id: 'c', outcome: 'skipped' }),
     ])
     expect(host.querySelectorAll('[data-card] button')).toHaveLength(0)
-    expect(host.textContent).toContain('applied')
-    expect(host.textContent).toContain('not applied · already at that stage')
-    expect(host.textContent).toContain('skipped')
+    expect(host.textContent).toContain('Applied · in Tasks')
+    expect(host.textContent).toContain('Not applied · already at that stage')
+    expect(host.textContent).toContain('Skipped')
+  })
+
+  it('dashes a proposed card, and sends an undecided earlier one to Review', () => {
+    const proposed = withCards([card({ outcome: 'proposed' })])
+    expect(proposed.querySelector('[data-card]')?.className).toContain(
+      'border-dashed',
+    )
+    const host = render([
+      question('q1', 'Who went quiet?'),
+      answer('a1', { cards: [card({})] }),
+      question('q2', 'And now?'),
+      answer('a2', { state: 'empty' }),
+    ])
+    expect(host.querySelector('a[href="/review"]')?.textContent).toBe(
+      'Waiting in Review ›',
+    )
   })
 
   it('refuses a card without evidence', () => {
@@ -411,7 +599,7 @@ describe('a find table', () => {
     expect(trs).toHaveLength(12)
     const filed = host.querySelector('tr[data-standing="filed"]')
     expect(filed?.querySelectorAll('button')).toHaveLength(0)
-    expect(filed?.textContent).toContain('filed')
+    expect(filed?.textContent).toContain('Filed')
     const held = host.querySelector('tr[data-standing="held"]')
     expect(held?.textContent).toContain('File here')
     expect(
@@ -425,7 +613,7 @@ describe('a find table', () => {
     const host = withTable([row('Leasewise', 'filed')], 0)
     const strip = host.querySelector('[aria-label="Tools called"]')
     expect(strip?.textContent).toContain('web_search_exa')
-    expect(strip?.textContent).toContain('unmounted')
+    expect(strip?.textContent).toContain('Unmounted')
     expect(strip?.querySelector('[title="via Exa"]')).not.toBeNull()
   })
 
@@ -433,7 +621,7 @@ describe('a find table', () => {
     const saved = { id: 'w1', spaceId: 's', spaceName: 'Property ops' }
     const live = withTable([row('Keyhold', 'unknown')], 0, saved)
     const line = live.querySelector('[data-saved-watch="live"]')
-    expect(line?.textContent).toBe('Saved as a watch on Property ops')
+    expect(line?.textContent).toBe('Saved as a watch on Property ops ›')
     expect(line?.querySelector('a')?.getAttribute('href')).toBe(
       '/spaces/$spaceId',
     )

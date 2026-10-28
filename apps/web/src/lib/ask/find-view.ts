@@ -58,7 +58,14 @@ export function rowMenu(
 
 /** The state word at rest: filed and held say so; a web result says nothing. */
 export function restWord(row: AskFindRow): string | null {
-  return row.standing === 'unknown' ? null : row.standing
+  switch (row.standing) {
+    case 'filed':
+      return 'Filed'
+    case 'held':
+      return 'Held'
+    case 'unknown':
+      return null
+  }
 }
 
 /** A source link's words: the page's host. */
@@ -68,6 +75,15 @@ export function sourceLabel(url: string): string {
   } catch {
     return url
   }
+}
+
+/** Found on, in one cell: the first page's host and how many more (`yourstory.com +1`). */
+export function foundOnLabel(row: AskFindRow): string {
+  const first = row.sources.at(0)
+  if (first === undefined) return ''
+  const more = row.sources.length - 1
+  const host = sourceLabel(first.url)
+  return more > 0 ? `${host} +${String(more)}` : host
 }
 
 /** The question Find companies prefills, from the space's criteria. */

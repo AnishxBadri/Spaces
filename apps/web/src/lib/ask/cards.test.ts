@@ -19,7 +19,8 @@ const card = (over: Partial<AskCardView>): AskCardView => ({
     { ref: 'record:r', label: 'Acme', href: '/companies/r', entityId: 'r' },
   ],
   outcome: 'open',
-  moved: false,
+  by: null,
+  moved: null,
   ...over,
 })
 
@@ -45,21 +46,38 @@ describe('action cards', () => {
     expect(renderableCard(card({}))).not.toBeNull()
   })
 
-  it('prints a decided card as a state word, an undecided one as none', () => {
-    expect(outcomeWord(card({ outcome: 'open' }))).toBeNull()
-    expect(outcomeWord(card({ outcome: 'applied' }))).toBe('applied')
-    expect(outcomeWord(card({ outcome: 'skipped' }))).toBe('skipped')
-    expect(outcomeWord(card({ kind: 'move_stage', outcome: 'conflict' }))).toBe(
-      'not applied · already at that stage',
+  it('prints a decided card as a sentence-case state word, an undecided one as none', () => {
+    const today = '2026-10-28'
+    expect(outcomeWord(card({ outcome: 'open' }), today)).toBeNull()
+    expect(outcomeWord(card({ outcome: 'applied', by: 'you' }), today)).toBe(
+      'Applied · in Tasks',
     )
     expect(
       outcomeWord(
-        card({ kind: 'move_stage', outcome: 'conflict', moved: true }),
+        card({ kind: 'move_stage', outcome: 'applied', by: 'you' }),
+        today,
       ),
-    ).toBe('conflict · stage moved since')
+    ).toBe('Applied · by you, in History')
+    expect(outcomeWord(card({ outcome: 'skipped' }), today)).toBe('Skipped')
     expect(
-      outcomeWord(card({ kind: 'file_into_space', outcome: 'conflict' })),
-    ).toBe('not applied · already filed')
+      outcomeWord(card({ kind: 'move_stage', outcome: 'conflict' }), today),
+    ).toBe('Not applied · already at that stage')
+    expect(
+      outcomeWord(
+        card({
+          kind: 'move_stage',
+          outcome: 'conflict',
+          moved: { by: 'Priya', at: '2026-10-13T09:00:00.000Z' },
+        }),
+        today,
+      ),
+    ).toBe('Not applied · Priya moved it on 13 Oct')
+    expect(
+      outcomeWord(
+        card({ kind: 'file_into_space', outcome: 'conflict' }),
+        today,
+      ),
+    ).toBe('Not applied · already filed')
   })
 
   it('takes a due date only when it names a real day', () => {

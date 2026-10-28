@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   askThread,
@@ -7,6 +7,7 @@ import {
   attributeEvent,
   entity,
   suggestion,
+  user,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { parseRef } from '@spaces/core/context/ref'
@@ -107,8 +108,19 @@ export const storeCardsProgram = Effect.fn('ask.storeCards')(function* (
   return out
 })
 
-/** The cards stored on these calls, each with its outcome read now. */
+/** A person as an outcome names them: `you` for the reader. */
+const actorWord = (
+  userId: string,
+  id: string | null,
+  name: string | null,
+): string | null => (id === null ? null : id === userId ? 'you' : name)
+
+/**
+ * The cards stored on these calls, each with its outcome read now, as
+ * `userId` reads it: who decided it, and who moved a stale stage card's deal.
+ */
 export const cardViewsProgram = Effect.fn('ask.cardViews')(function* (
+  userId: string,
   cards: ReadonlyArray<AskCallCard>,
 ): Effect.fn.Return<Map<string, AskCardView>, AskQueryFailed> {
   if (cards.length === 0) return new Map()
@@ -121,8 +133,11 @@ export const cardViewsProgram = Effect.fn('ask.cardViews')(function* (
         status: suggestion.status,
         rationale: suggestion.rationale,
         payload: suggestion.payload,
+        decidedBy: suggestion.decidedBy,
+        decider: user.name,
       })
       .from(suggestion)
+      .leftJoin(user, eq(user.id, suggestion.decidedBy))
       .where(inArray(suggestion.id, ids)),
   )
   const accepted = rows.filter((r) => r.status === 'accepted').map((r) => r.id)
@@ -167,6 +182,47 @@ export const cardViewsProgram = Effect.fn('ask.cardViews')(function* (
             .where(inArray(entity.id, stageDeals)),
         )).map((e) => [e.id, jsonString(e.values.stage)]),
   )
+  // Who last moved each stale stage card's deal, and when: its latest stage event.
+  const movedDeals = cards
+    .filter((c) => {
+      const row = rows.find((r) => r.id === c.suggestionId)
+      return (
+        c.kind === 'move_stage' &&
+        row !== undefined &&
+        row.status === 'accepted' &&
+        !wrote.has(row.id) &&
+        heldStage.get(c.record.id) !== stageTarget(row.payload)
+      )
+    })
+    .map((c) => c.record.id)
+  const lastMove = new Map(
+    movedDeals.length === 0
+      ? []
+      : (yield* askQuery(() =>
+          db
+            .selectDistinctOn([attributeEvent.entityId], {
+              entityId: attributeEvent.entityId,
+              at: attributeEvent.at,
+              actorId: attributeEvent.actorId,
+              actor: user.name,
+            })
+            .from(attributeEvent)
+            .leftJoin(user, eq(user.id, attributeEvent.actorId))
+            .where(
+              and(
+                inArray(attributeEvent.entityId, movedDeals),
+                eq(attributeEvent.attrSlug, 'stage'),
+              ),
+            )
+            .orderBy(attributeEvent.entityId, desc(attributeEvent.at)),
+        )).map((e) => [
+          e.entityId,
+          {
+            by: actorWord(userId, e.actorId, e.actor),
+            at: e.at.toISOString(),
+          },
+        ]),
+  )
   const byId = new Map(rows.map((r) => [r.id, r]))
   const out = new Map<string, AskCardView>()
   for (const card of cards) {
@@ -188,10 +244,13 @@ export const cardViewsProgram = Effect.fn('ask.cardViews')(function* (
       rationale: row.rationale ?? '',
       evidence: card.evidence,
       outcome,
+      by: actorWord(userId, row.decidedBy, row.decider),
       moved:
         outcome === 'conflict' &&
         card.kind === 'move_stage' &&
-        heldStage.get(card.record.id) !== stageTarget(row.payload),
+        heldStage.get(card.record.id) !== stageTarget(row.payload)
+          ? (lastMove.get(card.record.id) ?? { by: null, at: null })
+          : null,
     })
   }
   return out
@@ -225,8 +284,11 @@ const ownCardProgram = Effect.fn('ask.ownCard')(function* (
   return card
 })
 
-const viewOf = Effect.fn('ask.cardView')(function* (card: AskCallCard) {
-  const view = (yield* cardViewsProgram([card])).get(card.suggestionId)
+const viewOf = Effect.fn('ask.cardView')(function* (
+  userId: string,
+  card: AskCallCard,
+) {
+  const view = (yield* cardViewsProgram(userId, [card])).get(card.suggestionId)
   if (view === undefined)
     return yield* new AskCardRefused({ message: 'No such card' })
   return view
@@ -276,7 +338,7 @@ export const applyCardProgram = Effect.fn('ask.applyCard')(function* (
           and(eq(suggestion.id, suggestionId), eq(suggestion.status, 'open')),
         ),
     )
-    return yield* viewOf(card)
+    return yield* viewOf(userId, card)
   }
   const done = yield* acceptProgram(suggestionId, {
     type: 'user',
@@ -286,7 +348,7 @@ export const applyCardProgram = Effect.fn('ask.applyCard')(function* (
     return yield* new AskCardRefused({
       message: suggestionMessage(done.failure),
     })
-  return yield* viewOf(card)
+  return yield* viewOf(userId, card)
 })
 
 /** Skip: the suggestion closes rejected and nothing else is written. */
@@ -303,5 +365,5 @@ export const skipCardProgram = Effect.fn('ask.skipCard')(function* (
     return yield* new AskCardRefused({
       message: suggestionMessage(done.failure),
     })
-  return yield* viewOf(card)
+  return yield* viewOf(userId, card)
 })

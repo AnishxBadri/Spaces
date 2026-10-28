@@ -4,7 +4,6 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { PanelLeftClose } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -14,7 +13,7 @@ import {
   SaveAsNote,
   useAskThread,
 } from '#/components/ask/ask-thread'
-import { ScopeChips } from '#/components/ask/ask-dock'
+import { Band } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
@@ -27,7 +26,8 @@ import { MoreMenu } from '#/components/ui/more-menu'
 import { openAsk } from '#/lib/ask/dock-store'
 import { chipKey, withMention } from '#/lib/ask/page-scope'
 import { scopeWords } from '#/lib/ask/types'
-import { byDay, outcomeWords } from '#/lib/ask/thread-list'
+import { byDay, dayBand, outcomeWords } from '#/lib/ask/thread-list'
+import { useWebSources } from '#/lib/ask/web-sources'
 import {
   deleteAskThread,
   getAskThreadCounts,
@@ -35,7 +35,7 @@ import {
   renameAskThread,
 } from '#/lib/server-fns'
 import type { AskScopeChip, AskThreadRow } from '#/lib/server-fns'
-import { formatWeekday, formatWeekdayHead } from '@spaces/core/format'
+import { formatWeekday } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
@@ -80,9 +80,10 @@ function ThreadRow({
   return (
     <li
       data-row
+      aria-current={current ? 'page' : undefined}
       className={cn(
-        'flex min-h-ledger-row items-center gap-2 border-b border-rule px-3',
-        current && 'bg-selected',
+        'flex items-center gap-2 border-b border-rule px-3 py-2',
+        current && 'bg-bone',
       )}
     >
       {renaming ? (
@@ -105,9 +106,11 @@ function ThreadRow({
         <Link
           to="/ask"
           search={{ thread: row.id }}
-          className="focus-ring-inset flex min-w-0 flex-1 flex-col py-1.5"
+          className="focus-ring-inset flex min-w-0 flex-1 flex-col"
         >
-          <span className="truncate text-body">{row.title}</span>
+          <span className={cn('truncate text-body', current && 'font-medium')}>
+            {row.title}
+          </span>
           <span className="truncate text-label text-graphite">
             {[scopeWords(row.scope), outcome]
               .filter((p) => p !== '')
@@ -217,6 +220,7 @@ function AskPage() {
     [navigate, router],
   )
   const { thread, live, error, ask, stop } = useAskThread(threadId, onThread)
+  const webSources = useWebSources().map((s) => s.name)
 
   // A thread that is not yours, or is gone, gives way to a new one.
   useEffect(() => {
@@ -248,9 +252,9 @@ function AskPage() {
       {listOpen ? (
         <nav
           aria-label="Threads"
-          className="flex w-72 shrink-0 flex-col border-r border-hairline bg-paper"
+          className="flex w-70 shrink-0 flex-col border-r border-hairline bg-paper"
         >
-          <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-rule bg-bone px-3">
+          <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-rule bg-bone px-3">
             <h1 className="text-title font-medium">Threads</h1>
             <div className="flex items-center gap-1">
               <Link
@@ -264,9 +268,10 @@ function AskPage() {
                 variant="ghost"
                 size="icon-xs"
                 aria-label="Collapse threads"
+                title="Collapse threads"
                 onClick={() => setListOpen(false)}
               >
-                <PanelLeftClose strokeWidth={1.75} />
+                «
               </Button>
             </div>
           </div>
@@ -276,9 +281,7 @@ function AskPage() {
             ) : (
               byDay(rows).map((g) => (
                 <section key={g.day} aria-label={formatWeekday(g.day, today)}>
-                  <h2 className="flex h-7 items-center border-b border-hairline px-3 mono text-micro text-graphite">
-                    {formatWeekdayHead(g.day, today)}
-                  </h2>
+                  <Band label={dayBand(g.day, today)} />
                   <ul>
                     {g.rows.map((r) => (
                       <ThreadRow
@@ -298,7 +301,7 @@ function AskPage() {
       ) : null}
 
       <section className="@container flex min-w-0 flex-1 flex-col">
-        <header className="flex h-11 shrink-0 items-center gap-3 border-b border-rule bg-bone px-4">
+        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-rule bg-bone px-4">
           {listOpen ? null : (
             <Button variant="ghost" size="sm" onClick={() => setListOpen(true)}>
               Threads
@@ -307,14 +310,6 @@ function AskPage() {
           <h2 className="min-w-0 flex-1 truncate text-title font-medium">
             {thread?.title ?? 'New thread'}
           </h2>
-          <div className="flex items-center gap-1.5">
-            <ScopeChips
-              scope={scope}
-              onRemove={(chip) =>
-                setEdited(scope.filter((c) => chipKey(c) !== chipKey(chip)))
-              }
-            />
-          </div>
           {record === undefined ||
           thread === null ||
           record.href === null ? null : (
@@ -338,6 +333,7 @@ function AskPage() {
               variant="page"
               threadId={thread?.id ?? null}
               onRetry={send}
+              onStop={stop}
             />
           </div>
         </div>
@@ -347,8 +343,12 @@ function AskPage() {
               value={draft}
               onChange={setDraft}
               onSend={() => send(draft.trim())}
-              onStop={stop}
               onMention={(chip) => setEdited(withMention(scope, chip))}
+              scope={scope}
+              onRemoveChip={(chip) =>
+                setEdited(scope.filter((c) => chipKey(c) !== chipKey(chip)))
+              }
+              webSources={webSources}
               streaming={live?.phase === 'streaming'}
               focus={0}
             />

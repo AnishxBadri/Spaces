@@ -284,6 +284,7 @@ describe('Ask action cards', () => {
       applyCardProgram(FIXTURE_ACTOR.id, stageCard.id),
     )
     expect(appliedStage.outcome).toBe('applied')
+    expect(appliedStage.by).toBe('you')
     const events2 = await stageEvents(deal)
     expect(events2).toHaveLength(before + 1)
     const moved = events2.find((e) => e.suggestionId === stageCard.id)
@@ -564,7 +565,12 @@ describe('Ask action cards', () => {
       const before = (await stageEvents(deal)).length
       const view = await run(applyCardProgram(FIXTURE_ACTOR.id, c.id))
       expect(view.outcome).toBe('conflict')
-      expect(view.moved).toBe(true)
+      expect(view.moved).not.toBeNull()
+      // The reader moved these two themselves; the card names them as you.
+      if (deal !== reopen) {
+        expect(view.moved?.by).toBe('you')
+        expect(view.moved?.at).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+      }
       expect(await stageEvents(deal)).toHaveLength(before)
       const row = (
         await db.select().from(entity).where(eq(entity.id, deal))

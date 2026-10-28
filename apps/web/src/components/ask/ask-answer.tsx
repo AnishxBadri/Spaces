@@ -1,9 +1,10 @@
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
-import { answerBlocks, citedRefs } from '#/lib/ask/answer'
+import { answerBlocks, citedRefs, numericColumns } from '#/lib/ask/answer'
 import type { AnswerBlock, AnswerSegment } from '#/lib/ask/answer'
 import type { AskRef } from '#/lib/ask/types'
 import { cn } from '#/lib/utils'
+import { RefPreview } from './ref-preview'
 
 /**
  * An answer, set in sans: text with every claim's sources as ref chips, and
@@ -15,22 +16,29 @@ import { cn } from '#/lib/utils'
 
 export type AnswerVariant = 'dock' | 'page'
 
-/** One source chip: the label it was cited as, linked when it has a page. */
+/**
+ * One source chip: the label it was cited as, linked when it has a page; a
+ * passage's chip previews it on hover.
+ */
 export function RefChip({ source }: { source: AskRef }) {
   const cls =
     'mx-0.5 inline-flex h-4.5 max-w-48 items-center truncate rounded-md border border-rule bg-bone px-1 align-baseline mono text-micro text-graphite'
-  return source.href === null ? (
-    <span className={cls} title={source.ref}>
-      {source.label}
-    </span>
-  ) : (
-    <Link
-      to={source.href}
-      className={cn(cls, 'focus-ring hover:text-foreground')}
-      title={source.ref}
-    >
-      {source.label}
-    </Link>
+  return (
+    <RefPreview refId={source.ref} label={source.label}>
+      {source.href === null ? (
+        <span className={cls} data-ref={source.ref}>
+          {source.label}
+        </span>
+      ) : (
+        <Link
+          to={source.href}
+          className={cn(cls, 'focus-ring hover:text-foreground')}
+          data-ref={source.ref}
+        >
+          {source.label}
+        </Link>
+      )}
+    </RefPreview>
   )
 }
 
@@ -69,6 +77,8 @@ function Table({
   variant: AnswerVariant
   openInAsk: ReactNode
 }) {
+  // A column of figures reads mono and right-aligned, its head with it.
+  const figures = numericColumns(block)
   const table = (
     <table className="w-max min-w-full border-collapse text-ui">
       <thead>
@@ -76,7 +86,10 @@ function Table({
           {block.head.map((cell, i) => (
             <th
               key={i}
-              className="h-7 px-2 text-left field-label font-normal whitespace-nowrap text-graphite"
+              className={cn(
+                'h-7 px-2 field-label font-normal whitespace-nowrap text-graphite',
+                figures.has(i) ? 'text-right' : 'text-left',
+              )}
             >
               <Segments segments={cell} />
             </th>
@@ -87,7 +100,13 @@ function Table({
         {block.rows.map((row, r) => (
           <tr key={r} className="border-b border-rule last:border-b-0">
             {row.map((cell, c) => (
-              <td key={c} className="h-row px-2 whitespace-nowrap">
+              <td
+                key={c}
+                className={cn(
+                  'h-row px-2 whitespace-nowrap',
+                  figures.has(c) && 'text-right mono tabular-nums',
+                )}
+              >
                 <Segments segments={cell} />
               </td>
             ))}

@@ -155,7 +155,8 @@ describe('an Ask card during its hold', () => {
     rationale: '',
     evidence: [],
     outcome: 'open',
-    moved: false,
+    by: null,
+    moved: null,
   }
   it('reads as its outcome, and a decided card as it stands', () => {
     expect(heldOutcome(open, 'apply-card').outcome).toBe('applied')

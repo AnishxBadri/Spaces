@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { answerBlocks, answerMarkdown, citedRefs } from './answer'
+import {
+  answerBlocks,
+  answerMarkdown,
+  citedRefs,
+  numericColumns,
+} from './answer'
 import type { AskRef } from './types'
 
 /**
@@ -83,5 +88,21 @@ describe('citedRefs and answerMarkdown', () => {
     expect(answerMarkdown(answerBlocks(body, [ACME, DECK]))).toBe(
       'Acme raised (Acme; Deck.pdf, p.4).\n\n- Again (Acme)',
     )
+  })
+})
+
+describe('numericColumns', () => {
+  it('marks the columns whose every filled cell is a figure', () => {
+    const block = answerBlocks(
+      [
+        '| Deal | Stage | Check | Owned |',
+        '| --- | --- | --- | --- |',
+        `| Acme [${ACME.ref}] | Seed | $1.2M | 4.5% |`,
+        `| Deck [${DECK.ref}] | Series A | 250,000 | — |`,
+      ].join('\n'),
+      [ACME, DECK],
+    ).at(0)
+    if (block?.kind !== 'table') throw new Error('expected a table')
+    expect([...numericColumns(block)]).toEqual([2, 3])
   })
 })

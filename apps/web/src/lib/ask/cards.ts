@@ -1,3 +1,4 @@
+import { formatDay } from '@spaces/core/format'
 import type { HeldVerb } from '#/lib/inbox/held'
 import type { AskCardKind, AskRef } from './types'
 
@@ -59,8 +60,14 @@ export type AskCardView = {
   rationale: string
   evidence: ReadonlyArray<AskRef>
   outcome: AskCardOutcome
-  /** A stage card not applied because the deal moved or closed since. */
-  moved: boolean
+  /** Who decided it: `you` for the reader, else their name; null while open. */
+  by: string | null
+  /**
+   * A stage card not applied because the deal moved or closed since: who
+   * last moved the stage (`you`, a name, or null for no person) and when,
+   * ISO, from its latest stage event. Null for every other card.
+   */
+  moved: { by: string | null; at: string | null } | null
 }
 
 /** A card the renderer will draw: one with evidence. Null refuses it. */
@@ -77,10 +84,10 @@ export function heldOutcome(card: AskCardView, verb: HeldVerb): AskCardView {
   switch (verb) {
     case 'apply-card':
     case 'accept':
-      return { ...card, outcome: 'applied' }
+      return { ...card, outcome: 'applied', by: 'you' }
     case 'skip-card':
     case 'dismiss':
-      return { ...card, outcome: 'skipped' }
+      return { ...card, outcome: 'skipped', by: 'you' }
     case 'accept-column':
     case 'dismiss-duplicate':
     case 'add-option':
@@ -88,24 +95,38 @@ export function heldOutcome(card: AskCardView, verb: HeldVerb): AskCardView {
   }
 }
 
-/** The mono state word an outcome reads as; null while it can be decided. */
-export function outcomeWord(card: AskCardView): string | null {
+/**
+ * The state word an outcome reads as, sentence case; null while it can be
+ * decided. An applied card says where its write landed: a task in Tasks, a
+ * stage or a filing in the record's History.
+ */
+export function outcomeWord(card: AskCardView, today: string): string | null {
   switch (card.outcome) {
     case 'proposed':
     case 'open':
       return null
     case 'applied':
-      return 'applied'
+      if (card.kind === 'task') return 'Applied · in Tasks'
+      return card.by === null
+        ? 'Applied · in History'
+        : `Applied · by ${card.by}, in History`
     case 'skipped':
-      return 'skipped'
-    case 'conflict':
+      return 'Skipped'
+    case 'conflict': {
+      if (card.kind === 'move_stage' && card.moved !== null) {
+        const day =
+          card.moved.at === null ? '' : formatDay(card.moved.at, today)
+        if (day === '') return 'Not applied · the stage moved since'
+        return card.moved.by === null
+          ? `Not applied · moved on ${day}`
+          : `Not applied · ${card.moved.by} moved it on ${day}`
+      }
       return card.kind === 'move_stage'
-        ? card.moved
-          ? 'conflict · stage moved since'
-          : 'not applied · already at that stage'
+        ? 'Not applied · already at that stage'
         : card.kind === 'file_into_space'
-          ? 'not applied · already filed'
-          : 'not applied'
+          ? 'Not applied · already filed'
+          : 'Not applied'
+    }
   }
 }
 

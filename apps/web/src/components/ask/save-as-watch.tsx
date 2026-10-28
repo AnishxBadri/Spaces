@@ -3,14 +3,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { AddWatchDialog } from '#/components/space-watching'
 import type { WatchDraft } from '#/components/space-watching'
-import { Button } from '#/components/ui/button'
 import { getSaveWatchSetup, saveFindAsWatch } from '#/lib/server-fns'
 import type { AskFindTable, AskSavedWatch } from '#/lib/server-fns'
 import { engineFor, savedWatchLine, spaceNameFrom } from '#/lib/ask/find-view'
+import { Divider } from './divider'
 
 /**
- * A Find table's head: Save as watch, and once saved the thread's line
- * linking to the watch — which says so when the watch is gone.
+ * The line over a Find table: the route and its time on the left, Save as
+ * watch › on the right; once saved, a centred divider linking to the watch
+ * — which says so when the watch is gone.
  * - Absent until a watch engine is installed, like the space page's Add watch.
  * - The window opens on the table's space, else asks for one and offers to
  *   create a space named from the question; How often opens on Weekly.
@@ -21,16 +22,9 @@ type Setup = Awaited<ReturnType<typeof getSaveWatchSetup>>
 /** The saved line: the space linking to the watch, or the watch gone. */
 export function SavedWatchLine({ saved }: { saved: AskSavedWatch }) {
   if (saved.deleted === true)
-    return (
-      <span
-        data-saved-watch="deleted"
-        className="mono text-micro text-graphite"
-      >
-        {savedWatchLine(saved)}
-      </span>
-    )
+    return <span data-saved-watch="deleted">{savedWatchLine(saved)}</span>
   return (
-    <span data-saved-watch="live" className="mono text-micro text-graphite">
+    <span data-saved-watch="live">
       Saved as a watch on{' '}
       <Link
         to="/spaces/$spaceId"
@@ -38,7 +32,7 @@ export function SavedWatchLine({ saved }: { saved: AskSavedWatch }) {
         search={{ watch: saved.id }}
         className="focus-ring text-foreground hover:underline"
       >
-        {saved.spaceName}
+        {saved.spaceName} ›
       </Link>
     </span>
   )
@@ -49,7 +43,10 @@ export function FindTableHead({
   turnId,
   callIndex,
   question,
+  line,
 }: {
+  /** The route and its time, left of Save as watch; null prints none. */
+  line: string | null
   table: AskFindTable
   /** Null while the answer streams: nothing can be saved yet. */
   turnId: string | null
@@ -97,7 +94,7 @@ export function FindTableHead({
     setup !== null &&
     setup.installed.length > 0 &&
     (saved === undefined || saved.deleted === true)
-  if (saved === undefined && !offered) return null
+  if (saved === undefined && !offered && line === null) return null
 
   async function save(draft: WatchDraft) {
     if (turnId === null) return
@@ -137,37 +134,51 @@ export function FindTableHead({
         }
 
   return (
-    <div className="flex h-7 items-center gap-3 border-b border-rule px-2">
-      {saved === undefined ? null : <SavedWatchLine saved={saved} />}
-      {offered ? (
-        <>
-          <Button
-            size="xs"
-            variant="ghost"
-            className="ml-auto"
-            disabled={setup.engines.length === 0}
-            title={
-              setup.engines.length === 0
-                ? 'No watch engine is running'
-                : 'Keep finding these for a space'
-            }
-            onClick={() => setOpen(true)}
-          >
-            Save as watch
-          </Button>
-          <AddWatchDialog
-            open={open}
-            onOpenChange={setOpen}
-            title="Save as watch"
-            space={scoped}
-            spaces={setup.spaces}
-            newSpaceName={spaceNameFrom(question)}
-            engines={setup.engines}
-            prefill={prefill}
-            onSave={save}
-          />
-        </>
-      ) : null}
-    </div>
+    <>
+      {saved === undefined ? null : (
+        <div className="border-b border-rule px-2 py-1.5">
+          <Divider>
+            <SavedWatchLine saved={saved} />
+          </Divider>
+        </div>
+      )}
+      {line === null && !offered ? null : (
+        <div className="flex h-7 items-center gap-3 border-b border-rule px-2">
+          {line === null ? null : (
+            <span className="min-w-0 truncate mono text-micro text-graphite">
+              {line}
+            </span>
+          )}
+          {offered ? (
+            <>
+              <button
+                type="button"
+                className="focus-ring ml-auto shrink-0 text-label text-graphite hover:text-foreground disabled:opacity-50"
+                disabled={setup.engines.length === 0}
+                title={
+                  setup.engines.length === 0
+                    ? 'No watch engine is running'
+                    : 'Keep finding these for a space'
+                }
+                onClick={() => setOpen(true)}
+              >
+                Save as watch ›
+              </button>
+              <AddWatchDialog
+                open={open}
+                onOpenChange={setOpen}
+                title="Save as watch"
+                space={scoped}
+                spaces={setup.spaces}
+                newSpaceName={spaceNameFrom(question)}
+                engines={setup.engines}
+                prefill={prefill}
+                onSave={save}
+              />
+            </>
+          ) : null}
+        </div>
+      )}
+    </>
   )
 }

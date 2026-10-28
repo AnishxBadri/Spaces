@@ -12,6 +12,7 @@ import { cn } from '#/lib/utils'
  * records, found by Cmd-K's finder, and a pick becomes a scope chip.
  * - ↑ ↓ move, ↵ or Tab picks, Esc closes; the keys are never printed.
  * - The name stays in the text where it was typed, without the `@`.
+ * - Rows are 32px, the highlighted one on bone, the kind in sans at the end.
  */
 
 /** The finder's wait after a keystroke, as Cmd-K's lexical wave. */
@@ -19,11 +20,11 @@ const SEARCH_DELAY_MS = 180
 const HITS_MAX = 8
 
 const KIND_WORD: Record<string, string> = {
-  space: 'space',
-  person: 'person',
-  company: 'company',
-  deal: 'deal',
-  custom: 'record',
+  space: 'Space',
+  person: 'Person',
+  company: 'Company',
+  deal: 'Deal',
+  custom: 'Record',
 }
 
 type Field = Omit<
@@ -186,11 +187,11 @@ export function MentionTextarea({
                 onClick={() => pick(h.chip)}
                 className={cn(
                   'flex h-8 cursor-default items-center gap-3 px-3 text-ui',
-                  i === active && 'bg-selected',
+                  i === active && 'bg-bone',
                 )}
               >
                 <span className="min-w-0 flex-1 truncate">{h.chip.name}</span>
-                <span className="shrink-0 mono text-micro text-graphite">
+                <span className="shrink-0 text-label text-graphite">
                   {KIND_WORD[h.kind] ?? h.kind}
                 </span>
               </li>

@@ -71,6 +71,15 @@ export const WEB_CHIP: AskScopeChip = {
   href: null,
 }
 
+/** A chip's words in the composer: the web names what it searches through (`Web · Exa`). */
+export function chipLabel(
+  chip: AskScopeChip,
+  webSources: ReadonlyArray<string>,
+): string {
+  if (chip.kind !== 'web' || webSources.length === 0) return chip.name
+  return `${chip.name} · ${webSources.join(', ')}`
+}
+
 /**
  * The chips with the web after them, while a plugin can mount and the
  * reader has not removed it. It never takes one of the `SCOPE_MAX` places.

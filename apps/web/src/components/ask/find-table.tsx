@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { useEffect, useReducer, useState } from 'react'
 import { toast } from 'sonner'
-import { PluginMark } from '#/components/integrations/integration-ledger'
+import { Twinkle } from '#/components/twinkle'
 import { Button } from '#/components/ui/button'
 import { MoreMenu } from '#/components/ui/more-menu'
 import { actOnFindRow } from '#/lib/server-fns'
@@ -9,11 +9,11 @@ import type { AskFindRow, AskFindTable } from '#/lib/server-fns'
 import {
   FIND_FOLD,
   foldLine,
+  foundOnLabel,
   restWord,
   rowAction,
   rowMenu,
   shownRows,
-  sourceLabel,
 } from '#/lib/ask/find-view'
 import type { FindAfter } from '#/lib/ask/find-view'
 import { enrichPhase } from '#/lib/inbox/discovery-view'
@@ -33,15 +33,17 @@ import { FindTableHead } from './save-as-watch'
 
 /**
  * A find's results as a table, never prose: name, domain, one line, place,
- * the pages it was found on and the plugin it came through.
- * - A row ends on its state word and one action — Add, or File here;
- *   Add and file here and Dismiss live in its `···`.
+ * the pages it was found on and the plugin it came through, each column a
+ * fixed width.
+ * - A row ends on its sentence-case state word and one action — Add, or
+ *   File here; Add and file here and Dismiss live in its `···`. A new
+ *   record enriching carries a Twinkle.
  * - A filed row is greyed and has no control.
  * - Rows act only once the answer is stored; while it streams they read.
  * - Its head holds Save as watch, and the saved watch's line.
  */
 
-/** How long a new record's stream may stay silent before "added" stands alone. */
+/** How long a new record's stream may stay silent before Added stands alone. */
 const QUIET_MS = 20_000
 
 type StreamAction =
@@ -53,8 +55,10 @@ const reduce = (state: JobStatusState, action: StreamAction) =>
     ? jobStatusInit(state, action.rows)
     : jobStatusEvent(state, action.event)
 
-/** "added · enriching" until the new record's jobs settle. */
-function useAddedWord(entityId: string | null): string | null {
+/** Added, Enriching, Enriched or Enrichment failed, as the new record's jobs settle. */
+function useAddedWord(
+  entityId: string | null,
+): { word: string; working: boolean } | null {
   const [state, dispatch] = useReducer(reduce, emptyJobStatus)
   const [quiet, setQuiet] = useState(false)
   useEffect(() => {
@@ -79,32 +83,30 @@ function useAddedWord(entityId: string | null): string | null {
   if (entityId === null) return null
   switch (enrichPhase(state, quiet)) {
     case 'enriching':
-      return 'added · enriching'
+      return { word: 'Enriching', working: true }
     case 'enriched':
-      return 'added · enriched'
+      return { word: 'Enriched', working: false }
     case 'enrich-failed':
-      return 'added · enrichment failed'
+      return { word: 'Enrichment failed', working: false }
     case 'added':
-      return 'added'
+      return { word: 'Added', working: false }
   }
 }
 
-function Sources({ row }: { row: AskFindRow }) {
+/** Found on: the first page's host, linked, and how many more. */
+function FoundOn({ row }: { row: AskFindRow }) {
+  const first = row.sources.at(0)
+  if (first === undefined) return null
   return (
-    <span className="flex gap-1">
-      {row.sources.map((s) => (
-        <a
-          key={s.url}
-          href={s.url}
-          target="_blank"
-          rel="noreferrer"
-          title={s.url}
-          className="focus-ring max-w-32 truncate rounded-md border border-rule bg-paper px-1 mono text-micro text-graphite hover:text-foreground"
-        >
-          {s.title ?? sourceLabel(s.url)}
-        </a>
-      ))}
-    </span>
+    <a
+      href={first.url}
+      target="_blank"
+      rel="noreferrer"
+      title={row.sources.map((s) => s.url).join('\n')}
+      className="focus-ring block truncate mono text-micro text-graphite hover:text-foreground"
+    >
+      {foundOnLabel(row)}
+    </a>
   )
 }
 
@@ -142,12 +144,18 @@ function FindRow({
     }
   }
 
-  const word =
+  const rest = restWord(row)
+  const state: { word: string; working: boolean } | null =
     after === null
-      ? restWord(row)
+      ? rest === null
+        ? null
+        : { word: rest, working: false }
       : after.act === 'dismissed'
-        ? 'dismissed'
-        : (addedWord ?? (after.filed ? 'filed' : 'added'))
+        ? { word: 'Dismissed', working: false }
+        : (addedWord ?? {
+            word: after.filed ? 'Filed' : 'Added',
+            working: false,
+          })
   const action =
     after === null && turnId !== null ? rowAction(row, table) : null
   const menu = after === null && turnId !== null ? rowMenu(row, table) : []
@@ -168,7 +176,7 @@ function FindRow({
         greyed && 'text-graphite',
       )}
     >
-      <td className="h-row px-2 whitespace-nowrap">
+      <td className="h-row truncate px-2">
         {record === null ? (
           <span className="font-medium">{row.name}</span>
         ) : (
@@ -181,29 +189,28 @@ function FindRow({
           </Link>
         )}
       </td>
-      <td className="h-row px-2 mono text-label whitespace-nowrap text-graphite">
+      <td className="h-row truncate px-2 mono text-label text-graphite">
         {row.domain}
       </td>
-      <td className="h-row max-w-72 truncate px-2" title={row.line}>
+      <td className="h-row truncate px-2" title={row.line}>
         {row.line}
       </td>
-      <td className="h-row px-2 whitespace-nowrap text-graphite">
-        {row.place ?? ''}
-      </td>
+      <td className="h-row truncate px-2 text-graphite">{row.place ?? ''}</td>
       <td className="h-row px-2">
-        <Sources row={row} />
+        <FoundOn row={row} />
       </td>
-      <td className="h-row px-2 whitespace-nowrap">
-        <span className="flex items-center gap-1.5 text-label text-graphite">
-          <PluginMark name={row.via.name} />
-          {row.via.name}
-        </span>
+      <td className="h-row truncate px-2 mono text-micro text-graphite">
+        {row.via.name}
       </td>
       <td className="h-row px-2 whitespace-nowrap">
         <span className="flex items-center justify-end gap-2">
-          {word === null ? null : (
-            <span role="status" className="mono text-micro text-graphite">
-              {word}
+          {state === null ? null : (
+            <span
+              role="status"
+              className="flex items-center gap-1.5 mono text-micro text-graphite"
+            >
+              {state.working ? <Twinkle /> : null}
+              {state.word}
             </span>
           )}
           {action === null ? null : (
@@ -248,6 +255,17 @@ function FindRow({
   )
 }
 
+/** The columns, each a fixed width: 1088px in all, scrolled sideways in the dock. */
+const COLUMNS = [
+  { head: 'Company', width: 'w-40' },
+  { head: 'Domain', width: 'w-36' },
+  { head: 'What it does', width: 'w-64' },
+  { head: 'Place', width: 'w-28' },
+  { head: 'Found on', width: 'w-36' },
+  { head: 'Via', width: 'w-24' },
+  { head: '', width: 'w-44' },
+] as const
+
 export function FindTable({
   table,
   turnId,
@@ -255,8 +273,11 @@ export function FindTable({
   question,
   variant,
   threadId,
+  line,
 }: {
   table: AskFindTable
+  /** The route and its time, printed over the table. */
+  line: string | null
   turnId: string | null
   /** The call of the turn that left this table. */
   callIndex: number
@@ -269,25 +290,26 @@ export function FindTable({
   const foot = foldLine(table, expanded)
   const folded = !expanded && table.rows.length > FIND_FOLD
   const grid = (
-    <table className="w-max min-w-full border-collapse text-ui">
+    <table className="w-272 table-fixed border-collapse text-ui">
+      <colgroup>
+        {COLUMNS.map((c) => (
+          <col key={c.head} className={c.width} />
+        ))}
+      </colgroup>
       <thead>
         <tr className="border-b border-hairline">
-          {[
-            'Company',
-            'Domain',
-            'What it does',
-            'Place',
-            'Found on',
-            'Via',
-          ].map((h) => (
-            <th
-              key={h}
-              className="h-7 px-2 text-left field-label font-normal whitespace-nowrap text-graphite"
-            >
-              {h}
-            </th>
-          ))}
-          <th className="h-7 px-2" aria-label="State" />
+          {COLUMNS.map((c) =>
+            c.head === '' ? (
+              <th key="state" className="h-7 px-2" aria-label="State" />
+            ) : (
+              <th
+                key={c.head}
+                className="h-7 truncate px-2 text-left field-label font-normal text-graphite"
+              >
+                {c.head}
+              </th>
+            ),
+          )}
         </tr>
       </thead>
       <tbody>
@@ -319,6 +341,7 @@ export function FindTable({
       turnId={turnId}
       callIndex={callIndex}
       question={question}
+      line={line}
     />
   )
   if (variant === 'page')

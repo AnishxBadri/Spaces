@@ -4,6 +4,7 @@ import {
   engineFor,
   findQuestion,
   foldLine,
+  foundOnLabel,
   lookForFrom,
   restWord,
   rowAction,
@@ -69,10 +70,27 @@ describe('the find table', () => {
     expect(rowMenu(row('a.example', 'unknown'), table([], 0, null))).toEqual([])
   })
 
-  it('reads filed and held as state words; a web result says nothing', () => {
-    expect(restWord(row('a.example', 'filed'))).toBe('filed')
-    expect(restWord(row('a.example', 'held'))).toBe('held')
+  it('reads filed and held as sentence-case state words; a web result says nothing', () => {
+    expect(restWord(row('a.example', 'filed'))).toBe('Filed')
+    expect(restWord(row('a.example', 'held'))).toBe('Held')
     expect(restWord(row('a.example', 'unknown'))).toBeNull()
+  })
+
+  it('prints Found on as the first page’s host and how many more', () => {
+    const r = row('a.example', 'unknown')
+    expect(
+      foundOnLabel({
+        ...r,
+        sources: [
+          { url: 'https://www.yourstory.com/a' },
+          { url: 'https://inc42.com/b' },
+        ],
+      }),
+    ).toBe('yourstory.com +1')
+    expect(
+      foundOnLabel({ ...r, sources: [{ url: 'https://inc42.com/b' }] }),
+    ).toBe('inc42.com')
+    expect(foundOnLabel({ ...r, sources: [] })).toBe('')
   })
 
   it('prefills the question from the space’s criteria', () => {

@@ -1,4 +1,5 @@
-import { Link, useRouter } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
+import { X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -18,12 +19,24 @@ import type {
 } from '#/lib/server-fns'
 import { SCOPE_DROPPED } from '#/lib/ask/scope'
 import { scopeKey, scopeWords } from '#/lib/ask/types'
+import {
+  CALL_WORD,
+  modelLine,
+  shownCalls,
+  stoppedWords,
+  thinkingWords,
+  turnNotice,
+} from '#/lib/ask/notice'
+import type { AskNotice } from '#/lib/ask/notice'
+import { chipKey, chipLabel } from '#/lib/ask/page-scope'
 import { dayKey, formatTime, formatWeekday } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
+import { Twinkle } from '#/components/twinkle'
 import { cn } from '#/lib/utils'
 import { AskAnswer, RefChip } from './ask-answer'
 import { PluginMark } from '#/components/integrations/integration-ledger'
 import { AskCards } from './ask-card'
+import { Divider } from './divider'
 import { FindTable } from './find-table'
 import { MentionTextarea } from './mention-popover'
 import type { AnswerVariant } from './ask-answer'
@@ -34,6 +47,8 @@ import type { AnswerVariant } from './ask-answer'
  * - Your turn is a bone block with a hairline, right-aligned, at most three
  *   quarters of the column, its time under it; the answer has no box.
  * - A scope change between questions is a centred mono divider.
+ * - The turn streaming now carries its Twinkle and Stop; the composer has
+ *   no Send, only ⌘↵.
  */
 
 /** The answer streaming now, before it is stored. */
@@ -84,20 +99,6 @@ export function applyAskEvent(live: LiveTurn, event: AskEvent): LiveTurn {
   }
 }
 
-/** A centred mono divider across the column: a scope change or a day. */
-export function Divider({ children }: { children: ReactNode }) {
-  return (
-    <div
-      role="separator"
-      className="flex items-center gap-3 mono text-micro text-graphite"
-    >
-      <span className="h-px flex-1 bg-rule" />
-      <span className="shrink-0">{children}</span>
-      <span className="h-px flex-1 bg-rule" />
-    </div>
-  )
-}
-
 /** Your question: bone, a hairline, right-aligned, its time under it. */
 export function QuestionTurn({ turn }: { turn: AskTurnView }) {
   return (
@@ -112,12 +113,34 @@ export function QuestionTurn({ turn }: { turn: AskTurnView }) {
   )
 }
 
-const CALL_WORD: Record<AskCall['state'], string> = {
-  running: 'running',
-  done: '',
-  refused: 'refused',
-  failed: 'failed',
-  unmounted: 'unmounted',
+/**
+ * A notice over a turn: bone on a rule, a 6px warning or destructive
+ * square, one sentence and at most one link.
+ */
+export function NoticeRow({ notice }: { notice: AskNotice }) {
+  return (
+    <div
+      data-notice={notice.tone}
+      className="flex min-h-8 items-center gap-2.5 border border-rule bg-bone px-3 py-1.5 text-ui"
+    >
+      <span
+        aria-hidden
+        className={cn(
+          'size-1.5 shrink-0',
+          notice.tone === 'warning' ? 'bg-warning' : 'bg-destructive',
+        )}
+      />
+      <span className="min-w-0 flex-1">{notice.sentence}</span>
+      {notice.link === null ? null : (
+        <Link
+          to={notice.link.to}
+          className="focus-ring shrink-0 text-label text-foreground hover:underline"
+        >
+          {notice.link.label}
+        </Link>
+      )}
+    </div>
+  )
 }
 
 /** A chip the turn could not resolve: a scope line naming it. */
@@ -129,7 +152,7 @@ function DroppedChips({ calls }: { calls: ReadonlyArray<AskCall> }) {
 
 /** The tools a turn called, each with what it asked and found. */
 export function CallStrip({ calls: all }: { calls: ReadonlyArray<AskCall> }) {
-  const calls = all.filter((c) => c.tool !== SCOPE_DROPPED)
+  const calls = shownCalls(all)
   if (calls.length === 0) return null
   return (
     <ul
@@ -168,12 +191,15 @@ function FindTables({
   question,
   variant,
   threadId,
+  line,
 }: {
   calls: ReadonlyArray<AskCall>
   turnId: string | null
   question: string | null
   variant: AnswerVariant
   threadId: string | null
+  /** The route and its time, over each table. */
+  line: string | null
 }) {
   return calls.flatMap((c, i) =>
     c.find === undefined || c.find.rows.length + c.find.hidden === 0
@@ -187,18 +213,20 @@ function FindTables({
             question={question}
             variant={variant}
             threadId={threadId}
+            line={line}
           />,
         ],
   )
 }
 
-/** The answer's foot: the model or the route, then its sources. */
+/** The answer's foot: `Provider · model`, then its sources. */
 function AnswerFoot({ turn }: { turn: AskTurnView }) {
   const [open, setOpen] = useState(false)
+  const model = modelLine(turn.route)
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-x-3 mono text-micro text-graphite">
-        {turn.route === null ? null : <span>{turn.route}</span>}
+        {model === null ? null : <span>{model}</span>}
         {turn.refs.length === 0 ? null : (
           <button
             type="button"
@@ -262,15 +290,18 @@ export function AnswerTurn({
         threadId={threadId}
       />
     )
+  const notice = turnNotice(turn.state, turn.route)
+  const model = modelLine(turn.route)
   return (
     <div data-turn="assistant" className="flex flex-col gap-2.5">
       <DroppedChips calls={turn.calls} />
+      {notice === null ? null : <NoticeRow notice={notice} />}
       {turn.state === 'no_provider' ? (
         <p className="text-body">
           Ask needs a model to answer.{' '}
           <Link
             to="/settings/models"
-            className="focus-ring text-primary hover:underline"
+            className="focus-ring text-foreground underline underline-offset-2"
           >
             Add a model ›
           </Link>
@@ -279,13 +310,13 @@ export function AnswerTurn({
         <div className="flex flex-col gap-1">
           <p className="text-body">Nothing found.</p>
         </div>
-      ) : turn.state === 'refused' ||
-        turn.state === 'capped' ||
-        turn.state === 'failed' ? (
+      ) : turn.state === 'refused' || turn.state === 'capped' ? (
+        body
+      ) : turn.state === 'failed' ? (
         <>
           {body}
           <p className="text-body text-graphite">{turn.route}</p>
-          {onRetry && turn.state === 'failed' ? (
+          {onRetry ? (
             <div>
               <Button variant="ghost" size="sm" onClick={onRetry}>
                 Retry
@@ -302,10 +333,15 @@ export function AnswerTurn({
         question={question}
         variant={variant}
         threadId={threadId}
+        line={[model, formatTime(turn.createdAt)]
+          .filter((p) => p !== null && p !== '')
+          .join(' · ')}
       />
       <AskCards cards={turn.cards} waiting={waiting} />
       {turn.state === 'stopped' ? (
-        <span className="mono text-micro text-graphite">stopped</span>
+        <span data-stopped className="mono text-micro text-graphite">
+          {stoppedWords(turn.calls)}
+        </span>
       ) : null}
       <CallStrip calls={turn.calls} />
       {turn.state === 'answered' ||
@@ -317,36 +353,34 @@ export function AnswerTurn({
   )
 }
 
-/** The answer arriving now: its state word, the text so far, the strip. */
+/**
+ * The answer arriving now: before its text, a Twinkle and what it is doing;
+ * Stop, an outline button at the turn's right, while it streams.
+ */
 export function LiveAnswer({
   live,
   variant,
   threadId,
   onRetry,
+  onStop,
 }: {
   live: LiveTurn
   variant: AnswerVariant
   threadId: string | null
   onRetry: () => void
+  onStop: () => void
 }) {
-  const running = live.calls.some((c) => c.call.state === 'running')
-  const word =
-    live.phase === 'lost'
-      ? null
-      : live.phase === 'stopped'
-        ? 'stopped'
-        : live.text !== ''
-          ? null
-          : running
-            ? 'computing.'
-            : 'reading.'
+  const calls = live.calls.map((c) => c.call)
+  const streaming = live.phase === 'streaming'
+  const notice = turnNotice(null, live.route)
   return (
     <div
       data-turn="assistant"
       aria-live="polite"
       className="flex flex-col gap-2.5"
     >
-      <DroppedChips calls={live.calls.map((c) => c.call)} />
+      <DroppedChips calls={calls} />
+      {notice === null ? null : <NoticeRow notice={notice} />}
       {live.text === '' ? null : (
         <AskAnswer
           body={live.text}
@@ -355,9 +389,6 @@ export function LiveAnswer({
           threadId={threadId}
           streaming
         />
-      )}
-      {word === null ? null : (
-        <span className="mono text-micro text-graphite">{word}</span>
       )}
       {live.phase === 'lost' ? (
         <div className="flex items-center gap-3">
@@ -368,16 +399,45 @@ export function LiveAnswer({
         </div>
       ) : null}
       <FindTables
-        calls={live.calls.map((c) => c.call)}
+        calls={calls}
         turnId={null}
         question={live.question.body}
         variant={variant}
         threadId={threadId}
+        line={modelLine(live.route)}
       />
       <AskCards cards={live.cards} />
-      <CallStrip calls={live.calls.map((c) => c.call)} />
+      <CallStrip calls={calls} />
+      {live.phase === 'stopped' ? (
+        <span data-stopped className="mono text-micro text-graphite">
+          {stoppedWords(calls)}
+        </span>
+      ) : null}
+      {streaming ? (
+        <div className="flex min-h-8 items-center gap-3">
+          {live.text === '' ? (
+            <span
+              data-thinking
+              className="flex items-center gap-2 mono text-micro text-graphite"
+            >
+              <Twinkle />
+              {thinkingWords(calls)}
+            </span>
+          ) : null}
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto"
+            onClick={onStop}
+          >
+            Stop
+          </Button>
+        </div>
+      ) : null}
       {live.route === null ? null : (
-        <span className="mono text-micro text-graphite">{live.route}</span>
+        <span className="mono text-micro text-graphite">
+          {modelLine(live.route)}
+        </span>
       )}
     </div>
   )
@@ -390,12 +450,14 @@ export function AskTurns({
   variant,
   threadId,
   onRetry,
+  onStop,
 }: {
   turns: ReadonlyArray<AskTurnView>
   live: LiveTurn | null
   variant: AnswerVariant
   threadId: string | null
   onRetry: (question: string) => void
+  onStop: () => void
 }) {
   const { today } = useClock()
   const all = live === null ? turns : [...turns, live.question]
@@ -418,7 +480,7 @@ export function AskTurns({
       if (scope !== null && key !== scope)
         out.push(
           <Divider key={`scope-${t.id}`}>
-            Scope · {scopeWords(t.scope)}
+            Scope now {scopeWords(t.scope)} · {formatTime(t.createdAt)}
           </Divider>,
         )
       scope = key
@@ -451,6 +513,7 @@ export function AskTurns({
         variant={variant}
         threadId={threadId}
         onRetry={() => onRetry(live.question.body)}
+        onStop={onStop}
       />,
     )
   return <div className="flex flex-col gap-6">{out}</div>
@@ -647,7 +710,10 @@ export function latestSaveable(
   return null
 }
 
-/** "Save as note" on the latest answer; lands on the note it wrote. */
+/**
+ * "Save as note" on the latest answer. It stays where it is and swaps its
+ * label to `Saved as note`; the note is filed on the records it cited.
+ */
 export function SaveAsNote({
   thread,
   onSaved,
@@ -655,11 +721,12 @@ export function SaveAsNote({
   thread: AskThreadView | null
   onSaved?: () => void
 }) {
-  const router = useRouter()
   const [saving, setSaving] = useState(false)
+  // The turn saved here, before the thread is read again.
+  const [savedHere, setSavedHere] = useState<string | null>(null)
   const turn = latestSaveable(thread)
   if (turn === null) return null
-  const saved = turn.savedAt !== null
+  const saved = turn.savedAt !== null || savedHere === turn.id
   return (
     <Button
       variant="ghost"
@@ -670,12 +737,9 @@ export function SaveAsNote({
       onClick={async () => {
         setSaving(true)
         try {
-          const { noteId } = await saveAskAnswerAsNote({
-            data: { turnId: turn.id },
-          })
-          toast('Saved as a note')
+          await saveAskAnswerAsNote({ data: { turnId: turn.id } })
+          setSavedHere(turn.id)
           onSaved?.()
-          await router.navigate({ to: '/notes/$noteId', params: { noteId } })
         } catch (err) {
           toast.error(err instanceof Error ? err.message : 'Could not save it')
         } finally {
@@ -688,17 +752,62 @@ export function SaveAsNote({
   )
 }
 
+/** The chips a question narrows to, inside the composer; each one removable. */
+export function ComposerChips({
+  scope,
+  onRemove,
+  webSources = [],
+}: {
+  scope: ReadonlyArray<AskScopeChip>
+  onRemove: (chip: AskScopeChip) => void
+  /** The plugins the web chip searches through, named on it. */
+  webSources?: ReadonlyArray<string>
+}) {
+  if (scope.length === 0) return null
+  return (
+    <div data-chips className="flex flex-wrap items-center gap-1.5">
+      {scope.map((c) => {
+        const tip =
+          c.kind === 'web' ? 'Leave the web out' : `Ask beyond ${c.name}`
+        return (
+          <span
+            key={chipKey(c)}
+            data-chip={c.kind}
+            className={cn(
+              'inline-flex h-5.5 max-w-56 items-center gap-1 rounded-md border border-rule px-1.5 text-label',
+              c.kind === 'web' ? 'bg-bone' : 'bg-paper',
+            )}
+          >
+            <span className="truncate">{chipLabel(c, webSources)}</span>
+            <button
+              type="button"
+              aria-label={tip}
+              title={tip}
+              onClick={() => onRemove(c)}
+              className="focus-ring -mr-0.5 text-graphite hover:text-foreground"
+            >
+              <X className="size-3" strokeWidth={1.75} />
+            </button>
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
 /**
- * The composer: a field, ⌘↵ printed in its end lane as the one key, and
- * Send — or Stop while an answer streams. With `onMention`, `@` in the
- * field scopes the question to a space or record.
+ * The composer: one bordered box holding the scope chips, then the field
+ * with ⌘↵ in its end lane — the one key, and no Send button. With
+ * `onMention`, `@` in the field scopes the question to a space or record.
  */
 export function AskComposer({
   value,
   onChange,
   onSend,
-  onStop,
   onMention,
+  scope = [],
+  onRemoveChip,
+  webSources = [],
   streaming,
   focus,
   className,
@@ -706,8 +815,11 @@ export function AskComposer({
   value: string
   onChange: (v: string) => void
   onSend: () => void
-  onStop: () => void
   onMention?: ((chip: AskScopeChip) => void) | undefined
+  /** The chips the question will be asked in. */
+  scope?: ReadonlyArray<AskScopeChip>
+  onRemoveChip?: ((chip: AskScopeChip) => void) | undefined
+  webSources?: ReadonlyArray<string>
   streaming: boolean
   focus: number
   className?: string
@@ -729,44 +841,48 @@ export function AskComposer({
     title:
       onMention === undefined ? undefined : '@ scopes to a space or record',
     className:
-      'focus-ring min-h-16 w-full resize-none rounded-md border border-rule bg-paper px-3 py-2 text-body',
+      'min-h-12 min-w-0 flex-1 resize-none bg-transparent text-body outline-none placeholder:text-graphite',
   }
   return (
-    <div className={cn('flex flex-col gap-2', className)}>
-      {onMention === undefined ? (
-        <textarea
-          {...fieldProps}
-          ref={field}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={onKeyDown}
-        />
-      ) : (
-        <MentionTextarea
-          {...fieldProps}
-          fieldRef={field}
-          value={value}
-          onChange={onChange}
-          onMention={onMention}
-          onKeyDown={onKeyDown}
+    <div
+      data-composer
+      className={cn(
+        'flex flex-col gap-2 rounded-md border border-rule bg-paper px-3 py-2 focus-within:border-foreground',
+        className,
+      )}
+    >
+      {onRemoveChip === undefined ? null : (
+        <ComposerChips
+          scope={scope}
+          onRemove={onRemoveChip}
+          webSources={webSources}
         />
       )}
-      <div className="flex items-center justify-end gap-3">
-        <span className="mono text-micro text-graphite">⌘↵</span>
-        {streaming ? (
-          <Button variant="outline" size="sm" onClick={onStop}>
-            Stop
-          </Button>
+      <div className="flex items-end gap-3">
+        {onMention === undefined ? (
+          <textarea
+            {...fieldProps}
+            ref={field}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={onKeyDown}
+          />
         ) : (
-          <Button
-            size="sm"
-            disabled={value.trim() === ''}
-            title="Send (⌘↵)"
-            onClick={onSend}
-          >
-            Send
-          </Button>
+          <MentionTextarea
+            {...fieldProps}
+            fieldRef={field}
+            value={value}
+            onChange={onChange}
+            onMention={onMention}
+            onKeyDown={onKeyDown}
+          />
         )}
+        <span
+          className="shrink-0 pb-0.5 mono text-micro text-graphite"
+          title="Send"
+        >
+          ⌘↵
+        </span>
       </div>
     </div>
   )

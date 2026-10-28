@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { pageScope } from './page-scope'
-import { byDay, outcomeWords } from './thread-list'
+import { byDay, dayBand, outcomeWords } from './thread-list'
 import type { AskThreadRow } from './types'
 
 const ID = '00000000-0000-4000-8000-000000000001'
@@ -48,10 +48,17 @@ describe('the thread list', () => {
     ])
   })
 
-  it('names the outcome: cards applied, saved as note', () => {
+  it('names the outcome in sentence case: cards applied, saved as note', () => {
     expect(outcomeWords(row('x', { applied: 2, saved: 1 }))).toBe(
-      '2 applied · saved as note',
+      '2 applied · Saved as note',
     )
+    expect(outcomeWords(row('x', { saved: 2 }))).toBe('Saved as 2 notes')
     expect(outcomeWords(row('x'))).toBe('')
+  })
+
+  it('heads a day band TODAY, else its day in caps', () => {
+    expect(dayBand('2026-10-12', '2026-10-12')).toBe('TODAY')
+    expect(dayBand('2026-10-09', '2026-10-12')).toBe('9 OCT')
+    expect(dayBand('2025-10-09', '2026-10-12')).toBe('9 OCT 2025')
   })
 })

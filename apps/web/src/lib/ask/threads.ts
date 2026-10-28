@@ -145,6 +145,7 @@ export const turnViewsProgram = Effect.fn('ask.turnViews')(function* (
     rows.flatMap((r) => [...r.refs, ...evidenceOf(r)]),
   )
   const cards = yield* cardViewsProgram(
+    userId,
     rows.flatMap((r) =>
       r.calls.flatMap((c) => (c.card === undefined ? [] : [c.card])),
     ),

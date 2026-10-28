@@ -188,6 +188,7 @@ const mount = async (t: AskFindTable) => {
         turnId={TURN}
         callIndex={1}
         question={QUESTION}
+        line="Anthropic · claude-opus-5 · 10:51"
       />,
     ),
   )
@@ -209,7 +210,7 @@ describe('Save as watch', () => {
       cards: 9,
     })
     await mount(table(true))
-    await act(async () => buttonNamed(/^Save as watch$/).click())
+    await act(async () => buttonNamed(/^Save as watch ›$/).click())
     expect(text(dialog()?.querySelector('h2') ?? null)).toBe('Save as watch')
     expect(text(dialog())).toContain('Property ops')
     const labels = Array.from(dialog()?.querySelectorAll('label') ?? []).map(
@@ -236,22 +237,28 @@ describe('Save as watch', () => {
       'Saved as a watch on Property ops · 9 in Review',
     ])
     expect(text(document.querySelector('[data-saved-watch="live"]'))).toBe(
-      'Saved as a watch on Property ops',
+      'Saved as a watch on Property ops ›',
     )
-    expect(() => buttonNamed(/^Save as watch$/)).toThrow()
+    // A centred divider, under the route line.
+    expect(
+      document
+        .querySelector('[data-saved-watch]')
+        ?.closest('[role="separator"]'),
+    ).not.toBeNull()
+    expect(() => buttonNamed(/^Save as watch ›$/)).toThrow()
   })
 
   it('leaves Look for blank when the question is the space’s criteria', async () => {
     fns.getSaveWatchSetup.mockResolvedValue(setup(QUESTION))
     await mount(table(true))
-    await act(async () => buttonNamed(/^Save as watch$/).click())
+    await act(async () => buttonNamed(/^Save as watch ›$/).click())
     expect(lookFor()?.value).toBe('')
   })
 
   it('asks for a space when the turn had none, and Save waits for one', async () => {
     fns.getSaveWatchSetup.mockResolvedValue(setup())
     await mount(table(false))
-    await act(async () => buttonNamed(/^Save as watch$/).click())
+    await act(async () => buttonNamed(/^Save as watch ›$/).click())
     const labels = Array.from(dialog()?.querySelectorAll('label') ?? []).map(
       (l) => text(l),
     )
@@ -274,7 +281,7 @@ describe('Save as watch', () => {
       spaceName: 'Property ops',
     })
     await mount(table(true))
-    await act(async () => buttonNamed(/^Save as watch$/).click())
+    await act(async () => buttonNamed(/^Save as watch ›$/).click())
     await act(async () => buttonNamed(/^Save watch/).click())
     await settle()
     expect(fns.shown).toEqual(['Already watching this'])
@@ -293,6 +300,8 @@ describe('Save as watch', () => {
       spaces: [],
     })
     await mount(table(true))
-    expect(() => buttonNamed(/^Save as watch$/)).toThrow()
+    expect(() => buttonNamed(/^Save as watch ›$/)).toThrow()
+    // The route line stays.
+    expect(document.body.textContent).toContain('Anthropic · claude-opus-5')
   })
 })

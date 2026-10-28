@@ -415,7 +415,9 @@ describe('the gate', () => {
     )
     const turn = endOf(events)
     expect(turn.state).toBe('capped')
-    expect(turn.route).toContain('cap')
+    expect(turn.route).toMatch(
+      /^Daily AI cap reached · [\d,]+ of 20 tokens · resets 00:00 UTC$/,
+    )
     const runs = await runsOf(threadOf(events))
     expect(runs).toHaveLength(1)
     expect(runs.at(0)?.status).toBe('failed')

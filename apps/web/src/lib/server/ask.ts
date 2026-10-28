@@ -21,6 +21,7 @@ export type {
 export type { FindActed } from '../ask/find'
 export type { SaveWatchResult, WatchSpace } from '../ask/save-watch'
 export type { WebSource } from '../ask/mount'
+export type { AskRefPreview } from '../ask/ref-preview'
 
 /**
  * Ask's server fns: a turn streamed as `AskEvent`s, and the thread store —
@@ -122,6 +123,19 @@ export const saveAskAnswerAsNote = createServerFn({ method: 'POST' })
     const { saveAnswerNoteProgram } = await import('../ask/threads')
     const { effectFn } = await import('./effect')
     return run(() => effectFn(saveAnswerNoteProgram)(user.id, data.turnId))
+  })
+
+/**
+ * A citation's passage for its hover: the chunk, note, body or value the ref
+ * names, read as the reader — null when they may not read it.
+ */
+export const previewAskRef = createServerFn()
+  .validator(z.object({ ref: z.string().min(1).max(300) }))
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    const { askRefPreviewProgram } = await import('../ask/ref-preview')
+    const { effectFn } = await import('./effect')
+    return run(() => effectFn(askRefPreviewProgram)(user.id, data.ref))
   })
 
 const byCard = z.object({ suggestionId: z.uuid() })

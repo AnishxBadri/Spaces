@@ -24,6 +24,7 @@ import type { ToolCaller } from '#/lib/mcp/registry'
 import { recordPath } from '#/lib/record-path'
 import { citedRefs } from './answer'
 import { storeCardsProgram } from './card-store'
+import { capLine } from './notice'
 import {
   SHOW_COMPANIES,
   SHOW_COMPANIES_DESCRIPTION,
@@ -399,7 +400,7 @@ function openFailure(
 ): { state: AskTurnState; line: string } {
   switch (f._tag) {
     case 'CapExceeded':
-      return { state: 'capped', line: completeMessage(f) }
+      return { state: 'capped', line: capLine(f) }
     case 'SensitiveRouteRefused':
       return { state: 'refused', line: refusedLine(completeMessage(f)) }
     case 'LaneNotRouted':
@@ -461,7 +462,8 @@ const proposedView = (held: HeldCard): AskCardView => ({
   rationale: held.draft.rationale,
   evidence: held.evidence,
   outcome: 'proposed',
-  moved: false,
+  by: null,
+  moved: null,
 })
 
 /** A turn as events: the rows, the route, calls and text, then the stored turn. */
