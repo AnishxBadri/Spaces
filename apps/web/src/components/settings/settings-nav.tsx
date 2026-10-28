@@ -176,19 +176,25 @@ const ROW =
   'flex h-[1.875rem] shrink-0 items-center gap-2.5 rounded-md border border-transparent px-2.5 text-ui whitespace-nowrap transition-colors'
 
 /**
- * The section nav: caps group labels the way the chassis prints them, 30px
- * rows, current section = paper + rule + medium weight (the No-Bar Rule —
- * never a pine edge), and a count in the right lane where the shell has one.
- *
+ * The section nav: each group under a ruled band, 30px rows, the current
+ * section = paper + an ink border + medium weight (the No-Bar Rule — never a
+ * pine edge), and a count in the right lane where the shell has one.
+ * - A member reads an admin row in graphite with `Admin` in its lane, not a
+ *   count. It stays a link: the page opens read-only.
  * - `chassis`: the rows down the sidebar, which settings takes over at `md`.
+ *   A band is 36px with its label at the foot, so it carries the gap
+ *   between groups itself.
  * - `strip`: below `md`, the same rows as a horizontal strip above the
  *   content, scrolling on x, with vertical hairlines between groups.
  */
 export function SettingsNav({
   counts = {},
+  isAdmin,
   variant,
 }: {
   counts?: SettingsCounts
+  /** Whether the reader may change the admin-only rows. */
+  isAdmin: boolean
   variant: 'chassis' | 'strip'
 }) {
   const chassis = variant === 'chassis'
@@ -197,28 +203,33 @@ export function SettingsNav({
       aria-label="Settings sections"
       className={cn(
         chassis
-          ? 'flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-3 pb-3'
+          ? 'flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-3'
           : 'flex shrink-0 gap-3 overflow-x-auto border-b border-hairline bg-bone px-3 py-2',
       )}
     >
       {SETTINGS_GROUP_IDS.map((id, i) => (
         <div
           key={id}
+          data-settings-nav-group={id}
           className={cn(
             chassis
               ? 'flex flex-col gap-0.5'
               : 'flex shrink-0 items-center gap-1',
-            i > 0 && (chassis ? 'mt-5' : 'border-l border-hairline pl-3'),
+            i > 0 && !chassis && 'border-l border-hairline pl-3',
           )}
         >
           {chassis ? (
-            <div className="flex h-6 items-center px-2.5">
-              <span className="label-caps text-graphite">
+            <div
+              data-settings-band
+              className="flex h-9 shrink-0 items-end border-b border-hairline px-2.5 pb-1.5"
+            >
+              <span className="label-caps text-foreground">
                 {SETTINGS_CRUMBS[id]}
               </span>
             </div>
           ) : null}
           {SETTINGS_GROUPS[id].map((row) => {
+            const locked = row.admin && !isAdmin
             const count = counts[row.to]
             return (
               <Link
@@ -226,16 +237,24 @@ export function SettingsNav({
                 to={row.to}
                 className={cn(
                   ROW,
-                  'text-foreground hover:bg-bone-deep',
-                  'focus-ring',
+                  locked ? 'text-graphite' : 'text-foreground',
+                  'focus-ring hover:bg-bone-deep',
                 )}
                 activeProps={{
-                  className: 'border-rule bg-paper font-medium hover:bg-paper',
+                  className:
+                    'border-hairline bg-paper font-medium hover:bg-paper',
                   'aria-current': 'page',
                 }}
               >
                 <span className="min-w-0 flex-1 truncate">{row.label}</span>
-                {count !== undefined ? (
+                {locked ? (
+                  <span
+                    data-admin-lane
+                    className="shrink-0 mono text-micro font-normal text-graphite"
+                  >
+                    Admin
+                  </span>
+                ) : count !== undefined ? (
                   <span className="shrink-0 mono text-micro font-normal text-graphite">
                     {count}
                   </span>

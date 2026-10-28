@@ -177,6 +177,9 @@ function keyText(row: ProviderRow): string {
   return '—'
 }
 
+/** The Providers group's anchor, where the collapsed routing row points. */
+const PROVIDERS_ANCHOR = 'providers'
+
 // The lanes, shared by the head and every row so they stay one grid.
 const LANE = {
   key: 'w-28 shrink-0',
@@ -194,12 +197,12 @@ const LANE = {
 function ProvidersGroup({ providers }: { providers: ProviderRow[] }) {
   const [open, setOpen] = useState<LlmProvider | null>(null)
   return (
-    <div className="flex flex-col">
+    <div id={PROVIDERS_ANCHOR} className="flex scroll-mt-6 flex-col">
       <SettingsGroupHead
         title="Providers"
         action={`${providers.filter((p) => p.configured).length} of ${providers.length} set up`}
       />
-      <div className="flex h-8 items-center gap-3 border-b border-hairline field-label leading-4 text-graphite">
+      <div className="flex h-8 items-center gap-3 border-b border-hairline text-label text-graphite">
         <span className="min-w-0 flex-1">Provider</span>
         <span className={LANE.key}>Key</span>
         <span className={LANE.used}>Last used</span>
@@ -508,6 +511,25 @@ function RoutingGroup({
       routable.some((p) => p.provider === r.target?.provider),
   ).length
 
+  // With no provider every cell could only read Off: the grid is one row
+  // pointing at Providers instead.
+  if (routable.length === 0)
+    return (
+      <div data-routing-collapsed className="flex flex-col pt-7">
+        <div className="flex h-ledger-row items-center gap-6 border-y border-hairline">
+          <span className="w-[13.125rem] shrink-0 text-ui font-medium">
+            Who does what
+          </span>
+          <a
+            href={`#${PROVIDERS_ANCHOR}`}
+            className="focus-ring rounded-md text-ui text-foreground underline-offset-2 hover:underline"
+          >
+            Set up a provider ›
+          </a>
+        </div>
+      </div>
+    )
+
   return (
     <div className="flex flex-col">
       <SettingsGroupHead
@@ -515,7 +537,7 @@ function RoutingGroup({
         count={`${routed} of ${MODELS_GRID_LANES.length * AI_SENSITIVITIES.length} set`}
         action="sensitive lists local models only"
       />
-      <div className="flex h-8 items-center gap-3 border-b border-hairline field-label leading-4 text-graphite">
+      <div className="flex h-8 items-center gap-3 border-b border-hairline text-label text-graphite">
         <span className="min-w-0 flex-1">Job</span>
         {AI_SENSITIVITIES.map((s) => (
           <span key={s} className="w-52 shrink-0">
@@ -526,9 +548,16 @@ function RoutingGroup({
       <ol>
         {MODELS_GRID_LANES.map((lane) => (
           <LedgerRow key={lane} className="px-0">
-            <span className="flex min-w-0 flex-1 items-baseline gap-2 truncate">
-              <span className="text-ui font-medium">{LANE_JOB[lane]}</span>
-              <span className="mono text-micro text-graphite">{lane}</span>
+            <span className="flex min-w-0 flex-1 items-baseline truncate">
+              <SettingsTip tip={<span className="mono">{lane}</span>}>
+                <span
+                  data-lane={lane}
+                  tabIndex={0}
+                  className="focus-ring rounded-md text-ui font-medium"
+                >
+                  {LANE_JOB[lane]}
+                </span>
+              </SettingsTip>
             </span>
             {AI_SENSITIVITIES.map((sensitivity) => (
               <RouteCellSelect

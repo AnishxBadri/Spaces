@@ -70,7 +70,7 @@ afterEach(() => {
   document.body.replaceChildren()
 })
 
-/** What the settings shell's loader hands the nav. */
+/** What the settings shell's loader hands the nav; a test may make a member. */
 const shellData = {
   isAdmin: true,
   members: [{}, {}],
@@ -80,7 +80,7 @@ const shellData = {
   integrations: 3,
 }
 
-async function mount(path: string) {
+async function mount(path: string, reader: 'admin' | 'member' = 'admin') {
   const { SettingsChassis, useSettingsTakeover } = chassis
   const {
     Outlet,
@@ -116,7 +116,7 @@ async function mount(path: string) {
   const settings = createRoute({
     getParentRoute: () => app,
     path: 'settings',
-    loader: () => shellData,
+    loader: () => ({ ...shellData, isAdmin: reader === 'admin' }),
   })
   const general = createRoute({
     getParentRoute: () => settings,
@@ -214,5 +214,91 @@ describe('the settings chassis', () => {
     })
     spent.preventDefault()
     expect(chassis.isLeaveSettingsKey(spent)).toBe(false)
+  })
+})
+
+describe('the settings nav', () => {
+  const row = (to: string) => {
+    const hit = settingsNav()?.querySelector(`a[href="${to}"]`)
+    if (!(hit instanceof HTMLElement)) throw new Error(`no row for ${to}`)
+    return hit
+  }
+
+  it('heads each group with a 36px ruled band in ink caps, the gap carried by the band', async () => {
+    const r = await mount('/deals')
+    await go(r)
+    const bands = Array.from(
+      settingsNav()?.querySelectorAll('[data-settings-band]') ?? [],
+    )
+    expect(bands.map((b) => b.textContent)).toEqual([
+      'You',
+      'Workspace',
+      'AI',
+      'Integrations',
+    ])
+    for (const band of bands) {
+      for (const cls of ['h-9', 'items-end', 'pb-1.5', 'px-2.5'])
+        expect(band.className).toContain(cls)
+      expect(band.className).toContain('border-b border-hairline')
+      const label = band.querySelector('.label-caps')
+      expect(label?.className).toContain('text-foreground')
+      expect(label?.className).not.toContain('text-graphite')
+    }
+    // No margin stacks on the band: the 36px is the gap.
+    for (const group of settingsNav()?.querySelectorAll(
+      '[data-settings-nav-group]',
+    ) ?? [])
+      expect(group.className).not.toMatch(/\bmt-/)
+    expect(settingsNav()?.className).toContain('p-3')
+    expect(settingsNav()?.className).toContain('gap-0.5')
+  })
+
+  it('draws the current row on paper with an ink border, the rest borderless', async () => {
+    const r = await mount('/deals')
+    await go(r)
+    const current = row('/settings/general')
+    expect(current.getAttribute('aria-current')).toBe('page')
+    expect(current.className).toContain('border-hairline')
+    expect(current.className).toContain('bg-paper')
+    expect(current.className).not.toContain('border-rule')
+    const other = row('/settings/members')
+    expect(other.getAttribute('aria-current')).toBeNull()
+    expect(other.className).toContain('border-transparent')
+    expect(other.className).not.toContain('border-hairline')
+  })
+
+  it('reads an admin row to a member in graphite with Admin in its lane, still a link', async () => {
+    const r = await mount('/deals', 'member')
+    await go(r)
+    const plugins = row('/settings/plugins')
+    expect(plugins.tagName).toBe('A')
+    expect(plugins.className).toContain('text-graphite')
+    // The lane says Admin instead of the count.
+    expect(plugins.querySelector('[data-admin-lane]')?.textContent).toBe(
+      'Admin',
+    )
+    expect(plugins.textContent).not.toContain('3')
+    for (const to of [
+      '/settings/models',
+      '/settings/search',
+      '/settings/enrichment',
+      '/settings/email-forwarding',
+      '/settings/connection-apps',
+    ])
+      expect(row(to).querySelector('[data-admin-lane]')?.textContent).toBe(
+        'Admin',
+      )
+    // A row a member may change keeps ink and its count.
+    const members = row('/settings/members')
+    expect(members.className).toContain('text-foreground')
+    expect(members.querySelector('[data-admin-lane]')).toBeNull()
+    expect(members.textContent).toContain('2')
+  })
+
+  it('gives an admin counts and ink on every row, no Admin lane', async () => {
+    const r = await mount('/deals')
+    await go(r)
+    expect(settingsNav()?.querySelectorAll('[data-admin-lane]')).toHaveLength(0)
+    expect(row('/settings/plugins').className).toContain('text-foreground')
   })
 })

@@ -1,17 +1,29 @@
 import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import {
   SettingsGroupHead,
   SettingsSection,
+  rowOpens,
 } from '#/components/settings/settings-section'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '#/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
+import { Input } from '#/components/ui/input'
+import { Label } from '#/components/ui/label'
 import { MoreMenu } from '#/components/ui/more-menu'
 import { updateTemplate } from '#/lib/server-fns'
 import type { listTemplates } from '#/lib/server-fns'
@@ -72,24 +84,28 @@ function templateKindLabel(t: {
 /**
  * Templates are config, not entities — this is their whole management
  * surface. Creation happens by example ("Save as template" on a note,
- * record, or space), never here. Every change applies at once.
+ * record, or space), never here. A row click opens its Edit window, for the
+ * name; where it is offered first and archiving apply at once from the row.
  */
 function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
   const router = useRouter()
   const live = templates.filter((t) => !t.archived)
   const archived = templates.filter((t) => t.archived)
+  const [editing, setEditing] = useState<TemplateRow | null>(null)
 
   async function patch(
     id: string,
-    data: { archived?: boolean; suggestOn?: Array<string> },
+    data: { archived?: boolean; suggestOn?: Array<string>; name?: string },
     ok: string,
-  ) {
+  ): Promise<boolean> {
     try {
       await updateTemplate({ data: { id, ...data } })
       toast.success(ok)
       void router.invalidate()
+      return true
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'That did not work')
+      return false
     }
   }
 
@@ -97,7 +113,7 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
     <SettingsSection title="Templates" crumb="Workspace">
       <div className="flex flex-col">
         <SettingsGroupHead title="Templates" count={live.length} />
-        <div className="flex h-8 items-center gap-3 border-b border-hairline field-label leading-4 text-graphite">
+        <div className="flex h-8 items-center gap-3 border-b border-hairline text-label text-graphite">
           <span className="min-w-0 flex-1">Template</span>
           <span className="w-32 shrink-0">Kind</span>
           <span className="w-56 shrink-0">Offered first on</span>
@@ -113,7 +129,8 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
               key={t.id}
               data-template-row
               data-row
-              className="flex h-12 items-center gap-3 border-b border-rule"
+              onClick={rowOpens(() => setEditing(t))}
+              className="flex h-12 cursor-pointer items-center gap-3 border-b border-rule transition-colors duration-150 ease-out-quart hover:bg-bone"
             >
               <span className="min-w-0 flex-1 truncate text-ui font-medium">
                 {t.name}
@@ -139,6 +156,11 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
                   variant="row"
                   label={t.name}
                   items={[
+                    {
+                      label: 'Edit…',
+                      opens: true,
+                      onSelect: () => setEditing(t),
+                    },
                     {
                       label: 'Archive',
                       onSelect: () =>
@@ -181,7 +203,86 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
           ))}
         </div>
       ) : null}
+      {editing === null ? null : (
+        <EditTemplateDialog
+          key={editing.id}
+          template={editing}
+          onClose={() => setEditing(null)}
+          onSave={(name) => patch(editing.id, { name }, `${name} saved`)}
+        />
+      )}
     </SettingsSection>
+  )
+}
+
+/**
+ * Edit (S): the template's name. What it stamps is set by the note, record
+ * or space it was saved from, so it is not edited here.
+ */
+function EditTemplateDialog({
+  template,
+  onClose,
+  onSave,
+}: {
+  template: TemplateRow
+  onClose: () => void
+  /** Resolves true once the name is stored. */
+  onSave: (name: string) => Promise<boolean>
+}) {
+  const [name, setName] = useState(template.name)
+  const [pending, setPending] = useState(false)
+  const trimmed = name.trim()
+
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (trimmed === '' || trimmed === template.name) {
+      onClose()
+      return
+    }
+    setPending(true)
+    const saved = await onSave(trimmed)
+    setPending(false)
+    if (saved) onClose()
+  }
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
+    >
+      <DialogContent size="s" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>Edit template</DialogTitle>
+          <span className="mono text-micro text-graphite">
+            {templateKindLabel(template)}
+          </span>
+        </DialogHeader>
+        <form onSubmit={submit} className="flex flex-col gap-3.5" noValidate>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="template-name">Name</Label>
+            <Input
+              id="template-name"
+              autoFocus
+              value={name}
+              maxLength={120}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button type="submit" disabled={pending || trimmed === ''}>
+              {pending ? 'Saving…' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }
 

@@ -214,6 +214,29 @@ describe('the settings page grammar', () => {
     expect(banded).toEqual([])
   })
 
+  it('heads a ledger with sans 12 graphite lane labels, never mono', () => {
+    const sources = [
+      ...settingsSources(),
+      'components/attributes/registry-list.tsx',
+      'components/integrations/registry-pane.tsx',
+    ]
+    // A ledger's lane-head row: 32px on a hairline.
+    const heads = sources.flatMap((f) =>
+      [
+        ...read(f).matchAll(
+          /className="(flex h-8 items-center[^"]*border-b border-hairline[^"]*)"/g,
+        ),
+      ].map((m) => `${f}: ${m[1]}`),
+    )
+    expect(heads.length).toBeGreaterThan(8)
+    const mono = heads.filter(
+      (head) =>
+        !head.includes('text-label text-graphite') ||
+        /\b(mono|field-label|label-caps)\b/.test(head),
+    )
+    expect(mono).toEqual([])
+  })
+
   it('prints no sentence under a page title: no section passes a blurb', () => {
     const blurbs = settingsSources().filter((f) => /\bblurb=/.test(read(f)))
     expect(blurbs).toEqual([])

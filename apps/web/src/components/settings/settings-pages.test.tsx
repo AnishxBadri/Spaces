@@ -762,6 +762,12 @@ const menuItem = (text: string) =>
     document.querySelectorAll('[role="menuitem"], [role="menuitemcheckbox"]'),
   ).find((item) => item.textContent.trim() === text)
 
+/** The head's actions, its boxed `···` aside. */
+const headActions = () =>
+  Array.from(document.querySelectorAll('[data-settings-head] button')).filter(
+    (b) => !b.getAttribute('aria-label')?.startsWith('More for '),
+  )
+
 const byText = (text: string, scope: ParentNode = document) =>
   Array.from(scope.querySelectorAll('button')).find(
     (b) => b.textContent.trim() === text,
@@ -785,6 +791,18 @@ describe('every settings page', () => {
       expect(bar()?.getAttribute('data-shown')).toBe('false')
       // No footer strip: the "· admin only" caption lines are gone.
       expect(document.body.textContent).not.toMatch(/admin only/i)
+    },
+  )
+
+  it.each(PATHS)(
+    '%s carries one outline 32px action at most in its head, beside the ···',
+    async (path) => {
+      await mount(path)
+      expect(headActions().length).toBeLessThanOrEqual(1)
+      for (const action of headActions()) {
+        expect(action.getAttribute('data-variant')).toBe('outline')
+        expect(action.getAttribute('data-size')).toBe('default')
+      }
     },
   )
 
@@ -929,7 +947,7 @@ describe('the four acts that break something elsewhere ask first', () => {
   it('archiving an object', async () => {
     await mount('/settings/objects/funds')
     await openMenu('More for Funds')
-    await click(menuItem('Archive'))
+    await click(menuItem('Archive…'))
     // The verb runs once the menu has handed focus back, then asks.
     await vi.waitFor(() =>
       expect(dialog()?.textContent).toContain('Archive Funds?'),
@@ -1242,9 +1260,9 @@ describe('the accounts pages, by the job an account does', () => {
       await withHealth(async () => {
         await mount(`/settings/files/${DRIVE}`)
         expect(text()).toContain('Bound folders')
-        expect(text()).toContain('in sync · 3m · 128 files')
+        expect(text()).toContain('In sync · 3m · 128 files')
         expect(text()).toContain('Google said: File not found · 2d')
-        expect(text()).toContain('paused · Priya disconnected 9 Oct')
+        expect(text()).toContain('Paused · Priya disconnected 9 Oct')
         expect(
           document
             .querySelector('a[aria-label="Open Flent"]')
@@ -1436,17 +1454,66 @@ describe('the AI pages, as D81 splits them', () => {
     )
     expect(heads).toContain('Who does what')
     const text = document.body.textContent
-    for (const job of [
-      'Read documentsextract',
-      'Sortclassify',
-      'Writesynthesize',
-      'Read imagesvision',
-      'Web researchresearch',
+    // The job in words; its lane id waits in the tooltip.
+    const jobs = Array.from(document.querySelectorAll('[data-lane]')).map(
+      (j) => [j.getAttribute('data-lane'), j.textContent],
+    )
+    expect(jobs).toEqual([
+      ['extract', 'Read documents'],
+      ['classify', 'Sort'],
+      ['synthesize', 'Write'],
+      ['vision', 'Read images'],
+      ['research', 'Web research'],
     ])
-      expect(text).toContain(job)
+    // The job's lane holds the words alone.
+    for (const job of document.querySelectorAll('[data-lane]'))
+      expect(job.parentElement?.textContent).toBe(job.textContent)
     expect(text).not.toContain('A lane with no model routed')
     expect(text).toContain('Everyday records')
     expect(text).toContain('Sensitive records')
+  })
+
+  it('collapses the routing grid to one row with no provider set up', async () => {
+    const original = loaders.models
+    loaders.models = () => ({
+      ...original(),
+      providers: [
+        {
+          provider: 'openai',
+          label: 'OpenAI',
+          configured: false,
+          status: null,
+          display: null,
+          baseUrl: null,
+          headers: {},
+          lastUsedAt: null,
+          lastTestedAt: null,
+          lastTestOk: null,
+        },
+      ],
+    })
+    try {
+      await mount('/settings/models')
+      const collapsed = document.querySelector('[data-routing-collapsed]')
+      expect(collapsed?.textContent).toBe('Who does whatSet up a provider ›')
+      expect(collapsed?.querySelector('a')?.getAttribute('href')).toBe(
+        '#providers',
+      )
+      expect(document.querySelector('#providers')).not.toBeNull()
+      // No grid: no head, no lane heads, no cells, no Embeddings line.
+      const heads = Array.from(document.querySelectorAll('h3')).map((h) =>
+        h.textContent.trim(),
+      )
+      expect(heads).not.toContain('Who does what')
+      expect(document.querySelectorAll('[data-lane]')).toHaveLength(0)
+      expect(
+        document.querySelectorAll('button[aria-label$=", normal"]'),
+      ).toHaveLength(0)
+      expect(document.body.textContent).not.toContain('Everyday records')
+      expect(document.body.textContent).not.toContain('set in Search ›')
+    } finally {
+      loaders.models = original
+    }
   })
 
   it('the routing grid has no Embed row, and one line pointing to Search', async () => {
@@ -1654,8 +1721,8 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
     expect(groups()).toEqual(['Templates2', 'Archived1'])
     const rows = Array.from(document.querySelectorAll('[data-template-row]'))
     expect(rows.map((r) => r.textContent)).toEqual([
-      'Seed memoNoteCompaniesDeals+Archive',
-      'Market mapSpace breakdownSpaces+Archive',
+      'Seed memoNoteCompaniesDeals+···',
+      'Market mapSpace breakdownSpaces+···',
     ])
     await openMenu('Where Market map is offered first')
     await click(menuItem('People'))
@@ -1665,36 +1732,154 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
         suggestOn: ['space', 'person'],
       },
     })
+    // Choosing where it is offered is the badge's, not the row's Edit.
+    expect(dialog()).toBeNull()
     await click(byText('Restore'))
     expect(writes.updateTemplate).toHaveBeenLastCalledWith({
       data: { id: '00000000-0000-4000-8000-0000000000e3', archived: false },
     })
   })
 
-  it('API tokens: It may as sentences with the scope under each, Create token under the form, the plaintext once', async () => {
+  it('Templates: a row click opens Edit, which renames it', async () => {
+    await mount('/settings/templates')
+    const row = document.querySelector('[data-template-row]')
+    await click(row?.querySelector('span'))
+    expect(dialog()?.querySelector('h2')?.textContent).toBe('Edit template')
+    expect(dialog()?.textContent).toContain('Note')
+    const name = document.querySelector('#template-name')
+    if (!(name instanceof HTMLInputElement)) throw new Error('no name')
+    expect(name.value).toBe('Seed memo')
+    const foot = dialog()?.querySelector('[data-slot="dialog-footer"]')
+    expect(
+      Array.from(foot?.querySelectorAll('button') ?? []).map((b) =>
+        b.textContent.trim(),
+      ),
+    ).toEqual(['Cancel', 'Save'])
+    await type(name, 'Seed memo v2')
+    await click(byText('Save', dialog() ?? document))
+    expect(writes.updateTemplate).toHaveBeenCalledWith({
+      data: {
+        id: '00000000-0000-4000-8000-0000000000e1',
+        name: 'Seed memo v2',
+      },
+    })
+    await vi.waitFor(() => expect(dialog()).toBeNull())
+    // The row's ··· holds Edit… beside Archive.
+    await openMenu('More for Seed memo')
+    expect(
+      Array.from(document.querySelectorAll('[role="menuitem"]')).map((i) =>
+        i.textContent.trim(),
+      ),
+    ).toEqual(['Edit…', 'Archive'])
+  })
+
+  it('API tokens: New token in the head opens a window of Name and It may, and the window shows the plaintext once', async () => {
     await mount('/settings/tokens')
-    expect(groups()).toEqual(['New token', 'Your tokens1 live · 0 revoked'])
+    // The ledger alone on the page: no inline form, no scopes at rest.
+    expect(groups()).toEqual(['Your tokens1 live · 0 revoked'])
+    expect(document.querySelector('section input')).toBeNull()
+    const lanes =
+      document.querySelector('[data-token-row]')?.previousElementSibling
+    expect(Array.from(lanes?.children ?? []).map((c) => c.textContent)).toEqual(
+      ['Name', 'It may', 'Created', 'Last used', ''],
+    )
+
+    const head = document.querySelector('[data-settings-head]')
+    const action = byText('New token', head ?? document)
+    expect(action?.getAttribute('data-variant')).toBe('outline')
+    expect(action?.getAttribute('data-size')).toBe('default')
+    await click(action)
+    expect(dialog()?.querySelector('h2')?.textContent).toBe('New token')
+    expect(dialog()?.textContent).toContain('It may')
+    expect(dialog()?.textContent).toContain('It acts as you, never more.')
     const scopes = Array.from(
-      document.querySelectorAll('section label span.mono'),
+      dialog()?.querySelectorAll('label span.mono') ?? [],
     ).map((s) => s.textContent)
     expect(scopes).toEqual([
       'records:read',
       'suggestions:write',
       'capture:write',
     ])
-    expect(document.body.textContent).not.toContain('None yet')
+    const foot = dialog()?.querySelector('[data-slot="dialog-footer"]')
+    expect(
+      Array.from(foot?.querySelectorAll('button') ?? []).map((b) =>
+        b.textContent.trim(),
+      ),
+    ).toEqual(['Cancel', 'Create token'])
+
+    // Unnamed, it asks for a name and writes nothing.
+    await click(byText('Create token', dialog() ?? document))
+    expect(writes.createApiToken).not.toHaveBeenCalled()
+    expect(dialog()?.querySelector('[role="alert"]')?.textContent).toContain(
+      'Name the token',
+    )
+
     await type(input('Token name'), 'Claude Desktop')
     await click(
-      document.querySelector('button[aria-label="Read records you can see"]'),
+      dialog()?.querySelector('button[aria-label="Read records you can see"]'),
     )
-    await click(byText('Create token'))
+    await click(byText('Create token', dialog() ?? document))
     expect(writes.createApiToken).toHaveBeenCalledWith({
       data: { name: 'Claude Desktop', scopes: ['records:read'] },
     })
-    const panel = document.querySelector('[data-created-token]')
+    const panel = dialog()?.querySelector('[data-created-token]')
     expect(panel?.textContent).toContain('Copy it now. Spaces shows it once.')
     expect(panel?.textContent).toContain('spc_plaintext_once')
+    expect(byText('Copy', panel ?? document)).toBeDefined()
     expect(byText('Copy command', panel ?? document)).toBeDefined()
+
+    // Done closes the window, and the plaintext goes with it.
+    await click(byText('Done', dialog() ?? document))
+    expect(dialog()).toBeNull()
+    expect(document.body.textContent).not.toContain('spc_plaintext_once')
+    await click(byText('New token', head ?? document))
+    expect(input('Token name').value).toBe('')
+    expect(dialog()?.querySelector('[data-created-token]')).toBeNull()
+  })
+
+  it('API tokens: none is the Tokens + row, which opens the window', async () => {
+    const original = loaders.tokens
+    loaders.tokens = () => ({ tokens: [] })
+    try {
+      await mount('/settings/tokens')
+      expect(groups()).toEqual([])
+      const empty = document.querySelector('[data-empty-row]')
+      expect(empty?.textContent).toBe('Tokens+')
+      expect(document.body.textContent).not.toContain('No tokens')
+      await click(empty)
+      expect(dialog()?.querySelector('h2')?.textContent).toBe('New token')
+    } finally {
+      loaders.tokens = original
+    }
+  })
+
+  it('API tokens: a revoked row is struck through and reads Revoked with its day', async () => {
+    const original = loaders.tokens
+    loaders.tokens = () => ({
+      tokens: [
+        {
+          id: 't2',
+          name: 'old laptop',
+          prefix: 'sp_old',
+          scopes: ['records:read'],
+          createdAt: '2026-09-01T09:00:00.000Z',
+          lastUsedAt: '2026-09-18T09:00:00.000Z',
+          revokedAt: '2026-09-20T09:00:00.000Z',
+        },
+      ],
+    })
+    try {
+      await mount('/settings/tokens')
+      expect(groups()).toEqual(['Your tokens0 live · 1 revoked'])
+      const row = document.querySelector('[data-token-row]')
+      expect(row?.hasAttribute('data-revoked')).toBe(true)
+      expect(row?.className).toContain('line-through')
+      expect(row?.textContent).toContain('Revoked 20 Sep')
+      expect(row?.querySelector('button[aria-label^="More for"]')).toBeNull()
+      expect(byText('Revoke…')).toBeUndefined()
+    } finally {
+      loaders.tokens = original
+    }
   })
 
   it('Connection apps: GOOGLE with its members connected and sentence-case labels', async () => {
@@ -1799,19 +1984,27 @@ describe('Objects, by sheet 06', () => {
     })
   })
 
-  it('New relationship is the outline beside New attribute, and its window commits both sides once', async () => {
+  it('New attribute is the head’s one outline beside its ···, which holds New relationship…, and that window commits both sides once', async () => {
     const companies = objectRow(1, 'Companies', { isSystem: true })
     shellObjects = [{ ...objectRow(3, 'Funds', {}), id: OBJECT_ID }, companies]
     await mount('/settings/objects/funds')
-    const head = byText('New relationship')
-    expect(head?.getAttribute('data-variant')).toBe('outline')
-    // Edit and Archive wait in the head's ···, not beside the primary.
-    expect(byText('Edit')).toBeUndefined()
+    expect(headActions().map((b) => b.textContent.trim())).toEqual([
+      'New attribute',
+    ])
+    expect(byText('New relationship')).toBeUndefined()
+    await openMenu('More for Funds')
     expect(
-      document.querySelector('button[aria-label="More for Funds"]'),
-    ).not.toBeNull()
+      Array.from(document.querySelectorAll('[role="menuitem"]')).map((i) =>
+        i.textContent.trim(),
+      ),
+    ).toEqual(['New relationship…', 'Edit…', 'Copy link', 'Archive…'])
 
-    await click(head)
+    await click(menuItem('New relationship…'))
+    await vi.waitFor(() =>
+      expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
+        'Funds ↔ Companies',
+      ),
+    )
     const dialog = document.querySelector('[role="dialog"]')
     expect(dialog?.textContent).toContain('New relationship')
     expect(dialog?.textContent).toContain('Funds ↔ Companies')
@@ -1839,6 +2032,30 @@ describe('Objects, by sheet 06', () => {
         cardinality: 'N:N',
       },
     })
+  })
+
+  it('keeps a built-in object’s head to New attribute and its ···', async () => {
+    const original = loaders['objects/$objectSlug']
+    loaders['objects/$objectSlug'] = () => {
+      const page = original()
+      return 'object' in page && typeof page.object === 'object'
+        ? { ...page, object: { ...page.object, isSystem: true } }
+        : page
+    }
+    try {
+      await mount('/settings/objects/funds')
+      expect(headActions().map((b) => b.textContent.trim())).toEqual([
+        'New attribute',
+      ])
+      await openMenu('More for Funds')
+      expect(
+        Array.from(document.querySelectorAll('[role="menuitem"]')).map((i) =>
+          i.textContent.trim(),
+        ),
+      ).toEqual(['New relationship…', 'Copy link'])
+    } finally {
+      loaders['objects/$objectSlug'] = original
+    }
   })
 
   it('prints types in words, a Rules lane and ··· per row, the count in the head, no foot caption, and AI answers only where set', async () => {
@@ -1993,6 +2210,42 @@ describe('Search, Usage and Plugins, by sheets 04 and 07', () => {
     expect(heads).toEqual(['Limits', 'Runs'])
     expect(document.body.textContent).toContain('No runs yet.')
     expect(document.body.textContent).not.toContain('Read a deck')
+  })
+
+  describe('a plugin page head', () => {
+    const original = loaders['plugins/$integrationId']
+    const withDetail = (over: object) => () => {
+      const page = original()
+      return 'detail' in page && typeof page.detail === 'object'
+        ? { ...page, detail: { ...page.detail, ...over } }
+        : page
+    }
+    afterEach(() => {
+      loaders['plugins/$integrationId'] = original
+    })
+
+    it('carries an update alone as its one outline', async () => {
+      loaders['plugins/$integrationId'] = withDetail({ update: '1.1.0' })
+      await mount(`/settings/plugins/${PLUGIN_ID}`)
+      expect(headActions().map((b) => b.textContent.trim())).toEqual([
+        'Update to 1.1.0',
+      ])
+    })
+
+    it('folds Reset and Update into one ··· when both apply', async () => {
+      loaders['plugins/$integrationId'] = withDetail({
+        update: '1.1.0',
+        state: 'tripped',
+      })
+      await mount(`/settings/plugins/${PLUGIN_ID}`)
+      expect(headActions()).toEqual([])
+      await openMenu('More for Apollo')
+      expect(
+        Array.from(document.querySelectorAll('[role="menuitem"]')).map((i) =>
+          i.textContent.trim(),
+        ),
+      ).toEqual(['Reset', 'Update to 1.1.0'])
+    })
   })
 
   it('Plugins draws Available flush under Installed, both caps labels', async () => {

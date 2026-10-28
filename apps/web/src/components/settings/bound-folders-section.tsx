@@ -55,8 +55,8 @@ export function bindingStateOf(
   switch (b.status) {
     case 'active':
       return age === null
-        ? { tone: 'ok', text: `re-listing · ${filesOf(b.files)}` }
-        : { tone: 'ok', text: `in sync · ${age} · ${filesOf(b.files)}` }
+        ? { tone: 'ok', text: `Re-listing · ${filesOf(b.files)}` }
+        : { tone: 'ok', text: `In sync · ${age} · ${filesOf(b.files)}` }
     case 'error':
       return {
         tone: 'error',
@@ -67,7 +67,7 @@ export function bindingStateOf(
     case 'paused':
       return {
         tone: 'paused',
-        text: `paused · ${pausedLine(b.error, now)}`,
+        text: `Paused · ${pausedLine(b.error, now)}`,
       }
   }
 }

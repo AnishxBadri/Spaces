@@ -76,7 +76,7 @@ function ObjectsSection({
             mode="create"
             onSaved={() => router.invalidate()}
             trigger={
-              <Button size="sm" variant="outline">
+              <Button variant="outline">
                 <Plus className="size-3" strokeWidth={2} />
                 New object
               </Button>

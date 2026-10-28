@@ -103,7 +103,7 @@ export function defaultMailAccount(
 
 export type SyncState = {
   readonly tone: 'ok' | 'error' | 'revoked'
-  /** `In sync · 9 Oct`, `never synced`, the provider's reason, or `revoked`. */
+  /** `In sync · 9 Oct`, `Never synced`, the provider's reason, or `Revoked`. */
   readonly text: string
 }
 
@@ -119,7 +119,7 @@ export function syncStateOf(
       text: failed.errorReason ?? 'the provider gave no reason',
     }
   if (rows.length > 0 && rows.every((r) => r.status === 'revoked'))
-    return { tone: 'revoked', text: 'revoked' }
+    return { tone: 'revoked', text: 'Revoked' }
   const latest = rows
     .map((r) => r.lastSyncAt)
     .filter((at) => at !== null)
@@ -129,7 +129,7 @@ export function syncStateOf(
     tone: 'ok',
     text:
       latest === undefined
-        ? 'never synced'
+        ? 'Never synced'
         : `In sync · ${formatDay(latest, today)}`,
   }
 }

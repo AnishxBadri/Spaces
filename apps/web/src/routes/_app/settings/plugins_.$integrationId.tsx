@@ -12,8 +12,8 @@ import {
 import { PluginTemplate } from '#/components/integrations/plugin-template'
 import { useSettingsDraft } from '#/components/settings/settings-form'
 import { SettingsSection } from '#/components/settings/settings-section'
-import { Button } from '#/components/ui/button'
 import { useConfirm } from '#/components/ui/confirm-dialog'
+import { MoreMenu } from '#/components/ui/more-menu'
 import {
   getIntegration,
   removeIntegrationSecret,
@@ -221,37 +221,43 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
       title={detail.name}
       crumb="Integrations"
       action={
-        <>
-          {tripped ? (
-            <Button
-              size="sm"
-              disabled={pending}
-              onClick={() =>
-                void act(
-                  () => resetIntegration({ data: { id: detail.id } }),
-                  `${detail.name} reset · reloading`,
-                )
-              }
-            >
-              Reset
-            </Button>
-          ) : null}
-          {detail.update !== null ? (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={pending}
-              onClick={() =>
-                void act(
-                  () => updateIntegration({ data: { id: detail.id } }),
-                  `${detail.name} updated to ${detail.update ?? ''} · reloading`,
-                )
-              }
-            >
-              Update to {detail.update}
-            </Button>
-          ) : null}
-        </>
+        // One of the two is the head's outline action; both share a `···`.
+        // Not disabled while a write runs: a `···` with nothing enabled
+        // would vanish, so a second press is dropped instead.
+        <MoreMenu
+          variant="head"
+          label={detail.name}
+          items={[
+            ...(tripped
+              ? [
+                  {
+                    label: 'Reset',
+                    onSelect: () => {
+                      if (pending) return
+                      void act(
+                        () => resetIntegration({ data: { id: detail.id } }),
+                        `${detail.name} reset · reloading`,
+                      )
+                    },
+                  },
+                ]
+              : []),
+            ...(detail.update !== null
+              ? [
+                  {
+                    label: `Update to ${detail.update}`,
+                    onSelect: () => {
+                      if (pending) return
+                      void act(
+                        () => updateIntegration({ data: { id: detail.id } }),
+                        `${detail.name} updated to ${detail.update ?? ''} · reloading`,
+                      )
+                    },
+                  },
+                ]
+              : []),
+          ]}
+        />
       }
     >
       <PluginTemplate

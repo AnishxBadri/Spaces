@@ -74,7 +74,7 @@ export function isLeaveSettingsKey(e: KeyboardEvent): boolean {
  */
 export function SettingsChassis() {
   const navigate = useNavigate()
-  const { counts } = useSettingsNav()
+  const { counts, isAdmin } = useSettingsNav()
 
   useEffect(() => {
     const leave = (e: KeyboardEvent) => {
@@ -108,7 +108,7 @@ export function SettingsChassis() {
           <span className="min-w-0 flex-1 truncate">Settings</span>
         </button>
       </div>
-      <SettingsNav variant="chassis" counts={counts} />
+      <SettingsNav variant="chassis" counts={counts} isAdmin={isAdmin} />
     </div>
   )
 }

@@ -29,7 +29,6 @@ import {
   offerFor,
   providersFor,
   syncStateOf,
-  testingModeOf,
   wordsOf,
 } from '#/lib/connections/accounts'
 import type { Account, Offer, SyncState } from '#/lib/connections/accounts'
@@ -382,8 +381,6 @@ function pausesLine(count: number): string | null {
  * each product's last sync, and Disconnect for this page's products.
  * - A product's per-connection choices are drawn only when its plugin runs
  *   on the account: a mail sync's sharing and exclude list.
- * - Google's Testing mode, read off a refresh token that lapses, is one
- *   graphite line under the head: state, never a control.
  * - Sync now is drawn only for a product with a per-connection sync job.
  * - A storage account lists its bound folders; Disconnect then warns how
  *   many pause.
@@ -517,7 +514,6 @@ export function AccountSection({
       crumb="You"
       action={
         <Button
-          size="sm"
           variant="outline"
           disabled={pending || account.held.length === 0}
           onClick={() => void disconnectAll()}
@@ -529,12 +525,6 @@ export function AccountSection({
       <p className="px-3 pt-3 mono text-micro text-graphite">
         {provider} · {syncStateOf(account.held, today).text}
       </p>
-      {testingModeOf(account) ? (
-        <p className="px-3 pt-1 text-label text-graphite">
-          Google’s Testing mode ends this connection every 7 days. An Internal
-          app on Google Workspace avoids it.
-        </p>
-      ) : null}
       <div className="flex flex-col">
         <SettingsGroupHead title="Used for" />
         {productsOf(account.provider).map(({ product, entry }) => {

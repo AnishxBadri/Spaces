@@ -136,7 +136,7 @@ function RunLog({
               : `${usage.runs.length} listed · ${formatNumber(spent)} tokens`
           }
         />
-        <div className="flex h-8 items-center gap-3 border-b border-hairline field-label leading-4 text-graphite">
+        <div className="flex h-8 items-center gap-3 border-b border-hairline text-label text-graphite">
           <span className="min-w-0 flex-1">Run</span>
           <span className="w-24 shrink-0">Who</span>
           <span className="w-24 shrink-0">At</span>
@@ -298,7 +298,7 @@ function RunPanel({ detail }: { detail: RunDetail }) {
         </p>
       ) : null}
 
-      <div className="flex h-8 items-center gap-3 border-b border-hairline px-3 field-label leading-4 text-graphite">
+      <div className="flex h-8 items-center gap-3 border-b border-hairline px-3 text-label text-graphite">
         <span className="w-6 shrink-0">#</span>
         <span className="w-20 shrink-0">Tool</span>
         <span className="w-40 shrink-0">Model</span>
@@ -315,7 +315,7 @@ function RunPanel({ detail }: { detail: RunDetail }) {
         ))
       )}
 
-      <div className="flex h-8 items-center gap-3 border-b border-hairline px-3 field-label leading-4 text-graphite">
+      <div className="flex h-8 items-center gap-3 border-b border-hairline px-3 text-label text-graphite">
         <span className="min-w-0 flex-1">Suggestions it produced</span>
         <span className="w-20 shrink-0 text-right">Status</span>
       </div>
@@ -420,7 +420,7 @@ function LoneCalls({ calls }: { calls: ReadonlyArray<LoneCall> }) {
         title="Calls outside a run"
         count={String(calls.length)}
       />
-      <div className="flex h-8 items-center gap-3 border-b border-hairline field-label leading-4 text-graphite">
+      <div className="flex h-8 items-center gap-3 border-b border-hairline text-label text-graphite">
         <span className="w-20 shrink-0">Lane</span>
         <span className="min-w-0 flex-1">Provider · model</span>
         <span className="w-28 shrink-0">Who</span>

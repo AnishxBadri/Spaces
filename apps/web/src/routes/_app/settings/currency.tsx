@@ -83,7 +83,7 @@ function FxSection({
           count={`${rates.length} · ${currencies} ${currencies === 1 ? 'currency' : 'currencies'}`}
         />
 
-        <div className="flex h-8 items-center border-b border-hairline field-label leading-4 text-graphite">
+        <div className="flex h-8 items-center border-b border-hairline text-label text-graphite">
           <span className="min-w-0 flex-1">Pair</span>
           <span className="w-28 shrink-0 pr-3 text-right">Rate</span>
           <span className="w-28 shrink-0">From</span>

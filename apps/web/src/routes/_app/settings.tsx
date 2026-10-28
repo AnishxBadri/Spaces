@@ -65,7 +65,7 @@ function SettingsShell() {
       <div className="flex min-h-full flex-col">
         <SettingsForm>
           <div className="md:hidden">
-            <SettingsNav variant="strip" counts={counts} />
+            <SettingsNav variant="strip" counts={counts} isAdmin={isAdmin} />
           </div>
           {/* A 700px column inside the gutters (the Save bar matches it); the
               foot clears the bar, so it never covers the last row. */}

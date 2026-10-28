@@ -134,7 +134,7 @@ describe('syncStateOf', () => {
     ).toEqual({ tone: 'error', text: 'invalid_grant' })
     expect(syncStateOf([row({ status: 'revoked' })], TODAY)).toEqual({
       tone: 'revoked',
-      text: 'revoked',
+      text: 'Revoked',
     })
     expect(
       syncStateOf(
@@ -147,7 +147,7 @@ describe('syncStateOf', () => {
     ).toEqual({ tone: 'ok', text: 'In sync · 9 Oct' })
     expect(syncStateOf([row()], TODAY)).toEqual({
       tone: 'ok',
-      text: 'never synced',
+      text: 'Never synced',
     })
   })
 })

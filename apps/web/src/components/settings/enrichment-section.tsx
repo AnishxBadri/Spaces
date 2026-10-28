@@ -593,7 +593,7 @@ function GridBlock({ grids }: { grids: ReadonlyArray<FillsWhat> }) {
       />
       <div
         aria-hidden
-        className="flex h-8 items-center gap-3 border-b border-hairline px-3 mono text-micro text-graphite"
+        className="flex h-8 items-center gap-3 border-b border-hairline px-3 text-label text-graphite"
       >
         <span className="min-w-0 flex-1">Attribute</span>
         <span className="w-44 shrink-0">Fill from</span>

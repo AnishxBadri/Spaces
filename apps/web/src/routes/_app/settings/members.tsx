@@ -162,7 +162,7 @@ function MembersSection({
       crumb="Workspace"
       action={
         isAdmin ? (
-          <Button size="sm" onClick={() => setInviting(true)}>
+          <Button variant="outline" onClick={() => setInviting(true)}>
             Invite
           </Button>
         ) : null
@@ -170,7 +170,7 @@ function MembersSection({
     >
       <div className="flex flex-col">
         <SettingsGroupHead title="People" count={members.length} />
-        <div className="flex h-8 items-center gap-3 border-b border-hairline field-label leading-4 text-graphite">
+        <div className="flex h-8 items-center gap-3 border-b border-hairline text-label text-graphite">
           <span className="min-w-0 flex-1">Person</span>
           <span className="w-28 shrink-0">Role</span>
           <span className="w-6 shrink-0" />

@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { widenNote } from './attribute-dialog'
-import { RegistryList } from './registry-list'
+import { RegistryList, ruleWords } from './registry-list'
 import type { RegistryAttr } from './registry-list'
 
 /**
@@ -149,6 +149,54 @@ describe('the ledger row’s ··· (R1)', () => {
     expect(system).toContain('Edit…')
     expect(system).not.toContain('Archive')
     expect(await menuOf('Lead investor')).toContain('Archive')
+  })
+})
+
+describe('the ledger row', () => {
+  it('opens its Edit window on a click, and leaves a click on its ··· to the menu', async () => {
+    await mount([row({ name: 'Lead investor', slug: 'lead_investor' })])
+    const li = document.querySelector('[data-attribute="lead_investor"]')
+    if (!(li instanceof HTMLElement)) throw new Error('no row')
+    // The name is text, not an inline field: the click is the row's.
+    expect(li.querySelector('input')).toBeNull()
+    act(() => {
+      li.querySelector('[aria-label="More for Lead investor"]')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true }),
+      )
+    })
+    await flush()
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    act(() => {
+      li.querySelector('span:not([aria-hidden])')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true }),
+      )
+    })
+    await flush()
+    const dialog = document.querySelector('[role="dialog"]')
+    expect(dialog).not.toBeNull()
+    expect(dialog?.querySelector('#attr-name')).not.toBeNull()
+  })
+
+  it('prints filter and sort in the rules lane only when they are set', async () => {
+    expect(ruleWords(row({}), null)).toBe('')
+    expect(ruleWords(row({ filterable: true }), null)).toBe('filter')
+    expect(ruleWords(row({ filterable: true, sortable: true }), null)).toBe(
+      'filter · sort',
+    )
+    await mount([
+      row({ name: 'Stage', slug: 'stage', filterable: true, sortable: true }),
+      row({
+        id: '00000000-0000-4000-8000-000000000002',
+        name: 'Notes',
+        slug: 'notes',
+        sortOrder: 20,
+      }),
+    ])
+    const rules = (slug: string) =>
+      document.querySelector(`[data-attribute="${slug}"] [data-rules]`)
+        ?.textContent
+    expect(rules('stage')).toBe('filter · sort')
+    expect(rules('notes')).toBe('')
   })
 })
 

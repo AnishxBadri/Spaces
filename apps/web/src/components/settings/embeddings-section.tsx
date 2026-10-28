@@ -198,7 +198,7 @@ export function EmbeddingsSection({
           />
         </SettingsRow>
 
-        <div className="flex h-8 items-center gap-3 border-b border-hairline px-3 field-label leading-4 text-graphite">
+        <div className="flex h-8 items-center gap-3 border-b border-hairline px-3 text-label text-graphite">
           <span className="w-5 shrink-0" />
           <span className="w-56 shrink-0">Model</span>
           <span className="w-20 shrink-0">Emits</span>

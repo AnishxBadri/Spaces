@@ -31,9 +31,9 @@ describe('UploadPlugin', () => {
 })
 
 /**
- * Available, rendered the way the server renders it: tabs by job with a
- * count each, Other only when an entry names no role, every offered plugin
- * under All with its Install.
+ * Available, rendered the way the server renders it: a Segmented by job with
+ * a count in each segment (not tabs), Other only when an entry names no role,
+ * every offered plugin under All with its Install.
  */
 const plugin = (
   pluginId: string,
@@ -57,9 +57,9 @@ const pane = (available: Array<AvailablePlugin>, disabled = false) =>
     />,
   )
 
-/** Each tab as `label count`, in order. */
+/** Each segment as `label count`, in order. */
 const tabsOf = (html: string) =>
-  [...html.matchAll(/role="tab"[^>]*>(.*?)<\/button>/g)].map((m) =>
+  [...html.matchAll(/role="radio"[^>]*>(.*?)<\/button>/g)].map((m) =>
     m[1]
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
@@ -67,13 +67,17 @@ const tabsOf = (html: string) =>
   )
 
 describe('RegistryPane', () => {
-  it('groups the registry by job, a count on each tab, every plugin under All', () => {
+  it('groups the registry by job in a Segmented, a count in each segment, every plugin under All', () => {
     const html = pane([
       plugin('airtable', ['import']),
       plugin('rss', ['feeds']),
       plugin('m365', ['email-calendar', 'files']),
     ])
     expect(html).toContain('Available')
+    expect(html).toContain('role="radiogroup"')
+    expect(html).not.toContain('role="tab"')
+    // The segments carry the counts, so the head prints none.
+    expect(html).not.toMatch(/>Available<\/h3><span[^>]*>3</)
     expect(tabsOf(html)).toEqual([
       'All 3',
       'Email &amp; calendar 1',
@@ -97,9 +101,9 @@ describe('RegistryPane', () => {
     expect(html).toContain('>Other<')
   })
 
-  it('lets a member read every tab but install nothing', () => {
+  it('lets a member read every segment but install nothing', () => {
     const html = pane([plugin('rss', ['feeds'])], true)
-    expect(html).not.toMatch(/role="tab"[^>]*disabled=""/)
+    expect(html).not.toMatch(/role="radio"[^>]*disabled=""/)
     expect(html).toMatch(/disabled=""[^>]*>Install<\/button>/)
   })
 })

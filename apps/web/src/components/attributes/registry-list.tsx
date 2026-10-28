@@ -3,7 +3,10 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { readAiConfig } from '@spaces/core/ai/attribute-ai'
 import { AttributeDialog } from './attribute-dialog'
-import { SettingsGroupHead } from '#/components/settings/settings-section'
+import {
+  SettingsGroupHead,
+  rowOpens,
+} from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { MoreMenu } from '#/components/ui/more-menu'
 import { reorderAttributes, updateAttribute } from '#/lib/server-fns'
@@ -15,8 +18,9 @@ import { cn } from '#/lib/utils'
  * the live count and `drag to reorder` in its head, then one row per
  * attribute — grip · name · type in words (`Multi-select · 6`,
  * `Record · People`) · rules (`↔ Team · N:N`, `identity · unique`,
- * `filled by Apollo`) ·
+ * `filter · sort`, `filled by Apollo`) ·
  * `···` (Edit, Move up, Move down, and Archive on a user attribute only).
+ * A click on a live row opens its Edit window.
  * Drag or the menu's moves persist sort_order, which every table and rail
  * reads. Archived attributes wait in a collapsed group below — never
  * deleted, values intact, one click from coming back. Keyed on the object
@@ -93,12 +97,15 @@ export function typeWords(
 /**
  * An attribute's rules in words: its relationship pair (`↔ Team · N:N`,
  * `· pair archived` once the other half is), required, an identity key
- * (unique by construction), the enrichment source that fills it, an AI
- * answer. `filledBy` is the source's
- * name, or null when none fills it.
+ * (unique by construction), `filter` and `sort` only when the attribute is
+ * flagged for them, the enrichment source that fills it, an AI answer.
+ * `filledBy` is the source's name, or null when none fills it.
  */
 export function ruleWords(
-  attr: Pick<RegistryAttr, 'type' | 'options' | 'archived' | 'pair'>,
+  attr: Pick<
+    RegistryAttr,
+    'type' | 'options' | 'archived' | 'pair' | 'filterable' | 'sortable'
+  >,
   filledBy: string | null,
 ): string {
   const stored = attr.options
@@ -114,6 +121,8 @@ export function ruleWords(
           .join(' · '),
     stored.required ? 'required' : null,
     stored.identityKey === undefined ? null : 'identity · unique',
+    attr.filterable ? 'filter' : null,
+    attr.sortable ? 'sort' : null,
     filledBy === null ? null : `filled by ${filledBy}`,
     readAiConfig(attr) === null ? null : 'AI answers',
     attr.archived ? 'values kept' : null,
@@ -213,7 +222,7 @@ export function RegistryList({
         />
         <div
           aria-hidden
-          className="flex h-8 items-center gap-3 border-b border-hairline field-label leading-4 text-graphite"
+          className="flex h-8 items-center gap-3 border-b border-hairline text-label text-graphite"
         >
           <span className={LANE.grip} />
           <span className="min-w-0 flex-1">Attribute</span>
@@ -333,6 +342,7 @@ function AttributeRow({
   const router = useRouter()
   const [editing, setEditing] = useState(false)
   const draggable = Boolean(onDragStart) && canReshape
+  const opens = canReshape && !attr.archived
 
   async function act(
     patch: Parameters<typeof updateAttribute>[0]['data'] extends infer D
@@ -400,8 +410,10 @@ function AttributeRow({
         e.preventDefault()
         onDrop()
       }}
+      {...(opens ? { onClick: rowOpens(() => setEditing(true)) } : {})}
       className={cn(
         'flex h-ledger-row items-center gap-3 border-b border-rule transition-[background-color,opacity] duration-150 ease-out-quart',
+        opens && 'cursor-pointer hover:bg-bone',
         dragging && 'opacity-50',
         over && 'bg-bone',
       )}
@@ -419,13 +431,13 @@ function AttributeRow({
         ⋮⋮
       </span>
 
-      <span className="min-w-0 flex-1">
-        <InlineName
-          name={attr.name}
-          disabled={!canReshape}
-          muted={attr.archived}
-          onSave={(name) => act({ name })}
-        />
+      <span
+        className={cn(
+          'min-w-0 flex-1 truncate text-ui font-medium',
+          attr.archived && 'text-graphite',
+        )}
+      >
+        {attr.name}
       </span>
 
       <span
@@ -494,45 +506,6 @@ function RowMenu({
         opens: true,
         onSelect: v.onSelect,
       }))}
-    />
-  )
-}
-
-function InlineName({
-  name,
-  disabled,
-  muted,
-  onSave,
-}: {
-  name: string
-  disabled?: boolean
-  muted?: boolean
-  onSave: (name: string) => void
-}) {
-  const [draft, setDraft] = useState(name)
-  useEffect(() => setDraft(name), [name])
-  return (
-    <input
-      value={draft}
-      disabled={disabled}
-      aria-label="Attribute name"
-      spellCheck={false}
-      autoComplete="off"
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => draft.trim() && draft !== name && onSave(draft.trim())}
-      onKeyDown={(e) => {
-        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- React types a key event's target as EventTarget; the handler is on the input itself
-        if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-        if (e.key === 'Escape') {
-          setDraft(name)
-          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- React types a key event's target as EventTarget; the handler is on the input itself
-          ;(e.target as HTMLInputElement).blur()
-        }
-      }}
-      className={cn(
-        'focus-ring block w-full truncate rounded-md bg-transparent text-ui font-medium disabled:opacity-100',
-        muted && 'text-graphite',
-      )}
     />
   )
 }

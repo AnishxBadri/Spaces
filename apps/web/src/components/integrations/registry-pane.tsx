@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { SettingsGroupHead } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
-import { Tabs } from '#/components/ui/tabs'
+import { Segmented } from '#/components/ui/segmented'
 import { catalogueTabs, inTab, roleWords } from '#/lib/integrations/catalogue'
 import type { CatalogueTab } from '#/lib/integrations/catalogue'
 import type { AvailablePlugin, RegistryView } from '#/lib/server-fns'
@@ -58,8 +58,9 @@ export const pluginAnchor = (pluginId: string): string => `plugin-${pluginId}`
 
 /**
  * Available: every plugin the image's signed registry offers that this box
- * has not installed, in tabs by the job it does — All, each role some entry
- * names, and Other only when an entry names none. One row per plugin: mark,
+ * has not installed, filtered by the job it does — a `Segmented` of All, each
+ * role some entry names, and Other only when an entry names none, each with
+ * its count, so the head prints none. One row per plugin: mark,
  * name and version over what it does, its jobs and what it will ask for,
  * Install. A removed plugin is back here, and installing it again reuses its
  * old row.
@@ -87,7 +88,9 @@ export function RegistryPane({
     <div className="flex flex-col">
       <SettingsGroupHead
         title="Available"
-        count={String(available.length)}
+        {...(available.length > 0 && view.error === null
+          ? {}
+          : { count: String(available.length) })}
         action="signed by the project"
       />
       {view.error !== null ? (
@@ -99,12 +102,15 @@ export function RegistryPane({
           Nothing in the registry that is not installed.
         </p>
       ) : (
-        <Tabs
-          label="Available plugins by job"
-          items={tabs}
-          value={tab}
-          onValueChange={setTab}
-        >
+        <>
+          <div className="flex border-b border-rule px-3 py-2">
+            <Segmented<CatalogueTab>
+              label="Available plugins by job"
+              options={tabs}
+              value={tab}
+              onChange={setTab}
+            />
+          </div>
           <ol>
             {shown.map((plugin, i) => (
               <li
@@ -152,7 +158,7 @@ export function RegistryPane({
               </li>
             ))}
           </ol>
-        </Tabs>
+        </>
       )}
     </div>
   )

@@ -14,15 +14,10 @@ import {
   SettingsGroupHead,
   SettingsSection,
 } from '#/components/settings/settings-section'
-import { ListMenu } from '#/components/table/list-menu'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { useConfirm } from '#/components/ui/confirm-dialog'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '#/components/ui/tooltip'
+import { MENU_RULE, MoreMenu } from '#/components/ui/more-menu'
 import {
   IDENTITY_KEYS,
   IDENTITY_KEY_ATTRIBUTES,
@@ -102,6 +97,9 @@ function ObjectAttributesPage() {
   const [editingObject, setEditingObject] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
   useHotkey('a', () => setCreating(true))
+  // A custom object's own shape — its names and whether it is archived — is
+  // the admin's; a built-in one's is core's.
+  const reshapes = isAdmin && !object.isSystem
 
   async function toggleArchived() {
     if (!object.archived) {
@@ -173,44 +171,59 @@ function ObjectAttributesPage() {
       crumb="Workspace"
       action={
         <>
-          {object.archived ? null : (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setRelating(true)}
-            >
-              New relationship
-            </Button>
-          )}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button size="sm" onClick={() => setCreating(true)}>
-                <Plus className="size-3" strokeWidth={2} />
-                New attribute
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>A</TooltipContent>
-          </Tooltip>
-          {!object.isSystem && isAdmin ? (
-            <>
-              <ListMenu
-                label={object.plural}
-                verbs={[
-                  { label: 'Edit…', onSelect: () => setEditingObject(true) },
-                  {
-                    label: object.archived ? 'Restore' : 'Archive',
-                    onSelect: () => void toggleArchived(),
-                  },
-                ]}
-              />
-              <ObjectDialog
-                mode="edit"
-                object={object}
-                open={editingObject}
-                onOpenChange={setEditingObject}
-                onSaved={() => router.invalidate()}
-              />
-            </>
+          <Button
+            variant="outline"
+            shortcut="A"
+            onClick={() => setCreating(true)}
+          >
+            <Plus className="size-3" strokeWidth={2} />
+            New attribute
+          </Button>
+          {/* Copy link is on every object, so the `···` never folds into a
+              second head button on a built-in one. */}
+          <MoreMenu
+            variant="head"
+            label={object.plural}
+            items={[
+              ...(object.archived
+                ? []
+                : [
+                    {
+                      label: 'New relationship…',
+                      opens: true,
+                      onSelect: () => setRelating(true),
+                    },
+                  ]),
+              ...(reshapes
+                ? [
+                    {
+                      label: 'Edit…',
+                      opens: true,
+                      onSelect: () => setEditingObject(true),
+                    },
+                  ]
+                : []),
+              MENU_RULE,
+              { label: 'Copy link', copy: () => window.location.href },
+              ...(reshapes
+                ? [
+                    {
+                      label: object.archived ? 'Restore' : 'Archive…',
+                      opens: !object.archived,
+                      onSelect: () => void toggleArchived(),
+                    },
+                  ]
+                : []),
+            ]}
+          />
+          {reshapes ? (
+            <ObjectDialog
+              mode="edit"
+              object={object}
+              open={editingObject}
+              onOpenChange={setEditingObject}
+              onSaved={() => router.invalidate()}
+            />
           ) : null}
           <RelationshipDialog
             objectId={object.id}

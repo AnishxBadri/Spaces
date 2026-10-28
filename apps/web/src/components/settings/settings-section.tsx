@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { ReactElement, ReactNode } from 'react'
+import type { MouseEvent, ReactElement, ReactNode } from 'react'
 import { SettingsForm, useInSettingsForm } from './settings-form'
 import type { SettingsCrumb } from './settings-nav'
 import {
@@ -178,6 +178,25 @@ export function SettingsTip({
       <TooltipContent className="max-w-64">{tip}</TooltipContent>
     </Tooltip>
   )
+}
+
+/**
+ * The click handler of a ledger row whose click opens its Edit window.
+ * - A click on a control inside the row stays that control's.
+ * - A click inside a window or menu the row renders is ignored: React
+ *   bubbles it here through the portal although the row does not hold it.
+ */
+export function rowOpens(open: () => void) {
+  return (e: MouseEvent<HTMLElement>) => {
+    const row = e.currentTarget
+    const target = e.target
+    if (!(target instanceof Element) || !row.contains(target)) return
+    const control = target.closest(
+      'button, a, input, textarea, select, label, [role="menuitem"]',
+    )
+    if (control !== null && control !== row && row.contains(control)) return
+    open()
+  }
 }
 
 /**
