@@ -46,20 +46,20 @@ export function KeyboardHelp({
           </div>
           <div className="flex min-w-0 flex-1 flex-col">
             <Group label="Create">
-              <Row label="Task · from Today or Tasks" keys="T" />
-              <Row label="Task dates · fri, in 2w, next month" keys="↵" />
-              <Row label="Note · from Notes or a space" keys="N" />
-              <Row label="Space · from Spaces" keys="S" />
-              <Row label="Attribute · from an object's settings" keys="A" />
+              <Row label="New task · Today, Tasks" keys="T" />
+              <Row label="Due · Fri, in 2w, next month" keys="↵" />
+              <Row label="New note · Notes, a space" keys="N" />
+              <Row label="New space · Spaces" keys="S" />
+              <Row label="New attribute · object settings" keys="A" />
             </Group>
             <Group label="On a deal" top>
               <Row label="Log interaction" keys="L" />
               <Row label="Move stage" keys="M" />
-              <Row label="Task" keys="T" />
+              <Row label="New task" keys="T" />
             </Group>
             <Group label="In a window" top>
               <Row label="Submit" keys={`${mod}↵`} />
-              <Row label="Add & keep the composer open" keys="⇧↵" />
+              <Row label="Add and keep it open" keys="⇧↵" />
               <Row label="Close · revert a cell" keys="esc" />
             </Group>
           </div>
