@@ -7,3 +7,9 @@ export type DueDay = { readonly day: string; readonly n: number }
 /** Open tasks due today or overdue, as of `today` (ISO, compared lexically). */
 export const dueCount = (days: ReadonlyArray<DueDay>, today: string): number =>
   days.reduce((sum, d) => (d.day <= today ? sum + d.n : sum), 0)
+
+/** Open tasks due before `today`: the ones that turn the sidebar's count red. */
+export const overdueCount = (
+  days: ReadonlyArray<DueDay>,
+  today: string,
+): number => days.reduce((sum, d) => (d.day < today ? sum + d.n : sum), 0)

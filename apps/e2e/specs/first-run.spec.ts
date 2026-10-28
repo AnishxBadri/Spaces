@@ -75,9 +75,43 @@ test.describe('the first-run window', () => {
     firstRun,
   }) => {
     await page.goto(`${firstRun.url}/setup`)
+    await expect(page.getByText('Setup · 1 of 2')).toBeVisible()
+    await expect(
+      page.getByText(
+        'Signup closes for good once this account exists. Everyone else joins by invitation.',
+      ),
+    ).toBeVisible()
+    await expect(
+      page.getByText('Self-hosted · nothing here leaves this server'),
+    ).toBeVisible()
     await fillSetup(page, token)
     await expect(page.getByText('Start with demo data?')).toBeVisible()
+    await expect(page.getByText('Setup · 2 of 2')).toBeVisible()
+    await expect(
+      page.getByText(
+        'A worked example in data-center cooling: a small space tree, three companies and a memo. General removes it in one step.',
+      ),
+    ).toBeVisible()
+    // Load demo data on the left, Start empty — the primary — on the right.
+    await expect(page.locator('main button')).toHaveText([
+      'Load demo data',
+      'Start empty',
+    ])
     expect(await firstRun.userCount()).toBe(1)
+  })
+
+  test('once the admin exists, a signed-out /setup lands on login, which says so', async ({
+    page,
+    firstRun,
+  }) => {
+    await page.goto(`${firstRun.url}/setup`)
+    await expect(page).toHaveURL(`${firstRun.url}/login?from=setup`)
+    await expect(
+      page.getByText(
+        'First Run Capital is set up. Everyone else joins by invitation.',
+      ),
+    ).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
   })
 
   test('a second use of the same token is refused', async ({

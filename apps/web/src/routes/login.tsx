@@ -10,20 +10,26 @@ import { authClient } from '#/lib/auth-client'
 import { getSession, getSetupState } from '#/lib/server-fns'
 
 export const Route = createFileRoute('/login')({
-  // `reset=done` is where a reset link lands once the password is set.
-  validateSearch: z.object({ reset: z.string().optional() }),
+  // `reset=done` is where a reset link lands once the password is set;
+  // `from=setup` is where a closed /setup sends whoever opened it.
+  validateSearch: z.object({
+    reset: z.string().optional(),
+    from: z.string().optional(),
+  }),
   beforeLoad: async () => {
-    const { needsSetup } = await getSetupState()
+    const { needsSetup, workspaceName } = await getSetupState()
     if (needsSetup) throw redirect({ to: '/setup' })
     const session = await getSession()
     if (session) throw redirect({ to: '/today' })
+    return { workspaceName }
   },
   component: LoginPage,
 })
 
 function LoginPage() {
   const navigate = useNavigate()
-  const { reset } = Route.useSearch()
+  const { reset, from } = Route.useSearch()
+  const { workspaceName } = Route.useRouteContext()
   const [error, setError] = useState<string | null>(null)
   const [forgot, setForgot] = useState(false)
   const [pending, setPending] = useState(false)
@@ -54,7 +60,13 @@ function LoginPage() {
     <AuthShell
       eyebrow="Sign in"
       title="Welcome back"
-      blurb={reset === 'done' ? 'Password set. Sign in with it.' : null}
+      blurb={
+        reset === 'done'
+          ? 'Password set. Sign in with it.'
+          : from === 'setup'
+            ? `${workspaceName ?? 'This workspace'} is set up. Everyone else joins by invitation.`
+            : null
+      }
       foot={
         forgot
           ? 'Forgot it? An admin can send you a reset link.'

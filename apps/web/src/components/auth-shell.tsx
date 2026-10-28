@@ -18,7 +18,8 @@ export function AuthShell({
   title: ReactNode
   blurb?: ReactNode
   foot?: ReactNode
-  children: ReactNode
+  /** The form; a page that only says something (a dead link) has none. */
+  children?: ReactNode
 }) {
   return (
     <main className="flex min-h-dvh flex-col items-center bg-paper px-6">
@@ -31,7 +32,7 @@ export function AuthShell({
           <h1 className="title-serif">{title}</h1>
           {blurb ? <p className="text-ui text-graphite">{blurb}</p> : null}
         </div>
-        <div className="pt-5">{children}</div>
+        {children === undefined ? null : <div className="pt-5">{children}</div>}
         {foot ? (
           <p className="mt-6 mono text-micro text-graphite">{foot}</p>
         ) : null}

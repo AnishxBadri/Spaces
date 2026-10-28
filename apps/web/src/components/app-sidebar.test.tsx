@@ -22,8 +22,9 @@ import type * as RouterModule from '@tanstack/react-router'
 
 /**
  * The chassis, mounted under a memory router: the folding groups, the starred
- * spaces under Spaces, the pinned views under their object, the account row's
- * two icons and the current row's tab.
+ * spaces under Spaces, the pinned views under their object, the foot (Ask
+ * above the account row), the two menus, the phone drawer's missing keys and
+ * the current row's tab.
  *
  * The DOM is a happy-dom `Window` on this file's globals, so the per-file
  * database setup stays on node.
@@ -39,7 +40,8 @@ type PinnedAnswer = {
 /** What the server answers for pinned ids: these, when asked about. */
 const served = vi.hoisted(() => {
   const views: Array<PinnedAnswer> = []
-  return { views, drafts: 0 }
+  const members: Array<{ id: string; banned: boolean | null }> = []
+  return { views, drafts: 0, members }
 })
 
 vi.mock('#/lib/server-fns', () => ({
@@ -47,6 +49,7 @@ vi.mock('#/lib/server-fns', () => ({
     served.views.filter((v) => data.ids.includes(v.id)),
   ),
   countEmailDrafts: vi.fn(async () => served.drafts),
+  listMembers: vi.fn(async () => served.members),
 }))
 
 const win = new Window({ url: 'http://localhost/' })
@@ -99,6 +102,7 @@ beforeEach(() => {
   localStorage.clear()
   served.views.length = 0
   served.drafts = 0
+  served.members.length = 0
   const host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -116,6 +120,10 @@ type HeadProps = {
   workspaceLogo?: string | null
   collapsed?: boolean
   tasksDue?: number
+  tasksOverdue?: number
+  isAdmin?: boolean
+  drawer?: boolean
+  onOpenKeyboard?: () => void
 }
 
 async function mount(
@@ -182,6 +190,36 @@ const button = (name: RegExp) => {
 
 const click = (el: { click: () => void }) => act(() => el.click())
 
+/** A fresh root for a second mount inside one test. */
+function remount() {
+  act(() => root.unmount())
+  const host = document.createElement('div')
+  document.body.append(host)
+  root = createRoot(host)
+}
+
+/** Opens a Radix menu from the keyboard, then lets its queries land. */
+async function openMenu(trigger: Element) {
+  act(() => {
+    trigger.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+    )
+  })
+  await settle()
+  await settle()
+}
+
+const menuItems = () =>
+  Array.from(document.querySelectorAll('[role="menuitem"]')).map((el) =>
+    el.textContent.trim(),
+  )
+
+const one = (selector: string) => {
+  const el = document.querySelector(selector)
+  if (!el) throw new Error(`no ${selector}`)
+  return el
+}
+
 describe('the chassis', () => {
   it('draws Work, then Library, Objects and Capital', async () => {
     await mount('/today')
@@ -200,17 +238,26 @@ describe('the chassis', () => {
     ])
   })
 
-  it('prints Tasks’ due count in its lane, else its chord', async () => {
-    const tasksLane = () =>
-      nav().querySelector('a[href="/tasks"]')?.lastElementChild?.textContent
+  it('prints Tasks’ due count in ink, destructive only when a task is overdue, else its chord', async () => {
+    const tasksLane = () => {
+      const lane = nav().querySelector('a[href="/tasks"]')?.lastElementChild
+      if (!lane) throw new Error('no tasks lane')
+      return lane
+    }
     await mount('/today', [], { tasksDue: 3 })
-    expect(tasksLane()).toBe('3 due')
-    act(() => root.unmount())
-    const host = document.createElement('div')
-    document.body.append(host)
-    root = createRoot(host)
+    expect(tasksLane().textContent).toBe('3 due')
+    expect(tasksLane().className).toContain('text-foreground')
+    expect(tasksLane().className).not.toContain('text-destructive')
+
+    remount()
+    await mount('/today', [], { tasksDue: 3, tasksOverdue: 1 })
+    expect(tasksLane().textContent).toBe('3 due')
+    expect(tasksLane().className).toContain('text-destructive')
+
+    remount()
     await mount('/today', [], { tasksDue: 0 })
-    expect(tasksLane()).toBe('G K')
+    expect(tasksLane().textContent).toBe('G K')
+    expect(tasksLane().className).toContain('text-graphite')
   })
 
   it('folds a group to its heading and count, and remembers it', async () => {
@@ -278,30 +325,71 @@ describe('the chassis', () => {
     expect(rows()).not.toContain('Property ops')
   })
 
-  it('puts Upload and Settings on the account row as labelled icons', async () => {
+  it('puts Settings alone on the account row, and Upload nowhere', async () => {
     await mount('/today')
-    expect(button(/^Upload$/).textContent).toBe('')
-    const settings = document.querySelector('a[aria-label="Settings"]')
+    const account = one('[data-account-row]')
+    const settings = account.querySelector('a[aria-label="Settings"]')
     expect(settings?.getAttribute('href')).toBe('/settings')
+    expect(account.querySelectorAll('a, button')).toHaveLength(2)
     expect(nav().querySelector('a[href="/settings"]')).toBeNull()
+    expect(document.querySelector('[aria-label="Upload"]')).toBeNull()
+  })
+
+  it('draws Ask as a foot row above the account row, with ⌘J in its lane', async () => {
+    await mount('/today')
+    expect(nav().querySelector('a[href="/ask"]')).toBeNull()
+    const ask = one('[data-ask-row]')
+    expect(ask.querySelector('a')?.getAttribute('href')).toBe('/ask')
+    expect(ask.textContent).toMatch(/^Ask(⌘J|Ctrl J)$/)
+    const follows = (a: Element, b: Element) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+    expect(follows(nav(), ask)).toBe(true)
+    expect(follows(ask, one('[data-account-row]'))).toBe(true)
+  })
+
+  it('keeps Ask at the foot when collapsed, above Settings and the account', async () => {
+    await mount('/today', [], { collapsed: true })
+    expect(nav().querySelector('a[href="/ask"]')).toBeNull()
+    const ask = one('[data-ask-row]')
+    expect(ask.getAttribute('href')).toBe('/ask')
+    const settings = one('a[aria-label="Settings"]')
+    const follows = (a: Element, b: Element) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+    expect(follows(ask, settings)).toBe(true)
+    expect(follows(settings, one('[data-account-row]'))).toBe(true)
+    expect(document.querySelector('[aria-label="Upload"]')).toBeNull()
+  })
+
+  it('prints no key hints in the phone drawer, but keeps Tasks’ count', async () => {
+    await mount('/today', [], { drawer: true, tasksDue: 8 })
+    const lanes = Array.from(document.querySelectorAll('[data-lane]')).map(
+      (el) => el.textContent,
+    )
+    expect(lanes).toEqual(['8 due'])
+    expect(button(/^Search or jump to/).querySelector('kbd')).toBeNull()
+    expect(one('[data-ask-row]').textContent).toBe('Ask')
+    // The drawer has no head: the top bar carries the wordmark.
+    expect(document.querySelector('[data-workspace-head]')).toBeNull()
+  })
+
+  it('lists the account menu in words: Drafts, Keyboard, Sign out', async () => {
+    await mount('/today', [], { onOpenKeyboard: () => {} })
+    await openMenu(button(/Anish Badri/))
+    expect(document.body.textContent).toContain(
+      'Signed in as anish@fund.example',
+    )
+    expect(menuItems()).toEqual(['Drafts0', 'Keyboard?', 'Sign out'])
+    const menu = one('[role="menu"]')
+    expect(menu.querySelector('svg')).toBeNull()
   })
 
   it('counts the drafts in the account menu, read again each time it opens', async () => {
     served.drafts = 1
     await mount('/today')
     const trigger = button(/Anish Badri/)
-    const openMenu = async () => {
-      act(() => {
-        trigger.dispatchEvent(
-          new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
-        )
-      })
-      await settle()
-      await settle()
-    }
     const count = () =>
       document.querySelector('[data-drafts-count]')?.textContent ?? null
-    await openMenu()
+    await openMenu(trigger)
     expect(count()).toBe('1')
     // A draft trashed elsewhere: the next opening reads the new number.
     served.drafts = 0
@@ -311,7 +399,7 @@ describe('the chassis', () => {
       )
     })
     await settle()
-    await openMenu()
+    await openMenu(trigger)
     expect(count()).toBe('0')
   })
 
@@ -342,12 +430,28 @@ describe('the head', () => {
 
   it('draws the monogram beside the workspace name when there is no logo', async () => {
     await mount('/today', [], { workspaceName: 'northwind Capital' })
-    const home = document.querySelector(
-      'a[aria-label="northwind Capital home"]',
-    )
-    expect(home?.textContent).toBe('Nnorthwind Capital')
+    expect(one('[data-workspace-head]').textContent).toBe('Nnorthwind Capital')
     expect(mark().hasAttribute('data-monogram')).toBe(true)
     expect(mark().getAttribute('style')).toContain('width: 24px')
+    expect(mark().className).toContain('font-serif')
+  })
+
+  it('opens the workspace menu: General, Members with the active count, Invite for an admin', async () => {
+    served.members.push(
+      { id: 'a', banned: false },
+      { id: 'b', banned: null },
+      { id: 'c', banned: true },
+    )
+    await mount('/today', [], { workspaceName: 'Northwind', isAdmin: true })
+    await openMenu(one('[data-workspace-head]'))
+    expect(menuItems()).toEqual(['General', 'Members2', 'Invite a member…'])
+    expect(one('[data-members-count]').textContent).toBe('2')
+  })
+
+  it('leaves Invite out of the workspace menu for a member', async () => {
+    await mount('/today', [], { workspaceName: 'Northwind' })
+    await openMenu(one('[data-workspace-head]'))
+    expect(menuItems()).toEqual(['General', 'Members0'])
   })
 
   it('draws the logo in its place when one is set', async () => {

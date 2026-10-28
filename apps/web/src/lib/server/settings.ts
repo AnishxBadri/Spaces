@@ -1,6 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
-import { count } from 'drizzle-orm'
 import { auth } from '../auth'
 import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
@@ -19,21 +18,6 @@ export const getSession = createServerFn().handler(async () => {
       role: session.user.role,
     },
   }
-})
-
-/**
- * True until the first admin exists — drives the /setup redirect. Asking
- * while setup is needed (re)prints the one-time token to the server logs,
- * so the operator who just opened /setup finds it waiting in the terminal.
- */
-export const getSetupState = createServerFn().handler(async () => {
-  const [{ value }] = await db.select({ value: count() }).from(user)
-  const needsSetup = value === 0
-  if (needsSetup) {
-    const { printSetupToken } = await import('../setup-token')
-    printSetupToken()
-  }
-  return { needsSetup }
 })
 
 export const listUsers = createServerFn().handler(async () => {

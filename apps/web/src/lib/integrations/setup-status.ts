@@ -8,6 +8,7 @@ import {
   integration,
   mailbox,
   user,
+  workspace,
 } from '@spaces/db/schema'
 import { manifestSchema } from '@spaces/sdk'
 import type { SetupState } from '#/lib/setup/whats-set-up'
@@ -39,6 +40,30 @@ export const companyCountProgram = Effect.fn('companyCountProgram')(
         .where(and(eq(entity.kind, 'company'), isNull(entity.mergedIntoId))),
     )
     return rows.at(0)?.value ?? 0
+  },
+)
+
+/**
+ * Whether the first admin is still to be made, and once made, the workspace's
+ * name — what login prints to someone sent there from a closed /setup.
+ */
+export type SetupGate = {
+  readonly needsSetup: boolean
+  readonly workspaceName: string | null
+}
+
+export const setupGateProgram = Effect.fn('setupGateProgram')(
+  function* (): Effect.fn.Return<SetupGate, SetupReadFailed> {
+    const users = yield* query(() => db.select({ value: count() }).from(user))
+    if ((users.at(0)?.value ?? 0) === 0)
+      return { needsSetup: true, workspaceName: null }
+    const rows = yield* query(() =>
+      db
+        .select({ name: workspace.name })
+        .from(workspace)
+        .where(eq(workspace.id, 1)),
+    )
+    return { needsSetup: false, workspaceName: rows.at(0)?.name ?? null }
   },
 )
 

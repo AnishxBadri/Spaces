@@ -1,7 +1,8 @@
 import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
 import { Copy } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { z } from 'zod'
 import { InitialsMark } from '#/components/record/record-parts'
 import { ResetLinkDialog } from '#/components/settings/reset-link-dialog'
 import {
@@ -35,19 +36,30 @@ import { cn } from '#/lib/utils'
 
 const shell = getRouteApi('/_app/settings')
 
-/** Who can open this workspace, and the invites outstanding. */
+/**
+ * Who can open this workspace, and the invites outstanding. `?invite=true`
+ * (the workspace menu's `Invite a member…`) opens the Invite window.
+ */
 export const Route = createFileRoute('/_app/settings/members')({
+  validateSearch: z.object({
+    invite: z.boolean().optional().catch(undefined),
+  }),
   component: MembersRoute,
 })
 
 function MembersRoute() {
   const data = shell.useLoaderData()
+  const { invite } = Route.useSearch()
+  const navigate = Route.useNavigate()
   return (
     <MembersSection
       me={data.me}
       isAdmin={data.isAdmin}
       members={data.members}
       invites={data.invites}
+      invite={invite === true}
+      // Closing the window drops the flag, so a reload does not reopen it.
+      onInviteClosed={() => void navigate({ search: {}, replace: true })}
     />
   )
 }
@@ -84,14 +96,21 @@ function MembersSection({
   isAdmin,
   members,
   invites,
+  invite,
+  onInviteClosed,
 }: {
   me: { id: string }
   isAdmin: boolean
   members: Array<Member>
   invites: Array<Invite>
+  invite: boolean
+  onInviteClosed: () => void
 }) {
   const router = useRouter()
-  const [inviting, setInviting] = useState(false)
+  const [inviting, setInviting] = useState(isAdmin && invite)
+  useEffect(() => {
+    if (isAdmin && invite) setInviting(true)
+  }, [isAdmin, invite])
   const [resetLink, setResetLink] = useState<{
     name: string
     url: string
@@ -297,7 +316,10 @@ function MembersSection({
       {isAdmin ? (
         <InviteDialog
           open={inviting}
-          onOpenChange={setInviting}
+          onOpenChange={(next) => {
+            setInviting(next)
+            if (!next && invite) onInviteClosed()
+          }}
           onCreated={() => void router.invalidate()}
         />
       ) : null}

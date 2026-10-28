@@ -8,14 +8,10 @@ import {
   FileText,
   Kanban,
   Layers,
-  Keyboard,
-  Mail,
   MessageSquareText,
-  LogOut,
   Paperclip,
   Settings,
   Sunrise,
-  Upload,
   Users,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -48,14 +44,18 @@ import {
 import type { FoldableGroup } from '#/lib/chassis-prefs'
 import { objectIcon } from '#/lib/object-icons'
 import { EMAIL_DRAFTS_QUERY, openDrafts } from '#/lib/email/compose'
-import { countEmailDrafts, listPinnedViews } from '#/lib/server-fns'
-import { openUploadDialog } from '#/lib/upload-dialog-store'
+import {
+  countEmailDrafts,
+  listMembers,
+  listPinnedViews,
+} from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 /**
- * The chassis: 232px of bone with a hairline right edge. Work (Today, Tasks,
- * Spaces with its starred spaces), then three
- * groups that fold per browser — Library, Objects, Capital.
+ * The chassis: 232px of bone with a hairline right edge. The workspace head
+ * (a menu), Search, then Work (Today, Tasks, Spaces with its starred spaces)
+ * and three groups that fold per browser — Library, Objects, Capital. The
+ * foot is the Ask row above the account row.
  *
  * - The current row is a hairline box on paper, inside the chassis, expanded
  *   and collapsed. Never a tab cut through the edge, never a pine bar (the
@@ -64,9 +64,10 @@ import { cn } from '#/lib/utils'
  * - Pinned saved views stand under their object, indented, three then
  *   `▸ n more`; a pin the server no longer answers is pruned.
  * - Overflow expands inline as `▸ n more`, never a dropdown.
- * - Upload and Settings are icon buttons on the account row; Upload is not a
- *   page, so it is not a row of `NAV_ITEMS`.
+ * - Settings is the account row's one icon. Upload is not here: it lives in
+ *   ⌘K, on Files and in the first run.
  * - Collapsed it is 48px of marks only, with no group headings.
+ * - The phone drawer prints no keys; Tasks' `n due` is data and stays.
  */
 
 /**
@@ -179,6 +180,12 @@ const {
 const isMac =
   typeof navigator !== 'undefined' && navigator.platform.startsWith('Mac')
 
+/** A modifier chord as this platform prints it: `⌘K`, or `Ctrl K`. */
+const mod = (key: string) => (isMac ? `⌘${key}` : `Ctrl ${key}`)
+
+/** Read lazily by the workspace menu each time it opens. */
+const MEMBERS_COUNT_QUERY = 'workspace-members'
+
 type CustomObject = { slug: string; plural: string; icon: string | null }
 
 type PinnedView = Awaited<ReturnType<typeof listPinnedViews>>[number]
@@ -223,9 +230,11 @@ export function AppSidebar({
   workspaceLogo = null,
   objects = [],
   tasksDue = 0,
+  tasksOverdue = 0,
+  isAdmin = false,
   onOpenCommand,
   onNavigate,
-  hideWordmark = false,
+  drawer = false,
   collapsed = false,
   onToggleCollapsed,
   onOpenKeyboard,
@@ -239,10 +248,17 @@ export function AppSidebar({
   objects?: Array<CustomObject>
   /** Open tasks due today or overdue; nonzero, Tasks' lane reads `n due`. */
   tasksDue?: number
+  /** Of those, the ones due before today; nonzero, the count is destructive. */
+  tasksOverdue?: number
+  /** Admins find `Invite a member…` in the workspace menu. */
+  isAdmin?: boolean
   onOpenCommand: () => void
   onNavigate?: (() => void) | undefined
-  /** Drawer usage — the mobile top bar already shows the wordmark. */
-  hideWordmark?: boolean
+  /**
+   * The phone drawer: no head (the top bar carries the wordmark) and no key
+   * hints, since a phone has no keyboard to press them on.
+   */
+  drawer?: boolean
   /** The 48px marks-only chassis. */
   collapsed?: boolean
   /** Present on the desktop chassis only; the drawer never collapses. */
@@ -298,6 +314,7 @@ export function AppSidebar({
   )
   // On a starred space its own row is the tab, so Spaces stops matching it.
   const onStarredSpace = stars.shown.some((s) => pathname === `/spaces/${s.id}`)
+  const chord = (key: string) => (drawer ? undefined : key)
 
   /** One object's pinned rows; on one of them, that row is the tab. */
   function pinsUnder(slug: string, path: string) {
@@ -331,46 +348,27 @@ export function AppSidebar({
         aria-hidden
         className="pointer-events-none absolute inset-y-0 right-0 w-px bg-hairline"
       />
-      {hideWordmark ? (
+      {drawer ? (
         <div className="h-2 shrink-0" />
       ) : (
-        <div className="flex h-12 shrink-0 items-center justify-between border-b border-hairline px-4">
-          <Link
-            to="/spaces"
-            onClick={onNavigate}
-            className="focus-ring flex min-w-0 items-center gap-2.5"
-            // Accessible name must contain the visible text (WCAG 2.5.3).
-            aria-label={workspaceName ? `${workspaceName} home` : 'Spaces home'}
-          >
-            {workspaceName ? (
-              <>
-                <WorkspaceMark
-                  name={workspaceName}
-                  logo={workspaceLogo}
-                  size={24}
-                />
-                <span className="truncate text-ui font-medium text-foreground">
-                  {workspaceName}
-                </span>
-              </>
-            ) : (
-              <Wordmark />
-            )}
-          </Link>
-          <span className="flex shrink-0 items-center gap-2">
-            {onToggleCollapsed ? (
-              <IconTip label="Collapse sidebar · ⌘\\">
-                <button
-                  type="button"
-                  onClick={onToggleCollapsed}
-                  aria-label="Collapse sidebar"
-                  className="focus-ring -mr-1 flex size-6 shrink-0 items-center justify-center rounded-md mono text-label text-graphite transition-colors hover:bg-bone-deep hover:text-foreground"
-                >
-                  «
-                </button>
-              </IconTip>
-            ) : null}
-          </span>
+        <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-hairline px-4">
+          <WorkspaceHead
+            name={workspaceName ?? null}
+            logo={workspaceLogo}
+            isAdmin={isAdmin}
+          />
+          {onToggleCollapsed ? (
+            <IconTip label="Collapse sidebar" keys={mod('\\')}>
+              <button
+                type="button"
+                onClick={onToggleCollapsed}
+                aria-label="Collapse sidebar"
+                className="focus-ring -mr-1 flex size-6 shrink-0 items-center justify-center rounded-md mono text-label text-graphite transition-colors hover:bg-bone-deep hover:text-foreground"
+              >
+                «
+              </button>
+            </IconTip>
+          ) : null}
         </div>
       )}
 
@@ -381,20 +379,10 @@ export function AppSidebar({
           className="focus-ring flex h-8 w-full items-center justify-between rounded-md border border-rule bg-paper px-2.5 text-ui text-graphite transition-colors hover:border-hairline"
         >
           <span>Search or jump to…</span>
-          <kbd className="mono text-micro text-graphite">
-            {isMac ? '⌘K' : 'Ctrl K'}
-          </kbd>
+          {drawer ? null : (
+            <kbd className="mono text-micro text-graphite">{mod('K')}</kbd>
+          )}
         </button>
-        <div className="pt-1">
-          <NavLink
-            to="/ask"
-            icon={MessageSquareText}
-            hint={isMac ? '⌘J' : 'Ctrl J'}
-            onClick={onNavigate}
-          >
-            Ask
-          </NavLink>
-        </div>
       </div>
 
       <nav
@@ -410,7 +398,14 @@ export function AppSidebar({
                 hint={
                   item.to === '/tasks' && tasksDue > 0
                     ? `${tasksDue} due`
-                    : item.key
+                    : chord(item.key)
+                }
+                tone={
+                  item.to !== '/tasks' || tasksDue === 0
+                    ? 'chord'
+                    : tasksOverdue > 0
+                      ? 'overdue'
+                      : 'count'
                 }
                 onClick={onNavigate}
                 exact={item.to === '/spaces' && onStarredSpace}
@@ -459,7 +454,7 @@ export function AppSidebar({
               key={item.to}
               to={item.to}
               icon={item.icon}
-              hint={item.key}
+              hint={chord(item.key)}
               onClick={onNavigate}
             >
               {item.label}
@@ -480,7 +475,7 @@ export function AppSidebar({
                 <NavLink
                   to={item.to}
                   icon={item.icon}
-                  hint={item.key}
+                  hint={chord(item.key)}
                   onClick={onNavigate}
                   search={pins.onPinnedView ? { view: undefined } : undefined}
                 >
@@ -541,7 +536,7 @@ export function AppSidebar({
               key={item.to}
               to={item.to}
               icon={item.icon}
-              hint={item.key}
+              hint={chord(item.key)}
               onClick={onNavigate}
             >
               {item.label}
@@ -550,7 +545,21 @@ export function AppSidebar({
         </FoldGroup>
       </nav>
 
-      <div className="flex h-12 shrink-0 items-stretch border-t border-rule">
+      <div data-ask-row className="shrink-0 px-3 pt-1 pb-2">
+        <NavLink
+          to="/ask"
+          icon={MessageSquareText}
+          hint={chord(mod('J'))}
+          onClick={onNavigate}
+        >
+          Ask
+        </NavLink>
+      </div>
+
+      <div
+        data-account-row
+        className="flex h-13 shrink-0 items-stretch border-t border-hairline"
+      >
         <DropdownMenu>
           <DropdownMenuTrigger
             className={cn(
@@ -559,10 +568,7 @@ export function AppSidebar({
               'focus-ring-inset',
             )}
           >
-            {/* Ink square, never the primary: a mark, not a status. */}
-            <span className="flex size-[1.375rem] shrink-0 items-center justify-center bg-foreground mono text-field font-medium text-background">
-              {initials(user.name)}
-            </span>
+            <InitialsSquare name={user.name} />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-ui leading-tight font-medium">
                 {user.name}
@@ -578,21 +584,8 @@ export function AppSidebar({
             onSignOut={signOut}
           />
         </DropdownMenu>
-        <span className="flex shrink-0 items-center gap-0.5 pr-3 pl-1">
-          <IconTip label="Upload" side="top">
-            <button
-              type="button"
-              aria-label="Upload"
-              onClick={() => {
-                onNavigate?.()
-                openUploadDialog()
-              }}
-              className="focus-ring flex size-7 items-center justify-center rounded-md text-graphite transition-colors hover:bg-bone-deep hover:text-foreground"
-            >
-              <Upload className="size-3.5" strokeWidth={1.75} />
-            </button>
-          </IconTip>
-          <IconTip label="Settings · G ," side="top">
+        <span className="flex shrink-0 items-center pr-3 pl-1">
+          <IconTip label="Settings" keys={chord('G ,')} side="top">
             <Link
               to="/settings"
               aria-label="Settings"
@@ -673,8 +666,97 @@ export function overflow<T>(
 }
 
 /**
+ * The workspace head: the mark and the name open the workspace menu — General,
+ * Members with its count, and `Invite a member…` for an admin. Without a
+ * name yet, the Spaces wordmark stands in.
+ */
+function WorkspaceHead({
+  name,
+  logo,
+  isAdmin,
+}: {
+  name: string | null
+  logo: string | null
+  isAdmin: boolean
+}) {
+  const navigate = useNavigate()
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        data-workspace-head
+        className="focus-ring flex min-w-0 items-center gap-2.5 rounded-md text-left"
+      >
+        {name ? (
+          <>
+            <WorkspaceMark name={name} logo={logo} size={24} />
+            <span className="truncate text-body font-medium text-foreground">
+              {name}
+            </span>
+          </>
+        ) : (
+          <Wordmark />
+        )}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" sideOffset={8} className="w-55">
+        <DropdownMenuItem
+          onSelect={() => void navigate({ to: '/settings/general' })}
+        >
+          General
+        </DropdownMenuItem>
+        <MembersItem
+          onSelect={() => void navigate({ to: '/settings/members' })}
+        />
+        {isAdmin ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() =>
+                void navigate({
+                  to: '/settings/members',
+                  search: { invite: true },
+                })
+              }
+            >
+              Invite a member…
+            </DropdownMenuItem>
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+/**
+ * Members, with the active (unbanned) count read each time the menu opens,
+ * and never before: the head is on every page, the count is not.
+ */
+function MembersItem({ onSelect }: { onSelect: () => void }) {
+  const { data } = useQuery({
+    queryKey: [MEMBERS_COUNT_QUERY],
+    queryFn: async () =>
+      (await listMembers()).filter((m) => m.banned !== true).length,
+    staleTime: 0,
+    refetchOnMount: 'always',
+  })
+  return (
+    <DropdownMenuItem onSelect={onSelect}>
+      Members
+      {data === undefined ? null : (
+        <span
+          data-members-count
+          className="tabular ml-auto mono text-micro text-graphite"
+        >
+          {data}
+        </span>
+      )}
+    </DropdownMenuItem>
+  )
+}
+
+/**
  * The account menu opens to the right of the chassis, never up into the
- * screen corner. Settings is the icon beside it; the menu keeps the rest.
+ * screen corner. Settings is the icon beside it; the menu keeps the rest,
+ * in words only.
  */
 function AccountMenu({
   email,
@@ -690,24 +772,20 @@ function AccountMenu({
       side="right"
       align="end"
       sideOffset={8}
-      className="w-56"
+      className="w-65"
     >
-      <DropdownMenuLabel className="mono text-micro text-graphite">
+      <DropdownMenuLabel className="truncate mono text-micro font-normal text-graphite">
         Signed in as {email}
       </DropdownMenuLabel>
       <DropdownMenuSeparator />
       <DraftsItem />
       {onKeyboard ? (
         <DropdownMenuItem onSelect={onKeyboard}>
-          <Keyboard className="size-4" />
           Keyboard
           <span className="ml-auto mono text-micro text-graphite">?</span>
         </DropdownMenuItem>
       ) : null}
-      <DropdownMenuItem onSelect={onSignOut}>
-        <LogOut className="size-4" />
-        Sign out
-      </DropdownMenuItem>
+      <DropdownMenuItem onSelect={onSignOut}>Sign out</DropdownMenuItem>
     </DropdownMenuContent>
   )
 }
@@ -725,7 +803,6 @@ function DraftsItem() {
   })
   return (
     <DropdownMenuItem onSelect={openDrafts}>
-      <Mail className="size-4" />
       Drafts
       {data === undefined ? null : (
         <span
@@ -739,11 +816,20 @@ function DraftsItem() {
   )
 }
 
+/** The account's mark: 24px of ink with the initials, never the primary. */
+function InitialsSquare({ name }: { name: string }) {
+  return (
+    <span className="flex size-6 shrink-0 items-center justify-center bg-foreground mono text-field font-medium text-background">
+      {initials(name)}
+    </span>
+  )
+}
+
 /**
- * The collapsed chassis: a 48px cell with the workspace mark on a hairline, ⌘K on a
- * rule, 36px rows of 14px marks with a 24px rule between groups and no
- * headings, the current page in a 36×32 hairline paper box; the foot is Upload,
- * Settings and the ink initials square.
+ * The collapsed chassis: a 48px cell with the workspace mark on a hairline,
+ * ⌘K on a rule, 30px row boxes of 14px marks with a 20px rule between groups
+ * and no headings, the current page a hairline paper box. The foot is Ask,
+ * Settings on a rule and the account square on a hairline.
  */
 function CollapsedSidebar({
   user,
@@ -770,9 +856,7 @@ function CollapsedSidebar({
         aria-hidden
         className="pointer-events-none absolute inset-y-0 right-0 w-px bg-hairline"
       />
-      <IconTip
-        label={`Expand sidebar · ⌘\\${workspaceName ? ` · ${workspaceName}` : ''}`}
-      >
+      <IconTip label="Expand sidebar" keys={mod('\\')}>
         <button
           type="button"
           onClick={onExpand}
@@ -797,31 +881,43 @@ function CollapsedSidebar({
           aria-label="Search or jump to"
           className="focus-ring-inset flex h-10 w-12 shrink-0 items-center justify-center border-b border-rule mono text-micro text-graphite transition-colors hover:text-foreground"
         >
-          {isMac ? '⌘K' : 'Ctrl K'}
+          {mod('K')}
         </button>
       </IconTip>
 
       <nav
-        className="flex min-h-0 w-12 flex-1 flex-col items-center overflow-y-auto pt-1.5"
+        className="flex min-h-0 w-12 flex-1 flex-col items-center gap-0.5 overflow-y-auto py-1.5"
         aria-label="Primary"
       >
-        <CollapsedNavLink to="/ask" icon={MessageSquareText}>
-          Ask
-        </CollapsedNavLink>
         {WORK.map((item) => (
-          <CollapsedNavLink key={item.to} to={item.to} icon={item.icon}>
+          <CollapsedNavLink
+            key={item.to}
+            to={item.to}
+            icon={item.icon}
+            keys={item.key}
+          >
             {item.label}
           </CollapsedNavLink>
         ))}
         <GroupRule />
         {LIBRARY.map((item) => (
-          <CollapsedNavLink key={item.to} to={item.to} icon={item.icon}>
+          <CollapsedNavLink
+            key={item.to}
+            to={item.to}
+            icon={item.icon}
+            keys={item.key}
+          >
             {item.label}
           </CollapsedNavLink>
         ))}
         <GroupRule />
         {OBJECTS.map((item) => (
-          <CollapsedNavLink key={item.to} to={item.to} icon={item.icon}>
+          <CollapsedNavLink
+            key={item.to}
+            to={item.to}
+            icon={item.icon}
+            keys={item.key}
+          >
             {item.label}
           </CollapsedNavLink>
         ))}
@@ -837,24 +933,30 @@ function CollapsedSidebar({
         ))}
         <GroupRule />
         {CAPITAL.map((item) => (
-          <CollapsedNavLink key={item.to} to={item.to} icon={item.icon}>
+          <CollapsedNavLink
+            key={item.to}
+            to={item.to}
+            icon={item.icon}
+            keys={item.key}
+          >
             {item.label}
           </CollapsedNavLink>
         ))}
       </nav>
 
       <div className="flex shrink-0 flex-col items-center">
-        <IconTip label="Upload">
-          <button
-            type="button"
-            onClick={openUploadDialog}
-            aria-label="Upload"
-            className="focus-ring-inset flex h-10 w-12 items-center justify-center border-t border-rule text-graphite transition-colors hover:bg-bone-deep hover:text-foreground"
+        <IconTip label="Ask" keys={mod('J')}>
+          <Link
+            to="/ask"
+            aria-label="Ask"
+            data-ask-row
+            className="focus-ring-inset flex h-10 w-12 items-center justify-center text-graphite transition-colors hover:bg-bone-deep hover:text-foreground aria-[current=page]:text-foreground"
+            activeProps={{ 'aria-current': 'page' }}
           >
-            <Upload className="size-3.5" strokeWidth={1.75} />
-          </button>
+            <MessageSquareText className="size-3.5" strokeWidth={1.75} />
+          </Link>
         </IconTip>
-        <IconTip label="Settings · G ,">
+        <IconTip label="Settings" keys="G ,">
           <Link
             to="/settings"
             aria-label="Settings"
@@ -867,17 +969,11 @@ function CollapsedSidebar({
         <DropdownMenu>
           <IconTip label={user.name}>
             <DropdownMenuTrigger
+              data-account-row
               aria-label={`Account — ${user.name}`}
-              className="focus-ring-inset flex h-12 w-12 items-center justify-center border-t border-rule transition-colors hover:bg-bone-deep"
+              className="focus-ring-inset flex h-13 w-12 items-center justify-center border-t border-hairline transition-colors hover:bg-bone-deep"
             >
-              <span
-                /* Optical sizing, not a type step: two initials centred in a
-                   22px ink square read wrong at the 10px field step. */
-                // eslint-disable-next-line instrument/vocabulary
-                className="flex size-[1.375rem] shrink-0 items-center justify-center bg-foreground mono text-[0.5625rem] leading-3 font-medium text-background"
-              >
-                {initials(user.name)}
-              </span>
+              <InitialsSquare name={user.name} />
             </DropdownMenuTrigger>
           </IconTip>
           <AccountMenu
@@ -892,51 +988,68 @@ function CollapsedSidebar({
 }
 
 function GroupRule() {
-  return <span aria-hidden className="my-0 block h-px w-6 shrink-0 bg-rule" />
+  return <span aria-hidden className="my-1 block h-px w-5 shrink-0 bg-rule" />
 }
 
-/** Name on hover, in ink — for marks-only controls. */
+/**
+ * Name on hover, in ink — for marks-only controls. With `keys`, the name and
+ * then the key in mono at 85%, as `Button`'s shortcut tooltip reads.
+ */
 function IconTip({
   label,
+  keys,
   side = 'right',
   children,
 }: {
   label: string
+  keys?: string | undefined
   side?: 'right' | 'top'
   children: React.ReactNode
 }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side={side}>{label}</TooltipContent>
+      <TooltipContent side={side}>
+        {keys === undefined ? (
+          label
+        ) : (
+          <span data-tip-keys className="flex items-center gap-2.5">
+            <span>{label}</span>
+            <kbd className="mono opacity-85">{keys}</kbd>
+          </span>
+        )}
+      </TooltipContent>
     </Tooltip>
   )
 }
 
+/**
+ * One collapsed row. The 32×30 box is the link itself, so the reticle sits
+ * outside it inside the 48px column; the current page is paper on a hairline.
+ */
 function CollapsedNavLink({
   to,
   params,
   icon: Icon,
+  keys,
   children,
 }: {
   to: string
   params?: Record<string, string> | undefined
   icon: LucideIcon
+  keys?: string | undefined
   children: string
 }) {
   return (
-    <IconTip label={children}>
+    <IconTip label={children} keys={keys}>
       <Link
         to={to}
         {...(params ? { params } : {})}
         aria-label={children}
-        className="group focus-ring-inset flex h-9 w-12 shrink-0 items-center justify-center"
+        className="focus-ring flex h-[1.875rem] w-8 shrink-0 items-center justify-center rounded-md border border-transparent transition-colors hover:bg-bone-deep aria-[current=page]:border-hairline aria-[current=page]:bg-paper"
         activeProps={{ 'aria-current': 'page' }}
       >
-        {/* Current page = a paper box on a hairline (No-Bar Rule), 36×32. */}
-        <span className="flex h-8 w-9 items-center justify-center rounded-md border border-transparent transition-colors group-hover:bg-bone-deep group-aria-[current=page]:border-hairline group-aria-[current=page]:bg-paper group-aria-[current=page]:group-hover:bg-paper">
-          <Icon className="size-3.5 shrink-0" strokeWidth={1.75} />
-        </span>
+        <Icon className="size-3.5 shrink-0" strokeWidth={1.75} />
       </Link>
     </IconTip>
   )
@@ -1025,6 +1138,7 @@ function NavLink({
   search,
   icon: Icon,
   hint,
+  tone = 'chord',
   onClick,
   indent = false,
   exact = false,
@@ -1041,6 +1155,11 @@ function NavLink({
   icon?: LucideIcon | undefined
   /** The chord printed in the right lane — graphite, ink on the current page. */
   hint?: string | undefined
+  /**
+   * How the lane reads: a chord is graphite (ink on the current page); a
+   * count is ink; an overdue count is destructive.
+   */
+  tone?: 'chord' | 'count' | 'overdue'
   onClick?: (() => void) | undefined
   /** A starred space under Spaces: no mark, its label on the labels' lane. */
   indent?: boolean
@@ -1063,7 +1182,7 @@ function NavLink({
         'flex h-[1.875rem] shrink-0 items-center gap-2.5 rounded-md border border-transparent pr-2.5 text-ui text-foreground transition-colors',
         indent ? 'pl-8.5' : 'pl-2.5',
         'hover:bg-bone-deep',
-        'focus-ring-inset',
+        'focus-ring',
       )}
       activeProps={{
         className: 'border-hairline bg-paper font-medium hover:bg-paper',
@@ -1073,7 +1192,16 @@ function NavLink({
       {Icon ? <Icon className="size-3.5 shrink-0" strokeWidth={1.75} /> : null}
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {hint ? (
-        <span className="shrink-0 mono text-micro text-graphite [a[aria-current=page]_&]:text-foreground">
+        <span
+          data-lane={tone}
+          className={cn(
+            'tabular shrink-0 mono text-micro',
+            tone === 'chord' &&
+              'text-graphite [a[aria-current=page]_&]:text-foreground',
+            tone === 'count' && 'text-foreground',
+            tone === 'overdue' && 'text-destructive',
+          )}
+        >
           {hint}
         </span>
       ) : null}

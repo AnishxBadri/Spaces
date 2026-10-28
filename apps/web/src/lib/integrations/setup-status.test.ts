@@ -7,6 +7,7 @@ import {
   integration,
   mailbox,
   user,
+  workspace,
 } from '@spaces/db/schema'
 import type { IntegrationManifest } from '@spaces/db/schema'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
@@ -14,6 +15,7 @@ import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import {
   companyCountProgram,
   setupAudienceProgram,
+  setupGateProgram,
   whatsSetUpProgram,
 } from './setup-status'
 
@@ -149,5 +151,19 @@ describe('the first-run reads', () => {
       admins: ['Anish'],
     })
     expect((await run(setupAudienceProgram('admin'))).isAdmin).toBe(true)
+  })
+})
+
+describe('the setup gate', () => {
+  it('is closed once a user exists, and names the workspace when it has one', async () => {
+    expect(await run(setupGateProgram())).toEqual({
+      needsSetup: false,
+      workspaceName: null,
+    })
+    await db.insert(workspace).values({ id: 1, name: 'Meridian Ventures' })
+    expect(await run(setupGateProgram())).toEqual({
+      needsSetup: false,
+      workspaceName: 'Meridian Ventures',
+    })
   })
 })

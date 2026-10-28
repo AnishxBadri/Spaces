@@ -11,8 +11,8 @@ import {
 
 /**
  * The keyboard sheet. Two columns of 26px rows on rules:
- * Go, Create, On a deal, In a sheet. Every key printed here also shows
- * inside the control it triggers; nothing is listed that does not work.
+ * Go, Create, On a deal, In a window. Every key printed here is also in the
+ * tooltip of the control it triggers; nothing is listed that does not work.
  */
 export function KeyboardHelp({
   open,
@@ -39,6 +39,7 @@ export function KeyboardHelp({
               <Row label="Settings" keys="G ," />
               <Row label="Leave settings" keys="esc" />
               <Row label="Palette" keys={`${mod}K`} />
+              <Row label="Ask" keys={`${mod}J`} />
               <Row label="Fold the sidebar" keys={`${mod}\\`} />
               <Row label="This sheet" keys="?" />
             </Group>
@@ -56,14 +57,14 @@ export function KeyboardHelp({
               <Row label="Move stage" keys="M" />
               <Row label="Task" keys="T" />
             </Group>
-            <Group label="In a sheet" top>
+            <Group label="In a window" top>
               <Row label="Submit" keys={`${mod}↵`} />
               <Row label="Add & keep the composer open" keys="⇧↵" />
               <Row label="Close · revert a cell" keys="esc" />
             </Group>
           </div>
         </div>
-        <DialogFooter note="chords wait 800ms · keys are off while typing">
+        <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>

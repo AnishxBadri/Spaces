@@ -39,12 +39,8 @@ function JoinPage() {
       <AuthShell
         eyebrow="Invitation"
         title="This invitation isn’t valid"
-        blurb="The link may have expired, been revoked, or already been used — invitations work exactly once. Ask the person who invited you for a fresh one."
-      >
-        <p className="mono text-micro text-graphite">
-          one link · one account · never reused
-        </p>
-      </AuthShell>
+        blurb="Each link works once. Ask whoever invited you for a new one."
+      />
     )
   }
 
@@ -80,7 +76,6 @@ function JoinPage() {
           ? `Join ${preview.workspaceName}`
           : 'Join this workspace'
       }
-      blurb="You’ve been invited. Create your account to get in."
     >
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1.5">
@@ -90,15 +85,14 @@ function JoinPage() {
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="email">Email</Label>
           {preview.email ? (
-            <>
-              <Input
-                id="email"
-                value={preview.email}
-                disabled
-                className="mono"
-              />
-              <FieldHint>This invitation is locked to this address.</FieldHint>
-            </>
+            // Locked to the invited address: read-only on bone, not disabled,
+            // so it still reads at full contrast.
+            <Input
+              id="email"
+              value={preview.email}
+              readOnly
+              className="bg-bone mono"
+            />
           ) : (
             <Input
               id="email"
@@ -120,7 +114,7 @@ function JoinPage() {
             minLength={12}
             aria-describedby="password-hint"
           />
-          <FieldHint id="password-hint">At least 12 characters.</FieldHint>
+          <FieldHint id="password-hint">At least 12 characters</FieldHint>
         </div>
 
         {error ? <FormError>{error}</FormError> : null}

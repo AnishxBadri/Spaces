@@ -12,6 +12,23 @@ export type { SetupAudience } from '../integrations/setup-status'
  * reaches the client bundle.
  */
 
+/**
+ * True until the first admin exists — drives the /setup redirect — and the
+ * workspace's name after. Public: login reads it before anyone signs in.
+ * Asking while setup is needed (re)prints the one-time token to the server
+ * logs, so the operator who just opened /setup finds it in the terminal.
+ */
+export const getSetupState = createServerFn().handler(async () => {
+  const { setupGateProgram } = await import('../integrations/setup-status')
+  const { effectFn } = await import('./effect')
+  const gate = await effectFn(setupGateProgram)()
+  if (gate.needsSetup) {
+    const { printSetupToken } = await import('../setup-token')
+    printSetupToken()
+  }
+  return gate
+})
+
 /** General's foot: whether each of the seven pieces is set up. */
 export const getWhatsSetUp = createServerFn().handler(async () => {
   await requireSettingsReader()

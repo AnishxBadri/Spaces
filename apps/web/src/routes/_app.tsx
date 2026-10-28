@@ -28,7 +28,7 @@ import {
   listDueTaskDays,
   listObjects,
 } from '#/lib/server-fns'
-import { dueCount } from '#/lib/tasks/due'
+import { dueCount, overdueCount } from '#/lib/tasks/due'
 import { dayKey } from '@spaces/core/format'
 import { ClockProvider } from '#/components/clock'
 import { useHotkeys } from '#/lib/use-hotkey'
@@ -65,7 +65,10 @@ export const Route = createFileRoute('/_app')({
 function AppShell() {
   const { session } = Route.useRouteContext()
   const { workspace, objects, dueDays, now } = Route.useLoaderData()
-  const tasksDue = dueCount(dueDays, dayKey(now))
+  const today = dayKey(now)
+  const tasksDue = dueCount(dueDays, today)
+  const tasksOverdue = overdueCount(dueDays, today)
+  const isAdmin = session.user.role === 'admin'
   const [commandOpen, setCommandOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const collapsed = useChassisCollapsed()
@@ -114,6 +117,8 @@ function AppShell() {
               workspaceLogo={workspace?.logo ?? null}
               objects={objects}
               tasksDue={tasksDue}
+              tasksOverdue={tasksOverdue}
+              isAdmin={isAdmin}
               onOpenCommand={() => setCommandOpen(true)}
               collapsed={collapsed}
               onToggleCollapsed={() => setChassisCollapsed(!collapsed)}
@@ -150,12 +155,13 @@ function AppShell() {
             />
             <div className="absolute inset-y-0 top-12 left-0 w-58 shadow-solid">
               <AppSidebar
-                hideWordmark
+                drawer
                 user={session.user}
                 workspaceName={workspace?.name ?? null}
                 workspaceLogo={workspace?.logo ?? null}
                 objects={objects}
                 tasksDue={tasksDue}
+                tasksOverdue={tasksOverdue}
                 onOpenCommand={() => {
                   setMobileNavOpen(false)
                   setCommandOpen(true)

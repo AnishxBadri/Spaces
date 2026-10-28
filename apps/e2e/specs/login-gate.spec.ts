@@ -12,6 +12,19 @@ test.describe('the login gate', () => {
     await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
   })
 
+  test('signed out, a closed /setup lands on /login naming the workspace', async ({
+    page,
+    main,
+  }) => {
+    await page.goto(`${main.url}/setup`)
+    await expect(page).toHaveURL(`${main.url}/login?from=setup`)
+    await expect(
+      page.getByText(
+        'E2E Holdings is set up. Everyone else joins by invitation.',
+      ),
+    ).toBeVisible()
+  })
+
   test('a wrong password is refused', async ({ page, main }) => {
     await page.goto(`${main.url}/login`)
     await page.getByLabel('Email', { exact: true }).fill(ADMIN.email)

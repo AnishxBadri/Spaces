@@ -36,7 +36,7 @@ export function NeedsSetup({
       {needs} ·{' '}
       <Link
         to={to}
-        className="focus-ring mono text-micro text-primary hover:underline"
+        className="focus-ring mono text-micro font-medium text-foreground hover:underline"
       >
         {action} ›
       </Link>

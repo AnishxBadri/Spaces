@@ -28,9 +28,10 @@ export const Route = createFileRoute('/setup')({
     if (!needsSetup) {
       // Admin exists. Only a signed-in user (mid-wizard step 2) may stay —
       // and a refresh must land them on step 2, not the dead admin form
-      // (the setup token is gone; resubmitting can only fail).
+      // (the setup token is gone; resubmitting can only fail). Anyone else
+      // is told at login that the workspace is set up.
       const session = await getSession()
-      if (!session) throw redirect({ to: '/login' })
+      if (!session) throw redirect({ to: '/login', search: { from: 'setup' } })
       return { initialStep: 2 as const }
     }
     return { initialStep: 1 as const }
@@ -88,10 +89,10 @@ function AdminStep({ onDone }: { onDone: () => void }) {
 
   return (
     <AuthShell
-      eyebrow="Setup · step 1 of 2"
+      eyebrow="Setup · 1 of 2"
       title="Create the admin account"
-      blurb="This deployment is yours. Signup closes permanently after this account exists — everyone else joins by invitation."
-      foot="self-hosted · nothing here leaves this server"
+      blurb="Signup closes for good once this account exists. Everyone else joins by invitation."
+      foot="Self-hosted · nothing here leaves this server"
     >
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1.5">
@@ -103,13 +104,8 @@ function AdminStep({ onDone }: { onDone: () => void }) {
             required
             autoFocus
             placeholder="Printed in the server logs"
-            aria-describedby="token-hint"
             className="mono"
           />
-          <FieldHint id="token-hint">
-            One-time code from the terminal or container logs — proof you run
-            this server.
-          </FieldHint>
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="workspace">Workspace name</Label>
@@ -118,11 +114,7 @@ function AdminStep({ onDone }: { onDone: () => void }) {
             name="workspace"
             required
             placeholder="Priya Mehta, or Meridian Ventures"
-            aria-describedby="workspace-hint"
           />
-          <FieldHint id="workspace-hint">
-            Your name if you invest solo, your fund’s if you don’t.
-          </FieldHint>
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="name">Your name</Label>
@@ -149,9 +141,7 @@ function AdminStep({ onDone }: { onDone: () => void }) {
             minLength={12}
             aria-describedby="password-hint"
           />
-          <FieldHint id="password-hint">
-            At least 12 characters. This protects deal terms and cap tables.
-          </FieldHint>
+          <FieldHint id="password-hint">At least 12 characters</FieldHint>
         </div>
 
         {error ? <FormError>{error}</FormError> : null}
@@ -165,9 +155,9 @@ function AdminStep({ onDone }: { onDone: () => void }) {
 }
 
 /**
- * Demo data, offered rather than assumed: Start empty is the primary, and
- * an empty Today is where a new workspace starts. The demo records its
- * ids, so General can remove it in one step.
+ * Demo data, offered rather than assumed: Start empty is the primary, on the
+ * right, and an empty Today is where a new workspace starts. The demo
+ * records its ids, so General can remove it in one step.
  */
 function DemoStep() {
   const navigate = useNavigate()
@@ -188,23 +178,18 @@ function DemoStep() {
 
   return (
     <AuthShell
-      eyebrow="Setup · step 2 of 2"
+      eyebrow="Setup · 2 of 2"
       title="Start with demo data?"
-      blurb="Three fictional companies in data-center cooling, a memo and a small space tree."
-      foot="Removed in one step from Settings › General"
+      blurb="A worked example in data-center cooling: a small space tree, three companies and a memo. General removes it in one step."
     >
       <div className="flex flex-col gap-4">
         {error ? <FormError>{error}</FormError> : null}
-        <div className="flex gap-2">
-          <Button
-            className="flex-1"
-            disabled={pending}
-            onClick={() => navigate({ to: '/today' })}
-          >
-            Start empty
-          </Button>
+        <div className="grid grid-cols-2 gap-2">
           <Button variant="outline" disabled={pending} onClick={withDemo}>
             {pending ? 'Loading…' : 'Load demo data'}
+          </Button>
+          <Button disabled={pending} onClick={() => navigate({ to: '/today' })}>
+            Start empty
           </Button>
         </div>
       </div>

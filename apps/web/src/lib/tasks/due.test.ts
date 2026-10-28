@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dueCount } from './due'
+import { dueCount, overdueCount } from './due'
 
 /**
  * The sidebar's `n due`: open tasks due today or overdue. The server hands
@@ -16,6 +16,18 @@ describe('dueCount', () => {
     expect(dueCount(days, '2026-10-11')).toBe(3)
     expect(dueCount(days, '2026-10-12')).toBe(7)
     expect(dueCount([], '2026-10-11')).toBe(0)
+  })
+})
+
+describe('overdueCount', () => {
+  it('counts the days before today only', () => {
+    const days = [
+      { day: '2026-10-09', n: 2 },
+      { day: '2026-10-11', n: 1 },
+    ]
+    expect(overdueCount(days, '2026-10-11')).toBe(2)
+    expect(overdueCount(days, '2026-10-09')).toBe(0)
+    expect(overdueCount(days, '2026-10-12')).toBe(3)
   })
 })
 

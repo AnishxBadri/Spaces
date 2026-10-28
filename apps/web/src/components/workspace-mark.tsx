@@ -2,7 +2,7 @@ import { cn } from '#/lib/utils'
 
 /**
  * The workspace's mark: its logo when one is set, else the monogram — the
- * name's initial in an ink square. Drawn at the sidebar head (24px) and in
+ * name's initial, serif semibold, in an ink square. Drawn at the sidebar head (24px) and in
  * General's Logo row (48px).
  * - The logo is never cropped: it sits whole inside the square.
  */
@@ -36,7 +36,7 @@ export function WorkspaceMark({
       data-monogram
       style={{ width: size, height: size }}
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-none bg-foreground font-medium text-background',
+        'flex shrink-0 items-center justify-center rounded-none bg-foreground font-serif font-semibold text-background',
         size >= 40 ? 'text-display' : 'text-ui',
         className,
       )}
