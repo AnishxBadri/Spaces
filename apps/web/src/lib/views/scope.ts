@@ -5,7 +5,7 @@ import type { SQL } from 'drizzle-orm'
 
 /**
  * Which `entity` rows a list page lists, before any view condition: the
- * subtype guard, the kind, and "not merged away".
+ * subtype guard, the kind, "not merged away" and "not archived".
  * Spelled once so a view chip's count and the page it opens cannot disagree.
  * A new list surface adds an arm here, not a copy of a `where`.
  */
@@ -16,7 +16,7 @@ export type ListScope =
   | { kind: 'custom'; objectId: string }
 
 export function listScope(scope: ListScope): SQL {
-  const live = isNull(entity.mergedIntoId)
+  const live = and(isNull(entity.mergedIntoId), isNull(entity.archivedAt))
   switch (scope.kind) {
     case 'company':
       // The subtype row is the guard; as an `exists` it cannot multiply a row.

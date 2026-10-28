@@ -434,8 +434,9 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
       .where(
         and(
           isOpen,
+          // Across the queue, an archived record's cards wait on its page.
           scope.record === null
-            ? undefined
+            ? sql`not exists (select 1 from entity ae where ae.id = ${suggestion.entityId} and ae.archived_at is not null)`
             : or(
                 eq(suggestion.entityId, scope.record),
                 and(

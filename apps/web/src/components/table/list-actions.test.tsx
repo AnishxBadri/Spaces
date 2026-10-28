@@ -17,7 +17,8 @@ import { RecordTable } from './record-table'
  * estimate window, Cancel queues nothing and Enrich n sends the checked ids
  * once; Add to space files them in one call and the toast's Undo untags the
  * ones it filed; each row's `···` holds Open in a new tab · Add to space… ·
- * Enrich… · Copy link; a kind enrichment does not read has no Enrich….
+ * Enrich… · Copy link · Archive, whose toast's Undo restores the record; a
+ * kind enrichment does not read has no Enrich….
  * - happy-dom's DOM globals are installed by hand before React loads, as in
  *   the other window tests: the environment would also replace `URL`.
  */
@@ -64,6 +65,8 @@ const fns = vi.hoisted(() => ({
   listSpaces: vi.fn(),
   tagManyIntoSpace: vi.fn(),
   untagFromSpace: vi.fn(),
+  archiveRecord: vi.fn(),
+  restoreRecord: vi.fn(),
 }))
 vi.mock('#/lib/server-fns', () => fns)
 
@@ -258,24 +261,57 @@ describe('the selection bar', () => {
       'Open in a new tab',
       'Add to space…',
       'Copy link',
+      'Archive',
     ])
   })
 })
 
 describe('the row ···', () => {
-  it('Open in a new tab · Add to space… · Enrich… · Copy link, and no Delete', async () => {
+  it('Open in a new tab · Add to space… · Enrich… · Copy link · Archive, and no Delete', async () => {
     await mount()
     expect(await rowMenu('Co 2')).toEqual([
       'Open in a new tab',
       'Add to space…',
       'Enrich…',
       'Copy link',
+      'Archive',
     ])
     const open = [...document.querySelectorAll('[role="menuitem"]')].find(
       (el) => text(el) === 'Open in a new tab',
     )
     expect(open?.getAttribute('href')).toBe(`/companies/${ROWS[1]?.id}`)
     expect(open?.getAttribute('target')).toBe('_blank')
+  })
+})
+
+describe('Archive in the row ···', () => {
+  it('asks nothing: archives the record, refreshes, and Undo restores it', async () => {
+    fns.archiveRecord.mockResolvedValue({ on: '2026-10-28T10:00:00.000Z' })
+    fns.restoreRecord.mockResolvedValue({ restored: true })
+    await mount()
+    await rowMenu('Co 2')
+    const item = [...document.querySelectorAll('[role="menuitem"]')].find(
+      (el) => text(el) === 'Archive',
+    )
+    if (item === undefined) throw new Error('no Archive')
+    await click(item)
+    expect(dialog()).toBeNull()
+    expect(fns.archiveRecord).toHaveBeenCalledWith({
+      data: { id: ROWS[1]?.id },
+    })
+    expect(refresh).toHaveBeenCalledTimes(1)
+    const call = toasts.toast.mock.calls.at(0)
+    expect(call?.[0]).toBe('Archived Co 2')
+    const undo = Reflect.get(Reflect.get(call?.[1] ?? {}, 'action'), 'onClick')
+    if (typeof undo !== 'function') throw new Error('no Undo')
+    await act(async () => {
+      undo()
+    })
+    await flush()
+    expect(fns.restoreRecord).toHaveBeenCalledWith({
+      data: { id: ROWS[1]?.id },
+    })
+    expect(refresh).toHaveBeenCalledTimes(2)
   })
 })
 

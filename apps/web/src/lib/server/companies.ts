@@ -24,7 +24,13 @@ export const listCompanies = createServerFn().handler(async () => {
       createdAt: entity.createdAt,
     })
     .from(entity)
-    .where(and(eq(entity.kind, 'company'), isNull(entity.mergedIntoId)))
+    .where(
+      and(
+        eq(entity.kind, 'company'),
+        isNull(entity.mergedIntoId),
+        isNull(entity.archivedAt),
+      ),
+    )
     .orderBy(desc(entity.createdAt))
 
   if (rows.length === 0) return []

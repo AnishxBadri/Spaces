@@ -72,6 +72,8 @@ const fns = vi.hoisted(() => ({
   saveRecordAsTemplate: vi.fn(),
   searchEntities: vi.fn(async () => []),
   setEntitySensitive: vi.fn(),
+  archiveRecord: vi.fn(async () => ({ on: '2026-10-28T10:00:00.000Z' })),
+  restoreRecord: vi.fn(async () => ({ restored: true })),
 }))
 vi.mock('#/lib/server-fns', () => fns)
 
@@ -383,9 +385,36 @@ describe('the record ···', () => {
       '—',
       'Sensitive',
       '—',
+      'Archive',
+      '—',
       '[Exa]',
       'Find similar',
     ])
+  })
+
+  it('an archived record: the ··· alone, with Restore where Archive was', async () => {
+    await mount(
+      <heads.RecordHeadActions
+        record={{ id: ID, name: 'Flent', kind: 'company' }}
+        enrich={enrich}
+        sensitivity={normal}
+        template="company"
+        archived
+      />,
+    )
+    expect(verbs()).toEqual([])
+    await openMenu('Flent')
+    expect(rows()).toContain('Restore')
+    expect(rows()).not.toContain('Archive')
+    const item = [...document.querySelectorAll('[role="menuitem"]')].find(
+      (el) => text(el) === 'Restore',
+    )
+    if (!(item instanceof HTMLElement)) throw new Error('no Restore')
+    await act(async () => {
+      item.click()
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(fns.restoreRecord).toHaveBeenCalledWith({ data: { id: ID } })
   })
 
   it('offers a source’s own action under its name where no host Enrich runs', async () => {

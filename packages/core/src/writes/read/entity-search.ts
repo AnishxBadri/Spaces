@@ -34,6 +34,8 @@ export async function entitySearchRows(
     .where(
       and(
         isNull(entity.mergedIntoId),
+        // An archived record leaves every picker and autocomplete.
+        isNull(entity.archivedAt),
         // The default lane excludes nothing by kind, so a deck reaches the
         // note-body @ menu. The note editor is the only caller that omits
         // `kinds`; every other caller names its kinds.

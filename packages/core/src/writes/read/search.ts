@@ -116,6 +116,8 @@ export function fusedStatement({
         left join entity_alias a
           on a.entity_id = e.id and a.kind = 'name'
         where e.merged_into_id is null
+          -- An archived record opens from its own page, never from a search.
+          and e.archived_at is null
           -- canRead in SQL: private note titles are entities too.
           and ${canReadNoteSql(userId)}
           and (

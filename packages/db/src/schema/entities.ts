@@ -126,6 +126,15 @@ export const entity = pgTable(
      * when `picture_sha is null and not picture_held`.
      */
     pictureHeld: boolean('picture_held').notNull().default(false),
+    /**
+     * Archived: out of every list, search lane, the context walk and Today;
+     * its own page still opens. Never a delete — links, filings and history
+     * stay, and identity resolution still finds it.
+     * - Set on object records only; a space archives on `space.archived_at`.
+     */
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    /** Who archived it; null while live. */
+    archivedBy: text('archived_by').references(() => user.id),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

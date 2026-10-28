@@ -23,7 +23,7 @@ import {
 } from '#/components/record/record-parts'
 import { RecordHeadActions } from '#/components/record/record-heads'
 import { RecordNotices } from '#/components/record/record-notices'
-import { sensitiveStamp } from '#/components/sensitive-toggle'
+import { recordStamp } from '#/components/record/record-archive'
 import { PickPopover } from '#/components/record/details-add'
 import {
   RelationSection,
@@ -57,6 +57,7 @@ import { MeetingDialog } from '#/components/meeting-dialog'
 import {
   createNote,
   getEntitySensitivity,
+  getRecordArchive,
   getPerson,
   getRecordEnrichment,
   getRecordTimeline,
@@ -89,6 +90,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       notes,
       waiting,
       sensitivity,
+      archive,
       pluginActions,
       enrichment,
       duplicates,
@@ -102,6 +104,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       listRecordNotes({ data: { entityId: params.personId } }),
       listOpenSuggestionTitles({ data: { entityId: params.personId } }),
       getEntitySensitivity({ data: { entityId: params.personId } }),
+      getRecordArchive({ data: { id: params.personId } }),
       listRecordActions({ data: { kind: 'person' } }),
       getRecordEnrichment({
         data: { entityId: params.personId, kind: 'person' },
@@ -123,6 +126,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       notes,
       waiting,
       sensitivity,
+      archive,
       pluginActions,
       enrichment,
       duplicates,
@@ -142,6 +146,7 @@ function PersonRecordPage() {
     notes,
     waiting,
     sensitivity,
+    archive,
     pluginActions,
     enrichment,
     duplicates,
@@ -223,10 +228,12 @@ function PersonRecordPage() {
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
-        stamp={sensitiveStamp('Person', sensitivity)}
+        stamp={recordStamp('Person', sensitivity, archive)}
+        archived={archive !== null}
         actions={
           <RecordHeadActions
             record={{ id: person.id, name: person.name, kind: 'person' }}
+            archived={archive !== null}
             enrich={enrichment}
             sensitivity={sensitivity}
             template="person"
@@ -246,6 +253,7 @@ function PersonRecordPage() {
 
       <RecordNotices
         recordId={person.id}
+        archive={archive}
         duplicates={duplicates}
         parked={enrichment.parked}
       />

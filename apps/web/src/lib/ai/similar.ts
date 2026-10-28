@@ -172,6 +172,7 @@ const neighboursStatement = (
            null::boolean as note_widened
     from near c
     join entity e on e.id = c.entity_id and e.merged_into_id is null
+      and e.archived_at is null
     where c.source_kind = 'attribute'
       and e.kind = 'deal'
       and c.distance <= ${SIMILAR_MAX_DISTANCE}
@@ -190,6 +191,7 @@ const neighboursStatement = (
       from link l
       join entity d on d.id = l.to_entity_id
         and d.kind = 'deal' and d.merged_into_id is null
+        and d.archived_at is null
       where l.from_entity_id = e.id
         and l.relation = 'tagged_in'
         and ${terminalStageLabel('d', true)} is not null

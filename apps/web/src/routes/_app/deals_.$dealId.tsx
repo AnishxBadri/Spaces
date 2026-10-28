@@ -29,7 +29,7 @@ import {
   RecordHeadActions,
 } from '#/components/record/record-heads'
 import { RecordNotices } from '#/components/record/record-notices'
-import { sensitiveStamp } from '#/components/sensitive-toggle'
+import { recordStamp } from '#/components/record/record-archive'
 import { PickPopover } from '#/components/record/details-add'
 import {
   RelationSection,
@@ -65,6 +65,7 @@ import {
   listRecordDocuments,
   listRecordDuplicates,
   getEntitySensitivity,
+  getRecordArchive,
   listOpenSuggestionTitles,
   listRecordNotes,
   listRegistry,
@@ -90,6 +91,7 @@ export const Route = createFileRoute('/_app/deals_/$dealId')({
       notes,
       waiting,
       sensitivity,
+      archive,
       pluginActions,
       duplicates,
     ] = await Promise.all([
@@ -102,6 +104,7 @@ export const Route = createFileRoute('/_app/deals_/$dealId')({
       listRecordNotes({ data: { entityId: params.dealId } }),
       listOpenSuggestionTitles({ data: { entityId: params.dealId } }),
       getEntitySensitivity({ data: { entityId: params.dealId } }),
+      getRecordArchive({ data: { id: params.dealId } }),
       listRecordActions({ data: { kind: 'deal' } }),
       listRecordDuplicates({ data: { entityId: params.dealId } }),
     ])
@@ -120,6 +123,7 @@ export const Route = createFileRoute('/_app/deals_/$dealId')({
       notes,
       waiting,
       sensitivity,
+      archive,
       pluginActions,
       duplicates,
     }
@@ -138,6 +142,7 @@ function DealRecordPage() {
     notes,
     waiting,
     sensitivity,
+    archive,
     pluginActions,
     duplicates,
   } = Route.useLoaderData()
@@ -262,10 +267,12 @@ function DealRecordPage() {
       ) : null}
 
       <RecordHeader
-        stamp={sensitiveStamp('Deal', sensitivity)}
+        stamp={recordStamp('Deal', sensitivity, archive)}
+        archived={archive !== null}
         actions={
           <RecordHeadActions
             record={{ id: deal.id, name: deal.name, kind: 'deal' }}
+            archived={archive !== null}
             verbs={
               liveStages.length > 0 ? (
                 <MoveStageVerb onMove={() => setMoveOpen(true)} />
@@ -313,7 +320,11 @@ function DealRecordPage() {
         }
       />
 
-      <RecordNotices recordId={deal.id} duplicates={duplicates} />
+      <RecordNotices
+        recordId={deal.id}
+        archive={archive}
+        duplicates={duplicates}
+      />
 
       <RecordBody
         groups

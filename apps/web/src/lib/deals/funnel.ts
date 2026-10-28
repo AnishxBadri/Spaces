@@ -49,7 +49,13 @@ export const stageFunnelProgram = Effect.fn('stageFunnelProgram')(function* (
           sensitive: entity.sensitive,
         })
         .from(entity)
-        .where(and(eq(entity.kind, 'deal'), isNull(entity.mergedIntoId)))
+        .where(
+          and(
+            eq(entity.kind, 'deal'),
+            isNull(entity.mergedIntoId),
+            isNull(entity.archivedAt),
+          ),
+        )
       const ownerIds = [
         ...new Set(
           live.flatMap((d) => {

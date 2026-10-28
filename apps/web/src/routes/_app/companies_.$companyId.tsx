@@ -19,7 +19,7 @@ import {
 } from '#/components/record/record-parts'
 import { RecordHeadActions } from '#/components/record/record-heads'
 import { RecordNotices } from '#/components/record/record-notices'
-import { sensitiveStamp } from '#/components/sensitive-toggle'
+import { recordStamp } from '#/components/record/record-archive'
 import { PickPopover } from '#/components/record/details-add'
 import {
   RelationSection,
@@ -56,6 +56,7 @@ import {
   getCompany,
   getRecordEnrichment,
   getEntitySensitivity,
+  getRecordArchive,
   getRecordTimeline,
   listRecordActions,
   listRecordDocuments,
@@ -87,6 +88,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       notes,
       waiting,
       sensitivity,
+      archive,
       pluginActions,
       enrichment,
       duplicates,
@@ -101,6 +103,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       listRecordNotes({ data: { entityId: params.companyId } }),
       listOpenSuggestionTitles({ data: { entityId: params.companyId } }),
       getEntitySensitivity({ data: { entityId: params.companyId } }),
+      getRecordArchive({ data: { id: params.companyId } }),
       listRecordActions({ data: { kind: 'company' } }),
       getRecordEnrichment({
         data: { entityId: params.companyId, kind: 'company' },
@@ -124,6 +127,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       notes,
       waiting,
       sensitivity,
+      archive,
       pluginActions,
       enrichment,
       duplicates,
@@ -144,6 +148,7 @@ function CompanyRecordPage() {
     notes,
     waiting,
     sensitivity,
+    archive,
     pluginActions,
     enrichment,
     duplicates,
@@ -201,10 +206,12 @@ function CompanyRecordPage() {
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
-        stamp={sensitiveStamp('Company', sensitivity)}
+        stamp={recordStamp('Company', sensitivity, archive)}
+        archived={archive !== null}
         actions={
           <RecordHeadActions
             record={{ id: company.id, name: company.name, kind: 'company' }}
+            archived={archive !== null}
             enrich={enrichment}
             sensitivity={sensitivity}
             template="company"
@@ -223,6 +230,7 @@ function CompanyRecordPage() {
 
       <RecordNotices
         recordId={company.id}
+        archive={archive}
         duplicates={duplicates}
         parked={enrichment.parked}
       />

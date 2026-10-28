@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   attribute,
@@ -491,6 +491,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
       ),
     ),
   ]
+  // An archived record leaves the walk: its links stay, it is not read.
   const others = new Map<string, { kind: string; name: string }>()
   if (otherIds.length > 0)
     for (const o of yield* query(() =>
@@ -501,7 +502,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
           name: entity.canonicalName,
         })
         .from(entity)
-        .where(inArray(entity.id, otherIds)),
+        .where(and(inArray(entity.id, otherIds), isNull(entity.archivedAt))),
     ))
       others.set(o.id, { kind: o.kind, name: o.name })
 

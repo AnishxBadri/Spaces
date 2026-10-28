@@ -37,6 +37,7 @@ export type HeadRecord = {
  * A company's, person's, deal's or custom record's verbs: Log interaction
  * (`L`) where people are logged with it, then Enrich or the kind's own
  * verb, then the `···`.
+ * - An archived record's head is the `···` alone, which carries Restore.
  * - One status stream feeds Enrich's label and the plugins' toasts.
  * - A finished Enrich toasts the line its reload brings back.
  */
@@ -48,6 +49,7 @@ export function RecordHeadActions({
   sensitivity,
   template,
   pluginActions = [],
+  archived = false,
 }: {
   record: HeadRecord
   /** Log interaction, bound to `L`. */
@@ -59,6 +61,7 @@ export function RecordHeadActions({
   sensitivity?: SensitivityState | undefined
   template?: TemplateKind | undefined
   pluginActions?: ReadonlyArray<RecordAction> | undefined
+  archived?: boolean | undefined
 }) {
   const navigate = useNavigate()
   const offered = offeredActions(pluginActions, enrich !== undefined)
@@ -102,6 +105,17 @@ export function RecordHeadActions({
 
   const plugins = usePluginEntries(record.id, offered, jobs)
 
+  const more = (
+    <RecordMoreMenu
+      name={record.name}
+      entityId={record.id}
+      template={template}
+      sensitivity={sensitivity}
+      archived={archived}
+      plugins={plugins}
+    />
+  )
+  if (archived) return more
   return (
     <>
       {log ? (
@@ -119,13 +133,7 @@ export function RecordHeadActions({
         <EnrichVerb entityId={record.id} enrich={enrich} jobs={jobs} />
       )}
       {verbs}
-      <RecordMoreMenu
-        name={record.name}
-        entityId={record.id}
-        template={template}
-        sensitivity={sensitivity}
-        plugins={plugins}
-      />
+      {more}
     </>
   )
 }

@@ -199,6 +199,7 @@ export const positionAndPeersProgram = Effect.fn('positionAndPeersProgram')(
           and(
             eq(entity.kind, 'company'),
             isNull(entity.mergedIntoId),
+            isNull(entity.archivedAt),
             ne(entity.id, seed.id),
             sql`exists (select 1 from ${entitySpace} where ${entitySpace.entityId} = ${entity.id} and ${inArray(entitySpace.spaceId, leafIds)})`,
           ),

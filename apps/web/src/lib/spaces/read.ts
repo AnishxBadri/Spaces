@@ -70,7 +70,13 @@ const companyCountsBySpace = Effect.fn('companyCountsBySpace')(function* () {
       })
       .from(entitySpace)
       .innerJoin(entity, eq(entity.id, entitySpace.entityId))
-      .where(and(eq(entity.kind, 'company'), isNull(entity.mergedIntoId)))
+      .where(
+        and(
+          eq(entity.kind, 'company'),
+          isNull(entity.mergedIntoId),
+          isNull(entity.archivedAt),
+        ),
+      )
       .groupBy(entitySpace.spaceId),
   )
   return new Map(rows.map((r) => [r.spaceId, r.count]))
@@ -308,7 +314,13 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
       .from(entitySpace)
       .innerJoin(entity, eq(entity.id, entitySpace.entityId))
       .innerJoin(company, eq(company.entityId, entity.id))
-      .where(and(eq(entitySpace.spaceId, id), isNull(entity.mergedIntoId)))
+      .where(
+        and(
+          eq(entitySpace.spaceId, id),
+          isNull(entity.mergedIntoId),
+          isNull(entity.archivedAt),
+        ),
+      )
       .orderBy(asc(entity.canonicalName)),
   )
 
@@ -337,6 +349,7 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
                   eq(link.attrSlug, 'company'),
                   eq(entity.kind, 'deal'),
                   isNull(entity.mergedIntoId),
+                  isNull(entity.archivedAt),
                 ),
               )
               .groupBy(link.toEntityId),
@@ -411,6 +424,7 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
           eq(entitySpace.spaceId, id),
           eq(entity.kind, 'custom'),
           isNull(entity.mergedIntoId),
+          isNull(entity.archivedAt),
           eq(objectDef.archived, false),
         ),
       )

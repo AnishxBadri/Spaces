@@ -22,9 +22,9 @@ import { PERSON_COMPANIES, personCompanyEdge } from './companies'
  * Outside the server-fn barrel on purpose: a plain export there ships to the
  * browser, and a test can call these without a request.
  *
- * `entity.merged_into_id` is filtered in SQL on **both** ends of the
- * inherited join — a person merged away stops being a contact, and a company
- * merged away stops lending its contacts.
+ * `entity.merged_into_id` and `archived_at` are filtered in SQL on **both**
+ * ends of the inherited join — a person merged away or archived stops being
+ * a contact, and such a company stops lending its contacts.
  */
 
 export class SpaceContactsFailed extends Schema.TaggedError<SpaceContactsFailed>()(
@@ -128,7 +128,11 @@ export const spaceContactsProgram = Effect.fn('spaceContactsProgram')(
           .innerJoin(entity, eq(entity.id, entitySpace.entityId))
           .innerJoin(person, eq(person.entityId, entity.id))
           .where(
-            and(eq(entitySpace.spaceId, spaceId), isNull(entity.mergedIntoId)),
+            and(
+              eq(entitySpace.spaceId, spaceId),
+              isNull(entity.mergedIntoId),
+              isNull(entity.archivedAt),
+            ),
           )
           .orderBy(asc(entity.canonicalName)),
       catch: (cause) => new SpaceContactsFailed({ cause }),
@@ -189,7 +193,9 @@ export const spaceInheritedContactsProgram = Effect.fn(
             eq(entitySpace.spaceId, spaceId),
             eq(companyEntity.kind, 'company'),
             isNull(companyEntity.mergedIntoId),
+            isNull(companyEntity.archivedAt),
             isNull(entity.mergedIntoId),
+            isNull(entity.archivedAt),
             notExists(
               db
                 .select({ tagged: sql`1` })

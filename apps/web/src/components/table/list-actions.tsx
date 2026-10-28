@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
-import { MoreMenu } from '#/components/ui/more-menu'
+import { MENU_RULE, MoreMenu } from '#/components/ui/more-menu'
 import type { MoreMenuEntry } from '#/components/ui/more-menu'
 import type { Condition } from '@spaces/core/views/filter'
+import { archiveRecord, restoreRecord } from '#/lib/server-fns'
 import { AddToSpaceDialog } from './add-to-space-dialog'
 import type { AddTarget } from './add-to-space-dialog'
 import { BulkEnrichDialog } from './bulk-enrich-dialog'
@@ -19,9 +21,11 @@ const FILL_AT = [10, 25, 45, 70]
  * What a record list does to its rows, past editing a cell: the checkboxes
  * and the selection bar (`n selected · [Add to space] [Enrich…] · Clear`),
  * each row's `···` (Open in a new tab · Add to space… · Enrich… · Copy
- * link), the head's Enrich… over the view, and the two windows they open.
+ * link · Archive), the head's Enrich… over the view, and the two windows
+ * they open.
  * - Enrich… is there only for a kind enrichment reads (`enrich` set).
- * - Add to space works on any record kind.
+ * - Add to space and Archive work on any record kind; Archive asks nothing,
+ *   the row leaves, and the toast's Undo restores it.
  */
 export function useListActions<T extends { id: string; name: string }>({
   label,
@@ -75,6 +79,25 @@ export function useListActions<T extends { id: string; name: string }>({
       timers.current.push(window.setTimeout(refresh, s * 1000))
   }
 
+  async function archive(row: T) {
+    try {
+      await archiveRecord({ data: { id: row.id } })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not archive')
+      return
+    }
+    done()
+    toast(`Archived ${row.name}`, {
+      action: {
+        label: 'Undo',
+        onClick: () =>
+          void restoreRecord({ data: { id: row.id } })
+            .then(refresh)
+            .catch(() => toast.error('Could not undo')),
+      },
+    })
+  }
+
   const rowMenu = (row: T): ReactNode => {
     const href = hrefOf(row)
     const items: Array<MoreMenuEntry> = [
@@ -94,6 +117,8 @@ export function useListActions<T extends { id: string; name: string }>({
             },
           ]),
       { label: 'Copy link', copy: () => new URL(href, location.origin).href },
+      MENU_RULE,
+      { label: 'Archive', onSelect: () => void archive(row) },
     ]
     return <MoreMenu variant="row" label={row.name} items={items} />
   }

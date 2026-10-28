@@ -7,6 +7,7 @@ import { MENU_RULE, MoreMenu } from '#/components/ui/more-menu'
 import type { MoreMenuCheck, MoreMenuEntry } from '#/components/ui/more-menu'
 import { openAsk } from '#/lib/ask/dock-store'
 import { saveRecordAsTemplate } from '#/lib/server-fns'
+import { archiveEntry, useRecordArchive } from './record-archive'
 
 /** The kinds a record template is captured from. */
 export type TemplateKind = 'company' | 'person' | 'deal'
@@ -17,6 +18,8 @@ type MenuProps = {
   entityId?: string | undefined
   template?: TemplateKind | undefined
   sensitivity?: SensitivityState | undefined
+  /** Set where the record archives: whether it is archived now. */
+  archived?: boolean | undefined
   /** The record's own rarer verbs, after Copy link: `Record a round…`. */
   verbs?: ReadonlyArray<MoreMenuEntry> | undefined
   /** From `usePluginEntries`. */
@@ -29,6 +32,7 @@ type MenuProps = {
  *   chip; Copy link; the record's own `verbs`; Save as template… where the
  *   kind has templates;
  * - a rule and Sensitive, a switch, where the record carries the flag;
+ * - a rule and Archive, or Restore once archived, where the record archives;
  * - the plugins' actions, each group under its plugin's name.
  */
 export function RecordMoreMenu(props: MenuProps) {
@@ -53,9 +57,11 @@ function Menu({
   template,
   verbs = [],
   plugins = [],
+  archived,
   sensitive,
 }: MenuProps & { sensitive: MoreMenuCheck | null }) {
   const [templating, setTemplating] = useState(false)
+  const archiving = useRecordArchive(entityId ?? '')
   const templated =
     template !== undefined && entityId !== undefined
       ? { kind: template, id: entityId }
@@ -81,6 +87,8 @@ function Menu({
       opens: true,
     })
   if (sensitive !== null) items.push(MENU_RULE, sensitive)
+  if (archived !== undefined && entityId !== undefined)
+    items.push(MENU_RULE, archiveEntry(archived, archiving))
   items.push(...plugins)
   return (
     <>

@@ -30,14 +30,20 @@ const query = <T>(run: () => Promise<T>) =>
     catch: (cause) => new SetupReadFailed({ cause }),
   })
 
-/** Live companies — a merged-away row is not one. */
+/** Live companies — a merged-away or archived row is not one. */
 export const companyCountProgram = Effect.fn('companyCountProgram')(
   function* (): Effect.fn.Return<number, SetupReadFailed> {
     const rows = yield* query(() =>
       db
         .select({ value: count() })
         .from(entity)
-        .where(and(eq(entity.kind, 'company'), isNull(entity.mergedIntoId))),
+        .where(
+          and(
+            eq(entity.kind, 'company'),
+            isNull(entity.mergedIntoId),
+            isNull(entity.archivedAt),
+          ),
+        ),
     )
     return rows.at(0)?.value ?? 0
   },

@@ -58,6 +58,30 @@ describe('RecordNotices', () => {
     expect(html.match(/size-1\.5 shrink-0 bg-warning/g)).toHaveLength(2)
   })
 
+  it('says an archived record first, in graphite, with Restore', async () => {
+    const html = await render(
+      <RecordNotices
+        recordId={ID}
+        archive={{ on: '2026-10-12T09:30:00.000Z', by: 'Anish' }}
+        duplicates={[
+          {
+            pairId: 'p1',
+            otherId: 'b',
+            otherName: 'Flent Inc',
+            key: 'flent.com',
+          },
+        ]}
+      />,
+    )
+    expect(html).toContain('data-notice="archived"')
+    expect(html).toContain('Archived 12 Oct by Anish')
+    expect(html).toContain('Restore ›')
+    expect(html.indexOf('data-notice="archived"')).toBeLessThan(
+      html.indexOf('data-notice="duplicate"'),
+    )
+    expect(html.match(/size-1\.5 shrink-0 bg-graphite/g)).toHaveLength(1)
+  })
+
   it('renders nothing when nothing needs saying', () => {
     expect(renderToStaticMarkup(<RecordNotices recordId={ID} />)).toBe('')
     expect(

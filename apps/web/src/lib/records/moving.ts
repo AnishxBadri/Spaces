@@ -74,6 +74,7 @@ export const movingProgram = Effect.fn('movingProgram')(function* (
         and(
           eq(entity.kind, 'company'),
           isNull(entity.mergedIntoId),
+          isNull(entity.archivedAt),
           gte(signal.observedAt, since),
           touched,
         ),

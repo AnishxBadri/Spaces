@@ -21,7 +21,7 @@ import {
 } from '#/components/record/record-parts'
 import { RecordHeadActions } from '#/components/record/record-heads'
 import { RecordNotices } from '#/components/record/record-notices'
-import { sensitiveStamp } from '#/components/sensitive-toggle'
+import { recordStamp } from '#/components/record/record-archive'
 import { linksPeople } from '#/lib/records/head'
 import { PropertyFold } from '#/components/record/property-fold'
 import {
@@ -56,6 +56,7 @@ import {
   listRecordDocuments,
   listRecordDuplicates,
   getEntitySensitivity,
+  getRecordArchive,
   listOpenSuggestionTitles,
   listRecordNotes,
   listRegistry,
@@ -92,6 +93,7 @@ export const Route = createFileRoute('/_app/o_/$objectSlug/$recordId')({
       notes,
       waiting,
       sensitivity,
+      archive,
       duplicates,
     ] = await Promise.all([
       // Derived halves too: their rows read the resolver's value.
@@ -106,6 +108,7 @@ export const Route = createFileRoute('/_app/o_/$objectSlug/$recordId')({
       listRecordNotes({ data: { entityId: record.id } }),
       listOpenSuggestionTitles({ data: { entityId: record.id } }),
       getEntitySensitivity({ data: { entityId: record.id } }),
+      getRecordArchive({ data: { id: record.id } }),
       listRecordDuplicates({ data: { entityId: record.id } }),
     ])
     return {
@@ -117,6 +120,7 @@ export const Route = createFileRoute('/_app/o_/$objectSlug/$recordId')({
       notes,
       waiting,
       sensitivity,
+      archive,
       duplicates,
     }
   },
@@ -134,6 +138,7 @@ function ObjectRecordPage() {
     notes,
     waiting,
     sensitivity,
+    archive,
     duplicates,
   } = Route.useLoaderData()
   const router = useRouter()
@@ -194,10 +199,12 @@ function ObjectRecordPage() {
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
-        stamp={sensitiveStamp(record.object.singular, sensitivity)}
+        stamp={recordStamp(record.object.singular, sensitivity, archive)}
+        archived={archive !== null}
         actions={
           <RecordHeadActions
             record={{ id: record.id, name: record.name, kind: 'custom' }}
+            archived={archive !== null}
             log={logs}
             sensitivity={sensitivity}
           />
@@ -218,7 +225,11 @@ function ObjectRecordPage() {
         }
       />
 
-      <RecordNotices recordId={record.id} duplicates={duplicates} />
+      <RecordNotices
+        recordId={record.id}
+        archive={archive}
+        duplicates={duplicates}
+      />
 
       <RecordBody
         groups

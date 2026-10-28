@@ -130,6 +130,7 @@ export function semanticCtes(
           limit 100
         ) c
         join entity e on e.id = c.entity_id and e.merged_into_id is null
+          and e.archived_at is null
         where c.embedding_model = ${model}
           and ${canReadNoteSql(userId)}
         group by c.entity_id

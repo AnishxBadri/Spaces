@@ -217,6 +217,7 @@ const readBrief = Effect.fn('readBrief')(function* (
             inArray(entitySpace.spaceId, kept),
             eq(entity.kind, 'company'),
             isNull(entity.mergedIntoId),
+            isNull(entity.archivedAt),
           ),
         )
         .groupBy(entitySpace.spaceId),
@@ -255,6 +256,7 @@ const readBrief = Effect.fn('readBrief')(function* (
           inArray(entitySpace.spaceId, kept),
           eq(entity.kind, 'company'),
           isNull(entity.mergedIntoId),
+          isNull(entity.archivedAt),
           watch
             ? and(
                 eq(entity.sensitive, false),
