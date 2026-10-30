@@ -8,7 +8,8 @@ import { logExternalOrigin } from '#/lib/server/external-origin'
  * `pnpm db:migrate:run`.
  *
  * The composition (migrate, system attributes, starter taxonomy, value-index
- * reconcile, optional `SPACES_PLUGINS` install) is `@spaces/core`'s `boot()`.
+ * reconcile, the bundled plugins and the optional `SPACES_PLUGINS` install) is
+ * `@spaces/core`'s `boot()`.
  * This is the process around it: the two log lines an operator reads first,
  * the argv a test hands over, and the exit code.
  */

@@ -15,6 +15,7 @@ export type {
   IntegrationDetail,
   IntegrationRow,
   IntegrationState,
+  RunLine,
   SecretField,
   SecretSlot,
   SpaceOption,
@@ -53,6 +54,14 @@ export const getIntegration = createServerFn()
   .handler(async ({ data }) => {
     const { getIntegrationHandler } = await import('../integrations/admin')
     return getIntegrationHandler(data)
+  })
+
+/** One plugin's latest runs, for Usage filtered to it; bundled plugins have no page of their own. */
+export const getIntegrationRuns = createServerFn()
+  .validator(byId)
+  .handler(async ({ data }) => {
+    const { getIntegrationRunsHandler } = await import('../integrations/admin')
+    return getIntegrationRunsHandler(data)
   })
 
 /** The operator's switch; the worker registers or unregisters its queues. */

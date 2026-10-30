@@ -14,8 +14,8 @@ import { useSettingsDraft } from '#/components/settings/settings-form'
 import { SettingsSection } from '#/components/settings/settings-section'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import { MoreMenu } from '#/components/ui/more-menu'
+import { loadPluginPage, toProviderIfBundled } from '#/lib/settings-moves'
 import {
-  getIntegration,
   removeIntegrationSecret,
   resetIntegration,
   saveIntegrationAutoEnrich,
@@ -39,12 +39,12 @@ import type {
  * what it switches on, recent runs, Disable / Uninstall. Inside the settings
  * shell, so Plugins stays lit; the `_` keeps it out of the ledger's
  * component. A member reads it too, keys redacted and every control
- * disabled.
+ * disabled. A bundled plugin has no page here: by id or by row, it lands
+ * on its provider's In use tab.
  */
 export const Route = createFileRoute('/_app/settings/plugins_/$integrationId')({
-  loader: async ({ params }) => ({
-    detail: await getIntegration({ data: { id: params.integrationId } }),
-  }),
+  beforeLoad: toProviderIfBundled,
+  loader: ({ params }) => loadPluginPage(params.integrationId),
   component: IntegrationPage,
 })
 

@@ -75,6 +75,7 @@ import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as ApiWebhooksIdRouteImport } from './routes/api/webhooks/$id'
 import { Route as ApiWorkspaceLogoShaRouteImport } from './routes/api/workspace-logo/$sha'
 import { Route as AppOObjectSlugRecordIdRouteImport } from './routes/_app/o_.$objectSlug.$recordId'
+import { Route as AppSettingsConnectionsProviderRouteImport } from './routes/_app/settings/connections_.$provider'
 import { Route as AppSettingsEmailCalendarConnectionIdRouteImport } from './routes/_app/settings/email-calendar_.$connectionId'
 import { Route as AppSettingsFilesConnectionIdRouteImport } from './routes/_app/settings/files_.$connectionId'
 import { Route as AppSettingsIntegrationsIntegrationIdRouteImport } from './routes/_app/settings/integrations_.$integrationId'
@@ -415,6 +416,12 @@ const AppOObjectSlugRecordIdRoute = AppOObjectSlugRecordIdRouteImport.update({
   path: '/o/$objectSlug/$recordId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsConnectionsProviderRoute =
+  AppSettingsConnectionsProviderRouteImport.update({
+    id: '/connections_/$provider',
+    path: '/connections/$provider',
+    getParentRoute: () => AppSettingsRoute,
+  } as any)
 const AppSettingsEmailCalendarConnectionIdRoute =
   AppSettingsEmailCalendarConnectionIdRouteImport.update({
     id: '/email-calendar_/$connectionId',
@@ -524,6 +531,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace-logo/$sha': typeof ApiWorkspaceLogoShaRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
+  '/settings/connections/$provider': typeof AppSettingsConnectionsProviderRoute
   '/settings/email-calendar/$connectionId': typeof AppSettingsEmailCalendarConnectionIdRoute
   '/settings/files/$connectionId': typeof AppSettingsFilesConnectionIdRoute
   '/settings/integrations/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
@@ -597,6 +605,7 @@ export interface FileRoutesByTo {
   '/api/workspace-logo/$sha': typeof ApiWorkspaceLogoShaRoute
   '/settings': typeof AppSettingsIndexRoute
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
+  '/settings/connections/$provider': typeof AppSettingsConnectionsProviderRoute
   '/settings/email-calendar/$connectionId': typeof AppSettingsEmailCalendarConnectionIdRoute
   '/settings/files/$connectionId': typeof AppSettingsFilesConnectionIdRoute
   '/settings/integrations/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
@@ -673,6 +682,7 @@ export interface FileRoutesById {
   '/api/workspace-logo/$sha': typeof ApiWorkspaceLogoShaRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/o_/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
+  '/_app/settings/connections_/$provider': typeof AppSettingsConnectionsProviderRoute
   '/_app/settings/email-calendar_/$connectionId': typeof AppSettingsEmailCalendarConnectionIdRoute
   '/_app/settings/files_/$connectionId': typeof AppSettingsFilesConnectionIdRoute
   '/_app/settings/integrations_/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
@@ -749,6 +759,7 @@ export interface FileRouteTypes {
     | '/api/workspace-logo/$sha'
     | '/settings/'
     | '/o/$objectSlug/$recordId'
+    | '/settings/connections/$provider'
     | '/settings/email-calendar/$connectionId'
     | '/settings/files/$connectionId'
     | '/settings/integrations/$integrationId'
@@ -822,6 +833,7 @@ export interface FileRouteTypes {
     | '/api/workspace-logo/$sha'
     | '/settings'
     | '/o/$objectSlug/$recordId'
+    | '/settings/connections/$provider'
     | '/settings/email-calendar/$connectionId'
     | '/settings/files/$connectionId'
     | '/settings/integrations/$integrationId'
@@ -897,6 +909,7 @@ export interface FileRouteTypes {
     | '/api/workspace-logo/$sha'
     | '/_app/settings/'
     | '/_app/o_/$objectSlug/$recordId'
+    | '/_app/settings/connections_/$provider'
     | '/_app/settings/email-calendar_/$connectionId'
     | '/_app/settings/files_/$connectionId'
     | '/_app/settings/integrations_/$integrationId'
@@ -1390,6 +1403,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOObjectSlugRecordIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settings/connections_/$provider': {
+      id: '/_app/settings/connections_/$provider'
+      path: '/connections/$provider'
+      fullPath: '/settings/connections/$provider'
+      preLoaderRoute: typeof AppSettingsConnectionsProviderRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/settings/email-calendar_/$connectionId': {
       id: '/_app/settings/email-calendar_/$connectionId'
       path: '/email-calendar/$connectionId'
@@ -1466,6 +1486,7 @@ interface AppSettingsRouteChildren {
   AppSettingsUsageRoute: typeof AppSettingsUsageRoute
   AppSettingsWorkspaceRoute: typeof AppSettingsWorkspaceRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+  AppSettingsConnectionsProviderRoute: typeof AppSettingsConnectionsProviderRoute
   AppSettingsEmailCalendarConnectionIdRoute: typeof AppSettingsEmailCalendarConnectionIdRoute
   AppSettingsFilesConnectionIdRoute: typeof AppSettingsFilesConnectionIdRoute
   AppSettingsIntegrationsIntegrationIdRoute: typeof AppSettingsIntegrationsIntegrationIdRoute
@@ -1497,6 +1518,7 @@ const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsUsageRoute: AppSettingsUsageRoute,
   AppSettingsWorkspaceRoute: AppSettingsWorkspaceRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
+  AppSettingsConnectionsProviderRoute: AppSettingsConnectionsProviderRoute,
   AppSettingsEmailCalendarConnectionIdRoute:
     AppSettingsEmailCalendarConnectionIdRoute,
   AppSettingsFilesConnectionIdRoute: AppSettingsFilesConnectionIdRoute,

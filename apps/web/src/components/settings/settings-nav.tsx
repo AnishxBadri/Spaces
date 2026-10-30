@@ -13,7 +13,7 @@ import { cn } from '#/lib/utils'
  * - `you`: the reader's own accounts and tokens.
  * - `workspace`: the workspace, its people, what it records and prices.
  * - `ai`: models, search and what AI spends.
- * - `integrations`: plugins and the doors data comes in by.
+ * - `integrations`: providers, plugins and the doors data comes in by.
  *
  * The group is also the eyebrow the section prints — `SETTINGS · WORKSPACE` —
  * so a section cannot name a place the nav does not have.
@@ -58,7 +58,7 @@ export type SettingsSectionRow = {
 
 export const SETTINGS_SECTIONS = [
   // The reader's own accounts, by the job they do; the OAuth clients are
-  // Connection apps.
+  // Connections'.
   {
     to: '/settings/email-calendar',
     label: 'Email & calendar',
@@ -115,7 +115,16 @@ export const SETTINGS_SECTIONS = [
     group: 'ai',
     admin: false,
   },
-  // The installed plugins, their keys and settings.
+  // The providers (Google, Box): the OAuth client every member's Connect
+  // leaves through, and which uses members may use.
+  {
+    to: '/settings/connections',
+    label: 'Connections',
+    group: 'integrations',
+    admin: true,
+  },
+  // The installed plugins, their keys and settings; the bundled ones are
+  // their providers'.
   {
     to: '/settings/plugins',
     label: 'Plugins',
@@ -133,13 +142,6 @@ export const SETTINGS_SECTIONS = [
   {
     to: '/settings/email-forwarding',
     label: 'Email forwarding',
-    group: 'integrations',
-    admin: true,
-  },
-  // The providers' OAuth clients every member's Connect leaves through.
-  {
-    to: '/settings/connection-apps',
-    label: 'Connection apps',
     group: 'integrations',
     admin: true,
   },

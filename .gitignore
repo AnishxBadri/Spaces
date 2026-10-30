@@ -18,6 +18,10 @@ todos.json
 # runtime data (blobs + secret.key)
 data/
 
+# `pnpm bundle-plugins` output: the bundled plugins' tarballs boot installs
+# from in a checkout; the image packs its own
+bundled-plugins/
+
 # backup.sh output — a dump and every blob, never in git
 backups/
 

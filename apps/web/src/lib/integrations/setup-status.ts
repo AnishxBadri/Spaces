@@ -1,8 +1,7 @@
 import { Effect, Schema } from 'effect'
-import { and, asc, count, eq, isNull, ne } from 'drizzle-orm'
+import { and, asc, count, eq, isNull } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
-  accountConnection,
   credential,
   entity,
   integration,
@@ -100,7 +99,7 @@ export const setupAudienceProgram = Effect.fn('setupAudienceProgram')(
  * - Enrichment: a runnable plugin with the `enrichment` role. The Website
  *   source needs nothing, so it never counts.
  * - Email forwarding: a `mailbox` row.
- * - Google: an `account_connection` with provider google, not revoked.
+ * - Google: its OAuth client saved and active, so members can connect.
  * - Granola, Exa: an enabled `integration` row with that capability id.
  */
 export const whatsSetUpProgram = Effect.fn('whatsSetUpProgram')(
@@ -120,11 +119,13 @@ export const whatsSetUpProgram = Effect.fn('whatsSetUpProgram')(
         query(() =>
           db
             .select({ value: count() })
-            .from(accountConnection)
+            .from(credential)
             .where(
               and(
-                eq(accountConnection.provider, 'google'),
-                ne(accountConnection.status, 'revoked'),
+                eq(credential.provider, 'google'),
+                eq(credential.kind, 'oauth_client'),
+                eq(credential.scope, 'workspace'),
+                eq(credential.status, 'active'),
               ),
             ),
         ),

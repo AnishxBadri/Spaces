@@ -94,7 +94,7 @@ const oauthClient = Effect.fn('oauthClient')(function* (
   if (clientId === null || secret === null)
     return yield* new ProviderUnconfigured({
       provider,
-      message: `${label} has no OAuth client yet. An admin adds it in Settings → Connection apps.`,
+      message: `${label} isn’t set up yet. An admin sets it up in Settings → Connections → ${label}.`,
     })
   return { clientId, clientSecret: secret }
 })

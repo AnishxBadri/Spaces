@@ -50,7 +50,7 @@ const query = <T>(message: string, f: () => Promise<T>) =>
 /** APP_URL as the app decided it, read per request so an edit needs no build. */
 const origin = () => describeExternalOrigin(process.env.APP_URL).origin
 
-const readRow = Effect.fn('readProviderApp')(function* (
+export const providerAppProgram = Effect.fn('readProviderApp')(function* (
   provider: ProviderId,
 ): Effect.fn.Return<ProviderAppRow, ProviderAppFailed> {
   const row = yield* query('Could not read the OAuth client', () =>
@@ -75,7 +75,8 @@ const readRow = Effect.fn('readProviderApp')(function* (
 export const getProviderAppsProgram = Effect.fn('getProviderApps')(
   function* (): Effect.fn.Return<ProviderAppRow[], ProviderAppFailed> {
     const rows: ProviderAppRow[] = []
-    for (const provider of PROVIDER_IDS) rows.push(yield* readRow(provider))
+    for (const provider of PROVIDER_IDS)
+      rows.push(yield* providerAppProgram(provider))
     return rows
   },
 )
@@ -121,7 +122,7 @@ export const setProviderAppProgram = Effect.fn('setProviderApp')(function* (
         createdBy: actorId,
       }),
     )
-    return yield* readRow(provider)
+    return yield* providerAppProgram(provider)
   }
   const existing = yield* query('Could not read the OAuth client', () =>
     readWorkspaceCredential(provider, KIND),
@@ -133,7 +134,7 @@ export const setProviderAppProgram = Effect.fn('setProviderApp')(function* (
   yield* query('Could not save the OAuth client', () =>
     mergeCredentialMeta(existing.id, { clientId }),
   )
-  return yield* readRow(provider)
+  return yield* providerAppProgram(provider)
 })
 
 // The server fns' bodies. `requireAdmin()` first on the write.

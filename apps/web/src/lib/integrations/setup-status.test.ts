@@ -21,8 +21,8 @@ import {
 
 /**
  * The first-run reads against a real database: What's set up reads
- * each of its seven items live from the vault, users, mailbox, connections
- * and integrations; Today's empty state turns on the company count.
+ * each of its seven items live from the vault, users, mailbox and
+ * integrations; Today's empty state turns on the company count.
  */
 
 const run = <TValue, TError>(effect: Effect.Effect<TValue, TError>) =>
@@ -48,7 +48,7 @@ const APOLLO: IntegrationManifest = {
   ],
 }
 
-const secret = (provider: string, kind: 'llm' | 'mailbox') =>
+const secret = (provider: string, kind: 'llm' | 'mailbox' | 'oauth_client') =>
   db
     .insert(credential)
     .values({
@@ -102,6 +102,7 @@ describe("What's set up", () => {
       host: 'imap.fund.example',
       credentialId: await secret('imap', 'mailbox'),
     })
+    // A member's connection is not Google set up; its client is.
     await db.insert(accountConnection).values({
       userId: FIXTURE_ACTOR.id,
       provider: 'google',
@@ -109,6 +110,8 @@ describe("What's set up", () => {
       externalEmail: 'fixture@fund.example',
       tokensEnc: Buffer.from('x'),
     })
+    expect((await run(whatsSetUpProgram())).google).toBe(false)
+    await secret('google', 'oauth_client')
     await install('apollo', APOLLO)
     await install('granola', null)
     await install('exa', null)

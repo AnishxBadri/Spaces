@@ -6,8 +6,9 @@ import { describe, expect, it } from 'vitest'
 /**
  * Install, upgrade and uninstall go through one installer routine. Install
  * has exactly three callers — the registry install and the upload, each
- * behind its server fn, and first boot's SPACES_PLUGINS; upgrade two, the
- * program behind its server fn and the worker's boot autoupdate; uninstall
+ * behind its server fn, and first boot (the bundled plugins and
+ * SPACES_PLUGINS, through one door); upgrade three, the program behind its
+ * server fn, the worker's boot autoupdate and the bundled plugins; uninstall
  * one, the program behind its server fn. Checked over
  * the source text of every shipping file in apps/ and packages/ (tests
  * excluded), so a second caller fails here naming its file.
@@ -83,8 +84,13 @@ describe('the installer has one caller per entry point', () => {
   })
 
   it.each([
-    // The boot autoupdate is upgrade's one other door.
-    ['upgradePlugin', 'upgradeFromRegistryProgram', [WEB, AUTOUPDATE]],
+    // The boot autoupdate and the bundled plugins at boot are upgrade's
+    // other doors.
+    [
+      'upgradePlugin',
+      'upgradeFromRegistryProgram',
+      [WEB, AUTOUPDATE, FIRST_BOOT],
+    ],
     ['uninstallPlugin', 'uninstallIntegrationProgram', [WEB]],
   ])('%s is called by %s', (entry, program, callers) => {
     expect(callsOf(entry)).toEqual(callers)

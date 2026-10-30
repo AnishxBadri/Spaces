@@ -392,8 +392,9 @@ const remove = async (
 /**
  * The one installer routine. `install`, `upgrade` and `uninstall` are its
  * only callers. Their callers are counted by test: install's are the
- * registry install, the upload and first boot; upgrade's the Update button
- * and the worker's boot autoupdate; uninstall's its button alone.
+ * registry install, the upload and first boot; upgrade's the Update button,
+ * the worker's boot autoupdate and first boot's bundled plugins; uninstall's
+ * its button alone.
  */
 export const runInstaller = Effect.fn('runInstaller')(function* (
   op: InstallerOp,

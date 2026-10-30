@@ -240,49 +240,52 @@ function RunsBlock({ detail }: { detail: IntegrationDetail }) {
       title="Recent runs"
       count={detail.runs.length === 0 ? undefined : String(detail.runs.length)}
     >
-      {detail.runs.length === 0 ? (
-        <BlockEmpty>No runs yet.</BlockEmpty>
-      ) : (
-        <ol>
-          {detail.runs.map((run) => (
-            <li
-              key={run.id}
-              data-run={run.status}
-              className="flex h-ledger-row items-center gap-3 border-b border-rule px-3"
-            >
-              <span className="w-20 shrink-0 mono text-micro text-graphite">
-                {run.ago}
-              </span>
-              <span className="w-32 shrink-0 truncate mono text-micro text-foreground">
-                {run.job}
-              </span>
-              <span
-                className={cn(
-                  'w-20 shrink-0 mono text-micro',
-                  RUN_INK[run.status],
-                )}
-              >
-                {run.status}
-              </span>
-              <span
-                className={cn(
-                  'min-w-0 flex-1 truncate text-ui',
-                  run.status === 'failed'
-                    ? 'text-destructive'
-                    : 'text-graphite',
-                )}
-                {...(run.line === null ? {} : { title: run.line })}
-              >
-                {run.line ?? ''}
-              </span>
-              <span className="w-16 shrink-0 numeric text-right text-micro text-graphite">
-                {run.duration ?? ''}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
+      <RunLines runs={detail.runs} />
     </PluginBlock>
+  )
+}
+
+/** A plugin's runs, newest first: age, job, state, its one line, duration. */
+export function RunLines({
+  runs,
+}: {
+  runs: ReadonlyArray<IntegrationDetail['runs'][number]>
+}) {
+  if (runs.length === 0) return <BlockEmpty>No runs yet.</BlockEmpty>
+  return (
+    <ol>
+      {runs.map((run) => (
+        <li
+          key={run.id}
+          data-run={run.status}
+          className="flex h-ledger-row items-center gap-3 border-b border-rule px-3"
+        >
+          <span className="w-20 shrink-0 mono text-micro text-graphite">
+            {run.ago}
+          </span>
+          <span className="w-32 shrink-0 truncate mono text-micro text-foreground">
+            {run.job}
+          </span>
+          <span
+            className={cn('w-20 shrink-0 mono text-micro', RUN_INK[run.status])}
+          >
+            {run.status}
+          </span>
+          <span
+            className={cn(
+              'min-w-0 flex-1 truncate text-ui',
+              run.status === 'failed' ? 'text-destructive' : 'text-graphite',
+            )}
+            {...(run.line === null ? {} : { title: run.line })}
+          >
+            {run.line ?? ''}
+          </span>
+          <span className="w-16 shrink-0 numeric text-right text-micro text-graphite">
+            {run.duration ?? ''}
+          </span>
+        </li>
+      ))}
+    </ol>
   )
 }
 

@@ -1,7 +1,17 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { toEmailCalendar } from '#/lib/settings-moves'
+import { ConnectionsList } from '#/components/settings/connections-list'
+import { getConnections } from '#/lib/server-fns'
 
-/** Connections' path before accounts were grouped by job; old links land on Email & calendar. */
+/**
+ * Settings → Integrations → Connections: one row per provider, each opening
+ * its page. A member reads it too.
+ */
 export const Route = createFileRoute('/_app/settings/connections')({
-  beforeLoad: toEmailCalendar,
+  loader: async () => ({ rows: await getConnections() }),
+  component: ConnectionsRoute,
 })
+
+function ConnectionsRoute() {
+  const { rows } = Route.useLoaderData()
+  return <ConnectionsList rows={rows} />
+}

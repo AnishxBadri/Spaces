@@ -2,6 +2,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs'
@@ -40,6 +41,7 @@ let served: string
 let registryFile: string
 let keysDir: string
 let dataDir: string
+let bundledDir: string
 let fetched: Array<string>
 let logs: Array<{ level: string; message: string }>
 
@@ -55,6 +57,8 @@ beforeEach(async () => {
   mkdirSync(keysDir)
   signer.trustIn(keysDir)
   dataDir = mkdtempSync(path.join(tmpdir(), 'spaces-first-boot-data-'))
+  // Absent until a test ships something in it: the image's directory is not read.
+  bundledDir = path.join(served, 'bundled-plugins')
   fetched = []
   logs = []
 })
@@ -84,6 +88,7 @@ const boot = (env: FirstBootEnv) =>
       registryFile,
       keysDir,
       dataDir,
+      bundledDir,
       fetchTarball: async (url) => {
         fetched.push(url)
         return readFile(fileURLToPath(url))
@@ -152,7 +157,11 @@ describe('the variables', () => {
 describe('first boot with only the required env', () => {
   it('installs nothing and says nothing', async () => {
     serve(plugin('echo', '1.0.0'))
-    expect(await boot(REQUIRED)).toEqual({ installed: [], seeded: [] })
+    expect(await boot(REQUIRED)).toEqual({
+      bundled: [],
+      installed: [],
+      seeded: [],
+    })
     expect(logs).toEqual([])
     expect(fetched).toEqual([])
     expect(existsSync(path.join(dataDir, 'plugins'))).toBe(false)
@@ -173,6 +182,7 @@ describe('SPACES_PLUGINS', () => {
     const env = { ...REQUIRED, SPACES_PLUGINS: 'echo,rss' }
 
     expect(await boot(env)).toEqual({
+      bundled: [],
       installed: ['echo@1.1.0', 'rss@0.1.0'],
       seeded: [],
     })
@@ -186,7 +196,7 @@ describe('SPACES_PLUGINS', () => {
 
     fetched = []
     logs = []
-    expect(await boot(env)).toEqual({ installed: [], seeded: [] })
+    expect(await boot(env)).toEqual({ bundled: [], installed: [], seeded: [] })
     expect(fetched).toEqual([])
     expect(logs).toEqual([])
     expect(statSync(lockFile()).mtimeMs).toBe(lockMtime)
@@ -199,7 +209,11 @@ describe('SPACES_PLUGINS', () => {
     const installed = await rowsWithXmin()
     const lockMtime = statSync(lockFile()).mtimeMs
 
-    expect(await boot(REQUIRED)).toEqual({ installed: [], seeded: [] })
+    expect(await boot(REQUIRED)).toEqual({
+      bundled: [],
+      installed: [],
+      seeded: [],
+    })
     expect(await rowsWithXmin()).toEqual(installed)
     expect(statSync(lockFile()).mtimeMs).toBe(lockMtime)
     expect(
@@ -260,6 +274,7 @@ describe('SPACES_CREDENTIAL_<ID>', () => {
       SPACES_CREDENTIAL_ECHO_KEY: 'env-secret-1234',
     })
     expect(result).toEqual({
+      bundled: [],
       installed: ['echo-key@1.0.0'],
       seeded: ['echo-key'],
     })
@@ -300,7 +315,7 @@ describe('SPACES_CREDENTIAL_<ID>', () => {
     })
     const before = await rowsWithXmin()
 
-    expect(await boot(env)).toEqual({ installed: [], seeded: [] })
+    expect(await boot(env)).toEqual({ bundled: [], installed: [], seeded: [] })
     expect(await resolveSecret('echo-key', 'enrichment')).toBe('ui-secret-5678')
     expect(await workspaceKeys()).toHaveLength(1)
     expect(await rowsWithXmin()).toEqual(before)
@@ -337,5 +352,99 @@ describe('SPACES_CREDENTIAL_<ID>', () => {
     expect(said).toContain('SPACES_CREDENTIAL_ECHO: echo takes no key')
     expect(said).toContain('SPACES_CREDENTIAL_APOLLO: apollo is not installed')
     expect(await workspaceKeys()).toEqual([])
+  })
+})
+
+describe('bundled plugins', () => {
+  /** Ships a tarball in the image's directory; signed ships its entry beside it. */
+  const ship = (bundle: FixturePlugin, signed: boolean) => {
+    mkdirSync(bundledDir, { recursive: true })
+    const base = `${bundle.entry.id}-${bundle.entry.version}`
+    writeFileSync(path.join(bundledDir, `${base}.tgz`), bundle.tarball)
+    if (signed)
+      writeFileSync(
+        path.join(bundledDir, `${base}.json`),
+        JSON.stringify(bundle.entry),
+      )
+  }
+
+  it('installs each one with no SPACES_PLUGINS, unsigned or signed; the second boot writes nothing', async () => {
+    ship(plugin('gmail', '0.1.0'), false)
+    ship(plugin('box', '0.2.0'), true)
+
+    expect(await boot(REQUIRED)).toEqual({
+      bundled: ['box@0.2.0', 'gmail@0.1.0'],
+      installed: [],
+      seeded: [],
+    })
+    // Nothing came from the registry, and the unsigned one needed no marker.
+    expect(fetched).toEqual([])
+    const first = await rowsWithXmin()
+    expect(first.map((r) => [r.capabilityId, r.version, r.removedAt])).toEqual([
+      ['box', '0.2.0', null],
+      ['gmail', '0.1.0', null],
+    ])
+    expect(
+      existsSync(
+        path.join(dataDir, 'plugins', 'gmail', 'current', 'bundle.mjs'),
+      ),
+    ).toBe(true)
+
+    logs = []
+    expect(await boot(REQUIRED)).toEqual({
+      bundled: [],
+      installed: [],
+      seeded: [],
+    })
+    expect(logs).toEqual([])
+    expect(await rowsWithXmin()).toEqual(first)
+  })
+
+  it('upgrades a row to the image’s newer version, and leaves a newer row alone', async () => {
+    ship(plugin('gmail', '0.1.0'), false)
+    await boot(REQUIRED)
+    rmSync(bundledDir, { recursive: true })
+
+    ship(plugin('gmail', '0.2.0'), false)
+    expect((await boot(REQUIRED)).bundled).toEqual(['gmail@0.2.0'])
+    expect((await rowsWithXmin()).map((r) => r.version)).toEqual(['0.2.0'])
+    rmSync(bundledDir, { recursive: true })
+
+    ship(plugin('gmail', '0.1.0'), false)
+    expect((await boot(REQUIRED)).bundled).toEqual([])
+    expect((await rowsWithXmin()).map((r) => r.version)).toEqual(['0.2.0'])
+  })
+
+  it('reinstalls an uninstalled one on its old row', async () => {
+    ship(plugin('gmail', '0.1.0'), false)
+    await boot(REQUIRED)
+    const row = (await rowsWithXmin()).at(0)
+    await db
+      .update(integration)
+      .set({ removedAt: new Date() })
+      .where(eq(integration.capabilityId, 'gmail'))
+
+    expect((await boot(REQUIRED)).bundled).toEqual(['gmail@0.1.0'])
+    const after = await rowsWithXmin()
+    expect(after.map((r) => [r.id, r.removedAt])).toEqual([[row?.id, null]])
+  })
+
+  it('refuses a signed one whose signature is not the image’s, and boots on', async () => {
+    const stranger = fixturePlugin({
+      id: 'gmail',
+      version: '0.1.0',
+      signer: fixtureSigner(),
+    })
+    ship(stranger, true)
+    ship(plugin('box', '0.1.0'), false)
+
+    expect((await boot(REQUIRED)).bundled).toEqual(['box@0.1.0'])
+    expect(
+      logs
+        .filter((l) => l.level === 'Warn')
+        .map((l) => l.message)
+        .join('\n'),
+    ).toContain('gmail 0.1.0 not installed — refused (unknown-key)')
+    expect((await rowsWithXmin()).map((r) => r.capabilityId)).toEqual(['box'])
   })
 })

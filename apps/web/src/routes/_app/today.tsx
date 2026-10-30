@@ -428,6 +428,10 @@ function TodayLedger({
             parked={attention.state === 'done' ? attention.value.parked : []}
             waiting={attention.state === 'done' ? attention.value.waiting : []}
             failing={attention.state === 'done' ? attention.value.failing : []}
+            invite={attention.state === 'done' ? attention.value.invite : null}
+            expiring={
+              attention.state === 'done' ? attention.value.expiring : []
+            }
           />
           <NeedsYou
             rows={rows}

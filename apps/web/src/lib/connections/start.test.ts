@@ -208,14 +208,14 @@ describe('refusals', () => {
     expect(idp.authorizeRequests).toHaveLength(0)
   })
 
-  it('answers ProviderUnconfigured naming Settings → Connection apps, never a redirect', async () => {
+  it('answers ProviderUnconfigured naming the provider’s Connections page, never a redirect', async () => {
     await configureGoogle()
     await deleteGoogleClient()
     const response = await start('google', 'product=drive')
     expect(response.status).toBe(409)
     expect(response.headers.get('location')).toBeNull()
     expect(response.headers.get('set-cookie')).toBeNull()
-    expect(await response.text()).toContain('Settings → Connection apps')
+    expect(await response.text()).toContain('Settings → Connections → Google')
     expect(idp.authorizeRequests).toHaveLength(0)
 
     const error = await Effect.runPromise(
@@ -232,7 +232,7 @@ describe('refusals', () => {
     )
     expect(error._tag).toBe('ProviderUnconfigured')
     expect(error.message).toBe(
-      'Google has no OAuth client yet. An admin adds it in Settings → Connection apps.',
+      'Google isn’t set up yet. An admin sets it up in Settings → Connections → Google.',
     )
   })
 

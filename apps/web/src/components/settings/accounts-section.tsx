@@ -13,10 +13,8 @@ import {
   SettingsSection,
   useSettingsPage,
 } from './settings-section'
-import { oauthClientAnchor } from './connection-apps-section'
 import { BoundFoldersSection } from './bound-folders-section'
 import { MailSyncSettings } from './mail-sync-section'
-import { pluginAnchor } from '#/components/integrations/registry-pane'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { useConfirm } from '#/components/ui/confirm-dialog'
@@ -261,7 +259,7 @@ function ConnectRow({
   )
 }
 
-/** Connect, or what stands in its way: Configure ›, Install ›, Ask an admin, Not available yet. */
+/** Connect, or what stands in its way: Set up ›, Ask an admin, Not available yet. */
 function OfferControl({
   provider,
   offer,
@@ -283,21 +281,11 @@ function OfferControl({
     case 'configure':
       return (
         <Link
-          to="/settings/connection-apps"
-          hash={oauthClientAnchor(provider)}
+          to="/settings/connections/$provider"
+          params={{ provider }}
           className={LINK}
         >
-          Configure {PROVIDERS[provider].label} ›
-        </Link>
-      )
-    case 'install':
-      return (
-        <Link
-          to="/settings/plugins"
-          hash={pluginAnchor(offer.plugin)}
-          className={LINK}
-        >
-          Install ›
+          Set up {PROVIDERS[provider].label} ›
         </Link>
       )
     case 'ask':

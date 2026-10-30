@@ -20,6 +20,7 @@
 **/dist
 **/coverage
 out
+bundled-plugins
 
 # Runtime state and operator files: never inside an image.
 data

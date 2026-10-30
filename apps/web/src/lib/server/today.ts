@@ -3,6 +3,8 @@ import { requireUser } from './shared'
 
 export type {
   BrokenConnection,
+  ConnectInvite,
+  ExpiringConnection,
   FailingBinding,
   MovingSignal,
   ParkedSource,

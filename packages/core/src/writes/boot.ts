@@ -16,8 +16,10 @@ import { seedStarterTaxonomy } from './seeds/taxonomy'
  * 3. Starter taxonomy — first boot only; after the attributes its rows use.
  * 4. Per-attribute `values` indexes — after the seed, which flags
  *    `deal.stage`; retries any mint an earlier boot left undone. Never fatal.
- * 5. `SPACES_PLUGINS` / `SPACES_CREDENTIAL_<ID>` — optional, last, never
- *    fatal; the worker reconciles every row on its own boot.
+ * 5. Plugins, last and never fatal: the bundled plugins from the image's
+ *    `bundled-plugins/` (one live row each, at the image's version), then the
+ *    optional `SPACES_PLUGINS` / `SPACES_CREDENTIAL_<ID>`. The worker
+ *    reconciles every row on its own boot.
  *
  * `runMigrations` stays a library this composes, never the reverse: the
  * schema package must not depend on the product. `migrationsFolder` is for

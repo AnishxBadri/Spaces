@@ -135,18 +135,17 @@ export function syncStateOf(
 }
 
 /**
- * What a reader can do to add a product, decided by its plugin:
- * - `connect` when the plugin is installed and the provider has a client;
- * - `configure` (an admin) when the client is missing;
- * - `install` (an admin) when the registry offers the plugin;
- * - `ask` (a member) for either of those;
- * - `unavailable` when no plugin exists to install.
+ * What a reader can do to add a product. Its plugin is bundled, so it is
+ * installed wherever the image packed it; what stands in the way is the
+ * provider's setup and the workspace's switch for that use:
+ * - `connect` when the provider has a client and the use is on;
+ * - `configure` (an admin) otherwise, to the provider's page;
+ * - `ask` (a member) for the same;
+ * - `unavailable` when no plugin for the product is installed.
  */
 export type Offer =
   | { readonly kind: 'connect'; readonly product: string }
   | { readonly kind: 'configure' }
-  /** `plugin` is the registry's plugin id, for its row in the catalogue. */
-  | { readonly kind: 'install'; readonly plugin: string }
   | { readonly kind: 'ask' }
   | { readonly kind: 'unavailable' }
 
@@ -154,25 +153,19 @@ export type Offer =
 export function offerFor(
   provider: ProviderId,
   products: ReadonlyArray<string>,
-  view: Pick<AccountsView, 'configured' | 'installed' | 'offered'>,
+  view: Pick<AccountsView, 'configured' | 'installed' | 'enabled'>,
   isAdmin: boolean,
 ): Offer {
   const plugins = products.flatMap((product) => {
     const entry = productOf(provider, product)
     return entry === null ? [] : [{ product, plugin: entry.plugin }]
   })
-  const installed = plugins.find((p) => view.installed.includes(p.plugin))
-  if (installed !== undefined) {
-    if (view.configured.includes(provider))
-      return { kind: 'connect', product: installed.product }
-    return isAdmin ? { kind: 'configure' } : { kind: 'ask' }
-  }
-  const offered = plugins.find((p) => view.offered.includes(p.plugin))
-  if (offered !== undefined)
-    return isAdmin
-      ? { kind: 'install', plugin: offered.plugin }
-      : { kind: 'ask' }
-  return { kind: 'unavailable' }
+  const installed = plugins.filter((p) => view.installed.includes(p.plugin))
+  if (installed.length === 0) return { kind: 'unavailable' }
+  const on = installed.find((p) => view.enabled.includes(p.plugin))
+  if (on !== undefined && view.configured.includes(provider))
+    return { kind: 'connect', product: on.product }
+  return isAdmin ? { kind: 'configure' } : { kind: 'ask' }
 }
 
 /** The providers with a product of `job`, each with those products. */
@@ -185,18 +178,6 @@ export function providersFor(
       .map((p) => p.product)
     return products.length === 0 ? [] : [{ provider, products }]
   })
-}
-
-/**
- * Whether the provider limits this account's grant to days: Google says
- * when a refresh token lapses only for an OAuth client in Testing mode,
- * whose tokens last 7 days.
- */
-export function testingModeOf(account: Account): boolean {
-  return (
-    account.provider === 'google' &&
-    account.held.some((r) => r.refreshExpiresAt !== null)
-  )
 }
 
 /** The account's mail row, when it holds one: where a mail sync's settings hang. */

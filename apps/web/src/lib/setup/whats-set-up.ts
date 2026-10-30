@@ -28,6 +28,7 @@ export type SetupPath =
   | '/settings/email-forwarding'
   | '/settings/email-calendar'
   | '/settings/meeting-notes'
+  | '/settings/connections'
 
 export type SetupItem = {
   readonly id: SetupItemId
@@ -64,8 +65,8 @@ export const SETUP_ITEMS: ReadonlyArray<SetupItem> = [
   {
     id: 'google',
     label: 'Google',
-    unlocks: 'Mail, calendar and Drive on the records',
-    to: '/settings/email-calendar',
+    unlocks: 'Members bring mail, calendar and Drive to the records',
+    to: '/settings/connections',
   },
   {
     id: 'granola',

@@ -8,6 +8,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type {
   BrokenConnection,
+  ConnectInvite,
+  ExpiringConnection,
   FailingBinding,
   ParkedSource,
   StoppedPlugin,
@@ -30,6 +32,8 @@ async function render(
   failing: ReadonlyArray<FailingBinding> = [],
   stopped: ReadonlyArray<StoppedPlugin> = [],
   broken: ReadonlyArray<BrokenConnection> = [],
+  invite: ConnectInvite | null = null,
+  expiring: ReadonlyArray<ExpiringConnection> = [],
 ) {
   const root = createRootRoute({
     component: () => (
@@ -39,6 +43,8 @@ async function render(
         parked={parked}
         waiting={waiting}
         failing={failing}
+        invite={invite}
+        expiring={expiring}
       />
     ),
   })
@@ -140,7 +146,7 @@ describe('NoticesBand — the line', () => {
     label: 'Gmail',
     externalEmail: 'anish@fund.example',
     errorReason: 'Google said: token expired',
-    fixTo: '/settings/email-calendar',
+    provider: 'google',
   }
   const TRIPPED: StoppedPlugin = {
     integrationId: '00000000-0000-4000-8000-0000000000e1',
@@ -149,11 +155,43 @@ describe('NoticesBand — the line', () => {
     lastError: null,
   }
 
-  it('says a broken connection in one sentence, rose, with Reconnect', async () => {
+  it('says a broken connection in one sentence, rose, with Reconnect to the provider’s page', async () => {
     const html = await render([], [], [], [], [BROKEN])
     expect(html).toContain('Gmail stopped syncing · Google said: token expired')
     expect(html).toContain('data-notice="bad"')
     expect(html).toContain('>Reconnect ›<')
+    expect(html).toContain('href="/settings/connections/google"')
+  })
+
+  it('invites a member with nothing connected to connect Google, amber', async () => {
+    const html = await render([], [], [], [], [], {
+      provider: 'google',
+      label: 'Google',
+      href: '/api/connections/google/start?product=gmail&return=%2Ftoday',
+    })
+    expect(html).toContain('Bring in your email and meetings')
+    expect(html).toContain('data-notice="warn"')
+    expect(html).toContain('>Connect Google ›<')
+    expect(html).toContain(
+      'href="/api/connections/google/start?product=gmail&amp;return=%2Ftoday"',
+    )
+  })
+
+  it('warns of a grant about to lapse, with Reconnect to the same account', async () => {
+    const html = await render([], [], [], [], [], null, [
+      {
+        connectionId: '00000000-0000-4000-8000-0000000000d2',
+        label: 'Google',
+        days: 2,
+        href: '/api/connections/google/start?product=gmail&return=%2Ftoday&account=anish%40gmail.com',
+      },
+    ])
+    expect(html).toContain(
+      'Google expires in 2 days · personal Gmail reconnects weekly',
+    )
+    expect(html).toContain('data-notice="warn"')
+    expect(html).toContain('>Reconnect ›<')
+    expect(html).toContain('account=anish%40gmail.com')
   })
 
   it('names a stopped plugin in sentence case, rose, with Fix', async () => {

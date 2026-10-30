@@ -1218,11 +1218,11 @@ The Clean UI leftovers (`SPA-355`, `SPA-356`) have their bodies in Linear only; 
 
 ---
 
-#### `port-B3` · hitl · L — Connections: providers as bundled capabilities, Set up and In use
+#### `port-B3` · afk · L — Connections: providers as bundled capabilities, Set up and In use
 
-**Blocked by:** `port-St1`, and the owner's answer on bundling.
+**Blocked by:** `port-St1`.
 
-**Decided by the owner 2026-10-28: bundled plugins.** Gmail, Google Calendar, Google Drive and Box become **bundled capabilities**: signed plugin code shipped in the image, always installed, never uninstallable, enabled per use from the provider page. The alternative is folding them into core. The recommendation is bundled plugins, because they keep the SDK seam and `source_ref` provenance. Record it as an amendment to D51 (or as D82), with D81 updated.
+**Decided by the owner 2026-10-28: bundled plugins** (D82, amending D51; D81 amended to match). Gmail, Google Calendar, Google Drive and Box become **bundled capabilities**: signed plugin code shipped in the image, always installed, never uninstallable, enabled per use from the provider page. The alternative was folding them into core. Bundled plugins keep the SDK seam and `source_ref` provenance.
 
 **What to build** (no migration; choices go in `workspace.settings` jsonb, `providers.google = { audience, consent }`):
 

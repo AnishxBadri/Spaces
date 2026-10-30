@@ -3,6 +3,8 @@ import type { ReactNode } from 'react'
 import { reasonOf } from '#/components/plugin-status-section'
 import type {
   BrokenConnection,
+  ConnectInvite,
+  ExpiringConnection,
   FailingBinding,
   ParkedSource,
   StoppedPlugin,
@@ -73,9 +75,10 @@ const sentence = (what: string, why: string | null) =>
 /**
  * What stops the machine, one line each with the link that fixes it: a
  * plugin switched on and not running or capped, auto-enrich parked at a
- * source's daily cap, the reader's connections in `error`, bound folders
- * that cannot sync, and uploads waiting to reach a bound folder. Renders
- * nothing when all runs.
+ * source's daily cap, the reader's connections in `error` and grants about
+ * to lapse, bound folders that cannot sync, and uploads waiting to reach a
+ * bound folder; and, once Google is set up, the invitation to connect it.
+ * Renders nothing when all runs.
  */
 export function NoticesBand({
   stopped,
@@ -83,14 +86,20 @@ export function NoticesBand({
   parked,
   waiting,
   failing,
+  invite = null,
+  expiring = [],
 }: {
   stopped: ReadonlyArray<StoppedPlugin>
   broken: ReadonlyArray<BrokenConnection>
   parked: ReadonlyArray<ParkedSource>
   waiting: ReadonlyArray<WaitingExport>
   failing: ReadonlyArray<FailingBinding>
+  invite?: ConnectInvite | null
+  expiring?: ReadonlyArray<ExpiringConnection>
 }) {
   if (
+    invite === null &&
+    expiring.length === 0 &&
     stopped.length === 0 &&
     broken.length === 0 &&
     parked.length === 0 &&
@@ -106,7 +115,11 @@ export function NoticesBand({
             key={c.connectionId}
             tone="bad"
             fix={
-              <Link to={c.fixTo} className={fixClass}>
+              <Link
+                to="/settings/connections/$provider"
+                params={{ provider: c.provider }}
+                className={fixClass}
+              >
                 Reconnect ›
               </Link>
             }
@@ -115,6 +128,19 @@ export function NoticesBand({
               `${c.label} stopped syncing`,
               c.errorReason ?? c.externalEmail,
             )}
+          </NoticeLine>
+        ))}
+        {expiring.map((c) => (
+          <NoticeLine
+            key={`expiring:${c.connectionId}`}
+            tone="warn"
+            fix={
+              <a href={c.href} className={fixClass}>
+                Reconnect ›
+              </a>
+            }
+          >
+            {`${c.label} expires in ${String(c.days)} ${c.days === 1 ? 'day' : 'days'} · personal Gmail reconnects weekly`}
           </NoticeLine>
         ))}
         {failing.map((b) => (
@@ -166,6 +192,19 @@ export function NoticesBand({
             {`Auto-enrich paused · ${p.source} limit reached · ${String(p.waiting)} waiting · runs at ${utcTime(p.resumesAt)}`}
           </NoticeLine>
         ))}
+        {invite === null ? null : (
+          <NoticeLine
+            key={`invite:${invite.provider}`}
+            tone="warn"
+            fix={
+              <a href={invite.href} className={fixClass}>
+                Connect {invite.label} ›
+              </a>
+            }
+          >
+            Bring in your email and meetings
+          </NoticeLine>
+        )}
         {stopped.map((p) => (
           <NoticeLine
             key={`${p.integrationId}:${p.state}`}

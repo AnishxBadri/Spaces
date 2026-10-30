@@ -67,12 +67,15 @@ async function connectionOf(userId: string, externalEmail: string) {
 }
 
 describe('getMyAccounts', () => {
-  it("hands the reader's rows, the configured providers and which plugins are installed", async () => {
+  it("hands the reader's rows, the configured providers and which bundled plugins are installed and on", async () => {
     const mine = await connectionOf(FIXTURE_ACTOR.id, 'mine@fund.example')
     const theirs = await connectionOf(TEAMMATE.id, 'theirs@fund.example')
     await db.insert(integration).values([
-      { capabilityId: 'google-drive', version: '0.1.0' },
+      { capabilityId: 'google-drive', version: '0.1.0', enabled: true },
+      { capabilityId: 'gmail', version: '0.1.0', enabled: false },
       { capabilityId: 'box', version: '0.1.0', removedAt: new Date() },
+      // Not bundled: a plugin's own page, never an account offer.
+      { capabilityId: 'apollo', version: '0.1.0', enabled: true },
     ])
 
     const view = await listAccountsHandler()
@@ -80,8 +83,8 @@ describe('getMyAccounts', () => {
     expect(ids).toContain(mine.id)
     expect(ids).not.toContain(theirs.id)
     expect(view.configured).toEqual([])
-    expect(view.installed).toEqual(['google-drive'])
-    expect(view.offered).toEqual([])
+    expect([...view.installed].sort()).toEqual(['gmail', 'google-drive'])
+    expect(view.enabled).toEqual(['google-drive'])
   })
 
   it('refuses without a session', async () => {

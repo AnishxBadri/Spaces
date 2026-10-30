@@ -7,7 +7,6 @@ import {
   offerFor,
   providersFor,
   syncStateOf,
-  testingModeOf,
   mailRowOf,
   wordsOf,
 } from './accounts'
@@ -153,57 +152,70 @@ describe('syncStateOf', () => {
 })
 
 describe('offerFor', () => {
-  const none = { configured: [], installed: [], offered: [] }
+  const none = { configured: [], installed: [], enabled: [] }
+  const google = ['google' as const]
+  const all = ['gmail', 'google-calendar', 'google-drive', 'box']
 
-  it('offers Connect for an installed plugin under a configured provider', () => {
+  /** Every reader, every state a provider and its use can be in, and the one offer. */
+  it.each([
+    // provider set up, use on → Connect, for admin and member alike
+    [
+      'set up, on',
+      google,
+      all,
+      all,
+      true,
+      { kind: 'connect', product: 'gmail' },
+    ],
+    [
+      'set up, on',
+      google,
+      all,
+      all,
+      false,
+      { kind: 'connect', product: 'gmail' },
+    ],
+    // set up, but the workspace switched the use off → the provider's page
+    ['set up, off', google, all, [], true, { kind: 'configure' }],
+    ['set up, off', google, all, [], false, { kind: 'ask' }],
+    // installed and on, but the provider has no client yet
+    ['not set up', [], all, all, true, { kind: 'configure' }],
+    ['not set up', [], all, all, false, { kind: 'ask' }],
+    // the image shipped no plugin for it
+    ['not shipped', google, [], [], true, { kind: 'unavailable' }],
+    ['not shipped', google, [], [], false, { kind: 'unavailable' }],
+  ] as const)(
+    '%s, admin %s → %j',
+    (_state, configured, installed, enabled, isAdmin, offer) => {
+      expect(
+        offerFor(
+          'google',
+          ['gmail', 'calendar'],
+          {
+            configured: [...configured],
+            installed: [...installed],
+            enabled: [...enabled],
+          },
+          isAdmin,
+        ),
+      ).toEqual(offer)
+    },
+  )
+
+  it('offers the first product that is on, keyed by its plugin id', () => {
     expect(
       offerFor(
         'google',
         ['gmail', 'calendar'],
-        { ...none, configured: ['google'], installed: ['google-calendar'] },
+        {
+          ...none,
+          configured: google,
+          installed: all,
+          enabled: ['google-calendar'],
+        },
         false,
       ),
     ).toEqual({ kind: 'connect', product: 'calendar' })
-  })
-
-  it('shows Install › to an admin and Ask an admin to a member when the registry has the plugin', () => {
-    const view = {
-      ...none,
-      configured: ['google' as const],
-      offered: ['gmail'],
-    }
-    expect(offerFor('google', ['gmail', 'calendar'], view, true)).toEqual({
-      kind: 'install',
-      plugin: 'gmail',
-    })
-    expect(offerFor('google', ['gmail', 'calendar'], view, false)).toEqual({
-      kind: 'ask',
-    })
-  })
-
-  it("keys the calendar on its plugin's registry id, google-calendar", () => {
-    const view = { ...none, offered: ['google-calendar'] }
-    expect(offerFor('google', ['gmail', 'calendar'], view, true)).toEqual({
-      kind: 'install',
-      plugin: 'google-calendar',
-    })
-  })
-
-  it('reads Not available yet to everyone when no plugin exists to install', () => {
-    expect(offerFor('google', ['gmail'], none, true)).toEqual({
-      kind: 'unavailable',
-    })
-    expect(offerFor('google', ['gmail'], none, false)).toEqual({
-      kind: 'unavailable',
-    })
-  })
-
-  it('sends an admin to the OAuth client when the plugin is installed but the provider is not configured', () => {
-    const view = { ...none, installed: ['google-drive'] }
-    expect(offerFor('google', ['drive'], view, true)).toEqual({
-      kind: 'configure',
-    })
-    expect(offerFor('google', ['drive'], view, false)).toEqual({ kind: 'ask' })
   })
 })
 
@@ -220,15 +232,12 @@ describe('providersFor', () => {
   })
 })
 
-describe('testingModeOf', () => {
-  it('reads Google’s Testing mode off a refresh token that lapses', () => {
-    const lapsing = row({ refreshExpiresAt: '2026-10-08T09:00:00.000Z' })
-    const account = accountOf(lapsing, 'email-calendar', [lapsing])
-    expect(testingModeOf(account)).toBe(true)
-    expect(mailRowOf(account)).toBe(lapsing)
-    const lasting = row()
-    expect(testingModeOf(accountOf(lasting, 'email-calendar', [lasting]))).toBe(
-      false,
-    )
+describe('mailRowOf', () => {
+  it('finds the account’s mail row, where a mail sync’s settings hang', () => {
+    const mail = row()
+    const account = accountOf(mail, 'email-calendar', [mail])
+    expect(mailRowOf(account)).toBe(mail)
+    const drive = row({ product: 'drive' })
+    expect(mailRowOf(accountOf(drive, 'files', [drive]))).toBeNull()
   })
 })

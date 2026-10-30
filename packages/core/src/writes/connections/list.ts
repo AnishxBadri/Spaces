@@ -53,7 +53,7 @@ export async function listConnectionsFor(
 
 /**
  * How many members hold a connection under a provider, any product; a
- * revoked grant does not count. Connection apps prints it on the client.
+ * revoked grant does not count. Connections prints it on the client.
  */
 export async function countMembersConnected(
   provider: string,

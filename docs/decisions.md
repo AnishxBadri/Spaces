@@ -242,6 +242,8 @@ _Eight decisions taken by the owner while publishing project 17 (the plugin SDK)
 
 ### D51-plugin-triggers-not-kinds
 
+_Amended 2026-10-28 by D82:_ a plugin also arrives with the image. Gmail, Google Calendar, Google Drive and Box are bundled plugins, always installed and never uninstallable; the trigger model below is unchanged.
+
 **Does a plugin have a kind, and what grants its ports?** Answered: **no kinds.** Each job declares a `trigger` (`action` · `schedule` · `event` · `webhook` · `file`), which fixes its input and output, and the ports it `uses`, which the admin sees at install and the per-(integration, job) Layer grants exactly. `storage-source` stays a provider interface core calls into (`provides: 'storage-source'`). Rejected: one kind per plugin (Gmail ships as two installs), a kind per job (keeps a frozen port table that is not a security boundary — v1 loads only first-party signed plugins), and a set of kinds with the union of their ports (every job gets every port). Reason: a kind bundled trigger, shape and privilege; Zapier/n8n/Twenty split triggers from scopes, and the doctrine that matters lives inside the ports whatever the job declares. Carried by `sdk-3` (manifest) and `sdk-4a` (trigger shapes).
 
 _Amended 2026-10-01 (checkpoint review):_ a `webhook` job carries no plugin `verify` — it is a plain `(input: WebhookInput) => Effect<void, JobError, R>` like the others. Plugin code runs only in the worker, after web has already returned 200, so a plugin check could gate nothing, and running it in web breaks "web never executes plugin code". Signature checking stays manifest-declared (`ingress.signature`) and done by core in web (sdk-23). A plugin-side check, if a provider ever needs one, would be an optional field — a minor; removing a shipped one would be a major.
@@ -878,7 +880,8 @@ _Carried by_ the settings slices (nav and IA, then each page), on the canvas as 
 _Amended 2026-10-25 (the canvas port):_
 
 - **The nav's group heads are ruled ink bands**: YOU · WORKSPACE · AI · INTEGRATIONS in mono caps in ink with a hairline under, the grammar the settings ledgers' heads use; no graphite whisper.
-- **Integrations = Connections · Plugins · Enrichment · Email forwarding.** Connection apps folds into Connections. The owner's verdict of 2026-10-24: a connection is a provider whose admin-registered OAuth app serves a core job (Google, Box, Microsoft later), never installed; everything else, recorders included, is a plugin. A provider is a page with Set up and In use tabs: the first Set up row asks whether the accounts are on Google Workspace or personal Gmail, sync health per use lives on In use, there is no Gmail plugin page, and a reconnect is a Today line. Whether the bundled providers are plugin code shipped in the image or core is the owner's call, recorded against D51 by project 30's Connections slice.
+- **Integrations = Connections · Plugins · Enrichment · Email forwarding.** Connection apps folds into Connections. The owner's verdict of 2026-10-24: a connection is a provider whose admin-registered OAuth app serves a core job (Google, Box, Microsoft later), never installed; everything else, recorders included, is a plugin. A provider is a page with Set up and In use tabs: the first Set up row asks whether the accounts are on Google Workspace or personal Gmail, sync health per use lives on In use, there is no Gmail plugin page, and a reconnect is a Today line. The providers' uses are bundled plugins, shipped in the image and never installed by hand (D82).
+- **Amended 2026-10-28 (D82):** "A provider whose plugin is not installed shows Install ›" (above, under _Your accounts are grouped by job_) is superseded. A provider's use is always installed. An account page offers Connect, Set up › (an admin, to the provider's page), Ask an admin (a member), or Not available yet when the image shipped no plugin for it. Plugins is the catalogue of everything except the bundled four.
 - **The workspace head opens General · Members · Invite.**
 - **Members gains `Send a reset link…`**: an admin issues a one-time reset link, since there is no self-serve reset.
 - A settings page head carries one outline 32px action at most beside its `···`.
@@ -963,3 +966,34 @@ _Amended 2026-10-25 (the canvas port):_
 - The Companies tab's filter is a bounded Segmented (All · In pipeline · Watching, with counts).
 
 _Carried by_ project 30's record-head and space slices.
+
+## Addenda — 2026-10-28 (project 30's Connections slice)
+
+### D82-bundled-providers
+
+**Are the providers' uses (Gmail, Google Calendar, Google Drive, Box) plugins an admin installs, or part of core?** Answered (owner, 2026-10-28): **bundled plugins.** Each is signed plugin code shipped in the image, always installed and never uninstallable. An admin enables each use on its provider's page. This amends D51: a plugin can now arrive with the image as well as from the registry or an upload. The trigger model, the ports and the manifest are unchanged.
+
+- **Why plugins, not core:** the SDK seam and `source_ref` provenance stay. Gmail still writes through `Content.logEmail` as `integration` `<id>`, and a mail row still names the plugin that wrote it.
+- **What ships:** `BUNDLED_PLUGINS`, one per product in `PRODUCTS` (apps/web). The image builds those four plugins and packs them into `/app/bundled-plugins`. A test holds the Dockerfile's list to the constant. In a checkout, `pnpm bundle-plugins` packs the same four into `bundled-plugins/`.
+- **Boot** (`firstBootPlugins`, before `SPACES_PLUGINS`) ensures one live `integration` row per bundled tarball:
+  - a missing row is installed through the one installer;
+  - an uninstalled row is reinstalled on its old row;
+  - an older row is upgraded to the image's version;
+  - the same or a newer version is left alone.
+  - Never fatal: a refused tarball is one warning line.
+- **Signing:**
+  - A bundled tarball is signed when the image build is handed the release key (`--secret id=plugin_signing_key`), and then it verifies against `plugin-keys/` like any other.
+  - An unsigned bundled tarball is accepted from `bundled-plugins/` and nowhere else. Its bytes come in the image beside `plugin-keys/`, so the image is already the trust root for them. `.allow-unsigned` still governs every other source.
+  - No release key has been minted yet (`plugin-keys/` is empty), so images ship them unsigned until one is.
+- **Where they show:** nowhere in Plugins. The ledger, the Available catalogue and the nav count leave them out. `/settings/plugins/<id>`, by plugin id or by row id, lands on the provider's In use tab. The uninstall program refuses one.
+- **Enabled per use:** `integration.enabled` is the use's tick under In use → Members may use. Unticking stops its syncs and keeps every row it wrote.
+- **Offers:** an account page offers Connect when the provider has a client and the use is on. Otherwise it offers Set up ›, which takes an admin to the provider's page, or Ask an admin to a member. It reads Not available yet when the image shipped no plugin for the product. The Install › offer is gone.
+- **Set up answers** live in `workspace.settings.providers.google = { audience, consent }`, with no migration. Workspace or personal Gmail decides the copy and preselects the consent screen (Internal or External).
+
+_Rejected:_
+
+- Folding them into core. That loses the SDK seam, and the provenance would have to be rebuilt.
+- Leaving them as registry installs. An admin had to install Gmail before anyone could connect mail.
+- A per-provider plugin page beside the provider page. That meant two homes for one switch.
+
+_Carried by_ `port-B3` (SPA-383).

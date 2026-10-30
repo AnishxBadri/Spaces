@@ -95,7 +95,13 @@ describe('db/boot.ts (real database)', () => {
       {
         cwd: options?.cwd ?? tmpRoot,
         encoding: 'utf8',
-        env: { ...process.env, DATABASE_URL: testUrl },
+        // Boot installs the bundled plugins when a checkout has packed them:
+        // into a scratch data directory, never the checkout's own.
+        env: {
+          ...process.env,
+          DATABASE_URL: testUrl,
+          DATA_DIR: path.join(tmpRoot, 'data'),
+        },
       },
     )
   }

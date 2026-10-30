@@ -19,10 +19,16 @@ import {
   hasEventJob,
   integrationCountProgram,
   integrationDetailProgram,
-  integrationLedgerProgram,
+  integrationRunsProgram,
+  pluginLedgerProgram,
   manifestOf,
 } from './ledger'
-import type { IntegrationDetail, IntegrationRow, SecretSlot } from './ledger'
+import type {
+  IntegrationDetail,
+  IntegrationRow,
+  RunLine,
+  SecretSlot,
+} from './ledger'
 import { checkSettings, mergeConfig, settingsFormOf } from './settings-form'
 import type { FormValues } from './settings-form'
 
@@ -298,7 +304,7 @@ export async function listIntegrationsHandler(): Promise<
   Array<IntegrationRow>
 > {
   await requireUser()
-  return run(integrationLedgerProgram())
+  return run(pluginLedgerProgram())
 }
 
 export async function countIntegrationsHandler(): Promise<number> {
@@ -312,6 +318,14 @@ export async function getIntegrationHandler(input: {
   const { isAdmin } = await requireSettingsReader()
   const detail = await run(integrationDetailProgram(input.id))
   return isAdmin ? detail : redactIntegrationDetail(detail)
+}
+
+/** Any member reads a plugin's runs: the log writes nothing and is every member's provenance. */
+export async function getIntegrationRunsHandler(input: {
+  readonly id: string
+}): Promise<{ readonly name: string; readonly runs: Array<RunLine> }> {
+  await requireUser()
+  return run(integrationRunsProgram(input.id))
 }
 
 export async function setIntegrationEnabledHandler(input: {

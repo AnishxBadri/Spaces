@@ -283,7 +283,7 @@ describe('the settings nav', () => {
       '/settings/search',
       '/settings/enrichment',
       '/settings/email-forwarding',
-      '/settings/connection-apps',
+      '/settings/connections',
     ])
       expect(row(to).querySelector('[data-admin-lane]')?.textContent).toBe(
         'Admin',

@@ -75,6 +75,21 @@ COPY --from=prune /app/out/build/full/ ./
 # sdk's tsc (PR #4, "failed to resolve import @spaces/sdk/identity").
 RUN pnpm --filter @spaces/sdk build
 RUN pnpm --filter @spaces/web --filter @spaces/worker build
+# The bundled plugins: Gmail, Google Calendar, Google Drive and Box,
+# built and packed into /app/bundled-plugins, which every boot installs from
+# (@spaces/core's firstBootPlugins). Signed when the build is handed the
+# release key as the `plugin_signing_key` secret
+# (`docker build --secret id=plugin_signing_key,src=<pem>`), unsigned
+# otherwise; boot accepts an unsigned tarball from that directory and nowhere
+# else. The list is BUNDLED_PLUGINS (apps/web, derived from PRODUCTS), and
+# a test holds the two together.
+RUN pnpm --filter @spaces/plugin-gmail --filter @spaces/plugin-google-calendar --filter @spaces/plugin-google-drive --filter @spaces/plugin-box build
+RUN --mount=type=secret,id=plugin_signing_key \
+    for p in gmail google-calendar google-drive box; do \
+      SPACES_PLUGIN_SIGNING_KEY="$(cat /run/secrets/plugin_signing_key 2>/dev/null)" \
+        pnpm --filter "@spaces/plugin-$p" exec spaces-plugin-pack . --out /app/bundled-plugins \
+        || exit 1; \
+    done
 
 FROM base AS prod-deps
 COPY --from=prune /app/out/runtime/json/ ./
@@ -161,6 +176,9 @@ COPY --chown=node:node --from=build /app/packages/sdk/dist ./node_modules/@space
 # image has no workspace marker), never from registry.json and never from env.
 COPY --chown=node:node registry.json ./registry.json
 COPY --chown=node:node plugin-keys ./plugin-keys
+# The bundled plugins' tarballs, read from /app/bundled-plugins (the cwd, as
+# plugin-keys is) by boot, which installs each into /data/plugins.
+COPY --chown=node:node --from=build /app/bundled-plugins ./bundled-plugins
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chown node:node /app \
     && chmod +x /entrypoint.sh && mkdir -p /data && chown -R node:node /data

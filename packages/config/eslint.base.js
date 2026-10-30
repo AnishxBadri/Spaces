@@ -75,6 +75,9 @@ const DB_SERVER_MODULES = [
   'apps/web/src/routes/api/**',
   'apps/web/src/lib/server/**',
   'apps/web/src/lib/auth.ts',
+  // Settings → Connections' reads and writes; the rest of lib/connections is
+  // client-safe.
+  'apps/web/src/lib/connections/providers.ts',
   'apps/web/src/lib/{ai,arrival,ask,deals,documents,glossary,import,inbox,integrations,interactions,mcp,members,notes,people,portfolio,records,rpc,search,seeds,spaces,tasks,timeline,tokens,views}/**',
 ]
 // Client modules inside those directories (the client build's module graph):

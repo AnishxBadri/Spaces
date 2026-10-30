@@ -5,6 +5,7 @@ import {
   SettingsGroupHead,
   SettingsSection,
 } from '#/components/settings/settings-section'
+import { RunLines } from '#/components/integrations/plugin-template'
 import { ReadoutStrip } from '#/components/record/record-parts'
 import type { RecordReadout } from '#/components/record/record-parts'
 import { SUGGESTION_KIND_WORD } from '#/components/inbox/suggestion-card'
@@ -15,6 +16,7 @@ import {
   getAiRun,
   getAiUsage,
   getAiUsageToday,
+  getIntegrationRuns,
 } from '#/lib/server-fns'
 import { recordPath } from '#/lib/record-path'
 import { cn } from '#/lib/utils'
@@ -31,22 +33,33 @@ type RunStep = RunDetail['steps'][number]
  * - Every AI action is one `ai_run`, newest first; `?run=<id>` (which the
  *   inbox's "produced by this run" links to) opens its steps in order, refs
  *   resolved to names server-side. Calls no run owns list apart.
+ * - `?integration=<id>` lists one plugin's job runs instead: a provider's
+ *   In use tab sends its bundled uses' Runs › here.
  * - Not admin-only: the log writes nothing and is every member's provenance.
  *   A member reads Limits disabled; only an admin changes them.
  */
 export const Route = createFileRoute('/_app/settings/usage')({
-  validateSearch: z.object({ run: z.string().uuid().optional() }),
-  loaderDeps: ({ search }) => ({ run: search.run ?? null }),
+  validateSearch: z.object({
+    run: z.string().uuid().optional(),
+    integration: z.string().uuid().optional(),
+  }),
+  loaderDeps: ({ search }) => ({
+    run: search.run ?? null,
+    integration: search.integration ?? null,
+  }),
   loader: async ({ deps }) => {
-    const [usage, run, caps, today] = await Promise.all([
+    const [usage, run, caps, today, plugin] = await Promise.all([
       getAiUsage(),
       deps.run === null
         ? Promise.resolve(null)
         : getAiRun({ data: { runId: deps.run } }),
       getAiCaps(),
       getAiUsageToday(),
+      deps.integration === null
+        ? Promise.resolve(null)
+        : getIntegrationRuns({ data: { id: deps.integration } }),
     ])
-    return { usage, run, asked: deps.run, caps: { caps, today } }
+    return { usage, run, asked: deps.run, caps: { caps, today }, plugin }
   },
   component: UsageRoute,
 })
@@ -64,7 +77,24 @@ function tokens(tokensIn: number | null, tokensOut: number | null): string {
 }
 
 function UsageRoute() {
-  const { caps, usage, run, asked } = Route.useLoaderData()
+  const { caps, usage, run, asked, plugin } = Route.useLoaderData()
+  if (plugin !== null)
+    return (
+      <SettingsSection title="Usage & limits" crumb="AI">
+        <SettingsGroupHead
+          title={`Runs · ${plugin.name}`}
+          action={
+            <Link
+              to="/settings/usage"
+              className="focus-ring rounded-md hover:text-foreground"
+            >
+              All usage ›
+            </Link>
+          }
+        />
+        <RunLines runs={plugin.runs} />
+      </SettingsSection>
+    )
   return (
     <SettingsSection title="Usage & limits" crumb="AI">
       <ReadoutStrip

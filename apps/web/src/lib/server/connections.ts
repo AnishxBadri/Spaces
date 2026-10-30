@@ -3,6 +3,8 @@ import {
   connectionIdInput,
   mailboxSyncInput,
   providerAppInput,
+  providerChoiceInput,
+  providerIdInput,
   recorderKeyInput,
   recorderSettingsInput,
 } from '../connections/input'
@@ -12,6 +14,13 @@ export type {
   ConnectionDisconnectResult,
   ConnectionIdInput,
   ConnectionListRow,
+  ConnectionsListRow,
+  ConsentType,
+  GoogleAudience,
+  ProviderChoices,
+  ProviderMember,
+  ProviderPageView,
+  ProviderUse,
   MailboxSyncInput,
   MailboxSyncResult,
   MailboxSyncView,
@@ -25,19 +34,35 @@ export type {
 } from '../connections/input'
 
 /**
- * Settings → Connection apps: the providers' OAuth apps — written by an
- * admin, read by any member with the secret redacted — and the
- * reader's own accounts under You.
+ * Settings → Connections: each provider's OAuth app — written by an admin,
+ * read by any member with the secret redacted — its Set up answers and its
+ * uses; and the reader's own accounts under You.
  * Bodies are imported inside the handler so the vault never reaches the
  * client bundle.
  */
 
-/** Each provider's OAuth app: configured or not, client id, redacted secret, redirect URI. */
-export const getProviderApps = createServerFn().handler(async () => {
-  const { getProviderAppsHandler } =
-    await import('../connections/provider-apps')
-  return getProviderAppsHandler()
+/** Every provider as Settings → Connections lists it. */
+export const getConnections = createServerFn().handler(async () => {
+  const { connectionsListHandler } = await import('../connections/providers')
+  return connectionsListHandler()
 })
+
+/** One provider's page: its client, Set up answers, uses and who is connected. */
+export const getProviderPage = createServerFn()
+  .validator(providerIdInput)
+  .handler(async ({ data }) => {
+    const { providerPageHandler } = await import('../connections/providers')
+    return providerPageHandler(data)
+  })
+
+/** One Set up answer (Workspace or personal Gmail; the consent type), applied at once. */
+export const setProviderChoice = createServerFn({ method: 'POST' })
+  .validator(providerChoiceInput)
+  .handler(async ({ data }) => {
+    const { setProviderChoiceHandler } =
+      await import('../connections/providers')
+    return setProviderChoiceHandler(data)
+  })
 
 /** Saves a provider's client id and, when given, its secret; returns the redacted row. */
 export const setProviderApp = createServerFn({ method: 'POST' })

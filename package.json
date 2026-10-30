@@ -20,6 +20,7 @@
     "test:root": "vitest run --config scripts/vitest.config.ts",
     "worker": "pnpm --filter @spaces/worker worker",
     "preview": "pnpm --filter @spaces/web preview",
+    "bundle-plugins": "turbo run build --filter=./plugins/gmail --filter=./plugins/google-calendar --filter=./plugins/google-drive --filter=./plugins/box && pnpm --filter ./plugins/gmail --filter ./plugins/google-calendar --filter ./plugins/google-drive --filter ./plugins/box exec spaces-plugin-pack . --out ../../bundled-plugins",
     "db:migrate:run": "pnpm --filter @spaces/web db:migrate:run",
     "db:seed": "pnpm --filter @spaces/web db:seed",
     "db:generate": "pnpm --filter @spaces/db db:generate",

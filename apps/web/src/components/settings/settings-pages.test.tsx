@@ -77,6 +77,11 @@ const writes = vi.hoisted(() => ({
       'Google said: notFound · the folder isn’t shared with anish@fund.example · nothing changed',
   })),
   rebindStatus: vi.fn(async () => ({})),
+  setIntegrationEnabled: vi.fn(async () => undefined),
+  setProviderChoice: vi.fn(async () => ({
+    audience: 'workspace',
+    consent: 'internal',
+  })),
   saveEnrichmentOrder: vi.fn(async () => undefined),
   saveEnrichmentAuto: vi.fn(async () => undefined),
   saveEnrichmentReuse: vi.fn(async () => undefined),
@@ -173,7 +178,9 @@ beforeAll(async () => {
       await import('#/routes/_app/settings/plugins_.$integrationId'),
     enrichment: await import('#/routes/_app/settings/enrichment'),
     'email-forwarding': await import('#/routes/_app/settings/email-forwarding'),
-    'connection-apps': await import('#/routes/_app/settings/connection-apps'),
+    connections: await import('#/routes/_app/settings/connections'),
+    'connections/$provider':
+      await import('#/routes/_app/settings/connections_.$provider'),
   }
   for (const [path, mod] of Object.entries(modules)) {
     const component = mod.Route.options.component
@@ -279,8 +286,76 @@ const accounts = {
     ),
   ],
   configured: ['google' as const],
-  installed: ['google-calendar', 'google-drive'],
-  offered: ['box'],
+  installed: ['gmail', 'google-calendar', 'google-drive', 'box'],
+  enabled: ['gmail', 'google-calendar', 'google-drive', 'box'],
+}
+
+/** Google set up, Calendar switched off, one member's mail failing. */
+const providerView = {
+  app: {
+    provider: 'google' as const,
+    label: 'Google',
+    configured: true,
+    clientId: 'client-1',
+    secretDisplay: 'set',
+    secretSetAt: ISO,
+    redirectUri: 'http://localhost/api/connections/google/callback',
+    membersConnected: 2,
+  },
+  choices: { audience: 'personal' as const, consent: null },
+  uses: [
+    {
+      product: 'gmail',
+      label: 'Gmail',
+      plugin: 'gmail',
+      integrationId: '00000000-0000-4000-8000-0000000000b1',
+      enabled: true,
+      people: 2,
+      lastSyncAt: '2026-10-26T11:57:00.000Z',
+      failed: 1,
+      failedWho: 'Ines',
+    },
+    {
+      product: 'calendar',
+      label: 'Google Calendar',
+      plugin: 'google-calendar',
+      integrationId: '00000000-0000-4000-8000-0000000000b2',
+      enabled: false,
+      people: 0,
+      lastSyncAt: null,
+      failed: 0,
+      failedWho: null,
+    },
+    {
+      product: 'drive',
+      label: 'Google Drive',
+      plugin: 'google-drive',
+      integrationId: '00000000-0000-4000-8000-0000000000b3',
+      enabled: true,
+      people: 1,
+      lastSyncAt: '2026-10-26T09:00:00.000Z',
+      failed: 0,
+      failedWho: null,
+    },
+  ],
+  connected: [
+    {
+      userId: 'u-admin',
+      name: 'Anish',
+      email: 'anish@fund.example',
+      uses: 'Mail · Drive',
+      state: 'ok' as const,
+    },
+    {
+      userId: 'u-ines',
+      name: 'Ines',
+      email: 'ines@gmail.com',
+      uses: 'Mail',
+      state: 'expired' as const,
+    },
+  ],
+  members: 6,
+  mine: 'anish@fund.example',
 }
 
 /** The objects the shell lists; a test may set them. */
@@ -574,6 +649,7 @@ const loaders: Record<string, () => object> = {
     usage: { runs: [], loneCalls: [], today: { runs: 14, waiting: 6 } },
     run: null,
     asked: null,
+    plugin: null,
     caps: {
       caps: { dailyTokens: 1000, perRunTokens: null },
       today: { used: 0, since: ISO, resetsAt: ISO },
@@ -619,20 +695,29 @@ const loaders: Record<string, () => object> = {
       threadsToday: 3,
     },
   }),
-  'connection-apps': () => ({
-    apps: [
+  connections: () => ({
+    rows: [
       {
         provider: 'google',
         label: 'Google',
         configured: true,
-        clientId: 'client-1',
-        secretDisplay: 'set',
-        secretSetAt: ISO,
-        redirectUri: 'http://localhost/api/connections/google/callback',
-        membersConnected: 2,
+        membersConnected: 4,
+        members: 6,
+        testing: false,
+        error: null,
+      },
+      {
+        provider: 'box',
+        label: 'Box',
+        configured: false,
+        membersConnected: 0,
+        members: 6,
+        testing: false,
+        error: null,
       },
     ],
   }),
+  'connections/$provider': () => ({ view: providerView }),
 }
 
 /** Every page under the shell, as its URL. */
@@ -645,7 +730,7 @@ const PATHS = [
 ]
   .map(
     (p) =>
-      `/settings/${p.replace('$objectSlug', 'funds').replace('$integrationId', PLUGIN_ID).replace('$connectionId', DRIVE)}`,
+      `/settings/${p.replace('$objectSlug', 'funds').replace('$integrationId', PLUGIN_ID).replace('$connectionId', DRIVE).replace('$provider', 'google')}`,
   )
   .sort()
 
@@ -689,7 +774,8 @@ async function mount(path: string, isAdmin = true) {
             .replace('objects/', 'objects_/')
             .replace('plugins/', 'plugins_/')
             .replace('email-calendar/', 'email-calendar_/')
-            .replace('files/', 'files_/'),
+            .replace('files/', 'files_/')
+            .replace('connections/', 'connections_/'),
         })
       return route
     })
@@ -893,7 +979,6 @@ describe('a member on an admin page', () => {
     `/settings/plugins/${PLUGIN_ID}`,
     '/settings/enrichment',
     '/settings/email-forwarding',
-    '/settings/connection-apps',
   ])(
     '%s reads with every control disabled and says whom to ask',
     async (path) => {
@@ -1114,34 +1199,33 @@ describe('the accounts pages, by the job an account does', () => {
     )
   })
 
-  it('shows Install › to an admin and "Ask an admin" to a member for a plugin not installed', async () => {
+  it('shows Set up Box › to an admin and "Ask an admin" to a member while Box is not set up', async () => {
     await mount('/settings/files')
     expect(
-      document.querySelector('section a[href="/settings/plugins#plugin-box"]')
+      document.querySelector('section a[href="/settings/connections/box"]')
         ?.textContent,
-    ).toBe('Install ›')
+    ).toBe('Set up Box ›')
     expect(text()).not.toContain('Ask an admin')
+    expect(text()).not.toContain('Install')
     await mount('/settings/files', false)
     expect(
-      document.querySelector('section a[href^="/settings/plugins"]'),
+      document.querySelector('section a[href^="/settings/connections"]'),
     ).toBeNull()
     expect(text()).toContain('Ask an admin')
   })
 
-  it("keys Email & calendar's Install › on the calendar plugin's registry id", async () => {
+  it('reads Not available yet where the image shipped no plugin for the product', async () => {
     const original = loaders['email-calendar']
     loaders['email-calendar'] = () => ({
-      view: { ...accounts, installed: [], offered: ['google-calendar'] },
+      view: { ...accounts, installed: [], enabled: [] },
       address: null,
     })
     try {
       await mount('/settings/email-calendar')
+      expect(text()).toContain('Not available yet')
       expect(
-        document.querySelector(
-          'section a[href="/settings/plugins#plugin-google-calendar"]',
-        )?.textContent,
-      ).toBe('Install ›')
-      expect(text()).not.toContain('Not available yet')
+        document.querySelector('section a[href^="/settings/plugins"]'),
+      ).toBeNull()
     } finally {
       loaders['email-calendar'] = original
     }
@@ -1882,16 +1966,114 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
     }
   })
 
-  it('Connection apps: GOOGLE with its members connected and sentence-case labels', async () => {
-    await mount('/settings/connection-apps')
-    expect(groups()).toEqual(['Google2 members connected'])
-    const text = document.body.textContent
-    for (const label of ['Redirect address', 'Client ID', 'Client secret'])
-      expect(text).toContain(label)
-    expect(text).toContain('●●●● set 9 Oct')
+  it('Connections: PROVIDERS 1 of 2 set up, a row each, Microsoft not available yet', async () => {
+    await mount('/settings/connections')
+    expect(groups()).toEqual(['Providers1 of 2 set up'])
+    const row = (id: string) =>
+      document.querySelector(`[data-provider="${id}"]`)?.textContent
+    expect(row('google')).toBe('GoogleSet up · 4 of 6 members connectedOpen ›')
+    expect(row('box')).toBe('BoxNot set upSet up ›')
+    expect(row('microsoft')).toBe('MicrosoftNot available yet')
+    expect(
+      document
+        .querySelector('[data-provider="google"] a')
+        ?.getAttribute('href'),
+    ).toBe('/settings/connections/google?tab=in-use')
+    expect(
+      document.querySelector('[data-provider="box"] a')?.getAttribute('href'),
+    ).toBe('/settings/connections/box?tab=setup')
+  })
+
+  it('a provider opens on In use once set up: who may use what, and who is connected', async () => {
+    await mount('/settings/connections/google')
+    const tabs = Array.from(document.querySelectorAll('[role="tab"]'))
+    expect(tabs.map((t) => t.textContent)).toEqual(['Set up', 'In use'])
+    expect(tabs[1]?.getAttribute('aria-selected')).toBe('true')
+    expect(groups()).toEqual(['Members may use', 'Connected2 of 6'])
+    const use = (plugin: string) =>
+      document.querySelector(`[data-use="${plugin}"]`)?.textContent
+    expect(use('gmail')).toBe(
+      'Gmail2 people · last sync 3 min1 failed · InesRuns ›',
+    )
+    expect(use('google-calendar')).toBe(
+      'Google CalendarOff for this workspaceRuns ›',
+    )
+    expect(use('google-drive')).toContain('0 failed · 7 days')
+    expect(
+      document.querySelector('[data-use="gmail"] a')?.getAttribute('href'),
+    ).toBe('/settings/usage?integration=00000000-0000-4000-8000-0000000000b1')
+    const body = document.body.textContent
+    expect(body).toContain('anish@fund.example')
+    expect(body).toContain('In sync')
+    expect(body).toContain('Token expired')
+  })
+
+  it('unticking a use switches its plugin off', async () => {
+    await mount('/settings/connections/google')
+    const box = document.querySelector(
+      'button[aria-label="Members may use Gmail"]',
+    )
+    await click(box)
+    expect(writes.setIntegrationEnabled).toHaveBeenCalledWith({
+      data: { id: '00000000-0000-4000-8000-0000000000b1', enabled: false },
+    })
+  })
+
+  it('Set up: the audience question, the numbered steps, the client through the Save bar, Test', async () => {
+    await mount('/settings/connections/google')
+    await click(
+      Array.from(document.querySelectorAll('[role="tab"]')).find(
+        (t) => t.textContent === 'Set up',
+      ),
+    )
+    const body = document.body.textContent
+    expect(body).toContain('Your accounts are on')
+    expect(body).toContain(
+      'Google keeps an unverified app in Testing: each member reconnects every 7 days, forever.',
+    )
+    expect(body).toContain('Email only? Forwarding needs no Google app.')
+    for (const step of [
+      '1Create a Google Cloud project',
+      '2Turn on the Gmail, Calendar and Drive APIs',
+      '3Consent screen',
+      '4Redirect address',
+      '5Client ID',
+      '6Test',
+    ])
+      expect(body).toContain(step)
+    // Personal Gmail preselects an External consent screen.
+    const consent = document.querySelector(
+      '[role="radiogroup"][aria-label="Consent screen"] [aria-checked="true"]',
+    )
+    expect(consent?.textContent).toBe('External')
+    expect(body).toContain('/api/connections/google/callback')
+    expect(body).toContain('Works · anish@fund.example')
+    await click(
+      Array.from(
+        document.querySelectorAll(
+          '[role="radiogroup"][aria-label="Your accounts are on"] [role="radio"]',
+        ),
+      ).find((r) => r.textContent === 'Google Workspace'),
+    )
+    expect(writes.setProviderChoice).toHaveBeenCalledWith({
+      data: { provider: 'google', audience: 'workspace', consent: 'internal' },
+    })
     await click(byText('Replace'))
     await type(input('Google client secret'), 'GOCSPX-new')
     expect(bar()?.textContent).toContain('1 change')
+  })
+
+  it('a member reads a provider with the tabs live and every control disabled', async () => {
+    await mount('/settings/connections/google', false)
+    expect(document.querySelector('[data-read-only]')?.textContent).toBe(
+      'Only admins can change this · ask Anish',
+    )
+    for (const t of document.querySelectorAll('[role="tab"]'))
+      expect(t.closest('fieldset[disabled]')).toBeNull()
+    const box = document.querySelector(
+      'button[aria-label="Members may use Gmail"]',
+    )
+    expect(box?.closest('fieldset[disabled]')).not.toBeNull()
   })
 
   it('Email forwarding: Address · Since last check · Threads today, then Mail server, Check every, Secure', async () => {

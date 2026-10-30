@@ -8,6 +8,7 @@ import {
   gte,
   inArray,
   isNull,
+  notInArray,
   notLike,
   sql,
 } from 'drizzle-orm'
@@ -36,7 +37,11 @@ import { webhookSecretProvider } from '@spaces/core/writes/ingress/receive'
 import { MISSING_SETTINGS } from '@spaces/core/writes/ports/config'
 import { manifestSchema, satisfiesSdk } from '@spaces/sdk'
 import type { Manifest, PluginRole } from '@spaces/sdk'
-import { PRODUCTS } from '#/lib/connections/products'
+import {
+  BUNDLED_PLUGINS,
+  PRODUCTS,
+  isBundledPlugin,
+} from '#/lib/connections/products'
 import { describeExternalOrigin } from '#/lib/server/external-origin'
 import {
   capabilitiesOf,
@@ -627,13 +632,93 @@ export const integrationLedgerProgram = Effect.fn('integrationLedgerProgram')(
   },
 )
 
-/** How many plugins are installed, for the settings nav. */
+/**
+ * Every installed plugin as the Plugins ledger lists it: the bundled ones
+ * are their providers', on Settings → Connections.
+ */
+export const pluginLedgerProgram = Effect.fn('pluginLedgerProgram')(function* (
+  source: RegistrySource = {},
+) {
+  return (yield* integrationLedgerProgram(source)).filter(
+    (r) => !isBundledPlugin(r.pluginId),
+  )
+})
+
+/** How many plugins the Plugins ledger lists, for the settings nav. */
 export const integrationCountProgram = Effect.fn('integrationCountProgram')(
   function* (): Effect.fn.Return<number, IntegrationReadFailed> {
     const rows = yield* query(() =>
-      db.select({ n: count() }).from(integration).where(plugins),
+      db
+        .select({ n: count() })
+        .from(integration)
+        .where(
+          and(
+            plugins,
+            notInArray(integration.capabilityId, [...BUNDLED_PLUGINS]),
+          ),
+        ),
     )
     return rows.at(0)?.n ?? 0
+  },
+)
+
+/** One plugin's latest runs, newest first: its page's Recent runs, and Usage filtered to it. */
+export const recentRunsProgram = Effect.fn('recentRunsProgram')(function* (
+  integrationId: string,
+): Effect.fn.Return<Array<RunLine>, IntegrationReadFailed> {
+  const runs = yield* query(() =>
+    db
+      .select({
+        id: jobRun.id,
+        queue: jobRun.queue,
+        status: jobRun.status,
+        startedAt: jobRun.startedAt,
+        durationMs: jobRun.durationMs,
+        error: jobRun.error,
+        summary: jobRun.summary,
+      })
+      .from(jobRun)
+      .where(eq(jobRun.integrationId, integrationId))
+      .orderBy(desc(jobRun.startedAt), desc(jobRun.id))
+      .limit(RECENT_RUNS),
+  )
+  const now = yield* Clock.currentTimeMillis
+  return runs.map((r) => ({
+    id: r.id,
+    job: jobOfQueue(r.queue),
+    status: r.status,
+    ago: agoOf(r.startedAt, now),
+    duration: durationOf(r.durationMs),
+    line:
+      r.status === 'failed' ? (r.error ?? 'failed') : (r.summary ?? r.error),
+  }))
+})
+
+/** One installed plugin's name and latest runs, bundled or not: what Usage lists when filtered to it. */
+export const integrationRunsProgram = Effect.fn('integrationRunsProgram')(
+  function* (
+    id: string,
+  ): Effect.fn.Return<
+    { readonly name: string; readonly runs: Array<RunLine> },
+    IntegrationReadFailed | IntegrationNotFound
+  > {
+    const found = (yield* query(() =>
+      db
+        .select({
+          capabilityId: integration.capabilityId,
+          manifest: integration.manifest,
+        })
+        .from(integration)
+        .where(and(eq(integration.id, id), plugins)),
+    )).at(0)
+    if (!found)
+      return yield* new IntegrationNotFound({
+        message: 'That integration is not installed',
+      })
+    return {
+      name: manifestOf(found.manifest)?.name ?? found.capabilityId,
+      runs: yield* recentRunsProgram(id),
+    }
   },
 )
 
@@ -709,23 +794,7 @@ export const integrationDetailProgram = Effect.fn('integrationDetailProgram')(
         }
       : drawn
     const scope = autoEnrichScopeOf(row.config)
-    const runs = yield* query(() =>
-      db
-        .select({
-          id: jobRun.id,
-          queue: jobRun.queue,
-          status: jobRun.status,
-          startedAt: jobRun.startedAt,
-          durationMs: jobRun.durationMs,
-          error: jobRun.error,
-          summary: jobRun.summary,
-        })
-        .from(jobRun)
-        .where(eq(jobRun.integrationId, row.id))
-        .orderBy(desc(jobRun.startedAt), desc(jobRun.id))
-        .limit(RECENT_RUNS),
-    )
-    const now = yield* Clock.currentTimeMillis
+    const runs = yield* recentRunsProgram(row.id)
     return {
       ...view,
       description: manifest?.description ?? null,
@@ -734,17 +803,7 @@ export const integrationDetailProgram = Effect.fn('integrationDetailProgram')(
         manifest,
         manifest !== null && enriches ? yield* fillableOf(manifest) : null,
       ),
-      runs: runs.map((r) => ({
-        id: r.id,
-        job: jobOfQueue(r.queue),
-        status: r.status,
-        ago: agoOf(r.startedAt, now),
-        duration: durationOf(r.durationMs),
-        line:
-          r.status === 'failed'
-            ? (r.error ?? 'failed')
-            : (r.summary ?? r.error),
-      })),
+      runs,
       fix: fixOf(row, manifest),
       form,
       values: form.ok ? formValuesOf(form.fields, row.config) : {},

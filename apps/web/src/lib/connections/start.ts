@@ -161,7 +161,7 @@ export const connectStartProgram = Effect.fn('connectStart')(function* (
   if (clientId === null)
     return yield* new ProviderUnconfigured({
       provider,
-      message: `${entry.label} has no OAuth client yet. An admin adds it in Settings → Connection apps.`,
+      message: `${entry.label} isn’t set up yet. An admin sets it up in Settings → Connections → ${entry.label}.`,
     })
 
   const held = yield* holdsConnection({

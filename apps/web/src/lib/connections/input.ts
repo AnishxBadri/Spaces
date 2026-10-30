@@ -5,7 +5,7 @@ import { PROVIDER_IDS } from '@spaces/core/providers/registry'
 import type { ProviderId } from '@spaces/core/providers/registry'
 
 /**
- * A provider's OAuth app as Settings → Connection apps saves it. Client-safe: the
+ * A provider's OAuth app as its Set up tab saves it. Client-safe: the
  * server fn validates with it and the section types its draft by it.
  * - `clientSecret` empty keeps the stored secret; a first save needs one.
  */
@@ -79,10 +79,10 @@ export type AccountsView = {
   connections: ConnectionListRow[]
   /** Providers with an active OAuth client. */
   configured: ProviderId[]
-  /** Plugin ids installed here. */
+  /** The bundled plugin ids installed here. */
   installed: string[]
-  /** Plugin ids the registry offers that are not installed. */
-  offered: string[]
+  /** Of those, the ones the workspace has switched on. */
+  enabled: string[]
 }
 
 /**
@@ -161,4 +161,86 @@ export type MeetingNotesView = {
     plugin: string
     offer: RecorderOffer
   }>
+}
+
+/** Where a Google workspace's accounts live: one company domain, or personal Gmail. */
+export const GOOGLE_AUDIENCES = ['workspace', 'personal'] as const
+export type GoogleAudience = (typeof GOOGLE_AUDIENCES)[number]
+
+/** The OAuth consent screen's user type in Google Cloud. */
+export const CONSENT_TYPES = ['internal', 'external'] as const
+export type ConsentType = (typeof CONSENT_TYPES)[number]
+
+/** A provider's Set up answers, `workspace.settings.providers.<id>`; null until asked. */
+export type ProviderChoices = {
+  audience: GoogleAudience | null
+  consent: ConsentType | null
+}
+
+/** One Set up answer, applied at once. */
+export const providerChoiceInput = z.object({
+  provider: z.literal('google'),
+  audience: z.enum(GOOGLE_AUDIENCES).optional(),
+  consent: z.enum(CONSENT_TYPES).optional(),
+})
+
+export type ProviderChoiceInput = z.infer<typeof providerChoiceInput>
+
+/** One provider by id, for its page. */
+export const providerIdInput = z.object({ provider: z.enum(PROVIDER_IDS) })
+
+/** One use of a provider (a bundled plugin) as In use draws it. */
+export type ProviderUse = {
+  product: string
+  /** `Gmail`, `Google Calendar`. */
+  label: string
+  plugin: string
+  /** The plugin's live row; null when the image did not ship it. */
+  integrationId: string | null
+  /** `integration.enabled`: whether members may use it. */
+  enabled: boolean
+  /** Members holding a live connection for it. */
+  people: number
+  /** The latest sync of any of those connections, ISO. */
+  lastSyncAt: string | null
+  /** Failed runs in the last 7 days. */
+  failed: number
+  /** The first member whose connection for it is failing; null for none. */
+  failedWho: string | null
+}
+
+/** One member's account under a provider, as Connected lists it. */
+export type ProviderMember = {
+  userId: string
+  name: string
+  email: string
+  /** `Mail · Calendar`. */
+  uses: string
+  state: 'ok' | 'expired'
+}
+
+/** A provider's page: its client, the Set up answers, its uses and who is connected. */
+export type ProviderPageView = {
+  app: ProviderAppRow
+  /** Google's answers; null for a provider that asks none. */
+  choices: ProviderChoices | null
+  uses: ProviderUse[]
+  connected: ProviderMember[]
+  /** Members of the workspace, suspended ones left out. */
+  members: number
+  /** The reader's own live account under the provider, for Test. */
+  mine: string | null
+}
+
+/** One provider row on Settings → Connections. */
+export type ConnectionsListRow = {
+  provider: ProviderId
+  label: string
+  configured: boolean
+  membersConnected: number
+  members: number
+  /** Google holds the client in Testing: grants lapse every 7 days. */
+  testing: boolean
+  /** The client itself refused (`Google said: invalid_client`); null when not. */
+  error: string | null
 }

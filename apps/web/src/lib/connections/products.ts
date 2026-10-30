@@ -1,3 +1,4 @@
+import { PROVIDER_IDS } from '@spaces/core/providers/registry'
 import type { ProviderId } from '@spaces/core/providers/registry'
 
 /**
@@ -95,6 +96,28 @@ export function productsOf(
     product,
     entry,
   }))
+}
+
+/**
+ * The plugins every image ships and boot installs: one per product. They
+ * never appear in the Plugins ledger, the catalogue or its nav count, and
+ * cannot be uninstalled; a provider's page switches each use on and off.
+ */
+export const BUNDLED_PLUGINS: ReadonlyArray<string> = PROVIDER_IDS.flatMap(
+  (provider) => productsOf(provider).map((p) => p.entry.plugin),
+)
+
+export function isBundledPlugin(pluginId: string): boolean {
+  return BUNDLED_PLUGINS.includes(pluginId)
+}
+
+/** The provider whose page a bundled plugin is switched on from; null for any other plugin. */
+export function providerOfPlugin(pluginId: string): ProviderId | null {
+  return (
+    PROVIDER_IDS.find((provider) =>
+      productsOf(provider).some((p) => p.entry.plugin === pluginId),
+    ) ?? null
+  )
 }
 
 /** The settings page a product's accounts are listed on; where a dance with no return lands. */

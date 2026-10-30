@@ -52,10 +52,10 @@ const MAP: ReadonlyArray<
   [
     'Integrations',
     [
+      ['Connections', '/settings/connections'],
       ['Plugins', '/settings/plugins'],
       ['Enrichment', '/settings/enrichment'],
       ['Email forwarding', '/settings/email-forwarding'],
-      ['Connection apps', '/settings/connection-apps'],
     ],
   ],
 ]
@@ -187,10 +187,10 @@ describe('the settings nav grammar', () => {
     ).toEqual([
       'Models',
       'Search',
+      'Connections',
       'Plugins',
       'Enrichment',
       'Email forwarding',
-      'Connection apps',
     ])
   })
 })

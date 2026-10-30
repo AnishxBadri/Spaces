@@ -21,6 +21,7 @@ import type { RegistryEntry } from '@spaces/sdk/pack'
 import type { PluginRole } from '@spaces/sdk'
 import { requireAdmin, requireUser } from '#/lib/server/shared'
 import { IntegrationRefused, run } from './admin'
+import { isBundledPlugin } from '#/lib/connections/products'
 import { manifestOf } from './ledger'
 import { readRegistryProgram } from './registry'
 import type { RegistrySource } from './registry'
@@ -102,7 +103,7 @@ export const availableProgram = Effect.fn('availableProgram')(function* (
   )
   return {
     available: newestPerPlugin(read.success)
-      .filter((e) => !installed.has(e.id))
+      .filter((e) => !installed.has(e.id) && !isBundledPlugin(e.id))
       .map((e) => ({
         pluginId: e.id,
         name: e.name,
@@ -278,6 +279,10 @@ export const uninstallIntegrationProgram = Effect.fn(
   source: RegistrySource = {},
 ): Effect.fn.Return<InstallOutcome, IntegrationRefused> {
   const row = yield* liveRow(id)
+  if (isBundledPlugin(row.capabilityId))
+    return yield* refused(
+      `${manifestOf(row.manifest)?.name ?? row.capabilityId} comes with Spaces and cannot be uninstalled; turn it off on its provider’s page`,
+    )
   yield* uninstallPlugin(
     { pluginId: row.capabilityId, dropData },
     installerOptions(source),

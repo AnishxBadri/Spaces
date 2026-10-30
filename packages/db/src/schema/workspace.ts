@@ -56,11 +56,24 @@ export type EmbeddingPinSetting = {
   sensitive?: EmbeddingSlotSetting
 }
 
+/**
+ * A provider's Set up answers, keyed by provider id. Google's: whether the
+ * accounts are on a Workspace domain or personal Gmail, and the consent
+ * screen's user type. Either key absent means not yet answered.
+ */
+export type ProvidersSetting = {
+  google?: {
+    audience?: 'workspace' | 'personal'
+    consent?: 'internal' | 'external'
+  }
+}
+
 export type WorkspaceSettings = {
   base_currency?: string
   sensitivity_default?: AiSensitivity
   ai_caps?: AiCapsSetting
   embedding?: EmbeddingPinSetting
+  providers?: ProvidersSetting
 } & { [k: string]: Json | undefined }
 
 /**
