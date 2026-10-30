@@ -33,18 +33,18 @@ What is shipped, what is open, and what comes next. Linear (team `Spaces`) holds
 27. Instrument, printed — the decided design lands
 28. Spaces, research and watches
 29. Enrichment is the host's
+30. The canvas lands — the instrument port (shipped 2026-10-30, with the Clean UI leftovers `SPA-355` and `SPA-356`)
 
 Plus the UI sweep (the printed sheets landing) and Corrections.
 
 ## Open
 
-- **30. The canvas lands — the instrument port** (P-SPA-34, the next lane): brings the code in line with the drawn canvas (Paper pages Shell · Today · Lists · Record · Windows · Ask · Settings, the Grammar board, the rules in `docs/product-map.md`). Order: contract amendment → shared pieces one at a time → surfaces two at a time; behaviour slices labelled apart. Bodies drafted in `docs/backlog.md`, uploaded after owner review. It replaces Clean UI `SPA-349`…`SPA-353`, cancelled 2026-10-25 because the canvas superseded them.
-- **Clean UI leftovers** (`afk`): `SPA-355` orphaned components and tokens (run before project 30's shared pieces), `SPA-356` lib leftovers and dependencies. Bodies in Linear.
+- **Project 30 follow-ups** (`afk`, P-SPA-34): `port-C1` SPA-385 (Today, lists, dates, the holding) and `port-C2` SPA-386 (windows, Cmd-K, notices, Connections), side by side on disjoint files. They fix what project 30's browser passes found. Bodies in `docs/backlog.md`.
 - **Project 16** (`afk`, In Progress in Linear): `SPA-188` install, upgrade and rollback docs, `SPA-190` one-click templates. `docs/install.md` and `docs/upgrade.md` exist, so check whether 188 is done.
 
 ## Next, in order
 
-1. **Project 30**, the canvas lands: the remaining design port.
+1. **Project 30 follow-ups**, `port-C1` and `port-C2`.
 2. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided; starts after project 30.
 3. **Docs consolidation** — `DESIGN.md` and `docs/design-contract.md` merge into one design doc, checked against the Paper library; `CONTEXT.md` rewritten to current state only.
 
