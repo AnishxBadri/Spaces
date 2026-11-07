@@ -157,7 +157,7 @@ describe('the folded head', () => {
     expect(StubObserver.last?.options.rootMargin).toBe('-48px 0px 0px 0px')
   })
 
-  it('shows the 40px bar when the title scrolls out and hides it when it returns', () => {
+  it('shows the 48px bar when the title scrolls out and hides it when it returns', () => {
     mount(record)
     const bar = q('[data-head-bar]')
     expect(bar.dataset.folded).toBe('false')
@@ -166,7 +166,7 @@ describe('the folded head', () => {
     titleVisible(false)
     expect(bar.dataset.folded).toBe('true')
     expect(bar.className.split(' ')).toEqual(
-      expect.arrayContaining(['h-10', 'px-4']),
+      expect.arrayContaining(['h-12', 'px-4']),
     )
     expect(bar.textContent).toContain('Flent')
     // The record's mark at 16px in a hairline box, inert; never the stamp.
@@ -223,9 +223,9 @@ describe('the folded head', () => {
     expect(q('header').contains(actions)).toBe(true)
     expect(q('[data-head-bar]').querySelector('button')).toBeNull()
     expect(document.querySelectorAll('button')).toHaveLength(1)
-    // Lifted into the bar's right lane: fixed, 40px, on the sticky layer.
+    // Lifted into the bar's right lane: fixed, 48px, on the sticky layer.
     expect(actions.className).toContain('data-[folded=true]:fixed')
-    expect(actions.className).toContain('data-[folded=true]:h-10')
+    expect(actions.className).toContain('data-[folded=true]:h-12')
     expect(actions.className).toContain('data-[folded=true]:z-sticky')
     expect(actions.className).toContain('data-[folded=true]:right-4')
     // Folded, every action steps down to 26px.
@@ -255,10 +255,10 @@ describe('the folded head', () => {
     expect(q('header').contains(tabs)).toBe(false)
     expect(q('[data-head-actions]').contains(tabs)).toBe(false)
     expect(tabs.previousElementSibling).toBe(q('header'))
-    // The bar is 40px from the top; the row sticks at exactly its foot.
-    expect(q('[data-head-bar]').className.split(' ')).toContain('h-10')
+    // The bar is 48px from the top; the row sticks at exactly its foot.
+    expect(q('[data-head-bar]').className.split(' ')).toContain('h-12')
     expect(tabs.className.split(' ')).toEqual(
-      expect.arrayContaining(['sticky', 'md:top-10', 'top-22', 'z-sticky']),
+      expect.arrayContaining(['sticky', 'md:top-12', 'top-24', 'z-sticky']),
     )
   })
 

@@ -4,7 +4,7 @@ import { cn } from '#/lib/utils'
 
 /**
  * The sticky head: once a page or record head's title scrolls out, the head
- * folds to a 40px bar — a record's mark, the title in serif at the title
+ * folds to a 48px bar — a record's mark, the title in serif at the title
  * step, an optional mono meta, and the head's own actions at 26px.
  * `PageHeader` and `RecordHeader` own it.
  * - Nothing below moves: the bar hangs from a zero-height sticky anchor and
@@ -15,11 +15,11 @@ import { cn } from '#/lib/utils'
  */
 
 /**
- * Pins an element directly under the folded 40px bar (and the mobile top
+ * Pins an element directly under the folded 48px bar (and the mobile top
  * bar): a record's tab head, a page head's tabs. One line for every page,
  * so nothing hangs across the bar's rule.
  */
-export const PIN_UNDER_HEAD_BAR = 'sticky top-22 z-sticky md:top-10'
+export const PIN_UNDER_HEAD_BAR = 'sticky top-24 z-sticky md:top-12'
 
 /** The title folds once it passes under this line: the mobile top bar. */
 const FOLD_LINE_PX = 48
@@ -67,7 +67,7 @@ export function useHeadFold() {
 }
 
 /**
- * The 40px bar. Always mounted, decorative to assistive tech (the head's h1
+ * The 48px bar, the sidebar head's height, so the two lines run as one. Always mounted, decorative to assistive tech (the head's h1
  * and its real actions stay the accessible ones), on `z-sticky`, isolated.
  * Enter 180ms, exit 120ms; reduced motion just shows or hides it.
  * - `mark` is a record's head mark, drawn at 16px in a hairline box. It is a
@@ -95,7 +95,7 @@ export function HeadBar({
         aria-hidden
         data-head-bar
         data-folded={fold.folded}
-        className="absolute inset-x-0 top-0 isolate flex h-10 -translate-y-full items-center gap-3 border-b border-hairline bg-paper px-4 opacity-0 transition-[transform,opacity] duration-[120ms] ease-out-quart data-[folded=true]:pointer-events-auto data-[folded=true]:translate-y-0 data-[folded=true]:opacity-100 data-[folded=true]:duration-[180ms] motion-reduce:transition-none"
+        className="absolute inset-x-0 top-0 isolate flex h-12 -translate-y-full items-center gap-3 border-b border-hairline bg-paper px-4 opacity-0 transition-[transform,opacity] duration-[120ms] ease-out-quart data-[folded=true]:pointer-events-auto data-[folded=true]:translate-y-0 data-[folded=true]:opacity-100 data-[folded=true]:duration-[180ms] motion-reduce:transition-none"
         style={
           fold.folded
             ? { paddingRight: `calc(2rem + ${fold.width}px)` }
@@ -154,7 +154,7 @@ export function HeadActions({
         data-folded={fold.folded}
         className={cn(
           'flex items-center gap-2',
-          'data-[folded=true]:fixed data-[folded=true]:top-12 data-[folded=true]:right-4 data-[folded=true]:z-sticky data-[folded=true]:h-10 md:data-[folded=true]:top-0',
+          'data-[folded=true]:fixed data-[folded=true]:top-12 data-[folded=true]:right-4 data-[folded=true]:z-sticky data-[folded=true]:h-12 md:data-[folded=true]:top-0',
           // Folded, every action steps down to 26px to sit inside the bar.
           'data-[folded=true]:[&_[data-size=icon]]:w-6.5 data-[folded=true]:[&_[data-slot=button]]:h-6.5',
           'data-[folded=true]:animate-in data-[folded=true]:duration-[180ms] data-[folded=true]:fade-in-0 motion-reduce:animate-none',

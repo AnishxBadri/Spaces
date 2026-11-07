@@ -186,10 +186,10 @@ describe('an empty tab', () => {
 })
 
 describe('a pinned head', () => {
-  it('sticks directly under the 40px folded bar, above the body', () => {
+  it('sticks directly under the 48px folded bar, above the body', () => {
     const list = render('notes', true).querySelector('[role="tablist"]')
     expect(classes(list)).toEqual(
-      expect.arrayContaining(['sticky', 'md:top-10', 'top-22', 'z-sticky']),
+      expect.arrayContaining(['sticky', 'md:top-12', 'top-24', 'z-sticky']),
     )
     // Opaque, so rows scrolling under it never show through.
     expect(classes(list)).toContain('bg-bone')

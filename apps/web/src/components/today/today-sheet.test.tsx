@@ -145,7 +145,7 @@ function classOf(html: string, text: string): string | undefined {
 }
 
 describe('Today', () => {
-  it('heads the page with the date line over the title, and no buttons', async () => {
+  it('heads the page with the title and the date line under it, and no buttons', async () => {
     const html = await renderToday(loadedWith({}))
     const header = /<header[\s\S]*?<\/header>/.exec(html)?.[0] ?? ''
     expect(header).toContain('<h1')
@@ -154,7 +154,7 @@ describe('Today', () => {
       /(Sun|Mon|Tue|Wed|Thu|Fri|Sat) \d{1,2} [A-Z][a-z]{2} · W\d+/,
     )
     expect(date).toBeGreaterThan(-1)
-    expect(date).toBeLessThan(header.indexOf('<h1'))
+    expect(date).toBeGreaterThan(header.indexOf('<h1'))
     expect(html).not.toMatch(/>New task</)
     expect(html).not.toMatch(/>Log interaction</)
   })

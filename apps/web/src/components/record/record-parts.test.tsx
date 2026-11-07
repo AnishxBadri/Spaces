@@ -218,7 +218,7 @@ describe('the tab head', () => {
     expect(doc.body.textContent).not.toMatch(/Context/)
     const list = doc.querySelector('[role="tablist"]')
     expect(classes(list)).toEqual(
-      expect.arrayContaining(['h-11', 'bg-bone', 'sticky', 'md:top-10']),
+      expect.arrayContaining(['h-11', 'bg-bone', 'sticky', 'md:top-12']),
     )
   })
 

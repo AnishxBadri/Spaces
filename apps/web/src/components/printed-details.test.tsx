@@ -305,9 +305,9 @@ describe('the page head', () => {
     const html = renderToStaticMarkup(
       <PageHeader title="Review" tabs={<div data-bar>Tabs</div>} />,
     )
-    const wrap = classesOf(html, 'top-22')
+    const wrap = classesOf(html, 'top-24')
     expect(wrap).toEqual(
-      expect.arrayContaining(['shrink-0', 'sticky', 'z-sticky', 'md:top-10']),
+      expect.arrayContaining(['shrink-0', 'sticky', 'z-sticky', 'md:top-12']),
     )
     expect(wrap).not.toContain('border-b')
     expect(wrap).not.toContain('h-10')

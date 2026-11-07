@@ -4,6 +4,7 @@ import {
   useRouter,
 } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
+import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { MeetingDialog } from '#/components/meeting-dialog'
@@ -127,15 +128,26 @@ function sinceFigure(at: string, now: Date): string {
   return dayKey(at) === dayKey(now) ? formatTime(at) : formatAge(at, now)
 }
 
+/**
+ * A boxed section: the card's rule stands in for the band's opening hairline
+ * and the last row's rule, which the 1px pull clips under the edge.
+ */
+function Card({ children }: { children: ReactNode }) {
+  return (
+    <div className="overflow-hidden border border-rule bg-paper [&>section]:-my-px">
+      {children}
+    </div>
+  )
+}
+
 /** The head: the date line and the plain title, with no verbs. */
 function TodayHead({ today }: { today: string }) {
   return (
     <PageHeader
-      eyebrow={
-        <span className="tracking-normal normal-case">{todayStamp(today)}</span>
-      }
       title="Today"
+      description={todayStamp(today)}
       foldMeta={todayFoldStamp(today)}
+      rule="single"
     />
   )
 }
@@ -399,29 +411,25 @@ function TodayLedger({
           onOpen={(id) => openMeeting(id)}
         />
       ) : null}
-      {readouts.length > 0 ? (
-        <div className="border-b border-hairline px-8">
-          <ReadoutStrip
-            className="border-t-0"
-            fixed
-            readouts={readouts.map((r) => {
-              const by = r.filter
-              return by === undefined
-                ? r.cell
-                : {
-                    ...r.cell,
-                    press: {
-                      pressed: filter === by.id,
-                      onPress: () => pressReadout(by.id),
-                    },
-                  }
-            })}
-          />
-        </div>
-      ) : null}
-
       <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
         <div className="flex min-w-0 flex-1 flex-col gap-6 px-8 pt-6 pb-10">
+          {readouts.length > 0 ? (
+            <ReadoutStrip
+              boxed
+              readouts={readouts.map((r) => {
+                const by = r.filter
+                return by === undefined
+                  ? r.cell
+                  : {
+                      ...r.cell,
+                      press: {
+                        pressed: filter === by.id,
+                        onPress: () => pressReadout(by.id),
+                      },
+                    }
+              })}
+            />
+          ) : null}
           <NoticesBand
             stopped={stoppedPlugins}
             broken={attention.state === 'done' ? attention.value.broken : []}
@@ -433,37 +441,41 @@ function TodayLedger({
               attention.state === 'done' ? attention.value.expiring : []
             }
           />
-          <NeedsYou
-            rows={rows}
-            filter={filter}
-            onFilter={chooseFilter}
-            readout={
-              pinnedFilter === null
-                ? null
-                : { id: pinnedFilter.id, label: pinnedFilter.segment }
-            }
-            loading={attention.state === 'pending'}
-            onComplete={(id) => void complete(id)}
-            onOpen={(row) => {
-              if (row.kind === 'meeting') openMeeting(row.id)
-              else if (row.kind === 'mark') setMarkFor(row.holdingId)
-            }}
-            taskMenu={taskMenu.menuFor}
-            onCreated={bear}
-            washes={washes}
-            actions={actions}
-          />
-          <MeetingsSection
-            calendar={meetings.calendar}
-            audience={meetings.audience}
-            today={today}
-            day={day}
-            onDay={setDay}
-            meetings={shown}
-            preparing={preparing}
-            onOpen={openMeeting}
-            onRetry={() => setVersion((v) => v + 1)}
-          />
+          <Card>
+            <NeedsYou
+              rows={rows}
+              filter={filter}
+              onFilter={chooseFilter}
+              readout={
+                pinnedFilter === null
+                  ? null
+                  : { id: pinnedFilter.id, label: pinnedFilter.segment }
+              }
+              loading={attention.state === 'pending'}
+              onComplete={(id) => void complete(id)}
+              onOpen={(row) => {
+                if (row.kind === 'meeting') openMeeting(row.id)
+                else if (row.kind === 'mark') setMarkFor(row.holdingId)
+              }}
+              taskMenu={taskMenu.menuFor}
+              onCreated={bear}
+              washes={washes}
+              actions={actions}
+            />
+          </Card>
+          <Card>
+            <MeetingsSection
+              calendar={meetings.calendar}
+              audience={meetings.audience}
+              today={today}
+              day={day}
+              onDay={setDay}
+              meetings={shown}
+              preparing={preparing}
+              onOpen={openMeeting}
+              onRetry={() => setVersion((v) => v + 1)}
+            />
+          </Card>
         </div>
 
         <aside className="flex w-full shrink-0 flex-col gap-6 border-t border-hairline bg-bone p-5 xl:w-90 xl:border-t-0 xl:border-l">

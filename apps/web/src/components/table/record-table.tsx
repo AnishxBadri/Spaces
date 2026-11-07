@@ -69,9 +69,9 @@ export type TablePin = 'head' | 'bar' | 'chips'
 
 const HEAD_PIN: Record<TablePin, string> = {
   head: PIN_UNDER_HEAD_BAR,
-  // The folded bar's line (top-22 / md:top-10) plus 44px, then plus 36px.
-  bar: 'sticky top-33 z-sticky md:top-21',
-  chips: 'sticky top-42 z-sticky md:top-30',
+  // The folded bar's line (top-24 / md:top-12) plus 44px, then plus 36px.
+  bar: 'sticky top-35 z-sticky md:top-23',
+  chips: 'sticky top-44 z-sticky md:top-32',
 }
 
 /**

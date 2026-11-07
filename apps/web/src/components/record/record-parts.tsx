@@ -163,30 +163,36 @@ export function ReadoutStrip({
   readouts,
   size = 'page',
   fixed = false,
+  boxed = false,
   className,
 }: {
   readouts: ReadonlyArray<RecordReadout>
   size?: 'page' | 'pane' | undefined
   fixed?: boolean | undefined
+  /** A card of equal cells, ruled all round, for a page of boxed sections. */
+  boxed?: boolean | undefined
   className?: string | undefined
 }) {
   return (
     <div
       data-readouts
       className={cn(
-        'flex h-16 overflow-x-auto border-t border-hairline',
+        'flex h-16 overflow-x-auto',
+        boxed ? 'h-18 border border-rule bg-paper' : 'border-t border-hairline',
         className,
       )}
     >
       {readouts.map((r, i) => {
         const cls = cn(
-          'flex min-w-28 basis-0 flex-col justify-center gap-0.5 border-r border-rule first:pl-0 last:border-r-0',
+          'flex min-w-28 basis-0 flex-col justify-center gap-0.5 border-r border-rule last:border-r-0',
           size === 'pane' ? 'px-3' : 'px-4',
-          fixed
-            ? 'w-60 flex-none'
-            : r.figure
-              ? 'max-w-110 flex-2'
-              : 'max-w-55 flex-1',
+          boxed
+            ? 'flex-1'
+            : fixed
+              ? 'w-60 flex-none first:pl-0'
+              : r.figure
+                ? 'max-w-110 flex-2 first:pl-0'
+                : 'max-w-55 flex-1 first:pl-0',
         )
         const inner = (
           <>
@@ -348,7 +354,7 @@ export function RecordBody({
         <aside
           aria-label="Details"
           className={cn(
-            'flex w-full shrink-0 flex-col border-b border-hairline bg-bone xl:sticky xl:top-10 xl:max-h-[calc(100dvh-2.5rem)] xl:overflow-y-auto xl:border-r xl:border-b-0',
+            'flex w-full shrink-0 flex-col border-b border-hairline bg-bone xl:sticky xl:top-12 xl:max-h-[calc(100dvh-3rem)] xl:overflow-y-auto xl:border-r xl:border-b-0',
             groups ? 'gap-3 p-3 xl:w-75' : 'xl:w-80',
           )}
         >
@@ -364,7 +370,7 @@ export function RecordBody({
         {children}
       </div>
       {rail ? (
-        <aside className="flex w-full shrink-0 flex-col border-t border-hairline bg-bone xl:sticky xl:top-10 xl:max-h-[calc(100dvh-2.5rem)] xl:w-90 xl:overflow-y-auto xl:border-t-0 xl:border-l">
+        <aside className="flex w-full shrink-0 flex-col border-t border-hairline bg-bone xl:sticky xl:top-12 xl:max-h-[calc(100dvh-3rem)] xl:w-90 xl:overflow-y-auto xl:border-t-0 xl:border-l">
           {rail}
         </aside>
       ) : null}

@@ -11,9 +11,10 @@ import { cn } from '#/lib/utils'
  * Page header. Serif title, or a sentence when the page has a state to
  * report; one mono line of what the instrument measured (above as an
  * eyebrow, or below as a readout); `[outline?] [Primary] [···]` right, all
- * 32px, keys in their tooltips. The double rule under, 32px inset, 28px
- * above — the header owns its own anatomy so every field starts on the same
- * line. Scrolled past its title, it folds to `HeadBar`.
+ * 32px on the title's line, keys in their tooltips. The double rule under,
+ * 32px inset, 28px above, 104px tall at least — the header owns its own
+ * anatomy so every field starts on the same line. Scrolled past its title,
+ * it folds to `HeadBar`.
  * - `tabs` is the page's `Tabs` bar, under the double rule; scrolled, it pins
  *   under the folded bar rather than riding into it. A list's count is on its
  *   All tab; a page with no tab bar puts it in the title (`HeadCount`).
@@ -25,6 +26,7 @@ export function PageHeader({
   description,
   action,
   tabs,
+  rule = 'double',
   className,
 }: {
   /** Mono caps line above the title — "Today · Wednesday · 2026-09-10". */
@@ -37,6 +39,8 @@ export function PageHeader({
   action?: ReactNode
   /** The page's `Tabs` bar; pins under the folded bar. */
   tabs?: ReactNode
+  /** `single`: one rule, for a page whose body opens on boxed sections. */
+  rule?: 'double' | 'single'
   className?: string
 }) {
   const { titleRef, actionsRef, fold } = useHeadFold()
@@ -45,7 +49,10 @@ export function PageHeader({
       <HeadBar fold={fold} title={title} meta={foldMeta} />
       <header
         className={cn(
-          'flex shrink-0 items-end justify-between gap-4 px-8 pt-7 pb-4 double-rule',
+          // One height on every page, the title on one line from the top:
+          // moving between pages, the title and the rule never jump.
+          'flex min-h-26 shrink-0 items-start justify-between gap-4 px-8 pt-7 pb-4',
+          rule === 'double' ? 'double-rule' : 'border-b border-rule',
           className,
         )}
       >

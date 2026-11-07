@@ -154,7 +154,7 @@ describe('the sticky head', () => {
     const head = one('[data-table-head]')
     const body = one('[data-table-body]')
     expect(classes(head)).toEqual(
-      expect.arrayContaining(['sticky', 'top-22', 'md:top-10', 'z-sticky']),
+      expect.arrayContaining(['sticky', 'top-24', 'md:top-12', 'z-sticky']),
     )
     // Opaque, so rows scrolling under it never show through.
     expect(classes(head)).toContain('bg-paper')

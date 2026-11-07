@@ -138,7 +138,8 @@ Three ladders order everything on a surface, and none of them needs a new token.
 - **Surface.** Paper is work, bone is frame, bone-deep is pressed. An attribute grid is
   a bone label cell beside a paper value cell.
 - **Line.** The double rule once, under the page head; ink is structure; a rule
-  separates inside a pane; space separates inside a group.
+  separates inside a pane; space separates inside a group. Today is the exception: its
+  head closes on a single rule (`PageHeader rule="single"`) because its body is boxed.
 
 ### Dates
 
@@ -665,7 +666,10 @@ anatomy in §3. The surfaces:
   bar, not a view tab. A first-run list is one `Name +` row.
 - **Today** (D79 amended): the head is the title and the day (`Thu 15 Oct · W42`) with
   no verbs and no count; Notices, then Needs you, then Meetings; the day strip only with
-  a connected calendar.
+  a connected calendar. The body is boxed: the readouts are one ruled card of equal
+  cells (`ReadoutStrip boxed`) at the top of the main column, Needs you and Meetings are
+  cards ruled all round with their bone head band inside, and the rail runs the full
+  height beside them.
 - **Undo holds the write.** Accepting or dismissing a suggestion, a duplicate or an Ask
   card hides the row and holds the write for 5s; the toast's `Undo` is sans and
   underlined.
