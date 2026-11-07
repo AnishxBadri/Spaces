@@ -151,13 +151,35 @@ describe('AskTurns', () => {
     expect(theirs?.textContent).toContain('Sources 1 ›')
   })
 
-  it('refuses an unreferenced claim in a stored answer', () => {
+  it('refuses an unreferenced claim beside a cited one in a stored answer', () => {
     const host = render([
       question('q1', 'q'),
-      answer('a1', { body: 'Acme is the best.' }),
+      answer('a1', {
+        body: `Acme went quiet [record:${ACME}].\n\nAcme is the best.`,
+        refs: [
+          {
+            ref: `record:${ACME}`,
+            label: 'Acme',
+            href: `/deals/${ACME}`,
+            entityId: ACME,
+          },
+        ],
+      }),
     ])
     expect(host.textContent).toContain('A claim with no source was left out.')
     expect(host.textContent).not.toContain('Acme is the best.')
+  })
+
+  it('shows an answer that cites nothing whole, with one unsourced line', () => {
+    const host = render([
+      question('q1', 'hi'),
+      answer('a1', { body: 'Hi! What would you like to look at?' }),
+    ])
+    expect(host.textContent).toContain('Hi! What would you like to look at?')
+    expect(host.textContent).toContain(
+      'No sources: nothing here is from your records.',
+    )
+    expect(host.textContent).not.toContain('A claim with no source')
   })
 
   it('marks a scope change with a centred divider', () => {

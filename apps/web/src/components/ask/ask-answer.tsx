@@ -8,7 +8,8 @@ import { RefPreview } from './ref-preview'
 
 /**
  * An answer, set in sans: text with every claim's sources as ref chips, and
- * any claim that carries none withheld behind one line.
+ * any claim that carries none withheld behind one line. An answer that cites
+ * nothing is shown whole, closed by a line saying so.
  * - `dock`: a table scrolls sideways inside its card, with "Open in /ask ›".
  * - `page`: a table breaks out of the 760px column to the content width,
  *   which the page declares as an inline-size container.
@@ -205,6 +206,12 @@ export function AskAnswer({
             )
           case 'refused':
             return <RefusedClaim key={i} />
+          case 'unsourced':
+            return (
+              <p key={i} className="mono text-micro text-graphite">
+                No sources: nothing here is from your records.
+              </p>
+            )
         }
       })}
     </div>

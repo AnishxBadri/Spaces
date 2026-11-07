@@ -68,9 +68,38 @@ describe('answerBlocks', () => {
   it('refuses a table with no cited row, keeps one with', () => {
     const table = (cell: string) =>
       ['| Deal | Stage |', '| --- | --- |', `| ${cell} | Series A |`].join('\n')
-    expect(answerBlocks(table('Acme'), [ACME]).at(0)?.kind).toBe('refused')
+    const beside = (t: string) => `Acme went quiet [${ACME.ref}].\n\n${t}`
+    expect(answerBlocks(beside(table('Acme')), [ACME]).at(1)?.kind).toBe(
+      'refused',
+    )
     expect(answerBlocks(table(`Acme [${ACME.ref}]`), [ACME]).at(0)?.kind).toBe(
       'table',
+    )
+  })
+
+  it('shows an answer that cites nothing whole, closed by one unsourced line', () => {
+    const blocks = answerBlocks(
+      [
+        'Hi! I can help with your deal book.',
+        '',
+        'A few things I can dig into:',
+        '- Deals past their stage median',
+        '- Marks older than a year',
+        '',
+        'What would you like to look at?',
+      ].join('\n'),
+      [],
+    )
+    expect(blocks.map((b) => b.kind)).toEqual([
+      'paragraph',
+      'paragraph',
+      'item',
+      'item',
+      'paragraph',
+      'unsourced',
+    ])
+    expect(answerMarkdown(blocks)).toBe(
+      'Hi! I can help with your deal book.\n\nA few things I can dig into:\n\n- Deals past their stage median\n- Marks older than a year\n\nWhat would you like to look at?',
     )
   })
 

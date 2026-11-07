@@ -9,6 +9,9 @@ import type { AskRef } from './types'
  * - Exempt: headings, a lead-in ending in `:`, and a question.
  * - A bracket naming a ref the turn did not store is dropped, so a made-up
  *   citation cannot carry a claim.
+ * - An answer that cites nothing at all — a greeting, a question back, a
+ *   "found nothing" — is shown as written and closed by an `unsourced` line,
+ *   instead of every line of it being withheld.
  * Pure, so the dock, `/ask` and the tests read one parse.
  */
 
@@ -26,6 +29,8 @@ export type AnswerBlock =
     }
   /** An unreferenced claim, withheld. */
   | { kind: 'refused' }
+  /** Closes an answer that cited nothing: none of it is from the records. */
+  | { kind: 'unsourced' }
 
 const BRACKET = /\[([^[\]\n]+)\](?!\()/g
 
@@ -119,6 +124,12 @@ export function answerBlocks(
   /** False while streaming: a claim's ref may not have arrived yet. */
   refuse = true,
 ): Array<AnswerBlock> {
+  // A bracket that names a ref, even one the turn never stored, means the
+  // answer reached for the records, so its claims are judged one by one.
+  if (refuse && citedRefs(markdown).length === 0) {
+    const blocks = answerBlocks(markdown, refList, false)
+    return blocks.length === 0 ? blocks : [...blocks, { kind: 'unsourced' }]
+  }
   const refs = new Map(refList.map((r) => [r.ref, r]))
   const claim = (
     block: Extract<AnswerBlock, { segments: ReadonlyArray<AnswerSegment> }>,
@@ -238,6 +249,7 @@ export function answerMarkdown(blocks: ReadonlyArray<AnswerBlock>): string {
         break
       }
       case 'refused':
+      case 'unsourced':
         break
     }
   }
