@@ -1183,11 +1183,11 @@ function NavLink({
         indent ? 'pl-8.5' : 'pl-2.5',
         'hover:bg-bone-deep',
         'focus-ring',
+        // Variants, not plain utilities: a plain `border-hairline` sorts
+        // before `border-transparent` in the stylesheet and loses to it.
+        'aria-[current=page]:border-hairline aria-[current=page]:bg-paper aria-[current=page]:font-medium aria-[current=page]:hover:bg-paper',
       )}
-      activeProps={{
-        className: 'border-hairline bg-paper font-medium hover:bg-paper',
-        'aria-current': 'page',
-      }}
+      activeProps={{ 'aria-current': 'page' }}
     >
       {Icon ? <Icon className="size-3.5 shrink-0" strokeWidth={1.75} /> : null}
       <span className="min-w-0 flex-1 truncate">{children}</span>
