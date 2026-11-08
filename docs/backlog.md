@@ -30,8 +30,8 @@ Project 30 (Linear P-SPA-34) shipped all 25 slices on 2026-10-30; their bodies a
    - **Fix:** one `EmptyDash` in sans `text-graphite`, whatever the cell's face.
 5. **Deals:**
    - **Close date sits off its head.** `attributeColumnMeta` marks a date column numeric, so the head right-aligns, while the cell's button carries both `text-left` and `numeric`. Drop `text-left` from the cell variant so cell and head align.
-   - **`Import…` is a head button.** `MoreMenu` turns a one-item menu into an outline button, and Deals passes only the import verb. Give `MoreMenu` a `forceMenu` prop for list heads, so Deals' head is `···` alone.
-   - **The board's last column is clipped.** The `overflow-x-auto` scroller sits inside the page's `px-8` and ends flush with the last column. Bleed the scroller to the page edge (`-mx-8 px-8`) with an end spacer, so the last column scrolls fully into view.
+   - **`Import…` is a head button.** `MoreMenu` turns a one-item menu into an outline button, and Deals passes only the import verb. The rule: a rare verb goes in `···` even when it is the only one; a frequent verb is a button. Give `MoreMenu` a `forceMenu` prop for heads whose verbs are rare, so Deals' head is `···` alone.
+   - The board's clipped last column is not in this slice: the Edges and icons work replaces the page padding the fix would bleed against, and fixes it there.
 6. **The holding's as-of date filters nothing below the readouts.**
    - **Cause:** `detail.ts` hands `asOf` to `holdingMetrics` and `ownership` only. The investment, mark, distribution and round lists are loaded unfiltered.
    - **Fix:** filter each event list to `date <= asOf` before the sections render.
@@ -47,7 +47,7 @@ Project 30 (Linear P-SPA-34) shipped all 25 slices on 2026-10-30; their bodies a
 - [ ] `4 Oct 2024` fits one line in every day lane (one shared component, a render test).
 - [ ] A suggestion's `due` prints through `formatDay` (test).
 - [ ] Empty date, number and text cells render the same dash (test).
-- [ ] The Deals head is `···` only; Close date aligns with its head; the board's last column scrolls fully into view.
+- [ ] The Deals head is `···` only; Close date aligns with its head.
 - [ ] An as-of date before an event hides that event's rows (loader test, with a reversed event on each side of the date).
 - [ ] The Ownership rail names why it fell back (unit test on each reason).
 - [ ] Gates: typecheck, test, lint, prettier; web build.
