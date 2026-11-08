@@ -127,3 +127,19 @@ Features made of primitives that already exist, so nobody has to build them, onl
 - **Pass-letter drafting** — a draft note to the founder from the deal's `close_reason` and its assembled context, proposed as a note on the deal. One more prompt on the summarize lane; nothing is ever sent to the founder.
 - **Monday digest** — a weekly roll-up of what changed, what is waiting, and feed items that matched no record (sourcing signal). One scheduled job and one template, sent only when `SMTP_URL` is set; Today stays the notification.
 - **Deal scorecards** — weighted per-partner votes rolled into a score. Needs one value per member rather than per record, so it waits on a second partner asking, and on multi-workspace membership to hold a partner's weight.
+
+## Ask: slash commands and branching — 2026-11-08
+
+Drawn on the Ask sheet (board 10, panels 3 and 6) and parked.
+
+- **Slash commands:** `/` in the composer as a shortcut to actions that
+  already exist, never a new capability. First five if it lands: `/prep`,
+  `/find`, `/summarize`, `/watch`, `/note`. `/enrich`, `/task` and `/file`
+  stay out because Ask already proposes them as cards. `/memo` waits for
+  an AI-drafted memo, which does not exist yet.
+- **Branching:** editing a past question re-asks from that point as a
+  branch, and the original thread stays whole. The cheap form is "Ask again
+  in a new thread from here", which copies the turns so far into a fresh
+  thread and needs no tree in the UI.
+- Editing the **last** question (↑ in an empty composer) is not parked: it
+  stays in the Ask set.
