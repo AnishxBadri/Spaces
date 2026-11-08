@@ -55,6 +55,7 @@ import {
   instrumentLabel,
 } from '#/lib/portfolio/figures'
 import { fmtMoney, fmtPct } from '@spaces/core/portfolio/format'
+import type { CostBasisReason } from '@spaces/core/portfolio/ownership'
 
 /**
  * A holding: the company's position, one view with no tab bar. The figures
@@ -313,21 +314,49 @@ function ExplainedFigure({ figure, why }: { figure: string; why: string }) {
   )
 }
 
+/** Why the rail holds no percentage: what it prints, and its tooltip. */
+const COST_BASIS_WHY: Record<CostBasisReason, { figure: string; why: string }> =
+  {
+    shares_unknown: {
+      figure: 'Shares unknown',
+      why: 'A percentage needs the share count on the check.',
+    },
+    shares_outstanding_unknown: {
+      figure: 'Shares outstanding unknown',
+      why: 'A percentage needs the fully diluted share count of a round on or after the check.',
+    },
+    unconverted: {
+      figure: 'Unconverted instrument',
+      why: 'An unconverted instrument has no percentage yet; one would be a guess.',
+    },
+    mixed: {
+      figure: 'Mixed instruments',
+      why: 'Priced shares, capped SAFEs and unconverted instruments do not add up to one percentage.',
+    },
+    no_checks: {
+      figure: 'No checks',
+      why: 'No check stands as of the day shown.',
+    },
+  }
+
 /**
  * Fully diluted ownership by round: the day, the round, our shares over
- * the shares outstanding, and the percentage.
+ * the shares outstanding, and the percentage. Without one, cost basis
+ * only, and why.
  */
 function OwnershipBlock({ ownership }: { ownership: Holding['ownership'] }) {
   const { today } = useClock()
   if (ownership.kind === 'cost_basis_only') {
+    const { figure, why } = COST_BASIS_WHY[ownership.reason]
     return (
       <RailRow
-        label="Cost basis only"
+        label={
+          ownership.reason === 'no_checks' ? 'Ownership' : 'Cost basis only'
+        }
         value={
-          <ExplainedFigure
-            figure="—"
-            why="An unconverted instrument has no percentage yet; one would be a guess."
-          />
+          <span data-cost-basis={ownership.reason} className="font-sans">
+            <ExplainedFigure figure={figure} why={why} />
+          </span>
         }
       />
     )

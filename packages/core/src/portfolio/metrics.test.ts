@@ -193,7 +193,7 @@ describe('ownership', () => {
         [{ date: '2023-01-01', amount: 100_000, instrument, cap: 5_000_000 }],
         [],
       )
-      expect(o).toEqual({ kind: 'cost_basis_only' })
+      expect(o).toEqual({ kind: 'cost_basis_only', reason: 'unconverted' })
     }
   })
 
@@ -210,7 +210,7 @@ describe('ownership', () => {
       ],
       [],
     )
-    expect(o).toEqual({ kind: 'cost_basis_only' })
+    expect(o).toEqual({ kind: 'cost_basis_only', reason: 'mixed' })
   })
 })
 

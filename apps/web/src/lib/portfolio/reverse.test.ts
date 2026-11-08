@@ -431,6 +431,84 @@ describe('the loader contract', () => {
     expect(detail.metrics.metrics.unrealized).toBe(300)
   })
 
+  it('an as-of date before an event hides its rows, its correction with it', async () => {
+    const { loadHoldingDetail } = await import('./detail')
+    const { db } = await import('@spaces/db')
+    const { distribution, investment, round } =
+      await import('@spaces/db/schema/portfolio')
+    const { voidLedgerEventProgram } = await import('./reverse')
+
+    const built = await buildHolding(randomUUID().slice(0, 8))
+    // One voided mark on each side of the as-of day.
+    const early = await addMarkRow(
+      built.holdingId,
+      built.actor,
+      '300.0000',
+      '2023-01-01',
+    )
+    const late = await addMarkRow(
+      built.holdingId,
+      built.actor,
+      '750000.0000',
+      '2024-01-01',
+    )
+    for (const m of [early, late])
+      await Effect.runPromise(
+        voidLedgerEventProgram(built.actor, { table: 'mark', id: m.id }),
+      )
+    // And a check, a distribution and a round after it.
+    await db.insert(investment).values({
+      holdingId: built.holdingId,
+      date: '2024-02-01',
+      amount: '100000',
+      currency: 'USD',
+      instrument: 'priced',
+      createdBy: built.actor,
+    })
+    await db.insert(distribution).values({
+      holdingId: built.holdingId,
+      date: '2024-03-01',
+      amount: '5000',
+      currency: 'USD',
+      kind: 'dividend',
+      createdBy: built.actor,
+    })
+    await db.insert(round).values({
+      companyId: built.companyId,
+      date: '2024-02-01',
+      kind: 'Seed',
+      createdBy: built.actor,
+    })
+
+    const all = await loadHoldingDetail(built.holdingId)
+    expect(all.marks.map((m) => m.reversesId)).toEqual([
+      null,
+      early.id,
+      null,
+      late.id,
+    ])
+    expect(all.investments).toHaveLength(1)
+    expect(all.distributions).toHaveLength(1)
+    expect(all.rounds).toHaveLength(1)
+
+    const then = await loadHoldingDetail(built.holdingId, '2023-06-30')
+    // The early mark and its correction stand; the late pair is not yet.
+    expect(then.marks).toHaveLength(2)
+    expect(then.marks.map((m) => m.id)).not.toContain(late.id)
+    expect(then.marks[0].id).toBe(early.id)
+    expect(then.marks[0].reversedAt).not.toBeNull()
+    expect(then.marks[1].reversesId).toBe(early.id)
+    expect(then.investments).toEqual([])
+    expect(then.distributions).toEqual([])
+    expect(then.rounds).toEqual([])
+    // The pure libs still read every original against the day: the void
+    // was written after it, so the early mark was the value then.
+    expect(then.metrics.ok).toBe(true)
+    if (!then.metrics.ok) return
+    expect(then.metrics.metrics.costBasis).toBe(0)
+    expect(then.metrics.metrics.lastMarkDate).toBe('2023-01-01')
+  })
+
   it('an as-of date before the void still sees the original', async () => {
     const { loadHoldingDetail } = await import('./detail')
     const { db } = await import('@spaces/db')

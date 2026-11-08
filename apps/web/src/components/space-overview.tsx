@@ -1,10 +1,10 @@
 import { Link } from '@tanstack/react-router'
 import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
-import { formatDay, formatWhen } from '@spaces/core/format'
+import { formatDay } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 import { cellsFor } from '#/components/dither'
-import { Band, EmptyRow } from '#/components/ledger-section'
+import { Band, Day, EmptyRow } from '#/components/ledger-section'
 import { DitherMark } from '#/components/record/record-parts'
 import type { Space } from '#/components/space-tabs'
 import { TasksBand } from '#/components/tasks-rail'
@@ -142,7 +142,6 @@ function BandLink({
  */
 function MovingGroup({ signals }: { signals: ReadonlyArray<SpaceSignal> }) {
   const [open, setOpen] = useState(false)
-  const { now } = useClock()
   if (signals.length === 0) return null
   const shown = open ? signals : signals.slice(0, LATEST)
   const hidden = signals.length - shown.length
@@ -183,9 +182,7 @@ function MovingGroup({ signals }: { signals: ReadonlyArray<SpaceSignal> }) {
                   ? s.recordName
                   : `${s.recordName} · ${s.via.name}`}
               </span>
-              <span className="w-18 shrink-0 text-right mono text-micro text-graphite">
-                {formatWhen(s.observedAt, now)}
-              </span>
+              <Day at={s.observedAt} when />
             </li>
           )
         })}
@@ -196,7 +193,6 @@ function MovingGroup({ signals }: { signals: ReadonlyArray<SpaceSignal> }) {
 
 /** The latest filings: the mark, the name, its stage and the day filed. */
 function LatestCompanies({ spc, onAll }: { spc: Space; onAll: () => void }) {
-  const { today } = useClock()
   const latest = [...spc.companies]
     .sort((a, b) =>
       a.filedAt < b.filedAt ? 1 : a.filedAt > b.filedAt ? -1 : 0,
@@ -232,9 +228,7 @@ function LatestCompanies({ spc, onAll }: { spc: Space; onAll: () => void }) {
                   </span>
                 ) : null}
               </span>
-              <span className="w-18 shrink-0 text-right mono text-micro text-graphite">
-                {formatDay(c.filedAt, today)}
-              </span>
+              <Day at={c.filedAt} />
             </li>
           )
         })}

@@ -126,7 +126,7 @@ export function TasksBand({
               <span
                 data-due
                 className={cn(
-                  'w-18 shrink-0 text-right mono text-micro',
+                  'w-22 shrink-0 text-right mono text-micro whitespace-nowrap',
                   overdue ? 'text-destructive' : 'text-graphite',
                 )}
               >
@@ -150,7 +150,7 @@ export function TasksBand({
               +
             </span>
             <span className="min-w-0 flex-1 truncate">Add a task…</span>
-            <kbd className="w-18 shrink-0 text-right mono text-micro">T</kbd>
+            <kbd className="w-22 shrink-0 text-right mono text-micro">T</kbd>
           </button>
         }
       />

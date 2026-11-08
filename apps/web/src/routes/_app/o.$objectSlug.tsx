@@ -433,9 +433,10 @@ function ObjectListPage() {
       }
     />
   ) : undefined
-  // Import… is this head's only rare verb, so the `···` is that verb as
-  // the outline secondary, left of the primary.
-  const listMenu = <ListMenu label={object.plural} verbs={[importVerb]} />
+  // Import… is rare, so it stays in the `···` though it is the only verb.
+  const listMenu = (
+    <ListMenu label={object.plural} verbs={[importVerb]} forceMenu />
+  )
 
   return (
     <div className="flex flex-col">

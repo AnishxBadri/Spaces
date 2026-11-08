@@ -22,7 +22,8 @@ import { cn } from '#/lib/utils'
  * ancestor is hovered or holds focus (A5). The menu is paper on 1px ink with
  * the dither, 28px rows on a bone highlight.
  * - State is never a control (A7): with no enabled item it renders nothing,
- *   and a menu of one item is that item, as an outline button.
+ *   and a menu of one item is that item, as an outline button — unless
+ *   `forceMenu`: a rare verb stays in the `···` even when it is the only one.
  * - Destructive items go last, under one rule, wherever the caller put them.
  * - An item that `opens` a window or a field runs once the menu has let go of
  *   focus, and focus is not handed back to the trigger.
@@ -154,6 +155,7 @@ export function MoreMenu({
   label,
   align = 'end',
   modal,
+  forceMenu = false,
   className,
 }: {
   variant: 'head' | 'row'
@@ -162,6 +164,8 @@ export function MoreMenu({
   label: string
   align?: 'start' | 'end' | undefined
   modal?: boolean | undefined
+  /** Keep a lone item in the menu: the head's verbs are rare ones. */
+  forceMenu?: boolean | undefined
   className?: string | undefined
 }) {
   const afterClose = useRef<(() => void) | null>(null)
@@ -172,7 +176,7 @@ export function MoreMenu({
   const row = variant === 'row'
   const reveal = row ? 'row-reveal' : null
 
-  const only = live.length === 1 ? live[0] : undefined
+  const only = live.length === 1 && !forceMenu ? live[0] : undefined
   if (only !== undefined && !('items' in only)) {
     if ('checked' in only) {
       return (

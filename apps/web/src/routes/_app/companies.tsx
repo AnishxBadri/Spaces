@@ -415,6 +415,7 @@ function CompaniesPage() {
     <ListMenu
       label="Companies"
       verbs={[importVerb, ...(actions.enrichVerb ? [actions.enrichVerb] : [])]}
+      forceMenu
     />
   )
 

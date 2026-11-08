@@ -314,7 +314,12 @@ export async function loadPortfolio(
   }
 }
 
-/** The tear-sheet read: every event, plus computed metrics and ownership. */
+/**
+ * The tear-sheet read: every event, plus computed metrics and ownership.
+ * With `asOf` the ledgers hold only what was dated by then, each original
+ * with its correction beneath it; the pure libs still get every original
+ * and apply the as-of day themselves.
+ */
 export async function loadHoldingDetail(id: string, asOf?: string) {
   const row = (
     await db
@@ -359,6 +364,14 @@ export async function loadHoldingDetail(id: string, asOf?: string) {
   const inv = partitionReversals(invRows)
   const mk = partitionReversals(markRows)
   const dist = partitionReversals(distRows)
+  // What the ledgers show: an original goes with its correction, which
+  // carries the original's date.
+  const dated = <T extends { date: string }>(rows: Array<T>): Array<T> =>
+    asOf === undefined ? rows : rows.filter((r) => r.date <= asOf)
+  const shown = <T extends { date: string }>(part: {
+    originals: Array<T>
+    reversalOf: Map<string, T>
+  }) => ({ originals: dated(part.originals), reversalOf: part.reversalOf })
 
   // The voiders, named once: the timeline says who struck each entry.
   const voiderIds = [
@@ -424,7 +437,7 @@ export async function loadHoldingDetail(id: string, asOf?: string) {
       })),
       asOf,
     ),
-    rounds: roundRows.map((r) => ({
+    rounds: dated(roundRows).map((r) => ({
       id: r.id,
       date: r.date,
       kind: r.kind,
@@ -435,7 +448,7 @@ export async function loadHoldingDetail(id: string, asOf?: string) {
       pricePerShare: num(r.pricePerShare),
       sharesOutstanding: num(r.sharesOutstanding),
     })),
-    investments: withReversalsBeneath(inv, voidedBy, (r) => ({
+    investments: withReversalsBeneath(shown(inv), voidedBy, (r) => ({
       id: r.id,
       date: r.date,
       amount: Number(r.amount),
@@ -449,7 +462,7 @@ export async function loadHoldingDetail(id: string, asOf?: string) {
       roundId: r.roundId,
       batchId: r.batchId,
     })),
-    marks: withReversalsBeneath(mk, voidedBy, (r) => ({
+    marks: withReversalsBeneath(shown(mk), voidedBy, (r) => ({
       id: r.id,
       date: r.date,
       fairValue: Number(r.fairValue),
@@ -457,7 +470,7 @@ export async function loadHoldingDetail(id: string, asOf?: string) {
       basis: r.basis,
       batchId: r.batchId,
     })),
-    distributions: withReversalsBeneath(dist, voidedBy, (r) => ({
+    distributions: withReversalsBeneath(shown(dist), voidedBy, (r) => ({
       id: r.id,
       date: r.date,
       amount: Number(r.amount),

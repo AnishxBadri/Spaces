@@ -118,7 +118,10 @@ const EMPTY: Record<NeedsFilter, string> = {
   oldestMark: 'No stale marks.',
 }
 
-/** The lanes every row shares, so a column reads straight down the list. */
+/**
+ * The lanes every row shares, so a column reads straight down the list. An
+ * empty action or who lane is not drawn: its width goes to the body.
+ */
 const LANE = {
   kind: 'w-16 shrink-0 label-caps text-graphite',
   mark: 'flex w-3.5 shrink-0 items-center justify-center',
@@ -128,7 +131,10 @@ const LANE = {
   more: 'flex w-6 shrink-0 items-center justify-center',
 }
 
-/** The primary and its context, the body lane between the mark and action. */
+/**
+ * The primary and its context, the body lane between the mark and action.
+ * The context gives up its width before the primary loses a letter.
+ */
 function Body({
   primary,
   context,
@@ -147,7 +153,7 @@ function Body({
       {context === undefined || context === null ? null : (
         <span
           className={cn(
-            'min-w-0 shrink truncate text-graphite',
+            'min-w-0 shrink-[999] truncate text-graphite',
             mono ? 'mono text-micro' : 'text-label',
           )}
         >
@@ -156,6 +162,11 @@ function Body({
       )}
     </span>
   )
+}
+
+/** The who lane, or nothing when the row has no person. */
+function Who({ name }: { name: string | null }) {
+  return name === null ? null : <span className={LANE.who}>{name}</span>
 }
 
 /** A lock in the mark slot: the record on this row is never read by AI. */
@@ -231,6 +242,7 @@ function VerbLanes({
 }) {
   return (
     <span className="relative flex shrink-0 items-center gap-3 self-stretch">
+      {/* Kept with no person: the lane is where the verbs land on hover. */}
       <span
         className={cn(
           LANE.who,
@@ -324,7 +336,6 @@ function LeafLanes({
       <Link to="/review" search={leaf.review} className={rowTarget}>
         <Body primary={leaf.subject} context={leaf.line} />
       </Link>
-      <span className={LANE.action} />
       <VerbLanes
         who={leaf.who}
         figure={figure}
@@ -407,7 +418,6 @@ function GroupLanes({
         </span>
         <Body primary={group.subject} context={group.line} />
       </button>
-      <span className={LANE.action} />
       <VerbLanes
         who={group.who}
         figure={figure}
@@ -466,8 +476,7 @@ function RowLanes({
           </KeyTip>
           {/* A task's mark slot holds its checkbox, so its lock trails. */}
           {lock}
-          <span className={LANE.action} />
-          <span className={LANE.who}>{row.who}</span>
+          <Who name={row.who} />
           <span
             className={cn(
               LANE.figure,
@@ -511,7 +520,7 @@ function RowLanes({
                 scale={dealScale}
               />
             </span>
-            <span className={LANE.who}>{row.who}</span>
+            <Who name={row.who} />
             <span className={cn(LANE.figure, 'text-destructive')}>
               {row.days}d
             </span>
@@ -529,10 +538,8 @@ function RowLanes({
             className={rowTarget}
           >
             <Body primary={row.company} context={row.value} mono />
-            <span className={LANE.action} />
-            <span className={LANE.who} />
             <span className={cn(LANE.figure, 'text-destructive')}>
-              {row.age === null ? '—' : `${row.age}d`}
+              {row.age === null ? null : `${row.age}d`}
             </span>
           </button>
           <span className={LANE.more} />
@@ -569,7 +576,7 @@ function RowLanes({
           <span className={LANE.action}>
             <WriteUpButton interactionId={row.id} />
           </span>
-          <span className={LANE.who}>{row.who}</span>
+          <Who name={row.who} />
           <span className={cn(LANE.figure, 'text-graphite')}>{row.figure}</span>
           <span className={LANE.more} />
         </>
@@ -593,8 +600,9 @@ const rowClass =
 /**
  * Needs you: one ledger in urgency order. The head is the title and a
  * Segmented by kind (a readout's filter rides after `All` while it is on);
- * the rows share fixed lanes — kind, mark, body, action, who, figure, `···`;
- * the list folds at eight and ends in the task composer.
+ * the rows share fixed lanes — kind, mark, body, action, who, figure, `···`,
+ * an empty action or who lane left out; the list folds at eight and ends in
+ * the task composer.
  * - The caller orders the rows (`byUrgency`) and owns the filter, so a
  *   readout on the page can set it.
  * - A Review row is one proposal, decided in place by its hover verbs, or a

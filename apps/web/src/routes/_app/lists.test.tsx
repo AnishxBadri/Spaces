@@ -21,8 +21,8 @@ import { ClockProvider } from '#/components/clock'
  * mirror the app's (`_app` → `companies`, `people`, `o/$objectSlug`):
  * - the head is `[New x] [···]` with no count beside the title, and Import…
  *   lives in the `···` with Enrich…;
- * - a custom object's `···` would hold Import… alone, so it is that verb as
- *   the outline secondary, left of the primary;
+ * - Import… is a rare verb, so Deals and a custom object keep it in the
+ *   `···` though it is their only one;
  * - first run (the list holds nothing): the primary hides and the body is
  *   one `EmptyRow` that creates.
  * The loaders hand each page fixture data; the list queries' refetch is a
@@ -104,6 +104,7 @@ beforeAll(async () => {
     companies: await import('#/routes/_app/companies'),
     people: await import('#/routes/_app/people'),
     'o/$objectSlug': await import('#/routes/_app/o.$objectSlug'),
+    deals: await import('#/routes/_app/deals'),
   }
   for (const [path, mod] of Object.entries(modules)) {
     const component = mod.Route.options.component
@@ -158,6 +159,21 @@ function loaderData(path: string, rows: Array<object>) {
     me: { id: 'u-admin', role: 'admin' },
   }
   if (path === 'companies') return { ...common, objectId: OBJECT_ID }
+  if (path === 'deals')
+    return {
+      deals: {
+        rows: rows.map((r) => ({ ...r, stats: {} })),
+        refNames: {},
+        userNames: {},
+        pictures: {},
+      },
+      registry: [],
+      funnel: { medianDaysInStage: {}, daysInStage: [] },
+      views: [],
+      counts: {},
+      objectId: OBJECT_ID,
+      me: common.me,
+    }
   if (path === 'people')
     return { ...common, objectId: OBJECT_ID, companies: [] }
   return {
@@ -271,11 +287,20 @@ describe('a list head', () => {
     },
   )
 
-  it('a custom object: its one rare verb is the outline secondary, left of New', async () => {
+  it('deals: its one rare verb stays in the ···, left of New', async () => {
+    await mount('deals', [ROW])
+    await until('the head', () => title() === 'Deals')
+    expect(head().at(0)).toBe('More for Deals')
+    expect(head()).not.toContain('Import…')
+    expect(await menuItems('More for Deals')).toEqual(['Import…'])
+  })
+
+  it('a custom object: its one rare verb stays in the ···, left of New', async () => {
     await mount('o/$objectSlug', [ROW])
     await until('the head', () => title() === 'Funds')
     expect(document.querySelector('[data-head-count]')).toBeNull()
-    expect(head()).toEqual(['Import…', 'New fund'])
+    expect(head()).toEqual(['More for Funds', 'New fund'])
+    expect(await menuItems('More for Funds')).toEqual(['Import…'])
   })
 })
 

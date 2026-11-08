@@ -384,6 +384,7 @@ function PeoplePage() {
     <ListMenu
       label="People"
       verbs={[importVerb, ...(actions.enrichVerb ? [actions.enrichVerb] : [])]}
+      forceMenu
     />
   )
 

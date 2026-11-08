@@ -397,10 +397,9 @@ function DealsPage() {
     enrich: null,
     refresh,
   })
-  // Import… is the head's only rare verb, so the `···` is that verb as the
-  // outline secondary, left of the primary.
+  // Import… is rare, so it stays in the `···` though it is the only verb.
   const importVerb = useImportVerb('deals')
-  const listMenu = <ListMenu label="Deals" verbs={[importVerb]} />
+  const listMenu = <ListMenu label="Deals" verbs={[importVerb]} forceMenu />
 
   // The board draws the columns the chip leaves: a group's stages, or one.
   const boardStages: Array<BoardStage> =

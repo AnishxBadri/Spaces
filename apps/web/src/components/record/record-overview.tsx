@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
-import { formatDay } from '@spaces/core/format'
-import { useClock } from '#/components/clock'
 import { DocumentPreview } from '#/components/document-preview'
 import { EmailModal } from '#/components/email-dialog'
 import { FileGlyph } from '#/components/files/file-glyph'
 import { openFile } from '#/components/files/file-row'
 import type { RecordDocument } from '#/components/files/types'
 import { FileViewerSidebar } from '#/components/files/viewer-sidebar'
-import { Band, EmptyRow } from '#/components/ledger-section'
+import { Band, Day, EmptyRow } from '#/components/ledger-section'
 import { ThreadRow } from '#/components/record/thread-row'
 import type { ThreadItem } from '#/components/record/thread-row'
 import { TasksBand } from '#/components/tasks-rail'
@@ -182,7 +180,6 @@ function OverviewFiles({
   files: ReadonlyArray<RecordDocument>
   onAll: () => void
 }) {
-  const { today } = useClock()
   const [viewingId, setViewingId] = useState<string | null>(null)
   const viewing = files.find((d) => d.id === viewingId) ?? null
   return (
@@ -212,9 +209,7 @@ function OverviewFiles({
             >
               {doc.uploadedByName ?? ''}
             </span>
-            <span className="w-18 shrink-0 text-right mono text-micro text-graphite">
-              {formatDay(doc.createdAt, today)}
-            </span>
+            <Day at={doc.createdAt} />
           </li>
         ))}
       </ul>

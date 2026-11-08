@@ -107,6 +107,7 @@ const TASK = [
   'List the action items in the meeting notes above: what someone agreed to do after the meeting.',
   'One item per action, phrased as a short task (at most 15 words).',
   'Give `due` as YYYY-MM-DD only when the notes state a date; otherwise leave it out.',
+  'Write any date inside a task as day, short month and year: 4 Oct 2024.',
   'List none when the notes hold no action items.',
 ].join('\n')
 

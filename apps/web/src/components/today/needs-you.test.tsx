@@ -155,12 +155,28 @@ describe('the Needs-you lanes', () => {
     expect(html).toContain('aria-label="More for Chase the data room"')
   })
 
-  it("leaves the who lane blank on the reader's own task (H2)", async () => {
+  it("draws no who lane on the reader's own task (H2)", async () => {
     const html = rowOf(await render([task({ who: null })]), 'task')
-    expect(html).toMatch(
-      /w-30 shrink-0 truncate text-label text-graphite"><\/span>/,
-    )
+    expect(html).not.toContain('w-30')
     expect(html).not.toContain('Anika Rao')
+  })
+
+  it('gives the text the width of an empty action and who lane', async () => {
+    // A task has no action, and the reader's own has no person; a mark
+    // has neither. Neither row draws a blank 120px lane.
+    for (const [row, kind] of [
+      [task({ who: null }), 'task'],
+      [mark, 'mark'],
+    ] as const) {
+      const html = rowOf(await render([row]), kind)
+      expect(html).not.toContain('w-30')
+    }
+  })
+
+  it('lets the context shrink before the title', async () => {
+    const html = rowOf(await render([task()]), 'task')
+    expect(html).toMatch(/min-w-0 truncate text-body text-foreground/)
+    expect(html).toMatch(/shrink-\[999\][^>]*>Flent</)
   })
 
   it('draws a deal: its stage, days against the median, the owner, days in stage', async () => {

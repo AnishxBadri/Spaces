@@ -274,7 +274,7 @@ describe('the three bands', () => {
     expect(cls(task)).toContain('h-ledger-row')
     expect(task?.textContent).toContain('Send the term sheet')
     expect(cls(task?.querySelector('[data-due]'))).toEqual(
-      expect.arrayContaining(['w-18', 'mono', 'text-destructive']),
+      expect.arrayContaining(['w-22', 'mono', 'text-destructive']),
     )
     expect(el.textContent).toContain('Add a task…')
 

@@ -199,6 +199,6 @@ describe('voiding a priced investment', () => {
       ],
       rounds,
     )
-    expect(o).toEqual({ kind: 'cost_basis_only' })
+    expect(o).toEqual({ kind: 'cost_basis_only', reason: 'no_checks' })
   })
 })

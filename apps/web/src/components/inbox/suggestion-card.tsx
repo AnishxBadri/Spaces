@@ -310,6 +310,7 @@ function NoteDraftBody({ draft }: { draft: NotePayload }) {
  * writes it through the task writer, by and for the accepter.
  */
 function TaskBody({ title, due }: { title: string; due: string | null }) {
+  const { today } = useClock()
   return (
     <dl className="flex min-w-0 flex-col gap-2">
       <div className="flex min-w-0 flex-col gap-0.5">
@@ -319,7 +320,9 @@ function TaskBody({ title, due }: { title: string; due: string | null }) {
       {due === null ? null : (
         <div className="flex min-w-0 flex-col gap-0.5">
           <dt className="truncate field-label text-graphite">Due</dt>
-          <dd className="tabular min-w-0 truncate mono text-label">{due}</dd>
+          <dd className="tabular min-w-0 truncate mono text-label">
+            {formatDay(due, today)}
+          </dd>
         </div>
       )}
     </dl>

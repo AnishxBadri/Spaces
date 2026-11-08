@@ -5,7 +5,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { toast } from 'sonner'
 import { OptionChip, optionLabel, refName } from './attributes/value-editor'
 import { EmailModal } from './email-dialog'
-import { Band, EmptyRow, FoldRow } from './ledger-section'
+import { Band, Day, EmptyRow, FoldRow } from './ledger-section'
 import { PickPopover } from './record/details-add'
 import { ThreadRow } from './record/thread-row'
 import { useConfirm } from './ui/confirm-dialog'
@@ -633,7 +633,6 @@ function Row({
   figure: ReactNode
   struck?: boolean
 }) {
-  const { today } = useClock()
   return (
     <li
       data-history={kind}
@@ -649,7 +648,7 @@ function Row({
         {children}
       </span>
       <Figure struck={struck}>{figure}</Figure>
-      <Day at={at} today={today} />
+      <Day at={at} />
     </li>
   )
 }
@@ -688,17 +687,6 @@ function Figure({
     >
       {children}
     </span>
-  )
-}
-
-function Day({ at, today }: { at: string; today: string }) {
-  return (
-    <time
-      dateTime={at}
-      className="w-18 shrink-0 text-right mono text-micro text-graphite"
-    >
-      {formatDay(at, today)}
-    </time>
   )
 }
 
@@ -748,7 +736,6 @@ function AttrBurst({
   refNames: RefNames | undefined
 }) {
   const [open, setOpen] = useState(false)
-  const { today } = useClock()
   const bySlug = new Map(registry.map((d) => [d.slug, d]))
   const nameOf = (slug: string) => bySlug.get(slug)?.name ?? slug
   const stage = item.changes.find((c) => c.slug === 'stage')
@@ -796,7 +783,7 @@ function AttrBurst({
           {sentence}
         </span>
         {open ? null : <Figure>{figure}</Figure>}
-        <Day at={item.at} today={today} />
+        <Day at={item.at} />
       </button>
       {open ? (
         <dl className="flex flex-col">

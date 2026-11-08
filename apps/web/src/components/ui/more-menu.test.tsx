@@ -130,6 +130,23 @@ describe('MoreMenu', () => {
     expect(run).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps a rare lone verb in the ··· with forceMenu', async () => {
+    const run = vi.fn()
+    mount(
+      <MoreMenu
+        variant="head"
+        label="Deals"
+        forceMenu
+        items={[{ label: 'Import…', onSelect: run, opens: true }]}
+      />,
+    )
+    const trigger = document.querySelector('[aria-label="More for Deals"]')
+    expect(trigger?.textContent).toBe('···')
+    expect([...document.querySelectorAll('button')]).toHaveLength(1)
+    await open('Deals')
+    expect(rows()).toEqual(['Import…'])
+  })
+
   it('renders a row’s one item at 24px, revealed with its row', () => {
     const out = html(
       <MoreMenu

@@ -54,7 +54,7 @@ describe('ValueEditor — currency at rest', () => {
     expect(inputValue(ticketEur, 125000, 'cell').value).toBe('€125,000')
   })
 
-  it('leaves an empty value empty, for the em-dash placeholder', () => {
+  it('leaves an empty value empty, under the empty dash', () => {
     expect(inputValue(dealValue, null, 'cell').value).toBe('')
   })
 
@@ -188,5 +188,57 @@ describe('ValueEditor — multi-select chips', () => {
 
   it('keeps a table cell to its line', () => {
     expect(trigger('cell')).toContain('h-full')
+  })
+})
+
+describe('ValueEditor — an empty cell', () => {
+  const def = (type: string): RegistryEntry => ({
+    slug: type,
+    name: type,
+    type,
+    isSystem: false,
+    options: type === 'currency' ? { code: 'USD' } : {},
+  })
+  const cell = (type: string) =>
+    renderToStaticMarkup(
+      <ValueEditor
+        def={def(type)}
+        value={null}
+        variant="cell"
+        onSave={() => {}}
+      />,
+    )
+  /** The one dash an empty cell prints. */
+  const dashOf = (html: string) => {
+    const m = /<span data-empty-dash[^>]*>—<\/span>/.exec(html)
+    if (m === null) throw new Error(`no empty dash in ${html}`)
+    return m[0]
+  }
+
+  it('prints the same sans graphite dash whatever the face of the cell', () => {
+    const dashes = [
+      'date',
+      'number',
+      'currency',
+      'rating',
+      'text',
+      'select',
+    ].map((type) => dashOf(cell(type)))
+    expect(new Set(dashes).size).toBe(1)
+    expect(dashes[0]).toContain('font-sans')
+    expect(dashes[0]).toContain('text-graphite')
+    expect(dashes[0]).not.toContain('mono')
+  })
+
+  it('prints no placeholder, which would take the mono face of a figure', () => {
+    for (const type of ['number', 'currency', 'text'])
+      expect(cell(type)).not.toContain('placeholder')
+  })
+
+  it('right-aligns a date in a cell, under its head', () => {
+    const html = cell('date')
+    const button = /<button[^>]*class="([^"]*)"/.exec(html)?.[1] ?? ''
+    expect(button.split(' ')).toContain('numeric')
+    expect(button.split(' ')).not.toContain('text-left')
   })
 })

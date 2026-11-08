@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { CalendarDays, Mail, Paperclip, Phone } from 'lucide-react'
-import { formatDay } from '@spaces/core/format'
-import { useClock } from '#/components/clock'
+import { Day } from '#/components/ledger-section'
 import type { RecordTab } from '#/lib/records/record-tabs'
 import { threadPeople } from '#/lib/timeline/threads'
 import type { ThreadPerson } from '#/lib/timeline/threads'
@@ -112,7 +111,6 @@ export function ThreadRow({
   /** The row's `···`, after the day; shown on hover. */
   menu?: ReactNode
 }) {
-  const { today } = useClock()
   const Glyph = KIND_GLYPHS[item.kind] ?? Mail
   const people = threadPeople(item)
   return (
@@ -167,12 +165,7 @@ export function ThreadRow({
             </>
           ) : null}
         </span>
-        <time
-          dateTime={item.at}
-          className="w-18 shrink-0 text-right mono text-micro text-graphite"
-        >
-          {formatDay(item.at, today)}
-        </time>
+        <Day at={item.at} />
         {menu === null ? null : (
           <span className="flex w-6 shrink-0 justify-end">{menu}</span>
         )}

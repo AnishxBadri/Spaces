@@ -14,15 +14,19 @@ export type ListVerb = {
 export function ListMenu({
   label,
   verbs,
+  forceMenu = false,
 }: {
   /** What the list is called — "Companies". */
   label: string
   verbs: ReadonlyArray<ListVerb>
+  /** Keep a lone verb in the `···` rather than draw it as a button. */
+  forceMenu?: boolean | undefined
 }) {
   return (
     <MoreMenu
       variant="head"
       label={label}
+      forceMenu={forceMenu}
       items={verbs.map((v) => ({
         label: v.label,
         onSelect: v.onSelect,

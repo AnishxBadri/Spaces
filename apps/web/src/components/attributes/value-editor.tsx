@@ -59,6 +59,25 @@ const pickerChrome = (variant: Variant) =>
     'h-auto min-h-8 w-full py-1 data-[state=open]:border-rule',
   )
 
+/**
+ * An empty value: one em dash in sans graphite whatever face the value would
+ * print in, because in mono an em dash reads as a hyphen.
+ */
+function EmptyDash() {
+  return (
+    <span data-empty-dash className="font-sans text-ui text-graphite">
+      —
+    </span>
+  )
+}
+
+/** The dash sits on the input's text inset: its padding plus the 1px border the overlay has not. */
+const DASH_INSET: Record<Variant, string> = {
+  cell: 'px-1',
+  field: 'px-2.25',
+  form: 'px-2.75',
+}
+
 export type RegistryEntry = {
   id?: string
   slug: string
@@ -180,7 +199,7 @@ export function ValueEditor({ def, value, onSave, variant, refNames }: Props) {
           title="Move stage from the record (M)"
         >
           {value == null || value === '' ? (
-            <span className="text-ui text-graphite">—</span>
+            <EmptyDash />
           ) : (
             <OptionChip def={def} id={value} />
           )}
@@ -274,9 +293,13 @@ export function ValueEditor({ def, value, onSave, variant, refNames }: Props) {
               </button>
             ))}
           </span>
-          <span className="mono text-micro text-graphite">
-            {current > 0 ? `${current}/${max}` : '—'}
-          </span>
+          {current > 0 ? (
+            <span className="mono text-micro text-graphite">
+              {current}/{max}
+            </span>
+          ) : (
+            <EmptyDash />
+          )}
         </div>
       )
     }
@@ -364,15 +387,15 @@ function DateCellEditor({ def, value, onSave, variant }: Props) {
       aria-label={def.name}
       onClick={() => setEditing(true)}
       className={cn(
-        'w-full text-left text-ui',
+        'w-full text-ui',
+        // A cell's day right-aligns under its head, as `numeric` does; a
+        // button would centre it in a property row.
         variant === 'cell'
-          ? 'focus-ring-inset h-full rounded-md px-1'
-          : boxChrome(variant),
-        variant === 'cell' ? 'numeric' : 'tabular',
-        !stored && 'text-graphite',
+          ? 'focus-ring-inset h-full rounded-md px-1 numeric'
+          : cn(boxChrome(variant), 'tabular text-left'),
       )}
     >
-      {stored ? formatDay(stored.slice(0, 10), today) || stored : '—'}
+      {stored ? formatDay(stored.slice(0, 10), today) || stored : <EmptyDash />}
     </button>
   )
 }
@@ -440,6 +463,10 @@ function TextLikeEditor({ def, value, onSave, variant }: Props) {
     active: phone && focused,
     onPick: setDraft,
   })
+  const figures = def.type === 'number' || def.type === 'currency'
+  // Not a placeholder: that would take the input's face, mono for a figure.
+  // A native date control draws its own empty skeleton.
+  const dash = draft === '' && !focused && inputType !== 'date'
 
   const field = (
     <input
@@ -448,7 +475,6 @@ function TextLikeEditor({ def, value, onSave, variant }: Props) {
       {...(phone ? codes.inputProps : {})}
       value={formatted ? atRest(draft) : draft}
       aria-label={def.name}
-      placeholder="—"
       onFocus={() => setFocused(true)}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
@@ -469,8 +495,7 @@ function TextLikeEditor({ def, value, onSave, variant }: Props) {
         'w-full min-w-0 bg-transparent text-ui',
         // A column of figures right-aligns; a property row's value lane is
         // left-aligned like every other value.
-        (def.type === 'number' || def.type === 'currency') &&
-          (variant === 'cell' ? 'numeric' : 'tabular'),
+        figures && (variant === 'cell' ? 'numeric' : 'tabular'),
         variant !== 'cell'
           ? // ↵ commits, esc reverts; the reticle on focus.
             cn(boxChrome(variant), 'focus:border-rule')
@@ -480,19 +505,42 @@ function TextLikeEditor({ def, value, onSave, variant }: Props) {
       )}
     />
   )
-  if (!phone) return field
   return (
-    <Popover open={codes.open}>
-      <PopoverAnchor asChild>{field}</PopoverAnchor>
-      <PopoverContent
-        align="start"
-        className="w-64 p-0"
-        onOpenAutoFocus={(e) => e.preventDefault()}
-        onCloseAutoFocus={(e) => e.preventDefault()}
-      >
-        {codes.list}
-      </PopoverContent>
-    </Popover>
+    <span
+      className={cn(
+        'relative flex w-full min-w-0',
+        variant === 'cell' && 'h-full',
+      )}
+    >
+      {phone ? (
+        <Popover open={codes.open}>
+          <PopoverAnchor asChild>{field}</PopoverAnchor>
+          <PopoverContent
+            align="start"
+            className="w-64 p-0"
+            onOpenAutoFocus={(e) => e.preventDefault()}
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
+            {codes.list}
+          </PopoverContent>
+        </Popover>
+      ) : (
+        field
+      )}
+      {dash ? (
+        <span
+          aria-hidden
+          className={cn(
+            'pointer-events-none absolute inset-0 flex items-center',
+            DASH_INSET[variant],
+            // Under a figures head, where the figure would print.
+            figures && variant === 'cell' && 'justify-end',
+          )}
+        >
+          <EmptyDash />
+        </span>
+      ) : null}
+    </span>
   )
 }
 
@@ -559,7 +607,7 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
           )}
         >
           {selected.length === 0 ? (
-            <span className="text-ui text-graphite">—</span>
+            <EmptyDash />
           ) : (
             selected.map((id) => (
               <span
@@ -676,7 +724,7 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
           )}
         >
           {selected.length === 0 ? (
-            <span className="text-ui text-graphite">—</span>
+            <EmptyDash />
           ) : (
             chips.map((v) => (
               <span key={v} className="flex min-w-0 items-center gap-1">
@@ -798,7 +846,7 @@ function ActorPicker({ def, value, onSave, variant, refNames }: Props) {
               <span className="truncate">{refName(refNames, selected)}</span>
             </>
           ) : (
-            <span className="text-graphite">—</span>
+            <EmptyDash />
           )}
         </span>
         <ChevronDown className="size-3 shrink-0 text-graphite opacity-0 transition-opacity group-hover/pick:opacity-100 group-focus-visible/pick:opacity-100 group-data-[state=open]/pick:opacity-100" />
@@ -862,7 +910,7 @@ function OptionPicker({
           )}
         >
           {selected.length === 0 ? (
-            <span className="text-ui text-graphite">—</span>
+            <EmptyDash />
           ) : (
             selected.map((id) => <OptionChip key={id} def={def} id={id} />)
           )}

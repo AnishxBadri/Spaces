@@ -40,10 +40,45 @@ export type OwnershipPoint = {
   pct: number
 }
 
+/**
+ * Why no percentage could be had:
+ * - `shares_unknown`: every check is priced and none carries its share count.
+ * - `shares_outstanding_unknown`: every check is priced, but no round on or
+ *   after one carries a fully-diluted count.
+ * - `unconverted`: every check is a pre-money SAFE, a CCD or an uncapped
+ *   post-money SAFE — none has a percentage until it converts.
+ * - `mixed`: the checks are of kinds whose percentages do not add up.
+ * - `no_checks`: nothing stands at the as-of day.
+ */
+export type CostBasisReason =
+  | 'shares_unknown'
+  | 'shares_outstanding_unknown'
+  | 'unconverted'
+  | 'mixed'
+  | 'no_checks'
+
 export type Ownership =
   | { kind: 'actual'; history: Array<OwnershipPoint>; currentPct: number }
   | { kind: 'implied'; pct: number }
-  | { kind: 'cost_basis_only' }
+  | { kind: 'cost_basis_only'; reason: CostBasisReason }
+
+/** A check that gives no percentage on its own until it converts. */
+const unconverted = (i: OwnershipInvestment): boolean =>
+  i.instrument === 'safe_pre_money' ||
+  i.instrument === 'ccd' ||
+  (i.instrument === 'safe_post_money' && !(i.cap != null && i.cap > 0))
+
+function costBasisReason(
+  inWindow: Array<OwnershipInvestment>,
+): CostBasisReason {
+  if (inWindow.length === 0) return 'no_checks'
+  if (inWindow.every(unconverted)) return 'unconverted'
+  if (inWindow.every((i) => i.instrument === 'priced'))
+    return inWindow.some((i) => i.shares != null && i.shares > 0)
+      ? 'shares_outstanding_unknown'
+      : 'shares_unknown'
+  return 'mixed'
+}
 
 /**
  * Ledger rule: at each round carrying a fully-diluted count, our % is the
@@ -107,5 +142,5 @@ export function ownership(
     return { kind: 'implied', pct }
   }
 
-  return { kind: 'cost_basis_only' }
+  return { kind: 'cost_basis_only', reason: costBasisReason(inWindow) }
 }

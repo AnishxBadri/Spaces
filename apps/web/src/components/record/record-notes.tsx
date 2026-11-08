@@ -1,8 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { CalendarDays } from 'lucide-react'
-import { formatDay } from '@spaces/core/format'
-import { useClock } from '#/components/clock'
-import { Band, EmptyRow } from '#/components/ledger-section'
+import { Band, Day, EmptyRow } from '#/components/ledger-section'
 import { recordNoteGroups } from '#/lib/notes/record-groups'
 import type { NoteLanes } from '#/lib/notes/record-groups'
 import type { NoteVia } from '#/lib/notes/via-mark'
@@ -107,7 +105,6 @@ function NoteRow({
   note: RecordNoteRow
   meeting?: boolean
 }) {
-  const { today } = useClock()
   const superseded = n.supersededBy !== null
   return (
     <li data-note={n.id} className="border-b border-rule">
@@ -150,12 +147,7 @@ function NoteRow({
           >
             {noteKindLane(n)}
           </span>
-          <time
-            dateTime={n.updatedAt}
-            className="w-18 shrink-0 text-right mono text-micro text-graphite"
-          >
-            {formatDay(n.updatedAt, today)}
-          </time>
+          <Day at={n.updatedAt} />
         </span>
         {superseded || n.excerpt === null ? null : (
           <span
