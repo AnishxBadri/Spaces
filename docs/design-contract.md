@@ -42,11 +42,44 @@ bad; a zero reads graphite.
 inputs, `rounded-none` everywhere else — no 4, 6, 8 or 12, no pills, no circles.
 Shadows are named by kind and chosen by the primitive: a popover `shadow-dither` (4px,
 Bayer 8/16), a window over the scrim `shadow-solid` (3px ink); a call site passes none
-and gate 5 refuses `shadow-[…]`. Nothing blurs. Spacing is 4 8 12 16 24 32 and
-the page gutter is 32 (`px-8`). Heights: table row 36 (`h-row`), ledger row 40 (`h-ledger-row`),
+and gate 5 refuses `shadow-[…]`. Nothing blurs. Spacing is 4 8 12 16 24 32; the
+page edge is 12 and the body gutter 4 (The edges, below; `px-8` is the shipped gutter the
+Edges work retires). Heights: table row 36 (`h-row`), ledger row 40 (`h-ledger-row`),
 section head 44, tab bar 44, control 32, `Band` 28, `Segmented` 28, small 26, a row's `···`
 24, badge 20, nav row 30, dialog head 48, dialog foot 52. The readout strip (56–64) stays
 for Today and the holding's figures only; a record's readouts live in its Overview tab.
+
+### The edges (2026-11-07, drawn on the Paper Record page boards 16–27)
+
+How a page meets its frame. Decided by the owner on the canvas; the code lands it in
+the Edges and icons work (§5).
+
+- **E1 · The content edge is 12px.** The page title sits on it, and so does every
+  card's content: the body gutter is 4px, a card is a 1px rule box with 4px between
+  cards and a 7px inset, so 4 + 1 + 7 lands card content on the 12px line.
+- **E2 · One rule under the head.** A single 1px rule, never the double, and the head
+  stays 104px on every page; it folds to the 48px bar on scroll with its tabs and
+  toolbar pinned. The `···` is the rightmost head control and its right edge lines up
+  with the last control in the content below.
+- **E3 · Windows take one 16px inset all round.**
+- **E4 · Settings and form pages cap at 800px**, left-aligned on the 12px edge, the head
+  `···` moving with the cap; lists and tables stay full width. A settings row opens
+  Edit as a whole, and its actions are always visible, never hover-only.
+- **E5 · Folder tabs on white.** No bone band: the open tab has an ink outline on top,
+  left and right and runs straight into the content; a closed tab is plain text. The
+  list toolbar is tabs · a divider · Filter and Sort as icon buttons, each outlined only
+  while in use and then reading its state (`Filter 2`, `Last contact ↓`); search alone
+  on the right with its `/` hint; Columns is an icon at the end of the column-head row.
+  Save view appears only with something to save: `Save as view…` on a filtered All,
+  `Update view` + `Reset` on a changed view; `Save as new view…` lives in the view's
+  `···`. Tables are boxed, with column lines and white column heads.
+- **E6 · Every create is `+ New x`, in pine.** The split `[+ New x | ▾]` only where
+  creating is instant and templates exist (Notes, Spaces). Files' create is `Upload`;
+  Portfolio's primary is `Record a check`. A window's confirm carries no icon.
+- **E7 · One icon per verb, Lucide first**, from one shared icon list; a custom SVG only
+  for our own concepts (the note kinds), drawn on Lucide's grid. Brand marks only
+  through `ProviderMark`: monochrome official logos, Simple Icons where available.
+- **E8 · A date band carries no count.**
 
 ### The named type steps (`DESIGN.md` §3)
 
@@ -284,11 +317,10 @@ company head went from sixteen things to seven by this rule.
   email); everything else is `More fields ›`, inferred (company from email, deal name
   from company and stage, date today) or filled later by enrichment. Focus lands in the
   first field.
-- **A10 · One tab bar shape, and it hides when there is one view.** Bone-bar tabs in
-  sentence case, a count on every tab that holds something and none at 0; Filter ·
-  Sort · Columns and search to the right; a nested switch is a bounded `Segmented`; a
-  second axis is a chip in the bar, never a second row; the bar is absent when there is
-  a single view.
+- **A10 · One tab bar shape, and it hides when there is one view.** Folder tabs on
+  white (E5) in sentence case, a count on every tab that holds something and none at 0;
+  the toolbar E5 describes; a nested switch is a bounded `Segmented`; a second axis is a
+  chip in the bar, never a second row; the bar is absent when there is a single view.
 
 Three more rules govern what a section or a list prints rather than how it is acted on.
 
@@ -687,6 +719,14 @@ anatomy in §3. The surfaces:
 - **Settings** (D81 amended): the nav group heads are ruled bands; Integrations is
   Connections · Plugins · Enrichment · Email forwarding; a settings head carries one
   outline 32px action at most beside its `···`.
+
+**Edges and icons** (project 31, `edges-1`; E1–E8, A10 amended 2026-11-07). Boards
+16–27 on the Paper Record page: Notes, Companies, a record with its window and menu,
+Today, Meetings, Tasks, the Deals board, Files, Spaces, Portfolio, Settings. Mandate,
+Review and Import follow by rule with no board. Board 18, a details column with prose
+attributes shown as paragraphs and a 104px label lane, is **not** agreed and waits on
+the owner. Until the slice lands, the shipped `px-8` gutter, bone tab bar and double
+rule under a head stand.
 
 **The printed details** (`DESIGN.md` §1, §5 "Printed details"; project 27, `print-*`). The double rule, the
 stamp and real tabs are built (§2) as the `double-rule`, `stamp`, `stamp-outline` and

@@ -43,8 +43,9 @@ Plus the UI sweep (the printed sheets landing) and Corrections.
 
 ## Next, in order
 
-1. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided; starts after project 30.
-2. **Docs consolidation** — `DESIGN.md` and `docs/design-contract.md` merge into one design doc, checked against the Paper library; `CONTEXT.md` rewritten to current state only.
+1. **Project 31, Edges and the AI shape** (P-SPA-35): `edges-1` SPA-387 ∥ `ai-a` SPA-388, then `ai-b` SPA-389 (migration, hitl). Bodies in `docs/backlog.md` § 31; rules in `docs/design-contract.md` § 1 "The edges". Then Notes, then the Ask set.
+2. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided; starts after project 30.
+3. **Docs consolidation** — `DESIGN.md` and `docs/design-contract.md` merge into one design doc, checked against the Paper library; `CONTEXT.md` rewritten to current state only.
 
 ## Owner calls
 
