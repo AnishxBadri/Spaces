@@ -243,6 +243,14 @@ describe('the email window', () => {
     expect(dialog()?.textContent).not.toContain('acme-q3.pdf')
   })
 
+  it('prints nothing for a message with no body', async () => {
+    fns.getEmail.mockResolvedValue({ ...HTML, body: { kind: 'none' } })
+    await open()
+    expect(dialog()?.textContent).toContain('Acme Robotics — Q3 update')
+    expect(dialog()?.textContent).not.toContain('No body')
+    expect(dialog()?.querySelector('iframe')).toBeNull()
+  })
+
   it('has one close, in the foot, which drops the modal params', async () => {
     await open()
     expect(buttons('Cancel')).toHaveLength(1)

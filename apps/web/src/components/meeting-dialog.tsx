@@ -10,6 +10,7 @@ import { DetailsPickRow } from '#/components/record/details-add'
 import type { PickHit } from '#/components/record/details-add'
 import { Twinkle } from '#/components/twinkle'
 import { Button } from '#/components/ui/button'
+import { MoreMenu } from '#/components/ui/more-menu'
 import {
   Dialog,
   DialogContent,
@@ -561,42 +562,60 @@ function MeetingWindow({
             Join call ›
           </a>
         ) : null}
+        {meeting.participants.length > 0 ? null : (
+          // With no Participants group to carry it, Google rides the head.
+          <MoreMenu
+            variant="head"
+            label={meeting.title ?? 'Meeting'}
+            forceMenu
+            className={cn('-my-1 self-center', !joinable && 'ml-auto')}
+            items={[
+              {
+                label: 'Open in Google',
+                href: googleDayUrl(meeting.startsAt),
+                title: 'Opens the day in Google Calendar',
+              },
+            ]}
+          />
+        )}
       </DialogHeader>
 
       <div className="-mx-5 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-5">
-        <Group
-          label="Participants"
-          action={
-            <a
-              href={googleDayUrl(meeting.startsAt)}
-              target="_blank"
-              rel="noreferrer"
-              title="Answers change in Google Calendar"
-              className="focus-ring shrink-0 text-label text-foreground hover:underline"
-            >
-              Open in Google ›
-            </a>
-          }
-        >
-          {meeting.participants.map((p) => (
-            <LedgerRow key={p.email}>
-              <span className="min-w-0 flex-1 truncate text-body">
-                {participantName(p)}
-              </span>
-              {p.name === null ? null : (
-                <span className="min-w-0 truncate mono text-micro text-graphite">
-                  {p.email}
-                </span>
-              )}
-              <span
-                data-rsvp={p.rsvp}
-                className="w-24 shrink-0 text-right mono text-micro text-graphite"
+        {meeting.participants.length === 0 ? null : (
+          <Group
+            label="Participants"
+            action={
+              <a
+                href={googleDayUrl(meeting.startsAt)}
+                target="_blank"
+                rel="noreferrer"
+                title="Answers change in Google Calendar"
+                className="focus-ring shrink-0 text-label text-foreground hover:underline"
               >
-                {RSVP_MARK[p.rsvp]} {RSVP_LABEL[p.rsvp]}
-              </span>
-            </LedgerRow>
-          ))}
-        </Group>
+                Open in Google ›
+              </a>
+            }
+          >
+            {meeting.participants.map((p) => (
+              <LedgerRow key={p.email}>
+                <span className="min-w-0 flex-1 truncate text-body">
+                  {participantName(p)}
+                </span>
+                {p.name === null ? null : (
+                  <span className="min-w-0 truncate mono text-micro text-graphite">
+                    {p.email}
+                  </span>
+                )}
+                <span
+                  data-rsvp={p.rsvp}
+                  className="w-24 shrink-0 text-right mono text-micro text-graphite"
+                >
+                  {RSVP_MARK[p.rsvp]} {RSVP_LABEL[p.rsvp]}
+                </span>
+              </LedgerRow>
+            ))}
+          </Group>
+        )}
 
         <Group label="Linked records">
           {meeting.records.map((r) => {

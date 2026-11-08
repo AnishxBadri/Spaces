@@ -2,6 +2,8 @@ import { useRouter } from '@tanstack/react-router'
 import { Phone, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { formatDay, formatTime } from '@spaces/core/format'
+import { useClock } from '#/components/clock'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import {
@@ -149,7 +151,8 @@ export function LogInteractionDialog({
             onChange={setKind}
           />
 
-          <div className="grid grid-cols-[minmax(0,1fr)_11rem] gap-4">
+          {/* The When lane grows to the native control, whatever its locale. */}
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(13rem,max-content)] gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="int-subject">About</Label>
               <Input
@@ -162,13 +165,7 @@ export function LogInteractionDialog({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="int-when">When</Label>
-              <Input
-                id="int-when"
-                type="datetime-local"
-                className="mono"
-                value={occurredAt}
-                onChange={(e) => setOccurredAt(e.target.value)}
-              />
+              <WhenField value={occurredAt} onChange={setOccurredAt} />
             </div>
           </div>
 
@@ -204,6 +201,66 @@ export function LogInteractionDialog({
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** `13 Oct, 10:42` — a `datetime-local` value as the app prints a moment. */
+function whenText(value: string, today: string): string {
+  // A cleared control reads as the empty dash, as a cell does.
+  if (value === '') return '—'
+  const day = formatDay(value, today)
+  return day === '' ? value : `${day}, ${formatTime(value)}`
+}
+
+/**
+ * When, printed the app's way until clicked, then the native control with
+ * its picker open. At rest the native control prints the browser's locale
+ * (`10/13/2026, 10:42 AM`), which no other date in the app does.
+ */
+function WhenField({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const input = useRef<HTMLInputElement>(null)
+  const { today } = useClock()
+
+  useEffect(() => {
+    if (!editing) return
+    // The click that opened the field is the activation `showPicker` needs.
+    try {
+      input.current?.showPicker()
+    } catch {
+      // No picker to show (an older engine, or no activation): typing works.
+    }
+  }, [editing])
+
+  return editing ? (
+    <Input
+      ref={input}
+      id="int-when"
+      type="datetime-local"
+      autoFocus
+      className="tabular"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={() => setEditing(false)}
+    />
+  ) : (
+    <button
+      type="button"
+      id="int-when"
+      onClick={() => setEditing(true)}
+      className={cn(
+        'tabular focus-ring flex h-8 w-full items-center rounded-md border border-rule bg-paper px-2.5 text-left text-ui transition-colors duration-150 ease-out-quart',
+        value === '' && 'text-graphite',
+      )}
+    >
+      {whenText(value, today)}
+    </button>
   )
 }
 

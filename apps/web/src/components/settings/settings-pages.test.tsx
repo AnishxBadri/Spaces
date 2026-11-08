@@ -2063,6 +2063,64 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
     expect(bar()?.textContent).toContain('1 change')
   })
 
+  async function openSetUp() {
+    await mount('/settings/connections/google')
+    await click(
+      Array.from(document.querySelectorAll('[role="tab"]')).find(
+        (t) => t.textContent === 'Set up',
+      ),
+    )
+  }
+
+  it('Set up with nothing saved preselects neither audience nor consent screen', async () => {
+    const original = loaders['connections/$provider']
+    loaders['connections/$provider'] = () => ({
+      view: { ...providerView, choices: { audience: null, consent: null } },
+    })
+    try {
+      await openSetUp()
+      for (const label of ['Your accounts are on', 'Consent screen']) {
+        const radios = document.querySelectorAll(
+          `[role="radiogroup"][aria-label="${label}"] [role="radio"]`,
+        )
+        expect(radios).toHaveLength(2)
+        for (const r of radios)
+          expect(r.getAttribute('aria-checked')).toBe('false')
+      }
+      const body = document.body.textContent
+      expect(body).not.toContain('Members connect once and stay connected.')
+      expect(body).not.toContain('Only accounts on your Workspace domain')
+      expect(body).not.toContain('Email only?')
+    } finally {
+      loaders['connections/$provider'] = original
+    }
+  })
+
+  it('Test drops its hint once it works, even with no use on', async () => {
+    const original = loaders['connections/$provider']
+    const off = providerView.uses.map((u) => ({ ...u, enabled: false }))
+    loaders['connections/$provider'] = () => ({
+      view: { ...providerView, uses: off },
+    })
+    try {
+      await openSetUp()
+      const body = document.body.textContent
+      expect(body).toContain('Works · anish@fund.example')
+      expect(body).not.toContain('Once a use is on in In use')
+    } finally {
+      loaders['connections/$provider'] = original
+    }
+    loaders['connections/$provider'] = () => ({
+      view: { ...providerView, uses: off, mine: null },
+    })
+    try {
+      await openSetUp()
+      expect(document.body.textContent).toContain('Once a use is on in In use')
+    } finally {
+      loaders['connections/$provider'] = original
+    }
+  })
+
   it('a member reads a provider with the tabs live and every control disabled', async () => {
     await mount('/settings/connections/google', false)
     expect(document.querySelector('[data-read-only]')?.textContent).toBe(
@@ -2325,6 +2383,44 @@ describe('Objects, by sheet 06', () => {
       expect(
         document.querySelector('[aria-label="Funds AI answers"]')?.textContent,
       ).toContain('Model')
+    } finally {
+      loaders['objects/$objectSlug'] = original
+    }
+  })
+
+  it('AI answers with none set is its head alone: 0 set, and no sentence under it', async () => {
+    const original = loaders['objects/$objectSlug']
+    loaders['objects/$objectSlug'] = () => ({
+      ...original(),
+      registry: [
+        {
+          id: '00000000-0000-4000-8000-0000000000e1',
+          slug: 'thesis',
+          name: 'Thesis',
+          description: null,
+          type: 'text',
+          options: {},
+          isSystem: false,
+          archived: false,
+          sortOrder: 0,
+          filterable: false,
+          sortable: false,
+          pair: null,
+        },
+      ],
+    })
+    try {
+      await mount('/settings/objects/funds')
+      const head = Array.from(
+        document.querySelectorAll('[data-settings-group]'),
+      ).find((g) => g.textContent.startsWith('AI answers'))
+      expect(head?.textContent).toContain('0 set')
+      expect(document.body.textContent).not.toContain(
+        'No attribute answers with AI',
+      )
+      expect(
+        document.querySelector('[aria-label="Funds AI answers"]'),
+      ).toBeNull()
     } finally {
       loaders['objects/$objectSlug'] = original
     }

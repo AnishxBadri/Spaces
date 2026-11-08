@@ -207,3 +207,66 @@ describe('the palette window', () => {
     await new Promise((resolve) => setTimeout(resolve, 10))
   })
 })
+
+describe('Move stage handed over from the palette', () => {
+  it('opens the record page’s window, which asks the reason for Passed and writes it as close_reason', async () => {
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root: Root = createRoot(host)
+    const { MoveStageWindow } = palette
+    const wrote: Array<Record<string, unknown>> = []
+    let closed = 0
+    act(() =>
+      root.render(
+        <MoveStageWindow
+          handoff={{
+            deal: { id: 'd1', name: 'Halcyon Grid — Seed' },
+            stages: {
+              current: 'diligence',
+              options: [
+                { id: 'diligence', label: 'Diligence' },
+                { id: 'passed', label: 'Passed' },
+                { id: 'lost', label: 'Lost' },
+              ],
+            },
+            daysInStage: 12,
+            picked: 'passed',
+          }}
+          onClose={() => (closed += 1)}
+          onMoved={() => {}}
+          write={async (patch) => {
+            wrote.push(patch)
+          }}
+        />,
+      ),
+    )
+    expect(content().textContent).toContain('Move stage')
+    expect(content().textContent).toContain('current · 12d')
+    // Passed is picked already — the palette chose it — so only the reason is asked.
+    const reason = content().querySelector('textarea')
+    if (reason === null) throw new Error('no reason field')
+    const setter = Object.getOwnPropertyDescriptor(
+      win.HTMLTextAreaElement.prototype,
+      'value',
+    )?.set
+    act(() => {
+      setter?.call(reason, 'Too early for our check size')
+      reason.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const move = [...content().querySelectorAll('button')].find(
+      (b) => b.textContent === 'Move to Passed',
+    )
+    act(() => {
+      move?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await wait(0)
+    expect(wrote).toEqual([
+      { stage: 'passed', close_reason: 'Too early for our check size' },
+    ])
+    expect(closed).toBe(1)
+
+    act(() => root.unmount())
+    host.remove()
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  })
+})

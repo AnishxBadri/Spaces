@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { formatDay } from '@spaces/core/format'
 import { NAV_ITEMS } from './app-sidebar'
 import { useClock } from './clock'
+import { ASKS_REASON, MoveStageDialog } from './deal-board'
 import { DocumentPreview } from './document-preview'
 import { KIND_ICONS, PreviewPane } from './palette-preview'
 import type {
@@ -283,6 +284,35 @@ export function HitLine({ hit, today }: { hit: Hit; today: string }) {
   )
 }
 
+/**
+ * A passage row's content: the kind glyph, the snippet in quotes with its
+ * match set off, and the lane. With no snippet the row is the bare name —
+ * a file name is not a quotation.
+ */
+export function PassageLine({
+  passage,
+  today,
+}: {
+  passage: Passage
+  today: string
+}) {
+  return (
+    <>
+      <Glyph icon={KIND_ICONS[passage.kind] ?? Table2} />
+      <span data-name className="min-w-0 flex-1 truncate font-serif">
+        {passage.snippet ? (
+          <>
+            “<Highlighted text={passage.snippet} />”
+          </>
+        ) : (
+          passage.name
+        )}
+      </span>
+      <Lanes meta={passageMeta(passage, today)} />
+    </>
+  )
+}
+
 /** One Jump to destination: an object, a saved view, a page or settings. */
 export type JumpTarget = {
   readonly id: string
@@ -423,11 +453,13 @@ async function loadPreview(
 /**
  * A deal's Move stage, asked in the palette: its live stages, the current
  * one checked. A pick writes the stage through `updateRecord` and checks it
- * in place of the old one.
+ * in place of the old one. Passed and Lost write nothing here: they call
+ * `askReason` with the stage, which hands the move to the Move stage window.
  */
 export function moveStageStep(
   deal: { id: string; name: string },
   stages: PreviewStages,
+  askReason: (stageId: string) => void,
   write: (stageId: string) => Promise<unknown> = (stage) =>
     updateRecord({ data: { id: deal.id, patch: { stage } } }),
 ): ActionStep {
@@ -444,6 +476,11 @@ export function moveStageStep(
           : { id: o.id, label: o.label },
       ),
     pick: async (choice) => {
+      if (ASKS_REASON.has(choice.id)) {
+        askReason(choice.id)
+        // A rejection tells the palette nothing was written.
+        throw new Error(`${choice.label} asks for a reason`)
+      }
       try {
         await write(choice.id)
       } catch (err) {
@@ -454,6 +491,59 @@ export function moveStageStep(
       return { ...choice, meta: 'Current', done: true }
     },
   }
+}
+
+/** A move handed from the palette to the Move stage window. */
+export type StageHandoff = {
+  readonly deal: { readonly id: string; readonly name: string }
+  readonly stages: PreviewStages
+  readonly daysInStage: number | null
+  /** The stage chosen in the palette; the window opens on it. */
+  readonly picked: string
+}
+
+/**
+ * The record page's Move stage window, for a move the palette handed over:
+ * Passed and Lost ask the reason, which lands on the deal as close_reason.
+ */
+export function MoveStageWindow({
+  handoff,
+  onClose,
+  onMoved,
+  write = (patch) => updateRecord({ data: { id: handoff.deal.id, patch } }),
+}: {
+  handoff: StageHandoff
+  onClose: () => void
+  /** The stage was written; the page under the window refreshes. */
+  onMoved: () => void
+  write?: (patch: Record<string, unknown>) => Promise<unknown>
+}) {
+  const { deal, stages } = handoff
+  return (
+    <MoveStageDialog
+      dealName={deal.name}
+      stages={stages.options}
+      currentId={stages.current}
+      daysInStage={handoff.daysInStage}
+      initialId={handoff.picked}
+      onCancel={onClose}
+      onMove={(stageId, reason) => {
+        onClose()
+        const label =
+          stages.options.find((o) => o.id === stageId)?.label ?? stageId
+        write({ stage: stageId, ...(reason ? { close_reason: reason } : {}) })
+          .then(() => {
+            toast(`Moved ${deal.name} to ${label}`)
+            onMoved()
+          })
+          .catch((err: unknown) => {
+            toast.error(
+              err instanceof Error ? err.message : 'Could not move it',
+            )
+          })
+      }}
+    />
+  )
 }
 
 type Mode =
@@ -480,6 +570,8 @@ export type PaletteBodyProps = {
   onRun: (action: PageAction) => void
   /** A step's pick was written; the page under the palette refreshes. */
   onStepDone: () => void
+  /** Move stage to Passed or Lost: the Move stage window asks the reason. */
+  onMoveStage: (handoff: StageHandoff) => void
   /** The preview pane's reads; each runs once per row per opening. */
   loaders: PreviewLoaders
   /** Open a file in the viewer, at a page when the passage knows it. */
@@ -527,6 +619,7 @@ export function PaletteBody({
   onTask,
   onRun,
   onStepDone,
+  onMoveStage,
   loaders,
   onOpenFile,
   onAsk,
@@ -737,7 +830,17 @@ export function PaletteBody({
       const out: Array<PaneAction> = []
       if (href) out.push({ id: 'open', label: 'Open', run: () => onGo(href) })
       if (data?.stages && data.stages.options.length > 0) {
-        const step = moveStageStep(data, data.stages)
+        const handoff: Omit<StageHandoff, 'picked'> = {
+          deal: { id: data.id, name: data.name },
+          stages: data.stages,
+          daysInStage:
+            data.readouts?.kind === 'deal'
+              ? data.readouts.readouts.daysInStage
+              : null,
+        }
+        const step = moveStageStep(data, data.stages, (picked) =>
+          onMoveStage({ ...handoff, picked }),
+        )
         out.push({
           id: 'move-stage',
           label: 'Move stage…',
@@ -977,20 +1080,7 @@ export function PaletteBody({
                         }
                         className={ROW}
                       >
-                        <Glyph icon={KIND_ICONS[p.kind] ?? Table2} />
-                        <span
-                          data-name
-                          className="min-w-0 flex-1 truncate font-serif"
-                        >
-                          “
-                          {p.snippet ? (
-                            <Highlighted text={p.snippet} />
-                          ) : (
-                            p.name
-                          )}
-                          ”
-                        </span>
-                        <Lanes meta={passageMeta(p, today)} />
+                        <PassageLine passage={p} today={today} />
                       </CommandItem>
                     )
                   })}
@@ -1185,6 +1275,14 @@ export function CommandPalette({
     [],
   )
 
+  /** The Move stage window, opened once the palette has closed (as `run`). */
+  const [moving, setMoving] = useState<StageHandoff | null>(null)
+
+  function moveStage(handoff: StageHandoff) {
+    onOpenChange(false)
+    setTimeout(() => setMoving(handoff), 0)
+  }
+
   /** The file viewer, opened once the palette has closed (as `run`). */
   const [viewer, setViewer] = useState<{
     doc: NonNullable<Awaited<ReturnType<typeof getDocumentPreview>>>
@@ -1223,6 +1321,7 @@ export function CommandPalette({
           onTask={goTask}
           onRun={run}
           onStepDone={() => void router.invalidate()}
+          onMoveStage={moveStage}
           loaders={loaders}
           onOpenFile={openFile}
           onAsk={(text) => {
@@ -1231,6 +1330,13 @@ export function CommandPalette({
           }}
         />
       </CommandDialog>
+      {moving === null ? null : (
+        <MoveStageWindow
+          handoff={moving}
+          onClose={() => setMoving(null)}
+          onMoved={() => void router.invalidate()}
+        />
+      )}
       <DocumentPreview
         doc={viewer?.doc ?? null}
         {...(viewer?.page ? { page: viewer.page } : {})}

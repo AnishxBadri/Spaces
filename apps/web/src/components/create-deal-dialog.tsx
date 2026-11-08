@@ -255,7 +255,7 @@ export function CreateDealDialog({
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending || !companyId}>
               {pending ? 'Creating…' : 'Create deal'}
             </Button>
           </DialogFooter>

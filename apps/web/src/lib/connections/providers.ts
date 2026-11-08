@@ -107,7 +107,6 @@ const selectUnder = (provider: ProviderId) =>
       status: accountConnection.status,
       errorReason: accountConnection.errorReason,
       lastSyncAt: accountConnection.lastSyncAt,
-      refreshTokenExpiresAt: accountConnection.refreshTokenExpiresAt,
       createdAt: accountConnection.createdAt,
     })
     .from(accountConnection)
@@ -177,10 +176,8 @@ export const connectionsListProgram = Effect.fn('connectionsList')(
         configured: app.configured,
         membersConnected: app.membersConnected,
         members,
-        testing:
-          app.provider === 'google' &&
-          (choices.audience === 'personal' ||
-            held.some((r) => r.refreshTokenExpiresAt !== null)),
+        // The saved answer alone, so the list and Set up never disagree.
+        testing: app.provider === 'google' && choices.audience === 'personal',
         error: clientErrorOf(app.provider, held),
       })
     }

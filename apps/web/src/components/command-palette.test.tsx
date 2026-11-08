@@ -3,9 +3,11 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import type { Passage } from '#/lib/search/passages'
+import type { PreviewReadouts } from '#/lib/search/preview'
 import type { SearchHit } from '#/lib/search/query'
 import {
   HitLine,
+  PassageLine,
   hitMeta,
   hrefFor,
   mergePassages,
@@ -13,6 +15,7 @@ import {
   passageMeta,
   splitHits,
 } from './command-palette'
+import { filledReadouts } from './palette-preview'
 
 /**
  * The palette's record and passage rows. Asserted over the row's content and
@@ -222,11 +225,79 @@ describe('the palette passage row', () => {
     expect(passageMeta({ ...note, day: null }, TODAY)).toBe('IC call')
   })
 
+  it('quotes a snippet, and prints a snippet-less passage as its bare name', () => {
+    const quoted = renderToStaticMarkup(
+      <PassageLine passage={deckPassage} today={TODAY} />,
+    )
+    expect(quoted).toContain('“<span>Our direct-to-chip liquid loop')
+    expect(quoted).toContain('floor.</span>”')
+    const bare = renderToStaticMarkup(
+      <PassageLine passage={{ ...deckPassage, snippet: '' }} today={TODAY} />,
+    )
+    expect(bare).toMatch(/data-name="[^"]*"[^>]*>Coldplate Series A\.pdf</)
+    expect(bare).not.toMatch(/[“”]/)
+  })
+
   it("keeps cmdk's own filter off, so the server's order is the order shown", () => {
     const source = readFileSync(
       new URL('./command-palette.tsx', import.meta.url),
       'utf8',
     )
     expect(source).toContain('shouldFilter={false}')
+  })
+})
+
+describe('the pane readouts', () => {
+  const printed = (r: PreviewReadouts) =>
+    filledReadouts(r).map((x) => [x.label, x.value])
+
+  it('leaves a zero count out, as it does a dash', () => {
+    expect(
+      printed({
+        kind: 'company',
+        readouts: {
+          today: TODAY,
+          lastContact: '2026-10-04',
+          nextMeeting: null,
+          moving30: 0,
+          ownership: null,
+        },
+      }),
+    ).toEqual([['Last contact', '4 Oct']])
+    expect(
+      printed({
+        kind: 'custom',
+        readouts: {
+          today: TODAY,
+          lastContact: null,
+          nextMeeting: null,
+          moving30: 0,
+        },
+      }),
+    ).toEqual([])
+    const deal = {
+      today: TODAY,
+      lastContact: null,
+      daysInStage: 0,
+      medianDaysInStage: 9,
+      pastTwiceMedian: false,
+      round: null,
+    }
+    expect(printed({ kind: 'deal', readouts: deal })).toEqual([])
+    expect(
+      printed({ kind: 'deal', readouts: { ...deal, daysInStage: 3 } }),
+    ).toEqual([['Days in stage', '3 · med 9']])
+    expect(
+      printed({
+        kind: 'company',
+        readouts: {
+          today: TODAY,
+          lastContact: null,
+          nextMeeting: null,
+          moving30: 2,
+          ownership: null,
+        },
+      }),
+    ).toEqual([['Moving, 30 days', '2']])
   })
 })

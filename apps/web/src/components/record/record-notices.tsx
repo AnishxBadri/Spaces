@@ -41,7 +41,7 @@ function NoticeRow({
 }
 
 const fixClass =
-  'focus-ring shrink-0 mono text-micro text-primary hover:underline'
+  'focus-ring shrink-0 mono text-micro text-foreground hover:underline'
 
 /**
  * Under a record head's double rule, only while something needs saying: the

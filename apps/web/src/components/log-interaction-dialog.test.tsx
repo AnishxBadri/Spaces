@@ -2,6 +2,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { dayKey, formatDay } from '@spaces/core/format'
 import { LogInteractionDialog } from './log-interaction-dialog'
 
 /**
@@ -102,6 +103,40 @@ async function openDialog() {
 }
 
 describe('LogInteractionDialog', () => {
+  it('prints When as the app prints a moment, and hands over to the native control on a click', async () => {
+    await openDialog()
+    const when = document.getElementById('int-when')
+    if (!(when instanceof HTMLButtonElement)) throw new Error('no When')
+    const printed = when.textContent
+    expect(printed).toMatch(/^\d{1,2} [A-Z][a-z]{2}, \d{2}:\d{2}$/)
+    // The lane grows to the native control rather than clipping it.
+    const lane = when.closest('.grid')
+    expect(lane?.className).toContain(
+      'grid-cols-[minmax(0,1fr)_minmax(13rem,max-content)]',
+    )
+
+    await click(when)
+    const native = input('int-when')
+    expect(native.type).toBe('datetime-local')
+    const [day, time] = native.value.split('T')
+    expect(printed).toBe(`${formatDay(day, dayKey(new Date()))}, ${time}`)
+
+    await type(native, '2026-10-13T10:42')
+    act(() => {
+      native.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+    })
+    await wait(0)
+    expect(document.getElementById('int-when')?.textContent).toMatch(
+      /^13 Oct( 2026)?, 10:42$/,
+    )
+
+    await type(input('int-subject'), 'Series B intro')
+    await click(footButton('Log meeting'))
+    expect(fns.logInteraction.mock.calls[0]?.[0]).toMatchObject({
+      data: { occurredAt: '2026-10-13T10:42' },
+    })
+  })
+
   it('adds a chip from a suggestion and takes chips away with ×', async () => {
     await openDialog()
     expect(chips()).toEqual(['acme'])

@@ -187,7 +187,7 @@ function Body({ body, owner }: { body: EmailBody; owner: string }) {
         </p>
       )
     case 'none':
-      return <p className="px-3 py-2 text-ui text-graphite">No body.</p>
+      return null
   }
 }
 
@@ -838,14 +838,19 @@ function EmailWindow({
             </Lane>
           )}
         </div>
-        <div className="flex flex-col gap-1.5">
-          <Body body={email.body} owner={owner} />
-          {remote === null ? null : (
-            <span data-remote-images className="mono text-micro text-graphite">
-              {remote}
-            </span>
-          )}
-        </div>
+        {email.body.kind === 'none' ? null : (
+          <div className="flex flex-col gap-1.5">
+            <Body body={email.body} owner={owner} />
+            {remote === null ? null : (
+              <span
+                data-remote-images
+                className="mono text-micro text-graphite"
+              >
+                {remote}
+              </span>
+            )}
+          </div>
+        )}
       </section>
 
       {email.attachments.length === 0 ? null : (

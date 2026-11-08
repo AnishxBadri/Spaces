@@ -82,6 +82,27 @@ describe('RecordNotices', () => {
     expect(html.match(/size-1\.5 shrink-0 bg-graphite/g)).toHaveLength(1)
   })
 
+  it('inks every fix link, as Today’s notices do', async () => {
+    const html = await render(
+      <RecordNotices
+        recordId={ID}
+        archive={{ on: '2026-10-12T09:30:00.000Z', by: null }}
+        duplicates={[
+          { pairId: 'p1', otherId: 'b', otherName: 'Flent Inc', key: 'x' },
+        ]}
+        parked={{ source: 'Apollo', resumesAt: '2026-10-27T00:00:00.000Z' }}
+      />,
+    )
+    const links = [
+      ...html.matchAll(/class="([^"]*)"[^>]*>(Restore|Compare|Enrichment) ›/g),
+    ]
+    expect(links.map((m) => m[2])).toEqual(['Restore', 'Compare', 'Enrichment'])
+    for (const m of links) {
+      expect(m[1]).toContain('text-foreground')
+      expect(m[1]).not.toContain('text-primary')
+    }
+  })
+
   it('renders nothing when nothing needs saying', () => {
     expect(renderToStaticMarkup(<RecordNotices recordId={ID} />)).toBe('')
     expect(

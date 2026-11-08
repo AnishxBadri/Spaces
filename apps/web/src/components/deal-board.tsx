@@ -34,6 +34,9 @@ const COLUMN_LIMIT = 8
  */
 
 /** `Close 15 Nov · 31d`, or `· −3d` once the day has passed. */
+/** The stages a move asks a close reason for. */
+export const ASKS_REASON: ReadonlySet<string> = new Set(['passed', 'lost'])
+
 export function closeLine(close: string, today: string): string {
   const n = daysBetween(today, close)
   return `Close ${formatDay(close, today)} · ${n < 0 ? `−${String(-n)}` : String(n)}d`
@@ -124,7 +127,7 @@ export function DealBoard({
   function moveTo(dealId: string, stageId: string) {
     const current = deals.find((d) => d.id === dealId)
     if (!current || stageOf(current) === stageId) return
-    if (stageId === 'passed' || stageId === 'lost') {
+    if (ASKS_REASON.has(stageId)) {
       const stage = stages.find((s) => s.id === stageId)
       setClosing({
         dealId,
@@ -345,6 +348,7 @@ export function MoveStageDialog({
   stages,
   currentId,
   daysInStage,
+  initialId = null,
   onCancel,
   onMove,
 }: {
@@ -352,14 +356,16 @@ export function MoveStageDialog({
   stages: Array<BoardStage>
   currentId: string | null
   daysInStage?: number | null
+  /** A stage already chosen elsewhere: the window opens on it. */
+  initialId?: string | null
   onCancel: () => void
   onMove: (stageId: string, reason?: string) => void
 }) {
   const currentIndex = stages.findIndex((s) => s.id === currentId)
-  const [picked, setPicked] = useState<string | null>(null)
+  const [picked, setPicked] = useState<string | null>(initialId)
   const [reason, setReason] = useState('')
   const pickedStage = stages.find((s) => s.id === picked) ?? null
-  const asksReason = picked === 'passed' || picked === 'lost'
+  const asksReason = picked !== null && ASKS_REASON.has(picked)
   const canMove = pickedStage !== null && picked !== currentId
 
   function confirm() {
@@ -432,7 +438,7 @@ export function MoveStageDialog({
                           : `current · ${daysInStage}d`
                         : isNext
                           ? '→ next'
-                          : stage.id === 'passed' || stage.id === 'lost'
+                          : ASKS_REASON.has(stage.id)
                             ? 'asks for a reason'
                             : ''}
                     </span>

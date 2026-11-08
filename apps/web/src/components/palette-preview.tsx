@@ -106,7 +106,13 @@ export const KIND_ICONS: Record<string, LucideIcon> = {
   term: BookA,
 }
 
-/** The record head's readouts, as each record page prints them. */
+/** A count in the pane: a zero says nothing, so it reads as a dash. */
+const countOf = (n: number): string => (n === 0 ? DASH : String(n))
+
+/**
+ * The record head's readouts as the pane prints them: each record page's,
+ * except that a zero count is a dash, which the pane leaves out.
+ */
 export function previewReadouts(r: PreviewReadouts): Array<RecordReadout> {
   switch (r.kind) {
     case 'company':
@@ -117,8 +123,7 @@ export function previewReadouts(r: PreviewReadouts): Array<RecordReadout> {
         },
         {
           label: 'Moving, 30 days',
-          value: `${r.readouts.moving30}`,
-          tone: r.readouts.moving30 === 0 ? 'muted' : undefined,
+          value: countOf(r.readouts.moving30),
         },
         {
           label: 'Ownership',
@@ -149,8 +154,9 @@ export function previewReadouts(r: PreviewReadouts): Array<RecordReadout> {
         {
           label: 'Days in stage',
           value:
+            r.readouts.daysInStage === 0 ||
             r.readouts.medianDaysInStage === null
-              ? `${r.readouts.daysInStage}`
+              ? countOf(r.readouts.daysInStage)
               : `${r.readouts.daysInStage} · med ${Math.round(r.readouts.medianDaysInStage)}`,
           tone: r.readouts.pastTwiceMedian ? 'bad' : undefined,
         },
@@ -167,8 +173,7 @@ export function previewReadouts(r: PreviewReadouts): Array<RecordReadout> {
         },
         {
           label: 'Moving, 30 days',
-          value: `${r.readouts.moving30}`,
-          tone: r.readouts.moving30 === 0 ? 'muted' : undefined,
+          value: countOf(r.readouts.moving30),
         },
       ]
   }
@@ -338,7 +343,6 @@ function RecordPane({
                 className={cn(
                   'truncate mono text-title',
                   r.tone === 'bad' && 'text-destructive',
-                  r.tone === 'muted' && 'text-graphite',
                 )}
               >
                 {r.value}

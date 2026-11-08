@@ -67,7 +67,11 @@ const connect = (
   userId: string,
   product: string,
   externalEmail: string,
-  over: { status?: 'active' | 'error'; errorReason?: string } = {},
+  over: {
+    status?: 'active' | 'error'
+    errorReason?: string
+    refreshTokenExpiresAt?: Date
+  } = {},
 ) =>
   db.insert(accountConnection).values({
     userId,
@@ -137,6 +141,8 @@ describe('Settings → Connections', () => {
     await connect(INES.id, 'gmail', 'ines@gmail.com', {
       status: 'error',
       errorReason: 'invalid_client',
+      // A grant Google will lapse: still not Testing until the audience says so.
+      refreshTokenExpiresAt: new Date(Date.now() + 7 * 86_400_000),
     })
     const google = (await connectionsListHandler()).find(
       (r) => r.provider === 'google',
@@ -206,6 +212,16 @@ describe('Settings → Connections', () => {
       (await connectionsListHandler()).find((r) => r.provider === 'google')
         ?.testing,
     ).toBe(true)
+    // Workspace is not, whatever the grants carry: the list reads the answer.
+    await setProviderChoiceHandler({
+      provider: 'google',
+      audience: 'workspace',
+      consent: 'internal',
+    })
+    expect(
+      (await connectionsListHandler()).find((r) => r.provider === 'google')
+        ?.testing,
+    ).toBe(false)
   })
 
   it('refuses a provider it does not know', async () => {

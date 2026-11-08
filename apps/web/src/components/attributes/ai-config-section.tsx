@@ -71,11 +71,7 @@ export function AiConfigSection({
           ) : undefined
         }
       />
-      {listed.length === 0 ? (
-        <p className="border-b border-rule py-3 text-label text-graphite">
-          No attribute answers with AI.
-        </p>
-      ) : (
+      {listed.length === 0 ? null : (
         <ul aria-label={`${objectPlural} AI answers`}>
           {listed.map((attr) => {
             const ai = readAiConfig(attr)

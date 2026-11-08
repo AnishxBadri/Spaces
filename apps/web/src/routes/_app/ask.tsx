@@ -275,11 +275,9 @@ function AskPage() {
               </Button>
             </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {rows.length === 0 ? (
-              <p className="px-3 py-3 text-ui text-graphite">No threads.</p>
-            ) : (
-              byDay(rows).map((g) => (
+          {rows.length === 0 ? null : (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {byDay(rows).map((g) => (
                 <section key={g.day} aria-label={formatWeekday(g.day, today)}>
                   <Band label={dayBand(g.day, today)} />
                   <ul>
@@ -294,9 +292,9 @@ function AskPage() {
                     ))}
                   </ul>
                 </section>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </nav>
       ) : null}
 

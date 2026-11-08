@@ -88,8 +88,10 @@ export function ProviderSetup({ view }: { view: ProviderPageView }) {
   const { app, choices } = view
   const router = useRouter()
   const consoleSteps = CONSOLE[app.provider]
-  const audience = choices?.audience ?? 'workspace'
-  const consent = choices?.consent ?? consentFor(audience)
+  // Nothing is preselected: until an admin answers, neither control is.
+  const audience = choices?.audience ?? null
+  const consent =
+    choices?.consent ?? (audience === null ? null : consentFor(audience))
 
   async function choose(change: {
     audience?: GoogleAudience
@@ -122,9 +124,11 @@ export function ProviderSetup({ view }: { view: ProviderPageView }) {
               void choose({ audience: next, consent: consentFor(next) })
             }
           />
-          <p className="basis-full text-label text-graphite">
-            {AUDIENCE_COPY[audience]}
-          </p>
+          {audience === null ? null : (
+            <p className="basis-full text-label text-graphite">
+              {AUDIENCE_COPY[audience]}
+            </p>
+          )}
           {audience === 'personal' ? (
             <p className="basis-full text-label text-graphite">
               Email only? Forwarding needs no Google app.{' '}
@@ -157,9 +161,11 @@ export function ProviderSetup({ view }: { view: ProviderPageView }) {
             ]}
             onChange={(next) => void choose({ consent: next })}
           />
-          <p className="basis-full text-label text-graphite">
-            {CONSENT_HINT[consent]}
-          </p>
+          {consent === null ? null : (
+            <p className="basis-full text-label text-graphite">
+              {CONSENT_HINT[consent]}
+            </p>
+          )}
         </SettingsRow>
       ) : null}
       <RedirectRow n={nextStep()} uri={app.redirectUri} />
@@ -296,7 +302,8 @@ function OAuthClientRows({ n, app }: { n: number; app: ProviderAppRow }) {
 /**
  * Connects the reader's own account through the client, consenting to the
  * first use that is switched on, and lands back here. A live account of the
- * reader's under the provider reads `■ Works · <email>`.
+ * reader's under the provider reads `■ Works · <email>`, and once it does no
+ * hint stands beside it.
  */
 function TestRow({ n, view }: { n: number; view: ProviderPageView }) {
   const first = view.uses.find((u) => u.enabled && u.integrationId !== null)
@@ -307,9 +314,11 @@ function TestRow({ n, view }: { n: number; view: ProviderPageView }) {
           Once the client is saved
         </span>
       ) : first === undefined ? (
-        <span className="text-label text-graphite">
-          Once a use is on in In use
-        </span>
+        view.mine === null ? (
+          <span className="text-label text-graphite">
+            Once a use is on in In use
+          </span>
+        ) : null
       ) : (
         <Button size="sm" variant="outline" asChild>
           <a

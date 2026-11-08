@@ -76,8 +76,11 @@ beforeEach(() => {
   root = createRoot(host)
 })
 
-afterEach(() => {
+afterEach(async () => {
   act(() => root.unmount())
+  // A focus scope returns focus on a timer after it unmounts; let it run
+  // while the window's event classes are still the globals.
+  await new Promise((resolve) => setTimeout(resolve, 0))
   document.body.replaceChildren()
 })
 

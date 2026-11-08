@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { CreateCompanyDialog } from './create-company-dialog'
+import { CreateDealDialog } from './create-deal-dialog'
 import { CreatePersonDialog } from './create-person-dialog'
 
 /**
@@ -13,7 +14,8 @@ import { CreatePersonDialog } from './create-person-dialog'
  * domain with the rest behind `More fields ›`; New person's email names its
  * company through the server's identity lookup; a key another record holds
  * is refused in the window with the way to that record, and nothing is
- * created. Mounted in happy-dom, through Radix.
+ * created. New deal cannot be created until it has a company. Mounted in
+ * happy-dom, through Radix.
  */
 
 await vi.hoisted(async () => {
@@ -25,6 +27,8 @@ const fns = vi.hoisted(() => ({
   findByIdentity: vi.fn(),
   createCompany: vi.fn(),
   createPerson: vi.fn(),
+  createDeal: vi.fn(),
+  getCompany: vi.fn(),
   listTemplates: vi.fn(() => Promise.resolve([])),
 }))
 
@@ -66,6 +70,28 @@ const PERSON_REGISTRY: Array<RegistryEntry> = [
     name: 'Job title',
     type: 'text',
     options: {},
+    isSystem: true,
+  },
+]
+
+const DEAL_REGISTRY: Array<RegistryEntry> = [
+  {
+    slug: 'company',
+    name: 'Company',
+    type: 'record_reference',
+    options: { targetKind: 'company', multi: false },
+    isSystem: true,
+  },
+  {
+    slug: 'stage',
+    name: 'Stage',
+    type: 'status',
+    options: {
+      options: [
+        { id: 'pre_lead', label: 'Pre-lead', group: 'active' },
+        { id: 'screening', label: 'Screening', group: 'active' },
+      ],
+    },
     isSystem: true,
   },
 ]
@@ -255,5 +281,30 @@ describe('New person', () => {
     ).toContain('Ada already has this email')
     await submit()
     expect(fns.createPerson).not.toHaveBeenCalled()
+  })
+})
+
+describe('New deal', () => {
+  it('keeps Create deal off until a company is picked', async () => {
+    await mount(<CreateDealDialog registry={DEAL_REGISTRY} />, 'New deal')
+    expect(button('Create deal', dialog()).disabled).toBe(true)
+    await submit()
+    expect(fns.createDeal).not.toHaveBeenCalled()
+  })
+
+  it('offers Create deal at once when opened from a company', async () => {
+    fns.createDeal.mockResolvedValue({ id: 'd1' })
+    await mount(
+      <CreateDealDialog
+        registry={DEAL_REGISTRY}
+        presetCompany={{ id: 'flent', name: 'Flent' }}
+      />,
+      'New deal',
+    )
+    expect(button('Create deal', dialog()).disabled).toBe(false)
+    await submit()
+    expect(fns.createDeal.mock.calls[0]?.[0]).toMatchObject({
+      data: { companyId: 'flent', name: 'Flent — Pre-lead', stage: 'pre_lead' },
+    })
   })
 })

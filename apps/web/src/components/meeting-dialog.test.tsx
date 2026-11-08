@@ -186,6 +186,11 @@ describe('the meeting window', () => {
       (a) => a.textContent === 'Open in Google ›',
     )
     expect(google?.getAttribute('href')).toContain('calendar.google.com')
+    expect(
+      dialog()?.querySelector(
+        '[data-slot="dialog-header"] [aria-label^="More for"]',
+      ),
+    ).toBeNull()
     // The conference link is the head's one action.
     const join = [...document.querySelectorAll('a')].find(
       (a) => a.textContent === 'Join call ›',
@@ -193,6 +198,38 @@ describe('the meeting window', () => {
     expect(join?.getAttribute('href')).toBe(
       'https://meet.google.com/abc-defg-hij',
     )
+  })
+
+  it("prints no Participants head with nobody in the room, and carries Open in Google in the head's ···", async () => {
+    fns.getMeeting.mockResolvedValue({ ...DETAIL, participants: [] })
+    await open()
+    expect(dialog()?.querySelector('[aria-label="Participants"]')).toBeNull()
+    expect(dialog()?.textContent).not.toContain('Participants')
+    const links = () =>
+      [...document.querySelectorAll('a')].filter((a) =>
+        a.textContent.startsWith('Open in Google'),
+      )
+    // A rare verb: at rest the head holds the `···`, not a link.
+    expect(links()).toHaveLength(0)
+    const trigger = dialog()?.querySelector(
+      '[data-slot="dialog-header"] [aria-label^="More for"]',
+    )
+    if (!(trigger instanceof HTMLElement)) throw new Error('no ···')
+    await act(async () => {
+      trigger.focus()
+      trigger.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      )
+    })
+    for (
+      let i = 0;
+      i < 20 && document.querySelector('[role="menu"]') === null;
+      i++
+    )
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    // One way to Google: the group's link went with the group.
+    expect(links()).toHaveLength(1)
+    expect(links()[0].getAttribute('href')).toContain('calendar.google.com')
   })
 
   it('has one close, in the foot, and prints no esc or ↵', async () => {

@@ -138,6 +138,7 @@ type Mount = {
   passages?: (q: string) => Promise<ReadonlyArray<Passage>>
   onRun?: (a: PageAction) => void
   onStepDone?: () => void
+  onMoveStage?: (handoff: PaletteModule.StageHandoff) => void
   loaders?: Partial<PreviewLoaders>
   onOpenFile?: (id: string, page: number | null) => void
   onGo?: (href: string) => void
@@ -157,6 +158,7 @@ function mount({
   passages = async () => [],
   onRun = () => {},
   onStepDone = () => {},
+  onMoveStage = () => {},
   loaders = {},
   onOpenFile = () => {},
   onGo = () => {},
@@ -188,6 +190,7 @@ function mount({
           onTask={() => {}}
           onRun={onRun}
           onStepDone={onStepDone}
+          onMoveStage={onMoveStage}
           loaders={{ ...NO_LOADERS, ...loaders }}
           onOpenFile={onOpenFile}
           onAsk={onAsk}
@@ -410,7 +413,8 @@ describe('the palette, typed', () => {
     expect(rowsIn('records')).toEqual(['Vayu Orbital'])
     expect(rowsIn('passages')).toEqual([
       '“the Vayu thesis, mentions Vayu Orbital”Vayu — first call',
-      '“Vayu deck.pdf”Vayu deck.pdf',
+      // No snippet: the file name, never in quotes.
+      'Vayu deck.pdfVayu deck.pdf',
     ])
     // Passages are set in serif, clamped to one line.
     const quote = host.querySelector(
@@ -1099,6 +1103,7 @@ describe('a deal in the pane', () => {
           { id: 'ic', label: 'IC' },
         ],
       },
+      () => {},
       async (stage) => {
         wrote.push(stage)
       },
@@ -1114,5 +1119,79 @@ describe('a deal in the pane', () => {
     await wait(0)
     expect(wrote).toEqual(['ic'])
     expect(rowsIn('step')).toEqual(['Sourced', '✓ICCurrent'])
+  })
+
+  it('hands Passed and Lost to the Move stage window, which asks the reason, and writes nothing itself', async () => {
+    const deal: SearchHit = {
+      ...company('d-halcyon', 'Halcyon Grid — Seed'),
+      kind: 'deal',
+      objectSlug: 'deals',
+    }
+    const stages = {
+      current: 'diligence',
+      options: [
+        { id: 'diligence', label: 'Diligence' },
+        { id: 'passed', label: 'Passed' },
+        { id: 'lost', label: 'Lost' },
+      ],
+    }
+    const preview: RecordPreview = {
+      id: deal.id,
+      kind: 'deal',
+      name: deal.name,
+      singular: 'Deal',
+      spaces: [],
+      domain: null,
+      readouts: {
+        kind: 'deal',
+        readouts: {
+          today: '2026-10-10',
+          daysInStage: 12,
+          medianDaysInStage: null,
+          pastTwiceMedian: false,
+          lastContact: null,
+          round: null,
+        },
+      },
+      fields: [],
+      stages,
+    }
+    const handed: Array<PaletteModule.StageHandoff> = []
+    const done = vi.fn()
+    mount({
+      records: async () => [deal],
+      loaders: { record: async () => preview },
+      onMoveStage: (h) => handed.push(h),
+      onStepDone: done,
+    })
+    type('halcyon g')
+    await wait(180)
+    if (
+      host.querySelector('[data-preview]')?.getAttribute('data-preview') !==
+      'record'
+    ) {
+      press('ArrowDown')
+      await wait(0)
+    }
+    click(host.querySelector('[data-pane-action="move-stage"]'))
+    await wait(0)
+    for (const at of [1, 2]) {
+      click(
+        [...host.querySelectorAll('[data-group="step"] [cmdk-item]')].at(at),
+      )
+      await wait(0)
+    }
+    const handoff = {
+      deal: { id: deal.id, name: deal.name },
+      stages,
+      daysInStage: 12,
+    }
+    expect(handed).toEqual([
+      { ...handoff, picked: 'passed' },
+      { ...handoff, picked: 'lost' },
+    ])
+    // Nothing was written here: no refresh, and Diligence is still current.
+    expect(done).not.toHaveBeenCalled()
+    expect(rowsIn('step')).toEqual(['✓DiligenceCurrent', 'Passed', 'Lost'])
   })
 })

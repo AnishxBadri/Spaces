@@ -12,7 +12,7 @@ import { Segmented } from './segmented.tsx'
 
 const win = new Window()
 
-function render(value: 'all' | 'email' | 'calls' = 'all') {
+function render(value: 'all' | 'email' | 'calls' | null = 'all') {
   const doc = win.document
   doc.body.innerHTML = renderToStaticMarkup(
     <Segmented
@@ -86,6 +86,11 @@ describe('a segment', () => {
         'hover:text-foreground',
       ]),
     )
+  })
+
+  it('raises none while the answer has not been given', () => {
+    for (const s of Array.from(render(null).querySelectorAll('[role="radio"]')))
+      expect(s.getAttribute('aria-checked')).toBe('false')
   })
 
   it('carries its count in mono, and none at 0 or when not given', () => {

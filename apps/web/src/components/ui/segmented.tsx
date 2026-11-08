@@ -11,9 +11,10 @@ import { cn } from '#/lib/utils'
  * 28px bone-deep box, the chosen segment raised on paper. The nested switch
  * under a tab bar, a window's kind, a filter whose segments carry counts.
  *
- * A radiogroup, not a row of toggle buttons: exactly one is chosen at all
- * times, which is what `role="radio"` + `aria-checked` says and what
- * `aria-pressed` does not. The reticle frames the whole box, not a segment.
+ * A radiogroup, not a row of toggle buttons: one is chosen, which is what
+ * `role="radio"` + `aria-checked` says and what `aria-pressed` does not —
+ * or none, for a setting nobody has answered yet. The reticle frames the
+ * whole box, not a segment.
  *
  * Generic over the option ids so a caller with a union type — a note kind,
  * an interaction kind — gets that union back in `onChange` instead of a
@@ -39,7 +40,8 @@ export function Segmented<T extends string>({
   label,
   className,
 }: {
-  value: T
+  /** Null chooses no segment: the answer has not been given. */
+  value: T | null
   options: ReadonlyArray<SegmentedOption<T>>
   onChange: (id: T) => void
   disabled?: boolean | undefined
