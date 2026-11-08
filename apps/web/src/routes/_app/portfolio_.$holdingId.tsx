@@ -351,7 +351,7 @@ function OwnershipBlock({ ownership }: { ownership: Holding['ownership'] }) {
     return (
       <RailRow
         label={
-          ownership.reason === 'no_checks' ? 'Ownership' : 'Cost basis only'
+          ownership.reason === 'no_checks' ? 'Position' : 'Cost basis only'
         }
         value={
           <span data-cost-basis={ownership.reason} className="font-sans">
