@@ -23,7 +23,8 @@ import {
   pageSections,
   visionChunks,
   visionMessage,
-  visionTask,
+  VISION_INSTRUCTIONS,
+  visionSubject,
   visionText,
 } from '#web/lib/ai/vision'
 import type { VisionFailure } from '#web/lib/ai/vision'
@@ -124,7 +125,8 @@ const readPages = Effect.fn('visionDocument.readPages')(function* (
         ? { via: opts.sensitivity.via }
         : {}),
       budgetChars: VISION_CHARS_PER_PAGE * pages,
-      task: visionTask(range, doc.filename),
+      instructions: VISION_INSTRUCTIONS,
+      subject: visionSubject(range, doc.filename),
       files: [
         {
           mediaType: 'application/pdf',
@@ -146,7 +148,7 @@ const readPages = Effect.fn('visionDocument.readPages')(function* (
     const read = pageSections(text, range)
     sections.push(...read)
     console.log(
-      `[worker] vision ${documentId} pp.${String(range.first)}-${String(range.last)}: ${String(read.length)} page(s) with text, ${String(answered.usage.tokensIn ?? '?')} in / ${String(answered.usage.tokensOut ?? '?')} out`,
+      `[worker] vision ${documentId} pp.${String(range.first)}-${String(range.last)}: ${String(read.length)} page(s) with text, ${String(answered.usage.tokensIn ?? '?')} in (${String(answered.usage.tokensCached ?? '-')} cached) / ${String(answered.usage.tokensOut ?? '?')} out`,
     )
   }
   if (sections.length === 0)

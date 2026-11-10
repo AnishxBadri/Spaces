@@ -12,6 +12,7 @@ import type {
   CompleteFailure,
   CompleteOptions,
   CompleteOutput,
+  CompleteUsage,
 } from './complete'
 import type { AiTarget } from './route'
 
@@ -120,14 +121,14 @@ export type CachedExtractResult = {
   target: AiTarget
   /** When the stored answer was written — null when this run called. */
   cachedAt: string | null
-  /** What the call reported; both null on a hit, which made no call. */
-  usage: { tokensIn: number | null; tokensOut: number | null }
+  /** What the call reported; all null on a hit, which made no call. */
+  usage: CompleteUsage
   /** The key the call resolved; null on a hit or for an injected model. */
   credentialId: string | null
 }
 
 const NO_CALL = {
-  usage: { tokensIn: null, tokensOut: null },
+  usage: { tokensIn: null, tokensOut: null, tokensCached: null },
   credentialId: null,
 } as const
 

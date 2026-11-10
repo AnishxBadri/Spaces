@@ -413,6 +413,38 @@ describe('the run', () => {
     expect(usage).toHaveLength(4)
   })
 
+  it('sends every row one system part, byte for byte, with the row’s values last', async () => {
+    await routeLanes()
+    await proposeByHand(bay[0])
+    await proposeByHand(bay[1])
+    const model = mockModel()
+    await Effect.runPromise(
+      columnRunProgram({
+        viewId: screening,
+        attributeId: whyNow,
+        userId: USER,
+        model,
+      }),
+    )
+    const prompts = model.doGenerateCalls.map((c) => c.prompt)
+    expect(prompts).toHaveLength(3)
+    const systems = prompts.map((p) => JSON.stringify(p.at(0)))
+    expect(new Set(systems).size).toBe(1)
+    const system = prompts[0]?.at(0)
+    expect(system?.role).toBe('system')
+    // The attribute's prompt with its variable named, never a row's value;
+    // marked for the cache on the Anthropic route.
+    expect(system?.content).toContain('Why is {{city}} right now?')
+    expect(system?.content).not.toContain('Bay Area')
+    expect(system?.providerOptions).toEqual({
+      anthropic: { cacheControl: { type: 'ephemeral' } },
+    })
+    for (const p of prompts) {
+      const user = JSON.stringify(p.at(-1))
+      expect(user).toMatch(/\{\{city\}\}: Bay Area"\}\]/)
+    }
+  })
+
   it('the daily cap stops it with rows done and left; /inbox groups the run under one header whose Accept all takes only the run', async () => {
     await routeLanes()
     await proposeByHand(bay[0])

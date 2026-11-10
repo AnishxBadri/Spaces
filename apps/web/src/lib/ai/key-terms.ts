@@ -150,13 +150,15 @@ const dealsOf = (documentId: string) =>
  * No deal is named: the answer is stored in the extraction cache under the
  * bytes and the schema, and must mean the same whichever deal pressed.
  */
-const TASK = (kind: KeyTermKind, filename: string) =>
-  [
-    `Read the ${DOCUMENT_KIND_LABELS[kind].toLowerCase()} document "${filename}" above and fill in the key terms it states.`,
-    'Write each term briefly, in the document’s own terms. Use only what the document states.',
-    'Leave out every term the document does not state. Never write "not found", "N/A" or a guess.',
-    'For each term, list in `refs` the bracketed refs of the context items it was read from, exactly as written above.',
-  ].join('\n')
+const INSTRUCTIONS = [
+  'Fill in the key terms the document named last states.',
+  'Write each term briefly, in the document’s own terms. Use only what the document states.',
+  'Leave out every term the document does not state. Never write "not found", "N/A" or a guess.',
+  'For each term, list in `refs` the bracketed refs of the context items it was read from, exactly as written.',
+].join('\n')
+
+const SUBJECT = (kind: KeyTermKind, filename: string) =>
+  `Read the ${DOCUMENT_KIND_LABELS[kind].toLowerCase()} document "${filename}" and fill in the key terms it states.`
 
 export const keyTermsProgram = Effect.fn('keyTerms')(function* (
   input: KeyTermsInput,
@@ -243,7 +245,8 @@ const keyTermsInRun = Effect.fn('keyTerms.inRun')(function* (
         ? { sensitivity: 'normal' }
         : { sensitivity: 'sensitive', via }),
       budgetChars: KEY_TERMS_BUDGET_CHARS,
-      task: TASK(kind, filename),
+      instructions: INSTRUCTIONS,
+      subject: SUBJECT(kind, filename),
       ...(input.model === undefined ? {} : { model: input.model }),
       ...(input.jobRunId === undefined ? {} : { jobRunId: input.jobRunId }),
       runId,

@@ -97,12 +97,19 @@ export async function* visionChunks(
     yield { range, bytes: await chunkBytes(src, range) }
 }
 
-export const visionTask = (range: PageRange, filename: string): string =>
+/** The vision lane's system part: the same for every range of every document. */
+export const VISION_INSTRUCTIONS = [
+  'The attached PDF is part of a scanned document with no text layer.',
+  'Transcribe the text of every page in reading order: headings, body text, table cells row by row, chart labels and figures.',
+  'Begin each page with its marker on a line of its own — [Page N], numbered from the first page the message gives, then the next number for each page after it — and write that page’s text under it.',
+  'Write only what the page shows. Do not summarise, translate, describe pictures or add commentary. A page with no text gets its marker and nothing under it.',
+].join('\n')
+
+/** Which pages of which document this range is: the call's variable part. */
+export const visionSubject = (range: PageRange, filename: string): string =>
   [
-    `The attached PDF is ${range.first === range.last ? `page ${String(range.first)}` : `pages ${String(range.first)}–${String(range.last)}`} of "${filename}", a scanned document with no text layer.`,
-    'Transcribe the text of every page in reading order: headings, body text, table cells row by row, chart labels and figures.',
-    `Begin each page with its marker on a line of its own — [Page ${String(range.first)}] for the first attached page, then the next number for each page after it — and write that page’s text under it.`,
-    'Write only what the page shows. Do not summarise, translate, describe pictures or add commentary. A page with no text gets its marker and nothing under it.',
+    `The attached PDF is ${range.first === range.last ? `page ${String(range.first)}` : `pages ${String(range.first)}–${String(range.last)}`} of "${filename}".`,
+    `The first attached page is [Page ${String(range.first)}].`,
   ].join('\n')
 
 const PAGE_MARKER = /^\[Page (\d+)\]$/

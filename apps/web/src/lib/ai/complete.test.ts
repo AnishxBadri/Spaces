@@ -44,12 +44,18 @@ const opts = (over: Partial<CompleteOptions> = {}): CompleteOptions => ({
   caller: USER,
   sensitivity: 'normal',
   budgetChars: 4000,
-  task: 'Which stage is this company at?',
+  instructions: 'Answer from the context, citing it.',
+  subject: 'Which stage is this company at?',
   ...over,
 })
 
 /** A model that answers `text` with the given token counts, recording calls. */
-function mockModel(text = 'Series A', tokensIn = 12, tokensOut = 3) {
+function mockModel(
+  text = 'Series A',
+  tokensIn = 12,
+  tokensOut = 3,
+  cacheRead: number | undefined = undefined,
+) {
   return new MockLanguageModelV4({
     provider: 'mock',
     modelId: 'mock-model',
@@ -59,8 +65,8 @@ function mockModel(text = 'Series A', tokensIn = 12, tokensOut = 3) {
       usage: {
         inputTokens: {
           total: tokensIn,
-          noCache: tokensIn,
-          cacheRead: undefined,
+          noCache: tokensIn - (cacheRead ?? 0),
+          cacheRead,
           cacheWrite: undefined,
         },
         outputTokens: {
@@ -508,5 +514,99 @@ describe('the AI cap (SPA-73)', () => {
     )
     expect(result.output).toEqual({ kind: 'text', text: 'Series A' })
     expect(model.doGenerateCalls).toHaveLength(1)
+  })
+})
+
+describe('the request complete() sends', () => {
+  const MARK = { anthropic: { cacheControl: { type: 'ephemeral' } } }
+
+  it('sends the instructions as a cached system part and the context then the subject as the user part, on Anthropic', async () => {
+    const model = mockModel('Series A', 40, 9, 32)
+    const result = await Effect.runPromise(
+      completeProgram(
+        'extract',
+        ITEMS,
+        undefined,
+        opts({ model, route: ROUTE }),
+      ),
+    )
+    const [call] = model.doGenerateCalls
+    expect(call.prompt).toEqual([
+      {
+        role: 'system',
+        content: 'Answer from the context, citing it.',
+        providerOptions: MARK,
+      },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: '[attr:e1:stage] Stage: Seed\n\n[note:n1] Raising a Series A in Q4.\n\nWhich stage is this company at?',
+          },
+        ],
+      },
+    ])
+    expect(result.usage).toEqual({
+      tokensIn: 40,
+      tokensOut: 9,
+      tokensCached: 32,
+    })
+  })
+
+  it('sends the same shape with no marker to a provider that reads none, and reports no cached count', async () => {
+    const model = mockModel()
+    const result = await Effect.runPromise(
+      completeProgram(
+        'extract',
+        ITEMS,
+        undefined,
+        opts({ model, route: { provider: 'ollama', model: 'llama3.1' } }),
+      ),
+    )
+    const [call] = model.doGenerateCalls
+    expect(call.prompt[0]).toEqual({
+      role: 'system',
+      content: 'Answer from the context, citing it.',
+    })
+    expect(call.prompt.at(1)?.role).toBe('user')
+    expect(JSON.stringify(call.prompt)).not.toContain('cacheControl')
+    expect(result.usage.tokensCached).toBeNull()
+  })
+
+  it('keeps the vision files after the text of the user part', async () => {
+    const model = mockModel()
+    const data = new Uint8Array([37, 80, 68, 70])
+    await Effect.runPromise(
+      completeProgram(
+        'vision',
+        [],
+        undefined,
+        opts({
+          model,
+          route: ROUTE,
+          instructions: 'Transcribe the attached pages.',
+          subject: 'Pages 1–2 of "deck.pdf".',
+          files: [{ mediaType: 'application/pdf', data, name: 'deck.pdf' }],
+        }),
+      ),
+    )
+    const [call] = model.doGenerateCalls
+    expect(call.prompt[0]).toMatchObject({
+      role: 'system',
+      content: 'Transcribe the attached pages.',
+    })
+    const user = call.prompt.at(1)
+    if (user?.role !== 'user') throw new Error('no user part')
+    expect(user.content.map((p) => p.type)).toEqual(['text', 'file'])
+    expect(user.content[0]).toMatchObject({
+      type: 'text',
+      text: 'Pages 1–2 of "deck.pdf".',
+    })
+    expect(user.content[1]).toMatchObject({
+      type: 'file',
+      mediaType: 'application/pdf',
+      filename: 'deck.pdf',
+    })
   })
 })

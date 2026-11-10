@@ -197,7 +197,7 @@ describe('complete() over sensitivityFor', () => {
       caller: { type: 'user', id: FIXTURE_ACTOR.id },
       ...resolved,
       budgetChars: 1000,
-      task: 'Read the deck.',
+      instructions: 'Read the deck.',
       model: mockModel(),
     })
   }

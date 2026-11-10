@@ -555,8 +555,9 @@ describe('a variable through a relationship’s inverse half', () => {
       why_now: { value: 'x', refs: [], confidence: 0.5 },
       reason: 'x',
     }))
-    expect(JSON.stringify(model.doGenerateCalls[0].prompt)).toContain(
-      'Why now, given Halcyon Backed?',
-    )
+    // The prompt keeps the variable's name; the row's value comes last.
+    const sent = JSON.stringify(model.doGenerateCalls[0].prompt)
+    expect(sent).toContain(`Why now, given {{${pair.b.slug}}}?`)
+    expect(sent).toContain(`{{${pair.b.slug}}}: Halcyon Backed`)
   })
 })

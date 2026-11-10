@@ -623,6 +623,60 @@ describe('the thread store', () => {
     expect(kept.turns.at(1)?.hidden).toBe(false)
   })
 
+  it('sends the earlier turns as messages, the last two carrying the cache marker', async () => {
+    await route('normal', 'anthropic')
+    const MARK = { anthropic: { cacheControl: { type: 'ephemeral' } } }
+    const first = agentModel(
+      { toolName: 'list_registry', input: {} },
+      () => 'Nothing on Zephyr yet.',
+    )
+    const threadId = threadOf(
+      await collect(
+        askEvents({
+          userId: FIXTURE_ACTOR.id,
+          threadId: null,
+          question: 'What do we know about Zephyr?',
+          scope: [],
+          model: first,
+        }),
+      ),
+    )
+    const second = agentModel(
+      { toolName: 'list_registry', input: {} },
+      () => 'Still nothing.',
+    )
+    await collect(
+      askEvents({
+        userId: FIXTURE_ACTOR.id,
+        threadId,
+        question: 'And its founders?',
+        scope: [],
+        model: second,
+      }),
+    )
+
+    const opening = first.doStreamCalls.at(0)?.prompt ?? []
+    const prompt = second.doStreamCalls.at(0)?.prompt ?? []
+    expect(prompt.map((m) => m.role)).toEqual([
+      'system',
+      'user',
+      'assistant',
+      'user',
+    ])
+    // One system part across the thread's turns, marked for the cache.
+    expect(prompt[0]).toEqual(opening[0])
+    expect(prompt[0]?.providerOptions).toEqual(MARK)
+    expect(prompt.map((m) => m.providerOptions)).toEqual([
+      MARK,
+      undefined,
+      MARK,
+      MARK,
+    ])
+    expect(JSON.stringify(prompt[2])).toContain('Nothing on Zephyr yet.')
+    expect(JSON.stringify(prompt[3])).toContain('And its founders?')
+    expect(JSON.stringify(prompt)).not.toContain('The conversation so far')
+  })
+
   it('lists threads only for their author and refuses another user the id', async () => {
     await route('normal', 'anthropic')
     const threadId = threadOf(

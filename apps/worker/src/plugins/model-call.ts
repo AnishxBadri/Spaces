@@ -44,7 +44,8 @@ export const ModelCallLive = (
             ? { via: input.sensitivity.via }
             : {}),
           budgetChars: input.budgetChars,
-          task: input.task,
+          // A plugin's task is its lane's fixed text; the items are the material.
+          instructions: input.task,
           ...(options.model === undefined ? {} : { model: options.model }),
         }).pipe(
           Effect.map((result) => result.output),

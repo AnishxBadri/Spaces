@@ -103,8 +103,8 @@ export function recordedNoteTasksMessage(
   }
 }
 
-const TASK = [
-  'List the action items in the meeting notes above: what someone agreed to do after the meeting.',
+const INSTRUCTIONS = [
+  'List the action items in the meeting notes: what someone agreed to do after the meeting.',
   'One item per action, phrased as a short task (at most 15 words).',
   'Give `due` as YYYY-MM-DD only when the notes state a date; otherwise leave it out.',
   'Write any date inside a task as day, short month and year: 4 Oct 2024.',
@@ -269,7 +269,7 @@ export const recordedNoteTasksProgram = Effect.fn('recordedNoteTasks')(
       sensitivity: gate.sensitive ? 'sensitive' : 'normal',
       ...(gate.via === null ? {} : { via: gate.via }),
       budgetChars: BUDGET_CHARS,
-      task: TASK,
+      instructions: INSTRUCTIONS,
       ...(input.model === undefined ? {} : { model: input.model }),
       ...(input.jobRunId === undefined ? {} : { jobRunId: input.jobRunId }),
     }).pipe(

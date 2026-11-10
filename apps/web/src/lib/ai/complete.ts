@@ -8,7 +8,8 @@ import type { ContextItem } from '@spaces/core/context/types'
 import { resolveLanguageModel } from './providers'
 import type { ResolveModelFailure } from './providers'
 import { PROVIDER_LABEL } from './providers/ids'
-import { renderPrompt } from './prompt'
+import { buildRequest } from './prompt'
+import type { PromptFile } from './prompt'
 import { aiRouteProgram, isLocalProvider } from './route'
 import { capMessage, checkCapProgram } from './caps'
 import type { CapExceeded, CapReadFailed } from './caps'
@@ -19,8 +20,9 @@ import type { RunWriteFailed } from './run'
 
 /**
  * `complete(lane, items, schema?, opts)`: resolves the lane to a provider and
- * model, renders the ranked `ContextItem`s as citable `[ref] text` blocks,
- * calls the model once and writes one `ai_usage` row.
+ * model, sends the lane's instructions as the system part and the ranked
+ * `ContextItem`s (citable `[ref] text` blocks) then the subject as the user
+ * part, calls the model once and writes one `ai_usage` row.
  * - Sensitivity is an input (from `sensitivityFor`). A `sensitive` call to a
  *   non-local target fails `SensitiveRouteRefused`, checked before any model
  *   is built; there is no fallback to cloud.
@@ -40,10 +42,15 @@ export type CompleteOptions = {
   sensitivity: AiSensitivity
   /** Which input made it sensitive — `sensitivityFor`'s answer, carried to the refusal. */
   via?: SensitivityVia
-  /** The rendered prompt's ceiling, task included (`renderPrompt`). */
+  /** The whole request's ceiling, system part and subject included (`buildRequest`). */
   budgetChars: number
-  /** What to do with the context — rendered after it. */
-  task: string
+  /**
+   * The lane's fixed text, sent as the system part: identical on every call
+   * of the lane, so a provider can cache it. Nothing per-call belongs here.
+   */
+  instructions: string
+  /** What this call is about (the row, the document's name), rendered after the context. */
+  subject?: string
   model?: LanguageModel
   route?: AiTarget
   jobRunId?: string
@@ -55,18 +62,11 @@ export type CompleteOptions = {
   maxOutputTokens?: number
   maxRetries?: number
   /**
-   * Files sent as `file` parts of the one user message (the vision lane's PDF
-   * page range). Absent or empty, the call is a plain `prompt` string. The cap
-   * estimate is still `budgetChars`, so a caller sending files sizes it for them.
+   * Files sent as `file` parts after the user part's text (the vision lane's
+   * PDF page range). The cap estimate is still `budgetChars`, so a caller
+   * sending files sizes it for them.
    */
-  files?: ReadonlyArray<CompleteFile>
-}
-
-/** One file part of a `complete()` call. PDF only. */
-export type CompleteFile = {
-  mediaType: 'application/pdf'
-  data: Uint8Array
-  name?: string
+  files?: ReadonlyArray<PromptFile>
 }
 
 export type CompleteOutput =
@@ -74,10 +74,17 @@ export type CompleteOutput =
   /** Parsed against the schema by the SDK; the caller validates it again. */
   | { kind: 'object'; object: unknown }
 
+/** What the provider reported; `tokensCached` is null where it reports no cache reads. */
+export type CompleteUsage = {
+  tokensIn: number | null
+  tokensOut: number | null
+  tokensCached: number | null
+}
+
 export type CompleteResult = {
   output: CompleteOutput
   target: AiTarget
-  usage: { tokensIn: number | null; tokensOut: number | null }
+  usage: CompleteUsage
   /** The vault key the call resolved; null for an injected test model. */
   credentialId: string | null
 }
@@ -185,10 +192,23 @@ export function modelIdOf(model: LanguageModel): string {
   return typeof model === 'string' ? model : model.modelId
 }
 
-const tokens = (usage: LanguageModelUsage) => ({
+export const usageOf = (usage: LanguageModelUsage): CompleteUsage => ({
   tokensIn: usage.inputTokens ?? null,
   tokensOut: usage.outputTokens ?? null,
+  tokensCached: usage.inputTokenDetails.cacheReadTokens ?? null,
 })
+
+/** One call's usage as the log shows it, cache reads included. */
+export const usageLine = (
+  lane: AiLane,
+  target: AiTarget,
+  usage: CompleteUsage,
+): string =>
+  `ai usage ${lane} ${target.provider}/${target.model}: ${String(usage.tokensIn ?? '?')} in (${String(usage.tokensCached ?? '-')} cached) / ${String(usage.tokensOut ?? '?')} out`
+
+/** Whether `provider` reads the cache markers `buildRequest` can set. */
+export const readsCacheMarkers = (provider: string): boolean =>
+  provider === 'anthropic'
 
 /**
  * The one target a call to `lane` goes to, with the sensitive-to-cloud
@@ -235,35 +255,17 @@ export const completeProgram = Effect.fn('complete')(function* (
       : { model: opts.model, credentialId: null }
   const model = resolved.model
 
-  const prompt = renderPrompt({
+  const request = buildRequest({
+    instructions: opts.instructions,
     items,
-    task: opts.task,
+    subject: opts.subject ?? '',
     budgetChars: opts.budgetChars,
+    cache: readsCacheMarkers(target.provider),
+    ...(opts.files === undefined ? {} : { files: opts.files }),
   })
-  // With files, the prompt becomes the text part of one user message and each
-  // file a `file` part after it; without, the call is unchanged.
-  const input =
-    opts.files === undefined || opts.files.length === 0
-      ? { prompt }
-      : {
-          messages: [
-            {
-              role: 'user' as const,
-              content: [
-                { type: 'text' as const, text: prompt },
-                ...opts.files.map((f) => ({
-                  type: 'file' as const,
-                  data: f.data,
-                  mediaType: f.mediaType,
-                  ...(f.name === undefined ? {} : { filename: f.name }),
-                })),
-              ],
-            },
-          ],
-        }
   const settings = {
     model,
-    ...input,
+    ...request,
     ...(opts.maxOutputTokens === undefined
       ? {}
       : { maxOutputTokens: opts.maxOutputTokens }),
@@ -279,11 +281,11 @@ export const completeProgram = Effect.fn('complete')(function* (
         })
         return {
           output: { kind: 'object', object: r.output },
-          usage: tokens(r.usage),
+          usage: usageOf(r.usage),
         }
       }
       const r = await generateText(settings)
-      return { output: { kind: 'text', text: r.text }, usage: tokens(r.usage) }
+      return { output: { kind: 'text', text: r.text }, usage: usageOf(r.usage) }
     },
     catch: (cause) =>
       new ProviderCallFailed({ provider: target.provider, cause }),
@@ -304,6 +306,8 @@ export const completeProgram = Effect.fn('complete')(function* (
       }),
     catch: (cause) => new UsageWriteFailed({ cause }),
   })
+  // The cached count is not stored yet; the log line is where a cache hit shows.
+  yield* Effect.log(usageLine(lane, target, answered.usage))
 
   return { ...answered, target, credentialId: resolved.credentialId }
 })

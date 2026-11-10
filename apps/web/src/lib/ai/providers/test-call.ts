@@ -19,6 +19,8 @@ import type { LlmProvider } from './ids'
  */
 
 export const TEST_PROMPT = 'Reply with the single word OK.'
+/** The Test call's system part: it checks the key, it asks nothing of the model. */
+export const TEST_INSTRUCTIONS = 'This is a connection check.'
 
 export type TestCallResult =
   | { ok: true; text: string }
@@ -124,7 +126,8 @@ export const runTestCall = Effect.fn('runTestCall')(function* (
     // An admin checking a key, not record bytes: nothing to resolve.
     sensitivity: 'normal',
     budgetChars: 1000,
-    task: TEST_PROMPT,
+    instructions: TEST_INSTRUCTIONS,
+    subject: TEST_PROMPT,
     model,
     route: { provider: via.provider, model: modelIdOf(model) },
     maxOutputTokens: 1024,

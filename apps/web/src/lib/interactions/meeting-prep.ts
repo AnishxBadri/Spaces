@@ -40,7 +40,7 @@ import type { PrepEvent } from '#/lib/meetings/day'
 
 /** The assembler's budget across every linked record. */
 export const PREP_CONTEXT_CHARS = 24_000
-/** The whole prompt, task included. */
+/** The whole request, system part and subject included. */
 export const PREP_BUDGET_CHARS = 60_000
 
 export class PrepRefused extends Schema.TaggedError<PrepRefused>()(
@@ -106,14 +106,16 @@ const meetingProgram = Effect.fn('prep.meeting')(function* (
   }
 })
 
-const TASK = (m: Meeting) =>
-  [
-    `Brief the reader for the meeting "${m.title}" at ${m.startsAt.toISOString()}, with ${m.records.map((r) => r.name).join(', ')}.`,
-    'Use only what the context above states; never add a fact from elsewhere, and say plainly where the material is silent on something that matters.',
-    'Write markdown: two lines on what the meeting is for, then `## ` sections with `- ` bullets — who they are, where things stand, what changed recently, and the questions worth asking.',
-    'Cite every claim inline, right after it, with the bracketed ref of the context item it came from, exactly as written above — for example [note:<id>].',
-    'Do not write a title line, and do not wrap the answer in a code fence.',
-  ].join('\n')
+const INSTRUCTIONS = [
+  'Brief the reader for the meeting the last line names.',
+  'Use only what the context states; never add a fact from elsewhere, and say plainly where the material is silent on something that matters.',
+  'Write markdown: two lines on what the meeting is for, then `## ` sections with `- ` bullets — who they are, where things stand, what changed recently, and the questions worth asking.',
+  'Cite every claim inline, right after it, with the bracketed ref of the context item it came from, exactly as written — for example [note:<id>].',
+  'Do not write a title line, and do not wrap the answer in a code fence.',
+].join('\n')
+
+const SUBJECT = (m: Meeting) =>
+  `Brief the reader for the meeting "${m.title}" at ${m.startsAt.toISOString()}, with ${m.records.map((r) => r.name).join(', ')}.`
 
 export type PrepInput = {
   userId: string
@@ -189,7 +191,8 @@ export const preparePrepProgram = Effect.fn('preparePrep')(function* (
     sensitivity: sensitive ? 'sensitive' : 'normal',
     ...(via === null ? {} : { via }),
     budgetChars: PREP_BUDGET_CHARS,
-    task: TASK(meeting),
+    instructions: INSTRUCTIONS,
+    subject: SUBJECT(meeting),
     ...(input.model === undefined ? {} : { model: input.model }),
     ...(input.abortSignal === undefined
       ? {}

@@ -335,7 +335,12 @@ function outputSchema(): JsonSchema {
   }
 }
 
-const TASK = (
+const INSTRUCTIONS = [
+  'Read the most recent financing round the cap table shows and our position in it.',
+  'Use only what the cap table states. Omit any field it does not state; never guess.',
+].join('\n')
+
+const SUBJECT = (
   target: LedgerTarget,
   now: HoldingNow,
   workspaceName: string | null,
@@ -343,8 +348,6 @@ const TASK = (
   [
     `The text above is the latest revision of "${target.documentName}", the cap table of ${target.companyName}.`,
     `We${workspaceName === null ? '' : ` (${workspaceName})`} hold ${String(now.ourShares)} priced shares in ${target.companyName} on our ledger${now.ownershipPct === null ? '' : `, last known at ${fmtPct(now.ownershipPct)} fully diluted`}.`,
-    'Read the most recent financing round the cap table shows and our position in it.',
-    'Use only what the cap table states. Omit any field it does not state; never guess.',
   ].join('\n')
 
 // ---------- the choice ----------
@@ -538,7 +541,8 @@ const proposeInRun = Effect.fn('proposeLedgerEvent.inRun')(function* (
         ? { via: sensitivity.via }
         : {}),
       budgetChars: LEDGER_EVENT_BUDGET_CHARS,
-      task: TASK(target, now, workspaceName),
+      instructions: INSTRUCTIONS,
+      subject: SUBJECT(target, now, workspaceName),
       ...(input.model === undefined ? {} : { model: input.model }),
       ...(input.jobRunId === undefined ? {} : { jobRunId: input.jobRunId }),
       runId,

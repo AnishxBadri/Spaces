@@ -180,12 +180,16 @@ function outputSchema(options: ReadonlyArray<TreeSpace>): JsonSchema {
   }
 }
 
-const TASK = (name: string, options: ReadonlyArray<TreeSpace>) =>
+const INSTRUCTIONS = [
+  'Say which of the spaces listed last the record named there belongs in. A space is a market, sector or theme the fund tracks; a record may sit in several, or in none.',
+  `Answer with at most ${String(SUGGEST_SPACES_MAX)} space ids from the list, most likely first, each with a confidence between 0 and 1, and give a short reason. Propose only spaces the context supports.`,
+].join('\n')
+
+const SUBJECT = (name: string, options: ReadonlyArray<TreeSpace>) =>
   [
-    `Which of these spaces does "${name}" belong in? A space is a market, sector or theme the fund tracks; a record may sit in several, or in none.`,
+    `Which of these spaces does "${name}" belong in?`,
     'Spaces (id — path):',
     ...options.map((o) => `${o.id} — ${o.label}`),
-    `Answer with at most ${String(SUGGEST_SPACES_MAX)} space ids from the list, most likely first, each with a confidence between 0 and 1, and give a short reason. Propose only spaces the context above supports.`,
   ].join('\n')
 
 // ---------- the run (worker) ----------
@@ -347,7 +351,7 @@ const suggestSpacesInRun = Effect.fn('suggestSpaces.inRun')(function* (
     at: i.at,
   }))
 
-  const task = TASK(record.name, options)
+  const subject = SUBJECT(record.name, options)
   const runId = yield* run.id
   const answered = yield* completeProgram(
     'classify',
@@ -359,9 +363,12 @@ const suggestSpacesInRun = Effect.fn('suggestSpaces.inRun')(function* (
       ...(sensitivity.sensitivity === 'sensitive'
         ? { via: sensitivity.via }
         : {}),
-      // The context's share plus the whole task: the tree is never cut.
-      budgetChars: SUGGEST_SPACES_CONTEXT_CHARS + task.length + 2,
-      task,
+      // The context's share plus the instructions and the whole subject: the
+      // tree is never cut.
+      budgetChars:
+        SUGGEST_SPACES_CONTEXT_CHARS + INSTRUCTIONS.length + subject.length + 2,
+      instructions: INSTRUCTIONS,
+      subject,
       ...(input.model === undefined ? {} : { model: input.model }),
       ...(input.jobRunId === undefined ? {} : { jobRunId: input.jobRunId }),
       runId,

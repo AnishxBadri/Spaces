@@ -293,19 +293,19 @@ function keepValid(
   return { proposal, dropped }
 }
 
-const TASK = (target: Target, filename: string) =>
-  [
-    `Read the pitch deck "${filename}" above and fill in what it states about the ${KIND_LABEL[target.kind] ?? 'record'} "${target.name}".`,
-    'Use only facts the context states. Omit any field the context does not state; never guess.',
-    'For each field, list in `refs` the bracketed refs of the context items the value was read from, and give a confidence between 0 and 1.',
-  ].join('\n')
+// One system part for decks and captured pages alike: what is read, and
+// about what, is the subject.
+const INSTRUCTIONS = [
+  'Fill in what the material states about the record the last line names.',
+  'Use only facts the context states. Omit any field the context does not state; never guess.',
+  'For each field, list in `refs` the bracketed refs of the context items the value was read from, and give a confidence between 0 and 1.',
+].join('\n')
 
-const CAPTURE_TASK = (against: Against, title: string) =>
-  [
-    `Read the captured page "${title}" above and fill in what it states about the ${against.object.singular.toLowerCase()} it describes.`,
-    'Use only facts the context states. Omit any field the context does not state; never guess.',
-    'For each field, list in `refs` the bracketed refs of the context items the value was read from, and give a confidence between 0 and 1.',
-  ].join('\n')
+const SUBJECT = (target: Target, filename: string) =>
+  `Read the pitch deck "${filename}" and fill in what it states about the ${KIND_LABEL[target.kind] ?? 'record'} "${target.name}".`
+
+const CAPTURE_SUBJECT = (against: Against, title: string) =>
+  `Read the captured page "${title}" and fill in what it states about the ${against.object.singular.toLowerCase()} it describes.`
 
 /** The declared object, read once before the run opens: it names the run. */
 const againstOf = Effect.fn('readDeck.against')(function* (
@@ -539,10 +539,11 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
           ? { via: sensitivity.via }
           : {}),
         budgetChars: READ_DECK_BUDGET_CHARS,
-        task:
+        instructions: INSTRUCTIONS,
+        subject:
           against === null
-            ? TASK(target, filename)
-            : CAPTURE_TASK(against, filename),
+            ? SUBJECT(target, filename)
+            : CAPTURE_SUBJECT(against, filename),
         ...(input.model === undefined ? {} : { model: input.model }),
         ...(input.jobRunId === undefined ? {} : { jobRunId: input.jobRunId }),
         runId,

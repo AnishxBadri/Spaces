@@ -48,7 +48,7 @@ import type {
 /** The assembler's budget for the neighbourhood of the thing summarized. */
 export const SUMMARIZE_CONTEXT_CHARS = 24_000
 /**
- * The whole prompt, task included. Large on purpose: the synthesize lane is
+ * The whole request, system part and subject included. Large on purpose: the synthesize lane is
  * the frontier tier, and a diligence pack is the material it is for. What
  * does not fit is cut at the tail by `renderPrompt`, the document's later
  * pages first.
@@ -271,14 +271,15 @@ export const sharedOnly = Effect.fn('summarize.sharedOnly')(function* (
   })
 })
 
-const TASK = (source: Source) =>
-  [
-    `Summarize ${source.what} for the team's notes, in markdown.`,
-    'Use only what the context above states; never add a fact from elsewhere, and say plainly where the material is silent on something that matters.',
-    'Open with a short overview paragraph, then `## ` sections with `- ` bullet points for the substance — whichever of business, market, traction, team, terms and risks the material covers.',
-    'Cite every claim inline, right after it, with the bracketed ref of the context item it came from, exactly as written above — for example [doc:<id>#3]. Several refs share one bracket, separated by commas.',
-    'Do not write a title line, and do not wrap the answer in a code fence.',
-  ].join('\n')
+const INSTRUCTIONS = [
+  "Summarize what the last line names for the team's notes, in markdown.",
+  'Use only what the context states; never add a fact from elsewhere, and say plainly where the material is silent on something that matters.',
+  'Open with a short overview paragraph, then `## ` sections with `- ` bullet points for the substance — whichever of business, market, traction, team, terms and risks the material covers.',
+  'Cite every claim inline, right after it, with the bracketed ref of the context item it came from, exactly as written — for example [doc:<id>#3]. Several refs share one bracket, separated by commas.',
+  'Do not write a title line, and do not wrap the answer in a code fence.',
+].join('\n')
+
+const SUBJECT = (source: Source) => `Summarize ${source.what}.`
 
 export const summarizeProgram = Effect.fn('summarize')(function* (
   input: SummarizeInput,
@@ -413,7 +414,8 @@ const summarizeInRun = Effect.fn('summarize.inRun')(function* (
     sensitivity: sensitive.sensitivity,
     ...(sensitive.sensitivity === 'sensitive' ? { via: sensitive.via } : {}),
     budgetChars: SUMMARIZE_BUDGET_CHARS,
-    task: TASK(source),
+    instructions: INSTRUCTIONS,
+    subject: SUBJECT(source),
     ...(input.model === undefined ? {} : { model: input.model }),
     ...(input.jobRunId === undefined ? {} : { jobRunId: input.jobRunId }),
     runId,

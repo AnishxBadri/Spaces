@@ -7,10 +7,17 @@ import { estimateTokens } from '@spaces/core/ai/caps'
 import type { ContextItem } from '@spaces/core/context/types'
 import { resolveLanguageModel } from './providers'
 import type { ResolveModelFailure } from './providers'
-import { renderPrompt } from './prompt'
+import { buildRequest, requestChars } from './prompt'
+import type { PromptTurn } from './prompt'
 import { checkCapProgram } from './caps'
 import type { CapExceeded, CapReadFailed } from './caps'
-import { laneTargetProgram, ProviderCallFailed } from './complete'
+import {
+  laneTargetProgram,
+  ProviderCallFailed,
+  readsCacheMarkers,
+  usageLine,
+  usageOf,
+} from './complete'
 import type { Caller, SensitiveRouteRefused } from './complete'
 import type { AiTarget, LaneNotRouted, RouteReadFailed } from './route'
 import type { AiLane, AiSensitivity } from './lanes'
@@ -31,8 +38,17 @@ export type StreamOptions = {
   caller: Caller
   sensitivity: AiSensitivity
   via?: SensitivityVia
+  /** The whole request's ceiling, system part and subject included; not the conversation. */
   budgetChars: number
-  task: string
+  /** The lane's fixed text, sent as the system part (`CompleteOptions.instructions`). */
+  instructions: string
+  /** What this call is about (the question), rendered after the context. */
+  subject?: string
+  /**
+   * Earlier turns as real messages, oldest first. Present, the last two
+   * messages carry cache markers on a provider that reads them.
+   */
+  conversation?: ReadonlyArray<PromptTurn>
   model?: LanguageModel
   maxOutputTokens?: number
   abortSignal?: AbortSignal
@@ -81,14 +97,19 @@ export const openStreamProgram = Effect.fn('openStream')(function* (
       modelId: target.model,
       ...(opts.caller.type === 'user' ? { userId: opts.caller.id } : {}),
     })).model
-  const prompt = renderPrompt({
+  const request = buildRequest({
+    instructions: opts.instructions,
     items,
-    task: opts.task,
+    subject: opts.subject ?? '',
     budgetChars: opts.budgetChars,
+    cache: readsCacheMarkers(target.provider),
+    ...(opts.conversation === undefined
+      ? {}
+      : { conversation: opts.conversation }),
   })
   const result = streamText({
     model,
-    prompt,
+    ...request,
     ...(opts.maxOutputTokens === undefined
       ? {}
       : { maxOutputTokens: opts.maxOutputTokens }),
@@ -115,13 +136,15 @@ export const openStreamProgram = Effect.fn('openStream')(function* (
       lane,
       provider: target.provider,
       model: target.model,
-      tokensIn: usage?.inputTokens ?? estimateTokens(prompt.length),
+      tokensIn: usage?.inputTokens ?? estimateTokens(requestChars(request)),
       tokensOut: usage?.outputTokens ?? estimateTokens(streamed),
       callerType: opts.caller.type,
       callerId: opts.caller.type === 'system' ? null : opts.caller.id,
       jobRunId: null,
       runId: opts.runId ?? null,
     })
+    if (usage !== null)
+      Effect.runSync(Effect.log(usageLine(lane, target, usageOf(usage))))
   }
 
   async function* parts(): AsyncGenerator<StreamPart, void> {

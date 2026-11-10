@@ -105,12 +105,12 @@ export function enqueueSummarizeEmail(
 }
 
 const SUMMARY_TASK = [
-  'Summarise the email above in one plain sentence of at most 25 words: what it says or asks.',
+  'Summarise the email in one plain sentence of at most 25 words: what it says or asks.',
   'No preamble, no quotation marks, no names of the fields.',
 ].join('\n')
 
 const CATEGORY_TASK = [
-  'Label the email above with what kind of email it is.',
+  'Label the email with what kind of email it is.',
   `Choose zero to ${String(EMAIL_CATEGORIES_MAX)} of: ${EMAIL_CATEGORIES.join(', ')}.`,
   'Choose none when nothing fits.',
 ].join('\n')
@@ -244,7 +244,11 @@ export const summarizeEmailProgram = Effect.fn('summarizeEmail')(function* (
       at: row.occurredAt.toISOString(),
     },
   ]
-  const call = (lane: AiLane, task: string, schema: JsonSchema | undefined) =>
+  const call = (
+    lane: AiLane,
+    instructions: string,
+    schema: JsonSchema | undefined,
+  ) =>
     completeProgram(lane, items, schema, {
       // Nobody pressed anything: the lane runs off the arrival, as the
       // workspace, on the workspace's key.
@@ -252,7 +256,7 @@ export const summarizeEmailProgram = Effect.fn('summarizeEmail')(function* (
       sensitivity: gate.sensitive ? 'sensitive' : 'normal',
       ...(gate.via === null ? {} : { via: gate.via }),
       budgetChars: BUDGET_CHARS,
-      task,
+      instructions,
       ...(input.model === undefined ? {} : { model: input.model }),
       ...(input.jobRunId === undefined ? {} : { jobRunId: input.jobRunId }),
     })

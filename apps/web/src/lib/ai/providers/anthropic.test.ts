@@ -7,7 +7,7 @@ import {
   ANTHROPIC_DEFAULT_MODEL,
   anthropicLanguageModel,
 } from './llm/anthropic'
-import { TEST_PROMPT, runTestCall } from './test-call'
+import { TEST_INSTRUCTIONS, TEST_PROMPT, runTestCall } from './test-call'
 
 /**
  * The Anthropic adapter carries a credential's `meta` — base URL and extra
@@ -96,6 +96,14 @@ describe('the Anthropic adapter', () => {
     expect(call.headers.get('x-api-key')).toBe('sk-ant-test-0123456789')
     expect(call.body).toMatchObject({
       model: ANTHROPIC_DEFAULT_MODEL,
+      // The system part carries the cache marker on the wire.
+      system: [
+        {
+          type: 'text',
+          text: TEST_INSTRUCTIONS,
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
       messages: [
         { role: 'user', content: [{ type: 'text', text: TEST_PROMPT }] },
       ],

@@ -17,6 +17,7 @@ import { refusedLine, routeLine, providerLabel } from '#/lib/ai/route-line'
 import type { SensitivityVia } from '#/lib/ai/sensitivity'
 import { sensitivityFor } from '#/lib/ai/sensitivity-for'
 import { openStreamProgram } from '#/lib/ai/stream'
+import type { PromptTurn } from '#/lib/ai/prompt'
 import type { OpenedStream, StreamOpenFailure } from '#/lib/ai/stream'
 import { citationLabels } from '#/lib/ai/summarize'
 import { entityOfRef, toolRegistry } from '#/lib/mcp/registry'
@@ -80,7 +81,7 @@ import type {
  *   with an answered turn; their evidence must be refs the turn retrieved.
  */
 
-/** The whole prompt's ceiling, history and question included. */
+/** The system part, context and question's ceiling; the earlier turns are bounded by `HISTORY_TURNS`. */
 export const ASK_BUDGET_CHARS = 40_000
 /** Model steps a turn may take: tool calls, then the answer. */
 export const ASK_MAX_STEPS = 6
@@ -105,7 +106,8 @@ type Begun = {
   questionId: string
   answerId: string
   runId: string
-  history: string
+  /** Earlier turns as messages, oldest first, opening on the reader's. */
+  conversation: Array<PromptTurn>
 }
 
 const titleOf = (question: string): string => {
@@ -153,15 +155,20 @@ const writeTurnsProgram = Effect.fn('ask.writeTurns')(function* (
           yield* threadTurnsProgram(own.id),
           'stored',
         )
-  const history = earlier
+  // The same turns render the same bytes on every later turn, so a provider
+  // that caches re-reads them rather than paying for them again.
+  const kept = earlier
     .filter((t) => !t.hidden && t.body.trim() !== '')
     .slice(-HISTORY_TURNS * 2)
-    .map((t) =>
+    .map((t): PromptTurn =>
       t.role === 'user'
-        ? `Reader: ${t.body}`
-        : `You answered: ${t.body.slice(0, 2000)}`,
+        ? { role: 'user', text: t.body }
+        : { role: 'assistant', text: t.body.slice(0, 2000) },
     )
-    .join('\n\n')
+  // A conversation opens on the reader's turn: a window that starts on an
+  // answer drops it.
+  const start = kept.findIndex((t) => t.role === 'user')
+  const conversation = start === -1 ? [] : kept.slice(start)
 
   // A new thread and both turns in one transaction: never a thread or a
   // question without its answer row.
@@ -210,7 +217,7 @@ const writeTurnsProgram = Effect.fn('ask.writeTurns')(function* (
     questionId: rows.question.id,
     answerId: rows.answer.id,
     runId,
-    history,
+    conversation,
   }
   return { begun, question: turnView(rows.question, false) }
 })
@@ -249,10 +256,10 @@ const webSentence = (servers: ReadonlyArray<MountedServer>): string =>
         `When the reader asks which companies match a description, search the web, then call ${SHOW_COMPANIES} with the companies found: the table is the answer, so never list them as prose — follow it with a sentence or two at most. A web result is not a record until the reader adds it, and needs no citation.`,
       ].join(' ')
 
-const TASK = (
+/** Ask's system part: the same across a thread's turns unless its scope or tools change. */
+const INSTRUCTIONS = (
   input: AskInput,
   turn: TurnScope,
-  history: string,
   web: string,
 ): string => {
   return [
@@ -264,8 +271,6 @@ const TASK = (
     'A sentence you cannot cite does not belong in the answer. If nothing was found, say so in one line and name what you searched.',
     'Write markdown: short paragraphs, `- ` bullets, and a pipe table for a list of records. No title line, no code fence.',
     'When the reader would act on what you found — a follow-up, a stage move, a filing — offer it with propose_card, one card per action and record, citing the refs it rests on. You never apply a card; the reader does.',
-    history === '' ? '' : `The conversation so far:\n\n${history}`,
-    `Reader: ${input.question}`,
   ]
     .filter((line) => line !== '')
     .join('\n\n')
@@ -793,12 +798,13 @@ export async function* askEvents(asked: AskInput): AsyncGenerator<AskEvent> {
             sensitivity: gate.sensitive ? 'sensitive' : 'normal',
             ...(gate.via === null ? {} : { via: gate.via }),
             budgetChars: ASK_BUDGET_CHARS,
-            task: TASK(
+            instructions: INSTRUCTIONS(
               input,
               narrowing,
-              begun.history,
               webSentence(gate.sensitive ? [] : servers),
             ),
+            subject: input.question,
+            conversation: begun.conversation,
             runId: begun.runId,
             tools,
             maxSteps: ASK_MAX_STEPS,

@@ -14,7 +14,12 @@ import {
   OPENROUTER_DEFAULT_MODEL,
   openrouterLanguageModel,
 } from './llm/openrouter'
-import { TEST_PROMPT, providerFailure, runTestCall } from './test-call'
+import {
+  TEST_INSTRUCTIONS,
+  TEST_PROMPT,
+  providerFailure,
+  runTestCall,
+} from './test-call'
 
 // The Test call records under a lane and a caller; these adapter
 // tests assert the wire, not the usage row, so one fixture serves them all.
@@ -133,7 +138,12 @@ describe('the OpenAI adapter', () => {
     expect(call.headers.get('helicone-auth')).toBe('Bearer hc-1')
     expect(call.body).toMatchObject({
       model: OPENAI_DEFAULT_MODEL,
-      messages: [{ role: 'user', content: TEST_PROMPT }],
+      // The same two parts as Anthropic, with no cache marker; the SDK sends
+      // a reasoning model's system part as `developer`.
+      messages: [
+        { role: 'developer', content: TEST_INSTRUCTIONS },
+        { role: 'user', content: TEST_PROMPT },
+      ],
     })
   })
 
@@ -166,6 +176,7 @@ describe('the Google adapter', () => {
     expect(call.headers.get('x-goog-api-key')).toBe('AIza-google-0123')
     expect(call.headers.get('helicone-auth')).toBe('Bearer hc-1')
     expect(call.body).toMatchObject({
+      systemInstruction: { parts: [{ text: TEST_INSTRUCTIONS }] },
       contents: [{ role: 'user', parts: [{ text: TEST_PROMPT }] }],
     })
   })

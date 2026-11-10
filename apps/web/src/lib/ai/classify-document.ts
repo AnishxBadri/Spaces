@@ -152,12 +152,13 @@ function outputSchema(): JsonSchema {
   }
 }
 
-const TASK = (filename: string) =>
-  [
-    `Classify the document "${filename}" above by what kind of document it is.`,
-    `Choose from: ${CLASSIFY_OPTIONS.map((k) => `${k} (${DOCUMENT_KIND_LABELS[k]})`).join(', ')}.`,
-    'List one to three kinds, most likely first, each with a confidence between 0 and 1, and give a one-sentence reason.',
-  ].join('\n')
+const INSTRUCTIONS = [
+  'Classify the document named last by what kind of document it is.',
+  `Choose from: ${CLASSIFY_OPTIONS.map((k) => `${k} (${DOCUMENT_KIND_LABELS[k]})`).join(', ')}.`,
+  'List one to three kinds, most likely first, each with a confidence between 0 and 1, and give a one-sentence reason.',
+].join('\n')
+
+const SUBJECT = (filename: string) => `The document is "${filename}".`
 
 export const classifyDocumentProgram = Effect.fn('classifyDocument')(function* (
   input: ClassifyInput,
@@ -248,7 +249,8 @@ const classifyInRun = Effect.fn('classifyDocument.inRun')(function* (
         ? { via: sensitivity.via }
         : {}),
       budgetChars: CLASSIFY_BUDGET_CHARS,
-      task: TASK(filename),
+      instructions: INSTRUCTIONS,
+      subject: SUBJECT(filename),
       ...(input.model === undefined ? {} : { model: input.model }),
       ...(input.jobRunId === undefined ? {} : { jobRunId: input.jobRunId }),
       runId,

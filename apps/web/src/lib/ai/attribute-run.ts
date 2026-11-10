@@ -69,7 +69,7 @@ import type {
  *   the button and again in the job.
  */
 
-/** The record's context the model reads beside the task. */
+/** The record's context the model reads beside the attribute's instructions. */
 export const ATTRIBUTE_RUN_CONTEXT_CHARS = 10_000
 
 export class AttributeRunRefused extends Schema.TaggedError<AttributeRunRefused>()(
@@ -320,24 +320,17 @@ function displayValue(def: AttributeDef, raw: unknown): string | null {
   return typeof raw === 'string' ? raw : JSON.stringify(raw)
 }
 
-function taskFor(cell: Cell): string {
-  const { def, ai, record } = cell
-  const values: Record<string, string> = {}
-  for (const slug of ai.variables ?? []) {
-    const d = cell.registry.find((r) => r.slug === slug)
-    const shown = Object.hasOwn(cell.related, slug)
-      ? cell.related[slug]
-      : d
-        ? displayValue(d, record.values[slug])
-        : null
-    if (shown !== null) values[slug] = shown
-  }
-  const guidance = renderAiPrompt(ai.prompt, values).trim()
-  const about = `"${record.name}"`
+/**
+ * The attribute's fixed text — mode, options, its prompt as written and the
+ * answer's form — so a column run over N rows sends one system part N times,
+ * byte for byte. Nothing about the row is here: `subjectFor` carries it.
+ */
+function instructionsFor(cell: Pick<Cell, 'def' | 'ai'>): string {
+  const { def, ai } = cell
   const lines: Array<string> = []
   switch (ai.mode) {
     case 'classify':
-      lines.push(`Classify ${about} for the field "${def.name}".`)
+      lines.push(`Classify the record named last for the field "${def.name}".`)
       if (def.type === 'checkbox') lines.push('The value is true or false.')
       else {
         const live = liveOptions(def)
@@ -352,20 +345,48 @@ function taskFor(cell: Cell): string {
       break
     case 'summarize':
       lines.push(
-        `Write the field "${def.name}" for ${about}: a short summary of what the context says, in plain prose.`,
+        `Write the field "${def.name}" for the record named last: a short summary of what the context says, in plain prose.`,
       )
       break
     case 'prompt':
     case 'research':
       lines.push(
-        `Answer for ${about}, as the field "${def.name}" (a ${def.type} value).`,
+        `Answer for the record named last, as the field "${def.name}" (a ${def.type} value).`,
       )
       break
   }
-  if (guidance !== '') lines.push(`Instructions: ${guidance}`)
+  // Each `{{slug}}` kept as a name, spelled one way, never as this row's value.
+  const variables = ai.variables ?? []
+  const guidance = renderAiPrompt(
+    ai.prompt,
+    Object.fromEntries(variables.map((slug) => [slug, `{{${slug}}}`])),
+  ).trim()
+  if (guidance !== '') {
+    lines.push(`Instructions: ${guidance}`)
+    if (variables.length > 0)
+      lines.push(
+        "Each {{slug}} in the instructions stands for the record's value listed under it last.",
+      )
+  }
   lines.push(
     `Put the answer under "${def.slug}" as {value, refs, confidence} — refs are the [ref]s of the context items the answer rests on, confidence between 0 and 1 — and give a short reason. Omit "${def.slug}" when the context does not support an answer.`,
   )
+  return lines.join('\n')
+}
+
+/** The row: its name and the values its prompt's `{{slug}}`s read. */
+function subjectFor(cell: Cell): string {
+  const { ai, record } = cell
+  const lines = [`The record: "${record.name}"`]
+  for (const slug of ai.variables ?? []) {
+    const d = cell.registry.find((r) => r.slug === slug)
+    const shown = Object.hasOwn(cell.related, slug)
+      ? cell.related[slug]
+      : d
+        ? displayValue(d, record.values[slug])
+        : null
+    lines.push(`{{${slug}}}: ${shown ?? '(blank)'}`)
+  }
   return lines.join('\n')
 }
 
@@ -496,7 +517,8 @@ const attributeRunInRun = Effect.fn('attributeRun.inRun')(function* (
   }))
   const contextRefs = context.items.map((i) => i.ref)
 
-  const task = taskFor(cell)
+  const instructions = instructionsFor(cell)
+  const subject = subjectFor(cell)
   const runId = yield* run.id
   const answered = yield* completeProgram(ai.lane, items, outputSchema(cell), {
     caller: { type: 'user', id: input.userId },
@@ -504,8 +526,10 @@ const attributeRunInRun = Effect.fn('attributeRun.inRun')(function* (
     ...(sensitivity.sensitivity === 'sensitive'
       ? { via: sensitivity.via }
       : {}),
-    budgetChars: ATTRIBUTE_RUN_CONTEXT_CHARS + task.length + 2,
-    task,
+    budgetChars:
+      ATTRIBUTE_RUN_CONTEXT_CHARS + instructions.length + subject.length + 2,
+    instructions,
+    subject,
     ...(input.model === undefined ? {} : { model: input.model }),
     ...(input.jobRunId === undefined ? {} : { jobRunId: input.jobRunId }),
     runId,
