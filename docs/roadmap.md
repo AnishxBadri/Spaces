@@ -55,7 +55,8 @@ Plus the UI sweep (the printed sheets landing) and Corrections.
 
 ## Unticketed follow-ups
 
-- Edges: a window and a popover keep a 12px row inset where E3 says 16px; Import's inner grids and the empty-state pages are not carded; Tasks' `Open · Done` switch could be the page's folder tabs, as the lists' are.
+- Edges: Import's inner grids and the empty-state pages are not carded.
+- Windows (E3): a window's head, body and foot pad 16px, but a ledger row inside a padded body insets a further 12px, so its text stands at 28px while the title stands at 16px (the meeting window's Linked records); edge-to-edge windows (the file viewer) need the row inset itself to be 16px. One sweep over the 40 windows, `windows-1`: every window's text on one 16px line.
 - Record rail: a deal's Company group swaps the company from its `+` (the attribute is required), which reads as add; an existing install keeps its attribute order (only a fresh seed leads with identity), so a one-off `Reset to default order` on the object's settings page would let it catch up.
 - Settings: the folded head's actions pin to the page edge, not the 800px column; `listStatusOf`'s `tone` is unused; `DESIGN.md` "Printed details" still names a double rule under a settings head.
 - Two `no-shadow` warnings in `record-details.test.tsx`.
