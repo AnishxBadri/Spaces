@@ -28,7 +28,7 @@ import type { InstallOutcome, IntegrationRow } from '#/lib/server-fns'
  * in the head takes a tarball from disk for a box with no outbound HTTPS.
  * A member reads the same catalogue with every write disabled.
  * - Available sits outside the section's disabled fieldset so a member can
- *   still switch its tabs; its Install takes `disabled` instead.
+ *   still switch its job filter; its Install takes `disabled` instead.
  */
 export const Route = createFileRoute('/_app/settings/plugins')({
   loader: async () => {
@@ -101,53 +101,51 @@ function IntegrationsRoute() {
     }
   }
 
-  // One column: the section and Available sit flush, no shell gap between.
   return (
-    <div className="flex flex-col">
-      <SettingsSection
-        title="Plugins"
-        crumb="Integrations"
-        action={
-          <UploadPlugin
-            pending={pending === UPLOAD}
-            disabled={pending !== null}
-            onUpload={(files) => void upload(files)}
-          />
-        }
-      >
-        <IntegrationLedger
-          rows={rows}
-          actions={{
-            pending,
-            onToggle: (row, enabled) =>
-              void act(
-                row,
-                () => setIntegrationEnabled({ data: { id: row.id, enabled } }),
-                enabled ? `${row.name} on` : `${row.name} off · key kept`,
-              ),
-            onReset: (row) =>
-              void act(
-                row,
-                () => resetIntegration({ data: { id: row.id } }),
-                `${row.name} reset · reloading`,
-              ),
-            onUpdate: (row) =>
-              void act(
-                row,
-                async () => {
-                  await updateIntegration({ data: { id: row.id } })
-                },
-                `${row.name} updated to ${row.update ?? 'the newest version'} · reloading`,
-              ),
-          }}
+    <SettingsSection
+      title="Plugins"
+      action={
+        <UploadPlugin
+          pending={pending === UPLOAD}
+          disabled={pending !== null}
+          onUpload={(files) => void upload(files)}
         />
-      </SettingsSection>
-      <RegistryPane
-        view={registry}
-        pending={pending}
-        disabled={!page.isAdmin}
-        onInstall={(plugin) => void install(plugin.pluginId)}
+      }
+      after={
+        <RegistryPane
+          view={registry}
+          pending={pending}
+          disabled={!page.isAdmin}
+          onInstall={(plugin) => void install(plugin.pluginId)}
+        />
+      }
+    >
+      <IntegrationLedger
+        rows={rows}
+        actions={{
+          pending,
+          onToggle: (row, enabled) =>
+            void act(
+              row,
+              () => setIntegrationEnabled({ data: { id: row.id, enabled } }),
+              enabled ? `${row.name} on` : `${row.name} off · key kept`,
+            ),
+          onReset: (row) =>
+            void act(
+              row,
+              () => resetIntegration({ data: { id: row.id } }),
+              `${row.name} reset · reloading`,
+            ),
+          onUpdate: (row) =>
+            void act(
+              row,
+              async () => {
+                await updateIntegration({ data: { id: row.id } })
+              },
+              `${row.name} updated to ${row.update ?? 'the newest version'} · reloading`,
+            ),
+        }}
       />
-    </div>
+    </SettingsSection>
   )
 }

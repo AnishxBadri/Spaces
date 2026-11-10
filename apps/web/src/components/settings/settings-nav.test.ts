@@ -68,8 +68,9 @@ const webSrc = fileURLToPath(new URL('../../', import.meta.url))
 const read = (path: string) => readFileSync(`${webSrc}${path}`, 'utf8')
 
 /**
- * Every eyebrow a section's route prints: the `crumb="…"` literals in its
- * file, its drill-in page's, and the settings components either imports.
+ * Every eyebrow crumb a section's route would print: the `crumb="…"`
+ * literals in its file, its drill-in page's, and the settings components
+ * either imports.
  */
 function crumbsPrintedBy(to: string): Array<string> {
   const slug = to.replace('/settings/', '')
@@ -131,18 +132,11 @@ describe('the settings nav grammar', () => {
     }
   })
 
-  it("prints its group's crumb as every row's eyebrow", () => {
-    const wrong: Array<string> = []
-    for (const row of SETTINGS_SECTIONS) {
-      const printed = crumbsPrintedBy(row.to)
-      expect(printed.length, `${row.label} prints no eyebrow`).toBeGreaterThan(
-        0,
-      )
-      for (const crumb of printed)
-        if (crumb !== SETTINGS_CRUMBS[row.group])
-          wrong.push(`${row.label}: ${crumb}`)
-    }
-    expect(wrong).toEqual([])
+  it('prints no eyebrow: the shared head names the page, the nav its group', () => {
+    const printed = SETTINGS_SECTIONS.flatMap((row) =>
+      crumbsPrintedBy(row.to).map((crumb) => `${row.label}: ${crumb}`),
+    )
+    expect(printed).toEqual([])
   })
 
   it('keeps the groups contiguous and in order', () => {
@@ -220,21 +214,24 @@ describe('the settings page grammar', () => {
       'components/attributes/registry-list.tsx',
       'components/integrations/registry-pane.tsx',
     ]
-    // A ledger's lane-head row: 32px on a hairline.
-    const heads = sources.flatMap((f) =>
-      [
-        ...read(f).matchAll(
-          /className="(flex h-8 items-center[^"]*border-b border-hairline[^"]*)"/g,
-        ),
-      ].map((m) => `${f}: ${m[1]}`),
+    // Every ledger's lane-head row is the one primitive, on a rule.
+    const columns = sources.flatMap((f) =>
+      [...read(f).matchAll(/<SettingsColumns\b/g)].map(() => f),
     )
-    expect(heads.length).toBeGreaterThan(8)
-    const mono = heads.filter(
-      (head) =>
-        !head.includes('text-label text-graphite') ||
-        /\b(mono|field-label|label-caps)\b/.test(head),
+    expect(columns.length).toBeGreaterThan(8)
+    const primitive = read('components/settings/settings-section.tsx')
+    const head = /data-settings-columns[\s\S]*?'(flex h-8[^']*)'/.exec(
+      primitive,
+    )?.[1]
+    expect(head).toContain('border-rule px-(--inset) text-label text-graphite')
+    expect(head).not.toMatch(/\b(mono|field-label|label-caps)\b/)
+    // No hand-drawn lane head on a hairline is left.
+    const handDrawn = sources.filter((f) =>
+      /className="flex h-8 items-center[^"]*border-b border-hairline/.test(
+        read(f),
+      ),
     )
-    expect(mono).toEqual([])
+    expect(handDrawn).toEqual([])
   })
 
   it('prints no sentence under a page title: no section passes a blurb', () => {

@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
-import { SettingsGroupHead } from '#/components/settings/settings-section'
+import { SettingsGroup } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import type { CapabilityOwner } from '#/lib/integrations/catalogue'
 import type { IntegrationDetail } from '#/lib/server-fns'
@@ -55,7 +55,10 @@ const OWNER = {
 const LINK =
   'focus-ring rounded-md mono text-micro text-primary hover:text-foreground'
 
-/** A block: the section head band, then its rows. */
+/**
+ * A block: a group card, its head then its rows. Untitled, the block is a
+ * column of the cards its children draw (the settings form's own groups).
+ */
 export function PluginBlock({
   id,
   title,
@@ -67,22 +70,23 @@ export function PluginBlock({
   count?: string | undefined
   children: ReactNode
 }) {
+  if (title === undefined)
+    return (
+      <section data-block={id} className="flex flex-col gap-3">
+        {children}
+      </section>
+    )
   return (
-    <section data-block={id} className="flex flex-col">
-      {title === undefined ? null : (
-        <div className="flex flex-col">
-          <SettingsGroupHead title={title} count={count} />
-        </div>
-      )}
+    <SettingsGroup data-block={id} title={title} count={count}>
       {children}
-    </section>
+    </SettingsGroup>
   )
 }
 
 /** An empty block's one short line. */
 export function BlockEmpty({ children }: { children: ReactNode }) {
   return (
-    <p className="border-b border-rule px-3 py-3 text-ui text-graphite">
+    <p className="border-b border-rule px-(--inset) py-3 text-ui text-graphite">
       {children}
     </p>
   )
@@ -91,8 +95,10 @@ export function BlockEmpty({ children }: { children: ReactNode }) {
 /** A label-left row, as the settings rows draw it. */
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-ledger-row items-center gap-3 border-b border-rule px-3 py-2">
-      <span className="w-40 shrink-0 text-ui text-foreground">{label}</span>
+    <div className="flex min-h-12 items-center gap-6 border-b border-rule px-(--inset) py-2">
+      <span className="w-[13.125rem] shrink-0 text-ui font-medium text-foreground">
+        {label}
+      </span>
       <span className="flex min-w-0 flex-1 items-center gap-3">{children}</span>
     </div>
   )
@@ -137,7 +143,7 @@ function StatusBlock({ detail }: { detail: IntegrationDetail }) {
           {detail.lastRun ? `ran ${detail.lastRun.ago}` : 'never ran'}
         </span>
       </Row>
-      <Row label="Usage">
+      <Row label="Usage today">
         <span className="numeric text-micro text-graphite">
           {detail.figure}
         </span>
@@ -146,7 +152,7 @@ function StatusBlock({ detail }: { detail: IntegrationDetail }) {
         <div
           role="status"
           className={cn(
-            'flex flex-col gap-1 border-b border-rule px-3 py-2',
+            'flex flex-col gap-1 border-b border-rule px-(--inset) py-2',
             tripped ? 'bg-[var(--badge-rose)]' : 'bg-[var(--badge-amber)]',
           )}
         >
@@ -205,7 +211,7 @@ function SwitchesOnBlock({ detail }: { detail: IntegrationDetail }) {
             return (
               <li
                 key={`${c.owner}:${c.what}`}
-                className="flex h-ledger-row items-center gap-3 border-b border-rule px-3"
+                className="flex h-12 items-center gap-3 border-b border-rule px-(--inset)"
               >
                 <span className="min-w-0 flex-1 truncate text-ui text-foreground">
                   {c.what}
@@ -258,7 +264,7 @@ export function RunLines({
         <li
           key={run.id}
           data-run={run.status}
-          className="flex h-ledger-row items-center gap-3 border-b border-rule px-3"
+          className="flex h-12 items-center gap-3 border-b border-rule px-(--inset)"
         >
           <span className="w-20 shrink-0 mono text-micro text-graphite">
             {run.ago}
@@ -302,7 +308,7 @@ function RemoveBlock({
 }) {
   return (
     <PluginBlock id="remove" title="Disable or uninstall">
-      <div className="flex min-h-ledger-row items-center gap-3 border-b border-rule px-3 py-2">
+      <div className="flex min-h-12 items-center gap-3 border-b border-rule px-(--inset) py-2">
         <Button
           size="sm"
           variant="outline"

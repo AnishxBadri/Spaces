@@ -14,9 +14,6 @@ import { cn } from '#/lib/utils'
  * - `workspace`: the workspace, its people, what it records and prices.
  * - `ai`: models, search and what AI spends.
  * - `integrations`: providers, plugins and the doors data comes in by.
- *
- * The group is also the eyebrow the section prints — `SETTINGS · WORKSPACE` —
- * so a section cannot name a place the nav does not have.
  */
 
 /** The four groups of the settings shell, in the order the nav draws them. */
@@ -28,19 +25,13 @@ export const SETTINGS_GROUP_IDS = [
 ] as const
 export type SettingsGroupId = (typeof SETTINGS_GROUP_IDS)[number]
 
-/**
- * What each group is called — the caps label over its rows in the nav, and
- * the section's eyebrow (`SETTINGS · AI`). One name, printed twice.
- */
+/** What each group is called: the caps label over its rows in the nav. */
 export const SETTINGS_CRUMBS = {
   you: 'You',
   workspace: 'Workspace',
   ai: 'AI',
   integrations: 'Integrations',
 } as const satisfies Record<SettingsGroupId, string>
-
-/** The crumbs a section may print, and nothing else. */
-export type SettingsCrumb = (typeof SETTINGS_CRUMBS)[SettingsGroupId]
 
 export type SettingsSectionRow = {
   /** The child route under the shell. The path follows the label. */

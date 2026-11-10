@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { useSettingsDraft } from './settings-form'
 import {
-  SettingsGroupHead,
+  SettingsGroup,
   SettingsRow,
   SettingsSection,
   SettingsTip,
@@ -117,10 +117,10 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
     saved === null || saved.passwordDisplay === null || replacing
 
   return (
-    <SettingsSection title="Email forwarding" crumb="Integrations">
+    <SettingsSection title="Email forwarding">
       {saved ? (
         <ReadoutStrip
-          className="border-t-0 border-b border-rule"
+          boxed
           readouts={[
             {
               label: 'Address',
@@ -144,9 +144,7 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
         />
       ) : null}
 
-      <div className="flex flex-col">
-        <SettingsGroupHead title="Mailbox" count={stateOf(saved)} />
-
+      <SettingsGroup title="Mailbox" count={stateOf(saved)}>
         <SettingsRow
           label="Address"
           hint="What is forwarded here is shared with every member."
@@ -247,7 +245,7 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
 
         <div
           data-mailbox-foot
-          className="flex min-h-12 items-center gap-3 border-b border-rule py-2"
+          className="flex min-h-12 items-center gap-3 border-b border-rule px-(--inset) py-2"
         >
           <FootLine result={result} folder={draft.folder} settings={settings} />
           <Button
@@ -259,7 +257,7 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
             {pending === 'test' ? 'Testing' : 'Test connection'}
           </Button>
         </div>
-      </div>
+      </SettingsGroup>
     </SettingsSection>
   )
 }

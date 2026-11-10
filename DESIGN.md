@@ -445,7 +445,8 @@ navigating never moves it.
 Prose caps its measure, it does not center. A memo, a thesis, the mandate, the note
 editor and a glossary definition sit left at the gutter under `max-w-160` (640px, or
 the editor's own `72ch`); the space to the right is margin — the sheet comes out of the
-instrument at the left edge. Settings and Dedupe cap wide bodies at 880px the same way.
+instrument at the left edge. Settings caps its column of cards at 800px from the gutter,
+and Dedupe its wide body at 880px, the same way.
 
 The old **Column** mode (800px centered, no head strip; 2026-09 → 2026-09-11) is gone:
 its pages had become ledgers, its hairline never reached the chassis, and its left edge
@@ -557,15 +558,15 @@ A page reads as stacked sections, and each section separates itself from its nei
 by at least two of three means: **material**, **space**, **ink weight**. Approved by the
 owner on 2026-10-05 after the storage and email drafts read as one flat plane. The
 shared primitives draw it — `SectionHead` (the band, inside `LedgerSection`,
-`RecordSection`; a group inside a settings page is a caps label on a hairline instead,
-`SettingsGroupHead`), `LedgerRow` at `h-ledger-row`, `DialogHeader`,
+`RecordSection`; a group inside a settings page is a paper card whose 28px head is a
+caps label, `SettingsGroup`), `LedgerRow` at `h-ledger-row`, `DialogHeader`,
 the confirm — so every surface built on them follows; rows sit 11px in from the
 card's or the folder's edge, under its title, which puts them on the page's 24px line.
 
 - **Material.** A section head is a 44px band on bone — title, count, tabs, filters and
   the head's one action live in it — except where it opens a card: a card's own head is
   paper, standing on the card's rule. A Drive folder band is the same band; a settings
-  page is the page, so its groups take no band. A group inside a pane opens on a 28px
+  group is a card, its caps label on the card's own paper head, never a band. A group inside a pane opens on a 28px
   bone **band** with a mono caps label and an optional link right. Dialog heads and feet
   are bone. Rows sit on paper.
 - **Scale.** The section title is the title step (15/22, sans 500, sentence case); its
@@ -888,10 +889,17 @@ Decided 2026-10-09 (D80; port: `first-run-1`):
 
 ### Settings
 
-The section pattern: serif title 18, one sans sentence, a mono crumb (`SETTINGS /
-CAPITAL`) right, hairline under; then 48px rows on rules with the control on the right.
-Tables inside settings use the ledger primitives unchanged — the FX rates ledger is the
-example.
+The section pattern: the shared page head (`PageHeader`) — the serif title on the 24px
+edge, one rule across the full width, the section's one action right, ending where the
+800px column ends; no eyebrow, the nav already says where the reader is. Under it the
+bone ground holds a column of paper group cards, 800px wide from the 12px gutter, 12px
+apart: each a rule box with a 28px paper head (mono caps label, an optional count, an
+optional action right), then 48px rows on rules inset 11px — the label in a 210px lane,
+the control after it, the row's state and action in the end lane at the right. A table
+is a card whose first row is its column heads in sans 12 graphite; the FX rates ledger is
+the example. No settings card is hairline: a settings page has no folder, and a page
+with tabs (a connection) draws the plain bar inside a rule card. The Save bar sits on the
+24px edge under the same cap.
 
 **Settings by whose it is** (D81, decided 2026-10-08/09; port: project 27). Until the
 port, the shipped nav and pages stand; build toward this:

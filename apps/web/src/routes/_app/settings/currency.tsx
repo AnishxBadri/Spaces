@@ -2,7 +2,8 @@ import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import {
-  SettingsGroupHead,
+  SettingsColumns,
+  SettingsGroup,
   SettingsSection,
 } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
@@ -76,25 +77,23 @@ function FxSection({
   const currencies = new Set(rates.map((r) => r.currency)).size
 
   return (
-    <SettingsSection title="Currency & FX" crumb="Workspace">
-      <div className="flex flex-col">
-        <SettingsGroupHead
-          title="Rates"
-          count={`${rates.length} · ${currencies} ${currencies === 1 ? 'currency' : 'currencies'}`}
-        />
-
-        <div className="flex h-8 items-center border-b border-hairline text-label text-graphite">
+    <SettingsSection title="Currency & FX">
+      <SettingsGroup
+        title="Rates"
+        count={`${rates.length} · ${currencies} ${currencies === 1 ? 'currency' : 'currencies'}`}
+      >
+        <SettingsColumns className="gap-0">
           <span className="min-w-0 flex-1">Pair</span>
           <span className="w-28 shrink-0 pr-3 text-right">Rate</span>
           <span className="w-28 shrink-0">From</span>
           <span className="w-44 shrink-0">Applies to</span>
-        </div>
+        </SettingsColumns>
         {rows.map((r) => (
           <div
             key={`${r.currency}:${r.date}`}
             data-fx-row
             className={cn(
-              'flex h-10 items-center border-b border-rule',
+              'flex h-12 items-center border-b border-rule px-(--inset)',
               r.live ? 'text-foreground' : 'text-graphite',
             )}
           >
@@ -121,7 +120,7 @@ function FxSection({
         {/* The composer row: a rate is appended, never edited. */}
         <form
           onSubmit={addRate}
-          className="flex min-h-12 flex-wrap items-center gap-2 border-b border-rule py-2"
+          className="flex min-h-12 flex-wrap items-center gap-2 border-b border-rule px-(--inset) py-2"
         >
           <Input
             id="fx-ccy"
@@ -174,7 +173,7 @@ function FxSection({
             </span>
           ) : null}
         </form>
-      </div>
+      </SettingsGroup>
     </SettingsSection>
   )
 }

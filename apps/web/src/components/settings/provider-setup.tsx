@@ -3,7 +3,12 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { useSettingsDraft } from './settings-form'
-import { SettingsGroupHead, SettingsRow } from './settings-section'
+import {
+  SettingsGroupHead,
+  SettingsRow,
+  SettingsState,
+} from './settings-section'
+import { icon } from '#/components/icons'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Segmented } from '#/components/ui/segmented'
@@ -40,28 +45,35 @@ const CONSENT_HINT: Record<ConsentType, string> = {
 const CONSOLE: Record<
   ProviderId,
   ReadonlyArray<{
+    /** The step's short name, in the label lane. */
+    readonly label: string
+    /** What to do there, as a sentence. */
     readonly title: string
     readonly href: string
+    /** The small button that opens the console. */
     readonly link: string
   }>
 > = {
   google: [
     {
+      label: 'Cloud project',
       title: 'Create a Google Cloud project',
       href: 'https://console.cloud.google.com/projectcreate',
-      link: 'Open Google Cloud ↗',
+      link: 'Open Google Cloud',
     },
     {
+      label: 'APIs',
       title: 'Turn on the Gmail, Calendar and Drive APIs',
       href: 'https://console.cloud.google.com/apis/library',
-      link: 'Open the API library ↗',
+      link: 'Open the API library',
     },
   ],
   box: [
     {
+      label: 'Box app',
       title: 'Create a Box app with user authentication',
       href: 'https://app.box.com/developers/console',
-      link: 'Open the Box console ↗',
+      link: 'Open the Box console',
     },
   ],
 }
@@ -143,11 +155,17 @@ export function ProviderSetup({ view }: { view: ProviderPageView }) {
       {consoleSteps.map((step) => (
         <SettingsRow
           key={step.title}
-          label={<Step n={nextStep()}>{step.title}</Step>}
+          label={<Step n={nextStep()}>{step.label}</Step>}
+          end={
+            <Button size="sm" variant="outline" asChild>
+              <a href={step.href} target="_blank" rel="noreferrer">
+                <icon.open className="size-3" strokeWidth={2} />
+                {step.link}
+              </a>
+            </Button>
+          }
         >
-          <a href={step.href} target="_blank" rel="noreferrer" className={LINK}>
-            {step.link}
-          </a>
+          <span className="text-ui text-foreground">{step.title}</span>
         </SettingsRow>
       ))}
       {choices !== null ? (
@@ -334,10 +352,7 @@ function TestRow({ n, view }: { n: number; view: ProviderPageView }) {
         </Button>
       )}
       {view.mine === null ? null : (
-        <span className="flex items-center gap-2 mono text-micro text-foreground">
-          <span aria-hidden className="size-1.5 shrink-0 bg-primary" />
-          Works · {view.mine}
-        </span>
+        <SettingsState tone="ok">Works · {view.mine}</SettingsState>
       )}
     </SettingsRow>
   )

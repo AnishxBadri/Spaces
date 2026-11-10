@@ -1,8 +1,11 @@
 import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { Layers, Mail } from '#/components/icons'
+import { NoteKindIcon } from '#/components/note-kind-icon'
 import {
-  SettingsGroupHead,
+  SettingsColumns,
+  SettingsGroup,
   SettingsSection,
   rowOpens,
 } from '#/components/settings/settings-section'
@@ -27,6 +30,8 @@ import { Label } from '#/components/ui/label'
 import { MoreMenu } from '#/components/ui/more-menu'
 import { updateTemplate } from '#/lib/server-fns'
 import type { listTemplates } from '#/lib/server-fns'
+import { objectIcon } from '#/lib/object-icons'
+import { cn } from '#/lib/utils'
 
 const shell = getRouteApi('/_app/settings')
 
@@ -81,6 +86,42 @@ function templateKindLabel(t: {
   return RECORD_KIND[t.objectKind ?? ''] ?? 'Record'
 }
 
+const OBJECT_SLUG: Record<string, string> = {
+  company: 'companies',
+  person: 'people',
+  deal: 'deals',
+}
+
+/**
+ * The template's kind as its lead mark: the note glyph, a space's, the mail
+ * envelope, or the record's object icon. Muted on an archived row.
+ */
+function TemplateKindMark({
+  template,
+  muted = false,
+}: {
+  template: { kind: string; objectKind: string | null }
+  muted?: boolean
+}) {
+  const ink = cn('size-4 shrink-0', muted ? 'text-graphite' : 'text-foreground')
+  if (template.kind === 'note')
+    return <NoteKindIcon kind="note" className={ink} />
+  const Glyph =
+    template.kind === 'space'
+      ? Layers
+      : template.kind === 'email'
+        ? Mail
+        : objectIcon({ slug: OBJECT_SLUG[template.objectKind ?? ''] ?? null })
+  return (
+    <Glyph
+      aria-hidden
+      data-template-kind={template.kind}
+      className={ink}
+      strokeWidth={1.75}
+    />
+  )
+}
+
 /**
  * Templates are config, not entities — this is their whole management
  * surface. Creation happens by example ("Save as template" on a note,
@@ -110,17 +151,17 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
   }
 
   return (
-    <SettingsSection title="Templates" crumb="Workspace">
-      <div className="flex flex-col">
-        <SettingsGroupHead title="Templates" count={live.length} />
-        <div className="flex h-8 items-center gap-3 border-b border-hairline text-label text-graphite">
+    <SettingsSection title="Templates">
+      <SettingsGroup title="Templates" count={live.length}>
+        <SettingsColumns>
+          <span className="w-4 shrink-0" />
           <span className="min-w-0 flex-1">Template</span>
           <span className="w-32 shrink-0">Kind</span>
           <span className="w-56 shrink-0">Offered first on</span>
           <span className="w-16 shrink-0" />
-        </div>
+        </SettingsColumns>
         {live.length === 0 ? (
-          <p className="border-b border-rule py-3 text-label text-graphite">
+          <p className="border-b border-rule px-(--inset) py-3 text-label text-graphite">
             No templates.
           </p>
         ) : (
@@ -128,10 +169,10 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
             <div
               key={t.id}
               data-template-row
-              data-row
               onClick={rowOpens(() => setEditing(t))}
-              className="flex h-12 cursor-pointer items-center gap-3 border-b border-rule transition-colors duration-150 ease-out-quart hover:bg-bone"
+              className="flex h-12 cursor-pointer items-center gap-3 border-b border-rule px-(--inset) transition-colors duration-150 ease-out-quart hover:bg-bone"
             >
+              <TemplateKindMark template={t} />
               <span className="min-w-0 flex-1 truncate text-ui font-medium">
                 {t.name}
               </span>
@@ -176,17 +217,17 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
             </div>
           ))
         )}
-      </div>
+      </SettingsGroup>
 
       {archived.length > 0 ? (
-        <div className="flex flex-col">
-          <SettingsGroupHead title="Archived" count={archived.length} />
+        <SettingsGroup title="Archived" count={archived.length}>
           {archived.map((t) => (
             <div
               key={t.id}
-              data-row
-              className="flex h-12 items-center gap-3 border-b border-rule"
+              data-template-archived
+              className="flex h-12 items-center gap-3 border-b border-rule px-(--inset)"
             >
+              <TemplateKindMark template={t} muted />
               <span className="min-w-0 flex-1 truncate text-ui text-graphite line-through">
                 {t.name}
               </span>
@@ -201,7 +242,7 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
               </Button>
             </div>
           ))}
-        </div>
+        </SettingsGroup>
       ) : null}
       {editing === null ? null : (
         <EditTemplateDialog

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { folderNameOf } from '@spaces/core/documents/bindings'
 import { formatDay, formatSince } from '@spaces/core/format'
-import { SettingsGroupHead } from './settings-section'
+import { SettingsGroup } from './settings-section'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
@@ -102,13 +102,9 @@ export function BoundFoldersSection({ view }: { view: AccountBindings }) {
   const [rebinding, setRebinding] = useState<BoundFolderHealth | null>(null)
   return (
     <>
-      <div className="flex flex-col">
-        <SettingsGroupHead
-          title="Bound folders"
-          count={String(view.bindings.length)}
-        />
+      <SettingsGroup title="Bound folders" count={String(view.bindings.length)}>
         {view.bindings.length === 0 ? (
-          <p className="border-b border-rule px-3 py-3 text-label text-graphite">
+          <p className="border-b border-rule px-(--inset) py-3 text-label text-graphite">
             No folders linked.
           </p>
         ) : (
@@ -121,14 +117,13 @@ export function BoundFoldersSection({ view }: { view: AccountBindings }) {
             />
           ))
         )}
-      </div>
+      </SettingsGroup>
       {view.exports.length > 0 ? (
-        <div className="flex flex-col">
-          <SettingsGroupHead title="Exports" />
+        <SettingsGroup title="Exports">
           {view.exports.map((e) => (
             <div
               key={e.targetId}
-              className="flex min-h-12 items-center gap-3.5 border-b border-rule px-3 py-2"
+              className="flex min-h-12 items-center gap-3.5 border-b border-rule px-(--inset) py-2"
             >
               <span className="min-w-0 flex-1 truncate text-body text-foreground">
                 {filesOf(e.count)} waiting for a{' '}
@@ -139,7 +134,7 @@ export function BoundFoldersSection({ view }: { view: AccountBindings }) {
               </span>
             </div>
           ))}
-        </div>
+        </SettingsGroup>
       ) : null}
       {rebinding !== null ? (
         <RebindWindow
@@ -165,7 +160,7 @@ function BoundFolderRow({
   const name = folderNameOf(binding.folderPath)
   const open = recordOf(binding)
   return (
-    <div className="flex min-h-12 items-center gap-3.5 border-b border-rule px-3 py-2">
+    <div className="flex min-h-12 items-center gap-3.5 border-b border-rule px-(--inset) py-2">
       <span
         title={binding.folderPath}
         className="min-w-0 flex-1 truncate text-body text-foreground"

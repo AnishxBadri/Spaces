@@ -150,7 +150,7 @@ describe('IntegrationLedger', () => {
     expect(degraded).toContain('bg-[var(--badge-amber)]')
     expect(degraded).toContain('requires sdk ^2.0, host provides 1.1.0')
     expect(degraded).toContain('>degraded<')
-    expect(degraded).toContain('>Fix<')
+    expect(degraded).toContain('>Fix ›<')
 
     // Tripped: rose, the breaker's reason and count, Reset.
     expect(tripped).toContain('bg-[var(--badge-rose)]')
@@ -203,11 +203,11 @@ describe('IntegrationLedger', () => {
     const needsSetup = rowFor(html, 'needs-setup')
     expect(needsSetup).toContain('Not set up yet')
     expect(needsSetup).toContain('>not yet<')
-    expect(needsSetup).toContain('>Set up<')
+    expect(needsSetup).toContain('>Set up ›<')
     expect(needsSetup).not.toContain('badge-')
     expect(needsSetup).not.toContain('text-destructive')
     expect(needsSetup).not.toContain('missing settings')
-    expect(needsSetup).not.toContain('>Fix<')
+    expect(needsSetup).not.toContain('>Fix ›<')
   })
 
   it('shows a newer registry version and offers Update on a running row', () => {

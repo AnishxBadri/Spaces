@@ -112,7 +112,9 @@ export function SettingsForm({ children }: { children: ReactNode }) {
 }
 
 /**
- * The Save bar: a strip at the page foot, shown only while a draft is dirty.
+ * The Save bar: a strip at the page foot, shown only while a draft is dirty;
+ * paper with a hairline over it, its content on the 24px edge and ending
+ * where the 800px column of cards ends its content.
  * - It hangs from a zero-height sticky anchor and enters on transform and
  *   opacity only, so nothing on the page moves.
  * - Hidden, it is inert: its buttons take no focus and no click.
@@ -143,7 +145,7 @@ function SaveBar({
         data-shown={shown}
         className="absolute inset-x-0 bottom-0 isolate translate-y-full border-t border-hairline bg-paper opacity-0 transition-[transform,opacity] duration-[120ms] ease-out-quart data-[shown=true]:pointer-events-auto data-[shown=true]:translate-y-0 data-[shown=true]:opacity-100 data-[shown=true]:duration-[180ms] motion-reduce:transition-none"
       >
-        <div className="box-content flex h-12 max-w-200 items-center gap-3 px-3">
+        <div className="box-content flex h-12 max-w-194 items-center gap-3 px-6">
           <span className="tabular mono text-micro text-graphite">
             {count} {count === 1 ? 'change' : 'changes'}
           </span>

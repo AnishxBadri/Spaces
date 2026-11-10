@@ -2,10 +2,13 @@ import { Link, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import {
-  SettingsGroupHead,
+  SETTINGS_LINK,
+  SettingsGroup,
   SettingsRow,
   SettingsSection,
+  SettingsState,
 } from './settings-section'
+import { ProviderMark } from '#/components/provider-mark'
 import { useSettingsDraft } from './settings-form'
 import { pluginAnchor } from '#/components/integrations/registry-pane'
 import { Button } from '#/components/ui/button'
@@ -30,11 +33,10 @@ import {
  */
 export function MeetingNotesSection({ view }: { view: MeetingNotesView }) {
   return (
-    <SettingsSection title="Meeting notes" crumb="You">
-      <div className="flex flex-col">
-        <SettingsGroupHead title="Recorders" count={view.accounts.length} />
+    <SettingsSection title="Meeting notes">
+      <SettingsGroup title="Recorders" count={view.accounts.length}>
         {view.accounts.length === 0 ? (
-          <p className="border-b border-rule px-3 py-3 text-label text-graphite">
+          <p className="border-b border-rule px-(--inset) py-3 text-label text-graphite">
             No recorders connected.
           </p>
         ) : (
@@ -45,7 +47,7 @@ export function MeetingNotesSection({ view }: { view: MeetingNotesView }) {
         {view.providers.map((p) => (
           <ConnectKey key={p.provider} provider={p} />
         ))}
-      </div>
+      </SettingsGroup>
     </SettingsSection>
   )
 }
@@ -140,22 +142,18 @@ function RecorderAccount({ account }: { account: RecorderAccountView }) {
 
   return (
     <div className="flex flex-col">
-      <div className="flex min-h-12 items-center gap-3.5 border-b border-rule px-3 py-2">
+      <div className="flex min-h-12 items-center gap-3.5 border-b border-rule px-(--inset) py-2">
+        <ProviderMark brand={account.provider} />
         <div className="flex min-w-0 flex-1 items-baseline gap-2.5">
           <span className="shrink-0 text-body text-foreground">{label}</span>
           <span className="truncate mono text-micro text-graphite">
             {account.email}
           </span>
         </div>
-        <span
-          title={status.text}
-          className={
-            status.error
-              ? 'w-56 shrink-0 truncate mono text-micro text-destructive'
-              : 'w-56 shrink-0 truncate mono text-micro text-graphite'
-          }
-        >
-          {status.text}
+        <span title={status.text} className="flex w-56 shrink-0">
+          <SettingsState tone={status.error ? 'bad' : 'ok'}>
+            {status.text}
+          </SettingsState>
         </span>
         <Button
           size="sm"
@@ -229,8 +227,7 @@ function RecorderAccount({ account }: { account: RecorderAccountView }) {
   )
 }
 
-const LINK =
-  'focus-ring rounded-md text-label text-graphite hover:text-foreground'
+const LINK = SETTINGS_LINK
 
 /** A provider the reader can add: their key, or what stands in the way. */
 function ConnectKey({
@@ -249,7 +246,7 @@ function ConnectKey({
     return { key: '' }
   })
   return (
-    <SettingsRow label={provider.label}>
+    <SettingsRow label={`Add ${provider.label}`}>
       {provider.offer === 'connect' ? (
         <Input
           aria-label={`${provider.label} API key`}

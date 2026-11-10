@@ -4,12 +4,19 @@ import { toast } from 'sonner'
 import { PluginMark } from '#/components/integrations/integration-ledger'
 import { useSettingsDraft } from '#/components/settings/settings-form'
 import {
-  SettingsGroupHead,
+  SETTINGS_LINK,
+  SettingsColumns,
+  SettingsGroup,
   SettingsRow,
   SettingsSection,
+  SettingsState,
   SettingsTip,
+  rowOpens,
 } from '#/components/settings/settings-section'
+import type { SettingsTone } from '#/components/settings/settings-section'
 import { LedgerRow } from '#/components/ledger-section'
+import { FileText, Globe, Hash, Image, PenLine, Tags } from '#/components/icons'
+import type { LucideIcon } from '#/components/icons'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Segmented } from '#/components/ui/segmented'
@@ -73,7 +80,7 @@ function ModelsRoute() {
   const { providers, routes, sensitivityDefault, embeddingPin } =
     Route.useLoaderData()
   return (
-    <SettingsSection title="Models" crumb="AI">
+    <SettingsSection title="Models">
       <SensitivityGroup stored={sensitivityDefault} />
       <ProvidersGroup providers={providers} />
       <RoutingGroup
@@ -125,12 +132,11 @@ function SensitivityGroup({ stored }: { stored: AiSensitivity }) {
   }
 
   return (
-    <div className="flex flex-col">
-      <SettingsGroupHead
-        title="Sensitivity"
-        action="a record can be raised, never lowered"
-      />
-      <div className="flex items-start gap-6 border-b border-rule py-3">
+    <SettingsGroup
+      title="Sensitivity"
+      action="a record can be raised, never lowered"
+    >
+      <div className="flex items-start gap-6 border-b border-rule px-(--inset) py-3">
         <span className="w-[13.125rem] shrink-0 text-ui font-medium">
           Treat every record as
         </span>
@@ -150,7 +156,7 @@ function SensitivityGroup({ stored }: { stored: AiSensitivity }) {
           </span>
         </div>
       </div>
-    </div>
+    </SettingsGroup>
   )
 }
 
@@ -159,15 +165,15 @@ function stamp(iso: string | null, now: string): string {
   return iso ? formatWhen(iso, now) : '—'
 }
 
-type Status = { word: string; tone: 'ok' | 'bad' | 'none' }
+type Status = { word: string; tone: SettingsTone }
 
 /** The Status lane: whether the provider's last Test answered. */
 function statusOf(row: ProviderRow): Status {
-  if (!row.configured) return { word: 'not set up', tone: 'none' }
+  if (!row.configured) return { word: 'not set up', tone: 'wait' }
   if (row.status === 'invalid') return { word: 'key refused', tone: 'bad' }
   if (row.lastTestOk === true) return { word: 'works', tone: 'ok' }
   if (row.lastTestOk === false) return { word: 'failed', tone: 'bad' }
-  return { word: 'not tested', tone: 'none' }
+  return { word: 'not tested', tone: 'wait' }
 }
 
 /** The Key lane: the redacted display, or what stands in for one. */
@@ -197,18 +203,19 @@ const LANE = {
 function ProvidersGroup({ providers }: { providers: ProviderRow[] }) {
   const [open, setOpen] = useState<LlmProvider | null>(null)
   return (
-    <div id={PROVIDERS_ANCHOR} className="flex scroll-mt-6 flex-col">
-      <SettingsGroupHead
-        title="Providers"
-        action={`${providers.filter((p) => p.configured).length} of ${providers.length} set up`}
-      />
-      <div className="flex h-8 items-center gap-3 border-b border-hairline text-label text-graphite">
+    <SettingsGroup
+      id={PROVIDERS_ANCHOR}
+      className="scroll-mt-6"
+      title="Providers"
+      action={`${providers.filter((p) => p.configured).length} of ${providers.length} set up`}
+    >
+      <SettingsColumns>
         <span className="min-w-0 flex-1">Provider</span>
         <span className={LANE.key}>Key</span>
         <span className={LANE.used}>Last used</span>
         <span className={LANE.status}>Status</span>
         <span className={LANE.actions} />
-      </div>
+      </SettingsColumns>
       {providers.map((row) => (
         <ProviderLedgerRow
           key={row.provider}
@@ -217,7 +224,7 @@ function ProvidersGroup({ providers }: { providers: ProviderRow[] }) {
           onOpen={(next) => setOpen(next ? row.provider : null)}
         />
       ))}
-    </div>
+    </SettingsGroup>
   )
 }
 
@@ -257,12 +264,13 @@ function ProviderLedgerRow({
   return (
     <div
       data-provider={row.provider}
-      className={cn(
-        'flex flex-col border-b border-rule',
-        open && '-mx-3 bg-bone px-3',
-      )}
+      className={cn('flex flex-col border-b border-rule', open && 'bg-bone')}
     >
-      <div className="flex h-ledger-row items-center gap-3">
+      {/* The row is its Edit: a click anywhere on it opens the provider. */}
+      <div
+        onClick={rowOpens(() => onOpen(!open))}
+        className="flex h-12 cursor-pointer items-center gap-3 px-(--inset) transition-colors duration-150 ease-out-quart hover:bg-bone"
+      >
         <span className="flex min-w-0 flex-1 items-center gap-2.5">
           <PluginMark name={row.label} offered={!row.configured} />
           <span
@@ -285,29 +293,9 @@ function ProviderLedgerRow({
         <span className={cn(LANE.used, 'mono text-micro text-graphite')}>
           {stamp(row.lastUsedAt, now)}
         </span>
-        <span className={cn(LANE.status, 'flex items-center gap-1.5')}>
-          {status.tone === 'none' ? null : (
-            <span
-              aria-hidden
-              className={cn(
-                'size-1.5 shrink-0',
-                status.tone === 'ok' ? 'bg-primary' : 'bg-destructive',
-              )}
-            />
-          )}
-          <span
-            className={cn(
-              'truncate mono text-micro',
-              status.tone === 'ok'
-                ? 'text-primary'
-                : status.tone === 'bad'
-                  ? 'text-destructive'
-                  : 'text-graphite',
-            )}
-          >
-            {status.word}
-          </span>
-        </span>
+        <SettingsState tone={status.tone} className={LANE.status}>
+          {status.word}
+        </SettingsState>
         <span className={LANE.actions}>
           {row.configured ? (
             <Button
@@ -474,6 +462,27 @@ const LANE_JOB: Record<AiLane, string> = {
   research: 'Web research',
 }
 
+/** Each job's glyph, the one mark that tells the grid's rows apart. */
+const LANE_ICON: Record<AiLane, LucideIcon> = {
+  extract: FileText,
+  classify: Tags,
+  synthesize: PenLine,
+  embed: Hash,
+  vision: Image,
+  research: Globe,
+}
+
+function LaneIcon({ lane }: { lane: AiLane }) {
+  const Glyph = LANE_ICON[lane]
+  return (
+    <Glyph
+      aria-hidden
+      className="size-4 shrink-0 text-graphite"
+      strokeWidth={1.75}
+    />
+  )
+}
+
 const SENSITIVITY_COLUMN: Record<AiSensitivity, string> = {
   normal: 'Everyday records',
   sensitive: 'Sensitive records',
@@ -515,39 +524,34 @@ function RoutingGroup({
   // pointing at Providers instead.
   if (routable.length === 0)
     return (
-      <div data-routing-collapsed className="flex flex-col pt-7">
-        <div className="flex h-ledger-row items-center gap-6 border-y border-hairline">
-          <span className="w-[13.125rem] shrink-0 text-ui font-medium">
-            Who does what
-          </span>
-          <a
-            href={`#${PROVIDERS_ANCHOR}`}
-            className="focus-ring rounded-md text-ui text-foreground underline-offset-2 hover:underline"
-          >
+      <SettingsGroup data-routing-collapsed label="Who does what">
+        <SettingsRow label="Who does what">
+          <a href={`#${PROVIDERS_ANCHOR}`} className={SETTINGS_LINK}>
             Set up a provider ›
           </a>
-        </div>
-      </div>
+        </SettingsRow>
+      </SettingsGroup>
     )
 
   return (
-    <div className="flex flex-col">
-      <SettingsGroupHead
-        title="Who does what"
-        count={`${routed} of ${MODELS_GRID_LANES.length * AI_SENSITIVITIES.length} set`}
-        action="sensitive lists local models only"
-      />
-      <div className="flex h-8 items-center gap-3 border-b border-hairline text-label text-graphite">
+    <SettingsGroup
+      title="Who does what"
+      count={`${routed} of ${MODELS_GRID_LANES.length * AI_SENSITIVITIES.length} set`}
+      action="sensitive lists local models only"
+    >
+      <SettingsColumns>
+        <span className="w-4 shrink-0" />
         <span className="min-w-0 flex-1">Job</span>
         {AI_SENSITIVITIES.map((s) => (
           <span key={s} className="w-52 shrink-0">
             {SENSITIVITY_COLUMN[s]}
           </span>
         ))}
-      </div>
+      </SettingsColumns>
       <ol>
         {MODELS_GRID_LANES.map((lane) => (
-          <LedgerRow key={lane} className="px-0">
+          <LedgerRow key={lane} className="h-12">
+            <LaneIcon lane={lane} />
             <span className="flex min-w-0 flex-1 items-baseline truncate">
               <SettingsTip tip={<span className="mono">{lane}</span>}>
                 <span
@@ -574,7 +578,8 @@ function RoutingGroup({
             ))}
           </LedgerRow>
         ))}
-        <LedgerRow className="px-0">
+        <LedgerRow className="h-12">
+          <span className="w-4 shrink-0" />
           <span className="min-w-0 flex-1 truncate mono text-micro text-graphite">
             Embeddings · {embeddingPin?.model ?? 'none'} ·{' '}
             <Link
@@ -586,7 +591,7 @@ function RoutingGroup({
           </span>
         </LedgerRow>
       </ol>
-    </div>
+    </SettingsGroup>
   )
 }
 

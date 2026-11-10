@@ -1,12 +1,13 @@
 import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
-import { icon } from '#/components/icons'
+import { Link2, Mail, icon } from '#/components/icons'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { InitialsMark } from '#/components/record/record-parts'
 import { ResetLinkDialog } from '#/components/settings/reset-link-dialog'
 import {
-  SettingsGroupHead,
+  SettingsColumns,
+  SettingsGroup,
   SettingsSection,
 } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
@@ -153,13 +154,23 @@ function MembersSection({
     }
   }
 
+  /** An invite's link stops working at once, so revoking it asks. */
+  async function revoke(inv: Invite) {
+    const ok = await confirm({
+      title: `Revoke the invite for ${inv.email ?? 'the open link'}?`,
+      body: 'The link stops working at once. Invite them again to send a new one.',
+      action: 'Revoke',
+    })
+    if (!ok) return
+    await act(() => revokeInvite({ data: { id: inv.id } }), 'Invite revoked')
+  }
+
   const setRole = (m: Member, role: MemberRole) =>
     act(() => setMemberRole({ data: { userId: m.id, role } }), 'Role updated')
 
   return (
     <SettingsSection
       title="Members"
-      crumb="Workspace"
       action={
         isAdmin ? (
           <Button variant="outline" onClick={() => setInviting(true)}>
@@ -168,21 +179,20 @@ function MembersSection({
         ) : null
       }
     >
-      <div className="flex flex-col">
-        <SettingsGroupHead title="People" count={members.length} />
-        <div className="flex h-8 items-center gap-3 border-b border-hairline text-label text-graphite">
+      <SettingsGroup title="People" count={members.length}>
+        <SettingsColumns>
+          <span className="w-6 shrink-0" />
           <span className="min-w-0 flex-1">Person</span>
           <span className="w-28 shrink-0">Role</span>
           <span className="w-6 shrink-0" />
-        </div>
+        </SettingsColumns>
         {members.map((m) => {
           const editable = isAdmin && m.id !== me.id
           return (
             <div
               key={m.id}
               data-member-row
-              data-row
-              className="flex h-12 items-center gap-3 border-b border-rule"
+              className="flex h-12 items-center gap-3 border-b border-rule px-(--inset)"
             >
               <InitialsMark
                 name={m.name}
@@ -264,18 +274,17 @@ function MembersSection({
             </div>
           )
         })}
-      </div>
+      </SettingsGroup>
 
       {isAdmin && invites.length > 0 ? (
-        <div className="flex flex-col">
-          <SettingsGroupHead title="Waiting to join" count={invites.length} />
+        <SettingsGroup title="Waiting to join" count={invites.length}>
           {invites.map((inv) => (
             <div
               key={inv.id}
               data-invite-row
-              data-row
-              className="flex h-12 items-center gap-3 border-b border-rule"
+              className="flex h-12 items-center gap-3 border-b border-rule px-(--inset)"
             >
+              <InviteMark open={inv.email === null} />
               <span className="min-w-0 flex-1">
                 <span
                   className={cn(
@@ -292,25 +301,19 @@ function MembersSection({
                 </span>
               </span>
               <span className="flex shrink-0 justify-end">
-                <MoreMenu
-                  variant="row"
-                  label={inv.email ?? 'the open link'}
-                  items={[
-                    {
-                      label: 'Revoke invite',
-                      destructive: true,
-                      onSelect: () =>
-                        void act(
-                          () => revokeInvite({ data: { id: inv.id } }),
-                          'Invite revoked',
-                        ),
-                    },
-                  ]}
-                />
+                <Button
+                  size="xs"
+                  variant="outline"
+                  className="text-destructive"
+                  aria-label={`Revoke the invite for ${inv.email ?? 'the open link'}`}
+                  onClick={() => void revoke(inv)}
+                >
+                  Revoke…
+                </Button>
               </span>
             </div>
           ))}
-        </div>
+        </SettingsGroup>
       ) : null}
 
       {isAdmin ? (
@@ -326,6 +329,19 @@ function MembersSection({
       <ResetLinkDialog link={resetLink} onClose={() => setResetLink(null)} />
       {confirmDialog}
     </SettingsSection>
+  )
+}
+
+/** An invite's lead mark: the mail it went to, or an open link. */
+function InviteMark({ open }: { open: boolean }) {
+  const Glyph = open ? Link2 : Mail
+  return (
+    <Glyph
+      aria-hidden
+      data-invite-mark={open ? 'link' : 'mail'}
+      className="size-4 shrink-0 text-graphite"
+      strokeWidth={1.75}
+    />
   )
 }
 

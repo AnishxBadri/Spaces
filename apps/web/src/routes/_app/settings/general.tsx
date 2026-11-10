@@ -8,9 +8,11 @@ import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useSettingsDraft } from '#/components/settings/settings-form'
 import {
-  SettingsGroupHead,
+  SETTINGS_LINK,
+  SettingsGroup,
   SettingsRow,
   SettingsSection,
+  SettingsState,
 } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { useConfirm } from '#/components/ui/confirm-dialog'
@@ -30,6 +32,7 @@ import {
 import type { DemoSummary } from '#/lib/server-fns'
 import { SETUP_ITEMS } from '#/lib/setup/whats-set-up'
 import type { SetupState } from '#/lib/setup/whats-set-up'
+import { cn } from '#/lib/utils'
 
 const shell = getRouteApi('/_app/settings')
 
@@ -52,15 +55,17 @@ function GeneralRoute() {
   const data = shell.useLoaderData()
   const { demo, setUp } = Route.useLoaderData()
   return (
-    <SettingsSection title="General" crumb="Workspace" adminOnly>
-      <SettingsGroupHead title="Identity" />
-      <LogoRow
-        name={data.workspace?.name ?? ''}
-        logo={data.workspace?.logo ?? null}
-      />
-      <WorkspaceNameRow name={data.workspace?.name ?? ''} />
-      <SettingsGroupHead title="Defaults" />
-      <BaseCurrencyRow baseCurrency={data.fx.baseCurrency} />
+    <SettingsSection title="General" adminOnly>
+      <SettingsGroup title="Identity">
+        <LogoRow
+          name={data.workspace?.name ?? ''}
+          logo={data.workspace?.logo ?? null}
+        />
+        <WorkspaceNameRow name={data.workspace?.name ?? ''} />
+      </SettingsGroup>
+      <SettingsGroup title="Defaults">
+        <BaseCurrencyRow baseCurrency={data.fx.baseCurrency} />
+      </SettingsGroup>
       {demo === null ? null : <DemoDataRow demo={demo} />}
       <WhatsSetUp state={setUp} />
     </SettingsSection>
@@ -118,8 +123,7 @@ function DemoDataRow({ demo }: { demo: DemoSummary }) {
   }
 
   return (
-    <>
-      <SettingsGroupHead title="Demo data" />
+    <SettingsGroup title="Demo data">
       <SettingsRow label="Loaded">
         <span className="mono text-micro text-graphite">
           {counts.length === 0 ? 'nothing left' : counts.join(' · ')}
@@ -133,34 +137,46 @@ function DemoDataRow({ demo }: { demo: DemoSummary }) {
         </Button>
         {confirmDialog}
       </SettingsRow>
-    </>
+    </SettingsGroup>
   )
 }
 
-/** The seven pieces a workspace can bring, passive: state, what it unlocks, a link. */
+/**
+ * The seven pieces a workspace can bring, passive: what each unlocks, then
+ * its state and its link in the end lane.
+ */
 function WhatsSetUp({ state }: { state: SetupState }) {
   const set = SETUP_ITEMS.filter((item) => state[item.id]).length
   return (
-    <div className="flex flex-col">
-      <SettingsGroupHead
-        title="What's set up"
-        count={`${set} of ${SETUP_ITEMS.length}`}
-      />
+    <SettingsGroup
+      title="What's set up"
+      count={`${set} of ${SETUP_ITEMS.length}`}
+    >
       {/* The one line each item unlocks is the item itself, not a hint. */}
       {SETUP_ITEMS.map((item) => (
-        <SettingsRow key={item.id} label={item.label} hint={item.unlocks}>
-          <span className="mono text-micro text-graphite">
-            {state[item.id] ? 'set' : 'not set'}
-          </span>
-          <Link
-            to={item.to}
-            className="focus-ring mono text-micro text-primary hover:underline"
-          >
-            {state[item.id] ? 'Open' : 'Set up'} ›
-          </Link>
-        </SettingsRow>
+        <SettingsRow
+          key={item.id}
+          label={item.label}
+          hint={item.unlocks}
+          end={
+            <>
+              <SettingsState
+                tone={state[item.id] ? 'ok' : 'wait'}
+                className="w-16"
+              >
+                {state[item.id] ? 'set' : 'not set'}
+              </SettingsState>
+              <Link
+                to={item.to}
+                className={cn(SETTINGS_LINK, 'inline-block w-16 text-right')}
+              >
+                {state[item.id] ? 'Open' : 'Set up'} ›
+              </Link>
+            </>
+          }
+        />
       ))}
-    </div>
+    </SettingsGroup>
   )
 }
 

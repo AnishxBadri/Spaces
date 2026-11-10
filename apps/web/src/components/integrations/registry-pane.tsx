@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { SettingsGroupHead } from '#/components/settings/settings-section'
+import { SettingsGroup } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { Segmented } from '#/components/ui/segmented'
 import { catalogueTabs, inTab, roleWords } from '#/lib/integrations/catalogue'
@@ -85,25 +85,27 @@ export function RegistryPane({
   const tab = tabs.some((t) => t.id === chosen) ? chosen : 'all'
   const shown = available.filter((p) => inTab(p, tab))
   return (
-    <div className="flex flex-col">
-      <SettingsGroupHead
-        title="Available"
-        {...(available.length > 0 && view.error === null
-          ? {}
-          : { count: String(available.length) })}
-        action="signed by the project"
-      />
+    <SettingsGroup
+      title="Available"
+      {...(available.length > 0 && view.error === null
+        ? {}
+        : { count: String(available.length) })}
+      action="signed by the project"
+    >
       {view.error !== null ? (
-        <p role="alert" className="px-3 py-3 mono text-micro text-destructive">
+        <p
+          role="alert"
+          className="px-(--inset) py-3 mono text-micro text-destructive"
+        >
           {view.error}
         </p>
       ) : available.length === 0 ? (
-        <p className="px-3 py-3 text-ui text-graphite">
+        <p className="px-(--inset) py-3 text-ui text-graphite">
           Nothing in the registry that is not installed.
         </p>
       ) : (
         <>
-          <div className="flex border-b border-rule px-3 py-2">
+          <div className="flex border-b border-rule px-(--inset) py-2">
             <Segmented<CatalogueTab>
               label="Available plugins by job"
               options={tabs}
@@ -118,7 +120,7 @@ export function RegistryPane({
                 id={pluginAnchor(plugin.pluginId)}
                 data-plugin={plugin.pluginId}
                 className={cn(
-                  'flex min-h-ledger-row scroll-mt-6 items-center gap-3 px-3 py-1.5',
+                  'flex min-h-12 scroll-mt-6 items-center gap-3 px-(--inset) py-1.5',
                   i !== shown.length - 1 && 'border-b border-rule',
                 )}
               >
@@ -160,6 +162,6 @@ export function RegistryPane({
           </ol>
         </>
       )}
-    </div>
+    </SettingsGroup>
   )
 }

@@ -173,13 +173,11 @@ function AppShell() {
         ) : null}
 
         {/* The ground: under a page's paper head its body is bone to the
-          foot of the view, and the page fills the height. Settings keeps
-          its own paper. */}
+          foot of the view, and the page fills the height. */}
         <main
-          data-ground={onSettings ? 'paper' : 'bone'}
+          data-ground="bone"
           className={cn(
-            'flex min-w-0 flex-1 flex-col pt-12 *:flex-1 md:pt-0',
-            onSettings ? 'bg-paper' : 'bg-bone',
+            'flex min-w-0 flex-1 flex-col bg-bone pt-12 *:flex-1 md:pt-0',
             narrow ? 'md:pl-12' : 'md:pl-58',
           )}
         >

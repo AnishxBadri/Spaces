@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { EmptyRow } from '#/components/ledger-section'
 import {
-  SettingsGroupHead,
+  SettingsColumns,
+  SettingsGroup,
   SettingsSection,
 } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
@@ -17,7 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '#/components/ui/dialog'
-import { MoreMenu } from '#/components/ui/more-menu'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { createApiToken, listApiTokens, revokeApiToken } from '#/lib/server-fns'
@@ -101,7 +101,6 @@ function TokensRoute() {
   return (
     <SettingsSection
       title="API tokens"
-      crumb="You"
       action={
         <Button variant="outline" onClick={() => setCreating(true)}>
           New token
@@ -109,30 +108,28 @@ function TokensRoute() {
       }
     >
       {tokens.length === 0 ? (
-        <div className="flex flex-col pt-7">
+        <SettingsGroup label="Your tokens">
           <EmptyRow name="Tokens" onAdd={() => setCreating(true)} />
-        </div>
+        </SettingsGroup>
       ) : (
-        <div className="flex flex-col">
-          <SettingsGroupHead
-            title="Your tokens"
-            count={`${live} live · ${tokens.length - live} revoked`}
-          />
-          <div className="flex h-8 items-center gap-3 border-b border-hairline text-label text-graphite">
+        <SettingsGroup
+          title="Your tokens"
+          count={`${live} live · ${tokens.length - live} revoked`}
+        >
+          <SettingsColumns>
             <span className="min-w-0 flex-1">Name</span>
             <span className="w-32 shrink-0">It may</span>
             <span className="w-16 shrink-0">Created</span>
             <span className="w-28 shrink-0">Last used</span>
             <span className="w-16 shrink-0" />
-          </div>
+          </SettingsColumns>
           {tokens.map((t) => (
             <div
               key={t.id}
               data-token-row
-              data-row
               {...(t.revokedAt ? { 'data-revoked': '' } : {})}
               className={cn(
-                'flex h-10 items-center gap-3 border-b border-rule',
+                'flex h-12 items-center gap-3 border-b border-rule px-(--inset)',
                 t.revokedAt && 'text-graphite line-through',
               )}
             >
@@ -170,23 +167,20 @@ function TokensRoute() {
               </span>
               <span className="flex w-16 shrink-0 justify-end">
                 {t.revokedAt ? null : (
-                  <MoreMenu
-                    variant="row"
-                    label={t.name}
-                    items={[
-                      {
-                        label: 'Revoke…',
-                        destructive: true,
-                        opens: true,
-                        onSelect: () => void revoke(t),
-                      },
-                    ]}
-                  />
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    className="text-destructive"
+                    aria-label={`Revoke ${t.name}`}
+                    onClick={() => void revoke(t)}
+                  >
+                    Revoke…
+                  </Button>
                 )}
               </span>
             </div>
           ))}
-        </div>
+        </SettingsGroup>
       )}
       <NewTokenDialog
         open={creating}

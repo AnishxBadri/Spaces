@@ -9,7 +9,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { ObjectDialog } from '#/components/objects/object-dialog'
 import {
-  SettingsGroupHead,
+  SettingsGroup,
   SettingsSection,
 } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
@@ -69,7 +69,6 @@ function ObjectsSection({
   return (
     <SettingsSection
       title="Objects"
-      crumb="Workspace"
       action={
         isAdmin ? (
           <ObjectDialog
@@ -85,26 +84,27 @@ function ObjectsSection({
         ) : null
       }
     >
-      <SettingsGroupHead title="Built in" count={String(builtIn.length)} />
-      <ObjectList objects={builtIn} label="Built-in objects" />
+      <SettingsGroup title="Built in" count={String(builtIn.length)}>
+        <ObjectList objects={builtIn} label="Built-in objects" />
+      </SettingsGroup>
 
-      <SettingsGroupHead title="Yours" count={String(yours.length)} />
-      {yours.length === 0 ? (
-        <p className="border-b border-rule py-3 text-label text-graphite">
-          No objects of your own.
-        </p>
-      ) : (
-        <ObjectList objects={yours} label="Your objects" />
-      )}
+      <SettingsGroup title="Yours" count={String(yours.length)}>
+        {yours.length === 0 ? (
+          <p className="border-b border-rule px-(--inset) py-3 text-label text-graphite">
+            No objects of your own.
+          </p>
+        ) : (
+          <ObjectList objects={yours} label="Your objects" />
+        )}
+      </SettingsGroup>
 
       {archived.length > 0 ? (
-        <>
-          <SettingsGroupHead title="Archived" count={String(archived.length)} />
+        <SettingsGroup title="Archived" count={String(archived.length)}>
           <ul aria-label="Archived objects" className="flex flex-col">
             {archived.map((o) => (
               <li
                 key={o.id}
-                className="flex h-11 items-center gap-3 border-b border-rule text-graphite"
+                className="flex h-12 items-center gap-3 border-b border-rule px-(--inset) text-graphite"
               >
                 <ObjectMark object={o} muted />
                 <span className="min-w-0 flex-1 truncate text-ui line-through">
@@ -123,7 +123,7 @@ function ObjectsSection({
               </li>
             ))}
           </ul>
-        </>
+        </SettingsGroup>
       ) : null}
     </SettingsSection>
   )
@@ -164,11 +164,11 @@ function ObjectList({
   return (
     <ul aria-label={label} className="flex flex-col">
       {objects.map((o) => (
-        <li key={o.id}>
+        <li key={o.id} className="border-b border-rule">
           <Link
             to="/settings/objects/$objectSlug"
             params={{ objectSlug: o.slug }}
-            className="focus-ring-inset flex h-11 items-center gap-3 border-b border-rule transition-colors duration-150 ease-out-quart hover:bg-bone"
+            className="focus-ring-inset flex h-12 items-center gap-3 px-(--inset) transition-colors duration-150 ease-out-quart hover:bg-bone"
           >
             <ObjectMark object={o} />
             <span className="min-w-0 flex-1 truncate text-ui font-medium">

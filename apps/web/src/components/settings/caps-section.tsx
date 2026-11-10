@@ -2,7 +2,7 @@ import { useRouter } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { useSettingsDraft } from './settings-form'
 import {
-  SettingsGroupHead,
+  SettingsGroup,
   SettingsRow,
   SettingsTip,
   readOnlyLine,
@@ -56,15 +56,14 @@ export function LimitsGroup({ caps }: { caps: CapsView }) {
   )
 
   return (
-    <div className="flex flex-col">
-      <SettingsGroupHead
-        title="Limits"
-        action={
-          page.isAdmin ? undefined : (
-            <span data-read-only>{readOnlyLine(page.admins)}</span>
-          )
-        }
-      />
+    <SettingsGroup
+      title="Limits"
+      action={
+        page.isAdmin ? undefined : (
+          <span data-read-only>{readOnlyLine(page.admins)}</span>
+        )
+      }
+    >
       <fieldset disabled={!page.isAdmin} className="contents">
         <SettingsRow label="Daily limit">
           <SettingsTip tip="Tokens in and out across every lane, per UTC day. Blank is no limit.">
@@ -101,6 +100,6 @@ export function LimitsGroup({ caps }: { caps: CapsView }) {
           <span className="mono text-micro text-graphite">tokens</span>
         </SettingsRow>
       </fieldset>
-    </div>
+    </SettingsGroup>
   )
 }

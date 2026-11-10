@@ -9,7 +9,9 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import {
-  SettingsGroupHead,
+  SETTINGS_LINK,
+  SettingsColumns,
+  SettingsGroup,
   SettingsSection,
   useSettingsPage,
 } from './settings-section'
@@ -65,8 +67,7 @@ const TITLE = {
   files: 'Files',
 } as const satisfies Record<AccountPageJob, string>
 
-const LINK =
-  'focus-ring rounded-md text-label text-graphite hover:text-foreground'
+const LINK = SETTINGS_LINK
 
 /** An account page's link: the list page's own drill-in, so its nav row stays lit. */
 function OptionsLink({
@@ -111,11 +112,17 @@ export function AccountsSection({
   const sender =
     job === 'email-calendar' ? defaultMailAccount(view.connections) : null
   return (
-    <SettingsSection title={TITLE[job]} crumb="You">
-      <div className="flex flex-col">
-        <SettingsGroupHead title="Accounts" count={accounts.length} />
+    <SettingsSection title={TITLE[job]}>
+      <SettingsGroup title="Accounts" count={accounts.length}>
+        <SettingsColumns className="gap-3.5">
+          <span className="w-7 shrink-0" />
+          <span className="min-w-0 flex-1">Account</span>
+          <span className="w-36 shrink-0">Used for</span>
+          <span className="w-56 shrink-0">Status</span>
+          <span className="w-20 shrink-0" />
+        </SettingsColumns>
         {accounts.length === 0 ? (
-          <p className="border-b border-rule px-3 py-3 text-label text-graphite">
+          <p className="border-b border-rule px-(--inset) py-3 text-label text-graphite">
             No accounts connected.
           </p>
         ) : (
@@ -144,7 +151,7 @@ export function AccountsSection({
             returnTo={JOB_PAGE[job]}
           />
         ))}
-      </div>
+      </SettingsGroup>
       {forwarding !== undefined ? (
         <ForwardingAddress address={forwarding.address} />
       ) : null}
@@ -196,7 +203,7 @@ function AccountRow({
   const { today } = useClock()
   const first = account.held.at(0)
   return (
-    <div className="flex min-h-12 items-center gap-3.5 border-b border-rule px-3 py-2">
+    <div className="flex min-h-12 items-center gap-3.5 border-b border-rule px-(--inset) py-2">
       <ProductMark provider={account.provider} product={mark} />
       <div className="flex min-w-0 flex-1 items-baseline gap-2.5">
         <span className="truncate text-body text-foreground">
@@ -242,7 +249,7 @@ function ConnectRow({
 }) {
   const label = PROVIDERS[provider].label
   return (
-    <div className="flex min-h-12 items-center gap-3.5 border-b border-rule px-3 py-2">
+    <div className="flex min-h-12 items-center gap-3.5 border-b border-rule px-(--inset) py-2">
       <ProductMark
         provider={provider}
         product={productsOf(provider).at(0)?.product ?? provider}
@@ -306,21 +313,20 @@ function ForwardingAddress({ address }: { address: string | null }) {
     )
   }
   return (
-    <div className="flex flex-col">
-      <SettingsGroupHead
-        title="Bcc address"
-        action={
-          <Link to="/settings/email-forwarding" className={LINK}>
-            Email forwarding ›
-          </Link>
-        }
-      />
+    <SettingsGroup
+      title="Bcc address"
+      action={
+        <Link to="/settings/email-forwarding" className={LINK}>
+          Email forwarding ›
+        </Link>
+      }
+    >
       {address === null ? (
-        <p className="border-b border-rule px-3 py-3 text-label text-graphite">
+        <p className="border-b border-rule px-(--inset) py-3 text-label text-graphite">
           No forwarding address.
         </p>
       ) : (
-        <div className="flex min-h-12 items-center gap-3 border-b border-rule px-3 py-2">
+        <div className="flex min-h-12 items-center gap-3 border-b border-rule px-(--inset) py-2">
           <code className="min-w-0 flex-1 truncate mono text-label text-foreground">
             {address}
           </code>
@@ -335,7 +341,7 @@ function ForwardingAddress({ address }: { address: string | null }) {
           </Button>
         </div>
       )}
-    </div>
+    </SettingsGroup>
   )
 }
 
@@ -401,10 +407,12 @@ export function AccountSection({
   const row = view.connections.find((r) => r.connectionId === connectionId)
   if (row === undefined)
     return (
-      <SettingsSection title={TITLE[job]} crumb="You">
-        <p className="border-b border-rule px-3 py-3 text-label text-graphite">
-          No such account.
-        </p>
+      <SettingsSection title={TITLE[job]}>
+        <SettingsGroup label="Account">
+          <p className="px-(--inset) py-3 text-label text-graphite">
+            No such account.
+          </p>
+        </SettingsGroup>
       </SettingsSection>
     )
   const account = accountOf(row, job, view.connections)
@@ -501,7 +509,7 @@ export function AccountSection({
   return (
     <SettingsSection
       title={account.email}
-      crumb="You"
+      meta={`${provider} · ${syncStateOf(account.held, today).text}`}
       action={
         <Button
           variant="outline"
@@ -512,11 +520,7 @@ export function AccountSection({
         </Button>
       }
     >
-      <p className="px-3 pt-3 mono text-micro text-graphite">
-        {provider} · {syncStateOf(account.held, today).text}
-      </p>
-      <div className="flex flex-col">
-        <SettingsGroupHead title="Used for" />
+      <SettingsGroup title="Used for">
         {productsOf(account.provider).map(({ product, entry }) => {
           const held = account.rows.find((r) => r.product === product)
           return (
@@ -539,7 +543,7 @@ export function AccountSection({
             />
           )
         })}
-      </div>
+      </SettingsGroup>
       {mail ? (
         <MailSyncSettings connectionId={mail.connectionId} view={mail.view} />
       ) : null}
@@ -609,7 +613,7 @@ function ProductRow({
   return (
     <label
       className={cn(
-        'flex min-h-12 items-center gap-3.5 border-b border-rule px-3 py-2',
+        'flex min-h-12 items-center gap-3.5 border-b border-rule px-(--inset) py-2',
         canTick && !disabled && 'cursor-pointer',
       )}
     >
@@ -641,13 +645,14 @@ function ProductMark({
 }) {
   return (
     <span className="flex size-7 shrink-0 items-center justify-center border border-hairline bg-paper">
-      <ProviderMark
-        brand={
-          provider === 'box' ? 'box' : (PRODUCT_BRAND[product] ?? 'google')
-        }
-      />
+      <ProviderMark brand={productBrand(provider, product)} />
     </span>
   )
+}
+
+/** The mark a provider's product wears: Gmail's, Drive's, or the provider's. */
+export function productBrand(provider: ProviderId, product: string): Brand {
+  return provider === 'box' ? 'box' : (PRODUCT_BRAND[product] ?? 'google')
 }
 
 /** Each Google product's own mark. */

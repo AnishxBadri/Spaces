@@ -1,6 +1,9 @@
 import { Link } from '@tanstack/react-router'
 import { ProviderMark, brandOf } from '#/components/provider-mark'
-import { SettingsGroupHead } from '#/components/settings/settings-section'
+import {
+  SETTINGS_LINK,
+  SettingsGroup,
+} from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { Switch } from '#/components/ui/switch'
 import { roleWords } from '#/lib/integrations/catalogue'
@@ -8,10 +11,11 @@ import type { IntegrationRow, IntegrationState } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 /**
- * The Installed ledger: one 40px row per plugin — the operator's switch,
+ * The Installed ledger: one 48px row per plugin — the operator's switch,
  * its mark, name and version, the jobs it does, its state over the one
  * number that matters (credits, signals, people connected), and `Open ›`,
- * or `Update` when the registry has a newer version it can run.
+ * or `Update` when the registry has a newer version it can run. A way to
+ * the plugin's page is a mono `›` link; an act in place is a small button.
  * The three ways of not running read apart:
  * - degraded — amber row, the worker's reason, Fix;
  * - tripped — rose row, the breaker's reason, Reset;
@@ -134,9 +138,6 @@ export type LedgerActions = {
   readonly pending: string | null
 }
 
-const LINK =
-  'focus-ring rounded-md text-label text-graphite hover:text-foreground'
-
 function ActionLane({
   row,
   actions,
@@ -158,34 +159,23 @@ function ActionLane({
           Reset
         </Button>
       )
+    // Each of these goes to the plugin's page: a mono link, never a button.
     case 'degraded':
       return (
-        <Link
-          to={to}
-          params={params}
-          className={cn(LINK, 'font-medium text-primary')}
-        >
-          Fix
+        <Link to={to} params={params} className={SETTINGS_LINK}>
+          Fix ›
         </Link>
       )
     case 'needs-key':
       return (
-        <Link
-          to={to}
-          params={params}
-          className={cn(LINK, 'font-medium text-primary')}
-        >
-          Add key
+        <Link to={to} params={params} className={SETTINGS_LINK}>
+          Add key ›
         </Link>
       )
     case 'needs-setup':
       return (
-        <Link
-          to={to}
-          params={params}
-          className={cn(LINK, 'font-medium text-primary')}
-        >
-          Set up
+        <Link to={to} params={params} className={SETTINGS_LINK}>
+          Set up ›
         </Link>
       )
     default:
@@ -199,7 +189,7 @@ function ActionLane({
           Update
         </Button>
       ) : (
-        <Link to={to} params={params} className={LINK}>
+        <Link to={to} params={params} className={SETTINGS_LINK}>
           Open ›
         </Link>
       )
@@ -221,7 +211,7 @@ function LedgerLine({
     <li
       data-state={row.state}
       className={cn(
-        'flex h-ledger-row items-center gap-3 px-3',
+        'flex h-12 items-center gap-3 px-(--inset)',
         !last && 'border-b border-rule',
         ROW_TINT[row.state],
       )}
@@ -326,10 +316,11 @@ export function IntegrationLedger({
   actions: LedgerActions
 }) {
   return (
-    <div className="flex flex-col">
-      <SettingsGroupHead title="Installed" count={String(rows.length)} />
+    <SettingsGroup title="Installed" count={String(rows.length)}>
       {rows.length === 0 ? (
-        <p className="px-3 py-3 text-ui text-graphite">No plugins installed.</p>
+        <p className="px-(--inset) py-3 text-ui text-graphite">
+          No plugins installed.
+        </p>
       ) : (
         <ol>
           {rows.map((row, i) => (
@@ -342,6 +333,6 @@ export function IntegrationLedger({
           ))}
         </ol>
       )}
-    </div>
+    </SettingsGroup>
   )
 }

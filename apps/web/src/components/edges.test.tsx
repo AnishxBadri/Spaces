@@ -16,7 +16,12 @@ import {
   PageHeader,
 } from './page-header'
 import { ProviderMark, brandOf } from './provider-mark'
-import { SettingsRow, SettingsSection } from './settings/settings-section'
+import {
+  SETTINGS_HEAD_CAP,
+  SettingsGroup,
+  SettingsRow,
+  SettingsSection,
+} from './settings/settings-section'
 import { ReadoutStrip, RecordBody, RecordHeader } from './record/record-parts'
 import { Tabs } from './ui/tabs'
 
@@ -229,12 +234,12 @@ describe('E2 · one rule under the head, the ··· on the content’s right edg
 })
 
 describe('E9 · the ground is bone, the sheets are paper', () => {
-  it('lays the bone ground under every app page but settings, and the head on paper', () => {
+  it('lays the bone ground under every app page, settings included, and the head on paper', () => {
     const app = read('routes/_app.tsx')
-    expect(app).toContain("data-ground={onSettings ? 'paper' : 'bone'}")
-    expect(app).toContain("onSettings ? 'bg-paper' : 'bg-bone'")
+    expect(app).toContain('data-ground="bone"')
+    expect(app).not.toMatch(/onSettings \? 'bg-paper'/)
     // The page fills the view, so the ground runs to its foot.
-    expect(app).toMatch(/'flex min-w-0 flex-1 flex-col pt-12 \*:flex-1/)
+    expect(app).toMatch(/'flex min-w-0 flex-1 flex-col bg-bone pt-12 \*:flex-1/)
     expect(
       classesOf(renderToStaticMarkup(<PageHeader title="Deals" />), 'min-h-26'),
     ).toContain('bg-paper')
@@ -441,39 +446,90 @@ describe('the 32px gutter is gone', () => {
   })
 })
 
-describe('E4 · settings cap at 800px, left-aligned', () => {
-  it('holds the section, its head and its Save bar in one 800px column on the 12px edge', () => {
-    const shell = read('routes/_app/settings.tsx')
-    expect(shell).toMatch(
-      /className="box-content flex max-w-200 flex-col gap-12 px-3 /,
-    )
-    expect(shell).not.toMatch(/mx-auto/)
-    expect(read('components/settings/settings-form.tsx')).toMatch(
-      /box-content flex h-12 max-w-200 items-center gap-3 px-3/,
-    )
-    // 50rem: 800px of content, with the 12px edge outside it.
-    expect(50 * 16).toBe(800)
-  })
+describe('E4 · settings: the shared head, then group cards 800px wide on the ground', () => {
+  const settingsCard =
+    /@utility settings-card \{[\s\S]*?\n\}/.exec(css)?.[0] ?? ''
 
-  it('puts the head’s action and the rows in that one column, with no padding of their own', () => {
-    const html = renderToStaticMarkup(
-      <SettingsSection
-        title="Currency"
-        crumb="Workspace"
-        action={<button type="button">Add rate</button>}
-      >
+  const page = renderToStaticMarkup(
+    <SettingsSection
+      title="Currency"
+      action={<button type="button">Add rate</button>}
+    >
+      <SettingsGroup title="Rates" count="3">
         <SettingsRow label="Base">
           <button type="button">USD</button>
         </SettingsRow>
-      </SettingsSection>,
-    )
-    const head = classesOf(html, 'pb-2.5')
+      </SettingsGroup>
+      <SettingsGroup label="Ungrouped">
+        <SettingsRow label="Name" />
+      </SettingsGroup>
+    </SettingsSection>,
+  )
+
+  it('draws the shared PageHeader: title on the 24px edge, one rule, no eyebrow', () => {
+    const head = classesOf(page, 'min-h-26')
     expect(head).toEqual(
-      expect.arrayContaining(['justify-between', 'border-b', 'border-rule']),
+      expect.arrayContaining(['bg-paper', 'border-b', 'border-rule', 'px-6']),
     )
-    expect(head.some((c) => /^p[xr]-/.test(c))).toBe(false)
-    const row = classesOf(html, 'min-h-12')
-    expect(row.some((c) => /^p[xr]-/.test(c))).toBe(false)
+    expect(page).not.toMatch(/Settings · /)
+    expect(page).toContain('<h1')
+  })
+
+  it('ends the head’s action where the 800px column ends its content', () => {
+    // 12px gutter + 800px card − 1px rule − 11px inset = 800px from the left.
+    expect(SETTINGS_HEAD_CAP).toBe('pr-[max(1.5rem,calc(100%-50rem))]')
+    expect(classesOf(page, 'min-h-26')).toContain(SETTINGS_HEAD_CAP)
+    expect(GUTTER_PX + 800 - 1 - remPx(cardBlock, '--inset')).toBe(800)
+  })
+
+  it('lays the cards on the bone ground in one 800px column from the gutter, 12px apart', () => {
+    const body = classesAt(page, 'data-page-body')
+    expect(body).toEqual(expect.arrayContaining(['bg-bone', 'p-3']))
+    const column = classesAt(page, 'data-settings-body')
+    expect(column).toEqual(
+      expect.arrayContaining(['max-w-200', 'gap-3', 'w-full']),
+    )
+    expect(column.some((c) => /^p[xlr]?-/.test(c))).toBe(false)
+  })
+
+  it('makes every group a paper rule card with its label on paper, rows on the 11px inset', () => {
+    expect(page.match(/class="[^"]*\bcard settings-card\b/g)).toHaveLength(2)
+    const head = classesAt(page, 'data-settings-group')
+    expect(head).toEqual(
+      expect.arrayContaining([
+        'h-7',
+        'border-b',
+        'border-rule',
+        'px-(--inset)',
+      ]),
+    )
+    expect(head.some((c) => c.startsWith('bg-'))).toBe(false)
+    const row = classesAt(page, 'data-settings-row')
+    expect(row).toEqual(
+      expect.arrayContaining([
+        'min-h-12',
+        'border-b',
+        'border-rule',
+        'px-(--inset)',
+      ]),
+    )
+    // The last row stands on the card's own bottom rule.
+    expect(settingsCard).toMatch(
+      /& > :last-child,[\s\S]*border-bottom-width: 0/,
+    )
+    // No card on a settings page is hairline: there is no folder.
+    const body = page.slice(page.indexOf('data-settings-body'))
+    expect(body.slice(0, body.indexOf('data-save-anchor'))).not.toMatch(
+      /border-hairline|\bfolder\b/,
+    )
+  })
+
+  it('keeps the Save bar on the 24px edge under the same cap', () => {
+    // 24px edge + 776px of content: its last control ends where the cards' does.
+    expect(read('components/settings/settings-form.tsx')).toMatch(
+      /box-content flex h-12 max-w-194 items-center gap-3 px-6/,
+    )
+    expect(24 + 194 * STEP_PX).toBe(800)
   })
 
   it('keeps lists full width: no cap on a list route', () => {

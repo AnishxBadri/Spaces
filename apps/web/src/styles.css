@@ -519,6 +519,17 @@
 }
 
 /**
+ * A settings group card (`SettingsGroup`): rows of any shape, the last one
+ * standing on the card's bottom rule rather than doubling it.
+ */
+@utility settings-card {
+  & > :last-child,
+  & > :last-child > :last-child {
+    border-bottom-width: 0;
+  }
+}
+
+/**
  * The folder's body: the page's one ink object. Paper in a hairline frame
  * open at the top, where the folder bar's foot line and its open tab close
  * it; rows inset 11px like a card's.

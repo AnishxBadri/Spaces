@@ -2,7 +2,7 @@ import { useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useSettingsDraft } from './settings-form'
-import { SettingsGroupHead, SettingsRow } from './settings-section'
+import { SettingsGroup, SettingsRow } from './settings-section'
 import { Input } from '#/components/ui/input'
 import { Switch } from '#/components/ui/switch'
 import { useConfirm } from '#/components/ui/confirm-dialog'
@@ -112,8 +112,7 @@ export function MailSyncSettings({
   }
 
   return (
-    <div className="flex flex-col">
-      <SettingsGroupHead title="Mail sync" />
+    <SettingsGroup title="Mail sync">
       <SettingsRow
         label="Email bodies"
         hint="Subject, people and date are visible to the workspace."
@@ -150,6 +149,6 @@ export function MailSyncSettings({
         />
       </SettingsRow>
       {confirmDialog}
-    </div>
+    </SettingsGroup>
   )
 }

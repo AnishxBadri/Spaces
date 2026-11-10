@@ -9,9 +9,13 @@ import {
   SettingsFields,
   WebhookUrlRow,
 } from '#/components/integrations/integration-settings'
+import { PluginMark } from '#/components/integrations/integration-ledger'
 import { PluginTemplate } from '#/components/integrations/plugin-template'
 import { useSettingsDraft } from '#/components/settings/settings-form'
-import { SettingsSection } from '#/components/settings/settings-section'
+import {
+  SettingsBack,
+  SettingsSection,
+} from '#/components/settings/settings-section'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import { MoreMenu } from '#/components/ui/more-menu'
 import { loadPluginPage, toProviderIfBundled } from '#/lib/settings-moves'
@@ -219,7 +223,8 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
   return (
     <SettingsSection
       title={detail.name}
-      crumb="Integrations"
+      back={<SettingsBack to="/settings/plugins">Plugins</SettingsBack>}
+      mark={<PluginMark name={detail.name} />}
       action={
         // One of the two is the head's outline action; both share a `···`.
         // Not disabled while a write runs: a `···` with nothing enabled

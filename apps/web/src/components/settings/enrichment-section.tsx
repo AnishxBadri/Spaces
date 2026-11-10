@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
 import { ProviderMark, brandOf } from '#/components/provider-mark'
 import { ReadoutStrip } from '#/components/record/record-parts'
+import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import {
   DropdownMenu,
@@ -35,7 +36,8 @@ import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 import { useSettingsDraft } from './settings-form'
 import {
-  SettingsGroupHead,
+  SettingsColumns,
+  SettingsGroup,
   SettingsRow,
   SettingsSection,
   SettingsTip,
@@ -55,9 +57,9 @@ import {
  */
 export function EnrichmentSection({ page }: { page: EnrichmentPage }) {
   return (
-    <SettingsSection title="Enrichment" crumb="Integrations">
+    <SettingsSection title="Enrichment">
       <ReadoutStrip
-        className="border-t-0 border-b border-rule"
+        boxed
         readouts={[
           {
             label: 'Fields filled · 7 days',
@@ -157,8 +159,11 @@ function SourcesBlock({
   }
 
   return (
-    <section data-block="sources" className="flex flex-col">
-      <SettingsGroupHead title="Sources, in order" action="first answer wins" />
+    <SettingsGroup
+      data-block="sources"
+      title="Sources, in order"
+      action="first answer wins"
+    >
       <ol aria-label="Enrichment sources">
         {rows.map((source, idx) => (
           <li
@@ -188,7 +193,7 @@ function SourcesBlock({
                 void persist(moveItem(rows, from, idx), 'Order saved')
             }}
             className={cn(
-              'flex min-h-13 items-center gap-3 border-b border-rule px-3 py-2 transition-[background-color,opacity] duration-150 ease-out-quart',
+              'flex min-h-13 items-center gap-3 border-b border-rule px-(--inset) py-2 transition-[background-color,opacity] duration-150 ease-out-quart',
               dragging === source.id && 'opacity-50',
               over === source.id && dragging !== source.id && 'bg-bone',
             )}
@@ -291,12 +296,12 @@ function SourcesBlock({
           </li>
         ))}
       </ol>
-      <div className="flex h-9 items-center px-3">
+      <div className="flex h-12 items-center px-(--inset)">
         <Link to="/settings/plugins" className={LINK}>
           + Add a source from Plugins
         </Link>
       </div>
-    </section>
+    </SettingsGroup>
   )
 }
 
@@ -456,69 +461,71 @@ function AutoBlock({
   }
 
   return (
-    <section data-block="auto" className="flex flex-col">
-      <SettingsGroupHead
-        title="Enrich automatically when a record"
-        count={
-          auto.paid.length === 0
-            ? 'no paid source'
-            : scopes.length === 0
-              ? 'off'
-              : undefined
-        }
-      />
-      <div className="grid grid-cols-2 border-b border-rule py-2 max-md:grid-cols-1">
-        {SCOPE_LABELS.map((row) => {
-          const id = `auto-${row.scope}`
-          const checked = scopes.includes(row.scope)
-          return (
-            <div
-              key={row.scope}
-              className="flex min-h-10 items-start gap-2.5 py-1.5"
-            >
-              <Checkbox
-                id={id}
-                checked={checked}
-                disabled={pending || auto.paid.length === 0}
-                className="mt-[0.1875rem]"
-                onCheckedChange={(on) =>
-                  void save(
-                    on
-                      ? [...scopes, row.scope]
-                      : scopes.filter((s) => s !== row.scope),
-                    spaces,
-                  )
-                }
-              />
-              <span className="flex min-w-0 flex-col">
-                <span className="flex items-center gap-2">
-                  <label htmlFor={id} className="text-ui text-foreground">
-                    {row.label}
-                  </label>
-                  {row.scope === 'space' ? (
-                    <SpacesPicker
-                      chosen={spaces}
-                      options={auto.options}
-                      disabled={pending || auto.paid.length === 0}
-                      onChange={(next) =>
-                        void save(
-                          next.length === 0 || scopes.includes('space')
-                            ? scopes
-                            : [...scopes, row.scope],
-                          next,
-                        )
-                      }
-                    />
-                  ) : null}
+    <SettingsGroup
+      data-block="auto"
+      title="Enrich automatically"
+      count={
+        auto.paid.length === 0
+          ? 'no paid source'
+          : scopes.length === 0
+            ? 'off'
+            : undefined
+      }
+    >
+      <SettingsRow label="When a record">
+        <div className="grid w-full grid-cols-2 max-md:grid-cols-1">
+          {SCOPE_LABELS.map((row) => {
+            const id = `auto-${row.scope}`
+            const checked = scopes.includes(row.scope)
+            return (
+              <div
+                key={row.scope}
+                className="flex min-h-10 items-start gap-2.5 py-1.5"
+              >
+                <Checkbox
+                  id={id}
+                  checked={checked}
+                  disabled={pending || auto.paid.length === 0}
+                  className="mt-[0.1875rem]"
+                  onCheckedChange={(on) =>
+                    void save(
+                      on
+                        ? [...scopes, row.scope]
+                        : scopes.filter((s) => s !== row.scope),
+                      spaces,
+                    )
+                  }
+                />
+                <span className="flex min-w-0 flex-col">
+                  <span className="flex items-center gap-2">
+                    <label htmlFor={id} className="text-ui text-foreground">
+                      {row.label}
+                    </label>
+                    {row.scope === 'space' ? (
+                      <SpacesPicker
+                        chosen={spaces}
+                        options={auto.options}
+                        disabled={pending || auto.paid.length === 0}
+                        onChange={(next) =>
+                          void save(
+                            next.length === 0 || scopes.includes('space')
+                              ? scopes
+                              : [...scopes, row.scope],
+                            next,
+                          )
+                        }
+                      />
+                    ) : null}
+                  </span>
+                  {row.hint === null ? null : (
+                    <span className="text-label text-graphite">{row.hint}</span>
+                  )}
                 </span>
-                {row.hint === null ? null : (
-                  <span className="text-label text-graphite">{row.hint}</span>
-                )}
-              </span>
-            </div>
-          )
-        })}
-      </div>
+              </div>
+            )
+          })}
+        </div>
+      </SettingsRow>
       <SettingsRow label="Re-use a result for">
         <SettingsTip tip="A source answered within this many days is not asked again.">
           <Input
@@ -535,7 +542,7 @@ function AutoBlock({
         </SettingsTip>
         <span className="mono text-micro text-graphite">days</span>
       </SettingsRow>
-    </section>
+    </SettingsGroup>
   )
 }
 
@@ -587,28 +594,23 @@ function GridBlock({ grids }: { grids: ReadonlyArray<FillsWhat> }) {
   const grid = grids.find((g) => g.kind === kind) ?? grids.at(0)
   if (grid === undefined) return null
   return (
-    <section
+    <SettingsGroup
       id="what-fills-what"
       data-block="grid"
-      className="flex scroll-mt-6 flex-col"
+      className="scroll-mt-6"
+      title="What fills what"
+      action={
+        <Select<FillsWhat['kind']>
+          aria-label="Object"
+          value={grid.kind}
+          onChange={setKind}
+          items={grids.map((g) => ({ value: g.kind, label: g.label }))}
+          width="content"
+          className="h-6 w-auto rounded-none border-0 bg-transparent px-1 mono text-micro text-foreground"
+        />
+      }
     >
-      <SettingsGroupHead
-        title="What fills what"
-        action={
-          <Select<FillsWhat['kind']>
-            aria-label="Object"
-            value={grid.kind}
-            onChange={setKind}
-            items={grids.map((g) => ({ value: g.kind, label: g.label }))}
-            width="content"
-            className="h-6 w-auto rounded-none border-0 bg-transparent px-1 mono text-micro text-foreground"
-          />
-        }
-      />
-      <div
-        aria-hidden
-        className="flex h-8 items-center gap-3 border-b border-hairline px-3 text-label text-graphite"
-      >
+      <SettingsColumns>
         <span className="min-w-0 flex-1">Attribute</span>
         <span className="w-44 shrink-0">Fill from</span>
         {grid.sources.map((s) => (
@@ -616,13 +618,13 @@ function GridBlock({ grids }: { grids: ReadonlyArray<FillsWhat> }) {
             {s.name}
           </span>
         ))}
-      </div>
+      </SettingsColumns>
       <ol aria-label={`${grid.label} attributes and their sources`}>
         {grid.rows.map((row) => (
           <li
             key={row.id}
             data-attribute={row.slug}
-            className="flex h-9 items-center gap-3 border-b border-rule px-3"
+            className="flex h-10 items-center gap-3 border-b border-rule px-(--inset)"
           >
             <span
               className={cn(
@@ -642,13 +644,13 @@ function GridBlock({ grids }: { grids: ReadonlyArray<FillsWhat> }) {
                     not linked
                   </span>
                   {isAdmin ? (
-                    <button
-                      type="button"
+                    <Button
+                      size="xs"
+                      variant="outline"
                       onClick={() => setEditing(row)}
-                      className={LINK}
                     >
                       Fill from…
-                    </button>
+                    </Button>
                   ) : null}
                 </>
               ) : (
@@ -669,14 +671,14 @@ function GridBlock({ grids }: { grids: ReadonlyArray<FillsWhat> }) {
           </li>
         ))}
         {grid.rows.length === 0 ? (
-          <li className="border-b border-rule px-3 py-3 text-ui text-graphite">
+          <li className="border-b border-rule px-(--inset) py-3 text-ui text-graphite">
             No attribute here can fill from enrichment.
           </li>
         ) : null}
       </ol>
       <div
         aria-hidden
-        className="flex h-8 items-center gap-4 px-3 mono text-micro text-graphite"
+        className="flex h-8 items-center gap-4 px-(--inset) mono text-micro text-graphite"
       >
         <span className="flex items-center gap-1.5">
           <span className="size-2 bg-primary" /> fills it
@@ -702,20 +704,20 @@ function GridBlock({ grids }: { grids: ReadonlyArray<FillsWhat> }) {
           onSaved={() => void router.invalidate()}
         />
       )}
-    </section>
+    </SettingsGroup>
   )
 }
 
 function RunsBlock({ runs }: { runs: ReadonlyArray<RecentRun> }) {
   const { now } = useClock()
   return (
-    <section data-block="runs" className="flex flex-col">
-      <SettingsGroupHead
-        title="Recent runs"
-        count={runs.length === 0 ? undefined : String(runs.length)}
-      />
+    <SettingsGroup
+      data-block="runs"
+      title="Recent runs"
+      count={runs.length === 0 ? undefined : String(runs.length)}
+    >
       {runs.length === 0 ? (
-        <p className="border-b border-rule px-3 py-3 text-ui text-graphite">
+        <p className="border-b border-rule px-(--inset) py-3 text-ui text-graphite">
           No runs yet.
         </p>
       ) : (
@@ -723,7 +725,7 @@ function RunsBlock({ runs }: { runs: ReadonlyArray<RecentRun> }) {
           {runs.map((run) => (
             <li
               key={run.id}
-              className="flex h-ledger-row items-center gap-3 border-b border-rule px-3"
+              className="flex h-12 items-center gap-3 border-b border-rule px-(--inset)"
             >
               <span className="w-24 shrink-0 numeric text-micro text-graphite">
                 {formatWhen(run.at, now)}
@@ -746,7 +748,7 @@ function RunsBlock({ runs }: { runs: ReadonlyArray<RecentRun> }) {
           ))}
         </ol>
       )}
-    </section>
+    </SettingsGroup>
   )
 }
 

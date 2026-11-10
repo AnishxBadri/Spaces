@@ -2,7 +2,8 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { LimitsGroup } from '#/components/settings/caps-section'
 import {
-  SettingsGroupHead,
+  SettingsColumns,
+  SettingsGroup,
   SettingsSection,
 } from '#/components/settings/settings-section'
 import { RunLines } from '#/components/integrations/plugin-template'
@@ -80,8 +81,8 @@ function UsageRoute() {
   const { caps, usage, run, asked, plugin } = Route.useLoaderData()
   if (plugin !== null)
     return (
-      <SettingsSection title="Usage & limits" crumb="AI">
-        <SettingsGroupHead
+      <SettingsSection title="Usage & limits">
+        <SettingsGroup
           title={`Runs · ${plugin.name}`}
           action={
             <Link
@@ -91,16 +92,14 @@ function UsageRoute() {
               All usage ›
             </Link>
           }
-        />
-        <RunLines runs={plugin.runs} />
+        >
+          <RunLines runs={plugin.runs} />
+        </SettingsGroup>
       </SettingsSection>
     )
   return (
-    <SettingsSection title="Usage & limits" crumb="AI">
-      <ReadoutStrip
-        readouts={usageReadouts(caps, usage.today)}
-        className="border-t-0 border-b border-rule"
-      />
+    <SettingsSection title="Usage & limits">
+      <ReadoutStrip boxed readouts={usageReadouts(caps, usage.today)} />
       <LimitsGroup caps={caps.caps} />
       <RunLog usage={usage} run={run} asked={asked} />
     </SettingsSection>
@@ -157,24 +156,23 @@ function RunLog({
   )
   return (
     <>
-      <div className="flex flex-col">
-        <SettingsGroupHead
-          title="Runs"
-          action={
-            usage.runs.length === 0
-              ? undefined
-              : `${usage.runs.length} listed · ${formatNumber(spent)} tokens`
-          }
-        />
-        <div className="flex h-8 items-center gap-3 border-b border-hairline text-label text-graphite">
+      <SettingsGroup
+        title="Runs"
+        count={
+          usage.runs.length === 0
+            ? undefined
+            : `${usage.runs.length} listed · ${formatNumber(spent)} tokens`
+        }
+      >
+        <SettingsColumns>
           <span className="min-w-0 flex-1">Run</span>
           <span className="w-24 shrink-0">Who</span>
           <span className="w-24 shrink-0">At</span>
           <span className="w-40 shrink-0">Result</span>
           <span className="w-24 shrink-0 text-right">Tokens</span>
-        </div>
+        </SettingsColumns>
         {usage.runs.length === 0 ? (
-          <p className="border-b border-rule py-3 text-label text-graphite">
+          <p className="border-b border-rule px-(--inset) py-3 text-label text-graphite">
             No runs yet.
           </p>
         ) : (
@@ -182,12 +180,14 @@ function RunLog({
             <RunRow key={r.id} run={r} open={r.id === asked} />
           ))
         )}
-      </div>
+      </SettingsGroup>
 
       {asked === null ? null : run === null ? (
-        <p className="mt-5 border-y border-rule px-3 py-3 text-label text-graphite">
-          That run is not in the log.
-        </p>
+        <SettingsGroup label="Run">
+          <p className="px-(--inset) py-3 text-label text-graphite">
+            That run is not in the log.
+          </p>
+        </SettingsGroup>
       ) : (
         <RunPanel detail={run} />
       )}
@@ -220,7 +220,7 @@ function RunRow({ run, open }: { run: RunItem; open: boolean }) {
       search={open ? {} : { run: run.id }}
       aria-current={open ? 'true' : undefined}
       className={cn(
-        'focus-ring-inset flex min-h-12 items-center gap-3 border-b border-rule py-1.5 hover:bg-bone',
+        'focus-ring-inset flex min-h-12 items-center gap-3 border-b border-rule px-(--inset) py-1.5 hover:bg-bone',
         open && 'bg-bone',
       )}
     >
@@ -259,8 +259,8 @@ function RunPanel({ detail }: { detail: RunDetail }) {
   const { now } = useClock()
   const href = run.record ? recordPath(run.record) : null
   return (
-    <div className="mt-5 flex flex-col border border-rule">
-      <div className="flex items-baseline justify-between gap-3 border-b border-rule bg-bone px-3 py-2">
+    <SettingsGroup label={`Run · ${run.task}`}>
+      <div className="flex items-baseline justify-between gap-3 border-b border-rule px-(--inset) py-2">
         <div className="flex min-w-0 items-baseline gap-3">
           <h3 className="min-w-0 truncate text-title font-medium text-foreground">
             Run · {run.task}
@@ -280,7 +280,7 @@ function RunPanel({ detail }: { detail: RunDetail }) {
           close
         </Link>
       </div>
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-rule px-3 py-2 text-label">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-rule px-(--inset) py-2 text-label">
         <span>
           <span className="text-graphite">Record </span>
           {run.record === null ? (
@@ -316,19 +316,19 @@ function RunPanel({ detail }: { detail: RunDetail }) {
       {run.error === null ? null : (
         <p
           role="alert"
-          className="border-b border-rule px-3 py-2 text-label text-destructive"
+          className="border-b border-rule px-(--inset) py-2 text-label text-destructive"
         >
           {run.error}
         </p>
       )}
       {run.status === 'running' ? (
-        <p className="border-b border-rule px-3 py-2 text-label text-graphite">
+        <p className="border-b border-rule px-(--inset) py-2 text-label text-graphite">
           Still running — or its process stopped before it could finish, in
           which case it stays here as it was left.
         </p>
       ) : null}
 
-      <div className="flex h-8 items-center gap-3 border-b border-hairline px-3 text-label text-graphite">
+      <div className="flex h-8 items-center gap-3 border-b border-rule px-(--inset) text-label text-graphite">
         <span className="w-6 shrink-0">#</span>
         <span className="w-20 shrink-0">Tool</span>
         <span className="w-40 shrink-0">Model</span>
@@ -336,7 +336,7 @@ function RunPanel({ detail }: { detail: RunDetail }) {
         <span className="min-w-0 flex-1">Input refs → output ref</span>
       </div>
       {detail.steps.length === 0 ? (
-        <p className="border-b border-rule px-3 py-3 text-label text-graphite">
+        <p className="border-b border-rule px-(--inset) py-3 text-label text-graphite">
           No step finished.
         </p>
       ) : (
@@ -345,17 +345,17 @@ function RunPanel({ detail }: { detail: RunDetail }) {
         ))
       )}
 
-      <div className="flex h-8 items-center gap-3 border-b border-hairline px-3 text-label text-graphite">
+      <div className="flex h-8 items-center gap-3 border-b border-rule px-(--inset) text-label text-graphite">
         <span className="min-w-0 flex-1">Suggestions it produced</span>
         <span className="w-20 shrink-0 text-right">Status</span>
       </div>
       {detail.suggestions.length === 0 ? (
-        <p className="px-3 py-3 text-label text-graphite">None.</p>
+        <p className="px-(--inset) py-3 text-label text-graphite">None.</p>
       ) : (
         detail.suggestions.map((s) => (
           <div
             key={s.id}
-            className="flex h-9 items-center gap-3 border-b border-rule px-3 last:border-b-0"
+            className="flex h-9 items-center gap-3 border-b border-rule px-(--inset) last:border-b-0"
           >
             <span className="min-w-0 flex-1 truncate text-ui">
               {SUGGESTION_KIND_WORD[s.kind]}
@@ -373,7 +373,7 @@ function RunPanel({ detail }: { detail: RunDetail }) {
           </div>
         ))
       )}
-    </div>
+    </SettingsGroup>
   )
 }
 
@@ -392,7 +392,7 @@ function outputLabel(output: RunStep['output']): string {
 
 function StepRow({ step, index }: { step: RunStep; index: number }) {
   return (
-    <div className="flex items-start gap-3 border-b border-rule px-3 py-2">
+    <div className="flex items-start gap-3 border-b border-rule px-(--inset) py-2">
       <span className="w-6 shrink-0 numeric text-micro text-graphite">
         {index}
       </span>
@@ -445,22 +445,18 @@ function StepRow({ step, index }: { step: RunStep; index: number }) {
 function LoneCalls({ calls }: { calls: ReadonlyArray<LoneCall> }) {
   const { now } = useClock()
   return (
-    <div className="flex flex-col">
-      <SettingsGroupHead
-        title="Calls outside a run"
-        count={String(calls.length)}
-      />
-      <div className="flex h-8 items-center gap-3 border-b border-hairline text-label text-graphite">
+    <SettingsGroup title="Calls outside a run" count={String(calls.length)}>
+      <SettingsColumns>
         <span className="w-20 shrink-0">Lane</span>
         <span className="min-w-0 flex-1">Provider · model</span>
         <span className="w-28 shrink-0">Who</span>
         <span className="w-36 shrink-0">At</span>
         <span className="w-28 shrink-0 text-right">Tokens in / out</span>
-      </div>
+      </SettingsColumns>
       {calls.map((c) => (
         <div
           key={c.id}
-          className="flex h-9 items-center gap-3 border-b border-rule"
+          className="flex h-12 items-center gap-3 border-b border-rule px-(--inset)"
         >
           <span className="w-20 shrink-0 mono text-micro">{c.lane}</span>
           <span className="min-w-0 flex-1 truncate mono text-micro">
@@ -477,6 +473,6 @@ function LoneCalls({ calls }: { calls: ReadonlyArray<LoneCall> }) {
           </span>
         </div>
       ))}
-    </div>
+    </SettingsGroup>
   )
 }

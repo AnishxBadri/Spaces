@@ -4,7 +4,8 @@ import { toast } from 'sonner'
 import { readAiConfig } from '@spaces/core/ai/attribute-ai'
 import { AttributeDialog } from './attribute-dialog'
 import {
-  SettingsGroupHead,
+  SettingsColumns,
+  SettingsGroup,
   rowOpens,
 } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
@@ -210,26 +211,22 @@ export function RegistryList({
   })
 
   return (
-    <div className="flex flex-col">
-      <section className="flex flex-col">
-        <SettingsGroupHead
-          title="Attributes"
-          action={
-            canReshape && ordered.length > 1
-              ? `${ordered.length} · drag to reorder`
-              : String(ordered.length)
-          }
-        />
-        <div
-          aria-hidden
-          className="flex h-8 items-center gap-3 border-b border-hairline text-label text-graphite"
-        >
+    <>
+      <SettingsGroup
+        title="Attributes"
+        action={
+          canReshape && ordered.length > 1
+            ? `${ordered.length} · drag to reorder`
+            : String(ordered.length)
+        }
+      >
+        <SettingsColumns>
           <span className={LANE.grip} />
           <span className="min-w-0 flex-1">Attribute</span>
           <span className={LANE.type}>Type</span>
           <span className={LANE.rules}>Rules</span>
           <span className={LANE.actions} />
-        </div>
+        </SettingsColumns>
         <ol aria-label={`${object.plural} attributes`}>
           {ordered.map((attr, idx) => (
             <AttributeRow
@@ -262,20 +259,24 @@ export function RegistryList({
             />
           ))}
           {ordered.length === 0 ? (
-            <li className="flex h-row items-center border-b border-rule text-ui text-graphite">
+            <li className="flex h-12 items-center border-b border-rule px-(--inset) text-ui text-graphite">
               No attributes yet.
             </li>
           ) : null}
         </ol>
-      </section>
+      </SettingsGroup>
 
       {archived.length > 0 ? (
-        <section className="flex flex-col pt-7">
+        <SettingsGroup label="Archived attributes">
+          {/* The head is the fold's button: a paper row like any card head. */}
           <button
             type="button"
             aria-expanded={showArchived}
             onClick={() => setShowArchived((v) => !v)}
-            className="focus-ring-inset flex items-baseline gap-2 border-b border-hairline pb-1.5 text-left"
+            className={cn(
+              'focus-ring-inset flex h-7 shrink-0 items-center gap-2 px-(--inset) text-left',
+              showArchived && 'border-b border-rule',
+            )}
           >
             <span className="w-3 mono text-micro text-graphite">
               {showArchived ? '⌄' : '›'}
@@ -304,9 +305,9 @@ export function RegistryList({
               ))}
             </ol>
           ) : null}
-        </section>
+        </SettingsGroup>
       ) : null}
-    </div>
+    </>
   )
 }
 
@@ -390,7 +391,6 @@ function AttributeRow({
   return (
     <li
       data-attribute={attr.slug}
-      data-row
       draggable={draggable}
       onDragStart={(e) => {
         if (!draggable) return
@@ -412,7 +412,7 @@ function AttributeRow({
       }}
       {...(opens ? { onClick: rowOpens(() => setEditing(true)) } : {})}
       className={cn(
-        'flex h-ledger-row items-center gap-3 border-b border-rule transition-[background-color,opacity] duration-150 ease-out-quart',
+        'flex h-12 items-center gap-3 border-b border-rule px-(--inset) transition-[background-color,opacity] duration-150 ease-out-quart',
         opens && 'cursor-pointer hover:bg-bone',
         dragging && 'opacity-50',
         over && 'bg-bone',

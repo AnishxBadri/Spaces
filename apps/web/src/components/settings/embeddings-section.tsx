@@ -4,7 +4,8 @@ import { toast } from 'sonner'
 import { backfillConfirmOptions, confirmThenStart } from './embed-backfill-flow'
 import { useSettingsDraft } from './settings-form'
 import {
-  SettingsGroupHead,
+  SettingsColumns,
+  SettingsGroup,
   SettingsRow,
   SettingsSection,
   SettingsTip,
@@ -169,17 +170,12 @@ export function EmbeddingsSection({
   }
 
   return (
-    <SettingsSection title="Search" crumb="AI">
-      <ReadoutStrip
-        readouts={searchReadouts(backfill)}
-        className="border-t-0 border-b border-rule"
-      />
-      <div className="flex flex-col">
-        <SettingsGroupHead
-          title="Model"
-          action={pin ? `set ${formatDay(pin.pinnedAt, today)}` : 'not set'}
-        />
-
+    <SettingsSection title="Search">
+      <ReadoutStrip boxed readouts={searchReadouts(backfill)} />
+      <SettingsGroup
+        title="Model"
+        action={pin ? `set ${formatDay(pin.pinnedAt, today)}` : 'not set'}
+      >
         <SettingsRow
           label="Provider"
           hint={
@@ -198,12 +194,12 @@ export function EmbeddingsSection({
           />
         </SettingsRow>
 
-        <div className="flex h-8 items-center gap-3 border-b border-hairline px-3 text-label text-graphite">
+        <SettingsColumns>
           <span className="w-5 shrink-0" />
           <span className="w-56 shrink-0">Model</span>
           <span className="w-20 shrink-0">Emits</span>
           <span className="min-w-0 flex-1">At {PIN_DIMS}</span>
-        </div>
+        </SettingsColumns>
         <ol
           role="radiogroup"
           aria-label={`${descriptor.label} embedding model`}
@@ -249,7 +245,7 @@ export function EmbeddingsSection({
           />
         )}
 
-        <div className="flex min-h-12 items-center justify-end gap-3 border-b border-rule px-3 py-2">
+        <div className="flex min-h-12 items-center justify-end gap-3 border-b border-rule px-(--inset) py-2">
           {error ? (
             <span
               role="alert"
@@ -283,7 +279,7 @@ export function EmbeddingsSection({
         {result ? (
           <div
             role="status"
-            className="flex min-h-9 items-start gap-3 border-b border-rule px-3 py-2"
+            className="flex min-h-9 items-start gap-3 border-b border-rule px-(--inset) py-2"
           >
             <span
               className={cn(
@@ -304,13 +300,11 @@ export function EmbeddingsSection({
             </span>
           </div>
         ) : null}
+      </SettingsGroup>
 
-        {pin ? <SensitiveSlot pin={pin} slot={slot} keys={keys} /> : null}
+      {pin ? <SensitiveSlot pin={pin} slot={slot} keys={keys} /> : null}
 
-        {backfill.pin ? (
-          <Backfill initial={backfill} confirm={confirm} />
-        ) : null}
-      </div>
+      {backfill.pin ? <Backfill initial={backfill} confirm={confirm} /> : null}
       {confirmDialog}
     </SettingsSection>
   )
@@ -554,11 +548,10 @@ function Backfill({
   }
 
   return (
-    <>
-      <SettingsGroupHead
-        title="Catch up"
-        action={<span className="tabular">{runLine(view)}</span>}
-      />
+    <SettingsGroup
+      title="Catch up"
+      action={<span className="tabular">{runLine(view)}</span>}
+    >
       <SettingsRow
         label={
           pendingChunks === 0
@@ -599,13 +592,13 @@ function Backfill({
         </Button>
       </SettingsRow>
       {error || run.state === 'failed' ? (
-        <div className="flex min-h-9 items-center border-b border-rule px-3 py-2">
+        <div className="flex min-h-9 items-center border-b border-rule px-(--inset) py-2">
           <span role="alert" className="mono text-micro text-destructive">
             {error ?? (run.state === 'failed' ? run.reason : null)}
           </span>
         </div>
       ) : null}
-    </>
+    </SettingsGroup>
   )
 }
 
@@ -674,11 +667,10 @@ function SensitiveSlot({
   }
 
   return (
-    <>
-      <SettingsGroupHead
-        title="Sensitive records"
-        action={pinLocal ? 'the pin is local' : slot ? 'local' : 'left out'}
-      />
+    <SettingsGroup
+      title="Sensitive records"
+      action={pinLocal ? 'the pin is local' : slot ? 'local' : 'left out'}
+    >
       {pinLocal ? (
         <SettingsRow
           label="Embed them with"
@@ -722,13 +714,13 @@ function SensitiveSlot({
         </SettingsRow>
       )}
       {error ? (
-        <div className="flex min-h-9 items-center border-b border-rule px-3 py-2">
+        <div className="flex min-h-9 items-center border-b border-rule px-(--inset) py-2">
           <span role="alert" className="mono text-micro text-destructive">
             {error}
           </span>
         </div>
       ) : null}
-    </>
+    </SettingsGroup>
   )
 }
 
@@ -752,7 +744,7 @@ function ModelRow({
         aria-checked={on}
         onClick={onChoose}
         className={cn(
-          'focus-ring-inset flex h-row w-full items-center gap-3 px-3 text-left transition-colors',
+          'focus-ring-inset flex h-row w-full items-center gap-3 px-(--inset) text-left transition-colors',
           on ? 'bg-selected' : 'hover:bg-bone',
         )}
       >
@@ -788,7 +780,7 @@ function GreyedModelRow({ model }: { model: EmbeddingModelInfo }) {
   return (
     <li
       aria-disabled="true"
-      className="flex h-row items-center gap-3 border-b border-rule bg-bone-deep px-3 text-graphite"
+      className="flex h-row items-center gap-3 border-b border-rule bg-bone-deep px-(--inset) text-graphite"
     >
       <span className="w-5 shrink-0" />
       <span className="w-56 shrink-0 truncate mono text-label">{model.id}</span>

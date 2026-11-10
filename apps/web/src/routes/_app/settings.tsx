@@ -60,18 +60,16 @@ function SettingsShell() {
   const adminOnly = sectionAt(pathname)?.admin === true
 
   // One head per page: the section is the page, so the shell draws no title.
+  // The section draws the shared head and the bone ground under it; the
+  // page form's Save bar follows it.
   return (
     <SettingsPageProvider value={{ isAdmin, adminOnly, admins }}>
-      <div className="flex min-h-full flex-col">
+      <div className="flex flex-col">
         <SettingsForm>
           <div className="md:hidden">
             <SettingsNav variant="strip" counts={counts} isAdmin={isAdmin} />
           </div>
-          {/* An 800px column on the 12px edge, left-aligned (the Save bar matches it); the
-              foot clears the bar, so it never covers the last row. */}
-          <div className="box-content flex max-w-200 flex-col gap-12 px-3 pt-7 pb-20">
-            <Outlet />
-          </div>
+          <Outlet />
         </SettingsForm>
       </div>
     </SettingsPageProvider>

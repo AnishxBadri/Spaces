@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { SettingsGroupHead } from '#/components/settings/settings-section'
+import { SettingsGroup } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
@@ -30,7 +30,10 @@ import { cn } from '#/lib/utils'
  * - A saved key is never shown: the row reads its redacted display.
  */
 
-/** A 48px settings row on a rule, tinted when its value was refused. */
+/**
+ * A 48px settings row on a rule, tinted when its value was refused: the
+ * label in the 210px lane, the control after it.
+ */
 function FieldRow({
   label,
   hint,
@@ -47,11 +50,11 @@ function FieldRow({
   return (
     <div
       className={cn(
-        'flex min-h-12 items-center justify-between gap-6 border-b border-rule px-3 py-2',
+        'flex min-h-12 items-center gap-6 border-b border-rule px-(--inset) py-2',
         error !== null && 'bg-[var(--badge-rose)]',
       )}
     >
-      <div className="flex min-w-0 flex-col">
+      <div className="flex w-[13.125rem] shrink-0 flex-col">
         <label htmlFor={htmlFor} className="text-ui font-medium">
           {label}
         </label>
@@ -63,7 +66,7 @@ function FieldRow({
           <span className="text-label text-graphite">{hint}</span>
         ) : null}
       </div>
-      <div className="flex shrink-0 items-center gap-2">{children}</div>
+      <div className="flex min-w-0 flex-1 items-center gap-2">{children}</div>
     </div>
   )
 }
@@ -157,23 +160,21 @@ export function SettingsFields({
 }) {
   if (!form.ok)
     return (
-      <div className="flex flex-col">
-        <SettingsGroupHead title="Settings" />
+      <SettingsGroup title="Settings">
         <p
           role="alert"
-          className="border-b border-rule px-3 py-3 mono text-micro text-destructive"
+          className="border-b border-rule px-(--inset) py-3 mono text-micro text-destructive"
         >
           {form.reason}
         </p>
-      </div>
+      </SettingsGroup>
     )
   if (form.fields.length === 0) return null
   return (
-    <div className="flex flex-col">
-      <SettingsGroupHead
-        title="Settings"
-        count={notYet ? 'not yet' : String(form.fields.length)}
-      />
+    <SettingsGroup
+      title="Settings"
+      count={notYet ? 'not yet' : String(form.fields.length)}
+    >
       {form.fields.map((field) => {
         const error = Object.hasOwn(errors, field.key)
           ? errors[field.key]
@@ -198,7 +199,7 @@ export function SettingsFields({
           </FieldRow>
         )
       })}
-    </div>
+    </SettingsGroup>
   )
 }
 
@@ -231,8 +232,8 @@ function CheckRow({
   return (
     <div
       className={cn(
-        'flex min-h-10 items-center gap-3 border-b border-rule py-2 pr-3',
-        indent ? 'pl-10' : 'pl-3',
+        'flex min-h-10 items-center gap-3 border-b border-rule py-2 pr-(--inset)',
+        indent ? 'pl-10' : 'pl-(--inset)',
       )}
     >
       <Checkbox
@@ -287,11 +288,10 @@ export function AutoEnrichFields({
     })
   }
   return (
-    <div className="flex flex-col">
-      <SettingsGroupHead
-        title="Auto-enrich"
-        count={scopes.length === 0 ? 'off' : String(scopes.length)}
-      />
+    <SettingsGroup
+      title="Auto-enrich"
+      count={scopes.length === 0 ? 'off' : String(scopes.length)}
+    >
       {SCOPE_ROWS.map((row) => (
         <div key={row.scope} className="flex flex-col">
           <CheckRow
@@ -304,7 +304,7 @@ export function AutoEnrichFields({
           {row.scope === 'space' && scopes.includes('space') ? (
             <>
               {spaces.length === 0 ? (
-                <p className="border-b border-rule py-2 pr-3 pl-10 text-label text-graphite">
+                <p className="border-b border-rule py-2 pr-(--inset) pl-10 text-label text-graphite">
                   No space chosen: every space.
                 </p>
               ) : null}
@@ -325,7 +325,7 @@ export function AutoEnrichFields({
           ) : null}
         </div>
       ))}
-    </div>
+    </SettingsGroup>
   )
 }
 
@@ -347,7 +347,7 @@ const nounOf = (slot: SecretSlot) => (slot === 'webhook' ? 'secret' : 'key')
 export function WebhookUrlRow({ url }: { url: string }) {
   const [copied, setCopied] = useState(false)
   return (
-    <div className="flex min-h-12 items-center justify-between gap-6 border-b border-rule px-3 py-2">
+    <div className="flex min-h-12 items-center justify-between gap-6 border-b border-rule px-(--inset) py-2">
       <div className="flex min-w-0 flex-col">
         <span className="text-ui font-medium">Webhook URL</span>
         <span className="truncate mono text-micro text-graphite select-all">
@@ -390,7 +390,7 @@ export function SecretFieldRow({
   const noun = nounOf(field.slot)
   const id = `secret-${field.slot}`
   return (
-    <div className="flex min-h-12 items-center justify-between gap-6 border-b border-rule px-3 py-2">
+    <div className="flex min-h-12 items-center justify-between gap-6 border-b border-rule px-(--inset) py-2">
       <div className="flex min-w-0 flex-col">
         <label htmlFor={id} className="text-ui font-medium">
           {saved ? `Replace ${field.label}` : field.label}

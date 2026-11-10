@@ -11,7 +11,7 @@ import {
   TYPE_LABELS,
 } from '#/components/attributes/registry-list'
 import {
-  SettingsGroupHead,
+  SettingsGroup,
   SettingsSection,
 } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
@@ -168,7 +168,6 @@ function ObjectAttributesPage() {
   return (
     <SettingsSection
       title={object.plural}
-      crumb="Workspace"
       action={
         <>
           <Button
@@ -246,7 +245,7 @@ function ObjectAttributesPage() {
       }
     >
       {object.archived ? (
-        <p className="mt-6 border border-dashed border-rule px-3 py-2 text-ui text-graphite">
+        <p className="border border-dashed border-rule bg-paper px-(--inset) py-2 text-ui text-graphite">
           Archived: the list and record pages are hidden and pickers skip it.
           Records and their values are kept; Restore brings everything back.
         </p>
@@ -260,30 +259,37 @@ function ObjectAttributesPage() {
         filledBy={new Map(Object.entries(filledBy))}
       />
 
-      <AiConfigSection
-        objectPlural={object.plural}
-        registry={registry}
-        canReshape={isAdmin}
-      />
+      {/* The AI answers group draws its own head and rows without an inset;
+          the inner pad carries them to the card's 11px. */}
+      <SettingsGroup label="AI answers">
+        <div className="flex flex-col px-(--inset)">
+          <div className="flex flex-col [--inset:0]">
+            <AiConfigSection
+              objectPlural={object.plural}
+              registry={registry}
+              canReshape={isAdmin}
+            />
+          </div>
+        </div>
+      </SettingsGroup>
 
       {/* Identity keys — each backed by an attribute above, and
             revisable only while the object has no records (the slug rule).
             Core objects are not listed: their identity is core-owned and
             lives in entity_alias, not in this column. */}
       {object.isSystem ? null : (
-        <section className="flex flex-col">
-          <SettingsGroupHead
-            title="Identity keys"
-            count={`${object.identityKeys.length} declared`}
-          />
+        <SettingsGroup
+          title="Identity keys"
+          count={`${object.identityKeys.length} declared`}
+        >
           {editable ? (
             <ul aria-label={`${object.plural} identity keys`}>
               {IDENTITY_KEYS.map((key) => {
                 const backing = IDENTITY_KEY_ATTRIBUTES[key]
                 const on = object.identityKeys.includes(key)
                 return (
-                  <li key={key}>
-                    <label className="flex h-ledger-row cursor-pointer items-center gap-3 border-b border-rule px-3 text-body">
+                  <li key={key} className="border-b border-rule">
+                    <label className="flex h-12 cursor-pointer items-center gap-3 px-(--inset) text-body">
                       <Checkbox
                         checked={on}
                         disabled={saving !== null}
@@ -306,7 +312,7 @@ function ObjectAttributesPage() {
                 return (
                   <li
                     key={key}
-                    className="flex h-ledger-row items-center gap-3 border-b border-rule px-3 text-body"
+                    className="flex h-12 items-center gap-3 border-b border-rule px-(--inset) text-body"
                   >
                     <span className="min-w-0 flex-1">{backing.name}</span>
                     <span className="mono text-micro text-graphite">
@@ -316,19 +322,19 @@ function ObjectAttributesPage() {
                 )
               })}
               {object.identityKeys.length === 0 ? (
-                <li className="flex h-ledger-row items-center border-b border-rule px-3 text-ui text-graphite">
+                <li className="flex h-12 items-center border-b border-rule px-(--inset) text-ui text-graphite">
                   None — records here are matched by name alone.
                 </li>
               ) : null}
             </ul>
           )}
           {object.hasRecords ? (
-            <p className="flex h-ledger-row items-center px-3 text-ui text-graphite">
+            <p className="flex min-h-12 items-center px-(--inset) py-2 text-ui text-graphite">
               Frozen: {object.plural} has records, and a key that justified a
               record&apos;s identity cannot be withdrawn under it.
             </p>
           ) : null}
-        </section>
+        </SettingsGroup>
       )}
       {confirmDialog}
     </SettingsSection>

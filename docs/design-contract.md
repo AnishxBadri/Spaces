@@ -52,13 +52,13 @@ for Today and the holding's figures only; a record's readouts live in its Overvi
 
 How a page meets its frame, and how its parts rank. Decided by the owner on the canvas
 on 2026-11-11, in place of the 12px edge and 4px gutter of 2026-11-07. `edges-2` built
-the frame; `record-1` builds the inside of the record's rail and `settings-1` the
-settings pages, which until then keep the old 12px edge.
+the frame, `record-1` the inside of the record's rail and `settings-1` the settings
+pages.
 
 Where it lives. `PAGE_EDGE` (`px-6`), `PageBody` (bone, `p-3 gap-3`, `flex-1`),
 `FolderGround` and `Card` are in `components/page-header.tsx`; the ground itself is the
-app shell's `main` (`routes/_app.tsx`, `data-ground`), bone on every page but settings,
-with each page filling its height. `styles.css` holds `--inset` (24px on the page, 11px
+app shell's `main` (`routes/_app.tsx`, `data-ground`), bone on every page, settings
+included, with each page filling its height. `styles.css` holds `--inset` (24px on the page, 11px
 in the `card` and `folder` utilities), the `card` utility (paper, 1px rule, its opening
 `SectionHead` turned paper), the `folder` utility (paper, hairline sides and foot, no
 top) and `tab-open` / `tab-open-plain`. `Tabs` (`components/ui/tabs.tsx`) draws the
@@ -81,9 +81,11 @@ is the record chassis. The head folds as before; its bar and pinned actions sit 
   lines up with the last control in the content below.
 - **E3 · Windows take one 16px inset all round.**
 - **E4 · Settings and form pages cap at 800px**: a column of cards 800px wide from the
-  gutter, the head `···` moving with the cap; lists and tables stay full width. A
-  settings row opens Edit as a whole, and its actions are always visible, never
-  hover-only.
+  gutter, 12px apart, under the shared head, whose action (and `···`) ends where the
+  column's content ends (`SETTINGS_HEAD_CAP`); the Save bar sits on the 24px edge under
+  the same cap. Lists and tables stay full width. A settings row opens Edit as a whole,
+  and its actions are always visible, never hover-only: a settings row carries no
+  `data-row`, so no `row-reveal` hides them.
 - **E5 · Folder tabs.** The open tab has an ink outline on top, left and right and
   runs straight into the body under it; a closed tab is plain text. The list toolbar
   is tabs · a divider · Filter and Sort as icon buttons, each outlined only while in
@@ -393,7 +395,7 @@ hand-rolling one.
 | `SelectionBar`, `useRowSelection`, `ListMenu`                                     | `apps/web/src/components/table/`                         | the 44px bone bar while rows are checked (count, controls, one pine verb); a list head's `···`                                                                                                                                                                                                                                                                                                                                               |
 | `RecordLinkCell`, `IconBadge`, `InitialBadge`, `ChipLink`, `MetaCell`, `DateCell` | `apps/web/src/components/table/cells.tsx`                | the cell renderers a hand-declared column uses                                                                                                                                                                                                                                                                                                                                                                                               |
 | `ViewBar`, `useViewState`                                                         | `apps/web/src/components/views/`                         | saved views — **object surfaces only** (`/companies`, `/deals`, `/people`, `/o/$slug`)                                                                                                                                                                                                                                                                                                                                                       |
-| `SettingsSection`, `SettingsRow`                                                  | `apps/web/src/components/settings/settings-section.tsx`  | a section of the settings shell — serif title, sans sentence, mono crumb, 48px rows                                                                                                                                                                                                                                                                                                                                                          |
+| `SettingsSection`, `SettingsGroup`, `SettingsRow`                                 | `apps/web/src/components/settings/settings-section.tsx`  | a section of the settings shell — the shared `PageHeader` (back link and mark on a drill-in page), then `SettingsGroup` paper cards on the bone ground: a 28px paper `SettingsGroupHead`, `SettingsColumns` for a table, 48px `SettingsRow`s with an end lane, `SettingsState` for a status square                                                                                                                                           |
 | `SettingsNav`, `SETTINGS_SECTIONS`                                                | `apps/web/src/components/settings/settings-nav.tsx`      | the settings nav grammar — one row per section, groups derived, `Admin` in the lane                                                                                                                                                                                                                                                                                                                                                          |
 | `EmptyState`                                                                      | `apps/web/src/components/empty-state.tsx`                | P5 — dither block, serif sentence, one sans line, the primary with its key                                                                                                                                                                                                                                                                                                                                                                   |
 | `DitherBlock`, `DensityRamp`                                                      | `apps/web/src/components/dither.tsx`                     | the only texture; loading is a density ramp, never a shimmer                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -483,25 +485,35 @@ row is a decision, not a cell.
 
 **A settings section** — Integrations, Connections, Providers, Routing.
 → **the FX ledger**, `apps/web/src/routes/_app/settings/currency.tsx`, built from
-`SettingsSection` and `SettingsRow`
-(`apps/web/src/components/settings/settings-section.tsx`). The section is the page
-(2026-09-30): the shell draws no head of its own, so the section head is P1 — a mono
-eyebrow in sentence case (`Settings · Workspace`), the serif title in `title-serif`,
-**no sentence under it** (page blurbs go, D81), the one action right, and one rule
-under the head. The content column caps at 800px, left-aligned on the 12px edge
-(`max-w-200`, the Save bar matches), and the head's `···` moves with the cap (E4).
-A group inside a page is a mono caps label on a hairline (`SettingsGroupHead`:
-`IDENTITY`, `PROVIDERS`, `RATES`, an optional mono count beside it), 28px above —
-never the 44px bone `SectionHead` band. Rows (`SettingsRow`) are 48px on rules, the
-label in a 210px lane and the controls in a left-aligned lane after it, never pinned to
-the row's end. A field hint under the label survives only for cost, privacy or
+`SettingsSection`, `SettingsGroup` and `SettingsRow`
+(`apps/web/src/components/settings/settings-section.tsx`). The section is the page: the
+shell draws no head of its own, so the section draws the shared `PageHeader` — the serif
+title on the 24px edge, **no eyebrow and no sentence under it** (page blurbs go, D81),
+the one action right, one rule under across the full width, the action ending where the
+800px column ends its content (`SETTINGS_HEAD_CAP`, E4). A page drilled into from a list
+(a connection, a plugin) puts its way back above the title (`SettingsBack`,
+`‹ Connections`) and its mark beside it; the head's mono line carries a member's
+`Only admins can change this · ask …` and any reading the page states. The body is
+`PageBody`, the bone ground: a column of paper cards 800px wide from the 12px gutter, 12px
+apart (`max-w-200`), the Save bar on the 24px edge under the same cap. Each group is a
+card (`SettingsGroup`): a 28px paper head with the mono caps label (`IDENTITY`,
+`PROVIDERS`, `RATES`), an optional mono count beside it and an optional action right, a
+rule under — never the 44px bone `SectionHead` band; rows with no group share one card
+with no head. Rows (`SettingsRow`) are 48px on rules inset 11px, the label in a 210px
+lane and the control in a left-aligned lane after it; the row's state (`SettingsState`,
+a square then the mono word) and its action sit in the end lane at the right edge. A
+row's action that goes to another page is a mono link ending `›` (`Open ›`, `Set up ›`);
+one that acts in place or opens a window is a small button (`Test`, `Edit`, `Revoke…`);
+a row menu of one item is that item. A ledger row leads with an icon or mark only where
+it tells the rows apart. A field hint under the label survives only for cost, privacy or
 something irreversible; any other explanation is a tooltip on the control
-(`SettingsTip`) or goes. The nav left is the chassis grammar one level in: bone,
-each group head a ruled band (mono caps in ink with a hairline under it, the
-`LabelHead` grammar the settings ledgers use), 30px rows, counts in the right lane. A
-ledger inside the section takes a head of sentence-case sans 12 graphite lane labels on
-`border-y-hairline`, with lanes shared by head and rows. It carries no foot caption: a
-line under a settings ledger survives only for cost, privacy or irreversibility (D81).
+(`SettingsTip`) or goes. No settings card is hairline: a page with tabs draws the plain
+bar inside a rule card. The nav left is the chassis grammar one level in: bone, each
+group head a ruled band (mono caps in ink with a hairline under, the `LabelHead` grammar
+the settings ledgers use), 30px rows, counts in the right lane. A table inside the
+section is a card whose first row is its column heads (`SettingsColumns`, sentence-case
+sans 12 graphite on a rule), lanes shared by head and rows. It carries no foot caption:
+a line under a settings ledger survives only for cost, privacy or irreversibility (D81).
 
 **A settings section is a child route under the settings shell** (SPA-26). `/settings`
 is a layout — `apps/web/src/routes/_app/settings.tsx` — and every section is one file
@@ -514,8 +526,7 @@ answer. The row carries the path, the label, the `group` it joins — D81's four
 whose it is: `you`, `workspace`, `ai`, `integrations` — and `admin`; a new section is
 placed by D81's map, and its path follows its label (`/settings/email-forwarding`), with
 a moved path answering one 301 from a route file at the old name
-(`lib/settings-moves.ts`). The group is also the eyebrow the section prints, so
-`Settings · Workspace` cannot name a place the nav does not have; `admin: true` draws
+(`lib/settings-moves.ts`). `admin: true` draws
 the row graphite for a member with mono `Admin` in the right lane in place of a count;
 it stays a link, since the page opens read-only, and changes no guard. At `md` and up settings takes over the chassis:
 `‹ Settings` (and Escape, with no `esc` printed beside it) back to the page settings was opened from, Today on a cold

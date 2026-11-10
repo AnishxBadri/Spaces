@@ -893,28 +893,35 @@ describe('every settings page', () => {
   )
 
   it.each(PATHS)(
-    '%s heads the page with a sentence-case eyebrow, the title and one rule, no sentence',
+    '%s draws the shared head, no eyebrow, and its groups as paper cards on the ground',
     async (path) => {
       await mount(path)
-      const head = document.querySelector('[data-settings-head]')
+      const head = document.querySelector('[data-settings-head] header')
+      // The shared PageHeader: the 104px paper head on the 24px edge, one rule.
+      expect(head?.className).toContain('min-h-26')
+      expect(head?.className).toContain('px-6')
       expect(head?.className).toContain('border-rule')
       expect(head?.className).not.toContain('double-rule')
-      const eyebrow = head?.querySelector('h1')?.previousElementSibling
-      expect(eyebrow?.textContent).toMatch(
-        /^Settings · [A-Z][a-z]+|^Settings · AI$/,
-      )
-      expect(eyebrow?.className).not.toContain('uppercase')
-      // Nothing under the title but the member's read-only line.
+      expect(head?.textContent).not.toMatch(/Settings · /)
+      // Nothing under the title but the head's mono line, if any.
+      const under = head?.querySelector('h1')?.nextElementSibling
       expect(
-        head
-          ?.querySelector('h1')
-          ?.nextElementSibling?.hasAttribute('data-read-only') ?? true,
+        under === null ||
+          under === undefined ||
+          under.className.includes('mono'),
       ).toBe(true)
-      // Groups are caps labels on a hairline, never the bone band.
-      for (const group of document.querySelectorAll('[data-settings-group]'))
+      // The body is the bone ground; every group head sits on paper in a card.
+      expect(document.querySelector('[data-page-body]')?.className).toContain(
+        'bg-bone',
+      )
+      for (const group of document.querySelectorAll('[data-settings-group]')) {
         expect(group.className).not.toContain('bg-bone')
-      for (const h3 of document.querySelectorAll('section h3'))
-        expect(h3.closest('.bg-bone')).toBeNull()
+        expect(group.closest('.card')).not.toBeNull()
+      }
+      for (const card of document.querySelectorAll(
+        '[data-settings-body] .card',
+      ))
+        expect(card.className).not.toMatch(/\bfolder\b|border-hairline/)
     },
   )
 })
@@ -1141,11 +1148,11 @@ describe('General, after the first run (D80)', () => {
     const text = document.body.textContent
     expect(text).toContain("What's set up")
     expect(text).toContain('3 of 7')
-    // A caps label on a hairline, not a bone band.
+    // A caps label on the card's paper head, not a bone band.
     const head = Array.from(
       document.querySelectorAll('[data-settings-group]'),
     ).find((g) => g.textContent.includes("What's set up"))
-    expect(head?.className).toContain('border-hairline')
+    expect(head?.className).toContain('border-rule')
     expect(head?.className).not.toContain('bg-bone')
     expect(head?.querySelector('h3')?.className).toContain('label-caps')
     for (const label of [
@@ -1165,6 +1172,13 @@ describe('General, after the first run (D80)', () => {
     expect(
       document.querySelector('section a[href="/settings/models"]')?.textContent,
     ).toBe('Open ›')
+    // State and action sit in the end lane: a status square, then the link.
+    const models = document.querySelector('section a[href="/settings/models"]')
+    const end = models?.closest('[data-settings-end]')
+    expect(end).not.toBeNull()
+    expect(end?.querySelector('[data-state-tone]')?.textContent).toMatch(
+      /^(set|not set)$/,
+    )
   })
 })
 
@@ -1748,7 +1762,19 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
     expect(invites.at(0)?.textContent).toContain('Member · expires in 5 days')
     expect(invites.at(1)?.textContent).toContain('Anyone with the link')
     expect(invites.at(1)?.textContent).toContain('one use · expires in 2 days')
-    await click(byText('Revoke invite'))
+    // Mail against link leads each row; a menu of one is its button.
+    expect(
+      invites.map((r) =>
+        r.querySelector('[data-invite-mark]')?.getAttribute('data-invite-mark'),
+      ),
+    ).toEqual(['mail', 'link'])
+    expect(invites.at(0)?.querySelector('[aria-label^="More for"]')).toBeNull()
+    await click(invites.at(0)?.querySelector('button'))
+    expect(dialog()?.textContent).toContain(
+      'Revoke the invite for partner@fund.example?',
+    )
+    expect(writes.revokeInvite).not.toHaveBeenCalled()
+    await click(byText('Revoke', dialog() ?? document))
     expect(writes.revokeInvite).toHaveBeenCalledWith({
       data: { id: '00000000-0000-4000-8000-0000000000e4' },
     })
@@ -1989,7 +2015,15 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
     const tabs = Array.from(document.querySelectorAll('[role="tab"]'))
     expect(tabs.map((t) => t.textContent)).toEqual(['Set up', 'In use'])
     expect(tabs[1]?.getAttribute('aria-selected')).toBe('true')
-    expect(groups()).toEqual(['Members may use', 'Connected2 of 6'])
+    expect(groups()).toEqual(['Members may use2 of 3 on', 'Connected2 of 6'])
+    expect(document.body.textContent).toContain('Health · 7 days')
+    // Each use is a switch, led by its product's mark.
+    expect(
+      document.querySelector('[data-use="gmail"] button')?.getAttribute('role'),
+    ).toBe('switch')
+    expect(
+      document.querySelector('[data-use="gmail"] [data-provider-mark]'),
+    ).not.toBeNull()
     const use = (plugin: string) =>
       document.querySelector(`[data-use="${plugin}"]`)?.textContent
     expect(use('gmail')).toBe(
@@ -2033,14 +2067,19 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
     )
     expect(body).toContain('Email only? Forwarding needs no Google app.')
     for (const step of [
-      '1Create a Google Cloud project',
-      '2Turn on the Gmail, Calendar and Drive APIs',
+      '1Cloud projectCreate a Google Cloud project',
+      '2APIsTurn on the Gmail, Calendar and Drive APIs',
       '3Consent screen',
       '4Redirect address',
       '5Client ID',
       '6Test',
     ])
       expect(body).toContain(step)
+    // The outbound act is a small button that opens the console in a new tab.
+    const open = Array.from(
+      document.querySelectorAll('a[target="_blank"]'),
+    ).find((a) => a.textContent === 'Open Google Cloud')
+    expect(open?.getAttribute('data-slot')).toBe('button')
     // Personal Gmail preselects an External consent screen.
     const consent = document.querySelector(
       '[role="radiogroup"][aria-label="Consent screen"] [aria-checked="true"]',
@@ -2526,15 +2565,21 @@ describe('Search, Usage and Plugins, by sheets 04 and 07', () => {
     })
   })
 
-  it('Plugins draws Available flush under Installed, both caps labels', async () => {
+  it('Plugins draws Available as the card under Installed, both caps labels', async () => {
     await mount('/settings/plugins')
     const heads = Array.from(
       document.querySelectorAll('[data-settings-group] h3'),
     ).map((h) => h.textContent.trim())
     expect(heads).toEqual(['Installed', 'Available'])
-    const section = document.querySelector('section')
-    expect(section?.parentElement?.className).toContain('flex-col')
-    expect(section?.nextElementSibling?.textContent).toContain('Available')
+    const cards = Array.from(
+      document.querySelectorAll('[data-settings-body] .card'),
+    )
+    expect(cards.map((c) => c.querySelector('h3')?.textContent)).toEqual([
+      'Installed',
+      'Available',
+    ])
+    // Available is outside the member's disabled fieldset: its filter stays live.
+    expect(cards.at(1)?.closest('fieldset')).toBeNull()
   })
 })
 
@@ -2629,5 +2674,103 @@ describe('Meeting notes, by p-M-0 05', () => {
     expect(document.body.textContent).toContain(
       'Notes in a ticked folder are shared with the workspace.',
     )
+  })
+})
+
+describe('the sheet differences, page by page', () => {
+  const groupHead = (title: string) =>
+    Array.from(document.querySelectorAll('[data-settings-group]')).find(
+      (g) => g.querySelector('h3')?.textContent === title,
+    )
+
+  it('Email & calendar: the accounts card opens on its column heads', async () => {
+    await mount('/settings/email-calendar')
+    const card = groupHead('Accounts')?.closest('.card')
+    expect(card?.querySelector('[data-settings-columns]')?.textContent).toBe(
+      'AccountUsed forStatus',
+    )
+  })
+
+  it('Meeting notes: the recorder leads with its mark, a square before its sync, and Add Granola', async () => {
+    await mount('/settings/meeting-notes')
+    const card = groupHead('Recorders')?.closest('.card')
+    expect(card?.querySelector('[data-provider-mark="granola"]')).not.toBeNull()
+    expect(card?.querySelector('[data-state-tone]')?.textContent).toMatch(
+      /Synced|Connected|Needs|Revoked/,
+    )
+    expect(document.body.textContent).toContain('Add Granola')
+  })
+
+  it('Usage & limits: the Runs count sits in the count slot', async () => {
+    await mount('/settings/usage')
+    const runs = groupHead('Runs')
+    // The label and its count, and no action slot at the right.
+    expect(runs?.children).toHaveLength(1)
+    const count = runs?.querySelector('h3 + span')?.textContent ?? ''
+    expect(count === '' || / listed · /.test(count)).toBe(true)
+  })
+
+  it('Connections: a status square before each status line', async () => {
+    await mount('/settings/connections')
+    for (const row of document.querySelectorAll('[data-provider]'))
+      expect(row.querySelector('[data-state-tone]')).not.toBeNull()
+  })
+
+  it('a connection and a plugin: the way back above the title, the mark beside it', async () => {
+    await mount('/settings/connections/google')
+    const head = () => document.querySelector('[data-settings-head] header')
+    expect(head()?.querySelector('[data-settings-back]')?.textContent).toBe(
+      '‹ Connections',
+    )
+    expect(head()?.querySelector('h1 [data-provider-mark]')).not.toBeNull()
+    // The tabs are the plain bar inside a rule card: no folder in settings.
+    const tablist = document.querySelector('[role="tablist"]')
+    expect(tablist?.className).toContain('before:bg-rule')
+    expect(tablist?.closest('.card')).not.toBeNull()
+    expect(document.querySelector('.folder')).toBeNull()
+
+    act(() => root.unmount())
+    root = createRoot(document.body.appendChild(document.createElement('div')))
+    await mount(`/settings/plugins/${PLUGIN_ID}`)
+    expect(head()?.querySelector('[data-settings-back]')?.textContent).toBe(
+      '‹ Plugins',
+    )
+    expect(head()?.querySelector('h1 [aria-hidden]')).not.toBeNull()
+    expect(document.body.textContent).toContain('Usage today')
+  })
+
+  it('Templates: each row leads with its kind, archived ones included', async () => {
+    await mount('/settings/templates')
+    const rows = Array.from(
+      document.querySelectorAll(
+        '[data-template-row], [data-template-archived]',
+      ),
+    )
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows)
+      expect(
+        row.querySelector('[data-template-kind], [data-note-kind]'),
+      ).not.toBeNull()
+  })
+
+  it('Models: each job leads with its icon', async () => {
+    await mount('/settings/models')
+    const lanes = Array.from(document.querySelectorAll('[data-lane]'))
+    for (const lane of lanes)
+      expect(lane.closest('li')?.querySelector('svg')).not.toBeNull()
+  })
+
+  it('API tokens and invites: a lone Revoke… is a visible button, never a hover ···', async () => {
+    await mount('/settings/tokens')
+    const revoke = byText('Revoke…')
+    expect(revoke).toBeDefined()
+    expect(revoke?.className).not.toContain('row-reveal')
+    expect(document.querySelector('[data-token-row][data-row]')).toBeNull()
+  })
+
+  it('Enrichment: the group is Enrich automatically, its row When a record', async () => {
+    await mount('/settings/enrichment')
+    const card = groupHead('Enrich automatically')?.closest('.card')
+    expect(card?.textContent).toContain('When a record')
   })
 })
