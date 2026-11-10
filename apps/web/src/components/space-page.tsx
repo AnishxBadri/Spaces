@@ -547,28 +547,30 @@ function ArchivedNotice({
   onRestore: () => void
 }) {
   return (
-    <div
-      role="status"
-      className="mx-8 mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-3 border-double border-hairline bg-paper px-4 py-2.5 shadow-solid"
-    >
-      <p className="min-w-0 flex-1 text-ui text-graphite">
-        <span className="font-medium text-foreground">Archived</span> · out of
-        the tree and the picker · {filings} filing{filings === 1 ? '' : 's'}{' '}
-        kept · watches paused
-      </p>
-      {under ? (
-        <Link
-          to="/spaces/$spaceId"
-          params={{ spaceId: under.id }}
-          className="focus-ring shrink-0 text-label text-primary"
-        >
-          Archived with {under.name} ›
-        </Link>
-      ) : (
-        <Button variant="outline" size="sm" onClick={onRestore}>
-          Restore
-        </Button>
-      )}
+    <div className="shrink-0 bg-bone px-3 pt-3">
+      <div
+        role="status"
+        className="flex flex-wrap items-center gap-x-4 gap-y-2 card px-(--inset) py-2.5"
+      >
+        <p className="min-w-0 flex-1 text-ui text-graphite">
+          <span className="font-medium text-foreground">Archived</span> · out of
+          the tree and the picker · {filings} filing{filings === 1 ? '' : 's'}{' '}
+          kept · watches paused
+        </p>
+        {under ? (
+          <Link
+            to="/spaces/$spaceId"
+            params={{ spaceId: under.id }}
+            className="focus-ring shrink-0 text-label text-primary"
+          >
+            Archived with {under.name} ›
+          </Link>
+        ) : (
+          <Button variant="outline" size="sm" onClick={onRestore}>
+            Restore
+          </Button>
+        )}
+      </div>
     </div>
   )
 }

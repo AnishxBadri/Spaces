@@ -22,7 +22,6 @@ import { AiCell, AiCellsProvider } from '#/components/attributes/ai-cell'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { EmptyRow } from '#/components/ledger-section'
-import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
 import { CreateDealDialog } from '#/components/create-deal-dialog'
 import {
   attributeColumnMeta,
@@ -38,7 +37,13 @@ import {
 import { ListMenu } from '#/components/table/list-menu'
 import { useListActions } from '#/components/table/list-actions'
 import { statColumns } from '#/components/table/stat-columns'
-import { Card, PageBody, PageHeader } from '#/components/page-header'
+import {
+  Card,
+  FolderGround,
+  PageBody,
+  PageHeader,
+} from '#/components/page-header'
+import { FolderBody } from '#/components/ui/tabs'
 import { useImportVerb } from '#/components/import/import-action'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import {
@@ -440,7 +445,7 @@ function DealsPage() {
       ) : (
         <>
           {asTable && actions.selectionBar ? (
-            <div className={PIN_UNDER_HEAD_BAR}>{actions.selectionBar}</div>
+            <FolderGround pinned>{actions.selectionBar}</FolderGround>
           ) : (
             <ViewBar
               objectId={objectId}
@@ -495,7 +500,7 @@ function DealsPage() {
               }
             />
           )}
-          <div className={cn('px-1 pb-8', !asTable && 'pt-1')}>
+          <PageBody className="pt-0">
             {asTable ? (
               <AiCellsProvider
                 entityIds={shown.map((r) => r.id)}
@@ -503,6 +508,7 @@ function DealsPage() {
               >
                 <RecordTable
                   joined={!actions.selectionBar}
+                  folder
                   columnActions={columnRun.columnActions}
                   table={table}
                   label="Deals"
@@ -522,22 +528,24 @@ function DealsPage() {
                 />
               </AiCellsProvider>
             ) : (
-              <DealBoard
-                deals={shown}
-                stages={boardStages}
-                valueCurrency={
-                  registry.find((d) => d.slug === 'value')?.options.code ??
-                  'USD'
-                }
-                pictures={deals.pictures}
-                medianDaysInStage={funnel.medianDaysInStage}
-                daysInStage={Object.fromEntries(
-                  funnel.daysInStage.map((d) => [d.id, d.days]),
-                )}
-                sourceLabel={sourceLabel}
-              />
+              <FolderBody label="Board" className="flex-1 p-(--inset)">
+                <DealBoard
+                  deals={shown}
+                  stages={boardStages}
+                  valueCurrency={
+                    registry.find((d) => d.slug === 'value')?.options.code ??
+                    'USD'
+                  }
+                  pictures={deals.pictures}
+                  medianDaysInStage={funnel.medianDaysInStage}
+                  daysInStage={Object.fromEntries(
+                    funnel.daysInStage.map((d) => [d.id, d.days]),
+                  )}
+                  sourceLabel={sourceLabel}
+                />
+              </FolderBody>
             )}
-          </div>
+          </PageBody>
           {columnRun.dialog}
         </>
       )}

@@ -48,7 +48,7 @@ function NoticeLine({
   return (
     <li
       data-notice={tone}
-      className="flex h-8.5 items-center gap-2 border-b border-rule px-1.75 last:border-b-0"
+      className="flex h-8.5 items-center gap-2 border-b border-rule px-(--inset) last:border-b-0"
     >
       <span
         aria-hidden
@@ -108,7 +108,7 @@ export function NoticesBand({
   )
     return null
   return (
-    <section aria-label="Notices" className="border border-rule bg-bone">
+    <section aria-label="Notices" className="card">
       <ul>
         {broken.map((c) => (
           <NoticeLine

@@ -163,7 +163,7 @@ const buttonNamed = (name: string) => {
 }
 
 describe('the market map', () => {
-  it('is the title and its meta with the split + New space, the lanes headed in sans on an ink rule', async () => {
+  it('is the title and its meta with the split + New space, the lanes headed in sans on a rule', async () => {
     await mount(index())
     expect(document.querySelector('h1')?.textContent).toBe('Spaces')
     expect(document.querySelector('[data-spaces-meta]')?.textContent).toBe(
@@ -177,7 +177,7 @@ describe('the market map', () => {
       split?.querySelector('[data-split-new-menu]')?.getAttribute('aria-label'),
     ).toBe('New space from a template')
     const head = document.querySelector('[data-lane-heads]')
-    expect(head?.className).toContain('border-hairline')
+    expect(head?.className).toContain('border-rule')
     expect(head?.className).toContain('text-label')
     expect(head?.textContent).toBe('SpaceCompaniesMemosTermsLast filed')
     expect(document.body.textContent).not.toContain('Market map')

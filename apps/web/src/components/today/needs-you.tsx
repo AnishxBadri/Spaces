@@ -2,7 +2,7 @@ import { Link, useRouter } from '@tanstack/react-router'
 import { Lock } from '#/components/icons'
 import { Fragment, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactElement, ReactNode } from 'react'
-import { ReferenceBar, SectionHead } from '#/components/ledger-section'
+import { ReferenceBar } from '#/components/ledger-section'
 import { WriteUpButton } from '#/components/meetings/write-up-button'
 import { TaskComposer } from '#/components/task-composer'
 import type { MenuTask } from '#/components/tasks/task-menu'
@@ -11,8 +11,8 @@ import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { MoreMenu } from '#/components/ui/more-menu'
 import type { MoreMenuEntry } from '#/components/ui/more-menu'
-import { Segmented } from '#/components/ui/segmented'
-import type { SegmentedOption } from '#/components/ui/segmented'
+import { Tabs } from '#/components/ui/tabs'
+import type { TabItem } from '#/components/ui/tabs'
 import {
   Tooltip,
   TooltipContent,
@@ -584,10 +584,10 @@ function RowLanes({
   }
 }
 
-/** The rows' kind segments: one per kind with rows, its count beside it. */
+/** The rows' kind tabs: one per kind with rows, its count beside it. */
 function kindSegments(
   rows: ReadonlyArray<NeedsYouRow>,
-): Array<SegmentedOption<NeedsFilter>> {
+): Array<TabItem<NeedsFilter>> {
   return FILTER_ORDER.flatMap((k) => {
     const count = rows.filter((r) => r.kind === k).length
     return count > 0 ? [{ id: k, label: SEGMENT_LABEL[k], count }] : []
@@ -598,8 +598,9 @@ const rowClass =
   'group focus-ring-inset flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset) transition-colors duration-150 ease-out-quart hover:bg-bone'
 
 /**
- * Needs you: one ledger in urgency order. The head is the title and a
- * Segmented by kind (a readout's filter rides after `All` while it is on);
+ * Needs you: one ledger in urgency order, the page's folder. Its tabs are
+ * `Needs you n`, the unfiltered ledger, then each kind with rows and its
+ * count (a readout's filter rides after the first while it is on);
  * the rows share fixed lanes — kind, mark, body, action, who, figure, `···`,
  * an empty action or who lane left out; the list folds at eight and ends in
  * the task composer.
@@ -651,8 +652,8 @@ export function NeedsYou({
     ...rows.map((r) => (r.kind === 'deal' ? r.days : 0)),
   )
 
-  const segments: Array<SegmentedOption<NeedsFilter>> = [
-    { id: 'all', label: 'All' },
+  const tabs: Array<TabItem<NeedsFilter>> = [
+    { id: 'all', label: 'Needs you', count: rows.length },
     ...(readout === null
       ? []
       : [
@@ -660,6 +661,7 @@ export function NeedsYou({
             id: readout.id,
             label: readout.label,
             count: inFilter(rows, readout.id).length,
+            showZero: true,
           },
         ]),
     ...kindSegments(rows),
@@ -770,136 +772,134 @@ export function NeedsYou({
 
   return (
     <section aria-label="Needs you" className="flex flex-col">
-      <SectionHead
-        title="Needs you"
-        switch={
-          <Segmented
-            label="Needs you by kind"
-            value={filter}
-            onChange={(id) => {
-              setOpen(false)
-              onFilter(id)
-            }}
-            options={segments}
-          />
-        }
-      />
-      <ol ref={list}>
-        {shown.map((r) => {
-          const children =
-            r.kind === 'review' &&
-            r.proposal.kind === 'group' &&
-            expanded.has(r.key)
-              ? r.proposal.children
-              : []
-          return (
-            <Fragment key={r.key}>
-              <li
-                data-row
-                data-needs-row={r.kind}
-                tabIndex={-1}
-                onKeyDown={(e) => onRowKey(e, rowKeys(r))}
-                className={cn(
-                  rowClass,
-                  r.kind === 'review' && 'focus-within:bg-bone',
-                  r.kind === 'task' && washes(r.task.id) && 'row-wash',
-                )}
-              >
-                <span className={LANE.kind}>{r.kind}</span>
-                <RowLanes
-                  row={r}
-                  dealScale={dealScale}
-                  onComplete={onComplete}
-                  onOpen={onOpen}
-                  menu={taskMenu}
-                  actions={actions}
-                  expanded={expanded.has(r.key)}
-                  onToggle={() => toggle(r.key)}
-                />
-              </li>
-              {children.map((c) => (
+      <Tabs
+        label="Needs you by kind"
+        items={tabs}
+        value={filter}
+        onValueChange={(id) => {
+          setOpen(false)
+          onFilter(id)
+        }}
+      >
+        <ol ref={list}>
+          {shown.map((r) => {
+            const children =
+              r.kind === 'review' &&
+              r.proposal.kind === 'group' &&
+              expanded.has(r.key)
+                ? r.proposal.children
+                : []
+            return (
+              <Fragment key={r.key}>
                 <li
-                  key={c.key}
                   data-row
-                  data-needs-child
+                  data-needs-row={r.kind}
                   tabIndex={-1}
-                  onKeyDown={(e) => onRowKey(e, leafKeys(c))}
-                  className={cn(rowClass, 'focus-within:bg-bone')}
+                  onKeyDown={(e) => onRowKey(e, rowKeys(r))}
+                  className={cn(
+                    rowClass,
+                    r.kind === 'review' && 'focus-within:bg-bone',
+                    r.kind === 'task' && washes(r.task.id) && 'row-wash',
+                  )}
                 >
-                  <span className={LANE.kind} />
-                  <LeafLanes
-                    leaf={c}
-                    figure={actions.since(c.at)}
-                    lock={null}
+                  <span className={LANE.kind}>{r.kind}</span>
+                  <RowLanes
+                    row={r}
+                    dealScale={dealScale}
+                    onComplete={onComplete}
+                    onOpen={onOpen}
+                    menu={taskMenu}
                     actions={actions}
-                    child
+                    expanded={expanded.has(r.key)}
+                    onToggle={() => toggle(r.key)}
                   />
                 </li>
-              ))}
-            </Fragment>
-          )
-        })}
-        {loading && (filter === 'all' || filter === 'review') ? (
-          <li
-            data-needs-loading
-            className="flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset)"
-          >
-            <span className={LANE.kind} />
-            <span className={LANE.mark}>
-              <Twinkle />
-            </span>
-            <span className="text-label text-graphite">
-              Loading what needs you
-            </span>
-          </li>
-        ) : inView.length === 0 ? (
-          <li className="flex h-ledger-row items-center border-b border-rule px-(--inset) text-ui text-graphite">
-            {EMPTY[filter]}
-          </li>
-        ) : null}
-        {hidden.length > 0 ? (
-          <li className="border-b border-rule">
-            <button
-              type="button"
-              data-fold
-              onClick={() => setOpen(true)}
-              className="group/fold focus-ring-inset flex h-ledger-row w-full items-center justify-between gap-3 px-(--inset) text-left"
+                {children.map((c) => (
+                  <li
+                    key={c.key}
+                    data-row
+                    data-needs-child
+                    tabIndex={-1}
+                    onKeyDown={(e) => onRowKey(e, leafKeys(c))}
+                    className={cn(rowClass, 'focus-within:bg-bone')}
+                  >
+                    <span className={LANE.kind} />
+                    <LeafLanes
+                      leaf={c}
+                      figure={actions.since(c.at)}
+                      lock={null}
+                      actions={actions}
+                      child
+                    />
+                  </li>
+                ))}
+              </Fragment>
+            )
+          })}
+          {loading && (filter === 'all' || filter === 'review') ? (
+            <li
+              data-needs-loading
+              className="flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset)"
             >
-              <span className="min-w-0 truncate text-label text-graphite">
-                {foldSummary(hidden)}
+              <span className={LANE.kind} />
+              <span className={LANE.mark}>
+                <Twinkle />
               </span>
-              <span className="shrink-0 text-label text-foreground group-hover/fold:underline">
-                Show all ›
+              <span className="text-label text-graphite">
+                Loading what needs you
               </span>
-            </button>
-          </li>
-        ) : null}
-        <li>
-          <TaskComposer
-            hotkey="t"
-            onCreated={onCreated}
-            trigger={
+            </li>
+          ) : inView.length === 0 ? (
+            <li className="flex h-ledger-row items-center border-b border-rule px-(--inset) text-ui text-graphite">
+              {EMPTY[filter]}
+            </li>
+          ) : null}
+          {hidden.length > 0 ? (
+            <li className="border-b border-rule">
               <button
                 type="button"
-                data-composer-row
-                className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 px-(--inset) text-left transition-colors duration-150 ease-out-quart hover:bg-bone"
+                data-fold
+                onClick={() => setOpen(true)}
+                className="group/fold focus-ring-inset flex h-ledger-row w-full items-center justify-between gap-3 px-(--inset) text-left"
               >
-                <span
-                  aria-hidden
-                  className="w-16 shrink-0 mono text-ui text-graphite"
-                >
-                  +
+                <span className="min-w-0 truncate text-label text-graphite">
+                  {foldSummary(hidden)}
                 </span>
-                <span className={LANE.mark} />
-                <span className="min-w-0 flex-1 truncate text-body text-graphite">
-                  Add a task…
+                <span className="shrink-0 text-label text-foreground group-hover/fold:underline">
+                  Show all ›
                 </span>
-                <kbd className="shrink-0 mono text-micro text-graphite">T</kbd>
               </button>
-            }
-          />
-        </li>
-      </ol>
+            </li>
+          ) : null}
+          <li>
+            <TaskComposer
+              hotkey="t"
+              onCreated={onCreated}
+              trigger={
+                <button
+                  type="button"
+                  data-composer-row
+                  className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 px-(--inset) text-left transition-colors duration-150 ease-out-quart hover:bg-bone"
+                >
+                  <span
+                    aria-hidden
+                    className="w-16 shrink-0 mono text-ui text-graphite"
+                  >
+                    +
+                  </span>
+                  <span className={LANE.mark} />
+                  <span className="min-w-0 flex-1 truncate text-body text-graphite">
+                    Add a task…
+                  </span>
+                  <kbd className="shrink-0 mono text-micro text-graphite">
+                    T
+                  </kbd>
+                </button>
+              }
+            />
+          </li>
+        </ol>
+      </Tabs>
     </section>
   )
 }

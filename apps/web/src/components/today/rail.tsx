@@ -22,10 +22,10 @@ function hostOf(url: string): string | null {
   }
 }
 
-/** A rail section's head: mono caps graphite on a rule, nothing beside it. */
+/** A small card's own head: 28px of paper, mono caps graphite, a rule under. */
 function RailHead({ label }: { label: string }) {
   return (
-    <h2 className="border-b border-rule pb-2 label-caps text-graphite">
+    <h2 className="flex h-7 shrink-0 items-center border-b border-rule px-(--inset) label-caps text-graphite">
       {label}
     </h2>
   )
@@ -49,7 +49,8 @@ const railLink =
   'focus-ring shrink-0 text-label text-foreground hover:underline'
 
 /**
- * The book in the rail: Invested, Value, MOIC on 32px rows, then — only
+ * The book in the rail, a small paper card: Invested, Value, MOIC on 32px
+ * rows, then — only
  * when a holding has no rate to the base — the line that says so with the
  * way to add the rates. The caller leaves it out with no holdings.
  */
@@ -62,11 +63,14 @@ export function PortfolioRail({
 }) {
   const unpriced = rollup.excludedForMissingRates.length
   return (
-    <section aria-label="Portfolio" className="flex flex-col">
+    <section aria-label="Portfolio" className="flex flex-col card">
       <RailHead label="Portfolio" />
       <PortfolioHeadlineRail rollup={rollup} baseCurrency={baseCurrency} />
       {unpriced > 0 ? (
-        <div data-missing-rates className="flex h-8 items-center gap-2">
+        <div
+          data-missing-rates
+          className="flex h-8 items-center gap-2 px-(--inset)"
+        >
           <Square tone="warn" />
           <span className="min-w-0 flex-1 truncate text-label text-graphite">
             {unpriced} holding{unpriced === 1 ? '' : 's'} out of the totals
@@ -91,7 +95,7 @@ function RailRow({
   sub?: ReactNode
 }) {
   return (
-    <li className="flex items-start gap-2 border-b border-rule py-2 last:border-b-0">
+    <li className="flex items-start gap-2 border-b border-rule px-(--inset) py-2 last:border-b-0">
       <span className="w-11 shrink-0 pt-0.5 mono text-micro text-graphite">
         {when}
       </span>
@@ -111,7 +115,7 @@ function RailRow({
 export type MovingState = 'loading' | 'failed' | ReadonlyArray<MovingSignal>
 
 /**
- * What's moving: signals from the last seven days on the reader's
+ * What's moving, a small paper card: signals from the last seven days on the reader's
  * companies, newest first, each citing where it was read. Four show; the
  * foot unfolds the rest (`5 more`) and opens the team's last day in place
  * (`Team activity ›`).
@@ -133,12 +137,12 @@ export function WhatsMoving({
   const shown = all ? list : list.slice(0, MOVING_SHOWN)
   const hidden = list.length - shown.length
   return (
-    <section aria-label="What's moving" className="flex flex-col">
+    <section aria-label="What's moving" className="flex flex-col card">
       <RailHead label="What's moving" />
       {signals === 'loading' ? (
         <p
           data-moving-loading
-          className="flex h-8 items-center gap-2 text-label text-graphite"
+          className="flex h-8 items-center gap-2 px-(--inset) text-label text-graphite"
         >
           <Twinkle />
           Reading signals
@@ -146,7 +150,7 @@ export function WhatsMoving({
       ) : signals === 'failed' ? (
         <p
           data-moving-failed
-          className="flex h-8 items-center gap-2 text-label text-graphite"
+          className="flex h-8 items-center gap-2 px-(--inset) text-label text-graphite"
         >
           <Square tone="bad" />
           <span className="min-w-0 flex-1 truncate">
@@ -159,7 +163,7 @@ export function WhatsMoving({
       ) : list.length === 0 ? (
         <p
           data-moving-empty
-          className="flex h-8 items-center text-label text-graphite"
+          className="flex h-8 items-center px-(--inset) text-label text-graphite"
         >
           Nothing new.
         </p>
@@ -202,7 +206,7 @@ export function WhatsMoving({
         </ol>
       )}
       {hidden > 0 || team.length > 0 ? (
-        <div className="flex h-8 items-center justify-between gap-3 border-t border-rule">
+        <div className="flex h-8 items-center justify-between gap-3 border-t border-rule px-(--inset)">
           {hidden > 0 ? (
             <button
               type="button"

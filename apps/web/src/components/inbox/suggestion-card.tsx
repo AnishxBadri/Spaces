@@ -770,7 +770,7 @@ function FieldGrid({
       <div
         className={cn(
           cols,
-          'h-7 border-b border-hairline text-label text-graphite',
+          'h-7 border-b border-rule text-label text-graphite',
         )}
       >
         {named ? <span>Field</span> : null}
@@ -969,9 +969,9 @@ export function SuggestionCard({ card }: { card: SuggestionRow }) {
   return (
     <li
       data-suggestion-card
-      className="flex flex-col border border-hairline bg-paper"
+      className="flex flex-col border border-rule bg-paper"
     >
-      <div className="flex min-h-11 items-center gap-3 border-b border-hairline px-5 py-2.5">
+      <div className="flex min-h-11 items-center gap-3 border-b border-rule px-5 py-2.5">
         {/* A captured page's card is headed by the page. */}
         {card.page === null ? (
           <RecordName record={card.record} />

@@ -13,9 +13,9 @@ import { cn } from '#/lib/utils'
  * the serif name, its suffix and badges with the actions bottom-aligned at
  * the right, the double rule under — no readout strip; scrolled past its
  * name it folds to `HeadBar`.
- * Body: `RecordBody details=… groups` — the 300px rail on bone left (the
- * property grid as label–value rows, then the relationship groups), the
- * tab head over one view right, Overview first. Every part is markup only;
+ * Body: `RecordBody details=… groups` — on the bone ground, the 320px rail
+ * left with no box (the property grid, then the relationship groups), the
+ * record's folder right, Overview first. Every part is markup only;
  * the pages keep their data and handlers.
  */
 
@@ -89,7 +89,7 @@ export function RecordHeader({
       <HeadBar fold={fold} title={name} mark={mark} />
       <header
         className={cn(
-          'flex shrink-0 flex-col gap-3 border-b border-rule px-3 pt-5 pb-4',
+          'flex shrink-0 flex-col gap-3 border-b border-rule bg-paper px-6 pt-5 pb-4',
           className,
         )}
       >
@@ -148,7 +148,7 @@ export function RecordHeadPending({ kind }: { kind: string }) {
     <div className="flex min-h-full flex-col">
       <header
         data-record-pending
-        className="flex shrink-0 flex-col gap-3 border-b border-rule px-3 pt-5 pb-4"
+        className="flex shrink-0 flex-col gap-3 border-b border-rule bg-paper px-6 pt-5 pb-4"
       >
         <div data-stamp-row className="flex">
           <Stamp kind={kind} />
@@ -343,14 +343,15 @@ export function PreviewHead({
 }
 
 /**
- * Body. With `details` it is the tabbed record: the rail on bone left,
- * sticking under the folded bar on wide screens, and `children` — the tab
- * head over its view — taking the rest, edge to edge.
- * - `groups`: the 300px rail of a record or a space, `p-3` with its
- *   `RailGroup`s `gap-3` apart. Without it, a 320px column of edge-to-edge
- *   `RailSection`s.
+ * Body, on the bone ground in the 12px gutter. With `details` it is the
+ * tabbed record: the rail left, printed straight on the ground with no box
+ * and its content on the 24px edge, sticking under the folded bar on wide
+ * screens; then `children` — the record's folder — taking the rest and the
+ * height. Below `xl` the two stack.
+ * - `groups`: a record's or a space's rail of `RailGroup`s, `gap-3` apart.
+ *   Without it, a column of edge-to-edge `RailSection`s.
  * - Without `details`, the older shape the term and holding pages keep:
- *   the page left, a `rail` right on bone.
+ *   the page left, a `rail` right, both on the ground.
  */
 export function RecordBody({
   children,
@@ -367,28 +368,27 @@ export function RecordBody({
     return (
       <div
         data-record-body="details"
-        className="flex min-h-0 flex-1 flex-col xl:flex-row"
+        className="flex min-h-0 flex-1 flex-col gap-3 bg-bone p-3 xl:flex-row"
       >
         <aside
           aria-label="Details"
+          data-record-rail
           className={cn(
-            'flex w-full shrink-0 flex-col border-b border-hairline bg-bone xl:sticky xl:top-12 xl:max-h-[calc(100dvh-3rem)] xl:overflow-y-auto xl:border-r xl:border-b-0',
-            groups ? 'gap-3 p-3 xl:w-75' : 'xl:w-80',
+            'flex w-full shrink-0 flex-col px-3 xl:sticky xl:top-15 xl:max-h-[calc(100dvh-4.5rem)] xl:w-80 xl:self-start xl:overflow-y-auto',
+            groups && 'gap-3 pt-2 pb-4',
           )}
         >
           {details}
         </aside>
-        <div className="flex min-w-0 flex-1 flex-col pb-8">{children}</div>
+        <div className="flex min-w-0 flex-1 flex-col">{children}</div>
       </div>
     )
   }
   return (
-    <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
-      <div className="flex min-w-0 flex-1 flex-col gap-8 px-3 pt-6 pb-8">
-        {children}
-      </div>
+    <div className="flex min-h-0 flex-1 flex-col gap-3 bg-bone p-3 xl:flex-row">
+      <div className="flex min-w-0 flex-1 flex-col gap-3">{children}</div>
       {rail ? (
-        <aside className="flex w-full shrink-0 flex-col border-t border-hairline bg-bone xl:sticky xl:top-12 xl:max-h-[calc(100dvh-3rem)] xl:w-90 xl:overflow-y-auto xl:border-t-0 xl:border-l">
+        <aside className="flex w-full shrink-0 flex-col gap-3 xl:sticky xl:top-15 xl:max-h-[calc(100dvh-4.5rem)] xl:w-90 xl:self-start xl:overflow-y-auto">
           {rail}
         </aside>
       ) : null}

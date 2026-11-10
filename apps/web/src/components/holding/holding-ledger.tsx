@@ -21,8 +21,8 @@ import { cn } from '#/lib/utils'
  */
 
 /**
- * The figures, each sized to its value so none is cut, and the outline
- * `As of <day>` control at the right.
+ * The figures, a card on the ground, each sized to its value so none is
+ * cut, and the outline `As of <day>` control at the right.
  */
 export function HoldingFigures({
   figures,
@@ -41,7 +41,7 @@ export function HoldingFigures({
   return (
     <div
       data-figures
-      className="flex min-h-16 shrink-0 items-center gap-4 border-b border-rule"
+      className="flex min-h-16 shrink-0 items-center gap-4 card px-(--inset)"
     >
       <div className="flex min-w-0 flex-1 overflow-x-auto">
         {figures.length > 0
@@ -185,12 +185,13 @@ export function EventSection({
     }
   }
 
-  if (rows.length === 0) return <>{empty}</>
+  if (rows.length === 0)
+    return empty === null ? null : <div className="card">{empty}</div>
   const live = rows.filter(
     (r) => r.reversesId === null && r.reversedAt === null,
   )
   return (
-    <section aria-label={title} className="flex flex-col">
+    <section aria-label={title} className="flex flex-col card">
       <SectionHead title={title} count={String(live.length)} />
       {confirmDialog}
       <ol>
@@ -200,7 +201,7 @@ export function EventSection({
               key={r.id}
               id={`event-${r.id}`}
               data-reversal
-              className="flex h-ledger-row items-center gap-3 border-b border-rule px-3 text-graphite"
+              className="flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset) text-graphite"
             >
               <span className="w-24 shrink-0" />
               <span className="min-w-0 flex-1 truncate pl-4 text-ui">
@@ -224,7 +225,7 @@ export function EventSection({
               key={r.id}
               id={`event-${r.id}`}
               data-row
-              className="flex h-ledger-row items-center gap-3 border-b border-rule px-3"
+              className="flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset)"
             >
               <span className="w-24 shrink-0 mono text-micro text-graphite">
                 {formatDay(r.date.slice(0, 10), today)}

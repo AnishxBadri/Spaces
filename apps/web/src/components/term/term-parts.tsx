@@ -67,7 +67,7 @@ export function TermMentions({
 }) {
   if (total === 0) {
     return (
-      <div className="flex flex-col items-start gap-3">
+      <div className="flex flex-col items-start gap-3 px-(--inset) py-3">
         <p className="text-ui text-graphite">{TERM_EMPTY}</p>
         {action}
       </div>
@@ -117,14 +117,14 @@ function MentionItem({ row }: { row: MentionRow }) {
       {href ? (
         <Link
           to={href}
-          className="focus-ring-inset flex flex-col gap-0.5 px-3 py-2 hover:bg-bone"
+          className="focus-ring-inset flex flex-col gap-0.5 px-(--inset) py-2 hover:bg-bone"
         >
           {body}
         </Link>
       ) : (
         // An unfiled document has no page to land on; it still says it
         // mentions the term.
-        <div className="flex flex-col gap-0.5 px-3 py-2">{body}</div>
+        <div className="flex flex-col gap-0.5 px-(--inset) py-2">{body}</div>
       )}
     </li>
   )

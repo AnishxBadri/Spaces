@@ -480,7 +480,7 @@ describe('a proposal row', () => {
     expect(ask).toContain('href="/ask?thread=th1"')
   })
 
-  it('counts top-level rows in the Review segment, not their children', async () => {
+  it('counts top-level rows in the Review tab, not their children', async () => {
     const two = (id: string) =>
       suggestion({
         id,
@@ -504,18 +504,23 @@ describe('a proposal row', () => {
     const html = await render(
       reviewRows([group, card(suggestion({ id: 'z' }))]),
     )
-    expect(html).toMatch(/>Review<span data-segment-count[^>]*>2</)
+    expect(html).toMatch(/>Review<span data-tab-count[^>]*>2</)
   })
 })
 
-describe('the Needs-you head', () => {
-  it('carries no count, and a Segmented of the kinds that have rows', async () => {
+describe('the Needs-you folder', () => {
+  it('opens on Needs you with every row counted, then a tab per kind that has rows', async () => {
     const html = await render([task(), deal, mark])
     expect(html).not.toContain('data-section-count')
     expect(html).toContain('aria-label="Needs you by kind"')
-    expect(html).toMatch(/aria-checked="true"[^>]*>All</)
+    expect(html).toMatch(
+      /aria-selected="true"[^>]*>Needs you<span data-tab-count[^>]*>3</,
+    )
     for (const label of ['Tasks', 'Deals', 'Marks'])
-      expect(html).toMatch(new RegExp(`>${label}<span data-segment-count`))
+      expect(html).toMatch(new RegExp(`>${label}<span data-tab-count[^>]*>1<`))
+    // The ledger is the folder's body: the open tab runs into it.
+    expect(html).toMatch(/role="tabpanel"[^>]*class="[^"]*\bfolder\b/)
+    expect(html).toContain('tab-open')
     expect(html).not.toMatch(/>Review</)
     expect(html).not.toMatch(/>Meetings</)
   })

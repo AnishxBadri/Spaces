@@ -119,7 +119,7 @@ export function ThreadRow({
       data-row
       data-highlighted={highlighted ? '' : undefined}
       className={cn(
-        'flex flex-col px-3 py-2.25',
+        'flex flex-col px-(--inset) py-2.25',
         !last && 'border-b border-rule',
         highlighted && 'bg-bone',
       )}

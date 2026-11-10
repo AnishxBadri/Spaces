@@ -433,7 +433,7 @@ export function NoteRail({
     <aside
       aria-label="Details"
       data-note-rail
-      className="flex w-full shrink-0 flex-col border-t border-hairline bg-bone md:sticky md:top-12 md:max-h-[calc(100dvh-3rem)] md:w-72 md:overflow-y-auto md:border-t-0 md:border-l"
+      className="flex w-full shrink-0 flex-col bg-bone md:sticky md:top-12 md:max-h-[calc(100dvh-3rem)] md:w-72 md:overflow-y-auto"
     >
       <FiledOn note={note} allSpaces={allSpaces} onPreview={onPreview} />
       <LinkList

@@ -295,7 +295,8 @@ Structure is 1px ink. Inner rules are 1px rule. Nothing blurs.
     dither vanishes, so it keeps a solid 3px ink offset: `shadow-solid`.
   - The primitives choose (`Popover`, `DropdownMenu`, `Select`, the BlockNote sheets;
     `DialogContent`). No call site passes a shadow; gate 5 refuses `shadow-[…]`.
-- **Spacing.** 4 8 12 16 24 32; the page gutter is 32.
+- **Spacing.** 4 8 12 16 24 32; the content edge is 24 and the body gutter 12, with
+  12 between cards and an 11px inset inside one (design contract, The edges).
 - **Heights.** Table row 36 · ledger row 40 · section head 44 · tab bar 44 · control 32 ·
   band 28 · segmented 28 · small 26 · a row's `···` 24 · badge 20 · nav row 30 · header
   row 48 · readout strip 56–64 (Today and the holding's figures only) · dialog head 48 ·
@@ -435,9 +436,11 @@ carrying its own accept.
 
 **One page mode, Field.** Every route's outermost container is
 `flex min-h-full flex-col`, edge to edge: the `PageHeader` or `RecordHeader` runs the
-full width with its hairline (the hairline is what ties the page to the chassis, so it
-must reach the edge), and the body insets 32px (`px-8`). Content starts at the same
-left edge on every page; navigating never moves it.
+full width on paper with one rule under it, its title on the 24px content edge. Under
+the head the body is the bone ground, filling the view's height, with a 12px gutter;
+every card on it is paper, and the page's tabbed object is its one ink folder (design
+contract, The edges, E1–E11). Content starts at the same left edge on every page;
+navigating never moves it.
 
 Prose caps its measure, it does not center. A memo, a thesis, the mandate, the note
 editor and a glossary definition sit left at the gutter under `max-w-160` (640px, or
@@ -556,11 +559,12 @@ owner on 2026-10-05 after the storage and email drafts read as one flat plane. T
 shared primitives draw it — `SectionHead` (the band, inside `LedgerSection`,
 `RecordSection`; a group inside a settings page is a caps label on a hairline instead,
 `SettingsGroupHead`), `LedgerRow` at `h-ledger-row`, `DialogHeader`,
-the confirm — so every surface built on them follows; rows sit 12px in from the
-band's edge, under its title.
+the confirm — so every surface built on them follows; rows sit 11px in from the
+card's or the folder's edge, under its title, which puts them on the page's 24px line.
 
 - **Material.** A section head is a 44px band on bone — title, count, tabs, filters and
-  the head's one action live in it. A Drive folder band is the same band; a settings
+  the head's one action live in it — except where it opens a card: a card's own head is
+  paper, standing on the card's rule. A Drive folder band is the same band; a settings
   page is the page, so its groups take no band. A group inside a pane opens on a 28px
   bone **band** with a mono caps label and an optional link right. Dialog heads and feet
   are bone. Rows sit on paper.

@@ -211,7 +211,7 @@ function HoldingPage() {
           ) : null}
         </HoldingFigures>
 
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-3">
           <EventSection
             title="Checks"
             table="investment"

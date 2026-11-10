@@ -11,14 +11,15 @@ import { cn } from '#/lib/utils'
  * Page header. Serif title, or a sentence when the page has a state to
  * report; one mono line of what the instrument measured (above as an
  * eyebrow, or below as a readout); `[outline?] [Primary] [···]` right, all
- * 32px on the title's line, keys in their tooltips. The title sits on the
- * 12px page edge and the `···` ends 12px from the right, level with the
- * last control of the content under it; one rule under, 104px tall at
- * least, so every page's title and rule land on the same lines. Scrolled
- * past its title, it folds to `HeadBar`.
- * - `tabs` is the page's `Tabs` bar, under the rule; scrolled, it pins
- *   under the folded bar rather than riding into it. A list's count is on its
- *   All tab; a page with no tab bar puts it in the title (`HeadCount`).
+ * 32px on the title's line, keys in their tooltips. Paper, on the 24px page
+ * edge, the `···` ending 24px from the right, level with the last control of
+ * the content under it; one rule under, 104px tall at least, so every page's
+ * title and rule land on the same lines. Scrolled past its title, it folds
+ * to `HeadBar`.
+ * - `tabs` is the page's folder bar, set on the bone ground under the rule
+ *   (`FolderGround`); scrolled, it pins under the folded bar rather than
+ *   riding into it. A list's count is on its All tab; a page with no tab bar
+ *   puts it in the title (`HeadCount`).
  */
 export function PageHeader({
   eyebrow,
@@ -49,7 +50,7 @@ export function PageHeader({
         className={cn(
           // One height on every page, the title on one line from the top:
           // moving between pages, the title and the rule never jump.
-          'flex min-h-26 shrink-0 items-start justify-between gap-4 border-b border-rule pt-7 pb-4',
+          'flex min-h-26 shrink-0 items-start justify-between gap-4 border-b border-rule bg-paper pt-7 pb-4',
           PAGE_EDGE,
           className,
         )}
@@ -76,20 +77,21 @@ export function PageHeader({
         ) : null}
       </header>
       {tabs ? (
-        <div data-head-tabs className={cn('shrink-0', PIN_UNDER_HEAD_BAR)}>
+        <FolderGround pinned data-head-tabs>
           {tabs}
-        </div>
+        </FolderGround>
       ) : null}
     </>
   )
 }
 
-/** The page edge: the title, and every card's content, sit 12px in. */
-export const PAGE_EDGE = 'px-3'
+/** The page edge: the title, and every card's content, sit 24px in. */
+export const PAGE_EDGE = 'px-6'
 
 /**
- * A page's body under its head: the 4px gutter, 4px down from the head's
- * rule, cards 4px apart. It holds `Card`s, or a list's tab bar and table.
+ * A page's body under its head: the bone ground, filling the view's height,
+ * with the 12px gutter round it and cards 12px apart. It holds `Card`s, or a
+ * folder's body under a `FolderGround` bar (`pt-0`, so the two join).
  */
 export function PageBody({
   children,
@@ -101,7 +103,7 @@ export function PageBody({
   return (
     <div
       data-page-body
-      className={cn('flex flex-col gap-1 px-1 pt-1 pb-8', className)}
+      className={cn('flex flex-1 flex-col gap-3 bg-bone p-3', className)}
     >
       {children}
     </div>
@@ -109,8 +111,39 @@ export function PageBody({
 }
 
 /**
- * A content card: a 1px rule box. Rows and bands inside it inset 7px, so its
- * content lands on the page's 12px edge.
+ * The ground a page's folder bar stands on: bone, the 12px gutter at the
+ * sides and above, so the open tab's left edge is the folder body's under
+ * it. `pinned`, it sticks under the folded head bar and its bone hides what
+ * scrolls under, so nothing shows through the gutter.
+ */
+export function FolderGround({
+  children,
+  pinned = false,
+  className,
+  ...data
+}: {
+  children: ReactNode
+  pinned?: boolean | undefined
+  className?: string | undefined
+} & { [k: `data-${string}`]: string | boolean | undefined }) {
+  return (
+    <div
+      {...data}
+      className={cn(
+        'shrink-0 bg-bone px-3 pt-3',
+        pinned && PIN_UNDER_HEAD_BAR,
+        className,
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
+/**
+ * A content card: a paper sheet in a 1px rule box on the ground. Rows and
+ * bands inside it inset 11px, so its content lands on the page's 24px edge.
+ * A section head that opens it is its own head, on paper.
  */
 export function Card({
   children,

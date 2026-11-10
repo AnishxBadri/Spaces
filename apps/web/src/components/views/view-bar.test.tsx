@@ -275,7 +275,7 @@ describe('the tab bar', () => {
       selected: t.getAttribute('aria-selected'),
     }))
 
-  it('draws All with the total and each view with its count, as folder tabs on white', async () => {
+  it('draws All with the total and each view with its count, as folder tabs on the ground', async () => {
     await mount({ objectId: SEED.objectId, canEdit: false, activeId: null })
     expect(tabs()).toEqual([
       { text: 'All37', selected: 'true' },
@@ -283,8 +283,12 @@ describe('the tab bar', () => {
     ])
     const list = document.querySelector('[role="tablist"]')
     const barClass = list?.closest('[data-tab-bar]')?.className ?? ''
-    expect(barClass).toContain('bg-paper')
-    expect(barClass).not.toContain('bg-bone')
+    expect(barClass).toContain('before:bg-hairline')
+    expect(barClass.split(/\s+/).filter((c) => c.startsWith('bg-'))).toEqual([])
+    // The ground under it carries the bone and the gutter.
+    expect(list?.closest('[data-view-bar]')?.className.split(/\s+/)).toEqual(
+      expect.arrayContaining(['bg-bone', 'px-3', 'pt-3']),
+    )
     expect(
       document.querySelector('[aria-selected="true"]')?.className,
     ).toContain('tab-open')

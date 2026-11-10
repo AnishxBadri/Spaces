@@ -23,7 +23,7 @@ function NoticeRow({
   return (
     <li
       data-notice={kind}
-      className="flex h-8.5 items-center gap-2.5 border-b border-rule px-6 last:border-b-0"
+      className="flex h-8.5 items-center gap-2.5 border-b border-rule px-(--inset) last:border-b-0"
     >
       <span
         aria-hidden
@@ -44,11 +44,11 @@ const fixClass =
   'focus-ring shrink-0 mono text-micro text-foreground hover:underline'
 
 /**
- * Under a record head's double rule, only while something needs saying: the
- * record archived, a record the sweep paired with this one, and an
- * enrichment parked at a source's daily cap. Bone on a rule, 34px rows, each
- * a 6px square, the sentence and the link that settles it. Nothing at all
- * otherwise.
+ * Under a record head, only while something needs saying: the record
+ * archived, a record the sweep paired with this one, and an enrichment
+ * parked at a source's daily cap. A paper card on the ground, 34px rows,
+ * each a 6px square, the sentence and the link that settles it. Nothing at
+ * all otherwise.
  */
 export function RecordNotices({
   recordId,
@@ -64,44 +64,42 @@ export function RecordNotices({
   if (archive === null && duplicates.length === 0 && parked === null)
     return null
   return (
-    <ul
-      aria-label="Notices"
-      data-record-notices
-      className="shrink-0 border-b border-rule bg-bone"
-    >
-      {archive === null ? null : (
-        <ArchivedNotice recordId={recordId} archive={archive} />
-      )}
-      {duplicates.map((d) => (
-        <NoticeRow
-          key={d.pairId}
-          kind="duplicate"
-          fix={
-            <Link
-              to="/review"
-              search={{ record: recordId, lane: 'duplicates' }}
-              className={fixClass}
-            >
-              Compare ›
-            </Link>
-          }
-        >
-          {duplicateWords(d)}
-        </NoticeRow>
-      ))}
-      {parked === null ? null : (
-        <NoticeRow
-          kind="parked"
-          fix={
-            <Link to="/settings/enrichment" className={fixClass}>
-              Enrichment ›
-            </Link>
-          }
-        >
-          {parkedWords(parked)}
-        </NoticeRow>
-      )}
-    </ul>
+    <div className="shrink-0 bg-bone px-3 pt-3">
+      <ul aria-label="Notices" data-record-notices className="card">
+        {archive === null ? null : (
+          <ArchivedNotice recordId={recordId} archive={archive} />
+        )}
+        {duplicates.map((d) => (
+          <NoticeRow
+            key={d.pairId}
+            kind="duplicate"
+            fix={
+              <Link
+                to="/review"
+                search={{ record: recordId, lane: 'duplicates' }}
+                className={fixClass}
+              >
+                Compare ›
+              </Link>
+            }
+          >
+            {duplicateWords(d)}
+          </NoticeRow>
+        ))}
+        {parked === null ? null : (
+          <NoticeRow
+            kind="parked"
+            fix={
+              <Link to="/settings/enrichment" className={fixClass}>
+                Enrichment ›
+              </Link>
+            }
+          >
+            {parkedWords(parked)}
+          </NoticeRow>
+        )}
+      </ul>
+    </div>
   )
 }
 

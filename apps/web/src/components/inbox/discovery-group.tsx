@@ -313,7 +313,7 @@ export function DiscoveryGroup({ group }: { group: DiscoveryRow }) {
   if (group.suggestions.length === 0 && accepted.size === 0) return null
 
   return (
-    <li className="flex flex-col border border-hairline bg-paper">
+    <li className="flex flex-col border border-rule bg-paper">
       <DiscoveryHead group={group} />
       <ul className="flex flex-col">
         {group.suggestions.map((s) => {

@@ -355,7 +355,9 @@ describe('a thread row', () => {
       </ul>,
     )
     const row = el.querySelector('[data-thread="s"]')
-    expect(cls(row)).toEqual(expect.arrayContaining(['px-3', 'py-2.25']))
+    expect(cls(row)).toEqual(
+      expect.arrayContaining(['px-(--inset)', 'py-2.25']),
+    )
     expect(row?.querySelector('[data-people]')?.textContent).toBe(
       'To Ada Lovelace',
     )

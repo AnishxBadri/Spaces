@@ -140,9 +140,9 @@
   --ledger-row-h: 2.5rem;
 
   /* The edges. `--inset` is how far a row's text sits in from the box it is
-     drawn in: 12px on the page, 7px inside a `card`, so 4px gutter + 1px
-     rule + 7px lands a card's content on the page's 12px line. */
-  --inset: 0.75rem;
+     drawn in: 24px on the page, 11px inside a `card` or a `folder`, so 12px
+     gutter + 1px edge + 11px lands a card's content on the page's 24px line. */
+  --inset: 1.5rem;
 
   /* A note page's left inset (`NOTE_INSET`): where the editor's side menu
      (`+` and the drag handle, 48px) floats. At least the menu's width, so
@@ -475,27 +475,62 @@
   z-index: var(--z-toast);
 }
 
+/* A window, a popover and Ask's working surface are not on the page's
+   grid: their rows keep the 12px inset they had before the page edge moved. */
+[data-slot='dialog-content'],
+[data-slot='popover-content'],
+[data-ask-surface] {
+  --inset: 0.75rem;
+}
+
 /**
  * Printed details (DESIGN.md §5): the ink stamp and the open tab. Each shape
  * lives here once so no surface spells a clip-path or a border stack by hand.
  */
 
 /**
- * A content card: a 1px rule box whose rows inset 7px, so its content sits on
- * the page's 12px line from a 4px gutter. Cards stand 4px apart.
+ * A content card: a paper sheet in a 1px rule box on the bone ground, whose
+ * rows inset 11px, so its content sits on the page's 24px line from a 12px
+ * gutter. Cards stand 12px apart.
  */
 @utility card {
   border: 1px solid var(--rule);
   background: var(--paper);
-  --inset: 0.4375rem;
+  --inset: 0.6875rem;
 
-  /* A head band that opens the card stands on the card's own top rule. */
+  /* A head band that opens the card is the card's own head: paper, standing
+     on the card's top rule. Bone stays for a band further in. */
+  & > [data-section-head]:first-child,
+  & > :first-child > [data-section-head]:first-child {
+    border-top-width: 0;
+    background: var(--paper);
+  }
+
+  /* Nor does the last row's rule double the card's bottom one. */
+  & > ol:last-child > li:last-child,
+  & > :last-child > ol:last-child > li:last-child {
+    border-bottom-width: 0;
+  }
+}
+
+/**
+ * The folder's body: the page's one ink object. Paper in a hairline frame
+ * open at the top, where the folder bar's foot line and its open tab close
+ * it; rows inset 11px like a card's.
+ * - A `SectionHead` inside it is a band and keeps its bone, but drops the
+ *   hairline it would open on when it is the first thing under the bar.
+ */
+@utility folder {
+  border: 1px solid var(--hairline);
+  border-top-width: 0;
+  background: var(--paper);
+  --inset: 0.6875rem;
+
   & > [data-section-head]:first-child,
   & > :first-child > [data-section-head]:first-child {
     border-top-width: 0;
   }
 
-  /* Nor does the last row's rule double the card's bottom one. */
   & > ol:last-child > li:last-child,
   & > :last-child > ol:last-child > li:last-child {
     border-bottom-width: 0;
@@ -548,17 +583,17 @@
 }
 
 /**
- * The open tab of a tab bar: paper with a 1px ink edge on three sides, open
- * at the foot so it joins the body under it with no rule between.
- * - The caller pulls it 1px over the bar's foot rule (`-mb-px`); the paper
- *   pane covers that rule and the ink sides meet it.
+ * The open tab of a folder: paper with a 1px ink edge on three sides, open
+ * at the foot so it joins the body under it with no line between.
+ * - The caller drops it 1px over the bar's foot line (`top-px`); the paper
+ *   pane covers that line and the ink sides meet the body's.
  * - Same two layers as `stamp-outline`; `::after` stays free for the focus
  *   reticle.
  */
 @utility tab-open {
   position: relative;
   isolation: isolate;
-  background: var(--hairline);
+  background: var(--tab-edge, var(--hairline));
 
   &::before {
     content: '';
@@ -567,6 +602,11 @@
     z-index: -1;
     background: var(--paper);
   }
+}
+
+/** A plain bar's open tab, inside a rule card: the same shape on a rule. */
+@utility tab-open-plain {
+  --tab-edge: var(--rule);
 }
 
 /**

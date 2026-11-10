@@ -107,7 +107,7 @@ export function PreviewStrip({
   const to = `/import/${batchId}`
   return (
     <ReadoutStrip
-      className="border-b border-rule px-3"
+      className="border-b border-rule px-(--inset)"
       readouts={(
         [
           {

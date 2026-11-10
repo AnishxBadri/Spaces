@@ -17,7 +17,7 @@ import type * as RouterModule from '@tanstack/react-router'
 
 /**
  * Today mounted on a happy-dom `Window`: a readout is a toggle on Needs you.
- * Pressing it adds its segment after `All` and keeps the rows it counted;
+ * Pressing it adds its tab after `Needs you` and keeps the rows it counted;
  * pressing it again clears both.
  */
 
@@ -189,18 +189,18 @@ const overdue = () => {
   if (!cell) throw new Error('no Overdue readout')
   return cell
 }
-const segments = () =>
+const tabs = () =>
   [
     ...document.querySelectorAll(
-      '[aria-label="Needs you by kind"] [role="radio"]',
+      '[aria-label="Needs you by kind"] [role="tab"]',
     ),
   ].map((el) => ({
     label: el.textContent,
-    checked: el.getAttribute('aria-checked') === 'true',
+    checked: el.getAttribute('aria-selected') === 'true',
   }))
 
 describe("Today's readouts filter Needs you", () => {
-  it('a press adds the segment after All and keeps the late tasks; a second press clears it', async () => {
+  it('a press adds the tab after Needs you and keeps the late tasks; a second press clears it', async () => {
     await mount()
     expect(rowKinds()).toEqual(['task', 'task', 'task', 'meeting'])
     expect(overdue().getAttribute('aria-pressed')).toBe('false')
@@ -210,8 +210,8 @@ describe("Today's readouts filter Needs you", () => {
     })
     expect(overdue().getAttribute('aria-pressed')).toBe('true')
     expect(rowKinds()).toEqual(['task', 'task'])
-    expect(segments().slice(0, 2)).toEqual([
-      { label: 'All', checked: false },
+    expect(tabs().slice(0, 2)).toEqual([
+      { label: 'Needs you4', checked: false },
       { label: 'Overdue2', checked: true },
     ])
 
@@ -220,7 +220,7 @@ describe("Today's readouts filter Needs you", () => {
     })
     expect(overdue().getAttribute('aria-pressed')).toBe('false')
     expect(rowKinds()).toEqual(['task', 'task', 'task', 'meeting'])
-    expect(segments().map((s) => s.label)).not.toContain('Overdue2')
-    expect(segments().at(0)).toEqual({ label: 'All', checked: true })
+    expect(tabs().map((s) => s.label)).not.toContain('Overdue2')
+    expect(tabs().at(0)).toEqual({ label: 'Needs you4', checked: true })
   })
 })

@@ -104,17 +104,17 @@ describe('a note page: the body columns share the inset', () => {
       '<PageHeader\n        title="Mandate"',
       '/>',
     )
-    // The title sits at the 32px page edge like every other page's.
+    // The title sits at the 24px page edge like every other page's.
     expect(head).not.toContain('NOTE_INSET')
     expect(head).not.toContain('className={')
     const facts = between(mandatePage, 'function FactsGrid', '</div>')
     expect(facts).toContain(
-      "'flex shrink-0 flex-col border-b border-hairline pr-8'",
+      "'flex shrink-0 flex-col border-b border-rule pr-6'",
     )
     expect(facts).toContain('NOTE_INSET')
     const prose = between(
       mandatePage,
-      "cn('pt-6 pr-3 pb-8', NOTE_INSET)",
+      "cn('pt-6 pr-6 pb-8', NOTE_INSET)",
       '</div>',
     )
     expect(prose).toContain('<MandateProse')

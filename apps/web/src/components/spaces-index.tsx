@@ -129,14 +129,14 @@ export function SpacesIndexPage({
 
       <PageBody>
         {spaces.length === 0 ? (
-          <div className="px-2 pt-3">
+          <Card label="Markets" className="px-(--inset) py-5">
             <MarketsCreator />
-          </div>
+          </Card>
         ) : (
           <Card label="Spaces">
             <div
               data-lane-heads
-              className="flex h-7 items-center gap-2.5 border-b border-hairline px-(--inset) text-label text-graphite"
+              className="flex h-7 items-center gap-2.5 border-b border-rule px-(--inset) text-label text-graphite"
             >
               <span className="min-w-0 flex-1">Space</span>
               <span className={cn(LANES.companies, 'text-right max-md:hidden')}>
@@ -167,11 +167,7 @@ export function SpacesIndexPage({
           </Card>
         )}
         {archived.length > 0 ? (
-          <ArchivedFold
-            archived={archived}
-            today={today}
-            className={spaces.length === 0 ? 'mt-8' : undefined}
-          />
+          <ArchivedFold archived={archived} today={today} />
         ) : null}
       </PageBody>
 

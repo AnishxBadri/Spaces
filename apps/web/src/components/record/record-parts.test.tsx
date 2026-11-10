@@ -74,7 +74,7 @@ function record(tab: 'overview' | 'notes' | 'files' = 'notes') {
 }
 
 describe('the details slot', () => {
-  it('is the one column beside the view: 300px of bone on the left', () => {
+  it('is the one column beside the view: 320px on the ground on the left, with no box', () => {
     const doc = record()
     const body = doc.querySelector('[data-record-body="details"]')
     const asides = doc.querySelectorAll('aside')
@@ -82,14 +82,13 @@ describe('the details slot', () => {
     const details = doc.querySelector('aside[aria-label="Details"]')
     expect(details).not.toBeNull()
     expect(classes(details)).toEqual(
-      expect.arrayContaining([
-        'bg-bone',
-        'xl:w-75',
-        'p-3',
-        'gap-3',
-        'xl:border-r',
-        'border-hairline',
-      ]),
+      expect.arrayContaining(['xl:w-80', 'px-3', 'gap-3']),
+    )
+    expect(classes(details).filter((c) => /(^|:)(bg-|border)/.test(c))).toEqual(
+      [],
+    )
+    expect(classes(body)).toEqual(
+      expect.arrayContaining(['bg-bone', 'p-3', 'gap-3']),
     )
     // Details first, then the view taking the rest.
     expect(body?.firstElementChild).toBe(details)
@@ -218,7 +217,7 @@ describe('the tab head', () => {
     expect(doc.body.textContent).not.toMatch(/Context/)
     const list = doc.querySelector('[role="tablist"]')
     expect(classes(list)).toEqual(
-      expect.arrayContaining(['h-11', 'bg-paper', 'sticky', 'md:top-12']),
+      expect.arrayContaining(['h-11', 'bg-bone', 'sticky', 'md:top-12']),
     )
   })
 

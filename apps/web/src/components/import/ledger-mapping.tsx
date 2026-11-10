@@ -23,6 +23,7 @@ import {
   DefineRow,
   ImportHeader,
   SheetTabs,
+  ImportSheet,
   StepStrip,
   refuseContinue,
 } from '#/components/import/import-wizard'
@@ -701,7 +702,7 @@ export function LedgerMappingStep({
         uploadHint={uploadHint}
         mapHint={mapHint}
       />
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-3 py-6">
+      <ImportSheet className="gap-4 px-(--inset) py-6">
         <DefineRow
           objects={objects}
           mode="ledger"
@@ -762,7 +763,7 @@ export function LedgerMappingStep({
             }}
           />
         </div>
-      </div>
+      </ImportSheet>
       {confirmDialog}
     </div>
   )

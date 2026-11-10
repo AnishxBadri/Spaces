@@ -5,6 +5,7 @@ import {
   DropZone,
   ImportHeader,
   PreviousImportNotice,
+  ImportSheet,
   StepStrip,
   objectForSearch,
 } from '#/components/import/import-wizard'
@@ -77,7 +78,7 @@ function ImportPage() {
         }
       />
       <StepStrip uploadHint={null} />
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-3 py-6">
+      <ImportSheet className="gap-4 px-(--inset) py-6">
         {duplicate ? (
           <PreviousImportNotice
             previous={duplicate.previous}
@@ -100,7 +101,7 @@ function ImportPage() {
             void stage(file, false)
           }}
         />
-      </div>
+      </ImportSheet>
     </div>
   )
 }

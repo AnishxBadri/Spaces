@@ -7,10 +7,10 @@ import type { TabItem } from './tabs.tsx'
 import { declared } from '#/test/tailwind-css'
 
 /**
- * The tab head's states this file owns: the one 44px bar, an empty tab in
- * graphite with no count, a counted tab in ink, the open tab on paper, the
- * head pinned under the folded bar, and a switch that never fades the open
- * tab's fill.
+ * The folder bar's states this file owns: the one 44px bar on the ground,
+ * an empty tab in graphite with no count, a counted tab in ink, the open
+ * tab on paper running into the folder's body, the bar pinned under the
+ * folded bar on bone, and a switch that never fades the open tab's fill.
  */
 
 type Id = 'notes' | 'files' | 'history'
@@ -51,19 +51,22 @@ const classes = (el: { className: string } | null) =>
   (el?.className ?? '').split(/\s+/)
 
 describe('the bar', () => {
-  it('is one 44px bar on white, in the 4px gutter, the tabs sitting on its rule', () => {
+  it('is one 44px bar on the ground with no fill, the tabs sitting on its hairline foot', () => {
     const list = render('notes').querySelector('[role="tablist"]')
     expect(classes(list)).toEqual(
       expect.arrayContaining([
         'h-11',
-        'px-1',
-        'pt-1',
-        'bg-paper',
         'items-end',
-        'before:bg-rule',
+        'before:inset-x-0',
+        'before:bg-hairline',
       ]),
     )
-    expect(classes(list)).not.toContain('bg-bone')
+    expect(classes(list).filter((c) => /^(bg-|p[xt]-)/.test(c))).toEqual([])
+  })
+
+  it('hands the open tab’s body the folder: paper, a hairline frame open at the top', () => {
+    const panel = render('notes').querySelector('[role="tabpanel"]')
+    expect(classes(panel)).toContain('folder')
   })
 
   it('labels every tab in sentence-case sans, never the caps tier', () => {
@@ -93,12 +96,12 @@ describe('the open tab', () => {
     const notes = tab(render('notes'), 'Notes')
     expect(notes.getAttribute('aria-selected')).toBe('true')
     expect(classes(notes)).toEqual(
-      expect.arrayContaining(['tab-open', 'h-10', 'top-px']),
+      expect.arrayContaining(['tab-open', 'h-9.25', 'top-px', 'px-3']),
     )
     for (const t of Array.from(
       render('notes').querySelectorAll('[role="tab"][aria-selected="false"]'),
     )) {
-      expect(classes(t)).toContain('h-9.75')
+      expect(classes(t)).toEqual(expect.arrayContaining(['h-9', 'px-3']))
     }
   })
 })
@@ -199,8 +202,8 @@ describe('a pinned head', () => {
     expect(classes(list)).toEqual(
       expect.arrayContaining(['sticky', 'md:top-12', 'top-24', 'z-sticky']),
     )
-    // Opaque, so rows scrolling under it never show through.
-    expect(classes(list)).toContain('bg-paper')
+    // Opaque bone, so rows scrolling under it never show through.
+    expect(classes(list)).toContain('bg-bone')
   })
 
   it('scrolls with the page when not pinned', () => {
@@ -226,7 +229,11 @@ describe('a tab switch', () => {
     const open = tab(render('notes'), 'Notes')
     // The ink edge; the paper pane is its `::before`.
     expect(await declared(open.className, 'background')).toContain(
-      'var(--hairline)',
+      'var(--tab-edge, var(--hairline))',
+    )
+    // The plain bar's open tab swaps the edge for the rule, nothing else.
+    expect(await declared('tab-open-plain', '--tab-edge')).toContain(
+      'var(--rule)',
     )
     // Within the compositor budget: nothing over 250ms.
     expect(await declared(open.className, 'transition-duration')).toContain(

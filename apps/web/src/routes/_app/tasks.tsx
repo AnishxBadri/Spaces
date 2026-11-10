@@ -279,26 +279,26 @@ function TasksPage() {
         />
       ) : (
         <>
-          <div
-            data-tasks-band
-            className="flex h-11 shrink-0 items-center gap-3 border-b border-rule bg-bone px-3"
-          >
-            {scope === null ? null : <ScopeChip name={scope.name} />}
-            <span className="flex-1" />
-            <Segmented
-              label="Tasks"
-              value={view}
-              onChange={(v) => {
-                clearFocus()
-                setView(v)
-              }}
-              options={[
-                { id: 'open', label: 'Open', count: data.open.length },
-                { id: 'done', label: 'Done', count: data.done.length },
-              ]}
-            />
-          </div>
           <PageBody>
+            <div
+              data-tasks-band
+              className="flex h-8 shrink-0 items-center gap-3 px-3"
+            >
+              {scope === null ? null : <ScopeChip name={scope.name} />}
+              <span className="flex-1" />
+              <Segmented
+                label="Tasks"
+                value={view}
+                onChange={(v) => {
+                  clearFocus()
+                  setView(v)
+                }}
+                options={[
+                  { id: 'open', label: 'Open', count: data.open.length },
+                  { id: 'done', label: 'Done', count: data.done.length },
+                ]}
+              />
+            </div>
             <Card>
               <div ref={body} className="contents">
                 {groups.length === 0 ? (
@@ -432,7 +432,7 @@ function TaskItem({
       data-row
       data-task-row
       className={cn(
-        'flex h-ledger-row items-center gap-3 border-b border-rule px-3 transition-opacity duration-150 ease-out-quart',
+        'flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset) transition-opacity duration-150 ease-out-quart',
         wash === true && 'row-wash',
         leaving && 'pointer-events-none opacity-0',
       )}

@@ -118,8 +118,8 @@ function Block({
 }
 
 /**
- * The working hours of the day Meetings shows, 08–20, as a band under the
- * head: ink blocks for its meetings, labelled, each opening its window.
+ * The working hours of the day Meetings shows, 08–20, as a card on the
+ * ground: ink blocks for its meetings, labelled, each opening its window.
  * - Today dithers the elapsed part up to a pine now-dot with `Now · hh:mm`;
  *   a past day is dithered whole with no dot; a future day has no dither.
  * - Dither cells stay 2px: the svg has no viewBox, so its user units are pixels.
@@ -142,7 +142,7 @@ export function DayStrip({
   const at = now === null ? null : windowPercent(now)
   const dithered = tense === 'past' ? 100 : (at ?? 0)
   return (
-    <div data-day-strip={tense} className="h-16 shrink-0 px-3">
+    <div data-day-strip={tense} className="h-16 shrink-0 card px-(--inset)">
       <div className="relative h-full">
         {meetings.map((m) => {
           const from = windowPercent(new Date(m.startsAt))

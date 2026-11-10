@@ -203,7 +203,7 @@ export function SpaceSources({
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 px-3 text-left transition-colors hover:bg-bone"
+              className="focus-ring-inset -mx-(--inset) flex h-full min-w-0 flex-1 items-center gap-3 px-(--inset) text-left transition-colors hover:bg-bone"
             >
               <span className="w-3.5 shrink-0 text-center mono text-ui text-primary">
                 +
@@ -225,7 +225,7 @@ export function SpaceSources({
         {inherited.length > 0 ? (
           <li>
             <details className="group/inherited">
-              <summary className="focus-ring flex h-ledger-row cursor-pointer list-none items-center gap-2 border-b border-rule px-3 mono text-micro text-graphite transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+              <summary className="focus-ring flex h-ledger-row cursor-pointer list-none items-center gap-2 border-b border-rule px-(--inset) mono text-micro text-graphite transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
                 <ChevronRight
                   className="size-3 shrink-0 transition-transform group-open/inherited:rotate-90"
                   strokeWidth={2}
@@ -315,7 +315,7 @@ function SourceRow({
   }
 
   return (
-    <li className="group flex items-center gap-3 border-b border-rule px-3 py-2.5">
+    <li className="group flex items-center gap-3 border-b border-rule px-(--inset) py-2.5">
       <FileText
         className="size-3.5 shrink-0 text-graphite"
         strokeWidth={1.75}
@@ -415,7 +415,7 @@ function InheritedRow({
   const href = recordPath({ kind: 'company', id: source.companyId })
 
   return (
-    <li className="group flex items-center gap-3 border-b border-rule px-3 py-2.5">
+    <li className="group flex items-center gap-3 border-b border-rule px-(--inset) py-2.5">
       <FileText
         className="size-3.5 shrink-0 text-graphite"
         strokeWidth={1.75}

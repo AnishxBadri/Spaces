@@ -248,7 +248,9 @@ function AskPage() {
   }
 
   return (
-    <div className="flex h-dvh min-h-0">
+    // A working surface with its own two bars, not a page of cards: it
+    // keeps its paper over the ground.
+    <div data-ask-surface className="flex h-dvh min-h-0 bg-paper">
       {listOpen ? (
         <nav
           aria-label="Threads"

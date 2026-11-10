@@ -60,7 +60,7 @@ export function RecordNotes({
       <button
         type="button"
         onClick={onNewNote}
-        className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 border-b border-rule px-3 text-left hover:bg-bone"
+        className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 border-b border-rule px-(--inset) text-left hover:bg-bone"
       >
         <span className="w-4 shrink-0 text-center mono text-ui text-primary">
           +
@@ -112,7 +112,7 @@ function NoteRow({
         to="/notes/$noteId"
         params={{ noteId: n.id }}
         className={cn(
-          'focus-ring-inset flex flex-col px-3 hover:bg-bone',
+          'focus-ring-inset flex flex-col px-(--inset) hover:bg-bone',
           superseded ? 'h-ledger-row justify-center' : 'py-2.25',
         )}
       >

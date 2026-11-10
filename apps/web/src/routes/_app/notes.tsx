@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { EmptyState } from '#/components/empty-state'
 import { FileText } from '#/components/icons'
 import {
@@ -12,7 +13,7 @@ import { NewButton, SplitNewButton } from '#/components/new-button'
 import { NOTE_KIND_LABEL, NoteKindIcon } from '#/components/note-kind-icon'
 import { Card, PageBody, PageHeader } from '#/components/page-header'
 import { TemplatePicker } from '#/components/templates'
-import { Tabs } from '#/components/ui/tabs'
+import { FolderBody, Tabs } from '#/components/ui/tabs'
 import { createNote, createNoteFromTemplate, listNotes } from '#/lib/server-fns'
 import { useHotkey } from '#/lib/use-hotkey'
 import { formatDay } from '@spaces/core/format'
@@ -72,7 +73,6 @@ function NotesPage() {
         ]}
         value={tab}
         onValueChange={setTab}
-        pinned
       />
     ) : null
 
@@ -116,10 +116,7 @@ function NotesPage() {
         />
       ) : (
         <PageBody className={tabs === null ? undefined : 'pt-0'}>
-          <Card
-            label="Notes"
-            className={tabs === null ? undefined : 'border-t-0'}
-          >
+          <NotesBox folder={tabs !== null}>
             {thisWeek.length > 0 ? (
               <section aria-label="This week">
                 <Band label="This week" />
@@ -151,10 +148,25 @@ function NotesPage() {
                 </ol>
               </section>
             ) : null}
-          </Card>
+          </NotesBox>
         </PageBody>
       )}
     </div>
+  )
+}
+
+/** The ledger's sheet: the folder's body under the tabs, else a card. */
+function NotesBox({
+  folder,
+  children,
+}: {
+  folder: boolean
+  children: ReactNode
+}) {
+  return folder ? (
+    <FolderBody label="Notes">{children}</FolderBody>
+  ) : (
+    <Card label="Notes">{children}</Card>
   )
 }
 

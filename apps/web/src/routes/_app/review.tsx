@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { Check, icon, Inbox } from '#/components/icons'
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { EmptyState } from '#/components/empty-state'
@@ -8,10 +9,10 @@ import { SuggestionCard } from '#/components/inbox/suggestion-card'
 import { ColumnRunGroup } from '#/components/inbox/column-run-group'
 import { DiscoveryGroup } from '#/components/inbox/discovery-group'
 import { AskThreadGroup } from '#/components/inbox/ask-thread-group'
-import { PageHeader } from '#/components/page-header'
+import { Card, PageBody, PageHeader } from '#/components/page-header'
 import { PluginStatusSection } from '#/components/plugin-status-section'
 import { Button } from '#/components/ui/button'
-import { Tabs } from '#/components/ui/tabs'
+import { FolderBody, Tabs } from '#/components/ui/tabs'
 import {
   dismissDuplicate,
   listInbox,
@@ -180,8 +181,8 @@ export function rendererFor(kind: string): InboxRenderer {
 /** What an unknown kind renders as: the row, legible, and nothing thrown. */
 export function PayloadFallback({ row }: { row: QueueRow }): React.ReactNode {
   return (
-    <li className="flex flex-col border border-hairline bg-paper">
-      <div className="flex min-h-11 items-baseline gap-3 border-b border-hairline px-5 py-2.5">
+    <li className="flex flex-col border border-rule bg-paper">
+      <div className="flex min-h-11 items-baseline gap-3 border-b border-rule px-5 py-2.5">
         <h2 className="font-serif text-lg leading-5.5 font-semibold">
           Unrecognized item
         </h2>
@@ -253,13 +254,15 @@ function InboxPage() {
       </span>
     ) : undefined
 
+  const tabbed = rows.length > 0 || chips !== undefined
+
   return (
     <div className="flex min-h-full flex-col">
       <PageHeader
         title="Review"
         action={<ScanAction />}
         tabs={
-          rows.length > 0 || chips !== undefined ? (
+          tabbed ? (
             <Tabs
               label="Lanes"
               value={lane}
@@ -275,42 +278,69 @@ function InboxPage() {
         }
       />
 
-      {/* Why a record head is missing a plugin's action. */}
-      {stoppedPlugins.length > 0 ? (
-        <div className="max-w-220 px-1 pt-1">
-          <PluginStatusSection stopped={stoppedPlugins} />
-        </div>
-      ) : null}
+      <PageBody className={tabbed ? 'pt-0' : undefined}>
+        <ReviewSheet folder={tabbed}>
+          {/* Why a record head is missing a plugin's action. */}
+          {stoppedPlugins.length > 0 ? (
+            <div className="max-w-220">
+              <PluginStatusSection stopped={stoppedPlugins} />
+            </div>
+          ) : null}
 
-      {rows.length === 0 ? (
-        <EmptyState
-          icon={Inbox}
-          title="Nothing to review"
-          body="Nothing waits on you. Duplicate pairs appear here when two records claim the same domain or their names look alike; suggestions appear when a provider proposes a value."
-        />
-      ) : visible.length === 0 ? (
-        <EmptyState
-          icon={Inbox}
-          title="Nothing in this lane"
-          body="The other lane still has open items — switch to All to see them."
-        />
-      ) : null}
-      {mounted.length === 0 ? null : (
-        <ul className="flex max-w-220 flex-col gap-1 px-1 pt-1 pb-8 empty:hidden">
-          {mounted.map((row) => {
-            const same = mounted.filter((r) => r.kind === row.kind)
-            return (
-              <InboxItem
-                key={`${row.kind}:${row.id}`}
-                row={row}
-                index={same.indexOf(row)}
-                total={same.length}
-              />
-            )
-          })}
-        </ul>
-      )}
+          {rows.length === 0 ? (
+            <EmptyState
+              icon={Inbox}
+              title="Nothing to review"
+              body="Nothing waits on you. Duplicate pairs appear here when two records claim the same domain or their names look alike; suggestions appear when a provider proposes a value."
+            />
+          ) : visible.length === 0 ? (
+            <EmptyState
+              icon={Inbox}
+              title="Nothing in this lane"
+              body="The other lane still has open items — switch to All to see them."
+            />
+          ) : null}
+          {mounted.length === 0 ? null : (
+            <ul className="flex max-w-220 flex-col gap-3 empty:hidden">
+              {mounted.map((row) => {
+                const same = mounted.filter((r) => r.kind === row.kind)
+                return (
+                  <InboxItem
+                    key={`${row.kind}:${row.id}`}
+                    row={row}
+                    index={same.indexOf(row)}
+                    total={same.length}
+                  />
+                )
+              })}
+            </ul>
+          )}
+        </ReviewSheet>
+      </PageBody>
     </div>
+  )
+}
+
+/**
+ * The queue's sheet: the folder's body under the lanes, else a card. The
+ * items stand in it 12px apart.
+ */
+function ReviewSheet({
+  folder,
+  children,
+}: {
+  folder: boolean
+  children: ReactNode
+}) {
+  const cls = 'flex flex-1 flex-col gap-3 p-(--inset)'
+  return folder ? (
+    <FolderBody label="Review" className={cls}>
+      {children}
+    </FolderBody>
+  ) : (
+    <Card label="Review" className={cls}>
+      {children}
+    </Card>
   )
 }
 
@@ -509,11 +539,8 @@ function PairCard({ pair }: { pair: DuplicateCandidateRow }) {
   const fields = pairFields(today).filter((f) => f.has(left) || f.has(right))
 
   return (
-    <li
-      data-pair-card
-      className="flex flex-col border border-hairline bg-paper"
-    >
-      <div className="flex min-h-11 flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-hairline px-5 py-2.5">
+    <li data-pair-card className="flex flex-col border border-rule bg-paper">
+      <div className="flex min-h-11 flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-rule px-5 py-2.5">
         <h2 className="min-w-0 truncate font-serif text-lg leading-5.5 font-semibold">
           {left.name} ⇄ {right.name}
         </h2>
@@ -522,7 +549,7 @@ function PairCard({ pair }: { pair: DuplicateCandidateRow }) {
         </span>
       </div>
       <div className="flex flex-col overflow-x-auto">
-        <div className="flex h-10 border-b border-hairline">
+        <div className="flex h-10 border-b border-rule">
           <div className="flex w-35 shrink-0 items-center px-5 text-label text-graphite">
             Field
           </div>

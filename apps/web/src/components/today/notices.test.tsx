@@ -216,7 +216,8 @@ describe('NoticesBand — the line', () => {
       [TRIPPED],
       [BROKEN],
     )
-    expect(html).toContain('bg-bone')
+    // A paper card on the ground, each line a square, the sentence and its fix.
+    expect(html).toContain('<section aria-label="Notices" class="card">')
     expect(html.match(/size-1\.5/g)).toHaveLength(3)
     expect(html).not.toContain('text-primary')
     expect(html).not.toMatch(/>(account|plugin|enrich|files)</)

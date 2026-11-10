@@ -198,7 +198,7 @@ function CompanyLaneHeads({ selectable }: { selectable: boolean }) {
     <div
       aria-hidden
       data-lane-heads
-      className="flex h-7 items-center gap-3 border-b border-rule px-3 text-label text-graphite"
+      className="flex h-7 items-center gap-3 border-b border-rule px-(--inset) text-label text-graphite"
     >
       {selectable ? <span className="w-3.5 shrink-0" /> : null}
       <span className="w-3.5 shrink-0" />
@@ -333,7 +333,7 @@ function CompaniesTab({ spc, into }: { spc: Space; into: string | null }) {
       ) : (
         <div
           data-companies-bar
-          className="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-rule px-3"
+          className="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-rule px-(--inset)"
         >
           <Segmented
             label="Show companies"
@@ -511,7 +511,7 @@ function NotesTab({
               <Link
                 to="/notes/$noteId"
                 params={{ noteId: f.id }}
-                className="focus-ring-inset flex flex-col gap-2 px-3 py-4 transition-colors hover:bg-bone"
+                className="focus-ring-inset flex flex-col gap-2 px-(--inset) py-4 transition-colors hover:bg-bone"
               >
                 <div className="flex items-baseline justify-between gap-3">
                   <h3

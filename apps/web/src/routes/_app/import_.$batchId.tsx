@@ -11,6 +11,7 @@ import {
   PreviousImportNotice,
   ReadingNotice,
   SheetTabs,
+  ImportSheet,
   StepStrip,
   refuseContinue,
 } from '#/components/import/import-wizard'
@@ -396,7 +397,7 @@ function ImportBatchPage() {
           mapHint={mapHint ?? 'mapped'}
           previewHint={`${batch.rowCount.toLocaleString('en-US')} rows`}
         />
-        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto pb-6">
+        <ImportSheet className="gap-6 pb-6">
           <div className="flex flex-col gap-3">
             <ReceiptStrip
               counts={receipt.counts}
@@ -407,7 +408,7 @@ function ImportBatchPage() {
               <MissingRateLine ledger={receipt.ledger} />
             ) : null}
           </div>
-          <div className="px-3">
+          <div className="px-(--inset)">
             {receipt.ledger ? (
               <VoidLine
                 ledger={receipt.ledger}
@@ -419,7 +420,7 @@ function ImportBatchPage() {
             ) : null}
             <ReceiptLedger view={receipt} batchId={batch.id} />
           </div>
-        </div>
+        </ImportSheet>
         {confirmDialog}
       </div>
     )
@@ -463,9 +464,9 @@ function ImportBatchPage() {
           {...(canCommit ? { onCommit: () => commit(false) } : {})}
         />
         <StepStrip step={2} uploadHint={uploadHint} mapHint={mapHint} />
-        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto pb-6">
+        <ImportSheet className="gap-6 pb-6">
           <PreviewStrip counts={preview.counts} batchId={batch.id} />
-          <div className="px-3">
+          <div className="px-(--inset)">
             <PreviewLedger
               view={preview}
               batchId={batch.id}
@@ -473,7 +474,7 @@ function ImportBatchPage() {
               onDecide={decide}
             />
           </div>
-        </div>
+        </ImportSheet>
         {confirmDialog}
       </div>
     )
@@ -502,7 +503,7 @@ function ImportBatchPage() {
         mapHint={mapHint}
         mode={batch.mode}
       />
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-3 py-6">
+      <ImportSheet className="gap-4 px-(--inset) py-6">
         {batch.previous ? (
           <PreviousImportNotice previous={batch.previous} />
         ) : null}
@@ -547,7 +548,7 @@ function ImportBatchPage() {
             rowCount={batch.rowCount}
           />
         )}
-      </div>
+      </ImportSheet>
       {confirmDialog}
     </div>
   )

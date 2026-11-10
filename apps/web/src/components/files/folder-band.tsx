@@ -57,7 +57,7 @@ export function FolderBand({
     <section aria-label={tree.name} className="mt-6 border-t border-hairline">
       <div
         data-row
-        className="flex h-ledger-row items-center gap-3 border-b border-rule bg-bone px-3"
+        className="flex h-ledger-row items-center gap-3 border-b border-rule bg-bone px-(--inset)"
       >
         <FolderGlyph bound />
         <h3 className="min-w-0 truncate text-body font-medium">{tree.name}</h3>
@@ -149,7 +149,7 @@ function Subfolder({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 border-b border-rule px-3 text-left hover:bg-bone"
+        className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 border-b border-rule px-(--inset) text-left hover:bg-bone"
       >
         <span
           aria-hidden

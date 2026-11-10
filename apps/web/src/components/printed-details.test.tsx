@@ -336,18 +336,18 @@ describe('real tabs', () => {
     expect(count(html, /tabindex="-1"/g)).toBe(2)
   })
 
-  it('draws folder tabs on white: the open tab outlined over the bar foot, no bone band', () => {
+  it('draws the folder on the ground: the open tab outlined over the bar foot, no bone band', () => {
     const html = render('people')
-    const bar = classesOf(html, 'bg-paper')
+    const bar = classesOf(html, 'h-11')
     expect(bar).toEqual(
-      expect.arrayContaining(['px-1', 'before:bg-rule', 'before:h-px']),
+      expect.arrayContaining(['before:bg-hairline', 'before:h-px']),
     )
     expect(html).not.toContain('bg-bone')
     expect(count(html, /\btab-open\b/g)).toBe(1)
     const open = classesOf(html, 'tab-open')
     // A pixel taller and a pixel low, over the bar's foot: no rule under
     // the open tab.
-    expect(open).toEqual(expect.arrayContaining(['h-10', 'top-px']))
+    expect(open).toEqual(expect.arrayContaining(['h-9.25', 'top-px']))
     expect(open).not.toContain('border-b')
     expect(html).toMatch(/aria-selected="true"[^>]*class="[^"]*tab-open/)
   })

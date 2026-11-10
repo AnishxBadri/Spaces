@@ -261,14 +261,14 @@ const TASKS = {
 }
 
 describe('Tasks', () => {
-  it('is the title and + New task, a bone band with Open | Done, caps groups, and the composer as the last row', async () => {
+  it('is the title and + New task, Open | Done on the ground, caps groups, and the composer as the last row', async () => {
     fns.listTasks.mockResolvedValue(TASKS)
     await mount('tasks', '/tasks')
     await until('the head', () => title() === 'Tasks')
     expect(headMeta()).toBeNull()
     expect(head()).toEqual(['New task'])
     const band = document.querySelector('[data-tasks-band]')
-    expect(band?.className).toContain('bg-bone')
+    expect(band?.closest('[data-page-body]')?.className).toContain('bg-bone')
     expect(
       Array.from(band?.querySelectorAll('[role="radio"]') ?? []).map(
         (el) => el.textContent,
@@ -339,7 +339,7 @@ const aNote = (i: number, updatedAt: string, kind = 'note') => ({
 })
 
 describe('Notes', () => {
-  it('is one card banded This week and Earlier with no counts, kinds as glyphs, a Memos tab, and folds Earlier past 20', async () => {
+  it('is one sheet banded This week and Earlier with no counts, kinds as glyphs, a Memos tab, and folds Earlier past 20', async () => {
     const notes = [
       aNote(1, '2026-10-14T10:00:00.000Z', 'memo'),
       aNote(2, '2026-10-13T10:00:00.000Z', 'scratch'),
@@ -365,10 +365,12 @@ describe('Notes', () => {
         (t) => t.textContent,
       ),
     ).toEqual(['All26', 'Memos1'])
-    // One card, two date bands, no count on either.
-    const cards = document.querySelectorAll('[data-card]')
-    expect(cards).toHaveLength(1)
-    expect(cards.item(0).className).toContain('card')
+    // One sheet — the folder's body under the tabs — two date bands, no
+    // count on either.
+    expect(document.querySelectorAll('[data-card]')).toHaveLength(0)
+    const sheets = document.querySelectorAll('[data-folder]')
+    expect(sheets).toHaveLength(1)
+    expect(sheets.item(0).className).toContain('folder')
     expect(text('[data-band] h3')).toEqual(['This week', 'Earlier'])
     expect(document.querySelector('[data-section-count]')).toBeNull()
     expect(document.querySelector('[data-band] .tabular')).toBeNull()

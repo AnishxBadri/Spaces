@@ -448,8 +448,9 @@ describe('the rail', () => {
     ).map((s) => s.getAttribute('aria-label'))
     expect(sections).toEqual(['Criteria', 'Watching', 'Map'])
     expect(text(column)).not.toMatch(/Glossary|Tasks|What’s moving/)
-    expect(column?.className).toContain('bg-bone')
-    expect(column?.className).toContain('xl:w-75')
+    // Printed on the ground: no fill, no border, 320px wide.
+    expect(column?.className).not.toMatch(/\b(bg-|border)/)
+    expect(column?.className).toContain('xl:w-80')
   })
 
   it('heads Map with its count of subspaces and ends it on + Subspace', async () => {
@@ -478,8 +479,9 @@ describe('the tabs', () => {
     await mount('notes')
     const list = document.querySelector('[role="tablist"]')
     expect(list?.className).toContain('h-11')
-    expect(list?.className).toContain('bg-paper')
-    expect(list?.className).not.toContain('bg-bone')
+    // The folder bar stands on the ground with no fill of its own.
+    expect(list?.className).toContain('before:bg-hairline')
+    expect(list?.className).not.toMatch(/(^|\s)bg-/)
     const all = Array.from(document.querySelectorAll('[role="tab"]'))
     expect(all.map((t) => text(t))).toEqual([
       'Overview',
@@ -1305,13 +1307,14 @@ describe('an archived space', () => {
     archive: { on: '2026-10-08T09:00:00.000Z', spaces: 1, filings: 4 },
   }
 
-  it('says watches are paused in a notice on the solid shadow', async () => {
+  it('says watches are paused in a notice card on the ground', async () => {
     await mount('notes', undefined, undefined, { space: archivedSpc })
     const notice = document.querySelector('[role="status"]')
     expect(text(notice?.querySelector('p') ?? null).replace(/\s+/g, ' ')).toBe(
       'Archived · out of the tree and the picker · 4 filings kept · watches paused',
     )
-    expect(notice?.className).toContain('shadow-solid')
+    expect(notice?.className).toContain('card')
+    expect(notice?.className).not.toContain('shadow-solid')
     expect(text(notice)).toContain('Restore')
   })
 

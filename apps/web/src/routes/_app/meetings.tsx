@@ -5,8 +5,8 @@ import { DensityRamp } from '#/components/dither'
 import { LedgerRow } from '#/components/ledger-section'
 import { MeetingDialog } from '#/components/meeting-dialog'
 import { MeetingsLedger } from '#/components/meetings/meetings-ledger'
-import { Card, PageHeader } from '#/components/page-header'
-import { Tabs } from '#/components/ui/tabs'
+import { PageBody, PageHeader } from '#/components/page-header'
+import { FolderBody, Tabs } from '#/components/ui/tabs'
 import { listMeetings } from '#/lib/server-fns'
 import { useClock } from '#/components/clock'
 import {
@@ -120,8 +120,8 @@ function MeetingsPage() {
           />
         }
       />
-      <div className="flex flex-col px-1 pb-10">
-        <Card className="border-t-0">
+      <PageBody className="pt-0">
+        <FolderBody label="Meetings">
           {list === 'failed' ? (
             <ol>
               <LedgerRow>
@@ -154,8 +154,8 @@ function MeetingsPage() {
               onOpen={openMeeting}
             />
           )}
-        </Card>
-      </div>
+        </FolderBody>
+      </PageBody>
       <MeetingDialog
         id={meetingId}
         prepOnOpen={prepFor !== null && prepFor === meetingId}

@@ -50,7 +50,7 @@ export function MeetingRow({
         type="button"
         data-meeting-row
         onClick={onOpen}
-        className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 px-3 text-left hover:bg-bone"
+        className="focus-ring-inset -mx-(--inset) flex h-full min-w-0 flex-1 items-center gap-3 px-(--inset) text-left hover:bg-bone"
       >
         <span
           className={cn(

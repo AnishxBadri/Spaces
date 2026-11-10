@@ -73,7 +73,7 @@ export function SpaceOverview({
       {readouts.length > 0 ? (
         <div
           data-overview-readouts
-          className="flex h-19 shrink-0 overflow-x-auto border-b border-rule px-3"
+          className="flex h-19 shrink-0 overflow-x-auto border-b border-rule px-(--inset)"
         >
           {readouts.map((r, i) => {
             const bar = typeof r.value !== 'string'
@@ -163,7 +163,7 @@ function MovingGroup({ signals }: { signals: ReadonlyArray<SpaceSignal> }) {
             <li
               key={s.id}
               data-signal={s.id}
-              className="flex h-ledger-row items-center gap-3 border-b border-rule px-3"
+              className="flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset)"
             >
               {href ? (
                 <Link
@@ -211,7 +211,7 @@ function LatestCompanies({ spc, onAll }: { spc: Space; onAll: () => void }) {
             <li
               key={c.id}
               data-company={c.id}
-              className="flex h-ledger-row items-center gap-3 border-b border-rule px-3"
+              className="flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset)"
             >
               <DitherMark size={14} />
               <Link

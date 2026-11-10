@@ -21,7 +21,6 @@ import { AttributeCreateDialog } from '#/components/attributes/attribute-create-
 import { ValueEditor } from '#/components/attributes/value-editor'
 import { AiCell, AiCellsProvider } from '#/components/attributes/ai-cell'
 import { EmptyRow } from '#/components/ledger-section'
-import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
 import { RecordMark } from '#/components/record/record-parts'
 import {
   DateCell,
@@ -36,7 +35,12 @@ import {
   RecordTable,
   TableTools,
 } from '#/components/table/record-table'
-import { Card, PageBody, PageHeader } from '#/components/page-header'
+import {
+  Card,
+  FolderGround,
+  PageBody,
+  PageHeader,
+} from '#/components/page-header'
 import { useImportVerb } from '#/components/import/import-action'
 import { ListMenu } from '#/components/table/list-menu'
 import {
@@ -421,7 +425,7 @@ function PeoplePage() {
       ) : (
         <>
           {actions.selectionBar ? (
-            <div className={PIN_UNDER_HEAD_BAR}>{actions.selectionBar}</div>
+            <FolderGround pinned>{actions.selectionBar}</FolderGround>
           ) : (
             <ViewBar
               objectId={objectId}
@@ -453,7 +457,7 @@ function PeoplePage() {
               }
             />
           )}
-          <div className="px-1 pb-8">
+          <PageBody className="pt-0">
             <AiCellsProvider
               table
               entityIds={table.getRowModel().rows.map((r) => r.original.id)}
@@ -461,6 +465,7 @@ function PeoplePage() {
             >
               <RecordTable
                 joined={!actions.selectionBar}
+                folder
                 columnActions={(id) => [
                   ...columnRun.columnActions(id),
                   ...editAttribute.columnActions(id),
@@ -490,7 +495,7 @@ function PeoplePage() {
                 }
               />
             </AiCellsProvider>
-          </div>
+          </PageBody>
           {columnRun.dialog}
           {editAttribute.dialog}
         </>

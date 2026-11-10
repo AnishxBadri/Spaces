@@ -224,11 +224,13 @@ describe('a row', () => {
 })
 
 describe("a shelf's bar", () => {
-  it('is folder tabs on white, a divider, Sort as an icon and the search box right', () => {
+  it('is folder tabs on the ground, a divider, Sort as an icon and the search box right', () => {
     mount()
     const bar = one('[data-tab-bar]')
-    expect(classes(bar)).toEqual(expect.arrayContaining(['bg-paper', 'h-11']))
-    expect(classes(bar)).not.toContain('bg-bone')
+    expect(classes(bar)).toEqual(
+      expect.arrayContaining(['h-11', 'before:bg-hairline']),
+    )
+    expect(classes(bar).filter((c) => c.startsWith('bg-'))).toEqual([])
     expect(bar.querySelector('[data-tab-divider]')).not.toBeNull()
     const tab = one('[role="tab"]')
     expect(tab.textContent).toBe('All2')

@@ -124,19 +124,21 @@ function MandatePage() {
         }
       />
 
-      <FactsGrid mandate={mandate} stageOptions={stageOptions} />
-
-      {/* The facts and the prose wear the note inset, so they keep one
-          edge; the head keeps the page's 12px edge like every other page. */}
-      <div className={cn('pt-6 pr-3 pb-8', NOTE_INSET)}>
-        <MandateProse
-          noteId={note.id}
-          note={note}
-          onState={(s) => {
-            setSaveState(s)
-            if (s === 'saved') setSavedAt(formatTime(new Date()))
-          }}
-        />
+      {/* One paper sheet under the head. The facts and the prose wear the
+          note inset, so they keep one edge; the head keeps the page's 24px
+          edge like every other page. */}
+      <div className="flex-1 bg-paper">
+        <FactsGrid mandate={mandate} stageOptions={stageOptions} />
+        <div className={cn('pt-6 pr-6 pb-8', NOTE_INSET)}>
+          <MandateProse
+            noteId={note.id}
+            note={note}
+            onState={(s) => {
+              setSaveState(s)
+              if (s === 'saved') setSavedAt(formatTime(new Date()))
+            }}
+          />
+        </div>
       </div>
     </div>
   )
@@ -206,7 +208,7 @@ function FactsGrid({
   return (
     <div
       className={cn(
-        'flex shrink-0 flex-col border-b border-hairline pr-8',
+        'flex shrink-0 flex-col border-b border-rule pr-6',
         NOTE_INSET,
       )}
     >

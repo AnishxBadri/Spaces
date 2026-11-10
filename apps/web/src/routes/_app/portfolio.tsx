@@ -317,7 +317,7 @@ function PortfolioPage() {
           />
           <div>
             {showSearch ? (
-              <div className="flex h-11 items-center border-x border-t border-rule bg-bone px-1.75">
+              <div className="flex h-11 items-center border-x border-t border-rule bg-bone px-2.75">
                 <Input
                   autoFocus
                   value={globalFilter}

@@ -3,6 +3,7 @@ import type { Column, Header, RowData, Table } from '@tanstack/react-table'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { ComponentProps, ReactNode, RefObject } from 'react'
 import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
+import { FolderGround } from '#/components/page-header'
 import { ChevronsUpDown, icon } from '#/components/icons'
 import type { LucideIcon } from '#/components/icons'
 import { useHotkey } from '#/lib/use-hotkey'
@@ -46,9 +47,10 @@ declare module '@tanstack/react-table' {
  * sticky `thead` inside it. The body scrolls sideways and drives the head's
  * `scrollLeft`; both tables share one set of fixed column widths.
  * - Every cell's content is bounded to the 36px row.
- * - The table is a card: a 1px rule box with a line between columns, its
- *   heads white, the cells inset 7px so the first column lands on the
- *   page's 12px edge. Columns is an icon at the end of the head row.
+ * - The table is the page's folder body (`folder`: a hairline frame under
+ *   its tab bar) or, with no tabs over it, a rule card; a line between
+ *   columns, its heads white, the cells inset 7px from the frame. Columns
+ *   is an icon at the end of the head row.
  */
 
 /** Column widths nudge by this much per arrow-key press. */
@@ -74,9 +76,10 @@ export type TablePin = 'head' | 'bar' | 'chips'
 
 const HEAD_PIN: Record<TablePin, string> = {
   head: PIN_UNDER_HEAD_BAR,
-  // The folded bar's line (top-24 / md:top-12) plus 44px, then plus 36px.
-  bar: 'sticky top-35 z-sticky md:top-23',
-  chips: 'sticky top-44 z-sticky md:top-32',
+  // The folded bar's line (top-24 / md:top-12) plus the bar's 12px of
+  // ground and its 44px, then plus 36px.
+  bar: 'sticky top-38 z-sticky md:top-26',
+  chips: 'sticky top-47 z-sticky md:top-35',
 }
 
 /**
@@ -135,6 +138,7 @@ export function RecordTable<T>({
   rowEnd,
   rowEndWidth = TRAILING_WIDTH,
   joined = false,
+  folder = false,
 }: {
   table: Table<T>
   /** Column pinned to the left edge while the rest scrolls under it. */
@@ -181,10 +185,15 @@ export function RecordTable<T>({
   /** The trailing lane's width when a row ends on more than a `···`. */
   rowEndWidth?: number
   /**
-   * The table hangs from a tab bar, whose rule is its top edge and whose
-   * open tab runs into it; alone, the box draws its own top rule.
+   * The table hangs from a tab bar, whose foot line is its top edge and
+   * whose open tab runs into it; alone, the box draws its own top edge.
    */
   joined?: boolean | undefined
+  /**
+   * The table is the body of the page's folder: a hairline frame. Without a
+   * tab bar over it the table is a rule card.
+   */
+  folder?: boolean | undefined
 }) {
   const headRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -227,8 +236,10 @@ export function RecordTable<T>({
       role="table"
       aria-label={label}
       data-table-box
+      data-frame={folder ? 'folder' : 'card'}
       className={cn(
-        'isolate flex flex-col border-x border-b border-rule',
+        'isolate flex flex-col border-x border-b bg-paper',
+        folder ? 'border-hairline' : 'border-rule',
         !joined && 'border-t',
       )}
     >
@@ -249,7 +260,7 @@ export function RecordTable<T>({
         >
           <thead role="rowgroup">
             {table.getHeaderGroups().map((hg) => (
-              <tr key={hg.id} role="row" className="border-b border-hairline">
+              <tr key={hg.id} role="row" className="border-b border-rule">
                 {select ? (
                   <th
                     role="columnheader"
@@ -912,7 +923,8 @@ export function ColumnsMenu<T>({ table }: { table: Table<T> }) {
 /**
  * A shelf's bar — a list with no saved views: its own filter as folder tabs
  * (`All · Unfiled`, or one `All` with the count), a divider, Sort, and the
- * search box right. An object list's bar is `ViewBar`.
+ * search box right, on the ground over the table. An object list's bar is
+ * `ViewBar`.
  */
 export function TableToolbar<T, TKey extends string>({
   table,
@@ -937,24 +949,26 @@ export function TableToolbar<T, TKey extends string>({
   filterLabel: string
 }) {
   return (
-    <Tabs
-      label={label}
-      items={tabs}
-      value={value}
-      onValueChange={onValueChange}
-      trail={
-        <>
-          <TabDivider />
-          <TableTools
-            table={table}
-            filter={filter}
-            onFilterChange={onFilterChange}
-            filterPlaceholder={filterPlaceholder}
-            filterLabel={filterLabel}
-          />
-        </>
-      }
-    />
+    <FolderGround>
+      <Tabs
+        label={label}
+        items={tabs}
+        value={value}
+        onValueChange={onValueChange}
+        trail={
+          <>
+            <TabDivider />
+            <TableTools
+              table={table}
+              filter={filter}
+              onFilterChange={onFilterChange}
+              filterPlaceholder={filterPlaceholder}
+              filterLabel={filterLabel}
+            />
+          </>
+        }
+      />
+    </FolderGround>
   )
 }
 

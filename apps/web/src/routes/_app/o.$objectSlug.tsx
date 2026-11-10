@@ -38,11 +38,15 @@ import {
   RecordTable,
   TableTools,
 } from '#/components/table/record-table'
-import { Card, PageBody, PageHeader } from '#/components/page-header'
+import {
+  Card,
+  FolderGround,
+  PageBody,
+  PageHeader,
+} from '#/components/page-header'
 import { useImportVerb } from '#/components/import/import-action'
 import { ListMenu } from '#/components/table/list-menu'
 import { useListActions } from '#/components/table/list-actions'
-import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
 import {
   ListErrorRow,
   ListLoadingRow,
@@ -473,7 +477,7 @@ function ObjectListPage() {
       ) : (
         <>
           {actions.selectionBar ? (
-            <div className={PIN_UNDER_HEAD_BAR}>{actions.selectionBar}</div>
+            <FolderGround pinned>{actions.selectionBar}</FolderGround>
           ) : (
             <ViewBar
               objectId={object.id}
@@ -505,7 +509,7 @@ function ObjectListPage() {
               }
             />
           )}
-          <div className="px-1 pb-8">
+          <PageBody className="pt-0">
             <AiCellsProvider
               table
               entityIds={table.getRowModel().rows.map((r) => r.original.id)}
@@ -513,6 +517,7 @@ function ObjectListPage() {
             >
               <RecordTable
                 joined={!actions.selectionBar}
+                folder
                 columnActions={(id) => [
                   ...columnRun.columnActions(id),
                   ...editAttribute.columnActions(id),
@@ -545,7 +550,7 @@ function ObjectListPage() {
                 }
               />
             </AiCellsProvider>
-          </div>
+          </PageBody>
           {columnRun.dialog}
           {editAttribute.dialog}
         </>

@@ -300,15 +300,16 @@ function DocumentsPage() {
             filterPlaceholder="Search files"
             filterLabel="Search files"
           />
-          <div className="px-1 pb-8">
+          <PageBody className="pt-0">
             {documents.length === 0 ? (
               // The inbox is clear: good news, one line. `All` is the way back.
-              <p className="card border-t-0 px-(--inset) py-6 font-serif text-body text-graphite">
+              <p className="folder px-(--inset) py-6 font-serif text-body text-graphite">
                 Nothing unfiled.
               </p>
             ) : (
               <RecordTable
                 joined
+                folder
                 table={table}
                 label="Files"
                 stickyColumnId="filename"
@@ -317,7 +318,7 @@ function DocumentsPage() {
                 rowEndWidth={EXCEPTION_WIDTH}
               />
             )}
-          </div>
+          </PageBody>
         </>
       )}
       <DocumentPreview

@@ -68,7 +68,7 @@ export function PortfolioHeadlineRail({
       {portfolioRailHeadline(rollup).map((f) => (
         <div
           key={f.key}
-          className="flex h-8 items-center justify-between gap-3 border-b border-rule"
+          className="flex h-8 items-center justify-between gap-3 border-b border-rule px-(--inset) last:border-b-0"
         >
           <span className="text-label text-graphite">{f.label}</span>
           <span className="mono text-ui text-foreground">

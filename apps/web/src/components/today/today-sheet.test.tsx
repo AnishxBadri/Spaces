@@ -209,12 +209,14 @@ describe('Today', () => {
     expect(html).toContain('No calendar connected')
   })
 
-  it('filters by kind in a Segmented, and the fold names the kinds', async () => {
+  it('filters by kind in the folder’s tabs, and the fold names the kinds', async () => {
     const html = await renderToday(loadedWith({}))
     expect(html).toContain('aria-label="Needs you by kind"')
-    expect(html).toMatch(/aria-checked="true"[^>]*>All</)
-    expect(html).toMatch(/>Tasks<span data-segment-count[^>]*>10</)
-    expect(html).toMatch(/>Meetings<span data-segment-count[^>]*>1</)
+    expect(html).toMatch(
+      /aria-selected="true"[^>]*>Needs you<span data-tab-count/,
+    )
+    expect(html).toMatch(/>Tasks<span data-tab-count[^>]*>10</)
+    expect(html).toMatch(/>Meetings<span data-tab-count[^>]*>1</)
     expect(html).not.toMatch(/>Deals</)
     expect(html).toContain('3 more · 2 tasks · 1 meeting')
     expect(html).toContain('Show all ›')

@@ -7,7 +7,7 @@ import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { MeetingDialog } from '#/components/meeting-dialog'
-import { Card, PageHeader } from '#/components/page-header'
+import { Card, PageBody, PageHeader } from '#/components/page-header'
 import { ReadoutStrip } from '#/components/record/record-parts'
 import { useTaskMenu } from '#/components/tasks/task-menu'
 import { DayStrip, useNow } from '#/components/today/day-strip'
@@ -127,10 +127,6 @@ function sinceFigure(at: string, now: Date): string {
   return dayKey(at) === dayKey(now) ? formatTime(at) : formatAge(at, now)
 }
 
-/**
- * A boxed section: the card's rule stands in for the band's opening hairline
- * and the last row's rule, which the 1px pull clips under the edge.
- */
 /** The head: the date line and the plain title, with no verbs. */
 function TodayHead({ today }: { today: string }) {
   return (
@@ -393,45 +389,51 @@ function TodayLedger({
       <TodayHead today={today} />
       {/* No visible trigger: `L` and Cmd-K open it. */}
       <LogInteractionDialog hotkey="l" trigger={null} />
-      {meetings.calendar ? (
-        <DayStrip
-          day={day}
-          today={today}
-          meetings={stripDay}
-          onOpen={(id) => openMeeting(id)}
-        />
-      ) : null}
-      <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
-        <div className="flex min-w-0 flex-1 flex-col gap-1 px-1 pt-1 pb-10">
-          {readouts.length > 0 ? (
-            <ReadoutStrip
-              boxed
-              readouts={readouts.map((r) => {
-                const by = r.filter
-                return by === undefined
-                  ? r.cell
-                  : {
-                      ...r.cell,
-                      press: {
-                        pressed: filter === by.id,
-                        onPress: () => pressReadout(by.id),
-                      },
-                    }
-              })}
-            />
-          ) : null}
-          <NoticesBand
-            stopped={stoppedPlugins}
-            broken={attention.state === 'done' ? attention.value.broken : []}
-            parked={attention.state === 'done' ? attention.value.parked : []}
-            waiting={attention.state === 'done' ? attention.value.waiting : []}
-            failing={attention.state === 'done' ? attention.value.failing : []}
-            invite={attention.state === 'done' ? attention.value.invite : null}
-            expiring={
-              attention.state === 'done' ? attention.value.expiring : []
-            }
+      <PageBody>
+        {meetings.calendar ? (
+          <DayStrip
+            day={day}
+            today={today}
+            meetings={stripDay}
+            onOpen={(id) => openMeeting(id)}
           />
-          <Card className="overflow-hidden">
+        ) : null}
+        <div className="flex min-h-0 flex-1 flex-col items-start gap-3 xl:flex-row">
+          <div className="flex w-full min-w-0 flex-1 flex-col gap-3">
+            {readouts.length > 0 ? (
+              <ReadoutStrip
+                boxed
+                readouts={readouts.map((r) => {
+                  const by = r.filter
+                  return by === undefined
+                    ? r.cell
+                    : {
+                        ...r.cell,
+                        press: {
+                          pressed: filter === by.id,
+                          onPress: () => pressReadout(by.id),
+                        },
+                      }
+                })}
+              />
+            ) : null}
+            <NoticesBand
+              stopped={stoppedPlugins}
+              broken={attention.state === 'done' ? attention.value.broken : []}
+              parked={attention.state === 'done' ? attention.value.parked : []}
+              waiting={
+                attention.state === 'done' ? attention.value.waiting : []
+              }
+              failing={
+                attention.state === 'done' ? attention.value.failing : []
+              }
+              invite={
+                attention.state === 'done' ? attention.value.invite : null
+              }
+              expiring={
+                attention.state === 'done' ? attention.value.expiring : []
+              }
+            />
             <NeedsYou
               rows={rows}
               filter={filter}
@@ -452,43 +454,43 @@ function TodayLedger({
               washes={washes}
               actions={actions}
             />
-          </Card>
-          <Card className="overflow-hidden">
-            <MeetingsSection
-              calendar={meetings.calendar}
-              audience={meetings.audience}
-              today={today}
-              day={day}
-              onDay={setDay}
-              meetings={shown}
-              preparing={preparing}
-              onOpen={openMeeting}
-              onRetry={() => setVersion((v) => v + 1)}
-            />
-          </Card>
-        </div>
+            <Card className="overflow-hidden">
+              <MeetingsSection
+                calendar={meetings.calendar}
+                audience={meetings.audience}
+                today={today}
+                day={day}
+                onDay={setDay}
+                meetings={shown}
+                preparing={preparing}
+                onOpen={openMeeting}
+                onRetry={() => setVersion((v) => v + 1)}
+              />
+            </Card>
+          </div>
 
-        <aside className="flex w-full shrink-0 flex-col gap-6 border-t border-hairline bg-bone p-5 xl:w-90 xl:border-t-0 xl:border-l">
-          {holdings.holdings.length > 0 ? (
-            <PortfolioRail
-              rollup={holdings.rollup}
-              baseCurrency={holdings.baseCurrency}
+          <aside className="flex w-full shrink-0 flex-col gap-3 xl:w-90">
+            {holdings.holdings.length > 0 ? (
+              <PortfolioRail
+                rollup={holdings.rollup}
+                baseCurrency={holdings.baseCurrency}
+              />
+            ) : null}
+            <WhatsMoving
+              signals={
+                attention.state === 'done'
+                  ? attention.value.moving
+                  : attention.state === 'failed'
+                    ? 'failed'
+                    : 'loading'
+              }
+              team={team}
+              today={today}
+              onRetry={() => void router.invalidate()}
             />
-          ) : null}
-          <WhatsMoving
-            signals={
-              attention.state === 'done'
-                ? attention.value.moving
-                : attention.state === 'failed'
-                  ? 'failed'
-                  : 'loading'
-            }
-            team={team}
-            today={today}
-            onRetry={() => void router.invalidate()}
-          />
-        </aside>
-      </div>
+          </aside>
+        </div>
+      </PageBody>
       {taskMenu.windows}
       {markFor === null ? null : (
         <AddMarkDialog

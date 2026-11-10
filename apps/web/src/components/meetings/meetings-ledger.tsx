@@ -93,7 +93,7 @@ export function MeetingsLedger({
             {earlier > 0 ? (
               <li
                 data-meetings-earlier
-                className="flex h-ledger-row items-center px-3 text-label text-graphite"
+                className="flex h-ledger-row items-center px-(--inset) text-label text-graphite"
               >
                 {earlier.toLocaleString('en-US')} earlier
               </li>

@@ -5,6 +5,7 @@ import {
   useNavigate,
 } from '@tanstack/react-router'
 import { toast } from 'sonner'
+import { Card } from '#/components/page-header'
 import {
   DitherMark,
   RecordBody,
@@ -92,12 +93,16 @@ function TermPage() {
         }
       >
         {/* The definition is the lead: someone wrote it, so it is serif. */}
-        <p className="max-w-160 font-serif text-title">
-          {term.definitionMd || (
-            <span className="text-graphite">No definition yet.</span>
-          )}
-        </p>
-        <TermMentions rows={mentions.rows} total={mentions.total} />
+        <Card label="Definition" className="px-(--inset) py-4">
+          <p className="max-w-160 font-serif text-title">
+            {term.definitionMd || (
+              <span className="text-graphite">No definition yet.</span>
+            )}
+          </p>
+        </Card>
+        <Card>
+          <TermMentions rows={mentions.rows} total={mentions.total} />
+        </Card>
       </RecordBody>
     </div>
   )

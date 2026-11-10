@@ -188,7 +188,7 @@ export function FileRow({
       data-row
       data-superseded={doc.replacedBy === null ? undefined : ''}
       className={cn(
-        'flex h-ledger-row items-center gap-3 border-b border-rule px-3',
+        'flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset)',
         doc.replacedBy !== null && 'text-graphite',
         className,
       )}
@@ -335,7 +335,7 @@ export function PendingRow({
   const failed = pending.error !== null
   const filed = pending.documentId !== null
   return (
-    <li className="flex min-h-ledger-row items-center gap-3 border-b border-rule bg-selected px-3 py-1.5">
+    <li className="flex min-h-ledger-row items-center gap-3 border-b border-rule bg-selected px-(--inset) py-1.5">
       <FileGlyph
         type={fileType({
           filename: pending.name,

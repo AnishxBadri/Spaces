@@ -12,7 +12,7 @@ import type {
   RefNames,
   RegistryEntry,
 } from '#/components/attributes/value-editor'
-import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
+import { FolderGround } from '#/components/page-header'
 import { icon } from '#/components/icons'
 import { AfterSort, ToolButton } from '#/components/table/record-table'
 import type { TablePin } from '#/components/table/record-table'
@@ -305,7 +305,7 @@ export function ViewBar({
   )
 
   return (
-    <div data-view-bar className={pinned ? PIN_UNDER_HEAD_BAR : undefined}>
+    <FolderGround data-view-bar pinned={pinned}>
       <Tabs
         label="Views"
         items={items}
@@ -417,7 +417,7 @@ export function ViewBar({
           onEdit={() => openFilter(false)}
         />
       ) : null}
-    </div>
+    </FolderGround>
   )
 }
 

@@ -189,7 +189,8 @@ export function NoLandTail({
 const STEPS = ['Upload', 'Map columns', 'Preview', 'Commit'] as const
 
 /**
- * Four cells on rules; the current one carries the 2px ink foot. `step` is
+ * Four cells on rules in a card on the ground; the current one carries the
+ * 2px ink foot. `step` is
  * read off the batch by the caller (a mapping on the row is step 2), never
  * kept in component state, so a reload lands where the operator left.
  */
@@ -210,53 +211,77 @@ export function StepStrip({
   previewHint?: string | null
 }) {
   return (
-    <nav
-      aria-label="Import steps"
-      className="flex h-10 shrink-0 border-b border-hairline"
-    >
-      {STEPS.map((label, i) => {
-        const current = i === step
-        const hint =
-          i === 0
-            ? uploadHint
-            : i === 1
-              ? mapHint
-              : i === 2
-                ? previewHint
-                : null
-        const done = hint !== null
-        return (
-          <div
-            key={label}
-            aria-current={current ? 'step' : undefined}
-            className={cn(
-              'flex min-w-0 flex-1 items-center gap-2 border-r border-rule px-4 text-ui last:border-r-0',
-              i === 0 && 'pl-8',
-              current
-                ? 'border-b-2 border-b-foreground font-medium text-foreground'
-                : 'text-graphite',
-            )}
-          >
-            {done ? (
-              <Check
-                className="size-3.5 shrink-0 text-success"
-                strokeWidth={2}
-                aria-label="done"
-              />
-            ) : null}
-            <span className="tabular mono text-label">{i + 1}</span>
-            <span className="truncate">
-              {i === 1 && mode === 'ledger' ? 'Map to events' : label}
-            </span>
-            {done ? (
-              <span className="truncate mono text-micro font-normal text-graphite">
-                {hint}
+    <div className="shrink-0 bg-bone px-3 pt-3">
+      <nav aria-label="Import steps" className="flex h-10 card">
+        {STEPS.map((label, i) => {
+          const current = i === step
+          const hint =
+            i === 0
+              ? uploadHint
+              : i === 1
+                ? mapHint
+                : i === 2
+                  ? previewHint
+                  : null
+          const done = hint !== null
+          return (
+            <div
+              key={label}
+              aria-current={current ? 'step' : undefined}
+              className={cn(
+                'flex min-w-0 flex-1 items-center gap-2 border-r border-rule px-(--inset) text-ui last:border-r-0',
+                current
+                  ? 'border-b-2 border-b-foreground font-medium text-foreground'
+                  : 'text-graphite',
+              )}
+            >
+              {done ? (
+                <Check
+                  className="size-3.5 shrink-0 text-success"
+                  strokeWidth={2}
+                  aria-label="done"
+                />
+              ) : null}
+              <span className="tabular mono text-label">{i + 1}</span>
+              <span className="truncate">
+                {i === 1 && mode === 'ledger' ? 'Map to events' : label}
               </span>
-            ) : null}
-          </div>
-        )
-      })}
-    </nav>
+              {done ? (
+                <span className="truncate mono text-micro font-normal text-graphite">
+                  {hint}
+                </span>
+              ) : null}
+            </div>
+          )
+        })}
+      </nav>
+    </div>
+  )
+}
+
+/**
+ * A wizard step's work under the head and the step strip: one paper card on
+ * the bone ground, scrolling inside itself.
+ */
+export function ImportSheet({
+  children,
+  className,
+}: {
+  children: ReactNode
+  className?: string | undefined
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col bg-bone p-3">
+      <div
+        data-import-sheet
+        className={cn(
+          'flex min-h-0 flex-1 flex-col overflow-auto card',
+          className,
+        )}
+      >
+        {children}
+      </div>
+    </div>
   )
 }
 
@@ -477,6 +502,7 @@ export function SheetTabs({
   return (
     <Tabs
       label="Sheets"
+      plain
       items={sheets.map((sheet) => ({ id: sheet, label: sheet }))}
       value={current}
       onValueChange={onSelect}

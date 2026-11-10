@@ -166,7 +166,7 @@ describe('the folded head', () => {
     titleVisible(false)
     expect(bar.dataset.folded).toBe('true')
     expect(bar.className.split(' ')).toEqual(
-      expect.arrayContaining(['h-12', 'px-3']),
+      expect.arrayContaining(['h-12', 'px-6']),
     )
     expect(bar.textContent).toContain('Flent')
     // The record's mark at 16px in a hairline box, inert; never the stamp.
@@ -227,7 +227,7 @@ describe('the folded head', () => {
     expect(actions.className).toContain('data-[folded=true]:fixed')
     expect(actions.className).toContain('data-[folded=true]:h-12')
     expect(actions.className).toContain('data-[folded=true]:z-sticky')
-    expect(actions.className).toContain('data-[folded=true]:right-3')
+    expect(actions.className).toContain('data-[folded=true]:right-6')
     // Folded, every action steps down to 26px.
     expect(actions.className).toContain(
       'data-[folded=true]:[&_[data-slot=button]]:h-6.5',

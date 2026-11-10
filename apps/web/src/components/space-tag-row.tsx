@@ -82,7 +82,7 @@ export function TagCompanyRow({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 px-3 text-left transition-colors hover:bg-bone"
+          className="focus-ring-inset -mx-(--inset) flex h-full min-w-0 flex-1 items-center gap-3 px-(--inset) text-left transition-colors hover:bg-bone"
         >
           <span className="w-3.5 shrink-0 text-center mono text-ui text-primary">
             +
@@ -100,7 +100,7 @@ export function TagCompanyRow({
 
   return (
     <li className="flex flex-col border-b border-rule">
-      <div className="flex h-ledger-row items-center gap-3 px-3">
+      <div className="flex h-ledger-row items-center gap-3 px-(--inset)">
         <span className="w-3.5 shrink-0 text-center mono text-ui text-primary">
           +
         </span>
