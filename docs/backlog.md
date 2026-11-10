@@ -6,41 +6,7 @@ Full bodies of the open slices, the repo copy of their Linear issues. Linear iss
 
 ## 31. Edges and icons, and the AI shape
 
-Three slices the owner agreed on 2026-11-07/08 (Linear project P-SPA-35, "31. Edges and the AI shape"). `edges-1` (SPA-387, the canvas's "Edges and icons" system) and `ai-a` (SPA-388, the two-part prompt with cache markers) shipped 2026-11-10; `notes-1` (the note page, boards 13/14) and `ai-b` are what is left; `ai-b` carries the migration.
-
----
-
-#### `notes-1` (SPA-391) · afk · M — The note page: the record head, the body on paper, the rail that says where it is filed and who may read it
-
-**Blocked by:** none (`edges-1` shipped). **Owns** `apps/web/src/routes/_app/notes_.$noteId.tsx`, `lib/server/notes.ts` (`getNote`'s shape only), `components/editor/note-column.ts`, `styles.css` (the `prose-note` heading ladder), a new `components/notes/*`, and the tests beside them. **Does not touch** `routes/_app/notes.tsx` (the list, shipped) or `lib/ai/*`. No migration; no schema change.
-
-**The boards** are the Paper Record page `p-S-0`, 13 "Note" and 14 "Note · revised"; where they differ, 14 wins. Boards 15 and 16 (the list) are shipped. The edges rule E1–E8 (`docs/design-contract.md` § 1) applies: one rule under the head, the rail as the company record draws it.
-
-**Today:** the note page is a 48px bar (back link, `ViaMark`, `OpenIn`, a kind `Segmented`, the save word, a visibility toggle, a Delete button, `···`), then a 72ch column holding the title input, two filing rows (spaces, records) under the title, the editor, and a "Linked from" list at the foot. No stamp, no record head, no rail, no history.
-
-**What to build.**
-
-1. **The head is the record head (A4).** `RecordHeader` with the kind as the stamp (`NOTE` / `MEMO` / `SCRATCH`; a private note adds a second, outlined stamp `PRIVATE`), the serif title as the editable name field (wraps, never clips), and one mono meta line whose shape is the note's state: hand-written `Anish · 13 Oct 14:02`; via a tool `via Granola · Priya Raman · 13 Oct · Open in Granola ↗` (today's `ViaMark` and `OpenIn` fold into this line); private `Only you · 13 Oct 14:02` with the square; superseded: the line dims and ends `→ <replacing title> ›` linking to it, replacing today's "Replaced by →" paragraph. Right of the title: the save word (`Saved` / `Saving…` / `Unsaved changes`, mono, `role=status`) and the `···`, nothing else — no Edit, no Share, no Delete button, no back link (the sidebar is the way back). One rule under the head. The head and the body share one left edge, and that edge is the editor's inset (`NOTE_INSET`), because BlockNote's side menu needs the room: the one named exception to E1, written into the contract.
-2. **The `···` menu.** A `KIND` group of three checked rows — Note / Memo / Scratch — that call `setNoteKind` (replaces the `Segmented`). Rule. `Save as new version` · `Save as template…` · `Copy link` (the page URL to the clipboard, toast `Link copied`). Rule. `Delete…` (destructive, through the existing confirm). The author-only visibility toggle moves to the rail.
-3. **The body.** The editor column stays at 72ch, prose 17px serif; the heading ladder in `prose-note` is H1 20 / H2 17 / H3 15 sans medium (the title stays 28 serif). Mentions stay ink links. Nothing renders between the title and the editor: the filing rows leave.
-4. **The rail.** Right of the body, the record rail (`RailSection` / `RailRow` from `record-parts.tsx`, `w-72`, bone, rule left; under `md` it stacks below the body):
-   - `FILED ON · N`: every record and space the note hangs from, one row each — the name as an ink link, the kind in the mono end lane (`company`, `person`, `deal`, a custom object's singular, `space`); records first then spaces, each in edge order. The last row is `+ File on…`, which opens one picker offering both records and spaces (today's `RecordFilingPicker` and the space `Select` merge into it). Unfiling stays as today (the row's ×). With nothing filed the section reads one row, `Not filed`, then `+ File on…`.
-   - `MENTIONS · N`: the records the body mentions (this note's outbound `mentions` edges), name and kind; derived, never editable. Hidden at zero.
-   - `MENTIONED IN · N`: the inbound backlinks (today's "Linked from"), same row shape; a document row opens the preview as today. Hidden at zero.
-   - `VISIBILITY`: `Shared with the workspace` with the `Switch`, for the author only; another reader sees the words without a switch. Private reads `Only you`.
-   - `HISTORY`: rows from data that exists, newest first, each `<event> · <day> · <who>`: `Written` (the entity's `created_at`, the author); `Edited` (`note.updated_at`, when more than a minute after `created_at`); `Landed from <tool>` when `via` is set; `Replaced by <title>` when superseded (the `supersedes` link's `created_at`). Kind changes are not logged today, so `Made a memo` is not shown and no log is added.
-5. **Data.** `getNote` returns what the rail needs and no more: `author` (display name), `createdAt`, `mentions` (outbound, name + kind + objectSlug), `filedAgainst` gains the object's singular label, `replacedBy` gains `at`. One query per list as now; no per-row queries.
-6. **Contract.** `docs/design-contract.md` § 3: the Notes precedent becomes the note page (A4 head, the rail's five sections, the `NOTE_INSET` exception to E1); any § 5 line promising the note page is deleted.
-
-**Acceptance criteria**
-
-- [ ] The note page renders `RecordHeader` with the kind stamp, a `PRIVATE` second stamp when private, the meta line in each of the four states, the save word and a `···` — and no Edit, Share or Delete button, no back link, no `Segmented` (render tests, one per state).
-- [ ] The `···` holds the `KIND` rows (checked on the current kind, changing it on select), `Save as new version`, `Save as template…`, `Copy link`, `Delete…`, in that order with the two rules (test).
-- [ ] Nothing renders between the title field and the editor (test); the `prose-note` heading sizes are 20 / 17 / 15 (CSS test like `printed-details.test.tsx`).
-- [ ] Rail: `FILED ON` rows carry the kind lane and end on `+ File on…`; `MENTIONS` and `MENTIONED IN` render only when non-empty; `VISIBILITY` shows the switch to the author only; `HISTORY` shows exactly the rows the data supports (tests on fixture notes: plain, private, via a tool, superseded, unfiled).
-- [ ] Filing and unfiling (record and space), kind change, visibility, new version, template and delete still go through the existing server fns and their tests stay green; one test each on the moved controls.
-- [ ] The head's left edge equals the body's (test on the shared class); the contract names the exception.
-- [ ] Gates: typecheck, test, lint, prettier; web build. The browser pass is the orchestrator's.
+Three slices the owner agreed on 2026-11-07/08 (Linear project P-SPA-35, "31. Edges and the AI shape"). `edges-1` (SPA-387, the canvas's "Edges and icons" system) and `ai-a` (SPA-388, the two-part prompt with cache markers) shipped 2026-11-10; `notes-1` (SPA-391, the note page from boards 13/14) shipped 2026-11-10 too; `ai-b` below is the one left and carries the migration.
 
 ---
 

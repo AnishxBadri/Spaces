@@ -34,7 +34,7 @@ What is shipped, what is open, and what comes next. Linear (team `Spaces`) holds
 28. Spaces, research and watches
 29. Enrichment is the host's
 30. The canvas lands — the instrument port (shipped 2026-10-30, with the Clean UI leftovers `SPA-355` and `SPA-356`; its follow-ups `port-C1` SPA-385 and `port-C2` SPA-386 shipped 2026-11-09)
-31. Edges and the AI shape — `edges-1` SPA-387 (the 12px edge, cards, folder tabs, the toolbar, `+ New x`, one icon list, `ProviderMark`) and `ai-a` SPA-388 (system and user parts, Anthropic cache markers, one shared prefix per lane, `tokensCached`) shipped 2026-11-10; `ai-b` SPA-389 is open below
+31. Edges and the AI shape — `edges-1` SPA-387 (the 12px edge, cards, folder tabs, the toolbar, `+ New x`, one icon list, `ProviderMark`) and `ai-a` SPA-388 (system and user parts, Anthropic cache markers, one shared prefix per lane, `tokensCached`) shipped 2026-11-10, and `notes-1` SPA-391 (the note page as a record: kind stamp, meta line, the ··· with the kind, the rail with Filed on · Mentions · Mentioned in · Visibility · History) the same day; `ai-b` SPA-389 is open below
 
 Plus the UI sweep (the printed sheets landing) and Corrections.
 
@@ -44,7 +44,7 @@ Plus the UI sweep (the printed sheets landing) and Corrections.
 
 ## Next, in order
 
-1. **Project 31, the rest** (P-SPA-35): `notes-1` SPA-391 (the note page, boards 13/14, afk) and `ai-b` SPA-389 (migration, hitl: the owner confirms AI column answers may change under the mandate). Bodies in `docs/backlog.md` § 31. Then the Ask set.
+1. **Project 31, the rest** (P-SPA-35): `ai-b` SPA-389 (migration, hitl: the owner confirms AI column answers may change under the mandate). Body in `docs/backlog.md` § 31. Then the Ask set.
 2. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided; starts after project 30.
 3. **Docs consolidation** — `DESIGN.md` and `docs/design-contract.md` merge into one design doc, checked against the Paper library; `CONTEXT.md` rewritten to current state only.
 
@@ -55,6 +55,7 @@ Plus the UI sweep (the printed sheets landing) and Corrections.
 
 ## Unticketed follow-ups
 
+- Note page: `Edited` and `Replaced by` history rows carry no who (nothing records it); a tool-landed note shows `Landed from` and `Written` at one instant; the `+ File on…` picker prints `record` for a custom object because search returns no singular; `FilingRow` is now used only by `space-page.test.tsx`.
 - `buildRequest` hands `renderPrompt` a negative budget when a lane's system part alone exceeds `budgetChars`, and the subject is then dropped silently; guard it (every lane's budget is far above its instructions today).
 - `MoreMenu` draws Lucide's `Ellipsis` now, not the mono `···` text; the contract's wording still says `···`.
 - The `···`/last-control alignment is proved by shared padding, not a measured box; a Playwright check at 1280px would make it mechanical.
