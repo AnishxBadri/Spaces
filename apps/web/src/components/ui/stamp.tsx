@@ -1,4 +1,4 @@
-import { Lock } from 'lucide-react'
+import { Lock } from '#/components/icons'
 import { formatDay } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 

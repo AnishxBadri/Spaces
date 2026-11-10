@@ -407,7 +407,7 @@ function ImportBatchPage() {
               <MissingRateLine ledger={receipt.ledger} />
             ) : null}
           </div>
-          <div className="px-8">
+          <div className="px-3">
             {receipt.ledger ? (
               <VoidLine
                 ledger={receipt.ledger}
@@ -465,7 +465,7 @@ function ImportBatchPage() {
         <StepStrip step={2} uploadHint={uploadHint} mapHint={mapHint} />
         <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto pb-6">
           <PreviewStrip counts={preview.counts} batchId={batch.id} />
-          <div className="px-8">
+          <div className="px-3">
             <PreviewLedger
               view={preview}
               batchId={batch.id}
@@ -502,7 +502,7 @@ function ImportBatchPage() {
         mapHint={mapHint}
         mode={batch.mode}
       />
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-8 py-6">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-3 py-6">
         {batch.previous ? (
           <PreviousImportNotice previous={batch.previous} />
         ) : null}

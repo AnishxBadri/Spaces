@@ -224,10 +224,12 @@ describe('a row', () => {
 })
 
 describe("a shelf's bar", () => {
-  it('is real tabs on the bone head bar, with Sort, Columns and the text box right', () => {
+  it('is folder tabs on white, a divider, Sort as an icon and the search box right', () => {
     mount()
     const bar = one('[data-tab-bar]')
-    expect(classes(bar)).toEqual(expect.arrayContaining(['bg-bone', 'h-11']))
+    expect(classes(bar)).toEqual(expect.arrayContaining(['bg-paper', 'h-11']))
+    expect(classes(bar)).not.toContain('bg-bone')
+    expect(bar.querySelector('[data-tab-divider]')).not.toBeNull()
     const tab = one('[role="tab"]')
     expect(tab.textContent).toBe('All2')
     expect(tab.getAttribute('aria-selected')).toBe('true')
@@ -236,9 +238,15 @@ describe("a shelf's bar", () => {
       .map((el) =>
         el instanceof HTMLInputElement
           ? el.getAttribute('aria-label')
-          : el.textContent.trim(),
+          : (el.getAttribute('aria-label') ?? el.textContent.trim()),
       )
-    expect(controls).toEqual(['Sort', 'Columns', 'Filter holdings'])
+    // Columns is not on the bar: it ends the column head row.
+    expect(controls).toEqual(['Sort', 'Filter holdings'])
+    expect(one('thead [data-columns-menu]').getAttribute('aria-label')).toBe(
+      'Columns',
+    )
+    // At rest Sort is a bare icon, its name only in its label.
+    expect(one('[data-tool="sort"]').textContent.trim()).toBe('')
     // The tools sit outside the tablist: only tabs are its children.
     expect(one('[role="tablist"]').querySelectorAll('button')).toHaveLength(1)
   })

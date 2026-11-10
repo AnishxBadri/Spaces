@@ -14,7 +14,7 @@ import {
   Star,
   Type,
   User,
-} from 'lucide-react'
+} from '#/components/icons'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'

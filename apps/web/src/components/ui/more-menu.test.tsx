@@ -141,7 +141,7 @@ describe('MoreMenu', () => {
       />,
     )
     const trigger = document.querySelector('[aria-label="More for Deals"]')
-    expect(trigger?.textContent).toBe('···')
+    expect(trigger?.querySelector('[data-more-glyph]')).not.toBeNull()
     expect([...document.querySelectorAll('button')]).toHaveLength(1)
     await open('Deals')
     expect(rows()).toEqual(['Import…'])

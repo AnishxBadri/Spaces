@@ -1,4 +1,4 @@
-import { Copy } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
 import {
@@ -50,7 +50,7 @@ export function ResetLinkDialog({
                 variant="outline"
                 onClick={() => copy(link.url)}
               >
-                <Copy className="size-3" strokeWidth={2} />
+                <icon.copy className="size-3" strokeWidth={2} />
                 Copy link
               </Button>
             </div>

@@ -1,5 +1,5 @@
 import { useRouter } from '@tanstack/react-router'
-import { Plus } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { readOptionProposals } from '@spaces/core/ai/attribute-ai'
@@ -69,7 +69,7 @@ export function OptionProposalBody({
               title={`Add "${p.label}" to ${p.name}'s options — a registry change, for everyone`}
               onClick={() => void add(p)}
             >
-              <Plus className="size-3" strokeWidth={2} />
+              <icon.new className="size-3" strokeWidth={2} />
               Add option “{p.label}” to {p.name}
             </Button>
           </dd>

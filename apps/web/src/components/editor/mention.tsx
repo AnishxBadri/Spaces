@@ -7,8 +7,8 @@ import {
   Layers,
   Paperclip,
   User,
-} from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+} from '#/components/icons'
+import type { LucideIcon } from '#/components/icons'
 import { documentPreviewEvent } from '#/lib/editor/document-preview-event'
 import { recordPath } from '#/lib/record-path'
 

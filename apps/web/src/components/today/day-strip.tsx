@@ -142,7 +142,7 @@ export function DayStrip({
   const at = now === null ? null : windowPercent(now)
   const dithered = tense === 'past' ? 100 : (at ?? 0)
   return (
-    <div data-day-strip={tense} className="h-16 shrink-0 px-8">
+    <div data-day-strip={tense} className="h-16 shrink-0 px-3">
       <div className="relative h-full">
         {meetings.map((m) => {
           const from = windowPercent(new Date(m.startsAt))

@@ -1,5 +1,5 @@
 import { Link, useRouter } from '@tanstack/react-router'
-import { X } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { RailSection } from './record/record-parts'
@@ -148,7 +148,7 @@ function TermRow({ term, spaceId }: { term: Term; spaceId: string }) {
             }}
             className="focus-ring ml-auto flex size-5 shrink-0 items-center justify-center self-center rounded-md text-graphite opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100"
           >
-            <X className="size-3" strokeWidth={2} />
+            <icon.close className="size-3" strokeWidth={2} />
           </button>
         )}
       </div>

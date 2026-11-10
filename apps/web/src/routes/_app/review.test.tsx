@@ -637,7 +637,7 @@ describe('the discovery group', () => {
     expect(html).toContain('Space tech / Launch')
     expect(html).toContain(`href="/spaces/${spaceId}"`)
     expect(html).toContain('bg-bone')
-    expect(html).toMatch(/via.*>E<\/span>.*Exa/)
+    expect(html).toMatch(/via.*data-provider-mark="exa".*Exa/)
     expect(html).toMatch(/mono[^"]*">2<\/span>/)
   })
 

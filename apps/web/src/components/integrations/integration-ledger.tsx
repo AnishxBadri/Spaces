@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { ProviderMark, brandOf } from '#/components/provider-mark'
 import { SettingsGroupHead } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { Switch } from '#/components/ui/switch'
@@ -88,7 +89,10 @@ export function versionNoteOf(row: IntegrationRow): string | null {
   return parts.length === 0 ? null : parts.join(' · ')
 }
 
-/** A plugin's mark: its initial on a square, ink when installed, rule when offered. */
+/**
+ * A plugin's mark: its brand's `ProviderMark` when it has one, else its
+ * initial on a square; ink when installed, graphite on rule when offered.
+ */
 export function PluginMark({
   name,
   offered = false,
@@ -96,6 +100,19 @@ export function PluginMark({
   name: string
   offered?: boolean
 }) {
+  const brand = brandOf(name)
+  if (brand !== null)
+    return (
+      <span
+        aria-hidden
+        className={cn(
+          'flex size-5 shrink-0 items-center justify-center',
+          offered ? 'text-graphite' : 'text-foreground',
+        )}
+      >
+        <ProviderMark brand={brand} />
+      </span>
+    )
   return (
     <span
       aria-hidden

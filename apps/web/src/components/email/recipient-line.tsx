@@ -1,4 +1,4 @@
-import { ChevronDown, X } from 'lucide-react'
+import { ChevronDown, icon } from '#/components/icons'
 import { useEffect, useId, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import {
@@ -28,7 +28,7 @@ export function AddressRow({
   children: ReactNode
 }) {
   return (
-    <div className="flex min-h-10 items-center gap-3 border-b border-rule px-5 py-1.5">
+    <div className="flex min-h-10 items-center gap-3 border-b border-rule px-4 py-1.5">
       <label htmlFor={htmlFor} className={ADDRESS_LANE}>
         {label}
       </label>
@@ -107,7 +107,7 @@ function Chip({
         onClick={onRemove}
         className="focus-ring text-graphite hover:text-foreground"
       >
-        <X className="size-2.5" strokeWidth={2} />
+        <icon.close className="size-2.5" strokeWidth={2} />
       </button>
     </span>
   )

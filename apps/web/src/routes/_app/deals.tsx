@@ -7,7 +7,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
-import { Handshake } from 'lucide-react'
+import { Handshake } from '#/components/icons'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -38,7 +38,7 @@ import {
 import { ListMenu } from '#/components/table/list-menu'
 import { useListActions } from '#/components/table/list-actions'
 import { statColumns } from '#/components/table/stat-columns'
-import { PageHeader } from '#/components/page-header'
+import { Card, PageBody, PageHeader } from '#/components/page-header'
 import { useImportVerb } from '#/components/import/import-action'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import {
@@ -421,20 +421,22 @@ function DealsPage() {
             listMenu
           ) : (
             <>
-              {listMenu}
               <CreateDealDialog registry={registry} hotkey="c" />
+              {listMenu}
             </>
           )
         }
       />
       {firstRun ? (
-        <div className="px-8 pt-6 pb-8">
-          <CreateDealDialog
-            registry={registry}
-            hotkey="c"
-            trigger={<EmptyRow name="Deals" />}
-          />
-        </div>
+        <PageBody>
+          <Card>
+            <CreateDealDialog
+              registry={registry}
+              hotkey="c"
+              trigger={<EmptyRow name="Deals" />}
+            />
+          </Card>
+        </PageBody>
       ) : (
         <>
           {asTable && actions.selectionBar ? (
@@ -493,13 +495,14 @@ function DealsPage() {
               }
             />
           )}
-          <div className={cn('px-8 pb-8', !asTable && 'pt-4')}>
+          <div className={cn('px-1 pb-8', !asTable && 'pt-1')}>
             {asTable ? (
               <AiCellsProvider
                 entityIds={shown.map((r) => r.id)}
                 registry={registry}
               >
                 <RecordTable
+                  joined={!actions.selectionBar}
                   columnActions={columnRun.columnActions}
                   table={table}
                   label="Deals"

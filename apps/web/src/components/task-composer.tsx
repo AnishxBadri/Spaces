@@ -1,9 +1,10 @@
 import { useRouteContext, useRouter } from '@tanstack/react-router'
-import { Plus, X } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { DitherMark, InitialsMark } from './record/record-parts'
 import { Button } from './ui/button'
+import { NewButton } from './new-button'
 import {
   Dialog,
   DialogClose,
@@ -144,12 +145,7 @@ export function TaskComposer({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        {trigger ?? (
-          <Button size="sm">
-            <Plus className="size-4" strokeWidth={2} />
-            New task
-          </Button>
-        )}
+        {trigger ?? <NewButton noun="task" />}
       </DialogTrigger>
       {/* Quick task: no title bar — the input is the title. 48px prompt row
           with a pine +, chips under it, a bone foot. */}
@@ -457,7 +453,7 @@ export function TaskComposerRow(props: React.ComponentProps<'button'>) {
       type="button"
       data-composer-row
       {...props}
-      className="focus-ring-inset flex h-ledger-row w-full min-w-0 items-center gap-3 px-3 text-left transition-colors duration-150 ease-out-quart hover:bg-bone"
+      className="focus-ring-inset flex h-ledger-row w-full min-w-0 items-center gap-3 px-(--inset) text-left transition-colors duration-150 ease-out-quart hover:bg-bone"
     >
       <span
         aria-hidden
@@ -520,7 +516,7 @@ function RecordsPill({
             className="focus-ring text-graphite hover:text-foreground"
             onClick={() => onChange(records.filter((x) => x.id !== r.id))}
           >
-            <X className="size-3" strokeWidth={2} />
+            <icon.close className="size-3" strokeWidth={2} />
           </button>
         </span>
       ))}

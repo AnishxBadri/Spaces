@@ -220,10 +220,10 @@ export function LedgerPreviewStep({
       />
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto pb-6">
         <ReadoutStrip
-          className="border-b border-rule px-8"
+          className="border-b border-rule px-3"
           readouts={ledgerStripCells(counts).map(countReadout)}
         />
-        <section className="flex flex-col px-8">
+        <section className="flex flex-col px-3">
           <div className="flex h-8 items-center gap-3 border-b border-hairline px-2 field-label text-graphite">
             <span className="w-16 shrink-0 text-right">{HEAD[0]}</span>
             <span className="w-50 shrink-0">{HEAD[1]}</span>

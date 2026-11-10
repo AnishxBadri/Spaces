@@ -119,9 +119,7 @@ describe('a check ledger', () => {
   it('prints the day, the entry, its detail and the amount, and no void word', () => {
     mount(<EventSection title="Checks" table="investment" rows={rows} />)
     const first = document.querySelector('#event-a')
-    expect(text(first)).toBe(
-      '10 MarSAFE · Northgate Fund IIcap $12M$1,000,000···',
-    )
+    expect(text(first)).toBe('10 MarSAFE · Northgate Fund IIcap $12M$1,000,000')
     expect(document.body.textContent).not.toMatch(/\bvoid\b/)
     // The count is of live entries: the voided pair is not one.
     expect(text(document.querySelector('[data-section-count]'))).toBe('1')

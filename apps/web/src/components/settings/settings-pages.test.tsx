@@ -893,12 +893,12 @@ describe('every settings page', () => {
   )
 
   it.each(PATHS)(
-    '%s heads the page with a sentence-case eyebrow, the title and the double rule, no sentence',
+    '%s heads the page with a sentence-case eyebrow, the title and one rule, no sentence',
     async (path) => {
       await mount(path)
       const head = document.querySelector('[data-settings-head]')
-      expect(head?.className).toContain('double-rule')
-      expect(head?.className).not.toContain('border-b')
+      expect(head?.className).toContain('border-rule')
+      expect(head?.className).not.toContain('double-rule')
       const eyebrow = head?.querySelector('h1')?.previousElementSibling
       expect(eyebrow?.textContent).toMatch(
         /^Settings · [A-Z][a-z]+|^Settings · AI$/,
@@ -1805,8 +1805,8 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
     expect(groups()).toEqual(['Templates2', 'Archived1'])
     const rows = Array.from(document.querySelectorAll('[data-template-row]'))
     expect(rows.map((r) => r.textContent)).toEqual([
-      'Seed memoNoteCompaniesDeals+···',
-      'Market mapSpace breakdownSpaces+···',
+      'Seed memoNoteCompaniesDeals+',
+      'Market mapSpace breakdownSpaces+',
     ])
     await openMenu('Where Market map is offered first')
     await click(menuItem('People'))

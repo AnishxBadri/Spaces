@@ -4,7 +4,7 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { Copy } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -47,6 +47,8 @@ import type {
 import { disconnectConnection } from '#/lib/server-fns'
 import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
+import { ProviderMark } from '#/components/provider-mark'
+import type { Brand } from '#/components/provider-mark'
 
 /**
  * Settings → You: the reader's accounts grouped by the job they do.
@@ -328,7 +330,7 @@ function ForwardingAddress({ address }: { address: string | null }) {
             onClick={() => copy(address)}
             aria-label={`Copy ${address}`}
           >
-            <Copy className="size-3" strokeWidth={2} />
+            <icon.copy className="size-3" strokeWidth={2} />
             Copy
           </Button>
         </div>
@@ -639,77 +641,18 @@ function ProductMark({
 }) {
   return (
     <span className="flex size-7 shrink-0 items-center justify-center border border-hairline bg-paper">
-      <svg aria-hidden viewBox="0 0 24 24" className="size-4">
-        {MARKS[provider === 'box' ? 'box' : product]}
-      </svg>
+      <ProviderMark
+        brand={
+          provider === 'box' ? 'box' : (PRODUCT_BRAND[product] ?? 'google')
+        }
+      />
     </span>
   )
 }
 
-/** Provider marks in their own colours, drawn on a 24-unit square. */
-const MARKS: Record<string, ReactNode> = {
-  drive: (
-    <g transform="scale(0.2749) translate(0 4.3)">
-      <path
-        d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z"
-        fill="#0066da"
-      />
-      <path
-        d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z"
-        fill="#00ac47"
-      />
-      <path
-        d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z"
-        fill="#ea4335"
-      />
-      <path
-        d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z"
-        fill="#00832d"
-      />
-      <path
-        d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z"
-        fill="#2684fc"
-      />
-      <path
-        d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z"
-        fill="#ffba00"
-      />
-    </g>
-  ),
-  gmail: (
-    <g transform="translate(0 1)">
-      <path
-        fill="#4285f4"
-        d="M1.6 21h3.8v-9.2L0 7.75V19.4c0 .9.7 1.6 1.6 1.6z"
-      />
-      <path
-        fill="#34a853"
-        d="M18.6 21h3.8c.9 0 1.6-.7 1.6-1.6V7.75l-5.4 4.05z"
-      />
-      <path fill="#fbbc04" d="M18.6 4.8v7l5.4-4.05V5.6c0-2-2.3-3.1-3.8-1.9z" />
-      <path fill="#ea4335" d="M5.4 11.8v-7L12 9.75l6.6-4.95v7L12 16.75z" />
-      <path
-        fill="#c5221f"
-        d="M0 5.6v2.15l5.4 4.05v-7L3.8 3.7C2.3 2.5 0 3.6 0 5.6z"
-      />
-    </g>
-  ),
-  calendar: (
-    <g>
-      <path d="M3 3h18v5H3z" fill="#4285f4" />
-      <path d="M3 8h3v13H3z" fill="#34a853" />
-      <path d="M18 8h3v9h-3z" fill="#fbbc04" />
-      <path d="M18 17h3v4h-3z" fill="#ea4335" />
-      <path d="M6 18h12v3H6z" fill="#188038" />
-      <path d="M9 11h6v1.5H9zM9 14h6v1.5H9z" fill="#4285f4" />
-    </g>
-  ),
-  box: (
-    <g fill="none" stroke="#0061d5" strokeWidth="1.8" strokeLinecap="round">
-      <path d="M2.9 6v7.5" />
-      <circle cx="5.9" cy="13.5" r="3" />
-      <circle cx="13.2" cy="13.5" r="3" />
-      <path d="m17.8 10.3 4.6 6.4m0-6.4-4.6 6.4" />
-    </g>
-  ),
+/** Each Google product's own mark. */
+const PRODUCT_BRAND: Partial<Record<string, Brand>> = {
+  drive: 'googleDrive',
+  gmail: 'gmail',
+  calendar: 'googleCalendar',
 }

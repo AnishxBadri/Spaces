@@ -1,5 +1,5 @@
 import { Link, useLocation } from '@tanstack/react-router'
-import { Plus, X } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '#/components/ui/button'
 import {
@@ -158,7 +158,7 @@ export function AskDock() {
           title="New thread"
           onClick={() => setDockThread(null)}
         >
-          <Plus className="size-4" strokeWidth={1.75} />
+          <icon.new className="size-4" strokeWidth={1.75} />
         </Button>
         <Button
           variant="ghost"
@@ -167,7 +167,7 @@ export function AskDock() {
           title="Close (⌘J)"
           onClick={closeAsk}
         >
-          <X className="size-4" strokeWidth={1.75} />
+          <icon.close className="size-4" strokeWidth={1.75} />
         </Button>
       </header>
       <div ref={body} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">

@@ -580,7 +580,7 @@ function MeetingWindow({
         )}
       </DialogHeader>
 
-      <div className="-mx-5 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-5">
+      <div className="-mx-4 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4">
         {meeting.participants.length === 0 ? null : (
           <Group
             label="Participants"

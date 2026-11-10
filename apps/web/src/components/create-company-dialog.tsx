@@ -15,6 +15,7 @@ import {
 import { useClock } from '#/components/clock'
 import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
+import { NewButton } from '#/components/new-button'
 import {
   Dialog,
   DialogClose,
@@ -125,7 +126,7 @@ export function CreateCompanyDialog({
     >
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button shortcut={hotkey?.toUpperCase()}>New company</Button>
+          <NewButton noun="company" shortcut={hotkey?.toUpperCase()} />
         )}
       </DialogTrigger>
       <DialogContent

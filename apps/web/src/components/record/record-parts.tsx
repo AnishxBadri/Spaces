@@ -67,7 +67,7 @@ export function RecordHeader({
   name: ReactNode
   /** Rename in place: drawn where the title is; the folded bar keeps `name`. */
   nameField?: ReactNode
-  /** An archived record: the name and the double rule go graphite. */
+  /** An archived record: the name goes graphite. */
   archived?: boolean
   badges?: ReactNode
 }) {
@@ -75,12 +75,7 @@ export function RecordHeader({
   return (
     <>
       <HeadBar fold={fold} title={name} mark={mark} />
-      <header
-        className={cn(
-          'flex shrink-0 flex-col gap-3 px-6 pt-5 pb-4 double-rule',
-          archived && 'double-rule-archived',
-        )}
-      >
+      <header className="flex shrink-0 flex-col gap-3 border-b border-rule px-3 pt-5 pb-4">
         <div data-stamp-row className="flex">
           <Stamp {...stamp} />
         </div>
@@ -130,7 +125,7 @@ export function RecordHeadPending({ kind }: { kind: string }) {
     <div className="flex min-h-full flex-col">
       <header
         data-record-pending
-        className="flex shrink-0 flex-col gap-3 px-6 pt-5 pb-4 double-rule"
+        className="flex shrink-0 flex-col gap-3 border-b border-rule px-3 pt-5 pb-4"
       >
         <div data-stamp-row className="flex">
           <Stamp kind={kind} />
@@ -178,14 +173,14 @@ export function ReadoutStrip({
       data-readouts
       className={cn(
         'flex h-16 overflow-x-auto',
-        boxed ? 'h-18 border border-rule bg-paper' : 'border-t border-hairline',
+        boxed ? 'h-18 card' : 'border-t border-hairline',
         className,
       )}
     >
       {readouts.map((r, i) => {
         const cls = cn(
           'flex min-w-28 basis-0 flex-col justify-center gap-0.5 border-r border-rule last:border-r-0',
-          size === 'pane' ? 'px-3' : 'px-4',
+          size === 'pane' ? 'px-3' : boxed ? 'px-(--inset)' : 'px-4',
           boxed
             ? 'flex-1'
             : fixed
@@ -286,7 +281,7 @@ export function countReadout({
 
 /**
  * A head at preview size, for Cmd-K's pane: the stamp, then the glyph and
- * the name in serif, what sits under the name, and the double rule, as the
+ * the name in serif, what sits under the name, and the rule, as the
  * record page's head closes.
  */
 export function PreviewHead({
@@ -306,7 +301,7 @@ export function PreviewHead({
   children?: ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-2 px-5 pt-4 pb-3 double-rule">
+    <div className="flex flex-col gap-2 border-b border-rule px-5 pt-4 pb-3">
       {stamp !== undefined || working ? (
         <div className="flex items-center justify-between gap-3">
           {stamp === undefined ? <span /> : <Stamp kind={stamp} />}
@@ -366,7 +361,7 @@ export function RecordBody({
   }
   return (
     <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
-      <div className="flex min-w-0 flex-1 flex-col gap-8 px-8 pt-6 pb-8">
+      <div className="flex min-w-0 flex-1 flex-col gap-8 px-3 pt-6 pb-8">
         {children}
       </div>
       {rail ? (

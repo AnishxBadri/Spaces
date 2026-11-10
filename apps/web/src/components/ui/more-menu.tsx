@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from './dropdown-menu'
 import { Switch } from './switch'
+import { icon } from '#/components/icons'
 import { cn } from '#/lib/utils'
 
 /**
@@ -312,9 +313,7 @@ export function MoreMenu({
             className,
           )}
         >
-          <span aria-hidden className="mono text-ui">
-            ···
-          </span>
+          <icon.more data-more-glyph aria-hidden className="size-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent

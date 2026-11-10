@@ -1,5 +1,5 @@
 import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
-import { Copy } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -441,7 +441,7 @@ function InviteDialog({
                 {url}
               </code>
               <Button size="xs" variant="outline" onClick={() => copy(url)}>
-                <Copy className="size-3" strokeWidth={2} />
+                <icon.copy className="size-3" strokeWidth={2} />
                 Copy link
               </Button>
             </div>

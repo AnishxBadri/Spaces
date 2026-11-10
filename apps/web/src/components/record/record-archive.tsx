@@ -1,5 +1,5 @@
 import { useRouter } from '@tanstack/react-router'
-import { Archive, ArchiveRestore } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { toast } from 'sonner'
 import type { ResolvedSensitivity } from '#/lib/ai/sensitivity'
 import { archiveRecord, restoreRecord } from '#/lib/server-fns'
@@ -61,12 +61,12 @@ export function archiveEntry(
   return archived
     ? {
         label: 'Restore',
-        icon: <ArchiveRestore className="size-4" />,
+        icon: <icon.restore className="size-4" />,
         onSelect: () => void act.restore(),
       }
     : {
         label: 'Archive',
-        icon: <Archive className="size-4" />,
+        icon: <icon.archive className="size-4" />,
         onSelect: () => void act.archive(),
       }
 }

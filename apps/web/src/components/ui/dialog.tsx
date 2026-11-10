@@ -134,7 +134,7 @@ function DialogContent({
           // padding is the sheet's; DialogHeader and DialogFooter break out
           // of it to run edge to edge. It lands by its solid offset growing
           // 0→3px in three steps (`window-land`), never by scaling.
-          'fixed top-[50%] left-[50%] z-modal flex w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col rounded-none border border-hairline bg-paper p-5 shadow-solid ease-out-quart outline-none data-[state=closed]:animate-out data-[state=closed]:duration-[120ms] data-[state=closed]:fade-out-0 data-[state=open]:window-land',
+          'fixed top-[50%] left-[50%] z-modal flex w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col rounded-none border border-hairline bg-paper p-4 shadow-solid ease-out-quart outline-none data-[state=closed]:animate-out data-[state=closed]:duration-[120ms] data-[state=closed]:fade-out-0 data-[state=open]:window-land',
           WINDOW_SIZE[size],
           nested && 'translate-y-0',
           className,
@@ -162,7 +162,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
       // right; hairline under. The one close is the foot's Cancel — Escape
       // still closes, and is never printed.
       className={cn(
-        '-mx-5 -mt-5 mb-5 flex min-h-12 flex-row flex-wrap items-baseline gap-x-2.5 border-b border-hairline bg-bone px-5 py-3 text-left',
+        '-mx-4 -mt-4 mb-4 flex min-h-12 flex-row flex-wrap items-baseline gap-x-2.5 border-b border-hairline bg-bone px-4 py-3 text-left',
         className,
       )}
       {...props}
@@ -188,7 +188,7 @@ function DialogFooter({
       // - The note wraps, never truncates: it is a cost, privacy or
       //   irreversibility line, and a cut one says nothing.
       className={cn(
-        '-mx-5 mt-5 -mb-5 flex min-h-13 flex-row items-center justify-end gap-2 border-t border-rule bg-bone px-5 py-2.5',
+        '-mx-4 mt-4 -mb-4 flex min-h-13 flex-row items-center justify-end gap-2 border-t border-rule bg-bone px-4 py-2.5',
         className,
       )}
       {...props}

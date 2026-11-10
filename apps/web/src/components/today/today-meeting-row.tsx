@@ -80,7 +80,7 @@ export function TodayMeetingRow({
     <li
       data-row
       data-today-meeting={meeting.cancelled ? 'cancelled' : when}
-      className="group flex h-ledger-row items-center gap-3 border-b border-rule px-3 transition-colors duration-150 ease-out-quart hover:bg-bone"
+      className="group flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset) transition-colors duration-150 ease-out-quart hover:bg-bone"
     >
       <button
         type="button"

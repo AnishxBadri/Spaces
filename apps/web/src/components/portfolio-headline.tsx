@@ -52,12 +52,7 @@ export function PortfolioHeadlineStrip({
       : [{ label: 'XIRR', value: fmtXirr(rollup.grossXirr) }]),
   ]
   if (readouts.length === 0) return null
-  return (
-    <ReadoutStrip
-      className="border-t-0 border-b border-hairline px-8"
-      readouts={readouts}
-    />
-  )
+  return <ReadoutStrip boxed readouts={readouts} />
 }
 
 /** Today: the rail's 32px rows — Invested, Value, MOIC — money exact. */

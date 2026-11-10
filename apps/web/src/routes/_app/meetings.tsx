@@ -5,7 +5,7 @@ import { DensityRamp } from '#/components/dither'
 import { LedgerRow } from '#/components/ledger-section'
 import { MeetingDialog } from '#/components/meeting-dialog'
 import { MeetingsLedger } from '#/components/meetings/meetings-ledger'
-import { PageHeader } from '#/components/page-header'
+import { Card, PageHeader } from '#/components/page-header'
 import { Tabs } from '#/components/ui/tabs'
 import { listMeetings } from '#/lib/server-fns'
 import { useClock } from '#/components/clock'
@@ -120,39 +120,41 @@ function MeetingsPage() {
           />
         }
       />
-      <div className="flex flex-col px-8 pb-10">
-        {list === 'failed' ? (
-          <ol>
-            <LedgerRow>
-              <span
-                data-meetings-failed
-                className="mono text-micro text-graphite"
-              >
-                Read failed
-              </span>
-              <button
-                type="button"
-                onClick={() => setVersion((v) => v + 1)}
-                className="focus-ring mono text-micro text-foreground hover:underline"
-              >
-                Retry
-              </button>
-            </LedgerRow>
-          </ol>
-        ) : loaded === null ? (
-          <ol>
-            <LedgerRow>
-              <DensityRamp width={120} />
-            </LedgerRow>
-          </ol>
-        ) : (
-          <MeetingsLedger
-            list={loaded}
-            filter={filter}
-            now={now}
-            onOpen={openMeeting}
-          />
-        )}
+      <div className="flex flex-col px-1 pb-10">
+        <Card className="border-t-0">
+          {list === 'failed' ? (
+            <ol>
+              <LedgerRow>
+                <span
+                  data-meetings-failed
+                  className="mono text-micro text-graphite"
+                >
+                  Read failed
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setVersion((v) => v + 1)}
+                  className="focus-ring mono text-micro text-foreground hover:underline"
+                >
+                  Retry
+                </button>
+              </LedgerRow>
+            </ol>
+          ) : loaded === null ? (
+            <ol>
+              <LedgerRow>
+                <DensityRamp width={120} />
+              </LedgerRow>
+            </ol>
+          ) : (
+            <MeetingsLedger
+              list={loaded}
+              filter={filter}
+              now={now}
+              onOpen={openMeeting}
+            />
+          )}
+        </Card>
       </div>
       <MeetingDialog
         id={meetingId}

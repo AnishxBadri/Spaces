@@ -287,19 +287,19 @@ describe('a list head', () => {
     },
   )
 
-  it('deals: its one rare verb stays in the ···, left of New', async () => {
+  it('deals: its one rare verb stays in the ···, rightmost after New', async () => {
     await mount('deals', [ROW])
     await until('the head', () => title() === 'Deals')
-    expect(head().at(0)).toBe('More for Deals')
+    expect(head()).toEqual(['New deal', 'More for Deals'])
     expect(head()).not.toContain('Import…')
     expect(await menuItems('More for Deals')).toEqual(['Import…'])
   })
 
-  it('a custom object: its one rare verb stays in the ···, left of New', async () => {
+  it('a custom object: its one rare verb stays in the ···, rightmost after New', async () => {
     await mount('o/$objectSlug', [ROW])
     await until('the head', () => title() === 'Funds')
     expect(document.querySelector('[data-head-count]')).toBeNull()
-    expect(head()).toEqual(['More for Funds', 'New fund'])
+    expect(head()).toEqual(['New fund', 'More for Funds'])
     expect(await menuItems('More for Funds')).toEqual(['Import…'])
   })
 })

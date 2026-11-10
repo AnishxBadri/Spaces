@@ -1,4 +1,4 @@
-import { LayoutTemplate, Link2, MessageSquareText } from 'lucide-react'
+import { icon, Link2, MessageSquareText } from '#/components/icons'
 import { useState } from 'react'
 import { useSensitiveItem } from '#/components/sensitive-toggle'
 import type { SensitivityState } from '#/components/sensitive-toggle'
@@ -82,7 +82,7 @@ function Menu({
   if (templated !== null)
     items.push({
       label: 'Save as template…',
-      icon: <LayoutTemplate className="size-4" />,
+      icon: <icon.template className="size-4" />,
       onSelect: () => setTemplating(true),
       opens: true,
     })

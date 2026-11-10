@@ -1,4 +1,4 @@
-import { CheckCheck, Columns3 } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
 import { heldDecisions } from '#/lib/held-decisions'
@@ -73,7 +73,7 @@ export function ColumnRunGroup({ group }: { group: ColumnRunRow }) {
     <li className="flex flex-col gap-3">
       <div className="flex flex-col border border-hairline bg-paper">
         <div className="flex min-h-11 flex-wrap items-center gap-3 px-5 py-2.5">
-          <Columns3 className="size-3.5 text-graphite" strokeWidth={1.75} />
+          <icon.columns className="size-3.5 text-graphite" strokeWidth={1.75} />
           <span className="label-caps text-graphite">From this column run</span>
           <h2 className="min-w-0 truncate font-serif text-lg leading-5.5 font-semibold">
             {titleOf(group.run.task)}
@@ -88,7 +88,7 @@ export function ColumnRunGroup({ group }: { group: ColumnRunRow }) {
               title="Accept this run’s value on every record below, field by field"
               onClick={() => acceptAll(slug)}
             >
-              <CheckCheck className="size-3" strokeWidth={2} />
+              <icon.acceptAll className="size-3" strokeWidth={2} />
               Accept all
             </Button>
           )}

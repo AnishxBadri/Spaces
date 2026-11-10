@@ -13,7 +13,8 @@ import type {
   RegistryEntry,
 } from '#/components/attributes/value-editor'
 import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
-import { ToolButton } from '#/components/table/record-table'
+import { icon } from '#/components/icons'
+import { AfterSort, ToolButton } from '#/components/table/record-table'
 import type { TablePin } from '#/components/table/record-table'
 import { Button } from '#/components/ui/button'
 import {
@@ -35,7 +36,7 @@ import {
 } from '#/components/ui/popover'
 import { Segmented } from '#/components/ui/segmented'
 import { Select, selectClasses } from '#/components/ui/select'
-import { Tabs } from '#/components/ui/tabs'
+import { TabDivider, Tabs } from '#/components/ui/tabs'
 import type { TabItem } from '#/components/ui/tabs'
 import {
   PINNED_VIEWS_QUERY,
@@ -62,16 +63,20 @@ import type { ViewCount } from '#/lib/views/counts'
 import { FilterChips } from './filter-chips'
 
 /**
- * Views on an object list: the saved views as real tabs on the bone bar —
- * `All` with the list's total, each view with its count, `Save view…` — and
- * on the same bar's right Filter · Sort · Columns and the search box. Under
- * the bar, while the filter holds conditions, the chips row. The page owns
+ * Views on an object list: the saved views as folder tabs — `All` with the
+ * list's total, each view with its count — then a divider, Filter and Sort
+ * as icon buttons that read their state only while in use, and the search
+ * box alone at the right. Under the bar, while the filter holds conditions,
+ * the chips row.
+ * - Save view shows only with something to save: `Save as view…` on a
+ *   filtered All, `Update view` and `Reset` on a changed view. `Save as new
+ *   view…` is in the view's `···`. The page owns
  * its table state and hands the bar a snapshot to compare and to save.
  * `?view=` in the URL makes a view linkable.
  * - `pinned`, the bar and its chips stick under the folded head bar, and
  *   the table's column head pins under them (`viewBarPin`).
  * - A dirty view — its snapshot moved off the saved one — carries a pine
- *   square after its count, prints its count at 0, and offers Update view.
+ *   square after its count and prints its count at 0.
  * - The active view's `···` pins it to the sidebar (an object list's views
  *   only — the sidebar lists them under their object) and, for a view the
  *   user may edit, renames or deletes it.
@@ -132,7 +137,7 @@ export function ViewBar({
   total?: number | undefined
   /** A list's own chip, left of Filter: Deals' Stage. */
   lead?: ReactNode
-  /** The table's tools — Sort, Columns, the search box — right of Filter. */
+  /** The table's tools — Sort, then the search box right — after Filter. */
   tools?: ReactNode
   /** the view the page is currently showing, from `?view=` */
   activeId: string | null
@@ -267,6 +272,38 @@ export function ViewBar({
     }),
   ]
 
+  const save = (
+    <SaveControls
+      kind={
+        active === null
+          ? snapshot.filter.length > 0
+            ? 'save-as'
+            : null
+          : dirty
+            ? canEdit(active)
+              ? 'update'
+              : 'reset'
+            : null
+      }
+      onSaveAs={() => setSaving('new')}
+      onReset={() => {
+        if (active) onApply(active)
+      }}
+      onUpdate={() => {
+        if (!active) return
+        persist({
+          id: active.id,
+          name: active.name,
+          visibility: active.visibility,
+        })
+          .then(() => toast(`${active.name} updated`))
+          .catch((err: unknown) =>
+            toast.error(err instanceof Error ? err.message : 'Could not save'),
+          )
+      }}
+    />
+  )
+
   return (
     <div data-view-bar className={pinned ? PIN_UNDER_HEAD_BAR : undefined}>
       <Tabs
@@ -278,30 +315,10 @@ export function ViewBar({
         }
         trail={
           <>
-            {active && dirty && canEdit(active) ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  persist({
-                    id: active.id,
-                    name: active.name,
-                    visibility: active.visibility,
-                  })
-                    .then(() => toast(`${active.name} updated`))
-                    .catch((err: unknown) =>
-                      toast.error(
-                        err instanceof Error ? err.message : 'Could not save',
-                      ),
-                    )
-                }}
-              >
-                Update view
-              </Button>
-            ) : null}
             {active ? (
               <MoreMenu
                 variant="row"
+                forceMenu
                 modal={false}
                 align="start"
                 label={`the ${active.name} view`}
@@ -324,6 +341,11 @@ export function ViewBar({
                         },
                       ]
                     : []),
+                  {
+                    label: 'Save as new view…',
+                    opens: true,
+                    onSelect: () => setSaving('new'),
+                  },
                   MENU_RULE,
                   ...(canEdit(active)
                     ? [
@@ -342,15 +364,7 @@ export function ViewBar({
                 ]}
               />
             ) : null}
-            <button
-              type="button"
-              onClick={() => setSaving('new')}
-              title="Save the current filter, sort and columns as a view"
-              className="focus-ring flex h-6.5 shrink-0 items-center rounded-md px-2 mono text-micro text-primary transition-colors duration-150 ease-out-quart hover:bg-paper"
-            >
-              Save view…
-            </button>
-            <span className="flex-1" />
+            <TabDivider />
             {lead}
             <FilterPopover
               registry={registry}
@@ -364,7 +378,11 @@ export function ViewBar({
               picking={picking}
               onPicking={setPicking}
             />
-            {tools}
+            {tools === undefined ? (
+              save
+            ) : (
+              <AfterSort.Provider value={save}>{tools}</AfterSort.Provider>
+            )}
 
             <SaveViewDialog
               open={saving !== null}
@@ -400,6 +418,43 @@ export function ViewBar({
         />
       ) : null}
     </div>
+  )
+}
+
+/**
+ * Save view, shown only with something to save: `Save as view…` on a
+ * filtered All; on a changed view, `Update view` and `Reset`, or `Reset`
+ * alone for a view the reader may not edit.
+ */
+function SaveControls({
+  kind,
+  onSaveAs,
+  onUpdate,
+  onReset,
+}: {
+  kind: 'save-as' | 'update' | 'reset' | null
+  onSaveAs: () => void
+  onUpdate: () => void
+  onReset: () => void
+}) {
+  if (kind === null) return null
+  if (kind === 'save-as')
+    return (
+      <Button size="sm" variant="outline" data-save-view onClick={onSaveAs}>
+        Save as view…
+      </Button>
+    )
+  return (
+    <>
+      {kind === 'update' ? (
+        <Button size="sm" variant="outline" data-save-view onClick={onUpdate}>
+          Update view
+        </Button>
+      ) : null}
+      <Button size="sm" variant="ghost" data-save-view onClick={onReset}>
+        Reset
+      </Button>
+    </>
   )
 }
 
@@ -490,11 +545,14 @@ function FilterPopover({
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <ToolButton active={conditions.length > 0}>
+        <ToolButton
+          active={conditions.length > 0}
+          icon={icon.filter}
+          label="Filter"
+          data-tool="filter"
+        >
           Filter
-          {conditions.length > 0 ? (
-            <span className="tabular mono text-micro">{conditions.length}</span>
-          ) : null}
+          <span className="tabular mono text-micro">{conditions.length}</span>
         </ToolButton>
       </PopoverTrigger>
       <PopoverContent

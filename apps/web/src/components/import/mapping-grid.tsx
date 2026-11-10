@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown } from '#/components/icons'
 import { Command as CommandPrimitive } from 'cmdk'
 import { useEffect, useRef, useState } from 'react'
 import {

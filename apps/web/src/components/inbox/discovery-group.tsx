@@ -1,5 +1,5 @@
 import { useRouter } from '@tanstack/react-router'
-import { Check, X } from 'lucide-react'
+import { Check, icon } from '#/components/icons'
 import { useCallback, useEffect, useReducer, useState } from 'react'
 import { heldDecisions } from '#/lib/held-decisions'
 import { PluginMark } from '#/components/integrations/integration-ledger'
@@ -169,7 +169,7 @@ export function DiscoveryEntry({
               ? {}
               : { title: words.rejectTitle })}
           >
-            <X className="size-3" strokeWidth={2} />
+            <icon.close className="size-3" strokeWidth={2} />
             {words.reject}
           </Button>
           <Button size="xs" disabled={pending} onClick={onAccept}>

@@ -1,5 +1,4 @@
 import { useRouter } from '@tanstack/react-router'
-import { Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import {
@@ -17,6 +16,7 @@ import {
 import { useClock } from '#/components/clock'
 import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
+import { NewButton } from '#/components/new-button'
 import {
   Dialog,
   DialogClose,
@@ -44,14 +44,12 @@ const MORE_SLUGS = ['value', 'source', 'close_date']
 export function CreateDealDialog({
   registry,
   presetCompany,
-  triggerLabel = 'New deal',
   trigger,
   hotkey,
 }: {
   registry: Array<RegistryEntry>
   /** Opened from a company: the deal is that company's, and no picker shows. */
   presetCompany?: { id: string; name: string }
-  triggerLabel?: string
   /** A trigger of the caller's own — must forward props (plain DOM elements do). */
   trigger?: React.ReactNode
   /** Bare key that opens it from the page — in the default trigger's tooltip. */
@@ -152,12 +150,7 @@ export function CreateDealDialog({
       }}
     >
       <DialogTrigger asChild>
-        {trigger ?? (
-          <Button size="sm" shortcut={hotkey?.toUpperCase()}>
-            <Plus className="size-4" strokeWidth={2} />
-            {triggerLabel}
-          </Button>
-        )}
+        {trigger ?? <NewButton noun="deal" shortcut={hotkey?.toUpperCase()} />}
       </DialogTrigger>
       <DialogContent
         size="m"

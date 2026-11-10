@@ -1,8 +1,9 @@
 import { Link, useRouter } from '@tanstack/react-router'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown } from '#/components/icons'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
+import { ProviderMark, brandOf } from '#/components/provider-mark'
 import { ReadoutStrip } from '#/components/record/record-parts'
 import { Checkbox } from '#/components/ui/checkbox'
 import {
@@ -96,8 +97,21 @@ function moveItem<T>(
   return next
 }
 
-/** A source's mark: its initial, ink on paper reversed, 20px square. */
+/**
+ * A source's mark: its brand's `ProviderMark` when it has one, else its
+ * initial, ink on paper reversed, 20px square.
+ */
 function SourceMark({ name }: { name: string }) {
+  const brand = brandOf(name)
+  if (brand !== null)
+    return (
+      <span
+        aria-hidden
+        className="flex size-5 shrink-0 items-center justify-center"
+      >
+        <ProviderMark brand={brand} />
+      </span>
+    )
   return (
     <span
       aria-hidden

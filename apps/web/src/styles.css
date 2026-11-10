@@ -139,6 +139,11 @@
   --row-h: 2.25rem;
   --ledger-row-h: 2.5rem;
 
+  /* The edges. `--inset` is how far a row's text sits in from the box it is
+     drawn in: 12px on the page, 7px inside a `card`, so 4px gutter + 1px
+     rule + 7px lands a card's content on the page's 12px line. */
+  --inset: 0.75rem;
+
   /* A note page's left inset (`NOTE_INSET`): where the editor's side menu
      (`+` and the drag handle, 48px) floats. At least the menu's width, so
      the menu stays inside the page and never reaches the chassis. */
@@ -471,31 +476,30 @@
 }
 
 /**
- * Printed details (DESIGN.md §5): the double rule, the ink stamp and the open
- * tab. Each shape lives here once so no surface spells a clip-path or a
- * border stack by hand.
+ * Printed details (DESIGN.md §5): the ink stamp and the open tab. Each shape
+ * lives here once so no surface spells a clip-path or a border stack by hand.
  */
 
 /**
- * The double rule: 2px ink, 2px gap, 1px ink. Page and record heads only —
- * a section still opens on the single hairline. `--rule-ink` recolours it.
- * - A real 5px bottom border painted by a gradient, so it takes layout like
- *   the hairline it replaces and the gap shows the head's own ground.
+ * A content card: a 1px rule box whose rows inset 7px, so its content sits on
+ * the page's 12px line from a 4px gutter. Cards stand 4px apart.
  */
-@utility double-rule {
-  border-bottom: 5px solid var(--rule-ink, var(--hairline));
-  border-image: linear-gradient(
-      to top,
-      var(--rule-ink, var(--hairline)) 1px,
-      transparent 1px 3px,
-      var(--rule-ink, var(--hairline)) 3px
-    )
-    0 0 5 0 / 0 0 5px 0;
-}
+@utility card {
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  --inset: 0.4375rem;
 
-/** An archived head: the double rule in graphite. Used with `double-rule`. */
-@utility double-rule-archived {
-  --rule-ink: var(--graphite);
+  /* A head band that opens the card stands on the card's own top rule. */
+  & > [data-section-head]:first-child,
+  & > :first-child > [data-section-head]:first-child {
+    border-top-width: 0;
+  }
+
+  /* Nor does the last row's rule double the card's bottom one. */
+  & > ol:last-child > li:last-child,
+  & > :last-child > ol:last-child > li:last-child {
+    border-bottom-width: 0;
+  }
 }
 
 /**

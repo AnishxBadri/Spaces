@@ -10,7 +10,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Layers } from 'lucide-react'
+import { Layers } from '#/components/icons'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   keepPreviousData,
@@ -38,7 +38,7 @@ import {
   RecordTable,
   TableTools,
 } from '#/components/table/record-table'
-import { PageHeader } from '#/components/page-header'
+import { Card, PageBody, PageHeader } from '#/components/page-header'
 import { useImportVerb } from '#/components/import/import-action'
 import { ListMenu } from '#/components/table/list-menu'
 import { useListActions } from '#/components/table/list-actions'
@@ -447,27 +447,29 @@ function ObjectListPage() {
             listMenu
           ) : (
             <>
-              {listMenu}
               <CreateRecordDialog
                 object={object}
                 registry={registry}
                 refNames={refNames}
                 hotkey="c"
               />
+              {listMenu}
             </>
           )
         }
       />
       {firstRun ? (
-        <div className="px-8 pt-6 pb-8">
-          <CreateRecordDialog
-            object={object}
-            registry={registry}
-            refNames={refNames}
-            hotkey="c"
-            trigger={<EmptyRow name={object.plural} />}
-          />
-        </div>
+        <PageBody>
+          <Card>
+            <CreateRecordDialog
+              object={object}
+              registry={registry}
+              refNames={refNames}
+              hotkey="c"
+              trigger={<EmptyRow name={object.plural} />}
+            />
+          </Card>
+        </PageBody>
       ) : (
         <>
           {actions.selectionBar ? (
@@ -503,13 +505,14 @@ function ObjectListPage() {
               }
             />
           )}
-          <div className="px-8 pb-8">
+          <div className="px-1 pb-8">
             <AiCellsProvider
               table
               entityIds={table.getRowModel().rows.map((r) => r.original.id)}
               registry={registry}
             >
               <RecordTable
+                joined={!actions.selectionBar}
                 columnActions={(id) => [
                   ...columnRun.columnActions(id),
                   ...editAttribute.columnActions(id),

@@ -722,7 +722,9 @@ describe('the preview pane', () => {
     expect(pane()?.querySelector('[data-domain]')?.textContent).toBe(
       'halcyon.example',
     )
-    expect(pane()?.querySelector('.double-rule')).not.toBeNull()
+    // One rule under the preview head, never the double.
+    expect(pane()?.querySelector('.border-b.border-rule')).not.toBeNull()
+    expect(pane()?.querySelector('.double-rule')).toBeNull()
     // Two-up, and only the readouts with a value: Ownership's dash is gone.
     const strip = pane()?.querySelector('[data-readouts]')
     expect(strip?.className).toContain('grid-cols-2')

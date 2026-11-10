@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { HandCoins, Layers } from 'lucide-react'
+import { HandCoins, Layers } from '#/components/icons'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { EmptyRow } from '#/components/ledger-section'

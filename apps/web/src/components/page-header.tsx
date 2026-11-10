@@ -11,11 +11,12 @@ import { cn } from '#/lib/utils'
  * Page header. Serif title, or a sentence when the page has a state to
  * report; one mono line of what the instrument measured (above as an
  * eyebrow, or below as a readout); `[outline?] [Primary] [···]` right, all
- * 32px on the title's line, keys in their tooltips. The double rule under,
- * 32px inset, 28px above, 104px tall at least — the header owns its own
- * anatomy so every field starts on the same line. Scrolled past its title,
- * it folds to `HeadBar`.
- * - `tabs` is the page's `Tabs` bar, under the double rule; scrolled, it pins
+ * 32px on the title's line, keys in their tooltips. The title sits on the
+ * 12px page edge and the `···` ends 12px from the right, level with the
+ * last control of the content under it; one rule under, 104px tall at
+ * least, so every page's title and rule land on the same lines. Scrolled
+ * past its title, it folds to `HeadBar`.
+ * - `tabs` is the page's `Tabs` bar, under the rule; scrolled, it pins
  *   under the folded bar rather than riding into it. A list's count is on its
  *   All tab; a page with no tab bar puts it in the title (`HeadCount`).
  */
@@ -26,7 +27,6 @@ export function PageHeader({
   description,
   action,
   tabs,
-  rule = 'double',
   className,
 }: {
   /** Mono caps line above the title — "Today · Wednesday · 2026-09-10". */
@@ -39,8 +39,6 @@ export function PageHeader({
   action?: ReactNode
   /** The page's `Tabs` bar; pins under the folded bar. */
   tabs?: ReactNode
-  /** `single`: one rule, for a page whose body opens on boxed sections. */
-  rule?: 'double' | 'single'
   className?: string
 }) {
   const { titleRef, actionsRef, fold } = useHeadFold()
@@ -51,8 +49,8 @@ export function PageHeader({
         className={cn(
           // One height on every page, the title on one line from the top:
           // moving between pages, the title and the rule never jump.
-          'flex min-h-26 shrink-0 items-start justify-between gap-4 px-8 pt-7 pb-4',
-          rule === 'double' ? 'double-rule' : 'border-b border-rule',
+          'flex min-h-26 shrink-0 items-start justify-between gap-4 border-b border-rule pt-7 pb-4',
+          PAGE_EDGE,
           className,
         )}
       >
@@ -83,6 +81,55 @@ export function PageHeader({
         </div>
       ) : null}
     </>
+  )
+}
+
+/** The page edge: the title, and every card's content, sit 12px in. */
+export const PAGE_EDGE = 'px-3'
+
+/**
+ * A page's body under its head: the 4px gutter, 4px down from the head's
+ * rule, cards 4px apart. It holds `Card`s, or a list's tab bar and table.
+ */
+export function PageBody({
+  children,
+  className,
+}: {
+  children: ReactNode
+  className?: string | undefined
+}) {
+  return (
+    <div
+      data-page-body
+      className={cn('flex flex-col gap-1 px-1 pt-1 pb-8', className)}
+    >
+      {children}
+    </div>
+  )
+}
+
+/**
+ * A content card: a 1px rule box. Rows and bands inside it inset 7px, so its
+ * content lands on the page's 12px edge.
+ */
+export function Card({
+  children,
+  className,
+  label,
+}: {
+  children: ReactNode
+  className?: string | undefined
+  /** Names the card when no heading inside it does. */
+  label?: string | undefined
+}) {
+  return (
+    <section
+      data-card
+      {...(label === undefined ? {} : { 'aria-label': label })}
+      className={cn('flex flex-col card', className)}
+    >
+      {children}
+    </section>
   )
 }
 

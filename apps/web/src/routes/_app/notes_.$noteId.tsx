@@ -5,8 +5,8 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { ArrowLeft, Globe, Layers, Lock, Trash2 } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { Globe, icon, Layers, Lock } from '#/components/icons'
+import type { LucideIcon } from '#/components/icons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { DocumentPreview } from '#/components/document-preview'
@@ -171,7 +171,7 @@ function NotePage() {
           to="/notes"
           className="focus-ring flex items-center gap-1.5 rounded-md text-ui text-graphite hover:text-foreground"
         >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} />
+          <icon.back className="size-3.5" strokeWidth={1.75} />
           Notes
         </Link>
         <span className="flex items-center gap-3">
@@ -850,7 +850,7 @@ function DeleteNoteAction({ noteId }: { noteId: string }) {
         title="Delete this note"
         className="focus-ring flex items-center gap-1 rounded-md px-1.5 py-0.5 text-label font-medium text-graphite hover:bg-bone hover:text-destructive"
       >
-        <Trash2 className="size-3" strokeWidth={1.75} />
+        <icon.delete className="size-3" strokeWidth={1.75} />
         Delete
       </button>
       {confirmDialog}

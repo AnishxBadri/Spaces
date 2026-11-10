@@ -1,5 +1,5 @@
 import { useRouter } from '@tanstack/react-router'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown } from '#/components/icons'
 import { useCallback, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'

@@ -15,6 +15,7 @@ import {
 import { useClock } from '#/components/clock'
 import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
+import { NewButton } from '#/components/new-button'
 import {
   Dialog,
   DialogClose,
@@ -157,7 +158,7 @@ export function CreatePersonDialog({
     >
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button shortcut={hotkey?.toUpperCase()}>New person</Button>
+          <NewButton noun="person" shortcut={hotkey?.toUpperCase()} />
         )}
       </DialogTrigger>
       <DialogContent

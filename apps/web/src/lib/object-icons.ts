@@ -11,8 +11,8 @@ import {
   Rocket,
   Star,
   Users,
-} from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+} from '#/components/icons'
+import type { LucideIcon } from '#/components/icons'
 
 /**
  * The icons a custom object may wear — a curated dozen, stored by name in

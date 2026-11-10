@@ -1,4 +1,4 @@
-import { ChevronDown, X } from 'lucide-react'
+import { ChevronDown, icon } from '#/components/icons'
 import { useEffect, useRef, useState } from 'react'
 import {
   DropdownMenu,
@@ -794,7 +794,7 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
               onSave(next.length === 0 ? null : next)
             }}
           >
-            <X className="size-3 text-graphite" strokeWidth={2} />
+            <icon.close className="size-3 text-graphite" strokeWidth={2} />
             <span className="truncate mono text-label">{shown(v)}</span>
           </DropdownMenuItem>
         ))}

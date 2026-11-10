@@ -141,7 +141,9 @@ describe('MeetingsLedger', () => {
     expect(html).toContain('>■ No write-up<')
     expect(html).toMatch(/text-warning[^>]*>■/)
     // The recorder's mark, then the write-up and the tasks it proposed.
-    expect(html).toMatch(/title="Granola".*>G<\/span>.*Write-up · 2 tasks/)
+    expect(html).toMatch(
+      /title="Granola".*data-provider-mark="granola".*Write-up · 2 tasks/,
+    )
     expect(html).toContain('>Cancelled<')
     expect(html).toMatch(/line-through[^>]*>Dropped call</)
     expect(html.indexOf('Granola call')).toBeLessThan(

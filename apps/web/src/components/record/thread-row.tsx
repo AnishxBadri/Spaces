@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
-import { CalendarDays, Mail, Paperclip, Phone } from 'lucide-react'
+import { CalendarDays, Mail, Paperclip, Phone } from '#/components/icons'
 import { Day } from '#/components/ledger-section'
 import type { RecordTab } from '#/lib/records/record-tabs'
 import { threadPeople } from '#/lib/timeline/threads'

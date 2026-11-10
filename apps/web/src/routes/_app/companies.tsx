@@ -5,7 +5,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Layers } from 'lucide-react'
+import { Layers } from '#/components/icons'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   keepPreviousData,
@@ -37,7 +37,7 @@ import {
   RecordTable,
   TableTools,
 } from '#/components/table/record-table'
-import { PageHeader } from '#/components/page-header'
+import { Card, PageBody, PageHeader } from '#/components/page-header'
 import { useImportVerb } from '#/components/import/import-action'
 import { ListMenu } from '#/components/table/list-menu'
 import {
@@ -435,13 +435,15 @@ function CompaniesPage() {
         }
       />
       {firstRun ? (
-        <div className="px-8 pt-6 pb-8">
-          <CreateCompanyDialog
-            registry={registry}
-            hotkey="c"
-            trigger={<EmptyRow name="Companies" />}
-          />
-        </div>
+        <PageBody>
+          <Card>
+            <CreateCompanyDialog
+              registry={registry}
+              hotkey="c"
+              trigger={<EmptyRow name="Companies" />}
+            />
+          </Card>
+        </PageBody>
       ) : (
         <>
           {actions.selectionBar ? (
@@ -477,13 +479,14 @@ function CompaniesPage() {
               }
             />
           )}
-          <div className="px-8 pb-8">
+          <div className="px-1 pb-8">
             <AiCellsProvider
               table
               entityIds={table.getRowModel().rows.map((r) => r.original.id)}
               registry={registry}
             >
               <RecordTable
+                joined={!actions.selectionBar}
                 columnActions={(id) => [
                   ...columnRun.columnActions(id),
                   ...editAttribute.columnActions(id),

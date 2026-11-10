@@ -14,6 +14,7 @@ import {
 } from '#/components/create-window'
 import { useClock } from '#/components/clock'
 import { Button } from '#/components/ui/button'
+import { NewButton } from '#/components/new-button'
 import {
   Dialog,
   DialogClose,
@@ -155,7 +156,7 @@ export function CreateRecordDialog({
     >
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button shortcut={hotkey?.toUpperCase()}>New {singular}</Button>
+          <NewButton noun={singular} shortcut={hotkey?.toUpperCase()} />
         )}
       </DialogTrigger>
       <DialogContent

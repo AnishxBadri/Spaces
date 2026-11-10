@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { X } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -786,7 +786,7 @@ export function ComposerChips({
               onClick={() => onRemove(c)}
               className="focus-ring -mr-0.5 text-graphite hover:text-foreground"
             >
-              <X className="size-3" strokeWidth={1.75} />
+              <icon.close className="size-3" strokeWidth={1.75} />
             </button>
           </span>
         )

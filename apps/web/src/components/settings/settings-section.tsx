@@ -17,7 +17,7 @@ import {
  *   - for a member on an admin page, one mono line, "Only admins can change
  *     this · ask <admins>", and every control in the section disabled;
  *   - an optional **action** right — the one primary of the section;
- *   - the **double rule** under the head (a settings section is the page),
+ *   - one **rule** under the head,
  *     then the rows, grouped under `SettingsGroupHead` caps labels.
  * The section belongs to a page form (`SettingsForm`): typed fields collect
  * into its one Save bar. With no page form above it, the section opens one.
@@ -48,7 +48,7 @@ export function SettingsSection({
     <section className="flex flex-col">
       <div
         data-settings-head
-        className="flex items-end justify-between gap-6 pb-2.5 double-rule"
+        className="flex items-end justify-between gap-6 border-b border-rule pb-2.5"
       >
         <div className="flex min-w-0 flex-col gap-1.5">
           <div className="mono text-micro leading-3.5 text-graphite">

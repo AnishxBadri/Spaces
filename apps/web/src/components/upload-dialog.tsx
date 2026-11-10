@@ -1,5 +1,5 @@
 import { useRouter } from '@tanstack/react-router'
-import { X } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
@@ -527,7 +527,7 @@ function RecordPicker({
           onClick={() => onPick(null)}
           className="focus-ring text-graphite hover:text-foreground"
         >
-          <X className="size-2.5" strokeWidth={2} />
+          <icon.close className="size-2.5" strokeWidth={2} />
         </button>
       </span>
     )

@@ -153,7 +153,13 @@ export function DealBoard({
           }}
         />
       ) : null}
-      <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-4">
+      {/* Each stage a card, 4px apart. The end spacer keeps the last
+          column's right rule in the scroll range: some engines drop a flex
+          scroller's end padding, which clipped it at the page's edge. */}
+      <div
+        data-board
+        className="flex min-h-0 w-full min-w-0 flex-1 gap-1 overflow-x-auto pb-4"
+      >
         {stages.map((stage, stageIndex) => {
           const cards = deals.filter((d) => stageOf(d) === stage.id)
           const medianDays = medianDaysInStage[stage.id]
@@ -174,7 +180,8 @@ export function DealBoard({
           return (
             <div
               key={stage.id}
-              className="flex w-56 shrink-0 flex-col gap-2"
+              data-board-column
+              className="flex w-56 shrink-0 flex-col gap-2 card p-1.75"
               onDragOver={(e) => {
                 if (!droppable) {
                   e.dataTransfer.dropEffect = 'none'
@@ -331,6 +338,7 @@ export function DealBoard({
             </div>
           )
         })}
+        <span aria-hidden data-board-end className="w-px shrink-0" />
       </div>
     </>
   )

@@ -261,12 +261,12 @@ const TASKS = {
 }
 
 describe('Tasks', () => {
-  it('is the title alone, a bone band with Open | Done, caps groups, and the composer as the last row', async () => {
+  it('is the title and + New task, a bone band with Open | Done, caps groups, and the composer as the last row', async () => {
     fns.listTasks.mockResolvedValue(TASKS)
     await mount('tasks', '/tasks')
     await until('the head', () => title() === 'Tasks')
     expect(headMeta()).toBeNull()
-    expect(head()).toEqual([])
+    expect(head()).toEqual(['New task'])
     const band = document.querySelector('[data-tasks-band]')
     expect(band?.className).toContain('bg-bone')
     expect(
@@ -339,7 +339,7 @@ const aNote = (i: number, updatedAt: string, kind = 'note') => ({
 })
 
 describe('Notes', () => {
-  it('reads n notes · last edit, bands This week and Earlier, and folds Earlier past 20', async () => {
+  it('is one card banded This week and Earlier with no counts, kinds as glyphs, a Memos tab, and folds Earlier past 20', async () => {
     const notes = [
       aNote(1, '2026-10-14T10:00:00.000Z', 'memo'),
       aNote(2, '2026-10-13T10:00:00.000Z', 'scratch'),
@@ -350,31 +350,44 @@ describe('Notes', () => {
     ]
     await mount('notes', '/notes', () => notes)
     await until('the head', () => title() === 'Notes')
-    expect(headMeta()).toBe('26 notes · last edit 14 Oct')
-    expect(head()).toEqual(['From template', 'New note'])
-    expect(text('section h2')).toEqual(['This week', 'Earlier'])
-    expect(text('[data-section-count]')).toEqual(['3', '23'])
+    // No count line under the title: the All tab carries the count.
+    expect(headMeta()).toBeNull()
+    expect(head()).toEqual(['New note'])
+    const split = document.querySelector('[data-split-new]')
+    expect(split?.querySelector('[data-new-button]')?.textContent).toBe(
+      'New note',
+    )
+    expect(
+      split?.querySelector('[data-split-new-menu]')?.getAttribute('aria-label'),
+    ).toBe('New note from a template')
+    expect(
+      Array.from(document.querySelectorAll('[role="tab"]')).map(
+        (t) => t.textContent,
+      ),
+    ).toEqual(['All26', 'Memos1'])
+    // One card, two date bands, no count on either.
+    const cards = document.querySelectorAll('[data-card]')
+    expect(cards).toHaveLength(1)
+    expect(cards.item(0).className).toContain('card')
+    expect(text('[data-band] h3')).toEqual(['This week', 'Earlier'])
+    expect(document.querySelector('[data-section-count]')).toBeNull()
+    expect(document.querySelector('[data-band] .tabular')).toBeNull()
     expect(document.body.textContent).not.toMatch(/W\d\d/)
-    expect(text('[data-kind-lane]').slice(0, 3)).toEqual([
-      'MEMO',
-      'SCRATCH',
-      '',
-    ])
+    expect(
+      Array.from(document.querySelectorAll('[data-note-kind]'))
+        .slice(0, 3)
+        .map((el) => el.getAttribute('data-note-kind')),
+    ).toEqual(['memo', 'scratch', 'note'])
+    expect(document.querySelector('[data-kind-lane]')).toBeNull()
+    const earlier = () =>
+      document.querySelector('section[aria-label="Earlier"]')
     const fold = document.querySelector('[data-fold-row]')
     expect(fold?.textContent).toBe('3 more')
-    expect(
-      Array.from(document.querySelectorAll('section'))
-        .at(1)
-        ?.querySelectorAll('a'),
-    ).toHaveLength(20)
+    expect(earlier()?.querySelectorAll('a')).toHaveLength(20)
     await act(async () => {
       if (fold instanceof HTMLElement) fold.click()
     })
-    expect(
-      Array.from(document.querySelectorAll('section'))
-        .at(1)
-        ?.querySelectorAll('a'),
-    ).toHaveLength(23)
+    expect(earlier()?.querySelectorAll('a')).toHaveLength(23)
   })
 })
 

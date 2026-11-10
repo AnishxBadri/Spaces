@@ -1,5 +1,5 @@
 import { Link, useRouter } from '@tanstack/react-router'
-import { Check, CheckCheck } from 'lucide-react'
+import { Check, icon } from '#/components/icons'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { OptionChip } from '#/components/attributes/value-editor'
@@ -815,7 +815,7 @@ function FieldGrid({
                   title={`Accept ${f.name} on every record that proposes it`}
                   onClick={() => actions.onAcceptColumn(f)}
                 >
-                  <CheckCheck className="size-3" strokeWidth={2} />
+                  <icon.acceptAll className="size-3" strokeWidth={2} />
                   Accept column
                 </Button>
               </div>
@@ -889,7 +889,7 @@ export function AcceptAllButton({
       title="Accept every open suggestion on this record, field by field"
       onClick={onClick}
     >
-      <CheckCheck className="size-3" strokeWidth={2} />
+      <icon.acceptAll className="size-3" strokeWidth={2} />
       Accept all
     </Button>
   )

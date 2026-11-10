@@ -400,11 +400,11 @@ export function FakePickList({
           <DialogTitle>{folders ? 'Link a folder' : LABEL}</DialogTitle>
           <DialogDescription>{account}</DialogDescription>
         </DialogHeader>
-        <ul className="-mx-5 -my-5 max-h-80 overflow-y-auto">
+        <ul className="-mx-4 -my-4 max-h-80 overflow-y-auto">
           {files.map((f) => (
             <li
               key={f.id}
-              className="flex h-9 items-center gap-2.5 border-t border-rule px-5 text-ui first:border-t-0"
+              className="flex h-9 items-center gap-2.5 border-t border-rule px-4 text-ui first:border-t-0"
             >
               <Checkbox
                 checked={picked.has(f.id)}

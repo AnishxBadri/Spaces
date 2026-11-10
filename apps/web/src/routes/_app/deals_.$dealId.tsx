@@ -5,7 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { Compass } from 'lucide-react'
+import { Compass } from '#/components/icons'
 import { useCallback, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { RailField } from '#/components/attributes/rail-field'

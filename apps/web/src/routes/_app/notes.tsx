@@ -1,16 +1,18 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { FileText, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { EmptyState } from '#/components/empty-state'
+import { FileText } from '#/components/icons'
 import {
+  Band,
   FoldRow,
   LedgerFigure,
   LedgerRow,
-  LedgerSection,
 } from '#/components/ledger-section'
-import { PageHeader } from '#/components/page-header'
+import { NewButton, SplitNewButton } from '#/components/new-button'
+import { NOTE_KIND_LABEL, NoteKindIcon } from '#/components/note-kind-icon'
+import { Card, PageBody, PageHeader } from '#/components/page-header'
 import { TemplatePicker } from '#/components/templates'
-import { Button } from '#/components/ui/button'
+import { Tabs } from '#/components/ui/tabs'
 import { createNote, createNoteFromTemplate, listNotes } from '#/lib/server-fns'
 import { useHotkey } from '#/lib/use-hotkey'
 import { formatDay } from '@spaces/core/format'
@@ -31,19 +33,23 @@ function startOfWeekIso(now: Date) {
   return d.toISOString()
 }
 
+type NotesTab = 'all' | 'memos'
+
 /** How many rows `Earlier` shows before its fold. */
 const EARLIER_SHOWN = 20
 
 /**
- * Notes are a ledger split by recency: what moved this week, then the rest,
- * folded past `EARLIER_SHOWN`. Every row ends on a mono day lane; the
- * snippet takes what is left.
+ * Notes are one card split by recency: what moved this week, then the rest,
+ * folded past `EARLIER_SHOWN`, under two date bands that carry no count.
+ * Every row leads on its kind's glyph and ends on a mono day lane; the
+ * snippet takes what is left. A Memos tab joins All once a memo exists.
  */
 function NotesPage() {
   const notes = Route.useLoaderData()
   const navigate = useNavigate()
   const { now } = useClock()
   const [unfolded, setUnfolded] = useState(false)
+  const [tab, setTab] = useState<NotesTab>('all')
 
   async function newNote() {
     const { id } = await createNote()
@@ -51,46 +57,54 @@ function NotesPage() {
   }
   useHotkey('n', () => void newNote())
 
+  const memos = notes.filter((n) => n.kind === 'memo')
+  const shown = tab === 'memos' && memos.length > 0 ? memos : notes
   const weekStart = startOfWeekIso(new Date(now))
-  const thisWeek = notes.filter((n) => n.updatedAt >= weekStart)
-  const earlier = notes.filter((n) => n.updatedAt < weekStart)
-  const last = notes.at(0)
+  const thisWeek = shown.filter((n) => n.updatedAt >= weekStart)
+  const earlier = shown.filter((n) => n.updatedAt < weekStart)
+  const tabs =
+    memos.length > 0 ? (
+      <Tabs
+        label="Notes"
+        items={[
+          { id: 'all', label: 'All', count: notes.length },
+          { id: 'memos', label: 'Memos', count: memos.length },
+        ]}
+        value={tab}
+        onValueChange={setTab}
+        pinned
+      />
+    ) : null
 
   return (
     <div className="flex min-h-full flex-col">
       <PageHeader
         title="Notes"
-        description={
-          notes.length > 0 ? (
-            <span>
-              {notes.length} note{notes.length === 1 ? '' : 's'}
-              {last ? ` · last edit ${formatDay(last.updatedAt, now)}` : ''}
-            </span>
-          ) : undefined
-        }
         action={
           notes.length > 0 ? (
-            <>
-              <TemplatePicker
-                kind="note"
-                trigger={<Button variant="outline">From template</Button>}
-                onPick={async (t) => {
-                  const { id } = await createNoteFromTemplate({
-                    data: { templateId: t.id },
-                  })
-                  void navigate({
-                    to: '/notes/$noteId',
-                    params: { noteId: id },
-                  })
-                }}
-              />
-              <Button shortcut="N" onClick={newNote}>
-                <Plus className="size-4" strokeWidth={2} />
-                New note
-              </Button>
-            </>
+            <SplitNewButton
+              noun="note"
+              shortcut="N"
+              onNew={() => void newNote()}
+              templates={(trigger) => (
+                <TemplatePicker
+                  kind="note"
+                  trigger={trigger}
+                  onPick={async (t) => {
+                    const { id } = await createNoteFromTemplate({
+                      data: { templateId: t.id },
+                    })
+                    void navigate({
+                      to: '/notes/$noteId',
+                      params: { noteId: id },
+                    })
+                  }}
+                />
+              )}
+            />
           ) : null
         }
+        tabs={tabs ?? undefined}
       />
 
       {notes.length === 0 ? (
@@ -98,41 +112,47 @@ function NotesPage() {
           icon={FileText}
           title="No notes yet"
           body="Write in blocks, @mention any company or space, and the graph builds itself — backlinks land on every mentioned record."
-          action={
-            <Button shortcut="N" onClick={newNote}>
-              <Plus className="size-4" strokeWidth={2} />
-              New note
-            </Button>
-          }
+          action={<NewButton noun="note" shortcut="N" onClick={newNote} />}
         />
       ) : (
-        <div className="flex flex-col gap-8 px-8 pt-6 pb-8">
-          {thisWeek.length > 0 ? (
-            <LedgerSection label="This week" count={thisWeek.length}>
-              {thisWeek.map((n) => (
-                <NoteLedgerRow key={n.id} note={n} now={now} />
-              ))}
-            </LedgerSection>
-          ) : null}
-          {earlier.length > 0 ? (
-            <LedgerSection label="Earlier" count={earlier.length}>
-              {(unfolded ? earlier : earlier.slice(0, EARLIER_SHOWN)).map(
-                (n) => (
-                  <NoteLedgerRow key={n.id} note={n} now={now} />
-                ),
-              )}
-              {!unfolded && earlier.length > EARLIER_SHOWN ? (
-                <li>
-                  <FoldRow
-                    hidden={earlier.length - EARLIER_SHOWN}
-                    onShow={() => setUnfolded(true)}
-                    className="border-t-0"
-                  />
-                </li>
-              ) : null}
-            </LedgerSection>
-          ) : null}
-        </div>
+        <PageBody className={tabs === null ? undefined : 'pt-0'}>
+          <Card
+            label="Notes"
+            className={tabs === null ? undefined : 'border-t-0'}
+          >
+            {thisWeek.length > 0 ? (
+              <section aria-label="This week">
+                <Band label="This week" />
+                <ol>
+                  {thisWeek.map((n) => (
+                    <NoteLedgerRow key={n.id} note={n} now={now} />
+                  ))}
+                </ol>
+              </section>
+            ) : null}
+            {earlier.length > 0 ? (
+              <section aria-label="Earlier">
+                <Band label="Earlier" />
+                <ol>
+                  {(unfolded ? earlier : earlier.slice(0, EARLIER_SHOWN)).map(
+                    (n) => (
+                      <NoteLedgerRow key={n.id} note={n} now={now} />
+                    ),
+                  )}
+                  {!unfolded && earlier.length > EARLIER_SHOWN ? (
+                    <li>
+                      <FoldRow
+                        hidden={earlier.length - EARLIER_SHOWN}
+                        onShow={() => setUnfolded(true)}
+                        className="border-t-0"
+                      />
+                    </li>
+                  ) : null}
+                </ol>
+              </section>
+            ) : null}
+          </Card>
+        </PageBody>
       )}
     </div>
   )
@@ -144,21 +164,23 @@ function NoteLedgerRow({ note, now }: { note: NoteRow; now: string }) {
       <Link
         to="/notes/$noteId"
         params={{ noteId: note.id }}
-        className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 px-3 transition-colors hover:bg-bone"
+        className="focus-ring-inset -mx-(--inset) flex h-full min-w-0 flex-1 items-center gap-3 px-(--inset) transition-colors hover:bg-bone"
       >
-        <span aria-hidden className="w-3.5 shrink-0 text-center text-ui">
-          ¶
+        <span title={NOTE_KIND_LABEL[note.kind]} className="flex shrink-0">
+          <NoteKindIcon
+            kind={note.kind}
+            className={
+              note.kind === 'note'
+                ? 'size-3.5 text-graphite'
+                : 'size-3.5 text-foreground'
+            }
+          />
         </span>
         <span className="max-w-[40%] shrink-0 truncate text-body font-medium">
           {note.title}
         </span>
         <span className="min-w-0 flex-1 truncate text-ui text-graphite">
           {note.snippet || 'Empty so far'}
-        </span>
-        {/* The kind lane, blank for the default: a ledger says MEMO or
-            SCRATCH because those are the exceptions. */}
-        <span data-kind-lane className="w-16 shrink-0 label-caps text-graphite">
-          {note.kind === 'note' ? '' : note.kind.toUpperCase()}
         </span>
         <LedgerFigure tone="muted">
           {formatDay(note.updatedAt, now)}

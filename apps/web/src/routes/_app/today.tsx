@@ -4,11 +4,10 @@ import {
   useRouter,
 } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
-import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { MeetingDialog } from '#/components/meeting-dialog'
-import { PageHeader } from '#/components/page-header'
+import { Card, PageHeader } from '#/components/page-header'
 import { ReadoutStrip } from '#/components/record/record-parts'
 import { useTaskMenu } from '#/components/tasks/task-menu'
 import { DayStrip, useNow } from '#/components/today/day-strip'
@@ -132,14 +131,6 @@ function sinceFigure(at: string, now: Date): string {
  * A boxed section: the card's rule stands in for the band's opening hairline
  * and the last row's rule, which the 1px pull clips under the edge.
  */
-function Card({ children }: { children: ReactNode }) {
-  return (
-    <div className="overflow-hidden border border-rule bg-paper [&>section]:-my-px">
-      {children}
-    </div>
-  )
-}
-
 /** The head: the date line and the plain title, with no verbs. */
 function TodayHead({ today }: { today: string }) {
   return (
@@ -147,7 +138,6 @@ function TodayHead({ today }: { today: string }) {
       title="Today"
       description={todayStamp(today)}
       foldMeta={todayFoldStamp(today)}
-      rule="single"
     />
   )
 }
@@ -412,7 +402,7 @@ function TodayLedger({
         />
       ) : null}
       <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
-        <div className="flex min-w-0 flex-1 flex-col gap-6 px-8 pt-6 pb-10">
+        <div className="flex min-w-0 flex-1 flex-col gap-1 px-1 pt-1 pb-10">
           {readouts.length > 0 ? (
             <ReadoutStrip
               boxed
@@ -441,7 +431,7 @@ function TodayLedger({
               attention.state === 'done' ? attention.value.expiring : []
             }
           />
-          <Card>
+          <Card className="overflow-hidden">
             <NeedsYou
               rows={rows}
               filter={filter}
@@ -463,7 +453,7 @@ function TodayLedger({
               actions={actions}
             />
           </Card>
-          <Card>
+          <Card className="overflow-hidden">
             <MeetingsSection
               calendar={meetings.calendar}
               audience={meetings.audience}

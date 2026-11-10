@@ -391,7 +391,8 @@ describe('the space head', () => {
     expect(text(path)).toContain('Spaces')
     expect(text(path)).toContain('Proptech')
     expect(text(path)).not.toContain('created')
-    expect(head.className).toContain('double-rule')
+    expect(head.className).toContain('border-rule')
+    expect(head.className).not.toContain('double-rule')
     expect(text(head.querySelector('h1'))).toBe('Property ops')
   })
 
@@ -477,7 +478,8 @@ describe('the tabs', () => {
     await mount('notes')
     const list = document.querySelector('[role="tablist"]')
     expect(list?.className).toContain('h-11')
-    expect(list?.className).toContain('bg-bone')
+    expect(list?.className).toContain('bg-paper')
+    expect(list?.className).not.toContain('bg-bone')
     const all = Array.from(document.querySelectorAll('[role="tab"]'))
     expect(all.map((t) => text(t))).toEqual([
       'Overview',

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { ArrowLeftRight, Check, Inbox, X } from 'lucide-react'
+import { Check, icon, Inbox } from '#/components/icons'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -277,7 +277,7 @@ function InboxPage() {
 
       {/* Why a record head is missing a plugin's action. */}
       {stoppedPlugins.length > 0 ? (
-        <div className="max-w-220 px-8 pt-6">
+        <div className="max-w-220 px-1 pt-1">
           <PluginStatusSection stopped={stoppedPlugins} />
         </div>
       ) : null}
@@ -296,7 +296,7 @@ function InboxPage() {
         />
       ) : null}
       {mounted.length === 0 ? null : (
-        <ul className="flex max-w-220 flex-col gap-6 px-8 pt-6 pb-8 empty:hidden">
+        <ul className="flex max-w-220 flex-col gap-1 px-1 pt-1 pb-8 empty:hidden">
           {mounted.map((row) => {
             const same = mounted.filter((r) => r.kind === row.kind)
             return (
@@ -329,7 +329,7 @@ function ScopeChip({ name }: { name: string }) {
         aria-label={`Show the whole queue, not just ${name}`}
         className="focus-ring -mr-0.5 text-graphite hover:text-foreground"
       >
-        <X className="size-3" strokeWidth={2} />
+        <icon.close className="size-3" strokeWidth={2} />
       </Link>
     </span>
   )
@@ -356,7 +356,7 @@ function FilterChip({ filter }: { filter: InboxFilterLabels }) {
         aria-label={`Show the whole queue, not just ${name}`}
         className="focus-ring -mr-0.5 text-graphite hover:text-foreground"
       >
-        <X className="size-3" strokeWidth={2} />
+        <icon.close className="size-3" strokeWidth={2} />
       </Link>
     </span>
   )
@@ -538,7 +538,7 @@ function PairCard({ pair }: { pair: DuplicateCandidateRow }) {
             onClick={() => setKeep((k) => (k === 'a' ? 'b' : 'a'))}
             className="focus-ring-inset flex w-10 shrink-0 items-center justify-center border-x border-rule text-graphite transition-colors duration-150 ease-out-quart hover:bg-bone hover:text-foreground"
           >
-            <ArrowLeftRight className="size-3.5" strokeWidth={1.75} />
+            <icon.merge className="size-3.5" strokeWidth={1.75} />
           </button>
           <SideHead
             letter="B"

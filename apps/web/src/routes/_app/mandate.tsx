@@ -127,8 +127,8 @@ function MandatePage() {
       <FactsGrid mandate={mandate} stageOptions={stageOptions} />
 
       {/* The facts and the prose wear the note inset, so they keep one
-          edge; the head keeps the page's px-8 like every other page. */}
-      <div className={cn('pt-6 pr-8 pb-8', NOTE_INSET)}>
+          edge; the head keeps the page's 12px edge like every other page. */}
+      <div className={cn('pt-6 pr-3 pb-8', NOTE_INSET)}>
         <MandateProse
           noteId={note.id}
           note={note}

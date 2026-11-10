@@ -64,8 +64,8 @@ describe('the note inset', () => {
     ])
   })
 
-  it('survives a page column’s own px-8 under cn', () => {
-    expect(cn('px-8 pt-7', NOTE_INSET).split(' ')).toContain(NOTE_INSET)
+  it('survives a page column’s own px-3 under cn', () => {
+    expect(cn('px-3 pt-7', NOTE_INSET).split(' ')).toContain(NOTE_INSET)
   })
 
   it('is the only inset: the editor and its wrapper add none', () => {
@@ -116,7 +116,7 @@ describe('a note page: the body columns share the inset', () => {
     expect(facts).toContain('NOTE_INSET')
     const prose = between(
       mandatePage,
-      "cn('pt-6 pr-8 pb-8', NOTE_INSET)",
+      "cn('pt-6 pr-3 pb-8', NOTE_INSET)",
       '</div>',
     )
     expect(prose).toContain('<MandateProse')

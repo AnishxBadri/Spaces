@@ -1,5 +1,5 @@
 import { useRouter } from '@tanstack/react-router'
-import { Ban, ChevronDown, Link2 } from 'lucide-react'
+import { ChevronDown, icon, Link2 } from '#/components/icons'
 import { useRef } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -264,7 +264,7 @@ export function EventSection({
                       },
                       {
                         label: 'Void…',
-                        icon: <Ban className="size-4" />,
+                        icon: <icon.void className="size-4" />,
                         destructive: true,
                         opens: true,
                         onSelect: () => void onVoid(r),

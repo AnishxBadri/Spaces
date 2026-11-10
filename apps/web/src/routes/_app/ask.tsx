@@ -323,7 +323,7 @@ function AskPage() {
             </Button>
           )}
         </header>
-        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-8 py-6">
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-6">
           <div className="mx-auto w-full max-w-[47.5rem]">
             <AskTurns
               turns={thread?.turns ?? []}
@@ -335,7 +335,7 @@ function AskPage() {
             />
           </div>
         </div>
-        <footer className="shrink-0 border-t border-rule px-8 py-3">
+        <footer className="shrink-0 border-t border-rule px-3 py-3">
           <div className="mx-auto flex w-full max-w-[47.5rem] flex-col gap-2">
             <AskComposer
               value={draft}

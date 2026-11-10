@@ -95,10 +95,10 @@ export function HeadBar({
         aria-hidden
         data-head-bar
         data-folded={fold.folded}
-        className="absolute inset-x-0 top-0 isolate flex h-12 -translate-y-full items-center gap-3 border-b border-hairline bg-paper px-4 opacity-0 transition-[transform,opacity] duration-[120ms] ease-out-quart data-[folded=true]:pointer-events-auto data-[folded=true]:translate-y-0 data-[folded=true]:opacity-100 data-[folded=true]:duration-[180ms] motion-reduce:transition-none"
+        className="absolute inset-x-0 top-0 isolate flex h-12 -translate-y-full items-center gap-3 border-b border-hairline bg-paper px-3 opacity-0 transition-[transform,opacity] duration-[120ms] ease-out-quart data-[folded=true]:pointer-events-auto data-[folded=true]:translate-y-0 data-[folded=true]:opacity-100 data-[folded=true]:duration-[180ms] motion-reduce:transition-none"
         style={
           fold.folded
-            ? { paddingRight: `calc(2rem + ${fold.width}px)` }
+            ? { paddingRight: `calc(1.5rem + ${fold.width}px)` }
             : undefined
         }
       >
@@ -154,7 +154,7 @@ export function HeadActions({
         data-folded={fold.folded}
         className={cn(
           'flex items-center gap-2',
-          'data-[folded=true]:fixed data-[folded=true]:top-12 data-[folded=true]:right-4 data-[folded=true]:z-sticky data-[folded=true]:h-12 md:data-[folded=true]:top-0',
+          'data-[folded=true]:fixed data-[folded=true]:top-12 data-[folded=true]:right-3 data-[folded=true]:z-sticky data-[folded=true]:h-12 md:data-[folded=true]:top-0',
           // Folded, every action steps down to 26px to sit inside the bar.
           'data-[folded=true]:[&_[data-size=icon]]:w-6.5 data-[folded=true]:[&_[data-slot=button]]:h-6.5',
           'data-[folded=true]:animate-in data-[folded=true]:duration-[180ms] data-[folded=true]:fade-in-0 motion-reduce:animate-none',

@@ -51,6 +51,7 @@ export function KeyboardHelp({
               <Row label="New note · Notes, a space" keys="N" />
               <Row label="New space · Spaces" keys="S" />
               <Row label="New attribute · object settings" keys="A" />
+              <Row label="Search the list" keys="/" />
             </Group>
             <Group label="On a deal" top>
               <Row label="Log interaction" keys="L" />

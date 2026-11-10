@@ -44,8 +44,9 @@ export function SectionHead({
 } & HeadEnd) {
   return (
     <div
+      data-section-head
       className={cn(
-        'flex h-11 shrink-0 items-center justify-between gap-4 border-t border-b border-t-hairline border-b-rule bg-bone px-3',
+        'flex h-11 shrink-0 items-center justify-between gap-4 border-t border-b border-t-hairline border-b-rule bg-bone px-(--inset)',
         className,
       )}
     >
@@ -93,7 +94,7 @@ export function LabelHead({
   return (
     <div
       className={cn(
-        'flex h-7 shrink-0 items-center gap-2.5 border-b border-hairline bg-paper px-3',
+        'flex h-7 shrink-0 items-center gap-2.5 border-b border-hairline bg-paper px-(--inset)',
         className,
       )}
     >
@@ -124,7 +125,7 @@ export function Band({
     <div
       data-band
       className={cn(
-        'flex h-7 shrink-0 items-center justify-between gap-3 border-b border-rule bg-bone px-3',
+        'flex h-7 shrink-0 items-center justify-between gap-3 border-b border-rule bg-bone px-(--inset)',
         className,
       )}
     >
@@ -161,7 +162,7 @@ export function EmptyRow({
       {...(onAdd !== undefined ? { onClick: onAdd } : {})}
       {...props}
       className={cn(
-        'focus-ring-inset flex h-row w-full min-w-0 items-center justify-between gap-3 border-b border-rule bg-bone px-3 text-left text-ui text-graphite transition-colors duration-150 ease-out-quart last:border-b-0 hover:text-foreground',
+        'focus-ring-inset flex h-row w-full min-w-0 items-center justify-between gap-3 border-b border-rule bg-bone px-(--inset) text-left text-ui text-graphite transition-colors duration-150 ease-out-quart last:border-b-0 hover:text-foreground',
         className,
       )}
     >
@@ -196,7 +197,7 @@ export function FoldRow({
       data-fold-row
       onClick={onShow}
       className={cn(
-        'focus-ring-inset flex h-ledger-row w-full items-center border-t border-rule px-3 text-left text-label text-graphite transition-colors duration-150 ease-out-quart hover:text-foreground',
+        'focus-ring-inset flex h-ledger-row w-full items-center border-t border-rule px-(--inset) text-left text-label text-graphite transition-colors duration-150 ease-out-quart hover:text-foreground',
         className,
       )}
     >
@@ -270,7 +271,7 @@ export function LedgerRow({
   return (
     <li
       className={cn(
-        'flex h-ledger-row items-center gap-3 px-3',
+        'flex h-ledger-row items-center gap-3 px-(--inset)',
         !last && 'border-b border-rule',
         rowWashClass(wash),
         className,

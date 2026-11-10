@@ -1,4 +1,4 @@
-import { File, Hash, MessageSquare, Pilcrow } from 'lucide-react'
+import { File, Hash, MessageSquare, Pilcrow } from '#/components/icons'
 import { HoverCard } from 'radix-ui'
 import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'

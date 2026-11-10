@@ -1,5 +1,5 @@
 import { Link, useRouter } from '@tanstack/react-router'
-import { Boxes, FileText, X } from 'lucide-react'
+import { Boxes, FileText, icon } from '#/components/icons'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -438,7 +438,7 @@ function CompaniesTab({ spc, into }: { spc: Space; into: string | null }) {
                 onClick={() => untag(c)}
                 className="shrink-0 text-graphite opacity-0 group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100"
               >
-                <X />
+                <icon.close />
               </Button>
             </LedgerRow>
           )

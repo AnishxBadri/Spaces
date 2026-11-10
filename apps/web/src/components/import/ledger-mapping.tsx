@@ -1,5 +1,5 @@
 import { useRouter } from '@tanstack/react-router'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown } from '#/components/icons'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -701,7 +701,7 @@ export function LedgerMappingStep({
         uploadHint={uploadHint}
         mapHint={mapHint}
       />
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-8 py-6">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-3 py-6">
         <DefineRow
           objects={objects}
           mode="ledger"

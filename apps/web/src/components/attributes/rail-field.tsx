@@ -1,4 +1,4 @@
-import { Pencil } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AiCell } from './ai-cell'
@@ -98,7 +98,7 @@ export function RailField({
               onClick={() => setEditing(true)}
               className="focus-ring flex size-4 shrink-0 items-center justify-center text-graphite opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100 hover:text-foreground focus-visible:opacity-100"
             >
-              <Pencil className="size-2.5" strokeWidth={1.75} />
+              <icon.edit className="size-2.5" strokeWidth={1.75} />
             </button>
           ) : null}
         </>

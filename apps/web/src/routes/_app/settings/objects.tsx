@@ -4,7 +4,7 @@ import {
   Link,
   useRouter,
 } from '@tanstack/react-router'
-import { ChevronRight, Plus } from 'lucide-react'
+import { ChevronRight, icon } from '#/components/icons'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { ObjectDialog } from '#/components/objects/object-dialog'
@@ -77,7 +77,7 @@ function ObjectsSection({
             onSaved={() => router.invalidate()}
             trigger={
               <Button variant="outline">
-                <Plus className="size-3" strokeWidth={2} />
+                <icon.new className="size-3" strokeWidth={2} />
                 New object
               </Button>
             }

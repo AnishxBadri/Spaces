@@ -1,4 +1,4 @@
-import { Eye, EyeOff } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { useState } from 'react'
 import { Input } from './ui/input'
 import { cn } from '#/lib/utils'
@@ -28,9 +28,9 @@ export function PasswordInput({
         className="focus-ring absolute inset-y-0 right-0 flex w-9 items-center justify-center rounded-r-md text-graphite transition-colors hover:text-foreground"
       >
         {visible ? (
-          <EyeOff className="size-4" strokeWidth={1.75} />
+          <icon.conceal className="size-4" strokeWidth={1.75} />
         ) : (
-          <Eye className="size-4" strokeWidth={1.75} />
+          <icon.reveal className="size-4" strokeWidth={1.75} />
         )}
       </button>
     </div>

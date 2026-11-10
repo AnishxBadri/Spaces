@@ -51,11 +51,19 @@ const classes = (el: { className: string } | null) =>
   (el?.className ?? '').split(/\s+/)
 
 describe('the bar', () => {
-  it('is one 44px bone bar, inset 12px, the tabs sitting on its foot', () => {
+  it('is one 44px bar on white, in the 4px gutter, the tabs sitting on its rule', () => {
     const list = render('notes').querySelector('[role="tablist"]')
     expect(classes(list)).toEqual(
-      expect.arrayContaining(['h-11', 'px-3', 'pt-1', 'bg-bone', 'items-end']),
+      expect.arrayContaining([
+        'h-11',
+        'px-1',
+        'pt-1',
+        'bg-paper',
+        'items-end',
+        'before:bg-rule',
+      ]),
     )
+    expect(classes(list)).not.toContain('bg-bone')
   })
 
   it('labels every tab in sentence-case sans, never the caps tier', () => {
@@ -192,7 +200,7 @@ describe('a pinned head', () => {
       expect.arrayContaining(['sticky', 'md:top-12', 'top-24', 'z-sticky']),
     )
     // Opaque, so rows scrolling under it never show through.
-    expect(classes(list)).toContain('bg-bone')
+    expect(classes(list)).toContain('bg-paper')
   })
 
   it('scrolls with the page when not pinned', () => {

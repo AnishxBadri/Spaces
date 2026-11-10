@@ -1,12 +1,5 @@
 import { Link, useRouter } from '@tanstack/react-router'
-import {
-  ChevronRight,
-  Download,
-  Eye,
-  FileText,
-  Trash2,
-  Upload,
-} from 'lucide-react'
+import { ChevronRight, FileText, icon } from '#/components/icons'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { LedgerFigure, LedgerRow, LedgerSection } from './ledger-section'
@@ -169,7 +162,7 @@ export function SpaceSources({
             onClick={() => inputRef.current?.click()}
             className="focus-ring flex items-center gap-1 text-primary hover:underline"
           >
-            <Upload className="size-3" strokeWidth={2} />
+            <icon.upload className="size-3" strokeWidth={2} />
             upload
           </button>
         }
@@ -351,7 +344,7 @@ function SourceRow({
           onClick={onPreview}
           className="text-graphite opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
         >
-          <Eye />
+          <icon.reveal />
         </Button>
         {/* Bytes or an address, never both. A clipped
             article has no blob, so Download could only reach
@@ -369,7 +362,7 @@ function SourceRow({
             onClick={download}
             className="text-graphite"
           >
-            <Download />
+            <icon.download />
           </Button>
         )}
         <Button
@@ -380,7 +373,7 @@ function SourceRow({
           onClick={remove}
           className="text-graphite opacity-0 group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100"
         >
-          <Trash2 />
+          <icon.delete />
         </Button>
       </div>
       <LedgerFigure tone="muted">{formatBytes(source.sizeBytes)}</LedgerFigure>
@@ -460,7 +453,7 @@ function InheritedRow({
           onClick={onPreview}
           className="text-graphite opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
         >
-          <Eye />
+          <icon.reveal />
         </Button>
         {/* Bytes or an address, never both. A clipped
             article has no blob, so Download could only reach
@@ -478,7 +471,7 @@ function InheritedRow({
             onClick={download}
             className="text-graphite"
           >
-            <Download />
+            <icon.download />
           </Button>
         )}
       </div>

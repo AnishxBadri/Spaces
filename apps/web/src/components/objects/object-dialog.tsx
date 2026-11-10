@@ -1,5 +1,4 @@
 import { useNavigate } from '@tanstack/react-router'
-import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
@@ -338,9 +337,6 @@ function ObjectForm(
           </Button>
         </DialogClose>
         <Button type="submit" shortcut="⌘↵" pending={pending}>
-          {props.mode === 'create' ? (
-            <Plus className="size-4" strokeWidth={2} />
-          ) : null}
           {pending
             ? 'Saving…'
             : props.mode === 'create'

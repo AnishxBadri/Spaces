@@ -1,5 +1,5 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { Paperclip, X } from 'lucide-react'
+import { icon, Paperclip } from '#/components/icons'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -361,7 +361,7 @@ export function WidenDialog({
         <DialogDescription className="sr-only">
           The members who read this email
         </DialogDescription>
-        <div className="-mx-5 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5">
+        <div className="-mx-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
           <ol className="border-t border-rule">
             <LedgerRow last={granted.length === 0}>
               <span className="min-w-0 flex-1 truncate text-body">
@@ -384,7 +384,7 @@ export function WidenDialog({
                   }
                   className="focus-ring shrink-0 text-graphite hover:text-foreground"
                 >
-                  <X className="size-3" strokeWidth={2} />
+                  <icon.close className="size-3" strokeWidth={2} />
                 </button>
               </LedgerRow>
             ))}
@@ -934,7 +934,7 @@ function EmailWindow({
           onClose={() => setReply(null)}
           above={
             unfolded ? (
-              <div className="flex flex-col gap-6 border-b border-rule px-5 py-4">
+              <div className="flex flex-col gap-6 border-b border-rule px-4 py-4">
                 {message}
               </div>
             ) : (
@@ -953,7 +953,7 @@ function EmailWindow({
   return (
     <>
       {head}
-      <div className="-mx-5 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-5">
+      <div className="-mx-4 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4">
         {message}
       </div>
       {foot}
@@ -979,7 +979,7 @@ function QuotedParent({
       type="button"
       data-folded-message
       onClick={onShow}
-      className="focus-ring-inset flex min-h-10 w-full shrink-0 items-center gap-2 border-b border-rule px-5 text-left text-ui text-graphite hover:bg-bone"
+      className="focus-ring-inset flex min-h-10 w-full shrink-0 items-center gap-2 border-b border-rule px-4 text-left text-ui text-graphite hover:bg-bone"
     >
       <span className="text-foreground">{name}</span>
       wrote {dayKey(email.occurredAt) === today ? 'at' : 'on'} {at}

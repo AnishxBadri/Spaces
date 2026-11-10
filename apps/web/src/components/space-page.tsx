@@ -1,16 +1,11 @@
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
 import {
-  Archive,
-  ArchiveRestore,
-  CornerDownRight,
-  Layers,
   BookOpen,
-  LayoutTemplate,
-  Pencil,
-  Plus,
-  Search,
+  CornerDownRight,
+  icon,
+  Layers,
   Star,
-} from 'lucide-react'
+} from '#/components/icons'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
@@ -414,7 +409,7 @@ export function SpaceMenu({
         // Opens Ask with this space and the web in scope.
         {
           label: 'Find companies',
-          icon: <Search className="size-4" />,
+          icon: <icon.search className="size-4" />,
           hint: finders.length > 0 ? undefined : 'Add an Exa key ›',
           onSelect: () =>
             finders.length > 0
@@ -429,7 +424,7 @@ export function SpaceMenu({
         MENU_RULE,
         {
           label: 'Rename',
-          icon: <Pencil className="size-4" />,
+          icon: <icon.edit className="size-4" />,
           onSelect: onRename,
           opens: true,
         },
@@ -441,13 +436,13 @@ export function SpaceMenu({
         },
         {
           label: 'Split into a subspace…',
-          icon: <Plus className="size-4" />,
+          icon: <icon.new className="size-4" />,
           onSelect: onSubspace,
           opens: true,
         },
         {
           label: 'Save as template…',
-          icon: <LayoutTemplate className="size-4" />,
+          icon: <icon.template className="size-4" />,
           onSelect: onTemplate,
           opens: true,
         },
@@ -463,12 +458,12 @@ export function SpaceMenu({
         archived
           ? {
               label: 'Restore',
-              icon: <ArchiveRestore className="size-4" />,
+              icon: <icon.restore className="size-4" />,
               onSelect: onRestore,
             }
           : {
               label: 'Archive',
-              icon: <Archive className="size-4" />,
+              icon: <icon.archive className="size-4" />,
               onSelect: onArchive,
             },
       ]}
@@ -638,7 +633,10 @@ function NewSubspace({
         onClick={() => setEditing(true)}
         className="focus-ring flex min-w-0 flex-1 items-center gap-2.5 text-left text-graphite transition-colors hover:text-foreground"
       >
-        <Plus className="size-3.5 shrink-0 text-primary" strokeWidth={2.5} />
+        <icon.new
+          className="size-3.5 shrink-0 text-primary"
+          strokeWidth={2.5}
+        />
         <span className="min-w-0 flex-1 truncate">Subspace</span>
       </button>
     </RailGroupRow>

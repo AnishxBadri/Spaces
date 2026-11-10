@@ -12,7 +12,7 @@ import { openUploadDialog } from '#/lib/upload-dialog-store'
  */
 export function FirstRun({ registry }: { registry: Array<RegistryEntry> }) {
   return (
-    <div className="flex flex-1 items-center justify-center px-8 py-16">
+    <div className="flex flex-1 items-center justify-center px-3 py-16">
       <div className="flex max-w-md flex-col items-center gap-4 text-center">
         <DitherBlock tone="ink" />
         <h2 className="font-serif text-xl leading-6 font-semibold">

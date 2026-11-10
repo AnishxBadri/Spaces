@@ -199,6 +199,30 @@ describe('a window on its own', () => {
   })
 })
 
+describe('the window inset', () => {
+  it('is one 16px all round: the sheet, its head and its foot', () => {
+    const { DialogFooter, DialogHeader } = ui
+    mount(
+      <Sheet title="New space" size="m">
+        <DialogHeader>Head</DialogHeader>
+        <DialogFooter>Foot</DialogFooter>
+      </Sheet>,
+    )
+    const sheet = sheets().at(0)
+    if (sheet === undefined) throw new Error('no window')
+    const own = sheet.className.split(' ')
+    expect(own.filter((c) => /^p[xy]?-\d/.test(c))).toEqual(['p-4'])
+    const head = sheet.querySelector('[data-slot="dialog-header"]')
+    const foot = sheet.querySelector('[data-slot="dialog-footer"]')
+    expect(head?.className.split(' ')).toEqual(
+      expect.arrayContaining(['-mx-4', '-mt-4', 'px-4']),
+    )
+    expect(foot?.className.split(' ')).toEqual(
+      expect.arrayContaining(['-mx-4', '-mb-4', 'px-4']),
+    )
+  })
+})
+
 describe('the confirm', () => {
   it('opens on Cancel, prints its note, and carries no square', () => {
     const { ConfirmDialog } = confirm

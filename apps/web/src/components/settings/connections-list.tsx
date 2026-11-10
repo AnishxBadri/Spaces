@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
-import { Box, Mail, Square } from 'lucide-react'
+import { Square } from '#/components/icons'
+import { ProviderMark } from '#/components/provider-mark'
 import type { ReactNode } from 'react'
 import { SettingsGroupHead, SettingsSection } from './settings-section'
 import type { ProviderId } from '@spaces/core/providers/registry'
@@ -8,8 +9,8 @@ import type { ConnectionsListRow } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 const ICON: Record<ProviderId, ReactNode> = {
-  google: <Mail aria-hidden className="size-4" />,
-  box: <Box aria-hidden className="size-4" />,
+  google: <ProviderMark brand="google" />,
+  box: <ProviderMark brand="box" />,
 }
 
 const TONE = {

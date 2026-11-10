@@ -1,5 +1,5 @@
 import { Window } from 'happy-dom'
-import { act } from 'react'
+import { act, useContext } from 'react'
 import type { Root, createRoot as CreateRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
@@ -16,14 +16,16 @@ import type { Condition } from '@spaces/core/views/filter'
 import type { ViewRow } from '@spaces/core/writes/views/store'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import type * as ViewBarModule from './view-bar'
+import type * as TableModule from '#/components/table/record-table'
 
 /**
- * The view bar: the saved views as real tabs on the bone head bar — `All`
- * with the list's total, each view with its count, `Save view…` — with
- * Filter and the table's tools on the same bar, and the chips row under it
- * while the filter holds conditions. Its `···` menu: Pin to sidebar / Unpin
- * from sidebar for any view on an object list, Rename and Delete only for a
- * view the user may edit.
+ * The view bar: the saved views as folder tabs on white — `All` with the
+ * list's total, each view with its count — then a divider, Filter as an icon
+ * reading its state only while in use, and the table's tools; Save view only
+ * with something to save; the chips row under it while the filter holds
+ * conditions. Its `···` menu: Pin to sidebar / Unpin from sidebar for any
+ * view on an object list, Save as new view…, and Rename and Delete only for
+ * a view the user may edit.
  */
 
 const liveCounts = vi.hoisted(() => ({ value: {} }))
@@ -41,6 +43,17 @@ vi.mock('sonner', () => ({
 const win = new Window({ url: 'http://localhost/' })
 let createRoot: typeof CreateRoot
 let bar: typeof ViewBarModule
+let table: typeof TableModule
+
+/** The page's tools, which take the bar's Save view controls after Sort. */
+function Tools() {
+  return (
+    <>
+      <button type="button">Columns</button>
+      {useContext(table.AfterSort)}
+    </>
+  )
+}
 
 beforeAll(async () => {
   vi.stubGlobal('window', win)
@@ -73,6 +86,7 @@ beforeAll(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   ;({ createRoot } = await import('react-dom/client'))
   bar = await import('./view-bar')
+  table = await import('#/components/table/record-table')
 })
 
 afterAll(async () => {
@@ -142,7 +156,7 @@ async function mount(opts: {
           views={[SEED]}
           counts={{ [SEED.id]: { count: 4 } }}
           total={37}
-          tools={<button type="button">Columns</button>}
+          tools={<Tools />}
           activeId={opts.activeId === undefined ? SEED.id : opts.activeId}
           snapshot={{
             filter: opts.filter ?? [],
@@ -204,7 +218,8 @@ const items = () =>
 /** Click the button reading `label`. */
 async function press(label: string) {
   const button = Array.from(document.querySelectorAll('button')).find(
-    (b) => b.textContent.trim() === label,
+    (b) =>
+      b.textContent.trim() === label || b.getAttribute('aria-label') === label,
   )
   if (!(button instanceof HTMLElement)) throw new Error(`no ${label}`)
   await act(async () => {
@@ -213,35 +228,43 @@ async function press(label: string) {
 }
 
 describe('the view menu', () => {
-  it('pins a view someone else owns, then unpins it, its one verb a button', async () => {
+  it('pins a view someone else owns, and saves it as a new view', async () => {
     await mount({ objectId: SEED.objectId, canEdit: false })
-    // A menu of one is that item: no `···`, the verb itself.
-    expect(trigger()).toBeNull()
-    await press('Pin to sidebar')
+    await openMenu()
+    expect(items()).toEqual(['Pin to sidebar', 'Save as new view…'])
+    const pin = Array.from(document.querySelectorAll('[role="menuitem"]'))[0]
+    if (!(pin instanceof HTMLElement)) throw new Error('no pin')
+    await act(async () => {
+      pin.click()
+    })
     expect(localStorage.getItem('chassis:pinned-views')).toBe(
       JSON.stringify([SEED.id]),
     )
-
-    await press('Unpin from sidebar')
-    expect(localStorage.getItem('chassis:pinned-views')).toBe('[]')
   })
 
   it('carries Rename and Delete for a view the user may edit', async () => {
     await mount({ objectId: SEED.objectId, canEdit: true })
     await openMenu()
-    expect(items()).toEqual(['Pin to sidebar', 'Rename…', 'Delete view'])
+    expect(items()).toEqual([
+      'Pin to sidebar',
+      'Save as new view…',
+      'Rename…',
+      'Delete view',
+    ])
   })
 
-  it('offers no pin on a list with no object, and no menu with nothing in it', async () => {
+  it('offers no pin on a list with no object', async () => {
     await mount({ objectId: null, canEdit: true })
     await openMenu()
-    expect(items()).toEqual(['Rename…', 'Delete view'])
+    expect(items()).toEqual(['Save as new view…', 'Rename…', 'Delete view'])
     act(() => root.unmount())
     const host = document.createElement('div')
     document.body.append(host)
     root = createRoot(host)
     await mount({ objectId: null, canEdit: false })
-    expect(trigger()).toBeNull()
+    // A lone rare verb stays in the `···`.
+    await openMenu()
+    expect(items()).toEqual(['Save as new view…'])
   })
 })
 
@@ -252,24 +275,31 @@ describe('the tab bar', () => {
       selected: t.getAttribute('aria-selected'),
     }))
 
-  it('draws All with the total and each view with its count, as real tabs', async () => {
+  it('draws All with the total and each view with its count, as folder tabs on white', async () => {
     await mount({ objectId: SEED.objectId, canEdit: false, activeId: null })
     expect(tabs()).toEqual([
       { text: 'All37', selected: 'true' },
       { text: 'Seed, India4', selected: 'false' },
     ])
     const list = document.querySelector('[role="tablist"]')
-    expect(list?.closest('[data-tab-bar]')?.className).toContain('bg-bone')
+    const barClass = list?.closest('[data-tab-bar]')?.className ?? ''
+    expect(barClass).toContain('bg-paper')
+    expect(barClass).not.toContain('bg-bone')
+    expect(
+      document.querySelector('[aria-selected="true"]')?.className,
+    ).toContain('tab-open')
   })
 
-  it('carries + view, Filter and the tools on the same bar, outside the tablist', async () => {
+  it('carries a divider, Filter and the tools on the same bar, outside the tablist', async () => {
     await mount({ objectId: SEED.objectId, canEdit: false, activeId: null })
     const barEl = document.querySelector('[data-tab-bar]')
     if (!(barEl instanceof HTMLElement)) throw new Error('no bar')
     const controls = Array.from(barEl.querySelectorAll('button'))
       .filter((b) => b.getAttribute('role') !== 'tab')
-      .map((b) => b.textContent.trim())
-    expect(controls).toEqual(['Save view…', 'Filter', 'Columns'])
+      .map((b) => b.getAttribute('aria-label') ?? b.textContent.trim())
+    // Nothing to save on a clean All: no Save view at all.
+    expect(controls).toEqual(['Filter', 'Columns'])
+    expect(barEl.querySelector('[data-tab-divider]')).not.toBeNull()
     expect(
       barEl.querySelector('[role="tablist"]')?.querySelectorAll('button'),
     ).toHaveLength(2)
@@ -331,7 +361,58 @@ describe('a dirty view', () => {
         (b) => b.textContent.trim() === 'Update view',
       ),
     ).toBe(true)
+    expect(
+      Array.from(document.querySelectorAll('button')).some(
+        (b) => b.textContent.trim() === 'Reset',
+      ),
+    ).toBe(true)
     liveCounts.value = {}
+  })
+})
+
+describe('the toolbar', () => {
+  const saveControls = () =>
+    Array.from(document.querySelectorAll('[data-save-view]')).map((b) =>
+      b.textContent.trim(),
+    )
+  const filterTool = () => document.querySelector('[data-tool="filter"]')
+
+  it('shows Filter as a bare icon at rest, and no Save view', async () => {
+    await mount({ objectId: SEED.objectId, canEdit: true, activeId: null })
+    expect(saveControls()).toEqual([])
+    const tool = filterTool()
+    expect(tool?.getAttribute('aria-label')).toBe('Filter')
+    expect(tool?.textContent.trim()).toBe('')
+    expect(tool?.getAttribute('data-tool-active')).toBe('false')
+    expect(tool?.className).toContain('border-transparent')
+  })
+
+  it('reads `Filter 1`, outlined, and offers Save as view… on a filtered All', async () => {
+    await mount({
+      objectId: SEED.objectId,
+      canEdit: true,
+      activeId: null,
+      filter: [{ slug: 'city', op: 'contains', value: 'Pune' }],
+    })
+    const tool = filterTool()
+    // The label and its mono count, a gap apart.
+    expect(tool?.textContent.replace(/\s+/g, '')).toBe('Filter1')
+    expect(tool?.className).toContain('border-hairline')
+    expect(saveControls()).toEqual(['Save as view…'])
+  })
+
+  it('offers nothing to save on a view that has not moved', async () => {
+    await mount({ objectId: SEED.objectId, canEdit: true })
+    expect(saveControls()).toEqual([])
+  })
+
+  it('offers Reset alone on a moved view the reader may not edit', async () => {
+    await mount({
+      objectId: SEED.objectId,
+      canEdit: false,
+      filter: [{ slug: 'city', op: 'contains', value: 'Pune' }],
+    })
+    expect(saveControls()).toEqual(['Reset'])
   })
 })
 

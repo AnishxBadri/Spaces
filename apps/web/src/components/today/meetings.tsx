@@ -119,7 +119,7 @@ function NowRule({ now, next }: { now: Date; next: TodayMeeting | null }) {
   return (
     <li
       data-now-rule
-      className="flex h-6 items-center gap-2 border-b border-rule px-3"
+      className="flex h-6 items-center gap-2 border-b border-rule px-(--inset)"
     >
       <span aria-hidden className="size-1.5 shrink-0 bg-primary" />
       <span className="shrink-0 mono text-micro text-foreground">

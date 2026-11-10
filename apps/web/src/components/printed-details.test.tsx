@@ -21,9 +21,9 @@ import { Tabs, nextTabIndex } from './ui/tabs.tsx'
 import type { TabItem } from './ui/tabs.tsx'
 
 /**
- * The printed details as the primitives draw them: the double rule under a
- * page or record head and nowhere else, one ink stamp per page (outlined
- * when archived), and real tabs whose open tab joins the body.
+ * The printed details as the primitives draw them: one rule under a page or
+ * record head, one ink stamp per page (outlined when archived), and folder
+ * tabs whose open tab joins the body.
  */
 
 const src = fileURLToPath(new URL('..', import.meta.url))
@@ -58,23 +58,32 @@ const companyStamp = { kind: 'Company' }
 /** The instant the dates on these sheets are printed against. */
 const NOW = '2026-10-26T12:00:00.000Z'
 
-describe('the double rule', () => {
-  it('is a named utility: 2px ink, 2px gap, 1px ink', () => {
-    expect(css).toMatch(/@utility double-rule \{[^}]*border-bottom: 5px/)
+describe('one rule under a head', () => {
+  it('is no longer a utility: the double rule is retired', () => {
+    expect(css).not.toMatch(/@utility double-rule/)
   })
 
-  it('draws under every page head and record head, in place of the hairline', () => {
+  it('draws one rule under every page head and record head', () => {
     for (const html of [
       renderToStaticMarkup(<PageHeader title="Companies" />),
       renderToStaticMarkup(<RecordHeader stamp={companyStamp} name="Flent" />),
     ]) {
-      const head = classesOf(html, 'double-rule')
-      expect(head).not.toContain('border-b')
-      expect(html).toMatch(/<header class="[^"]*\bdouble-rule\b/)
+      const head = headOf(html)
+      expect(head).toMatch(
+        /<header class="[^"]*\bborder-b\b[^"]*\bborder-rule\b/,
+      )
+      expect(head).not.toContain('double-rule')
     }
   })
 
-  it('never draws under a section head, a dialog head, a rail or a readout strip', () => {
+  it('is spelled by no file under src', () => {
+    const spelling = tsxFiles(src)
+      .filter((f) => readFileSync(f, 'utf8').includes('double-rule'))
+      .map((f) => relative(src, f))
+    expect(spelling).toEqual([])
+  })
+
+  it('never doubles under a section head, a dialog head, a rail or a readout strip', () => {
     for (const html of [
       renderToStaticMarkup(<SectionHead title="Files" count="3" />),
       renderToStaticMarkup(
@@ -99,18 +108,6 @@ describe('the double rule', () => {
     ]) {
       expect(html).not.toContain('double-rule')
     }
-  })
-
-  it('is spelled only by the page head, the record head and the settings head', () => {
-    const spelling = tsxFiles(src)
-      .filter((f) => readFileSync(f, 'utf8').includes('double-rule'))
-      .map((f) => relative(src, f))
-      .sort()
-    expect(spelling).toEqual([
-      'components/page-header.tsx',
-      'components/record/record-parts.tsx',
-      'components/settings/settings-section.tsx',
-    ])
   })
 })
 
@@ -270,7 +267,7 @@ describe('the ink stamp', () => {
     expect(html).not.toContain('depth')
   })
 
-  it('draws an archived space head in outline, the name and the double rule graphite', () => {
+  it('draws an archived space head in outline, the name graphite', () => {
     const html = renderToStaticMarkup(
       <ClockProvider now={NOW}>
         <RecordHeader
@@ -280,7 +277,6 @@ describe('the ink stamp', () => {
         />
       </ClockProvider>,
     )
-    expect(html).toMatch(/<header class="[^"]*\bdouble-rule-archived\b/)
     expect(headOf(html)).toContain('data-stamp="archived"')
     expect(html).toContain('8 Oct')
     expect(html).toMatch(
@@ -340,10 +336,13 @@ describe('real tabs', () => {
     expect(count(html, /tabindex="-1"/g)).toBe(2)
   })
 
-  it('draws the open tab in paper over the bar foot, the rest on bone', () => {
+  it('draws folder tabs on white: the open tab outlined over the bar foot, no bone band', () => {
     const html = render('people')
-    const bar = classesOf(html, 'bg-bone')
-    expect(bar).toEqual(expect.arrayContaining(['border-b', 'border-hairline']))
+    const bar = classesOf(html, 'bg-paper')
+    expect(bar).toEqual(
+      expect.arrayContaining(['px-1', 'before:bg-rule', 'before:h-px']),
+    )
+    expect(html).not.toContain('bg-bone')
     expect(count(html, /\btab-open\b/g)).toBe(1)
     const open = classesOf(html, 'tab-open')
     // A pixel taller and a pixel low, over the bar's foot: no rule under

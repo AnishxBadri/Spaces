@@ -7,8 +7,8 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
-import { Layers, Upload } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { icon, Layers } from '#/components/icons'
+import type { LucideIcon } from '#/components/icons'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { DocumentPreview } from '#/components/document-preview'
@@ -20,7 +20,7 @@ import {
 import { DocumentTile } from '#/components/document-tile'
 import { KIND_ICONS } from '#/components/editor/mention'
 import { EmptyRow } from '#/components/ledger-section'
-import { PageHeader } from '#/components/page-header'
+import { Card, PageBody, PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'
 import { RecordTable, TableToolbar } from '#/components/table/record-table'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
@@ -272,16 +272,18 @@ function DocumentsPage() {
           /* The upload door on the shelf that lists what it produces. The
              dialog lives in the app shell; the chassis and ⌘K open it too. */
           <Button onClick={openUploadDialog}>
-            <Upload className="size-3.5" strokeWidth={2} />
+            <icon.upload className="size-4" strokeWidth={2} />
             Upload
           </Button>
         }
       />
       {counts.all === 0 ? (
         // First run: nothing on the shelf — one row that uploads.
-        <div className="px-8 pt-6 pb-8">
-          <EmptyRow name="Files" onAdd={openUploadDialog} />
-        </div>
+        <PageBody>
+          <Card>
+            <EmptyRow name="Files" onAdd={openUploadDialog} />
+          </Card>
+        </PageBody>
       ) : (
         <>
           <TableToolbar
@@ -298,14 +300,15 @@ function DocumentsPage() {
             filterPlaceholder="Search files"
             filterLabel="Search files"
           />
-          <div className="px-8 pb-8">
+          <div className="px-1 pb-8">
             {documents.length === 0 ? (
               // The inbox is clear: good news, one line. `All` is the way back.
-              <p className="py-6 font-serif text-body text-graphite">
+              <p className="card border-t-0 px-(--inset) py-6 font-serif text-body text-graphite">
                 Nothing unfiled.
               </p>
             ) : (
               <RecordTable
+                joined
                 table={table}
                 label="Files"
                 stickyColumnId="filename"

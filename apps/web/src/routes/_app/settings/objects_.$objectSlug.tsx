@@ -1,5 +1,5 @@
 import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
-import { Plus } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
@@ -176,7 +176,7 @@ function ObjectAttributesPage() {
             shortcut="A"
             onClick={() => setCreating(true)}
           >
-            <Plus className="size-3" strokeWidth={2} />
+            <icon.new className="size-3" strokeWidth={2} />
             New attribute
           </Button>
           {/* Copy link is on every object, so the `···` never folds into a

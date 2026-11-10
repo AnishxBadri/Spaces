@@ -1,5 +1,5 @@
 import { createLink } from '@tanstack/react-router'
-import type { LucideIcon } from 'lucide-react'
+import type { LucideIcon } from '#/components/icons'
 import type { AnchorHTMLAttributes, ReactNode, Ref } from 'react'
 import { readAiConfig } from '@spaces/core/ai/attribute-ai'
 import { formatAge, formatDay } from '@spaces/core/format'

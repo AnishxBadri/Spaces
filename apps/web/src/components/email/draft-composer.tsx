@@ -1,4 +1,4 @@
-import { X } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -380,7 +380,7 @@ export function DraftComposer({
     <>
       <div
         className={cn(
-          '-mx-5 flex min-h-0 flex-1 flex-col overflow-y-auto',
+          '-mx-4 flex min-h-0 flex-1 flex-col overflow-y-auto',
           sending && 'pointer-events-none opacity-50',
         )}
         {...(sending ? { 'aria-busy': true } : {})}
@@ -393,7 +393,7 @@ export function DraftComposer({
       >
         {review === null ? above : null}
         {modes === null || draft.mode === 'new' ? null : (
-          <div className="flex h-11 shrink-0 items-center gap-3 border-b border-rule px-5">
+          <div className="flex h-11 shrink-0 items-center gap-3 border-b border-rule px-4">
             <Segmented
               label="Reply mode"
               value={draft.mode}
@@ -485,7 +485,7 @@ export function DraftComposer({
             value={draft.bodyMd}
             autoFocus={draft.to.length > 0}
             onChange={(e) => edit({ bodyMd: e.target.value })}
-            className="text-prose min-h-48 w-full flex-1 resize-none bg-paper px-5 py-4 font-serif leading-6.75 outline-none"
+            className="text-prose min-h-48 w-full flex-1 resize-none bg-paper px-4 py-4 font-serif leading-6.75 outline-none"
           />
           <Attachments
             files={draft.attachments}
@@ -533,7 +533,7 @@ export function DraftComposer({
           </div>
         </div>
         {error === null ? null : (
-          <p role="alert" className="px-5 pb-3 text-ui text-destructive">
+          <p role="alert" className="px-4 pb-3 text-ui text-destructive">
             {error}
           </p>
         )}
@@ -759,7 +759,7 @@ function Attachments({
   )
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 px-5 pb-4">
+    <div className="flex flex-wrap items-center gap-1.5 px-4 pb-4">
       {files.map((f) => (
         <span
           key={f.documentId}
@@ -792,7 +792,7 @@ function Attachments({
             }
             className="focus-ring text-graphite hover:text-foreground"
           >
-            <X className="size-2.5" strokeWidth={2} />
+            <icon.close className="size-2.5" strokeWidth={2} />
           </button>
         </span>
       ))}

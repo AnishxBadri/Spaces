@@ -108,7 +108,8 @@ describe('IntegrationLedger', () => {
     expect(html).toContain('Installed')
     expect(html.match(/<li/g)).toHaveLength(5)
     const apollo = rowFor(html, 'enabled')
-    expect(apollo).toContain('>A</span>')
+    // A known brand draws its ProviderMark, not its initial.
+    expect(apollo).toContain('data-provider-mark="apollo"')
     expect(apollo).toContain('Apollo')
     expect(apollo).toContain('v0.1.0')
     expect(apollo).toContain('>Enrichment<')

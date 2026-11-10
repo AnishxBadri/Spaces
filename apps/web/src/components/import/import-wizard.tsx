@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { Check } from 'lucide-react'
+import { Check } from '#/components/icons'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { ReactNode } from 'react'

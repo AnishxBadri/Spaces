@@ -184,7 +184,7 @@ export function ReceiptStrip({
   const remaining = { label: 'Remaining', value: counts.remaining }
   return (
     <ReadoutStrip
-      className="border-b border-rule px-8"
+      className="border-b border-rule px-3"
       readouts={(ledger
         ? [
             { label: 'Holdings', value: ledger.holdings },
@@ -216,7 +216,7 @@ export function ReceiptStrip({
 export function MissingRateLine({ ledger }: { ledger: LedgerReceipt }) {
   if (ledger.missingRates.length === 0) return null
   return (
-    <p className="flex flex-wrap items-center gap-x-2 px-8 mono text-micro text-warning">
+    <p className="flex flex-wrap items-center gap-x-2 px-3 mono text-micro text-warning">
       <span className="tabular">{missingRateLine(ledger.missingRates)}</span>
       <Link
         to="/settings/currency"

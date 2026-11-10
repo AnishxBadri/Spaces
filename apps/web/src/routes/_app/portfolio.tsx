@@ -7,13 +7,13 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef, SortingState, Table } from '@tanstack/react-table'
-import { Briefcase } from 'lucide-react'
+import { Briefcase } from '#/components/icons'
 import { useMemo, useState } from 'react'
 import { RecordCheckDialog } from '#/components/holding/record-check-dialog'
 import { EmptyRow } from '#/components/ledger-section'
 import { IconBadge, RecordLinkCell } from '#/components/table/cells'
 import { RecordTable } from '#/components/table/record-table'
-import { HeadCount, PageHeader } from '#/components/page-header'
+import { Card, HeadCount, PageBody, PageHeader } from '#/components/page-header'
 import { PortfolioHeadlineStrip } from '#/components/portfolio-headline'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
@@ -293,9 +293,7 @@ function PortfolioPage() {
         action={
           firstRun ? undefined : (
             <>
-              <RecordCheckDialog
-                trigger={<Button variant="outline">Record a check</Button>}
-              />
+              <RecordCheckDialog trigger={<Button>Record a check</Button>} />
               <MoreMenu
                 variant="head"
                 label="Portfolio"
@@ -306,44 +304,46 @@ function PortfolioPage() {
         }
       />
       {firstRun ? (
-        <div className="px-8 pt-6 pb-8">
-          <RecordCheckDialog trigger={<EmptyRow name="Holdings" />} />
-        </div>
+        <PageBody>
+          <Card>
+            <RecordCheckDialog trigger={<EmptyRow name="Holdings" />} />
+          </Card>
+        </PageBody>
       ) : (
-        <>
+        <PageBody>
           <PortfolioHeadlineStrip
             rollup={rollup}
             baseCurrency={data.baseCurrency}
           />
-          {showSearch ? (
-            <div className="flex h-11 items-center border-b border-rule bg-bone px-8">
-              <Input
-                autoFocus
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key !== 'Escape') return
-                  e.preventDefault()
-                  setGlobalFilter('')
-                  setSearching(false)
-                }}
-                onBlur={() => {
-                  if (globalFilter === '') setSearching(false)
-                }}
-                placeholder="Search holdings"
-                aria-label="Search holdings"
-                className="h-6.5 w-45 bg-paper text-ui"
-              />
-            </div>
-          ) : null}
-          <div className="px-8 pb-8">
+          <div>
+            {showSearch ? (
+              <div className="flex h-11 items-center border-x border-t border-rule bg-bone px-1.75">
+                <Input
+                  autoFocus
+                  value={globalFilter}
+                  onChange={(e) => setGlobalFilter(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Escape') return
+                    e.preventDefault()
+                    setGlobalFilter('')
+                    setSearching(false)
+                  }}
+                  onBlur={() => {
+                    if (globalFilter === '') setSearching(false)
+                  }}
+                  placeholder="Search holdings"
+                  aria-label="Search holdings"
+                  className="h-6.5 w-45 bg-paper text-ui"
+                />
+              </div>
+            ) : null}
             <RecordTable
               table={table}
               label="Portfolio"
               stickyColumnId="company"
             />
           </div>
-        </>
+        </PageBody>
       )}
     </div>
   )

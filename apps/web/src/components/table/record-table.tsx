@@ -1,9 +1,11 @@
 import { flexRender } from '@tanstack/react-table'
 import type { Column, Header, RowData, Table } from '@tanstack/react-table'
-import { ChevronsUpDown, Plus } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { ComponentProps, ReactNode, RefObject } from 'react'
 import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
+import { ChevronsUpDown, icon } from '#/components/icons'
+import type { LucideIcon } from '#/components/icons'
+import { useHotkey } from '#/lib/use-hotkey'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -15,7 +17,7 @@ import {
 } from '#/components/ui/dropdown-menu'
 import { Checkbox } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
-import { Tabs } from '#/components/ui/tabs'
+import { TabDivider, Tabs } from '#/components/ui/tabs'
 import type { TabItem } from '#/components/ui/tabs'
 import { ListZeroRow } from './list-states'
 import type { RowSelection } from './selection-bar'
@@ -44,6 +46,9 @@ declare module '@tanstack/react-table' {
  * sticky `thead` inside it. The body scrolls sideways and drives the head's
  * `scrollLeft`; both tables share one set of fixed column widths.
  * - Every cell's content is bounded to the 36px row.
+ * - The table is a card: a 1px rule box with a line between columns, its
+ *   heads white, the cells inset 7px so the first column lands on the
+ *   page's 12px edge. Columns is an icon at the end of the head row.
  */
 
 /** Column widths nudge by this much per arrow-key press. */
@@ -52,7 +57,7 @@ const MIN_COLUMN_WIDTH = 64
 /** The checkbox lane's width: `w-8`, which the pinned column's `left-8` clears. */
 const SELECT_WIDTH = 32
 /** The trailing lane's floor: the add-column control, or the right margin. */
-const TRAILING_WIDTH = 40
+const TRAILING_WIDTH = 56
 
 /**
  * Grouped, never compact — `Intl.NumberFormat` compact notation prints
@@ -129,6 +134,7 @@ export function RecordTable<T>({
   pinUnder = 'head',
   rowEnd,
   rowEndWidth = TRAILING_WIDTH,
+  joined = false,
 }: {
   table: Table<T>
   /** Column pinned to the left edge while the rest scrolls under it. */
@@ -174,6 +180,11 @@ export function RecordTable<T>({
   rowEnd?: (row: T) => ReactNode
   /** The trailing lane's width when a row ends on more than a `···`. */
   rowEndWidth?: number
+  /**
+   * The table hangs from a tab bar, whose rule is its top edge and whose
+   * open tab runs into it; alone, the box draws its own top rule.
+   */
+  joined?: boolean | undefined
 }) {
   const headRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -212,7 +223,15 @@ export function RecordTable<T>({
   // small local z values inside one stacking context, so the page's
   // five-step z-index scale never has to climb.
   return (
-    <div role="table" aria-label={label} className="isolate flex flex-col">
+    <div
+      role="table"
+      aria-label={label}
+      data-table-box
+      className={cn(
+        'isolate flex flex-col border-x border-b border-rule',
+        !joined && 'border-t',
+      )}
+    >
       <div
         ref={headRef}
         data-table-head
@@ -235,7 +254,7 @@ export function RecordTable<T>({
                   <th
                     role="columnheader"
                     style={{ width: SELECT_WIDTH }}
-                    className="sticky left-0 z-20 bg-paper pl-2.5 align-middle"
+                    className="sticky left-0 z-20 bg-paper pl-1.75 align-middle"
                   >
                     <Checkbox
                       checked={allChecked}
@@ -256,10 +275,13 @@ export function RecordTable<T>({
                 ))}
                 <th
                   role="columnheader"
-                  style={rowEnd ? { minWidth: rowEndWidth } : undefined}
-                  className="px-1 text-left"
+                  style={{ minWidth: rowEndWidth }}
+                  className="px-1"
                 >
-                  {addColumn ?? null}
+                  <div className="flex items-center justify-end gap-0.5">
+                    {addColumn ?? null}
+                    <ColumnsMenu table={table} />
+                  </div>
                 </th>
               </tr>
             ))}
@@ -323,7 +345,7 @@ export function RecordTable<T>({
                           role="cell"
                           style={{ width: cell.column.getSize() }}
                           className={cn(
-                            'h-row px-1 py-0 align-middle',
+                            'h-row border-r border-rule px-0.75 py-0 align-middle',
                             cell.column.id === stickyColumnId &&
                               // Opaque at rest and on hover: a translucent tint here
                               // would let the scrolled-under columns bleed through.
@@ -464,7 +486,7 @@ function SelectCell({
       role="cell"
       onClick={(e) => e.stopPropagation()}
       style={{ width: SELECT_WIDTH }}
-      className="sticky left-0 z-10 h-row bg-paper py-0 pl-2.5 align-middle transition-colors duration-150 ease-out-quart group-hover:bg-row-hover"
+      className="sticky left-0 z-10 h-row bg-paper py-0 pl-1.75 align-middle transition-colors duration-150 ease-out-quart group-hover:bg-row-hover"
     >
       <Checkbox
         checked={checked}
@@ -536,7 +558,7 @@ function HeaderCell<T>({
             : 'none'
       }
       className={cn(
-        'relative h-8 px-2 align-middle text-label font-normal text-graphite',
+        'relative h-8 border-r border-rule px-1.75 align-middle text-label font-normal text-graphite',
         numeric ? 'text-right' : 'text-left',
         sticky && 'sticky z-20 bg-paper',
         sticky && stickyLeft,
@@ -551,7 +573,7 @@ function HeaderCell<T>({
           <DropdownMenuTrigger
             title={`${title} column`}
             className={cn(
-              'group/sort focus-ring-inset -mx-2 flex h-8 w-[calc(100%+1rem)] items-center gap-1.5 truncate px-2 transition-colors duration-150 ease-out-quart hover:bg-bone data-[state=open]:bg-bone',
+              'group/sort focus-ring-inset -mx-1.75 flex h-8 w-[calc(100%+0.875rem)] items-center gap-1.5 truncate px-1.75 transition-colors duration-150 ease-out-quart hover:bg-bone data-[state=open]:bg-bone',
               numeric ? 'text-right' : 'text-left',
               sorted && 'text-foreground',
             )}
@@ -662,28 +684,45 @@ function HeaderCell<T>({
 }
 
 /**
- * A bar tool — Filter, Sort, Columns: plain sans ink at rest with no icon,
- * an outline box carrying its state while it is doing something
- * (`Filter 1`, `Sort Last contact ↓`, `Columns 9/15`).
+ * A bar tool. With an `icon` (Filter, Sort, Columns) it is the bare icon at
+ * rest, named by `label`, and an outline box reading its state only while
+ * in use (`Filter 2`, `Last contact ↓`); the children are that state.
+ * Without one (Deals' Stage chip) the children always print.
  */
 export function ToolButton({
   active,
+  icon: Icon,
+  label,
   className,
+  children,
   ...props
-}: ComponentProps<'button'> & { active: boolean }) {
+}: ComponentProps<'button'> & {
+  active: boolean
+  icon?: LucideIcon | undefined
+  /** The tool's name: its accessible name and tooltip when it is an icon. */
+  label?: string | undefined
+}) {
+  const bare = Icon !== undefined && !active
   return (
     <button
       type="button"
       data-tool-active={active}
+      {...(label === undefined ? {} : { 'aria-label': label, title: label })}
       {...props}
       className={cn(
-        'focus-ring flex h-6.5 shrink-0 items-center gap-1.5 rounded-md border px-2 text-ui whitespace-nowrap text-foreground transition-colors duration-150 ease-out-quart',
+        'focus-ring flex h-6.5 shrink-0 items-center gap-1.5 rounded-md border text-ui whitespace-nowrap text-foreground transition-colors duration-150 ease-out-quart',
+        bare ? 'w-6.5 justify-center' : 'px-2',
         active
           ? 'border-hairline bg-paper hover:bg-bone'
-          : 'border-transparent hover:bg-paper data-[state=open]:bg-paper',
+          : 'border-transparent hover:bg-bone data-[state=open]:bg-bone',
         className,
       )}
-    />
+    >
+      {Icon === undefined ? null : (
+        <Icon aria-hidden className="size-3.5" strokeWidth={2} />
+      )}
+      {bare ? null : children}
+    </button>
   )
 }
 
@@ -697,8 +736,15 @@ function AiTag() {
 }
 
 /**
- * The right lane of a list's bar: Sort · Columns · the search box, in that
- * order, after the views' Filter. One lane for every list, object or shelf.
+ * What the bar shows right after Sort: an object list's Save view controls,
+ * handed down by `ViewBar` so the page's `TableTools` need not carry them.
+ */
+export const AfterSort = createContext<ReactNode>(null)
+
+/**
+ * The rest of a list's bar after the views' Filter: Sort, then the search box
+ * alone at the right with its `/`. Columns is not here: it ends the column
+ * head row. One lane for every list, object or shelf.
  */
 export function TableTools<T>({
   table,
@@ -713,21 +759,39 @@ export function TableTools<T>({
   onFilterChange: (value: string) => void
   filterPlaceholder: string
   filterLabel: string
-  /** A list's own switch between Columns and the search box. */
+  /** A list's own switch, right, before the search box. */
   beforeSearch?: ReactNode
 }) {
+  const afterSort = useContext(AfterSort)
+  const search = useRef<HTMLInputElement>(null)
+  useHotkey('/', () => search.current?.focus())
   return (
     <>
       <SortMenu table={table} />
-      <ColumnsMenu table={table} />
+      {afterSort}
+      <span className="flex-1" />
       {beforeSearch}
-      <Input
-        value={filter}
-        onChange={(e) => onFilterChange(e.target.value)}
-        placeholder={filterPlaceholder}
-        aria-label={filterLabel}
-        className="ml-1 h-6.5 w-45 bg-paper text-ui"
-      />
+      <span className="relative ml-1 flex shrink-0 items-center">
+        <Input
+          ref={search}
+          type="search"
+          value={filter}
+          onChange={(e) => onFilterChange(e.target.value)}
+          placeholder={filterPlaceholder}
+          aria-label={filterLabel}
+          aria-keyshortcuts="/"
+          className="h-6.5 w-45 bg-paper pr-6 text-ui"
+        />
+        {filter === '' ? (
+          <kbd
+            aria-hidden
+            data-search-key
+            className="pointer-events-none absolute right-1.5 border border-rule px-1 mono text-field text-graphite"
+          >
+            /
+          </kbd>
+        ) : null}
+      </span>
     </>
   )
 }
@@ -749,13 +813,13 @@ export function SortMenu<T>({ table }: { table: Table<T> }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <ToolButton active={active !== undefined}>
-          Sort
-          {active ? (
-            <span>
-              {columnTitle(active)} {desc ? '↓' : '↑'}
-            </span>
-          ) : null}
+        <ToolButton
+          active={active !== undefined}
+          icon={icon.sort}
+          label="Sort"
+          data-tool="sort"
+        >
+          {active ? `${columnTitle(active)} ${desc ? '↓' : '↑'}` : null}
         </ToolButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -792,21 +856,26 @@ export function SortMenu<T>({ table }: { table: Table<T> }) {
   )
 }
 
-/** Show and hide columns; the count says how many of them are on. */
+/**
+ * Show and hide columns, from an icon at the end of the column head row;
+ * the menu's head says how many are on.
+ */
 export function ColumnsMenu<T>({ table }: { table: Table<T> }) {
   const hideable = table.getAllLeafColumns().filter((c) => c.getCanHide())
   const hiddenCount = hideable.filter((c) => !c.getIsVisible()).length
+  if (hideable.length === 0) return null
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <ToolButton active={hiddenCount > 0}>
-          Columns
-          {hiddenCount > 0 ? (
-            <span className="tabular mono text-micro">
-              {hideable.length - hiddenCount}/{hideable.length}
-            </span>
-          ) : null}
-        </ToolButton>
+        <button
+          type="button"
+          aria-label="Columns"
+          title="Columns"
+          data-columns-menu
+          className="focus-ring flex size-6 items-center justify-center rounded-md text-graphite transition-colors duration-150 ease-out-quart hover:bg-bone hover:text-foreground data-[state=open]:bg-bone"
+        >
+          <icon.columns aria-hidden className="size-3.5" strokeWidth={2} />
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
@@ -841,9 +910,9 @@ export function ColumnsMenu<T>({ table }: { table: Table<T> }) {
 }
 
 /**
- * A shelf's bar — a list with no saved views: its own filter as real tabs on
- * the bone bar (`All · Unfiled`, or one `All` with the count), and the
- * table's tools right. An object list's bar is `ViewBar`.
+ * A shelf's bar — a list with no saved views: its own filter as folder tabs
+ * (`All · Unfiled`, or one `All` with the count), a divider, Sort, and the
+ * search box right. An object list's bar is `ViewBar`.
  */
 export function TableToolbar<T, TKey extends string>({
   table,
@@ -875,7 +944,7 @@ export function TableToolbar<T, TKey extends string>({
       onValueChange={onValueChange}
       trail={
         <>
-          <span className="flex-1" />
+          <TabDivider />
           <TableTools
             table={table}
             filter={filter}
@@ -902,7 +971,7 @@ export function AddColumnButton() {
       title="Add column"
       className="focus-ring flex size-6 items-center justify-center rounded-md text-graphite transition-colors duration-150 ease-out-quart hover:bg-bone hover:text-foreground"
     >
-      <Plus className="size-3.5" strokeWidth={2} />
+      <icon.new className="size-3.5" strokeWidth={2} />
     </button>
   )
 }

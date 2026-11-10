@@ -1,9 +1,10 @@
 import { Link, useRouter } from '@tanstack/react-router'
-import { Layers } from 'lucide-react'
+import { Layers } from '#/components/icons'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { LedgerRow, rowWashClass } from '#/components/ledger-section'
-import { PageHeader } from '#/components/page-header'
+import { rowWashClass } from '#/components/ledger-section'
+import { SplitNewButton } from '#/components/new-button'
+import { Card, PageBody, PageHeader } from '#/components/page-header'
 import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import {
@@ -30,6 +31,8 @@ import { cn } from '#/lib/utils'
 export type SpacesIndex = Awaited<ReturnType<typeof getSpacesIndex>>
 type SpaceRow = SpacesIndex['spaces'][number]
 type ArchivedRow = SpacesIndex['archived'][number]
+/** A saved breakdown to stamp under the new space's name. */
+type Scaffold = { id: string; name: string }
 
 /** The market map's fixed lanes, right of the name: 88 · 72 · 72 · 96. */
 const LANES = {
@@ -68,8 +71,9 @@ function Lane({
 }
 
 /**
- * The spaces index: the market map as one tree, its last filed lane,
- * the composer row, the archived fold and the New space window.
+ * The spaces index: the market map as one tree in a card, its last filed
+ * lane, the archived fold and the New space window, opened from the head's
+ * split `+ New space`, whose `▾` stamps a saved breakdown.
  */
 export function SpacesIndexPage({
   index: { spaces, archived, today },
@@ -77,19 +81,42 @@ export function SpacesIndexPage({
   index: SpacesIndex
 }) {
   const [open, setOpen] = useState(false)
-  // The composer row's arrivals, and only those: a space the loader already
-  // knew about is never in the set, however recently it was created.
+  const [stamp, setStamp] = useState<Scaffold | null>(null)
+  // The window's arrivals, and only those: a space the loader already knew
+  // about is never in the set, however recently it was created.
   const { washes, bear } = useBornRows()
-  useHotkey('s', () => setOpen(true))
+  const blank = () => {
+    setStamp(null)
+    setOpen(true)
+  }
+  useHotkey('s', blank)
 
   const nested = spaces.filter((s) => s.depth > 0).length
 
   return (
     <div className="flex min-h-full flex-col">
-      {/* No head button: the composer row at the list's end is the one
-          way to a new space, and `S` opens it. */}
       <PageHeader
         title="Spaces"
+        action={
+          spaces.length > 0 ? (
+            <SplitNewButton
+              noun="space"
+              shortcut="S"
+              onNew={blank}
+              templates={(trigger) => (
+                <TemplatePicker
+                  kind="space"
+                  context="space"
+                  trigger={trigger}
+                  onPick={(t) => {
+                    setStamp({ id: t.id, name: t.name })
+                    setOpen(true)
+                  }}
+                />
+              )}
+            />
+          ) : undefined
+        }
         description={
           spaces.length > 0 ? (
             <span data-spaces-meta>
@@ -100,14 +127,16 @@ export function SpacesIndexPage({
         }
       />
 
-      <div className="px-8 pt-4 pb-8">
+      <PageBody>
         {spaces.length === 0 ? (
-          <MarketsCreator />
+          <div className="px-2 pt-3">
+            <MarketsCreator />
+          </div>
         ) : (
-          <section className="flex flex-col">
+          <Card label="Spaces">
             <div
               data-lane-heads
-              className="flex h-7 items-center gap-2.5 border-b border-hairline px-3 text-label text-graphite"
+              className="flex h-7 items-center gap-2.5 border-b border-hairline px-(--inset) text-label text-graphite"
             >
               <span className="min-w-0 flex-1">Space</span>
               <span className={cn(LANES.companies, 'text-right max-md:hidden')}>
@@ -134,30 +163,8 @@ export function SpacesIndexPage({
                   wash={washes(s.id)}
                 />
               ))}
-              {/* The composer row: adding never starts from a corner button. */}
-              <LedgerRow last>
-                <button
-                  type="button"
-                  data-composer-row
-                  onClick={() => setOpen(true)}
-                  className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-2.5 px-3 text-left transition-colors hover:bg-bone"
-                >
-                  <span
-                    aria-hidden
-                    className="w-3.5 shrink-0 text-center mono text-ui text-primary"
-                  >
-                    +
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-body text-graphite">
-                    New space…
-                  </span>
-                  <kbd className="shrink-0 mono text-micro text-graphite">
-                    S
-                  </kbd>
-                </button>
-              </LedgerRow>
             </ol>
-          </section>
+          </Card>
         )}
         {archived.length > 0 ? (
           <ArchivedFold
@@ -166,13 +173,15 @@ export function SpacesIndexPage({
             className={spaces.length === 0 ? 'mt-8' : undefined}
           />
         ) : null}
-      </div>
+      </PageBody>
 
       <CreateSpaceDialog
         spaces={spaces}
         open={open}
         onOpenChange={setOpen}
         onCreated={bear}
+        scaffold={stamp}
+        onScaffoldChange={setStamp}
       />
     </div>
   )
@@ -198,8 +207,8 @@ function MapRow({
   return (
     <li
       className={cn(
-        'flex h-row items-center px-3',
-        ruled && 'border-b border-rule',
+        'flex h-row items-center px-(--inset)',
+        ruled && 'border-b border-rule last:border-b-0',
         rowWashClass(wash),
       )}
     >
@@ -207,11 +216,11 @@ function MapRow({
         to="/spaces/$spaceId"
         params={{ spaceId: s.id }}
         className={cn(
-          'focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-2.5 pr-3 transition-colors hover:bg-bone',
+          'focus-ring-inset -mx-(--inset) flex h-full min-w-0 flex-1 items-center gap-2.5 pr-(--inset) transition-colors hover:bg-bone',
           // A top-level row sits 4px lower: its group's first line breathes.
           mark === null && 'pt-1',
         )}
-        style={{ paddingLeft: `${12 + s.depth * 24}px` }}
+        style={{ paddingLeft: `calc(var(--inset) + ${s.depth * 24}px)` }}
       >
         {mark === null ? (
           <Layers
@@ -277,8 +286,8 @@ function ArchivedFold({
   }
 
   return (
-    <div className={cn('flex flex-col border-t border-rule', className)}>
-      <div className="flex h-8 items-center gap-2.5 px-3">
+    <div className={cn('flex flex-col card', className)}>
+      <div className="flex h-8 items-center gap-2.5 px-(--inset)">
         <span aria-hidden className="w-3.5 shrink-0" />
         <span className="text-label text-graphite">
           {archived.length} archived
@@ -295,7 +304,10 @@ function ArchivedFold({
       {shown ? (
         <ol>
           {archived.map((a) => (
-            <li key={a.id} className="flex h-row items-center gap-2.5 px-3">
+            <li
+              key={a.id}
+              className="flex h-row items-center gap-2.5 border-t border-rule px-(--inset)"
+            >
               <span aria-hidden className="w-3.5 shrink-0" />
               <Link
                 to="/spaces/$spaceId"
@@ -434,10 +446,15 @@ function CreateSpaceDialog({
   open,
   onOpenChange,
   onCreated,
+  scaffold,
+  onScaffoldChange: setScaffold,
 }: {
   spaces: Array<SpaceRow>
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** The saved breakdown to stamp, picked from the head's `▾` or here. */
+  scaffold: Scaffold | null
+  onScaffoldChange: (next: Scaffold | null) => void
   /** The row that landed — what the market map's wash reads. A stamped
    *  scaffold reports its root: the children are a subtree the composer
    *  did not name, and only the named row is the arrival. */
@@ -446,9 +463,6 @@ function CreateSpaceDialog({
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
-  const [scaffold, setScaffold] = useState<{ id: string; name: string } | null>(
-    null,
-  )
   // The form is still read through `FormData`; the picker mirrors its value
   // into a hidden `parent` input, so the submit path is untouched.
   const [parent, setParent] = useState('')

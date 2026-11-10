@@ -1,5 +1,5 @@
 import { Link, useRouter } from '@tanstack/react-router'
-import { Lock } from 'lucide-react'
+import { Lock } from '#/components/icons'
 import { Fragment, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactElement, ReactNode } from 'react'
 import { ReferenceBar, SectionHead } from '#/components/ledger-section'
@@ -595,7 +595,7 @@ function kindSegments(
 }
 
 const rowClass =
-  'group focus-ring-inset flex h-ledger-row items-center gap-3 border-b border-rule px-3 transition-colors duration-150 ease-out-quart hover:bg-bone'
+  'group focus-ring-inset flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset) transition-colors duration-150 ease-out-quart hover:bg-bone'
 
 /**
  * Needs you: one ledger in urgency order. The head is the title and a
@@ -842,7 +842,7 @@ export function NeedsYou({
         {loading && (filter === 'all' || filter === 'review') ? (
           <li
             data-needs-loading
-            className="flex h-ledger-row items-center gap-3 border-b border-rule px-3"
+            className="flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset)"
           >
             <span className={LANE.kind} />
             <span className={LANE.mark}>
@@ -853,7 +853,7 @@ export function NeedsYou({
             </span>
           </li>
         ) : inView.length === 0 ? (
-          <li className="flex h-ledger-row items-center border-b border-rule px-3 text-ui text-graphite">
+          <li className="flex h-ledger-row items-center border-b border-rule px-(--inset) text-ui text-graphite">
             {EMPTY[filter]}
           </li>
         ) : null}
@@ -863,7 +863,7 @@ export function NeedsYou({
               type="button"
               data-fold
               onClick={() => setOpen(true)}
-              className="group/fold focus-ring-inset flex h-ledger-row w-full items-center justify-between gap-3 px-3 text-left"
+              className="group/fold focus-ring-inset flex h-ledger-row w-full items-center justify-between gap-3 px-(--inset) text-left"
             >
               <span className="min-w-0 truncate text-label text-graphite">
                 {foldSummary(hidden)}
@@ -882,7 +882,7 @@ export function NeedsYou({
               <button
                 type="button"
                 data-composer-row
-                className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 px-3 text-left transition-colors duration-150 ease-out-quart hover:bg-bone"
+                className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 px-(--inset) text-left transition-colors duration-150 ease-out-quart hover:bg-bone"
               >
                 <span
                   aria-hidden

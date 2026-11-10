@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { useEffect, useState } from 'react'
 import { LabelHead, LedgerRow } from '#/components/ledger-section'
 import { DensityRamp } from '#/components/dither'
@@ -112,7 +112,7 @@ export function DraftsDialog({
               : `${String(rows.length)} · only yours`}
           </DialogDescription>
         </DialogHeader>
-        <div className="-mx-5 flex min-h-0 flex-1 flex-col overflow-y-auto px-5">
+        <div className="-mx-4 flex min-h-0 flex-1 flex-col overflow-y-auto px-4">
           {rows === null ? (
             error === null ? (
               <DensityRamp width={160} />
@@ -169,7 +169,7 @@ export function DraftsDialog({
                       onClick={() => void trash(r.id)}
                       className="focus-ring flex size-7 shrink-0 items-center justify-center rounded-md text-graphite hover:bg-bone hover:text-foreground"
                     >
-                      <Trash2 className="size-3.5" strokeWidth={1.75} />
+                      <icon.delete className="size-3.5" strokeWidth={1.75} />
                     </button>
                   </LedgerRow>
                 ))}

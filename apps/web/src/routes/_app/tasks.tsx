@@ -4,13 +4,14 @@ import {
   useRouteContext,
   useRouter,
 } from '@tanstack/react-router'
-import { CheckSquare, X } from 'lucide-react'
+import { CheckSquare, icon } from '#/components/icons'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { EmptyState } from '#/components/empty-state'
 import { LabelHead, LedgerFigure } from '#/components/ledger-section'
-import { PageHeader } from '#/components/page-header'
+import { Card, PageBody, PageHeader } from '#/components/page-header'
+import { NewButton } from '#/components/new-button'
 import { useTaskMenu } from '#/components/tasks/task-menu'
 import { TaskComposer, TaskComposerRow } from '#/components/task-composer'
 import { Checkbox } from '#/components/ui/checkbox'
@@ -160,6 +161,7 @@ function TasksPage() {
   // Rows mid-exit. The write waits for the transition so completing a task
   // reads as the row leaving, not as the list flinching.
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set())
+  const body = useRef<HTMLDivElement>(null)
   // Rows this page's composer created — the only ones the wash touches.
   const { washes, bear } = useBornRows()
   const { today } = useClock()
@@ -245,7 +247,26 @@ function TasksPage() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <PageHeader title="Tasks" />
+      <PageHeader
+        title="Tasks"
+        action={
+          empty ? undefined : (
+            // The head's create hands off to the list's own composer row,
+            // so there is one way in and focus comes back to the row.
+            <NewButton
+              noun="task"
+              shortcut="T"
+              onClick={() => {
+                const row = body.current?.querySelector<HTMLButtonElement>(
+                  '[data-composer-row]',
+                )
+                row?.focus()
+                row?.click()
+              }}
+            />
+          )
+        }
+      />
 
       {empty ? (
         <EmptyState
@@ -260,7 +281,7 @@ function TasksPage() {
         <>
           <div
             data-tasks-band
-            className="flex h-11 shrink-0 items-center gap-3 border-b border-rule bg-bone px-8"
+            className="flex h-11 shrink-0 items-center gap-3 border-b border-rule bg-bone px-3"
           >
             {scope === null ? null : <ScopeChip name={scope.name} />}
             <span className="flex-1" />
@@ -277,58 +298,62 @@ function TasksPage() {
               ]}
             />
           </div>
-          <div className="flex flex-col gap-8 px-8 py-6">
-            {groups.length === 0 ? (
-              <ol className="border-t border-rule">
-                <li>{composer}</li>
-              </ol>
-            ) : null}
-            {groups.map((g, gi) => (
-              <section
-                key={g.key}
-                aria-label={g.label}
-                className="flex flex-col"
-              >
-                <LabelHead
-                  label={
-                    <span
-                      className={
-                        g.tone === 'bad' ? 'text-destructive' : undefined
+          <PageBody>
+            <Card>
+              <div ref={body} className="contents">
+                {groups.length === 0 ? (
+                  <ol>
+                    <li>{composer}</li>
+                  </ol>
+                ) : null}
+                {groups.map((g, gi) => (
+                  <section
+                    key={g.key}
+                    aria-label={g.label}
+                    className="flex flex-col"
+                  >
+                    <LabelHead
+                      label={
+                        <span
+                          className={
+                            g.tone === 'bad' ? 'text-destructive' : undefined
+                          }
+                        >
+                          {g.label}
+                        </span>
                       }
-                    >
-                      {g.label}
-                    </span>
-                  }
-                />
-                <ol>
-                  {g.rows.map((t) => (
-                    <TaskItem
-                      key={t.id}
-                      task={t}
-                      meId={me.id}
-                      figure={
-                        viewDone
-                          ? t.doneAt
-                            ? formatWhen(t.doneAt, today)
-                            : ''
-                          : t.dueDate
-                            ? formatDue(t.dueDate, today)
-                            : ''
-                      }
-                      done={viewDone}
-                      focused={t.id === focusId}
-                      overdue={g.key === 'overdue'}
-                      leaving={leaving.has(t.id)}
-                      wash={washes(t.id)}
-                      menu={menuFor(t)}
-                      onToggle={() => toggle(t.id, !viewDone)}
                     />
-                  ))}
-                  {gi === groups.length - 1 ? <li>{composer}</li> : null}
-                </ol>
-              </section>
-            ))}
-          </div>
+                    <ol>
+                      {g.rows.map((t) => (
+                        <TaskItem
+                          key={t.id}
+                          task={t}
+                          meId={me.id}
+                          figure={
+                            viewDone
+                              ? t.doneAt
+                                ? formatWhen(t.doneAt, today)
+                                : ''
+                              : t.dueDate
+                                ? formatDue(t.dueDate, today)
+                                : ''
+                          }
+                          done={viewDone}
+                          focused={t.id === focusId}
+                          overdue={g.key === 'overdue'}
+                          leaving={leaving.has(t.id)}
+                          wash={washes(t.id)}
+                          menu={menuFor(t)}
+                          onToggle={() => toggle(t.id, !viewDone)}
+                        />
+                      ))}
+                      {gi === groups.length - 1 ? <li>{composer}</li> : null}
+                    </ol>
+                  </section>
+                ))}
+              </div>
+            </Card>
+          </PageBody>
         </>
       )}
       {windows}
@@ -350,7 +375,7 @@ function ScopeChip({ name }: { name: string }) {
         aria-label={`Show every task, not just ${name}'s`}
         className="focus-ring -mr-0.5 text-graphite hover:text-foreground"
       >
-        <X className="size-3" strokeWidth={2} />
+        <icon.close className="size-3" strokeWidth={2} />
       </Link>
     </span>
   )

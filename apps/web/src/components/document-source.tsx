@@ -1,4 +1,4 @@
-import { ExternalLink } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { Button } from './ui/button'
 import { storageLinkProvider } from '#/lib/documents/storage-link'
 import { cn } from '#/lib/utils'
@@ -65,7 +65,7 @@ export function OpenInSourceButton({
         aria-label={`Open ${filename} in ${where}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <ExternalLink />
+        <icon.open />
       </a>
     </Button>
   )
@@ -106,7 +106,7 @@ export function OpenSourceButton({
         aria-label={`Open source ${filename}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <ExternalLink />
+        <icon.open />
       </a>
     </Button>
   )

@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { CalendarDays } from 'lucide-react'
+import { CalendarDays } from '#/components/icons'
 import { Band, Day, EmptyRow } from '#/components/ledger-section'
 import { recordNoteGroups } from '#/lib/notes/record-groups'
 import type { NoteLanes } from '#/lib/notes/record-groups'

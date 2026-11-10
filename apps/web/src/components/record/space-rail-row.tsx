@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { Layers, X } from 'lucide-react'
+import { icon, Layers } from '#/components/icons'
 import { RailGroupRow } from '#/components/record/record-parts'
 import { cn } from '#/lib/utils'
 
@@ -36,7 +36,7 @@ export function SpaceRailRow({
           onClick={onRemove}
           className="focus-ring hidden size-5 items-center justify-center text-graphite group-hover:flex hover:text-foreground focus-visible:flex"
         >
-          <X className="size-3" strokeWidth={2} />
+          <icon.close className="size-3" strokeWidth={2} />
         </button>
       )}
     </RailGroupRow>

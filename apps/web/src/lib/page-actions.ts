@@ -1,6 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
-import type { LucideIcon } from 'lucide-react'
-import { Upload } from 'lucide-react'
+import { icon } from '#/components/icons'
+import type { LucideIcon } from '#/components/icons'
 import { openUploadDialog } from './upload-dialog-store'
 
 /**
@@ -83,7 +83,7 @@ export const GLOBAL_ACTIONS: ReadonlyArray<PageAction> = [
   {
     id: 'upload',
     label: 'Upload a file…',
-    icon: Upload,
+    icon: icon.upload,
     words: 'upload file document deck attach drop',
     run: openUploadDialog,
   },

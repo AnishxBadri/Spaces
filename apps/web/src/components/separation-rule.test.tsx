@@ -167,7 +167,7 @@ describe('a band', () => {
         'bg-bone',
         'border-b',
         'border-rule',
-        'px-3',
+        'px-(--inset)',
       ]),
     )
     const label = band?.querySelector('h3')
@@ -244,7 +244,7 @@ describe('a fold row', () => {
         'h-ledger-row',
         'border-t',
         'border-rule',
-        'px-3',
+        'px-(--inset)',
         'text-label',
         'text-graphite',
       ]),

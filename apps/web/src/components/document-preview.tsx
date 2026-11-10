@@ -1,4 +1,4 @@
-import { FileWarning } from 'lucide-react'
+import { FileWarning } from '#/components/icons'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { PDFDocumentProxy } from 'unpdf/pdfjs'

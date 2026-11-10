@@ -163,13 +163,19 @@ const buttonNamed = (name: string) => {
 }
 
 describe('the market map', () => {
-  it('is the title and its meta with no head button, the lanes headed in sans on an ink rule', async () => {
+  it('is the title and its meta with the split + New space, the lanes headed in sans on an ink rule', async () => {
     await mount(index())
     expect(document.querySelector('h1')?.textContent).toBe('Spaces')
     expect(document.querySelector('[data-spaces-meta]')?.textContent).toBe(
       '5 spaces · 3 nested',
     )
-    expect(document.querySelector('header button')).toBeNull()
+    const split = document.querySelector('header [data-split-new]')
+    expect(split?.querySelector('[data-new-button]')?.textContent).toBe(
+      'New space',
+    )
+    expect(
+      split?.querySelector('[data-split-new-menu]')?.getAttribute('aria-label'),
+    ).toBe('New space from a template')
     const head = document.querySelector('[data-lane-heads]')
     expect(head?.className).toContain('border-hairline')
     expect(head?.className).toContain('text-label')
@@ -177,11 +183,10 @@ describe('the market map', () => {
     expect(document.body.textContent).not.toContain('Market map')
   })
 
-  it('ends on the composer row, New space… with its key', async () => {
+  it('has no composer row: the head’s split is the one way in', async () => {
     await mount(index())
-    expect(document.querySelector('[data-composer-row]')?.textContent).toBe(
-      '+New space…S',
-    )
+    expect(document.querySelector('[data-composer-row]')).toBeNull()
+    expect(document.body.textContent).not.toContain('New space…')
   })
 
   it('draws 36px rows, ruled only under a top-level group', async () => {
@@ -248,8 +253,8 @@ describe('the New space window', () => {
 
   it('has a title only, the three fields, and Cancel closes it', async () => {
     await mount(index())
-    const open = document.querySelector('[data-composer-row]')
-    if (!(open instanceof HTMLElement)) throw new Error('no composer row')
+    const open = document.querySelector('header [data-new-button]')
+    if (!(open instanceof HTMLElement)) throw new Error('no New space')
     await act(async () => open.click())
     const d = dialog()
     expect(d?.querySelector('h2')?.textContent).toBe('New space')

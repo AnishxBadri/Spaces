@@ -9,10 +9,10 @@ import {
   Paperclip,
   Pilcrow,
   Users,
-} from 'lucide-react'
+} from '#/components/icons'
+import type { LucideIcon } from '#/components/icons'
 import { forwardRef } from 'react'
 import type { KeyboardEvent } from 'react'
-import type { LucideIcon } from 'lucide-react'
 import { formatDay } from '@spaces/core/format'
 import { fmtPct } from '@spaces/core/portfolio/format'
 import { useClock } from './clock'

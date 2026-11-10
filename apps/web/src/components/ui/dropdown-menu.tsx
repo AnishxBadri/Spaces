@@ -1,5 +1,8 @@
 import * as React from 'react'
-import { CheckIcon, ChevronRightIcon } from 'lucide-react'
+import {
+  Check as CheckIcon,
+  ChevronRight as ChevronRightIcon,
+} from '#/components/icons'
 import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui'
 
 import { useWindowSheet } from '#/components/ui/dialog.tsx'

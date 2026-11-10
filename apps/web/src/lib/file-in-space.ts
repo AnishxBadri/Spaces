@@ -1,4 +1,4 @@
-import { FolderInput } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { toast } from 'sonner'
 import type { PageAction, StepChoice, StepCreate } from './page-actions'
 import { createSpace, listSpaces, tagIntoSpace } from './server-fns'
@@ -144,7 +144,7 @@ export function fileInSpaceAction(record: {
   return {
     id: 'file-in-space',
     label: 'File in a space…',
-    icon: FolderInput,
+    icon: icon.fileIn,
     words: 'tag space file',
     ...(filed.size > 0 ? { meta: `in ${String(filed.size)} now` } : {}),
     step: {

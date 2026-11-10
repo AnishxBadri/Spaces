@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useRouter } from '@tanstack/react-router'
-import { CheckSquare, LogOut, Settings, Table2 } from 'lucide-react'
+import { CheckSquare, icon, Settings, Table2 } from '#/components/icons'
+import type { LucideIcon } from '#/components/icons'
 import { useCommandState } from 'cmdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDay } from '@spaces/core/format'
 import { NAV_ITEMS } from './app-sidebar'
@@ -258,7 +258,7 @@ function Lanes({
  * name in ink, the lane in graphite. A task is struck through once done.
  */
 export function HitLine({ hit, today }: { hit: Hit; today: string }) {
-  const icon =
+  const glyph =
     hit.rowKind === 'task' ? CheckSquare : (KIND_ICONS[hit.kind] ?? Table2)
   const done = hit.rowKind === 'task' && hit.task.done
   return (
@@ -268,7 +268,7 @@ export function HitLine({ hit, today }: { hit: Hit; today: string }) {
           <PictureMark src={hit.picture} size={14} />
         </GlyphSlot>
       ) : (
-        <Glyph icon={icon} />
+        <Glyph icon={glyph} />
       )}
       <span
         data-name
@@ -1230,7 +1230,7 @@ export function CommandPalette({
       {
         id: 'sign-out',
         label: 'Sign out',
-        icon: LogOut,
+        icon: icon.signOut,
         words: 'log out session',
         run: () => {
           // Held decisions are written as this user, so before the session goes.

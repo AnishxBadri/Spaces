@@ -71,7 +71,7 @@ export function FilterChips({
       data-filter-chips
       role="group"
       aria-label="Filter conditions"
-      className="flex h-9 items-center gap-2 border-b border-rule bg-paper px-3"
+      className="mx-1 flex h-9 items-center gap-2 border-x border-b border-rule bg-paper px-1.75"
     >
       <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto">
         {conditions.map((c, i) => {

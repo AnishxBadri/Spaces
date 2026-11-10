@@ -5,7 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { Menu, X } from 'lucide-react'
+import { icon } from '#/components/icons'
 import { useCallback, useState } from 'react'
 import { AppSidebar, CHASSIS_LAYER, NAV_ITEMS } from '#/components/app-sidebar'
 import {
@@ -137,9 +137,9 @@ function AppShell() {
             className="focus-ring -ml-1 flex size-8 items-center justify-center rounded-md text-graphite hover:bg-bone"
           >
             {mobileNavOpen ? (
-              <X className="size-4.5" strokeWidth={1.75} />
+              <icon.close className="size-4.5" strokeWidth={1.75} />
             ) : (
-              <Menu className="size-4.5" strokeWidth={1.75} />
+              <icon.menu className="size-4.5" strokeWidth={1.75} />
             )}
           </button>
           <Wordmark />

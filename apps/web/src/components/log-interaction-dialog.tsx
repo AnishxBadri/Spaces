@@ -1,5 +1,5 @@
 import { useRouter } from '@tanstack/react-router'
-import { Phone, X } from 'lucide-react'
+import { icon, Phone } from '#/components/icons'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { formatDay, formatTime } from '@spaces/core/format'
@@ -333,7 +333,7 @@ function AttendeeField({
                 }}
                 className="focus-ring text-graphite hover:text-foreground"
               >
-                <X className="size-2.5" strokeWidth={2} />
+                <icon.close className="size-2.5" strokeWidth={2} />
               </button>
             </span>
           ))}

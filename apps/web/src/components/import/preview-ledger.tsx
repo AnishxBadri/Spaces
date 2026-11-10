@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { Check } from 'lucide-react'
+import { Check } from '#/components/icons'
 import type { ReactNode } from 'react'
 import {
   alsoCreateWhy,
@@ -107,7 +107,7 @@ export function PreviewStrip({
   const to = `/import/${batchId}`
   return (
     <ReadoutStrip
-      className="border-b border-rule px-8"
+      className="border-b border-rule px-3"
       readouts={(
         [
           {
