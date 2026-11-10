@@ -1,25 +1,22 @@
 import {
   ClientOnly,
   createFileRoute,
-  Link,
   useNavigate,
-  useRouter,
 } from '@tanstack/react-router'
-import { Globe, icon, Layers, Lock } from '#/components/icons'
-import type { LucideIcon } from '#/components/icons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { DocumentPreview } from '#/components/document-preview'
-import { FilingRow } from '#/components/filing-row'
-import { OpenIn, ViaMark } from '#/components/open-in'
 import {
   deriveMarkdown,
   extractMentionIds,
   NoteEditor,
 } from '#/components/editor/note-editor'
-import { KIND_ICONS } from '#/components/editor/mention'
-import { NOTE_INSET } from '#/components/editor/note-column'
 import type { DroppedDocument } from '#/components/editor/note-editor'
+import { NoteHead } from '#/components/notes/note-head'
+import type { SaveState } from '#/components/notes/note-head'
+import { NoteSheet } from '#/components/notes/note-sheet'
+import { NoteMoreMenu } from '#/components/notes/note-menu'
+import { NoteRail } from '#/components/notes/note-rail'
 import {
   DOCUMENT_PREVIEW_EVENT,
   documentPreviewRequest,
@@ -33,44 +30,21 @@ import {
 import { uploadDocument } from '#/lib/documents/upload'
 import type { UploadPhase } from '#/lib/documents/upload'
 import type { NoteBody } from '@spaces/db/schema/kinds'
-import { SaveAsTemplateAction } from '#/components/templates'
-import { useConfirm } from '#/components/ui/confirm-dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '#/components/ui/dropdown-menu'
-import { MoreMenu } from '#/components/ui/more-menu'
-import { Input } from '#/components/ui/input'
-import { Segmented } from '#/components/ui/segmented'
-import { Select } from '#/components/ui/select'
-import { recordPath } from '#/lib/record-path'
-import { cn } from '#/lib/utils'
 import { fileInSpaceAction } from '#/lib/file-in-space'
 import { usePageActions } from '#/lib/page-actions'
 import {
-  deleteNote,
-  fileNoteAgainst,
   getDocumentPreview,
   getNote,
   listSpaces,
   listTermsForNote,
-  previewNoteDeletion,
   saveNote,
   saveNoteAsNewVersion,
-  saveNoteAsTemplate,
-  searchEntities,
-  setNoteKind,
-  setNoteVisibility,
-  tagIntoSpace,
-  unfileNoteFrom,
-  untagFromSpace,
 } from '#/lib/server-fns'
 
 /**
- * The prose register: this page reads like a page, not a dashboard.
- * Serif body, capped measure, quiet chrome.
+ * The prose register: this page reads like a page, not a dashboard. A
+ * record head, the body on paper at a capped measure, and the rail that says
+ * where the note is filed and who may read it.
  */
 export const Route = createFileRoute('/_app/notes_/$noteId')({
   loader: async ({ params }) => {
@@ -87,8 +61,6 @@ export const Route = createFileRoute('/_app/notes_/$noteId')({
   component: NotePage,
 })
 
-type SaveState = 'idle' | 'dirty' | 'saving' | 'saved'
-
 /** One toast, rewritten in place, for the three phases of a dropped file. */
 const DROP_PHASES: Record<UploadPhase, string> = {
   hashing: 'Reading…',
@@ -97,17 +69,17 @@ const DROP_PHASES: Record<UploadPhase, string> = {
 }
 
 function NotePage() {
-  const { note: initial, allSpaces, terms } = Route.useLoaderData()
-  const [title, setTitle] = useState(initial.title)
+  const { note, allSpaces, terms } = Route.useLoaderData()
+  const [title, setTitle] = useState(note.title)
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const preview = useDocumentPreview()
-  const onFileDrop = useNoteFileDrop(initial.spaces)
+  const onFileDrop = useNoteFileDrop(note.spaces)
 
   const latest = useRef<{
     document: NoteBody
     blocksToMarkdownLossy: () => Promise<string>
   } | null>(null)
-  const titleRef = useRef(initial.title)
+  const titleRef = useRef(note.title)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const flush = useCallback(async () => {
@@ -126,13 +98,13 @@ function NotePage() {
         }
       }
       await saveNote({
-        data: { id: initial.id, title: titleRef.current, body },
+        data: { id: note.id, title: titleRef.current, body },
       })
       setSaveState('saved')
     } catch {
       setSaveState('dirty') // retried on next change
     }
-  }, [initial.id])
+  }, [note.id])
 
   const scheduleSave = useCallback(() => {
     setSaveState('dirty')
@@ -150,108 +122,51 @@ function NotePage() {
 
   usePageActions([
     fileInSpaceAction({
-      id: initial.id,
+      id: note.id,
       name: title || 'Untitled',
-      filedIds: initial.spaces.map((s) => s.id),
+      filedIds: note.spaces.map((s) => s.id),
     }),
   ])
 
   return (
-    <div className="flex min-h-full flex-col">
-      {/* The head runs the full field on a hairline; the sheet below keeps
-          its 72ch measure. Both start at the note inset, so the back link,
-          the title, the filing rows and the body share one left edge. */}
-      <div
-        className={cn(
-          'flex h-12 shrink-0 items-center justify-between border-b border-hairline pr-8',
-          NOTE_INSET,
-        )}
-      >
-        <Link
-          to="/notes"
-          className="focus-ring flex items-center gap-1.5 rounded-md text-ui text-graphite hover:text-foreground"
-        >
-          <icon.back className="size-3.5" strokeWidth={1.75} />
-          Notes
-        </Link>
-        <span className="flex items-center gap-3">
-          <ViaMark via={initial.via} />
-          <OpenIn link={initial.openIn} />
-          <KindToggle noteId={initial.id} kind={initial.kind} />
-          <span
-            className="text-label text-graphite"
-            role="status"
-            aria-live="polite"
-          >
-            {saveState === 'saving'
-              ? 'Saving…'
-              : saveState === 'saved'
-                ? 'Saved'
-                : saveState === 'dirty'
-                  ? 'Unsaved changes'
-                  : ''}
-          </span>
-          {initial.isMine ? (
-            <VisibilityToggle
-              noteId={initial.id}
-              isPrivate={initial.isPrivate}
-            />
-          ) : null}
-          <DeleteNoteAction noteId={initial.id} />
-          <NoteMoreMenu
-            noteId={initial.id}
-            title={initial.title}
-            beforeVersion={async () => {
-              if (timer.current === null) return
-              clearTimeout(timer.current)
-              timer.current = null
-              await flush()
+    <>
+      <NoteSheet
+        head={
+          <NoteHead
+            note={note}
+            title={title}
+            onTitleChange={(next) => {
+              setTitle(next)
+              titleRef.current = next
+              scheduleSave()
             }}
+            saveState={saveState}
+            menu={
+              <NoteMoreMenu
+                noteId={note.id}
+                title={title}
+                kind={note.kind}
+                saveNewVersion={async () => {
+                  // The pending autosave lands first, so the copy carries
+                  // the latest body.
+                  if (timer.current !== null) {
+                    clearTimeout(timer.current)
+                    timer.current = null
+                    await flush()
+                  }
+                  const { id } = await saveNoteAsNewVersion({
+                    data: { id: note.id },
+                  })
+                  return id
+                }}
+              />
+            }
           />
-        </span>
-      </div>
-
-      <div className={cn('max-w-[72ch] pt-6 pr-8 pb-8', NOTE_INSET)}>
-        <input
-          value={title}
-          onChange={(e) => {
-            setTitle(e.target.value)
-            titleRef.current = e.target.value
-            scheduleSave()
-          }}
-          placeholder="Untitled"
-          aria-label="Note title"
-          className={cn(
-            'w-full bg-transparent title-serif outline-none placeholder:text-graphite',
-            initial.replacedBy !== null && 'text-graphite',
-          )}
-        />
-
-        {initial.replacedBy === null ? null : (
-          <p className="mt-1 mono text-micro text-graphite">
-            Replaced by →{' '}
-            <Link
-              to="/notes/$noteId"
-              params={{ noteId: initial.replacedBy.id }}
-              className="focus-ring rounded-md hover:text-foreground hover:underline"
-            >
-              {initial.replacedBy.title}
-            </Link>
-          </p>
-        )}
-
-        <SpaceFiling
-          noteId={initial.id}
-          filed={initial.spaces}
-          allSpaces={allSpaces}
-        />
-
-        <RecordFiling noteId={initial.id} filed={initial.filedAgainst} />
-
-        <div className="prose-note mt-4">
+        }
+        editor={
           <ClientOnly fallback={<div className="min-h-40" />}>
             <NoteEditor
-              initialContent={initial.bodyJson}
+              initialContent={note.bodyJson}
               terms={terms}
               onChange={(editor) => {
                 latest.current = editor
@@ -260,62 +175,22 @@ function NotePage() {
               onFileDrop={onFileDrop}
             />
           </ClientOnly>
-        </div>
-
-        {initial.backlinks.length > 0 ? (
-          <aside className="mt-12 border-t border-rule pt-5">
-            <h2 className="text-label font-medium text-graphite">
-              Linked from
-            </h2>
-            <ul className="mt-2 space-y-1">
-              {initial.backlinks.map((b) => {
-                // KIND_ICONS' Record index type hides misses — widen honestly.
-                const Icon: LucideIcon | undefined = KIND_ICONS[b.kind]
-                const row = (
-                  <>
-                    {Icon ? (
-                      <Icon className="size-3.5" strokeWidth={1.75} />
-                    ) : null}
-                    {b.name}
-                  </>
-                )
-                const className =
-                  'flex items-center gap-2 rounded-md px-1 py-0.5 text-ui text-graphite hover:text-foreground'
-                // One route table for the whole app, as the chip row below
-                // uses. A document has no page at all, and opens the same
-                // preview its chip does.
-                const href = recordPath({ kind: b.kind, id: b.fromId })
-                return (
-                  <li key={b.fromId}>
-                    {b.kind === 'document' ? (
-                      <button
-                        type="button"
-                        className={className}
-                        onClick={() => preview.open(b.fromId)}
-                      >
-                        {row}
-                      </button>
-                    ) : href ? (
-                      <Link to={href} className={className}>
-                        {row}
-                      </Link>
-                    ) : (
-                      <span className={className}>{row}</span>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          </aside>
-        ) : null}
-      </div>
+        }
+        rail={
+          <NoteRail
+            note={note}
+            allSpaces={allSpaces}
+            onPreview={preview.open}
+          />
+        }
+      />
 
       {/* Mounted by the page, not by the editor: a mention chip renders
           inside BlockNote's ProseMirror tree, where a Radix dialog has no
           context to open in and is remounted on every nearby keystroke.
           The chip dispatches; this listens. */}
       <DocumentPreview doc={preview.doc} onOpenChange={preview.onOpenChange} />
-    </div>
+    </>
   )
 }
 
@@ -438,488 +313,4 @@ function useDocumentPreview() {
   }, [open])
 
   return { doc, open, onOpenChange }
-}
-
-/** The three kinds the enum holds, as `getNote` hands them over. */
-type NoteKind = Awaited<ReturnType<typeof getNote>>['kind']
-
-/**
- * Note · Memo · Scratch, in the head row beside the save state. Kind is
- * presentation and intent, never structure: a
- * promote or a demote moves this one column and leaves every link, every
- * space filing and the body exactly where they were.
- *
- * Not gated on `isMine`, unlike visibility beside it — a shared note's genre
- * is the team's reading of it, and the server agrees.
- */
-function KindToggle({
-  noteId,
-  kind: initial,
-}: {
-  noteId: string
-  kind: NoteKind
-}) {
-  const router = useRouter()
-  const [kind, setKind] = useState(initial)
-  const [pending, setPending] = useState(false)
-
-  async function pick(next: NoteKind) {
-    if (next === kind || pending) return
-    const previous = kind
-    // Optimistic: the segment inks on the click, and rolls back if the
-    // server refuses — the alternative is a control that lags a round trip.
-    setKind(next)
-    setPending(true)
-    try {
-      await setNoteKind({ data: { id: noteId, kind: next } })
-      await router.invalidate()
-    } catch (e) {
-      setKind(previous)
-      toast.error(e instanceof Error ? e.message : 'Could not change that')
-    } finally {
-      setPending(false)
-    }
-  }
-
-  return (
-    <Segmented
-      label="Note kind"
-      value={kind}
-      disabled={pending}
-      options={[
-        { id: 'note', label: 'Note' },
-        { id: 'memo', label: 'Memo' },
-        { id: 'scratch', label: 'Scratch' },
-      ]}
-      onChange={(next) => void pick(next)}
-    />
-  )
-}
-
-/**
- * Author-only. Default is shared — private is the exception you opt into:
- * private-by-default keeps the second partner writing elsewhere.
- */
-function VisibilityToggle({
-  noteId,
-  isPrivate: initialPrivate,
-}: {
-  noteId: string
-  isPrivate: boolean
-}) {
-  const [isPrivate, setIsPrivate] = useState(initialPrivate)
-  const [pending, setPending] = useState(false)
-
-  async function toggle() {
-    const next = !isPrivate
-    setPending(true)
-    try {
-      await setNoteVisibility({
-        data: { id: noteId, visibility: next ? 'private' : 'shared' },
-      })
-      setIsPrivate(next)
-      toast.success(
-        next ? 'Only you can see this note now' : 'Visible to the workspace',
-      )
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not change that')
-    } finally {
-      setPending(false)
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={toggle}
-      disabled={pending}
-      className="focus-ring flex items-center gap-1 rounded-md px-1.5 py-0.5 text-label font-medium text-graphite hover:bg-bone hover:text-foreground"
-      title={
-        isPrivate
-          ? 'Private — only you. Click to share with the workspace.'
-          : 'Shared with the workspace. Click to make private.'
-      }
-    >
-      {isPrivate ? (
-        <Lock className="size-3" strokeWidth={1.75} />
-      ) : (
-        <Globe className="size-3" strokeWidth={1.75} />
-      )}
-      {isPrivate ? 'Private' : 'Shared'}
-    </button>
-  )
-}
-
-/** Run a filing write, then let the loader say what the row now is. */
-function useFiling() {
-  const router = useRouter()
-  const [busy, setBusy] = useState(false)
-
-  const run = useCallback(
-    async (action: () => Promise<unknown>) => {
-      setBusy(true)
-      try {
-        await action()
-        await router.invalidate()
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Could not file')
-      } finally {
-        setBusy(false)
-      }
-    },
-    [router],
-  )
-
-  return { busy, run }
-}
-
-/**
- * Filing, not referencing. Mentioning a space in the body links to it;
- * filing says the note *lives* here, and puts it in the space's top block.
- * Same `entity_space` write a company tag makes — one mechanism per kind.
- */
-function SpaceFiling({
-  noteId,
-  filed,
-  allSpaces,
-}: {
-  noteId: string
-  filed: Array<{ id: string; name: string; archived: boolean }>
-  allSpaces: Awaited<ReturnType<typeof listSpaces>>
-}) {
-  const { busy, run } = useFiling()
-  const unfiled = allSpaces.filter((s) => !filed.some((f) => f.id === s.id))
-
-  return (
-    <FilingRow
-      label="Filed in space"
-      busy={busy}
-      chips={filed.map((s) => ({
-        id: s.id,
-        name: s.name,
-        href: `/spaces/${s.id}`,
-        Icon: Layers,
-        archived: s.archived,
-      }))}
-      removeLabel={(name) => `Remove from ${name}`}
-      onRemove={(chip) =>
-        void run(() =>
-          untagFromSpace({ data: { entityId: noteId, spaceId: chip.id } }),
-        )
-      }
-      adder={
-        /*
-          A picker that files rather than holds: its value stays empty, so the
-          trigger keeps the dashed invitation and the sheet is the one the rest
-          of the app draws. Spaces are a tree of a few dozen, so the whole list
-          is offered and it nests by depth — the record lane below cannot do
-          that, which is why it searches instead.
-        */
-        unfiled.length > 0 ? (
-          <Select
-            aria-label="File this note in a space"
-            value=""
-            disabled={busy}
-            onChange={(spaceId) =>
-              void run(() =>
-                tagIntoSpace({ data: { entityId: noteId, spaceId } }),
-              )
-            }
-            items={unfiled.map((s) => ({
-              value: s.id,
-              label: s.name,
-              depth: s.depth,
-            }))}
-            width="content"
-            placeholder="+ File in space…"
-            searchPlaceholder="Search spaces…"
-            emptyLabel="No space matches."
-            className="h-6 w-auto rounded-none border-dashed bg-transparent px-2 text-label text-graphite hover:text-foreground"
-          />
-        ) : null
-      }
-    />
-  )
-}
-
-/**
- * The other lane: the records this note is filed against, which is
- * `link(tagged_in)` — the outbound direction, and the opposite of the
- * "Linked from" aside, which lists who mentions the note.
- *
- * Unfiling removes the filing alone. A body mention of the same record is a
- * different edge and stays, so the note slides from "Filed here" to "Mentions
- * this" on that record instead of vanishing from it.
- */
-function RecordFiling({
-  noteId,
-  filed,
-}: {
-  noteId: string
-  filed: Awaited<ReturnType<typeof getNote>>['filedAgainst']
-}) {
-  const { busy, run } = useFiling()
-
-  return (
-    <FilingRow
-      label="Filed against"
-      busy={busy}
-      chips={filed.map((r) => ({
-        id: r.id,
-        name: r.name,
-        // One route table for the whole app: a custom record goes through
-        // its object's slug, and a kind with no page reads as text.
-        href: recordPath(r),
-        Icon: KIND_ICONS[r.kind],
-      }))}
-      removeLabel={(name) => `Unfile from ${name}`}
-      onRemove={(chip) =>
-        void run(() =>
-          unfileNoteFrom({ data: { id: noteId, targetId: chip.id } }),
-        )
-      }
-      adder={
-        <RecordFilingPicker
-          noteId={noteId}
-          filedIds={filed.map((r) => r.id)}
-          disabled={busy}
-          onPick={(targetId) =>
-            void run(() => fileNoteAgainst({ data: { id: noteId, targetId } }))
-          }
-        />
-      }
-    />
-  )
-}
-
-/**
- * Records are unbounded where spaces are a tree of a few dozen, so this is a
- * debounced search rather than a list — the combobox `value-editor.tsx`'s
- * record-reference picker already draws.
- *
- * `searchEntities` filters merged records and unreadable notes in SQL; the
- * `kinds` argument is what keeps `space`, `note` and `document` out. That is
- * a convenience, not the rule: `fileNoteAgainstProgram` refuses the same
- * targets server-side. `mandate` is absent from the list because it is a
- * workspace row rather than an entity — it has no id the `link` table could
- * point at, so it cannot be offered and could not be accepted.
- */
-function RecordFilingPicker({
-  noteId,
-  filedIds,
-  disabled,
-  onPick,
-}: {
-  noteId: string
-  filedIds: Array<string>
-  disabled: boolean
-  onPick: (targetId: string) => void
-}) {
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState<
-    Awaited<ReturnType<typeof searchEntities>>
-  >([])
-
-  useEffect(() => {
-    if (!query.trim()) {
-      setResults([])
-      return
-    }
-    let alive = true
-    const t = setTimeout(() => {
-      void (async () => {
-        const rows = await searchEntities({
-          data: { q: query, kinds: ['company', 'person', 'deal', 'custom'] },
-        })
-        if (alive) setResults(rows)
-      })()
-    }, 200)
-    return () => {
-      alive = false
-      clearTimeout(t)
-    }
-  }, [query])
-
-  // Already filed, and the note itself — the second is unreachable through
-  // `kinds` above, and held here anyway so the exclusion does not depend on
-  // an argument an edit could widen.
-  const excluded = useMemo(
-    () => new Set([...filedIds, noteId]),
-    [filedIds, noteId],
-  )
-  const offered = results.filter((r) => !excluded.has(r.id))
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        aria-label="File this note against a record"
-        disabled={disabled}
-        className="focus-ring flex h-6 items-center rounded-none border border-dashed border-rule px-2 text-label text-graphite hover:text-foreground disabled:opacity-50"
-      >
-        + File against…
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64">
-        <div className="p-1.5">
-          <Input
-            value={query}
-            autoFocus
-            placeholder="Search records…"
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.stopPropagation()}
-            className="h-7 text-label"
-          />
-        </div>
-        {offered.map((r) => (
-          <DropdownMenuItem
-            key={r.id}
-            onSelect={() => {
-              onPick(r.id)
-              setQuery('')
-            }}
-          >
-            {r.name}
-          </DropdownMenuItem>
-        ))}
-        {query.trim() && offered.length === 0 ? (
-          <p className="px-2 py-1.5 text-label text-graphite">
-            No record matches.
-          </p>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
-/**
- * Hard delete, no trash. The
- * preview runs before the sheet opens, so the sheet can name what loses its
- * edge to this note — and so the mandate's note is refused *in the dialog*,
- * in the registry's own words, rather than by a toast after the user has
- * already said yes.
- */
-function DeleteNoteAction({ noteId }: { noteId: string }) {
-  const navigate = useNavigate()
-  const router = useRouter()
-  const [busy, setBusy] = useState(false)
-  const { confirm, confirmDialog } = useConfirm()
-
-  async function remove() {
-    setBusy(true)
-    try {
-      const impact = await previewNoteDeletion({ data: { id: noteId } })
-      const name = impact.title || 'Untitled'
-      if (impact.blockedReason !== null) {
-        // A notice, not a question: no Delete button, because the server has
-        // already said it would refuse, and it said why.
-        await confirm({
-          title: `“${name}” stays`,
-          body: impact.blockedReason,
-          kind: 'primary',
-          keep: 'Close',
-        })
-        return
-      }
-      const ok = await confirm({
-        title: `Delete “${name}”?`,
-        body:
-          impact.unlinks.length > 0
-            ? 'The note and its text go for good. Everything listed below keeps its own row — only its link to this note goes.'
-            : 'The note and its text go for good. This cannot be undone.',
-        rows: impact.unlinks,
-        action: 'Delete',
-      })
-      if (!ok) return
-      await deleteNote({ data: { id: noteId } })
-      // Leave first, then invalidate: this route's loader would otherwise
-      // refetch a note that is no longer there.
-      await navigate({ to: '/notes' })
-      void router.invalidate()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not delete')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={remove}
-        disabled={busy}
-        title="Delete this note"
-        className="focus-ring flex items-center gap-1 rounded-md px-1.5 py-0.5 text-label font-medium text-graphite hover:bg-bone hover:text-destructive"
-      >
-        <icon.delete className="size-3" strokeWidth={1.75} />
-        Delete
-      </button>
-      {confirmDialog}
-    </>
-  )
-}
-
-/**
- * The note head's `···`: Save as new version and Save as template….
- * - A new version is a copy filed where this note is, superseding it.
- *   The pending autosave lands first, so the copy carries the latest body.
- */
-function NoteMoreMenu({
-  noteId,
-  title,
-  beforeVersion,
-}: {
-  noteId: string
-  title: string
-  beforeVersion: () => Promise<void>
-}) {
-  const navigate = useNavigate()
-  const [templating, setTemplating] = useState(false)
-  const [busy, setBusy] = useState(false)
-
-  async function newVersion() {
-    if (busy) return
-    setBusy(true)
-    try {
-      await beforeVersion()
-      const { id } = await saveNoteAsNewVersion({ data: { id: noteId } })
-      toast.success('New version saved')
-      await navigate({ to: '/notes/$noteId', params: { noteId: id } })
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Could not save a new version',
-      )
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <>
-      <MoreMenu
-        variant="head"
-        label="this note"
-        items={[
-          {
-            label: 'Save as new version',
-            disabled: busy,
-            onSelect: () => void newVersion(),
-          },
-          {
-            label: 'Save as template…',
-            opens: true,
-            onSelect: () => setTemplating(true),
-          },
-        ]}
-      />
-      <SaveAsTemplateAction
-        entityLabel="note"
-        defaultName={title}
-        open={templating}
-        onOpenChange={setTemplating}
-        onSave={async (name) => {
-          await saveNoteAsTemplate({ data: { noteId, name } })
-        }}
-      />
-    </>
-  )
 }

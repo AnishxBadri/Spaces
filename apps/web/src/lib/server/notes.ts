@@ -1,12 +1,20 @@
 import { excerpt } from '@spaces/core/context/excerpt'
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, desc, eq, isNull } from 'drizzle-orm'
+import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { entity, link, note, objectDef } from '@spaces/db/schema'
+import {
+  entity,
+  entitySpace,
+  link,
+  note,
+  objectDef,
+  space,
+} from '@spaces/db/schema'
+import { user } from '@spaces/db/schema/auth'
 import { noteWidenedSql } from '@spaces/core/writes/read/can-read-sql'
 import { canRead, requireUser } from './shared'
-import { recordSpaces } from '#/lib/spaces/filed-in'
+import { liveSpaceSql } from '#/lib/spaces/live'
 import { jsonValue } from '@spaces/core/json'
 
 export const createNote = createServerFn({ method: 'POST' })
@@ -91,13 +99,17 @@ export const getNote = createServerFn()
           title: note.title,
           bodyJson: note.bodyJson,
           kind: note.kind,
+          createdAt: entity.createdAt,
           updatedAt: note.updatedAt,
           authorId: note.authorId,
+          author: user.name,
           visibility: note.visibility,
           // An email body its owner widened to the reader.
           widened: noteWidenedSql(u.id),
         })
         .from(note)
+        .innerJoin(entity, eq(entity.id, note.entityId))
+        .innerJoin(user, eq(user.id, note.authorId))
         .where(eq(note.entityId, data.id))
     ).at(0)
     // "Not found" on purpose — a 403 would confirm a private note exists.
@@ -112,20 +124,66 @@ export const getNote = createServerFn()
       .from(link)
       .innerJoin(entity, eq(entity.id, link.fromEntityId))
       .where(and(eq(link.toEntityId, data.id), eq(link.relation, 'mentions')))
-    // Spaces this note is filed in — the picker's current state; an archived
-    // one stays, flagged, and its chip dims.
-    const spaces = await recordSpaces(data.id)
+    // What the body mentions: the outbound direction of the edge above,
+    // written from the body at save. A private note the reader cannot see
+    // drops out rather than leaking its name; so does a merged-away target.
+    const mentions = (
+      await db
+        .select({
+          id: entity.id,
+          name: entity.canonicalName,
+          kind: entity.kind,
+          objectSlug: objectDef.slug,
+          objectLabel: objectDef.singular,
+          visibility: note.visibility,
+          authorId: note.authorId,
+        })
+        .from(link)
+        .innerJoin(entity, eq(entity.id, link.toEntityId))
+        .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
+        .leftJoin(note, eq(note.entityId, entity.id))
+        .where(
+          and(
+            eq(link.fromEntityId, data.id),
+            eq(link.relation, 'mentions'),
+            isNull(entity.mergedIntoId),
+          ),
+        )
+        .orderBy(asc(link.createdAt))
+    )
+      .filter((r) => canRead(u, r))
+      .map(({ id, name, kind, objectSlug, objectLabel }) => ({
+        id,
+        name,
+        kind,
+        objectSlug,
+        objectLabel,
+      }))
+    // Spaces this note is filed in, in the order it was filed; an archived
+    // one stays, flagged, and its row dims.
+    const spaces = await db
+      .select({
+        id: space.entityId,
+        name: entity.canonicalName,
+        archived: sql<boolean>`not ${liveSpaceSql}`,
+      })
+      .from(entitySpace)
+      .innerJoin(space, eq(space.entityId, entitySpace.spaceId))
+      .innerJoin(entity, eq(entity.id, space.entityId))
+      .where(eq(entitySpace.entityId, data.id))
+      .orderBy(asc(entitySpace.createdAt))
     // Records this note is filed against — the *outbound* tagged_in edges,
-    // which is the opposite direction from `backlinks` above. `objectSlug`
-    // rides along so a custom record's chip routes through `/o/<slug>/<id>`
-    // (`recordPath`); a merged-away target drops out rather than linking to
-    // a tombstone.
+    // which is the opposite direction from `backlinks` above, in the order
+    // they were filed. `objectSlug` rides along so a custom record's row
+    // routes through `/o/<slug>/<id>` (`recordPath`); a merged-away target
+    // drops out rather than linking to a tombstone.
     const filedAgainst = await db
       .select({
         id: entity.id,
         name: entity.canonicalName,
         kind: entity.kind,
         objectSlug: objectDef.slug,
+        objectLabel: objectDef.singular,
       })
       .from(link)
       .innerJoin(entity, eq(entity.id, link.toEntityId))
@@ -137,10 +195,10 @@ export const getNote = createServerFn()
           isNull(entity.mergedIntoId),
         ),
       )
-      .orderBy(asc(entity.canonicalName))
+      .orderBy(asc(link.createdAt))
 
     // The newer version that replaced this note, if one the reader can see
-    // exists: the page shows "Replaced by → <title>", dimmed.
+    // exists, and when it replaced it.
     const replacedBy =
       (
         await db
@@ -149,6 +207,7 @@ export const getNote = createServerFn()
             title: note.title,
             visibility: note.visibility,
             authorId: note.authorId,
+            at: link.createdAt,
           })
           .from(link)
           .innerJoin(note, eq(note.entityId, link.fromEntityId))
@@ -158,7 +217,11 @@ export const getNote = createServerFn()
           .orderBy(desc(link.createdAt))
       )
         .filter((r) => canRead(u, r))
-        .map((r) => ({ id: r.id, title: r.title || 'Untitled' }))
+        .map((r) => ({
+          id: r.id,
+          title: r.title || 'Untitled',
+          at: r.at.toISOString(),
+        }))
         .at(0) ?? null
 
     // A recorder's note opens at the recorder too.
@@ -175,8 +238,11 @@ export const getNote = createServerFn()
       title: row.title,
       bodyJson: row.bodyJson,
       kind: row.kind,
+      author: row.author,
+      createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
       backlinks,
+      mentions,
       spaces,
       filedAgainst,
       isPrivate: row.visibility === 'private',

@@ -59,7 +59,9 @@ owner decides it.
 
 - **E1 · The content edge is 12px.** The page title sits on it, and so does every
   card's content: the body gutter is 4px, a card is a 1px rule box with 4px between
-  cards and a 7px inset, so 4 + 1 + 7 lands card content on the 12px line.
+  cards and a 7px inset, so 4 + 1 + 7 lands card content on the 12px line. The one
+  exception is a page that holds a note editor: its head and body start at
+  `NOTE_INSET` (§3, "A note").
 - **E2 · One rule under the head.** A single 1px rule, never the double, and the head
   stays 104px on every page; it folds to the 48px bar on scroll with its tabs and
   toolbar pinned. The `···` is the rightmost head control and its right edge lines up
@@ -528,6 +530,35 @@ There is no Context tab: Ask's answer card carries a `Sources n ›` footer inst
 stacked sections of 2026-09-30, the readout strip under the title and the Notes default
 of 2026-10-06 are superseded.
 
+**A note** — the note page. → `apps/web/src/routes/_app/notes_.$noteId.tsx`, its parts
+in `apps/web/src/components/notes/` (`NoteHead`, `NoteMoreMenu`, `NoteSheet`,
+`NoteRail`). The record anatomy in the prose register:
+
+- **Head.** `RecordHeader` (A4): the kind is the stamp (`NOTE`, `MEMO`, `SCRATCH`), a
+  private note adds an outlined `PRIVATE` beside it, and the serif title is the name
+  field and wraps. One mono meta line whose shape is the note's state:
+  `Anish · 13 Oct 14:02`;
+  `via Granola · Priya Raman · 13 Oct · Open in Granola ↗`;
+  `■ Only you · 13 Oct 14:02`;
+  a replaced note's line in graphite ending `→ <newer title> ›`. Right of
+  the title, the save word and the `···` and nothing else: `KIND` (three checked rows),
+  a rule, Save as new version · Save as template… · Copy link, a rule, Delete…. No back
+  link — the sidebar is the way back. One rule under.
+- **Body.** The editor alone at 72ch, 17px serif, its headings 20 / 17 / 15 sans medium
+  under the 28px serif title; nothing sits between the title and the editor.
+- **Rail.** Right, `w-72` on bone with a rule left, stacked under the body below `md`:
+  `RailSection`s with mono caps labels. `FILED ON · n` — records then spaces in the
+  order they were filed, the name an ink link, the kind in the mono end lane, `×` to
+  unfile, ending on `+ File on…`, one picker for records and spaces (`Not filed` when
+  there is nothing). `MENTIONS · n` and `MENTIONED IN · n` — derived, absent at zero.
+  `VISIBILITY` — the switch for the author alone, the words for anyone else.
+  `HISTORY` — `Written`, `Edited`, `Landed from <tool>`, `Replaced by <title>`: only
+  what the rows record.
+- **The one exception to E1.** The head and the body start at `NOTE_INSET`
+  (`--note-gutter`), not the 12px edge, because BlockNote's side menu floats left of
+  every block and needs the room. The mandate's prose takes the same inset; nothing
+  else does.
+
 **A ledger of a stream** — Ask's sources footer, a run log, a feed.
 → **Today's spine**, `apps/web/src/routes/_app/today.tsx:320`. `LedgerSection` with a
 bone head band with the title, a mono count and one link right; 40px `LedgerRow`s on rules; a fixed
@@ -784,5 +815,3 @@ the sticky head (`HeadBar`, inside `PageHeader` and `RecordHeader`).
   value; Fill from on an attribute.
 - **The Find table** (D77, project 24): results as rows with Add / File here / Dismiss
   checked against what is held, and the Save as watch window.
-- **Notes filed from a tool** (D78): serif with a `via <tool>` mark; the Notes tab gains
-  a From meetings filter.

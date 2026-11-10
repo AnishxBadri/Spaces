@@ -921,11 +921,32 @@
   color: var(--foreground);
 }
 
+/**
+ * The heading ladder inside a note: sans medium, each step under the 28px
+ * serif title above it. Set on the heading element itself, which BlockNote
+ * otherwise sizes from its block's `--level` (3em, 2em, 1.3em) at 700.
+ */
 .prose-note .bn-editor h1,
 .prose-note .bn-editor h2,
 .prose-note .bn-editor h3 {
   font-family: var(--font-sans);
+  font-weight: 500;
   letter-spacing: -0.01em;
+}
+
+.prose-note .bn-editor h1 {
+  font-size: 1.25rem; /* 20px */
+  line-height: 1.75rem;
+}
+
+.prose-note .bn-editor h2 {
+  font-size: 1.0625rem; /* 17px */
+  line-height: 1.5rem;
+}
+
+.prose-note .bn-editor h3 {
+  font-size: 0.9375rem; /* 15px */
+  line-height: 1.375rem;
 }
 
 .prose-note .bn-editor .bn-inline-content[data-content-type='paragraph'] {

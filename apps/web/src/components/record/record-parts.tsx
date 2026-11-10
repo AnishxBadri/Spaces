@@ -58,6 +58,9 @@ export function RecordHeader({
   nameField,
   archived = false,
   badges,
+  stampAside,
+  meta,
+  className,
 }: {
   /** The page's one stamp, alone on the row above the name. */
   stamp: StampProps
@@ -65,19 +68,34 @@ export function RecordHeader({
   actions?: ReactNode
   mark?: ReactNode
   name: ReactNode
-  /** Rename in place: drawn where the title is; the folded bar keeps `name`. */
+  /**
+   * Rename in place: drawn where the title is, and free to wrap; the folded
+   * bar keeps `name`.
+   */
   nameField?: ReactNode
   /** An archived record: the name goes graphite. */
   archived?: boolean
   badges?: ReactNode
+  /** An outlined state stamp beside the kind's: a private note's. */
+  stampAside?: ReactNode
+  /** The one mono line under the name: who wrote it, when, from where. */
+  meta?: ReactNode
+  /** The head's left edge, where the page's body holds a wider one. */
+  className?: string | undefined
 }) {
   const { titleRef, actionsRef, fold } = useHeadFold()
   return (
     <>
       <HeadBar fold={fold} title={name} mark={mark} />
-      <header className="flex shrink-0 flex-col gap-3 border-b border-rule px-3 pt-5 pb-4">
+      <header
+        className={cn(
+          'flex shrink-0 flex-col gap-3 border-b border-rule px-3 pt-5 pb-4',
+          className,
+        )}
+      >
         <div data-stamp-row className="flex">
           <Stamp {...stamp} />
+          {stampAside}
         </div>
         <div className="flex items-end justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-3.5">
@@ -85,8 +103,8 @@ export function RecordHeader({
             <h1
               ref={titleRef}
               className={cn(
-                'min-w-0 truncate title-serif',
-                nameField !== undefined && 'flex-1',
+                'min-w-0 title-serif',
+                nameField === undefined ? 'truncate' : 'flex-1',
                 archived && 'text-graphite',
               )}
             >
@@ -111,6 +129,11 @@ export function RecordHeader({
             </HeadActions>
           ) : null}
         </div>
+        {meta === undefined ? null : (
+          <div data-head-meta className="-mt-2 mono text-micro text-graphite">
+            {meta}
+          </div>
+        )}
       </header>
     </>
   )
@@ -506,12 +529,15 @@ export function RailSection({
   label,
   meta,
   empty = false,
+  caps = false,
   children,
   className,
 }: {
   label: string
   meta?: ReactNode
   empty?: boolean | undefined
+  /** A group label rather than a title: mono caps graphite (`FILED ON`). */
+  caps?: boolean | undefined
   children: ReactNode
   className?: string
 }) {
@@ -536,7 +562,14 @@ export function RailSection({
       )}
     >
       <div className="flex items-baseline justify-between gap-3 pb-2">
-        <h2 className="min-w-0 truncate text-title font-medium text-foreground">
+        <h2
+          className={cn(
+            'min-w-0 truncate',
+            caps
+              ? 'label-caps text-graphite'
+              : 'text-title font-medium text-foreground',
+          )}
+        >
           {label}
         </h2>
         {meta ? (
@@ -638,7 +671,7 @@ export function RailRow({
         className,
       )}
     >
-      <span className="text-label text-graphite">{label}</span>
+      <span className="min-w-0 truncate text-label text-graphite">{label}</span>
       <span className="min-w-0 truncate mono text-ui font-medium">{value}</span>
     </div>
   )

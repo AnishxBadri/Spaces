@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 
 import { NOTE_INSET } from './note-column'
+import { NOTE_EDGE } from '#/components/notes/note-head'
 import { cn } from '#/lib/utils'
 import { declared } from '#/test/tailwind-css'
 
@@ -13,7 +14,7 @@ import { declared } from '#/test/tailwind-css'
  * sidebar at every width the sidebar shows at (1440 and 1100 included):
  * - a note page's columns start at `NOTE_INSET`, at least the menu's width,
  *   and the editor adds no inset of its own — so the menu stays inside the
- *   page and the title, the filing rows and the body share one left edge;
+ *   page and the head and the body share one left edge;
  * - the chassis is its own stacking context on the z-scale, so a layer from
  *   `main` cannot paint over it even if one does cross.
  */
@@ -24,7 +25,8 @@ const src = fileURLToPath(new URL('../..', import.meta.url))
 const read = (path: string) => readFileSync(`${src}/${path}`, 'utf8')
 const css = read('styles.css')
 const shell = read('routes/_app.tsx')
-const notePage = read('routes/_app/notes_.$noteId.tsx')
+const noteHead = read('components/notes/note-head.tsx')
+const noteSheet = read('components/notes/note-sheet.tsx')
 const mandatePage = read('routes/_app/mandate.tsx')
 
 /** The side menu's width, as measured in the browser at 1440 and 1100. */
@@ -71,7 +73,7 @@ describe('the note inset', () => {
   it('is the only inset: the editor and its wrapper add none', () => {
     expect(css).not.toMatch(/\n\.prose-note\s*\{/)
     expect(rule('.prose-note .bn-editor')).toContain('padding-inline: 0;')
-    for (const page of [notePage, mandatePage]) {
+    for (const page of [noteSheet, mandatePage]) {
       const wrapper = /className="(prose-note[^"]*)"/.exec(page)
       expect(wrapper).not.toBeNull()
       expect(wrapper?.[1]).not.toMatch(LEFT_INSET)
@@ -80,23 +82,19 @@ describe('the note inset', () => {
 })
 
 describe('a note page: the body columns share the inset', () => {
-  it('on /notes/$id, the back link’s bar and the title-to-body column', () => {
-    const bar = between(notePage, 'border-b border-hairline pr-8', '<Link')
-    expect(bar).toContain('NOTE_INSET')
-    // One column holds the title, both filing rows and the editor.
+  it('on /notes/$id, the record head and the body column', () => {
+    expect(NOTE_EDGE).toBe(NOTE_INSET)
+    // The head is the record head moved onto the note's edge.
+    const head = between(noteHead, '<RecordHeader', '/>\n  )')
+    expect(head).toContain('className={NOTE_EDGE}')
+    // The body column holds the editor's wrapper and nothing else.
     const column = between(
-      notePage,
-      "cn('max-w-[72ch] pt-6 pr-8 pb-8', NOTE_INSET)",
-      '<NoteEditor',
+      noteSheet,
+      "cn('max-w-[72ch] pt-6 pr-8 pb-8', NOTE_EDGE)",
+      '{editor}',
     )
-    for (const part of [
-      'aria-label="Note title"',
-      '<SpaceFiling',
-      '<RecordFiling',
-      'prose-note',
-    ])
-      expect(column).toContain(part)
-    // Nothing between them moves one of the three off that edge.
+    expect(column).toContain('prose-note')
+    // Nothing between them moves the prose off that edge.
     expect(column.slice(column.indexOf('>'))).not.toMatch(LEFT_INSET)
   })
 
