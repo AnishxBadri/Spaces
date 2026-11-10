@@ -34,7 +34,7 @@ What is shipped, what is open, and what comes next. Linear (team `Spaces`) holds
 28. Spaces, research and watches
 29. Enrichment is the host's
 30. The canvas lands — the instrument port (shipped 2026-10-30, with the Clean UI leftovers `SPA-355` and `SPA-356`; its follow-ups `port-C1` SPA-385 and `port-C2` SPA-386 shipped 2026-11-09)
-31. Edges and the AI shape — `edges-1` SPA-387 (the 12px edge, cards, folder tabs, the toolbar, `+ New x`, one icon list, `ProviderMark`) and `ai-a` SPA-388 (system and user parts, Anthropic cache markers, one shared prefix per lane, `tokensCached`) shipped 2026-11-10, and `notes-1` SPA-391 (the note page as a record: kind stamp, meta line, the ··· with the kind, the rail with Filed on · Mentions · Mentioned in · Visibility · History) the same day; `edges-2` SPA-392, `record-1` SPA-393, `settings-1` SPA-394 and `ai-b` SPA-389 are open below
+31. Edges and the AI shape — `edges-1` SPA-387 (the 12px edge, cards, folder tabs, the toolbar, `+ New x`, one icon list, `ProviderMark`) and `ai-a` SPA-388 (system and user parts, Anthropic cache markers, one shared prefix per lane, `tokensCached`) shipped 2026-11-10, and `notes-1` SPA-391 (the note page as a record: kind stamp, meta line, the ··· with the kind, the rail with Filed on · Mentions · Mentioned in · Visibility · History) the same day; `edges-2` SPA-392 (the 24px edge, the 12px gutter, the bone ground, paper cards, the folder as the page's one ink object), `record-1` SPA-393 (the rail as unboxed rows, Long text as an Overview paragraph, each relationship once and removable there, registry order with identity first) and `settings-1` SPA-394 (settings on the shared head, group cards 800px wide, the sheet differences) shipped 2026-11-11; `ai-b` SPA-389 is open below
 
 Plus the UI sweep (the printed sheets landing) and Corrections.
 
@@ -44,7 +44,7 @@ Plus the UI sweep (the printed sheets landing) and Corrections.
 
 ## Next, in order
 
-1. **Project 31, the rest** (P-SPA-35): `edges-2` SPA-392 (the 24px edge, the bone ground, one ink folder; the owner's option D of 2026-11-11), then `record-1` SPA-393 (the record's rail unboxed, long text as paragraphs, a relationship once) beside `settings-1` SPA-394 (settings on the shared head, in group cards), then `ai-b` SPA-389 (migration, hitl: the owner confirms AI column answers may change under the mandate). Bodies in `docs/backlog.md` § 31. Then the Ask set, which the owner has not picked from yet.
+1. **Project 31, the rest** (P-SPA-35): `ai-b` SPA-389 (migration, hitl: the owner confirms AI column answers may change under the mandate). Body in `docs/backlog.md` § 31. Then the Ask set, which the owner has not picked from yet.
 2. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided; starts after project 30.
 3. **Docs consolidation** — `DESIGN.md` and `docs/design-contract.md` merge into one design doc, checked against the Paper library; `CONTEXT.md` rewritten to current state only.
 
@@ -55,6 +55,10 @@ Plus the UI sweep (the printed sheets landing) and Corrections.
 
 ## Unticketed follow-ups
 
+- Edges: a window and a popover keep a 12px row inset where E3 says 16px; Import's inner grids and the empty-state pages are not carded; Tasks' `Open · Done` switch could be the page's folder tabs, as the lists' are.
+- Record rail: a deal's Company group swaps the company from its `+` (the attribute is required), which reads as add; an existing install keeps its attribute order (only a fresh seed leads with identity), so a one-off `Reset to default order` on the object's settings page would let it catch up.
+- Settings: the folded head's actions pin to the page edge, not the 800px column; `listStatusOf`'s `tone` is unused; `DESIGN.md` "Printed details" still names a double rule under a settings head.
+- Two `no-shadow` warnings in `record-details.test.tsx`.
 - Note page: `Edited` and `Replaced by` history rows carry no who (nothing records it); a tool-landed note shows `Landed from` and `Written` at one instant; the `+ File on…` picker prints `record` for a custom object because search returns no singular; `FilingRow` is now used only by `space-page.test.tsx`.
 - `buildRequest` hands `renderPrompt` a negative budget when a lane's system part alone exceeds `budgetChars`, and the subject is then dropped silently; guard it (every lane's budget is far above its instructions today).
 - `MoreMenu` draws Lucide's `Ellipsis` now, not the mono `···` text; the contract's wording still says `···`.

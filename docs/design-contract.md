@@ -565,7 +565,10 @@ anatomy (D74 amended 2026-10-25):
     opens it in a new tab; a click on the value still edits it.
   - A relationship with a section (Team, Associated deals, Companies, Deals, Company,
     People, and `RelationSections` for the rest) is that section only, never also a
-    row; one with no section stays a row. What the head says leaves the rail: a
+    row; one with no section stays a row. The section is the relationship's one place,
+    so it also undoes it: a row shows an unlink at its end on hover and focus, and a
+    required single one (a deal's Company) swaps from the head's `+` and never
+    clears. What the head says leaves the rail: a
     person's name parts (the title; `Rename…` in the `···` edits them) and a deal's
     stage (the badge, the stepper and Move stage).
   - A long text attribute (`options.longText`, the `Long text` switch on a Text
