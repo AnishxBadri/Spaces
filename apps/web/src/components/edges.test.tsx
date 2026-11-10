@@ -373,6 +373,7 @@ describe('E10 · one ink object on a page: the folder', () => {
       ['routes/_app/meetings.tsx', 1],
       ['routes/_app/notes.tsx', 1],
       ['routes/_app/review.tsx', 1],
+      ['routes/_app/tasks.tsx', 1],
     ] as const) {
       const n = read(page).match(/<FolderBody\b/g)?.length ?? 0
       expect(n, page).toBe(bodies)
@@ -383,7 +384,6 @@ describe('E10 · one ink object on a page: the folder', () => {
     // Pages with no tab bar draw no hairline sheet.
     for (const page of [
       'routes/_app/portfolio.tsx',
-      'routes/_app/tasks.tsx',
       'routes/_app/mandate.tsx',
       'components/spaces-index.tsx',
     ]) {

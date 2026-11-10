@@ -19,7 +19,7 @@ import { ClockProvider } from '#/components/clock'
  * The heads and bands of the work pages — Tasks, Notes, Meetings, Mandate
  * and Review — each mounted under a memory router whose ids mirror the
  * app's (`_app` → the page), on fixture data:
- * - Tasks: the title alone, a bone band with `Open n | Done n`, caps group
+ * - Tasks: the title alone, `Open n · Done n` as the page's folder tabs, caps group
  *   heads, the row `···`, the composer as the last row, and `?record=`
  *   reaching the read.
  * - Notes: the meta line, `This week` and `Earlier` bands, the fold.
@@ -261,19 +261,22 @@ const TASKS = {
 }
 
 describe('Tasks', () => {
-  it('is the title and + New task, Open | Done on the ground, caps groups, and the composer as the last row', async () => {
+  it('is the title and + New task, Open · Done as the folder tabs, caps groups, and the composer as the last row', async () => {
     fns.listTasks.mockResolvedValue(TASKS)
     await mount('tasks', '/tasks')
     await until('the head', () => title() === 'Tasks')
     expect(headMeta()).toBeNull()
     expect(head()).toEqual(['New task'])
-    const band = document.querySelector('[data-tasks-band]')
-    expect(band?.closest('[data-page-body]')?.className).toContain('bg-bone')
+    const bar = document.querySelector('[data-head-tabs]')
     expect(
-      Array.from(band?.querySelectorAll('[role="radio"]') ?? []).map(
+      Array.from(bar?.querySelectorAll('[role="tab"]') ?? []).map(
         (el) => el.textContent,
       ),
     ).toEqual(['Open4', 'Done12'])
+    // The ledger is the folder's body, the page's one hairline frame.
+    expect(
+      document.querySelector('[data-page-body] > [data-folder]'),
+    ).not.toBeNull()
     expect(text('section h2')).toEqual([
       'OVERDUE',
       'TODAY · THU 15 OCT',

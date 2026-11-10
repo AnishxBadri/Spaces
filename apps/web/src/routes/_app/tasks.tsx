@@ -10,14 +10,14 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { EmptyState } from '#/components/empty-state'
 import { LabelHead, LedgerFigure } from '#/components/ledger-section'
-import { Card, PageBody, PageHeader } from '#/components/page-header'
+import { PageBody, PageHeader } from '#/components/page-header'
 import { NewButton } from '#/components/new-button'
 import { useTaskMenu } from '#/components/tasks/task-menu'
 import { TaskComposer, TaskComposerRow } from '#/components/task-composer'
 import { Checkbox } from '#/components/ui/checkbox'
 import { MoreMenu } from '#/components/ui/more-menu'
 import type { MoreMenuEntry } from '#/components/ui/more-menu'
-import { Segmented } from '#/components/ui/segmented'
+import { FolderBody, Tabs } from '#/components/ui/tabs'
 import { useBornRows } from '#/lib/born-rows'
 import { recordPath } from '#/lib/record-path'
 import { deleteTask, listTasks, setTaskDone } from '#/lib/server-fns'
@@ -266,6 +266,37 @@ function TasksPage() {
             />
           )
         }
+        tabs={
+          empty ? undefined : (
+            <Tabs
+              label="Tasks"
+              items={[
+                {
+                  id: 'open',
+                  label: 'Open',
+                  count: data.open.length,
+                },
+                {
+                  id: 'done',
+                  label: 'Done',
+                  count: data.done.length,
+                },
+              ]}
+              value={view}
+              onValueChange={(v) => {
+                clearFocus()
+                setView(v)
+              }}
+              trail={
+                scope === null ? undefined : (
+                  <span data-tasks-scope className="ml-auto flex">
+                    <ScopeChip name={scope.name} />
+                  </span>
+                )
+              }
+            />
+          )
+        }
       />
 
       {empty ? (
@@ -279,27 +310,8 @@ function TasksPage() {
         />
       ) : (
         <>
-          <PageBody>
-            <div
-              data-tasks-band
-              className="flex h-8 shrink-0 items-center gap-3 px-3"
-            >
-              {scope === null ? null : <ScopeChip name={scope.name} />}
-              <span className="flex-1" />
-              <Segmented
-                label="Tasks"
-                value={view}
-                onChange={(v) => {
-                  clearFocus()
-                  setView(v)
-                }}
-                options={[
-                  { id: 'open', label: 'Open', count: data.open.length },
-                  { id: 'done', label: 'Done', count: data.done.length },
-                ]}
-              />
-            </div>
-            <Card>
+          <PageBody className="pt-0">
+            <FolderBody label="Tasks">
               <div ref={body} className="contents">
                 {groups.length === 0 ? (
                   <ol>
@@ -352,7 +364,7 @@ function TasksPage() {
                   </section>
                 ))}
               </div>
-            </Card>
+            </FolderBody>
           </PageBody>
         </>
       )}
