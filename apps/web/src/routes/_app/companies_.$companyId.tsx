@@ -327,6 +327,21 @@ function CompanyRecordPage() {
                   }}
                 />
               )}
+              onRemove={(p) =>
+                void setPersonCompany({
+                  data: {
+                    personId: p.id,
+                    companyId: company.id,
+                    action: 'unlink',
+                  },
+                })
+                  .then(() => router.invalidate())
+                  .catch((err: unknown) =>
+                    toast.error(
+                      err instanceof Error ? err.message : 'Could not remove',
+                    ),
+                  )
+              }
             />
 
             <RelationSection

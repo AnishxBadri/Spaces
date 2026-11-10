@@ -7,7 +7,7 @@ import {
   readAiConfig,
 } from '@spaces/core/ai/attribute-ai'
 import type { AiAttributeMode } from '@spaces/core/ai/attribute-ai'
-import { SettingsGroupHead } from '#/components/settings/settings-section'
+import { SettingsGroup } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { Segmented } from '#/components/ui/segmented'
 import { Select } from '#/components/ui/select'
@@ -53,30 +53,32 @@ export function AiConfigSection({
     (a) => readAiConfig(a) !== null || a.id === open,
   )
   return (
-    <section className="flex flex-col">
-      <SettingsGroupHead
-        title="AI answers"
-        count={`${configured.length} set`}
-        action={
-          canReshape && offered.length > 0 ? (
-            <Select
-              aria-label={`Add an AI answer to ${objectPlural}`}
-              value=""
-              placeholder="+ Add"
-              items={offered.map((a) => ({ value: a.id, label: a.name }))}
-              onChange={(id) => setOpen(id)}
-              width="content"
-              className="h-6 w-auto rounded-none border-0 bg-transparent px-1 mono text-micro text-graphite hover:text-foreground"
-            />
-          ) : undefined
-        }
-      />
+    <SettingsGroup
+      title="AI answers"
+      count={`${configured.length} set`}
+      action={
+        canReshape && offered.length > 0 ? (
+          <Select
+            aria-label={`Add an AI answer to ${objectPlural}`}
+            value=""
+            placeholder="+ Add"
+            items={offered.map((a) => ({ value: a.id, label: a.name }))}
+            onChange={(id) => setOpen(id)}
+            width="content"
+            className="h-6 w-auto rounded-none border-0 bg-transparent px-1 mono text-micro text-graphite hover:text-foreground"
+          />
+        ) : undefined
+      }
+    >
       {listed.length === 0 ? null : (
         <ul aria-label={`${objectPlural} AI answers`}>
           {listed.map((attr) => {
             const ai = readAiConfig(attr)
             return (
-              <li key={attr.id} className="flex flex-col border-b border-rule">
+              <li
+                key={attr.id}
+                className="flex flex-col border-b border-rule px-(--inset) last:border-b-0"
+              >
                 <div className="flex h-ledger-row items-center gap-3 text-ui">
                   <span className="min-w-0 flex-1 truncate font-medium">
                     {attr.name}
@@ -109,7 +111,7 @@ export function AiConfigSection({
           })}
         </ul>
       )}
-    </section>
+    </SettingsGroup>
   )
 }
 

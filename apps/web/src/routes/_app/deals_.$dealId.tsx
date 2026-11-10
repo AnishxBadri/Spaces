@@ -404,18 +404,19 @@ function DealRecordPage() {
               label="Company"
               rows={company}
               mark={() => <DitherMark size={14} />}
-              add={
-                company.length === 0
-                  ? (trigger) => (
-                      <PickPopover
-                        trigger={trigger}
-                        placeholder="Add the company…"
-                        search={searchCompanies}
-                        onPick={(hit) => save({ company: hit.id })}
-                      />
-                    )
-                  : undefined
-              }
+              // Required, so the group swaps the company and never clears it.
+              add={(trigger) => (
+                <PickPopover
+                  trigger={trigger}
+                  placeholder={
+                    company.length === 0
+                      ? 'Add the company…'
+                      : 'Change the company…'
+                  }
+                  search={searchCompanies}
+                  onPick={(hit) => save({ company: hit.id })}
+                />
+              )}
             />
 
             <RelationSection
@@ -430,6 +431,9 @@ function DealRecordPage() {
                   onPick={(hit) => save({ people: [...peopleIds, hit.id] })}
                 />
               )}
+              onRemove={(p) =>
+                void save({ people: peopleIds.filter((id) => id !== p.id) })
+              }
             />
 
             <RelationSections

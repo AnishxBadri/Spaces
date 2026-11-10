@@ -1,8 +1,10 @@
 import { Link } from '@tanstack/react-router'
 import { useCallback } from 'react'
 import type { ReactElement, ReactNode } from 'react'
+import { toast } from 'sonner'
 import { isDerived } from '@spaces/core/attributes/relationship'
 import type { AttributeOptions } from '@spaces/core/attributes/registry'
+import { icon } from '#/components/icons'
 import { PickPopover } from '#/components/record/details-add'
 import { RailGroup, RailGroupRow } from '#/components/record/record-parts'
 import { recordPath } from '#/lib/record-path'
@@ -57,6 +59,8 @@ export function relationRows(
  * one `Name +` row.
  * - `add` wraps the `+` (or that row) in whatever adds a record — a
  *   `PickPopover`, a create window. Without it the head carries the count.
+ * - `onRemove` puts an unlink at a row's end on hover and focus: the group
+ *   is the relationship's only place on the page, so it must also undo it.
  */
 export function RelationSection({
   label,
@@ -64,12 +68,14 @@ export function RelationSection({
   mark,
   lane,
   add,
+  onRemove,
 }: {
   label: string
   rows: ReadonlyArray<RelationRow>
   mark?: (row: RelationRow) => ReactNode
   lane?: (row: RelationRow, index: number) => ReactNode
   add?: ((trigger: ReactElement) => ReactNode) | undefined
+  onRemove?: ((row: RelationRow) => void) | undefined
 }) {
   return (
     <RailGroup
@@ -107,6 +113,16 @@ export function RelationSection({
                 {body}
               </span>
             )}
+            {onRemove ? (
+              <button
+                type="button"
+                aria-label={`Remove ${row.name}`}
+                onClick={() => onRemove(row)}
+                className="focus-ring hidden size-5 shrink-0 items-center justify-center text-graphite group-hover/row:flex hover:text-foreground focus-visible:flex"
+              >
+                <icon.close className="size-3" strokeWidth={2} />
+              </button>
+            ) : null}
           </RailGroupRow>
         )
       })}
@@ -138,7 +154,7 @@ export function RelationSections({
   defs: ReadonlyArray<PairDef>
   halves: ReadonlyArray<RelationHalfRow>
   skip?: ReadonlyArray<string>
-  onAdd: (slug: string, value: string | Array<string>) => Promise<void>
+  onAdd: (slug: string, value: string | Array<string> | null) => Promise<void>
 }) {
   const shown = pairSectionDefs(defs, skip)
   return (
@@ -162,7 +178,7 @@ function PairSection({
 }: {
   def: PairDef
   rows: ReadonlyArray<RelationRow>
-  onAdd: (slug: string, value: string | Array<string>) => Promise<void>
+  onAdd: (slug: string, value: string | Array<string> | null) => Promise<void>
 }) {
   const multi = def.options.multi === true
   const targetObjectId = def.options.targetObjectId
@@ -202,6 +218,14 @@ function PairSection({
               />
             )
           : undefined
+      }
+      onRemove={(row) =>
+        void onAdd(
+          def.slug,
+          multi ? rows.filter((r) => r.id !== row.id).map((r) => r.id) : null,
+        ).catch((err: unknown) =>
+          toast.error(err instanceof Error ? err.message : 'Could not remove'),
+        )
       }
     />
   )

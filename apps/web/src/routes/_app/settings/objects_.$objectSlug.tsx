@@ -259,19 +259,11 @@ function ObjectAttributesPage() {
         filledBy={new Map(Object.entries(filledBy))}
       />
 
-      {/* The AI answers group draws its own head and rows without an inset;
-          the inner pad carries them to the card's 11px. */}
-      <SettingsGroup label="AI answers">
-        <div className="flex flex-col px-(--inset)">
-          <div className="flex flex-col [--inset:0]">
-            <AiConfigSection
-              objectPlural={object.plural}
-              registry={registry}
-              canReshape={isAdmin}
-            />
-          </div>
-        </div>
-      </SettingsGroup>
+      <AiConfigSection
+        objectPlural={object.plural}
+        registry={registry}
+        canReshape={isAdmin}
+      />
 
       {/* Identity keys — each backed by an attribute above, and
             revisable only while the object has no records (the slug rule).

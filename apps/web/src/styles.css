@@ -483,6 +483,12 @@
   --inset: 0.75rem;
 }
 
+/* A record's rail is padded onto the 24px edge already: a row inside it
+   that insets itself would stand in twice. */
+[data-record-rail] {
+  --inset: 0rem;
+}
+
 /**
  * Printed details (DESIGN.md §5): the ink stamp and the open tab. Each shape
  * lives here once so no surface spells a clip-path or a border stack by hand.

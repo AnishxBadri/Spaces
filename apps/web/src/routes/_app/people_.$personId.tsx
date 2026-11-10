@@ -352,6 +352,21 @@ function PersonRecordPage() {
                   }}
                 />
               )}
+              onRemove={(c) =>
+                void setPersonCompany({
+                  data: {
+                    personId: person.id,
+                    companyId: c.id,
+                    action: 'unlink',
+                  },
+                })
+                  .then(() => router.invalidate())
+                  .catch((err: unknown) =>
+                    toast.error(
+                      err instanceof Error ? err.message : 'Could not remove',
+                    ),
+                  )
+              }
             />
 
             <RelationSection
@@ -367,6 +382,16 @@ function PersonRecordPage() {
                   }
                 />
               )}
+              onRemove={(d) =>
+                void saveValue(
+                  'deals',
+                  deals.filter((x) => x.id !== d.id).map((x) => x.id),
+                ).catch((err: unknown) =>
+                  toast.error(
+                    err instanceof Error ? err.message : 'Could not remove',
+                  ),
+                )
+              }
             />
 
             <RelationSections
