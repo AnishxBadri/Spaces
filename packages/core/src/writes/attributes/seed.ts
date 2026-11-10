@@ -48,9 +48,19 @@ export async function seedSystemAttributes() {
   let inserted = 0
   for (const objectKind of OBJECT_KINDS) {
     const objectId = objectIds.get(objectKind)!
-    const defs = SYSTEM_ATTRIBUTES[objectKind]
-    for (let i = 0; i < defs.length; i++) {
-      const def = defs[i]
+    // Each insert lands after everything the object already holds, so a
+    // fresh install takes the array's order and an upgrade never collides
+    // with a user's attribute or reorders what the owner arranged.
+    let lastOrder =
+      (
+        await db
+          .select({
+            max: sql<number>`coalesce(max(${attribute.sortOrder}), 0)`,
+          })
+          .from(attribute)
+          .where(eq(attribute.objectId, objectId))
+      ).at(0)?.max ?? 0
+    for (const def of SYSTEM_ATTRIBUTES[objectKind]) {
       const existing = await db
         .select({ id: attribute.id })
         .from(attribute)
@@ -72,8 +82,9 @@ export async function seedSystemAttributes() {
         filterable: def.filterable ?? false,
         sortable: def.sortable ?? false,
         isSystem: true,
-        sortOrder: (i + 1) * 10,
+        sortOrder: lastOrder + 10,
       })
+      lastOrder += 10
       inserted++
     }
   }
@@ -83,6 +94,10 @@ export async function seedSystemAttributes() {
   const linked = await seedEnrichmentLinks(objectIds)
   if (linked > 0)
     console.log(`[attributes] linked ${linked} system attributes to enrichment`)
+
+  const flagged = await seedLongTextFlags(objectIds)
+  if (flagged > 0)
+    console.log(`[attributes] marked ${flagged} system attributes long text`)
 
   const paired = await seedRelationshipPairs(objectIds)
   if (paired > 0)
@@ -181,4 +196,39 @@ async function seedEnrichmentLinks(
     }
   }
   return linked
+}
+
+/**
+ * The default paragraph flag for system text attributes seeded before it
+ * existed: insert-if-absent on `options.longText`. An attribute the owner
+ * switched off holds `longText: false` and is never re-flagged.
+ */
+async function seedLongTextFlags(
+  objectIds: ReadonlyMap<ObjectKind, string>,
+): Promise<number> {
+  let flagged = 0
+  for (const objectKind of OBJECT_KINDS) {
+    const objectId = objectIds.get(objectKind)
+    if (objectId === undefined) continue
+    for (const def of SYSTEM_ATTRIBUTES[objectKind]) {
+      if (def.options?.longText !== true) continue
+      const rows = await db
+        .update(attribute)
+        .set({
+          options: sql`${attribute.options} || '{"longText": true}'::jsonb`,
+        })
+        .where(
+          and(
+            eq(attribute.objectId, objectId),
+            eq(attribute.slug, def.slug),
+            eq(attribute.isSystem, true),
+            eq(attribute.type, 'text'),
+            sql`not (${attribute.options} ? 'longText')`,
+          ),
+        )
+        .returning({ id: attribute.id })
+      flagged += rows.length
+    }
+  }
+  return flagged
 }

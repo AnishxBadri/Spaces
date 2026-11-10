@@ -181,6 +181,7 @@ function HoldingPage() {
       <RecordBody
         rail={
           <RailSection
+            ground
             label="Ownership"
             meta={
               h.ownership.kind === 'actual' ? <span>Fully diluted</span> : null

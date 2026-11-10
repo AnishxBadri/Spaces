@@ -27,6 +27,15 @@ import {
   relationRows,
   withDerived,
 } from '#/components/record/relation-section'
+import {
+  LongTextParagraphs,
+  useLongTextPick,
+} from '#/components/record/long-text'
+import {
+  OWN_SECTIONS,
+  isLongText,
+  recordRailDefs,
+} from '#/lib/records/rail-defs'
 import { PropertyFold } from '#/components/record/property-fold'
 import { RecordSpacesSection } from '#/components/record/spaces-section'
 import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
@@ -168,6 +177,12 @@ function CompanyRecordPage() {
   const team = relationRows(company.relations, 'team', true)
   const deals = relationRows(company.relations, 'associated_deals', true)
   const values = withDerived(company.values, company.relations)
+  const rail = recordRailDefs('company', registry)
+  const longText = useLongTextPick(() => changeTab('overview'))
+  async function saveValue(slug: string, v: unknown) {
+    await updateRecord({ data: { id: company.id, patch: { [slug]: v } } })
+    void router.invalidate()
+  }
   const searchPeople = useCallback(
     async (q: string) => {
       const on = new Set(team.map((p) => p.id))
@@ -242,7 +257,9 @@ function CompanyRecordPage() {
             <AiCellsProvider entityIds={[company.id]} registry={registry}>
               <PropertyGrid>
                 <PropertyFold
-                  defs={registry}
+                  defs={rail}
+                  away={isLongText}
+                  onPickAway={longText.pick}
                   valueOf={(def) => values[def.slug]}
                   render={(def) => (
                     <RailField
@@ -333,13 +350,8 @@ function CompanyRecordPage() {
             <RelationSections
               defs={registry}
               halves={company.relations}
-              skip={['team', 'associated_deals']}
-              onAdd={async (slug, value) => {
-                await updateRecord({
-                  data: { id: company.id, patch: { [slug]: value } },
-                })
-                void router.invalidate()
-              }}
+              skip={OWN_SECTIONS.company}
+              onAdd={saveValue}
             />
 
             <RecordSpacesSection
@@ -361,6 +373,14 @@ function CompanyRecordPage() {
             overview: (
               <RecordOverview
                 record={{ id: company.id, name: company.name, kind: 'company' }}
+                lead={
+                  <LongTextParagraphs
+                    defs={registry}
+                    valueOf={(def) => values[def.slug]}
+                    opened={longText.opened}
+                    onSave={saveValue}
+                  />
+                }
                 readouts={[
                   {
                     label: 'Last contact',

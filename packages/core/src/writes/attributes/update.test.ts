@@ -48,7 +48,8 @@ const slugFor = (base: string) => `zz_upd_${base}_${tag}`
 
 async function makeAttribute(
   base: string,
-  type: 'rating' | 'currency' | 'number' | 'status' | 'record_reference',
+  type:
+    'rating' | 'currency' | 'number' | 'status' | 'record_reference' | 'text',
   options: Record<string, unknown>,
 ) {
   const { db } = await import('@spaces/db')
@@ -153,6 +154,28 @@ describe('updateAttributeProgram', () => {
       updateAttributeProgram({ id: attr.id, config: { precision: 2 } }),
     )
     expect((await readOptions(attr.id)).precision).toBe(2)
+  })
+
+  it('switches long text on and off for a text attribute only', async () => {
+    const { updateAttributeProgram, AttributeConfigRejected } =
+      await import('./update')
+    const memo = await makeAttribute('memo', 'text', {})
+    await Effect.runPromise(
+      updateAttributeProgram({ id: memo.id, config: { longText: true } }),
+    )
+    expect((await readOptions(memo.id)).longText).toBe(true)
+    await Effect.runPromise(
+      updateAttributeProgram({ id: memo.id, config: { longText: false } }),
+    )
+    expect((await readOptions(memo.id)).longText).toBe(false)
+
+    const num = await makeAttribute('not_memo', 'number', {})
+    const err = await Effect.runPromise(
+      Effect.flip(
+        updateAttributeProgram({ id: num.id, config: { longText: true } }),
+      ),
+    )
+    expect(err).toBeInstanceOf(AttributeConfigRejected)
   })
 
   it('allows regrouping status options', async () => {

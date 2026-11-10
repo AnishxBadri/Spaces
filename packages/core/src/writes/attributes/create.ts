@@ -59,6 +59,8 @@ export type CreateAttributeInput = {
         targetKind?: ObjectKind | undefined
         targetObjectId?: string | undefined
         multi?: boolean | undefined
+        /** text — a paragraph in Overview rather than a rail row */
+        longText?: boolean | undefined
         /**
          * This attribute backs one of its object's declared identity keys.
          * Only `createObjectProgram` passes it, inside the
@@ -147,6 +149,12 @@ const buildOptions = Effect.fn('buildOptions')(function* (
     if (input.type !== 'number')
       return yield* reject('Precision is not a setting of this type')
     out.precision = cfg.precision
+  }
+
+  if (cfg.longText !== undefined) {
+    if (input.type !== 'text')
+      return yield* reject('Long text is not a setting of this type')
+    if (cfg.longText) out.longText = true
   }
 
   if (input.type === 'record_reference') {

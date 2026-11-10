@@ -50,6 +50,7 @@ export function RecordHeadActions({
   template,
   pluginActions = [],
   archived = false,
+  more: moreVerbs,
 }: {
   record: HeadRecord
   /** Log interaction, bound to `L`. */
@@ -62,6 +63,8 @@ export function RecordHeadActions({
   template?: TemplateKind | undefined
   pluginActions?: ReadonlyArray<RecordAction> | undefined
   archived?: boolean | undefined
+  /** The record's own rarer verbs, in the `···` after Copy link: `Rename…`. */
+  more?: ReadonlyArray<MoreMenuEntry> | undefined
 }) {
   const navigate = useNavigate()
   const offered = offeredActions(pluginActions, enrich !== undefined)
@@ -112,6 +115,7 @@ export function RecordHeadActions({
       template={template}
       sensitivity={sensitivity}
       archived={archived}
+      verbs={moreVerbs}
       plugins={plugins}
     />
   )

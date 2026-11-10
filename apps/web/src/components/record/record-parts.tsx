@@ -14,7 +14,7 @@ import { cn } from '#/lib/utils'
  * the right, the double rule under — no readout strip; scrolled past its
  * name it folds to `HeadBar`.
  * Body: `RecordBody details=… groups` — on the bone ground, the 320px rail
- * left with no box (the property grid, then the relationship groups), the
+ * left with no box (the attribute rows, then the relationship groups), the
  * record's folder right, Overview first. Every part is markup only;
  * the pages keep their data and handlers.
  */
@@ -418,15 +418,14 @@ export function RecordSection({
 }
 
 /**
- * The property grid at the head of the details column: a box on a rule, one
- * label–value row per attribute with a rule between — a bone label cell in
- * sans graphite beside a paper value cell. Cells are `PropertyCell`s
- * (RailField renders one).
+ * The attribute rows at the head of the details column, printed on the rail's
+ * ground: no box and no label column, a rule over the first row and under
+ * each. Rows are `PropertyCell`s (RailField renders one).
  */
 export function PropertyGrid({ children }: { children: ReactNode }) {
   return (
     <div className="group/grid flex flex-col gap-1">
-      <div data-property-grid className="flex flex-col border border-rule">
+      <div data-property-grid className="flex flex-col border-t border-rule">
         {children}
       </div>
       {/* Shown only while a cell's field has the caret. */}
@@ -469,11 +468,19 @@ export function rejectPaneClass(phase: RejectPhase): string {
   )
 }
 
+/**
+ * One attribute row: the 104px label lane, then the value taking the rest,
+ * 32px at least, on a rule. The label wraps rather than truncates; the value
+ * grows downward, never sideways, when its editor opens.
+ * - `wide`: a mono value that drops under its label, full width, when it
+ *   does not fit beside it — a long domain, email or url.
+ */
 export function PropertyCell({
   label,
   children,
   below,
   className,
+  wide = false,
   reject = 'rest',
 }: {
   label: ReactNode
@@ -481,36 +488,40 @@ export function PropertyCell({
   /** An error or hint line under the value. */
   below?: ReactNode
   className?: string
+  wide?: boolean | undefined
   /** The cell's rejected-write phase; `RailField` owns the clock. */
   reject?: RejectPhase | undefined
 }) {
   return (
     <div
+      data-property-row
       className={cn(
-        'relative flex min-w-0 items-stretch border-b border-rule last:border-b-0',
+        'relative flex min-w-0 flex-wrap items-start gap-x-2 border-b border-rule',
         className,
       )}
     >
       {reject === 'rest' ? null : (
         <span aria-hidden className={rejectPaneClass(reject)} />
       )}
-      {/* The label cell runs the row's full height, so a value that grows
-          (wrapped chips) keeps its label on the first line; a long label
-          wraps rather than truncates. */}
+      {/* 8px over a 16px line: the label's first line sits on the centre of
+          the value's 32px box, however tall the value grows. */}
       <div
         data-property-label
-        className="flex w-28 shrink-0 items-start gap-1 border-r border-rule bg-bone px-2.5 py-2 text-label break-words text-graphite"
+        className="flex w-26 shrink-0 items-start gap-1 py-2 text-label break-words text-graphite"
       >
         {label}
       </div>
-      {/* The field editor is its own 32px box with an 8px inset, so the
-          cell adds 2px: its text lands on the label's 10px. */}
+      {/* `wide` sizes the value to its content, so a flex wrap puts one that
+          does not fit on its own line; otherwise it takes what is left. */}
       <div
         data-property-value
-        className="flex min-h-8 min-w-0 flex-1 flex-col justify-center bg-paper px-0.5 text-ui"
+        className={cn(
+          'flex min-h-8 min-w-0 flex-col justify-center text-ui',
+          wide ? 'flex-auto' : 'flex-1',
+        )}
       >
         {children}
-        {below ? <div className="px-2 pb-1">{below}</div> : null}
+        {below ? <div className="px-2.25 pb-1">{below}</div> : null}
       </div>
     </div>
   )
@@ -530,6 +541,7 @@ export function RailSection({
   meta,
   empty = false,
   caps = false,
+  ground = false,
   children,
   className,
 }: {
@@ -538,6 +550,12 @@ export function RailSection({
   empty?: boolean | undefined
   /** A group label rather than a title: mono caps graphite (`FILED ON`). */
   caps?: boolean | undefined
+  /**
+   * Beside a page body on the bone ground, inside its 12px gutter: a 12px
+   * inset lands the content on the page's 24px edge. Otherwise the section
+   * is its own panel's edge and takes the full 24px.
+   */
+  ground?: boolean | undefined
   children: ReactNode
   className?: string
 }) {
@@ -557,7 +575,8 @@ export function RailSection({
   return (
     <section
       className={cn(
-        'flex flex-col border-b border-hairline px-6 py-4 last:border-b-0',
+        'flex flex-col border-b border-hairline py-4 last:border-b-0',
+        ground ? 'px-3' : 'px-6',
         className,
       )}
     >

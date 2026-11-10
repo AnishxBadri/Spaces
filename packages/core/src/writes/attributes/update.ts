@@ -116,6 +116,11 @@ export type AttributeConfigPatch = {
    * object can hold; null is "from nothing", which the seeder respects.
    */
   enrichmentKey?: string | null | undefined
+  /**
+   * text — a paragraph in Overview rather than a rail row. Display only, so
+   * freely toggleable; false is stored, so the seeder never re-flags it.
+   */
+  longText?: boolean | undefined
 }
 
 export type UpdateAttributePatch = {
@@ -280,6 +285,10 @@ const applyConfig = Effect.fn('applyConfig')(function* (
   if (patch.precision !== undefined) {
     if (attr.type !== 'number') return yield* reject('Precision')
     next = { ...next, precision: patch.precision }
+  }
+  if (patch.longText !== undefined) {
+    if (attr.type !== 'text') return yield* reject('Long text')
+    next = { ...next, longText: patch.longText }
   }
   if (patch.default !== undefined) {
     if (patch.default === null) {

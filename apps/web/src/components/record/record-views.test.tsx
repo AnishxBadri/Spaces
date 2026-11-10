@@ -843,7 +843,7 @@ describe('a property row’s values', () => {
     expect(cell.querySelector('input')?.className).toContain('numeric')
   })
 
-  it('shows a list’s first email and +n for the rest', async () => {
+  it('shows every email of a list, one to a line, with no +n', async () => {
     const el = await mount(
       <ValueEditor
         def={def('email', { options: { multi: true } })}
@@ -852,8 +852,8 @@ describe('a property row’s values', () => {
         onSave={() => undefined}
       />,
     )
-    expect(el.textContent).toContain('a@x.example')
-    expect(el.textContent).not.toContain('b@x.example')
-    expect(el.textContent).toContain('+2')
+    for (const email of ['a@x.example', 'b@x.example', 'c@x.example'])
+      expect(el.querySelector(`[title="${email}"]`)?.textContent).toBe(email)
+    expect(el.textContent).not.toContain('+')
   })
 })

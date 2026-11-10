@@ -6,6 +6,7 @@ import type { AttributeOptions } from '@spaces/core/attributes/registry'
 import { PickPopover } from '#/components/record/details-add'
 import { RailGroup, RailGroupRow } from '#/components/record/record-parts'
 import { recordPath } from '#/lib/record-path'
+import { pairSectionDefs } from '#/lib/records/rail-defs'
 import { searchEntities } from '#/lib/server-fns'
 
 /** A record on the far side of a relationship, as the resolver names it. */
@@ -139,14 +140,7 @@ export function RelationSections({
   skip?: ReadonlyArray<string>
   onAdd: (slug: string, value: string | Array<string>) => Promise<void>
 }) {
-  const shown = defs.filter(
-    (d) =>
-      d.type === 'record_reference' &&
-      d.options.inverseOf !== undefined &&
-      d.pair !== null &&
-      !(isDerived(d) && d.pair.archived) &&
-      !skip.includes(d.slug),
-  )
+  const shown = pairSectionDefs(defs, skip)
   return (
     <>
       {shown.map((def) => (

@@ -205,7 +205,12 @@ describe('the readouts', () => {
     )
     const row = el.querySelector('[data-overview-readouts]')
     expect(cls(row)).toEqual(
-      expect.arrayContaining(['h-19', 'px-3', 'border-b', 'border-rule']),
+      expect.arrayContaining([
+        'h-19',
+        'px-(--inset)',
+        'border-b',
+        'border-rule',
+      ]),
     )
     const cells = [...el.querySelectorAll('[data-readout]')]
     expect(cells.map((c) => c.textContent)).toEqual([

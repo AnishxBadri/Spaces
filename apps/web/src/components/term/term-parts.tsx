@@ -146,6 +146,7 @@ export function CompaniesReached({
   if (rows.length === 0) return null
   return (
     <RailSection
+      ground
       label="Companies reached"
       meta={rows.length < total ? `${rows.length} of ${total}` : `${total}`}
     >
@@ -179,7 +180,7 @@ export function CompaniesReached({
 export function CoMentioned({ rows }: { rows: Array<CoMentionRow> }) {
   if (rows.length === 0) return null
   return (
-    <RailSection label="Co-mentioned" meta={`${rows.length}`}>
+    <RailSection ground label="Co-mentioned" meta={`${rows.length}`}>
       {rows.map((t) => (
         <RailItem key={t.id}>
           <Link

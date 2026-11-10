@@ -497,40 +497,35 @@ const opt = (
 })
 
 /**
- * The seeded system attributes, per core kind.
+ * The seeded system attributes, per core kind, in the order a fresh
+ * install's rail prints them: identity and contact first.
  * - Sensitivity is not an attribute: an attribute can never reach a space or
  *   a document. It is the `entity.sensitive` column, read by `resolveSensitivity`.
  * - A person's `emails` and a company's `domains` are identity: multi-valued,
  *   carrying `options.identityKey`, mirrored into `entity_alias` by `setValues`.
  *   LinkedIn is a plain `url` on both.
- * - `options.enrichmentKey` is the default enrichment link; `seedEnrichmentLinks`
- *   adds it to installs seeded without it.
- * - Append new entries, never slot them: the seeder derives sortOrder from the
- *   array index and only inserts what is missing.
+ * - `options.enrichmentKey` is the default enrichment link and
+ *   `options.longText` the default paragraph flag; the seeder adds each to
+ *   installs seeded without it.
+ * - The array is the fresh-install order only. The seeder inserts what is
+ *   missing at the object's `max(sort_order) + 10`, so an install that
+ *   already has these keeps its order and a new entry lands last there.
  */
 export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
   company: [
     {
-      slug: 'description',
-      name: 'Description',
-      type: 'text',
-      options: { enrichmentKey: 'company.description' },
+      // Identity: every value is an `entity_alias` claim, so a domain
+      // another company holds is refused at that element.
+      slug: 'domains',
+      name: 'Domains',
+      type: 'domain',
+      options: { multi: true, identityKey: 'domain' },
     },
     {
-      slug: 'business_model',
-      name: 'Business model',
-      type: 'multi_select',
-      options: {
-        options: [
-          opt('b2b', 'B2B'),
-          opt('b2c', 'B2C'),
-          opt('b2b2c', 'B2B2C'),
-          opt('marketplace', 'Marketplace'),
-          opt('hardware', 'Hardware'),
-          opt('deep_tech', 'Deep tech'),
-          opt('services', 'Services'),
-        ],
-      },
+      slug: 'linkedin',
+      name: 'LinkedIn',
+      type: 'url',
+      options: { enrichmentKey: 'company.linkedin' },
     },
     {
       slug: 'funding_stage',
@@ -549,6 +544,22 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       },
     },
     {
+      slug: 'business_model',
+      name: 'Business model',
+      type: 'multi_select',
+      options: {
+        options: [
+          opt('b2b', 'B2B'),
+          opt('b2c', 'B2C'),
+          opt('b2b2c', 'B2B2C'),
+          opt('marketplace', 'Marketplace'),
+          opt('hardware', 'Hardware'),
+          opt('deep_tech', 'Deep tech'),
+          opt('services', 'Services'),
+        ],
+      },
+    },
+    {
       slug: 'location',
       name: 'Location',
       type: 'text',
@@ -561,34 +572,23 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       options: { enrichmentKey: 'company.founded_year' },
     },
     {
-      slug: 'linkedin',
-      name: 'LinkedIn',
-      type: 'url',
-      options: { enrichmentKey: 'company.linkedin' },
+      slug: 'description',
+      name: 'Description',
+      type: 'text',
+      options: { enrichmentKey: 'company.description', longText: true },
     },
     {
       // Where the deck reader puts the founders a company deck names, so a
       // deck filed on a bare company still proposes identities. Accepting one
       // writes the person here and the company to the person's `companies`.
-      // Appended, never slotted.
       slug: 'founders',
       name: 'Founders',
       type: 'record_reference',
       options: { targetKind: 'person', multi: true },
     },
     {
-      // Identity: every value is an `entity_alias` claim, so a domain
-      // another company holds is refused at that element. Appended, never
-      // slotted — the seeder derives sortOrder from the array index.
-      slug: 'domains',
-      name: 'Domains',
-      type: 'domain',
-      options: { multi: true, identityKey: 'domain' },
-    },
-    {
       // The people at this company: the inverse of a person's `companies`.
       // Stores nothing — `setValues` writes a person's `companies` instead.
-      // Appended, never slotted.
       slug: 'team',
       name: 'Team',
       type: 'record_reference',
@@ -602,7 +602,7 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
     },
     {
       // The deals naming this company: the inverse of a deal's `company`.
-      // Stores nothing. Appended, never slotted.
+      // Stores nothing.
       slug: 'associated_deals',
       name: 'Associated deals',
       type: 'record_reference',
@@ -617,23 +617,14 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
   ],
   person: [
     {
-      slug: 'job_title',
-      name: 'Job title',
-      type: 'text',
-      options: { enrichmentKey: 'person.title' },
+      // Identity, like a company's domains.
+      slug: 'emails',
+      name: 'Emails',
+      type: 'email',
+      options: { multi: true, identityKey: 'email' },
     },
-    {
-      slug: 'description',
-      name: 'Description',
-      type: 'text',
-      options: { enrichmentKey: 'person.description' },
-    },
-    {
-      slug: 'location',
-      name: 'Location',
-      type: 'text',
-      options: { enrichmentKey: 'person.location' },
-    },
+    // Unlinked by default: a phone costs extra credits and is opt-in.
+    { slug: 'phone', name: 'Phone', type: 'phone', options: { multi: true } },
     {
       slug: 'linkedin',
       name: 'LinkedIn',
@@ -646,12 +637,28 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       type: 'url',
       options: { enrichmentKey: 'person.twitter' },
     },
-    // Unlinked by default: a phone costs extra credits and is opt-in.
-    { slug: 'phone', name: 'Phone', type: 'phone', options: { multi: true } },
+    {
+      slug: 'job_title',
+      name: 'Job title',
+      type: 'text',
+      options: { enrichmentKey: 'person.title' },
+    },
+    {
+      slug: 'location',
+      name: 'Location',
+      type: 'text',
+      options: { enrichmentKey: 'person.location' },
+    },
+    {
+      slug: 'description',
+      name: 'Description',
+      type: 'text',
+      options: { enrichmentKey: 'person.description', longText: true },
+    },
     {
       // The companies this person is at: angels, advisors and co-investors
       // sit at several, hence multi. The write path materializes
-      // `link(references, 'companies')`. Appended, never slotted.
+      // `link(references, 'companies')`.
       slug: 'companies',
       name: 'Companies',
       type: 'record_reference',
@@ -664,20 +671,14 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       // The owner of the pair a company's `team` reads.
       pair: { kind: 'company', slug: 'team' },
     },
-    {
-      // Identity, like a company's domains. Appended, never slotted.
-      slug: 'emails',
-      name: 'Emails',
-      type: 'email',
-      options: { multi: true, identityKey: 'email' },
-    },
     // The name in two parts; `setValues` keeps `canonical_name` their
-    // join. Appended, never slotted — the record page draws them as one cell.
+    // join. The record page prints the join as its title and renames from
+    // the head, so neither is a rail row.
     { slug: 'first_name', name: 'First name', type: 'text' },
     { slug: 'last_name', name: 'Last name', type: 'text' },
     {
       // The deals this person is on: the inverse of a deal's `people`.
-      // Stores nothing. Appended, never slotted.
+      // Stores nothing.
       slug: 'deals',
       name: 'Deals',
       type: 'record_reference',
@@ -691,6 +692,35 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
     },
   ],
   deal: [
+    {
+      slug: 'value',
+      name: 'Value',
+      type: 'currency',
+      options: { code: 'USD' },
+    },
+    { slug: 'close_date', name: 'Close date', type: 'date' },
+    {
+      // New deals arrive owned — the most repetitive click in deal capture.
+      // The seed never rewrites rows a user may have edited, so existing
+      // installs got this default from a migration.
+      slug: 'owner',
+      name: 'Owner',
+      type: 'actor_reference',
+      options: { default: 'current-user' },
+    },
+    {
+      slug: 'source',
+      name: 'Source',
+      type: 'select',
+      options: {
+        options: [
+          opt('inbound', 'Inbound', undefined, 'blue'),
+          opt('referral', 'Referral', undefined, 'emerald'),
+          opt('outbound', 'Outbound', undefined, 'orange'),
+          opt('event', 'Event', undefined, 'violet'),
+        ],
+      },
+    },
     {
       slug: 'stage',
       name: 'Stage',
@@ -711,12 +741,6 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
           opt('lost', 'Lost', 'closed', 'fuchsia'),
         ],
       },
-    },
-    {
-      slug: 'value',
-      name: 'Value',
-      type: 'currency',
-      options: { code: 'USD' },
     },
     {
       slug: 'company',
@@ -740,42 +764,17 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       pair: { kind: 'person', slug: 'deals' },
     },
     {
-      // New deals arrive owned — the most repetitive click in deal capture.
-      // The seed never rewrites rows a user may have edited, so existing
-      // installs got this default from a migration.
-      slug: 'owner',
-      name: 'Owner',
-      type: 'actor_reference',
-      options: { default: 'current-user' },
-    },
-    { slug: 'close_date', name: 'Close date', type: 'date' },
-    {
-      slug: 'source',
-      name: 'Source',
-      type: 'select',
-      options: {
-        options: [
-          opt('inbound', 'Inbound', undefined, 'blue'),
-          opt('referral', 'Referral', undefined, 'emerald'),
-          opt('outbound', 'Outbound', undefined, 'orange'),
-          opt('event', 'Event', undefined, 'violet'),
-        ],
-      },
-    },
-    {
       // Post-mortem memory: Passed and Lost carry distinct
       // lessons — the reason is captured at close time, while it's fresh.
       slug: 'close_reason',
       name: 'Close reason',
       type: 'text',
-      options: {},
+      options: { longText: true },
     },
     {
       // Who sent the deal; `source` says how it arrived. A plain reference:
       // the write path syncs its `references` link in the same transaction,
       // so backlinks, the merge repoint and the context assembler read it.
-      // Appended, never slotted next to Source: sortOrder is (i+1)*10 and a
-      // mid-array insert would collide with an installed close_reason.
       slug: 'referred_by',
       name: 'Referred by',
       type: 'record_reference',

@@ -736,10 +736,16 @@ drew it; `docs/design-contract.md` §3 "A record" carries the whole anatomy.
 
 - **Head:** the stamp alone on its row, the kind only; the mark, the serif name and its
   suffix with `[verb] [verb] [···]` on the next; the double rule; **no readout strip**.
-- **Rail left**, 300px on bone: the attribute grid (bone label cell, paper value cell)
-  and the relations. **Tabs right:** Overview · Notes · Interactions · Files · History,
-  Overview first and the default every time, which holds the readouts that have a value,
-  the open tasks, the latest threads and the latest files.
+- **Rail left**, 320px on the bone ground with no box: the attribute rows — a 104px
+  sans graphite label lane that wraps, the value after it, a rule under each, in
+  registry order with identity and contact first — then the relations. A relationship
+  shows once, as its section; a person's name and a deal's stage are the head's; a
+  mono value too long for its line drops under its label and is cut in the middle with
+  the whole value in its `title`; a url reads as host and path with an `↗`. **Tabs
+  right:** Overview · Notes · Interactions · Files · History, Overview first and the
+  default every time, which holds the long text paragraphs (three lines, `More`,
+  edited in place, saved on blur), the readouts that have a value, the open tasks, the
+  latest threads and the latest files.
 
 - **A space (2026-09-16).** The head measures it — SUBSPACES · COMPANIES · IN PIPELINE ·
   MEMOS · TERMS (own `+inherited`) · REFERENCED — under a crumb of ancestor links. Body:

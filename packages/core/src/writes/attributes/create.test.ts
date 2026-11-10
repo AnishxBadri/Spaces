@@ -144,6 +144,51 @@ describe('createAttributeProgram', () => {
       default: 'two',
     })
     await rejects({ ...base, name: name('dt'), type: 'date', default: 'soon' })
+    await rejects({
+      ...base,
+      name: name('long'),
+      type: 'number',
+      config: { longText: true },
+    })
+  })
+
+  it('marks a text attribute long, and gives two made in a row different orders', async () => {
+    const { Effect } = await import('effect')
+    const { createAttributeProgram } = await import('./create')
+    const { db } = await import('@spaces/db')
+    const { attribute } = await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
+    const { inArray } = await import('drizzle-orm')
+    const [actor] = await db.select({ id: user.id }).from(user).limit(1)
+    const base = { objectKind: 'company' as const, createdBy: actor.id }
+
+    const a = await Effect.runPromise(
+      createAttributeProgram({
+        ...base,
+        name: name('memo'),
+        type: 'text',
+        config: { longText: true },
+      }),
+    )
+    const b = await Effect.runPromise(
+      createAttributeProgram({ ...base, name: name('memo b'), type: 'text' }),
+    )
+    const rows = await db
+      .select({
+        slug: attribute.slug,
+        options: attribute.options,
+        sortOrder: attribute.sortOrder,
+      })
+      .from(attribute)
+      .where(inArray(attribute.slug, [a.slug, b.slug]))
+    const bySlug = new Map(rows.map((r) => [r.slug, r]))
+    expect(bySlug.get(a.slug)?.options.longText).toBe(true)
+    expect(bySlug.get(b.slug)?.options.longText).toBeUndefined()
+    const orders = rows.map((r) => r.sortOrder)
+    expect(new Set(orders).size).toBe(2)
+    expect(bySlug.get(b.slug)?.sortOrder).toBe(
+      (bySlug.get(a.slug)?.sortOrder ?? 0) + 10,
+    )
   })
 })
 

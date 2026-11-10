@@ -17,12 +17,13 @@ export type CreateOpener = {
 }
 
 /**
- * The property grid's rows with the empty attributes folded: the filled
- * ones in order, then one 32px bone row — `n empty +` — that opens a
+ * The rail's attribute rows with the empty attributes folded: the filled
+ * ones in registry order, then one 32px row — `n empty +` — that opens a
  * popover to search the empty attributes by name (each with its mono
- * type), picking one into the grid, with `New attribute…` at its foot.
- * - What was picked stays shown for this mount; a value written moves it
- *   up on reload.
+ * type), picking one into the rows, with `New attribute…` at its foot.
+ * - What was picked stays shown for this mount, in its registry place.
+ * - `away`: attributes printed elsewhere (long text, in Overview). Never a
+ *   row; empty, they are offered here and a pick goes to `onPickAway`.
  * - `create` renders the caller's create window, held open by the fold.
  * - Nothing empty and nothing to create: no row, never a `0 empty`.
  */
@@ -31,21 +32,25 @@ export function PropertyFold<TDef extends FoldDef>({
   valueOf,
   render,
   create,
+  away,
+  onPickAway,
 }: {
   defs: ReadonlyArray<TDef>
   valueOf: (def: TDef) => unknown
   render: (def: TDef) => ReactNode
   create?: ((opener: CreateOpener) => ReactNode) | undefined
+  away?: ((def: TDef) => boolean) | undefined
+  onPickAway?: ((def: TDef) => void) | undefined
 }) {
   const [picking, setPicking] = useState(false)
   const [creating, setCreating] = useState(false)
   const [picked, setPicked] = useState<ReadonlyArray<string>>([])
   const [q, setQ] = useState('')
-  const { filled, empty } = splitByFilled(defs, valueOf)
-  const shown = picked.flatMap((slug) => {
-    const def = empty.find((d) => d.slug === slug)
-    return def === undefined ? [] : [def]
-  })
+  const { empty } = splitByFilled(defs, valueOf)
+  const rows = defs.filter(
+    (d) =>
+      away?.(d) !== true && (!empty.includes(d) || picked.includes(d.slug)),
+  )
   const term = q.trim().toLowerCase()
   const offered = empty
     .filter((d) => !picked.includes(d.slug))
@@ -55,12 +60,12 @@ export function PropertyFold<TDef extends FoldDef>({
     setPicked((now) => [...now, def.slug])
     setPicking(false)
     setQ('')
+    if (away?.(def) === true) onPickAway?.(def)
   }
 
   return (
     <>
-      {filled.map(render)}
-      {shown.map(render)}
+      {rows.map(render)}
       {empty.length > 0 || create ? (
         <Popover
           open={picking}
@@ -74,7 +79,7 @@ export function PropertyFold<TDef extends FoldDef>({
               type="button"
               data-property-foot
               aria-label="Add an attribute"
-              className="focus-ring-inset flex h-8 w-full items-center justify-between gap-3 bg-bone px-2.5 text-left text-label text-graphite transition-colors duration-150 ease-out-quart hover:text-foreground"
+              className="focus-ring-inset flex h-8 w-full items-center justify-between gap-3 border-b border-rule bg-bone text-left text-label text-graphite transition-colors duration-150 ease-out-quart hover:text-foreground"
             >
               <span>
                 {empty.length > 0 ? `${String(empty.length)} empty` : ''}

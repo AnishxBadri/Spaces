@@ -189,6 +189,8 @@ export const updateAttributeInput = z.object({
       ai: aiConfigInput.nullable().optional(),
       /** "Fill from": the vocabulary key to link; null unlinks. Checked by the program. */
       enrichmentKey: z.string().trim().min(1).max(80).nullable().optional(),
+      /** text — "Long text": a paragraph in Overview, not a rail row */
+      longText: z.boolean().optional(),
     })
     .optional(),
 })
@@ -273,6 +275,7 @@ export const createAttributeInput = z.object({
       targetKind: z.enum(['company', 'person', 'deal']).optional(),
       targetObjectId: z.string().uuid().optional(),
       multi: z.boolean().optional(),
+      longText: z.boolean().optional(),
     })
     .optional(),
   default: jsonValue.optional(),

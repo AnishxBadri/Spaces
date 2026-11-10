@@ -37,6 +37,15 @@ import {
   relationRows,
   withDerived,
 } from '#/components/record/relation-section'
+import {
+  LongTextParagraphs,
+  useLongTextPick,
+} from '#/components/record/long-text'
+import {
+  OWN_SECTIONS,
+  isLongText,
+  recordRailDefs,
+} from '#/lib/records/rail-defs'
 import { PropertyFold } from '#/components/record/property-fold'
 import { RecordSpacesSection } from '#/components/record/spaces-section'
 import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
@@ -194,6 +203,8 @@ function DealRecordPage() {
   const peopleIds = useMemo(() => people.map((p) => p.id), [people])
   const company = relationRows(deal.relations, 'company', false)
   const values = withDerived(deal.values, deal.relations)
+  const rail = recordRailDefs('deal', registry)
+  const longText = useLongTextPick(() => changeTab('overview'))
   const searchPeople = useCallback(
     async (q: string) => {
       const rows = await searchEntities({ data: { q, kinds: ['person'] } })
@@ -333,7 +344,9 @@ function DealRecordPage() {
             <AiCellsProvider entityIds={[deal.id]} registry={registry}>
               <PropertyGrid>
                 <PropertyFold
-                  defs={registry}
+                  defs={rail}
+                  away={isLongText}
+                  onPickAway={longText.pick}
                   valueOf={(def) => values[def.slug]}
                   render={(def) => (
                     <RailField
@@ -422,7 +435,7 @@ function DealRecordPage() {
             <RelationSections
               defs={registry}
               halves={deal.relations}
-              skip={['company', 'people']}
+              skip={OWN_SECTIONS.deal}
               onAdd={(slug, value) => save({ [slug]: value })}
             />
 
@@ -445,6 +458,20 @@ function DealRecordPage() {
             overview: (
               <RecordOverview
                 record={{ id: deal.id, name: deal.name, kind: 'deal' }}
+                lead={
+                  <LongTextParagraphs
+                    defs={registry}
+                    valueOf={(def) => values[def.slug]}
+                    opened={longText.opened}
+                    onSave={async (slug, v) => {
+                      // Not `save`: a refusal has to reach the paragraph.
+                      await updateRecord({
+                        data: { id: deal.id, patch: { [slug]: v } },
+                      })
+                      void router.invalidate()
+                    }}
+                  />
+                }
                 readouts={[
                   {
                     label: 'Our check',

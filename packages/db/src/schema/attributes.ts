@@ -97,6 +97,12 @@ export type AttributeOptions = {
   /** number: display decimals; stored numbers untouched */
   precision?: number
   /**
+   * text: a paragraph rather than a field — the record prints it in Overview,
+   * never in the rail. False is the owner's "not long", which the boot seeder
+   * never re-flags; absent is never decided.
+   */
+  longText?: boolean
+  /**
    * This attribute backs an identity key: a custom object's
    * declared `domain`/`linkedin`, or a person's `emails` and a company's
    * `domains`. The write path mirrors its values into `entity_alias`, and

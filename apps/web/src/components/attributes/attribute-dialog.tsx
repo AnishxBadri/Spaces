@@ -34,6 +34,7 @@ import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { Segmented } from '#/components/ui/segmented'
 import { Select } from '#/components/ui/select'
+import { Switch } from '#/components/ui/switch'
 import type { SelectItem } from '#/components/ui/select'
 import { ConfirmDialog } from '#/components/ui/confirm-dialog'
 import { optionColor } from '@spaces/core/attributes/colors'
@@ -365,6 +366,8 @@ function AttributeForm({
   const [code, setCode] = useState(stored.code ?? 'USD')
   const [max, setMax] = useState(stored.max ?? 5)
   const [precision, setPrecision] = useState(stored.precision ?? 0)
+  // A text attribute printed as a paragraph in Overview, not a rail row.
+  const [longText, setLongText] = useState(stored.longText === true)
   // The relationship target: a core kind or `object:<id>`.
   const [target, setTarget] = useState<string>(
     stored.targetKind ??
@@ -446,6 +449,7 @@ function AttributeForm({
     setRelative(false)
     setTarget('')
     setMulti(false)
+    setLongText(false)
     requestAnimationFrame(() => nameRef.current?.focus())
   }
 
@@ -548,6 +552,7 @@ function AttributeForm({
               ...(type === 'currency' ? { code } : {}),
               ...(type === 'rating' ? { max } : {}),
               ...(type === 'number' ? { precision } : {}),
+              ...(type === 'text' && longText ? { longText } : {}),
               ...(type === 'phone' ? { multi } : {}),
               ...(type === 'record_reference' && targetKind
                 ? { targetKind, multi }
@@ -583,6 +588,9 @@ function AttributeForm({
               ...(type === 'number' && precision !== (stored.precision ?? 0)
                 ? { precision }
                 : {}),
+              ...(type === 'text' && longText !== (stored.longText === true)
+                ? { longText }
+                : {}),
               ...(JSON.stringify(dflt) !==
               JSON.stringify(stored.default ?? null)
                 ? { default: dflt }
@@ -605,6 +613,22 @@ function AttributeForm({
 
   const slot = (() => {
     switch (type) {
+      case 'text':
+        return (
+          <div className="flex flex-col gap-1">
+            <Switch
+              id="attr-long-text"
+              checked={longText}
+              onCheckedChange={setLongText}
+              className="self-start text-ui text-foreground"
+            >
+              Long text
+            </Switch>
+            <p className="text-label text-graphite">
+              A paragraph in Overview, not a row in the details
+            </p>
+          </div>
+        )
       case 'number':
         return (
           <Field label="Decimals" htmlFor="attr-precision">

@@ -98,12 +98,13 @@ describe('the details slot', () => {
     expect(details?.querySelector('[role="tablist"]')).toBeNull()
   })
 
-  it('holds the property grid as a ruled box of label–value rows, labels in sans graphite on bone', () => {
+  it('prints the attribute rows on the ground: no box, a 104px sans graphite label lane, a rule under each', () => {
     const doc = record()
     const grid = doc.querySelector('[data-property-grid]')
     expect(classes(grid)).not.toContain('md:grid-cols-2')
+    expect(classes(grid)).not.toContain('border')
     expect(classes(grid)).toEqual(
-      expect.arrayContaining(['border', 'border-rule']),
+      expect.arrayContaining(['border-t', 'border-rule']),
     )
     const labels = Array.from(doc.querySelectorAll('[data-property-label]'))
     expect(labels.map((l) => l.textContent)).toEqual([
@@ -112,27 +113,19 @@ describe('the details slot', () => {
     ])
     for (const l of labels) {
       expect(classes(l)).toEqual(
-        expect.arrayContaining([
-          'w-28',
-          'bg-bone',
-          'border-r',
-          'border-rule',
-          'px-2.5',
-          'py-2',
-          'text-label',
-          'text-graphite',
-        ]),
+        expect.arrayContaining(['w-26', 'py-2', 'text-label', 'text-graphite']),
       )
+      expect(classes(l)).not.toContain('bg-bone')
+      expect(classes(l)).not.toContain('border-r')
       expect(classes(l)).not.toContain('mono')
       expect(classes(l)).not.toContain('lowercase')
       expect(classes(l)).not.toContain('field-label')
       // A long name wraps, never truncates.
       expect(l.outerHTML).not.toContain('truncate')
-      // The value follows in the same row on paper, left-aligned.
+      // The value follows in the same row, left-aligned, with no sheet of its own.
       const value = l.nextElementSibling
-      expect(classes(value)).toEqual(
-        expect.arrayContaining(['bg-paper', 'text-ui']),
-      )
+      expect(classes(value)).toEqual(expect.arrayContaining(['text-ui']))
+      expect(classes(value)).not.toContain('bg-paper')
       expect(classes(value)).not.toContain('text-right')
       // Rows are separated by a rule.
       expect(classes(l.parentElement)).toEqual(
@@ -140,7 +133,6 @@ describe('the details slot', () => {
       )
     }
   })
-
   it('draws an empty rail section as its one Name + row, no head and no sentence', () => {
     const doc = render(
       <RailSection label="Spaces" meta="0" empty>

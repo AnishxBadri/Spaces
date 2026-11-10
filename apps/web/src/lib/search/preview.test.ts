@@ -110,11 +110,11 @@ describe('a record preview', () => {
     )
     // Seven are filled (domains too); the six first in the registry show.
     expect(preview.fields.map((f) => f.slug)).toEqual([
-      'description',
+      'linkedin',
       'funding_stage',
       'location',
       'founded_year',
-      'linkedin',
+      'description',
       'founders',
     ])
     expect(preview.fields).toHaveLength(PREVIEW_FIELDS)

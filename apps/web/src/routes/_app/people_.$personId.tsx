@@ -6,7 +6,7 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { RailField } from '#/components/attributes/rail-field'
@@ -25,6 +25,17 @@ import { RecordHeadActions } from '#/components/record/record-heads'
 import { RecordNotices } from '#/components/record/record-notices'
 import { recordStamp } from '#/components/record/record-archive'
 import { PickPopover } from '#/components/record/details-add'
+import { icon } from '#/components/icons'
+import {
+  LongTextParagraphs,
+  useLongTextPick,
+} from '#/components/record/long-text'
+import { RenamePersonDialog } from '#/components/record/rename-person'
+import {
+  OWN_SECTIONS,
+  isLongText,
+  recordRailDefs,
+} from '#/lib/records/rail-defs'
 import {
   RelationSection,
   RelationSections,
@@ -44,7 +55,6 @@ import { WaitingRail } from '#/components/record/waiting-rail'
 import { recordPath } from '#/lib/record-path'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { jsonString } from '@spaces/core/json'
-import { isNamePart } from '@spaces/core/attributes/person-name'
 import { fileInSpaceAction } from '#/lib/file-in-space'
 import { runBinding, usePageActions } from '#/lib/page-actions'
 import {
@@ -170,11 +180,9 @@ function PersonRecordPage() {
   const nameMeta = [role, companies.at(0)?.name]
     .filter((part) => part !== null && part !== undefined && part !== '')
     .join(' · ')
-  // The name's parts lead the grid; the head is their join.
-  const fields = [
-    ...registry.filter((def) => isNamePart(def.slug)),
-    ...registry.filter((def) => !isNamePart(def.slug)),
-  ]
+  const rail = recordRailDefs('person', registry)
+  const longText = useLongTextPick(() => changeTab('overview'))
+  const [renaming, setRenaming] = useState(false)
   const searchCompanies = useCallback(
     async (q: string) => {
       const on = new Set(companies.map((c) => c.id))
@@ -192,9 +200,9 @@ function PersonRecordPage() {
     [deals],
   )
 
-  /** Write one of this person's own relationship halves; `setValues` puts a
-   *  derived half's write on its owner. */
-  async function saveRelation(slug: string, value: string | Array<string>) {
+  /** Write one of this person's values; for a derived relationship half,
+   *  `setValues` puts the write on its owner. */
+  async function saveValue(slug: string, value: unknown) {
     await updateRecord({ data: { id: person.id, patch: { [slug]: value } } })
     void router.invalidate()
   }
@@ -238,6 +246,14 @@ function PersonRecordPage() {
             sensitivity={sensitivity}
             template="person"
             pluginActions={pluginActions}
+            more={[
+              {
+                label: 'Rename…',
+                icon: <icon.edit className="size-4" />,
+                opens: true,
+                onSelect: () => setRenaming(true),
+              },
+            ]}
           />
         }
         mark={
@@ -265,7 +281,9 @@ function PersonRecordPage() {
             <AiCellsProvider entityIds={[person.id]} registry={registry}>
               <PropertyGrid>
                 <PropertyFold
-                  defs={fields}
+                  defs={rail}
+                  away={isLongText}
+                  onPickAway={longText.pick}
                   valueOf={(def) => values[def.slug]}
                   render={(def) => (
                     <RailField
@@ -345,7 +363,7 @@ function PersonRecordPage() {
                   placeholder="Add to a deal…"
                   search={searchDeals}
                   onPick={(hit) =>
-                    saveRelation('deals', [...deals.map((d) => d.id), hit.id])
+                    saveValue('deals', [...deals.map((d) => d.id), hit.id])
                   }
                 />
               )}
@@ -354,8 +372,8 @@ function PersonRecordPage() {
             <RelationSections
               defs={registry}
               halves={person.relations}
-              skip={['companies', 'deals']}
-              onAdd={saveRelation}
+              skip={OWN_SECTIONS.person}
+              onAdd={saveValue}
             />
 
             {/* Inbound record-references outside any relationship, one
@@ -411,6 +429,14 @@ function PersonRecordPage() {
             overview: (
               <RecordOverview
                 record={{ id: person.id, name: person.name, kind: 'person' }}
+                lead={
+                  <LongTextParagraphs
+                    defs={registry}
+                    valueOf={(def) => values[def.slug]}
+                    opened={longText.opened}
+                    onSave={saveValue}
+                  />
+                }
                 readouts={[
                   {
                     label: 'Last contact',
@@ -476,6 +502,16 @@ function PersonRecordPage() {
           }}
         />
       </RecordBody>
+      <RenamePersonDialog
+        open={renaming}
+        onOpenChange={setRenaming}
+        first={jsonString(person.values.first_name) ?? ''}
+        last={jsonString(person.values.last_name) ?? ''}
+        onSave={async (name) => {
+          await updateRecord({ data: { id: person.id, patch: name } })
+          void router.invalidate()
+        }}
+      />
       <MeetingDialog
         id={openModalId(search, 'meeting')}
         onOpenChange={(open) => {

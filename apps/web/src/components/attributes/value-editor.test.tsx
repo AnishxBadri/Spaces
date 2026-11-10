@@ -89,11 +89,11 @@ describe('ValueEditor — a person’s emails', () => {
     expect(html.match(/shared inbox/g)).toHaveLength(1)
   })
 
-  it('shows the first email in a property row and +N for the rest', () => {
+  it('shows every email in a property row, each whole in its title, with no +N', () => {
     const html = render(emails, ['jane@acme.example', 'info@acme.example'])
-    expect(html).toContain('jane@acme.example')
-    expect(html).not.toContain('info@acme.example')
-    expect(html).toContain('+1</span>')
+    expect(html).toContain('title="jane@acme.example"')
+    expect(html).toContain('title="info@acme.example"')
+    expect(html).not.toContain('+1</span>')
   })
 
   it('leaves the mark off an email attribute that is not identity', () => {

@@ -28,6 +28,11 @@ import {
   RelationSections,
   withDerived,
 } from '#/components/record/relation-section'
+import {
+  LongTextParagraphs,
+  useLongTextPick,
+} from '#/components/record/long-text'
+import { isLongText, recordRailDefs } from '#/lib/records/rail-defs'
 import { RecordSpacesSection } from '#/components/record/spaces-section'
 import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
 import { RecordOverview } from '#/components/record/record-overview'
@@ -152,6 +157,12 @@ function ObjectRecordPage() {
     (next) =>
       void go({ search: { tab: next }, replace: true, resetScroll: false }),
   )
+  const rail = recordRailDefs('custom', registry)
+  const longText = useLongTextPick(() => changeTab('overview'))
+  async function saveValue(slug: string, v: unknown) {
+    await updateRecord({ data: { id: record.id, patch: { [slug]: v } } })
+    void router.invalidate()
+  }
 
   async function newNoteAboutThis() {
     try {
@@ -238,7 +249,9 @@ function ObjectRecordPage() {
             <AiCellsProvider entityIds={[record.id]} registry={registry}>
               <PropertyGrid>
                 <PropertyFold
-                  defs={registry}
+                  defs={rail}
+                  away={isLongText}
+                  onPickAway={longText.pick}
                   valueOf={(def) => values[def.slug]}
                   render={(def) => (
                     <RailField
@@ -288,12 +301,7 @@ function ObjectRecordPage() {
             <RelationSections
               defs={registry}
               halves={record.relations}
-              onAdd={async (slug, value) => {
-                await updateRecord({
-                  data: { id: record.id, patch: { [slug]: value } },
-                })
-                void router.invalidate()
-              }}
+              onAdd={saveValue}
             />
 
             {/* The records that point here outside any relationship, one
@@ -349,6 +357,14 @@ function ObjectRecordPage() {
             overview: (
               <RecordOverview
                 record={{ id: record.id, name: record.name, kind: 'custom' }}
+                lead={
+                  <LongTextParagraphs
+                    defs={registry}
+                    valueOf={(def) => values[def.slug]}
+                    opened={longText.opened}
+                    onSave={saveValue}
+                  />
+                }
                 readouts={[
                   {
                     label: 'Last contact',

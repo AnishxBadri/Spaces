@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { AiCell } from './ai-cell'
 import { AttributeDialog } from './attribute-dialog'
 import type { EditableAttribute } from './attribute-dialog'
-import { ValueEditor } from './value-editor'
+import { MONO_VALUE_TYPES, ValueEditor } from './value-editor'
 import type { RefNames, RegistryEntry } from './value-editor'
 import {
   PropertyCell,
@@ -60,27 +60,13 @@ export function RailField({
   /** Where the value came from, when a source filled it. */
   whereFrom?: WhereFrom | undefined
 }) {
-  const [error, setError] = useState<string | null>(null)
-  const [attempt, setAttempt] = useState(0)
   const [editing, setEditing] = useState(false)
-  const [reject, setReject] = useState<RejectPhase>('rest')
-
-  // The clock behind the two-second hold. `attempt` is in the deps so a
-  // second rejection during a hold restarts it rather than being swallowed
-  // by a phase that did not change.
-  useEffect(() => {
-    if (reject === 'rest') return
-    const leaving = reject === 'leaving'
-    const t = setTimeout(
-      () => setReject(leaving ? 'rest' : 'leaving'),
-      leaving ? REJECT_LEAVE_MS : REJECT_HOLD_MS - REJECT_LEAVE_MS,
-    )
-    return () => clearTimeout(t)
-  }, [reject, attempt])
+  const { error, attempt, reject, save } = useRejectedWrite(def.slug, onSave)
 
   return (
     <PropertyCell
       className="group/rail"
+      wide={MONO_VALUE_TYPES.has(def.type)}
       reject={reject}
       label={
         <>
@@ -131,21 +117,7 @@ export function RailField({
             value={value}
             variant="field"
             refNames={refNames}
-            onSave={(v) => {
-              onSave(v).then(
-                () => {
-                  setError(null)
-                  setReject('rest')
-                },
-                (err: unknown) => {
-                  const raw =
-                    err instanceof Error ? err.message : 'Could not save'
-                  setError(raw.replace(new RegExp(`^${def.slug}: `), ''))
-                  setAttempt((n) => n + 1)
-                  setReject('hold')
-                },
-              )
-            }}
+            onSave={(v) => void save(v)}
           />
         </WithWhereFrom>
       </MaybeAiCell>
@@ -189,4 +161,52 @@ function MaybeAiCell({
       {children}
     </AiCell>
   )
+}
+
+/**
+ * A value write that can be refused: the server's message without its
+ * `slug: ` prefix, an `attempt` to remount the editor on (the snap back to
+ * the stored value), and the crimson `reject` phase for two seconds. It runs
+ * off the rejection the write already returns, so nothing asks twice.
+ */
+export function useRejectedWrite(
+  slug: string,
+  onSave: (value: unknown) => Promise<void>,
+) {
+  const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
+  const [reject, setReject] = useState<RejectPhase>('rest')
+
+  // The clock behind the two-second hold. `attempt` is in the deps so a
+  // second rejection during a hold restarts it rather than being swallowed
+  // by a phase that did not change.
+  useEffect(() => {
+    if (reject === 'rest') return
+    const leaving = reject === 'leaving'
+    const t = setTimeout(
+      () => setReject(leaving ? 'rest' : 'leaving'),
+      leaving ? REJECT_LEAVE_MS : REJECT_HOLD_MS - REJECT_LEAVE_MS,
+    )
+    return () => clearTimeout(t)
+  }, [reject, attempt])
+
+  /** Resolves whether the write landed; it never rejects. */
+  function save(value: unknown): Promise<boolean> {
+    return onSave(value).then(
+      () => {
+        setError(null)
+        setReject('rest')
+        return true
+      },
+      (err: unknown) => {
+        const raw = err instanceof Error ? err.message : 'Could not save'
+        setError(raw.replace(new RegExp(`^${slug}: `), ''))
+        setAttempt((n) => n + 1)
+        setReject('hold')
+        return false
+      },
+    )
+  }
+
+  return { error, attempt, reject, save }
 }

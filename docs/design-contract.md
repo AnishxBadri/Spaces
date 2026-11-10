@@ -52,8 +52,9 @@ for Today and the holding's figures only; a record's readouts live in its Overvi
 
 How a page meets its frame, and how its parts rank. Decided by the owner on the canvas
 on 2026-11-11, in place of the 12px edge and 4px gutter of 2026-11-07. `edges-2` built
-the frame, `record-1` the inside of the record's rail and `settings-1` the settings
-pages.
+the frame; `record-1` built the inside of the record's rail from Paper board "18
+Company record · details column", the rule for every record kind; `settings-1` built
+the settings pages.
 
 Where it lives. `PAGE_EDGE` (`px-6`), `PageBody` (bone, `p-3 gap-3`, `flex-1`),
 `FolderGround` and `Card` are in `components/page-header.tsx`; the ground itself is the
@@ -205,8 +206,8 @@ Three ladders order everything on a surface, and none of them needs a new token.
 
 - **Text.** A value is ink at 13–14; its label is sans 12 graphite; a kind is graphite
   mono caps. Nothing is lighter than graphite.
-- **Surface.** Paper is work, bone is frame, bone-deep is pressed. An attribute grid is
-  a bone label cell beside a paper value cell.
+- **Surface.** Paper is work, bone is frame, bone-deep is pressed. A record's
+  attribute rows are printed on the bone ground of its rail, no cell of either.
 - **Line.** One rule under every head (E2); ink is structure; a rule separates inside
   a pane; space separates inside a group.
 
@@ -551,17 +552,40 @@ anatomy (D74 amended 2026-10-25):
   while something needs saying (a possible duplicate, enrichment parked, the
   record archived).
 - **Rail.** Left, 320px on the bone ground with no card and no border, its content on
-  the 24px edge (E11): the attribute grid — a bone label cell beside a paper value cell,
-  the empty attributes folded into one `n empty +` row — and then the relations (Team,
-  Associated deals, Spaces, Waiting), each empty one an `EmptyRow`. Tasks are not in the
-  rail.
+  the 24px edge (E11). First the attribute rows (`PropertyGrid`, `PropertyCell`): a rule
+  over the first and under each, a 104px label lane in sans 12 graphite that wraps and
+  never truncates, then the value, 32px at least, whose editor opens in place and grows
+  the row downward, never sideways. Rows print in registry order (`sort_order`; a new
+  attribute takes `max + 10`) and the empty ones fold into one `n empty +` row.
+  - A value is never cut silently: sans text wraps; a mono value (domain, email,
+    phone, url) that does not fit beside its label drops under it at full width, one
+    value per line, with no chip at rest, and one too long even then is cut in the
+    middle with the whole value in its `title` (the menu that edits it prints it whole).
+  - A url prints host and path, no scheme or `www.`, with an `↗` at the row's end that
+    opens it in a new tab; a click on the value still edits it.
+  - A relationship with a section (Team, Associated deals, Companies, Deals, Company,
+    People, and `RelationSections` for the rest) is that section only, never also a
+    row; one with no section stays a row. What the head says leaves the rail: a
+    person's name parts (the title; `Rename…` in the `···` edits them) and a deal's
+    stage (the badge, the stepper and Move stage).
+  - A long text attribute (`options.longText`, the `Long text` switch on a Text
+    attribute; seeded on company and person `description` and deal `close_reason`) is
+    never a row: it is an Overview paragraph, and while empty it is offered in the
+    fold, whose pick opens its editor in Overview.
+  - Then the relations (Team, Associated deals, Spaces, Waiting), each empty one an
+    `EmptyRow`. Tasks are not in the rail.
 - **View.** Right, 12px from the rail, the record's folder: the 44px bar on the ground,
   the body hairline-framed and filling the height: Overview ·
   Notes · Interactions · Files · History. **Overview is first and opens every time**;
   no tab is remembered per kind. A tab that holds something carries its count; an empty
-  tab is graphite with none. Overview holds the readouts that have a value (never a
-  `—` or a 0), the open tasks with their composer, the latest three threads and the
-  latest files, each group a `Band` ending on a link to its tab.
+  tab is graphite with none. Overview opens on the record's long text paragraphs, in
+  registry order: the label in sans 12 graphite, the text at the body step clamped to
+  three lines with `More` / `Less`; a click opens a textarea in place at full width
+  that commits on blur and reverts on Esc, with no Save, and a refused write holds
+  crimson as a rail row does. Then the readouts that have a value (never a `—` or a
+  0), the open tasks with their composer, the latest three threads and the latest
+  files, each group a `Band` ending on a link to its tab. A list table keeps a long
+  text to its one truncated line.
 - **A space** is the same anatomy: the head is `···` only and the stamp prints no
   depth; Overview holds its readouts (in pipeline, last filed, the funding-stage bar),
   What's moving, open tasks and the latest companies; the rail is Criteria, Watching

@@ -1,5 +1,6 @@
 import { ChevronDown, icon } from '#/components/icons'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { KeyboardEvent } from 'react'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -78,6 +79,53 @@ const DASH_INSET: Record<Variant, string> = {
   form: 'px-2.75',
 }
 
+/**
+ * The types whose value prints in mono: in a property row each may drop
+ * under its label when it does not fit beside it (`PropertyCell`'s `wide`).
+ */
+export const MONO_VALUE_TYPES: ReadonlySet<string> = new Set([
+  'domain',
+  'email',
+  'phone',
+  'url',
+])
+
+/** A url at rest: host and path, without the scheme, `www.` or a closing `/`. */
+export function urlAtRest(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/$/, '')
+}
+
+/** Only a web address opens in a new tab; anything else stays text. */
+function webHref(raw: string): string | null {
+  return /^https?:\/\//i.test(raw.trim()) ? raw.trim() : null
+}
+
+/**
+ * A mono value cut in the middle when even its own line is too narrow: the
+ * head ellipsizes, the tail stays, so a domain keeps its suffix. The whole
+ * value is the `title`.
+ */
+export function MiddleCut({
+  text,
+  className,
+}: {
+  text: string
+  className?: string | undefined
+}) {
+  const tail = Math.min(9, Math.floor(text.length / 2))
+  const cut = text.length - tail
+  return (
+    <span title={text} className={cn('flex min-w-0', className)}>
+      <span className="truncate">{text.slice(0, cut)}</span>
+      <span className="shrink-0 whitespace-pre">{text.slice(cut)}</span>
+    </span>
+  )
+}
+
 export type RegistryEntry = {
   id?: string
   slug: string
@@ -131,10 +179,13 @@ export function OptionChip({
   def,
   id,
   className,
+  title,
 }: {
   def: RegistryEntry
   id: unknown
   className?: string
+  /** The label whole, where the chip may be cut to its row. */
+  title?: string | undefined
 }) {
   const state = optionState(def, id)
   return (
@@ -146,7 +197,7 @@ export function OptionChip({
       option={state.option}
       index={state.index}
       archived={state.archived}
-      title={state.archived ? 'Archived option' : undefined}
+      title={state.archived ? 'Archived option' : title}
       className={cn('inline-flex h-auto truncate py-0.5', className)}
     >
       {state.label}
@@ -468,50 +519,116 @@ function TextLikeEditor({ def, value, onSave, variant }: Props) {
   // A native date control draws its own empty skeleton.
   const dash = draft === '' && !focused && inputType !== 'date'
 
-  const field = (
+  // In a property row a text value is prose: it wraps and the row grows.
+  const prose = variant === 'field' && def.type === 'text'
+  // A mono value in a property row prints cut in the middle at rest, the
+  // input over it holding the whole value for the click that edits it.
+  const monoRow = variant === 'field' && MONO_VALUE_TYPES.has(def.type)
+  const href = variant === 'field' && def.type === 'url' ? webHref(draft) : null
+  const area = useRef<HTMLTextAreaElement>(null)
+  useLayoutEffect(() => {
+    const el = area.current
+    if (el === null) return
+    el.style.height = 'auto'
+    // scrollHeight leaves out the 1px border top and bottom.
+    el.style.height = `${String(el.scrollHeight + 2)}px`
+  }, [draft, prose])
+
+  // Esc reverts: the blur it causes must not commit the draft it threw away.
+  const reverting = useRef(false)
+  const keys = (e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (e.key === 'Enter') {
+      // A newline is not a value here; Enter commits as it does in a field.
+      if (prose) e.preventDefault()
+      e.currentTarget.blur()
+    }
+    if (e.key === 'Escape') {
+      reverting.current = true
+      setDraft(committed.current)
+      e.currentTarget.blur()
+    }
+  }
+  const leave = () => {
+    setFocused(false)
+    if (reverting.current) reverting.current = false
+    else commit()
+  }
+  const chrome = cn(
+    'w-full min-w-0 bg-transparent text-ui',
+    // A column of figures right-aligns; a property row's value lane is
+    // left-aligned like every other value.
+    figures && (variant === 'cell' ? 'numeric' : 'tabular'),
+    variant !== 'cell'
+      ? // ↵ commits, esc reverts; the reticle on focus.
+        cn(boxChrome(variant), 'focus:border-rule')
+      : // Inset inside a cell: an offset ring would be clipped by the
+        // table's scroll container and overlap the neighbouring column.
+        'focus-ring-inset h-full rounded-md px-1',
+  )
+
+  const field = prose ? (
+    <textarea
+      ref={area}
+      rows={1}
+      value={draft}
+      aria-label={def.name}
+      onFocus={() => setFocused(true)}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={leave}
+      onKeyDown={keys}
+      className={cn(
+        chrome,
+        'block h-auto min-h-8 resize-none overflow-hidden py-1.25 leading-5 break-words',
+      )}
+    />
+  ) : (
     <input
       type={inputType}
       inputMode={def.type === 'number' ? 'decimal' : phone ? 'tel' : undefined}
       {...(phone ? codes.inputProps : {})}
       value={formatted ? atRest(draft) : draft}
       aria-label={def.name}
+      {...(monoRow && draft !== '' ? { title: draft } : {})}
       onFocus={() => setFocused(true)}
       onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        setFocused(false)
-        commit()
-      }}
+      onBlur={leave}
       onKeyDown={(e) => {
         if (phone && codes.onKeyDown(e)) return
-        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- React types a key event's target as EventTarget; the handler is on the input itself
-        if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-        if (e.key === 'Escape') {
-          setDraft(committed.current)
-          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- React types a key event's target as EventTarget; the handler is on the input itself
-          ;(e.target as HTMLInputElement).blur()
-        }
+        keys(e)
       }}
       className={cn(
-        'w-full min-w-0 bg-transparent text-ui',
-        // A column of figures right-aligns; a property row's value lane is
-        // left-aligned like every other value.
-        figures && (variant === 'cell' ? 'numeric' : 'tabular'),
-        variant !== 'cell'
-          ? // ↵ commits, esc reverts; the reticle on focus.
-            cn(boxChrome(variant), 'focus:border-rule')
-          : // Inset inside a cell: an offset ring would be clipped by the
-            // table's scroll container and overlap the neighbouring column.
-            'focus-ring-inset h-full rounded-md px-1',
+        chrome,
+        monoRow && 'absolute inset-0 mono text-label',
+        // At rest the cut print below shows through.
+        monoRow && !focused && draft !== '' && 'text-transparent',
       )}
     />
   )
-  return (
+  const shown = phone
+    ? atRest(draft)
+    : def.type === 'url'
+      ? urlAtRest(draft)
+      : draft
+  const box = (
     <span
       className={cn(
-        'relative flex w-full min-w-0',
-        variant === 'cell' && 'h-full',
+        'relative flex min-w-0',
+        variant === 'cell' ? 'h-full w-full' : 'grow',
       )}
     >
+      {monoRow ? (
+        // In flow, so the row measures the value it prints, not the input.
+        <span
+          aria-hidden
+          data-value-at-rest
+          className={cn(
+            'pointer-events-none flex h-8 min-w-0 items-center border border-transparent px-2 mono text-label',
+            (focused || draft === '') && 'invisible',
+          )}
+        >
+          <MiddleCut text={shown} />
+        </span>
+      ) : null}
       {phone ? (
         <Popover open={codes.open}>
           <PopoverAnchor asChild>{field}</PopoverAnchor>
@@ -540,6 +657,22 @@ function TextLikeEditor({ def, value, onSave, variant }: Props) {
           <EmptyDash />
         </span>
       ) : null}
+    </span>
+  )
+  if (href === null) return box
+  return (
+    <span className="flex w-full min-w-0 items-center gap-1">
+      {box}
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`Open ${def.name}`}
+        title={href}
+        className="focus-ring flex size-6 shrink-0 items-center justify-center text-ui text-graphite transition-colors duration-150 ease-out-quart hover:text-foreground"
+      >
+        ↗
+      </a>
     </span>
   )
 }
@@ -612,6 +745,7 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
             selected.map((id) => (
               <span
                 key={id}
+                title={refName(refNames, id)}
                 className="flex h-5 items-center gap-1.5 truncate border border-rule bg-paper px-1.5 text-label font-medium"
               >
                 {mark(refName(refNames, id))}
@@ -683,14 +817,11 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
     active: phone && focused,
     onPick: setDraft,
   })
-  // A cell shows a list's first phone, a property row a person's first
-  // email; a mono +N counts the rest.
-  const chips =
-    (phone && variant === 'cell') ||
-    (def.type === 'email' && variant === 'field')
-      ? selected.slice(0, 1)
-      : selected
+  // A cell shows a list's first phone, a mono +N counting the rest; a
+  // property row prints every value, one to a line.
+  const chips = phone && variant === 'cell' ? selected.slice(0, 1) : selected
   const more = selected.length - chips.length
+  const lines = variant === 'field'
 
   function add() {
     const raw = draft.trim()
@@ -718,9 +849,13 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
       >
         <span
           className={cn(
-            'flex min-w-0 flex-1 items-center gap-1',
-            // A cell is one 36px line: its chips clip rather than wrap.
-            variant === 'cell' ? 'overflow-hidden' : 'flex-wrap',
+            'flex min-w-0 flex-1 gap-1',
+            lines
+              ? 'flex-col items-stretch'
+              : // A cell is one 36px line: its chips clip rather than wrap.
+                variant === 'cell'
+                ? 'items-center overflow-hidden'
+                : 'flex-wrap items-center',
           )}
         >
           {selected.length === 0 ? (
@@ -728,9 +863,14 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
           ) : (
             chips.map((v) => (
               <span key={v} className="flex min-w-0 items-center gap-1">
-                <span className="flex h-5 items-center truncate border border-rule bg-paper px-1.5 mono text-label">
-                  {shown(v)}
-                </span>
+                {lines ? (
+                  // Bare at rest: the value is the mark, no chip around it.
+                  <MiddleCut text={shown(v)} className="mono text-label" />
+                ) : (
+                  <span className="flex h-5 items-center truncate border border-rule bg-paper px-1.5 mono text-label">
+                    {shown(v)}
+                  </span>
+                )}
                 {def.options?.identityKey !== undefined &&
                 isNonIdentityValue(def.options.identityKey, v) ? (
                   <SharedInboxMark />
@@ -794,8 +934,15 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
               onSave(next.length === 0 ? null : next)
             }}
           >
-            <icon.close className="size-3 text-graphite" strokeWidth={2} />
-            <span className="truncate mono text-label">{shown(v)}</span>
+            <icon.close
+              className="size-3 shrink-0 text-graphite"
+              strokeWidth={2}
+            />
+            {/* Whole, never cut: on touch, the menu is where a long value
+                is read in full. */}
+            <span className="min-w-0 mono text-label break-all">
+              {shown(v)}
+            </span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
@@ -843,7 +990,9 @@ function ActorPicker({ def, value, onSave, variant, refNames }: Props) {
           {selected ? (
             <>
               <InitialsMark name={refName(refNames, selected)} size="xs" />
-              <span className="truncate">{refName(refNames, selected)}</span>
+              <span title={refName(refNames, selected)} className="truncate">
+                {refName(refNames, selected)}
+              </span>
             </>
           ) : (
             <EmptyDash />
@@ -912,7 +1061,16 @@ function OptionPicker({
           {selected.length === 0 ? (
             <EmptyDash />
           ) : (
-            selected.map((id) => <OptionChip key={id} def={def} id={id} />)
+            selected.map((id) => (
+              <OptionChip
+                key={id}
+                def={def}
+                id={id}
+                {...(variant === 'field'
+                  ? { title: optionLabel(def, id) }
+                  : {})}
+              />
+            ))
           )}
         </span>
         <ChevronDown className="size-3 shrink-0 text-graphite opacity-0 transition-opacity group-hover/pick:opacity-100 group-focus-visible/pick:opacity-100 group-data-[state=open]/pick:opacity-100" />

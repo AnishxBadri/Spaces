@@ -18,7 +18,8 @@ import { latestThreads } from '#/lib/timeline/threads'
 import { cn } from '#/lib/utils'
 
 /**
- * A record's Overview tab, top to bottom: the readouts that have a value,
+ * A record's Overview tab, top to bottom: the record's long text paragraphs
+ * (`lead`), the readouts that have a value,
  * the open tasks with their composer, the latest three threads and the
  * latest three files — each group a band ending on a link to its tab. A
  * group with nothing in it is its one `Name +` row, so a first-run record
@@ -43,6 +44,7 @@ export function RecordOverview({
   documents,
   onTab,
   logInteraction,
+  lead,
 }: {
   record: { id: string; name: string; kind: string }
   readouts: ReadonlyArray<OverviewReadout>
@@ -54,6 +56,8 @@ export function RecordOverview({
    * opens the Interactions tab.
    */
   logInteraction?: ((trigger: ReactElement) => ReactNode) | undefined
+  /** Above the readouts: the long text paragraphs. */
+  lead?: ReactNode
 }) {
   const shown = shownReadouts(readouts)
   const threads = latestThreads(
@@ -69,10 +73,11 @@ export function RecordOverview({
 
   return (
     <div data-overview className="flex flex-col">
+      {lead}
       {shown.length > 0 ? (
         <div
           data-overview-readouts
-          className="flex h-19 shrink-0 overflow-x-auto border-b border-rule px-3"
+          className="flex h-19 shrink-0 overflow-x-auto border-b border-rule px-(--inset)"
         >
           {shown.map((r, i) => (
             <div
@@ -193,7 +198,7 @@ function OverviewFiles({
           <li
             key={doc.id}
             data-file={doc.id}
-            className="flex h-ledger-row items-center gap-3 border-b border-rule px-3"
+            className="flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset)"
           >
             <FileGlyph type={fileType(doc)} />
             <button
