@@ -221,6 +221,13 @@ describe('a row', () => {
     expect(classes(invested)).toContain('text-right')
     expect(classes(company)).toContain('text-left')
   })
+
+  it('insets its first lane 11px, head and body, onto the 24px line', () => {
+    mount()
+    // 12px gutter + 1px frame + 11px = the page's 24px edge.
+    expect(classes(one('thead th'))).toContain('first:pl-2.75')
+    expect(classes(one('tbody td'))).toContain('first:pl-1.75')
+  })
 })
 
 describe("a shelf's bar", () => {

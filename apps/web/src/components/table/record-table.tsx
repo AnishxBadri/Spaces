@@ -49,15 +49,16 @@ declare module '@tanstack/react-table' {
  * - Every cell's content is bounded to the 36px row.
  * - The table is the page's folder body (`folder`: a hairline frame under
  *   its tab bar) or, with no tabs over it, a rule card; a line between
- *   columns, its heads white, the cells inset 7px from the frame. Columns
- *   is an icon at the end of the head row.
+ *   columns, its heads white, the cells inset 7px and the row's first lane
+ *   11px, on the page's 24px line. Columns is an icon at the end of the
+ *   head row.
  */
 
 /** Column widths nudge by this much per arrow-key press. */
 const RESIZE_STEP = 16
 const MIN_COLUMN_WIDTH = 64
-/** The checkbox lane's width: `w-8`, which the pinned column's `left-8` clears. */
-const SELECT_WIDTH = 32
+/** The checkbox lane's width: `w-9`, which the pinned column's `left-9` clears. */
+const SELECT_WIDTH = 36
 /** The trailing lane's floor: the add-column control, or the right margin. */
 const TRAILING_WIDTH = 56
 
@@ -220,7 +221,7 @@ export function RecordTable<T>({
     keys.length > 0 &&
     select.rows.among(keys).length === keys.length
   // The pinned column sits after the checkbox lane when there is one.
-  const stickyLeft = select ? 'left-8' : 'left-0'
+  const stickyLeft = select ? 'left-9' : 'left-0'
   // Both tables: the columns at their widths plus the trailing lane, never
   // narrower than the pane — the trailing lane takes the slack.
   const tableStyle = {
@@ -265,7 +266,7 @@ export function RecordTable<T>({
                   <th
                     role="columnheader"
                     style={{ width: SELECT_WIDTH }}
-                    className="sticky left-0 z-20 bg-paper pl-1.75 align-middle"
+                    className="sticky left-0 z-20 bg-paper pl-2.75 align-middle"
                   >
                     <Checkbox
                       checked={allChecked}
@@ -356,7 +357,7 @@ export function RecordTable<T>({
                           role="cell"
                           style={{ width: cell.column.getSize() }}
                           className={cn(
-                            'h-row border-r border-rule px-0.75 py-0 align-middle',
+                            'h-row border-r border-rule px-0.75 py-0 align-middle first:pl-1.75',
                             cell.column.id === stickyColumnId &&
                               // Opaque at rest and on hover: a translucent tint here
                               // would let the scrolled-under columns bleed through.
@@ -497,7 +498,7 @@ function SelectCell({
       role="cell"
       onClick={(e) => e.stopPropagation()}
       style={{ width: SELECT_WIDTH }}
-      className="sticky left-0 z-10 h-row bg-paper py-0 pl-1.75 align-middle transition-colors duration-150 ease-out-quart group-hover:bg-row-hover"
+      className="sticky left-0 z-10 h-row bg-paper py-0 pl-2.75 align-middle transition-colors duration-150 ease-out-quart group-hover:bg-row-hover"
     >
       <Checkbox
         checked={checked}
@@ -569,7 +570,8 @@ function HeaderCell<T>({
             : 'none'
       }
       className={cn(
-        'relative h-8 border-r border-rule px-1.75 align-middle text-label font-normal text-graphite',
+        // The row's first lane insets 11px, on the page's 24px line.
+        'relative h-8 border-r border-rule px-1.75 align-middle text-label font-normal text-graphite first:pl-2.75',
         numeric ? 'text-right' : 'text-left',
         sticky && 'sticky z-20 bg-paper',
         sticky && stickyLeft,
@@ -585,6 +587,8 @@ function HeaderCell<T>({
             title={`${title} column`}
             className={cn(
               'group/sort focus-ring-inset -mx-1.75 flex h-8 w-[calc(100%+0.875rem)] items-center gap-1.5 truncate px-1.75 transition-colors duration-150 ease-out-quart hover:bg-bone data-[state=open]:bg-bone',
+              // In the first lane the trigger still reaches the frame.
+              'in-[th:first-child]:-ml-2.75 in-[th:first-child]:w-[calc(100%+1.125rem)] in-[th:first-child]:pl-2.75',
               numeric ? 'text-right' : 'text-left',
               sorted && 'text-foreground',
             )}

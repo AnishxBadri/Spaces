@@ -506,6 +506,11 @@
     background: var(--paper);
   }
 
+  /* A label head inside is the card's, on a rule: ink is the folder's. */
+  & [data-label-head] {
+    border-bottom-color: var(--rule);
+  }
+
   /* Nor does the last row's rule double the card's bottom one. */
   & > ol:last-child > li:last-child,
   & > :last-child > ol:last-child > li:last-child {
@@ -529,6 +534,11 @@
   & > [data-section-head]:first-child,
   & > :first-child > [data-section-head]:first-child {
     border-top-width: 0;
+  }
+
+  /* Ink is the frame alone: a label head inside stands on a rule. */
+  & [data-label-head] {
+    border-bottom-color: var(--rule);
   }
 
   & > ol:last-child > li:last-child,

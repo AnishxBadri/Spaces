@@ -80,6 +80,7 @@ export function SectionHead({
  * ledger that is the page's one list (the market map), where a bone band
  * would be a second head under the page's own. 28px; lane heads ride right
  * as `children`.
+ * - Inside a `card` or a `folder` its line is a rule: ink is the folder's.
  */
 export function LabelHead({
   label,
@@ -93,6 +94,7 @@ export function LabelHead({
 }) {
   return (
     <div
+      data-label-head
       className={cn(
         'flex h-7 shrink-0 items-center gap-2.5 border-b border-hairline bg-paper px-(--inset)',
         className,
