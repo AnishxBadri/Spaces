@@ -43,41 +43,41 @@ inputs, `rounded-none` everywhere else — no 4, 6, 8 or 12, no pills, no circle
 Shadows are named by kind and chosen by the primitive: a popover `shadow-dither` (4px,
 Bayer 8/16), a window over the scrim `shadow-solid` (3px ink); a call site passes none
 and gate 5 refuses `shadow-[…]`. Nothing blurs. Spacing is 4 8 12 16 24 32; the
-page edge is 12 and the body gutter 4 (The edges, below). Heights: table row 36 (`h-row`), ledger row 40 (`h-ledger-row`),
+page edge is 24 and the body gutter 12 (The edges, below). Heights: table row 36 (`h-row`), ledger row 40 (`h-ledger-row`),
 section head 44, tab bar 44, control 32, `Band` 28, `Segmented` 28, small 26, a row's `···`
 24, badge 20, nav row 30, dialog head 48, dialog foot 52. The readout strip (56–64) stays
 for Today and the holding's figures only; a record's readouts live in its Overview tab.
 
-### The edges (2026-11-07, drawn on the Paper Record page boards 16–27)
+### The edges (2026-11-11, drawn on the Paper page "Edges options", boards D)
 
-How a page meets its frame. Decided by the owner on the canvas, and built: `PageHeader`,
-`PageBody` and `Card` (`page-header.tsx`, with the `card` utility and `--inset` in
-`styles.css`), `Tabs` and the list toolbar, `NewButton`, `components/icons.ts` and
-`ProviderMark` (§2). Board 18, a details column with prose attributes as paragraphs and
-a 104px label lane, is **not** agreed: the record's property grid stands until the
-owner decides it.
+How a page meets its frame, and how its parts rank. Decided by the owner on the canvas
+on 2026-11-11, in place of the 12px edge and 4px gutter of 2026-11-07. `edges-2` builds
+E1–E11, `record-1` the record's rail and `settings-1` the settings pages; until they
+land the code still carries the old numbers.
 
-- **E1 · The content edge is 12px.** The page title sits on it, and so does every
-  card's content: the body gutter is 4px, a card is a 1px rule box with 4px between
-  cards and a 7px inset, so 4 + 1 + 7 lands card content on the 12px line. The one
-  exception is a page that holds a note editor: its head and body start at
-  `NOTE_INSET` (§3, "A note").
+- **E1 · The content edge is 24px.** The page title sits on it, and so does every
+  card's content: the body gutter is 12px, a card is a 1px box with 12px between cards
+  and an 11px inset, so 12 + 1 + 11 lands card content on the 24px line. The space
+  outside a card is never smaller than the inset inside it. The one exception is a
+  page that holds a note editor: its head and body start at `NOTE_INSET` (§3, "A
+  note").
 - **E2 · One rule under the head.** A single 1px rule, never the double, and the head
-  stays 104px on every page; it folds to the 48px bar on scroll with its tabs and
-  toolbar pinned. The `···` is the rightmost head control and its right edge lines up
-  with the last control in the content below.
+  stays 104px and paper on every page; it folds to the 48px bar on scroll with its
+  tabs and toolbar pinned. The `···` is the rightmost head control and its right edge
+  lines up with the last control in the content below.
 - **E3 · Windows take one 16px inset all round.**
-- **E4 · Settings and form pages cap at 800px**, left-aligned on the 12px edge, the head
-  `···` moving with the cap; lists and tables stay full width. A settings row opens
-  Edit as a whole, and its actions are always visible, never hover-only.
-- **E5 · Folder tabs on white.** No bone band: the open tab has an ink outline on top,
-  left and right and runs straight into the content; a closed tab is plain text. The
-  list toolbar is tabs · a divider · Filter and Sort as icon buttons, each outlined only
-  while in use and then reading its state (`Filter 2`, `Last contact ↓`); search alone
-  on the right with its `/` hint; Columns is an icon at the end of the column-head row.
-  Save view appears only with something to save: `Save as view…` on a filtered All,
+- **E4 · Settings and form pages cap at 800px**: a column of cards 800px wide from the
+  gutter, the head `···` moving with the cap; lists and tables stay full width. A
+  settings row opens Edit as a whole, and its actions are always visible, never
+  hover-only.
+- **E5 · Folder tabs.** The open tab has an ink outline on top, left and right and
+  runs straight into the body under it; a closed tab is plain text. The list toolbar
+  is tabs · a divider · Filter and Sort as icon buttons, each outlined only while in
+  use and then reading its state (`Filter 2`, `Last contact ↓`); search alone on the
+  right with its `/` hint; Columns is an icon at the end of the column-head row. Save
+  view appears only with something to save: `Save as view…` on a filtered All,
   `Update view` + `Reset` on a changed view; `Save as new view…` lives in the view's
-  `···`. Tables are boxed, with column lines and white column heads.
+  `···`. Tables keep their column lines and white column heads.
 - **E6 · Every create is `+ New x`, in pine.** The split `[+ New x | ▾]` only where
   creating is instant and templates exist (Notes, Spaces). Files' create is `Upload`;
   Portfolio's primary is `Record a check`. A window's confirm carries no icon.
@@ -85,6 +85,22 @@ owner decides it.
   for our own concepts (the note kinds), drawn on Lucide's grid. Brand marks only
   through `ProviderMark`: monochrome official logos, Simple Icons where available.
 - **E8 · A date band carries no count.**
+- **E9 · The ground is bone, the sheets are paper.** Under its head a page's body is
+  bone, and every card on it is paper: material separates a sheet from the desk before
+  any line does. The head stays paper. Bone inside a card is a group band only
+  (`Band`, a `SectionHead` inside a folder); a card's own head is paper, 44px with a
+  sentence-case title for a section card or 28px with a mono caps label for a small
+  one, a rule under either.
+- **E10 · One ink object on a page: the folder.** The page's tabbed object — a list's
+  table, Today's Needs you, a record's tabbed pane — is a folder: its tab bar sits on
+  the ground, the open tab is paper, and the body under it is paper in a hairline
+  frame that the tab joins. Every other card takes the rule. A page with no tabs has
+  no hairline card. Where a page has two tab bars, the page's own is the folder.
+- **E11 · A record's rail sits on the ground.** No card and no border: its rows are
+  printed on the bone at the 24px edge, and the folder stands to its right. The rows
+  themselves are a 104px label lane and a value on a rule, never a boxed grid; a long
+  text attribute is a paragraph in Overview, and a relationship shows once, as its
+  section.
 
 ### The named type steps (`DESIGN.md` §3)
 

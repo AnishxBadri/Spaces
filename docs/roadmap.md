@@ -34,7 +34,7 @@ What is shipped, what is open, and what comes next. Linear (team `Spaces`) holds
 28. Spaces, research and watches
 29. Enrichment is the host's
 30. The canvas lands — the instrument port (shipped 2026-10-30, with the Clean UI leftovers `SPA-355` and `SPA-356`; its follow-ups `port-C1` SPA-385 and `port-C2` SPA-386 shipped 2026-11-09)
-31. Edges and the AI shape — `edges-1` SPA-387 (the 12px edge, cards, folder tabs, the toolbar, `+ New x`, one icon list, `ProviderMark`) and `ai-a` SPA-388 (system and user parts, Anthropic cache markers, one shared prefix per lane, `tokensCached`) shipped 2026-11-10, and `notes-1` SPA-391 (the note page as a record: kind stamp, meta line, the ··· with the kind, the rail with Filed on · Mentions · Mentioned in · Visibility · History) the same day; `ai-b` SPA-389 is open below
+31. Edges and the AI shape — `edges-1` SPA-387 (the 12px edge, cards, folder tabs, the toolbar, `+ New x`, one icon list, `ProviderMark`) and `ai-a` SPA-388 (system and user parts, Anthropic cache markers, one shared prefix per lane, `tokensCached`) shipped 2026-11-10, and `notes-1` SPA-391 (the note page as a record: kind stamp, meta line, the ··· with the kind, the rail with Filed on · Mentions · Mentioned in · Visibility · History) the same day; `edges-2` SPA-392, `record-1` SPA-393, `settings-1` SPA-394 and `ai-b` SPA-389 are open below
 
 Plus the UI sweep (the printed sheets landing) and Corrections.
 
@@ -44,7 +44,7 @@ Plus the UI sweep (the printed sheets landing) and Corrections.
 
 ## Next, in order
 
-1. **Project 31, the rest** (P-SPA-35): `ai-b` SPA-389 (migration, hitl: the owner confirms AI column answers may change under the mandate). Body in `docs/backlog.md` § 31. Then the Ask set.
+1. **Project 31, the rest** (P-SPA-35): `edges-2` SPA-392 (the 24px edge, the bone ground, one ink folder; the owner's option D of 2026-11-11), then `record-1` SPA-393 (the record's rail unboxed, long text as paragraphs, a relationship once) beside `settings-1` SPA-394 (settings on the shared head, in group cards), then `ai-b` SPA-389 (migration, hitl: the owner confirms AI column answers may change under the mandate). Bodies in `docs/backlog.md` § 31. Then the Ask set, which the owner has not picked from yet.
 2. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided; starts after project 30.
 3. **Docs consolidation** — `DESIGN.md` and `docs/design-contract.md` merge into one design doc, checked against the Paper library; `CONTEXT.md` rewritten to current state only.
 
