@@ -6,62 +6,7 @@ Full bodies of the open slices, the repo copy of their Linear issues. Linear iss
 
 ## 31. Edges and icons, and the AI shape
 
-Three slices the owner agreed on 2026-11-07/08 (Linear project P-SPA-35, "31. Edges and the AI shape"). `edges-1` is the canvas's "Edges and icons" system (`docs/design-contract.md` §1 "The edges", E1–E8); `ai-a` and `ai-b` reshape what the AI lanes send. Order: `edges-1` ∥ `ai-a`, then `ai-b` (migration). Nothing here is dispatched until the owner says go.
-
----
-
-#### `edges-1` (SPA-387) · afk · L — Edges and icons: the 12px edge, folder tabs, the toolbar, create buttons, one icon list
-
-**Blocked by:** none (port-C1/C2 shipped). **Runs beside** `ai-a` (no shared files). **Does not touch** `lib/ai/*`. **Owns** the page frame: `components/page-header.tsx`, `components/ui/tabs.tsx`, `components/table/*`, `components/views/*`, every list route under `routes/_app/`, `components/deal-board.tsx`, `routes/_app/today.tsx`, `components/today/*`, `components/record/record-parts.tsx`, `components/ui/dialog.tsx`, `components/settings/*`, `components/ui/more-menu.tsx`, a new `components/icons.ts` and `components/provider-mark.tsx`, and `apps/web/src/styles.css`.
-
-**The rule** is the contract's E1–E8; the boards are the Paper Record page `p-S-0`, boards 16–27 (Notes, Companies, record + window + menu, Today, Meetings, Tasks, Deals board, Files, Spaces, Portfolio, Settings). Mandate, Review and Import follow by rule with no board. Board 18 (the details column) is not agreed: leave the record's property grid as it is.
-
-**What to build, in this order** (each step leaves every gate green; commit per step).
-
-1. **The frame (E1–E4).** Page edge 12px (`px-3`), title on it; body gutter 4px; a content card is a 1px `border-rule` box, 4px between cards, 7px inset. Under every head one rule, never `double-rule`. The head stays 104px and keeps the scroll fold (`HeadBar` to 48px with tabs/toolbar pinned); the `···` is rightmost and its right edge aligns with the content's last control. Windows: one 16px inset all round (`DialogContent`, head, body, foot). Settings and form pages cap at 800px left-aligned, the head `···` moving with the cap (replaces today's centred 700px column); lists and tables full width. A settings row opens Edit as a whole; its actions always visible. Fix the Deals board's clipped last column here (it bled against `px-8`).
-2. **Folder tabs and the toolbar (E5, A10).** `Tabs` renders on white with the `tab-open` outline; no bone band. The list toolbar: tabs · divider · Filter and Sort as icon buttons outlined only while in use, reading `Filter 2` / `Last contact ↓`; search right with `/`; Columns as an icon at the end of the column-head row; Save view only when there is something to save (`Save as view…` on a filtered All; `Update view` + `Reset` on a changed view; `Save as new view…` in the view's `···`). `RecordTable` boxed, column lines, white column heads.
-3. **Notes list (board 16).** One card, time bands `THIS WEEK` / `EARLIER` with no count (E8), kind shown by the board-15 icons, an optional Memos tab, no `17 notes` line under the title.
-4. **Create buttons (E6).** Every create is `+ New x` in pine (`Button` primary with the Lucide `Plus`). Split `[+ New x | ▾]` on Notes and Spaces only, the `▾` listing templates; the Spaces composer row goes. Files' create is `Upload`; Portfolio's primary is `Record a check`. Tasks keeps the head button and the `Add a task…` row, the button focusing the row. Window confirms carry no icon.
-5. **Icons (E7).** `components/icons.ts` maps each verb to one Lucide icon (`new`, `import`, `filter`, `sort`, `columns`, `search`, `open`, `upload`, `enrich`, `archive`, `more`, …) and every call site imports from it; custom SVGs stay only for the note kinds, on Lucide's 24-grid. `ProviderMark` draws brand marks monochrome from Simple Icons (Google, Box, Airtable, Gmail, Apollo, Exa, Granola, Anthropic, OpenAI, Google Calendar, Google Drive) and replaces every inline logo.
-6. **Head menus.** A head `···` only where the code has a menu; a lone frequent verb is a button, a lone rare one stays in the `···` (`forceMenu`, A7). Settings' only actions stay buttons.
-7. **Contract.** `docs/design-contract.md`: `px-8` gone from §1 "Material and scale" and the precedent map's settings column line; §5's Edges entry deleted; §3 precedents re-pointed where a shape moved.
-
-**Acceptance criteria**
-
-- [ ] On every list, Today, a record, Settings and a window, the title and the first card's content sit on x = 12 from the page edge; cards are 1px rule boxes 4px apart (render tests on `PageHeader`, `LedgerSection` in a card, `DialogContent`).
-- [ ] No `double-rule` under a page head; `px-8` appears in no route or page-level component (grep test).
-- [ ] The head `···` right edge equals the content's last control's right edge on a list and on Settings (layout test with measured boxes).
-- [ ] Settings pages are ≤ 800px of content, left-aligned; lists are full width.
-- [ ] Folder tabs: the open tab carries `tab-open`, no bone band renders; Filter/Sort show state text only while in use; Save view controls render only when there is something to save (tests on the toolbar).
-- [ ] Notes list is one card with `THIS WEEK`/`EARLIER` bands, no counts on bands, no count line under the title.
-- [ ] Every create button reads `+ New x`; Notes and Spaces render the split; Files reads `Upload`; Portfolio's primary is `Record a check` (tests).
-- [ ] `components/icons.ts` is the only Lucide import site for verbs (lint rule or grep test); `ProviderMark` is the only place a brand logo is drawn.
-- [ ] The Deals board's last column is not clipped at 1280px.
-- [ ] Gates: typecheck, test, lint, prettier; web build; one browser pass over the eleven boards.
-
----
-
-#### `ai-a` (SPA-388) · afk · M — The prompt shape: system and user parts, cache markers, one shared prefix per lane
-
-**Blocked by:** none. **Runs beside** `edges-1`. **Owns** `lib/ai/complete.ts`, `lib/ai/prompt.ts`, `lib/ai/column-run.ts`, `lib/ai/attribute-run.ts`, `lib/ask/turn.ts`, `lib/ai/providers/llm/*`, and the tests beside them. No migration; no schema change.
-
-**Today:** `completeProgram` renders one string with `renderPrompt` (context blocks, then the task) and sends it as a single user message with no system message. Every call is a fresh prefix, so nothing caches, and a column run over 200 rows re-sends the attribute prompt 200 times.
-
-**What to build.**
-
-1. **Two parts.** `completeProgram` sends `system` and `messages`. The system part is the lane's instructions (the fixed text of the task: what to produce, the format, the schema's intent) and, after `ai-b`, the mandate. The user part is the shared material (the context blocks `renderPrompt` renders) and then the variable part last (the row, the question, the document). `renderPrompt`'s budget still truncates the context blocks, never the system part. The `vision` lane keeps its `file` parts after the text in the user message.
-2. **Cache markers.** On Anthropic, `providerOptions.anthropic.cacheControl: { type: 'ephemeral' }` on the system part; Ask (`lib/ask/turn.ts`) sends its history as real messages instead of a `The conversation so far:` string, with rolling markers on the last two messages so each turn re-reads the cache. Other providers get the same message shape and no marker.
-3. **AI columns.** `column-run.ts` / `attribute-run.ts` put the attribute's prompt and the object's shape in the system part and the row's values last, so a run over N rows shares one prefix byte-for-byte.
-4. **Usage.** Read the provider's cached-input count from the AI SDK usage (`cachedInputTokens`) and carry it on `CompleteResult.usage`; log it with the run's usage line. Storing it waits for `ai-b`'s column.
-5. **Tests.** A unit test on the message builder: two calls of one lane with different variable parts produce byte-identical system parts and identical user prefixes up to the variable part; a column run over three rows shares its system part; Ask's last two messages carry the marker and the earlier ones do not; the `vision` call keeps its file parts; `renderPrompt`'s truncation still bites the context, not the task.
-
-**Acceptance criteria**
-
-- [ ] Every `completeProgram` call sends a system part and a user part; no lane sends one concatenated string (test).
-- [ ] Byte-identical prefix across calls of a lane and across a column run's rows (tests).
-- [ ] Anthropic calls carry the cache marker on the system part; Ask carries rolling markers on its last two messages (tests on the built request).
-- [ ] `CompleteResult.usage.tokensCached` is set from the provider's count, `null` where the provider has none.
-- [ ] Gates: typecheck, test, lint, prettier; web build. A live check on one Anthropic call shows `cache_read_input_tokens > 0` on the second call.
+Three slices the owner agreed on 2026-11-07/08 (Linear project P-SPA-35, "31. Edges and the AI shape"). `edges-1` (SPA-387, the canvas's "Edges and icons" system) and `ai-a` (SPA-388, the two-part prompt with cache markers) shipped 2026-11-10; `ai-b` below is the one left, unblocked now, and carries the migration.
 
 ---
 
