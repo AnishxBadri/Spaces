@@ -92,7 +92,24 @@ Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-
 6. **The sheets.** Each settings page is checked against its sheet (S1–S16 and S7b, S13b, S14b); the differences listed under "Sheet differences" below are built. A head `···` appears only where the page has a menu; a menu of one item is a visible button.
 7. **Docs.** The contract's § 3 "A settings section" and E4 read as built; `DESIGN.md` "Settings" likewise.
 
-**Sheet differences.** Added by the orchestrator before dispatch.
+**Sheet differences.** From a survey of the 19 sheets against the app. Anything not listed matches, or the app is newer and stays (the nav takeover, the member `Admin` lane, Remove logo, the Search provider hint, the per-plugin Runs view, the plugin head `···`, the Mailbox state word, the tooltip notes, the separate `What it sends` group, every hint's wording).
+
+Three rules settle the cross-page questions; apply them on every settings page, drawn or not:
+
+- **Row actions.** One that goes to another page is a mono text link with `›` (`Open ›`, `Set up ›`, `Configure ›`). One that acts in place or opens a window is a small button (`Add key`, `Update`, `Reset`, `Test`, `Edit`). Connections, Plugins (`integration-ledger.tsx`) and Enrichment follow it; no row mixes the two for the same kind of act.
+- **A menu of one.** A row `···` holding a single item becomes that item as a visible small button in the end lane: `Revoke…` on API tokens and on Members' invites.
+- **Lead marks.** A ledger row leads with an icon or mark only where it tells rows apart. Built: the recorder's product mark (Meeting notes), mail against link on invite rows (Members), the kind icon on template rows, archived ones included (Templates), the job icon on `Who does what` and `ProviderMark` on provider rows (Models), the product mark on a connection's use rows. Not built: an icon that is the same on every row (the key on tokens, the sparkle on AI answers).
+
+Per page:
+
+- **Email & calendar, Files** (`accounts-section.tsx`): the accounts card gains its column-head row, `Account · Used for · Status`.
+- **Meeting notes** (`meeting-notes-section.tsx`): a status dot before `Synced 09:12`, as the accounts' sync lane has; the key row's label is `Add Granola`.
+- **General**: a status dot before `set` / `not set` in `What's set up`.
+- **Usage & limits**: the Runs count moves from the head's action slot to the count slot.
+- **Connections** (`connections-list.tsx`): a status dot before each status line.
+- **A connection** (`provider-page.tsx`, `provider-setup.tsx`): a `‹ Connections` back link above the title and the provider mark beside it; setup steps read as a short label (`Cloud project`, `APIs`), a sentence, and the outbound act as a small button (`Open Google Cloud`); the `Members may use` band carries its count (`2 of 3 on`); the column reads `Health · 7 days`; each use row is a switch, not a checkbox.
+- **A plugin** (`plugins_.$integrationId.tsx`, `plugin-template.tsx`): a `‹ Plugins` back link above the title and the plugin's mark beside it; the usage row reads `Usage today`.
+- **Enrichment** (`enrichment-section.tsx`): the group is `Enrich automatically` and its row is labelled `When a record`.
 
 **Acceptance criteria**
 
