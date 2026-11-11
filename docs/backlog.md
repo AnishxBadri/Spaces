@@ -6,7 +6,7 @@ Full bodies of the open slices, the repo copy of their Linear issues. Linear iss
 
 ## 31. Edges and icons, and the AI shape
 
-Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-387), `ai-a` (SPA-388) and `notes-1` (SPA-391) shipped 2026-11-10; `edges-2` (SPA-392), `record-1` (SPA-393) and `settings-1` (SPA-394) shipped 2026-11-11 (the owner's option D: the 24px edge, the bone ground, one ink folder; the record's unboxed rail and long text; settings in group cards); `settings-2` (SPA-395) and `shell-2` (SPA-396) shipped 2026-11-12. Two slices are left. `ai-b` carries the migration and waits on the owner. `record-2` comes from the owner's review of 2026-11-11.
+Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-387), `ai-a` (SPA-388) and `notes-1` (SPA-391) shipped 2026-11-10; `edges-2` (SPA-392), `record-1` (SPA-393) and `settings-1` (SPA-394) shipped 2026-11-11 (the owner's option D: the 24px edge, the bone ground, one ink folder; the record's unboxed rail and long text; settings in group cards); `settings-2` (SPA-395), `shell-2` (SPA-396) and `record-2` (SPA-397), the three from the owner's review of 2026-11-11, shipped 2026-11-12. One slice is left: `ai-b` carries the migration and waits on the owner.
 
 ---
 
@@ -29,34 +29,6 @@ Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-
 - [ ] Migration adds `tokens_cached`; `boot.test.ts` green; `ai_usage` rows carry it after an Anthropic call.
 - [ ] Usage page prints the cached share and per-run cached count (render test).
 - [ ] Gates: typecheck, test, lint, prettier; web build; `boot.test.ts` alone.
-
----
-
-#### `record-2` (SPA-397) · afk · S — A lone readout joins the rail: the Overview strip needs two
-
-**Blocked by:** nothing. **Owns** `components/record/record-overview.tsx`, `lib/records/overview.ts`, `RailRow` in `components/record/record-parts.tsx`, and the readout wiring in the four record routes (`companies_.$companyId.tsx`, `people_.$personId.tsx`, `deals_.$dealId.tsx`, `o_.$objectSlug.$recordId.tsx`).
-
-**Does not touch** `components/settings/**` (`settings-2`), `components/app-sidebar.tsx` (`shell-2`), `components/space-overview.tsx` or Today. In `docs/design-contract.md` it edits § 3's record sections only.
-
-**Spec.** A record's Overview draws a 76px strip of readouts, built for four. A readout with no value is already left out, so a company with one interaction and nothing else shows a strip holding one date and 600px of nothing. The owner asked about it (2026-11-11). Agreed: a strip needs two readouts; one alone is a row in the rail. The strip itself stays: on a company that is held it carries Ownership and Moving, the numbers the record is opened for.
-
-**What to build.**
-
-1. **Two or more, a strip.** The Overview draws the readout strip only when two or more readouts have a value. Its layout does not change.
-2. **One, a rail row.** A single readout is drawn in the record's rail as a `RailRow`: its label on the rail's 104px label lane, its value in mono, on the same rules as the attribute rows. It sits after the last attribute row and before the `N empty` row. It is read only: no editor, no hover control, no pointer. A `bad` tone keeps its crimson.
-3. **None, nothing.** As now.
-4. **One decision, one place.** A pure `splitReadouts` in `lib/records/overview.ts` takes the readouts and returns the strip's and the rail's: none and none, none and one, or two-plus and none. The four record routes read it once and hand each half to its place, so the strip and the rail can never both draw the same readout.
-5. **`RailRow` on the lane.** If `RailRow` predates the 104px label lane, bring it onto it: the label and the value start where an attribute row's do.
-6. **Docs.** `docs/design-contract.md` § 3, the Overview and the Rail: the strip's rule of two and the lone readout's row.
-
-**Acceptance criteria**
-
-- [ ] `splitReadouts` is tested at 0, 1, 2 and 4 shown readouts, and with empty values mixed in (a `—`, a 0, a null).
-- [ ] A record with one readout draws no `[data-overview-readouts]` and one read-only rail row carrying its label and value; with two it draws the strip and no such rail row (render tests).
-- [ ] The rail row's label and value share their left edges with an attribute row's (test on the shared classes or a measured pass).
-- [ ] All four record kinds follow it: company, person, deal, custom object.
-- [ ] Browser pass on a company with one readout and one with several.
-- [ ] Gates: typecheck, lint, the affected tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
 
 ---
 
