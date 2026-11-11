@@ -38,7 +38,7 @@ import { suggestionOfOutputRef } from './run'
  * Settings → Usage: the run log read back, by run, each step with its model,
  * tokens and `input_refs → output_ref` resolved to names by
  * `resolveRefsProgram`. Calls no run owns (the Test call) are listed under
- * "Calls outside a run".
+ * "Other calls".
  * - Any signed-in member reads it: it is provenance and writes nothing.
  */
 

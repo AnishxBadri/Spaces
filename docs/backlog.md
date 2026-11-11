@@ -6,7 +6,7 @@ Full bodies of the open slices, the repo copy of their Linear issues. Linear iss
 
 ## 31. Edges and icons, and the AI shape
 
-Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-387), `ai-a` (SPA-388) and `notes-1` (SPA-391) shipped 2026-11-10; `edges-2` (SPA-392), `record-1` (SPA-393) and `settings-1` (SPA-394) shipped 2026-11-11 (the owner's option D: the 24px edge, the bone ground, one ink folder; the record's unboxed rail and long text; settings in group cards). Four slices are left. `ai-b` carries the migration and waits on the owner. `settings-2`, `shell-2` and `record-2` come from the owner's review of 2026-11-11; they own disjoint files and can run side by side.
+Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-387), `ai-a` (SPA-388) and `notes-1` (SPA-391) shipped 2026-11-10; `edges-2` (SPA-392), `record-1` (SPA-393) and `settings-1` (SPA-394) shipped 2026-11-11 (the owner's option D: the 24px edge, the bone ground, one ink folder; the record's unboxed rail and long text; settings in group cards); `settings-2` (SPA-395) shipped 2026-11-12. Three slices are left. `ai-b` carries the migration and waits on the owner. `shell-2` and `record-2` come from the owner's review of 2026-11-11; they own disjoint files and can run side by side.
 
 ---
 
@@ -29,60 +29,6 @@ Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-
 - [ ] Migration adds `tokens_cached`; `boot.test.ts` green; `ai_usage` rows carry it after an Anthropic call.
 - [ ] Usage page prints the cached share and per-run cached count (render test).
 - [ ] Gates: typecheck, test, lint, prettier; web build; `boot.test.ts` alone.
-
----
-
-#### `settings-2` (SPA-395) · afk · M — Settings read plainly: noun heads, no empty cards, no head that repeats the title
-
-**Blocked by:** nothing. **Owns** `components/settings/**`, `routes/_app/settings/**`, `components/integrations/plugin-template.tsx`; may touch `components/attributes/registry-list.tsx` for rule 4 only.
-
-**Does not touch** `components/app-sidebar.tsx` (`shell-2`) or `components/record/**` (`record-2`), which may run beside this slice. In `docs/design-contract.md` and `DESIGN.md` it edits the settings sections only.
-
-**Spec.** The owner read the settings pages `settings-1` built and asked for them to be plainer (2026-11-11). Six rules came out of that review, all agreed. Two of them reverse `settings-1` (a state and an action side by side in a row's end lane; a column-head row on every table card): this slice is the later word. Nothing here was drawn on Paper; the rules below are the drawing.
-
-**What to build.**
-
-1. **A group head is a noun.** One or two words, never a clause. The renames:
-
-   | Now                    | Becomes                                  | Where                                   |
-   | ---------------------- | ---------------------------------------- | --------------------------------------- |
-   | `What it switches on`  | `Used by`                                | `plugin-template.tsx`                   |
-   | `What it sends`        | `Data sent`                              | `plugin-template.tsx`                   |
-   | `What's set up`        | `Setup`                                  | `routes/_app/settings/general.tsx`      |
-   | `Who does what`        | `Routing`                                | `routes/_app/settings/models.tsx`       |
-   | `What fills what`      | `Fields`                                 | `enrichment-section.tsx`                |
-   | `Sources, in order`    | `Sources`                                | `enrichment-section.tsx`                |
-   | `Calls outside a run`  | `Other calls`                            | `routes/_app/settings/usage.tsx`        |
-   | `Members may use`      | `Access`                                 | `provider-page.tsx`                     |
-   | `Enrich automatically` | `Auto-enrich`                            | `enrichment-section.tsx`                |
-   | `Waiting to join`      | `Invites`                                | `routes/_app/settings/members.tsx`      |
-   | `Disable or uninstall` | no card: both acts join the head's `···` | `plugin-template.tsx`, the plugin route |
-
-   The plugin page's `···` gains `Disable` (or `Enable`) and `Uninstall…`; Uninstall keeps its confirm. Any other group head that reads as a clause is named in the report, not renamed.
-
-2. **An empty card does not draw.** A card with nothing to show and nothing to act on is left out, as an empty section already is on a record. Named cases: on a plugin page `Workspace key` (when the plugin asks for none), `Data sent`, `Used by`, `Recent runs`, and `Settings` while the manifest is unread (the `Status` card already says so); Enrichment's `Recent runs`. A card stays when it holds a control to add the first thing (Objects' `Yours`), and a page never ends up blank: when its only card is empty, that card keeps its empty line.
-
-3. **One group, no head.** A page that draws a single group draws it with no head (`SettingsGroup` without `title`, named by `label`). The page title already says it: Templates, Currency & FX, Email forwarding, Connections, Files, Meeting notes, Search when it shows one group, Members when there are no invites. The count is already in the nav; a head action moves to the page head. Members with invites keeps both heads, `People` and `Invites`.
-
-4. **A column head only when it tells columns apart.** `SettingsColumns` draws only on a card with three or more named columns. Members (`Person`, `Role`) and any other two-column card lose it. Where it stays (Providers, Routing, Runs, rates, tokens, accounts, Fields), it must read as a head, not as another row: the default is the list table's head cell, 32px, `text-label` graphite, with the column rule between cells that `RecordTable`'s `th` has. This is the one part not agreed by sight, so the report carries a screenshot of Models with it.
-
-5. **General · Identity is one row.** A 64px logo tile and the Name field beside it. The tile is the upload control: a click or a drop opens the file picker, and hover and focus name the act (`Upload`, or `Replace` when a logo is held). `Remove` is a quiet text link in the row's end lane, drawn only when a logo is held. The logo still writes at once with a toast; the name still joins the Save bar.
-
-6. **General · Setup rows say one thing.** The end lane holds one item: a tick when the piece is set up, `Set up ›` when it is not. The words `set`, `not set` and `Open` go. The whole row opens its page. Rows not set up come first; each run keeps its present order. The head keeps its count (`3 of 7`). At 7 of 7 the card does not draw.
-
-7. **Docs.** `docs/design-contract.md` § 3 "A settings section" states rules 1 to 4; `DESIGN.md` "Settings" likewise. `docs/decisions.md` D80 and D81 each gain a dated amendment line (2026-11-11, owner): the renamed heads, Setup hiding when complete, Disable and Uninstall in the plugin page's menu.
-
-**Acceptance criteria**
-
-- [ ] No group head in settings is one of the eleven old titles; a test lists the settings group titles and fails on a clause (`What`, `Who`, a comma).
-- [ ] A degraded plugin with no manifest draws its `Status` card and no empty card; `Disable` and `Uninstall…` are in the head's `···` (render test).
-- [ ] Templates, Currency & FX, Email forwarding, Connections, Files and Meeting notes draw one headless card; Members draws no group head without invites and two with (render tests).
-- [ ] Members draws no column-head row; Models' Providers and Routing do.
-- [ ] General's Identity is one row with a 64px tile that opens the file picker; `Remove` appears only with a logo.
-- [ ] A Setup row holds a tick or `Set up ›`, never both, and never `set`, `not set` or `Open`; unfinished rows lead; the card is absent at 7 of 7 (render tests).
-- [ ] A member still sees every page read-only (existing tests keep passing).
-- [ ] Browser pass on General, Members, Models, a plugin page and Enrichment; the report carries the Models screenshot for rule 4.
-- [ ] Gates: typecheck, lint, the affected tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
 
 ---
 

@@ -891,7 +891,7 @@ the sticky head (`HeadBar`, inside `PageHeader` and `RecordHeader`).
   deal, mark), Today's meetings, and a rail of Portfolio and What's moving. Amended by
   the canvas port (above).
 - **First run** (D80, `first-run-1`): Today's empty state with three ways in; each
-  missing setup named in place with one link; Settings → General → What's set up; demo
+  missing setup named in place with one link; Settings → General → Setup; demo
   data offered with Start empty as the primary.
 - **Meetings page** (D68 amended): Upcoming by day with Prep, Past with no-write-up rows
   first and Write, filters All · Upcoming · Past · No write-up · Mine.

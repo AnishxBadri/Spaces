@@ -891,7 +891,7 @@ Decided 2026-10-09 (D80; port: `first-run-1`):
   absent says so in place with one link (`Ask needs a model to answer · Add a model ›`,
   `No calendar connected · Connect Google ›`). A member sees who to ask instead of the
   link.
-- **The whole picture is passive:** Settings → General → What's set up, never shown
+- **The whole picture is passive:** Settings → General → Setup, never shown
   unprompted.
 
 ### Settings
