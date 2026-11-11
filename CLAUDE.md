@@ -390,6 +390,9 @@ in comments; the rest is the reviewer's. Directive comments (`eslint-disable`,
   crosses into React — the seam is the `effectFn()` adapter (server-fns) /
   HttpApi handlers (`effect/unstable/httpapi`; decision 3 amended 2026-09-16,
   oRPC dropped before it was ever installed).
+- A new server-fn `.validator()` is an Effect schema through `input()`
+  (`apps/web/src/lib/server/input.ts`); `lib/server/tasks.ts` is the reference.
+- No new file imports `zod`; Effect Schema is the one schema language (D85).
 - Writing Effect: invoke the vendored `effect-ts` skill; it defers to
   `node_modules/effect/AGENTS.md` (version-matched guidance).
 - TanStack guidance: the installed packages ship their own `SKILL.md`
