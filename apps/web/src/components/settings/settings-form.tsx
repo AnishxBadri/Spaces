@@ -136,31 +136,35 @@ function SaveBar({
       data-save-anchor
       className="pointer-events-none sticky bottom-0 z-sticky mt-auto h-0"
     >
-      <div
-        role="region"
-        aria-label="Unsaved changes"
-        aria-hidden={!shown}
-        inert={!shown}
-        data-save-bar
-        data-shown={shown}
-        className="absolute inset-x-0 bottom-0 isolate translate-y-full border-t border-hairline bg-paper opacity-0 transition-[transform,opacity] duration-[120ms] ease-out-quart data-[shown=true]:pointer-events-auto data-[shown=true]:translate-y-0 data-[shown=true]:opacity-100 data-[shown=true]:duration-[180ms] motion-reduce:transition-none"
-      >
-        <div className="box-content flex h-12 max-w-194 items-center gap-3 px-6">
-          <span className="tabular mono text-micro text-graphite">
-            {count} {count === 1 ? 'change' : 'changes'}
-          </span>
-          <span className="min-w-0 flex-1" />
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={saving}
-            onClick={onDiscard}
-          >
-            Discard
-          </Button>
-          <Button size="sm" shortcut="⌘↵" disabled={saving} onClick={onSave}>
-            {saving ? 'Saving' : 'Save'}
-          </Button>
+      {/* Clipped: the hidden bar rests below the page foot, and unclipped
+          it would lengthen the page by its own height. */}
+      <div className="absolute inset-x-0 bottom-0 overflow-clip">
+        <div
+          role="region"
+          aria-label="Unsaved changes"
+          aria-hidden={!shown}
+          inert={!shown}
+          data-save-bar
+          data-shown={shown}
+          className="isolate translate-y-full border-t border-hairline bg-paper opacity-0 transition-[transform,opacity] duration-[120ms] ease-out-quart data-[shown=true]:pointer-events-auto data-[shown=true]:translate-y-0 data-[shown=true]:opacity-100 data-[shown=true]:duration-[180ms] motion-reduce:transition-none"
+        >
+          <div className="box-content flex h-12 max-w-194 items-center gap-3 px-6">
+            <span className="tabular mono text-micro text-graphite">
+              {count} {count === 1 ? 'change' : 'changes'}
+            </span>
+            <span className="min-w-0 flex-1" />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={saving}
+              onClick={onDiscard}
+            >
+              Discard
+            </Button>
+            <Button size="sm" shortcut="⌘↵" disabled={saving} onClick={onSave}>
+              {saving ? 'Saving' : 'Save'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
