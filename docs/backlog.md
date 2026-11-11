@@ -6,7 +6,7 @@ Full bodies of the open slices, the repo copy of their Linear issues. Linear iss
 
 ## 31. Edges and icons, and the AI shape
 
-Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-387), `ai-a` (SPA-388) and `notes-1` (SPA-391) shipped 2026-11-10; `edges-2` (SPA-392), `record-1` (SPA-393) and `settings-1` (SPA-394) shipped 2026-11-11 (the owner's option D: the 24px edge, the bone ground, one ink folder; the record's unboxed rail and long text; settings in group cards); `settings-2` (SPA-395) shipped 2026-11-12. Three slices are left. `ai-b` carries the migration and waits on the owner. `shell-2` and `record-2` come from the owner's review of 2026-11-11; they own disjoint files and can run side by side.
+Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-387), `ai-a` (SPA-388) and `notes-1` (SPA-391) shipped 2026-11-10; `edges-2` (SPA-392), `record-1` (SPA-393) and `settings-1` (SPA-394) shipped 2026-11-11 (the owner's option D: the 24px edge, the bone ground, one ink folder; the record's unboxed rail and long text; settings in group cards); `settings-2` (SPA-395) and `shell-2` (SPA-396) shipped 2026-11-12. Two slices are left. `ai-b` carries the migration and waits on the owner. `record-2` comes from the owner's review of 2026-11-11.
 
 ---
 
@@ -29,38 +29,6 @@ Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-
 - [ ] Migration adds `tokens_cached`; `boot.test.ts` green; `ai_usage` rows carry it after an Anthropic call.
 - [ ] Usage page prints the cached share and per-run cached count (render test).
 - [ ] Gates: typecheck, test, lint, prettier; web build; `boot.test.ts` alone.
-
----
-
-#### `shell-2` (SPA-396) · afk · S — One account menu at the sidebar foot, and Drafts under Library while there are some
-
-**Blocked by:** nothing. **Owns** `components/app-sidebar.tsx` and its tests (`app-sidebar.test.tsx`, `nav-grammar.test.ts` where it reads the foot), and the drafts count's invalidation in `lib/email/compose.ts` and the compose windows that save, send or trash a draft.
-
-**Does not touch** `components/settings/**` (`settings-2`) or `components/record/**` (`record-2`). In `docs/design-contract.md` and `DESIGN.md` it edits the shell sections only.
-
-**Spec.** The sidebar foot holds two targets in one row with nothing between them: the account row (a menu of `Drafts`, `Keyboard`, `Sign out`) and a gear (Settings). The owner found it confusing and asked what Drafts is for (2026-11-11). Agreed: one row, one menu, and Drafts moves to where a reader would look for it. This reverses "Settings is the account row's one icon" from the shell sheet (2026-10-08). There is still no email page: mail is read on the record it concerns, and Drafts is the one list of mail not yet sent.
-
-**What to build.**
-
-1. **One foot row.** Expanded, the account row is one trigger across the full width: the initials square and the name. The email line goes (it never changes; the menu's first line already prints it). The gear goes. The row keeps its height, so the Ask row above does not move.
-2. **One menu.** `Signed in as <email>`, a rule, `Settings` with `G ,` in its key lane, `Keyboard` with `?`, a rule, `Sign out`. It opens to the right of the chassis as now. `Drafts` leaves it.
-3. **Collapsed.** The Settings icon goes; the initials square opens the same menu. The Ask icon stays.
-4. **The key stays.** `G ,` still opens Settings from anywhere.
-5. **Drafts under Library.** A `Drafts` row after `Files`, drawn only while the reader has at least one draft. Its right lane holds the count, as Tasks' holds `13 due`. It is a button, not a link: it opens the drafts window (`openDrafts`) and never reads as the current page. Its icon comes from the icon list; add one there only if none fits. Collapsed, it is an icon whose tip reads `Drafts · n`. The mobile drawer draws it too.
-6. **The count is live.** The sidebar reads `countEmailDrafts` on mount under `EMAIL_DRAFTS_QUERY` (it is read only when the menu opens today). Saving a draft, sending one and trashing one each invalidate that key, so the row appears with the first draft and leaves with the last, with no reload.
-7. **Unchanged.** The workspace head's menu (`General`, `Members`, `Invite a member…`), the Ask row, the settings chassis.
-8. **Docs.** `DESIGN.md` (the sidebar foot, the keyboard sheet's "the account menu lists it"), `docs/product-map.md` (the Sidebar A row), `docs/design-contract.md` (the shell line on the account row), and a dated amendment line (2026-11-11, owner) on the shell decision in `docs/decisions.md`.
-
-**Acceptance criteria**
-
-- [ ] The expanded foot has one focusable control, the account trigger; no link to `/settings` sits beside it, and no email line is drawn (render test).
-- [ ] The menu lists `Settings`, `Keyboard`, `Sign out` in that order, and no `Drafts`; `Settings` navigates to `/settings`.
-- [ ] Collapsed, the foot is the Ask icon and the account trigger; no Settings icon.
-- [ ] `G ,` still opens Settings (existing test keeps passing).
-- [ ] With no drafts the Library group has no `Drafts` row; with two it has one reading `2`, after `Files`, and activating it calls `openDrafts` (render tests).
-- [ ] Saving, sending and trashing a draft each invalidate `EMAIL_DRAFTS_QUERY` (test per path).
-- [ ] Browser pass: both sidebar states, the menu open, a draft saved from a compose window and the row appearing.
-- [ ] Gates: typecheck, lint, the affected tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
 
 ---
 
