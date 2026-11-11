@@ -146,6 +146,191 @@ Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-
 
 ---
 
+## 32. One backend grammar
+
+Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2026-11-12 (owner): D84, a module in `apps/web/src/lib` that does I/O is Effect, and the 53 that are not get converted in a planned sweep; D85, Effect Schema is the one schema language and Zod leaves. `schema-1` goes first and alone among these: it proves the server-fn boundary and ships the helper every later slice uses. The `effect-*` slices own disjoint files and run one after another, each beside a slice from another area.
+
+**What a conversion is, for every `effect-*` slice.** It changes the grammar and nothing a user or a caller can see.
+
+- A function that queries, writes, fetches or enqueues becomes an Effect program (`Effect.fn('name')`), on the pattern of `lib/server/objects.ts`: failures are `Schema.TaggedError` classes, a database call goes through a `tryPromise` helper that names the failure, and a server fn runs its program through `effectFn()` or `Effect.runPromise`.
+- A tagged error carries the `message` the UI prints today, word for word. A handler that threw `new Error('Admins only')` rejects with an error whose `message` is `Admins only`.
+- An exported async function that a file outside the slice calls (a route, a worker job through `#web/*`, another `lib/` module) keeps its name and its signature, and becomes a one-line run of the program. The program is exported beside it for callers that are already Effect. No file outside the slice's list changes, except a test that asserted on an error's class.
+- A `.validator()` in a listed file moves from zod to Effect Schema through the `schema-1` helper. A zod shape imported from a file outside the list stays zod and is named in the report.
+- A listed file that turns out to do no I/O (it builds SQL and runs none, or holds types, or the grep matched a comment) stays plain and is named in the report with the reason.
+- Transactions keep their boundaries; nothing that ran inside one runs outside it afterwards, and the reverse.
+- Existing tests pass with their assertions unchanged. A conversion that needs a test's expectation changed is a behaviour change: stop and name it.
+
+---
+
+#### `schema-1` (SPA-400) · afk · M — The server-fn boundary on Effect Schema: the helper, the proof, and Tasks as the reference module
+
+**Blocked by:** nothing. **Owns** a new `lib/server/input.ts` (the helper), `lib/server/tasks.ts`, `lib/tasks/create.ts`, their tests, and the Backend paradigm lines of `CLAUDE.md`.
+
+**Does not touch** `components/app-sidebar.tsx`, `lib/email/compose.ts` or the compose windows (`shell-2` runs beside this slice), or any other server module.
+
+**Spec.** D85. Checked by hand on 2026-11-12: effect `4.0.0-rc.112` has `Schema.toStandardSchemaV1(schema)`, and `@tanstack/start-client-core` 1.170.14's `execValidator` looks for `'~standard'` before `.parse`, with `StandardSchemaValidator` in router-core's `Validator` union. A plain Effect schema carries no `~standard`, so each `.validator()` needs the wrap. Not yet checked: a real `createServerFn` under `pnpm typecheck`. That is step 1, and the rest of project 32 waits on it.
+
+**What to build.**
+
+1. **The proof, first.** One `createServerFn` whose `.validator()` takes a wrapped Effect schema: the handler's `data` infers the decoded type with no assertion, a valid call returns, an invalid call rejects. **If `data` does not infer, or the wrap cannot be made to typecheck without an assertion, stop there and report: the decision goes back to the owner.**
+2. **The helper.** `input(schema)` in `lib/server/input.ts`: one export, the wrap and nothing else, safe to import from a client-imported server-fn module (it imports `effect` only). Its JSDoc says what a caller gets.
+3. **What a refused input looks like.** Today a zod failure reaches the client as a message. Find what the client receives from a Standard Schema failure, make the message a reader can act on (the field and what was expected), and state both shapes in the report. A test pins the new one.
+4. **Tasks, whole.** `lib/server/tasks.ts` and `lib/tasks/create.ts` are converted as the reference module for both decisions: every validator through `input()`, every handler an Effect program run through `effectFn()`, by the conversion rules at the head of this section. `isoDate` and the other shapes keep their constraints and their messages.
+5. **The bundle.** `scripts/check-client-bundle.sh` passes. The report gives the client entry's gzipped size before and after, since Effect Schema now runs in the browser for these validators.
+6. **Docs.** `CLAUDE.md` Backend paradigm: two lines, a new validator is an Effect schema through `input()`, and no new file imports `zod`.
+
+**Acceptance criteria**
+
+- [ ] A type-level test proves `data` in a handler is the schema's decoded type.
+- [ ] `input()` has tests for a valid input, an invalid one, a transformed one (a trimmed string, a defaulted field).
+- [ ] `lib/server/tasks.ts` and `lib/tasks/create.ts` import no `zod` and are Effect; every existing Tasks test passes with its assertions unchanged.
+- [ ] The refused-input message is pinned by a test and described in the report beside the old one.
+- [ ] Bundle check passes; the size delta is in the report.
+- [ ] Gates: typecheck, lint, the affected tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
+
+---
+
+#### `effect-1` (SPA-401) · afk · L — The record server modules and the session gate become Effect
+
+**Blocked by:** `schema-1`. **Owns** `lib/server/shared.ts`, `attributes.ts`, `companies.ts`, `deals.ts`, `people.ts`, `glossary.ts`, `mandate.ts`, `members.ts` and `inbox.ts` in `lib/server/` (2,100 lines, 53 server fns), and their tests.
+
+**Does not touch** the other files in `lib/server/` (`effect-2`), or `components/record/**`, `lib/records/overview.ts` and the four record routes (`record-2` runs beside this slice).
+
+**Spec.** D84, and the conversion rules at the head of this section. Size L because `shared.ts` is one file every server module imports, and splitting it across slices would have two agents in it.
+
+**What to build.**
+
+1. **The session gate is typed.** `requireUser` and `requireAdmin` reject with tagged errors, `Unauthorized` and `Forbidden`, whose messages stay `Unauthorized` and `Admins only`. Their async signatures stay: 341 call sites keep working untouched. Each gains an Effect twin for programs to yield.
+2. **`shared.ts`.** Its helpers that do I/O become programs with async wrappers, by the rules. `birthHolding`'s re-export stays.
+3. **The eight server modules.** By the rules.
+
+**Acceptance criteria**
+
+- [ ] Each listed file imports `effect`, and no listed file imports `zod`, or the report names the file and why.
+- [ ] `requireUser` rejects with `Unauthorized` and `requireAdmin` with `Forbidden` (tests on the class and on the message); every existing `rejects.toThrow('Unauthorized')` and `'Admins only'` test passes unchanged.
+- [ ] No file outside the list changed, bar tests that asserted on an error class (listed in the report).
+- [ ] Gates: typecheck, lint, the `@spaces/web` and `@spaces/worker` tests (the worker crosses into `shared.ts`), prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
+
+---
+
+#### `effect-2` (SPA-403) · afk · L — The rest of the server modules become Effect
+
+**Blocked by:** `effect-1`. **Owns** `documents.ts`, `emails.ts`, `notes.ts`, `portfolio.ts`, `settings.ts`, `setup.ts` and `templates.ts` in `lib/server/` (1,950 lines, 77 server fns), and their tests.
+
+**Does not touch** `lib/server/shared.ts`, `packages/core/src/portfolio/**`, `lib/portfolio/**` or the holding route (`ownership-1` runs beside this slice).
+
+**Spec.** D84, and the conversion rules at the head of this section. The portfolio void flow (`lib/portfolio/reverse.ts`) is already Effect and its tagged errors carry an empty `message` on purpose: `ledgerVoidMessage` is what the dialog shows. Leave that as it is.
+
+**What to build.** The seven modules, by the rules. Handlers yield the session gate's Effect twin from `effect-1`.
+
+**Acceptance criteria**
+
+- [ ] Each listed file imports `effect`, and no listed file imports `zod`, or the report names the file and why.
+- [ ] After this slice no non-test file in `lib/server/` imports `db` without importing `effect` (a grep in the report).
+- [ ] No file outside the list changed, bar tests that asserted on an error class.
+- [ ] Gates: typecheck, lint, the `@spaces/web` tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
+
+---
+
+#### `effect-3` (SPA-405) · afk · L — Documents, notes, views, records and the portfolio loader become Effect
+
+**Blocked by:** `effect-2`, `ownership-1`. **Owns**, in `apps/web/src/lib/`: `documents/` (`blob-refs.ts`, `fetch-guard.ts`, `preview-card.ts`, `record-files.ts`, `unfiled.ts`, `upload.ts`), `notes/` (`from-suggestion.ts`, `list-rows.ts`, `ordering.ts`, `templates.ts`), `views/` (`paging.ts`, `resolve.ts`, `scope.ts`, `sql.ts`), `records/` (`head.ts`, `pictures.ts`), `portfolio/` (`detail.ts`, `holding.ts`), and their tests. 2,300 lines.
+
+**Does not touch** `packages/sdk/**`, `plugins/**`, `packages/core/**` or `lib/integrations/**` (`schema-2` runs beside this slice).
+
+**Spec.** D84, and the conversion rules at the head of this section. Three cautions:
+
+- `views/sql.ts` and `views/resolve.ts` compile SQL. The expression `compileSortKey` emits must stay byte-identical, because the `attr_idx_*` indexes match on it; `value-index-plan.test.ts` is the EXPLAIN assertion. A file that only builds SQL stays plain.
+- `portfolio/detail.ts` hands the pure libs originals only, each stamped with `reversedAt`. That reader contract does not move.
+- `documents/fetch-guard.ts` is the SSRF guard. Its checks keep their order, and a refused fetch still never opens a socket.
+
+**What to build.** The listed files, by the rules.
+
+**Acceptance criteria**
+
+- [ ] Each listed file imports `effect`, or the report names it as pure with the reason.
+- [ ] `value-index-plan.test.ts`, the fetch-guard tests and the portfolio as-of tests pass unchanged.
+- [ ] No file outside the list changed, bar tests that asserted on an error class.
+- [ ] Gates: typecheck, lint, the `@spaces/web` and `@spaces/worker` tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
+
+---
+
+#### `effect-4` (SPA-406) · afk · M — The last I/O modules become Effect, and a lint rule keeps it so
+
+**Blocked by:** `effect-3`. **Owns**, in `apps/web/src/lib/`: `ai/enqueue-embed.ts`, `ai/enqueue-restamp.ts`, `ai/lanes.ts`, `arrival/synced-settings.ts`, `ask/types.ts`, `auth.ts`, `email/fixtures.ts`, `inbox/context.ts`, `integrations/runnable.ts`, `interactions/email-draft-prefill.ts`, `meetings/day.ts`, `members/suspend.ts`, `queue.ts`, `search/waves.ts`, `spaces/filed-in.ts`, `spaces/live.ts`, `spaces/tag.ts`, and their tests (1,300 lines); a new rule in `packages/config/eslint-rules/` and its line in `eslint.base.js`; the Principles and Backend paradigm sections of `CLAUDE.md`.
+
+**Does not touch** `packages/core/src/attributes/**`, `packages/core/src/writes/attributes/**` or `lib/rpc/**` (`schema-3` runs beside this slice).
+
+**Spec.** D84, and the conversion rules at the head of this section. Several of these were listed by a grep and may hold no I/O (`ask/types.ts`, `ai/lanes.ts`, `email/fixtures.ts`); `auth.ts` is better-auth's configuration, not a program. Each stays plain if so, with the reason in the report.
+
+**What to build.**
+
+1. **The listed files,** by the rules.
+2. **The enforcer.** An eslint rule, `effect/io-is-effect`: a non-test file under `apps/web/src/lib/` that imports the `db` value (from `@spaces/db` or `#/db`) must import from `effect`. Type-only imports do not count. A file that is exempt for a stated reason carries an `eslint-disable` with that reason on the import; expect a handful and list them. The rule has its own tests, on the pattern of the rules beside it, and `turbo.json`'s lint inputs already cover the directory.
+3. **Docs.** `CLAUDE.md` Principles gains the principle and its enforcer ("I/O is an Effect program; a pure helper, a type module and client code stay plain"); the Backend paradigm section's "existing modules convert only when already open" sentence is replaced by the rule.
+
+**Acceptance criteria**
+
+- [ ] `pnpm lint` is green with the rule on, and red when a `lib/` file imports `db` without `effect` (the rule's own test).
+- [ ] The report lists every exempted file and its reason.
+- [ ] No file outside the list changed, bar tests that asserted on an error class.
+- [ ] Gates: typecheck, lint over every package (the rule lives in `packages/config`), the `@spaces/web` and `@spaces/worker` tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
+
+---
+
+#### `schema-2` (SPA-402) · afk · L — The plugin contract on Effect Schema: SDK 2.0, every plugin, no zod
+
+**Blocked by:** `schema-1`. **Owns** `packages/sdk/**`, `plugins/**`, the host's manifest readers and resolve hook (`packages/core/src/plugins/**`, `apps/worker/src/plugins/**`), and the `lib/integrations/**` files that read a manifest through the SDK.
+
+**Does not touch** the files `effect-3` lists (it runs beside this slice), or `packages/core/src/attributes/registry.ts` beyond the import of the enrichment vocabulary.
+
+**Spec.** D85. The registry is empty and no plugin release key is published, so no plugin outside this repo exists: the contract is cheapest to change now, before the first public release. Size L because the contract and its nine plugins move together or not at all.
+
+**What to build.**
+
+1. **The contract.** `manifest.ts` (`manifestSchema`, the `settings` and job `settings` an author writes, `settingsJsonSchema`), `vocabulary.ts`, `ports.ts` (the AI port's `schema`, `configOf`, `watchSettingsOf`) and `pack/` read and write Effect Schema. `zod` leaves the SDK's dependencies and `src/package.test.ts`'s pinned list.
+2. **The emitted manifest does not change shape.** `manifest.json` still carries the settings as JSON Schema. For the echo fixture and for apollo, the emitted `manifest.json` before and after differs only in its `sdk` range, or the report names each other difference and why it is harmless to the settings form.
+3. **Every plugin and fixture.** The nine plugins under `plugins/` and the fixtures under `plugins/_fixtures/` author their settings and AI schemas in Effect Schema. `zod` leaves their peers. Each `manifest.sdk` range becomes `^2`.
+4. **The host.** `host-resolve.ts` stops handing a bundle `zod`. The loader refuses a 1.x bundle as it refuses any range it does not satisfy, and a refused plugin reads as degraded, as now.
+5. **The version.** `SDK_VERSION` and the package are `2.0.0`, with a major changeset that says what an author changes. The pending 1.5 changesets fold into it.
+6. **The bundled plugins.** `pnpm bundle-plugins` re-run, so first boot installs 2.0 builds.
+7. **Docs.** `docs/spec-plugin-sdk.md` and the SDK's README: every zod example becomes Effect Schema.
+
+**Acceptance criteria**
+
+- [ ] No file under `packages/sdk/src` or `plugins/` imports `zod`, and no `package.json` there names it.
+- [ ] The manifest comparison of step 2 is in the report.
+- [ ] The loader's tests cover a 1.x bundle refused and a 2.0 bundle loaded.
+- [ ] Every plugin's own suite passes.
+- [ ] The report says which plugins a running install must reinstall (those not bundled).
+- [ ] Gates: the full `turbo run build`, typecheck, lint and test over every package, prettier on touched files.
+
+---
+
+#### `schema-3` (SPA-404) · afk · M — `valueValidator` on Effect Schema: one type system for attribute values, inside and at `/api/v1`
+
+**Blocked by:** `schema-2`. **Owns** `packages/core/src/attributes/registry.ts`, `attributes/default-values.ts`, `writes/attributes/values.ts`, `import/coerce.ts`, `enrichment/plan.ts`, `ai/schema.ts`, the `lib/rpc/**` handlers that decode a record's values, and their tests.
+
+**Does not touch** the files `effect-4` lists (it runs beside this slice).
+
+**Spec.** D85, and Backend paradigm decision 3 in `CONTEXT.md`, which asked for this lift when `/api/v1` was built: HttpApi speaks Effect Schema, the attribute engine spoke zod, and the seam between them is where an external write is checked. `valueValidator` is the attribute engine's type system, so the lift happens once and here.
+
+**What to build.**
+
+1. **`valueValidator` returns an Effect schema** for an attribute, with every constraint it has today (type, options, required, uniqueness is not its job) and the same messages.
+2. **The one write path decodes with it.** `setValues` and its helpers in `writes/attributes/values.ts`; the import coercer; the enrichment plan; the AI column's answer schema.
+3. **`/api/v1` uses it directly.** The handlers that take record values compose the same schema into their HttpApi payloads; any zod-to-Schema bridge at that seam goes.
+4. **What stays zod in core** is named in the report with a count per folder.
+
+**Acceptance criteria**
+
+- [ ] Every existing attribute, import, enrichment and API test passes with its assertions unchanged, messages included.
+- [ ] One test per attribute type feeds the same bad value through `setValues` and through `/api/v1` and gets the same refusal.
+- [ ] The listed files import no `zod`.
+- [ ] Gates: typecheck, lint, the `@spaces/core`, `@spaces/web` and `@spaces/worker` tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
+
+---
+
 ## Corrections
 
 Slices of Linear project P-SPA-28, "Corrections".
@@ -176,6 +361,30 @@ Slices of Linear project P-SPA-28, "Corrections".
 - [ ] The note menu and the head toggle offer two kinds (render tests updated).
 - [ ] No test names `scratch` as a note kind.
 - [ ] Gates: typecheck, lint, the affected tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
+
+---
+
+#### `ownership-1` (SPA-399) · afk · S — Ownership counts the shares sold
+
+**Blocked by:** nothing. **Owns** `packages/core/src/portfolio/ownership.ts` and its tests, the two call sites in `lib/portfolio/detail.ts`, the one in `lib/records/readouts.ts`, and the ownership figure's fixtures in `lib/seeds/dev.ts` if a seeded holding's number moves.
+
+**Does not touch** `lib/server/**` (`effect-2` runs beside this slice). No migration.
+
+**Spec.** `ownership()` sums the shares bought and never subtracts `distribution.shares_sold`, so after a secondary or a partial exit the percentage is overstated (found 2026-11-12). The correction policy is unchanged: the loader passes originals only, each stamped with `reversedAt`, and a voided sale stops counting once the as-of day reaches the void (`liveAt`).
+
+**What to build.**
+
+1. **Sales in.** `ownership()` takes the holding's sales (date, shares sold, `reversedAt`), filtered by as-of and `liveAt` as the checks are. At each counted round, our shares are those bought on or before it less those sold on or before it.
+2. **A sale after the last counted round still shows.** The history gains a point at the sale's date over the last known fully-diluted count, so `currentPct` is honest. Its `roundKind` is `sale`; the timeline prints it as a sale, not as a round.
+3. **Sold out reads zero.** A round before the first purchase is still skipped; a point after the last share is sold reads 0%, and is not skipped.
+4. **Implied and cost-basis-only are untouched.** A SAFE has no shares to sell.
+5. **Callers.** The holding loader, the as-of loader and the record readout pass the sales. If MCP's `standingAt` computes ownership on its own, name it in the report.
+
+**Acceptance criteria**
+
+- [ ] Tests: a partial sale between two rounds, a sale after the last round, a full exit, a voided sale before and after the void's instant under `asOf`, and a holding with no sales (unchanged output).
+- [ ] The dev seed's two holdings with `sharesSold` show the reduced percentage on the holding page (stated in the report with before and after).
+- [ ] Gates: typecheck, lint, the `@spaces/core` and `@spaces/web` tests, prettier on touched files.
 
 ---
 

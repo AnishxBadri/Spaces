@@ -1015,3 +1015,40 @@ _Rejected:_
 - Keeping the dead label in the enum until the journal squash. Postgres cannot drop it in place, but the 0037 pattern already does it in one step.
 
 _Carried by_ `notes-kind` (SPA-398).
+
+## Addenda — 2026-11-12 (the backend grammar)
+
+### D84-io-is-effect
+
+**Does Effect stay a ratchet in `apps/web/src/lib`?** Answered (owner, 2026-11-12): **no. A module that does I/O is Effect, and the ones that are not get converted in a planned sweep.** This amends Backend paradigm decision 1 in CONTEXT.md, which ruled out dedicated migration work.
+
+- **The rule:** a module that queries, writes, fetches or enqueues is an Effect program. A pure helper, a type module, a validator shape and client code (stores, hooks) stay plain: Effect buys nothing where nothing can fail or wait.
+- **The count:** 383 non-test files in `lib/`. 174 are Effect. Of the 209 that are not, 53 do I/O (a grep floor) and 156 do not.
+- **Why now:** the server is half in each style, so a reader needs both and every new slice picks one. A ratchet only converts a file somebody opens for another reason, and most of the 53 are settled code nobody will open. 53 files is small enough to finish before production.
+- **What a conversion is:** the grammar changes and nothing a user or a caller sees does. Tagged errors carry the message the UI prints today; an exported async function keeps its signature and becomes a one-line run of its program; transactions keep their boundaries; existing tests pass unchanged.
+- **The session gate is typed:** `requireUser` and `requireAdmin` reject with `Unauthorized` and `Forbidden`, with the same messages.
+- **The enforcer:** an eslint rule. A `lib/` file that imports the `db` value must import `effect`.
+
+_Rejected:_
+
+- Leaving the ratchet. It does not finish.
+- Converting the 156 pure files. That is ceremony.
+
+_Carried by_ `effect-1` to `effect-4` (SPA-401, SPA-403, SPA-405, SPA-406).
+
+### D85-effect-schema-is-the-schema-language
+
+**Does Zod stay at the boundaries?** Answered (owner, 2026-11-12): **no. Effect Schema is the one schema language, and Zod leaves.** This amends Backend paradigm decision 2 in CONTEXT.md, which left the question for later.
+
+- **Why:** two schema languages meet at `/api/v1` (HttpApi speaks Effect Schema) and at `valueValidator`, and each meeting is a bridge to keep honest. About 224 files import zod and about 183 already use Effect `Schema`.
+- **Why now:** the plugin registry is empty and no release key is published, so no plugin exists outside this repo. The SDK contract is cheapest to change before its first public release.
+- **The server-fn boundary:** TanStack's `.validator()` takes a Standard Schema, and `Schema.toStandardSchemaV1` makes one. One shared helper does the wrap.
+- **The order:** the helper and its proof (`schema-1`); the SDK contract and every plugin, as SDK 2.0 (`schema-2`); `valueValidator`, lifted once (`schema-3`); the validators in the files the Effect sweep opens, with the sweep. Everything left converts when its file is next opened, and `zod` leaves each `package.json` with its last import.
+- **The one thing not yet proved:** a real `createServerFn` typechecking with a wrapped schema. It is `schema-1`'s first step. If it fails, this decision comes back to the owner.
+
+_Rejected:_
+
+- Keeping both languages.
+- One slice over all 224 files.
+
+_Carried by_ `schema-1` (SPA-400), `schema-2` (SPA-402), `schema-3` (SPA-404).

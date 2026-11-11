@@ -122,8 +122,18 @@ relational coordinator.** Nine decisions:
    in the same PR; the merge executor converts last, alone, on its test
    suite; no dedicated migration sprints. Seam: one `effectFn()` adapter
    (Effect → TanStack server-fn); Effect never crosses into React.
-2. **Zod stays at the boundaries** — `valueValidator` is load-bearing;
-   Effect Schema is a separate later decision, not a rider.
+   **Amended 2026-11-12 (owner, D84): in `apps/web/src/lib` the ratchet
+   ends. A module that does I/O is an Effect program; a pure helper, a type
+   module, a validator shape and client code stay plain. The 53 I/O files
+   that were not Effect convert in a planned sweep, and a lint rule holds
+   the line after it.**
+2. ~~**Zod stays at the boundaries** — `valueValidator` is load-bearing;
+   Effect Schema is a separate later decision, not a rider.~~ **Decided
+   2026-11-12 (owner, D85): Effect Schema is the one schema language.** A
+   server fn's `.validator()` takes an Effect schema through one shared
+   wrap (Standard Schema); the plugin contract moves as SDK 2.0 before its
+   first public release; `valueValidator` is lifted once. Zod leaves each
+   file when it is next opened, and each package with its last import.
 3. ~~**API layer: oRPC on Effect** (`@orpc/experimental-effect`)~~ —
    **amended 2026-09-16 (owner): the external door is `effect/unstable/httpapi`.**
    The original pick bought one thing: a single procedure definition serving
