@@ -232,12 +232,11 @@ export function SettingsNav({
                   ROW,
                   locked ? 'text-graphite' : 'text-foreground',
                   'focus-ring hover:bg-bone-deep',
+                  // Variants, not plain utilities: a plain `border-hairline`
+                  // sorts before `border-transparent` and loses to it.
+                  'aria-[current=page]:border-hairline aria-[current=page]:bg-paper aria-[current=page]:font-medium aria-[current=page]:hover:bg-paper',
                 )}
-                activeProps={{
-                  className:
-                    'border-hairline bg-paper font-medium hover:bg-paper',
-                  'aria-current': 'page',
-                }}
+                activeProps={{ 'aria-current': 'page' }}
               >
                 <span className="min-w-0 flex-1 truncate">{row.label}</span>
                 {locked ? (

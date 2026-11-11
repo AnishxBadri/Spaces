@@ -258,13 +258,15 @@ describe('the settings nav', () => {
     await go(r)
     const current = row('/settings/general')
     expect(current.getAttribute('aria-current')).toBe('page')
-    expect(current.className).toContain('border-hairline')
-    expect(current.className).toContain('bg-paper')
+    // As variants keyed on the current row: a plain `border-hairline` loses
+    // to `border-transparent` in the stylesheet and the border never draws.
+    expect(current.className).toContain('aria-[current=page]:border-hairline')
+    expect(current.className).toContain('aria-[current=page]:bg-paper')
+    expect(current.className.split(' ')).not.toContain('border-hairline')
     expect(current.className).not.toContain('border-rule')
     const other = row('/settings/members')
     expect(other.getAttribute('aria-current')).toBeNull()
     expect(other.className).toContain('border-transparent')
-    expect(other.className).not.toContain('border-hairline')
   })
 
   it('reads an admin row to a member in graphite with Admin in its lane, still a link', async () => {
