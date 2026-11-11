@@ -936,6 +936,8 @@ _Amended 2026-10-25 (the canvas port):_
 
 _Carried by_ project 30's Cmd-K, Ask and shell slices.
 
+_Amended 2026-11-11 (owner):_ the foot is one account row with one menu. The gear goes, reversing "Settings is the account row's one icon" (shell sheet, 2026-10-08): the menu reads `Signed in as <email>`, Settings (`G ,`), Keyboard (`?`), Sign out, and `G ,` still opens Settings. Drafts leaves the menu for a row under Library after Files, drawn only while the reader has a draft, with its count; it opens the drafts window and is not a page, so D68's "email gets no sidebar row" stands for mail itself. Carried by `shell-2` (SPA-396).
+
 ### D73-spaces-are-malleable and D74-record-body-is-tabbed — amended (the space page)
 
 **What does a space's own page look like, now that a record's body is tabbed?** Answered (owner, 2026-10-08): **a space reads like a record.**

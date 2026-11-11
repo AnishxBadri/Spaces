@@ -8,9 +8,9 @@ import {
   FileText,
   Kanban,
   Layers,
+  Mail,
   MessageSquareText,
   Paperclip,
-  Settings,
   Sunrise,
   Users,
 } from '#/components/icons'
@@ -64,8 +64,11 @@ import { cn } from '#/lib/utils'
  * - Pinned saved views stand under their object, indented, three then
  *   `▸ n more`; a pin the server no longer answers is pruned.
  * - Overflow expands inline as `▸ n more`, never a dropdown.
- * - Settings is the account row's one icon. Upload is not here: it lives in
- *   ⌘K, on Files and in the first run.
+ * - The foot's account row is one trigger: its menu holds Settings, Keyboard
+ *   and Sign out. Upload is not here: it lives in ⌘K, on Files and in the
+ *   first run.
+ * - Drafts stands under Library only while the reader has one: a button that
+ *   opens the drafts window, never the current page.
  * - Collapsed it is 48px of marks only, with no group headings.
  * - The phone drawer prints no keys; Tasks' `n due` is data and stays.
  */
@@ -224,6 +227,18 @@ function usePinnedViewRows(): ReadonlyArray<PinnedView> {
   }, [asked, data])
 }
 
+/**
+ * The reader's unsent drafts, read on mount. Saving, sending and trashing a
+ * draft invalidate the key, so the Drafts row comes and goes without a reload.
+ */
+function useDraftsCount(): number {
+  const { data } = useQuery({
+    queryKey: [EMAIL_DRAFTS_QUERY],
+    queryFn: () => countEmailDrafts(),
+  })
+  return data ?? 0
+}
+
 export function AppSidebar({
   user,
   workspaceName,
@@ -277,6 +292,7 @@ export function AppSidebar({
     select: (s) => viewOf(s.location.search),
   })
   const [pinsOpen, setPinsOpen] = useState<ReadonlyArray<string>>([])
+  const drafts = useDraftsCount()
 
   async function signOut() {
     // Held decisions are written as this user, so before the session goes.
@@ -292,6 +308,7 @@ export function AppSidebar({
         workspaceName={workspaceName}
         workspaceLogo={workspaceLogo}
         objects={objects}
+        drafts={drafts}
         onOpenCommand={onOpenCommand}
         onExpand={onToggleCollapsed}
         onKeyboard={onOpenKeyboard}
@@ -446,7 +463,7 @@ export function AppSidebar({
         <FoldGroup
           id="library"
           label="Library"
-          count={LIBRARY.length}
+          count={LIBRARY.length + (drafts > 0 ? 1 : 0)}
           folded={folded.includes('library')}
         >
           {LIBRARY.map((item) => (
@@ -460,6 +477,9 @@ export function AppSidebar({
               {item.label}
             </NavLink>
           ))}
+          {drafts > 0 ? (
+            <DraftsRow count={drafts} onNavigate={onNavigate} />
+          ) : null}
         </FoldGroup>
 
         <FoldGroup
@@ -563,40 +583,24 @@ export function AppSidebar({
         <DropdownMenu>
           <DropdownMenuTrigger
             className={cn(
-              'flex min-w-0 flex-1 items-center gap-2.5 pr-1 pl-4 text-left transition-colors',
+              'flex min-w-0 flex-1 items-center gap-2.5 px-4 text-left transition-colors',
               'hover:bg-bone-deep',
               'focus-ring-inset',
             )}
           >
             <InitialsSquare name={user.name} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-ui leading-tight font-medium">
-                {user.name}
-              </span>
-              <span className="block truncate mono text-micro leading-tight text-graphite">
-                {user.email}
-              </span>
+            <span className="min-w-0 flex-1 truncate text-ui font-medium">
+              {user.name}
             </span>
           </DropdownMenuTrigger>
           <AccountMenu
             email={user.email}
+            settingsKeys={chord('G ,')}
+            onSettings={onNavigate}
             onKeyboard={onOpenKeyboard}
             onSignOut={signOut}
           />
         </DropdownMenu>
-        <span className="flex shrink-0 items-center pr-3 pl-1">
-          <IconTip label="Settings" keys={chord('G ,')} side="top">
-            <Link
-              to="/settings"
-              aria-label="Settings"
-              onClick={onNavigate}
-              className="focus-ring flex size-7 items-center justify-center rounded-md text-graphite transition-colors hover:bg-bone-deep hover:text-foreground aria-[current=page]:bg-paper aria-[current=page]:text-foreground"
-              activeProps={{ 'aria-current': 'page' }}
-            >
-              <Settings className="size-3.5" strokeWidth={1.75} />
-            </Link>
-          </IconTip>
-        </span>
       </div>
     </div>
   )
@@ -755,18 +759,25 @@ function MembersItem({ onSelect }: { onSelect: () => void }) {
 
 /**
  * The account menu opens to the right of the chassis, never up into the
- * screen corner. Settings is the icon beside it; the menu keeps the rest,
- * in words only.
+ * screen corner. Words only: Settings and Keyboard with their keys, then
+ * Sign out.
  */
 function AccountMenu({
   email,
+  settingsKeys = 'G ,',
+  onSettings,
   onKeyboard,
   onSignOut,
 }: {
   email: string
+  /** The chord in Settings' lane; absent in the phone drawer. */
+  settingsKeys?: string | undefined
+  /** Called after Settings navigates, so the phone drawer closes. */
+  onSettings?: (() => void) | undefined
   onKeyboard?: (() => void) | undefined
   onSignOut: () => void
 }) {
+  const navigate = useNavigate()
   return (
     <DropdownMenuContent
       side="right"
@@ -778,41 +789,61 @@ function AccountMenu({
         Signed in as {email}
       </DropdownMenuLabel>
       <DropdownMenuSeparator />
-      <DraftsItem />
+      <DropdownMenuItem
+        onSelect={() => {
+          void navigate({ to: '/settings' })
+          onSettings?.()
+        }}
+      >
+        Settings
+        {settingsKeys ? (
+          <span className="ml-auto mono text-micro text-graphite">
+            {settingsKeys}
+          </span>
+        ) : null}
+      </DropdownMenuItem>
       {onKeyboard ? (
         <DropdownMenuItem onSelect={onKeyboard}>
           Keyboard
           <span className="ml-auto mono text-micro text-graphite">?</span>
         </DropdownMenuItem>
       ) : null}
+      <DropdownMenuSeparator />
       <DropdownMenuItem onSelect={onSignOut}>Sign out</DropdownMenuItem>
     </DropdownMenuContent>
   )
 }
 
 /**
- * Drafts, with the count read each time the menu opens — so a draft
- * saved or trashed since is already counted.
+ * Drafts under Library: the row's box with the count in its lane. A button,
+ * not a link — it opens the drafts window and is never the current page.
  */
-function DraftsItem() {
-  const { data } = useQuery({
-    queryKey: [EMAIL_DRAFTS_QUERY],
-    queryFn: () => countEmailDrafts(),
-    staleTime: 0,
-    refetchOnMount: 'always',
-  })
+function DraftsRow({
+  count,
+  onNavigate,
+}: {
+  count: number
+  onNavigate?: (() => void) | undefined
+}) {
   return (
-    <DropdownMenuItem onSelect={openDrafts}>
-      Drafts
-      {data === undefined ? null : (
-        <span
-          data-drafts-count
-          className="tabular ml-auto mono text-micro text-graphite"
-        >
-          {data}
-        </span>
-      )}
-    </DropdownMenuItem>
+    <button
+      type="button"
+      data-drafts-row
+      onClick={() => {
+        openDrafts()
+        onNavigate?.()
+      }}
+      className="focus-ring flex h-[1.875rem] shrink-0 items-center gap-2.5 rounded-md border border-transparent pr-2.5 pl-2.5 text-left text-ui text-foreground transition-colors hover:bg-bone-deep"
+    >
+      <Mail className="size-3.5 shrink-0" strokeWidth={1.75} />
+      <span className="min-w-0 flex-1 truncate">Drafts</span>
+      <span
+        data-lane="count"
+        className="tabular shrink-0 mono text-micro text-foreground"
+      >
+        {count}
+      </span>
+    </button>
   )
 }
 
@@ -828,14 +859,15 @@ function InitialsSquare({ name }: { name: string }) {
 /**
  * The collapsed chassis: a 48px cell with the workspace mark on a hairline,
  * ⌘K on a rule, 30px row boxes of 14px marks with a 20px rule between groups
- * and no headings, the current page a hairline paper box. The foot is Ask,
- * Settings on a rule and the account square on a hairline.
+ * and no headings, the current page a hairline paper box. The foot is Ask
+ * and the account square on a hairline, which opens the account menu.
  */
 function CollapsedSidebar({
   user,
   workspaceName,
   workspaceLogo,
   objects,
+  drafts,
   onOpenCommand,
   onExpand,
   onKeyboard,
@@ -845,6 +877,7 @@ function CollapsedSidebar({
   workspaceName?: string | null | undefined
   workspaceLogo: string | null
   objects: Array<CustomObject>
+  drafts: number
   onOpenCommand: () => void
   onExpand?: (() => void) | undefined
   onKeyboard?: (() => void) | undefined
@@ -910,6 +943,19 @@ function CollapsedSidebar({
             {item.label}
           </CollapsedNavLink>
         ))}
+        {drafts > 0 ? (
+          <IconTip label={`Drafts · ${String(drafts)}`}>
+            <button
+              type="button"
+              data-drafts-row
+              onClick={openDrafts}
+              aria-label={`Drafts · ${String(drafts)}`}
+              className="focus-ring flex h-[1.875rem] w-8 shrink-0 items-center justify-center rounded-md border border-transparent transition-colors hover:bg-bone-deep"
+            >
+              <Mail className="size-3.5 shrink-0" strokeWidth={1.75} />
+            </button>
+          </IconTip>
+        ) : null}
         <GroupRule />
         {OBJECTS.map((item) => (
           <CollapsedNavLink
@@ -954,16 +1000,6 @@ function CollapsedSidebar({
             activeProps={{ 'aria-current': 'page' }}
           >
             <MessageSquareText className="size-3.5" strokeWidth={1.75} />
-          </Link>
-        </IconTip>
-        <IconTip label="Settings" keys="G ,">
-          <Link
-            to="/settings"
-            aria-label="Settings"
-            className="focus-ring-inset flex h-10 w-12 items-center justify-center border-t border-rule text-graphite transition-colors hover:bg-bone-deep hover:text-foreground aria-[current=page]:text-foreground"
-            activeProps={{ 'aria-current': 'page' }}
-          >
-            <Settings className="size-3.5" strokeWidth={1.75} />
           </Link>
         </IconTip>
         <DropdownMenu>

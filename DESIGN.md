@@ -704,14 +704,22 @@ an object's pinned saved views and the count on Tasks. The decided order:
   `▸ n more`).
 - **Library ▾**, a collapsible group: Notes (`G N`), Meetings (`G E`), Files (`G L`).
   Documents is renamed Files and keeps its chord. Collapsed, it reads `Library ▸ 3`.
+  **Drafts** follows Files only while the reader has a draft, its count in the right
+  lane. It is a button that opens the drafts window, never the current page; collapsed,
+  a mark whose tip reads `Drafts · n` (amended 2026-11-11).
 - **Objects ▾**: the objects, then customs, overflowing inline as `▸ n more` (never a
   dropdown); an object's pinned saved views sit under it.
 - **Capital ▸**: Portfolio, Mandate.
-- **Counts only on Tasks.** No other row carries a number. The count is ink, and
-  destructive only when a task is overdue.
+- **Counts only on Tasks and Drafts.** No other row carries a number. The count is ink,
+  and destructive only when a task is overdue.
 - **Review is not a row**; Today's Needs-you ledger reaches it (D79).
-- **Upload and Settings leave the list.** Settings is the account row's one icon
-  button; Upload lives in ⌘K, on Files and in the first run (amended 2026-10-25).
+- **Upload and Settings leave the list.** Upload lives in ⌘K, on Files and in the first
+  run (amended 2026-10-25).
+- **The foot is one account row** (amended 2026-11-11, owner): one trigger across the
+  width, the initials square and the name, with no email line and no gear. Its menu
+  opens to the right: `Signed in as <email>`, a rule, Settings (`G ,`), Keyboard (`?`),
+  a rule, Sign out. Collapsed, the foot is the Ask mark and the initials square, which
+  opens the same menu.
 - **The workspace head opens a menu:** General, Members, Invite a member…. The phone
   drawer prints no key hints.
 - **The current row is a hairline box on paper** (`border-hairline`), expanded and
@@ -859,7 +867,7 @@ Stage` box appears while dragging over a column.
   - Your turn is a right-aligned bone block with a hairline, at most three quarters of
     the column; the answer has no box and sits left at full measure; a scope change is
     a centred mono divider.
-- **The keyboard sheet:** `?` opens it (the account menu lists it). Two columns of 26px
+- **The keyboard sheet:** `?` opens it (the account menu lists it, under Settings). Two columns of 26px
   rows on rules — Go, Create, On a deal, In a sheet — with 18px keycaps (hairline, 2px
   foot, mono 10). Only keys that work are printed. Every nav row prints its G-chord in
   its right lane; chords wait 800ms and every key is off while typing. Documents takes

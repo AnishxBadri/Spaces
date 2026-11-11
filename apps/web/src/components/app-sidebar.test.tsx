@@ -19,12 +19,13 @@ import { useViewState } from './views/use-view-state'
 import type * as SidebarModule from './app-sidebar'
 import type * as PrefsModule from '#/lib/chassis-prefs'
 import type * as RouterModule from '@tanstack/react-router'
+import type * as ComposeModule from '#/lib/email/compose'
 
 /**
  * The chassis, mounted under a memory router: the folding groups, the starred
- * spaces under Spaces, the pinned views under their object, the foot (Ask
- * above the account row), the two menus, the phone drawer's missing keys and
- * the current row's tab.
+ * spaces under Spaces, the pinned views under their object, Drafts under
+ * Library while there are some, the foot (Ask above the one account trigger),
+ * the two menus, the phone drawer's missing keys and the current row's tab.
  *
  * The DOM is a happy-dom `Window` on this file's globals, so the per-file
  * database setup stays on node.
@@ -52,11 +53,18 @@ vi.mock('#/lib/server-fns', () => ({
   listMembers: vi.fn(async () => served.members),
 }))
 
+// The Drafts row's door, watched rather than opened.
+vi.mock('#/lib/email/compose', async (importOriginal) => ({
+  ...(await importOriginal<typeof ComposeModule>()),
+  openDrafts: vi.fn(),
+}))
+
 const win = new Window({ url: 'http://localhost/' })
 let createRoot: typeof CreateRoot
 let sidebar: typeof SidebarModule
 let prefs: typeof PrefsModule
 let router: typeof RouterModule
+let compose: typeof ComposeModule
 
 beforeAll(async () => {
   vi.stubGlobal('window', win)
@@ -89,6 +97,7 @@ beforeAll(async () => {
   sidebar = await import('./app-sidebar')
   prefs = await import('#/lib/chassis-prefs')
   router = await import('@tanstack/react-router')
+  compose = await import('#/lib/email/compose')
 })
 
 afterAll(async () => {
@@ -126,6 +135,10 @@ type HeadProps = {
   onOpenKeyboard?: () => void
 }
 
+/** Where the last mounted router stands. */
+let pathname = () => ''
+let client = new QueryClient()
+
 async function mount(
   path: string,
   objects: Array<{ slug: string; plural: string; icon: string | null }> = [],
@@ -144,15 +157,17 @@ async function mount(
       />
     ),
   })
-  const r = createRouter({
+  const made = createRouter({
     routeTree: rootRoute,
     history: createMemoryHistory({ initialEntries: [path] }),
   })
+  pathname = () => made.state.location.pathname
+  client = queryClient()
   await act(async () => {
-    await r.load()
+    await made.load()
     root.render(
-      <QueryClientProvider client={queryClient()}>
-        <RouterProvider router={r} />
+      <QueryClientProvider client={client}>
+        <RouterProvider router={made} />
       </QueryClientProvider>,
     )
   })
@@ -325,13 +340,15 @@ describe('the chassis', () => {
     expect(rows()).not.toContain('Property ops')
   })
 
-  it('puts Settings alone on the account row, and Upload nowhere', async () => {
+  it('draws the foot as one account trigger: no Settings link, no email line, no Upload', async () => {
     await mount('/today')
     const account = one('[data-account-row]')
-    const settings = account.querySelector('a[aria-label="Settings"]')
-    expect(settings?.getAttribute('href')).toBe('/settings')
-    expect(account.querySelectorAll('a, button')).toHaveLength(2)
-    expect(nav().querySelector('a[href="/settings"]')).toBeNull()
+    const controls = account.querySelectorAll('a, button')
+    expect(controls).toHaveLength(1)
+    expect(controls[0].textContent).toBe('ABAnish Badri')
+    expect(account.textContent).not.toContain(user.email)
+    expect(document.querySelector('a[href="/settings"]')).toBeNull()
+    expect(document.querySelector('[aria-label="Settings"]')).toBeNull()
     expect(document.querySelector('[aria-label="Upload"]')).toBeNull()
   })
 
@@ -347,17 +364,21 @@ describe('the chassis', () => {
     expect(follows(ask, one('[data-account-row]'))).toBe(true)
   })
 
-  it('keeps Ask at the foot when collapsed, above Settings and the account', async () => {
-    await mount('/today', [], { collapsed: true })
+  it('keeps the collapsed foot to Ask and the account square, which opens the same menu', async () => {
+    await mount('/today', [], { collapsed: true, onOpenKeyboard: () => {} })
     expect(nav().querySelector('a[href="/ask"]')).toBeNull()
     const ask = one('[data-ask-row]')
     expect(ask.getAttribute('href')).toBe('/ask')
-    const settings = one('a[aria-label="Settings"]')
+    const account = one('[data-account-row]')
     const follows = (a: Element, b: Element) =>
       (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
-    expect(follows(ask, settings)).toBe(true)
-    expect(follows(settings, one('[data-account-row]'))).toBe(true)
+    expect(follows(ask, account)).toBe(true)
+    expect(ask.nextElementSibling).toBe(account)
+    expect(document.querySelector('a[href="/settings"]')).toBeNull()
+    expect(document.querySelector('[aria-label="Settings"]')).toBeNull()
     expect(document.querySelector('[aria-label="Upload"]')).toBeNull()
+    await openMenu(account)
+    expect(menuItems()).toEqual(['SettingsG ,', 'Keyboard?', 'Sign out'])
   })
 
   it('prints no key hints in the phone drawer, but keeps Tasks’ count', async () => {
@@ -372,35 +393,97 @@ describe('the chassis', () => {
     expect(document.querySelector('[data-workspace-head]')).toBeNull()
   })
 
-  it('lists the account menu in words: Drafts, Keyboard, Sign out', async () => {
+  it('lists the account menu in words: Settings, Keyboard, then Sign out', async () => {
     await mount('/today', [], { onOpenKeyboard: () => {} })
     await openMenu(button(/Anish Badri/))
     expect(document.body.textContent).toContain(
       'Signed in as anish@fund.example',
     )
-    expect(menuItems()).toEqual(['Drafts0', 'Keyboard?', 'Sign out'])
+    expect(menuItems()).toEqual(['SettingsG ,', 'Keyboard?', 'Sign out'])
     const menu = one('[role="menu"]')
     expect(menu.querySelector('svg')).toBeNull()
+    // A rule under the email, and one before Sign out.
+    const parts = Array.from(menu.children).map((el) =>
+      el.getAttribute('role') === 'separator' ? '—' : el.textContent.trim(),
+    )
+    expect(parts.at(1)).toBe('—')
+    expect(parts.at(-2)).toBe('—')
   })
 
-  it('counts the drafts in the account menu, read again each time it opens', async () => {
-    served.drafts = 1
+  it('opens Settings from the account menu', async () => {
     await mount('/today')
-    const trigger = button(/Anish Badri/)
-    const count = () =>
-      document.querySelector('[data-drafts-count]')?.textContent ?? null
-    await openMenu(trigger)
-    expect(count()).toBe('1')
-    // A draft trashed elsewhere: the next opening reads the new number.
-    served.drafts = 0
-    act(() => {
-      document.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
-      )
+    await openMenu(button(/Anish Badri/))
+    const settings = Array.from(
+      document.querySelectorAll('[role="menuitem"]'),
+    ).find((el) => el.textContent.startsWith('Settings'))
+    if (!(settings instanceof HTMLElement)) throw new Error('no Settings')
+    await act(async () => {
+      settings.click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(pathname()).toBe('/settings')
+  })
+
+  it('draws no Drafts row under Library while there are none', async () => {
+    await mount('/today')
+    expect(document.querySelector('[data-drafts-row]')).toBeNull()
+    expect(document.body.textContent).not.toContain('Drafts')
+  })
+
+  it('draws Drafts after Files with the count, a button that opens the drafts window', async () => {
+    served.drafts = 2
+    const opened = vi.mocked(compose.openDrafts)
+    opened.mockClear()
+    await mount('/files')
+    const row = one('[data-drafts-row]')
+    expect(row.tagName).toBe('BUTTON')
+    expect(row.textContent).toBe('Drafts2')
+    expect(row.hasAttribute('aria-current')).toBe(false)
+    const files = nav().querySelector('a[href="/files"]')
+    expect(files?.nextElementSibling).toBe(row)
+    // Library counts it while folded.
+    click(button(/^Library/))
+    expect(button(/^Library/).textContent).toContain('▸ 4')
+    click(button(/^Library/))
+    if (!(row instanceof HTMLElement)) throw new Error('no Drafts row')
+    act(() => row.click())
+    expect(opened).toHaveBeenCalledTimes(1)
+  })
+
+  it('draws Drafts as a mark with its count in the tip when collapsed', async () => {
+    served.drafts = 2
+    await mount('/today', [], { collapsed: true })
+    const row = one('[data-drafts-row]')
+    expect(row.getAttribute('aria-label')).toBe('Drafts · 2')
+    const files = nav().querySelector('a[href="/files"]')
+    expect(files?.nextElementSibling).toBe(row)
+  })
+
+  it('draws Drafts in the phone drawer too', async () => {
+    served.drafts = 1
+    await mount('/today', [], { drawer: true })
+    expect(one('[data-drafts-row]').textContent).toBe('Drafts1')
+  })
+
+  it('brings Drafts in with the first draft and out with the last, on invalidation', async () => {
+    await mount('/today')
+    expect(document.querySelector('[data-drafts-row]')).toBeNull()
+    served.drafts = 1
+    await act(async () => {
+      await client.invalidateQueries({
+        queryKey: [compose.EMAIL_DRAFTS_QUERY],
+      })
     })
     await settle()
-    await openMenu(trigger)
-    expect(count()).toBe('0')
+    expect(one('[data-drafts-row]').textContent).toBe('Drafts1')
+    served.drafts = 0
+    await act(async () => {
+      await client.invalidateQueries({
+        queryKey: [compose.EMAIL_DRAFTS_QUERY],
+      })
+    })
+    await settle()
+    expect(document.querySelector('[data-drafts-row]')).toBeNull()
   })
 
   it('marks the current row by colour only — the same box as every row', async () => {

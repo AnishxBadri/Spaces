@@ -1,13 +1,16 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { EMAIL_DRAFTS_QUERY } from '#/lib/email/compose'
 import type { DraftRow } from '#/lib/server-fns'
 import { DraftsDialog, recipientsLine } from './compose-windows'
 
 /**
  * The drafts list: only what the server lists for the viewer,
- * `(no subject)` for a draft without one, and Trash on the row's end.
+ * `(no subject)` for a draft without one, and Trash on the row's end, which
+ * marks the sidebar's drafts count stale.
  */
 
 await vi.hoisted(async () => {
@@ -84,9 +87,21 @@ const ROWS: Array<DraftRow> = [
 
 let host: HTMLDivElement
 let root: Root
+let queryClient = new QueryClient()
+
+function list() {
+  act(() =>
+    root.render(
+      <QueryClientProvider client={queryClient}>
+        <DraftsDialog open onOpenChange={() => {}} />
+      </QueryClientProvider>,
+    ),
+  )
+}
 
 beforeEach(() => {
   for (const f of Object.values(fns)) f.mockReset()
+  queryClient = new QueryClient()
   fns.listEmailDrafts.mockResolvedValue(ROWS)
   fns.deleteEmailDraft.mockResolvedValue({ ok: true })
   fns.getEmailSender.mockResolvedValue({
@@ -116,7 +131,7 @@ const rows = () =>
 
 describe('the drafts list', () => {
   it('lists the viewer’s drafts with mode, recipients and the empty subject', async () => {
-    act(() => root.render(<DraftsDialog open onOpenChange={() => {}} />))
+    list()
     await settle()
     expect(fns.listEmailDrafts).toHaveBeenCalledTimes(1)
     expect(rows()).toHaveLength(2)
@@ -128,8 +143,9 @@ describe('the drafts list', () => {
     ).toBe('2 · only yours')
   })
 
-  it('trashes a row from its end and drops it from the list', async () => {
-    act(() => root.render(<DraftsDialog open onOpenChange={() => {}} />))
+  it('trashes a row from its end, drops it from the list and marks the count stale', async () => {
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+    list()
     await settle()
     const trash = document.querySelector(
       'button[aria-label="Trash Re: Sept cap table + data room access"]',
@@ -141,6 +157,7 @@ describe('the drafts list', () => {
       data: { id: '00000000-0000-4000-8000-0000000000d1' },
     })
     expect(rows()).toHaveLength(1)
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: [EMAIL_DRAFTS_QUERY] })
   })
 
   it('reads the recipients as one name and a count', () => {

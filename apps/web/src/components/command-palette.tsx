@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useRouter } from '@tanstack/react-router'
-import { CheckSquare, icon, Settings, Table2 } from '#/components/icons'
+import { CheckSquare, icon, Mail, Settings, Table2 } from '#/components/icons'
 import type { LucideIcon } from '#/components/icons'
 import { useCommandState } from 'cmdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -29,6 +29,7 @@ import {
   CommandList,
 } from './ui/command'
 import { authClient } from '#/lib/auth-client'
+import { openCompose } from '#/lib/email/compose'
 import { heldDecisions } from '#/lib/held-decisions'
 import { fileInSpaceAction } from '#/lib/file-in-space'
 import { objectIcon } from '#/lib/object-icons'
@@ -1227,6 +1228,14 @@ export function CommandPalette({
   const extraActions = useMemo<ReadonlyArray<PageAction>>(
     () => [
       ...GLOBAL_ACTIONS,
+      // The one way to a blank email while the sidebar has no Drafts row.
+      {
+        id: 'new-email',
+        label: 'New email…',
+        icon: Mail,
+        words: 'email mail compose write send draft message',
+        run: () => openCompose({ draftId: null }),
+      },
       {
         id: 'sign-out',
         label: 'Sign out',

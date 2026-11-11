@@ -1,9 +1,10 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Dialog, DialogContent } from '#/components/ui/dialog'
-import { blankDraft } from '#/lib/email/compose'
+import { EMAIL_DRAFTS_QUERY, blankDraft } from '#/lib/email/compose'
 import type { DraftState } from '#/lib/email/compose'
 import { DraftComposer } from './draft-composer'
 
@@ -16,7 +17,8 @@ import { DraftComposer } from './draft-composer'
  * rendered with its blanks flagged, and Send absent until each blank is
  * filled or accepted. Send hands the draft's id and Review's fills over; a
  * mailbox without `gmail.send` makes the primary Reconnect Gmail; a failure
- * keeps the composer open and says why.
+ * keeps the composer open and says why. Saving, sending and deleting each
+ * mark the sidebar's drafts count stale.
  */
 
 await vi.hoisted(async () => {
@@ -79,8 +81,17 @@ const ID = '00000000-0000-4000-8000-0000000000d1'
 let host: HTMLDivElement
 let root: Root
 let closed = vi.fn<() => void>()
+let queryClient = new QueryClient()
+
+/** How many times the sidebar's drafts count was marked stale. */
+const draftsInvalidated = (spy: ReturnType<typeof spyInvalidate>) =>
+  spy.mock.calls.filter(
+    ([filters]) => filters?.queryKey?.[0] === EMAIL_DRAFTS_QUERY,
+  ).length
+const spyInvalidate = () => vi.spyOn(queryClient, 'invalidateQueries')
 
 beforeEach(() => {
+  queryClient = new QueryClient()
   for (const f of Object.values(fns)) f.mockReset()
   fns.saveEmailDraft.mockResolvedValue({
     id: ID,
@@ -116,11 +127,13 @@ const settle = async () => {
 function mount(initial: DraftState = blankDraft(ID)) {
   act(() =>
     root.render(
-      <Dialog open>
-        <DialogContent size="l">
-          <DraftComposer initial={initial} onClose={closed} />
-        </DialogContent>
-      </Dialog>,
+      <QueryClientProvider client={queryClient}>
+        <Dialog open>
+          <DialogContent size="l">
+            <DraftComposer initial={initial} onClose={closed} />
+          </DialogContent>
+        </Dialog>
+      </QueryClientProvider>,
     ),
   )
 }
@@ -257,6 +270,20 @@ describe('the autosave', () => {
     })
   })
 
+  it('marks the drafts count stale once the save lands', async () => {
+    vi.useFakeTimers()
+    const invalidate = spyInvalidate()
+    mount()
+    type(body(), 'Thanks Dana')
+    expect(draftsInvalidated(invalidate)).toBe(0)
+    act(() => {
+      vi.advanceTimersByTime(800)
+    })
+    await settle()
+    expect(fns.saveEmailDraft).toHaveBeenCalledTimes(1)
+    expect(draftsInvalidated(invalidate)).toBe(1)
+  })
+
   it('writes nothing for a draft only opened', async () => {
     vi.useFakeTimers()
     mount()
@@ -339,6 +366,33 @@ describe('the foot', () => {
   })
 })
 
+describe('Delete draft', () => {
+  it('deletes the draft from the ··· and marks the drafts count stale', async () => {
+    const invalidate = spyInvalidate()
+    mount()
+    await settle()
+    const more = document.querySelector('[aria-label="More for this draft"]')
+    if (!more) throw new Error('no ···')
+    act(() => {
+      more.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      )
+    })
+    await settle()
+    const item = [...document.querySelectorAll('[role="menuitem"]')].find(
+      (el) => el.textContent.trim() === 'Delete draft…',
+    )
+    if (!(item instanceof HTMLElement)) throw new Error('no Delete draft…')
+    act(() => item.click())
+    await settle()
+    act(() => button('Delete')?.click())
+    await settle()
+    expect(fns.deleteEmailDraft).toHaveBeenCalledWith({ data: { id: ID } })
+    expect(draftsInvalidated(invalidate)).toBe(1)
+    expect(closed).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('Review', () => {
   const DANA = {
     email: 'dana@flent.example',
@@ -389,6 +443,18 @@ describe('Review', () => {
       data: { draftId: ID, fills: {}, accepted: [] },
     })
     expect(closed).toHaveBeenCalledTimes(1)
+  })
+
+  it('marks the drafts count stale when the draft is sent', async () => {
+    const invalidate = spyInvalidate()
+    mount({ ...blankDraft(ID), to: [DANA], bodyMd: 'Thanks Dana' })
+    await settle()
+    expect(draftsInvalidated(invalidate)).toBe(0)
+    act(() => sendButton()?.click())
+    await settle()
+    expect(fns.sendEmailDraft).toHaveBeenCalledTimes(1)
+    // Once for the save before the send, once for the send.
+    expect(draftsInvalidated(invalidate)).toBe(2)
   })
 
   it('reviews a draft with variables and flags the blank row; Send is absent', async () => {

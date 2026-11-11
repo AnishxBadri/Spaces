@@ -1,6 +1,7 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   DraftFields,
@@ -160,7 +161,13 @@ const settle = async () => {
 }
 
 async function open(recordId: string | null = null) {
-  act(() => root.render(<EmailModal recordId={recordId} />))
+  act(() =>
+    root.render(
+      <QueryClientProvider client={new QueryClient()}>
+        <EmailModal recordId={recordId} />
+      </QueryClientProvider>,
+    ),
+  )
   await settle()
 }
 

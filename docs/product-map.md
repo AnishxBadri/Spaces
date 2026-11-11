@@ -18,13 +18,13 @@ decides most of the surface area and is designed first.
 
 ## 1. Shell — Paper page `Shell`
 
-| Surface               | What                                                                                                                                                             | Design                | Build |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ----- |
-| Sidebar A             | Today · Tasks · Spaces · Notes · Meetings · Files · Companies · People · Deals · Portfolio · Mandate; starred spaces, overflow, account row, Ask + Settings foot | P (p-J, drawn 5 ways) | ✓     |
-| Sticky head           | page/record head folds to a 48px bar                                                                                                                             | P                     | ✓     |
-| Keyboard help, toasts |                                                                                                                                                                  | L                     | ✓     |
-| First run (D80)       |                                                                                                                                                                  | P (p-O)               | ✓     |
-| Login · Setup · Join  | `/login` `/setup` `/join`                                                                                                                                        | —                     | ✓     |
+| Surface               | What                                                                                                                                                                                                         | Design                | Build |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------- | ----- |
+| Sidebar A             | Today · Tasks · Spaces · Notes · Meetings · Files · Companies · People · Deals · Portfolio · Mandate; starred spaces, overflow, Drafts under Library while any; Ask + one account row (Settings in its menu) | P (p-J, drawn 5 ways) | ✓     |
+| Sticky head           | page/record head folds to a 48px bar                                                                                                                                                                         | P                     | ✓     |
+| Keyboard help, toasts |                                                                                                                                                                                                              | L                     | ✓     |
+| First run (D80)       |                                                                                                                                                                                                              | P (p-O)               | ✓     |
+| Login · Setup · Join  | `/login` `/setup` `/join`                                                                                                                                                                                    | —                     | ✓     |
 
 ## 2. Today — Paper page `Today`
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type {
   DraftDocument,
   DraftFields,
@@ -8,7 +9,7 @@ import type {
 
 /**
  * The composer's client half: the draft it edits, the mode switch, the
- * autosave debounce and the store the account menu opens Drafts through.
+ * autosave debounce and the store the sidebar's Drafts row opens through.
  * Imports types from the barrel and nothing that reaches a database.
  */
 
@@ -187,7 +188,7 @@ function subscribe(cb: () => void) {
 
 const CLOSED: ComposeState = { drafts: false, compose: null }
 
-/** The account menu's door: the drafts list. */
+/** The sidebar's Drafts row: the drafts list. */
 export function openDrafts() {
   set({ drafts: true, compose: null })
 }
@@ -213,8 +214,19 @@ export function useComposeState(): ComposeState {
   )
 }
 
-/** The account menu's query key for the drafts count. */
+/** The sidebar's query key for the drafts count. */
 export const EMAIL_DRAFTS_QUERY = 'email-drafts-count'
+
+/**
+ * Marks the drafts count stale. Every save, send and trash calls it, so the
+ * sidebar's Drafts row appears with the first draft and leaves with the last.
+ */
+export function useDraftsChanged(): () => void {
+  const queryClient = useQueryClient()
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: [EMAIL_DRAFTS_QUERY] })
+  }
+}
 
 /** What Review holds per recipient: the blanks typed in, and a blank accepted. */
 export type ReviewChoices = {

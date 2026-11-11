@@ -27,6 +27,7 @@ import {
   saveInput,
   switchMode,
   useDraftAutosave,
+  useDraftsChanged,
 } from '#/lib/email/compose'
 import type { DraftState, ReviewChoices } from '#/lib/email/compose'
 import {
@@ -168,6 +169,7 @@ export function DraftComposer({
   const { confirm, confirmDialog } = useConfirm()
   const inflight = useRef<Promise<void>>(Promise.resolve())
   const body = useRef<HTMLTextAreaElement>(null)
+  const draftsChanged = useDraftsChanged()
 
   const save = (d: DraftState): Promise<void> => {
     setSaving(true)
@@ -176,6 +178,7 @@ export function DraftComposer({
         setSavedAt(r.updatedAt)
         setError(null)
         onSaved?.(r.updatedAt)
+        draftsChanged()
       })
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : 'Could not save')
@@ -243,6 +246,8 @@ export function DraftComposer({
       const saved = await saveEmailDraft({ data: saveInput(draft) })
       setSavedAt(saved.updatedAt)
       onSaved?.(saved.updatedAt)
+      // Counted now: a refused send keeps the draft.
+      draftsChanged()
       const sent = await sendEmailDraft({
         data: {
           draftId: draft.id,
@@ -250,6 +255,7 @@ export function DraftComposer({
           accepted: [...choices.accepted],
         },
       })
+      draftsChanged()
       toast(sent.sent === 1 ? 'Sent' : `Sent ${plural(sent.sent, 'email')}`)
       onClose()
     } catch (err) {
@@ -333,6 +339,7 @@ export function DraftComposer({
     await inflight.current
     try {
       await deleteEmailDraft({ data: { id: draft.id } })
+      draftsChanged()
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not delete')

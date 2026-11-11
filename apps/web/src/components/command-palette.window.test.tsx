@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type * as ReactQuery from '@tanstack/react-query'
 import type * as ReactRouter from '@tanstack/react-router'
 import type * as PaletteModule from './command-palette'
+import type * as Compose from '#/lib/email/compose'
 import type * as PageActionsModule from '#/lib/page-actions'
 import type * as ServerFns from '#/lib/server-fns'
 
@@ -34,6 +35,11 @@ vi.mock('#/lib/server-fns', async (original) => ({
   searchAll: async () => [],
   searchPassages: ({ data }: { data: { q: string } }) =>
     data.q === 'zzqx' ? Promise.resolve([]) : new Promise(() => {}),
+}))
+
+vi.mock('#/lib/email/compose', async (original) => ({
+  ...(await original<typeof Compose>()),
+  openCompose: vi.fn(),
 }))
 
 const win = new Window({ url: 'http://localhost/' })
@@ -201,6 +207,33 @@ describe('the palette window', () => {
     // Nothing widens or caps the window by what it holds.
     expect(sizes[0]?.className).not.toContain('has-[[data-preview]]')
     expect(document.body.innerHTML).not.toContain('max-h-[420px]')
+
+    act(() => root.unmount())
+    host.remove()
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  })
+})
+
+describe('New email from the palette', () => {
+  it('offers a blank email on a typed word and opens the compose window', async () => {
+    const { openCompose } = await import('#/lib/email/compose')
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root: Root = createRoot(host)
+    const { CommandPalette } = palette
+    act(() => root.render(<CommandPalette open onOpenChange={() => {}} />))
+
+    type('email')
+    await wait(0)
+    const row = [
+      ...document.querySelectorAll<HTMLElement>(
+        '[data-group="actions"] [cmdk-item]',
+      ),
+    ].find((el) => el.textContent.includes('New email…'))
+    expect(row).toBeDefined()
+    act(() => row?.click())
+    await wait(0)
+    expect(openCompose).toHaveBeenCalledWith({ draftId: null })
 
     act(() => root.unmount())
     host.remove()

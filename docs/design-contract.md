@@ -841,8 +841,10 @@ anatomy in §3. The surfaces:
   preview pane always mounted, blank bone when nothing previewable is highlighted; Ask's
   scope chips sit in the composer; a citation previews its passage on hover; Ask's row
   is at the sidebar foot (`⌘J`).
-- **Shell.** Upload leaves the account row; the workspace head opens General · Members ·
-  Invite; a password reset is a one-time link an admin issues; the phone drawer prints
+- **Shell.** The foot's account row is one trigger (initials and name) whose menu is
+  Settings · Keyboard · Sign out; no gear beside it; Drafts sits under Library only
+  while there is one, a button that opens the drafts window; the workspace head opens
+  General · Members · Invite; a password reset is a one-time link an admin issues; the phone drawer prints
   no key hints; sidebar counts are ink, destructive only when something is overdue.
 - **Settings** (D81 amended): the nav group heads are ruled bands; Integrations is
   Connections · Plugins · Enrichment · Email forwarding; a settings head carries one

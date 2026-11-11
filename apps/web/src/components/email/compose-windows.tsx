@@ -18,6 +18,7 @@ import {
   draftStateOf,
   openCompose,
   useComposeState,
+  useDraftsChanged,
 } from '#/lib/email/compose'
 import type { ComposeTarget, DraftState } from '#/lib/email/compose'
 import {
@@ -75,6 +76,7 @@ export function DraftsDialog({
   const { now } = useClock()
   const [rows, setRows] = useState<Array<DraftRow> | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const draftsChanged = useDraftsChanged()
 
   useEffect(() => {
     if (!open) return
@@ -96,6 +98,7 @@ export function DraftsDialog({
     setRows((prev) => (prev ?? []).filter((r) => r.id !== id))
     try {
       await deleteEmailDraft({ data: { id } })
+      draftsChanged()
     } catch {
       setError('Could not delete the draft')
     }

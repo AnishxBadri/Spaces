@@ -123,7 +123,7 @@ export const listEmailDrafts = createServerFn().handler(async () => {
   return effectFn(listDraftsProgram)({ id: user.id })
 })
 
-/** The account menu's count. */
+/** The sidebar's Drafts count. */
 export const countEmailDrafts = createServerFn().handler(async () => {
   const user = await requireUser()
   const { countDraftsProgram } = await import('../interactions/email-drafts')
