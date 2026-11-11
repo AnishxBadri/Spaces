@@ -44,7 +44,7 @@ Plus the UI sweep (the printed sheets landing) and Corrections.
 
 ## Next, in order
 
-1. **Project 31, the rest** (P-SPA-35): `ai-b` SPA-389 (migration, hitl: the owner confirms AI column answers may change under the mandate). Body in `docs/backlog.md` § 31. Then the Ask set, which the owner has not picked from yet.
+1. **Project 31, the rest** (P-SPA-35), bodies in `docs/backlog.md` § 31. From the owner's review of 2026-11-11, all `afk`, no migration, disjoint files: `settings-2` SPA-395 (noun heads, no empty cards, one group without a head, General's logo and Setup rows), `shell-2` SPA-396 (one account menu at the sidebar foot, Drafts under Library), `record-2` SPA-397 (a lone readout joins the rail). Then `ai-b` SPA-389 (migration, hitl: the owner confirms AI column answers may change under the mandate). Then the Ask set, which the owner has not picked from yet.
 2. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided; starts after project 30.
 3. **Docs consolidation** — `DESIGN.md` and `docs/design-contract.md` merge into one design doc, checked against the Paper library; `CONTEXT.md` rewritten to current state only.
 

@@ -143,3 +143,32 @@ Drawn on the Ask sheet (board 10, panels 3 and 6) and parked.
   thread and needs no tree in the UI.
 - Editing the **last** question (↑ in an empty composer) is not parked: it
   stays in the Ask set.
+
+## Panes that scroll, not the page — 2026-11-11
+
+The window scrolls today and the head folds into a 48px bar; only the
+record's rail scrolls on its own.
+
+- **Shape:** the head and the tabs stay put and the body under them scrolls,
+  one scroller per pane and never one inside another. Records and a space
+  (rail and tab body as two panes), lists (the table scrolls both ways, so
+  its horizontal bar is always in reach), the deal board (each column),
+  Tasks, Review, Notes, Settings (the Save bar pins to the pane foot), Ask.
+- **Stays a page:** Today, a note, a holding, Portfolio, Import, and every
+  page on a phone.
+- **Costs:** the full head stays on screen; every sticky offset is
+  re-anchored; Back must restore a pane's scroll by hand; the body pane has
+  to take focus for Space and Page Down; panes need
+  `overscroll-behavior: contain`. It reverses the sticky-head verdict of
+  2026-10-08, and most of `head-fold.tsx` goes on desktop.
+- **First step, free of all that:** thin rule-coloured scrollbars with a
+  reserved gutter.
+
+## Fewer settings pages — 2026-11-11
+
+Sixteen pages in four groups, and one provider can sit on four of them
+(Google: Connections, Email & calendar, Files, Meeting notes).
+
+- Folding Search into Models and Email forwarding into Email & calendar
+  makes fourteen. It reopens the settings map (D81), so it waits for the
+  owner to ask.
