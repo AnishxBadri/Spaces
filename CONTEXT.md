@@ -804,11 +804,11 @@ to think.
 One table, one editor, one body substrate. Three orthogonal axes, three
 mechanisms, never mixed:
 
-| axis                 | mechanism                                                                                        | values                                  |
-| -------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------- |
-| **where** it's filed | `entity_space` (space) · `link(tagged_in → record)` (company / person / deal / custom / mandate) | zero or more places                     |
-| **what** genre       | `note.kind`                                                                                      | `memo · note · scratch` — three, frozen |
-| **who** can read     | `note.visibility` + `author_id`                                                                  | `shared` (default) · `private`          |
+| axis                 | mechanism                                                                                        | values                         |
+| -------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------ |
+| **where** it's filed | `entity_space` (space) · `link(tagged_in → record)` (company / person / deal / custom / mandate) | zero or more places            |
+| **what** genre       | `note.kind`                                                                                      | `memo · note` — two (D83)      |
+| **who** can read     | `note.visibility` + `author_id`                                                                  | `shared` (default) · `private` |
 
 - **A memo is a note with the flag up.** Same row, same edges; the kind is
   presentation (serif, pins to the top of wherever it is filed, is the face
@@ -818,16 +818,20 @@ mechanisms, never mixed:
   document. Promote by flipping the kind. Kind never restricts filing targets
   — an IC memo is a memo filed against a deal; a market memo is a memo filed
   into a space.
-- **Kinds stay at three; genres are templates.** "Teardown", "post-mortem",
+- **Two kinds; genres are templates.** "Teardown", "post-mortem",
   "IC memo" are note templates that set title/structure/kind, not new kinds.
-  A fourth kind is a taxonomy leaking into structure (the sectors rule). Tags
-  encoding _where_ a note lives are rejected outright — filing already says
-  which company, a tag cannot.
+  A third kind is a taxonomy leaking into structure (the sectors rule).
+  A kind earns its place only by changing presentation or intent, which is
+  why `scratch` was dropped (D83, 2026-11-12): it pinned nothing, faced
+  nothing, had no tab and was listed like any note, so it was a choice on
+  every note for nothing. A want like "keep this out of Ask" is a property
+  on another axis, never a kind. Tags encoding _where_ a note lives are
+  rejected outright — filing already says which company, a tag cannot.
 - **Gap found in code (to fix):** "Note about this" on a record writes only a
   `mentions` link, so notes are _referenced_ to records, never _filed_; memo
   is creatable only from a space page; the editor has no kind toggle. Fix:
   record "Note about this" writes `link(tagged_in)` (plus the starter
-  mention), a `Note · Memo · Scratch` toggle in the editor header, "Filed
+  mention), a `Note · Memo` toggle in the editor header, "Filed
   against" chips next to "Filed in space", and record Notes sections read
   `tagged_in` first ("Filed here · Mentions this"), memo pinned.
 - **Deletion is hard, and there is no trash (decided 2026-09-19, SPA-125).** A note
@@ -864,7 +868,7 @@ person(entity_id)    -- entity.values, identity included (a company's domains,
                      -- and against "Spaces vs attributes": there is no sector
                      -- field anywhere, ever.
 space(entity_id, parent_id, slug, path, is_seeded)   -- name is entity.canonical_name
-note(entity_id, title, body_json, body_md, tsv, kind: note|memo|scratch,
+note(entity_id, title, body_json, body_md, tsv, kind: note|memo,
      author_id, visibility, updated_at)   -- body_json authoritative (2026-07)
 document(entity_id, blob_sha, filename, mime, url, size_bytes,
          kind: deck|dd|cap_table|legal|article|other,

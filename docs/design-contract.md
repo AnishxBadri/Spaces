@@ -604,7 +604,7 @@ of 2026-10-06 are superseded.
 in `apps/web/src/components/notes/` (`NoteHead`, `NoteMoreMenu`, `NoteSheet`,
 `NoteRail`). The record anatomy in the prose register:
 
-- **Head.** `RecordHeader` (A4): the kind is the stamp (`NOTE`, `MEMO`, `SCRATCH`), a
+- **Head.** `RecordHeader` (A4): the kind is the stamp (`NOTE`, `MEMO`), a
   private note adds an outlined `PRIVATE` beside it, and the serif title is the name
   field and wraps. One mono meta line whose shape is the note's state:
   `Anish · 13 Oct 14:02`;

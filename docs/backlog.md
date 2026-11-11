@@ -146,6 +146,39 @@ Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-
 
 ---
 
+## Corrections
+
+Slices of Linear project P-SPA-28, "Corrections".
+
+---
+
+#### `notes-kind` (SPA-398) · afk · S · migration — Two note kinds: `scratch` leaves the enum and every surface
+
+**Blocked by:** nothing. **Owns** the `note_kind` enum (`packages/db/src/schema/kinds.ts`, one hand-written migration and its journal entry), `lib/notes/kind.ts`, the kind validators in `lib/server/notes.ts`, `components/note-kind-icon.tsx`, `components/notes/note-menu.tsx`, `components/notes/note-head.tsx`, the kind type in `components/record/record-notes.tsx`, and the scratch rows in `lib/seeds/dev.ts`.
+
+**Does not touch** `components/settings/**` or `routes/_app/settings/**` (`settings-2` runs beside this slice). The docs are already amended (D83 in `docs/decisions.md`, the note model in `CONTEXT.md`, the note head in `docs/design-contract.md`); edit none of them.
+
+**Spec.** D83 (owner, 2026-11-12): a note has two kinds, Note and Memo. `scratch` pinned nothing, faced nothing and had no tab, so it was a choice on every note for nothing. Every `scratch` note becomes a `note`; a template whose `note_kind` is `scratch` maps the same way.
+
+**What to build.**
+
+1. **The migration, hand-written.** On the pattern of `packages/db/drizzle/0037_drop_document_kind_memo.sql`: rename `note_kind` to `note_kind_old`; create `note_kind` as `('note','memo')`; `DROP DEFAULT` on `note.kind`; alter **both** columns, `note.kind` and `template.note_kind` (nullable), with `USING (CASE WHEN col::text = 'scratch' THEN 'note' ELSE col::text END)::note_kind`; `SET DEFAULT 'note'` on `note.kind`; drop the old type. Drizzle's generated SQL has no mapping and aborts on a scratch row, so run `db:generate` only to get the snapshot and replace its SQL, or write the file and the journal entry by hand. The journal `when` is the clock at write time (`date -u +%s000`), greater than 0091's. Print it in the report. No index or constraint depends on the type (checked 2026-11-12); confirm before the rename.
+2. **The schema.** `noteKind` in `kinds.ts` reads `['note', 'memo']`. The drizzle snapshot matches, so the next `db:generate` proposes nothing.
+3. **The code.** `NOTE_KINDS` in `lib/notes/kind.ts`, both kind validators in `lib/server/notes.ts`, the kind icon, the note menu and the head's kind toggle lose `scratch`. The toggle and the menu read `Note · Memo`; the stamp reads `NOTE` or `MEMO`. Any copy that explains scratch goes with it (the note list's line that a scratch note is listed like any other).
+4. **The seed.** `lib/seeds/dev.ts` seeds its two scratch notes as `note`.
+5. **Everything else that names the kind.** `grep -ri scratch apps packages` and settle each hit: a note kind goes, an unrelated scratch directory or scratch pad stays. Name the hits left in the report.
+
+**Acceptance criteria**
+
+- [ ] A database holding a `scratch` note and a template with `note_kind = 'scratch'` migrates: both read `note` afterwards, and `note_kind` has two labels (migration test, or `boot.test.ts` extended on the pattern of 0037's).
+- [ ] `boot.test.ts` is green, and `pnpm db:generate` after the migration reports no changes.
+- [ ] No server fn accepts `scratch` as a kind (test on the validator).
+- [ ] The note menu and the head toggle offer two kinds (render tests updated).
+- [ ] No test names `scratch` as a note kind.
+- [ ] Gates: typecheck, lint, the affected tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
+
+---
+
 ## 16. A published image anyone can run
 
 #### `ship-10` · afk · M — Install, upgrade and rollback docs — back up first, pin the tag, never lose MASTER_KEY

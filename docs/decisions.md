@@ -997,3 +997,21 @@ _Rejected:_
 - A per-provider plugin page beside the provider page. That meant two homes for one switch.
 
 _Carried by_ `port-B3` (SPA-383).
+
+## Addenda — 2026-11-12 (the note model)
+
+### D83-two-note-kinds
+
+**Does `scratch` stay a note kind?** Answered (owner, 2026-11-12): **no. Two kinds, Note and Memo.** This amends the note model in CONTEXT.md, which had the kinds at "three, frozen". The freeze guarded against adding kinds; its test (a kind must change presentation or intent) is the one `scratch` fails.
+
+- **Why:** a memo pins to the top of wherever it is filed, can be a space's face and has its own Memos tab. `scratch` had none of that: in code it was a label, an icon and a menu entry, and the note list says outright that a scratch note is listed like any other.
+- **Existing rows:** every `scratch` note becomes a `note`. `template.note_kind` maps the same way.
+- **The enum:** `note_kind` loses the label in one hand-written migration on the pattern of 0037 (`document_kind` dropping `memo`): rename the old type, create the new one, drop and restore `note.kind`'s default, cast both columns `note.kind` and `template.note_kind` with a `CASE 'scratch' → 'note'`, drop the old type. Drizzle's generated SQL has no mapping and would abort on a scratch row.
+- **Surfaces:** the kind toggle and the note menu read Note · Memo; the stamp reads `NOTE` or `MEMO`; `NOTE_KINDS`, the server fns' kind validators, the kind icon and the dev seed lose `scratch`.
+
+_Rejected:_
+
+- Giving scratch a behaviour to keep it, such as staying out of Ask and search. That is a property on another axis (like `visibility`), not a genre.
+- Keeping the dead label in the enum until the journal squash. Postgres cannot drop it in place, but the 0037 pattern already does it in one step.
+
+_Carried by_ `notes-kind` (SPA-398).
