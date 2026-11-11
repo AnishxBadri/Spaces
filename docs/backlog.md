@@ -62,45 +62,18 @@ Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-
 
 ## 32. One backend grammar
 
-Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2026-11-12 (owner): D84, a module in `apps/web/src/lib` that does I/O is Effect, and the 53 that are not get converted in a planned sweep; D85, Effect Schema is the one schema language and Zod leaves. `schema-1` goes first and alone among these: it proves the server-fn boundary and ships the helper every later slice uses. The `effect-*` slices own disjoint files and run one after another, each beside a slice from another area.
+Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2026-11-12 (owner): D84, a module in `apps/web/src/lib` that does I/O is Effect, and the 53 that are not get converted in a planned sweep; D85, Effect Schema is the one schema language and Zod leaves. `schema-1` (SPA-400) shipped 2026-11-12: `input()` in `lib/server/input.ts` is the helper, and `lib/server/tasks.ts` with `lib/tasks/create.ts` is the reference module every later slice copies. The `effect-*` slices own disjoint files and run one after another, each beside a slice from another area.
 
 **What a conversion is, for every `effect-*` slice.** It changes the grammar and nothing a user or a caller can see.
 
 - A function that queries, writes, fetches or enqueues becomes an Effect program (`Effect.fn('name')`), on the pattern of `lib/server/objects.ts`: failures are `Schema.TaggedError` classes, a database call goes through a `tryPromise` helper that names the failure, and a server fn runs its program through `effectFn()` or `Effect.runPromise`.
-- A tagged error carries the `message` the UI prints today, word for word. A handler that threw `new Error('Admins only')` rejects with an error whose `message` is `Admins only`.
+- A database failure is one `Schema.TaggedError` per area with `cause: Schema.Defect()`, shared by the area's files with its `tryPromise` helper (`ask/query.ts` is the pattern), not one class per file.
+- The client receives a rejected tagged error as a plain `Error` with its `message` and nothing else: no `_tag`, no fields. So a tagged error carries the `message` the UI prints today, word for word. A handler that threw `new Error('Admins only')` rejects with an error whose `message` is `Admins only`.
 - An exported async function that a file outside the slice calls (a route, a worker job through `#web/*`, another `lib/` module) keeps its name and its signature, and becomes a one-line run of the program. The program is exported beside it for callers that are already Effect. No file outside the slice's list changes, except a test that asserted on an error's class.
-- A `.validator()` in a listed file moves from zod to Effect Schema through the `schema-1` helper. A zod shape imported from a file outside the list stays zod and is named in the report.
+- A `.validator()` in a listed file moves from zod to Effect Schema through `input()`. A message written by hand (`Expected YYYY-MM-DD`) is kept word for word; zod's default wording becomes Effect's. Unknown keys are still dropped. A validator runs on the server only, so a test of one goes through TanStack's `execValidator`, as `input.test.ts` does. A zod shape imported from a file outside the list stays zod and is named in the report.
 - A listed file that turns out to do no I/O (it builds SQL and runs none, or holds types, or the grep matched a comment) stays plain and is named in the report with the reason.
 - Transactions keep their boundaries; nothing that ran inside one runs outside it afterwards, and the reverse.
 - Existing tests pass with their assertions unchanged. A conversion that needs a test's expectation changed is a behaviour change: stop and name it.
-
----
-
-#### `schema-1` (SPA-400) · afk · M — The server-fn boundary on Effect Schema: the helper, the proof, and Tasks as the reference module
-
-**Blocked by:** nothing. **Owns** a new `lib/server/input.ts` (the helper), `lib/server/tasks.ts`, `lib/tasks/create.ts`, their tests, and the Backend paradigm lines of `CLAUDE.md`.
-
-**Does not touch** `components/app-sidebar.tsx`, `lib/email/compose.ts` or the compose windows (`shell-2` runs beside this slice), or any other server module.
-
-**Spec.** D85. Checked by hand on 2026-11-12: effect `4.0.0-rc.112` has `Schema.toStandardSchemaV1(schema)`, and `@tanstack/start-client-core` 1.170.14's `execValidator` looks for `'~standard'` before `.parse`, with `StandardSchemaValidator` in router-core's `Validator` union. A plain Effect schema carries no `~standard`, so each `.validator()` needs the wrap. Not yet checked: a real `createServerFn` under `pnpm typecheck`. That is step 1, and the rest of project 32 waits on it.
-
-**What to build.**
-
-1. **The proof, first.** One `createServerFn` whose `.validator()` takes a wrapped Effect schema: the handler's `data` infers the decoded type with no assertion, a valid call returns, an invalid call rejects. **If `data` does not infer, or the wrap cannot be made to typecheck without an assertion, stop there and report: the decision goes back to the owner.**
-2. **The helper.** `input(schema)` in `lib/server/input.ts`: one export, the wrap and nothing else, safe to import from a client-imported server-fn module (it imports `effect` only). Its JSDoc says what a caller gets.
-3. **What a refused input looks like.** Today a zod failure reaches the client as a message. Find what the client receives from a Standard Schema failure, make the message a reader can act on (the field and what was expected), and state both shapes in the report. A test pins the new one.
-4. **Tasks, whole.** `lib/server/tasks.ts` and `lib/tasks/create.ts` are converted as the reference module for both decisions: every validator through `input()`, every handler an Effect program run through `effectFn()`, by the conversion rules at the head of this section. `isoDate` and the other shapes keep their constraints and their messages.
-5. **The bundle.** `scripts/check-client-bundle.sh` passes. The report gives the client entry's gzipped size before and after, since Effect Schema now runs in the browser for these validators.
-6. **Docs.** `CLAUDE.md` Backend paradigm: two lines, a new validator is an Effect schema through `input()`, and no new file imports `zod`.
-
-**Acceptance criteria**
-
-- [ ] A type-level test proves `data` in a handler is the schema's decoded type.
-- [ ] `input()` has tests for a valid input, an invalid one, a transformed one (a trimmed string, a defaulted field).
-- [ ] `lib/server/tasks.ts` and `lib/tasks/create.ts` import no `zod` and are Effect; every existing Tasks test passes with its assertions unchanged.
-- [ ] The refused-input message is pinned by a test and described in the report beside the old one.
-- [ ] Bundle check passes; the size delta is in the report.
-- [ ] Gates: typecheck, lint, the affected tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
 
 ---
 

@@ -1048,9 +1048,9 @@ _Carried by_ `effect-1` to `effect-4` (SPA-401, SPA-403, SPA-405, SPA-406).
 
 - **Why:** two schema languages meet at `/api/v1` (HttpApi speaks Effect Schema) and at `valueValidator`, and each meeting is a bridge to keep honest. About 224 files import zod and about 183 already use Effect `Schema`.
 - **Why now:** the plugin registry is empty and no release key is published, so no plugin exists outside this repo. The SDK contract is cheapest to change before its first public release.
-- **The server-fn boundary:** TanStack's `.validator()` takes a Standard Schema, and `Schema.toStandardSchemaV1` makes one. One shared helper does the wrap.
+- **The server-fn boundary:** one shared helper, `input(schema)`, turns an Effect schema into a server fn's `.validator()`. It is a validator that throws, not a Standard Schema: TanStack serializes a Standard Schema's issues to JSON as the error message, and a throw sets its own, so a refused input reads `content: Expected a value with a length of at least 1; dueDate: Expected YYYY-MM-DD`. The handler's `data` infers the decoded type with no assertion (proved by `schema-1`, 2026-11-12).
 - **The order:** the helper and its proof (`schema-1`); the SDK contract and every plugin, as SDK 2.0 (`schema-2`); `valueValidator`, lifted once (`schema-3`); the validators in the files the Effect sweep opens, with the sweep. Everything left converts when its file is next opened, and `zod` leaves each `package.json` with its last import.
-- **The one thing not yet proved:** a real `createServerFn` typechecking with a wrapped schema. It is `schema-1`'s first step. If it fails, this decision comes back to the owner.
+- **The cost in the browser:** none. Effect Schema was already in the client entry; the entry's gzipped size did not move.
 
 _Rejected:_
 
