@@ -28,7 +28,7 @@ function authSecret(): string {
  * - DB-backed revocable sessions, httpOnly cookies.
  * - Roles: admin (settings, integrations, keys, user mgmt) and member.
  * - First run: signup open only while count(user) == 0, guarded server-side,
- *   not by config flag. After that, users arrive via invites (TODO) only.
+ *   not by config flag. After that, users arrive via invites only.
  * - APP_URL drives baseURL, cookie security, and OAuth redirect URIs —
  *   the reverse-proxy trap (proxy terminates TLS, app sees http) is solved
  *   by trusting APP_URL, not the request.
