@@ -274,8 +274,11 @@ export function SettingsGroupHead({
 }
 
 /**
- * A table's first row in a settings card: its column heads, sans 12
- * graphite on a rule, inset like the rows so a head sits over its lane.
+ * A table's first row in a settings card: its column heads, drawn as the
+ * list table's head cells — 32px, sans 12 graphite, a rule closing each
+ * named lane — inset like the rows so a head sits over its lane.
+ * - Only on a card with three or more named columns: two lanes tell
+ *   themselves apart.
  */
 export function SettingsColumns({
   children,
@@ -290,6 +293,9 @@ export function SettingsColumns({
       data-settings-columns
       className={cn(
         'flex h-8 shrink-0 items-center gap-3 border-b border-rule px-(--inset) text-label text-graphite',
+        // Each head fills the row's height so its rule runs rule to rule;
+        // an empty lane (an icon's, an action's) closes with no rule.
+        '[&>*]:self-stretch [&>*]:leading-8 [&>*:not(:last-child):not(:empty)]:border-r [&>*:not(:last-child):not(:empty)]:border-rule',
         className,
       )}
     >
@@ -396,7 +402,7 @@ export function SettingsRow({
 }: {
   label: ReactNode
   hint?: ReactNode
-  /** State and action, right: `■ set  Open ›`. */
+  /** State or action, right: a status square, or `Set up ›`. */
   end?: ReactNode
   onOpen?: (() => void) | undefined
   children?: ReactNode

@@ -49,8 +49,8 @@ import {
  * come from. Top to bottom: three readouts (number above a sentence-case
  * label), the sources in order (drag or ↑↓; each row's switch takes a source
  * in or out of the order — the Website's is always on), when to enrich
- * automatically and how long an answer is reused, What fills what, and the
- * recent runs.
+ * automatically and how long an answer is reused, Fields, and the recent
+ * runs once there are any.
  * - Switches, ticks and the order apply at once with a toast; the reuse
  *   days are a typed field in the page's Save bar.
  * - A member reads it all, every control disabled (the row is admin-only).
@@ -161,7 +161,7 @@ function SourcesBlock({
   return (
     <SettingsGroup
       data-block="sources"
-      title="Sources, in order"
+      title="Sources"
       action="first answer wins"
     >
       <ol aria-label="Enrichment sources">
@@ -463,7 +463,7 @@ function AutoBlock({
   return (
     <SettingsGroup
       data-block="auto"
-      title="Enrich automatically"
+      title="Auto-enrich"
       count={
         auto.paid.length === 0
           ? 'no paid source'
@@ -581,7 +581,7 @@ function Cell({ cell, source }: { cell: GridCell; source: string }) {
 }
 
 /**
- * What fills what: per object, each attribute that can fill from the
+ * Fields: per object, each attribute that can fill from the
  * vocabulary against the sources in order, and which one answers it. An
  * unlinked attribute reads "not linked" with Fill from…, which opens the
  * attribute's window.
@@ -595,10 +595,10 @@ function GridBlock({ grids }: { grids: ReadonlyArray<FillsWhat> }) {
   if (grid === undefined) return null
   return (
     <SettingsGroup
-      id="what-fills-what"
+      id="fields"
       data-block="grid"
       className="scroll-mt-6"
-      title="What fills what"
+      title="Fields"
       action={
         <Select<FillsWhat['kind']>
           aria-label="Object"
@@ -710,44 +710,40 @@ function GridBlock({ grids }: { grids: ReadonlyArray<FillsWhat> }) {
 
 function RunsBlock({ runs }: { runs: ReadonlyArray<RecentRun> }) {
   const { now } = useClock()
+  // No runs is no card: nothing to show and nothing to act on.
+  if (runs.length === 0) return null
   return (
     <SettingsGroup
       data-block="runs"
       title="Recent runs"
-      count={runs.length === 0 ? undefined : String(runs.length)}
+      count={String(runs.length)}
     >
-      {runs.length === 0 ? (
-        <p className="border-b border-rule px-(--inset) py-3 text-ui text-graphite">
-          No runs yet.
-        </p>
-      ) : (
-        <ol>
-          {runs.map((run) => (
-            <li
-              key={run.id}
-              className="flex h-12 items-center gap-3 border-b border-rule px-(--inset)"
-            >
-              <span className="w-24 shrink-0 numeric text-micro text-graphite">
-                {formatWhen(run.at, now)}
-              </span>
-              <span className="w-36 shrink-0 truncate text-ui">
-                <RecordLink run={run} />
-              </span>
-              <span className="w-36 shrink-0 truncate mono text-micro text-graphite">
-                {run.why}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-ui text-foreground">
-                {run.line.replace(/^Enriched · /, '')}
-              </span>
-              <span className="w-16 shrink-0 numeric text-right text-micro text-graphite">
-                {run.credits === 0
-                  ? '—'
-                  : `${run.credits} credit${run.credits === 1 ? '' : 's'}`}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
+      <ol>
+        {runs.map((run) => (
+          <li
+            key={run.id}
+            className="flex h-12 items-center gap-3 border-b border-rule px-(--inset)"
+          >
+            <span className="w-24 shrink-0 numeric text-micro text-graphite">
+              {formatWhen(run.at, now)}
+            </span>
+            <span className="w-36 shrink-0 truncate text-ui">
+              <RecordLink run={run} />
+            </span>
+            <span className="w-36 shrink-0 truncate mono text-micro text-graphite">
+              {run.why}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-ui text-foreground">
+              {run.line.replace(/^Enriched · /, '')}
+            </span>
+            <span className="w-16 shrink-0 numeric text-right text-micro text-graphite">
+              {run.credits === 0
+                ? '—'
+                : `${run.credits} credit${run.credits === 1 ? '' : 's'}`}
+            </span>
+          </li>
+        ))}
+      </ol>
     </SettingsGroup>
   )
 }

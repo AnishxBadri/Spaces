@@ -157,12 +157,12 @@ describe('the blocks that moved between sections', () => {
     expect(source('general')).toContain('setBaseCurrency')
     expect(source('currency')).not.toContain('Base currency"')
     expect(source('currency')).not.toContain('setBaseCurrency')
-    expect(source('currency')).toContain('title="Rates"')
+    expect(source('currency')).toContain('label="Rates"')
   })
 
-  it('Models holds Providers and Who does what; Limits moved to Usage & limits', () => {
+  it('Models holds Providers and Routing; Limits moved to Usage & limits', () => {
     expect(source('models')).toContain('title="Providers"')
-    expect(source('models')).toContain('title="Who does what"')
+    expect(source('models')).toContain('title="Routing"')
     expect(source('models')).not.toMatch(/LimitsGroup|setAiCaps|getAiCaps/)
     expect(source('usage')).toContain('<LimitsGroup')
     expect(source('usage')).toContain('title="Usage & limits"')

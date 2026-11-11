@@ -39,11 +39,11 @@ export function ConnectionsList({
 }) {
   const set = rows.filter((r) => r.configured).length
   return (
-    <SettingsSection title="Connections">
-      <SettingsGroup
-        title="Providers"
-        count={`${String(set)} of ${String(rows.length)} set up`}
-      >
+    <SettingsSection
+      title="Connections"
+      meta={`${String(set)} of ${String(rows.length)} set up`}
+    >
+      <SettingsGroup label="Providers">
         {rows.map((row) => {
           const status = listStatusOf(row)
           return (

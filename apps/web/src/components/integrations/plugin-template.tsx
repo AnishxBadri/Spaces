@@ -1,21 +1,22 @@
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { SettingsGroup } from '#/components/settings/settings-section'
-import { Button } from '#/components/ui/button'
 import type { CapabilityOwner } from '#/lib/integrations/catalogue'
 import type { IntegrationDetail } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 import { ROLLBACK_WORD, STATE_WORD } from './integration-ledger'
 
 /**
- * One plugin's page, one template for every plugin. Seven blocks in a
- * fixed order, each a `section[data-block]`:
- * - status and version, the workspace key, what it sends out of the box,
- *   the manifest settings, what it switches on, recent runs, and Disable /
- *   Uninstall.
+ * One plugin's page, one template for every plugin. Six blocks in a fixed
+ * order, each a `section[data-block]`:
+ * - status and version, the workspace key, the data it sends out of the box,
+ *   the manifest settings, what uses it elsewhere, and recent runs.
+ * - A block with nothing to show and nothing to act on is not drawn; Status
+ *   always is, so the page is never blank.
  * - The key and settings blocks are the caller's (they hold drafts); the
  *   rest are drawn from the detail alone.
- * - What it switches on only links: the owning page holds the settings.
+ * - Used by only links: the owning page holds the settings.
+ * - Disable and Uninstall are the caller's, in the head's `···`.
  */
 
 export const PLUGIN_BLOCKS = [
@@ -23,22 +24,21 @@ export const PLUGIN_BLOCKS = [
   'key',
   'sends',
   'settings',
-  'switches-on',
+  'used-by',
   'runs',
-  'remove',
 ] as const
 export type PluginBlockId = (typeof PLUGIN_BLOCKS)[number]
 
 /**
  * The page that owns each capability. An owner not built yet links to the
  * catalogue and says so; its entry is the one line to change when it lands.
- * Enrichment links to its What fills what grid.
+ * Enrichment links to its Fields grid.
  */
 const OWNER = {
   enrichment: {
-    label: 'What fills what',
+    label: 'Fields',
     to: '/settings/enrichment',
-    hash: 'what-fills-what',
+    hash: 'fields',
   },
   watching: { label: 'Watching · coming', to: '/spaces' },
   'email-calendar': {
@@ -84,7 +84,7 @@ export function PluginBlock({
 }
 
 /** An empty block's one short line. */
-export function BlockEmpty({ children }: { children: ReactNode }) {
+function BlockEmpty({ children }: { children: ReactNode }) {
   return (
     <p className="border-b border-rule px-(--inset) py-3 text-ui text-graphite">
       {children}
@@ -176,58 +176,48 @@ function StatusBlock({ detail }: { detail: IntegrationDetail }) {
 }
 
 function SendsBlock({ detail }: { detail: IntegrationDetail }) {
+  if (detail.sends.length === 0) return null
   return (
-    <PluginBlock id="sends" title="What it sends">
-      {detail.sends.length === 0 ? (
-        <BlockEmpty>Not read yet.</BlockEmpty>
-      ) : (
-        <Row label="Sends">
-          <span className="mono text-micro text-foreground">
-            {detail.sends.join(' · ')}
-          </span>
-        </Row>
-      )}
+    <PluginBlock id="sends" title="Data sent">
+      <Row label="Sends">
+        <span className="mono text-micro text-foreground">
+          {detail.sends.join(' · ')}
+        </span>
+      </Row>
     </PluginBlock>
   )
 }
 
-function SwitchesOnBlock({ detail }: { detail: IntegrationDetail }) {
+function UsedByBlock({ detail }: { detail: IntegrationDetail }) {
+  if (detail.capabilities.length === 0) return null
   return (
     <PluginBlock
-      id="switches-on"
-      title="What it switches on"
-      count={
-        detail.capabilities.length === 0
-          ? undefined
-          : String(detail.capabilities.length)
-      }
+      id="used-by"
+      title="Used by"
+      count={String(detail.capabilities.length)}
     >
-      {detail.capabilities.length === 0 ? (
-        <BlockEmpty>Nothing elsewhere.</BlockEmpty>
-      ) : (
-        <ol>
-          {detail.capabilities.map((c) => {
-            const owner = OWNER[c.owner]
-            return (
-              <li
-                key={`${c.owner}:${c.what}`}
-                className="flex h-12 items-center gap-3 border-b border-rule px-(--inset)"
+      <ol>
+        {detail.capabilities.map((c) => {
+          const owner = OWNER[c.owner]
+          return (
+            <li
+              key={`${c.owner}:${c.what}`}
+              className="flex h-12 items-center gap-3 border-b border-rule px-(--inset)"
+            >
+              <span className="min-w-0 flex-1 truncate text-ui text-foreground">
+                {c.what}
+              </span>
+              <Link
+                to={owner.to}
+                {...('hash' in owner ? { hash: owner.hash } : {})}
+                className={LINK}
               >
-                <span className="min-w-0 flex-1 truncate text-ui text-foreground">
-                  {c.what}
-                </span>
-                <Link
-                  to={owner.to}
-                  {...('hash' in owner ? { hash: owner.hash } : {})}
-                  className={LINK}
-                >
-                  {owner.label} ›
-                </Link>
-              </li>
-            )
-          })}
-        </ol>
-      )}
+                {owner.label} ›
+              </Link>
+            </li>
+          )
+        })}
+      </ol>
     </PluginBlock>
   )
 }
@@ -240,11 +230,12 @@ const RUN_INK: Record<IntegrationDetail['runs'][number]['status'], string> = {
 }
 
 function RunsBlock({ detail }: { detail: IntegrationDetail }) {
+  if (detail.runs.length === 0) return null
   return (
     <PluginBlock
       id="runs"
       title="Recent runs"
-      count={detail.runs.length === 0 ? undefined : String(detail.runs.length)}
+      count={String(detail.runs.length)}
     >
       <RunLines runs={detail.runs} />
     </PluginBlock>
@@ -295,89 +286,44 @@ export function RunLines({
   )
 }
 
-function RemoveBlock({
-  detail,
-  pending,
-  onToggle,
-  onUninstall,
-}: {
-  detail: IntegrationDetail
-  pending: boolean
-  onToggle: (enabled: boolean) => void
-  onUninstall: () => void
-}) {
-  return (
-    <PluginBlock id="remove" title="Disable or uninstall">
-      <div className="flex min-h-12 items-center gap-3 border-b border-rule px-(--inset) py-2">
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={pending}
-          onClick={() => onToggle(!detail.enabled)}
-        >
-          {detail.enabled ? 'Disable' : 'Enable'}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={pending}
-          onClick={onUninstall}
-        >
-          Uninstall…
-        </Button>
-      </div>
-    </PluginBlock>
-  )
-}
-
-/** The seven blocks, in order; the key and settings blocks' rows are the caller's. */
+/** The blocks, in order; the key and settings blocks' rows are the caller's. */
 export function PluginTemplate({
   detail,
   keyBlock,
   settingsBlock,
-  pending,
-  onToggle,
-  onUninstall,
 }: {
   detail: IntegrationDetail
   /** The key and webhook-secret rows; null when the plugin needs none. */
   keyBlock: ReactNode
-  /** The manifest settings form; null when it declares none. */
+  /** The manifest settings form; null when it declares none, or is unread. */
   settingsBlock: ReactNode
-  pending: boolean
-  onToggle: (enabled: boolean) => void
-  onUninstall: () => void
 }) {
   const saved = detail.secrets.every((s) => s.display !== null)
   return (
     <>
       <StatusBlock detail={detail} />
-      <PluginBlock
-        id="key"
-        title="Workspace key"
-        count={
-          detail.secrets.length === 0 ? undefined : saved ? 'saved' : 'not yet'
-        }
-      >
-        {keyBlock ?? <BlockEmpty>No workspace key.</BlockEmpty>}
-      </PluginBlock>
-      <SendsBlock detail={detail} />
-      {settingsBlock === null ? (
-        <PluginBlock id="settings" title="Settings">
-          <BlockEmpty>No settings.</BlockEmpty>
+      {keyBlock === null ? null : (
+        <PluginBlock
+          id="key"
+          title="Workspace key"
+          count={
+            detail.secrets.length === 0
+              ? undefined
+              : saved
+                ? 'saved'
+                : 'not yet'
+          }
+        >
+          {keyBlock}
         </PluginBlock>
-      ) : (
+      )}
+      <SendsBlock detail={detail} />
+      {settingsBlock === null ? null : (
         // The settings form draws its own head.
         <PluginBlock id="settings">{settingsBlock}</PluginBlock>
       )}
-      <SwitchesOnBlock detail={detail} />
+      <UsedByBlock detail={detail} />
       <RunsBlock detail={detail} />
-      <RemoveBlock
-        detail={detail}
-        pending={pending}
-        onToggle={onToggle}
-        onUninstall={onUninstall}
-      />
     </>
   )
 }

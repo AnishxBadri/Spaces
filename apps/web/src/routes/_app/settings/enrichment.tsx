@@ -4,7 +4,7 @@ import { getEnrichmentPage } from '#/lib/server-fns'
 
 /**
  * Settings → Integrations → Enrichment: the sources in order,
- * auto-enrich, What fills what and the recent runs. A member reads it too,
+ * auto-enrich, Fields and the recent runs. A member reads it too,
  * every control disabled.
  */
 export const Route = createFileRoute('/_app/settings/enrichment')({

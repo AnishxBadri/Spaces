@@ -2,17 +2,18 @@ import {
   createFileRoute,
   getRouteApi,
   Link,
+  useNavigate,
   useRouter,
 } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { Check } from '#/components/icons'
 import { useSettingsDraft } from '#/components/settings/settings-form'
 import {
   SETTINGS_LINK,
   SettingsGroup,
   SettingsRow,
   SettingsSection,
-  SettingsState,
 } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { useConfirm } from '#/components/ui/confirm-dialog'
@@ -37,8 +38,9 @@ import { cn } from '#/lib/utils'
 const shell = getRouteApi('/_app/settings')
 
 /**
- * The workspace singleton: Identity (logo, then name), Defaults (the currency
- * it prices in), the demo while it is loaded, and What's set up at the foot.
+ * The workspace singleton: Identity (the logo tile and the name, one row),
+ * Defaults (the currency it prices in), the demo while it is loaded, and
+ * Setup at the foot until every piece is set up.
  * - Name and currency are drafts: they collect into the page's Save bar.
  * - The logo's Upload and Remove write at once, with a toast.
  * - Only an admin changes them; a member reads them disabled.
@@ -57,17 +59,16 @@ function GeneralRoute() {
   return (
     <SettingsSection title="General" adminOnly>
       <SettingsGroup title="Identity">
-        <LogoRow
+        <IdentityRow
           name={data.workspace?.name ?? ''}
           logo={data.workspace?.logo ?? null}
         />
-        <WorkspaceNameRow name={data.workspace?.name ?? ''} />
       </SettingsGroup>
       <SettingsGroup title="Defaults">
         <BaseCurrencyRow baseCurrency={data.fx.baseCurrency} />
       </SettingsGroup>
       {demo === null ? null : <DemoDataRow demo={demo} />}
-      <WhatsSetUp state={setUp} />
+      <Setup state={setUp} />
     </SettingsSection>
   )
 }
@@ -142,37 +143,40 @@ function DemoDataRow({ demo }: { demo: DemoSummary }) {
 }
 
 /**
- * The seven pieces a workspace can bring, passive: what each unlocks, then
- * its state and its link in the end lane.
+ * The seven pieces a workspace can bring: each row opens its page, its end
+ * lane a tick when set up or `Set up ›` when not. Unfinished rows lead,
+ * each run in its own order; with all seven set up the card is gone.
  */
-function WhatsSetUp({ state }: { state: SetupState }) {
+function Setup({ state }: { state: SetupState }) {
+  const navigate = useNavigate()
   const set = SETUP_ITEMS.filter((item) => state[item.id]).length
+  if (set === SETUP_ITEMS.length) return null
+  const rows = [
+    ...SETUP_ITEMS.filter((item) => !state[item.id]),
+    ...SETUP_ITEMS.filter((item) => state[item.id]),
+  ]
   return (
-    <SettingsGroup
-      title="What's set up"
-      count={`${set} of ${SETUP_ITEMS.length}`}
-    >
+    <SettingsGroup title="Setup" count={`${set} of ${SETUP_ITEMS.length}`}>
       {/* The one line each item unlocks is the item itself, not a hint. */}
-      {SETUP_ITEMS.map((item) => (
+      {rows.map((item) => (
         <SettingsRow
           key={item.id}
           label={item.label}
           hint={item.unlocks}
+          onOpen={() => void navigate({ to: item.to })}
           end={
-            <>
-              <SettingsState
-                tone={state[item.id] ? 'ok' : 'wait'}
-                className="w-16"
-              >
-                {state[item.id] ? 'set' : 'not set'}
-              </SettingsState>
-              <Link
-                to={item.to}
-                className={cn(SETTINGS_LINK, 'inline-block w-16 text-right')}
-              >
-                {state[item.id] ? 'Open' : 'Set up'} ›
+            state[item.id] ? (
+              <Check
+                data-setup-done
+                aria-label="Set up"
+                className="size-4 text-primary"
+                strokeWidth={2}
+              />
+            ) : (
+              <Link to={item.to} className={SETTINGS_LINK}>
+                Set up ›
               </Link>
-            </>
+            )
           }
         />
       ))}
@@ -180,8 +184,20 @@ function WhatsSetUp({ state }: { state: SetupState }) {
   )
 }
 
-function WorkspaceNameRow({ name }: { name: string }) {
+const LOGO_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,image/svg+xml'
+
+/**
+ * Identity in one row: the 64px logo tile, the name beside it, and a quiet
+ * Remove at the end while a logo is held.
+ * - The tile is the upload control: a click opens the file picker, a dropped
+ *   image uploads; hover and focus name the act.
+ * - The logo writes at once with a toast; the name joins the Save bar.
+ */
+function IdentityRow({ name, logo }: { name: string; logo: string | null }) {
   const router = useRouter()
+  const input = useRef<HTMLInputElement>(null)
+  const [pending, setPending] = useState<'upload' | 'remove' | null>(null)
+  const [over, setOver] = useState(false)
   const { draft, set } = useSettingsDraft({ name }, async (next) => {
     const trimmed = next.name.trim()
     if (trimmed === '') throw new Error('The workspace needs a name.')
@@ -190,28 +206,6 @@ function WorkspaceNameRow({ name }: { name: string }) {
     void router.invalidate()
     return { name: trimmed }
   })
-
-  return (
-    <SettingsRow label="Name">
-      <Input
-        id="ws-name"
-        aria-label="Workspace name"
-        value={draft.name}
-        onChange={(e) => set('name', e.target.value)}
-        placeholder="Your fund's name"
-        className="w-70"
-      />
-    </SettingsRow>
-  )
-}
-
-const LOGO_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,image/svg+xml'
-
-/** The logo at 48px, or the monogram without one; it heads the sidebar. */
-function LogoRow({ name, logo }: { name: string; logo: string | null }) {
-  const router = useRouter()
-  const input = useRef<HTMLInputElement>(null)
-  const [pending, setPending] = useState<'upload' | 'remove' | null>(null)
 
   async function run(
     kind: 'upload' | 'remove',
@@ -244,33 +238,78 @@ function LogoRow({ name, logo }: { name: string; logo: string | null }) {
     )
   }
 
+  const act = logo === null ? 'Upload' : 'Replace'
   return (
-    <SettingsRow label="Logo">
-      <WorkspaceMark name={name} logo={logo} size={48} />
-      <Button
-        variant="outline"
-        pending={pending === 'upload'}
+    <div
+      data-settings-row
+      data-identity-row
+      className="flex min-h-12 items-center gap-6 border-b border-rule px-(--inset) py-3"
+    >
+      <button
+        type="button"
+        data-logo-tile
+        aria-label={`${act} logo`}
+        title={act}
         disabled={pending !== null}
         onClick={() => input.current?.click()}
+        onDragOver={(e) => {
+          e.preventDefault()
+          setOver(true)
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setOver(false)
+          const file = e.dataTransfer.files.item(0)
+          if (file) upload(file)
+        }}
+        className={cn(
+          'group/tile focus-ring relative size-16 shrink-0 rounded-none outline outline-1 outline-rule disabled:cursor-default',
+          over && 'outline-primary',
+        )}
       >
-        Upload
-      </Button>
-      {logo === null ? null : (
-        <Button
-          variant="ghost"
-          pending={pending === 'remove'}
-          disabled={pending !== null}
-          onClick={() =>
-            void run(
-              'remove',
-              () => clearWorkspaceLogo(),
-              'Logo removed',
-              'Could not remove the logo',
-            )
-          }
+        <WorkspaceMark name={name} logo={logo} size={64} />
+        <span
+          aria-hidden
+          className={cn(
+            'absolute inset-0 flex items-center justify-center bg-paper/90 text-label text-foreground opacity-0 transition-opacity duration-150 ease-out-quart group-hover/tile:opacity-100 group-focus-visible/tile:opacity-100 group-disabled/tile:opacity-0',
+            (over || pending === 'upload') && 'opacity-100',
+          )}
         >
-          Remove
-        </Button>
+          {pending === 'upload' ? 'Saving…' : act}
+        </span>
+      </button>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <label htmlFor="ws-name" className="text-label text-graphite">
+          Name
+        </label>
+        <Input
+          id="ws-name"
+          aria-label="Workspace name"
+          value={draft.name}
+          onChange={(e) => set('name', e.target.value)}
+          placeholder="Your fund's name"
+          className="w-70"
+        />
+      </div>
+      {logo === null ? null : (
+        <div data-settings-end className="flex shrink-0 items-center">
+          <button
+            type="button"
+            disabled={pending !== null}
+            onClick={() =>
+              void run(
+                'remove',
+                () => clearWorkspaceLogo(),
+                'Logo removed',
+                'Could not remove the logo',
+              )
+            }
+            className="focus-ring rounded-md text-label text-graphite hover:text-foreground hover:underline disabled:opacity-50"
+          >
+            Remove
+          </button>
+        </div>
       )}
       <input
         ref={input}
@@ -284,7 +323,7 @@ function LogoRow({ name, logo }: { name: string; logo: string | null }) {
           if (file) upload(file)
         }}
       />
-    </SettingsRow>
+    </div>
   )
 }
 

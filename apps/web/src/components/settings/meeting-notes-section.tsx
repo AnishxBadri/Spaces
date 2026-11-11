@@ -34,7 +34,7 @@ import {
 export function MeetingNotesSection({ view }: { view: MeetingNotesView }) {
   return (
     <SettingsSection title="Meeting notes">
-      <SettingsGroup title="Recorders" count={view.accounts.length}>
+      <SettingsGroup label="Recorders">
         {view.accounts.length === 0 ? (
           <p className="border-b border-rule px-(--inset) py-3 text-label text-graphite">
             No recorders connected.

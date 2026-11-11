@@ -152,7 +152,8 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
 
   return (
     <SettingsSection title="Templates">
-      <SettingsGroup title="Templates" count={live.length}>
+      {/* The live ledger repeats the page title, so it draws no head. */}
+      <SettingsGroup label="Templates">
         <SettingsColumns>
           <span className="w-4 shrink-0" />
           <span className="min-w-0 flex-1">Template</span>

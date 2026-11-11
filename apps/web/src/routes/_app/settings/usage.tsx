@@ -445,7 +445,7 @@ function StepRow({ step, index }: { step: RunStep; index: number }) {
 function LoneCalls({ calls }: { calls: ReadonlyArray<LoneCall> }) {
   const { now } = useClock()
   return (
-    <SettingsGroup title="Calls outside a run" count={String(calls.length)}>
+    <SettingsGroup title="Other calls" count={String(calls.length)}>
       <SettingsColumns>
         <span className="w-20 shrink-0">Lane</span>
         <span className="min-w-0 flex-1">Provider · model</span>

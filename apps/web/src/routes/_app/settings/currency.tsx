@@ -74,14 +74,10 @@ function FxSection({
   }
 
   const rows = fxLedgerRows(rates, today)
-  const currencies = new Set(rates.map((r) => r.currency)).size
 
   return (
     <SettingsSection title="Currency & FX">
-      <SettingsGroup
-        title="Rates"
-        count={`${rates.length} · ${currencies} ${currencies === 1 ? 'currency' : 'currencies'}`}
-      >
+      <SettingsGroup label="Rates">
         <SettingsColumns className="gap-0">
           <span className="min-w-0 flex-1">Pair</span>
           <span className="w-28 shrink-0 pr-3 text-right">Rate</span>

@@ -7,9 +7,9 @@ import { PLUGIN_BLOCKS, PluginTemplate } from './plugin-template'
 /**
  * The plugin page's template, rendered the way the server renders it: every
  * plugin — an enrichment source with a key, a feed with no key, a plugin
- * the worker has not read — gets the same seven blocks in the same order;
- * what it switches on only links to the owning page; recent runs print the
- * provider's error text.
+ * the worker has not read — gets its blocks in the same order, and a block
+ * with nothing to show is not drawn; Used by only links to the owning page;
+ * recent runs print the provider's error text.
  */
 
 vi.mock('@tanstack/react-router', () => ({
@@ -110,9 +110,6 @@ const render = (
       detail={detail}
       keyBlock={slots.keyBlock ?? null}
       settingsBlock={slots.settingsBlock ?? null}
-      pending={false}
-      onToggle={() => undefined}
-      onUninstall={() => undefined}
     />,
   )
 
@@ -122,15 +119,21 @@ const blocksOf = (html: string) =>
 /** One block's markup, up to the next block. */
 const block = (html: string, id: string): string => {
   const start = html.indexOf(`data-block="${id}"`)
+  if (start === -1) return ''
   const next = html.indexOf('data-block="', start + 1)
   return html.slice(start, next === -1 ? undefined : next)
 }
 
 describe('PluginTemplate', () => {
-  it('renders the same seven blocks, in order, for every plugin', () => {
-    expect(PLUGIN_BLOCKS).toHaveLength(7)
-    for (const detail of [apollo, rss, unread])
-      expect(blocksOf(render(detail))).toEqual([...PLUGIN_BLOCKS])
+  it('draws its blocks in the one order, leaving out the empty ones', () => {
+    expect(PLUGIN_BLOCKS).toEqual([
+      'status',
+      'key',
+      'sends',
+      'settings',
+      'used-by',
+      'runs',
+    ])
     expect(
       blocksOf(
         render(apollo, {
@@ -139,18 +142,21 @@ describe('PluginTemplate', () => {
         }),
       ),
     ).toEqual([...PLUGIN_BLOCKS])
+    expect(blocksOf(render(rss))).toEqual(['status', 'sends', 'used-by'])
+    // Unread: only Status, which says why.
+    expect(blocksOf(render(unread))).toEqual(['status'])
   })
 
-  it('reads status, version, the one number and what it sends', () => {
+  it('reads status, version, the one number and the data it sends', () => {
     const html = render(apollo)
     expect(block(html, 'status')).toContain('v0.1.0')
     expect(block(html, 'status')).toContain('ran 4m ago')
     expect(block(html, 'status')).toContain('12 / 100 credits')
+    expect(block(html, 'sends')).toContain('Data sent')
     expect(block(html, 'sends')).toContain('domain · email · LinkedIn URL')
-    expect(block(render(unread), 'sends')).toContain('Not read yet.')
   })
 
-  it('holds the caller key and settings rows, or says there are none', () => {
+  it('holds the caller key and settings rows', () => {
     const html = render(apollo, {
       keyBlock: <div>key rows</div>,
       settingsBlock: <div>settings form</div>,
@@ -159,18 +165,18 @@ describe('PluginTemplate', () => {
     expect(block(html, 'key')).toContain('saved')
     expect(block(html, 'settings')).toContain('settings form')
     const plain = render(rss)
-    expect(block(plain, 'key')).toContain('No workspace key.')
-    expect(block(plain, 'settings')).toContain('No settings.')
+    expect(plain).not.toContain('No workspace key.')
+    expect(plain).not.toContain('No settings.')
   })
 
-  it('links each capability to its owning page and holds no control of its own', () => {
-    const on = block(render(apollo), 'switches-on')
+  it('links each use to its owning page and holds no control of its own', () => {
+    const on = block(render(apollo), 'used-by')
+    expect(on).toContain('Used by')
     expect(on).toContain('Fills company fields')
     expect(on).toContain('href="/settings/enrichment')
-    expect(on).toContain('What fills what ›')
+    expect(on).toContain('Fields ›')
     expect(on).not.toMatch(/<(input|button|select)/)
-    expect(block(render(rss), 'switches-on')).toContain('href="/spaces"')
-    expect(block(render(unread), 'switches-on')).toContain('Nothing elsewhere.')
+    expect(block(render(rss), 'used-by')).toContain('href="/spaces"')
   })
 
   it('lists recent runs newest first with the provider error text', () => {
@@ -178,14 +184,11 @@ describe('PluginTemplate', () => {
     expect(runs.indexOf('2m ago')).toBeLessThan(runs.indexOf('1h ago'))
     expect(runs).toContain('permanent: Apollo said 422: domain is not valid')
     expect(runs).toContain('data-run="failed"')
-    expect(block(render(rss), 'runs')).toContain('No runs yet.')
   })
 
-  it('ends with Disable, or Enable when off, and Uninstall', () => {
-    expect(block(render(apollo), 'remove')).toContain('>Disable</button>')
-    expect(block(render(apollo), 'remove')).toContain('>Uninstall…</button>')
-    expect(
-      block(render({ ...apollo, enabled: false, state: 'off' }), 'remove'),
-    ).toContain('>Enable</button>')
+  it('draws no Disable or Uninstall: they are the head menu’s', () => {
+    const html = render(apollo)
+    expect(html).not.toContain('Disable')
+    expect(html).not.toContain('Uninstall')
   })
 })

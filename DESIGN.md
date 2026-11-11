@@ -903,8 +903,12 @@ bone ground holds a column of paper group cards, 800px wide from the 12px gutter
 apart: each a rule box with a 28px paper head (mono caps label, an optional count, an
 optional action right), then 48px rows on rules inset 11px — the label in a 210px lane,
 the control after it, the row's state and action in the end lane at the right. A table
-is a card whose first row is its column heads in sans 12 graphite; the FX rates ledger is
-the example. No settings card is hairline: a settings page has no folder, and a page
+is a card whose first row is its column heads, drawn as the list table's head cells (32px,
+sans 12 graphite, a rule closing each named lane), and only over three or more named
+columns; the FX rates ledger is the example. A group head is a noun of one or two words,
+never a clause (`Used by`, `Invites`, `Setup`). A card with nothing to show and nothing
+to act on is not drawn, unless it is the page's only card. A page of one group draws it
+with no head: the page title already names it. No settings card is hairline: a settings page has no folder, and a page
 with tabs (a connection) draws the plain bar inside a rule card. The Save bar sits on the
 24px edge under the same cap.
 
@@ -914,9 +918,10 @@ port, the shipped nav and pages stand; build toward this:
 - **Settings takes over the sidebar**, with `‹` back. Four groups, by whose it is:
   - **You:** Email & calendar, Files, Meeting notes, API tokens. Accounts are grouped by
     the job they do, never by provider.
-  - **Workspace:** General (logo, name, base currency, What's set up), Members, Objects,
+  - **Workspace:** General (logo and name in one row, base currency, Setup until all
+    seven pieces are set up), Members, Objects,
     Templates, Currency & FX.
-  - **AI:** Models (the sensitivity floor at the top, providers, who does what),
+  - **AI:** Models (the sensitivity floor at the top, providers, routing),
     Search (embeddings; reuses the Models key), Usage & limits.
   - **Integrations:** Connections, Plugins, Enrichment (D76), Email forwarding
     (amended 2026-10-25: Connection apps folds into Connections).
@@ -934,9 +939,9 @@ port, the shipped nav and pages stand; build toward this:
   irreversibility, beside its control.
 - **Every plugin and every account has its own page.**
   - A plugin page is one template: status and version, the workspace key, what it
-    sends, its manifest settings, what it switches on (linking to the page that owns
-    each capability, never repeating its settings), recent runs and errors, Disable /
-    Uninstall.
+    sent, its manifest settings, Used by (linking to the page that owns each
+    capability, never repeating its settings), recent runs and errors; an empty block
+    is not drawn, and Disable and Uninstall… sit in the head's `···`.
   - An account page (Options ›) holds the person's choices for that account, last sync
     and Disconnect.
 - **Plugins is a catalogue:** Installed as a ledger, then Available from the registry

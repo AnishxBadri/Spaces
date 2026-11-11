@@ -117,7 +117,10 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
     saved === null || saved.passwordDisplay === null || replacing
 
   return (
-    <SettingsSection title="Email forwarding">
+    <SettingsSection
+      title="Email forwarding"
+      {...(stateOf(saved) === undefined ? {} : { meta: stateOf(saved) })}
+    >
       {saved ? (
         <ReadoutStrip
           boxed
@@ -144,7 +147,7 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
         />
       ) : null}
 
-      <SettingsGroup title="Mailbox" count={stateOf(saved)}>
+      <SettingsGroup label="Mailbox">
         <SettingsRow
           label="Address"
           hint="What is forwarded here is shared with every member."

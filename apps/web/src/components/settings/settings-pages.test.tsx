@@ -926,6 +926,87 @@ describe('every settings page', () => {
   )
 })
 
+describe('group heads read as nouns', () => {
+  /** The heads this slice renamed or removed; none may come back. */
+  const OLD = [
+    'What it switches on',
+    'What it sends',
+    "What's set up",
+    'Who does what',
+    'What fills what',
+    'Sources, in order',
+    'Calls outside a run',
+    'Members may use',
+    'Enrich automatically',
+    'Waiting to join',
+    'Disable or uninstall',
+  ]
+
+  it.each(PATHS)(
+    '%s heads its groups with nouns, never a clause',
+    async (path) => {
+      await mount(path)
+      const titles = Array.from(
+        document.querySelectorAll('[data-settings-group] h3'),
+      ).map((h) => h.textContent.trim())
+      for (const title of titles) {
+        expect(OLD).not.toContain(title)
+        expect(title).not.toMatch(/^(What|Who)\b|,/)
+      }
+    },
+  )
+})
+
+describe('a page of one group draws it headless', () => {
+  const heads = () => document.querySelectorAll('[data-settings-group]')
+  // Group cards only: a boxed readout strip is a card too.
+  const cards = () =>
+    Array.from(document.querySelectorAll('[data-settings-body] section.card'))
+
+  it.each([
+    '/settings/templates',
+    '/settings/currency',
+    '/settings/email-forwarding',
+    '/settings/connections',
+    '/settings/files',
+    '/settings/meeting-notes',
+  ])('%s draws one headless card', async (path) => {
+    await mount(path)
+    const headless = cards().filter(
+      (c) => c.querySelector(':scope > [data-settings-group]') === null,
+    )
+    expect(headless).toHaveLength(1)
+    expect(headless.at(0)?.getAttribute('aria-label')).toBeTruthy()
+    // Templates keeps its Archived head; the others have none.
+    expect(heads()).toHaveLength(path === '/settings/templates' ? 1 : 0)
+  })
+
+  it('Members draws no head without invites, and People and Invites with', async () => {
+    await mount('/settings/members', false)
+    expect(heads()).toHaveLength(0)
+    expect(
+      document.querySelector('section[aria-label="People"]'),
+    ).not.toBeNull()
+    act(() => root.unmount())
+    document.body.replaceChildren()
+    const host = document.createElement('div')
+    document.body.append(host)
+    root = createRoot(host)
+    await mount('/settings/members')
+    expect(
+      Array.from(heads()).map((h) => h.querySelector('h3')?.textContent),
+    ).toEqual(['People', 'Invites'])
+  })
+
+  it('Models keeps the column heads on Providers and Routing', async () => {
+    await mount('/settings/models')
+    const columns = Array.from(
+      document.querySelectorAll('[data-settings-columns]'),
+    ).map((c) => c.closest('.card')?.querySelector('h3')?.textContent)
+    expect(columns).toEqual(['Providers', 'Routing'])
+  })
+})
+
 describe('saving', () => {
   it('collects a typed field into the Save bar; Discard restores the stored value', async () => {
     await mount('/settings/general')
@@ -1084,28 +1165,46 @@ describe('General, by sheet 01', () => {
       h.textContent.trim(),
     )
 
-  it('groups Identity (Logo, then Name) and Defaults under caps labels', async () => {
+  it('groups Identity and Defaults under caps labels', async () => {
     await mount('/settings/general')
     expect(groups().slice(0, 2)).toEqual(['Identity', 'Defaults'])
     for (const h3 of document.querySelectorAll('[data-settings-group] h3'))
       expect(h3.className).toContain('label-caps')
     const text = document.body.textContent
-    expect(text.indexOf('Logo')).toBeLessThan(text.indexOf('Name'))
     expect(text.indexOf('Name')).toBeLessThan(text.indexOf('Base currency'))
   })
 
-  it('offers Upload and no Remove while no logo is saved', async () => {
+  const tile = () => document.querySelector('[data-logo-tile]')
+
+  it('draws Identity as one row: a 64px tile that opens the file picker, the name beside it, no Remove without a logo', async () => {
     await mount('/settings/general')
-    expect(byText('Upload')).toBeDefined()
+    const card = tile()?.closest('.card')
+    expect(card?.querySelectorAll('[data-settings-row]')).toHaveLength(1)
+    const row = card?.querySelector('[data-settings-row]')
+    expect(
+      row?.querySelector('input[aria-label="Workspace name"]'),
+    ).not.toBeNull()
+    expect(tile()?.className).toContain('size-16')
+    expect(
+      tile()?.querySelector('[data-monogram]')?.getAttribute('style'),
+    ).toContain('width: 64px')
+    expect(tile()?.getAttribute('aria-label')).toBe('Upload logo')
+    const picker = document.querySelector('input[type="file"]')
+    if (!(picker instanceof HTMLInputElement)) throw new Error('no picker')
+    const opened = vi.fn()
+    picker.addEventListener('click', opened)
+    await click(tile())
+    expect(opened).toHaveBeenCalledTimes(1)
     expect(byText('Remove')).toBeUndefined()
+    expect(byText('Upload')).toBeUndefined()
   })
 
-  it('offers Remove beside Upload once a logo is saved', async () => {
+  it('names the tile Replace and offers Remove in the end lane once a logo is saved', async () => {
     workspace.logo = '/api/blob/logo'
     try {
       await mount('/settings/general')
-      expect(byText('Upload')).toBeDefined()
-      expect(byText('Remove')).toBeDefined()
+      expect(tile()?.getAttribute('aria-label')).toBe('Replace logo')
+      expect(byText('Remove')?.closest('[data-settings-end]')).not.toBeNull()
     } finally {
       workspace.logo = null
     }
@@ -1143,42 +1242,78 @@ describe('General, after the first run (D80)', () => {
     expect(writes.removeDemoData).toHaveBeenCalledTimes(1)
   })
 
-  it("lists the seven pieces in What's set up with their state and link", async () => {
+  it('lists the seven pieces in Setup, unfinished first, each end lane a tick or Set up ›', async () => {
     await mount('/settings/general')
-    const text = document.body.textContent
-    expect(text).toContain("What's set up")
-    expect(text).toContain('3 of 7')
-    // A caps label on the card's paper head, not a bone band.
-    const head = Array.from(
-      document.querySelectorAll('[data-settings-group]'),
-    ).find((g) => g.textContent.includes("What's set up"))
-    expect(head?.className).toContain('border-rule')
-    expect(head?.className).not.toContain('bg-bone')
-    expect(head?.querySelector('h3')?.className).toContain('label-caps')
-    for (const label of [
-      'AI model',
+    const card = Array.from(document.querySelectorAll('[data-settings-group]'))
+      .find((g) => g.querySelector('h3')?.textContent === 'Setup')
+      ?.closest('.card')
+    expect(card?.querySelector('[data-settings-group]')?.textContent).toBe(
+      'Setup3 of 7',
+    )
+    const rows = Array.from(card?.querySelectorAll('[data-settings-row]') ?? [])
+    const labels = rows.map((r) => r.querySelector('.font-medium')?.textContent)
+    // Not set up (in their order), then set up (in theirs).
+    expect(labels).toEqual([
       'Team',
-      'Enrichment',
       'Email forwarding',
-      'Google',
       'Granola',
       'Exa',
+      'AI model',
+      'Enrichment',
+      'Google',
     ])
-      expect(text).toContain(label)
-    expect(
-      document.querySelector('section a[href="/settings/meeting-notes"]')
-        ?.textContent,
-    ).toBe('Set up ›')
-    expect(
-      document.querySelector('section a[href="/settings/models"]')?.textContent,
-    ).toBe('Open ›')
-    // State and action sit in the end lane: a status square, then the link.
-    const models = document.querySelector('section a[href="/settings/models"]')
-    const end = models?.closest('[data-settings-end]')
-    expect(end).not.toBeNull()
-    expect(end?.querySelector('[data-state-tone]')?.textContent).toMatch(
-      /^(set|not set)$/,
-    )
+    for (const [i, row] of rows.entries()) {
+      const end = row.querySelector('[data-settings-end]')
+      const tick = end?.querySelector('[data-setup-done]')
+      const link = end?.querySelector('a')
+      // One thing in the end lane: a tick or Set up ›, never both.
+      expect(end?.children).toHaveLength(1)
+      if (i < 4) {
+        expect(tick).toBeNull()
+        expect(link?.textContent).toBe('Set up ›')
+      } else {
+        expect(tick).not.toBeNull()
+        expect(link).toBeNull()
+      }
+      expect(end?.textContent).not.toMatch(/\bset\b|not set|Open/)
+    }
+    expect(card?.querySelector('[data-state-tone]')).toBeNull()
+  })
+
+  it('opens the piece from anywhere on its row', async () => {
+    const r = await mount('/settings/general')
+    const row = Array.from(
+      document.querySelectorAll('[data-settings-row]'),
+    ).find((el) => el.querySelector('.font-medium')?.textContent === 'AI model')
+    await click(row?.querySelector('.font-medium'))
+    expect(r.state.location.pathname).toBe('/settings/models')
+  })
+
+  it('draws no Setup card at 7 of 7', async () => {
+    const original = loaders.general
+    loaders.general = () => ({
+      ...original(),
+      setUp: {
+        model: true,
+        team: true,
+        enrichment: true,
+        forwarding: true,
+        google: true,
+        granola: true,
+        exa: true,
+      },
+    })
+    try {
+      await mount('/settings/general')
+      expect(
+        Array.from(document.querySelectorAll('[data-settings-group] h3')).map(
+          (h) => h.textContent,
+        ),
+      ).not.toContain('Setup')
+      expect(document.body.textContent).not.toContain('AI model')
+    } finally {
+      loaders.general = original
+    }
   })
 })
 
@@ -1550,7 +1685,7 @@ describe('the AI pages, as D81 splits them', () => {
     const heads = Array.from(document.querySelectorAll('h3')).map((h) =>
       h.textContent.trim(),
     )
-    expect(heads).toContain('Who does what')
+    expect(heads).toContain('Routing')
     const text = document.body.textContent
     // The job in words; its lane id waits in the tooltip.
     const jobs = Array.from(document.querySelectorAll('[data-lane]')).map(
@@ -1593,7 +1728,7 @@ describe('the AI pages, as D81 splits them', () => {
     try {
       await mount('/settings/models')
       const collapsed = document.querySelector('[data-routing-collapsed]')
-      expect(collapsed?.textContent).toBe('Who does whatSet up a provider ›')
+      expect(collapsed?.textContent).toBe('RoutingSet up a provider ›')
       expect(collapsed?.querySelector('a')?.getAttribute('href')).toBe(
         '#providers',
       )
@@ -1602,7 +1737,7 @@ describe('the AI pages, as D81 splits them', () => {
       const heads = Array.from(document.querySelectorAll('h3')).map((h) =>
         h.textContent.trim(),
       )
-      expect(heads).not.toContain('Who does what')
+      expect(heads).not.toContain('Routing')
       expect(document.querySelectorAll('[data-lane]')).toHaveLength(0)
       expect(
         document.querySelectorAll('button[aria-label$=", normal"]'),
@@ -1721,7 +1856,7 @@ describe('Integrations → Enrichment (D76)', () => {
 
   it('shows which source fills each linked attribute, and an unlinked one as not linked with Fill from…', async () => {
     await mount('/settings/enrichment')
-    const grid = document.querySelector('#what-fills-what')
+    const grid = document.querySelector('#fields')
     const description = grid?.querySelector('[data-attribute="description"]')
     expect(description?.querySelectorAll('[data-cell="fills"]')).toHaveLength(1)
     const employees = grid?.querySelector('[data-attribute="employees"]')
@@ -1740,7 +1875,9 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
 
   it('Members: a People ledger with a role Select per row, Invite in the head, and the waiting invites', async () => {
     await mount('/settings/members')
-    expect(groups()).toEqual(['People2', 'Waiting to join2'])
+    expect(groups()).toEqual(['People2', 'Invites2'])
+    // Two named lanes tell themselves apart: no column-head row.
+    expect(document.querySelector('[data-settings-columns]')).toBeNull()
     const rows = Array.from(document.querySelectorAll('[data-member-row]'))
     expect(rows).toHaveLength(2)
     // You read your own role; another member's is a Select and a ···.
@@ -1828,7 +1965,13 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
 
   it('Templates: Template, Kind and Offered first on lanes, then Archived with Restore', async () => {
     await mount('/settings/templates')
-    expect(groups()).toEqual(['Templates2', 'Archived1'])
+    // The live ledger repeats the title, so only Archived carries a head.
+    expect(groups()).toEqual(['Archived1'])
+    expect(
+      document.querySelector(
+        '[data-settings-body] section[aria-label="Templates"]',
+      ),
+    ).not.toBeNull()
     const rows = Array.from(document.querySelectorAll('[data-template-row]'))
     expect(rows.map((r) => r.textContent)).toEqual([
       'Seed memoNoteCompaniesDeals+',
@@ -1992,9 +2135,12 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
     }
   })
 
-  it('Connections: PROVIDERS 1 of 2 set up, a row each, Microsoft not available yet', async () => {
+  it('Connections: one headless card, 1 of 2 set up in the head, a row each, Microsoft not available yet', async () => {
     await mount('/settings/connections')
-    expect(groups()).toEqual(['Providers1 of 2 set up'])
+    expect(groups()).toEqual([])
+    expect(
+      document.querySelector('[data-settings-head] header')?.textContent,
+    ).toContain('1 of 2 set up')
     const row = (id: string) =>
       document.querySelector(`[data-provider="${id}"]`)?.textContent
     expect(row('google')).toBe('GoogleSet up · 4 of 6 members connectedOpen ›')
@@ -2015,7 +2161,7 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
     const tabs = Array.from(document.querySelectorAll('[role="tab"]'))
     expect(tabs.map((t) => t.textContent)).toEqual(['Set up', 'In use'])
     expect(tabs[1]?.getAttribute('aria-selected')).toBe('true')
-    expect(groups()).toEqual(['Members may use2 of 3 on', 'Connected2 of 6'])
+    expect(groups()).toEqual(['Access2 of 3 on', 'Connected2 of 6'])
     expect(document.body.textContent).toContain('Health · 7 days')
     // Each use is a switch, led by its product's mark.
     expect(
@@ -2206,7 +2352,7 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
   it('Currency & FX: the title, and a range on each superseded rate, no two rows alike', async () => {
     await mount('/settings/currency')
     expect(document.querySelector('h1')?.textContent).toBe('Currency & FX')
-    expect(groups()).toEqual(['Rates4 · 2 currencies'])
+    expect(groups()).toEqual([])
     const rows = Array.from(document.querySelectorAll('[data-fx-row]'))
     const clauses = rows.map((r) => r.lastElementChild?.textContent)
     expect(clauses).toEqual([
@@ -2541,15 +2687,64 @@ describe('Search, Usage and Plugins, by sheets 04 and 07', () => {
       loaders['plugins/$integrationId'] = original
     })
 
-    it('carries an update alone as its one outline', async () => {
-      loaders['plugins/$integrationId'] = withDetail({ update: '1.1.0' })
+    const items = () =>
+      Array.from(document.querySelectorAll('[role="menuitem"]')).map((i) =>
+        i.textContent.trim(),
+      )
+
+    it('holds Disable and Uninstall… in its ···, and no card of their own', async () => {
       await mount(`/settings/plugins/${PLUGIN_ID}`)
-      expect(headActions().map((b) => b.textContent.trim())).toEqual([
-        'Update to 1.1.0',
-      ])
+      expect(headActions()).toEqual([])
+      expect(document.querySelector('[data-block="remove"]')).toBeNull()
+      await openMenu('More for Apollo')
+      expect(items()).toEqual(['Disable', 'Uninstall…'])
+      await click(menuItem('Disable'))
+      expect(writes.setIntegrationEnabled).toHaveBeenCalledWith({
+        data: { id: PLUGIN_ID, enabled: false },
+      })
     })
 
-    it('folds Reset and Update into one ··· when both apply', async () => {
+    it('reads Enable for a plugin that is off', async () => {
+      loaders['plugins/$integrationId'] = withDetail({
+        enabled: false,
+        state: 'off',
+      })
+      await mount(`/settings/plugins/${PLUGIN_ID}`)
+      await openMenu('More for Apollo')
+      expect(items()).toEqual(['Enable', 'Uninstall…'])
+    })
+
+    it('a degraded plugin with no manifest draws its Status card and no empty card', async () => {
+      loaders['plugins/$integrationId'] = withDetail({
+        state: 'degraded',
+        reason: 'The worker could not load it',
+        form: {
+          ok: false,
+          reason:
+            'the worker has not read this plugin’s manifest yet, so its settings cannot be drawn',
+        },
+        values: {},
+        secrets: [],
+        sends: [],
+        capabilities: [],
+        runs: [],
+      })
+      await mount(`/settings/plugins/${PLUGIN_ID}`)
+      const cards = Array.from(
+        document.querySelectorAll('[data-settings-body] .card'),
+      )
+      expect(cards.map((c) => c.getAttribute('data-block'))).toEqual(['status'])
+      expect(document.body.textContent).toContain(
+        'The worker could not load it',
+      )
+      expect(document.body.textContent).not.toMatch(
+        /No runs yet|No workspace key|Not read yet|Nothing elsewhere|No settings/,
+      )
+      await openMenu('More for Apollo')
+      expect(items()).toEqual(['Disable', 'Uninstall…'])
+    })
+
+    it('folds Reset and Update into the ··· beside Disable and Uninstall…', async () => {
       loaders['plugins/$integrationId'] = withDetail({
         update: '1.1.0',
         state: 'tripped',
@@ -2561,7 +2756,7 @@ describe('Search, Usage and Plugins, by sheets 04 and 07', () => {
         Array.from(document.querySelectorAll('[role="menuitem"]')).map((i) =>
           i.textContent.trim(),
         ),
-      ).toEqual(['Reset', 'Update to 1.1.0'])
+      ).toEqual(['Reset', 'Update to 1.1.0', 'Disable', 'Uninstall…'])
     })
   })
 
@@ -2693,7 +2888,7 @@ describe('the sheet differences, page by page', () => {
 
   it('Meeting notes: the recorder leads with its mark, a square before its sync, and Add Granola', async () => {
     await mount('/settings/meeting-notes')
-    const card = groupHead('Recorders')?.closest('.card')
+    const card = document.querySelector('section[aria-label="Recorders"]')
     expect(card?.querySelector('[data-provider-mark="granola"]')).not.toBeNull()
     expect(card?.querySelector('[data-state-tone]')?.textContent).toMatch(
       /Synced|Connected|Needs|Revoked/,
@@ -2768,9 +2963,9 @@ describe('the sheet differences, page by page', () => {
     expect(document.querySelector('[data-token-row][data-row]')).toBeNull()
   })
 
-  it('Enrichment: the group is Enrich automatically, its row When a record', async () => {
+  it('Enrichment: the group is Auto-enrich, its row When a record', async () => {
     await mount('/settings/enrichment')
-    const card = groupHead('Enrich automatically')?.closest('.card')
+    const card = groupHead('Auto-enrich')?.closest('.card')
     expect(card?.textContent).toContain('When a record')
   })
 })

@@ -493,7 +493,7 @@ const UNSET = 'unset'
 type CellValue = LlmProvider | typeof UNSET
 
 /**
- * Who does what — the lane × sensitivity grid as a settings ledger:
+ * Routing — the lane × sensitivity grid as a settings ledger:
  * one row per job, then one `Select` per sensitivity. Everyday cells list
  * every provider holding an active credential; sensitive cells list the
  * local ones only. A cell saves when it is chosen. The sensitivities are
@@ -524,8 +524,8 @@ function RoutingGroup({
   // pointing at Providers instead.
   if (routable.length === 0)
     return (
-      <SettingsGroup data-routing-collapsed label="Who does what">
-        <SettingsRow label="Who does what">
+      <SettingsGroup data-routing-collapsed label="Routing">
+        <SettingsRow label="Routing">
           <a href={`#${PROVIDERS_ANCHOR}`} className={SETTINGS_LINK}>
             Set up a provider ›
           </a>
@@ -535,7 +535,7 @@ function RoutingGroup({
 
   return (
     <SettingsGroup
-      title="Who does what"
+      title="Routing"
       count={`${routed} of ${MODELS_GRID_LANES.length * AI_SENSITIVITIES.length} set`}
       action="sensitive lists local models only"
     >

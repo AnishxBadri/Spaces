@@ -113,7 +113,12 @@ export function AccountsSection({
     job === 'email-calendar' ? defaultMailAccount(view.connections) : null
   return (
     <SettingsSection title={TITLE[job]}>
-      <SettingsGroup title="Accounts" count={accounts.length}>
+      {/* Files draws this card alone, so it goes headless there. */}
+      <SettingsGroup
+        {...(forwarding === undefined
+          ? { label: 'Accounts' }
+          : { title: 'Accounts', count: accounts.length })}
+      >
         <SettingsColumns className="gap-3.5">
           <span className="w-7 shrink-0" />
           <span className="min-w-0 flex-1">Account</span>

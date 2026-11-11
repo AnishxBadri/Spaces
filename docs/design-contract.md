@@ -512,9 +512,29 @@ something irreversible; any other explanation is a tooltip on the control
 bar inside a rule card. The nav left is the chassis grammar one level in: bone, each
 group head a ruled band (mono caps in ink with a hairline under, the `LabelHead` grammar
 the settings ledgers use), 30px rows, counts in the right lane. A table inside the
-section is a card whose first row is its column heads (`SettingsColumns`, sentence-case
-sans 12 graphite on a rule), lanes shared by head and rows. It carries no foot caption:
-a line under a settings ledger survives only for cost, privacy or irreversibility (D81).
+section is a card whose first row is its column heads (`SettingsColumns`), lanes shared
+by head and rows. It carries no foot caption: a line under a settings ledger survives
+only for cost, privacy or irreversibility (D81).
+
+Four rules keep a settings page plain (D81 amended):
+
+1. **A group head is a noun**, one or two words, never a clause: `Used by`, not "What it
+   switches on"; `Invites`, not "Waiting to join". `settings-pages.test.tsx` fails on a
+   head that opens `What` or `Who` or holds a comma.
+2. **An empty card does not draw.** A card with nothing to show and nothing to act on is
+   left out, as an empty section is on a record: a plugin's `Workspace key` when it asks
+   for none, `Data sent`, `Used by`, `Recent runs`. A card stays when it holds the control
+   that adds the first thing (Objects' `Yours`), and a page never ends blank: when its
+   only card is empty, that card keeps its empty line.
+3. **One group, no head.** A page that draws a single group draws it headless
+   (`SettingsGroup` with `label`, no `title`): the page title already says it, the count
+   is in the nav, and a head action moves to the page head (Templates, Currency & FX,
+   Email forwarding, Connections, Files, Meeting notes; Members until there are invites).
+   A group whose head would repeat the page title goes headless too.
+4. **A column head only when it tells columns apart:** `SettingsColumns` draws on a card
+   with three or more named columns, never two (Members has none). It is the list
+   table's head cell — 32px, `text-label` graphite, the column rule closing each named
+   lane, as `RecordTable`'s `th` draws it.
 
 **A settings section is a child route under the settings shell** (SPA-26). `/settings`
 is a layout — `apps/web/src/routes/_app/settings.tsx` — and every section is one file

@@ -39,8 +39,8 @@ import type {
 
 /**
  * One plugin's page, on the one template every plugin shares
- * (`PluginTemplate`): status, key, what it sends, its manifest settings,
- * what it switches on, recent runs, Disable / Uninstall. Inside the settings
+ * (`PluginTemplate`): status, key, data sent, its manifest settings, used
+ * by, recent runs; Disable and Uninstall in the head's `···`. Inside the settings
  * shell, so Plugins stays lit; the `_` keeps it out of the ledger's
  * component. A member reads it too, keys redacted and every control
  * disabled. A bundled plugin has no page here: by id or by row, it lands
@@ -216,9 +216,11 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
       ...fields.map(secretRow),
     ]
   })
+  // An unread manifest on a degraded plugin is the Status card's to say.
+  const unread = !detail.form.ok && detail.state === 'degraded'
   const hasSettings =
-    !detail.form.ok ||
-    detail.form.fields.length > 0 ||
+    (!detail.form.ok && !unread) ||
+    (detail.form.ok && detail.form.fields.length > 0) ||
     detail.autoEnrichForm !== null
   return (
     <SettingsSection
@@ -226,7 +228,6 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
       back={<SettingsBack to="/settings/plugins">Plugins</SettingsBack>}
       mark={<PluginMark name={detail.name} />}
       action={
-        // One of the two is the head's outline action; both share a `···`.
         // Not disabled while a write runs: a `···` with nothing enabled
         // would vanish, so a second press is dropped instead.
         <MoreMenu
@@ -261,6 +262,31 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
                   },
                 ]
               : []),
+            {
+              label: detail.enabled ? 'Disable' : 'Enable',
+              onSelect: () => {
+                if (pending) return
+                const enabled = !detail.enabled
+                void act(
+                  () =>
+                    setIntegrationEnabled({
+                      data: { id: detail.id, enabled },
+                    }),
+                  enabled
+                    ? `${detail.name} on`
+                    : `${detail.name} off · key kept`,
+                )
+              },
+            },
+            {
+              label: 'Uninstall…',
+              destructive: true,
+              opens: true,
+              onSelect: () => {
+                if (pending) return
+                void uninstall()
+              },
+            },
           ]}
         />
       }
@@ -301,14 +327,6 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
             </>
           ) : null
         }
-        pending={pending}
-        onToggle={(enabled) =>
-          void act(
-            () => setIntegrationEnabled({ data: { id: detail.id, enabled } }),
-            enabled ? `${detail.name} on` : `${detail.name} off · key kept`,
-          )
-        }
-        onUninstall={() => void uninstall()}
       />
       {confirmDialog}
     </SettingsSection>

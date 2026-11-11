@@ -169,12 +169,17 @@ export function EmbeddingsSection({
     }
   }
 
+  const modelState = pin ? `set ${formatDay(pin.pinnedAt, today)}` : 'not set'
+  const alone = !pin && !backfill.pin
+
   return (
-    <SettingsSection title="Search">
+    <SettingsSection title="Search" {...(alone ? { meta: modelState } : {})}>
       <ReadoutStrip boxed readouts={searchReadouts(backfill)} />
+      {/* Before a pin the Model card is the page's one group: no head. */}
       <SettingsGroup
-        title="Model"
-        action={pin ? `set ${formatDay(pin.pinnedAt, today)}` : 'not set'}
+        {...(alone
+          ? { label: 'Model' }
+          : { title: 'Model', action: modelState })}
       >
         <SettingsRow
           label="Provider"

@@ -836,6 +836,8 @@ _Rejected:_
 
 _Carried by_ a first-run slice (Today's empty state, the in-place prompts, the What's set up list), on the canvas as Today sheet 01.
 
+_Amended 2026-11-11 (owner):_ What's set up is headed **Setup**. Each row's end lane holds one item, a tick when the piece is set up or `Set up ›` when it is not, and the whole row opens its page. Rows not set up come first. The head keeps its count (`3 of 7`), and at 7 of 7 the card is not drawn. Carried by `settings-2` (SPA-395).
+
 ### D81-settings-by-whose-it-is
 
 **How is Settings organised, and how do its pages behave, now that it holds personal connections, workspace policy, AI routing and plugins side by side?** Answered (owner, 2026-10-08 for the map, 2026-10-09 for the behaviours): **Settings is grouped by whose it is, and every page behaves the same way.**
@@ -887,6 +889,8 @@ _Amended 2026-10-25 (the canvas port):_
 - A settings page head carries one outline 32px action at most beside its `···`.
 
 _Carried by_ project 30's shell, settings and Connections slices.
+
+_Amended 2026-11-11 (owner):_ settings read plainly. A group head is a noun of one or two words: What it switches on → Used by, What it sends → Data sent, What's set up → Setup (D80, amended), Who does what → Routing, What fills what → Fields, Sources, in order → Sources, Calls outside a run → Other calls, Members may use → Access, Enrich automatically → Auto-enrich, Waiting to join → Invites. A plugin page has no Disable or uninstall card: `Disable` (or `Enable`) and `Uninstall…` join its head's `···`, and Uninstall keeps its confirm. A card with nothing to show and nothing to act on is not drawn; a page of one group draws it with no head; a column-head row draws only over three or more named columns. Carried by `settings-2` (SPA-395).
 
 ### D70-find-and-ask — amended (where Ask lives)
 

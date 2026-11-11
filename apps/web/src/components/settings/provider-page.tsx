@@ -99,7 +99,7 @@ export function ProviderInUse({ view }: { view: ProviderPageView }) {
   return (
     <div className="flex flex-col">
       <SettingsGroupHead
-        title="Members may use"
+        title="Access"
         count={`${String(on)} of ${String(view.uses.length)} on`}
       />
       <SettingsColumns>

@@ -6,7 +6,6 @@ import { z } from 'zod'
 import { InitialsMark } from '#/components/record/record-parts'
 import { ResetLinkDialog } from '#/components/settings/reset-link-dialog'
 import {
-  SettingsColumns,
   SettingsGroup,
   SettingsSection,
 } from '#/components/settings/settings-section'
@@ -168,6 +167,8 @@ function MembersSection({
   const setRole = (m: Member, role: MemberRole) =>
     act(() => setMemberRole({ data: { userId: m.id, role } }), 'Role updated')
 
+  const showInvites = isAdmin && invites.length > 0
+
   return (
     <SettingsSection
       title="Members"
@@ -179,13 +180,13 @@ function MembersSection({
         ) : null
       }
     >
-      <SettingsGroup title="People" count={members.length}>
-        <SettingsColumns>
-          <span className="w-6 shrink-0" />
-          <span className="min-w-0 flex-1">Person</span>
-          <span className="w-28 shrink-0">Role</span>
-          <span className="w-6 shrink-0" />
-        </SettingsColumns>
+      {/* With no invites People is the page's one group, headless: the
+          title and the nav's count already say it. */}
+      <SettingsGroup
+        {...(showInvites
+          ? { title: 'People', count: members.length }
+          : { label: 'People' })}
+      >
         {members.map((m) => {
           const editable = isAdmin && m.id !== me.id
           return (
@@ -276,8 +277,8 @@ function MembersSection({
         })}
       </SettingsGroup>
 
-      {isAdmin && invites.length > 0 ? (
-        <SettingsGroup title="Waiting to join" count={invites.length}>
+      {showInvites ? (
+        <SettingsGroup title="Invites" count={invites.length}>
           {invites.map((inv) => (
             <div
               key={inv.id}
