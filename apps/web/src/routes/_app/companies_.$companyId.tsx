@@ -1,3 +1,4 @@
+import { splitReadouts } from '#/lib/records/overview'
 import {
   createFileRoute,
   redirect,
@@ -16,6 +17,7 @@ import {
   RecordBody,
   RecordHeadPending,
   RecordHeader,
+  RailReadout,
 } from '#/components/record/record-parts'
 import { RecordHeadActions } from '#/components/record/record-heads'
 import { RecordNotices } from '#/components/record/record-notices'
@@ -218,6 +220,29 @@ function CompanyRecordPage() {
     company.name,
   )
 
+  const readoutSplit = splitReadouts([
+    {
+      label: 'Last contact',
+      value: readoutDay(company.readouts.lastContact, company.readouts.today),
+    },
+    {
+      label: 'Next meeting',
+      value: readoutDay(company.readouts.nextMeeting, company.readouts.today),
+    },
+    {
+      label: 'Moving, 30 days',
+      value: company.readouts.moving30,
+    },
+    {
+      label: 'Ownership',
+      value: !company.readouts.ownership
+        ? null
+        : company.readouts.ownership.kind === 'implied'
+          ? `~${fmtPct(company.readouts.ownership.pct)}`
+          : fmtPct(company.readouts.ownership.pct),
+    },
+  ])
+
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
@@ -257,6 +282,7 @@ function CompanyRecordPage() {
             <AiCellsProvider entityIds={[company.id]} registry={registry}>
               <PropertyGrid>
                 <PropertyFold
+                  after={<RailReadout readout={readoutSplit.rail} />}
                   defs={rail}
                   away={isLongText}
                   onPickAway={longText.pick}
@@ -396,34 +422,7 @@ function CompanyRecordPage() {
                     onSave={saveValue}
                   />
                 }
-                readouts={[
-                  {
-                    label: 'Last contact',
-                    value: readoutDay(
-                      company.readouts.lastContact,
-                      company.readouts.today,
-                    ),
-                  },
-                  {
-                    label: 'Next meeting',
-                    value: readoutDay(
-                      company.readouts.nextMeeting,
-                      company.readouts.today,
-                    ),
-                  },
-                  {
-                    label: 'Moving, 30 days',
-                    value: company.readouts.moving30,
-                  },
-                  {
-                    label: 'Ownership',
-                    value: !company.readouts.ownership
-                      ? null
-                      : company.readouts.ownership.kind === 'implied'
-                        ? `~${fmtPct(company.readouts.ownership.pct)}`
-                        : fmtPct(company.readouts.ownership.pct),
-                  },
-                ]}
+                readouts={readoutSplit.strip}
                 timeline={timeline}
                 documents={documents}
                 onTab={changeTab}

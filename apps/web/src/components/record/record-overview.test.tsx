@@ -5,9 +5,16 @@ import type { Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ClockProvider } from '#/components/clock'
 import type { RecordDocument } from '#/components/files/types'
-import { shownReadouts } from '#/lib/records/overview'
+import { shownReadouts, splitReadouts } from '#/lib/records/overview'
+import type { OverviewReadout } from '#/lib/records/overview'
 import { latestThreads, threadPeople } from '#/lib/timeline/threads'
 import { RecordOverview } from './record-overview'
+import {
+  PROPERTY_LABEL_LANE,
+  PROPERTY_VALUE_INSET,
+  PropertyCell,
+  RailReadout,
+} from './record-parts'
 import { ThreadRow } from './thread-row'
 import type { ThreadItem } from './thread-row'
 
@@ -193,11 +200,13 @@ describe('the readouts', () => {
     const el = await mount(
       <RecordOverview
         record={RECORD}
-        readouts={[
-          { label: 'Last contact', value: '4 Oct' },
-          { label: 'Next meeting', value: '—' },
-          { label: 'Close', value: '1 Oct', tone: 'bad' },
-        ]}
+        readouts={
+          splitReadouts([
+            { label: 'Last contact', value: '4 Oct' },
+            { label: 'Next meeting', value: '—' },
+            { label: 'Close', value: '1 Oct', tone: 'bad' },
+          ]).strip
+        }
         timeline={[]}
         documents={[]}
         onTab={() => {}}
@@ -228,6 +237,153 @@ describe('the readouts', () => {
       expect.arrayContaining(['text-label', 'text-graphite']),
     )
     expect(el.textContent).not.toContain('Next meeting')
+  })
+})
+
+describe('a strip needs two', () => {
+  const day = (label: string, value: OverviewReadout['value']) => ({
+    label,
+    value,
+  })
+
+  it('splits none into nothing in either place', () => {
+    expect(splitReadouts([])).toEqual({ strip: [], rail: null })
+  })
+
+  it('sends one alone to the rail', () => {
+    expect(splitReadouts([day('Last contact', '4 Oct')])).toEqual({
+      strip: [],
+      rail: { label: 'Last contact', value: '4 Oct' },
+    })
+  })
+
+  it('keeps two in the strip and none in the rail', () => {
+    expect(
+      splitReadouts([day('Last contact', '4 Oct'), day('Ownership', '8%')]),
+    ).toEqual({
+      strip: [
+        { label: 'Last contact', value: '4 Oct' },
+        { label: 'Ownership', value: '8%' },
+      ],
+      rail: null,
+    })
+  })
+
+  it('keeps four in the strip', () => {
+    const four = [
+      day('Last contact', '4 Oct'),
+      day('Next meeting', 'Today'),
+      day('Moving, 30 days', 3),
+      day('Ownership', '8%'),
+    ]
+    const split = splitReadouts(four)
+    expect(split.strip.map((r) => r.label)).toEqual(four.map((r) => r.label))
+    expect(split.rail).toBeNull()
+  })
+
+  it('counts only shown readouts: a dash, a 0 and a null are not one', () => {
+    const empties = [
+      day('Next meeting', '—'),
+      day('Moving, 30 days', 0),
+      day('Ownership', null),
+    ]
+    expect(splitReadouts(empties)).toEqual({ strip: [], rail: null })
+    expect(
+      splitReadouts([
+        ...empties,
+        { label: 'Close', value: '1 Oct', tone: 'bad' },
+      ]),
+    ).toEqual({
+      strip: [],
+      rail: { label: 'Close', value: '1 Oct', tone: 'bad' },
+    })
+    expect(
+      splitReadouts([
+        day('Last contact', '4 Oct'),
+        ...empties,
+        day('First contact', '2 Mar 2024'),
+      ]).strip.map((r) => r.label),
+    ).toEqual(['Last contact', 'First contact'])
+  })
+
+  /** What a record route draws: the rail's half, then the strip's. */
+  async function record(readouts: ReadonlyArray<OverviewReadout>) {
+    const split = splitReadouts(readouts)
+    return mount(
+      <>
+        <div data-test-rail>
+          <PropertyCell label="Domain">flent.io</PropertyCell>
+          <RailReadout readout={split.rail} />
+        </div>
+        <RecordOverview
+          record={RECORD}
+          readouts={split.strip}
+          timeline={[]}
+          documents={[]}
+          onTab={() => {}}
+        />
+      </>,
+    )
+  }
+
+  it('draws one readout as a read-only rail row and no strip', async () => {
+    const el = await record([
+      day('Last contact', '4 Oct'),
+      day('Next meeting', '—'),
+      day('Ownership', null),
+    ])
+    expect(el.querySelector('[data-overview-readouts]')).toBeNull()
+    const rows = [...el.querySelectorAll('[data-rail-readout]')]
+    expect(rows).toHaveLength(1)
+    const row = rows.at(0)
+    expect(row?.textContent).toBe('Last contact4 Oct')
+    expect(row?.querySelector('[data-property-label]')?.textContent).toBe(
+      'Last contact',
+    )
+    const value = row?.querySelector('[data-property-value]')
+    expect(value?.textContent).toBe('4 Oct')
+    expect(cls(value)).toEqual(
+      expect.arrayContaining(['mono', 'text-foreground']),
+    )
+    expect(row?.querySelector('button, input, textarea, a')).toBeNull()
+    expect(cls(row).some((c) => c.startsWith('hover:'))).toBe(false)
+    expect(cls(row)).not.toContain('cursor-pointer')
+  })
+
+  it('keeps a bad tone crimson in the rail', async () => {
+    const el = await record([{ label: 'Close', value: '1 Oct', tone: 'bad' }])
+    expect(
+      cls(el.querySelector('[data-rail-readout] [data-property-value]')),
+    ).toContain('text-destructive')
+  })
+
+  it('draws two as the strip and no rail row', async () => {
+    const el = await record([
+      day('Last contact', '4 Oct'),
+      day('Ownership', '8%'),
+    ])
+    expect(el.querySelector('[data-overview-readouts]')).not.toBeNull()
+    expect(el.querySelectorAll('[data-readout]')).toHaveLength(2)
+    expect(el.querySelector('[data-rail-readout]')).toBeNull()
+  })
+
+  it("starts the rail row on the attribute row's label and value lanes", async () => {
+    const el = await record([day('Last contact', '4 Oct')])
+    const rows = [...el.querySelectorAll('[data-test-rail] > div')]
+    const readout = rows.at(1)
+    const lane = PROPERTY_LABEL_LANE.split(' ')
+    expect(rows).toHaveLength(2)
+    for (const row of rows) {
+      expect(cls(row)).toEqual(
+        expect.arrayContaining(['flex', 'gap-x-2', 'border-b', 'border-rule']),
+      )
+      expect(cls(row.querySelector('[data-property-label]'))).toEqual(
+        expect.arrayContaining(lane),
+      )
+    }
+    expect(cls(readout?.querySelector('[data-property-value]'))).toContain(
+      PROPERTY_VALUE_INSET,
+    )
   })
 })
 
@@ -317,7 +473,7 @@ describe('the three bands', () => {
     const el = await mount(
       <RecordOverview
         record={RECORD}
-        readouts={[{ label: 'Moving, 30 days', value: 0 }]}
+        readouts={splitReadouts([{ label: 'Moving, 30 days', value: 0 }]).strip}
         timeline={[{ type: 'attrs' }]}
         documents={[]}
         onTab={() => {}}

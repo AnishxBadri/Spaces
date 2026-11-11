@@ -6,6 +6,7 @@ import { EmptyRow, SectionHead } from '#/components/ledger-section'
 import { Twinkle } from '#/components/twinkle'
 import { Stamp } from '#/components/ui/stamp'
 import type { StampProps } from '#/components/ui/stamp'
+import type { ShownReadout } from '#/lib/records/overview'
 import { cn } from '#/lib/utils'
 
 /**
@@ -469,6 +470,18 @@ export function rejectPaneClass(phase: RejectPhase): string {
 }
 
 /**
+ * The rail's 104px label lane: 8px over a 16px line, so a label's first line
+ * sits on the centre of the 32px value box beside it.
+ */
+export const PROPERTY_LABEL_LANE = 'w-26 shrink-0 py-2'
+
+/**
+ * Where a value's text starts in its lane: a field editor's padding plus the
+ * 1px border its trigger draws.
+ */
+export const PROPERTY_VALUE_INSET = 'px-2.25'
+
+/**
  * One attribute row: the 104px label lane, then the value taking the rest,
  * 32px at least, on a rule. The label wraps rather than truncates; the value
  * grows downward, never sideways, when its editor opens.
@@ -507,7 +520,10 @@ export function PropertyCell({
           the value's 32px box, however tall the value grows. */}
       <div
         data-property-label
-        className="flex w-26 shrink-0 items-start gap-1 py-2 text-label break-words text-graphite"
+        className={cn(
+          PROPERTY_LABEL_LANE,
+          'flex items-start gap-1 text-label break-words text-graphite',
+        )}
       >
         {label}
       </div>
@@ -672,17 +688,57 @@ export function RailGroupRow({
   )
 }
 
-/** A 36px readout row in the rail: sans graphite label left, mono value
- *  right. */
+/**
+ * A 36px readout row in the rail: sans graphite label left, mono value
+ * right.
+ * - `lane`: on the attribute rows' lanes instead, a row among them — the
+ *   label in the 104px lane, the value where a field's text starts, 32px at
+ *   least, a rule under. Read only: no editor, no hover, no pointer.
+ */
 export function RailRow({
   label,
   value,
   className,
+  lane = false,
+  tone,
 }: {
   label: ReactNode
   value: ReactNode
   className?: string
+  lane?: boolean | undefined
+  /** Crimson on a `lane` row's value: past its threshold. */
+  tone?: 'bad' | undefined
 }) {
+  if (lane)
+    return (
+      <div
+        data-rail-readout
+        className={cn(
+          'flex min-w-0 items-start gap-x-2 border-b border-rule',
+          className,
+        )}
+      >
+        <div
+          data-property-label
+          className={cn(
+            PROPERTY_LABEL_LANE,
+            'text-label break-words text-graphite',
+          )}
+        >
+          {label}
+        </div>
+        <div
+          data-property-value
+          className={cn(
+            PROPERTY_VALUE_INSET,
+            'flex min-h-8 min-w-0 flex-1 flex-col justify-center mono text-ui break-words',
+            tone === 'bad' ? 'text-destructive' : 'text-foreground',
+          )}
+        >
+          {value}
+        </div>
+      </div>
+    )
   return (
     <div
       className={cn(
@@ -693,6 +749,19 @@ export function RailRow({
       <span className="min-w-0 truncate text-label text-graphite">{label}</span>
       <span className="min-w-0 truncate mono text-ui font-medium">{value}</span>
     </div>
+  )
+}
+
+/** A record's lone readout as a rail row; nothing when there is none. */
+export function RailReadout({ readout }: { readout: ShownReadout | null }) {
+  if (readout === null) return null
+  return (
+    <RailRow
+      lane
+      label={readout.label}
+      value={readout.value}
+      tone={readout.tone}
+    />
   )
 }
 

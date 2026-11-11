@@ -1,3 +1,4 @@
+import { splitReadouts } from '#/lib/records/overview'
 import {
   createFileRoute,
   Link,
@@ -23,6 +24,7 @@ import {
   RecordHeader,
   PropertyGrid,
   StageStepper,
+  RailReadout,
 } from '#/components/record/record-parts'
 import {
   MoveStageVerb,
@@ -256,6 +258,35 @@ function DealRecordPage() {
     deal.name,
   )
 
+  const readoutSplit = splitReadouts([
+    {
+      label: 'Our check',
+      value:
+        ourCheck !== null && Number.isFinite(ourCheck)
+          ? fmtMoney(ourCheck, valueCode)
+          : null,
+    },
+    { label: 'Round', value: readoutRound(readouts.round) },
+    {
+      label: 'Close',
+      value: readoutDay(closeDate, readouts.today),
+      tone:
+        closeDate !== null && closeDate < readouts.today ? 'bad' : undefined,
+    },
+    {
+      label: 'Days in stage',
+      value:
+        readouts.medianDaysInStage === null
+          ? daysInStage
+          : `${daysInStage} · med ${Math.round(readouts.medianDaysInStage)}`,
+      tone: readouts.pastTwiceMedian ? 'bad' : undefined,
+    },
+    {
+      label: 'Last contact',
+      value: readoutDay(readouts.lastContact, readouts.today),
+    },
+  ])
+
   return (
     <div className="flex min-h-full flex-col">
       {moveOpen && liveStages.length > 0 ? (
@@ -344,6 +375,7 @@ function DealRecordPage() {
             <AiCellsProvider entityIds={[deal.id]} registry={registry}>
               <PropertyGrid>
                 <PropertyFold
+                  after={<RailReadout readout={readoutSplit.rail} />}
                   defs={rail}
                   away={isLongText}
                   onPickAway={longText.pick}
@@ -476,36 +508,7 @@ function DealRecordPage() {
                     }}
                   />
                 }
-                readouts={[
-                  {
-                    label: 'Our check',
-                    value:
-                      ourCheck !== null && Number.isFinite(ourCheck)
-                        ? fmtMoney(ourCheck, valueCode)
-                        : null,
-                  },
-                  { label: 'Round', value: readoutRound(readouts.round) },
-                  {
-                    label: 'Close',
-                    value: readoutDay(closeDate, readouts.today),
-                    tone:
-                      closeDate !== null && closeDate < readouts.today
-                        ? 'bad'
-                        : undefined,
-                  },
-                  {
-                    label: 'Days in stage',
-                    value:
-                      readouts.medianDaysInStage === null
-                        ? daysInStage
-                        : `${daysInStage} · med ${Math.round(readouts.medianDaysInStage)}`,
-                    tone: readouts.pastTwiceMedian ? 'bad' : undefined,
-                  },
-                  {
-                    label: 'Last contact',
-                    value: readoutDay(readouts.lastContact, readouts.today),
-                  },
-                ]}
+                readouts={readoutSplit.strip}
                 timeline={timeline}
                 documents={documents}
                 onTab={changeTab}

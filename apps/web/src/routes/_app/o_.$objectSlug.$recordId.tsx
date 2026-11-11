@@ -1,3 +1,4 @@
+import { splitReadouts } from '#/lib/records/overview'
 import {
   createFileRoute,
   Link,
@@ -18,6 +19,7 @@ import {
   RecordBody,
   RecordHeadPending,
   RecordHeader,
+  RailReadout,
 } from '#/components/record/record-parts'
 import { RecordHeadActions } from '#/components/record/record-heads'
 import { RecordNotices } from '#/components/record/record-notices'
@@ -207,6 +209,21 @@ function ObjectRecordPage() {
     record.name,
   )
 
+  const readoutSplit = splitReadouts([
+    {
+      label: 'Last contact',
+      value: readoutDay(record.readouts.lastContact, record.readouts.today),
+    },
+    {
+      label: 'Next meeting',
+      value: readoutDay(record.readouts.nextMeeting, record.readouts.today),
+    },
+    {
+      label: 'Moving, 30 days',
+      value: record.readouts.moving30,
+    },
+  ])
+
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
@@ -249,6 +266,7 @@ function ObjectRecordPage() {
             <AiCellsProvider entityIds={[record.id]} registry={registry}>
               <PropertyGrid>
                 <PropertyFold
+                  after={<RailReadout readout={readoutSplit.rail} />}
                   defs={rail}
                   away={isLongText}
                   onPickAway={longText.pick}
@@ -365,26 +383,7 @@ function ObjectRecordPage() {
                     onSave={saveValue}
                   />
                 }
-                readouts={[
-                  {
-                    label: 'Last contact',
-                    value: readoutDay(
-                      record.readouts.lastContact,
-                      record.readouts.today,
-                    ),
-                  },
-                  {
-                    label: 'Next meeting',
-                    value: readoutDay(
-                      record.readouts.nextMeeting,
-                      record.readouts.today,
-                    ),
-                  },
-                  {
-                    label: 'Moving, 30 days',
-                    value: record.readouts.moving30,
-                  },
-                ]}
+                readouts={readoutSplit.strip}
                 timeline={timeline}
                 documents={documents}
                 onTab={changeTab}

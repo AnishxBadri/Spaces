@@ -12,14 +12,13 @@ import type { ThreadItem } from '#/components/record/thread-row'
 import { TasksBand } from '#/components/tasks-rail'
 import { fileType } from '#/lib/documents/files-tab'
 import type { RecordTab } from '#/lib/records/record-tabs'
-import { shownReadouts } from '#/lib/records/overview'
-import type { OverviewReadout } from '#/lib/records/overview'
+import type { ShownReadout } from '#/lib/records/overview'
 import { latestThreads } from '#/lib/timeline/threads'
 import { cn } from '#/lib/utils'
 
 /**
  * A record's Overview tab, top to bottom: the record's long text paragraphs
- * (`lead`), the readouts that have a value,
+ * (`lead`), the readout strip,
  * the open tasks with their composer, the latest three threads and the
  * latest three files — each group a band ending on a link to its tab. A
  * group with nothing in it is its one `Name +` row, so a first-run record
@@ -47,7 +46,8 @@ export function RecordOverview({
   lead,
 }: {
   record: { id: string; name: string; kind: string }
-  readouts: ReadonlyArray<OverviewReadout>
+  /** The strip's half of `splitReadouts`: none, or two and more. */
+  readouts: ReadonlyArray<ShownReadout>
   timeline: ReadonlyArray<TimelineRow>
   documents: ReadonlyArray<RecordDocument>
   onTab: (tab: RecordTab) => void
@@ -59,7 +59,6 @@ export function RecordOverview({
   /** Above the readouts: the long text paragraphs. */
   lead?: ReactNode
 }) {
-  const shown = shownReadouts(readouts)
   const threads = latestThreads(
     timeline.filter(
       (r): r is Extract<TimelineRow, { type: 'interaction' }> =>
@@ -74,12 +73,12 @@ export function RecordOverview({
   return (
     <div data-overview className="flex flex-col">
       {lead}
-      {shown.length > 0 ? (
+      {readouts.length > 0 ? (
         <div
           data-overview-readouts
           className="flex h-19 shrink-0 overflow-x-auto border-b border-rule px-(--inset)"
         >
-          {shown.map((r, i) => (
+          {readouts.map((r, i) => (
             <div
               key={r.label}
               data-readout

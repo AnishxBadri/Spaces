@@ -595,6 +595,11 @@ anatomy (D74 amended 2026-10-25):
     attribute; seeded on company and person `description` and deal `close_reason`) is
     never a row: it is an Overview paragraph, and while empty it is offered in the
     fold, whose pick opens its editor in Overview.
+  - A record's lone readout is a row here, not a strip in Overview: when only one
+    readout has a value it prints after the last attribute row and before the
+    `n empty +` row, its label on the 104px lane and its value in mono where a
+    field's text starts, on the same rules (`RailRow` with `lane`). It is read only
+    (no editor, no hover, no pointer), and a `bad` tone keeps its crimson.
   - Then the relations (Team, Associated deals, Spaces, Waiting), each empty one an
     `EmptyRow`. Tasks are not in the rail.
 - **View.** Right, 12px from the rail, the record's folder: the 44px bar on the ground,
@@ -605,10 +610,12 @@ anatomy (D74 amended 2026-10-25):
   registry order: the label in sans 12 graphite, the text at the body step clamped to
   three lines with `More` / `Less`; a click opens a textarea in place at full width
   that commits on blur and reverts on Esc, with no Save, and a refused write holds
-  crimson as a rail row does. Then the readouts that have a value (never a `—` or a
-  0), the open tasks with their composer, the latest three threads and the latest
-  files, each group a `Band` ending on a link to its tab. A list table keeps a long
-  text to its one truncated line.
+  crimson as a rail row does. Then the readout strip, which needs two: it draws
+  only when two or more readouts have a value (never a `—` or a 0), and one alone
+  is a rail row instead (`splitReadouts` decides both, once). Then the open tasks
+  with their composer, the latest three threads and the latest files, each group
+  a `Band` ending on a link to its tab. A list table keeps a long text to its one
+  truncated line.
 - **A space** is the same anatomy: the head is `···` only and the stamp prints no
   depth; Overview holds its readouts (in pipeline, last filed, the funding-stage bar),
   What's moving, open tasks and the latest companies; the rail is Criteria, Watching

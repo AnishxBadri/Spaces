@@ -1,3 +1,4 @@
+import { splitReadouts } from '#/lib/records/overview'
 import { readoutDay } from '#/lib/records/readout-format'
 import {
   createFileRoute,
@@ -20,6 +21,7 @@ import {
   RecordBody,
   RecordHeadPending,
   RecordHeader,
+  RailReadout,
 } from '#/components/record/record-parts'
 import { RecordHeadActions } from '#/components/record/record-heads'
 import { RecordNotices } from '#/components/record/record-notices'
@@ -233,6 +235,25 @@ function PersonRecordPage() {
     person.name,
   )
 
+  const readoutSplit = splitReadouts([
+    {
+      label: 'Last contact',
+      value: readoutDay(person.readouts.lastContact, person.readouts.today),
+    },
+    {
+      label: 'Last email',
+      value: readoutDay(person.readouts.lastEmail, person.readouts.today),
+    },
+    {
+      label: 'Next meeting',
+      value: readoutDay(person.readouts.nextMeeting, person.readouts.today),
+    },
+    {
+      label: 'First contact',
+      value: readoutDay(person.readouts.firstContact, person.readouts.today),
+    },
+  ])
+
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
@@ -281,6 +302,7 @@ function PersonRecordPage() {
             <AiCellsProvider entityIds={[person.id]} registry={registry}>
               <PropertyGrid>
                 <PropertyFold
+                  after={<RailReadout readout={readoutSplit.rail} />}
                   defs={rail}
                   away={isLongText}
                   onPickAway={longText.pick}
@@ -462,36 +484,7 @@ function PersonRecordPage() {
                     onSave={saveValue}
                   />
                 }
-                readouts={[
-                  {
-                    label: 'Last contact',
-                    value: readoutDay(
-                      person.readouts.lastContact,
-                      person.readouts.today,
-                    ),
-                  },
-                  {
-                    label: 'Last email',
-                    value: readoutDay(
-                      person.readouts.lastEmail,
-                      person.readouts.today,
-                    ),
-                  },
-                  {
-                    label: 'Next meeting',
-                    value: readoutDay(
-                      person.readouts.nextMeeting,
-                      person.readouts.today,
-                    ),
-                  },
-                  {
-                    label: 'First contact',
-                    value: readoutDay(
-                      person.readouts.firstContact,
-                      person.readouts.today,
-                    ),
-                  },
-                ]}
+                readouts={readoutSplit.strip}
                 timeline={timeline}
                 documents={documents}
                 onTab={changeTab}

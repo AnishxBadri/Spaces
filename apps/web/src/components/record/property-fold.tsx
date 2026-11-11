@@ -25,6 +25,8 @@ export type CreateOpener = {
  * - `away`: attributes printed elsewhere (long text, in Overview). Never a
  *   row; empty, they are offered here and a pick goes to `onPickAway`.
  * - `create` renders the caller's create window, held open by the fold.
+ * - `after`: a read-only row after the last attribute row, before the fold
+ *   (a record's lone readout).
  * - Nothing empty and nothing to create: no row, never a `0 empty`.
  */
 export function PropertyFold<TDef extends FoldDef>({
@@ -34,6 +36,7 @@ export function PropertyFold<TDef extends FoldDef>({
   create,
   away,
   onPickAway,
+  after,
 }: {
   defs: ReadonlyArray<TDef>
   valueOf: (def: TDef) => unknown
@@ -41,6 +44,7 @@ export function PropertyFold<TDef extends FoldDef>({
   create?: ((opener: CreateOpener) => ReactNode) | undefined
   away?: ((def: TDef) => boolean) | undefined
   onPickAway?: ((def: TDef) => void) | undefined
+  after?: ReactNode
 }) {
   const [picking, setPicking] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -66,6 +70,7 @@ export function PropertyFold<TDef extends FoldDef>({
   return (
     <>
       {rows.map(render)}
+      {after}
       {empty.length > 0 || create ? (
         <Popover
           open={picking}
