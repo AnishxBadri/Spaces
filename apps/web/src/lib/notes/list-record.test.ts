@@ -33,7 +33,7 @@ async function aCompany(tag: string): Promise<string> {
 async function aNote(opts: {
   title: string
   authorId: string
-  kind?: 'note' | 'memo' | 'scratch'
+  kind?: 'note' | 'memo'
   visibility?: 'shared' | 'private'
   updatedAt?: Date
   filedAgainst?: string
@@ -287,7 +287,7 @@ describe('byMemoThenRecent', () => {
     const { byMemoThenRecent } = await import('./ordering')
     const rows = [
       { kind: 'note', updatedAt: '2026-01-01T00:00:00.000Z' },
-      { kind: 'scratch', updatedAt: '2026-03-01T00:00:00.000Z' },
+      { kind: 'note', updatedAt: '2026-03-01T00:00:00.000Z' },
       { kind: 'memo', updatedAt: '2020-01-01T00:00:00.000Z' },
       { kind: 'memo', updatedAt: '2026-09-01T00:00:00.000Z' },
     ] as const

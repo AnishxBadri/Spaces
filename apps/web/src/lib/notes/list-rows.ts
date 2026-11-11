@@ -5,8 +5,7 @@ import { entity, note } from '@spaces/db/schema'
 /**
  * The query behind `listNotes`, minus the request context, so tests can run
  * it without a session.
- * - No kind predicate, and must not grow one: a scratch note is listed like
- *   any other.
+ * - No kind predicate, and must not grow one: every kind is listed.
  * - Kept out of the server-fn modules: a plain export there keeps its imports
  *   alive in the client bundle.
  */

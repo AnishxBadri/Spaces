@@ -251,10 +251,10 @@ describe('the head', () => {
     expect(text(meta)).toBe('Anish Badri · 13 Oct 14:02')
   })
 
-  it('stamps the kind: MEMO, SCRATCH', () => {
+  it('stamps the kind: NOTE, MEMO', () => {
     for (const [kind, word] of [
+      ['note', 'Note'],
       ['memo', 'Memo'],
-      ['scratch', 'Scratch'],
     ] as const) {
       const root = check(fixture({ kind }))
       expect(text(root.querySelector('[data-stamp="live"]'))).toBe(word)
@@ -425,7 +425,6 @@ describe('the ··· entries', () => {
       '[Kind]',
       'Note',
       'Memo',
-      'Scratch',
       '—',
       'Save as new version',
       'Save as template…',
@@ -452,7 +451,7 @@ describe('the ··· entries', () => {
     })
     for (const e of entries)
       if (e !== MENU_RULE && 'checked' in e) e.onCheckedChange(true)
-    expect(onKind.mock.calls).toEqual([['memo'], ['scratch']])
+    expect(onKind.mock.calls).toEqual([['memo']])
   })
 })
 
@@ -525,7 +524,7 @@ describe('the ··· menu', () => {
   }
 
   it('draws its rows in order, the current kind checked', async () => {
-    mountMenu('scratch')
+    mountMenu('memo')
     await open()
     const menuEl = document.querySelector('[role="menu"]')
     const rows = [...(menuEl?.children ?? [])].map((el) =>
@@ -535,7 +534,6 @@ describe('the ··· menu', () => {
       'Kind',
       'Note',
       'Memo',
-      'Scratch',
       '—',
       'Save as new version',
       'Save as template…',
@@ -543,7 +541,7 @@ describe('the ··· menu', () => {
       '—',
       'Delete…',
     ])
-    expect(item('Scratch')?.getAttribute('aria-checked')).toBe('true')
+    expect(item('Memo')?.getAttribute('aria-checked')).toBe('true')
     expect(item('Note')?.getAttribute('aria-checked')).toBe('false')
   })
 

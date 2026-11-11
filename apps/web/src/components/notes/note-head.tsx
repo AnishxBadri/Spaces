@@ -18,7 +18,6 @@ export type SaveState = 'idle' | 'dirty' | 'saving' | 'saved'
 const STAMPS: Record<NoteKind, string> = {
   note: 'Note',
   memo: 'Memo',
-  scratch: 'Scratch',
 }
 
 /**

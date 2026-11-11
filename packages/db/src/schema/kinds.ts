@@ -121,7 +121,7 @@ export const entitySpace = pgTable(
 
 // ---------- note ----------
 
-export const noteKind = pgEnum('note_kind', ['note', 'memo', 'scratch'])
+export const noteKind = pgEnum('note_kind', ['note', 'memo'])
 export const visibility = pgEnum('visibility', ['shared', 'private'])
 
 /**

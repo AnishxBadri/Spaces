@@ -1792,7 +1792,7 @@ const FX: Array<{ currency: string; days: number; rate: number }> = [
 type NoteSpec = {
   title: string
   body: string
-  kind: 'note' | 'memo' | 'scratch'
+  kind: 'note' | 'memo'
   author: 'lead' | 'partner'
   visibility: 'shared' | 'private'
   days: number
@@ -1907,7 +1907,7 @@ const NOTES: Array<NoteSpec> = [
   },
   {
     title: 'Pipeline hygiene — read before Monday',
-    kind: 'scratch',
+    kind: 'note',
     author: 'lead',
     visibility: 'private',
     days: 4,

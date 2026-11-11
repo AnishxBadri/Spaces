@@ -5,8 +5,7 @@ import { cn } from '#/lib/utils'
  * A note's kind as a glyph: our own concept, so our own drawing, on
  * Lucide's 24-grid with its 2px round stroke so it sits beside Lucide icons
  * without a seam.
- * - note: a page of lines; memo: a page under a seal, the written-up kind;
- *   scratch: a loose scribble over a rule.
+ * - note: a page of lines; memo: a page under a seal, the written-up kind.
  */
 const PATHS: Record<NoteKind, Array<string>> = {
   note: ['M6 3h8l4 4v14H6z', 'M14 3v4h4', 'M9 12h6', 'M9 16h6'],
@@ -16,7 +15,6 @@ const PATHS: Record<NoteKind, Array<string>> = {
     'M9 11h6',
     'M14.5 14.5a2.5 2.5 0 1 0 0 .01',
   ],
-  scratch: ['M4 15c2-5 4-5 5 0s3 5 5 0 4-5 6 0', 'M4 20h16'],
 }
 
 export function NoteKindIcon({
@@ -49,5 +47,4 @@ export function NoteKindIcon({
 export const NOTE_KIND_LABEL: Record<NoteKind, string> = {
   note: 'Note',
   memo: 'Memo',
-  scratch: 'Scratch',
 }

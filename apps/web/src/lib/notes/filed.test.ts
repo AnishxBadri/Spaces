@@ -3,7 +3,7 @@ import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The filed block of a space page: a memo leads even when a scratch note was
+ * The filed block of a space page: a memo leads even when a plain note was
  * touched later; two memos order by recency (there is no singleton memo); a
  * teammate's private note never reaches the loader.
  */
@@ -36,7 +36,7 @@ async function aNote(opts: {
   title: string
   authorId: string
   inSpace: string
-  kind?: 'note' | 'memo' | 'scratch'
+  kind?: 'note' | 'memo'
   visibility?: 'shared' | 'private'
   updatedAt?: Date
   bodyMd?: string
@@ -97,10 +97,10 @@ describe('filedNotesProgram', () => {
       updatedAt: new Date('2025-01-01T00:00:00Z'),
     })
     const fresh = await aNote({
-      title: `Scratch ${tag}`,
+      title: `Fresh ${tag}`,
       authorId: me,
       inSpace: spaceId,
-      kind: 'scratch',
+      kind: 'note',
       updatedAt: new Date('2026-09-01T00:00:00Z'),
     })
 

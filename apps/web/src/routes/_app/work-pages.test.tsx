@@ -345,7 +345,7 @@ describe('Notes', () => {
   it('is one sheet banded This week and Earlier with no counts, kinds as glyphs, a Memos tab, and folds Earlier past 20', async () => {
     const notes = [
       aNote(1, '2026-10-14T10:00:00.000Z', 'memo'),
-      aNote(2, '2026-10-13T10:00:00.000Z', 'scratch'),
+      aNote(2, '2026-10-13T10:00:00.000Z'),
       aNote(3, '2026-10-12T10:00:00.000Z'),
       ...Array.from({ length: 23 }, (_, i) =>
         aNote(10 + i, '2026-09-01T10:00:00.000Z'),
@@ -382,7 +382,7 @@ describe('Notes', () => {
       Array.from(document.querySelectorAll('[data-note-kind]'))
         .slice(0, 3)
         .map((el) => el.getAttribute('data-note-kind')),
-    ).toEqual(['memo', 'scratch', 'note'])
+    ).toEqual(['memo', 'note', 'note'])
     expect(document.querySelector('[data-kind-lane]')).toBeNull()
     const earlier = () =>
       document.querySelector('section[aria-label="Earlier"]')

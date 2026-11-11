@@ -28,7 +28,7 @@ async function actorId(): Promise<string> {
 async function makeNote(opts: {
   tag: string
   authorId: string
-  kind: 'note' | 'memo' | 'scratch'
+  kind: 'note' | 'memo'
   bodyJson?: NoteBody
 }): Promise<string> {
   const { db } = await import('@spaces/db')
@@ -109,21 +109,19 @@ describe('note template kind', () => {
     expect(stamped?.title).toBe(`IC memo ${tag}`)
   })
 
-  it('captures scratch and plain note the same way', async () => {
+  it('captures a plain note as a plain note', async () => {
     const { captureNoteTemplate, stampNoteTemplate } =
       await import('#/lib/notes/templates')
     const me = await actorId()
-    for (const kind of ['note', 'scratch'] as const) {
-      const tag = randomUUID().slice(0, 8)
-      const sourceId = await makeNote({ tag, authorId: me, kind })
-      const { id: templateId } = await captureNoteTemplate(me, {
-        noteId: sourceId,
-        name: `${kind} ${tag}`,
-      })
-      expect((await readTemplate(templateId))?.noteKind).toBe(kind)
-      const { id: stampedId } = await stampNoteTemplate(me, { templateId })
-      expect((await readNote(stampedId))?.kind).toBe(kind)
-    }
+    const tag = randomUUID().slice(0, 8)
+    const sourceId = await makeNote({ tag, authorId: me, kind: 'note' })
+    const { id: templateId } = await captureNoteTemplate(me, {
+      noteId: sourceId,
+      name: `note ${tag}`,
+    })
+    expect((await readTemplate(templateId))?.noteKind).toBe('note')
+    const { id: stampedId } = await stampNoteTemplate(me, { templateId })
+    expect((await readNote(stampedId))?.kind).toBe('note')
   })
 
   it('stamps a plain note from a template saved before the column', async () => {

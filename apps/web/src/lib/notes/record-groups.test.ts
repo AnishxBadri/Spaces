@@ -11,7 +11,7 @@ import { recordNoteGroups, recordNotesCount } from './record-groups'
 const note = (
   id: string,
   over: Partial<{
-    kind: 'note' | 'memo' | 'scratch'
+    kind: 'note' | 'memo'
     updatedAt: string
     supersededBy: string | null
   }> = {},
@@ -26,7 +26,7 @@ describe('recordNoteGroups', () => {
   it('lists filed notes memos first, then the meetings’ notes, a note in two lanes once', () => {
     const groups = recordNoteGroups({
       filed: [
-        note('scratch', { kind: 'scratch', updatedAt: '2026-10-09' }),
+        note('loose', { updatedAt: '2026-10-09' }),
         note('memo', { kind: 'memo', updatedAt: '2026-10-01' }),
         note('granola', { updatedAt: '2026-10-05' }),
       ],
@@ -35,7 +35,7 @@ describe('recordNoteGroups', () => {
     })
     expect(groups.notes.map((n) => n.id)).toEqual([
       'memo',
-      'scratch',
+      'loose',
       'aside',
       'granola',
     ])

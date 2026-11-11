@@ -14,14 +14,14 @@ import { cn } from '#/lib/utils'
  * one `Notes +` row.
  * - A row: the glyph, the serif title, its people (the author, or the
  *   meeting's attendees), the kind in mono and the day, then the excerpt.
- * - The kind lane prints `memo`, `scratch`, `via Granola` or `superseded`,
+ * - The kind lane prints `memo`, `via Granola` or `superseded`,
  *   never `note`.
  */
 
 export type RecordNoteRow = {
   id: string
   title: string
-  kind: 'note' | 'memo' | 'scratch'
+  kind: 'note' | 'memo'
   updatedAt: string
   via: NoteVia | null
   author: string | null

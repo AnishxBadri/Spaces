@@ -729,7 +729,6 @@ describe('the Notes tab', () => {
           filed: [
             row('old', 'IC memo v1', { kind: 'memo', supersededBy: 'memo' }),
             row('s', 'Loose ends', {
-              kind: 'scratch',
               author: 'Priya Raman',
               excerpt: 'Ask about churn in the Pune cohort.',
             }),
@@ -768,7 +767,7 @@ describe('the Notes tab', () => {
     const lane = (id: string, slot: string) =>
       el.querySelector(`li[data-note="${id}"] [data-${slot}]`)?.textContent
     expect(lane('memo', 'kind')).toBe('memo')
-    expect(lane('s', 'kind')).toBe('scratch')
+    expect(lane('s', 'kind')).toBe('')
     expect(lane('x', 'kind')).toBe('')
     expect(lane('g', 'kind')).toBe('via Granola')
     expect(lane('old', 'kind')).toBe('superseded')

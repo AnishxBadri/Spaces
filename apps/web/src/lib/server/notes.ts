@@ -15,6 +15,7 @@ import { user } from '@spaces/db/schema/auth'
 import { noteWidenedSql } from '@spaces/core/writes/read/can-read-sql'
 import { canRead, requireUser } from './shared'
 import { liveSpaceSql } from '#/lib/spaces/live'
+import { noteKindInput } from '#/lib/notes/kind-input'
 import { jsonValue } from '@spaces/core/json'
 
 export const createNote = createServerFn({ method: 'POST' })
@@ -32,7 +33,7 @@ export const createNote = createServerFn({ method: 'POST' })
           })
           .optional(),
         /** memo: the note IS the memo of `about` (tagged_in, not mentions). */
-        noteKind: z.enum(['note', 'memo', 'scratch']).optional(),
+        noteKind: noteKindInput.optional(),
       })
       .optional(),
   )
@@ -340,7 +341,7 @@ export const setNoteKind = createServerFn({ method: 'POST' })
   .validator(
     z.object({
       id: z.string().uuid(),
-      kind: z.enum(['note', 'memo', 'scratch']),
+      kind: noteKindInput,
     }),
   )
   .handler(async ({ data }) => {

@@ -17,11 +17,10 @@ import type { NoteKind } from './note-head'
 const KINDS: ReadonlyArray<{ id: NoteKind; label: string }> = [
   { id: 'note', label: 'Note' },
   { id: 'memo', label: 'Memo' },
-  { id: 'scratch', label: 'Scratch' },
 ]
 
 /**
- * The note head's `···`, in order: the `KIND` group of three checked rows;
+ * The note head's `···`, in order: the `KIND` group of two checked rows;
  * a rule; Save as new version, Save as template…, Copy link; a rule; Delete….
  * Every verb is a callback, so the order is testable without a menu open.
  */

@@ -7,7 +7,7 @@ import { NoteNotFound, NoteQueryFailed } from '#/lib/notes/delete'
 import { canRead } from '#/lib/server/shared'
 
 /**
- * Note kind: `memo · note · scratch`, three and frozen. A memo is a note with
+ * Note kind: `note · memo`, two and frozen. A memo is a note with
  * the flag up, so a promote or demote updates one column and writes no link,
  * no `entity_space` and no body; the test pins that.
  * - Not author-only: whoever may read a shared note may promote it.
@@ -15,8 +15,8 @@ import { canRead } from '#/lib/server/shared'
  *   re-declared) so a private note's existence is never confirmed.
  */
 
-/** The three kinds, in the order the editor's segmented control draws them. */
-export const NOTE_KINDS = ['note', 'memo', 'scratch'] as const
+/** The two kinds, in the order the editor's segmented control draws them. */
+export const NOTE_KINDS = ['note', 'memo'] as const
 
 export type NoteKind = (typeof NOTE_KINDS)[number]
 

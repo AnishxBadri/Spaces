@@ -244,9 +244,8 @@ export const spacesIndexProgram = Effect.fn('spacesIndexProgram')(function* (
 })
 
 /**
- * Exported for the test that pins the lanes' contents (the `filed` lane
- * carries a scratch note like any other). The server fn is the only
- * production caller.
+ * Exported for the test that pins the lanes' contents. The server fn is the
+ * only production caller.
  */
 export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
   id: string,
