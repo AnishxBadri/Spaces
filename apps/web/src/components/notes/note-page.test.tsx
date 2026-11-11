@@ -686,6 +686,25 @@ describe('the rail', () => {
     expect(kindLane({ kind: 'space' })).toBe('space')
   })
 
+  it('FILED ON keeps an archived space: its name graphite, its lane marked', () => {
+    const host = rail(
+      fixture({
+        spaces: [FINTECH, { id: 's9', name: 'Harbour', archived: true }],
+      }),
+    )
+    expect(section(host, 'filed-on')?.rows).toEqual([
+      'Fintech | space×',
+      'Harbour | space · archived×',
+      '+ | File on…',
+    ])
+    expect(host.querySelector('a[href="/spaces/s1"]')?.className).toContain(
+      'text-foreground',
+    )
+    expect(host.querySelector('a[href="/spaces/s9"]')?.className).toContain(
+      'text-graphite',
+    )
+  })
+
   it('FILED ON with nothing filed: Not filed, then + File on…', () => {
     const filed = section(rail(fixture()), 'filed-on')
     expect(filed?.head).toBe('Filed on')

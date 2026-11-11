@@ -15,7 +15,6 @@ import {
 
 import type * as PageModule from './space-page'
 import type * as OverviewModule from './space-overview'
-import type * as FilingModule from './filing-row'
 import type * as RailRowModule from './record/space-rail-row'
 import type { Space } from './space-tabs'
 import type { SensitivityState } from './sensitive-toggle'
@@ -101,7 +100,6 @@ let createRoot: typeof CreateRoot
 let page: typeof PageModule
 let overview: typeof OverviewModule
 let router: typeof RouterModule
-let filing: typeof FilingModule
 let railRow: typeof RailRowModule
 
 /** The space's status stream, fed by hand: what `/api/job-status` would send. */
@@ -162,7 +160,6 @@ beforeAll(async () => {
   page = await import('./space-page')
   overview = await import('./space-overview')
   router = await import('@tanstack/react-router')
-  filing = await import('./filing-row')
   railRow = await import('./record/space-rail-row')
 })
 
@@ -1356,36 +1353,6 @@ async function mountNode(node: React.ReactNode) {
 }
 
 describe("an archived space's filings elsewhere", () => {
-  it("dims the space's chip on a note page and marks it archived", async () => {
-    await mountNode(
-      <filing.FilingRow
-        label="Filed in space"
-        busy={false}
-        chips={[
-          { id: 'a', name: 'Launch', href: '/spaces/a', Icon: undefined },
-          {
-            id: 'b',
-            name: 'Harbour',
-            href: '/spaces/b',
-            Icon: undefined,
-            archived: true,
-          },
-        ]}
-        removeLabel={(name) => `Remove from ${name}`}
-        onRemove={() => {}}
-        adder={null}
-      />,
-    )
-    const live = document.querySelector('[data-chip="live"]')
-    const gone = document.querySelector('[data-chip="archived"]')
-    expect(live?.className).toContain('font-medium')
-    expect(live?.className).not.toContain('text-graphite')
-    expect(gone?.className).toContain('text-graphite')
-    expect(gone?.className).not.toContain('font-medium')
-    expect(text(gone)).toContain('Harbour')
-    expect(text(gone)).toContain('archived')
-  })
-
   it("dims the row in a record's Spaces section, with no untag", async () => {
     await mountNode(
       <railRow.SpaceRailRow
