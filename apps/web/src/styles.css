@@ -1,8 +1,22 @@
 /* Self-hosted fonts — no font CDN calls from a privacy product.
-   Inter carries UI (ledger register); Source Serif carries prose (page register). */
-@import '@fontsource-variable/inter';
-@import '@fontsource-variable/source-serif-4';
-@import '@fontsource-variable/jetbrains-mono';
+   One family in three cuts: Plex Sans carries UI (ledger register), Plex
+   Serif carries titles and prose (page register), Plex Mono carries data.
+   Static files, so every weight the app draws is listed: an unlisted one
+   would be faked by the browser. */
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/400-italic.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-sans/700.css';
+@import '@fontsource/ibm-plex-serif/400.css';
+@import '@fontsource/ibm-plex-serif/400-italic.css';
+@import '@fontsource/ibm-plex-serif/500.css';
+@import '@fontsource/ibm-plex-serif/600.css';
+@import '@fontsource/ibm-plex-serif/700.css';
+@import '@fontsource/ibm-plex-serif/700-italic.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+@import '@fontsource/ibm-plex-mono/600.css';
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
 
@@ -161,12 +175,11 @@
 }
 
 @theme inline {
-  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
-  --font-serif: 'Source Serif 4 Variable', Georgia, serif;
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'IBM Plex Serif', Georgia, serif;
   /* Mono is the third voice: everything the instrument measured — numbers,
      dates, IDs, domains, column labels, key hints. Never prose or names. */
-  --font-mono:
-    'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   /**
    * Type scale — named steps, fixed rem, never fluid. DESIGN.md §3 asks for a
@@ -805,12 +818,6 @@
 @layer base {
   * {
     @apply border-border;
-  }
-
-  html {
-    font-feature-settings:
-      'cv11' 1,
-      'ss01' 1;
   }
 
   body {

@@ -18,43 +18,43 @@ colors:
   info-blue: 'oklch(0.55 0.1 240)'
 typography:
   display:
-    fontFamily: 'Source Serif 4 Variable, Georgia, serif'
+    fontFamily: 'IBM Plex Serif, Georgia, serif'
     fontSize: '1.75rem'
     fontWeight: 600
     lineHeight: '2rem'
     letterSpacing: '-0.01em'
   section:
-    fontFamily: 'Source Serif 4 Variable, Georgia, serif'
+    fontFamily: 'IBM Plex Serif, Georgia, serif'
     fontSize: '1.125rem'
     fontWeight: 600
     lineHeight: '1.375rem'
   prose:
-    fontFamily: 'Source Serif 4 Variable, Georgia, serif'
+    fontFamily: 'IBM Plex Serif, Georgia, serif'
     fontSize: '1.0625rem'
     fontWeight: 400
     lineHeight: '1.6875rem'
   title:
-    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontFamily: 'IBM Plex Sans, ui-sans-serif, system-ui, sans-serif'
     fontSize: '0.9375rem'
     fontWeight: 500
     lineHeight: '1.375rem'
   ui:
-    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontFamily: 'IBM Plex Sans, ui-sans-serif, system-ui, sans-serif'
     fontSize: '0.8125rem'
     fontWeight: 400
     lineHeight: '1.25rem'
   readout:
-    fontFamily: 'JetBrains Mono Variable, ui-monospace, monospace'
+    fontFamily: 'IBM Plex Mono, ui-monospace, monospace'
     fontSize: '1.25rem'
     fontWeight: 500
     lineHeight: '1.5rem'
   numeral:
-    fontFamily: 'JetBrains Mono Variable, ui-monospace, monospace'
+    fontFamily: 'IBM Plex Mono, ui-monospace, monospace'
     fontSize: '0.8125rem'
     fontWeight: 400
     lineHeight: '1rem'
   label:
-    fontFamily: 'JetBrains Mono Variable, ui-monospace, monospace'
+    fontFamily: 'IBM Plex Mono, ui-monospace, monospace'
     fontSize: '0.6875rem'
     fontWeight: 500
     lineHeight: '1rem'
@@ -218,9 +218,10 @@ tall, mono 11 medium. Options get a hue auto-assigned; users can override per op
 ## 3. Type — three voices
 
 **Serif** where a human wrote it · **Sans** for the interface · **Mono** for everything
-the instrument measured. Inter Variable (`cv11` + `ss01`), Source Serif 4 Variable and
-JetBrains Mono Variable, all self-hosted via Fontsource — no font CDN calls from a
-privacy product.
+the instrument measured. One family in three cuts — IBM Plex Sans, IBM Plex Serif and
+IBM Plex Mono, at their default letterforms — all self-hosted via Fontsource as static
+weights (400 to 700), no font CDN calls from a privacy product. The landing site still
+draws Inter, Source Serif 4 and JetBrains Mono.
 
 | voice | step             | size / leading | role                                                    |
 | ----- | ---------------- | -------------- | ------------------------------------------------------- |

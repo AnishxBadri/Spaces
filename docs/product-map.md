@@ -132,7 +132,7 @@ it. Cards are designed on the first page that needs them.
   delete it or make it a tooltip. Each board carries one caption naming the code
   symbol it draws (`RecordHeader · record-parts.tsx`) and `proposed` where the
   drawing is ahead of or contradicts the code.
-- Tokens only, no raw hex. Fonts Inter · Source Serif 4 · JetBrains Mono.
+- Tokens only, no raw hex. Fonts IBM Plex Sans · IBM Plex Serif · IBM Plex Mono.
 
 ### Where the rules live
 
