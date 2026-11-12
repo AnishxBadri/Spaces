@@ -65,7 +65,7 @@ describe('effect/io-is-effect', () => {
     for (const line of [
       "import { Effect } from 'effect'",
       "import { Schema } from 'effect'",
-      "import { HttpApi } from 'effect/unstable/httpapi'",
+      "import { Schema } from 'effect/Schema'",
     ])
       expect(
         await lint(`${line}\nimport { db } from '@spaces/db'\n${QUERY}`),

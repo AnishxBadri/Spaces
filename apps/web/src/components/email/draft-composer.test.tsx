@@ -124,6 +124,21 @@ const settle = async () => {
     })
 }
 
+/**
+ * Waits for what a window draws a beat later (a menu, a confirm) instead of
+ * counting ticks: under load five ticks are not always enough.
+ */
+async function until<T>(read: () => T | null | undefined | false): Promise<T> {
+  for (let i = 0; i < 200; i++) {
+    const got = read()
+    if (got) return got
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+  }
+  throw new Error('timed out waiting')
+}
+
 function mount(initial: DraftState = blankDraft(ID)) {
   act(() =>
     root.render(
@@ -378,14 +393,15 @@ describe('Delete draft', () => {
         new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
       )
     })
-    await settle()
-    const item = [...document.querySelectorAll('[role="menuitem"]')].find(
-      (el) => el.textContent.trim() === 'Delete draft…',
+    const item = await until(() =>
+      [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+        (el) => el.textContent.trim() === 'Delete draft…',
+      ),
     )
-    if (!(item instanceof HTMLElement)) throw new Error('no Delete draft…')
     act(() => item.click())
-    await settle()
-    act(() => button('Delete')?.click())
+    const confirmDelete = await until(() => button('Delete'))
+    act(() => confirmDelete.click())
+    await until(() => fns.deleteEmailDraft.mock.calls.length > 0)
     await settle()
     expect(fns.deleteEmailDraft).toHaveBeenCalledWith({ data: { id: ID } })
     expect(draftsInvalidated(invalidate)).toBe(1)
