@@ -34,7 +34,7 @@ Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-
 
 ## 32. One backend grammar
 
-Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2026-11-12 (owner): D84, a module in `apps/web/src/lib` that does I/O is Effect, and the 53 that are not get converted in a planned sweep; D85, Effect Schema is the one schema language and Zod leaves. `schema-1` (SPA-400) shipped 2026-11-12: `input()` in `lib/server/input.ts` is the helper, and `lib/server/tasks.ts` with `lib/tasks/create.ts` is the reference module every later slice copies. `effect-1` (SPA-401) shipped 2026-11-12: nine server modules, the typed session gate (`requireUserProgram`, `requireAdminProgram`, `requireSettingsReaderProgram` beside the async three), and `lib/server/query.ts`, whose `ServerQueryFailed` and `serverQuery` every module under `lib/server/` shares. `effect-2` (SPA-403) shipped 2026-11-12: the other seven server modules, so every file in `lib/server/` that imports `db` imports `effect`. `schema-2` (SPA-402) shipped 2026-11-12: the plugin contract is Effect Schema, SDK 2.0.0, with no zod under `packages/sdk/src` or `plugins/`. The `effect-*` slices own disjoint files and run one after another, each beside a slice from another area.
+Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2026-11-12 (owner): D84, a module in `apps/web/src/lib` that does I/O is Effect, and the 53 that are not get converted in a planned sweep; D85, Effect Schema is the one schema language and Zod leaves. `schema-1` (SPA-400) shipped 2026-11-12: `input()` in `lib/server/input.ts` is the helper, and `lib/server/tasks.ts` with `lib/tasks/create.ts` is the reference module every later slice copies. `effect-1` (SPA-401) shipped 2026-11-12: nine server modules, the typed session gate (`requireUserProgram`, `requireAdminProgram`, `requireSettingsReaderProgram` beside the async three), and `lib/server/query.ts`, whose `ServerQueryFailed` and `serverQuery` every module under `lib/server/` shares. `effect-2` (SPA-403) shipped 2026-11-12: the other seven server modules, so every file in `lib/server/` that imports `db` imports `effect`. `schema-2` (SPA-402) shipped 2026-11-12: the plugin contract is Effect Schema, SDK 2.0.0, with no zod under `packages/sdk/src` or `plugins/`. `effect-3` (SPA-405) shipped 2026-11-12: documents, notes, records and the portfolio loader, each area with its own `query.ts`, and the money, note-kind and paged-list inputs as Effect schemas. The `effect-*` slices own disjoint files and run one after another, each beside a slice from another area.
 
 **What a conversion is, for every `effect-*` slice.** It changes the grammar and nothing a user or a caller can see.
 
@@ -50,33 +50,9 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 
 ---
 
-#### `effect-3` (SPA-405) · afk · L — Documents, notes, views, records and the portfolio loader become Effect
-
-**Blocked by:** nothing. **Owns**, in `apps/web/src/lib/`: `portfolio/inputs.ts`, `notes/kind-input.ts`, and the `.validator()` of each server fn that takes one of their shapes; `views/page-input.ts` and the `.validator()` of each server fn that takes `pagedListInput`; `documents/` (`blob-refs.ts`, `fetch-guard.ts`, `preview-card.ts`, `record-files.ts`, `unfiled.ts`, `upload.ts`), `notes/` (`from-suggestion.ts`, `list-rows.ts`, `ordering.ts`, `templates.ts`), `views/` (`paging.ts`, `resolve.ts`, `scope.ts`, `sql.ts`), `records/` (`head.ts`, `pictures.ts`), `portfolio/` (`detail.ts`, `holding.ts`), and their tests. 2,300 lines.
-
-**Does not touch** `packages/sdk/**`, `plugins/**`, `packages/core/**` or `lib/integrations/**`.
-
-**Spec.** D84, and the conversion rules at the head of this section. Three cautions:
-
-- `views/sql.ts` and `views/resolve.ts` compile SQL. The expression `compileSortKey` emits must stay byte-identical, because the `attr_idx_*` indexes match on it; `value-index-plan.test.ts` is the EXPLAIN assertion. A file that only builds SQL stays plain.
-- `portfolio/detail.ts` hands the pure libs originals only, each stamped with `reversedAt`. That reader contract does not move.
-- `documents/fetch-guard.ts` is the SSRF guard. Its checks keep their order, and a refused fetch still never opens a socket.
-
-**What to build.** The listed files, by the rules. `pagedListInput` in `views/page-input.ts` becomes an Effect schema, and every server fn that validates with it (`companies.ts`, `people.ts` and the rest; grep) takes it through `input()`.
-
-**Acceptance criteria**
-
-- [ ] Each listed file imports `effect`, or the report names it as pure with the reason.
-- [ ] No file imports a zod `pagedListInput`, and the shapes of `portfolio/inputs.ts` and `notes/kind-input.ts` are Effect schemas. The money shapes accept and refuse exactly what they did (a test per shape on the edge values: an empty string, a negative, a non-number, a number as a string), and `lib/ai/propose.ts`, which shares them with the suggestion accept path, still reads one set.
-- [ ] `value-index-plan.test.ts`, the fetch-guard tests and the portfolio as-of tests pass unchanged.
-- [ ] No file outside the list changed, bar tests that asserted on an error class.
-- [ ] Gates: typecheck, lint, the `@spaces/web` and `@spaces/worker` tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
-
----
-
 #### `effect-4` (SPA-406) · afk · M — The last I/O modules become Effect, and a lint rule keeps it so
 
-**Blocked by:** `effect-3`. **Owns**, in `apps/web/src/lib/`: `ai/enqueue-embed.ts`, `ai/enqueue-restamp.ts`, `ai/lanes.ts`, `arrival/synced-settings.ts`, `ask/types.ts`, `auth.ts`, `email/fixtures.ts`, `inbox/context.ts`, `integrations/runnable.ts`, `interactions/email-draft-prefill.ts`, `meetings/day.ts`, `members/suspend.ts`, `queue.ts`, `search/waves.ts`, `spaces/filed-in.ts`, `spaces/live.ts`, `spaces/tag.ts`, and their tests (1,300 lines); a new rule in `packages/config/eslint-rules/` and its line in `eslint.base.js`; the Principles and Backend paradigm sections of `CLAUDE.md`.
+**Blocked by:** nothing. **Owns**, in `apps/web/src/lib/`: `ai/enqueue-embed.ts`, `ai/enqueue-restamp.ts`, `ai/lanes.ts`, `arrival/synced-settings.ts`, `ask/types.ts`, `auth.ts`, `email/fixtures.ts`, `inbox/context.ts`, `integrations/runnable.ts`, `interactions/email-draft-prefill.ts`, `meetings/day.ts`, `members/suspend.ts`, `queue.ts`, `search/waves.ts`, `spaces/filed-in.ts`, `spaces/live.ts`, `spaces/tag.ts`, and their tests (1,300 lines); a new rule in `packages/config/eslint-rules/` and its line in `eslint.base.js`; the Principles and Backend paradigm sections of `CLAUDE.md`.
 
 **Does not touch** `packages/core/src/attributes/**`, `packages/core/src/writes/attributes/**` or `lib/rpc/**` (`schema-3` runs beside this slice).
 
