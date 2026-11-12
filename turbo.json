@@ -267,8 +267,8 @@
     },
 
     // The root half of gate 2: the release scripts' tests (scripts/**/*.test.ts,
-    // `scripts/vitest.config.ts`). They read every package.json and the
-    // changesets config, the committed registry.json and plugin-keys/, run
+    // `scripts/vitest.config.ts`). They read every package.json, the
+    // committed registry.json and plugin-keys/, run
     // core's verifier, and dry-run a release of the echo fixture — whose
     // build is therefore a dependency. No database.
     "//#test:root": {
@@ -277,7 +277,6 @@
         "package.json",
         "pnpm-workspace.yaml",
         "scripts/**",
-        ".changeset/**",
         "registry.json",
         "plugin-keys/**",
         "apps/*/package.json",

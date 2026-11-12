@@ -1,5 +1,5 @@
-# Plugin releases. A `plugin-<id>@X.Y.Z` tag — pushed by the Version and tag
-# workflow when a release PR bumps plugins/<id> — tests, packs, signs and
+# Plugin releases. A `plugin-<id>@X.Y.Z` tag — pushed by the Tag workflow
+# when a push bumps plugins/<id> — tests, packs, signs and
 # publishes that plugin, and commits its registry.json entry.
 #
 # Order is the contract, and nothing is published until the end:

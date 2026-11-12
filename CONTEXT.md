@@ -619,13 +619,12 @@ comparison). The chaos list runs the real bundle through pg-boss and
 `runJob` against the fakes, on the harness's per-worker test database, and
 CI's `offline` job runs the worker and plugin suites with egress rejected.
 
-**Release procedure (changesets; core, the sdk and each plugin version independently):**
+**Release procedure (core, the sdk and each plugin version independently; changesets dropped 2026-11-12, D86):**
 
-1. **Changeset** — a change carries `.changeset/*.md` naming `spaces` (core, the root package), `@spaces/sdk` or `@spaces/plugin-<id>`; a package bumps only for a changeset that names it, so an sdk release re-releases no plugin.
-2. **Merge** — on main, the Version and tag workflow opens the release PR with `pnpm release:version` (changesets plus the root, and each bumped manifest `version` / `SDK_VERSION` synced to package.json).
-3. **Tag** — merging the release PR pushes one tag per bumped line, `core@X.Y.Z` · `plugin-<id>@X.Y.Z` · `sdk@X.Y.Z`, with `RELEASE_TOKEN` (a GITHUB_TOKEN push starts no workflow).
-4. **Image** — `core@` runs `release.yml` unchanged; `plugin-<id>@` runs `plugin-release.yml`: the plugin's tests, its `pack:plugin` signed with `SPACES_PLUGIN_SIGNING_KEY` (a key `plugin-keys/` must hold), and a GitHub release carrying the .tgz, .sha256, .sig and entry.
-5. **Registry** — the same job checks registry.json against the downloaded release with core's `verifyPlugin` and commits the entry on main; the next `core@` image carries it. `pnpm exec tsx scripts/release-plugin.ts --no-push <id>` is the dry run.
+1. **Bump** — the commit that changes what a line ships bumps that line: `pnpm release:bump <core|sdk|plugin id> <patch|minor|major|X.Y.Z>` writes the package.json version and the line that repeats it (a plugin's manifest `version`, the sdk's `SDK_VERSION`). A line moves only when its own package does, so an sdk release re-releases no plugin. The sdk's notes are kept by hand in `packages/sdk/CHANGELOG.md`.
+2. **Tag** — on main, the Tag workflow pushes one tag per line the push bumped, `core@X.Y.Z` · `plugin-<id>@X.Y.Z` · `sdk@X.Y.Z`, with `RELEASE_TOKEN` (a GITHUB_TOKEN push starts no workflow). A push that bumps nothing tags nothing.
+3. **Image** — `core@` runs `release.yml` unchanged; `plugin-<id>@` runs `plugin-release.yml`: the plugin's tests, its `pack:plugin` signed with `SPACES_PLUGIN_SIGNING_KEY` (a key `plugin-keys/` must hold), and a GitHub release carrying the .tgz, .sha256, .sig and entry.
+4. **Registry** — the same job checks registry.json against the downloaded release with core's `verifyPlugin` and commits the entry on main; the next `core@` image carries it. `pnpm exec tsx scripts/release-plugin.ts --no-push <id>` is the dry run.
 
 ### Architecture week 2026-09-13 → 15 — index
 

@@ -351,6 +351,11 @@ in comments; the rest is the reviewer's. Directive comments (`eslint-disable`,
   future value — the migrator and the downgrade guard order by `when`, and a
   future one mis-orders the next `db:generate` (cost a session 2026-09-20).
   The journal is squashed to one file at the v1 cut, not before.
+- A plugin, the sdk or core changes what it ships → bump that line in the
+  same commit: `pnpm release:bump <core|sdk|plugin id> <patch|minor|major>`
+  (package.json plus the manifest `version` or `SDK_VERSION`). There are no
+  changesets. `pnpm release:tag` only tags locally; the Tag workflow is what
+  pushes, on a push to main.
 - New system attribute → add to `SYSTEM_ATTRIBUTES` in
   `packages/core/src/attributes/registry.ts`; `pnpm db:migrate:run` reseeds
   insert-if-absent

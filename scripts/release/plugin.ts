@@ -98,7 +98,7 @@ export const preflight = async (
   )
   if (manifest.id !== id || manifest.version !== version) {
     throw new Error(
-      `the built manifest is ${manifest.id}@${manifest.version}, the package ${id}@${version} — rebuild, or run pnpm release:version to sync the manifest`,
+      `the built manifest is ${manifest.id}@${manifest.version}, the package ${id}@${version} — rebuild, or bump with pnpm release:bump, which moves both`,
     )
   }
   return { version, packScript }

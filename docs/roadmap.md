@@ -51,7 +51,7 @@ Plus the UI sweep (the printed sheets landing) and Corrections.
 
 ## Owner calls
 
-- **Plugin release** — the SDK is 2.0.0 on main, set by hand with its notes in `packages/sdk/CHANGELOG.md` (a major changeset on top of it planned 3.0.0, so there is none); no `sdk@2.0.0` tag is pushed until the owner tags it. `pnpm release:status` plans every plugin's bump (seven to 0.2.0, rss and airtable to 0.1.1). A running install must reinstall apollo, exa, rss, granola and airtable after that release; the four bundled plugins upgrade on first boot once they are 0.2.0, and read as degraded on a 2.0 host until then.
+- **Plugin release** — the SDK is 2.0.0 on main with its notes in `packages/sdk/CHANGELOG.md`, and the nine plugins are still 0.1.0 with 1.x builds released nowhere. To release: bump each plugin that changed (`pnpm release:bump <id> minor`), push, and the Tag workflow pushes `plugin-<id>@X.Y.Z` (it needs `RELEASE_TOKEN`, and the plugin workflow needs the signing key). The push that carries the 2.0.0 bump tags `sdk@2.0.0`; no workflow listens for an sdk tag. A running install must reinstall apollo, exa, rss, granola and airtable after that release; the four bundled plugins upgrade on first boot once their version is above 0.1.0, and read as degraded on a 2.0 host until then.
 - **Gmail reconnect** — older connections lack `gmail.send` and must reconnect before sending.
 
 ## Unticketed follow-ups

@@ -1,20 +1,19 @@
 /**
- * Tags what a merged release PR bumped: `core@X.Y.Z` for the root package,
+ * Tags what a push bumped: `core@X.Y.Z` for the root package,
  * `plugin-<id>@X.Y.Z` per plugin, `sdk@X.Y.Z` for the contract. A package is
- * tagged when its version differs from the one at `--since` (default HEAD^,
- * the merge's parent) and the tag does not exist yet, so a re-run is a no-op.
+ * tagged when its version differs from the one at `--since` (default HEAD^)
+ * and the tag does not exist yet, so a re-run is a no-op.
  *
  *   pnpm exec tsx scripts/release-tags.ts [--since <ref>] [--push]
  *
- * `--push` pushes each tag on its own: GitHub starts no workflow for a push
- * of more than three tags at once, and the image and plugin workflows each
- * fire on one.
+ * Without `--push` the tags are local only. `--push` pushes each tag on its
+ * own: GitHub starts no workflow for a push of more than three tags at once,
+ * and the image and plugin workflows each fire on one.
  */
 import { execFileSync } from 'node:child_process'
 import { parseArgs } from 'node:util'
 import {
   ROOT,
-  loadConfig,
   parsePackageJson,
   tagCandidates,
   tagsToCreate,
@@ -39,8 +38,7 @@ const succeeds = (...args: Array<string>): boolean => {
   }
 }
 
-const packages = await workspacePackages(ROOT)
-const candidates = tagCandidates(packages, await loadConfig(packages))
+const candidates = tagCandidates(await workspacePackages(ROOT))
 const since = values.since
 const created = tagsToCreate(candidates, {
   tagExists: (tag) =>

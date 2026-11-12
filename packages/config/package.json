@@ -22,6 +22,7 @@
   "//devDependencies": "What the eslint base and the prettier config import, plus the tools themselves. They resolve from this directory, so they are this package's and no longer the root's; eslint, prettier and typescript stay the root's too, because the binaries run from there (lefthook, CI, `pnpm exec`). All of it is devDependencies and none of it dependencies (SPA-183): this package is configuration, read only at development time, and a `pnpm install --prod` installs every workspace importer's dependencies — so the plugins listed as dependencies put eslint, typescript-eslint and typescript into the image's runtime node_modules, which runs none of them. A devDependency of a private workspace package is still installed and linked here in every developer and CI checkout.",
   "devDependencies": {
     "@tanstack/eslint-config": "^0.4.0",
+    "@types/estree": "^1.0.9",
     "@types/node": "^22.10.2",
     "@typescript-eslint/parser": "^8.65.0",
     "astro-eslint-parser": "^1.4.0",

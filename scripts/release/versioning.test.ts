@@ -1,5 +1,4 @@
 import {
-  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -8,36 +7,26 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import type { NewChangeset, VersionType } from '@changesets/types'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
   CORE_PACKAGE,
   ROOT,
   SDK_PACKAGE,
-  loadConfig,
+  bumpPackage,
   manifestVersionOf,
+  nextVersion,
+  packageToBump,
   parsePluginTag,
   readPackageJson,
-  releasePlanFor,
   spelledVersionDrift,
   tagCandidates,
   tagFor,
   tagsToCreate,
-  versionPackages,
   versionedPackages,
   withManifestVersion,
   workspacePackages,
 } from './versioning.ts'
 import type { TagCandidate } from './versioning.ts'
-
-const changeset = (
-  id: string,
-  releases: Record<string, Exclude<VersionType, 'none'>>,
-): NewChangeset => ({
-  id,
-  summary: id,
-  releases: Object.entries(releases).map(([name, type]) => ({ name, type })),
-})
 
 /** The pattern release.yml's `version` job accepts, copied verbatim. */
 const RELEASE_YML_TAG = /^core@([0-9]+)\.([0-9]+)\.([0-9]+)$/
@@ -89,20 +78,15 @@ describe('tag names', () => {
   })
 })
 
-describe('the workspace changesets versions', () => {
+describe('the version lines', () => {
   let packages: Awaited<ReturnType<typeof workspacePackages>>
-  let config: Awaited<ReturnType<typeof loadConfig>>
   beforeAll(async () => {
     packages = await workspacePackages()
-    config = await loadConfig(packages)
   })
 
-  it('is core, the sdk and each real plugin — every fixture and internal package is ignored', () => {
-    expect(
-      versionedPackages(packages, config)
-        .map((p) => p.packageJson.name)
-        .sort(),
-    ).toEqual(
+  it('are core, the sdk and each real plugin — no fixture and no internal package', () => {
+    const versioned = versionedPackages(packages)
+    expect(versioned.map((p) => p.packageJson.name).sort()).toEqual(
       [
         CORE_PACKAGE,
         SDK_PACKAGE,
@@ -113,55 +97,51 @@ describe('the workspace changesets versions', () => {
       p.dir.includes(`${path.sep}_fixtures${path.sep}`),
     )
     expect(fixtures.length).toBeGreaterThan(0)
-    for (const p of fixtures)
-      expect(config.ignore).toContain(p.packageJson.name)
-  })
-
-  it('versions every line independently', () => {
-    expect(config.fixed).toEqual([])
-    expect(config.linked).toEqual([])
-  })
-
-  it('bumps only apollo for an apollo changeset', () => {
-    const plan = releasePlanFor(
-      [changeset('apollo-fix', { '@spaces/plugin-apollo': 'patch' })],
-      packages,
-      config,
-    )
-    expect(plan.releases.map((r) => [r.name, r.type])).toEqual([
-      ['@spaces/plugin-apollo', 'patch'],
-    ])
-  })
-
-  it('bumps only core for a core changeset', () => {
-    const plan = releasePlanFor(
-      [changeset('core-feature', { [CORE_PACKAGE]: 'minor' })],
-      packages,
-      config,
-    )
-    expect(plan.releases.map((r) => [r.name, r.type])).toEqual([
-      [CORE_PACKAGE, 'minor'],
-    ])
-  })
-
-  it('bumps only the sdk for an sdk minor — plugins on workspace:* are not dragged along', () => {
-    const plan = releasePlanFor(
-      [changeset('sdk-port', { [SDK_PACKAGE]: 'minor' })],
-      packages,
-      config,
-    )
-    expect(plan.releases.map((r) => r.name)).toEqual([SDK_PACKAGE])
+    for (const p of fixtures) expect(versioned).not.toContain(p)
   })
 
   it('keeps each manifest version and SDK_VERSION equal to package.json', () => {
-    expect(spelledVersionDrift(versionedPackages(packages, config))).toEqual([])
+    expect(spelledVersionDrift(versionedPackages(packages))).toEqual([])
   })
 
   it('has a tag for every versioned package, core at the root', () => {
-    const candidates = tagCandidates(packages, config)
+    const candidates = tagCandidates(packages)
     const core = candidates.find((c) => c.name === CORE_PACKAGE)
     expect(core?.relativeDir).toBe('')
     expect(core?.tag).toBe(`core@${packages.rootPackage?.packageJson.version}`)
+  })
+
+  it('names a line by core, sdk, a plugin id or its package name, and nothing else', () => {
+    expect(packageToBump(packages, 'core').packageJson.name).toBe(CORE_PACKAGE)
+    expect(packageToBump(packages, 'sdk').packageJson.name).toBe(SDK_PACKAGE)
+    expect(packageToBump(packages, 'apollo').packageJson.name).toBe(
+      '@spaces/plugin-apollo',
+    )
+    expect(
+      packageToBump(packages, '@spaces/plugin-apollo').packageJson.name,
+    ).toBe('@spaces/plugin-apollo')
+    expect(() => packageToBump(packages, 'echo')).toThrow(
+      'carries no version line',
+    )
+    expect(() => packageToBump(packages, '@spaces/web')).toThrow(
+      'carries no version line',
+    )
+  })
+})
+
+describe('nextVersion', () => {
+  it('steps a patch, a minor and a major', () => {
+    expect(nextVersion('1.4.2', 'patch')).toBe('1.4.3')
+    expect(nextVersion('1.4.2', 'minor')).toBe('1.5.0')
+    expect(nextVersion('1.4.2', 'major')).toBe('2.0.0')
+  })
+
+  it('takes an exact version above the present one, and no other', () => {
+    expect(nextVersion('1.4.2', '1.10.0')).toBe('1.10.0')
+    expect(() => nextVersion('1.4.2', '1.4.2')).toThrow('not above')
+    expect(() => nextVersion('1.4.2', '1.3.9')).toThrow('not above')
+    expect(() => nextVersion('1.4.2', 'next')).toThrow('not patch, minor')
+    expect(() => nextVersion('1.4', 'patch')).toThrow('not X.Y.Z')
   })
 })
 
@@ -242,7 +222,7 @@ describe('the manifest version line', () => {
   })
 })
 
-describe('versionPackages on a scratch workspace', () => {
+describe('bumpPackage on a scratch workspace', () => {
   const write = (root: string, file: string, body: string) => {
     mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
     writeFileSync(path.join(root, file), body)
@@ -251,7 +231,7 @@ describe('versionPackages on a scratch workspace', () => {
     readPackageJson(path.join(root, dir)).version
 
   const scratch = () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'spaces-changesets-'))
+    const root = mkdtempSync(path.join(tmpdir(), 'spaces-release-'))
     write(
       root,
       'package.json',
@@ -287,59 +267,49 @@ describe('versionPackages on a scratch workspace', () => {
       'plugins/apollo/src/manifest.ts',
       "export const manifest = {\n  id: 'apollo',\n  version: '1.0.0',\n}\n",
     )
-    write(
-      root,
-      '.changeset/config.json',
-      JSON.stringify({
-        changelog: false,
-        format: false,
-        privatePackages: { version: true, tag: true },
-      }),
-    )
     return root
   }
 
-  it('bumps apollo and its manifest line for an apollo changeset, and leaves core alone', async () => {
+  it('bumps apollo and its manifest line, and leaves core and the sdk alone', () => {
     const root = scratch()
-    write(
-      root,
-      '.changeset/apollo-fix.md',
-      "---\n'@spaces/plugin-apollo': patch\n---\n\nFix\n",
-    )
-    await versionPackages(root)
+    expect(bumpPackage(path.join(root, 'plugins/apollo'), 'patch')).toEqual({
+      name: '@spaces/plugin-apollo',
+      from: '1.0.0',
+      to: '1.0.1',
+    })
     expect(version(root, 'plugins/apollo')).toBe('1.0.1')
     expect(
       readFileSync(path.join(root, 'plugins/apollo/src/manifest.ts'), 'utf8'),
     ).toContain("version: '1.0.1',")
     expect(version(root, '.')).toBe('0.1.0')
-    expect(existsSync(path.join(root, '.changeset/apollo-fix.md'))).toBe(false)
+    expect(version(root, 'packages/sdk')).toBe('1.1.0')
   })
 
-  it('bumps core for a core changeset, and leaves apollo alone', async () => {
+  it('bumps core, which spells its version nowhere else', () => {
     const root = scratch()
-    write(
-      root,
-      '.changeset/core-feature.md',
-      `---\n'${CORE_PACKAGE}': minor\n---\n\nFeature\n`,
-    )
-    await versionPackages(root)
+    bumpPackage(root, 'minor')
     expect(version(root, '.')).toBe('0.2.0')
     expect(version(root, 'plugins/apollo')).toBe('1.0.0')
   })
 
-  it('bumps the sdk and SDK_VERSION for an sdk changeset, and re-releases no plugin', async () => {
+  it('bumps the sdk and SDK_VERSION, and re-releases no plugin', () => {
     const root = scratch()
-    write(
-      root,
-      '.changeset/sdk-port.md',
-      `---\n'${SDK_PACKAGE}': minor\n---\n\nA port\n`,
-    )
-    await versionPackages(root)
-    expect(version(root, 'packages/sdk')).toBe('1.2.0')
+    bumpPackage(path.join(root, 'packages/sdk'), 'major')
+    expect(version(root, 'packages/sdk')).toBe('2.0.0')
     expect(
       readFileSync(path.join(root, 'packages/sdk/src/version.ts'), 'utf8'),
-    ).toBe("export const SDK_VERSION = '1.2.0'\n")
+    ).toBe("export const SDK_VERSION = '2.0.0'\n")
     expect(version(root, 'plugins/apollo')).toBe('1.0.0')
     expect(version(root, '.')).toBe('0.1.0')
+  })
+
+  it('leaves every other line of package.json as it was', () => {
+    const root = scratch()
+    const file = path.join(root, 'plugins/apollo/package.json')
+    const before = readFileSync(file, 'utf8')
+    bumpPackage(path.join(root, 'plugins/apollo'), '1.2.0')
+    expect(readFileSync(file, 'utf8')).toBe(
+      before.replace('"version":"1.0.0"', '"version":"1.2.0"'),
+    )
   })
 })

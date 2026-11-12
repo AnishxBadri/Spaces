@@ -1058,3 +1058,21 @@ _Rejected:_
 - One slice over all 224 files.
 
 _Carried by_ `schema-1` (SPA-400), `schema-2` (SPA-402), `schema-3` (SPA-404).
+
+## Addenda — 2026-11-12 (releases)
+
+### D86-versions-by-hand
+
+**Do changesets stay?** Answered (owner, 2026-11-12): **no. A version line is bumped by hand, in the commit that earns it.** This amends the release procedure in CONTEXT.md.
+
+- **Why:** changesets pay when several people ship several packages to readers of changelogs. Here one owner ships to no outside install. In three weeks the pile reached 25 changesets and one tag (`core@0.1.0`); nineteen of them described an SDK 1.5 that never shipped; and a hand-set SDK 2.0.0 with a major changeset on top planned 3.0.0.
+- **What stays:** the three independent lines (core, the sdk, each plugin), their tags, and the two workflows the tags start. What a host checks at runtime is a version, never a changeset: first boot upgrades a bundled plugin whose version is newer, and the loader refuses a plugin whose `sdk` range the host does not satisfy.
+- **The bump:** `pnpm release:bump <core|sdk|plugin id> <patch|minor|major|X.Y.Z>` writes the package.json version and the line that repeats it. A test holds each manifest `version` and `SDK_VERSION` equal to its package.json.
+- **The tag:** the Tag workflow tags what a push bumped. There is no release PR.
+- **What a line is:** core, the sdk, and each package under `plugins/` outside `plugins/_fixtures/`. The rule is the path, so a new fixture needs no entry anywhere.
+- **Changelogs:** the sdk's is kept by hand in `packages/sdk/CHANGELOG.md`. A plugin's history is its commits.
+
+_Rejected:_
+
+- Keeping the machinery and not writing changesets. It drifts, and the release PR opens on a stale pile.
+- Bringing it back now for a registry that has no entry. It returns when plugin authors outside this repo read changelogs.

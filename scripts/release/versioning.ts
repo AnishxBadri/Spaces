@@ -1,30 +1,19 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { applyReleasePlan } from '@changesets/apply-release-plan'
-import { assembleReleasePlan } from '@changesets/assemble-release-plan'
-import { readConfig } from '@changesets/config'
-import { readChangesets } from '@changesets/read'
-import type {
-  Config,
-  NewChangeset,
-  Package,
-  Packages,
-  ReleasePlan,
-} from '@changesets/types'
 import { getPackages } from '@manypkg/get-packages'
+import type { Package, Packages } from '@manypkg/get-packages'
 import { z } from 'zod'
 
 /**
  * Release versioning: which packages carry a version line, what their tags
- * are called, and the changesets run that bumps them.
+ * are called, and the bump that moves one.
  *
  * - Independent lines: core (the root package `spaces`), `@spaces/sdk` and
- *   each `plugins/<id>`. `fixed` and `linked` stay empty, so a changeset
- *   bumps exactly the packages it names. Everything else is `ignore`d in
- *   `.changeset/config.json`.
- * - changesets does not see a monorepo's root package, so `versionPackages`
- *   hands it the root as one more package — the stock `changeset version`
- *   refuses a changeset naming `spaces`.
+ *   each `plugins/<id>`. A fixture under `plugins/_fixtures/` and every
+ *   other package carry none.
+ * - A line moves only when its own package.json does: an sdk release
+ *   re-releases no plugin, because a plugin leaves `@spaces/sdk` to the host
+ *   at runtime and its manifest's `sdk` range is the compatibility claim.
  */
 
 export const ROOT = path.resolve(import.meta.dirname, '..', '..')
@@ -76,7 +65,7 @@ export const parsePluginTag = (
   return id !== null && SEMVER.test(version) ? { id, version } : null
 }
 
-/** The workspace as changesets sees it, plus the root package (core). */
+/** Every workspace package, plus the root package (core). */
 export const workspacePackages = async (
   root: string = ROOT,
 ): Promise<Packages> => {
@@ -88,43 +77,20 @@ export const workspacePackages = async (
   }
 }
 
-export const loadConfig = async (packages: Packages): Promise<Config> => {
-  const result = await readConfig(packages.rootDir, packages)
-  if (result.errors) {
-    throw new Error(`.changeset/config.json: ${result.errors.join('; ')}`)
-  }
-  return result.config
-}
+const FIXTURES = path.join('plugins', '_fixtures') + path.sep
 
-/** The packages a changeset may name: every one not ignored. */
-export const versionedPackages = (
-  packages: Packages,
-  config: Config,
-): Array<Package> =>
-  packages.packages.filter((p) => !config.ignore.includes(p.packageJson.name))
-
-/**
- * changesets' plan, minus every release no changeset named. Those are the
- * dependents it would bump because a `workspace:*` dependency moved — every
- * plugin on an sdk minor — but a plugin leaves `@spaces/sdk` to the host at
- * runtime and its manifest's `sdk` range is the compatibility claim, so an
- * sdk release re-releases nothing.
- */
-export const releasePlanFor = (
-  changesets: Array<NewChangeset>,
-  packages: Packages,
-  config: Config,
-): ReleasePlan => {
-  const plan = assembleReleasePlan(changesets, packages, config, undefined)
-  return {
-    ...plan,
-    releases: plan.releases.filter((r) => r.changesets.length > 0),
-  }
-}
+/** The packages that carry a version line: core, the sdk, each real plugin. */
+export const versionedPackages = (packages: Packages): Array<Package> =>
+  packages.packages.filter((p) => {
+    const { name } = p.packageJson
+    if (name === CORE_PACKAGE || name === SDK_PACKAGE) return true
+    if (pluginIdOf(name) === null) return false
+    return !path.relative(packages.rootDir, p.dir).startsWith(FIXTURES)
+  })
 
 // ---------------------------------------------------------------------------
-// Versions spelled in source. Two lines repeat package.json's version, and the
-// version run rewrites both so a bump cannot leave them behind:
+// Versions spelled in source. Two lines repeat package.json's version, and a
+// bump rewrites both so it cannot leave them behind:
 // - a plugin's `manifest.ts` `version:` — the packed manifest.json carries it,
 //   and the plugin workflow refuses a tag that disagrees with it;
 // - the sdk's `SDK_VERSION`, which `package.test.ts` holds equal.
@@ -220,34 +186,79 @@ export const syncSpelledVersions = (dirs: Array<string>): Array<string> => {
   return touched
 }
 
+// ---------------------------------------------------------------------------
+// The bump. One package at a time, by hand: `patch`, `minor`, `major`, or the
+// version itself.
+
+const numbers = (version: string): [number, number, number] | null => {
+  const parts = SEMVER.exec(version)
+  return parts ? [Number(parts[1]), Number(parts[2]), Number(parts[3])] : null
+}
+
+/** The version after a bump; `to` may also be an exact `X.Y.Z` above it. */
+export const nextVersion = (version: string, to: string): string => {
+  const now = numbers(version)
+  if (now === null) throw new Error(`${version} is not X.Y.Z`)
+  const [major, minor, patch] = now
+  if (to === 'major') return `${major + 1}.0.0`
+  if (to === 'minor') return `${major}.${minor + 1}.0`
+  if (to === 'patch') return `${major}.${minor}.${patch + 1}`
+  const next = numbers(to)
+  if (next === null)
+    throw new Error(`${to} is not patch, minor, major or X.Y.Z`)
+  const first = next.findIndex((n, i) => n !== now[i])
+  if (first < 0 || next[first] < now[first])
+    throw new Error(`${to} is not above ${version}`)
+  return to
+}
+
 /**
- * `changeset version` with the root visible: bump every package the pending
- * changesets name, delete the changesets, then rewrite the spelled versions.
- * Returns the plan it applied; an empty plan writes nothing.
+ * The versioned package a bump names: its package name, `core`, `sdk`, or a
+ * plugin's id. Throws on a package that carries no version line.
  */
-export const versionPackages = async (
-  root: string = ROOT,
-): Promise<ReleasePlan> => {
-  const packages = await workspacePackages(root)
-  const config = await loadConfig(packages)
-  const plan = releasePlanFor(await readChangesets(root), packages, config)
-  if (plan.releases.length === 0) return plan
-  await applyReleasePlan(plan, packages, config)
-  syncSpelledVersions(
-    plan.releases
-      .filter((r) => r.type !== 'none')
-      .flatMap((r) => {
-        const pkg = packages.packages.find((p) => p.packageJson.name === r.name)
-        return pkg ? [pkg.dir] : []
-      }),
+export const packageToBump = (packages: Packages, named: string): Package => {
+  const name =
+    named === 'core'
+      ? CORE_PACKAGE
+      : named === 'sdk'
+        ? SDK_PACKAGE
+        : named.startsWith('@') || named === CORE_PACKAGE
+          ? named
+          : `@spaces/plugin-${named}`
+  const found = versionedPackages(packages).find(
+    (p) => p.packageJson.name === name,
   )
-  return plan
+  if (!found) throw new Error(`${named} carries no version line`)
+  return found
+}
+
+// The field as written, wherever the file puts it: a re-serialise would
+// reformat a package.json prettier owns.
+const VERSION_FIELD = /("version"\s*:\s*)"[^"]*"/
+
+/**
+ * Moves one package's version: its package.json line in place, then the
+ * version its source spells. Returns the old and the new version.
+ */
+export const bumpPackage = (
+  dir: string,
+  to: string,
+): { readonly name: string; readonly from: string; readonly to: string } => {
+  const file = path.join(dir, 'package.json')
+  const source = readFileSync(file, 'utf8')
+  const { name, version } = parsePackageJson(source)
+  const next = nextVersion(version, to)
+  if (!VERSION_FIELD.test(source))
+    throw new Error(`${file} has no version line`)
+  writeFileSync(file, source.replace(VERSION_FIELD, `$1"${next}"`))
+  syncSpelledVersions([dir])
+  return { name, from: version, to: next }
 }
 
 // ---------------------------------------------------------------------------
 // Tags. A package is tagged when its version changed since the base commit
-// (the release PR's merge parent) and that tag does not exist yet — so the
-// merge of a release PR tags exactly what it bumped, and a re-run is a no-op.
+// (the push's parent) and that tag does not exist yet — so a push tags
+// exactly what it bumped, and a re-run is a no-op.
 
 export type TagCandidate = {
   readonly tag: string
@@ -257,16 +268,13 @@ export type TagCandidate = {
   readonly relativeDir: string
 }
 
-export const tagCandidates = (
-  packages: Packages,
-  config: Config,
-): Array<TagCandidate> =>
-  versionedPackages(packages, config).map((pkg) => {
+export const tagCandidates = (packages: Packages): Array<TagCandidate> =>
+  versionedPackages(packages).map((pkg) => {
     const { name, version } = pkg.packageJson
     const tag = tagFor(name, version)
     if (tag === null) {
       throw new Error(
-        `${name}@${version} is versioned but has no tag line — ignore it in .changeset/config.json or give it one in tagFor`,
+        `${name}@${version} is versioned but has no tag line — give it one in tagFor`,
       )
     }
     const relativeDir = path.relative(packages.rootDir, pkg.dir)

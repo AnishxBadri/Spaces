@@ -84,7 +84,9 @@ Rules the turbo graph and `no-restricted-imports` enforce:
 - `plugins/*` → `sdk`. Never `core`, `db`.
 - `db` → nothing internal.
 
-Versioning: changesets; core and each plugin version independently. CI
+Versioning: core, the sdk and each plugin version independently, each bumped
+by hand in the commit that earns it (`pnpm release:bump`; changesets were
+dropped 2026-11-12, D86). CI
 builds the image on `core@x` tags and a plugin release on
 `plugin-<id>@x` tags. The worker gets bundled (`vite build --ssr` — D26,
 decided 2026-09-29; this line said tsup until SPA-185 built it) so `src/`
