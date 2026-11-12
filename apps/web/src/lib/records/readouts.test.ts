@@ -11,7 +11,12 @@ import {
   objectDef,
   signal,
 } from '@spaces/db/schema'
-import { holding, investment, round } from '@spaces/db/schema/portfolio'
+import {
+  distribution,
+  holding,
+  investment,
+  round,
+} from '@spaces/db/schema/portfolio'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { recomputeInteractionStats } from '@spaces/core/writes/interactions/stats'
 import { updateInteraction } from '@spaces/core/writes/interactions/write'
@@ -266,6 +271,46 @@ describe('company readouts', () => {
     expect(r.ownership).toEqual({ kind: 'actual', pct: 0.05 })
     const none = await Effect.runPromise(companyReadoutsProgram(notHeld, NOW))
     expect(none.ownership).toBeNull()
+  })
+
+  it('reads ownership net of the shares sold', async () => {
+    const held = await aCompany('Sold')
+    const h = (
+      await db
+        .insert(holding)
+        .values({
+          companyId: held,
+          openedAt: '2025-01-01',
+          createdBy: FIXTURE_ACTOR.id,
+        })
+        .returning({ id: holding.id })
+    ).at(0)
+    if (!h) throw new Error('no holding')
+    await db.insert(investment).values({
+      holdingId: h.id,
+      date: '2025-01-01',
+      amount: '100000',
+      currency: 'USD',
+      instrument: 'priced',
+      shares: '50000',
+    })
+    await db.insert(round).values({
+      companyId: held,
+      date: '2025-01-01',
+      kind: 'seed',
+      sharesOutstanding: '1000000',
+    })
+    await db.insert(distribution).values({
+      holdingId: h.id,
+      date: '2025-06-01',
+      amount: '60000',
+      currency: 'USD',
+      kind: 'secondary',
+      sharesSold: '20000',
+    })
+
+    const r = await Effect.runPromise(companyReadoutsProgram(held, NOW))
+    expect(r.ownership).toEqual({ kind: 'actual', pct: 0.03 })
   })
 
   it('reads dashes and a zero count for a quiet company', async () => {

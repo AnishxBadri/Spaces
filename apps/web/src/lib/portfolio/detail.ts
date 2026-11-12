@@ -13,6 +13,7 @@ import { user } from '@spaces/db/schema/auth'
 import { holdingMetrics } from '@spaces/core/portfolio/metrics'
 import type { HoldingEvents } from '@spaces/core/portfolio/metrics'
 import { ownership } from '@spaces/core/portfolio/ownership'
+import type { OwnershipSale } from '@spaces/core/portfolio/ownership'
 import { portfolioRollup } from '@spaces/core/portfolio/rollup'
 import type { FxRate } from '@spaces/core/portfolio/fx'
 
@@ -31,7 +32,7 @@ import type { FxRate } from '@spaces/core/portfolio/fx'
  * Nothing derived leans on the negation cancelling, because nothing derived
  * is a plain sum: `holdingMetrics` picks the *latest* mark, `writtenOff`
  * reads the latest write-off distribution, and `ownership()` filters
- * `shares > 0`. The negation is stored so a raw SQL `SUM` over the table
+ * `shares > 0` and `sharesSold > 0`. The negation is stored so a raw SQL `SUM` over the table
  * stays honest and the timeline can show the correction.
  */
 
@@ -75,6 +76,29 @@ export function partitionReversals<
     else reversalOf.set(r.reversesId, r)
   }
   return { originals, reversalOf }
+}
+
+/**
+ * The holding's distributions as `ownership()` reads them: originals only,
+ * each with its shares sold (null on a dividend or a write-off).
+ */
+export function ownershipSales<
+  T extends {
+    id: string
+    date: string
+    sharesSold: string | null
+    reversesId: string | null
+    createdAt: Date
+  },
+>(part: {
+  originals: Array<T>
+  reversalOf: Map<string, T>
+}): Array<OwnershipSale> {
+  return part.originals.map((r) => ({
+    date: r.date,
+    sharesSold: num(r.sharesSold),
+    reversedAt: reversedAtOf(part.reversalOf, r.id),
+  }))
 }
 
 /** The void instant the pure libs gate on, or null while the event stands. */
@@ -147,6 +171,7 @@ export type LoadedHolding = {
     cap: number | null
     reversedAt: string | null
   }>
+  ownershipSales: Array<OwnershipSale>
 }
 
 export async function loadHoldingEvents(
@@ -157,6 +182,7 @@ export async function loadHoldingEvents(
     byHolding.set(id, {
       events: { investments: [], marks: [], distributions: [] },
       ownershipInputs: [],
+      ownershipSales: [],
     })
   }
   if (holdingIds.length === 0) return byHolding
@@ -207,12 +233,19 @@ export async function loadHoldingEvents(
     })
   }
   for (const r of dist.originals) {
-    byHolding.get(r.holdingId)?.events.distributions.push({
+    const h = byHolding.get(r.holdingId)
+    const reversedAt = reversedAtOf(dist.reversalOf, r.id)
+    h?.events.distributions.push({
       date: r.date,
       amount: Number(r.amount),
       currency: r.currency,
       kind: r.kind,
-      reversedAt: reversedAtOf(dist.reversalOf, r.id),
+      reversedAt,
+    })
+    h?.ownershipSales.push({
+      date: r.date,
+      sharesSold: num(r.sharesSold),
+      reversedAt,
     })
   }
   return byHolding
@@ -282,6 +315,7 @@ export async function loadPortfolio(
   const empty: LoadedHolding = {
     events: { investments: [], marks: [], distributions: [] },
     ownershipInputs: [],
+    ownershipSales: [],
   }
   const holdings = rows.map((r) => {
     const l = loaded.get(r.id) ?? empty
@@ -295,6 +329,7 @@ export async function loadPortfolio(
       ownership: ownership(
         l.ownershipInputs,
         roundsByCompany.get(r.companyId) ?? [],
+        l.ownershipSales,
         asOf,
       ),
     }
@@ -435,6 +470,7 @@ export async function loadHoldingDetail(id: string, asOf?: string) {
         kind: r.kind,
         sharesOutstanding: num(r.sharesOutstanding),
       })),
+      ownershipSales(dist),
       asOf,
     ),
     rounds: dated(roundRows).map((r) => ({

@@ -2,12 +2,22 @@ import { Effect, Schema } from 'effect'
 import { and, asc, desc, eq, gte, inArray, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity, interactionStat, signal } from '@spaces/db/schema'
-import { holding, investment, round } from '@spaces/db/schema/portfolio'
+import {
+  distribution,
+  holding,
+  investment,
+  round,
+} from '@spaces/db/schema/portfolio'
 import { jsonString } from '@spaces/core/json'
 import { ownership } from '@spaces/core/portfolio/ownership'
 import { companyPeopleProgram } from '#/lib/people/companies'
 import { stageFunnelProgram } from '#/lib/deals/funnel'
-import { num, partitionReversals, reversedAtOf } from '#/lib/portfolio/detail'
+import {
+  num,
+  ownershipSales,
+  partitionReversals,
+  reversedAtOf,
+} from '#/lib/portfolio/detail'
 import { localDay } from './readout-format'
 
 /**
@@ -150,7 +160,7 @@ const companyOwnership = Effect.fn('companyOwnership')(function* (
     ).at(0),
   )
   if (!held) return null
-  const [invRows, roundRows] = yield* query(() =>
+  const [invRows, roundRows, distRows] = yield* query(() =>
     Promise.all([
       db
         .select()
@@ -162,6 +172,11 @@ const companyOwnership = Effect.fn('companyOwnership')(function* (
         .from(round)
         .where(eq(round.companyId, companyId))
         .orderBy(asc(round.date)),
+      db
+        .select()
+        .from(distribution)
+        .where(eq(distribution.holdingId, held.id))
+        .orderBy(asc(distribution.date)),
     ]),
   )
   const inv = partitionReversals(invRows)
@@ -179,6 +194,7 @@ const companyOwnership = Effect.fn('companyOwnership')(function* (
       kind: r.kind,
       sharesOutstanding: num(r.sharesOutstanding),
     })),
+    ownershipSales(partitionReversals(distRows)),
   )
   if (own.kind === 'actual')
     return { kind: 'actual' as const, pct: own.currentPct }

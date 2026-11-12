@@ -163,6 +163,7 @@ describe('ownership', () => {
         { date: '2022-01-01', kind: 'Seed', sharesOutstanding: 10000 },
         { date: '2023-01-01', kind: 'Series A', sharesOutstanding: 20000 },
       ],
+      [],
     )
     expect(o.kind).toBe('actual')
     if (o.kind !== 'actual') return
@@ -183,6 +184,7 @@ describe('ownership', () => {
         },
       ],
       [],
+      [],
     )
     expect(o).toEqual({ kind: 'implied', pct: 0.02 })
   })
@@ -191,6 +193,7 @@ describe('ownership', () => {
     for (const instrument of ['safe_pre_money', 'ccd'] as const) {
       const o = ownership(
         [{ date: '2023-01-01', amount: 100_000, instrument, cap: 5_000_000 }],
+        [],
         [],
       )
       expect(o).toEqual({ kind: 'cost_basis_only', reason: 'unconverted' })
@@ -208,6 +211,7 @@ describe('ownership', () => {
         },
         { date: '2023-06-01', amount: 50_000, instrument: 'ccd' },
       ],
+      [],
       [],
     )
     expect(o).toEqual({ kind: 'cost_basis_only', reason: 'mixed' })

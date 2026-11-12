@@ -175,9 +175,11 @@ describe('voiding a priced investment', () => {
         reversedAt: VOIDED_AT,
       },
     ]
-    expect(ownership(withVoided, rounds)).toEqual(ownership(live, rounds))
+    expect(ownership(withVoided, rounds, [])).toEqual(
+      ownership(live, rounds, []),
+    )
 
-    const before = ownership(withVoided, rounds, '2024-06-30')
+    const before = ownership(withVoided, rounds, [], '2024-06-30')
     expect(before.kind).toBe('actual')
     if (before.kind !== 'actual') return
     // 500,000 of 2,000,000 — what was believed before the void.
@@ -198,6 +200,7 @@ describe('voiding a priced investment', () => {
         },
       ],
       rounds,
+      [],
     )
     expect(o).toEqual({ kind: 'cost_basis_only', reason: 'no_checks' })
   })

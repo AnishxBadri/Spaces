@@ -55,6 +55,7 @@ import {
   instrumentLabel,
 } from '#/lib/portfolio/figures'
 import { fmtMoney, fmtPct } from '@spaces/core/portfolio/format'
+import { SALE_POINT } from '@spaces/core/portfolio/ownership'
 import type { CostBasisReason } from '@spaces/core/portfolio/ownership'
 
 /**
@@ -386,7 +387,9 @@ function OwnershipBlock({ ownership }: { ownership: Holding['ownership'] }) {
           <span className="w-20 shrink-0 mono text-micro text-graphite">
             {formatDay(p.date, today)}
           </span>
-          <span className="min-w-0 flex-1 truncate text-ui">{p.roundKind}</span>
+          <span className="min-w-0 flex-1 truncate text-ui">
+            {p.roundKind === SALE_POINT ? 'Sale' : p.roundKind}
+          </span>
           <span className="shrink-0 mono text-micro text-graphite">
             {count(p.ourShares)} / {count(p.sharesOutstanding)}
           </span>

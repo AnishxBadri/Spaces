@@ -509,6 +509,98 @@ describe('the loader contract', () => {
     expect(then.metrics.metrics.lastMarkDate).toBe('2023-01-01')
   })
 
+  it('ownership counts the shares sold, and a voided sale stops counting', async () => {
+    const { loadHoldingDetail, loadPortfolio } = await import('./detail')
+    const { db } = await import('@spaces/db')
+    const { distribution, investment, round } =
+      await import('@spaces/db/schema/portfolio')
+    const { voidLedgerEventProgram } = await import('./reverse')
+
+    const built = await buildHolding(randomUUID().slice(0, 8))
+    await db.insert(investment).values({
+      holdingId: built.holdingId,
+      date: '2023-01-01',
+      amount: '100000',
+      currency: 'USD',
+      instrument: 'priced',
+      shares: '10000',
+      createdBy: built.actor,
+    })
+    await db.insert(round).values({
+      companyId: built.companyId,
+      date: '2023-01-01',
+      kind: 'Seed',
+      sharesOutstanding: '1000000',
+      createdBy: built.actor,
+    })
+    const [secondary] = await db
+      .insert(distribution)
+      .values({
+        holdingId: built.holdingId,
+        date: '2024-01-01',
+        amount: '20000',
+        currency: 'USD',
+        kind: 'secondary',
+        sharesSold: '4000',
+        createdBy: built.actor,
+      })
+      .returning()
+    // A dividend carries no shares sold and changes nothing.
+    await db.insert(distribution).values({
+      holdingId: built.holdingId,
+      date: '2024-02-01',
+      amount: '500',
+      currency: 'USD',
+      kind: 'dividend',
+      createdBy: built.actor,
+    })
+
+    const sold = await loadHoldingDetail(built.holdingId)
+    expect(sold.ownership).toEqual({
+      kind: 'actual',
+      history: [
+        {
+          date: '2023-01-01',
+          roundKind: 'Seed',
+          ourShares: 10_000,
+          sharesOutstanding: 1_000_000,
+          pct: 0.01,
+        },
+        {
+          date: '2024-01-01',
+          roundKind: 'sale',
+          ourShares: 6_000,
+          sharesOutstanding: 1_000_000,
+          pct: 0.006,
+        },
+      ],
+      currentPct: 0.006,
+    })
+    const book = await loadPortfolio()
+    const row = book.holdings.find((h) => h.id === built.holdingId)
+    expect(row?.ownership).toEqual(sold.ownership)
+
+    await Effect.runPromise(
+      voidLedgerEventProgram(built.actor, {
+        table: 'distribution',
+        id: secondary.id,
+      }),
+    )
+    const voided = await loadHoldingDetail(built.holdingId)
+    expect(voided.ownership).toMatchObject({ currentPct: 0.01 })
+    const bookAfter = await loadPortfolio()
+    expect(
+      bookAfter.holdings.find((h) => h.id === built.holdingId)?.ownership,
+    ).toEqual(voided.ownership)
+    // At a day before the void was written, the sale still stood.
+    const asOfThen = await loadHoldingDetail(built.holdingId, '2024-06-30')
+    expect(asOfThen.ownership).toMatchObject({ currentPct: 0.006 })
+    const bookThen = await loadPortfolio('2024-06-30')
+    expect(
+      bookThen.holdings.find((h) => h.id === built.holdingId)?.ownership,
+    ).toEqual(asOfThen.ownership)
+  })
+
   it('an as-of date before the void still sees the original', async () => {
     const { loadHoldingDetail } = await import('./detail')
     const { db } = await import('@spaces/db')
