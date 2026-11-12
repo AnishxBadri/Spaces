@@ -1,118 +1,125 @@
 import { createServerFn } from '@tanstack/react-start'
+import { Effect, Schema } from 'effect'
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
+import { attribute, objectDef } from '@spaces/db/schema'
 import { BADGE_COLORS } from '@spaces/core/attributes/colors'
 import { aiConfigInput } from '@spaces/core/ai/attribute-ai'
 import { isDerived } from '@spaces/core/attributes/relationship'
 import { requireAdmin, requireUser } from './shared'
 import { jsonValue } from '@spaces/core/json'
+import { input } from './input'
+import { serverQuery } from './query'
+
+const uuid = Schema.String.check(Schema.isUUID())
+
+const coreKind = Schema.Literals(['company', 'person', 'deal'])
+
+const listRegistryProgram = Effect.fn('listRegistryProgram')(function* (
+  key: {
+    kind?: 'company' | 'person' | 'deal' | undefined
+    objectId?: string | undefined
+  },
+  includeArchived: boolean,
+  includeDerived: boolean,
+) {
+  const { objectIdForKind } = yield* Effect.promise(
+    () => import('@spaces/core/writes/attributes/objects'),
+  )
+  const objectId =
+    key.objectId ?? (yield* objectIdForKind(key.kind ?? 'company'))
+  const rows = yield* serverQuery(
+    () =>
+      db
+        .select()
+        .from(attribute)
+        .where(
+          includeArchived
+            ? eq(attribute.objectId, objectId)
+            : and(
+                eq(attribute.objectId, objectId),
+                eq(attribute.archived, false),
+              ),
+        )
+        .orderBy(asc(attribute.sortOrder), asc(attribute.createdAt)),
+    'Registry read failed',
+  )
+  const listed = includeDerived ? rows : rows.filter((d) => !isDerived(d))
+  // Each relationship half's pair, named with the object it sits on.
+  const pairIds = listed.flatMap((d) =>
+    d.options.inverseOf === undefined ? [] : [d.options.inverseOf],
+  )
+  const pairs = new Map(
+    pairIds.length === 0
+      ? []
+      : (yield* serverQuery(
+          () =>
+            db
+              .select({
+                id: attribute.id,
+                name: attribute.name,
+                objectPlural: objectDef.plural,
+                archived: attribute.archived,
+              })
+              .from(attribute)
+              .innerJoin(objectDef, eq(objectDef.id, attribute.objectId))
+              .where(inArray(attribute.id, pairIds)),
+          'Registry read failed',
+        )).map((p) => [p.id, p]),
+  )
+  return listed.map((d) => ({
+    id: d.id,
+    slug: d.slug,
+    name: d.name,
+    description: d.description,
+    type: d.type,
+    options: d.options,
+    isSystem: d.isSystem,
+    archived: d.archived,
+    sortOrder: d.sortOrder,
+    // One control in the dialog, two columns here: the edit dialog reads
+    // `filterable` back so a reopened attribute shows the box as it was left.
+    filterable: d.filterable,
+    sortable: d.sortable,
+    pair:
+      d.options.inverseOf === undefined
+        ? null
+        : (pairs.get(d.options.inverseOf) ?? null),
+  }))
+})
 
 export const listRegistry = createServerFn()
   .validator(
-    z
-      .object({
+    input(
+      Schema.Struct({
         /** a core kind — resolves to its system object row */
-        kind: z.enum(['company', 'person', 'deal']).optional(),
+        kind: Schema.optional(coreKind),
         /** or the object row itself, the only key a custom object has */
-        objectId: z.string().uuid().optional(),
-        includeArchived: z.boolean().optional(),
+        objectId: Schema.optional(uuid),
+        includeArchived: Schema.optional(Schema.Boolean),
         /**
          * The inverse half of a relationship. `values` never holds it,
          * so only a surface that reads its value from the resolver asks —
          * the ledger and the record pages; one that edited what `values`
          * holds would empty the relationship.
          */
-        includeDerived: z.boolean().optional(),
-      })
-      .refine((v) => v.kind || v.objectId, {
-        message: 'Give a kind or an objectId',
-      }),
+        includeDerived: Schema.optional(Schema.Boolean),
+      }).check(
+        Schema.makeFilter((v) => Boolean(v.kind || v.objectId), {
+          message: 'Give a kind or an objectId',
+        }),
+      ),
+    ),
   )
   .handler(async ({ data }) => {
-    // Auth stays promise-land outside the program.
     await requireUser()
-    const { attribute, objectDef } = await import('@spaces/db/schema')
-    const { objectIdForKind } =
-      await import('@spaces/core/writes/attributes/objects')
-    const { effectFn } = await import('./effect')
-    const { Effect } = await import('effect')
-
-    const listRegistryProgram = Effect.fn('listRegistryProgram')(function* (
-      key: {
-        kind?: 'company' | 'person' | 'deal' | undefined
-        objectId?: string | undefined
-      },
-      includeArchived: boolean,
-      includeDerived: boolean,
-    ) {
-      const objectId =
-        key.objectId ?? (yield* objectIdForKind(key.kind ?? 'company'))
-      const rows = yield* Effect.tryPromise({
-        try: () =>
-          db
-            .select()
-            .from(attribute)
-            .where(
-              includeArchived
-                ? eq(attribute.objectId, objectId)
-                : and(
-                    eq(attribute.objectId, objectId),
-                    eq(attribute.archived, false),
-                  ),
-            )
-            .orderBy(asc(attribute.sortOrder), asc(attribute.createdAt)),
-        catch: (cause) => new Error(`Registry read failed: ${String(cause)}`),
-      })
-      const listed = includeDerived ? rows : rows.filter((d) => !isDerived(d))
-      // Each relationship half's pair, named with the object it sits on.
-      const pairIds = listed.flatMap((d) =>
-        d.options.inverseOf === undefined ? [] : [d.options.inverseOf],
-      )
-      const pairs = new Map(
-        pairIds.length === 0
-          ? []
-          : (yield* Effect.tryPromise({
-              try: () =>
-                db
-                  .select({
-                    id: attribute.id,
-                    name: attribute.name,
-                    objectPlural: objectDef.plural,
-                    archived: attribute.archived,
-                  })
-                  .from(attribute)
-                  .innerJoin(objectDef, eq(objectDef.id, attribute.objectId))
-                  .where(inArray(attribute.id, pairIds)),
-              catch: (cause) =>
-                new Error(`Registry read failed: ${String(cause)}`),
-            })).map((p) => [p.id, p]),
-      )
-      return listed.map((d) => ({
-        id: d.id,
-        slug: d.slug,
-        name: d.name,
-        description: d.description,
-        type: d.type,
-        options: d.options,
-        isSystem: d.isSystem,
-        archived: d.archived,
-        sortOrder: d.sortOrder,
-        // One control in the dialog, two columns here: the edit dialog reads
-        // `filterable` back so a reopened attribute shows the box as it was left.
-        filterable: d.filterable,
-        sortable: d.sortable,
-        pair:
-          d.options.inverseOf === undefined
-            ? null
-            : (pairs.get(d.options.inverseOf) ?? null),
-      }))
-    })
-
-    return effectFn(listRegistryProgram)(
-      { kind: data.kind, objectId: data.objectId },
-      data.includeArchived ?? false,
-      data.includeDerived ?? false,
+    return Effect.runPromise(
+      listRegistryProgram(
+        { kind: data.kind, objectId: data.objectId },
+        data.includeArchived ?? false,
+        data.includeDerived ?? false,
+      ),
     )
   })
 
@@ -122,19 +129,23 @@ export const listRegistry = createServerFn()
  */
 export const reorderAttributes = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      objectId: z.string().uuid(),
-      ids: z.array(z.string().uuid()).max(200),
-    }),
+    input(
+      Schema.Struct({
+        objectId: uuid,
+        ids: Schema.Array(uuid).check(Schema.isMaxLength(200)),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     await requireAdmin()
     const { reorderAttributesProgram } =
       await import('@spaces/core/writes/attributes/update')
     const { effectFn } = await import('./effect')
-    return effectFn(reorderAttributesProgram)(data.objectId, data.ids)
+    return effectFn(reorderAttributesProgram)(data.objectId, [...data.ids])
   })
 
+// The option, update and create boundaries stay zod: they compose core's
+// zod shapes `aiConfigInput` and `jsonValue`.
 const optionEdit = z.object({
   /** absent id = new option (id derived from label) */
   id: z.string().max(60).optional(),
@@ -201,6 +212,36 @@ export const updateAttributeInput = z.object({
  * renamed and archived but not removed — stored values may reference them.
  * - A user attribute widens to a list and archives; a system one does neither.
  */
+const reconcileIndexesProgram = Effect.fn('reconcileIndexesProgram')(
+  function* () {
+    const { reconcileAttributeIndexes } = yield* Effect.promise(
+      () => import('@spaces/core/writes/attributes/reconcile'),
+    )
+    yield* serverQuery(() => reconcileAttributeIndexes())
+  },
+)
+
+const editAttributeProgram = Effect.fn('editAttributeProgram')(function* (
+  data: z.infer<typeof updateAttributeInput>,
+  actorId: string,
+) {
+  const core = yield* Effect.promise(
+    () => import('@spaces/core/writes/attributes/update'),
+  )
+  const result = yield* core.updateAttributeProgram(data, {
+    type: 'user',
+    id: actorId,
+  })
+  // After the write commits, never inside it: `CREATE INDEX CONCURRENTLY`
+  // cannot run in a transaction. Ticking the box mints the
+  // attribute's `attr_idx_<id>`, unticking it — or archiving the
+  // attribute — drops it, with no restart. A failed mint is logged by the
+  // reconciler and leaves the attribute usable; the next boot retries.
+  if (data.indexed !== undefined || data.archived !== undefined)
+    yield* reconcileIndexesProgram()
+  return result
+})
+
 export const updateAttribute = createServerFn({ method: 'POST' })
   .validator(updateAttributeInput)
   .handler(async ({ data }) => {
@@ -209,24 +250,7 @@ export const updateAttribute = createServerFn({ method: 'POST' })
     // Creating an attribute stays member (the "+ Add column" flow): additive,
     // and a two-person fund should not need ceremony to add a field.
     const u = await requireAdmin()
-    const { updateAttributeProgram } =
-      await import('@spaces/core/writes/attributes/update')
-    const { effectFn } = await import('./effect')
-    const result = await effectFn(updateAttributeProgram)(data, {
-      type: 'user',
-      id: u.id,
-    })
-    // After the write commits, never inside it: `CREATE INDEX CONCURRENTLY`
-    // cannot run in a transaction. Ticking the box mints the
-    // attribute's `attr_idx_<id>`, unticking it — or archiving the
-    // attribute — drops it, with no restart. A failed mint is logged by the
-    // reconciler and leaves the attribute usable; the next boot retries.
-    if (data.indexed !== undefined || data.archived !== undefined) {
-      const { reconcileAttributeIndexes } =
-        await import('@spaces/core/writes/attributes/reconcile')
-      await reconcileAttributeIndexes()
-    }
-    return result
+    return Effect.runPromise(editAttributeProgram(data, u.id))
   })
 
 const ATTRIBUTE_TYPES = [
@@ -284,6 +308,19 @@ export const createAttributeInput = z.object({
   indexed: z.boolean().optional(),
 })
 
+const addAttributeProgram = Effect.fn('addAttributeProgram')(function* (
+  data: z.infer<typeof createAttributeInput>,
+  createdBy: string,
+) {
+  const core = yield* Effect.promise(
+    () => import('@spaces/core/writes/attributes/create'),
+  )
+  const result = yield* core.createAttributeProgram({ ...data, createdBy })
+  // Same rule as the update path: after the insert commits.
+  if (data.indexed) yield* reconcileIndexesProgram()
+  return result
+})
+
 export const createAttribute = createServerFn({ method: 'POST' })
   .validator(createAttributeInput)
   .handler(async ({ data }) => {
@@ -291,20 +328,7 @@ export const createAttribute = createServerFn({ method: 'POST' })
     // to add a field. Reshaping (rename, options, archive) is admin — see
     // updateAttribute.
     const u = await requireUser()
-    const { createAttributeProgram } =
-      await import('@spaces/core/writes/attributes/create')
-    const { effectFn } = await import('./effect')
-    const result = await effectFn(createAttributeProgram)({
-      ...data,
-      createdBy: u.id,
-    })
-    // Same rule as the update path: after the insert commits.
-    if (data.indexed) {
-      const { reconcileAttributeIndexes } =
-        await import('@spaces/core/writes/attributes/reconcile')
-      await reconcileAttributeIndexes()
-    }
-    return result
+    return Effect.runPromise(addAttributeProgram(data, u.id))
   })
 
 /**
@@ -314,13 +338,18 @@ export const createAttribute = createServerFn({ method: 'POST' })
  */
 export const createRelationship = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      objectId: z.string().uuid(),
-      name: z.string().trim().min(1).max(80),
-      targetObjectId: z.string().uuid(),
-      inverseName: z.string().trim().min(1).max(80),
-      cardinality: z.enum(['1:1', '1:N', 'N:1', 'N:N']),
-    }),
+    input(
+      Schema.Struct({
+        objectId: uuid,
+        name: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
+        targetObjectId: uuid,
+        inverseName: Schema.Trim.check(
+          Schema.isMinLength(1),
+          Schema.isMaxLength(80),
+        ),
+        cardinality: Schema.Literals(['1:1', '1:N', 'N:1', 'N:N']),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()

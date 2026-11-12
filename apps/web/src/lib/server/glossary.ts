@@ -1,9 +1,11 @@
 import { createServerFn } from '@tanstack/react-start'
 import { asc, eq, isNull, or, sql } from 'drizzle-orm'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import { db } from '@spaces/db'
 import { entity, space, term } from '@spaces/db/schema'
 import { requireUser } from './shared'
+import { input } from './input'
+import { serverQuery } from './query'
 
 /**
  * Terms are scoped to a space because "stage" means something different in
@@ -12,18 +14,31 @@ import { requireUser } from './shared'
  * everywhere (SAFE, pro-rata, ARR).
  */
 
-const termInput = z.object({
-  name: z.string().trim().min(1).max(120),
-  aliases: z.array(z.string().trim().min(1).max(120)).max(20).default([]),
-  definitionMd: z.string().trim().max(4000).default(''),
-  spaceId: z.string().uuid().nullish(),
-})
+const uuid = Schema.String.check(Schema.isUUID())
 
-export const listTerms = createServerFn()
-  .validator(z.object({ spaceId: z.string().uuid().nullish() }).optional())
-  .handler(async ({ data }) => {
-    await requireUser()
-    const rows = await db
+const termName = Schema.Trim.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(120),
+)
+
+// An absent list or definition reads as empty, on update as on create.
+const termFields = {
+  aliases: Schema.Array(termName)
+    .check(Schema.isMaxLength(20))
+    .pipe(
+      Schema.withDecodingDefault(Effect.succeed<ReadonlyArray<string>>([])),
+    ),
+  definitionMd: Schema.Trim.check(Schema.isMaxLength(4000)).pipe(
+    Schema.withDecodingDefault(Effect.succeed('')),
+  ),
+  spaceId: Schema.optional(Schema.NullOr(uuid)),
+}
+
+const listTermsProgram = Effect.fn('listTermsProgram')(function* (
+  spaceId: string | null | undefined,
+) {
+  return yield* serverQuery(() =>
+    db
       .select({
         id: term.entityId,
         name: term.name,
@@ -36,7 +51,7 @@ export const listTerms = createServerFn()
       .leftJoin(space, eq(space.entityId, term.spaceId))
       .leftJoin(entity, eq(entity.id, space.entityId))
       .where(
-        data?.spaceId
+        spaceId
           ? // A space's glossary is its own terms, everything inherited from
             // its ancestors, and the global ones. Inheritance runs downward
             // only: PUE defined at Data centers is true in Cooling, but a
@@ -46,14 +61,27 @@ export const listTerms = createServerFn()
               isNull(term.spaceId),
               sql`${term.spaceId} in (
                 select anc.entity_id from space anc
-                join space self on self.entity_id = ${data.spaceId}
+                join space self on self.entity_id = ${spaceId}
                 where anc.path @> self.path
               )`,
             )
           : undefined,
       )
-      .orderBy(asc(term.name))
-    return rows
+      .orderBy(asc(term.name)),
+  )
+})
+
+export const listTerms = createServerFn()
+  .validator(
+    input(
+      Schema.UndefinedOr(
+        Schema.Struct({ spaceId: Schema.optional(Schema.NullOr(uuid)) }),
+      ),
+    ),
+  )
+  .handler(async ({ data }) => {
+    await requireUser()
+    return Effect.runPromise(listTermsProgram(data?.spaceId))
   })
 
 /**
@@ -64,12 +92,20 @@ export const listTerms = createServerFn()
  * link sync matches against, so what the editor highlights and what
  * the graph links are drawn from the same set.
  */
+const listTermsForNoteProgram = Effect.fn('listTermsForNoteProgram')(function* (
+  noteId: string,
+) {
+  const { termsVisibleFrom } = yield* Effect.promise(
+    () => import('../glossary/link-terms'),
+  )
+  return yield* serverQuery(() => termsVisibleFrom(db, noteId))
+})
+
 export const listTermsForNote = createServerFn()
-  .validator(z.object({ noteId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ noteId: uuid })))
   .handler(async ({ data }) => {
     await requireUser()
-    const { termsVisibleFrom } = await import('../glossary/link-terms')
-    return termsVisibleFrom(db, data.noteId)
+    return Effect.runPromise(listTermsForNoteProgram(data.noteId))
   })
 
 /**
@@ -77,21 +113,29 @@ export const listTermsForNote = createServerFn()
  * aliases into `entity_alias` so search finds a term by its abbreviation. This is the request half only.
  */
 export const createTerm = createServerFn({ method: 'POST' })
-  .validator(termInput)
+  .validator(input(Schema.Struct({ name: termName, ...termFields })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { createTermProgram } = await import('../glossary/write-term')
     const { effectFn } = await import('./effect')
     return effectFn(createTermProgram)(u.id, {
       name: data.name,
-      aliases: data.aliases,
+      aliases: [...data.aliases],
       definitionMd: data.definitionMd,
       spaceId: data.spaceId ?? null,
     })
   })
 
 export const updateTerm = createServerFn({ method: 'POST' })
-  .validator(termInput.partial().extend({ id: z.string().uuid() }))
+  .validator(
+    input(
+      Schema.Struct({
+        id: uuid,
+        name: Schema.optional(termName),
+        ...termFields,
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     await requireUser()
     const { updateTermProgram } = await import('../glossary/write-term')
@@ -99,7 +143,7 @@ export const updateTerm = createServerFn({ method: 'POST' })
     return effectFn(updateTermProgram)({
       id: data.id,
       name: data.name,
-      aliases: data.aliases,
+      aliases: [...data.aliases],
       definitionMd: data.definitionMd,
       ...(data.spaceId !== undefined ? { spaceId: data.spaceId } : {}),
     })
@@ -110,7 +154,7 @@ export const updateTerm = createServerFn({ method: 'POST' })
  * with an entity is ENTITY_REFS' answer. Never keep a hand list here.
  */
 export const deleteTerm = createServerFn({ method: 'POST' })
-  .validator(z.object({ id: z.string().uuid() }))
+  .validator(input(Schema.Struct({ id: uuid })))
   .handler(async ({ data }) => {
     await requireUser()
     const { deleteEntityProgram } =
@@ -126,7 +170,7 @@ export const deleteTerm = createServerFn({ method: 'POST' })
  * term.
  */
 export const getTermPage = createServerFn()
-  .validator(z.object({ termId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ termId: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { termPageProgram } = await import('../glossary/term-page')

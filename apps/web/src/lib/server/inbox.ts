@@ -1,10 +1,13 @@
 import { createServerFn } from '@tanstack/react-start'
+import { Cause, Effect, Schema } from 'effect'
 import { eq } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { duplicateCandidate } from '@spaces/db/schema'
 import { mergeEntities } from '@spaces/core/writes/entities/merge'
 import { requireUser } from './shared'
+import { input } from './input'
+import { serverQuery } from './query'
+import type { ServerQueryFailed } from './query'
 
 /**
  * The review inbox: one queue over typed rows (`duplicate_candidate` pairs
@@ -12,8 +15,8 @@ import { requireUser } from './shared'
  * A new lane joins by adding a member to `InboxRow` and a renderer to the
  * page's `RENDERERS` map — never a second page.
  *
- * Reads are Effect programs through `effectFn()`; nothing Effect-shaped
- * escapes this file. The programs are imported inside the handlers so their
+ * Every handler runs an Effect program; nothing Effect-shaped escapes this
+ * file. The inbox's own programs are imported inside these so their
  * database code never reaches the client bundle.
  */
 
@@ -41,6 +44,41 @@ export type { InboxSide } from '../inbox/context'
 export type { SuggestionKind } from '@spaces/core/writes/suggestions/propose'
 export type { RecordDuplicate } from '../records/notices'
 
+const uuid = Schema.String.check(Schema.isUUID())
+
+/** The pair is no longer open, or the winner is not one of it. */
+class PairRefused extends Schema.TaggedError<PairRefused>()('PairRefused', {
+  message: Schema.String,
+}) {}
+
+/** A dismiss that did not land, with the reason the card shows. */
+class DismissFailed extends Schema.TaggedError<DismissFailed>()(
+  'DismissFailed',
+  { message: Schema.String },
+) {}
+
+const listInboxProgram = Effect.fn('listInboxProgram')(function* (
+  viewer: string,
+  record: string | null,
+  source: string | null,
+  space: string | null,
+) {
+  const queue = yield* Effect.promise(() => import('../inbox/queue'))
+  const [rows, scope, filter] = yield* Effect.all(
+    [
+      queue.listInboxProgram({ record, source, space, viewer }),
+      record === null
+        ? Effect.succeed(null)
+        : queue.inboxScopeRecordProgram(record),
+      source === null && space === null
+        ? Effect.succeed(null)
+        : queue.inboxFilterLabelsProgram(source, space),
+    ],
+    { concurrency: 'unbounded' },
+  )
+  return { rows, scope, filter }
+})
+
 /**
  * The queue, optionally scoped to one record (the record rail's "Waiting"
  * chips land here with `?record=`) or to Today's source and space. `scope`
@@ -49,42 +87,33 @@ export type { RecordDuplicate } from '../records/notices'
  */
 export const listInbox = createServerFn()
   .validator(
-    z.object({
-      record: z.string().uuid().nullable(),
-      source: z.string().min(1).max(100).nullable().optional(),
-      space: z.string().uuid().nullable().optional(),
-    }),
+    input(
+      Schema.Struct({
+        record: Schema.NullOr(uuid),
+        source: Schema.optional(
+          Schema.NullOr(
+            Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+          ),
+        ),
+        space: Schema.optional(Schema.NullOr(uuid)),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const user = await requireUser()
-    const {
-      listInboxProgram,
-      inboxScopeRecordProgram,
-      inboxFilterLabelsProgram,
-    } = await import('../inbox/queue')
-    const { effectFn } = await import('./effect')
-    const source = data.source ?? null
-    const space = data.space ?? null
-    const [rows, scope, filter] = await Promise.all([
-      effectFn(listInboxProgram)({
-        record: data.record,
-        source,
-        space,
-        viewer: user.id,
-      }),
-      data.record === null
-        ? Promise.resolve(null)
-        : effectFn(inboxScopeRecordProgram)(data.record),
-      source === null && space === null
-        ? Promise.resolve(null)
-        : effectFn(inboxFilterLabelsProgram)(source, space),
-    ])
-    return { rows, scope, filter }
+    return Effect.runPromise(
+      listInboxProgram(
+        user.id,
+        data.record,
+        data.source ?? null,
+        data.space ?? null,
+      ),
+    )
   })
 
 /** The open duplicate pairs a record is in, for its notices band. */
 export const listRecordDuplicates = createServerFn()
-  .validator(z.object({ entityId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ entityId: uuid })))
   .handler(async ({ data }) => {
     await requireUser()
     const { recordDuplicatesProgram } = await import('../inbox/queue')
@@ -92,47 +121,64 @@ export const listRecordDuplicates = createServerFn()
     return effectFn(recordDuplicatesProgram)(data.entityId)
   })
 
-export const mergeDuplicate = createServerFn({ method: 'POST' })
-  .validator(
-    z.object({
-      candidateId: z.string().uuid(),
-      winnerId: z.string().uuid(),
-    }),
+const mergeDuplicateProgram = Effect.fn('mergeDuplicateProgram')(function* (
+  candidateId: string,
+  winnerId: string,
+  mergedBy: string,
+): Effect.fn.Return<{ ok: boolean }, PairRefused | ServerQueryFailed> {
+  const cand = (yield* serverQuery(() =>
+    db
+      .select()
+      .from(duplicateCandidate)
+      .where(eq(duplicateCandidate.id, candidateId)),
+  )).at(0)
+  if (!cand || cand.status !== 'open')
+    return yield* new PairRefused({ message: 'Candidate not open' })
+  if (winnerId !== cand.entityA && winnerId !== cand.entityB)
+    return yield* new PairRefused({ message: 'Winner must be one of the pair' })
+  const loserId = winnerId === cand.entityA ? cand.entityB : cand.entityA
+  // The merge's own refusals reach the caller as it throws them.
+  yield* Effect.promise(() =>
+    mergeEntities({ winnerId, loserId, mergedBy, candidateId }),
   )
+  return { ok: true }
+})
+
+export const mergeDuplicate = createServerFn({ method: 'POST' })
+  .validator(input(Schema.Struct({ candidateId: uuid, winnerId: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const cand = (
-      await db
-        .select()
-        .from(duplicateCandidate)
-        .where(eq(duplicateCandidate.id, data.candidateId))
-    ).at(0)
-    if (!cand || cand.status !== 'open') throw new Error('Candidate not open')
-    if (data.winnerId !== cand.entityA && data.winnerId !== cand.entityB)
-      throw new Error('Winner must be one of the pair')
-    const loserId = data.winnerId === cand.entityA ? cand.entityB : cand.entityA
-    await mergeEntities({
-      winnerId: data.winnerId,
-      loserId,
-      mergedBy: u.id,
-      candidateId: data.candidateId,
-    })
-    return { ok: true }
+    return Effect.runPromise(
+      mergeDuplicateProgram(data.candidateId, data.winnerId, u.id),
+    )
   })
 
+const dismissProgram = Effect.fn('dismissProgram')(function* (
+  candidateId: string,
+  actorId: string,
+) {
+  const { dismissDuplicateProgram } = yield* Effect.promise(
+    () => import('../inbox/held-commit'),
+  )
+  // A pair merged or dismissed meanwhile is left as it stands. Whatever
+  // stopped it reaches the card as its message alone.
+  yield* dismissDuplicateProgram(candidateId, actorId).pipe(
+    Effect.catchCause((cause) => {
+      const err = Cause.squash(cause)
+      return Effect.fail(
+        new DismissFailed({
+          message:
+            err instanceof Error ? err.message : 'Could not dismiss the pair',
+        }),
+      )
+    }),
+  )
+  return { ok: true }
+})
+
 export const dismissDuplicate = createServerFn({ method: 'POST' })
-  .validator(z.object({ candidateId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ candidateId: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const { dismissDuplicateProgram } = await import('../inbox/held-commit')
-    const { effectFn } = await import('./effect')
-    // A pair merged or dismissed meanwhile is left as it stands.
-    await effectFn(dismissDuplicateProgram)(data.candidateId, u.id).catch(
-      (err: unknown) => {
-        throw new Error(
-          err instanceof Error ? err.message : 'Could not dismiss the pair',
-        )
-      },
-    )
-    return { ok: true }
+    return Effect.runPromise(dismissProgram(data.candidateId, u.id))
   })

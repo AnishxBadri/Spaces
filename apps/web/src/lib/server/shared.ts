@@ -1,4 +1,5 @@
 import { getRequest } from '@tanstack/react-start/server'
+import { Effect, Schema } from 'effect'
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import { auth } from '../auth'
 import { db } from '@spaces/db'
@@ -15,27 +16,55 @@ import {
 } from '@spaces/db/schema'
 import type { SourceClass } from '@spaces/db/schema'
 import type { RelationHalf } from '@spaces/core/writes/read/relations'
+import type { Tx } from '@spaces/core/writes/attributes/values'
+import { ServerQueryFailed, serverQuery, serverQueryFailed } from './query'
 
 /** Closed JSON type — Start's serializer rejects `unknown`. */
 export type { Json } from '@spaces/core/json'
 
-export async function requireUser() {
-  const session = await auth.api.getSession({
-    headers: getRequest().headers,
-  })
-  if (!session) throw new Error('Unauthorized')
+/** No session on the request. */
+export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
+  'Unauthorized',
+  { message: Schema.String },
+) {}
+
+/** A signed-in member reached an admin-only write. */
+export class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
+  message: Schema.String,
+}) {}
+
+/** The signed-in user, for a program; fails `Unauthorized` without a session. */
+export const requireUserProgram = Effect.fn('requireUserProgram')(function* () {
+  // A failing session lookup rejects as it always has, untouched.
+  const session = yield* Effect.promise(() =>
+    auth.api.getSession({ headers: getRequest().headers }),
+  )
+  if (!session) return yield* new Unauthorized({ message: 'Unauthorized' })
   return session.user
-}
+})
 
 /**
- * canWrite's admin gate. Admin owns settings, integrations, keys and user
- * management. Everything else any member writes; a two-person fund has no
- * ceremony.
+ * canWrite's admin gate, for a program. Admin owns settings, integrations,
+ * keys and user management. Everything else any member writes; a two-person
+ * fund has no ceremony.
  */
+export const requireAdminProgram = Effect.fn('requireAdminProgram')(
+  function* () {
+    const u = yield* requireUserProgram()
+    if (u.role !== 'admin')
+      return yield* new Forbidden({ message: 'Admins only' })
+    return u
+  },
+)
+
+/** `requireUserProgram` for a handler; rejects with `Unauthorized`. */
+export async function requireUser() {
+  return Effect.runPromise(requireUserProgram())
+}
+
+/** `requireAdminProgram` for a handler; rejects with `Forbidden`. */
 export async function requireAdmin() {
-  const u = await requireUser()
-  if (u.role !== 'admin') throw new Error('Admins only')
-  return u
+  return Effect.runPromise(requireAdminProgram())
 }
 
 /**
@@ -43,9 +72,16 @@ export async function requireAdmin() {
  * `isAdmin` says whether its secrets are shown or redacted. Its writes keep
  * `requireAdmin()`.
  */
-export async function requireSettingsReader(): Promise<{ isAdmin: boolean }> {
-  const u = await requireUser()
+export const requireSettingsReaderProgram = Effect.fn(
+  'requireSettingsReaderProgram',
+)(function* () {
+  const u = yield* requireUserProgram()
   return { isAdmin: u.role === 'admin' }
+})
+
+/** `requireSettingsReaderProgram` for a handler. */
+export async function requireSettingsReader(): Promise<{ isAdmin: boolean }> {
+  return Effect.runPromise(requireSettingsReaderProgram())
 }
 
 /**
@@ -68,44 +104,49 @@ export function toLabel(name: string): string {
   return label || 'space'
 }
 
-/**
- * Space creation, shared by the createSpace server fn and the scaffold
- * stamper. Slugs are unique per parent (two branches may both hold a
- * "Cooling"); only a genuine same-parent collision gets a suffix.
- */
-export async function createSpaceRow(
+/** `createSpaceRow` was handed a parent that is not a space. */
+export class ParentSpaceNotFound extends Schema.TaggedError<ParentSpaceNotFound>()(
+  'ParentSpaceNotFound',
+  { message: Schema.String },
+) {}
+
+const insertSpaceRowProgram = Effect.fn('insertSpaceRowProgram')(function* (
+  tx: Tx,
   name: string,
   parentId: string | null,
   userId: string,
-  /** An open transaction to create it inside; its own otherwise. */
-  within: Pick<typeof db, 'transaction'> = db,
-): Promise<string> {
-  return within.transaction(async (tx) => {
-    let parentPath: string | null = null
-    if (parentId) {
-      const parent = (
-        await tx
-          .select({ path: space.path })
-          .from(space)
-          .where(eq(space.entityId, parentId))
-      ).at(0)
-      if (!parent) throw new Error('Parent space not found')
-      parentPath = parent.path
-    }
-    const base = toLabel(name)
-    const siblingOf = parentId
-      ? eq(space.parentId, parentId)
-      : isNull(space.parentId)
-    let slug = base
-    for (let i = 2; ; i++) {
-      const existing = await tx
+) {
+  let parentPath: string | null = null
+  if (parentId) {
+    const parent = (yield* serverQuery(() =>
+      tx
+        .select({ path: space.path })
+        .from(space)
+        .where(eq(space.entityId, parentId)),
+    )).at(0)
+    if (!parent)
+      return yield* new ParentSpaceNotFound({
+        message: 'Parent space not found',
+      })
+    parentPath = parent.path
+  }
+  const base = toLabel(name)
+  const siblingOf = parentId
+    ? eq(space.parentId, parentId)
+    : isNull(space.parentId)
+  let slug = base
+  for (let i = 2; ; i++) {
+    const existing = yield* serverQuery(() =>
+      tx
         .select({ id: space.entityId })
         .from(space)
-        .where(and(siblingOf, eq(space.slug, slug)))
-      if (existing.length === 0) break
-      slug = `${base}_${i}`
-    }
-    const [ent] = await tx
+        .where(and(siblingOf, eq(space.slug, slug))),
+    )
+    if (existing.length === 0) break
+    slug = `${base}_${i}`
+  }
+  const [ent] = yield* serverQuery(() =>
+    tx
       .insert(entity)
       .values({
         kind: 'space',
@@ -113,15 +154,59 @@ export async function createSpaceRow(
         sourceClass: 'manual',
         createdBy: userId,
       })
-      .returning({ id: entity.id })
-    await tx.insert(space).values({
+      .returning({ id: entity.id }),
+  )
+  yield* serverQuery(() =>
+    tx.insert(space).values({
       entityId: ent.id,
       parentId,
       slug,
       path: parentPath ? `${parentPath}.${slug}` : slug,
+    }),
+  )
+  return ent.id
+})
+
+/**
+ * Space creation, shared by the createSpace server fn and the scaffold
+ * stamper. Slugs are unique per parent (two branches may both hold a
+ * "Cooling"); only a genuine same-parent collision gets a suffix.
+ */
+export const createSpaceRowProgram = Effect.fn('createSpaceRowProgram')(
+  function* (
+    name: string,
+    parentId: string | null,
+    userId: string,
+    /** An open transaction to create it inside; its own otherwise. */
+    within: Pick<typeof db, 'transaction'> = db,
+  ) {
+    // The writer's own failures come out of the transaction already tagged;
+    // only what drizzle throws around them (begin, commit) is wrapped here.
+    return yield* Effect.tryPromise({
+      try: () =>
+        within.transaction((tx) =>
+          Effect.runPromise(insertSpaceRowProgram(tx, name, parentId, userId)),
+        ),
+      catch: (cause) =>
+        cause instanceof ParentSpaceNotFound ||
+        cause instanceof ServerQueryFailed
+          ? cause
+          : serverQueryFailed(cause),
     })
-    return ent.id
-  })
+  },
+)
+
+/** `createSpaceRowProgram` for a caller that is not Effect. */
+export async function createSpaceRow(
+  name: string,
+  parentId: string | null,
+  userId: string,
+  /** An open transaction to create it inside; its own otherwise. */
+  within: Pick<typeof db, 'transaction'> = db,
+): Promise<string> {
+  return Effect.runPromise(
+    createSpaceRowProgram(name, parentId, userId, within),
+  )
 }
 
 /**
@@ -150,42 +235,50 @@ export type ReferencedByRow = {
  * - A server helper, not a serverFn, so it is testable without a request.
  * - Merged-away referrers are excluded: the survivor carries the link.
  */
+export const referencedByRowsProgram = Effect.fn('referencedByRowsProgram')(
+  function* (entityId: string) {
+    const rows: Array<ReferencedByRow> = yield* serverQuery(() =>
+      db
+        .select({
+          fromId: link.fromEntityId,
+          attrSlug: link.attrSlug,
+          attrName: attribute.name,
+          name: entity.canonicalName,
+          kind: entity.kind,
+          objectSlug: objectDef.slug,
+          objectSingular: objectDef.singular,
+          objectPlural: objectDef.plural,
+        })
+        .from(link)
+        .innerJoin(entity, eq(entity.id, link.fromEntityId))
+        .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
+        // The attribute that made the edge, on the referrer's own object: its
+        // display name is the only thing a heading needs that the link lacks.
+        .leftJoin(
+          attribute,
+          and(
+            eq(attribute.objectId, entity.objectId),
+            eq(attribute.slug, link.attrSlug),
+          ),
+        )
+        .where(
+          and(
+            eq(link.toEntityId, entityId),
+            eq(link.relation, 'references'),
+            isNull(entity.mergedIntoId),
+          ),
+        )
+        .orderBy(asc(link.attrSlug), asc(entity.canonicalName)),
+    )
+    return rows
+  },
+)
+
+/** `referencedByRowsProgram` for a caller that is not Effect. */
 export async function referencedByRows(
   entityId: string,
 ): Promise<Array<ReferencedByRow>> {
-  return (
-    db
-      .select({
-        fromId: link.fromEntityId,
-        attrSlug: link.attrSlug,
-        attrName: attribute.name,
-        name: entity.canonicalName,
-        kind: entity.kind,
-        objectSlug: objectDef.slug,
-        objectSingular: objectDef.singular,
-        objectPlural: objectDef.plural,
-      })
-      .from(link)
-      .innerJoin(entity, eq(entity.id, link.fromEntityId))
-      .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
-      // The attribute that made the edge, on the referrer's own object: its
-      // display name is the only thing a heading needs that the link lacks.
-      .leftJoin(
-        attribute,
-        and(
-          eq(attribute.objectId, entity.objectId),
-          eq(attribute.slug, link.attrSlug),
-        ),
-      )
-      .where(
-        and(
-          eq(link.toEntityId, entityId),
-          eq(link.relation, 'references'),
-          isNull(entity.mergedIntoId),
-        ),
-      )
-      .orderBy(asc(link.attrSlug), asc(entity.canonicalName))
-  )
+  return Effect.runPromise(referencedByRowsProgram(entityId))
 }
 
 /** Inbound references under one attribute, ready to render as a section. */
@@ -272,27 +365,41 @@ export function withoutRelations(
  * - Left join: every non-integration document's ref is null, which
  *   `document_source_ref_invariant` guarantees.
  */
+export const documentProvenanceProgram = Effect.fn('documentProvenanceProgram')(
+  function* (
+    documentIds: Array<string>,
+  ): Effect.fn.Return<
+    Map<string, { sourceClass: SourceClass; sourceCapability: string | null }>,
+    ServerQueryFailed
+  > {
+    if (documentIds.length === 0) return new Map()
+    const rows = yield* serverQuery(() =>
+      db
+        .select({
+          id: document.entityId,
+          sourceClass: document.sourceClass,
+          sourceCapability: integration.capabilityId,
+        })
+        .from(document)
+        .leftJoin(integration, eq(integration.id, document.sourceRef))
+        .where(inArray(document.entityId, documentIds)),
+    )
+    return new Map(
+      rows.map((r) => [
+        r.id,
+        { sourceClass: r.sourceClass, sourceCapability: r.sourceCapability },
+      ]),
+    )
+  },
+)
+
+/** `documentProvenanceProgram` for a caller that is not Effect. */
 export async function documentProvenance(
   documentIds: Array<string>,
 ): Promise<
   Map<string, { sourceClass: SourceClass; sourceCapability: string | null }>
 > {
-  if (documentIds.length === 0) return new Map()
-  const rows = await db
-    .select({
-      id: document.entityId,
-      sourceClass: document.sourceClass,
-      sourceCapability: integration.capabilityId,
-    })
-    .from(document)
-    .leftJoin(integration, eq(integration.id, document.sourceRef))
-    .where(inArray(document.entityId, documentIds))
-  return new Map(
-    rows.map((r) => [
-      r.id,
-      { sourceClass: r.sourceClass, sourceCapability: r.sourceCapability },
-    ]),
-  )
+  return Effect.runPromise(documentProvenanceProgram(documentIds))
 }
 
 /**
@@ -315,43 +422,46 @@ export type DocumentFilingEdge =
  * target is left out: it has a surviving record, and a chip pointing at the
  * tombstone would route to a page the merge redirects away from.
  */
-export async function documentFilingEdges(
-  documentIds: Array<string>,
-): Promise<Map<string, Array<DocumentFilingEdge>>> {
+export const documentFilingEdgesProgram = Effect.fn(
+  'documentFilingEdgesProgram',
+)(function* (documentIds: Array<string>) {
   const edges = new Map<string, Array<DocumentFilingEdge>>()
   if (documentIds.length === 0) return edges
 
-  const [records, spaces] = await Promise.all([
-    db
-      .select({
-        documentId: link.fromEntityId,
-        id: entity.id,
-        name: entity.canonicalName,
-        entityKind: entity.kind,
-        objectSlug: objectDef.slug,
-      })
-      .from(link)
-      .innerJoin(entity, eq(entity.id, link.toEntityId))
-      .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
-      .where(
-        and(
-          inArray(link.fromEntityId, documentIds),
-          eq(link.relation, 'tagged_in'),
-          isNull(entity.mergedIntoId),
-        ),
-      )
-      .orderBy(asc(entity.canonicalName)),
-    db
-      .select({
-        documentId: entitySpace.entityId,
-        id: entity.id,
-        name: entity.canonicalName,
-      })
-      .from(entitySpace)
-      .innerJoin(entity, eq(entity.id, entitySpace.spaceId))
-      .where(inArray(entitySpace.entityId, documentIds))
-      .orderBy(asc(entity.canonicalName)),
-  ])
+  // Two statements at once, as the reader always ran them.
+  const [records, spaces] = yield* serverQuery(() =>
+    Promise.all([
+      db
+        .select({
+          documentId: link.fromEntityId,
+          id: entity.id,
+          name: entity.canonicalName,
+          entityKind: entity.kind,
+          objectSlug: objectDef.slug,
+        })
+        .from(link)
+        .innerJoin(entity, eq(entity.id, link.toEntityId))
+        .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
+        .where(
+          and(
+            inArray(link.fromEntityId, documentIds),
+            eq(link.relation, 'tagged_in'),
+            isNull(entity.mergedIntoId),
+          ),
+        )
+        .orderBy(asc(entity.canonicalName)),
+      db
+        .select({
+          documentId: entitySpace.entityId,
+          id: entity.id,
+          name: entity.canonicalName,
+        })
+        .from(entitySpace)
+        .innerJoin(entity, eq(entity.id, entitySpace.spaceId))
+        .where(inArray(entitySpace.entityId, documentIds))
+        .orderBy(asc(entity.canonicalName)),
+    ]),
+  )
 
   const push = (documentId: string, edge: DocumentFilingEdge) => {
     const list = edges.get(documentId)
@@ -371,6 +481,13 @@ export async function documentFilingEdges(
     push(s.documentId, { kind: 'space', id: s.id, name: s.name })
   }
   return edges
+})
+
+/** `documentFilingEdgesProgram` for a caller that is not Effect. */
+export async function documentFilingEdges(
+  documentIds: Array<string>,
+): Promise<Map<string, Array<DocumentFilingEdge>>> {
+  return Effect.runPromise(documentFilingEdgesProgram(documentIds))
 }
 
 /**
@@ -386,26 +503,30 @@ export type { DocumentFilingTarget } from '@spaces/core/documents/filing'
  *   never hand-list tables here.
  * - Outside the server fn so a test can delete without a request.
  */
-export async function deleteDocumentWithBlobGc(
-  id: string,
-): Promise<{ ok: true }> {
-  const row = (
-    await db
+export const deleteDocumentWithBlobGcProgram = Effect.fn(
+  'deleteDocumentWithBlobGcProgram',
+)(function* (id: string) {
+  const row = (yield* serverQuery(() =>
+    db
       .select({ blobSha: document.blobSha })
       .from(document)
-      .where(eq(document.entityId, id))
-  ).at(0)
-  if (!row) return { ok: true }
+      .where(eq(document.entityId, id)),
+  )).at(0)
+  if (!row) return { ok: true as const }
   // Its prior revisions go with it, so their bytes are candidates too.
-  const revisions = await db
-    .select({ blobSha: documentRevision.blobSha })
-    .from(documentRevision)
-    .where(eq(documentRevision.documentId, id))
+  const revisions = yield* serverQuery(() =>
+    db
+      .select({ blobSha: documentRevision.blobSha })
+      .from(documentRevision)
+      .where(eq(documentRevision.documentId, id)),
+  )
 
-  const { deleteEntityProgram } =
-    await import('@spaces/core/writes/entities/delete')
-  const { effectFn } = await import('./effect')
-  await effectFn(deleteEntityProgram)(id)
+  // Imported here, not at the top: the server-fn modules that import this
+  // one are re-exported by the client-imported barrel.
+  const { deleteEntityProgram } = yield* Effect.promise(
+    () => import('@spaces/core/writes/entities/delete'),
+  )
+  yield* deleteEntityProgram(id)
 
   // Content addressing means one file can back several rows: the deck sent
   // to both partners, or the same deck filed on a company and a space.
@@ -414,8 +535,19 @@ export async function deleteDocumentWithBlobGc(
   const shas = new Set(revisions.map((r) => r.blobSha))
   if (row.blobSha) shas.add(row.blobSha)
   if (shas.size > 0) {
-    const { reclaimBlobIfOrphaned } = await import('#/lib/documents/blob-refs')
-    for (const sha of shas) await reclaimBlobIfOrphaned(sha)
+    const { reclaimBlobIfOrphaned } = yield* Effect.promise(
+      () => import('#/lib/documents/blob-refs'),
+    )
+    // Its own failures reach the caller as they always have.
+    for (const sha of shas)
+      yield* Effect.promise(() => reclaimBlobIfOrphaned(sha))
   }
-  return { ok: true }
+  return { ok: true as const }
+})
+
+/** `deleteDocumentWithBlobGcProgram` for a caller that is not Effect. */
+export async function deleteDocumentWithBlobGc(
+  id: string,
+): Promise<{ ok: true }> {
+  return Effect.runPromise(deleteDocumentWithBlobGcProgram(id))
 }
