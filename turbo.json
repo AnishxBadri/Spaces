@@ -121,6 +121,36 @@
       "outputs": []
     },
 
+    // The worker's gates read apps/web/src through `#web/*` exactly as its
+    // build does: its jobs import web's lib modules, so their types, their
+    // lint and their tests all depend on that source. apps/web is not a
+    // dependency of the worker, so turbo would not fold it into these hashes
+    // on its own, and an edit there would replay a cached pass.
+    "@spaces/worker#test": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/web/src/**"],
+      "outputs": []
+    },
+
+    "@spaces/worker#typecheck": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/web/src/**"],
+      "outputs": []
+    },
+
+    // The generic `lint` inputs below, plus web's source.
+    "@spaces/worker#lint": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/eslint.config.js",
+        "$TURBO_ROOT$/packages/config/eslint.base.js",
+        "$TURBO_ROOT$/packages/config/eslint-rules/**",
+        "$TURBO_ROOT$/apps/web/src/**"
+      ],
+      "outputs": []
+    },
+
     // core's one-writer scans (chunk.sensitive, document birth) read apps/
     // and plugins/, which are dependents, not dependencies, so turbo would
     // not fold them into this hash on its own.

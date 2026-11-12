@@ -142,10 +142,10 @@ export const setMemberBanned = createServerFn({ method: 'POST' })
     input(Schema.Struct({ userId: Schema.String, banned: Schema.Boolean })),
   )
   .handler(async ({ data }) => {
-    // The body lives outside the server-fn modules so a test can drive the
-    // real suspension (a suspended member's MCP token stops answering).
-    const { setMemberBannedHandler } = await import('#/lib/members/suspend')
-    return setMemberBannedHandler(data)
+    // The program lives outside the server-fn modules so a test can drive
+    // the real suspension (a suspended member's MCP token stops answering).
+    const { setMemberBannedProgram } = await import('#/lib/members/suspend')
+    return Effect.runPromise(setMemberBannedProgram(data))
   })
 
 // ---------- invites ----------
@@ -291,14 +291,17 @@ export const createResetLink = createServerFn({ method: 'POST' })
     ),
   )
   .handler(async ({ data }) => {
-    const { createResetLinkHandler } = await import('../members/reset-link')
-    return createResetLinkHandler(data)
+    const admin = await requireAdmin()
+    const { createResetLinkProgram } = await import('../members/reset-link')
+    return Effect.runPromise(
+      createResetLinkProgram({ adminId: admin.id, userId: data.userId }),
+    )
   })
 
 /** Public — the /reset page runs before any session exists. */
 export const getResetPreview = createServerFn()
   .validator(input(Schema.Struct({ token: inviteToken })))
   .handler(async ({ data }) => {
-    const { resetPreviewHandler } = await import('../members/reset-link')
-    return resetPreviewHandler(data)
+    const { resetPreviewProgram } = await import('../members/reset-link')
+    return Effect.runPromise(resetPreviewProgram(data.token))
   })

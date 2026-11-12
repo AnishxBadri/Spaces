@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * The two dependency fences, `SDK_IMPORTS_NOTHING_INTERNAL` and
- * `PLUGIN_IMPORTS_SDK_ONLY`, proved on the real packages. This lints source
+ * `PLUGIN_IMPORTS_SDK_ONLY`, and `NO_ZOD_IN_THE_CONTRACT` beside each,
+ * proved on the real packages. This lints source
  * text through the workspace's own eslint config (the root shim), at a path
  * inside each package, and expects the zone's message — nothing is written
  * to disk.
@@ -40,14 +41,25 @@ describe('the sdk fence', () => {
     const found = await lint('packages/sdk/src/leak.ts', `${line}\n`)
     expect(found).toHaveLength(1)
     expect(found[0]).toMatch(
-      /^no-restricted-imports: .*@spaces\/sdk imports effect, zod and tldts and nothing internal/,
+      /^no-restricted-imports: .*@spaces\/sdk imports effect and tldts and nothing internal/,
     )
   })
 
-  it('allows effect and zod', async () => {
+  it.each(["import { z } from 'zod'", "import { z } from 'zod/v4'"])(
+    'refuses %s in packages/sdk',
+    async (line) => {
+      const found = await lint('packages/sdk/src/leak.ts', `${line}\n`)
+      expect(found).toHaveLength(1)
+      expect(found[0]).toMatch(
+        /^no-restricted-imports: .*No zod in @spaces\/sdk or a plugin — Effect Schema is the one schema language/,
+      )
+    },
+  )
+
+  it('allows effect and tldts', async () => {
     const found = await lint(
       'packages/sdk/src/fine.ts',
-      "import { Effect } from 'effect'\nimport { z } from 'zod'\n",
+      "import { Effect, Schema } from 'effect'\nimport { parse } from 'tldts'\n",
     )
     expect(found).toEqual([])
   })
@@ -66,10 +78,21 @@ describe('the plugin fence', () => {
     )
   })
 
-  it('allows @spaces/sdk', async () => {
+  it('refuses zod in a plugin', async () => {
+    const found = await lint(
+      'plugins/_fixtures/echo/src/leak.ts',
+      "import { z } from 'zod'\n",
+    )
+    expect(found).toHaveLength(1)
+    expect(found[0]).toMatch(
+      /^no-restricted-imports: .*No zod in @spaces\/sdk or a plugin — Effect Schema is the one schema language/,
+    )
+  })
+
+  it('allows @spaces/sdk and effect', async () => {
     const found = await lint(
       'plugins/_fixtures/echo/src/fine.ts',
-      "import { definePlugin } from '@spaces/sdk'\n",
+      "import { definePlugin } from '@spaces/sdk'\nimport { Schema } from 'effect'\n",
     )
     expect(found).toEqual([])
   })

@@ -4,6 +4,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin } from 'better-auth/plugins'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
 import { and, count, eq, gt, isNull } from 'drizzle-orm'
+// eslint-disable-next-line effect/io-is-effect -- better-auth's configuration, not a program: its database hooks are callbacks better-auth runs and awaits.
 import { db } from '@spaces/db'
 import { invite, user } from '@spaces/db/schema/auth'
 import { clearSetupToken, verifySetupToken } from '#/lib/setup-token'

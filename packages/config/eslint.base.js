@@ -12,6 +12,7 @@ import tsParser from '@typescript-eslint/parser'
 import vocabulary from './eslint-rules/vocabulary.js'
 import keys from './eslint-rules/keys.js'
 import comments from './eslint-rules/history.js'
+import ioIsEffect from './eslint-rules/io-is-effect.js'
 
 /** The Instrument rules under one plugin name: the vocabulary and A2's keys. */
 const instrument = {
@@ -224,7 +225,14 @@ const SDK_IMPORTS_NOTHING_INTERNAL = {
     climbsInto(['apps', 'plugins', 'packages/(core|db)', 'core', 'db']),
   ].join('|'),
   message:
-    '@spaces/sdk imports effect, zod and tldts and nothing internal — if sdk ever needs core, the contract leaked (docs/spec-plugin-sdk.md §2: "sdk → effect, zod, tldts. Nothing internal"; D55).',
+    '@spaces/sdk imports effect and tldts and nothing internal — if sdk ever needs core, the contract leaked (docs/spec-plugin-sdk.md §2: "sdk → effect, tldts. Nothing internal"; D55).',
+}
+// The plugin contract speaks Effect Schema and nothing else, in the sdk and
+// in every plugin. Proved on the real packages by the sdk's fence test.
+const NO_ZOD_IN_THE_CONTRACT = {
+  regex: '^zod(/|$)',
+  message:
+    'No zod in @spaces/sdk or a plugin — Effect Schema is the one schema language, and the plugin contract is Effect Schema (D85). Import `Schema` from effect.',
 }
 // Proved on the echo fixture plugin by the sdk's fence test.
 const PLUGIN_IMPORTS_SDK_ONLY = {
@@ -268,6 +276,16 @@ export default [
       'instrument/vocabulary': 'error',
       'instrument/no-key-in-button': 'error',
     },
+  },
+  // I/O is an Effect program: a lib module that imports the `db` value
+  // imports `effect`. Pure helpers, type modules and client code import no
+  // `db` and stay plain; a test drives what it likes. The rule's own test is
+  // beside the key rule's in apps/web.
+  {
+    files: ['apps/web/src/lib/**/*.{ts,tsx}'],
+    ignores: ['apps/web/src/lib/**/*.test.{ts,tsx}'],
+    plugins: { effect: ioIsEffect },
+    rules: { 'effect/io-is-effect': 'error' },
   },
   // Comments describe the current code; ids and dates belong in the commit.
   {
@@ -440,7 +458,7 @@ export default [
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [SDK_IMPORTS_NOTHING_INTERNAL] },
+        { patterns: [SDK_IMPORTS_NOTHING_INTERNAL, NO_ZOD_IN_THE_CONTRACT] },
       ],
     },
   },
@@ -449,7 +467,7 @@ export default [
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [PLUGIN_IMPORTS_SDK_ONLY] },
+        { patterns: [PLUGIN_IMPORTS_SDK_ONLY, NO_ZOD_IN_THE_CONTRACT] },
       ],
       // Clock is not a port: Effect ships one, and a job that reads the wall
       // clock directly cannot be tested at a fixed time. `Date.now()` and a

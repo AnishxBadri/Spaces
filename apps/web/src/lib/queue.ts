@@ -1,3 +1,4 @@
+import { Effect } from 'effect'
 import { createSender } from '@spaces/core/queue/sender'
 import { requireEnv } from './server/env'
 import type { EnqueueTarget } from '@spaces/core/queue/names'
@@ -35,28 +36,50 @@ function senderOrNull(queue: EnqueueTarget): Sender | null {
   }
 }
 
-/** Onto a core queue, or a plugin job's `plugin.<id>.<job>`. */
+/**
+ * Onto a core queue, or a plugin job's `plugin.<id>.<job>`. Never fails: a
+ * job that could not be sent answers `null`.
+ */
+export const enqueueProgram = Effect.fn('enqueueProgram')(function* (
+  queue: EnqueueTarget,
+  data: Record<string, unknown>,
+  options?: EnqueueOptions,
+) {
+  const s = senderOrNull(queue)
+  if (s === null) return null
+  return yield* Effect.promise(() =>
+    options === undefined
+      ? s.enqueue(queue, data)
+      : s.enqueue(queue, data, options),
+  )
+})
+
+/** `enqueueProgram` for a caller that is not Effect. */
 export async function enqueue(
   queue: EnqueueTarget,
   data: Record<string, unknown>,
   options?: EnqueueOptions,
 ): Promise<string | null> {
-  const s = senderOrNull(queue)
-  if (s === null) return null
-  return options === undefined
-    ? s.enqueue(queue, data)
-    : s.enqueue(queue, data, options)
+  return Effect.runPromise(enqueueProgram(queue, data, options))
 }
 
 /**
  * The jobs on `queue` keyed `key`, any state, or `null` when the queue cannot
  * be read (what `readDeckStatus` reads).
  */
+export const jobsByKeyProgram = Effect.fn('jobsByKeyProgram')(function* (
+  queue: EnqueueTarget,
+  key: string,
+) {
+  const s = senderOrNull(queue)
+  if (s === null) return null
+  return yield* Effect.promise(() => s.jobsByKey(queue, key))
+})
+
+/** `jobsByKeyProgram` for a caller that is not Effect. */
 export async function jobsByKey(
   queue: EnqueueTarget,
   key: string,
 ): Promise<Array<QueuedJob> | null> {
-  const s = senderOrNull(queue)
-  if (s === null) return null
-  return s.jobsByKey(queue, key)
+  return Effect.runPromise(jobsByKeyProgram(queue, key))
 }

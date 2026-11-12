@@ -1,4 +1,5 @@
 import { and, eq, exists, isNull, sql } from 'drizzle-orm'
+// eslint-disable-next-line effect/io-is-effect -- builds a SQL predicate from db's query builder and runs none; the caller's query runs it.
 import { db } from '@spaces/db'
 import { company, entity, person } from '@spaces/db/schema'
 import type { SQL } from 'drizzle-orm'

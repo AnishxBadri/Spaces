@@ -1,3 +1,4 @@
+import { Effect } from 'effect'
 import { QUEUES } from '@spaces/core/queue/names'
 import { enqueue } from '#/lib/queue'
 
@@ -7,34 +8,53 @@ import { enqueue } from '#/lib/queue'
  * removed a filing. The job resolves live, so an entity still sensitive
  * through another input stays stamped.
  *
- * Never throws, like every enqueue: a failed send leaves the chunks stamped
+ * Never fails, like every enqueue: a failed send leaves the chunks stamped
  * `true`, the cautious direction. Answers how many were sent.
+ * - Sends through `enqueue`, so a test that mocks the queue records it.
  */
+export const enqueueRestampProgram = Effect.fn('enqueueRestampProgram')(
+  function* (entityIds: ReadonlyArray<string>) {
+    let sent = 0
+    for (const entityId of entityIds) {
+      const id = yield* Effect.promise(() =>
+        enqueue(
+          QUEUES.restampSensitivity,
+          { entityId },
+          { singletonKey: entityId },
+        ),
+      )
+      if (id !== null) sent += 1
+    }
+    return sent
+  },
+)
+
+/** `enqueueRestampProgram` for a caller that is not Effect. */
 export async function enqueueRestamp(
   entityIds: ReadonlyArray<string>,
 ): Promise<number> {
-  let sent = 0
-  for (const entityId of entityIds) {
-    const id = await enqueue(
-      QUEUES.restampSensitivity,
-      { entityId },
-      { singletonKey: entityId },
-    )
-    if (id !== null) sent += 1
-  }
-  return sent
+  return Effect.runPromise(enqueueRestampProgram(entityIds))
 }
 
 /**
  * The lowering after the workspace default goes back to normal: one
  * `sensitivity.restamp` job over every entity still stamped, not one per
- * entity. Never throws; answers whether it was sent.
+ * entity. Never fails; answers whether it was sent.
  */
+export const enqueueRestampAllProgram = Effect.fn('enqueueRestampAllProgram')(
+  function* () {
+    const id = yield* Effect.promise(() =>
+      enqueue(
+        QUEUES.restampSensitivity,
+        { all: true },
+        { singletonKey: 'all' },
+      ),
+    )
+    return id !== null
+  },
+)
+
+/** `enqueueRestampAllProgram` for a caller that is not Effect. */
 export async function enqueueRestampAll(): Promise<boolean> {
-  const id = await enqueue(
-    QUEUES.restampSensitivity,
-    { all: true },
-    { singletonKey: 'all' },
-  )
-  return id !== null
+  return Effect.runPromise(enqueueRestampAllProgram())
 }

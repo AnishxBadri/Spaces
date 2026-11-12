@@ -1,3 +1,4 @@
+import { Effect } from 'effect'
 import { QUEUES } from '@spaces/core/queue/names'
 import { embedSourceKey } from '@spaces/core/writes/ai/chunk-sources'
 import type { EmbedSource } from '@spaces/core/writes/ai/chunk-sources'
@@ -9,12 +10,26 @@ import { enqueue } from '#/lib/queue'
  * commit. Outside core because the queue reads DATABASE_URL and core may not
  * read the environment.
  *
- * Never throws, like every enqueue: a failed send leaves the old chunks.
+ * Never fails, like every enqueue: a failed send leaves the old chunks.
+ * - Sends through `enqueue`, so a test that mocks the queue records it.
  */
+export const enqueueSourceEmbedProgram = Effect.fn('enqueueSourceEmbedProgram')(
+  function* (s: EmbedSource) {
+    return yield* Effect.promise(() =>
+      enqueue(
+        QUEUES.embedSource,
+        {
+          entityId: s.entityId,
+          sourceKind: s.sourceKind,
+          sourceKey: s.sourceKey,
+        },
+        { singletonKey: embedSourceKey(s) },
+      ),
+    )
+  },
+)
+
+/** `enqueueSourceEmbedProgram` for a caller that is not Effect. */
 export function enqueueSourceEmbed(s: EmbedSource): Promise<string | null> {
-  return enqueue(
-    QUEUES.embedSource,
-    { entityId: s.entityId, sourceKind: s.sourceKind, sourceKey: s.sourceKey },
-    { singletonKey: embedSourceKey(s) },
-  )
+  return Effect.runPromise(enqueueSourceEmbedProgram(s))
 }

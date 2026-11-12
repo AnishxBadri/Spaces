@@ -302,6 +302,11 @@ harness derives `spaces_test*` from it, so the suite never writes the
 - Effect never crosses into React; the seam is `effectFn()`
   (`no-restricted-imports` on `effect` in `apps/web/src/routes/**`,
   `apps/web/src/components/**`).
+- I/O is an Effect program; a pure helper, a type module and client code
+  stay plain (`effect/io-is-effect`: a non-test file under `apps/web/src/lib`
+  that imports the `db` value imports `effect`; an exempt file says why in
+  an `eslint-disable` on the import — D84,
+  `packages/config/eslint-rules/io-is-effect.js`).
 
 `noUncheckedIndexedAccess` stays **off**, decided 2026-09-18 (SPA-151): 371
 errors, 62% of them in test files and `apps/web/src/lib/seeds/dev.ts`, where manufactured
@@ -383,10 +388,13 @@ in comments; the rest is the reviewer's. Directive comments (`eslint-disable`,
   snapshot. This was the worst bug of a review cycle; there is no unmerge
   executor — the snapshot convention is the only contract.
 
-## Backend paradigm (Effect ratchet — CONTEXT.md "Backend paradigm" is the contract)
+## Backend paradigm (I/O is Effect — CONTEXT.md "Backend paradigm" is the contract)
 
-- **All new server code is Effect-first** (v4); existing modules convert only
-  when already open for behavioral change, in the same PR. Effect never
+- **A module that does I/O is an Effect program** (v4, D84): it queries,
+  writes, fetches or enqueues through `Effect.fn` programs, and an async
+  export a non-Effect caller needs is a one-line run of its program. A pure
+  helper, a type module, a validator shape and client code stay plain.
+  `effect/io-is-effect` holds it for `apps/web/src/lib`. Effect never
   crosses into React — the seam is the `effectFn()` adapter (server-fns) /
   HttpApi handlers (`effect/unstable/httpapi`; decision 3 amended 2026-09-16,
   oRPC dropped before it was ever installed).

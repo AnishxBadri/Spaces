@@ -1,3 +1,4 @@
+import { Effect } from 'effect'
 import { and, eq, isNull } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity, entitySpace, space } from '@spaces/db/schema'
@@ -10,6 +11,7 @@ import {
 import { filed } from '@spaces/core/writes/events/dispatch'
 import type { DomainEvent } from '@spaces/sdk'
 import type { Tx } from '@spaces/core/writes/attributes/values'
+import { spacesQuery } from './query'
 
 /**
  * The one insert that tags a record into a space. Callers: `tagByHand`
@@ -47,38 +49,51 @@ export type SpaceTagged = {
   readonly emit: DomainEvent | null
 }
 
+export const insertSpaceTagProgram = Effect.fn('insertSpaceTagProgram')(
+  function* (tx: Tx, input: TagIntoSpaceInput) {
+    const inserted = yield* spacesQuery(() =>
+      tx
+        .insert(entitySpace)
+        .values({
+          entityId: input.entityId,
+          spaceId: input.spaceId,
+          source: input.source,
+          confidence: input.confidence,
+          createdBy: input.createdBy,
+        })
+        .onConflictDoNothing()
+        .returning({ entityId: entitySpace.entityId }),
+    )
+    const none: SpaceTagged = { tagged: false, emit: null }
+    if (inserted.length === 0) return none
+    yield* Effect.promise(() =>
+      raiseSensitivity(tx, {
+        kind: 'filed',
+        entityId: input.entityId,
+        spaceId: input.spaceId,
+      }),
+    )
+    const kind = (yield* spacesQuery(() =>
+      tx
+        .select({ kind: entity.kind })
+        .from(entity)
+        .where(eq(entity.id, input.entityId)),
+    )).at(0)?.kind
+    const tagged: SpaceTagged = {
+      tagged: true,
+      emit:
+        kind === undefined ? null : filed(input.entityId, kind, input.spaceId),
+    }
+    return tagged
+  },
+)
+
+/** `insertSpaceTagProgram` for a caller that is not Effect. */
 export async function insertSpaceTag(
   tx: Tx,
   input: TagIntoSpaceInput,
 ): Promise<SpaceTagged> {
-  const inserted = await tx
-    .insert(entitySpace)
-    .values({
-      entityId: input.entityId,
-      spaceId: input.spaceId,
-      source: input.source,
-      confidence: input.confidence,
-      createdBy: input.createdBy,
-    })
-    .onConflictDoNothing()
-    .returning({ entityId: entitySpace.entityId })
-  if (inserted.length === 0) return { tagged: false, emit: null }
-  await raiseSensitivity(tx, {
-    kind: 'filed',
-    entityId: input.entityId,
-    spaceId: input.spaceId,
-  })
-  const kind = (
-    await tx
-      .select({ kind: entity.kind })
-      .from(entity)
-      .where(eq(entity.id, input.entityId))
-  ).at(0)?.kind
-  return {
-    tagged: true,
-    emit:
-      kind === undefined ? null : filed(input.entityId, kind, input.spaceId),
-  }
+  return Effect.runPromise(insertSpaceTagProgram(tx, input))
 }
 
 /**
@@ -86,18 +101,26 @@ export async function insertSpaceTag(
  * been merged away. The accept branch asks before tagging, because a
  * proposed space may have been merged since.
  */
+export const isLiveSpaceProgram = Effect.fn('isLiveSpaceProgram')(function* (
+  reader: Tx | typeof db,
+  spaceId: string,
+) {
+  const row = (yield* spacesQuery(() =>
+    reader
+      .select({ id: space.entityId })
+      .from(space)
+      .innerJoin(entity, eq(entity.id, space.entityId))
+      .where(and(eq(space.entityId, spaceId), isNull(entity.mergedIntoId))),
+  )).at(0)
+  return row !== undefined
+})
+
+/** `isLiveSpaceProgram` for a caller that is not Effect. */
 export async function isLiveSpace(
   reader: Tx | typeof db,
   spaceId: string,
 ): Promise<boolean> {
-  const row = (
-    await reader
-      .select({ id: space.entityId })
-      .from(space)
-      .innerJoin(entity, eq(entity.id, space.entityId))
-      .where(and(eq(space.entityId, spaceId), isNull(entity.mergedIntoId)))
-  ).at(0)
-  return row !== undefined
+  return Effect.runPromise(isLiveSpaceProgram(reader, spaceId))
 }
 
 /** A filing a person changes by hand: who, which record, which space. */
@@ -134,33 +157,56 @@ export async function tagByHand(tx: Tx, f: HandFiling): Promise<SpaceTagged> {
  * `space.untagged` history line says so, in the caller's transaction.
  * - The caller runs `restampUntagged` after the commit.
  */
-export async function untagByHand(tx: Tx, f: HandFiling): Promise<void> {
-  await tx
-    .delete(entitySpace)
-    .where(
-      and(
-        eq(entitySpace.entityId, f.entityId),
-        eq(entitySpace.spaceId, f.spaceId),
+export const untagByHandProgram = Effect.fn('untagByHandProgram')(function* (
+  tx: Tx,
+  f: HandFiling,
+) {
+  yield* spacesQuery(() =>
+    tx
+      .delete(entitySpace)
+      .where(
+        and(
+          eq(entitySpace.entityId, f.entityId),
+          eq(entitySpace.spaceId, f.spaceId),
+        ),
       ),
-    )
-  await tx.insert(activity).values({
-    actorId: f.actorId,
-    verb: 'space.untagged',
-    subjectEntityId: f.entityId,
-    objectEntityId: f.spaceId,
-  })
+  )
+  yield* spacesQuery(() =>
+    tx.insert(activity).values({
+      actorId: f.actorId,
+      verb: 'space.untagged',
+      subjectEntityId: f.entityId,
+      objectEntityId: f.spaceId,
+    }),
+  )
+})
+
+/** `untagByHandProgram` for a caller that is not Effect. */
+export async function untagByHand(tx: Tx, f: HandFiling): Promise<void> {
+  return Effect.runPromise(untagByHandProgram(tx, f))
 }
 
 /**
  * The lowering half of an untag, after the commit and never inside it:
  * another space may still hold the record sensitive, so it is a job.
  */
+export const restampUntaggedProgram = Effect.fn('restampUntaggedProgram')(
+  function* (entityId: string, spaceId: string) {
+    const ids = yield* Effect.promise(() =>
+      stampedSensitive(db, { kind: 'filed', entityId, spaceId }),
+    )
+    const { enqueueRestamp } = yield* Effect.promise(
+      () => import('../ai/enqueue-restamp'),
+    )
+    // Never fails, like every enqueue.
+    yield* Effect.promise(() => enqueueRestamp(ids))
+  },
+)
+
+/** `restampUntaggedProgram` for a caller that is not Effect. */
 export async function restampUntagged(
   entityId: string,
   spaceId: string,
 ): Promise<void> {
-  const { enqueueRestamp } = await import('../ai/enqueue-restamp')
-  await enqueueRestamp(
-    await stampedSensitive(db, { kind: 'filed', entityId, spaceId }),
-  )
+  return Effect.runPromise(restampUntaggedProgram(entityId, spaceId))
 }
