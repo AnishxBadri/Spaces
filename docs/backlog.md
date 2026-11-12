@@ -32,49 +32,6 @@ Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-
 
 ---
 
-## 32. One backend grammar
-
-Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2026-11-12 (owner): D84, a module in `apps/web/src/lib` that does I/O is Effect, and the 53 that are not get converted in a planned sweep; D85, Effect Schema is the one schema language and Zod leaves. `schema-1` (SPA-400) shipped 2026-11-12: `input()` in `lib/server/input.ts` is the helper, and `lib/server/tasks.ts` with `lib/tasks/create.ts` is the reference module every later slice copies. `effect-1` (SPA-401) shipped 2026-11-12: nine server modules, the typed session gate (`requireUserProgram`, `requireAdminProgram`, `requireSettingsReaderProgram` beside the async three), and `lib/server/query.ts`, whose `ServerQueryFailed` and `serverQuery` every module under `lib/server/` shares. `effect-2` (SPA-403) shipped 2026-11-12: the other seven server modules, so every file in `lib/server/` that imports `db` imports `effect`. `schema-2` (SPA-402) shipped 2026-11-12: the plugin contract is Effect Schema, SDK 2.0.0, with no zod under `packages/sdk/src` or `plugins/`. `effect-3` (SPA-405) shipped 2026-11-12: documents, notes, records and the portfolio loader, each area with its own `query.ts`, and the money, note-kind and paged-list inputs as Effect schemas. `effect-4` (SPA-406) shipped 2026-11-12: the last modules, the `effect/io-is-effect` lint rule, the SDK and plugin zones refusing zod, and the worker's gates hashing `apps/web/src`. The sweep is done; `schema-3` is what is left. The `effect-*` slices own disjoint files and run one after another, each beside a slice from another area.
-
-**What a conversion is, for every `effect-*` slice.** It changes the grammar and nothing a user or a caller can see.
-
-- A function that queries, writes, fetches or enqueues becomes an Effect program (`Effect.fn('name')`), on the pattern of `lib/server/objects.ts`: failures are `Schema.TaggedError` classes, a database call goes through a `tryPromise` helper that names the failure, and a server fn runs its program through `effectFn()` or `Effect.runPromise`.
-- A database failure is one `Schema.TaggedError` per area, shared by the area's files with its `tryPromise` helper, not one class per file. It carries the cause and the cause's own `message`, so a caller that prints a rejected call's message reads what it read before: `lib/server/query.ts` is the pattern, and a module under `lib/server/` imports it rather than writing another.
-- A call into a module outside the slice goes through `Effect.promise`, so its errors reach the caller as they did.
-- The client receives a rejected tagged error as a plain `Error` with its `message` and nothing else: no `_tag`, no fields. So a tagged error carries the `message` the UI prints today, word for word. A handler that threw `new Error('Admins only')` rejects with an error whose `message` is `Admins only`.
-- An exported async function that a file outside the slice calls (a route, a worker job through `#web/*`, another `lib/` module) keeps its name and its signature, and becomes a one-line run of the program. The program is exported beside it for callers that are already Effect. No file outside the slice's list changes, except a test that asserted on an error's class.
-- A `.validator()` in a listed file moves from zod to Effect Schema through `input()`. A message written by hand (`Expected YYYY-MM-DD`) is kept word for word; zod's default wording becomes Effect's. Unknown keys are still dropped. A validator runs on the server only, so a test of one goes through TanStack's `execValidator`, as `input.test.ts` does. A zod shape imported from a file outside the list stays zod and is named in the report.
-- A listed file that turns out to do no I/O (it builds SQL and runs none, or holds types, or the grep matched a comment) stays plain and is named in the report with the reason.
-- Transactions keep their boundaries; nothing that ran inside one runs outside it afterwards, and the reverse.
-- Existing tests pass with their assertions unchanged. A conversion that needs a test's expectation changed is a behaviour change: stop and name it.
-
----
-
-#### `schema-3` (SPA-404) · afk · M — `valueValidator` on Effect Schema: one type system for attribute values, inside and at `/api/v1`
-
-**Blocked by:** nothing. **Owns** `packages/core/src/attributes/registry.ts`, `attributes/default-values.ts`, `writes/attributes/values.ts`, `import/coerce.ts`, `enrichment/plan.ts`, `ai/schema.ts`, the `lib/rpc/**` handlers that decode a record's values, `packages/core/src/json.ts`, the validators in `lib/server/` named in step 0, and their tests.
-
-**Does not touch** `packages/config/**` or `turbo.json`.
-
-**Spec.** D85, and Backend paradigm decision 3 in `CONTEXT.md`, which asked for this lift when `/api/v1` was built: HttpApi speaks Effect Schema, the attribute engine spoke zod, and the seam between them is where an external write is checked. `valueValidator` is the attribute engine's type system, so the lift happens once and here.
-
-**What to build.**
-
-0. **The shapes the server modules still take from core as zod.** `aiConfigInput`, and in `packages/core/src/json.ts` `jsonValue`, `draftRecipientsSchema` and `draftAttachmentsSchema`, become Effect schemas. The validators that use them move to `input()`: `saveNote` in `notes.ts`, `saveEmailDraft` and `reviewEmailVariables` in `emails.ts`, `saveEmailAsTemplate` in `templates.ts`. In `attributes.ts`, `optionEdit`, `updateAttributeInput` and `createAttributeInput` follow. `update-attribute-input.test.ts` keeps its expectations.
-1. **`valueValidator` returns an Effect schema** for an attribute, with every constraint it has today (type, options, required, uniqueness is not its job) and the same messages.
-2. **The one write path decodes with it.** `setValues` and its helpers in `writes/attributes/values.ts`; the import coercer; the enrichment plan; the AI column's answer schema.
-3. **`/api/v1` uses it directly.** The handlers that take record values compose the same schema into their HttpApi payloads; any zod-to-Schema bridge at that seam goes.
-4. **What stays zod in core** is named in the report with a count per folder.
-
-**Acceptance criteria**
-
-- [ ] Every existing attribute, import, enrichment and API test passes with its assertions unchanged, messages included.
-- [ ] One test per attribute type feeds the same bad value through `setValues` and through `/api/v1` and gets the same refusal.
-- [ ] The listed files import no `zod`.
-- [ ] Gates: typecheck, lint, the `@spaces/core`, `@spaces/web` and `@spaces/worker` tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
-
----
-
 ## 16. A published image anyone can run
 
 #### `ship-10` · afk · M — Install, upgrade and rollback docs — back up first, pin the tag, never lose MASTER_KEY
