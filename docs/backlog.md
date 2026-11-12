@@ -34,41 +34,19 @@ Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-
 
 ## 32. One backend grammar
 
-Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2026-11-12 (owner): D84, a module in `apps/web/src/lib` that does I/O is Effect, and the 53 that are not get converted in a planned sweep; D85, Effect Schema is the one schema language and Zod leaves. `schema-1` (SPA-400) shipped 2026-11-12: `input()` in `lib/server/input.ts` is the helper, and `lib/server/tasks.ts` with `lib/tasks/create.ts` is the reference module every later slice copies. The `effect-*` slices own disjoint files and run one after another, each beside a slice from another area.
+Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2026-11-12 (owner): D84, a module in `apps/web/src/lib` that does I/O is Effect, and the 53 that are not get converted in a planned sweep; D85, Effect Schema is the one schema language and Zod leaves. `schema-1` (SPA-400) shipped 2026-11-12: `input()` in `lib/server/input.ts` is the helper, and `lib/server/tasks.ts` with `lib/tasks/create.ts` is the reference module every later slice copies. `effect-1` (SPA-401) shipped 2026-11-12: nine server modules, the typed session gate (`requireUserProgram`, `requireAdminProgram`, `requireSettingsReaderProgram` beside the async three), and `lib/server/query.ts`, whose `ServerQueryFailed` and `serverQuery` every module under `lib/server/` shares. The `effect-*` slices own disjoint files and run one after another, each beside a slice from another area.
 
 **What a conversion is, for every `effect-*` slice.** It changes the grammar and nothing a user or a caller can see.
 
 - A function that queries, writes, fetches or enqueues becomes an Effect program (`Effect.fn('name')`), on the pattern of `lib/server/objects.ts`: failures are `Schema.TaggedError` classes, a database call goes through a `tryPromise` helper that names the failure, and a server fn runs its program through `effectFn()` or `Effect.runPromise`.
-- A database failure is one `Schema.TaggedError` per area with `cause: Schema.Defect()`, shared by the area's files with its `tryPromise` helper (`ask/query.ts` is the pattern), not one class per file.
+- A database failure is one `Schema.TaggedError` per area, shared by the area's files with its `tryPromise` helper, not one class per file. It carries the cause and the cause's own `message`, so a caller that prints a rejected call's message reads what it read before: `lib/server/query.ts` is the pattern, and a module under `lib/server/` imports it rather than writing another.
+- A call into a module outside the slice goes through `Effect.promise`, so its errors reach the caller as they did.
 - The client receives a rejected tagged error as a plain `Error` with its `message` and nothing else: no `_tag`, no fields. So a tagged error carries the `message` the UI prints today, word for word. A handler that threw `new Error('Admins only')` rejects with an error whose `message` is `Admins only`.
 - An exported async function that a file outside the slice calls (a route, a worker job through `#web/*`, another `lib/` module) keeps its name and its signature, and becomes a one-line run of the program. The program is exported beside it for callers that are already Effect. No file outside the slice's list changes, except a test that asserted on an error's class.
 - A `.validator()` in a listed file moves from zod to Effect Schema through `input()`. A message written by hand (`Expected YYYY-MM-DD`) is kept word for word; zod's default wording becomes Effect's. Unknown keys are still dropped. A validator runs on the server only, so a test of one goes through TanStack's `execValidator`, as `input.test.ts` does. A zod shape imported from a file outside the list stays zod and is named in the report.
 - A listed file that turns out to do no I/O (it builds SQL and runs none, or holds types, or the grep matched a comment) stays plain and is named in the report with the reason.
 - Transactions keep their boundaries; nothing that ran inside one runs outside it afterwards, and the reverse.
 - Existing tests pass with their assertions unchanged. A conversion that needs a test's expectation changed is a behaviour change: stop and name it.
-
----
-
-#### `effect-1` (SPA-401) · afk · L — The record server modules and the session gate become Effect
-
-**Blocked by:** `schema-1`. **Owns** `lib/server/shared.ts`, `attributes.ts`, `companies.ts`, `deals.ts`, `people.ts`, `glossary.ts`, `mandate.ts`, `members.ts` and `inbox.ts` in `lib/server/` (2,100 lines, 53 server fns), and their tests.
-
-**Does not touch** the other files in `lib/server/` (`effect-2`), or `components/record/**`, `lib/records/overview.ts` and the four record routes (`record-2` runs beside this slice).
-
-**Spec.** D84, and the conversion rules at the head of this section. Size L because `shared.ts` is one file every server module imports, and splitting it across slices would have two agents in it.
-
-**What to build.**
-
-1. **The session gate is typed.** `requireUser` and `requireAdmin` reject with tagged errors, `Unauthorized` and `Forbidden`, whose messages stay `Unauthorized` and `Admins only`. Their async signatures stay: 341 call sites keep working untouched. Each gains an Effect twin for programs to yield.
-2. **`shared.ts`.** Its helpers that do I/O become programs with async wrappers, by the rules. `birthHolding`'s re-export stays.
-3. **The eight server modules.** By the rules.
-
-**Acceptance criteria**
-
-- [ ] Each listed file imports `effect`, and no listed file imports `zod`, or the report names the file and why.
-- [ ] `requireUser` rejects with `Unauthorized` and `requireAdmin` with `Forbidden` (tests on the class and on the message); every existing `rejects.toThrow('Unauthorized')` and `'Admins only'` test passes unchanged.
-- [ ] No file outside the list changed, bar tests that asserted on an error class (listed in the report).
-- [ ] Gates: typecheck, lint, the `@spaces/web` and `@spaces/worker` tests (the worker crosses into `shared.ts`), prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
 
 ---
 
@@ -80,7 +58,7 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 
 **Spec.** D84, and the conversion rules at the head of this section. The portfolio void flow (`lib/portfolio/reverse.ts`) is already Effect and its tagged errors carry an empty `message` on purpose: `ledgerVoidMessage` is what the dialog shows. Leave that as it is.
 
-**What to build.** The seven modules, by the rules. Handlers yield the session gate's Effect twin from `effect-1`.
+**What to build.** The seven modules, by the rules. Programs yield the session gate's Effect twins from `shared.ts` and query through `serverQuery`. `lib/server/tasks.ts` joins the list for one change: its own `TaskQueryFailed` and `query` give way to the shared pair.
 
 **Acceptance criteria**
 
@@ -93,7 +71,7 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 
 #### `effect-3` (SPA-405) · afk · L — Documents, notes, views, records and the portfolio loader become Effect
 
-**Blocked by:** `effect-2`. **Owns**, in `apps/web/src/lib/`: `documents/` (`blob-refs.ts`, `fetch-guard.ts`, `preview-card.ts`, `record-files.ts`, `unfiled.ts`, `upload.ts`), `notes/` (`from-suggestion.ts`, `list-rows.ts`, `ordering.ts`, `templates.ts`), `views/` (`paging.ts`, `resolve.ts`, `scope.ts`, `sql.ts`), `records/` (`head.ts`, `pictures.ts`), `portfolio/` (`detail.ts`, `holding.ts`), and their tests. 2,300 lines.
+**Blocked by:** `effect-2`. **Owns**, in `apps/web/src/lib/`: `views/page-input.ts` and the `.validator()` of each server fn that takes `pagedListInput`; `documents/` (`blob-refs.ts`, `fetch-guard.ts`, `preview-card.ts`, `record-files.ts`, `unfiled.ts`, `upload.ts`), `notes/` (`from-suggestion.ts`, `list-rows.ts`, `ordering.ts`, `templates.ts`), `views/` (`paging.ts`, `resolve.ts`, `scope.ts`, `sql.ts`), `records/` (`head.ts`, `pictures.ts`), `portfolio/` (`detail.ts`, `holding.ts`), and their tests. 2,300 lines.
 
 **Does not touch** `packages/sdk/**`, `plugins/**`, `packages/core/**` or `lib/integrations/**` (`schema-2` runs beside this slice).
 
@@ -103,11 +81,12 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 - `portfolio/detail.ts` hands the pure libs originals only, each stamped with `reversedAt`. That reader contract does not move.
 - `documents/fetch-guard.ts` is the SSRF guard. Its checks keep their order, and a refused fetch still never opens a socket.
 
-**What to build.** The listed files, by the rules.
+**What to build.** The listed files, by the rules. `pagedListInput` in `views/page-input.ts` becomes an Effect schema, and every server fn that validates with it (`companies.ts`, `people.ts` and the rest; grep) takes it through `input()`.
 
 **Acceptance criteria**
 
 - [ ] Each listed file imports `effect`, or the report names it as pure with the reason.
+- [ ] No file imports a zod `pagedListInput`.
 - [ ] `value-index-plan.test.ts`, the fetch-guard tests and the portfolio as-of tests pass unchanged.
 - [ ] No file outside the list changed, bar tests that asserted on an error class.
 - [ ] Gates: typecheck, lint, the `@spaces/web` and `@spaces/worker` tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
@@ -124,9 +103,10 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 
 **What to build.**
 
-1. **The listed files,** by the rules.
+1. **The listed files,** by the rules. With `members/suspend.ts` converted, the three handlers `effect-1` left plain in `lib/server/members.ts` (`setMemberBanned`, `createResetLink`, `getResetPreview`) run programs too.
 2. **The enforcer.** An eslint rule, `effect/io-is-effect`: a non-test file under `apps/web/src/lib/` that imports the `db` value (from `@spaces/db` or `#/db`) must import from `effect`. Type-only imports do not count. A file that is exempt for a stated reason carries an `eslint-disable` with that reason on the import; expect a handful and list them. The rule has its own tests, on the pattern of the rules beside it, and `turbo.json`'s lint inputs already cover the directory.
-3. **Docs.** `CLAUDE.md` Principles gains the principle and its enforcer ("I/O is an Effect program; a pure helper, a type module and client code stay plain"); the Backend paradigm section's "existing modules convert only when already open" sentence is replaced by the rule.
+3. **The worker's gates hash what the worker reads.** The worker imports `apps/web/src` through `#web/*`, but only `@spaces/worker#build` names it as an input, so an edit under `apps/web/src/lib` replays the worker's cached `test`, `typecheck` and `lint` (found by `effect-1`). `turbo.json` gives those three tasks `$TURBO_ROOT$/apps/web/src/**`; the report shows a comment edit in `lib/server/shared.ts` turning the worker's three cache hits into misses.
+4. **Docs.** `CLAUDE.md` Principles gains the principle and its enforcer ("I/O is an Effect program; a pure helper, a type module and client code stay plain"); the Backend paradigm section's "existing modules convert only when already open" sentence is replaced by the rule.
 
 **Acceptance criteria**
 
@@ -168,7 +148,7 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 
 #### `schema-3` (SPA-404) · afk · M — `valueValidator` on Effect Schema: one type system for attribute values, inside and at `/api/v1`
 
-**Blocked by:** `schema-2`. **Owns** `packages/core/src/attributes/registry.ts`, `attributes/default-values.ts`, `writes/attributes/values.ts`, `import/coerce.ts`, `enrichment/plan.ts`, `ai/schema.ts`, the `lib/rpc/**` handlers that decode a record's values, and their tests.
+**Blocked by:** `schema-2`. **Owns** `packages/core/src/attributes/registry.ts`, `attributes/default-values.ts`, `writes/attributes/values.ts`, `import/coerce.ts`, `enrichment/plan.ts`, `ai/schema.ts`, the `lib/rpc/**` handlers that decode a record's values, the three input shapes in `lib/server/attributes.ts`, and their tests.
 
 **Does not touch** the files `effect-4` lists (it runs beside this slice).
 
@@ -176,6 +156,7 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 
 **What to build.**
 
+0. **The shapes `lib/server/attributes.ts` still takes as zod.** `aiConfigInput` and `jsonValue` in core become Effect schemas, and `optionEdit`, `updateAttributeInput` and `createAttributeInput` in `attributes.ts` with them, through `input()`. `update-attribute-input.test.ts` keeps its expectations.
 1. **`valueValidator` returns an Effect schema** for an attribute, with every constraint it has today (type, options, required, uniqueness is not its job) and the same messages.
 2. **The one write path decodes with it.** `setValues` and its helpers in `writes/attributes/values.ts`; the import coercer; the enrichment plan; the AI column's answer schema.
 3. **`/api/v1` uses it directly.** The handlers that take record values compose the same schema into their HttpApi payloads; any zod-to-Schema bridge at that seam goes.
