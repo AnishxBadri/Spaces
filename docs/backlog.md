@@ -34,7 +34,7 @@ Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-
 
 ## 32. One backend grammar
 
-Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2026-11-12 (owner): D84, a module in `apps/web/src/lib` that does I/O is Effect, and the 53 that are not get converted in a planned sweep; D85, Effect Schema is the one schema language and Zod leaves. `schema-1` (SPA-400) shipped 2026-11-12: `input()` in `lib/server/input.ts` is the helper, and `lib/server/tasks.ts` with `lib/tasks/create.ts` is the reference module every later slice copies. `effect-1` (SPA-401) shipped 2026-11-12: nine server modules, the typed session gate (`requireUserProgram`, `requireAdminProgram`, `requireSettingsReaderProgram` beside the async three), and `lib/server/query.ts`, whose `ServerQueryFailed` and `serverQuery` every module under `lib/server/` shares. The `effect-*` slices own disjoint files and run one after another, each beside a slice from another area.
+Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2026-11-12 (owner): D84, a module in `apps/web/src/lib` that does I/O is Effect, and the 53 that are not get converted in a planned sweep; D85, Effect Schema is the one schema language and Zod leaves. `schema-1` (SPA-400) shipped 2026-11-12: `input()` in `lib/server/input.ts` is the helper, and `lib/server/tasks.ts` with `lib/tasks/create.ts` is the reference module every later slice copies. `effect-1` (SPA-401) shipped 2026-11-12: nine server modules, the typed session gate (`requireUserProgram`, `requireAdminProgram`, `requireSettingsReaderProgram` beside the async three), and `lib/server/query.ts`, whose `ServerQueryFailed` and `serverQuery` every module under `lib/server/` shares. `effect-2` (SPA-403) shipped 2026-11-12: the other seven server modules, so every file in `lib/server/` that imports `db` imports `effect`. The `effect-*` slices own disjoint files and run one after another, each beside a slice from another area.
 
 **What a conversion is, for every `effect-*` slice.** It changes the grammar and nothing a user or a caller can see.
 
@@ -50,28 +50,9 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 
 ---
 
-#### `effect-2` (SPA-403) · afk · L — The rest of the server modules become Effect
-
-**Blocked by:** `effect-1`. **Owns** `documents.ts`, `emails.ts`, `notes.ts`, `portfolio.ts`, `settings.ts`, `setup.ts` and `templates.ts` in `lib/server/` (1,950 lines, 77 server fns), and their tests.
-
-**Does not touch** `lib/server/shared.ts` or `lib/portfolio/**`.
-
-**Spec.** D84, and the conversion rules at the head of this section. The portfolio void flow (`lib/portfolio/reverse.ts`) is already Effect and its tagged errors carry an empty `message` on purpose: `ledgerVoidMessage` is what the dialog shows. Leave that as it is.
-
-**What to build.** The seven modules, by the rules. Programs yield the session gate's Effect twins from `shared.ts` and query through `serverQuery`. `lib/server/tasks.ts` joins the list for one change: its own `TaskQueryFailed` and `query` give way to the shared pair.
-
-**Acceptance criteria**
-
-- [ ] Each listed file imports `effect`, and no listed file imports `zod`, or the report names the file and why.
-- [ ] After this slice no non-test file in `lib/server/` imports `db` without importing `effect` (a grep in the report).
-- [ ] No file outside the list changed, bar tests that asserted on an error class.
-- [ ] Gates: typecheck, lint, the `@spaces/web` tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
-
----
-
 #### `effect-3` (SPA-405) · afk · L — Documents, notes, views, records and the portfolio loader become Effect
 
-**Blocked by:** `effect-2`. **Owns**, in `apps/web/src/lib/`: `views/page-input.ts` and the `.validator()` of each server fn that takes `pagedListInput`; `documents/` (`blob-refs.ts`, `fetch-guard.ts`, `preview-card.ts`, `record-files.ts`, `unfiled.ts`, `upload.ts`), `notes/` (`from-suggestion.ts`, `list-rows.ts`, `ordering.ts`, `templates.ts`), `views/` (`paging.ts`, `resolve.ts`, `scope.ts`, `sql.ts`), `records/` (`head.ts`, `pictures.ts`), `portfolio/` (`detail.ts`, `holding.ts`), and their tests. 2,300 lines.
+**Blocked by:** nothing. **Owns**, in `apps/web/src/lib/`: `portfolio/inputs.ts`, `notes/kind-input.ts`, the draft shapes `draftRecipientsSchema` and `draftAttachmentsSchema` where they are defined, and the `.validator()` of each server fn that takes one of them; `views/page-input.ts` and the `.validator()` of each server fn that takes `pagedListInput`; `documents/` (`blob-refs.ts`, `fetch-guard.ts`, `preview-card.ts`, `record-files.ts`, `unfiled.ts`, `upload.ts`), `notes/` (`from-suggestion.ts`, `list-rows.ts`, `ordering.ts`, `templates.ts`), `views/` (`paging.ts`, `resolve.ts`, `scope.ts`, `sql.ts`), `records/` (`head.ts`, `pictures.ts`), `portfolio/` (`detail.ts`, `holding.ts`), and their tests. 2,300 lines.
 
 **Does not touch** `packages/sdk/**`, `plugins/**`, `packages/core/**` or `lib/integrations/**` (`schema-2` runs beside this slice).
 
@@ -86,7 +67,7 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 **Acceptance criteria**
 
 - [ ] Each listed file imports `effect`, or the report names it as pure with the reason.
-- [ ] No file imports a zod `pagedListInput`.
+- [ ] No file imports a zod `pagedListInput`, and the shapes of `portfolio/inputs.ts`, `notes/kind-input.ts` and the two draft shapes are Effect schemas. The money shapes accept and refuse exactly what they did (a test per shape on the edge values: an empty string, a negative, a non-number, a number as a string), and `lib/ai/propose.ts`, which shares them with the suggestion accept path, still reads one set.
 - [ ] `value-index-plan.test.ts`, the fetch-guard tests and the portfolio as-of tests pass unchanged.
 - [ ] No file outside the list changed, bar tests that asserted on an error class.
 - [ ] Gates: typecheck, lint, the `@spaces/web` and `@spaces/worker` tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
