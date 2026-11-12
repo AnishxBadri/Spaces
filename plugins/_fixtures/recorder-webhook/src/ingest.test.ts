@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { Cause, Effect, Exit, Layer } from 'effect'
-import { z } from 'zod'
+import { Cause, Effect, Exit, Layer, Schema } from 'effect'
 import { ContentTest, LogTest } from '@spaces/sdk/testing'
 import { describe, expect, it } from 'vitest'
 import plugin, { toRecordedNote } from './index.ts'
@@ -11,13 +10,11 @@ import plugin, { toRecordedNote } from './index.ts'
  * a change to the contract shows here first.
  */
 const payload = (name: string) =>
-  z
-    .json()
-    .parse(
-      JSON.parse(
-        readFileSync(new URL(`../fixtures/${name}`, import.meta.url), 'utf8'),
-      ),
-    )
+  Schema.decodeUnknownSync(Schema.Json)(
+    JSON.parse(
+      readFileSync(new URL(`../fixtures/${name}`, import.meta.url), 'utf8'),
+    ),
+  )
 
 const deliver = async (name: string, times = 1) => {
   const content = ContentTest()

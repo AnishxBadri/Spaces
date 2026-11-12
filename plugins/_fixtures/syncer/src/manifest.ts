@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { defineManifest } from '@spaces/sdk'
 
 /**
@@ -11,11 +11,11 @@ export const manifest = defineManifest({
   manifestVersion: 1,
   id: 'syncer',
   version: '0.1.0',
-  sdk: '^1.0',
+  sdk: '^2.0',
   name: 'Syncer',
   description:
     'A fixture plugin: a schedule job that pages a mail provider and logs each message as an interaction.',
-  settings: z.object({}),
+  settings: Schema.Struct({}),
   jobs: {
     sync: {
       trigger: 'schedule',

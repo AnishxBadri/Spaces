@@ -1,4 +1,4 @@
-import { Effect, Redacted } from 'effect'
+import { Effect, Option, Redacted, Schema } from 'effect'
 import {
   ConnectionRefused,
   Content,
@@ -127,15 +127,17 @@ export const sync = Effect.fn('granola.sync')(function* (
         return yield* new JobPermanent({
           reason: `Granola paged past ${MAX_PAGES} pages of folder ${folderId}`,
         })
-      const page = notesPage.safeParse(yield* get(listUrl(folderId, cursor)))
-      if (!page.success)
+      const page = Schema.decodeUnknownOption(notesPage)(
+        yield* get(listUrl(folderId, cursor)),
+      )
+      if (Option.isNone(page))
         return yield* new JobPermanent({
           reason: 'Granola returned a page this plugin cannot read',
         })
-      for (const item of page.data.notes) {
-        const read = listedNote.safeParse(item)
-        if (!read.success) continue
-        const note = read.data
+      for (const item of page.value.notes) {
+        const read = Schema.decodeUnknownOption(listedNote)(item)
+        if (Option.isNone(read)) continue
+        const note = read.value
         if (seen.has(note.id) || deleted.has(note.id)) continue
         if (note.deleted_at !== null && note.deleted_at !== undefined) {
           deleted.add(note.id)
@@ -148,18 +150,18 @@ export const sync = Effect.fn('granola.sync')(function* (
         }
         let detail: NoteDetail | null = null
         if (wantsDetail) {
-          const parsed = noteDetail.safeParse(
+          const parsed = Schema.decodeUnknownOption(noteDetail)(
             yield* get(noteUrl(note.id, settings.transcript)),
           )
-          detail = parsed.success ? parsed.data : null
+          detail = Option.isSome(parsed) ? parsed.value : null
         }
         const recorded = recordedNoteOf(note, detail, settings)
         if (recorded === null) continue
         const result = yield* content.logRecordedNote(recorded)
         if (result.outcome !== 'removed') counts[result.outcome]++
       }
-      const next = page.data.cursor
-      if (!page.data.hasMore || next === null || next === undefined) break
+      const next = page.value.cursor
+      if (!page.value.hasMore || next === null || next === undefined) break
       cursor = next
     }
   }

@@ -12,7 +12,7 @@ import {
 } from '@spaces/db/schema'
 import type { SpaceWatchSettings } from '@spaces/db/schema'
 import type { Json } from '@spaces/db/json'
-import { manifestSchema } from '@spaces/sdk'
+import { decodeManifest } from '@spaces/sdk'
 import { jsonRecord, jsonString } from '@spaces/core/json'
 import { checkSettings, settingsFormOf } from '#/lib/integrations/settings-form'
 import type { FormValues, SettingsForm } from '#/lib/integrations/settings-form'
@@ -46,7 +46,7 @@ const query = <T>(run: () => Promise<T>) =>
 
 /** A watch job's settings schema in a stored manifest; null when none. */
 const watchSettingsSchema = (manifest: unknown): unknown => {
-  const parsed = manifestSchema.safeParse(manifest)
+  const parsed = decodeManifest(manifest)
   if (!parsed.success) return null
   const job = Object.values(parsed.data.jobs).find((j) => j.trigger === 'watch')
   return job === undefined ? null : (job.settings ?? {})

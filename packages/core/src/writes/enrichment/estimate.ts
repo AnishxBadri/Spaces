@@ -14,7 +14,7 @@ import {
 import { db } from '@spaces/db'
 import { enrichmentRecord, entity, integration } from '@spaces/db/schema'
 import { workspace } from '@spaces/db/schema/workspace'
-import { manifestSchema } from '@spaces/sdk'
+import { decodeManifest } from '@spaces/sdk'
 import { nextUtcMidnight, utcDayStart } from '../../ai/caps'
 import { DEFAULT_REUSE_DAYS, hasLookupKey } from '../../enrichment/auto'
 import {
@@ -178,7 +178,7 @@ const sourcesOf = (kind: 'company' | 'person', now: Date) =>
         })
         continue
       }
-      const manifest = manifestSchema.safeParse(row.manifest)
+      const manifest = decodeManifest(row.manifest)
       const cap = manifest.success
         ? creditPolicy(row.config, creditDefaults(manifest.data)).dailyCreditCap
         : null

@@ -12,9 +12,8 @@ import {
   it,
   vi,
 } from 'vitest'
-import { z } from 'zod'
-import { settingsJsonSchema } from '@spaces/sdk'
 import { formValuesOf, settingsFormOf } from '#/lib/integrations/settings-form'
+import { enrichmentSettings } from '#/test/plugin-settings'
 import type * as RouterModule from '@tanstack/react-router'
 import type { RouteComponent } from '@tanstack/react-router'
 
@@ -453,14 +452,7 @@ const shellData = (isAdmin: boolean) => ({
   },
 })
 
-const pluginForm = settingsFormOf(
-  settingsJsonSchema(
-    z.object({
-      cacheDays: z.int().min(0).max(3650).default(90),
-      autoEnrich: z.boolean().default(false),
-    }),
-  ),
-)
+const pluginForm = settingsFormOf(enrichmentSettings)
 
 const pluginRow = {
   id: PLUGIN_ID,

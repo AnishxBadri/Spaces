@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Result, Schema, SchemaParser } from 'effect'
 import type { JsonValue } from './contract.ts'
 
 /**
@@ -94,21 +94,32 @@ export function isVocabularyKey(key: string): key is VocabularyKey {
   return Object.hasOwn(ENRICHMENT_VOCABULARY, key)
 }
 
-const VALUE_SCHEMAS: { readonly [T in VocabularyType]: z.ZodType<JsonValue> } =
-  {
-    text: z.string().trim().min(1),
-    number: z.number().finite(),
-    url: z.url(),
-    phone: z.string().trim().min(1).max(40),
-    list: z.array(z.string().trim().min(1)).min(1),
-    image: z.url({ protocol: /^https?$/ }),
-    company: z
-      .object({
-        name: z.string().trim().min(1),
-        domain: z.string().trim().min(1),
-      })
-      .strict(),
-  }
+/** Text with something besides whitespace in it. */
+const blankless = Schema.String.check(
+  Schema.makeFilter((s: string) => s.trim().length > 0),
+)
+
+const VALUE_SCHEMAS: {
+  readonly [T in VocabularyType]: Schema.Decoder<unknown>
+} = {
+  text: blankless,
+  number: Schema.Finite,
+  url: Schema.String.check(Schema.makeFilter((s: string) => URL.canParse(s))),
+  phone: blankless.check(
+    Schema.makeFilter((s: string) => s.trim().length <= 40),
+  ),
+  list: Schema.Array(blankless).check(Schema.isMinLength(1)),
+  // Spelled out with `://`, so `http:example.com` is not a picture.
+  image: Schema.String.check(
+    Schema.makeFilter(
+      (s: string) => /^https?:\/\//i.test(s.trim()) && URL.canParse(s.trim()),
+    ),
+  ),
+  company: Schema.Struct({ name: blankless, domain: blankless }),
+}
+
+// A company answer names exactly name and domain; any other key refuses it.
+const strict = { onExcessProperty: 'error' } as const
 
 /**
  * Why `value` is not an answer for `key`, or null when it is. An unknown key
@@ -120,7 +131,9 @@ export function vocabularyProblem(
 ): string | null {
   if (!isVocabularyKey(key)) return `${key} is not in the enrichment vocabulary`
   const { type } = ENRICHMENT_VOCABULARY[key]
-  return VALUE_SCHEMAS[type].safeParse(value).success
+  return Result.isSuccess(
+    SchemaParser.decodeUnknownResult(VALUE_SCHEMAS[type], strict)(value),
+  )
     ? null
     : `${key} takes ${type === 'image' ? 'an' : 'a'} ${type === 'company' ? 'company by name and domain' : type}`
 }

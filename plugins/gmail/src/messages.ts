@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Effect, Option, Schema } from 'effect'
 
 /**
  * Gmail's resources, read, and the batch request written and parsed. Pure:
@@ -13,9 +13,9 @@ export const GMAIL_SEND =
   'https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=multipart'
 
 /** What `messages.send` answers: the mailbox's id for the message and its thread. */
-export const sentRef = z.object({
-  id: z.string().min(1),
-  threadId: z.string().min(1).optional(),
+export const sentRef = Schema.Struct({
+  id: Schema.NonEmptyString,
+  threadId: Schema.optional(Schema.NonEmptyString),
 })
 
 /** Gets per batch: Gmail allows 100 and throttles above 50. */
@@ -24,53 +24,58 @@ export const BATCH_SIZE = 50
 /** Ids per `messages.list` or `history.list` page. */
 export const PAGE_SIZE = 500
 
-export const messageRef = z.object({
-  id: z.string().min(1),
-  threadId: z.string().optional(),
+export const messageRef = Schema.Struct({
+  id: Schema.NonEmptyString,
+  threadId: Schema.optional(Schema.String),
 })
 
-export const messagesPage = z.object({
-  messages: z.array(messageRef).default([]),
-  nextPageToken: z.string().min(1).optional(),
+export const messagesPage = Schema.Struct({
+  messages: Schema.Array(messageRef).pipe(
+    Schema.withDecodingDefault(Effect.succeed([])),
+  ),
+  nextPageToken: Schema.optional(Schema.NonEmptyString),
 })
 
-export const historyPage = z.object({
-  history: z
-    .array(
-      z.object({
-        id: z.string().min(1),
-        messagesAdded: z
-          .array(
-            z.object({
-              message: messageRef.extend({
-                labelIds: z.array(z.string()).default([]),
-              }),
-            }),
-          )
-          .default([]),
-      }),
-    )
-    .default([]),
-  nextPageToken: z.string().min(1).optional(),
-  historyId: z.string().min(1),
+export const historyPage = Schema.Struct({
+  history: Schema.Array(
+    Schema.Struct({
+      id: Schema.NonEmptyString,
+      messagesAdded: Schema.Array(
+        Schema.Struct({
+          message: Schema.Struct({
+            ...messageRef.fields,
+            labelIds: Schema.Array(Schema.String).pipe(
+              Schema.withDecodingDefault(Effect.succeed([])),
+            ),
+          }),
+        }),
+      ).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+    }),
+  ).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+  nextPageToken: Schema.optional(Schema.NonEmptyString),
+  historyId: Schema.NonEmptyString,
 })
 
-export const profile = z.object({ historyId: z.string().min(1) })
+export const profile = Schema.Struct({ historyId: Schema.NonEmptyString })
 
 /** `messages.get?format=raw`: the bytes and what the mailbox knows of them. */
-export const rawMessage = z.object({
-  id: z.string().min(1),
-  threadId: z.string().optional(),
-  labelIds: z.array(z.string()).default([]),
-  internalDate: z.string().regex(/^\d+$/),
-  raw: z.string().min(1),
-  snippet: z.string().optional(),
+export const rawMessage = Schema.Struct({
+  id: Schema.NonEmptyString,
+  threadId: Schema.optional(Schema.String),
+  labelIds: Schema.Array(Schema.String).pipe(
+    Schema.withDecodingDefault(Effect.succeed([])),
+  ),
+  internalDate: Schema.String.check(Schema.isPattern(/^\d+$/)),
+  raw: Schema.NonEmptyString,
+  snippet: Schema.optional(Schema.String),
 })
 
-export type RawMessage = z.output<typeof rawMessage>
+export type RawMessage = typeof rawMessage.Type
 
-export const labelsList = z.object({
-  labels: z.array(z.object({ id: z.string(), name: z.string() })).default([]),
+export const labelsList = Schema.Struct({
+  labels: Schema.Array(
+    Schema.Struct({ id: Schema.String, name: Schema.String }),
+  ).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
 })
 
 /**
@@ -215,10 +220,12 @@ export const QUOTA_REASONS: ReadonlySet<string> = new Set([
   'quotaExceeded',
 ])
 
-const envelope = z.object({
-  error: z.object({
-    message: z.string().optional(),
-    errors: z.array(z.object({ reason: z.string().optional() })).optional(),
+const envelope = Schema.Struct({
+  error: Schema.Struct({
+    message: Schema.optional(Schema.String),
+    errors: Schema.optional(
+      Schema.Array(Schema.Struct({ reason: Schema.optional(Schema.String) })),
+    ),
   }),
 })
 
@@ -227,11 +234,11 @@ export const googleError = (
   body: string,
 ): { words: string | null; reasons: Array<string> } | null => {
   try {
-    const parsed = envelope.safeParse(JSON.parse(body))
-    if (!parsed.success) return null
+    const parsed = Schema.decodeUnknownOption(envelope)(JSON.parse(body))
+    if (Option.isNone(parsed)) return null
     return {
-      words: parsed.data.error.message ?? null,
-      reasons: (parsed.data.error.errors ?? []).flatMap((e) =>
+      words: parsed.value.error.message ?? null,
+      reasons: (parsed.value.error.errors ?? []).flatMap((e) =>
         e.reason === undefined ? [] : [e.reason],
       ),
     }

@@ -176,7 +176,7 @@ describe('SPACES_PLUGINS', () => {
       plugin('echo', '1.0.0'),
       plugin('echo', '1.1.0'),
       // Newer, but for an SDK major this host does not have.
-      plugin('echo', '2.0.0', { manifest: { sdk: '^2.0' } }),
+      plugin('echo', '2.0.0', { manifest: { sdk: '^3.0' } }),
       plugin('rss', '0.1.0'),
     )
     const env = { ...REQUIRED, SPACES_PLUGINS: 'echo,rss' }

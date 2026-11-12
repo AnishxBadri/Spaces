@@ -1,6 +1,5 @@
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import type { Layer } from 'effect'
-import { z } from 'zod'
 import { describe, expect, it } from 'vitest'
 import type { IntegrationConfig } from '@spaces/db/schema/integrations'
 import { ConfigLive } from '@spaces/core/writes/ports/config'
@@ -25,10 +24,14 @@ type ConfigImplementation = {
 }
 
 /** A plugin's settings with a default, so "as stored" is observable. */
-const settings = z.object({
-  cacheDays: z.int().min(0).default(90),
-  autoEnrich: z.boolean().default(false),
-  label: z.string().optional(),
+const settings = Schema.Struct({
+  cacheDays: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(90)),
+  ),
+  autoEnrich: Schema.Boolean.pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(false)),
+  ),
+  label: Schema.optionalKey(Schema.String),
 })
 
 const IMPLEMENTATIONS: ReadonlyArray<ConfigImplementation> = [

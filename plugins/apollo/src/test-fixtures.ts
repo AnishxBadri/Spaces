@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import type { JsonValue } from '@spaces/sdk'
 
 /** The committed Apollo responses under fixtures/, for the tests. */
@@ -12,4 +12,4 @@ export const fixtureText = (name: string): string =>
   readFileSync(new URL(name, FIXTURES_DIR), 'utf8')
 
 export const fixture = (name: string): JsonValue =>
-  z.json().parse(JSON.parse(fixtureText(name)))
+  Schema.decodeUnknownSync(Schema.Json)(JSON.parse(fixtureText(name)))

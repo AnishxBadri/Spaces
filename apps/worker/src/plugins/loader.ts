@@ -2,9 +2,8 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { pathToFileURL } from 'node:url'
-import { Data, Effect } from 'effect'
+import { Data, Effect, Option, Schema } from 'effect'
 import { and, eq, isNull, notLike } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
 import type { IntegrationManifest } from '@spaces/db/schema/integrations'
@@ -14,11 +13,11 @@ import type { BoundIntegration } from '@spaces/core/writes/ports/binding'
 import { dataDir } from '@spaces/core/writes/vault/key'
 import {
   SDK_VERSION,
+  decodeManifest,
   keyedProviderOf,
-  manifestSchema,
   satisfiesSdk,
 } from '@spaces/sdk'
-import type { Manifest } from '@spaces/sdk'
+import type { Manifest, SettingsSchema } from '@spaces/sdk'
 import { standInFor } from './fakes/switch'
 import type { FakeProviders } from './fakes/switch'
 import { resolvePluginImportsToHost } from './host-resolve'
@@ -78,7 +77,7 @@ export type LoadedPlugin = {
   readonly row: BoundIntegration
   readonly manifest: Manifest
   /** The bundle's `manifest.settings`, which ConfigLive validates the row against. */
-  readonly settings: z.ZodType
+  readonly settings: SettingsSchema
   readonly jobs: { readonly [name: string]: unknown }
   readonly onEnable?: LoadedHook
   readonly onDisable?: LoadedHook
@@ -113,30 +112,36 @@ export const messageOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
 
 /** The stored manifest is JSON — `integration.manifest`'s column type. */
-const jsonRecord = z.record(z.string(), z.json())
+const jsonRecord = Schema.Record(Schema.String, Schema.MutableJson)
 
-const hook = z.custom<LoadedHook>((value) => typeof value === 'function')
+const hook = Schema.declare(
+  (value): value is LoadedHook => typeof value === 'function',
+)
 
 /** An Effect from a bundle: its `R` did not survive the import, so what it reaches is what the host provides. */
 export type BundleEffect = Effect.Effect<unknown, unknown>
 
-const bundleEffect = z.custom<BundleEffect>((value) => Effect.isEffect(value))
+const bundleEffect = Schema.declare((value): value is BundleEffect =>
+  Effect.isEffect(value),
+)
 
 /**
- * What a bundle's default export must look like to be loaded at all. The
- * bundle's `zod` is the host's (`resolvePluginImportsToHost`), so its
- * settings schema is a ZodType here.
+ * A settings struct as `defineManifest` holds it. The bundle's `effect` is
+ * the host's (`resolvePluginImportsToHost`), so its schema is one of ours.
  */
-const pluginExport = z.object({
-  default: z.object({
-    manifest: z.object({
-      id: z.string(),
-      settings: z.custom<z.ZodType>((value) => value instanceof z.ZodType),
-    }),
-    jobs: z.record(z.string(), z.unknown()),
-    onEnable: hook.optional(),
-    onDisable: hook.optional(),
-    storageSource: bundleEffect.optional(),
+const settingsSchema = Schema.declare(
+  (value): value is SettingsSchema =>
+    Schema.isSchema(value) && value.ast._tag === 'Objects',
+)
+
+/** What a bundle's default export must look like to be loaded at all. */
+const pluginExport = Schema.Struct({
+  default: Schema.Struct({
+    manifest: Schema.Struct({ id: Schema.String, settings: settingsSchema }),
+    jobs: Schema.Record(Schema.String, Schema.Unknown),
+    onEnable: Schema.optional(hook),
+    onDisable: Schema.optional(hook),
+    storageSource: Schema.optional(bundleEffect),
   }),
 })
 
@@ -170,7 +175,7 @@ type Checked = {
   readonly bundleUrl: string
   readonly manifest: Manifest
   readonly stored: IntegrationManifest
-  readonly settings: z.ZodType
+  readonly settings: SettingsSchema
   readonly jobs: { readonly [name: string]: unknown }
   readonly onEnable?: LoadedHook
   readonly onDisable?: LoadedHook
@@ -220,12 +225,12 @@ const check = (
           reason: truncate(`manifest.json is not JSON: ${messageOf(error)}`),
         }),
     })
-    const parsed = manifestSchema.safeParse(raw)
+    const parsed = decodeManifest(raw)
     if (!parsed.success) {
       const issue = parsed.error.issues.at(0)
       return yield* new Degraded({
         reason: truncate(
-          `manifest.json is invalid: ${issue ? `${issue.path.join('.')}: ${issue.message}` : 'unreadable'}`,
+          `manifest.json is invalid: ${issue ? `${issue.path.map(String).join('.')}: ${issue.message}` : 'unreadable'}`,
         ),
       })
     }
@@ -235,7 +240,7 @@ const check = (
         reason: `manifest.json names plugin ${manifest.id}, not ${id}`,
       })
     }
-    const stored = jsonRecord.parse(raw)
+    const stored = Schema.decodeUnknownSync(jsonRecord)(raw)
     onManifest(stored)
 
     const sdk = satisfiesSdk(manifest.sdk, SDK_VERSION)
@@ -287,14 +292,14 @@ const check = (
           reason: truncate(`bundle.mjs failed to import: ${messageOf(error)}`),
         }),
     })
-    const exported = pluginExport.safeParse(mod)
-    if (!exported.success) {
+    const exported = Schema.decodeUnknownOption(pluginExport)(mod)
+    if (Option.isNone(exported)) {
       return yield* new Degraded({
         reason:
           'bundle.mjs has no definePlugin(…) default export with manifest, settings and jobs',
       })
     }
-    const { jobs, onEnable, onDisable, storageSource } = exported.data.default
+    const { jobs, onEnable, onDisable, storageSource } = exported.value.default
     const declared = Object.keys(manifest.jobs).sort()
     if (!isDeepStrictEqual(Object.keys(jobs).sort(), declared)) {
       return yield* new Degraded({
@@ -329,7 +334,7 @@ const check = (
       bundleUrl,
       manifest,
       stored,
-      settings: exported.data.default.manifest.settings,
+      settings: exported.value.default.manifest.settings,
       jobs,
       ...(onEnable === undefined ? {} : { onEnable }),
       ...(onDisable === undefined ? {} : { onDisable }),

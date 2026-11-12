@@ -18,7 +18,7 @@ import { z } from 'zod'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
 import type { IntegrationManifest } from '@spaces/db/schema/integrations'
-import { isVersion, manifestSchema } from '@spaces/sdk'
+import { decodeManifest, isVersion } from '@spaces/sdk'
 import { LOCK_FILE, bundleSha256, lockSchema } from '@spaces/core/plugins/lock'
 import type { Lock } from '@spaces/core/plugins/lock'
 import { CORE_VERSION } from '@spaces/core/plugins/core-version'
@@ -425,7 +425,7 @@ export const runInstaller = Effect.fn('runInstaller')(function* (
     trust: op.trust,
   })
   // Stored only as the loader would store it; the loader rewrites it on load.
-  const manifest = manifestSchema.safeParse(verified.manifest).success
+  const manifest = decodeManifest(verified.manifest).success
     ? jsonRecord.parse(verified.manifest)
     : null
   const done = yield* Effect.tryPromise({

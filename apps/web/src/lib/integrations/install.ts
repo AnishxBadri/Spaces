@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { Effect } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import { and, eq, isNull, notLike } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
@@ -218,17 +218,17 @@ const uploadedEntry = Effect.fn('uploadedEntry')(function* (
     }
   }
   const text = upload.entryText
-  const parsed = registryEntrySchema.safeParse(
+  const parsed = Schema.decodeUnknownOption(registryEntrySchema)(
     yield* Effect.try({
       try: (): unknown => JSON.parse(text),
       catch: () => refused('The .json beside the tarball is not JSON'),
     }),
   )
-  if (!parsed.success)
+  if (Option.isNone(parsed))
     return yield* refused(
       'The .json beside the tarball is not the registry entry its release published',
     )
-  return { name: parsed.data.name, entry: parsed.data }
+  return { name: parsed.value.name, entry: parsed.value }
 })
 
 /** Install an uploaded tarball through the same installer as a registry install. */

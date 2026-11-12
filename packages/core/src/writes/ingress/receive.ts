@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { ingressPayload, integration } from '@spaces/db/schema'
 import type { IngressHeaders } from '@spaces/db/schema'
-import { manifestSchema } from '@spaces/sdk'
+import { decodeManifest } from '@spaces/sdk'
 import type { Json } from '../../json'
 import { jsonValue } from '../../json'
 import { Enqueue } from '../../queue/enqueue'
@@ -175,7 +175,7 @@ const routeOf = Effect.fn('routeOf')(function* (integrationId: string) {
       .from(integration)
       .where(eq(integration.id, id)),
   )).at(0)
-  const parsed = manifestSchema.safeParse(row?.manifest)
+  const parsed = decodeManifest(row?.manifest)
   const manifest = parsed.success ? parsed.data : null
   const ingress = manifest?.ingress
   const queues =

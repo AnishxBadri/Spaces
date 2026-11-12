@@ -1,9 +1,9 @@
+import { Schema } from 'effect'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { ESLint } from 'eslint'
 import { manifestSchema, satisfiesSdk, settingsJsonSchema } from '@spaces/sdk'
 import { build } from 'vite'
-import { z } from 'zod'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { manifest } from './manifest.ts'
 
@@ -25,7 +25,7 @@ beforeAll(async () => {
 }, 60_000)
 
 describe('the apollo bundle', () => {
-  it('imports @spaces/sdk, effect and zod and nothing else', () => {
+  it('imports @spaces/sdk and effect and nothing else', () => {
     const bare = [...bundle.matchAll(/^import .* from "([^"]+)";$/gm)].map(
       (m) => m[1],
     )
@@ -33,7 +33,6 @@ describe('the apollo bundle', () => {
       '@spaces/sdk',
       '@spaces/sdk/identity',
       'effect',
-      'zod',
     ])
     expect(bundle).not.toMatch(/node_modules/)
     expect(
@@ -44,7 +43,7 @@ describe('the apollo bundle', () => {
 
 describe('the apollo manifest.json', () => {
   it('parses under manifestSchema, requiring a workspace enrichment key', () => {
-    const parsed = manifestSchema.parse(emitted)
+    const parsed = Schema.decodeUnknownSync(manifestSchema)(emitted)
     expect(parsed.id).toBe('apollo')
     expect(parsed.roles).toEqual(['enrichment'])
     expect(satisfiesSdk(parsed.sdk)).toEqual({ ok: true })
@@ -62,7 +61,7 @@ describe('the apollo manifest.json', () => {
   })
 
   it('defaults the cache to 90 days, carries a daily credit cap and leaves the phone off; auto-enrich is the host’s, not a setting', () => {
-    expect(z.parse(manifest.settings, {})).toEqual({
+    expect(Schema.decodeUnknownSync(manifest.settings)({})).toEqual({
       cacheDays: 90,
       dailyCreditCap: 100,
       phone: false,
@@ -70,14 +69,16 @@ describe('the apollo manifest.json', () => {
   })
 
   it('has the version the package declares', () => {
-    const pkg = z
-      .object({ version: z.string() })
-      .parse(
-        JSON.parse(
-          readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
-        ),
-      )
-    expect(manifestSchema.parse(emitted).version).toBe(pkg.version)
+    const pkg = Schema.decodeUnknownSync(
+      Schema.Struct({ version: Schema.String }),
+    )(
+      JSON.parse(
+        readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+      ),
+    )
+    expect(Schema.decodeUnknownSync(manifestSchema)(emitted).version).toBe(
+      pkg.version,
+    )
   })
 })
 

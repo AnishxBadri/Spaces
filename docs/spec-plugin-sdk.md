@@ -73,9 +73,9 @@ registry.json     plugin index; committed; copied into the image
 
 Rules the turbo graph and `no-restricted-imports` enforce:
 
-- `sdk` → `effect`, `zod`, `tldts` (D55: the identity normalizers need the
-  public suffix list; a test pins this list). Nothing internal. **If sdk ever
-  needs core, the contract leaked.**
+- `sdk` → `effect`, `tldts` (D55: the identity normalizers need the
+  public suffix list; a test pins this list; zod left at SDK 2.0, D85).
+  Nothing internal. **If sdk ever needs core, the contract leaked.**
 - `core` → `db`, `sdk` (it _implements_ sdk's port interfaces). Never `web`.
 - `web` → `core`, `sdk` (manifest types only, to render settings/actions).
   Never `plugins/*`, never `worker`.
@@ -104,16 +104,16 @@ history) → extract `packages/core` (pure libs first; split
 
 ## 3. Manifest
 
-`manifest.json`, validated by a zod schema exported from the SDK. Web
-renders settings cards and record actions from it without loading the
-bundle.
+`manifest.json`, read by the Effect schema the SDK exports (`manifestSchema`,
+through `decodeManifest`). Web renders settings cards and record actions from
+it without loading the bundle.
 
 ```ts
 {
   manifestVersion: 1,
   id: 'apollo',                          // the source_ref slug; immutable
   version: '1.2.0',
-  sdk: '^1.0',                           // semver range against SDK_VERSION
+  sdk: '^2.0',                           // semver range against SDK_VERSION
   name, description, icon?,
   roles?: ['enrichment' | 'research' | 'email-calendar' | 'files'
            | 'meeting-notes' | 'import' | 'feeds'],   // catalogue grouping (D81, SDK 1.4)
@@ -121,7 +121,7 @@ bundle.
     credential?: { kind: 'enrichment' | 'search' | 'llm', scope: 'workspace' },
     connection?: { provider: 'google', scopes: ['drive.readonly'] },   // §12
   },
-  settings: ZodSchema,                   // operator config; rendered by web; typed Config port
+  settings: Schema.Struct,               // operator config; rendered by web; typed Config port
   jobs: {
     [name]: {
       trigger: 'action' | 'schedule' | 'event' | 'webhook' | 'file',   // §5 — fixes the job's input/output
@@ -442,7 +442,7 @@ Import.stage(grid: {
 
 ### 5.3 The `watch` trigger (SDK 1.5, D72)
 
-- A watch job declares its own `settings` (zod, emitted as JSON Schema like the plugin's; `watchSettingsOf` is the typed read). The manifest refuses a watch job without one, `settings` on any other job, and a second watch job: a `space_watch` row names its integration, not a job.
+- A watch job declares its own `settings` (a `Schema.Struct`, emitted as JSON Schema like the plugin's; `watchSettingsOf` is the typed read). The manifest refuses a watch job without one, `settings` on any other job, and a second watch job: a `space_watch` row names its integration, not a job.
 - The worker registers the job's queue `stately` and keys every run by watch id, so one run of a watch waits at a time; beside it, `plugin.<id>.<job>.tick` on a one-minute cron sends each due watch. A watch is due once per slot of `cadence_minutes` counted from the epoch, so "Run now" (`runWatchNow`, sent at once) never moves or eats the next tick; a null cadence is never due. An archived space, or an archived ancestor, pauses both paths.
 - The run hands the job `{ watchId, spaceId, settings, state }` and writes the returned `state` in the transaction closing the `job_run` row — a failed run leaves it as it was. `job_run.watch_id` names the watch and `entity_id` the space.
 - `Spaces.brief` is `spaceBriefProgram` read as the integration: path, criteria, memos (shared only) and terms on the path, members with their key values and domains (capped, with `memberCount`), the subtree with direct counts. Sensitive or archived subspaces leave the tree with their branch; a member sensitive by any input is left out; a space sensitive anywhere in its path — or by the workspace floor — refuses the call, which fails the run with the reason.
@@ -504,7 +504,7 @@ Grafana's discovery → bootstrap → validation → initialization, same beats.
 ```
 1. discover    integration rows where enabled = true
 2. locate      /data/plugins/<id>/current/{manifest.json, bundle.mjs}
-3. validate    manifest zod-parses; manifest.sdk satisfies SDK_VERSION; bundle sha matches lock.json
+3. validate    manifest decodes; manifest.sdk satisfies SDK_VERSION; bundle sha matches lock.json
 4. import      const plugin = (await import(pathToFileURL(bundle))).default
 5. migrate     plugin/migrations/* in schema plugin_<id>, own journal table
 6. wire        Layer per (integration, job): the ports the job's `uses` names, bound to row, credential, config
@@ -692,7 +692,7 @@ contract 5) stays true.
   the bytes degrades it. The loader (`apps/worker/src/plugins/loader.ts`)
   writes the validated manifest to `integration.manifest`, which web renders
   from; `core.*` rows (the mailbox) are first-party and never reconciled;
-  a bundle's bare `effect` / `zod` / `@spaces/sdk` imports resolve to the
+  a bundle's bare `effect` / `@spaces/sdk` imports resolve to the
   worker's own copies through a `node:module` resolve hook, which is why the
   worker bundle leaves `@spaces/sdk` external and the image carries it in
   `/app/node_modules`. `/api/health` lists `degradedPlugins`.

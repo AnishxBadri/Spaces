@@ -35,7 +35,7 @@ import { enrichActionFor } from '@spaces/core/enrichment/settings'
 import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
 import { webhookSecretProvider } from '@spaces/core/writes/ingress/receive'
 import { MISSING_SETTINGS } from '@spaces/core/writes/ports/config'
-import { manifestSchema, satisfiesSdk } from '@spaces/sdk'
+import { decodeManifest, satisfiesSdk } from '@spaces/sdk'
 import type { Manifest, PluginRole } from '@spaces/sdk'
 import {
   BUNDLED_PLUGINS,
@@ -256,7 +256,7 @@ const query = <T>(run: () => Promise<T>) =>
 
 /** The stored manifest, or null when the worker has not validated one. */
 export const manifestOf = (stored: unknown): Manifest | null => {
-  const parsed = manifestSchema.safeParse(stored)
+  const parsed = decodeManifest(stored)
   return parsed.success ? parsed.data : null
 }
 

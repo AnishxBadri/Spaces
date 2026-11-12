@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import type {
   MeetingAttendee,
   MeetingCancellation,
@@ -13,49 +13,53 @@ import type {
 
 export const CALENDAR_API = 'https://www.googleapis.com/calendar/v3'
 
-const time = z.object({
-  dateTime: z.string().optional(),
-  date: z.string().optional(),
+const time = Schema.Struct({
+  dateTime: Schema.optional(Schema.String),
+  date: Schema.optional(Schema.String),
 })
 
-const attendee = z.object({
-  email: z.string().optional(),
-  displayName: z.string().optional(),
-  responseStatus: z.string().optional(),
-  self: z.boolean().optional(),
-  resource: z.boolean().optional(),
+const attendee = Schema.Struct({
+  email: Schema.optional(Schema.String),
+  displayName: Schema.optional(Schema.String),
+  responseStatus: Schema.optional(Schema.String),
+  self: Schema.optional(Schema.Boolean),
+  resource: Schema.optional(Schema.Boolean),
 })
 
-const entryPoint = z.object({
-  entryPointType: z.string().optional(),
-  uri: z.string().optional(),
+const entryPoint = Schema.Struct({
+  entryPointType: Schema.optional(Schema.String),
+  uri: Schema.optional(Schema.String),
 })
 
 /** The fields of an `Event` resource this plugin reads. */
-export const calendarEvent = z.object({
-  id: z.string().min(1),
-  status: z.string().optional(),
-  iCalUID: z.string().min(1).optional(),
-  summary: z.string().optional(),
-  start: time.optional(),
-  end: time.optional(),
-  attendees: z.array(attendee).optional(),
-  organizer: z.object({ email: z.string().optional() }).optional(),
-  hangoutLink: z.string().optional(),
-  conferenceData: z
-    .object({ entryPoints: z.array(entryPoint).optional() })
-    .optional(),
-  recurringEventId: z.string().optional(),
-  originalStartTime: time.optional(),
+export const calendarEvent = Schema.Struct({
+  id: Schema.NonEmptyString,
+  status: Schema.optional(Schema.String),
+  iCalUID: Schema.optional(Schema.NonEmptyString),
+  summary: Schema.optional(Schema.String),
+  start: Schema.optional(time),
+  end: Schema.optional(time),
+  attendees: Schema.optional(Schema.Array(attendee)),
+  organizer: Schema.optional(
+    Schema.Struct({ email: Schema.optional(Schema.String) }),
+  ),
+  hangoutLink: Schema.optional(Schema.String),
+  conferenceData: Schema.optional(
+    Schema.Struct({ entryPoints: Schema.optional(Schema.Array(entryPoint)) }),
+  ),
+  recurringEventId: Schema.optional(Schema.String),
+  originalStartTime: Schema.optional(time),
 })
 
-export type CalendarEvent = z.output<typeof calendarEvent>
+export type CalendarEvent = typeof calendarEvent.Type
 
 /** One `events.list` page; items are read one by one so a bad one is skipped alone. */
-export const eventsPage = z.object({
-  items: z.array(z.unknown()).default([]),
-  nextPageToken: z.string().min(1).optional(),
-  nextSyncToken: z.string().min(1).optional(),
+export const eventsPage = Schema.Struct({
+  items: Schema.Array(Schema.Unknown).pipe(
+    Schema.withDecodingDefault(Effect.succeed([])),
+  ),
+  nextPageToken: Schema.optional(Schema.NonEmptyString),
+  nextSyncToken: Schema.optional(Schema.NonEmptyString),
 })
 
 /** Items per page, Google's ceiling. */
@@ -83,7 +87,7 @@ export const listUrl = (
 
 /** An event time as an ISO instant; an all-day date is its UTC midnight. */
 export const instantOf = (
-  value: z.output<typeof time> | undefined,
+  value: typeof time.Type | undefined,
 ): string | null => {
   const raw =
     value?.dateTime ??

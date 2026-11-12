@@ -86,7 +86,7 @@ const ledgerRow = async () =>
 describe('the update badge', () => {
   it('names the newest satisfying version, and one click takes that one — not a newer one this host cannot run', async () => {
     const id = await installed()
-    serve(echo('1.0.0'), echo('1.1.0'), echo('2.0.0', { sdk: '^2.0' }))
+    serve(echo('1.0.0'), echo('1.1.0'), echo('2.0.0', { sdk: '^3.0' }))
     expect(await ledgerRow()).toMatchObject({
       version: '1.0.0',
       update: '1.1.0',
@@ -99,7 +99,7 @@ describe('the update badge', () => {
     expect(await ledgerRow()).toMatchObject({
       version: '1.1.0',
       update: null,
-      held: `2.0.0 needs sdk ^2.0; this host provides ${SDK_VERSION}`,
+      held: `2.0.0 needs sdk ^3.0; this host provides ${SDK_VERSION}`,
       rollback: { from: '1.0.0', answer: 'unknown' },
     })
   })

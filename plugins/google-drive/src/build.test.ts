@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Option, Schema } from 'effect'
 import { manifestSchema, satisfiesSdk } from '@spaces/sdk'
 import type { StorageSourceProvider } from '@spaces/sdk'
 import {
@@ -11,7 +11,6 @@ import {
   makeFakeDriveApi,
 } from '@spaces/sdk/testing'
 import { build } from 'vite'
-import { z } from 'zod'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { manifest } from './manifest.ts'
 
@@ -33,28 +32,28 @@ beforeAll(async () => {
 }, 60_000)
 
 describe('the google-drive bundle', () => {
-  it('imports @spaces/sdk, effect and zod and nothing else', () => {
+  it('imports @spaces/sdk and effect and nothing else', () => {
     const bare = [...bundle.matchAll(/^import .* from "([^"]+)";$/gm)].map(
       (m) => m[1],
     )
-    expect(bare.sort()).toEqual(['@spaces/sdk', 'effect', 'zod'])
+    expect(bare.sort()).toEqual(['@spaces/sdk', 'effect'])
     expect(bundle).not.toMatch(/node_modules/)
   })
 
   it('exports a storageSource the host can build over its ports', async () => {
-    const exported = z
-      .object({
-        default: z.object({
-          storageSource: z.custom<StorageSourceProvider>((value) =>
-            Effect.isEffect(value),
+    const exported = Schema.decodeUnknownSync(
+      Schema.Struct({
+        default: Schema.Struct({
+          storageSource: Schema.declare(
+            (value): value is StorageSourceProvider => Effect.isEffect(value),
           ),
         }),
-      })
-      .parse(
-        await import(
-          /* @vite-ignore */ pathToFileURL(`${root}dist/bundle.mjs`).href
-        ),
-      )
+      }),
+    )(
+      await import(
+        /* @vite-ignore */ pathToFileURL(`${root}dist/bundle.mjs`).href
+      ),
+    )
     const api = makeFakeDriveApi()
     const source = await Effect.runPromise(
       Effect.provide(
@@ -75,7 +74,7 @@ describe('the google-drive bundle', () => {
 
 describe('the google-drive manifest.json', () => {
   it('provides a storage source over a drive.file connection, with one schedule job', () => {
-    const parsed = manifestSchema.parse(emitted)
+    const parsed = Schema.decodeUnknownSync(manifestSchema)(emitted)
     expect(parsed.id).toBe('google-drive')
     expect(parsed.roles).toEqual(['files'])
     expect(satisfiesSdk(parsed.sdk)).toEqual({ ok: true })
@@ -93,29 +92,37 @@ describe('the google-drive manifest.json', () => {
   })
 
   it('carries the folder as one scalar setting', () => {
-    expect(manifestSchema.parse(emitted).settings).toMatchObject({
+    expect(
+      Schema.decodeUnknownSync(manifestSchema)(emitted).settings,
+    ).toMatchObject({
       type: 'object',
       properties: {
         folderId: { type: 'string', pattern: '^[\\w-]+$', title: 'Folder id' },
       },
       required: ['folderId'],
     })
-    expect(z.safeParse(manifest.settings, { folderId: '0B-x_1' }).success).toBe(
-      true,
-    )
-    expect(z.safeParse(manifest.settings, { folderId: "a'b" }).success).toBe(
-      false,
-    )
+    expect(
+      Option.isSome(
+        Schema.decodeUnknownOption(manifest.settings)({ folderId: '0B-x_1' }),
+      ),
+    ).toBe(true)
+    expect(
+      Option.isSome(
+        Schema.decodeUnknownOption(manifest.settings)({ folderId: "a'b" }),
+      ),
+    ).toBe(false)
   })
 
   it('has the version the package declares', () => {
-    const pkg = z
-      .object({ version: z.string() })
-      .parse(
-        JSON.parse(
-          readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
-        ),
-      )
-    expect(manifestSchema.parse(emitted).version).toBe(pkg.version)
+    const pkg = Schema.decodeUnknownSync(
+      Schema.Struct({ version: Schema.String }),
+    )(
+      JSON.parse(
+        readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+      ),
+    )
+    expect(Schema.decodeUnknownSync(manifestSchema)(emitted).version).toBe(
+      pkg.version,
+    )
   })
 })

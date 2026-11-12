@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { defineManifest } from '@spaces/sdk'
 
 /**
@@ -9,14 +9,13 @@ import { defineManifest } from '@spaces/sdk'
  *   the participants module mail uses.
  * - The connection asks `calendar.events.readonly` only; RSVP is shown,
  *   never edited.
- * - `sdk: '^1.4'`, as the watch fixture: raise it once an SDK release
- *   carries `logMeeting`, `connectedAt` and `CursorInvalid`.
+ * - `sdk: '^2.0'`: settings are an Effect schema.
  */
 export const manifest = defineManifest({
   manifestVersion: 1,
   id: 'google-calendar',
   version: '0.1.0',
-  sdk: '^1.4',
+  sdk: '^2.0',
   name: 'Google Calendar',
   roles: ['email-calendar'],
   description:
@@ -24,7 +23,7 @@ export const manifest = defineManifest({
   requires: {
     connection: { provider: 'google', scopes: ['calendar.events.readonly'] },
   },
-  settings: z.object({}),
+  settings: Schema.Struct({}),
   jobs: {
     sync: {
       trigger: 'schedule',

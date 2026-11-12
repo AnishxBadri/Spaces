@@ -1,8 +1,8 @@
+import { Schema } from 'effect'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { manifestSchema, satisfiesSdk } from '@spaces/sdk'
 import { build } from 'vite'
-import { z } from 'zod'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 /**
@@ -23,18 +23,18 @@ beforeAll(async () => {
 }, 60_000)
 
 describe('the google-calendar bundle', () => {
-  it('imports @spaces/sdk, effect and zod and nothing else', () => {
+  it('imports @spaces/sdk and effect and nothing else', () => {
     const bare = [...bundle.matchAll(/^import .* from "([^"]+)";$/gm)].map(
       (m) => m[1],
     )
-    expect(bare.sort()).toEqual(['@spaces/sdk', 'effect', 'zod'])
+    expect(bare.sort()).toEqual(['@spaces/sdk', 'effect'])
     expect(bundle).not.toMatch(/node_modules/)
   })
 })
 
 describe('the google-calendar manifest.json', () => {
   it('is a syncer: one schedule job over a read-only calendar connection', () => {
-    const parsed = manifestSchema.parse(emitted)
+    const parsed = Schema.decodeUnknownSync(manifestSchema)(emitted)
     expect(parsed.id).toBe('google-calendar')
     expect(parsed.roles).toEqual(['email-calendar'])
     expect(satisfiesSdk(parsed.sdk)).toEqual({ ok: true })
@@ -52,13 +52,15 @@ describe('the google-calendar manifest.json', () => {
   })
 
   it('has the version the package declares', () => {
-    const pkg = z
-      .object({ version: z.string() })
-      .parse(
-        JSON.parse(
-          readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
-        ),
-      )
-    expect(manifestSchema.parse(emitted).version).toBe(pkg.version)
+    const pkg = Schema.decodeUnknownSync(
+      Schema.Struct({ version: Schema.String }),
+    )(
+      JSON.parse(
+        readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+      ),
+    )
+    expect(Schema.decodeUnknownSync(manifestSchema)(emitted).version).toBe(
+      pkg.version,
+    )
   })
 })

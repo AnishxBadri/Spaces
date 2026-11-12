@@ -1,6 +1,5 @@
-import { Context, Effect, Schema } from 'effect'
-import type { Redacted } from 'effect'
-import { z } from 'zod'
+import { Context, Effect, Result, Schema, SchemaParser } from 'effect'
+import type { Redacted, SchemaIssue } from 'effect'
 import { JobPermanent } from './contract.ts'
 import type {
   AliasClaim,
@@ -31,7 +30,8 @@ import type {
   SignalClaim,
   WatchInput,
 } from './contract.ts'
-import type { AuthoredManifest } from './manifest.ts'
+import { issueText } from './issues.ts'
+import type { AuthoredManifest, SettingsSchema } from './manifest.ts'
 
 /**
  * The ports. Effect service tags and no implementations: a plugin imports
@@ -237,7 +237,7 @@ export class Ai extends Context.Service<
       <TResult>(
         lane: AiLane,
         items: ReadonlyArray<AiItem>,
-        schema: z.ZodType<TResult>,
+        schema: Schema.ConstraintDecoder<TResult>,
       ): Effect.Effect<TResult, JobError>
     }
   }
@@ -337,17 +337,24 @@ export class Config extends Context.Service<
  * applied, typed as the plugin authored it. A config that does not parse is
  * a permanent failure: retrying reads the same row.
  */
-export const configOf = <TSettings extends z.ZodType>(
+export const configOf = <TSettings extends SettingsSchema>(
   manifest: Pick<AuthoredManifest, 'id'> & { readonly settings: TSettings },
-): Effect.Effect<z.output<TSettings>, JobPermanent, Config> =>
+): Effect.Effect<TSettings['Type'], JobPermanent, Config> =>
   Effect.gen(function* () {
     const raw = yield* (yield* Config).get()
-    const parsed = z.safeParse(manifest.settings, raw)
-    if (parsed.success) return parsed.data
+    const parsed = decodeSettings(manifest.settings, raw)
+    if (Result.isSuccess(parsed)) return parsed.success
     return yield* new JobPermanent({
-      reason: `${manifest.id}'s settings do not match its manifest: ${parsed.error.message}`,
+      reason: `${manifest.id}'s settings do not match its manifest: ${issueText(parsed.failure)}`,
     })
   })
+
+/** Settings decoded with every issue reported, unknown keys ignored. */
+const decodeSettings = <TSettings extends SettingsSchema>(
+  settings: TSettings,
+  raw: unknown,
+): Result.Result<TSettings['Type'], SchemaIssue.Issue> =>
+  SchemaParser.decodeUnknownResult(settings, { errors: 'all' })(raw)
 
 // ---------------------------------------------------------------------------
 // PluginDb
@@ -595,16 +602,16 @@ export class Discover extends Context.Service<
  * defaults applied, typed as authored. Settings that do not parse are a
  * permanent failure: retrying reads the same row.
  */
-export const watchSettingsOf = <TSettings extends z.ZodType>(
+export const watchSettingsOf = <TSettings extends SettingsSchema>(
   job: { readonly settings: TSettings },
   input: Pick<WatchInput, 'watchId' | 'settings'>,
-): Effect.Effect<z.output<TSettings>, JobPermanent> => {
-  const parsed = z.safeParse(job.settings, input.settings)
-  return parsed.success
-    ? Effect.succeed(parsed.data)
+): Effect.Effect<TSettings['Type'], JobPermanent> => {
+  const parsed = decodeSettings(job.settings, input.settings)
+  return Result.isSuccess(parsed)
+    ? Effect.succeed(parsed.success)
     : Effect.fail(
         new JobPermanent({
-          reason: `watch ${input.watchId}'s settings do not match its job: ${parsed.error.message}`,
+          reason: `watch ${input.watchId}'s settings do not match its job: ${issueText(parsed.failure)}`,
         }),
       )
 }

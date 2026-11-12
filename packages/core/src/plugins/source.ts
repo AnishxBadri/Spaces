@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Effect, Schema } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import { registrySchema } from '@spaces/sdk/pack'
 import type { RegistryEntry } from '@spaces/sdk/pack'
 import { workspaceRoot } from '../writes/vault/key.ts'
@@ -38,15 +38,15 @@ export const readRegistryFile = Effect.fn('readRegistryFile')(function* (
     try: () => readFile(file, 'utf8'),
     catch: () => unreadable(`The plugin registry (${file}) could not be read`),
   })
-  const parsed = registrySchema.safeParse(
+  const parsed = Schema.decodeUnknownOption(registrySchema)(
     yield* Effect.try({
       try: (): unknown => JSON.parse(text),
       catch: () => unreadable(`The plugin registry (${file}) is not JSON`),
     }),
   )
-  if (!parsed.success)
+  if (Option.isNone(parsed))
     return yield* unreadable(`The plugin registry (${file}) is invalid`)
-  return parsed.data
+  return [...parsed.value]
 })
 
 /** The tarball's bytes: a read for `file:`, an HTTP GET otherwise. */

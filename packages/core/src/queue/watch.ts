@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { manifestSchema } from '@spaces/sdk'
+import { decodeManifest } from '@spaces/sdk'
 import { pluginQueueName } from './names'
 import type { PluginQueueName } from './names'
 
@@ -21,7 +21,7 @@ export type WatchRunData = z.output<typeof watchRunData>
 export const watchJobOf = (
   manifest: unknown,
 ): { readonly job: string; readonly queue: PluginQueueName } | null => {
-  const parsed = manifestSchema.safeParse(manifest)
+  const parsed = decodeManifest(manifest)
   if (!parsed.success) return null
   const found = Object.entries(parsed.data.jobs).find(
     ([, declared]) => declared.trigger === 'watch',

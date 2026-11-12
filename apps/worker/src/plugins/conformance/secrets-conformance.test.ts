@@ -1,5 +1,4 @@
-import { Context, Effect, Layer, Option, Redacted } from 'effect'
-import { z } from 'zod'
+import { Context, Effect, Layer, Option, Redacted, Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { storeCredential } from '@spaces/core/writes/vault'
 import { Secrets } from '@spaces/sdk'
@@ -45,7 +44,7 @@ const IMPLEMENTATIONS: ReadonlyArray<SecretsImplementation> = [
         Effect.scoped(
           Layer.build(
             grantLayer(row, ['Secrets'], {
-              settings: z.object({}),
+              settings: Schema.Struct({}),
               enqueue: noEnqueue,
             }),
           ),

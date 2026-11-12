@@ -1,5 +1,14 @@
 import { randomUUID } from 'node:crypto'
-import { Cause, Context, Effect, Exit, Layer, Option, Redacted } from 'effect'
+import {
+  Cause,
+  Context,
+  Effect,
+  Exit,
+  Layer,
+  Option,
+  Redacted,
+  Schema,
+} from 'effect'
 import { isNotNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -115,7 +124,7 @@ describe('google-drive with the fakes on', () => {
         Effect.scoped(
           Layer.build(
             grantLayer(boundRow, ['Http', 'Secrets'], {
-              settings: z.object({}),
+              settings: Schema.Struct({}),
               enqueue: NoEnqueue,
               fakes,
             }),

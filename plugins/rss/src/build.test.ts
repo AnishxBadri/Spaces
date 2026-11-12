@@ -1,8 +1,8 @@
+import { Option, Schema } from 'effect'
 import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { manifestSchema, satisfiesSdk } from '@spaces/sdk'
 import { build } from 'vite'
-import { z } from 'zod'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { manifest } from './manifest.ts'
 
@@ -25,11 +25,11 @@ beforeAll(async () => {
 }, 60_000)
 
 describe('the rss bundle', () => {
-  it('imports @spaces/sdk, effect and zod and nothing else', () => {
+  it('imports @spaces/sdk and effect and nothing else', () => {
     const bare = [...bundle.matchAll(/^import .* from "([^"]+)";$/gm)].map(
       (m) => m[1],
     )
-    expect(bare.sort()).toEqual(['@spaces/sdk', 'effect', 'zod'])
+    expect(bare.sort()).toEqual(['@spaces/sdk', 'effect'])
     expect(bundle).not.toMatch(/node_modules/)
   })
 
@@ -48,7 +48,7 @@ describe('the rss bundle', () => {
 
 describe('the rss manifest.json', () => {
   it('declares one schedule job with a cron — a poller', () => {
-    const parsed = manifestSchema.parse(emitted)
+    const parsed = Schema.decodeUnknownSync(manifestSchema)(emitted)
     expect(parsed.id).toBe('rss')
     expect(parsed.roles).toEqual(['feeds'])
     expect(satisfiesSdk(parsed.sdk)).toEqual({ ok: true })
@@ -68,7 +68,7 @@ describe('the rss manifest.json', () => {
    * configured there with no rss-specific code.
    */
   it('carries the feed as three scalar settings', () => {
-    expect(manifestSchema.parse(emitted).settings).toEqual({
+    expect(Schema.decodeUnknownSync(manifestSchema)(emitted).settings).toEqual({
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       type: 'object',
       properties: {
@@ -105,24 +105,31 @@ describe('the rss manifest.json', () => {
       feedUrl: 'https://x.example/feed.xml',
       record: '0b5cbe3e-7a4e-4f7e-9b44-3f1c2a9d8e01',
     }
-    expect(z.parse(manifest.settings, ok)).toEqual({ ...ok, maxItems: 20 })
+    expect(Schema.decodeUnknownSync(manifest.settings)(ok)).toEqual({
+      ...ok,
+      maxItems: 20,
+    })
     for (const bad of [
       { ...ok, feedUrl: 'ftp://x.example/feed.xml' },
       { ...ok, record: 'Northwind' },
       { ...ok, maxItems: 0 },
     ]) {
-      expect(z.safeParse(manifest.settings, bad).success).toBe(false)
+      expect(
+        Option.isSome(Schema.decodeUnknownOption(manifest.settings)(bad)),
+      ).toBe(false)
     }
   })
 
   it('has the version the package declares', () => {
-    const pkg = z
-      .object({ version: z.string() })
-      .parse(
-        JSON.parse(
-          readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
-        ),
-      )
-    expect(manifestSchema.parse(emitted).version).toBe(pkg.version)
+    const pkg = Schema.decodeUnknownSync(
+      Schema.Struct({ version: Schema.String }),
+    )(
+      JSON.parse(
+        readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+      ),
+    )
+    expect(Schema.decodeUnknownSync(manifestSchema)(emitted).version).toBe(
+      pkg.version,
+    )
   })
 })

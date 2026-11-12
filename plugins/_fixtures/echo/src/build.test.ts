@@ -1,3 +1,4 @@
+import { Schema } from 'effect'
 import { generateKeyPairSync, verify } from 'node:crypto'
 import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -34,11 +35,11 @@ beforeAll(async () => {
 }, 60_000)
 
 describe('the echo bundle', () => {
-  it('leaves effect, zod and @spaces/sdk as bare imports for the host', () => {
+  it('leaves effect and @spaces/sdk as bare imports for the host', () => {
     const bare = [...bundle.matchAll(/^import .* from "([^"]+)";$/gm)].map(
       (m) => m[1],
     )
-    expect(bare.sort()).toEqual(['@spaces/sdk', 'effect', 'zod'])
+    expect(bare.sort()).toEqual(['@spaces/sdk', 'effect'])
   })
 
   it('inlines no copy of either runtime', () => {
@@ -56,14 +57,14 @@ describe('the echo bundle', () => {
 
 describe('the echo manifest.json', () => {
   it('parses under manifestSchema', () => {
-    const parsed = manifestSchema.parse(emitted)
+    const parsed = Schema.decodeUnknownSync(manifestSchema)(emitted)
     expect(parsed.id).toBe('echo')
     expect(Object.keys(parsed.jobs)).toEqual(['echo', 'enrich'])
     expect(satisfiesSdk(parsed.sdk)).toEqual({ ok: true })
   })
 
-  it('carries settings as the JSON Schema of the authored zod schema', () => {
-    const parsed = manifestSchema.parse(emitted)
+  it('carries settings as the JSON Schema of the authored settings schema', () => {
+    const parsed = Schema.decodeUnknownSync(manifestSchema)(emitted)
     expect(parsed.settings).toEqual(settingsJsonSchema(manifest.settings))
   })
 })

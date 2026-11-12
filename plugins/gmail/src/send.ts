@@ -1,4 +1,4 @@
-import { Clock, Effect, Redacted } from 'effect'
+import { Clock, Effect, Option, Redacted, Schema } from 'effect'
 import {
   Content,
   Http,
@@ -16,7 +16,6 @@ import type {
   OutgoingEmail,
   PayloadActionInput,
 } from '@spaces/sdk'
-import { z } from 'zod'
 import { UPLOAD_BOUNDARY, buildMime, uploadBody } from './mime.ts'
 import type { OutgoingAttachment } from './mime.ts'
 import {
@@ -44,30 +43,32 @@ import {
  * - A failure says what Gmail said; the host shows it and keeps the draft.
  */
 
-const mailbox = z.object({
-  email: z.string().min(3),
-  name: z.string().exactOptional(),
+const mailbox = Schema.Struct({
+  email: Schema.String.check(Schema.isMinLength(3)),
+  name: Schema.optionalKey(Schema.String),
 })
 
-const outgoing = z.object({
-  messageId: z.string().regex(/^[^<>\s@]+@[^<>\s@]+$/),
+const outgoing = Schema.Struct({
+  messageId: Schema.String.check(Schema.isPattern(/^[^<>\s@]+@[^<>\s@]+$/)),
   from: mailbox,
-  to: z.array(mailbox),
-  cc: z.array(mailbox),
-  bcc: z.array(mailbox),
-  subject: z.string(),
-  bodyMd: z.string(),
-  inReplyTo: z.string().min(1).nullable(),
-  references: z.array(z.string().min(1)),
-  attachments: z.array(
-    z.object({
-      filename: z.string().min(1),
-      mime: z.string().min(1),
-      url: z.url(),
-      sizeBytes: z.int().nonnegative(),
+  to: Schema.Array(mailbox),
+  cc: Schema.Array(mailbox),
+  bcc: Schema.Array(mailbox),
+  subject: Schema.String,
+  bodyMd: Schema.String,
+  inReplyTo: Schema.NullOr(Schema.NonEmptyString),
+  references: Schema.Array(Schema.NonEmptyString),
+  attachments: Schema.Array(
+    Schema.Struct({
+      filename: Schema.NonEmptyString,
+      mime: Schema.NonEmptyString,
+      url: Schema.String.check(
+        Schema.makeFilter((text: string) => URL.canParse(text.trim())),
+      ),
+      sizeBytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
     }),
   ),
-}) satisfies z.ZodType<OutgoingEmail>
+}) satisfies Schema.Decoder<OutgoingEmail>
 
 type Failure = JobRetryable | JobRateLimited | JobPermanent
 
@@ -149,12 +150,12 @@ const readAll = (
 export const send = Effect.fn('gmail.send')(function* (
   input: PayloadActionInput,
 ) {
-  const parsed = outgoing.safeParse(input.payload)
-  if (!parsed.success)
+  const parsed = Schema.decodeUnknownOption(outgoing)(input.payload)
+  if (Option.isNone(parsed))
     return yield* new JobPermanent({
       reason: 'the host sent a message the send job cannot read',
     })
-  const message = parsed.data
+  const message = parsed.value
   const declared = message.attachments.reduce((n, a) => n + a.sizeBytes, 0)
   if (declared > OUTGOING_EMAIL_LIMIT_BYTES) return yield* tooLarge(declared)
 
@@ -187,7 +188,7 @@ export const send = Effect.fn('gmail.send')(function* (
   const byMessageId = Effect.fn('gmail.send.byMessageId')(function* (
     id: string,
   ) {
-    const page = messagesPage.safeParse(
+    const page = Schema.decodeUnknownOption(messagesPage)(
       yield* get(
         url('/users/me/messages', {
           q: `rfc822msgid:${id}`,
@@ -195,7 +196,7 @@ export const send = Effect.fn('gmail.send')(function* (
         }),
       ),
     )
-    return page.success ? (page.data.messages.at(0) ?? null) : null
+    return Option.isSome(page) ? (page.value.messages.at(0) ?? null) : null
   })
 
   const held = yield* byMessageId(message.messageId)
@@ -252,37 +253,39 @@ export const send = Effect.fn('gmail.send')(function* (
       body: uploadBody(raw, parent?.threadId ?? null),
     })
     if (response.status !== 200) return yield* refused(response)
-    const sent = sentRef.safeParse(yield* responseJson(response, GMAIL_SEND))
-    if (!sent.success)
+    const sent = Schema.decodeUnknownOption(sentRef)(
+      yield* responseJson(response, GMAIL_SEND),
+    )
+    if (Option.isNone(sent))
       return yield* new JobPermanent({
         reason: 'Gmail sent the message but answered without its id',
       })
-    gmailId = sent.data.id
+    gmailId = sent.value.id
   }
 
   // The sent copy as the mailbox holds it. Unreadable, the message is
   // still sent: the next sync files it.
-  const copy = rawMessage.safeParse(
+  const copy = Schema.decodeUnknownOption(rawMessage)(
     yield* get(
       url(`/users/me/messages/${encodeURIComponent(gmailId)}`, {
         format: 'raw',
       }),
     ).pipe(Effect.orElseSucceed(() => null)),
   )
-  if (!copy.success) {
+  if (Option.isNone(copy)) {
     yield* log.warn('sent; the mailbox copy could not be read', {
       messageId: message.messageId,
     })
     return
   }
-  const snippet = snippetText(copy.data.snippet)
+  const snippet = snippetText(copy.value.snippet)
   const filed = yield* content
     .logEmail({
       _tag: 'email',
-      providerMessageId: copy.data.id,
-      raw: copy.data.raw,
-      receivedAt: new Date(Number(copy.data.internalDate)).toISOString(),
-      labels: labelNames(copy.data.labelIds, new Map()),
+      providerMessageId: copy.value.id,
+      raw: copy.value.raw,
+      receivedAt: new Date(Number(copy.value.internalDate)).toISOString(),
+      labels: labelNames(copy.value.labelIds, new Map()),
       ...(snippet === undefined ? {} : { snippet }),
     })
     .pipe(

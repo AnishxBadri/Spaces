@@ -4,8 +4,8 @@ import { pathToFileURL } from 'node:url'
 import { HOST_PACKAGES } from '@spaces/sdk/build'
 
 /**
- * A plugin bundle runs on the host's Effect, sdk and zod. The plugin build
- * leaves exactly three bare imports (`effect`, `zod`, `@spaces/sdk`), and
+ * A plugin bundle runs on the host's Effect and sdk. The plugin build
+ * leaves exactly two bare imports (`effect`, `@spaces/sdk`), and
  * node's own lookup from `<dataDir>/plugins/<id>/current/` finds no
  * `node_modules` (or some other copy). Two SDK copies mean two sets of
  * service tags, and a job's `Identity` against the host's Layer is "service
@@ -13,7 +13,7 @@ import { HOST_PACKAGES } from '@spaces/sdk/build'
  *
  * - A synchronous in-thread hook (`module.registerHooks`, node ≥ 22.15), so
  *   no loader file ships beside the bundle, unlike `module.register()`.
- * - A bare import of one of the three, from a module under a registered
+ * - A bare import of one of the two, from a module under a registered
  *   plugins root, resolves as if this module made it: the same URL, so the
  *   same instance as the worker's own. This is why the worker bundle leaves
  *   `@spaces/sdk` external and the image ships it in `node_modules`.
@@ -40,7 +40,7 @@ const realpath = (p: string): string => {
 const roots = new Set<string>()
 let registered = false
 
-/** Route plugin bundles under `pluginsRoot` to the host's three packages. */
+/** Route plugin bundles under `pluginsRoot` to the host's two packages. */
 export function resolvePluginImportsToHost(pluginsRoot: string): void {
   // Node hands the hook a module's *real* path as `parentURL` (symlinks
   // resolved), so the root is compared as a real path too — macOS's

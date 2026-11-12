@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { manifestSchema } from '@spaces/sdk'
+import { decodeManifest } from '@spaces/sdk'
 import { pluginQueueName } from '../queue/names'
 import type { PluginQueueName } from '../queue/names'
 
@@ -39,7 +39,7 @@ export const importReaderOf = (
   manifest: unknown,
   filename: string,
 ): ImportReader | null => {
-  const parsed = manifestSchema.safeParse(manifest)
+  const parsed = decodeManifest(manifest)
   if (!parsed.success) return null
   const m = parsed.data
   for (const [job, declared] of Object.entries(m.jobs)) {

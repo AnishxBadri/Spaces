@@ -164,7 +164,7 @@ COPY --chown=node:node --from=prune /app/out/build/full/packages/db/drizzle ./pa
 # bundle's own `@spaces/sdk` import is resolved by the loader's hook to the
 # copy the worker loaded — one set of port tags in the process. Copied, not
 # linked: prod-deps' hoisted install links no workspace package (see above),
-# and the sdk's own dependencies (effect, zod, tldts) are already in
+# and the sdk's own dependencies (effect, tldts) are already in
 # /app/node_modules from it. Its package.json carries the `exports` map node
 # resolves `@spaces/sdk/identity` and `@spaces/sdk/build` through.
 COPY --chown=node:node --from=build /app/packages/sdk/package.json ./node_modules/@spaces/sdk/package.json

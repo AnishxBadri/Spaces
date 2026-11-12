@@ -2,7 +2,7 @@ import { Clock, Effect } from 'effect'
 import { and, eq, isNull } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity } from '@spaces/db/schema'
-import { manifestSchema } from '@spaces/sdk'
+import { decodeManifest } from '@spaces/sdk'
 import type { DomainEvent } from '@spaces/sdk'
 import { nextUtcMidnight, utcDayStart } from '../../ai/caps'
 import {
@@ -86,7 +86,7 @@ const cappedSource = (sources: ReadonlyArray<Candidate>, now: Date) =>
   Effect.gen(function* () {
     for (const source of sources) {
       if (source.local) continue
-      const manifest = manifestSchema.safeParse(source.row.manifest)
+      const manifest = decodeManifest(source.row.manifest)
       if (!manifest.success) continue
       const cap = creditPolicy(
         source.row.config,

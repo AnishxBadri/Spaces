@@ -1,8 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
-import { settingsJsonSchema } from '@spaces/sdk'
 import { formValuesOf, settingsFormOf } from '#/lib/integrations/settings-form'
+import { everyKindSettings, listSettings } from '#/test/plugin-settings'
 import {
   AutoEnrichFields,
   SecretFieldRow,
@@ -16,16 +15,7 @@ import {
  * saved key shown only as its redacted display.
  */
 
-const form = settingsFormOf(
-  settingsJsonSchema(
-    z.object({
-      cacheDays: z.int().min(0).max(3650).default(90).describe('days'),
-      autoEnrich: z.boolean().default(false),
-      region: z.enum(['us', 'eu']).default('us'),
-      label: z.string().optional(),
-    }),
-  ),
-)
+const form = settingsFormOf(everyKindSettings)
 
 const fields = (errors: { [key: string]: string } = {}) => {
   if (!form.ok) throw new Error(form.reason)
@@ -82,9 +72,7 @@ describe('SettingsFields', () => {
   })
 
   it('says why in one line when the manifest cannot be drawn', () => {
-    const refused = settingsFormOf(
-      settingsJsonSchema(z.object({ feeds: z.array(z.string()) })),
-    )
+    const refused = settingsFormOf(listSettings)
     const html = renderToStaticMarkup(
       <SettingsFields
         form={refused}

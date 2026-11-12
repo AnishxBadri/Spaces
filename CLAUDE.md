@@ -95,15 +95,15 @@ propose.ts`, SPA-204, with migration 0057's partial unique index making an
   `@spaces/sdk/testing` (SPA-196), and the identity-key normalizers
   (`@spaces/sdk/identity`, SPA-195 — core and apps/web import it directly,
   so core imports the sdk at runtime). It
-  depends on effect, zod and tldts (D55) and nothing internal,
+  depends on effect and tldts (D55; zod left with SDK 2.0, D85) and nothing internal,
   and — unlike db and core — its `exports` point at `dist/` (ESM + d.ts,
   `tsc -p tsconfig.build.json`), because a plugin bundle leaves it as a bare
   import node resolves at runtime; turbo's `^build` edge builds it before
   any dependent's `dev`, typecheck, test or lint, and the Dockerfile builds
   it before web and the worker. Its suite needs no Postgres.
   **`plugins/*` and `plugins/_fixtures/*` are workspace packages** named
-  `@spaces/plugin-<id>`, depending on `@spaces/sdk` only (effect and zod are
-  peers the host provides); `plugins/_fixtures/echo` is the first.
+  `@spaces/plugin-<id>`, depending on `@spaces/sdk` only (effect is a
+  peer the host provides); `plugins/_fixtures/echo` is the first.
   **`packages/config` (`@spaces/config`) holds the shared configuration since
   SPA-180: `tsconfig.base.json`, the eslint base (`eslint.base.js`, with
   the architecture zones and the spec §2 boundary rules) and its rule
@@ -133,7 +133,7 @@ propose.ts`, SPA-204, with migration 0057's partial unique index making an
   reconciliation of enabled `integration` rows against
   `<dataDir>/plugins/<id>/current/`, before any queue registers, and a
   `node:module` resolve hook (`host-resolve.ts`) that hands a bundle's bare
-  `effect`/`zod`/`@spaces/sdk` imports the worker's own copies — which is
+  `effect`/`@spaces/sdk` imports the worker's own copies — which is
   why the worker's vite build leaves `@spaces/sdk` external and the image
   copies it into `/app/node_modules`, and why its vitest config hands
   `packages/sdk/dist` and plugin bundles to node. The loader fixtures

@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { defineManifest } from '@spaces/sdk'
 
 /**
@@ -12,11 +12,11 @@ export const manifest = defineManifest({
   manifestVersion: 1,
   id: 'importer',
   version: '0.1.0',
-  sdk: '^1.0',
+  sdk: '^2.0',
   name: 'Importer',
   description:
     'A fixture plugin: a file job that files an uploaded deck against the company its filename names.',
-  settings: z.object({}),
+  settings: Schema.Struct({}),
   jobs: {
     importDeck: {
       trigger: 'file',

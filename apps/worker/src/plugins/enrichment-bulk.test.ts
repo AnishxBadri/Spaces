@@ -1,9 +1,8 @@
-import { Clock, Effect, Layer } from 'effect'
+import { Clock, Effect, Layer, Schema } from 'effect'
 import { TestClock } from 'effect/testing'
 import { isNotNull, sql } from 'drizzle-orm'
 import { PgBoss } from 'pg-boss'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { enrichmentRecord, integration } from '@spaces/db/schema'
 import { defineManifest, toManifestJson } from '@spaces/sdk'
@@ -65,7 +64,7 @@ const paid = jsonRecord(
         sdk: '^1.3',
         name: 'Paid',
         description: 'A capped source.',
-        settings: z.object({}),
+        settings: Schema.Struct({}),
         jobs: { enrichCompany: { trigger: 'action', uses: ['Facts'] } },
         actions: [
           {

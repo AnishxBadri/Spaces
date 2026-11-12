@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { manifestSchema, settingsJsonSchema } from '@spaces/sdk'
 import { withoutAccountPageKeys } from './ledger'
@@ -10,7 +10,7 @@ import { settingsFormOf } from './settings-form'
  * an admin would decide who reads someone else's mail.
  */
 const manifestWith = (roles: Array<'email-calendar' | 'enrichment'>) =>
-  manifestSchema.parse({
+  Schema.decodeUnknownSync(manifestSchema)({
     manifestVersion: 1,
     id: 'gmail',
     version: '0.1.0',
@@ -19,11 +19,19 @@ const manifestWith = (roles: Array<'email-calendar' | 'enrichment'>) =>
     description: 'Mail.',
     roles,
     settings: settingsJsonSchema(
-      z.object({
-        shareBodies: z.boolean().default(false),
-        excludeSenders: z.array(z.string()).default([]),
-        excludeLabels: z.array(z.string()).default([]),
-        signature: z.string().default(''),
+      Schema.Struct({
+        shareBodies: Schema.Boolean.pipe(
+          Schema.withDecodingDefaultKey(Effect.succeed(false)),
+        ),
+        excludeSenders: Schema.Array(Schema.String).pipe(
+          Schema.withDecodingDefaultKey(Effect.succeed([])),
+        ),
+        excludeLabels: Schema.Array(Schema.String).pipe(
+          Schema.withDecodingDefaultKey(Effect.succeed([])),
+        ),
+        signature: Schema.String.pipe(
+          Schema.withDecodingDefaultKey(Effect.succeed('')),
+        ),
       }),
     ),
     jobs: {

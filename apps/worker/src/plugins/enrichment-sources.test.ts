@@ -1,6 +1,5 @@
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { enrichmentRecord, integration } from '@spaces/db/schema'
 import { EnrichmentSources } from '@spaces/core/enrichment/sources'
@@ -25,7 +24,11 @@ const manifest = toManifestJson(
     sdk: '^1.3',
     name: 'Source',
     description: 'A source.',
-    settings: z.object({ cacheDays: z.int().default(90) }),
+    settings: Schema.Struct({
+      cacheDays: Schema.Int.pipe(
+        Schema.withDecodingDefaultKey(Effect.succeed(90)),
+      ),
+    }),
     jobs: { enrichCompany: { trigger: 'action', uses: ['Facts'] } },
     actions: [
       {
@@ -73,7 +76,7 @@ const loaded = (row: Awaited<ReturnType<typeof install>>): LoadedPlugin => ({
   integrationId: row.id,
   row,
   manifest,
-  settings: z.object({}),
+  settings: Schema.Struct({}),
   jobs: { enrichCompany: () => Effect.void },
   fingerprint: 'f',
 })

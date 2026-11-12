@@ -15,8 +15,7 @@
     "@spaces/sdk": "workspace:*"
   },
   "peerDependencies": {
-    "effect": "4.0.0-rc.112",
-    "zod": "^4.3.6"
+    "effect": "4.0.0-rc.112"
   },
   "devDependencies": {
     "@spaces/config": "workspace:*",
@@ -25,7 +24,6 @@
     "eslint": "^9.20.0",
     "typescript": "^6.0.2",
     "vite": "^8.1.5",
-    "vitest": "^4.1.10",
-    "zod": "^4.3.6"
+    "vitest": "^4.1.10"
   }
 }

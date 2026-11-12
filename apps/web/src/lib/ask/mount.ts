@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { db } from '@spaces/db'
 import { aiUsage, enrichmentRecord, integration } from '@spaces/db/schema'
 import type { IntegrationConfig } from '@spaces/db/schema'
-import { Http, manifestSchema } from '@spaces/sdk'
+import { Http, decodeManifest } from '@spaces/sdk'
 import type { JobError, JsonValue, Manifest } from '@spaces/sdk'
 import { utcDayStart } from '@spaces/core/ai/caps'
 import { jsonValue } from '@spaces/core/json'
@@ -85,7 +85,7 @@ export const mountablesProgram = Effect.fn('ask.mountables')(function* () {
       .orderBy(asc(integration.capabilityId), asc(integration.createdAt)),
   )
   return rows.flatMap((row): Array<Mountable> => {
-    const parsed = manifestSchema.safeParse(row.manifest)
+    const parsed = decodeManifest(row.manifest)
     if (!parsed.success || parsed.data.mcp === undefined) return []
     return [
       {

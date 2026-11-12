@@ -1,19 +1,18 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import { Content, JobPermanent, Log, definePlugin } from '@spaces/sdk'
 import type { SignalClaim } from '@spaces/sdk'
 import { manifest } from './manifest.ts'
 
 /** The delivery this fixture's provider sends — what it reads and nothing more. */
-const delivery = z.object({
-  entityId: z.string().min(1),
-  title: z.string().min(1),
-  url: z.string().min(1).optional(),
+const delivery = Schema.Struct({
+  entityId: Schema.NonEmptyString,
+  title: Schema.NonEmptyString,
+  url: Schema.optional(Schema.NonEmptyString),
 })
 
 /** The pure half: one delivery → one signal claim. */
 export const toSignal = (payload: unknown, receivedAt: string): SignalClaim => {
-  const d = delivery.parse(payload)
+  const d = Schema.decodeUnknownSync(delivery)(payload)
   return {
     _tag: 'signal',
     entityId: d.entityId,

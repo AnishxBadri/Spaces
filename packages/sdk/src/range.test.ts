@@ -14,10 +14,10 @@ describe('satisfiesSdk', () => {
   })
 
   it('defaults the host to SDK_VERSION', () => {
-    expect(satisfiesSdk('^1.0')).toEqual({ ok: true })
-    expect(satisfiesSdk('^2.0')).toEqual({
+    expect(satisfiesSdk('^2.0')).toEqual({ ok: true })
+    expect(satisfiesSdk('^1.4')).toEqual({
       ok: false,
-      reason: `requires sdk ^2.0, host provides ${SDK_VERSION}`,
+      reason: `requires sdk ^1.4, host provides ${SDK_VERSION}`,
     })
   })
 

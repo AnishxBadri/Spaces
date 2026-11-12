@@ -1,6 +1,13 @@
-import { Context, Effect, Layer, Predicate, Schema } from 'effect'
+import {
+  Context,
+  Effect,
+  Layer,
+  Predicate,
+  Result,
+  Schema,
+  SchemaParser,
+} from 'effect'
 import { sql } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { workspace } from '@spaces/db/schema'
 import { Ai, JobPermanent, JobRetryable } from '@spaces/sdk'
@@ -116,8 +123,8 @@ const NUMERIC_KEYS = [
 const TEXT_KEYS = ['title', 'description', 'format', 'pattern'] as const
 
 /**
- * A plugin's zod schema as the JSON Schema `complete()` hands the provider:
- * the subset core speaks, read off `z.toJSONSchema`. A keyword outside it is
+ * A plugin's schema as the JSON Schema `complete()` hands the provider:
+ * the subset core speaks, read off `Schema.toJsonSchemaDocument`. A keyword outside it is
  * dropped, which only loosens what the provider is told — the answer is
  * still parsed against the plugin's own schema.
  */
@@ -241,7 +248,7 @@ export const AiLive = (
         entityId: string | null,
         lane: AiLane,
         items: ReadonlyArray<AiItem>,
-        schema: z.ZodType | undefined,
+        schema: Schema.ConstraintDecoder<unknown> | undefined,
       ): Effect.Effect<ModelCallOutput, JobError> =>
         Effect.gen(function* () {
           if (!lanes.includes(lane)) {
@@ -257,7 +264,7 @@ export const AiLive = (
               schema:
                 schema === undefined
                   ? undefined
-                  : toJsonSchema(z.toJSONSchema(schema)),
+                  : toJsonSchema(Schema.toJsonSchemaDocument(schema).schema),
               task: TASK[lane],
               budgetChars: BUDGET_CHARS[lane],
               caller,
@@ -274,12 +281,12 @@ export const AiLive = (
         function complete<TResult>(
           lane: AiLane,
           items: ReadonlyArray<AiItem>,
-          schema: z.ZodType<TResult>,
+          schema: Schema.ConstraintDecoder<TResult>,
         ): Effect.Effect<TResult, JobError>
         function complete<TResult>(
           lane: AiLane,
           items: ReadonlyArray<AiItem>,
-          schema?: z.ZodType<TResult>,
+          schema?: Schema.ConstraintDecoder<TResult>,
         ): Effect.Effect<string | TResult, JobError> {
           return call(entityId, lane, items, schema).pipe(
             Effect.flatMap(
@@ -292,11 +299,11 @@ export const AiLive = (
                           reason: `Ai.complete: the ${lane} lane answered with an object where text was asked for`,
                         }),
                       )
-                const parsed = schema.safeParse(
+                const parsed = SchemaParser.decodeUnknownResult(schema)(
                   output.kind === 'object' ? output.object : output.text,
                 )
-                return parsed.success
-                  ? Effect.succeed(parsed.data)
+                return Result.isSuccess(parsed)
+                  ? Effect.succeed(parsed.success)
                   : Effect.fail(
                       new JobPermanent({
                         reason: `Ai.complete: the ${lane} lane's answer does not match the schema`,

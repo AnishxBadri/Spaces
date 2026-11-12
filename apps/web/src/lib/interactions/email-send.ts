@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { Context, Effect, Layer, Schema } from 'effect'
 import { and, asc, eq, inArray, isNull, ne } from 'drizzle-orm'
-import { OUTGOING_EMAIL_LIMIT_BYTES, manifestSchema } from '@spaces/sdk'
+import { OUTGOING_EMAIL_LIMIT_BYTES, decodeManifest } from '@spaces/sdk'
 import type { EmailAddress, OutgoingEmail } from '@spaces/sdk'
 import {
   UnknownVariable,
@@ -170,7 +170,7 @@ const SEND_JOB = 'send'
 
 /** The queue a stored Gmail manifest sends on; null when it has no send job. */
 const sendQueueOf = (manifest: unknown): PluginQueueName | null => {
-  const parsed = manifestSchema.safeParse(manifest)
+  const parsed = decodeManifest(manifest)
   if (!parsed.success) return null
   const job = Object.hasOwn(parsed.data.jobs, SEND_JOB)
     ? parsed.data.jobs[SEND_JOB]

@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { Context, Effect, Exit, Layer, Option, Redacted } from 'effect'
+import { Context, Effect, Exit, Layer, Option, Redacted, Schema } from 'effect'
 import { isNotNull } from 'drizzle-orm'
-import { z } from 'zod'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
@@ -65,7 +64,7 @@ const granted = async (
     Effect.scoped(
       Layer.build(
         grantLayer(row, ['Http', 'Secrets'], {
-          settings: z.object({}),
+          settings: Schema.Struct({}),
           enqueue: noEnqueue,
           fetch,
           fakes,

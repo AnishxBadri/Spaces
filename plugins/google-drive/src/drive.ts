@@ -1,5 +1,4 @@
-import { Effect, Option, Predicate, Redacted } from 'effect'
-import { z } from 'zod'
+import { Effect, Option, Predicate, Redacted, Schema } from 'effect'
 import {
   AuthExpired,
   Config,
@@ -94,67 +93,69 @@ const ENTRY_FIELDS = 'id,name,mimeType,parents,size,modifiedTime,version'
 // Drive's JSON
 // ---------------------------------------------------------------------------
 
-const driveFile = z.object({
-  id: z.string(),
-  name: z.string(),
-  mimeType: z.string(),
-  parents: z.array(z.string()).optional(),
-  size: z.string().optional(),
-  modifiedTime: z.string().optional(),
-  version: z.string().optional(),
-  trashed: z.boolean().optional(),
-  createdTime: z.string().optional(),
-  headRevisionId: z.string().optional(),
-  sha256Checksum: z.string().optional(),
+const driveFile = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  mimeType: Schema.String,
+  parents: Schema.optional(Schema.Array(Schema.String)),
+  size: Schema.optional(Schema.String),
+  modifiedTime: Schema.optional(Schema.String),
+  version: Schema.optional(Schema.String),
+  trashed: Schema.optional(Schema.Boolean),
+  createdTime: Schema.optional(Schema.String),
+  headRevisionId: Schema.optional(Schema.String),
+  sha256Checksum: Schema.optional(Schema.String),
 })
-type DriveFile = z.output<typeof driveFile>
+type DriveFile = typeof driveFile.Type
 
-const fileList = z.object({
-  files: z.array(driveFile),
-  nextPageToken: z.string().optional(),
+const fileList = Schema.Struct({
+  files: Schema.Array(driveFile),
+  nextPageToken: Schema.optional(Schema.String),
 })
 
-const changeList = z.object({
-  changes: z.array(
-    z.object({
-      changeType: z.string().optional(),
-      fileId: z.string().optional(),
-      removed: z.boolean().optional(),
-      file: driveFile.optional(),
+const changeList = Schema.Struct({
+  changes: Schema.Array(
+    Schema.Struct({
+      changeType: Schema.optional(Schema.String),
+      fileId: Schema.optional(Schema.String),
+      removed: Schema.optional(Schema.Boolean),
+      file: Schema.optional(driveFile),
     }),
   ),
-  nextPageToken: z.string().optional(),
-  newStartPageToken: z.string().optional(),
+  nextPageToken: Schema.optional(Schema.String),
+  newStartPageToken: Schema.optional(Schema.String),
 })
 
-const startToken = z.object({ startPageToken: z.string() })
+const startToken = Schema.Struct({ startPageToken: Schema.String })
 
-const driveList = z.object({
-  drives: z.array(z.object({ id: z.string() })).optional(),
-  nextPageToken: z.string().optional(),
+const driveList = Schema.Struct({
+  drives: Schema.optional(Schema.Array(Schema.Struct({ id: Schema.String }))),
+  nextPageToken: Schema.optional(Schema.String),
 })
 
-const errorBody = z.object({
-  error: z.object({
-    message: z.string().optional(),
-    errors: z.array(z.object({ reason: z.string() })).optional(),
+const errorBody = Schema.Struct({
+  error: Schema.Struct({
+    message: Schema.optional(Schema.String),
+    errors: Schema.optional(
+      Schema.Array(Schema.Struct({ reason: Schema.String })),
+    ),
   }),
 })
 
 /** The cursor `changes` hands out: one Drive page token per drive it reads. */
-const cursorSchema = z.object({
-  v: z.literal(1),
-  myDrive: z.string(),
-  drives: z.record(z.string(), z.string()),
+const cursorSchema = Schema.Struct({
+  v: Schema.Literal(1),
+  myDrive: Schema.String,
+  drives: Schema.Record(Schema.String, Schema.String),
 })
-type Cursor = z.output<typeof cursorSchema>
+type Cursor = typeof cursorSchema.Type
 
 const encodeCursor = (cursor: Cursor): string => JSON.stringify(cursor)
 
 const decodeCursor = (text: string): Cursor | null => {
   try {
-    const parsed = cursorSchema.safeParse(JSON.parse(text))
-    return parsed.success ? parsed.data : null
+    const parsed = Schema.decodeUnknownOption(cursorSchema)(JSON.parse(text))
+    return Option.isSome(parsed) ? parsed.value : null
   } catch {
     return null
   }
@@ -204,11 +205,11 @@ const AUTH_REASONS = new Set([
 
 const reasonOf = (body: string): { reason: string; message: string } => {
   try {
-    const parsed = errorBody.safeParse(JSON.parse(body))
-    if (parsed.success)
+    const parsed = Schema.decodeUnknownOption(errorBody)(JSON.parse(body))
+    if (Option.isSome(parsed))
       return {
-        reason: parsed.data.error.errors?.at(0)?.reason ?? '',
-        message: parsed.data.error.message ?? '',
+        reason: parsed.value.error.errors?.at(0)?.reason ?? '',
+        message: parsed.value.error.message ?? '',
       }
   } catch {
     // Not JSON: Drive's HTML error pages carry no reason.
@@ -264,13 +265,14 @@ const fromPort = <TValue>(
     JobPermanent: (e) => Effect.die(new Error(`Google Drive: ${e.reason}`)),
   })
 
-const parse = <TSchema extends z.ZodType>(
+const parse = <TSchema extends Schema.ConstraintDecoder<unknown>>(
   schema: TSchema,
   body: string,
   url: string,
 ) =>
   Effect.try({
-    try: (): z.output<TSchema> => schema.parse(JSON.parse(body)),
+    try: (): TSchema['Type'] =>
+      Schema.decodeUnknownSync(schema)(JSON.parse(body)),
     catch: (error) =>
       new Error(`Google Drive answered ${url} with JSON it does not send`, {
         cause: error,
@@ -346,7 +348,7 @@ export const driveSource = Effect.gen(function* () {
   const get = (url: string) => send('GET', url)
 
   /** One GET for JSON that must answer 200. */
-  const getOk = <TSchema extends z.ZodType>(
+  const getOk = <TSchema extends Schema.ConstraintDecoder<unknown>>(
     url: string,
     schema: TSchema,
     id: string,

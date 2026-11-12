@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Effect, Schema, SchemaGetter } from 'effect'
 import { vocabularyProblem } from '@spaces/sdk'
 import { isRoleEmail, normalizeDomain } from '@spaces/sdk/identity'
 import type {
@@ -45,20 +45,34 @@ export const endpointUrl = (
   query: { readonly [name: string]: string },
 ): string => `${APOLLO_API}/${endpoint}?${new URLSearchParams(query)}`
 
-const text = z
-  .string()
-  .transform((s) => s.trim())
-  .pipe(z.string().min(1))
-  .nullish()
-  .catch(null)
+/** `schema`, or null for null and for anything it refuses. */
+const orNull = <TSchema extends Schema.Top>(schema: TSchema) =>
+  Schema.NullOr(schema).pipe(
+    Schema.catchDecoding(() => Effect.succeedSome(null)),
+  )
 
-const count = z.number().finite().min(0).nullish().catch(null)
+/** A field Apollo may leave out, send null, or send malformed: all read null. */
+const lenient = <TSchema extends Schema.Top>(schema: TSchema) =>
+  Schema.optional(orNull(schema))
 
-const texts = z
-  .array(z.string().catch(''))
-  .transform((items) => items.map((s) => s.trim()).filter((s) => s !== ''))
-  .nullish()
-  .catch(null)
+const text = lenient(Schema.Trim.check(Schema.isNonEmpty()))
+
+const count = lenient(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)))
+
+/** A list of words, trimmed, with blanks and non-strings dropped. */
+const texts = lenient(
+  Schema.Array(Schema.Unknown).pipe(
+    Schema.decodeTo(Schema.Array(Schema.String), {
+      decode: SchemaGetter.transform((items) =>
+        items
+          .filter((item) => typeof item === 'string')
+          .map((item) => item.trim())
+          .filter((item) => item !== ''),
+      ),
+      encode: SchemaGetter.transform((items) => items),
+    }),
+  ),
+)
 
 const place = (...parts: ReadonlyArray<string | null | undefined>) =>
   parts.filter((p) => p != null && p !== '').join(', ')
@@ -75,58 +89,65 @@ const domainOf = (url: string | null | undefined): string | null =>
   url == null ? null : normalizeDomain(url)
 
 /** One of `funding_events`: Apollo spells the amount as text or a number. */
-const fundingEvent = z.object({
+const fundingEvent = Schema.Struct({
   id: text,
   date: text,
   type: text,
-  amount: z.union([z.string(), z.number()]).nullish().catch(null),
+  amount: lenient(Schema.Union([Schema.String, Schema.Finite])),
   currency: text,
   news_url: text,
   investors: text,
 })
 
-const phoneOf = z
-  .object({ sanitized_number: text, number: text })
-  .nullish()
-  .catch(null)
+const phoneOf = orNull(Schema.Struct({ sanitized_number: text, number: text }))
 
 /** `organizations/enrich` — `{ organization }`, or `{}` for no match. */
-const organizationResponse = z.object({
-  organization: z
-    .object({
-      name: text,
-      primary_domain: text,
-      website_url: text,
-      linkedin_url: text,
-      twitter_url: text,
-      facebook_url: text,
-      angellist_url: text,
-      crunchbase_url: text,
-      blog_url: text,
-      logo_url: text,
-      founded_year: z.int().min(1000).max(9999).nullish().catch(null),
-      short_description: text,
-      seo_description: text,
-      city: text,
-      country: text,
-      raw_address: text,
-      industry: text,
-      keywords: texts,
-      technology_names: texts,
-      estimated_num_employees: count,
-      annual_revenue: count,
-      total_funding: count,
-      publicly_traded_symbol: text,
-      primary_phone: phoneOf,
-      phone: text,
-      funding_events: z.array(fundingEvent.catch({})).nullish().catch(null),
-      latest_funding_stage: text,
-      latest_funding_round_date: text,
-    })
-    .nullish(),
+const organizationResponse = Schema.Struct({
+  organization: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({
+        name: text,
+        primary_domain: text,
+        website_url: text,
+        linkedin_url: text,
+        twitter_url: text,
+        facebook_url: text,
+        angellist_url: text,
+        crunchbase_url: text,
+        blog_url: text,
+        logo_url: text,
+        founded_year: lenient(
+          Schema.Int.check(Schema.isBetween({ minimum: 1000, maximum: 9999 })),
+        ),
+        short_description: text,
+        seo_description: text,
+        city: text,
+        country: text,
+        raw_address: text,
+        industry: text,
+        keywords: texts,
+        technology_names: texts,
+        estimated_num_employees: count,
+        annual_revenue: count,
+        total_funding: count,
+        publicly_traded_symbol: text,
+        primary_phone: Schema.optional(phoneOf),
+        phone: text,
+        funding_events: lenient(
+          Schema.Array(
+            fundingEvent.pipe(
+              Schema.catchDecoding(() => Effect.succeedSome({})),
+            ),
+          ),
+        ),
+        latest_funding_stage: text,
+        latest_funding_round_date: text,
+      }),
+    ),
+  ),
 })
 
-type FundingEvent = z.infer<typeof fundingEvent>
+type FundingEvent = typeof fundingEvent.Type
 
 /** The fields of a JSON object that hold something, nulls left out. */
 const present = (fields: {
@@ -209,37 +230,42 @@ const fundingSignal = (
 }
 
 /** `people/match` — `{ person }`, with `person: null` for no match. */
-const personResponse = z.object({
-  person: z
-    .object({
-      email: text,
-      email_status: text,
-      linkedin_url: text,
-      twitter_url: text,
-      github_url: text,
-      facebook_url: text,
-      photo_url: text,
-      title: text,
-      headline: text,
-      city: text,
-      country: text,
-      seniority: text,
-      departments: texts,
-      phone_numbers: z.array(phoneOf).nullish().catch(null),
-      organization: z
-        .object({ name: text, primary_domain: text, website_url: text })
-        .nullish()
-        .catch(null),
-      employment_history: z
-        .array(
-          z
-            .object({ current: z.boolean().nullish(), start_date: text })
-            .catch({}),
-        )
-        .nullish()
-        .catch(null),
-    })
-    .nullish(),
+const personResponse = Schema.Struct({
+  person: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({
+        email: text,
+        email_status: text,
+        linkedin_url: text,
+        twitter_url: text,
+        github_url: text,
+        facebook_url: text,
+        photo_url: text,
+        title: text,
+        headline: text,
+        city: text,
+        country: text,
+        seniority: text,
+        departments: texts,
+        phone_numbers: lenient(Schema.Array(phoneOf)),
+        organization: lenient(
+          Schema.Struct({
+            name: text,
+            primary_domain: text,
+            website_url: text,
+          }),
+        ),
+        employment_history: lenient(
+          Schema.Array(
+            Schema.Struct({
+              current: Schema.optional(Schema.NullOr(Schema.Boolean)),
+              start_date: text,
+            }).pipe(Schema.catchDecoding(() => Effect.succeedSome({}))),
+          ),
+        ),
+      }),
+    ),
+  ),
 })
 
 /** Apollo's seniority codes as the words a person reads. */
@@ -309,7 +335,7 @@ export const organizationEnrichment = (
   entityId: EntityId,
   raw: JsonValue,
 ): Enrichment => {
-  const org = organizationResponse.parse(raw).organization
+  const org = Schema.decodeUnknownSync(organizationResponse)(raw).organization
   if (org == null) return enrichment(entityId, raw, CREDITS_PER_MATCH, null)
   const domain = org.primary_domain ?? org.website_url
   const round = latestRound(org)
@@ -401,7 +427,7 @@ export const personEnrichment = (
   held: HeldPerson = NOTHING_HELD,
   options: PersonOptions = { phone: false },
 ): Enrichment => {
-  const person = personResponse.parse(raw).person
+  const person = Schema.decodeUnknownSync(personResponse)(raw).person
   const credits = CREDITS_PER_MATCH + (options.phone ? PHONE_CREDITS : 0)
   if (person == null) return enrichment(entityId, raw, credits, null)
   const title = person.title ?? null
@@ -493,10 +519,12 @@ export const personEnrichment = (
   })
 }
 
-const errorBody = z.union([
-  z.object({ error: z.string().min(1) }),
-  z.object({ message: z.string().min(1) }),
-  z.object({ errors: z.array(z.string()).min(1) }),
+const errorBody = Schema.Union([
+  Schema.Struct({ error: Schema.NonEmptyString }),
+  Schema.Struct({ message: Schema.NonEmptyString }),
+  Schema.Struct({
+    errors: Schema.Array(Schema.String).check(Schema.isMinLength(1)),
+  }),
 ])
 
 /**
@@ -511,9 +539,9 @@ export const apolloMessage = (body: string): string => {
   } catch {
     json = null
   }
-  const parsed = errorBody.safeParse(json)
-  if (parsed.success) {
-    const e = parsed.data
+  const parsed = Schema.decodeUnknownOption(errorBody)(json)
+  if (parsed._tag === 'Some') {
+    const e = parsed.value
     return 'error' in e
       ? e.error
       : 'message' in e

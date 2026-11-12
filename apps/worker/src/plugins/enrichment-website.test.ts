@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Schema } from 'effect'
 import { MockLanguageModelV4 } from 'ai/test'
 import { and, eq, isNotNull } from 'drizzle-orm'
 import {
@@ -11,7 +11,6 @@ import {
   it,
   vi,
 } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
   aiRoute,
@@ -184,7 +183,7 @@ const installPaidSource = async () => {
           sdk: '^1.3',
           name: 'Paid',
           description: 'A paid source.',
-          settings: z.object({}),
+          settings: Schema.Struct({}),
           jobs: { enrichCompany: { trigger: 'action', uses: ['Facts'] } },
           actions: [
             {

@@ -9,7 +9,7 @@ import {
   user,
   workspace,
 } from '@spaces/db/schema'
-import { manifestSchema } from '@spaces/sdk'
+import { decodeManifest } from '@spaces/sdk'
 import type { SetupState } from '#/lib/setup/whats-set-up'
 
 /**
@@ -22,6 +22,12 @@ export class SetupReadFailed extends Schema.TaggedError<SetupReadFailed>()(
   'SetupReadFailed',
   { cause: Schema.Defect() },
 ) {}
+
+/** A stored manifest's roles; none for one that does not read. */
+const rolesOf = (stored: unknown): ReadonlyArray<string> => {
+  const read = decodeManifest(stored)
+  return read.success ? (read.data.roles ?? []) : []
+}
 
 const query = <T>(run: () => Promise<T>) =>
   Effect.tryPromise({
@@ -149,9 +155,7 @@ export const whatsSetUpProgram = Effect.fn('whatsSetUpProgram')(
       (r) =>
         r.enabled &&
         r.status === 'enabled' &&
-        (manifestSchema.safeParse(r.manifest).data?.roles ?? []).includes(
-          'enrichment',
-        ),
+        rolesOf(r.manifest).includes('enrichment'),
     )
     return {
       model: n(llm) > 0,

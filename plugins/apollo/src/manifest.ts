@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import { defineManifest } from '@spaces/sdk'
 
 /**
@@ -18,19 +18,22 @@ export const manifest = defineManifest({
   manifestVersion: 1,
   id: 'apollo',
   version: '0.1.0',
-  sdk: '^1.4',
+  sdk: '^2.0',
   name: 'Apollo',
   roles: ['enrichment'],
   description:
     'Answers company and person fields from Apollo.io: description, founding year, location, LinkedIn, funding stage, headcount and total raised for a company (sent the domain only); job title, LinkedIn, Twitter and the company for a person (sent the email and LinkedIn URL). Adds the domains and verified emails it returns, and logs the latest funding round and a change of role as dated events; every value and event cites the raw response.',
   requires: { credential: { kind: 'enrichment', scope: 'workspace' } },
-  settings: z.object({
-    cacheDays: z.int().min(0).max(3650).default(90),
-    dailyCreditCap: z.int().min(0).default(100),
-    phone: z
-      .boolean()
-      .default(false)
-      .describe('Ask for a person’s phone number (extra Apollo credits)'),
+  settings: Schema.Struct({
+    cacheDays: Schema.Int.check(
+      Schema.isBetween({ minimum: 0, maximum: 3650 }),
+    ).pipe(Schema.withDecodingDefaultKey(Effect.succeed(90))),
+    dailyCreditCap: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(
+      Schema.withDecodingDefaultKey(Effect.succeed(100)),
+    ),
+    phone: Schema.Boolean.annotate({
+      description: 'Ask for a person’s phone number (extra Apollo credits)',
+    }).pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   }),
   jobs: {
     enrichCompany: {

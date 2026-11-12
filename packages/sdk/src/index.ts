@@ -13,6 +13,8 @@ export {
   ACTION_TARGETS,
   STORAGE_SOURCE_WITHHELD,
   manifestSchema,
+  decodeManifest,
+  ManifestRefused,
   defineManifest,
   toManifestJson,
   settingsJsonSchema,
@@ -25,6 +27,9 @@ export type {
   JobDeclaration,
   AuthoredJob,
   AuthoredManifest,
+  ManifestIssue,
+  ManifestRead,
+  SettingsSchema,
 } from './manifest.ts'
 export { definePlugin } from './plugin.ts'
 export type {

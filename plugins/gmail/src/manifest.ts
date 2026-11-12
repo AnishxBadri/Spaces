@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import { defineManifest } from '@spaces/sdk'
 
 /**
@@ -14,8 +14,7 @@ import { defineManifest } from '@spaces/sdk'
  * - The settings are the connection's, edited on its account page, and read
  *   by the host: whether bodies are shared and the exclude list. The
  *   defaults are the host's `DEFAULT_MAIL_EXCLUDE`, asserted equal.
- * - `sdk: '^1.4'`, as google-calendar: raise it once an SDK release carries
- *   `logEmail`, `connectedAt`, `CursorInvalid` and `ConnectionRefused`.
+ * - `sdk: '^2.0'`: settings are an Effect schema.
  */
 export const DEFAULT_EXCLUDE_SENDERS = [
   'noreply@',
@@ -45,7 +44,7 @@ export const manifest = defineManifest({
   manifestVersion: 1,
   id: 'gmail',
   version: '0.1.0',
-  sdk: '^1.4',
+  sdk: '^2.0',
   name: 'Gmail',
   roles: ['email-calendar'],
   description:
@@ -56,19 +55,23 @@ export const manifest = defineManifest({
       scopes: ['gmail.readonly', 'gmail.send'],
     },
   },
-  settings: z.object({
-    shareBodies: z
-      .boolean()
-      .default(false)
-      .describe('Show the bodies of this mailbox’s emails to the workspace.'),
-    excludeSenders: z
-      .array(z.string())
-      .default(DEFAULT_EXCLUDE_SENDERS)
-      .describe('Domains, addresses or local parts (noreply@) never synced.'),
-    excludeLabels: z
-      .array(z.string())
-      .default(DEFAULT_EXCLUDE_LABELS)
-      .describe('Gmail labels never synced.'),
+  settings: Schema.Struct({
+    shareBodies: Schema.Boolean.annotate({
+      description: 'Show the bodies of this mailbox’s emails to the workspace.',
+    }).pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
+    excludeSenders: Schema.Array(Schema.String)
+      .annotate({
+        description:
+          'Domains, addresses or local parts (noreply@) never synced.',
+      })
+      .pipe(
+        Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_EXCLUDE_SENDERS)),
+      ),
+    excludeLabels: Schema.Array(Schema.String)
+      .annotate({ description: 'Gmail labels never synced.' })
+      .pipe(
+        Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_EXCLUDE_LABELS)),
+      ),
   }),
   jobs: {
     sync: {

@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import type {
   AiItem,
   JsonObject,
@@ -46,26 +46,26 @@ export const searchBody = (
  * Exa's answer — the fields this plugin reads and nothing more. Parsed,
  * never trusted: an absent or null field is simply not claimed.
  */
-const searchResponse = z.object({
-  results: z.array(
-    z.object({
-      id: z.string().min(1).nullish(),
-      url: z.string().min(1),
-      title: z.string().min(1).nullish(),
-      publishedDate: z.string().min(1).nullish(),
-      author: z.string().min(1).nullish(),
-      score: z.number().nullish(),
-      highlights: z.array(z.string()).nullish(),
+const searchResponse = Schema.Struct({
+  results: Schema.Array(
+    Schema.Struct({
+      id: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
+      url: Schema.NonEmptyString,
+      title: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
+      publishedDate: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
+      author: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
+      score: Schema.optional(Schema.NullOr(Schema.Finite)),
+      highlights: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
     }),
   ),
 })
 
-export type Hit = z.output<typeof searchResponse>['results'][number]
+export type Hit = (typeof searchResponse.Type)['results'][number]
 
 /** The hits, once per URL, in Exa's order. */
 export const searchHits = (raw: unknown): ReadonlyArray<Hit> => {
   const seen = new Set<string>()
-  return searchResponse.parse(raw).results.filter((hit) => {
+  return Schema.decodeUnknownSync(searchResponse)(raw).results.filter((hit) => {
     if (seen.has(hit.url)) return false
     seen.add(hit.url)
     return true
@@ -129,7 +129,7 @@ export const citeSignals = (
     return index < 0 ? whole : (signalRefs.at(index) ?? whole)
   })
 
-const errorBody = z.object({ error: z.string().min(1) })
+const errorBody = Schema.Struct({ error: Schema.NonEmptyString })
 
 /** Exa's own sentence for a failed call, else the body as it came, trimmed. */
 export const exaMessage = (body: string): string => {
@@ -139,8 +139,8 @@ export const exaMessage = (body: string): string => {
   } catch {
     json = null
   }
-  const parsed = errorBody.safeParse(json)
-  if (parsed.success) return parsed.data.error
+  const parsed = Schema.decodeUnknownOption(errorBody)(json)
+  if (parsed._tag === 'Some') return parsed.value.error
   const trimmed = body.trim()
   return trimmed === '' ? '(no message)' : trimmed.slice(0, 500)
 }

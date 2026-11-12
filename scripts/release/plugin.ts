@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { Schema } from 'effect'
 import { manifestSchema } from '@spaces/sdk'
 import { keyIdOf, registryEntrySchema } from '@spaces/sdk/pack'
 import type { RegistryEntry } from '@spaces/sdk/pack'
@@ -92,7 +93,9 @@ export const preflight = async (
       `${built} is missing — build first: pnpm exec turbo run build --filter=${name}`,
     )
   }
-  const manifest = manifestSchema.parse(await readJson(built))
+  const manifest = Schema.decodeUnknownSync(manifestSchema)(
+    await readJson(built),
+  )
   if (manifest.id !== id || manifest.version !== version) {
     throw new Error(
       `the built manifest is ${manifest.id}@${manifest.version}, the package ${id}@${version} — rebuild, or run pnpm release:version to sync the manifest`,
@@ -170,7 +173,7 @@ export const releasePlugin = async (
   log(runPack(pluginDir, packScript, packArgs, packEnv).trimEnd())
 
   const names = artifactNames(id, version)
-  const entry = registryEntrySchema.parse(
+  const entry = Schema.decodeUnknownSync(registryEntrySchema)(
     await readJson(path.join(outDir, names.entry)),
   )
   const trust = await trustFrom(keysDirs)

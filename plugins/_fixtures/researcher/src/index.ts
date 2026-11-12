@@ -1,5 +1,4 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import {
   Ai,
   Content,
@@ -22,14 +21,14 @@ export const SEARCH_URL = 'https://search.example/v1/search'
  * The provider's answer — the fields this fixture reads and nothing more.
  * Parsed, never trusted: an absent field is simply not claimed.
  */
-const searchResponse = z.object({
-  results: z.array(
-    z.object({
-      url: z.string().min(1),
-      title: z.string().min(1).nullish(),
-      publishedDate: z.string().min(1).nullish(),
-      score: z.number().nullish(),
-      author: z.string().min(1).nullish(),
+const searchResponse = Schema.Struct({
+  results: Schema.Array(
+    Schema.Struct({
+      url: Schema.NonEmptyString,
+      title: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
+      publishedDate: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
+      score: Schema.optional(Schema.NullOr(Schema.Finite)),
+      author: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
     }),
   ),
 })
@@ -39,7 +38,7 @@ export const toSignals = (
   entityId: string,
   raw: unknown,
 ): ReadonlyArray<SignalClaim> =>
-  searchResponse.parse(raw).results.map((hit) => ({
+  Schema.decodeUnknownSync(searchResponse)(raw).results.map((hit) => ({
     _tag: 'signal',
     entityId,
     kind: 'web',

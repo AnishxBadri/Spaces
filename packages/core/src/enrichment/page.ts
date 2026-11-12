@@ -1,4 +1,4 @@
-import { manifestSchema } from '@spaces/sdk'
+import { decodeManifest } from '@spaces/sdk'
 import {
   ENRICHMENT_VOCABULARY,
   VOCABULARY_KEYS,
@@ -23,7 +23,7 @@ export const answersOf = (
   manifest: unknown,
   kind: 'company' | 'person',
 ): ReadonlySet<VocabularyKey> => {
-  const parsed = manifestSchema.safeParse(manifest)
+  const parsed = decodeManifest(manifest)
   if (!parsed.success) return new Set()
   const action = (parsed.data.actions ?? []).find(
     (a) => a.on === kind && a.id.startsWith('enrich'),

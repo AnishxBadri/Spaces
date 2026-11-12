@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto'
-import { Cause, Effect, Exit, Layer } from 'effect'
+import { Cause, Effect, Exit, Layer, Schema } from 'effect'
 import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
   attribute,
@@ -89,7 +88,7 @@ const manifestFor = (id: string, name: string) =>
           sdk: '^1.3',
           name,
           description: `${name} enrichment.`,
-          settings: z.object({}),
+          settings: Schema.Struct({}),
           jobs: {
             enrichCompany: { trigger: 'action', uses: ['Facts', 'Receipts'] },
           },

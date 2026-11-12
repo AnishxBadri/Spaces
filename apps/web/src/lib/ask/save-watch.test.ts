@@ -1,7 +1,6 @@
-import { Effect, Exit } from 'effect'
+import { Effect, Exit, Schema } from 'effect'
 import { and, count, eq, sql } from 'drizzle-orm'
 import { describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
   askThread,
@@ -47,14 +46,18 @@ const anEngine = async () => {
           sdk: '^1.5',
           name: 'Exa',
           description: 'A test engine.',
-          settings: z.object({}),
+          settings: Schema.Struct({}),
           jobs: {
             watch: {
               trigger: 'watch',
               uses: ['Spaces'],
-              settings: z.object({
-                criteria: z.string().max(1000).default(''),
-                cap: z.int().min(1).max(100).default(10),
+              settings: Schema.Struct({
+                criteria: Schema.String.check(Schema.isMaxLength(1000)).pipe(
+                  Schema.withDecodingDefaultKey(Effect.succeed('')),
+                ),
+                cap: Schema.Int.check(
+                  Schema.isBetween({ minimum: 1, maximum: 100 }),
+                ).pipe(Schema.withDecodingDefaultKey(Effect.succeed(10))),
               }),
             },
           },

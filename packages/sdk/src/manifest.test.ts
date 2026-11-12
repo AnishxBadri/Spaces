@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import { DOMAIN_EVENTS, PORT_NAMES } from './contract.ts'
 import {
   ROLES,
   STORAGE_SOURCE_WITHHELD,
+  decodeManifest,
   keyedProviderOf,
-  manifestSchema,
   settingsJsonSchema,
   toManifestJson,
 } from './manifest.ts'
@@ -37,10 +37,19 @@ const base = () => {
 
 /** Every issue as `path: message`, so a test can name the field it expects. */
 const issues = (input: unknown): Array<string> => {
-  const result = manifestSchema.safeParse(input)
+  const result = decodeManifest(input)
   return result.success
     ? []
-    : result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
+    : result.error.issues.map(
+        (i) => `${i.path.map(String).join('.')}: ${i.message}`,
+      )
+}
+
+/** The manifest, or the refusal thrown. */
+const parse = (input: unknown) => {
+  const result = decodeManifest(input)
+  if (!result.success) throw result.error
+  return result.data
 }
 
 describe('manifestSchema', () => {
@@ -54,12 +63,12 @@ describe('manifestSchema', () => {
       requires: { connection: { provider: 'granola', key: true } },
     }
     expect(issues(keyed)).toEqual([])
-    expect(keyedProviderOf(manifestSchema.parse(keyed))).toBe('granola')
+    expect(keyedProviderOf(parse(keyed))).toBe('granola')
     const granted = {
       ...base(),
       requires: { connection: { provider: 'google', scopes: ['email'] } },
     }
-    expect(keyedProviderOf(manifestSchema.parse(granted))).toBeNull()
+    expect(keyedProviderOf(parse(granted))).toBeNull()
     expect(
       issues({
         ...base(),
@@ -82,7 +91,7 @@ describe('manifestSchema', () => {
   })
 
   it('parses the too-new fixture, which then fails the sdk check with the loader reason', () => {
-    const manifest = manifestSchema.parse(fixture('too-new-sdk.json'))
+    const manifest = parse(fixture('too-new-sdk.json'))
     const check = satisfiesSdk(manifest.sdk, '1.0.0')
     expect(check).toEqual({
       ok: false,
@@ -93,7 +102,7 @@ describe('manifestSchema', () => {
 
   describe('roles', () => {
     it('is optional: a manifest without it loads', () => {
-      expect(manifestSchema.parse(base())).not.toHaveProperty('roles')
+      expect(parse(base())).not.toHaveProperty('roles')
     })
 
     it('takes any of the seven jobs the catalogue groups by (D81)', () => {
@@ -587,9 +596,11 @@ describe('toManifestJson', () => {
     sdk: '^1.0',
     name: 'Exa',
     description: 'Web research.',
-    settings: z.object({
-      maxResults: z.int().min(1).max(25).default(5),
-      lookbackDays: z.int().optional(),
+    settings: Schema.Struct({
+      maxResults: Schema.Int.check(
+        Schema.isBetween({ minimum: 1, maximum: 25 }),
+      ).pipe(Schema.withDecodingDefaultKey(Effect.succeed(5))),
+      lookbackDays: Schema.optionalKey(Schema.Int),
     }),
     jobs: { research: { trigger: 'action', uses: ['Http', 'Content'] } },
   }
@@ -605,18 +616,22 @@ describe('toManifestJson', () => {
   it('names the settings in declaration order, which jsonb would sort away', () => {
     const json = toManifestJson({
       ...authored,
-      settings: z.object({ z: z.string(), a: z.int(), m: z.boolean() }),
+      settings: Schema.Struct({
+        z: Schema.String,
+        a: Schema.Int,
+        m: Schema.Boolean,
+      }),
     })
     expect(json.settings).toMatchObject({ propertyOrder: ['z', 'a', 'm'] })
-    expect(settingsJsonSchema(z.object({}))).toMatchObject({
+    expect(settingsJsonSchema(Schema.Struct({}))).toMatchObject({
       propertyOrder: [],
     })
   })
 
   it("serialises a watch job's settings the same way", () => {
-    const watchSettings = z.object({
-      criteria: z.string(),
-      cap: z.int().default(25),
+    const watchSettings = Schema.Struct({
+      criteria: Schema.String,
+      cap: Schema.Int.pipe(Schema.withDecodingDefaultKey(Effect.succeed(25))),
     })
     const json = toManifestJson({
       ...authored,
@@ -626,6 +641,42 @@ describe('toManifestJson', () => {
     })
     expect(json.jobs.lens.settings).toEqual(settingsJsonSchema(watchSettings))
     expect(json.jobs.lens.settings).toMatchObject({ required: ['criteria'] })
+  })
+
+  it('emits what the settings form reads: defaults, annotations, optional keys, enums', () => {
+    expect(
+      settingsJsonSchema(
+        Schema.Struct({
+          cap: Schema.Int.annotate({ description: 'At most' })
+            .check(Schema.isBetween({ minimum: 1, maximum: 100 }))
+            .pipe(Schema.withDecodingDefaultKey(Effect.succeed(10))),
+          region: Schema.Literals(['us', 'eu']),
+          tier: Schema.Literals(['a']),
+          folderId: Schema.String.annotate({ title: 'Folder id' }).check(
+            Schema.isPattern(/^\d+$/),
+          ),
+          note: Schema.optionalKey(Schema.String),
+        }),
+      ),
+    ).toEqual({
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      properties: {
+        cap: {
+          default: 10,
+          type: 'integer',
+          description: 'At most',
+          minimum: 1,
+          maximum: 100,
+        },
+        region: { type: 'string', enum: ['us', 'eu'] },
+        tier: { type: 'string', enum: ['a'] },
+        folderId: { type: 'string', title: 'Folder id', pattern: '^\\d+$' },
+        note: { type: 'string' },
+      },
+      required: ['region', 'tier', 'folderId'],
+      propertyOrder: ['cap', 'region', 'tier', 'folderId', 'note'],
+    })
   })
 
   it('refuses to emit a manifest the loader would refuse', () => {

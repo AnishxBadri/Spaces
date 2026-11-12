@@ -1,5 +1,4 @@
 ---
-'@spaces/sdk': minor
 'spaces': patch
 ---
 

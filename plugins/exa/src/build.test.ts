@@ -1,9 +1,9 @@
+import { Option, Schema } from 'effect'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { ESLint } from 'eslint'
 import { manifestSchema, satisfiesSdk, settingsJsonSchema } from '@spaces/sdk'
 import { build } from 'vite'
-import { z } from 'zod'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { manifest, watchSettings } from './manifest.ts'
 
@@ -25,7 +25,7 @@ beforeAll(async () => {
 }, 60_000)
 
 describe('the exa bundle', () => {
-  it('imports @spaces/sdk, effect and zod and nothing else', () => {
+  it('imports @spaces/sdk and effect and nothing else', () => {
     const bare = [...bundle.matchAll(/^import .* from "([^"]+)";$/gm)].map(
       (m) => m[1],
     )
@@ -33,7 +33,6 @@ describe('the exa bundle', () => {
       '@spaces/sdk',
       '@spaces/sdk/identity',
       'effect',
-      'zod',
     ])
     expect(bundle).not.toMatch(/node_modules/)
   })
@@ -41,7 +40,7 @@ describe('the exa bundle', () => {
 
 describe('the exa manifest.json', () => {
   it('parses under manifestSchema: a research action and a watch, requiring a workspace search key', () => {
-    const parsed = manifestSchema.parse(emitted)
+    const parsed = Schema.decodeUnknownSync(manifestSchema)(emitted)
     expect(parsed.id).toBe('exa')
     expect(parsed.roles).toEqual(['research'])
     expect(parsed).not.toHaveProperty('kind')
@@ -88,30 +87,41 @@ describe('the exa manifest.json', () => {
   })
 
   it('defaults to five pages from the last 90 days', () => {
-    expect(z.parse(manifest.settings, {})).toEqual({
+    expect(Schema.decodeUnknownSync(manifest.settings)({})).toEqual({
       maxResults: 5,
       lookbackDays: 90,
     })
-    expect(z.safeParse(manifest.settings, { maxResults: 0 }).success).toBe(
-      false,
-    )
+    expect(
+      Option.isSome(
+        Schema.decodeUnknownOption(manifest.settings)({ maxResults: 0 }),
+      ),
+    ).toBe(false)
   })
 
   it('a watch defaults to the space’s criteria and ten companies a run', () => {
-    expect(z.parse(watchSettings, {})).toEqual({ criteria: '', cap: 10 })
-    expect(z.safeParse(watchSettings, { cap: 0 }).success).toBe(false)
-    expect(z.safeParse(watchSettings, { cap: 101 }).success).toBe(false)
+    expect(Schema.decodeUnknownSync(watchSettings)({})).toEqual({
+      criteria: '',
+      cap: 10,
+    })
+    expect(
+      Option.isSome(Schema.decodeUnknownOption(watchSettings)({ cap: 0 })),
+    ).toBe(false)
+    expect(
+      Option.isSome(Schema.decodeUnknownOption(watchSettings)({ cap: 101 })),
+    ).toBe(false)
   })
 
   it('has the version the package declares', () => {
-    const pkg = z
-      .object({ version: z.string() })
-      .parse(
-        JSON.parse(
-          readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
-        ),
-      )
-    expect(manifestSchema.parse(emitted).version).toBe(pkg.version)
+    const pkg = Schema.decodeUnknownSync(
+      Schema.Struct({ version: Schema.String }),
+    )(
+      JSON.parse(
+        readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+      ),
+    )
+    expect(Schema.decodeUnknownSync(manifestSchema)(emitted).version).toBe(
+      pkg.version,
+    )
   })
 })
 

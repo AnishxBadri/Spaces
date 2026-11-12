@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
 import type { SourceClass } from '@spaces/db/schema'
-import { manifestSchema } from '@spaces/sdk'
+import { decodeManifest } from '@spaces/sdk'
 import type { DomainEvent } from '@spaces/sdk'
 import { autoEnrichScopeOf, inScope } from '@spaces/core/plugins/auto-enrich'
 import type {
@@ -109,7 +109,7 @@ export const subscriptions = <TRow extends SubscriberRow>(
 ): ReadonlyArray<Subscription> => {
   const out: Array<Subscription> = []
   for (const row of rows) {
-    const parsed = manifestSchema.safeParse(row.manifest)
+    const parsed = decodeManifest(row.manifest)
     if (!parsed.success) continue
     const queues: Array<PluginQueueName> = []
     for (const [job, declared] of Object.entries(parsed.data.jobs)) {

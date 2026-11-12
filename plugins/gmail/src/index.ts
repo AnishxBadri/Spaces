@@ -1,4 +1,4 @@
-import { Effect, Redacted, Result } from 'effect'
+import { Effect, Option, Redacted, Result, Schema } from 'effect'
 import {
   ConnectionRefused,
   Content,
@@ -187,9 +187,11 @@ export const sync = Effect.fn('gmail.sync')(function* (input: ScheduleInput) {
   if (input.cursor === null) {
     // The mailbox's own history id, taken before the list: never older than
     // Gmail's retention, and mail arriving mid-run is in the next history.
-    const owner = profile.safeParse(yield* get(url('/users/me/profile')))
-    if (!owner.success) return yield* unreadable('a profile')
-    nextCursor = owner.data.historyId
+    const owner = Schema.decodeUnknownOption(profile)(
+      yield* get(url('/users/me/profile')),
+    )
+    if (Option.isNone(owner)) return yield* unreadable('a profile')
+    nextCursor = owner.value.historyId
     const ids: Array<string> = []
     let pageToken: string | undefined
     for (let pages = 0; ; pages++) {
@@ -197,7 +199,7 @@ export const sync = Effect.fn('gmail.sync')(function* (input: ScheduleInput) {
         return yield* new JobPermanent({
           reason: `Gmail paged past ${MAX_PAGES} pages`,
         })
-      const page = messagesPage.safeParse(
+      const page = Schema.decodeUnknownOption(messagesPage)(
         yield* get(
           url('/users/me/messages', {
             q: `after:${Math.floor(floor / 1000)}`,
@@ -206,10 +208,10 @@ export const sync = Effect.fn('gmail.sync')(function* (input: ScheduleInput) {
           }),
         ),
       )
-      if (!page.success) return yield* unreadable('a message list')
-      ids.push(...page.data.messages.map((m) => m.id))
-      if (page.data.nextPageToken === undefined) break
-      pageToken = page.data.nextPageToken
+      if (Option.isNone(page)) return yield* unreadable('a message list')
+      ids.push(...page.value.messages.map((m) => m.id))
+      if (page.value.nextPageToken === undefined) break
+      pageToken = page.value.nextPageToken
     }
     // Listed newest first; written oldest first, as they arrived.
     for (const id of ids.reverse()) entries.push({ id, through: null })
@@ -221,7 +223,7 @@ export const sync = Effect.fn('gmail.sync')(function* (input: ScheduleInput) {
         return yield* new JobPermanent({
           reason: `Gmail paged past ${MAX_PAGES} pages`,
         })
-      const page = historyPage.safeParse(
+      const page = Schema.decodeUnknownOption(historyPage)(
         yield* get(
           url('/users/me/history', {
             startHistoryId: input.cursor,
@@ -232,8 +234,8 @@ export const sync = Effect.fn('gmail.sync')(function* (input: ScheduleInput) {
           true,
         ),
       )
-      if (!page.success) return yield* unreadable('a history page')
-      for (const record of page.data.history)
+      if (Option.isNone(page)) return yield* unreadable('a history page')
+      for (const record of page.value.history)
         for (const added of record.messagesAdded) {
           // The history feed reports spam, trash and drafts too; the
           // first run's list never sees them, and neither does this.
@@ -244,9 +246,9 @@ export const sync = Effect.fn('gmail.sync')(function* (input: ScheduleInput) {
           if (!entries.some((e) => e.id === added.message.id))
             entries.push({ id: added.message.id, through: record.id })
         }
-      last = page.data.historyId
-      if (page.data.nextPageToken === undefined) break
-      pageToken = page.data.nextPageToken
+      last = page.value.historyId
+      if (page.value.nextPageToken === undefined) break
+      pageToken = page.value.nextPageToken
     }
     nextCursor = last
   }
@@ -257,9 +259,11 @@ export const sync = Effect.fn('gmail.sync')(function* (input: ScheduleInput) {
     message: RawMessage,
   ): Effect.fn.Return<Array<string>, Failure | JobError> {
     if (userLabels === null && message.labelIds.some(isUserLabel)) {
-      const listed = labelsList.safeParse(yield* get(url('/users/me/labels')))
-      if (!listed.success) return yield* unreadable('a label list')
-      userLabels = new Map(listed.data.labels.map((l) => [l.id, l.name]))
+      const listed = Schema.decodeUnknownOption(labelsList)(
+        yield* get(url('/users/me/labels')),
+      )
+      if (Option.isNone(listed)) return yield* unreadable('a label list')
+      userLabels = new Map(listed.value.labels.map((l) => [l.id, l.name]))
     }
     return labelNames(message.labelIds, userLabels ?? new Map())
   })
@@ -283,27 +287,27 @@ export const sync = Effect.fn('gmail.sync')(function* (input: ScheduleInput) {
     }
     if (part.status !== 200)
       return yield* refused(part.status, {}, part.body, false)
-    const message = rawMessage.safeParse(
+    const message = Schema.decodeUnknownOption(rawMessage)(
       yield* Effect.try({
         try: (): unknown => JSON.parse(part.body),
         catch: () => unreadable('a message'),
       }),
     )
-    if (!message.success) return yield* unreadable('a message')
-    const receivedAt = Number(message.data.internalDate)
-    if (receivedAt < floor || binned(message.data.labelIds)) {
+    if (Option.isNone(message)) return yield* unreadable('a message')
+    const receivedAt = Number(message.value.internalDate)
+    if (receivedAt < floor || binned(message.value.labelIds)) {
       counts.skipped++
       return
     }
-    const labels = yield* namesOf(message.data)
-    const snippet = snippetText(message.data.snippet)
+    const labels = yield* namesOf(message.value)
+    const snippet = snippetText(message.value.snippet)
     // One message the lane cannot file is skipped, in words, and the run
     // goes on: a message that always fails must not hold every later one.
     const result = yield* content
       .logEmail({
         _tag: 'email',
-        providerMessageId: message.data.id,
-        raw: message.data.raw,
+        providerMessageId: message.value.id,
+        raw: message.value.raw,
         receivedAt: new Date(receivedAt).toISOString(),
         labels,
         ...(snippet === undefined ? {} : { snippet }),

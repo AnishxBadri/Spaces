@@ -1,5 +1,4 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import {
   Facts,
   Http,
@@ -48,7 +47,7 @@ export default definePlugin({
           const raw = yield* responseJson(response, url).pipe(
             Effect.flatMap((body) =>
               Effect.try({
-                try: () => z.json().parse(body),
+                try: () => Schema.decodeUnknownSync(Schema.Json)(body),
                 catch: () => new JobPermanent({ reason: `${url}: not JSON` }),
               }),
             ),

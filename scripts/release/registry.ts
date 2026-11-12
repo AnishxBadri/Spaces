@@ -3,7 +3,7 @@ import type { KeyObject } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { Effect } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import * as prettier from 'prettier'
 import { loadPluginTrust } from '@spaces/core/plugins/trust'
 import type { PluginTrust } from '@spaces/core/plugins/verify'
@@ -40,8 +40,9 @@ export const artifactNames = (id: string, version: string) => {
   }
 }
 
-export const parseRegistry = (text: string): Array<RegistryEntry> =>
-  registrySchema.parse(JSON.parse(text))
+export const parseRegistry = (text: string): Array<RegistryEntry> => [
+  ...Schema.decodeUnknownSync(registrySchema)(JSON.parse(text)),
+]
 
 export const readRegistry = async (
   file: string,
@@ -209,12 +210,12 @@ export const checkRegistry = async (input: {
     const published = await input.artifacts(entry, names.entry)
     if (tarball === null || published === null) continue
 
-    const publishedEntry = registryEntrySchema.safeParse(
+    const publishedEntry = Schema.decodeUnknownOption(registryEntrySchema)(
       JSON.parse(new TextDecoder().decode(published)),
     )
-    if (!publishedEntry.success) {
+    if (Option.isNone(publishedEntry)) {
       problems.push(`${label}: the published ${names.entry} does not parse`)
-    } else if (canonical(publishedEntry.data) !== canonical(entry)) {
+    } else if (canonical(publishedEntry.value) !== canonical(entry)) {
       problems.push(
         `${label}: registry.json's entry differs from the published ${names.entry}`,
       )

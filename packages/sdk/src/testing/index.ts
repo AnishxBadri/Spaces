@@ -1,5 +1,5 @@
-import { Effect, Layer, Redacted } from 'effect'
-import type { z } from 'zod'
+import { Effect, Layer, Redacted, Result, SchemaParser } from 'effect'
+import type { Schema } from 'effect'
 import { JobPermanent, JobRateLimited } from '../contract.ts'
 import { normalizeDomain, normalizeEmail } from '../identity/normalize.ts'
 import type {
@@ -477,12 +477,12 @@ export const AiTest = (
   function complete<TResult>(
     lane: AiLane,
     items: ReadonlyArray<AiItem>,
-    schema: z.ZodType<TResult>,
+    schema: Schema.ConstraintDecoder<TResult>,
   ): Effect.Effect<TResult, JobError>
   function complete<TResult>(
     lane: AiLane,
     items: ReadonlyArray<AiItem>,
-    schema?: z.ZodType<TResult>,
+    schema?: Schema.ConstraintDecoder<TResult>,
   ): Effect.Effect<string | TResult, JobError> {
     const answer = options.answers?.[lane]
     if (schema === undefined)
@@ -493,9 +493,11 @@ export const AiTest = (
           answer?.text ?? `${lane} answer`,
         ),
       )
-    const parsed = schema.safeParse(answer?.object)
-    return parsed.success
-      ? Effect.sync(() => record('complete', input(lane, items), parsed.data))
+    const parsed = SchemaParser.decodeUnknownResult(schema)(answer?.object)
+    return Result.isSuccess(parsed)
+      ? Effect.sync(() =>
+          record('complete', input(lane, items), parsed.success),
+        )
       : Effect.fail(
           new JobPermanent({
             reason: `Ai.complete: no ${lane} answer the schema accepts`,

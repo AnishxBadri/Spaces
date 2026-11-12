@@ -1,5 +1,4 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import { Ai, Log, definePlugin } from '@spaces/sdk'
 import type { AiItem } from '@spaces/sdk'
 import { manifest } from './manifest.ts'
@@ -12,8 +11,8 @@ const ITEMS: ReadonlyArray<AiItem> = [
   },
 ]
 
-export const topic = z.object({
-  topic: z.enum(['funding', 'hiring', 'product', 'other']),
+export const topic = Schema.Struct({
+  topic: Schema.Literals(['funding', 'hiring', 'product', 'other']),
 })
 
 export default definePlugin({

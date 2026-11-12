@@ -1,4 +1,4 @@
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Schema } from 'effect'
 import { eq } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
@@ -14,7 +14,6 @@ import { workspace } from '@spaces/db/schema/workspace'
 import type { Json } from '@spaces/db/json'
 import { defineManifest, toManifestJson } from '@spaces/sdk'
 import type { DomainEvent } from '@spaces/sdk'
-import { z } from 'zod'
 import { jsonRecord, jsonValue } from '../../json'
 import { Enqueue } from '../../queue/enqueue'
 import { setValues } from '../attributes/values'
@@ -78,7 +77,7 @@ const apollo = toManifestJson(
     sdk: '^1.0',
     name: 'Apollo',
     description: 'Enrichment.',
-    settings: z.object({}),
+    settings: Schema.Struct({}),
     jobs: {
       enrichCompany: { trigger: 'action', uses: ['Read'] },
       onCompanyCreated: {

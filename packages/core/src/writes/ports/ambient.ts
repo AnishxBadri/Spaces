@@ -1,6 +1,5 @@
 import { Effect, Layer } from 'effect'
-import type { z } from 'zod'
-import type { Config, Http, Log, Secrets } from '@spaces/sdk'
+import type { Config, Http, Log, Secrets, SettingsSchema } from '@spaces/sdk'
 import { makeScrub } from './binding'
 import type { BoundIntegration } from './binding'
 import { ConfigLive } from './config'
@@ -17,8 +16,8 @@ import { SecretsLive, resolveBoundSecret } from './secrets'
  * the scrub LogLive and HttpLive write through. What the loader merges with the lane ports a job's `uses` names.
  */
 export type AmbientOptions = {
-  /** The bundle's own `manifest.settings` zod schema. */
-  readonly settings: z.ZodType
+  /** The bundle's own `manifest.settings` schema. */
+  readonly settings: SettingsSchema
   /** `manifest.http.rateLimit.rpm`. */
   readonly rpm?: number
   readonly fetch?: FetchLike

@@ -14,8 +14,7 @@
  * exits 0: an unconfigured nightly is not a red one.
  */
 import { readFileSync } from 'node:fs'
-import { Effect, Exit, Layer } from 'effect'
-import { z } from 'zod'
+import { Effect, Exit, Layer, Schema } from 'effect'
 import {
   HttpFetchTest,
   SecretsTest,
@@ -24,23 +23,26 @@ import {
 import type { StorageSourceFixture } from '@spaces/sdk/testing'
 import { driveSource } from '../src/drive.ts'
 
-const fixtureSchema = z.object({
-  dataRoom: z.object({
-    folderId: z.string(),
-    link: z.string(),
-    childIds: z.array(z.string()),
+const fixtureSchema = Schema.Struct({
+  dataRoom: Schema.Struct({
+    folderId: Schema.String,
+    link: Schema.String,
+    childIds: Schema.Array(Schema.String),
   }),
-  nativeDoc: z.object({
-    fileId: z.string(),
-    folderId: z.string(),
-    link: z.string(),
-    exportMime: z.string(),
+  nativeDoc: Schema.Struct({
+    fileId: Schema.String,
+    folderId: Schema.String,
+    link: Schema.String,
+    exportMime: Schema.String,
   }),
-  ancestry: z.array(
-    z.object({ folderId: z.string(), ancestorIds: z.array(z.string()) }),
+  ancestry: Schema.Array(
+    Schema.Struct({
+      folderId: Schema.String,
+      ancestorIds: Schema.Array(Schema.String),
+    }),
   ),
-  foreignLink: z.string(),
-  missingId: z.string(),
+  foreignLink: Schema.String,
+  missingId: Schema.String,
 })
 
 const token = process.env.GOOGLE_DRIVE_SANDBOX_TOKEN
@@ -53,7 +55,7 @@ const main = async (): Promise<number> => {
     )
     return 0
   }
-  const fixture: StorageSourceFixture = fixtureSchema.parse(
+  const fixture: StorageSourceFixture = Schema.decodeUnknownSync(fixtureSchema)(
     JSON.parse(readFileSync(fixturePath, 'utf8')),
   )
   const ports = Layer.merge(

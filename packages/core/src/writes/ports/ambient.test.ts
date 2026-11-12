@@ -1,7 +1,6 @@
-import { Effect, Exit, Fiber, Layer, Redacted } from 'effect'
+import { Effect, Exit, Fiber, Layer, Redacted, Schema } from 'effect'
 import { TestClock } from 'effect/testing'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
 import { Http, Log, Secrets, configOf } from '@spaces/sdk'
@@ -26,9 +25,13 @@ import type { LogLevel } from './log'
  * That the ports read no environment is the purity test's to enforce.
  */
 
-const settings = z.object({
-  greeting: z.string().default('hello'),
-  times: z.int().min(1).max(3).default(1),
+const settings = Schema.Struct({
+  greeting: Schema.String.pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed('hello')),
+  ),
+  times: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 3 })).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(1)),
+  ),
 })
 const manifest = { id: 'echo', settings } as const
 
@@ -134,10 +137,14 @@ describe('ConfigLive', () => {
   })
 
   /** rss's shape: two required settings with no default, one with. */
-  const required = z.object({
-    feedUrl: z.httpUrl(),
-    record: z.string(),
-    maxItems: z.int().default(20),
+  const required = Schema.Struct({
+    feedUrl: Schema.String.check(
+      Schema.makeFilter((text: string) => /^https?:\/\//.test(text)),
+    ),
+    record: Schema.String,
+    maxItems: Schema.Int.pipe(
+      Schema.withDecodingDefaultKey(Effect.succeed(20)),
+    ),
   })
   const reasonOf = async (config: BoundIntegration['config']) =>
     failureOf(
@@ -208,7 +215,7 @@ describe('SecretsLive', () => {
       Effect.gen(function* () {
         return Redacted.value(yield* (yield* Secrets).get())
       }).pipe(
-        Effect.provide(AmbientPortsLive(row, { settings: z.object({}) })),
+        Effect.provide(AmbientPortsLive(row, { settings: Schema.Struct({}) })),
       ),
     )
 
@@ -235,7 +242,7 @@ describe('SecretsLive', () => {
       Effect.gen(function* () {
         return yield* (yield* Secrets).accessToken()
       }).pipe(
-        Effect.provide(AmbientPortsLive(echo, { settings: z.object({}) })),
+        Effect.provide(AmbientPortsLive(echo, { settings: Schema.Struct({}) })),
       ),
     )
     expect(failureOf(token)._tag).toBe('NotConnected')
@@ -288,7 +295,7 @@ describe('LogLive', () => {
           AmbientPortsLive(
             bound({ capabilityId: 'apollo', credentialId: id }),
             {
-              settings: z.object({}),
+              settings: Schema.Struct({}),
               sink: (_level, line) => lines.push(line),
             },
           ),

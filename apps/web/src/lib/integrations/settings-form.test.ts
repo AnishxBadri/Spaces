@@ -1,5 +1,5 @@
+import { Effect, Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
@@ -21,12 +21,28 @@ import {
  * plugin build writes them into `manifest.json`.
  */
 
+const withDefault = Schema.withDecodingDefaultKey
+
+/** An email address, as a plugin's settings spell one for the form. */
+const email = Schema.String.annotate({ format: 'email' }).check(
+  Schema.makeFilter((s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)),
+)
+
+/** A URL, as a plugin's settings spell one for the form. */
+const url = Schema.String.annotate({ format: 'uri' }).check(
+  Schema.makeFilter((s: string) => URL.canParse(s)),
+)
+
 /** Apollo's settings, as its manifest authors them. */
 const apollo = settingsJsonSchema(
-  z.object({
-    cacheDays: z.int().min(0).max(3650).default(90),
-    dailyCreditCap: z.int().min(0).default(100),
-    autoEnrich: z.boolean().default(false),
+  Schema.Struct({
+    cacheDays: Schema.Int.check(
+      Schema.isBetween({ minimum: 0, maximum: 3650 }),
+    ).pipe(withDefault(Effect.succeed(90))),
+    dailyCreditCap: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(
+      withDefault(Effect.succeed(100)),
+    ),
+    autoEnrich: Schema.Boolean.pipe(withDefault(Effect.succeed(false))),
   }),
 )
 
@@ -39,7 +55,7 @@ const fieldsOf = (settings: unknown) => {
 describe('settingsFormOf', () => {
   it('draws a stored manifest in declaration order, though jsonb sorts its keys', async () => {
     const settings = settingsJsonSchema(
-      z.object({ z: z.string(), a: z.int(), m: z.boolean() }),
+      Schema.Struct({ z: Schema.String, a: Schema.Int, m: Schema.Boolean }),
     )
     const row = (
       await db
@@ -61,11 +77,17 @@ describe('settingsFormOf', () => {
         .from(integration)
         .where(eq(integration.id, row.id))
     ).at(0)?.manifest
-    const back = z.object({ settings: z.unknown() }).parse(stored).settings
+    const back = Schema.decodeUnknownSync(
+      Schema.Struct({ settings: Schema.Unknown }),
+    )(stored).settings
     // What Postgres hands back is sorted; the form still reads z, a, m.
     expect(
       Object.keys(
-        z.object({ properties: z.object({}).loose() }).parse(back).properties,
+        Schema.decodeUnknownSync(
+          Schema.Struct({
+            properties: Schema.Record(Schema.String, Schema.Unknown),
+          }),
+        )(back).properties,
       ),
     ).toEqual(['a', 'm', 'z'])
     expect(fieldsOf(back).map((f) => f.key)).toEqual(['z', 'a', 'm'])
@@ -83,14 +105,20 @@ describe('settingsFormOf', () => {
   it('draws string, number, boolean and enum fields in declaration order', () => {
     const fields = fieldsOf(
       settingsJsonSchema(
-        z.object({
-          region: z.enum(['us', 'eu']).default('us'),
-          label: z.string().min(2).describe('Shown on every receipt'),
-          ratio: z.number().gt(0),
-          cacheDays: z.int().min(0).max(3650).default(90),
-          live: z.boolean().default(true),
-          contact: z.email().optional(),
-          endpoint: z.url().optional(),
+        Schema.Struct({
+          region: Schema.Literals(['us', 'eu']).pipe(
+            withDefault(Effect.succeed('us' as const)),
+          ),
+          label: Schema.String.annotate({
+            description: 'Shown on every receipt',
+          }).check(Schema.isMinLength(2)),
+          ratio: Schema.Finite.check(Schema.isGreaterThan(0)),
+          cacheDays: Schema.Int.check(
+            Schema.isBetween({ minimum: 0, maximum: 3650 }),
+          ).pipe(withDefault(Effect.succeed(90))),
+          live: Schema.Boolean.pipe(withDefault(Effect.succeed(true))),
+          contact: Schema.optionalKey(email),
+          endpoint: Schema.optionalKey(url),
         }),
       ),
     )
@@ -127,22 +155,37 @@ describe('settingsFormOf', () => {
 
   it('draws a plugin with no settings as no fields', () => {
     expect(settingsFormOf({})).toEqual({ ok: true, fields: [] })
-    expect(settingsFormOf(settingsJsonSchema(z.object({})))).toEqual({
+    expect(settingsFormOf(settingsJsonSchema(Schema.Struct({})))).toEqual({
       ok: true,
       fields: [],
     })
   })
 
   it.each([
-    ['an array', z.object({ feeds: z.array(z.string()) }), 'feeds', 'array'],
+    [
+      'an array',
+      Schema.Struct({ feeds: Schema.Array(Schema.String) }),
+      'feeds',
+      'array',
+    ],
     [
       'an object',
-      z.object({ auth: z.object({ user: z.string() }) }),
+      Schema.Struct({ auth: Schema.Struct({ user: Schema.String }) }),
       'auth',
       'object',
     ],
-    ['a nullable', z.object({ note: z.string().nullable() }), 'note', ''],
-    ['a number enum', z.object({ level: z.literal([1, 2]) }), 'level', ''],
+    [
+      'a nullable',
+      Schema.Struct({ note: Schema.NullOr(Schema.String) }),
+      'note',
+      '',
+    ],
+    [
+      'a number enum',
+      Schema.Struct({ level: Schema.Literals([1, 2]) }),
+      'level',
+      '',
+    ],
   ])('refuses %s, naming the setting', (_, schema, key, type) => {
     const form = settingsFormOf(settingsJsonSchema(schema))
     expect(form.ok).toBe(false)
@@ -216,7 +259,9 @@ describe('checkSettings', () => {
       values: { cacheDays: undefined },
     })
     const required = fieldsOf(
-      settingsJsonSchema(z.object({ label: z.string(), tier: z.enum(['a']) })),
+      settingsJsonSchema(
+        Schema.Struct({ label: Schema.String, tier: Schema.Literals(['a']) }),
+      ),
     )
     expect(checkSettings(required, { label: '', tier: '' })).toEqual({
       ok: false,
@@ -231,14 +276,14 @@ describe('checkSettings', () => {
   it('checks string length, pattern and format', () => {
     const strings = fieldsOf(
       settingsJsonSchema(
-        z.object({
-          code: z
-            .string()
-            .min(2)
-            .max(4)
-            .regex(/^[A-Z]+$/),
-          contact: z.email().optional(),
-          endpoint: z.url().optional(),
+        Schema.Struct({
+          code: Schema.String.check(
+            Schema.isMinLength(2),
+            Schema.isMaxLength(4),
+            Schema.isPattern(/^[A-Z]+$/),
+          ),
+          contact: Schema.optionalKey(email),
+          endpoint: Schema.optionalKey(url),
         }),
       ),
     )

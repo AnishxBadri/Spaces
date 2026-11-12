@@ -1,39 +1,45 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Option, Schema } from 'effect'
 import { Content, JobPermanent, Log, definePlugin } from '@spaces/sdk'
 import type { JsonValue, RecordedNote } from '@spaces/sdk'
 import { manifest } from './manifest.ts'
 
+const invitee = Schema.Struct({
+  email: Schema.NonEmptyString,
+  name: Schema.optional(Schema.String),
+})
+
 /** Fathom's "new meeting content" delivery — what this fixture reads of it. */
-const fathom = z.object({
-  recording_id: z.number().int(),
-  title: z.string(),
-  url: z.string().min(1),
-  share_url: z.string().min(1).optional(),
-  recording_start_time: z.string().min(1),
-  recording_end_time: z.string().min(1).optional(),
-  calendar_invitees: z
-    .array(z.object({ email: z.string().min(1), name: z.string().optional() }))
-    .default([]),
-  default_summary: z.object({ markdown_formatted: z.string() }).nullish(),
+const fathom = Schema.Struct({
+  recording_id: Schema.Int,
+  title: Schema.String,
+  url: Schema.NonEmptyString,
+  share_url: Schema.optional(Schema.NonEmptyString),
+  recording_start_time: Schema.NonEmptyString,
+  recording_end_time: Schema.optional(Schema.NonEmptyString),
+  calendar_invitees: Schema.Array(invitee).pipe(
+    Schema.withDecodingDefault(Effect.succeed([])),
+  ),
+  default_summary: Schema.optional(
+    Schema.NullOr(Schema.Struct({ markdown_formatted: Schema.String })),
+  ),
 })
 
 /** tl;dv's `MeetingReady` delivery. */
-const tldv = z.object({
-  id: z.string().min(1),
-  event: z.literal('MeetingReady'),
-  data: z.object({
-    id: z.string().min(1),
-    name: z.string(),
-    happenedAt: z.string().min(1),
-    duration: z.number().nonnegative().optional(),
-    url: z.string().min(1),
-    invitees: z
-      .array(
-        z.object({ email: z.string().min(1), name: z.string().optional() }),
-      )
-      .default([]),
-    notes: z.string().optional(),
+const tldv = Schema.Struct({
+  id: Schema.NonEmptyString,
+  event: Schema.Literal('MeetingReady'),
+  data: Schema.Struct({
+    id: Schema.NonEmptyString,
+    name: Schema.String,
+    happenedAt: Schema.NonEmptyString,
+    duration: Schema.optional(
+      Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),
+    ),
+    url: Schema.NonEmptyString,
+    invitees: Schema.Array(invitee).pipe(
+      Schema.withDecodingDefault(Effect.succeed([])),
+    ),
+    notes: Schema.optional(Schema.String),
   }),
 })
 
@@ -46,9 +52,9 @@ const plus = (iso: string, seconds: number) =>
  * delivery that is neither shape.
  */
 export const toRecordedNote = (payload: JsonValue): RecordedNote | null => {
-  const f = fathom.safeParse(payload)
-  if (f.success) {
-    const d = f.data
+  const f = Schema.decodeUnknownOption(fathom)(payload)
+  if (Option.isSome(f)) {
+    const d = f.value
     const summary = d.default_summary?.markdown_formatted
     return {
       _tag: 'recorded-note',
@@ -68,9 +74,9 @@ export const toRecordedNote = (payload: JsonValue): RecordedNote | null => {
       raw: payload,
     }
   }
-  const t = tldv.safeParse(payload)
-  if (t.success) {
-    const d = t.data.data
+  const t = Schema.decodeUnknownOption(tldv)(payload)
+  if (Option.isSome(t)) {
+    const d = t.value.data
     return {
       _tag: 'recorded-note',
       providerNoteId: `tldv:${d.id}`,

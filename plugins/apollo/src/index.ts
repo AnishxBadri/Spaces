@@ -1,5 +1,4 @@
-import { Effect, Redacted } from 'effect'
-import { z } from 'zod'
+import { Effect, Redacted, Schema } from 'effect'
 import {
   Content,
   Facts,
@@ -82,7 +81,7 @@ const callApollo = Effect.fn('apollo.call')(function* (
   }
   const body = yield* responseJson(response, `Apollo ${endpoint}`)
   return yield* Effect.try({
-    try: (): JsonValue => z.json().parse(body),
+    try: (): JsonValue => Schema.decodeUnknownSync(Schema.Json)(body),
     catch: () =>
       new JobPermanent({ reason: `Apollo ${endpoint} returned no JSON` }),
   })

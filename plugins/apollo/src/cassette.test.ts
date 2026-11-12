@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import {
   apolloMessage,
@@ -15,20 +15,22 @@ import { fixtureText } from './test-fixtures.ts'
  * and no other key, and nothing in it is key material.
  */
 
-const cassette = z
-  .object({
-    keyHeader: z.string(),
-    interactions: z.array(
-      z.object({
-        method: z.string(),
-        url: z.url(),
-        status: z.int(),
-        file: z.string(),
+const cassette = Schema.decodeUnknownSync(
+  Schema.Struct({
+    keyHeader: Schema.String,
+    interactions: Schema.Array(
+      Schema.Struct({
+        method: Schema.String,
+        url: Schema.String.check(
+          Schema.makeFilter((url: string) => URL.canParse(url)),
+        ),
+        status: Schema.Int,
+        file: Schema.String,
       }),
     ),
-    revoked: z.object({ status: z.int(), file: z.string() }),
-  })
-  .parse(JSON.parse(fixtureText('cassette/cassette.json')))
+    revoked: Schema.Struct({ status: Schema.Int, file: Schema.String }),
+  }),
+)(JSON.parse(fixtureText('cassette/cassette.json')))
 
 /** A response file with its `{{name}}` placeholders filled from `SAMPLE`. */
 const answer = (file: string): unknown =>
@@ -55,7 +57,9 @@ describe('the Apollo cassette', () => {
   it.each(cassette.interactions.map((i): [string, typeof i] => [i.url, i]))(
     '%s maps through the plugin’s own reader',
     (_url, interaction) => {
-      const raw = z.json().parse(answer(interaction.file))
+      const raw = Schema.decodeUnknownSync(Schema.Json)(
+        answer(interaction.file),
+      )
       const read = interaction.url.includes('/organizations/enrich')
         ? organizationEnrichment('entity-1', raw)
         : personEnrichment('entity-1', raw)
@@ -70,7 +74,7 @@ describe('the Apollo cassette', () => {
     if (wildcard === undefined) throw new Error('no wildcard organization')
     const read = organizationEnrichment(
       'entity-1',
-      z.json().parse(answer(wildcard.file)),
+      Schema.decodeUnknownSync(Schema.Json)(answer(wildcard.file)),
     )
     expect(read.matched).toBe(true)
     expect(read.alias?.keys).toEqual({ domain: SAMPLE.get('domain') })
@@ -83,7 +87,7 @@ describe('the Apollo cassette', () => {
     if (wildcard === undefined) throw new Error('no wildcard person')
     const read = personEnrichment(
       'entity-1',
-      z.json().parse(answer(wildcard.file)),
+      Schema.decodeUnknownSync(Schema.Json)(answer(wildcard.file)),
     )
     expect(read.alias?.keys).toEqual({ email: SAMPLE.get('email') })
   })

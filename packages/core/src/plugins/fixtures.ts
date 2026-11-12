@@ -64,7 +64,7 @@ export const fixturePlugin = (input: FixtureInput): FixturePlugin => {
     manifestVersion: 1,
     id: input.id,
     version: input.version,
-    sdk: '^1.0',
+    sdk: '^2.0',
     name: `${input.id.charAt(0).toUpperCase()}${input.id.slice(1)}`,
     description: `The ${input.id} fixture.`,
     settings: { type: 'object', properties: {} },

@@ -1,5 +1,4 @@
-import { Effect, Exit } from 'effect'
-import { z } from 'zod'
+import { Effect, Exit, Schema } from 'effect'
 import { readEntity, testPorts } from '@spaces/sdk/testing'
 import type { RecordedCall } from '@spaces/sdk/testing'
 import type { ReadEntity } from '@spaces/sdk'
@@ -224,7 +223,9 @@ describe('enrichCompany', () => {
       const body = fixture(name)
       const ports = portsFor(company, ORG_URL, { status, body })
       const exit = await run(jobs.enrichCompany, ports)
-      const sentence = z.object({ error: z.string() }).parse(body).error
+      const sentence = Schema.decodeUnknownSync(
+        Schema.Struct({ error: Schema.String }),
+      )(body).error
       const failure = JSON.stringify(failureOf(exit))
       expect(failure).toContain('JobPermanent')
       expect(failure).toContain(

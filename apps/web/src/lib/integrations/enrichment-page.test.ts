@@ -1,7 +1,6 @@
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { eq } from 'drizzle-orm'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { attributeEvent, entity, integration, space } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
@@ -44,10 +43,16 @@ const manifestFor = (id: string, name: string) =>
           name,
           roles: ['enrichment'],
           description: `${name} enrichment.`,
-          settings: z.object({
-            cacheDays: z.int().min(0).default(90),
-            dailyCreditCap: z.int().min(0).default(100),
-            phone: z.boolean().default(false),
+          settings: Schema.Struct({
+            cacheDays: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(
+              Schema.withDecodingDefaultKey(Effect.succeed(90)),
+            ),
+            dailyCreditCap: Schema.Int.check(
+              Schema.isGreaterThanOrEqualTo(0),
+            ).pipe(Schema.withDecodingDefaultKey(Effect.succeed(100))),
+            phone: Schema.Boolean.pipe(
+              Schema.withDecodingDefaultKey(Effect.succeed(false)),
+            ),
           }),
           jobs: {
             enrichCompany: { trigger: 'action', uses: ['Facts'] },

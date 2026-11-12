@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { manifestSchema } from '@spaces/sdk'
+import { decodeManifest } from '@spaces/sdk'
 import { autoEnrichScopeOf } from '@spaces/core/plugins/auto-enrich'
 import type { AutoEnrichScope } from '@spaces/core/plugins/auto-enrich'
 import type { Json } from '@spaces/db/json'
@@ -73,7 +73,7 @@ export const enrichActionFor = (
   manifest: unknown,
   kind: 'company' | 'person',
 ): EnrichAction | null => {
-  const parsed = manifestSchema.safeParse(manifest)
+  const parsed = decodeManifest(manifest)
   if (!parsed.success) return null
   const action = (parsed.data.actions ?? []).find(
     (a) => a.on === kind && a.id.startsWith('enrich'),

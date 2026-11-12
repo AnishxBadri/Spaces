@@ -335,7 +335,7 @@ describe('SPACES_PLUGINS_AUTOUPDATE', () => {
     const registryFile = registry([
       v1.entry,
       v2.entry,
-      { ...v2.entry, version: '0.3.0', sdk: '^2.0' },
+      { ...v2.entry, version: '0.3.0', sdk: '^3.0' },
     ])
     const lines: Array<string> = []
 

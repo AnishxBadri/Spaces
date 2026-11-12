@@ -1,9 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { Clock, Effect, Layer } from 'effect'
+import { Clock, Effect, Layer, Schema } from 'effect'
 import { TestClock } from 'effect/testing'
 import { eq, isNotNull, like } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { enrichmentRecord, entity, integration } from '@spaces/db/schema'
 import { defineManifest, toManifestJson } from '@spaces/sdk'
@@ -72,7 +71,7 @@ const manifest = jsonRecord(
         sdk: '^1.3',
         name: 'Apollo',
         description: 'A paid source.',
-        settings: z.object({}),
+        settings: Schema.Struct({}),
         jobs: { enrichCompany: { trigger: 'action', uses: ['Facts'] } },
         actions: [
           {

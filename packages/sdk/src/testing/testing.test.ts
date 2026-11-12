@@ -1,6 +1,5 @@
-import { Effect, Exit, Redacted } from 'effect'
+import { Effect, Exit, Redacted, Schema } from 'effect'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { z } from 'zod'
 import type { PortName } from '../contract.ts'
 import {
   Ai,
@@ -461,7 +460,9 @@ describe('AiTest', () => {
   })
 
   it('parses a structured answer with the schema, and fails when it does not fit', () => {
-    const schema = z.object({ label: z.enum(['funding', 'other']) })
+    const schema = Schema.Struct({
+      label: Schema.Literals(['funding', 'other']),
+    })
     const ai = AiTest({
       answers: { classify: { object: { label: 'funding' } } },
     })
@@ -514,7 +515,11 @@ describe('SpacesTest', () => {
 })
 
 describe('watchSettingsOf', () => {
-  const job = { settings: z.object({ cap: z.int().default(25) }) }
+  const job = {
+    settings: Schema.Struct({
+      cap: Schema.Int.pipe(Schema.withDecodingDefaultKey(Effect.succeed(25))),
+    }),
+  }
 
   it("parses a watch's settings by the job's schema, defaults applied", () => {
     expect(
@@ -570,7 +575,10 @@ describe('makeFakeCalendarApi', () => {
         headers: { Authorization: `Bearer ${api.accessToken}` },
       },
     )
-    return { status: res.status, body: z.json().parse(await res.json()) }
+    return {
+      status: res.status,
+      body: Schema.decodeUnknownSync(Schema.Json)(await res.json()),
+    }
   }
 
   it('filters a full list on timeMin, and without one lists all of history', async () => {
@@ -589,9 +597,9 @@ describe('makeFakeCalendarApi', () => {
   it('answers 410 to an expired sync token, 400 to a token with a filter, 401 once revoked', async () => {
     const api = makeFakeCalendarApi()
     const first = await list(api, 'singleEvents=true')
-    const token = z
-      .object({ nextSyncToken: z.string() })
-      .parse(first.body).nextSyncToken
+    const token = Schema.decodeUnknownSync(
+      Schema.Struct({ nextSyncToken: Schema.String }),
+    )(first.body).nextSyncToken
     expect(
       (await list(api, `singleEvents=true&syncToken=${token}&timeMin=x`))
         .status,
@@ -615,7 +623,10 @@ describe('makeFakeGmailApi', () => {
       method: 'GET',
       headers: { Authorization: `Bearer ${api.accessToken}` },
     })
-    return { status: res.status, body: z.json().parse(await res.json()) }
+    return {
+      status: res.status,
+      body: Schema.decodeUnknownSync(Schema.Json)(await res.json()),
+    }
   }
 
   it('bounds a list on after:, and without one lists all of history', async () => {
@@ -650,11 +661,9 @@ describe('makeFakeGmailApi', () => {
     const text = await res.text()
     expect(res.headers.get('content-type')).toContain('multipart/mixed')
     expect(text).toContain('HTTP/1.1 200 OK')
-    const raw = z
-      .object({ raw: z.string() })
-      .parse(
-        JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)),
-      ).raw
+    const raw = Schema.decodeUnknownSync(Schema.Struct({ raw: Schema.String }))(
+      JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)),
+    ).raw
     expect(fromBase64Url(raw)).toContain(
       'Message-ID: <acme-q3@acme-robotics.example>',
     )

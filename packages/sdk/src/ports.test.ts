@@ -1,6 +1,5 @@
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { PORT_NAMES } from './contract.ts'
 import * as sdk from './index.ts'
 import { defineManifest } from './manifest.ts'
@@ -55,7 +54,11 @@ describe('configOf', () => {
     sdk: '^1.0',
     name: 'Exa',
     description: 'Web research.',
-    settings: z.object({ maxResults: z.int().default(5) }),
+    settings: Schema.Struct({
+      maxResults: Schema.Int.pipe(
+        Schema.withDecodingDefaultKey(Effect.succeed(5)),
+      ),
+    }),
     jobs: { research: { trigger: 'action', uses: ['Config'] } },
   })
 
@@ -86,7 +89,7 @@ describe("a job's R is bounded by its uses (D51)", () => {
     sdk: '^1.0',
     name: 'Bounded',
     description: 'Declares Identity only.',
-    settings: z.object({}),
+    settings: Schema.Struct({}),
     jobs: { enrich: { trigger: 'action', uses: ['Identity'] } },
   })
 
@@ -133,7 +136,7 @@ describe('a file job granted Import, and one it is withheld from', () => {
     sdk: '^1.1',
     name: 'Dialect',
     description: 'Hands core a grid.',
-    settings: z.object({}),
+    settings: Schema.Struct({}),
     jobs: {
       read: { trigger: 'file', uses: ['Import'] },
       readWithout: { trigger: 'file', uses: ['Log'] },

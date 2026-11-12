@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { defineManifest } from '@spaces/sdk'
 
 /**
@@ -10,12 +10,12 @@ export const manifest = defineManifest({
   manifestVersion: 1,
   id: 'recorder-webhook',
   version: '0.1.0',
-  sdk: '^1.4',
+  sdk: '^2.0',
   name: 'Recorder webhook',
   roles: ['meeting-notes'],
   description:
     'A fixture plugin: a webhook job that hands each signed Fathom or tl;dv delivery to the host as a recorded note.',
-  settings: z.object({}),
+  settings: Schema.Struct({}),
   jobs: {
     ingest: { trigger: 'webhook', uses: ['Content', 'Log'] },
   },

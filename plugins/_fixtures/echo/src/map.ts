@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import type {
   EntityId,
   FactClaim,
@@ -12,17 +12,19 @@ import type {
  * organization-enrich response, the fields this fixture reads and nothing
  * more. Parsed, never trusted: an absent field is simply not claimed.
  */
-const organizationResponse = z.object({
-  organization: z.object({
-    name: z.string().min(1),
-    primary_domain: z.string().min(1).nullish(),
-    linkedin_url: z.string().min(1).nullish(),
-    founded_year: z.int().nullish(),
-    short_description: z.string().min(1).nullish(),
-    city: z.string().min(1).nullish(),
-    country: z.string().min(1).nullish(),
+const organizationResponse = Schema.Struct({
+  organization: Schema.Struct({
+    name: Schema.NonEmptyString,
+    primary_domain: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
+    linkedin_url: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
+    founded_year: Schema.optional(Schema.NullOr(Schema.Int)),
+    short_description: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
+    city: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
+    country: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
   }),
-  credits_consumed: z.int().nonnegative().nullish(),
+  credits_consumed: Schema.optional(
+    Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
+  ),
 })
 
 /**
@@ -34,7 +36,7 @@ const organizationResponse = z.object({
  */
 export const toClaims = (raw: JsonValue) => {
   const { organization: org, credits_consumed } =
-    organizationResponse.parse(raw)
+    Schema.decodeUnknownSync(organizationResponse)(raw)
   const location = [org.city, org.country].filter(Boolean).join(', ')
 
   const identity: IdentityClaim = {

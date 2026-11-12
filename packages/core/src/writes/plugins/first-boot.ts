@@ -2,12 +2,12 @@ import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
-import { manifestSchema } from '@spaces/sdk'
+import { decodeManifest } from '@spaces/sdk'
 import { registryEntrySchema } from '@spaces/sdk/pack'
 import type { RegistryEntry } from '@spaces/sdk/pack'
 import { compareVersions, newestPerPlugin } from '@spaces/core/plugins/registry'
@@ -267,9 +267,9 @@ const readBundled = Effect.fn('readBundled')(function* (dir: string) {
       const tarball = new Uint8Array(await readFile(path.join(dir, name)))
       const signed = path.join(dir, `${id}-${version}.json`)
       if (existsSync(signed)) {
-        const entry: EntryToVerify = registryEntrySchema.parse(
-          JSON.parse(await readFile(signed, 'utf8')),
-        )
+        const entry: EntryToVerify = Schema.decodeUnknownSync(
+          registryEntrySchema,
+        )(JSON.parse(await readFile(signed, 'utf8')))
         return { tarball, entry }
       }
       const sha256 = createHash('sha256').update(tarball).digest('hex')
@@ -367,7 +367,7 @@ const seedOne = Effect.fn('seedOne')(function* (seed: SeedCredential) {
   if (!PLUGIN_ID.test(pluginId)) return yield* skip('not a plugin id')
   const row = (yield* liveRows([pluginId])).at(0)
   if (row === undefined) return yield* skip(`${pluginId} is not installed`)
-  const manifest = manifestSchema.safeParse(row.manifest)
+  const manifest = decodeManifest(row.manifest)
   const kind = manifest.success
     ? manifest.data.requires?.credential?.kind
     : undefined

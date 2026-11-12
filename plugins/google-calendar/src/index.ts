@@ -1,4 +1,4 @@
-import { Effect, Redacted } from 'effect'
+import { Effect, Option, Redacted, Schema } from 'effect'
 import {
   ConnectionRefused,
   Content,
@@ -123,16 +123,18 @@ export const sync = Effect.fn('googleCalendar.sync')(function* (
     })
     if (response.status !== 200)
       return yield* refused(response, input.cursor !== null)
-    const page = eventsPage.safeParse(yield* responseJson(response, url))
-    if (!page.success) {
+    const page = Schema.decodeUnknownOption(eventsPage)(
+      yield* responseJson(response, url),
+    )
+    if (Option.isNone(page)) {
       return yield* new JobPermanent({
         reason: 'Google Calendar returned a page this plugin cannot read',
       })
     }
-    for (const item of page.data.items) {
-      const event = calendarEvent.safeParse(item)
-      const mapped: Mapped = event.success
-        ? mapEvent(event.data, connectedAt)
+    for (const item of page.value.items) {
+      const event = Schema.decodeUnknownOption(calendarEvent)(item)
+      const mapped: Mapped = Option.isSome(event)
+        ? mapEvent(event.value, connectedAt)
         : { _tag: 'skip', reason: 'unreadable' }
       if (mapped._tag === 'skip') {
         counts.skipped++
@@ -141,11 +143,11 @@ export const sync = Effect.fn('googleCalendar.sync')(function* (
       const result = yield* content.logMeeting(mapped.claim)
       counts[result.outcome]++
     }
-    if (page.data.nextPageToken !== undefined) {
-      pageToken = page.data.nextPageToken
+    if (page.value.nextPageToken !== undefined) {
+      pageToken = page.value.nextPageToken
       continue
     }
-    if (page.data.nextSyncToken === undefined) {
+    if (page.value.nextSyncToken === undefined) {
       return yield* new JobPermanent({
         reason: 'Google Calendar ended a list without a sync token',
       })
@@ -154,7 +156,7 @@ export const sync = Effect.fn('googleCalendar.sync')(function* (
       from: 'syncToken' in from ? 'sync token' : `connectedAt ${connectedAt}`,
       ...counts,
     })
-    return { nextCursor: page.data.nextSyncToken }
+    return { nextCursor: page.value.nextSyncToken }
   }
   return yield* new JobPermanent({
     reason: `Google Calendar paged past ${MAX_PAGES} pages`,

@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { normalizeDomain } from '@spaces/sdk/identity'
 import type {
   DiscoverClaim,
@@ -42,12 +42,12 @@ export type WatchSettings = {
  * - `lastItemId` is the last item handed on from that page, so a page read
  *   again skips what was already handed on and takes only what Exa added.
  */
-export const watchState = z.object({
-  websetId: z.string().min(1),
-  cursor: z.string().min(1).nullable(),
-  lastItemId: z.string().min(1).nullable(),
+export const watchState = Schema.Struct({
+  websetId: Schema.NonEmptyString,
+  cursor: Schema.NullOr(Schema.NonEmptyString),
+  lastItemId: Schema.NullOr(Schema.NonEmptyString),
 })
-export type WatchState = z.output<typeof watchState>
+export type WatchState = typeof watchState.Type
 
 /** The criteria the watch runs on: its own, else the space's, else none. */
 export const criteriaOf = (
@@ -128,46 +128,56 @@ export const createBody = (
 }
 
 /** Exa's webset — the field this plugin reads. */
-const webset = z.object({ id: z.string().min(1) })
+const webset = Schema.Struct({ id: Schema.NonEmptyString })
 
-export const websetId = (raw: unknown): string => webset.parse(raw).id
+export const websetId = (raw: unknown): string =>
+  Schema.decodeUnknownSync(webset)(raw).id
 
-const reference = z.object({
-  url: z.string().min(1),
-  title: z.string().min(1).nullish(),
+const reference = Schema.Struct({
+  url: Schema.NonEmptyString,
+  title: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
 })
 
 /**
  * One webset item — the fields this plugin reads. Parsed, never trusted: an
  * absent or null field is simply not claimed.
  */
-const websetItem = z.object({
-  id: z.string().min(1),
-  properties: z.object({
-    url: z.string().min(1),
-    description: z.string().nullish(),
-    company: z.object({ name: z.string().min(1).nullish() }).nullish(),
+const websetItem = Schema.Struct({
+  id: Schema.NonEmptyString,
+  properties: Schema.Struct({
+    url: Schema.NonEmptyString,
+    description: Schema.optional(Schema.NullOr(Schema.String)),
+    company: Schema.optional(
+      Schema.NullOr(
+        Schema.Struct({
+          name: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
+        }),
+      ),
+    ),
   }),
-  evaluations: z
-    .array(
-      z.object({
-        criterion: z.string().nullish(),
-        satisfied: z.string().nullish(),
-        references: z.array(reference).nullish(),
-      }),
-    )
-    .nullish(),
+  evaluations: Schema.optional(
+    Schema.NullOr(
+      Schema.Array(
+        Schema.Struct({
+          criterion: Schema.optional(Schema.NullOr(Schema.String)),
+          satisfied: Schema.optional(Schema.NullOr(Schema.String)),
+          references: Schema.optional(Schema.NullOr(Schema.Array(reference))),
+        }),
+      ),
+    ),
+  ),
 })
-export type Item = z.output<typeof websetItem>
+export type Item = typeof websetItem.Type
 
-const itemsPage = z.object({
-  data: z.array(websetItem),
-  hasMore: z.boolean(),
-  nextCursor: z.string().min(1).nullish(),
+const itemsPage = Schema.Struct({
+  data: Schema.Array(websetItem),
+  hasMore: Schema.Boolean,
+  nextCursor: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
 })
-export type ItemsPage = z.output<typeof itemsPage>
+export type ItemsPage = typeof itemsPage.Type
 
-export const readPage = (raw: unknown): ItemsPage => itemsPage.parse(raw)
+export const readPage = (raw: unknown): ItemsPage =>
+  Schema.decodeUnknownSync(itemsPage)(raw)
 
 /** The page's items after `lastItemId`; all of them when it is not there. */
 export const itemsAfter = (

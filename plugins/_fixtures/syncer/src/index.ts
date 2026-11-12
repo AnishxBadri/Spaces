@@ -1,5 +1,4 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import {
   Content,
   Http,
@@ -21,33 +20,33 @@ const pageUrl = (cursor: string | null) =>
     ? MESSAGES_URL
     : `${MESSAGES_URL}?cursor=${encodeURIComponent(cursor)}`
 
-const address = z.object({
-  email: z.string().min(1),
-  name: z.string().min(1).nullish(),
+const address = Schema.Struct({
+  email: Schema.NonEmptyString,
+  name: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
 })
 
 /** One page of the provider's answer — the fields this fixture reads. */
-const messagesPage = z.object({
-  messages: z.array(
-    z.object({
-      id: z.string().min(1),
-      threadId: z.string().min(1).nullish(),
-      subject: z.string().nullish(),
-      date: z.string().min(1),
+const messagesPage = Schema.Struct({
+  messages: Schema.Array(
+    Schema.Struct({
+      id: Schema.NonEmptyString,
+      threadId: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
+      subject: Schema.optional(Schema.NullOr(Schema.String)),
+      date: Schema.NonEmptyString,
       from: address,
-      to: z.array(address).default([]),
-      snippet: z.string().nullish(),
+      to: Schema.Array(address).pipe(
+        Schema.withDecodingDefault(Effect.succeed([])),
+      ),
+      snippet: Schema.optional(Schema.NullOr(Schema.String)),
     }),
   ),
-  nextCursor: z.string().min(1).nullable(),
+  nextCursor: Schema.NullOr(Schema.NonEmptyString),
 })
 
-export type MessagesPage = z.output<typeof messagesPage>
+export type MessagesPage = typeof messagesPage.Type
 
 /** The pure half: a participant → the identity claim that names them. */
-export const participantClaim = (
-  who: z.output<typeof address>,
-): IdentityClaim => ({
+export const participantClaim = (who: typeof address.Type): IdentityClaim => ({
   kind: 'person',
   keys: { email: who.email },
   ...(who.name == null ? {} : { name: who.name }),
@@ -74,7 +73,7 @@ export default definePlugin({
         }
         const raw = yield* responseJson(response, url)
         const page = yield* Effect.try({
-          try: () => messagesPage.parse(raw),
+          try: () => Schema.decodeUnknownSync(messagesPage)(raw),
           catch: () =>
             new JobPermanent({ reason: `${url} did not return a page` }),
         })

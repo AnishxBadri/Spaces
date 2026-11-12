@@ -1,5 +1,4 @@
-import { Effect, Redacted } from 'effect'
-import { z } from 'zod'
+import { Effect, Option, Redacted, Schema } from 'effect'
 import {
   AuthExpired,
   CursorExpired,
@@ -126,84 +125,88 @@ export const mimeOf = (name: string): string => {
 // Box's JSON
 // ---------------------------------------------------------------------------
 
-const boxItem = z.object({
-  type: z.string(),
-  id: z.string(),
-  name: z.string().optional(),
-  size: z.number().nullable().optional(),
-  modified_at: z.string().nullable().optional(),
-  etag: z.string().nullable().optional(),
+const boxItem = Schema.Struct({
+  type: Schema.String,
+  id: Schema.String,
+  name: Schema.optional(Schema.String),
+  size: Schema.optional(Schema.NullOr(Schema.Finite)),
+  modified_at: Schema.optional(Schema.NullOr(Schema.String)),
+  etag: Schema.optional(Schema.NullOr(Schema.String)),
   /** Read only by `putFile`'s collision check; never surfaced. */
-  sha1: z.string().nullable().optional(),
-  parent: z.object({ id: z.string() }).nullable().optional(),
-  item_status: z.string().optional(),
-  extension: z.string().optional(),
-  path_collection: z
-    .object({
-      entries: z.array(z.object({ id: z.string(), name: z.string() })),
-    })
-    .optional(),
+  sha1: Schema.optional(Schema.NullOr(Schema.String)),
+  parent: Schema.optional(Schema.NullOr(Schema.Struct({ id: Schema.String }))),
+  item_status: Schema.optional(Schema.String),
+  extension: Schema.optional(Schema.String),
+  path_collection: Schema.optional(
+    Schema.Struct({
+      entries: Schema.Array(
+        Schema.Struct({ id: Schema.String, name: Schema.String }),
+      ),
+    }),
+  ),
 })
-type BoxItem = z.output<typeof boxItem>
+type BoxItem = typeof boxItem.Type
 
-const folderItems = z.object({
-  entries: z.array(boxItem),
-  next_marker: z.string().nullable().optional(),
-})
-
-const representation = z.object({
-  representation: z.string(),
-  info: z.object({ url: z.string() }),
-  status: z.object({ state: z.string() }),
-  content: z.object({ url_template: z.string() }),
+const folderItems = Schema.Struct({
+  entries: Schema.Array(boxItem),
+  next_marker: Schema.optional(Schema.NullOr(Schema.String)),
 })
 
-const withRepresentations = z.object({
-  representations: z.object({ entries: z.array(representation) }).optional(),
+const representation = Schema.Struct({
+  representation: Schema.String,
+  info: Schema.Struct({ url: Schema.String }),
+  status: Schema.Struct({ state: Schema.String }),
+  content: Schema.Struct({ url_template: Schema.String }),
 })
 
-const eventPage = z.object({
-  chunk_size: z.number(),
-  entries: z.array(
-    z.object({
-      event_type: z.string(),
-      source: z.unknown().optional(),
+const withRepresentations = Schema.Struct({
+  representations: Schema.optional(
+    Schema.Struct({ entries: Schema.Array(representation) }),
+  ),
+})
+
+const eventPage = Schema.Struct({
+  chunk_size: Schema.Finite,
+  entries: Schema.Array(
+    Schema.Struct({
+      event_type: Schema.String,
+      source: Schema.optional(Schema.Unknown),
     }),
   ),
 })
 
-const errorBody = z.object({
-  code: z.string().optional(),
-  message: z.string().optional(),
+const errorBody = Schema.Struct({
+  code: Schema.optional(Schema.String),
+  message: Schema.optional(Schema.String),
 })
 
-const conflictItem = z.object({
-  type: z.string(),
-  id: z.string(),
-  name: z.string().optional(),
-  sha1: z.string().nullable().optional(),
+const conflictItem = Schema.Struct({
+  type: Schema.String,
+  id: Schema.String,
+  name: Schema.optional(Schema.String),
+  sha1: Schema.optional(Schema.NullOr(Schema.String)),
 })
-type Conflict = z.output<typeof conflictItem>
+type Conflict = typeof conflictItem.Type
 
 /** Box's 409: a folder create lists its conflicts, an upload names one. */
-const nameInUse = z.object({
-  code: z.literal('item_name_in_use'),
-  context_info: z
-    .object({
-      conflicts: z.union([conflictItem, z.array(conflictItem)]),
-    })
-    .optional(),
+const nameInUse = Schema.Struct({
+  code: Schema.Literal('item_name_in_use'),
+  context_info: Schema.optional(
+    Schema.Struct({
+      conflicts: Schema.Union([conflictItem, Schema.Array(conflictItem)]),
+    }),
+  ),
 })
 
-const created = z.object({ id: z.string() })
+const created = Schema.Struct({ id: Schema.String })
 
-const uploaded = z.object({
-  entries: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      file_version: z.object({ id: z.string() }),
-      etag: z.string().nullish(),
+const uploaded = Schema.Struct({
+  entries: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      name: Schema.String,
+      file_version: Schema.Struct({ id: Schema.String }),
+      etag: Schema.optional(Schema.NullOr(Schema.String)),
     }),
   ),
 })
@@ -246,11 +249,11 @@ const AUTH_CODES = new Set(['insufficient_scope'])
 
 const codeOf = (body: string): { code: string; message: string } => {
   try {
-    const parsed = errorBody.safeParse(JSON.parse(body))
-    if (parsed.success)
+    const parsed = Schema.decodeUnknownOption(errorBody)(JSON.parse(body))
+    if (Option.isSome(parsed))
       return {
-        code: parsed.data.code ?? '',
-        message: parsed.data.message ?? '',
+        code: parsed.value.code ?? '',
+        message: parsed.value.message ?? '',
       }
   } catch {
     // Not JSON: a 401 has an empty body, and an edge page is HTML.
@@ -302,13 +305,14 @@ const fromPort = <TValue>(
     JobPermanent: (e) => Effect.die(new Error(`Box: ${e.reason}`)),
   })
 
-const parse = <TSchema extends z.ZodType>(
+const parse = <TSchema extends Schema.ConstraintDecoder<unknown>>(
   schema: TSchema,
   body: string,
   url: string,
 ) =>
   Effect.try({
-    try: (): z.output<TSchema> => schema.parse(JSON.parse(body)),
+    try: (): TSchema['Type'] =>
+      Schema.decodeUnknownSync(schema)(JSON.parse(body)),
     catch: (error) =>
       new Error(`Box answered ${url} with JSON it does not send`, {
         cause: error,
@@ -375,9 +379,9 @@ const sha1Of = (bytes: Uint8Array<ArrayBuffer>) =>
 /** The conflict a 409 names, or null when the body says no name was in use. */
 const conflictOf = (body: string): Conflict | null | 'unnamed' => {
   try {
-    const parsed = nameInUse.safeParse(JSON.parse(body))
-    if (!parsed.success) return null
-    const conflicts = parsed.data.context_info?.conflicts
+    const parsed = Schema.decodeUnknownOption(nameInUse)(JSON.parse(body))
+    if (Option.isNone(parsed)) return null
+    const conflicts = parsed.value.context_info?.conflicts
     if (conflicts === undefined) return 'unnamed'
     return (Array.isArray(conflicts) ? conflicts.at(0) : conflicts) ?? 'unnamed'
   } catch {
@@ -499,7 +503,7 @@ export const boxSource = Effect.gen(function* () {
     })
 
   /** One GET for JSON that must answer 200. */
-  const getOk = <TSchema extends z.ZodType>(
+  const getOk = <TSchema extends Schema.ConstraintDecoder<unknown>>(
     url: string,
     schema: TSchema,
     id: string,
@@ -726,9 +730,9 @@ export const boxSource = Effect.gen(function* () {
     eventType: string,
     source: unknown,
   ): StorageChange | null => {
-    const parsed = boxItem.safeParse(source)
-    if (!parsed.success || !isFileOrFolder(parsed.data)) return null
-    const changed = parsed.data
+    const parsed = Schema.decodeUnknownOption(boxItem)(source)
+    if (Option.isNone(parsed) || !isFileOrFolder(parsed.value)) return null
+    const changed = parsed.value
     const gone =
       REMOVED_EVENTS.has(eventType) ||
       (changed.item_status !== undefined && changed.item_status !== 'active')

@@ -1,7 +1,6 @@
 import { Data, Effect, Layer, Redacted } from 'effect'
-import type { z } from 'zod'
 import { Secrets } from '@spaces/sdk'
-import type { PortName, Trigger } from '@spaces/sdk'
+import type { PortName, SettingsSchema, Trigger } from '@spaces/sdk'
 import type { Enqueue } from '@spaces/core/queue/enqueue'
 import { NoMeetingLane } from '@spaces/core/writes/interactions/meeting-lane'
 import type { MeetingLane } from '@spaces/core/writes/interactions/meeting-lane'
@@ -49,8 +48,8 @@ const AMBIENT: ReadonlyArray<PortName> = ['Config', 'Secrets', 'Log', 'Http']
 
 /** What every grant shares, from the host and the bundle. */
 export type GrantOptions = {
-  /** The bundle's `manifest.settings` zod schema. */
-  readonly settings: z.ZodType
+  /** The bundle's `manifest.settings` schema. */
+  readonly settings: SettingsSchema
   /** `manifest.http.rateLimit.rpm`. */
   readonly rpm?: number
   /** The host's shared sender; building it opens nothing the job's scope owns. */

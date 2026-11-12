@@ -1,6 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs'
-import { Clock, Effect, Layer } from 'effect'
-import { z } from 'zod'
+import { Clock, Effect, Layer, Schema } from 'effect'
 import { Discover } from '@spaces/sdk'
 import { normalizeDomain } from '@spaces/sdk/identity'
 import { readEntity, testPorts } from '@spaces/sdk/testing'
@@ -28,24 +27,25 @@ export const fixtureText = (name: string): string =>
  * to search, a POST creating a webset, a GET of a webset's items. The key
  * is never recorded.
  */
-export const cassette = z
-  .object({
-    keyHeader: z.literal('x-api-key'),
-    interactions: z.array(
-      z.object({
-        name: z.string(),
-        method: z.enum(['GET', 'POST']),
-        url: z
-          .string()
-          .refine(
-            (url) => url === EXA_SEARCH_URL || url.startsWith(EXA_WEBSETS_URL),
+export const cassette = Schema.decodeUnknownSync(
+  Schema.Struct({
+    keyHeader: Schema.Literal('x-api-key'),
+    interactions: Schema.Array(
+      Schema.Struct({
+        name: Schema.String,
+        method: Schema.Literals(['GET', 'POST']),
+        url: Schema.String.check(
+          Schema.makeFilter(
+            (url: string) =>
+              url === EXA_SEARCH_URL || url.startsWith(EXA_WEBSETS_URL),
           ),
-        status: z.int(),
-        file: z.string(),
+        ),
+        status: Schema.Int,
+        file: Schema.String,
       }),
     ),
-  })
-  .parse(JSON.parse(fixtureText('cassette.json')))
+  }),
+)(JSON.parse(fixtureText('cassette.json')))
 
 /** The cassette's answer named `name`, as an HttpTest script line. */
 export const replay = (

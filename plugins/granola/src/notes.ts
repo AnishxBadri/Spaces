@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Effect, Option, Schema } from 'effect'
 import type { JsonObject, RecordedNote } from '@spaces/sdk'
 
 /**
@@ -11,11 +11,23 @@ export const GRANOLA_API = 'https://public-api.granola.ai/v1'
 /** Notes per page, Granola's ceiling. */
 export const PAGE_SIZE = 30
 
+/** `schema`, or `fallback` when the key is missing or holds anything else. */
+const orElse = <
+  TSchema extends Schema.Top & { readonly DecodingServices: never },
+>(
+  schema: TSchema,
+  fallback: TSchema['Type'] & TSchema['Encoded'],
+) =>
+  schema.pipe(
+    Schema.catchDecoding(() => Effect.succeedSome(fallback)),
+    Schema.withDecodingDefault(Effect.succeed(fallback)),
+  )
+
 /** The member's choices, as the host hands them over; nothing ticked by default. */
-const settingsShape = z.object({
-  folder_ids: z.array(z.string().min(1)).catch([]),
-  typed_notes: z.boolean().catch(false),
-  transcript: z.boolean().catch(false),
+const settingsShape = Schema.Struct({
+  folder_ids: orElse(Schema.Array(Schema.NonEmptyString), []),
+  typed_notes: orElse(Schema.Boolean, false),
+  transcript: orElse(Schema.Boolean, false),
 })
 
 export type NoteSettings = {
@@ -25,7 +37,7 @@ export type NoteSettings = {
 }
 
 export const settingsOf = (settings: JsonObject): NoteSettings => {
-  const parsed = settingsShape.parse(settings)
+  const parsed = Schema.decodeUnknownSync(settingsShape)(settings)
   return {
     folderIds: [...new Set(parsed.folder_ids)],
     typedNotes: parsed.typed_notes,
@@ -37,8 +49,8 @@ export const settingsOf = (settings: JsonObject): NoteSettings => {
  * The cursor: every note handed over last run, with the `updated_at` it was
  * handed at. A note that is no longer in a ticked folder is the difference.
  */
-const cursorShape = z.object({
-  held: z.record(z.string(), z.string()),
+const cursorShape = Schema.Struct({
+  held: Schema.Record(Schema.String, Schema.String),
 })
 
 export type Held = ReadonlyMap<string, string>
@@ -46,9 +58,9 @@ export type Held = ReadonlyMap<string, string>
 export const heldOf = (cursor: string | null): Held => {
   if (cursor === null) return new Map()
   try {
-    const parsed = cursorShape.safeParse(JSON.parse(cursor))
-    return parsed.success
-      ? new Map(Object.entries(parsed.data.held))
+    const parsed = Schema.decodeUnknownOption(cursorShape)(JSON.parse(cursor))
+    return Option.isSome(parsed)
+      ? new Map(Object.entries(parsed.value.held))
       : new Map()
   } catch {
     return new Map()
@@ -58,49 +70,66 @@ export const heldOf = (cursor: string | null): Held => {
 export const cursorOf = (held: Held): string =>
   JSON.stringify({ held: Object.fromEntries([...held].sort()) })
 
-const attendee = z.object({
-  email: z.string().nullish(),
-  name: z.string().nullish(),
+const attendee = Schema.Struct({
+  email: Schema.optional(Schema.NullOr(Schema.String)),
+  name: Schema.optional(Schema.NullOr(Schema.String)),
 })
 
 /** The fields of a listed note this plugin reads. */
-export const listedNote = z.object({
-  id: z.string().min(1),
-  title: z.string().nullish(),
-  created_at: z.string().min(1),
-  updated_at: z.string().min(1),
-  deleted_at: z.string().nullish(),
-  web_url: z.string().nullish(),
-  calendar_event: z
-    .object({
-      calendar_event_id: z.string().nullish(),
-      scheduled_start_time: z.string().nullish(),
-      scheduled_end_time: z.string().nullish(),
-    })
-    .nullish(),
-  attendees: z.array(attendee).default([]),
-  folder_membership: z.array(z.object({ id: z.string().min(1) })).default([]),
-  summary_markdown: z.string().nullish(),
+export const listedNote = Schema.Struct({
+  id: Schema.NonEmptyString,
+  title: Schema.optional(Schema.NullOr(Schema.String)),
+  created_at: Schema.NonEmptyString,
+  updated_at: Schema.NonEmptyString,
+  deleted_at: Schema.optional(Schema.NullOr(Schema.String)),
+  web_url: Schema.optional(Schema.NullOr(Schema.String)),
+  calendar_event: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({
+        calendar_event_id: Schema.optional(Schema.NullOr(Schema.String)),
+        scheduled_start_time: Schema.optional(Schema.NullOr(Schema.String)),
+        scheduled_end_time: Schema.optional(Schema.NullOr(Schema.String)),
+      }),
+    ),
+  ),
+  attendees: Schema.Array(attendee).pipe(
+    Schema.withDecodingDefault(Effect.succeed([])),
+  ),
+  folder_membership: Schema.Array(
+    Schema.Struct({ id: Schema.NonEmptyString }),
+  ).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+  summary_markdown: Schema.optional(Schema.NullOr(Schema.String)),
 })
 
-export type ListedNote = z.output<typeof listedNote>
+export type ListedNote = typeof listedNote.Type
 
 /** One page of a folder's notes; items are read one by one so a bad one is skipped alone. */
-export const notesPage = z.object({
-  notes: z.array(z.unknown()).default([]),
-  hasMore: z.boolean().default(false),
-  cursor: z.string().min(1).nullish(),
+export const notesPage = Schema.Struct({
+  notes: Schema.Array(Schema.Unknown).pipe(
+    Schema.withDecodingDefault(Effect.succeed([])),
+  ),
+  hasMore: Schema.Boolean.pipe(
+    Schema.withDecodingDefault(Effect.succeed(false)),
+  ),
+  cursor: Schema.optional(Schema.NullOr(Schema.NonEmptyString)),
 })
 
 /** The private extras, from the note itself: only fetched when opted in. */
-export const noteDetail = z.object({
-  private_notes_markdown: z.string().nullish(),
-  transcript: z
-    .array(z.object({ speaker: z.string().nullish(), text: z.string() }))
-    .nullish(),
+export const noteDetail = Schema.Struct({
+  private_notes_markdown: Schema.optional(Schema.NullOr(Schema.String)),
+  transcript: Schema.optional(
+    Schema.NullOr(
+      Schema.Array(
+        Schema.Struct({
+          speaker: Schema.optional(Schema.NullOr(Schema.String)),
+          text: Schema.String,
+        }),
+      ),
+    ),
+  ),
 })
 
-export type NoteDetail = z.output<typeof noteDetail>
+export type NoteDetail = typeof noteDetail.Type
 
 export const listUrl = (folderId: string, cursor: string | undefined) => {
   const query = new URLSearchParams({

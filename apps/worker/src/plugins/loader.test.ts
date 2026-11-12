@@ -9,12 +9,12 @@ import {
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { isNotNull, sql } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import * as hostEffect from 'effect'
 import * as hostSdk from '@spaces/sdk'
+import { HOST_PACKAGES } from '@spaces/sdk/build'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
 import { readDegradedPlugins } from '@spaces/db/plugin-health'
@@ -124,7 +124,7 @@ describe('boot with the four fixtures', () => {
     expect(verdicts.map((v) => [v.id, v.status, v.reason])).toEqual([
       ['echo', 'enabled', null],
       ['needs-key', 'degraded', 'missing credential'],
-      ['old-sdk', 'degraded', 'requires sdk ^2.0, host provides 1.4.0'],
+      ['old-sdk', 'degraded', 'requires sdk ^1.0, host provides 2.0.0'],
       ['tampered', 'degraded', 'bundle sha does not match lock.json'],
     ])
     expect(loaded.map((p) => p.manifest.id)).toEqual(['echo'])
@@ -138,7 +138,7 @@ describe('boot with the four fixtures', () => {
       ['core.mailbox', 'enabled', null],
       ['echo', 'enabled', null],
       ['needs-key', 'degraded', 'missing credential'],
-      ['old-sdk', 'degraded', 'requires sdk ^2.0, host provides 1.4.0'],
+      ['old-sdk', 'degraded', 'requires sdk ^1.0, host provides 2.0.0'],
       ['tampered', 'degraded', 'bundle sha does not match lock.json'],
     ])
   })
@@ -183,7 +183,7 @@ describe('boot with the four fixtures', () => {
       {
         id: 'old-sdk',
         version: '0.1.0',
-        reason: 'requires sdk ^2.0, host provides 1.4.0',
+        reason: 'requires sdk ^1.0, host provides 2.0.0',
       },
       {
         id: 'tampered',
@@ -206,7 +206,7 @@ describe('boot with the four fixtures', () => {
 })
 
 describe('the bundle runs on the host', () => {
-  it("resolves a bundle's effect, zod and @spaces/sdk to the worker's own copies", async () => {
+  it("resolves a bundle's effect and @spaces/sdk to the worker's own copies, and nothing else", async () => {
     const root = newPluginsRoot()
     const dir = install(root, 'echo')
     await row('echo')
@@ -214,35 +214,55 @@ describe('the bundle runs on the host', () => {
     expect(verdicts.at(0)?.status).toBe('enabled')
 
     // A probe beside the bundle, importing exactly what a bundle imports.
-    // The root is under the OS temp dir: without the hook none of these
-    // three would resolve at all.
+    // The root is under the OS temp dir: without the hook neither would
+    // resolve at all.
     writeFileSync(
       path.join(dir, 'probe.mjs'),
       [
         "export { Identity, Facts, definePlugin } from '@spaces/sdk'",
         "export { Effect, Context } from 'effect'",
-        "export { z } from 'zod'",
       ].join('\n'),
     )
     const probe: unknown = await import(
       /* @vite-ignore */ pathToFileURL(path.join(dir, 'probe.mjs')).href
     )
-    const seen = z
-      .object({
-        Identity: z.unknown(),
-        Facts: z.unknown(),
-        definePlugin: z.unknown(),
-        Effect: z.unknown(),
-        Context: z.unknown(),
-        z: z.unknown(),
-      })
-      .parse(probe)
+    const seen = Schema.decodeUnknownSync(
+      Schema.Struct({
+        Identity: Schema.Unknown,
+        Facts: Schema.Unknown,
+        definePlugin: Schema.Unknown,
+        Effect: Schema.Unknown,
+        Context: Schema.Unknown,
+      }),
+    )(probe)
     expect(seen.Identity).toBe(hostSdk.Identity)
     expect(seen.Facts).toBe(hostSdk.Facts)
     expect(seen.definePlugin).toBe(hostSdk.definePlugin)
     expect(seen.Effect).toBe(hostEffect.Effect)
     expect(seen.Context).toBe(hostEffect.Context)
-    expect(seen.z).toBe(z)
+
+    // The hook routes these and nothing else: zod is not one of them.
+    expect(HOST_PACKAGES).toEqual(['effect', '@spaces/sdk'])
+  })
+})
+
+describe('the sdk range', () => {
+  it('refuses a bundle built for SDK 1.x and loads one built for 2.0', async () => {
+    const root = newPluginsRoot()
+    const sdkOf = (dir: string) =>
+      Schema.decodeUnknownSync(Schema.Struct({ sdk: Schema.String }))(
+        JSON.parse(readFileSync(path.join(dir, 'manifest.json'), 'utf8')),
+      ).sdk
+    expect(sdkOf(install(root, 'old-sdk'))).toBe('^1.0')
+    expect(sdkOf(install(root, 'echo'))).toBe('^2.0')
+    await row('old-sdk')
+    await row('echo')
+    const { verdicts, loaded } = await run(root)
+    expect(verdicts.map((v) => [v.id, v.status, v.reason])).toEqual([
+      ['echo', 'enabled', null],
+      ['old-sdk', 'degraded', 'requires sdk ^1.0, host provides 2.0.0'],
+    ])
+    expect(loaded.map((p) => p.manifest.id)).toEqual(['echo'])
   })
 })
 
@@ -304,9 +324,9 @@ describe('a bundle whose top-level import throws', () => {
     const root = newPluginsRoot()
     install(root, 'echo')
     const dir = install(root, 'echo', 'boom')
-    const manifest = z
-      .record(z.string(), z.json())
-      .parse(JSON.parse(readFileSync(path.join(dir, 'manifest.json'), 'utf8')))
+    const manifest = Schema.decodeUnknownSync(
+      Schema.Record(Schema.String, Schema.Json),
+    )(JSON.parse(readFileSync(path.join(dir, 'manifest.json'), 'utf8')))
     writeFileSync(
       path.join(dir, 'manifest.json'),
       JSON.stringify({ ...manifest, id: 'boom' }),

@@ -1,4 +1,4 @@
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { eq, sql } from 'drizzle-orm'
 import { Client } from 'pg'
 import type { Notification } from 'pg'
@@ -11,7 +11,6 @@ import {
   it,
   vi,
 } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
   credential,
@@ -83,10 +82,16 @@ const APOLLO: IntegrationManifest = {
   settings: JSON.parse(
     JSON.stringify(
       settingsJsonSchema(
-        z.object({
-          cacheDays: z.int().min(0).max(3650).default(90),
-          dailyCreditCap: z.int().min(0).default(100),
-          autoEnrich: z.boolean().default(false),
+        Schema.Struct({
+          cacheDays: Schema.Int.check(
+            Schema.isBetween({ minimum: 0, maximum: 3650 }),
+          ).pipe(Schema.withDecodingDefaultKey(Effect.succeed(90))),
+          dailyCreditCap: Schema.Int.check(
+            Schema.isGreaterThanOrEqualTo(0),
+          ).pipe(Schema.withDecodingDefaultKey(Effect.succeed(100))),
+          autoEnrich: Schema.Boolean.pipe(
+            Schema.withDecodingDefaultKey(Effect.succeed(false)),
+          ),
         }),
       ),
     ),
@@ -344,12 +349,12 @@ describe('the ledger', () => {
   it('names the version fix for a plugin built against an sdk this host does not provide', async () => {
     asAdmin()
     const old = await install({
-      manifest: fixture('old-sdk', '^2.0'),
+      manifest: fixture('old-sdk', '^3.0'),
       status: 'degraded',
-      lastError: 'requires sdk ^2.0, host provides 1.1.0',
+      lastError: 'requires sdk ^3.0, host provides 1.1.0',
     })
     const detail = await getIntegrationHandler({ id: old.id })
-    expect(detail.fix).toContain('^2.0')
+    expect(detail.fix).toContain('^3.0')
     expect(detail.form).toEqual({ ok: true, fields: [] })
   })
 
@@ -500,10 +505,14 @@ describe('the settings form', () => {
         settings: JSON.parse(
           JSON.stringify(
             settingsJsonSchema(
-              z.object({
-                feedUrl: z.httpUrl(),
-                record: z.string(),
-                maxItems: z.int().min(1).max(100).default(20),
+              Schema.Struct({
+                feedUrl: Schema.String.annotate({ format: 'uri' }).check(
+                  Schema.makeFilter((url: string) => /^https?:\/\//.test(url)),
+                ),
+                record: Schema.String,
+                maxItems: Schema.Int.check(
+                  Schema.isBetween({ minimum: 1, maximum: 100 }),
+                ).pipe(Schema.withDecodingDefaultKey(Effect.succeed(20))),
               }),
             ),
           ),

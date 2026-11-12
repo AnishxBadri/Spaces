@@ -9,8 +9,8 @@ import { existsSync } from 'node:fs'
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { gzipSync } from 'node:zlib'
-import { z } from 'zod'
-import { manifestSchema } from '../manifest.ts'
+import { Schema } from 'effect'
+import { decodeManifest, manifestSchema } from '../manifest.ts'
 import type { Manifest } from '../manifest.ts'
 import { writeTar } from './tar.ts'
 import type { TarInput } from './tar.ts'
@@ -62,25 +62,27 @@ const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/
  * `keyId` names the public key the image trusts for `sig`; the key itself is
  * never in the registry — whoever serves the registry would then choose it.
  */
-export const registryEntrySchema = z.strictObject({
-  id: manifestSchema.shape.id,
-  version: manifestSchema.shape.version,
-  sdk: manifestSchema.shape.sdk,
-  name: z.string().min(1),
-  description: z.string().min(1),
-  requires: manifestSchema.shape.requires,
+export const registryEntrySchema = Schema.Struct({
+  id: manifestSchema.fields.id,
+  version: manifestSchema.fields.version,
+  sdk: manifestSchema.fields.sdk,
+  name: Schema.String.check(Schema.isMinLength(1)),
+  description: Schema.String.check(Schema.isMinLength(1)),
+  requires: manifestSchema.fields.requires,
   // The manifest's roles, so the catalogue groups a plugin before install.
-  roles: manifestSchema.shape.roles,
-  tarball: z.url(),
-  sha256: z.string().regex(SHA256),
-  sig: z.string().regex(BASE64),
-  keyId: z.string().regex(KEY_ID),
-  minCore: z.string().optional(),
-})
-export type RegistryEntry = z.output<typeof registryEntrySchema>
+  roles: manifestSchema.fields.roles,
+  tarball: Schema.String.check(
+    Schema.makeFilter((s: string) => URL.canParse(s.trim())),
+  ),
+  sha256: Schema.String.check(Schema.isPattern(SHA256)),
+  sig: Schema.String.check(Schema.isPattern(BASE64)),
+  keyId: Schema.String.check(Schema.isPattern(KEY_ID)),
+  minCore: Schema.optional(Schema.String),
+}).annotate({ parseOptions: { onExcessProperty: 'error', errors: 'all' } })
+export type RegistryEntry = typeof registryEntrySchema.Type
 
 /** `registry.json`: every published plugin version, newest last per id. */
-export const registrySchema = z.array(registryEntrySchema)
+export const registrySchema = Schema.Array(registryEntrySchema)
 
 /** The files a plugin tarball carries, relative to the built `dist/`. */
 const collect = async (distDir: string): Promise<Array<TarInput>> => {
@@ -132,9 +134,11 @@ export type PackResult = {
 export const packPlugin = async (options: PackOptions): Promise<PackResult> => {
   const files = await collect(options.distDir)
   const manifestFile = files.find((f) => f.path === 'manifest.json')
-  const manifest = manifestSchema.parse(
+  const read = decodeManifest(
     JSON.parse(new TextDecoder().decode(manifestFile?.data)),
   )
+  if (!read.success) throw read.error
+  const manifest = read.data
   const base = `${manifest.id}-${manifest.version}.tgz`
   // gzip's header carries no timestamp from node, so the bytes are a pure
   // function of the files.
@@ -157,7 +161,7 @@ export const packPlugin = async (options: PackOptions): Promise<PackResult> => {
   const keyId = keyIdOf(key)
   await writeFile(`${tarball}.sig`, `${sig}\n`)
 
-  const entry = registryEntrySchema.parse({
+  const entry = Schema.decodeUnknownSync(registryEntrySchema)({
     id: manifest.id,
     version: manifest.version,
     sdk: manifest.sdk,

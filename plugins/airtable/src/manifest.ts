@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { defineManifest } from '@spaces/sdk'
 
 /**
@@ -8,18 +8,18 @@ import { defineManifest } from '@spaces/sdk'
  *   built-in view's name ends in "view" (`Grid view`, `Kanban view`); a
  *   browser's ` (1)` on a second download still matches. A renamed view's
  *   export takes the plain CSV path and its mapping step.
- * - `sdk: '^1.4'`: the first SDK with `roles` (Import and `accepts` need 1.1).
+ * - `sdk: '^2.0'`: settings are an Effect schema.
  */
 export const manifest = defineManifest({
   manifestVersion: 1,
   id: 'airtable',
   version: '0.1.0',
-  sdk: '^1.4',
+  sdk: '^2.0',
   name: 'Airtable',
   roles: ['import'],
   description:
     'Reads an Airtable CSV export dropped on Import: multi-select and linked-record cells become lists, attachments their URLs. You map, preview and commit it like any spreadsheet.',
-  settings: z.object({}),
+  settings: Schema.Struct({}),
   jobs: {
     stage: {
       trigger: 'file',

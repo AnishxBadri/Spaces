@@ -16,13 +16,13 @@ import type { Plugin } from '../plugin.ts'
  * It writes into `dist/`:
  *
  * - `bundle.mjs` — the plugin's code in one ESM file, every third-party
- *   dependency it has inlined, and exactly three bare imports left for the
- *   host to resolve: `effect`, `zod` and `@spaces/sdk` (plus `node:*`). A
- *   plugin never ships its own Effect or its own copy of the SDK — two copies
- *   of the SDK's service tags in one process is "service not found" at best
- *   — so those three are the host's, resolved to its copies by the loader.
+ *   dependency it has inlined, and exactly two bare imports left for the
+ *   host to resolve: `effect` and `@spaces/sdk` (plus `node:*`). A plugin
+ *   never ships its own Effect or its own copy of the SDK — two copies of
+ *   the SDK's service tags in one process is "service not found" at best —
+ *   so those two are the host's, resolved to its copies by the loader.
  * - `manifest.json` — the bundle's `default.manifest` through
- *   `toManifestJson`: settings as JSON Schema, validated by `manifestSchema`,
+ *   `toManifestJson`: settings as JSON Schema, read by `decodeManifest`,
  *   so a build that would write a manifest the loader refuses fails here.
  *   The manifest is read from the bundle it describes, not from a second
  *   entry, so the two cannot disagree.
@@ -32,7 +32,7 @@ import type { Plugin } from '../plugin.ts'
  */
 
 /** The bare specifiers a plugin bundle leaves to the host. */
-export const HOST_PACKAGES = ['effect', 'zod', '@spaces/sdk'] as const
+export const HOST_PACKAGES = ['effect', '@spaces/sdk'] as const
 
 const isHostImport = (id: string): boolean =>
   id.startsWith('node:') ||

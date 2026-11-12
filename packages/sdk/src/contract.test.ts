@@ -1,6 +1,5 @@
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { z } from 'zod'
 import { JobPermanent, PORT_NAMES } from './contract.ts'
 import type {
   AliasClaim,
@@ -227,7 +226,7 @@ describe('definePlugin types each job by its trigger', () => {
     sdk: '^1.0',
     name: 'Triggers',
     description: 'One job per trigger.',
-    settings: z.object({}),
+    settings: Schema.Struct({}),
     jobs: {
       enrich: { trigger: 'action', uses: ['Identity'] },
       sync: { trigger: 'schedule', uses: ['Http'], schedule: '*/15 * * * *' },
@@ -237,7 +236,7 @@ describe('definePlugin types each job by its trigger', () => {
       lens: {
         trigger: 'watch',
         uses: ['Spaces'],
-        settings: z.object({ cap: z.int() }),
+        settings: Schema.Struct({ cap: Schema.Int }),
       },
     },
     ingress: { signature: 'hmac-sha256' },

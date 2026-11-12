@@ -1,7 +1,6 @@
-import { Effect, Exit, Layer } from 'effect'
+import { Effect, Exit, Layer, Schema } from 'effect'
 import { eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
   entity,
@@ -37,12 +36,12 @@ const manifest = toManifestJson(
     sdk: '^1.4',
     name: 'Watcher',
     description: 'A watch.',
-    settings: z.object({}),
+    settings: Schema.Struct({}),
     jobs: {
       lens: {
         trigger: 'watch',
         uses: ['Spaces'],
-        settings: z.object({}),
+        settings: Schema.Struct({}),
       },
     },
   }),

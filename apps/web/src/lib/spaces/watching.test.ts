@@ -1,7 +1,6 @@
-import { Effect, Exit } from 'effect'
+import { Effect, Exit, Schema } from 'effect'
 import { eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
   entity,
@@ -35,15 +34,17 @@ const manifest = (id: string, name: string, watch: boolean) =>
           sdk: '^1.5',
           name,
           description: 'A test engine.',
-          settings: z.object({}),
+          settings: Schema.Struct({}),
           jobs: watch
             ? {
                 watch: {
                   trigger: 'watch',
                   uses: ['Spaces'],
-                  settings: z.object({
-                    criteria: z.string().optional(),
-                    cap: z.int().min(1).max(100).default(10),
+                  settings: Schema.Struct({
+                    criteria: Schema.optionalKey(Schema.String),
+                    cap: Schema.Int.check(
+                      Schema.isBetween({ minimum: 1, maximum: 100 }),
+                    ).pipe(Schema.withDecodingDefaultKey(Effect.succeed(10))),
                   }),
                 },
               }

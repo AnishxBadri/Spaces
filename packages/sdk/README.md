@@ -5,8 +5,9 @@ The design is `docs/spec-plugin-sdk.md` (§3 manifest, §4 ports, §5 triggers,
 §6 `definePlugin`); the decisions behind it are D51–D55 in
 `docs/decisions.md`.
 
-Dependencies: `effect`, `zod` and — from sdk-4b — `tldts`, and nothing inside
-this repo (D55). `src/package.test.ts` pins that list; the eslint sdk zone
+Dependencies: `effect` and — from sdk-4b — `tldts`, and nothing inside this
+repo (D55); Effect Schema is the one schema language (D85), and zod left at
+2.0. `src/package.test.ts` pins that list; the eslint sdk zone
 (`packages/config/eslint.base.js`) fails any `@spaces/core` or `@spaces/db`
 import, and `src/fence.test.ts` proves it.
 
@@ -16,14 +17,33 @@ import, and `src/fence.test.ts` proves it.
 - `satisfiesSdk(range, host?)` — `manifest.sdk` against the host. Three
   operators (`^x.y`, `~x.y`, exact `x.y.z`), hand-rolled; a refusal carries
   the sentence the loader writes as the degraded reason
-  (`requires sdk ^2.0, host provides 1.0.0`).
-- `manifestSchema` — the on-disk `manifest.json`. No plugin `kind` (D51):
-  each job has a `trigger` (`action` · `schedule` · `event` · `webhook` ·
-  `file`) and the ports it `uses`.
+  (`requires sdk ^1.0, host provides 2.0.0`).
+- `manifestSchema` — the on-disk `manifest.json`, an Effect schema whose every
+  object is closed. `decodeManifest(raw)` reads one: `{ success: true, data }`
+  or `{ success: false, error }`, the error a `ManifestRefused` naming each
+  issue's path. No plugin `kind` (D51): each job has a `trigger` (`action` ·
+  `schedule` · `event` · `webhook` · `file` · `watch`) and the ports it `uses`.
 - `defineManifest` / `toManifestJson` — the manifest is authored once as a
-  TS const with a zod `settings` schema and emitted with `settings` as JSON
-  Schema (`z.toJSONSchema`, input mode), so web can render the settings card
+  TS const with a `Schema.Struct` as `settings` and emitted with `settings` as
+  JSON Schema of what the operator types (`settingsJsonSchema`: each field's
+  `default`, and `propertyOrder`), so web can render the settings card
   without loading the bundle.
+
+```ts
+settings: Schema.Struct({
+  cacheDays: Schema.Int.annotate({ description: 'Days a result is reused' })
+    .check(Schema.isBetween({ minimum: 0, maximum: 3650 }))
+    .pipe(Schema.withDecodingDefaultKey(Effect.succeed(90))),
+  region: Schema.Literals(['us', 'eu']),
+  label: Schema.optionalKey(Schema.String),
+}),
+```
+
+Annotate a field (`title`, `description`, `format`) before its checks: an
+annotation after a check describes the check. A field the operator may
+leave out is `Schema.optionalKey`, not `Schema.optional`, whose JSON Schema
+the form cannot draw.
+
 - `definePlugin` — the bundle's default export; its `jobs` must carry exactly
   the manifest's job names.
 
@@ -77,7 +97,8 @@ pins them. Write ports take the claims and return what the lane decided
 `uses`: yielding a port it did not declare fails typecheck. There is no Clock
 port — Effect ships one, and the plugin lint zone refuses `Date.now()` and
 `new Date()`. `configOf(manifest)` reads the config typed by the manifest's
-own settings schema.
+own settings schema, and `watchSettingsOf(job, input)` a watch's; `Ai.complete`
+takes an Effect schema and decodes the answer by it.
 
 ## Testing a plugin — `@spaces/sdk/testing` (sdk-5)
 
@@ -94,8 +115,8 @@ runs it with `DATABASE_URL` unset. `Ai` and `PluginDb` have no fake yet.
 ## Writing a plugin
 
 A plugin is a workspace package under `plugins/` (fixtures under
-`plugins/_fixtures/`) depending on `@spaces/sdk`, with `effect` and `zod` as
-peer dependencies — the host provides them. `plugins/_fixtures/echo` is the
+`plugins/_fixtures/`) depending on `@spaces/sdk`, with `effect` as a peer
+dependency — the host provides it. `plugins/_fixtures/echo` is the
 smallest complete one:
 
 ```
@@ -111,13 +132,13 @@ as `pluginBuildConfig()`, that every plugin's `vite.config.ts` reuses (D26
 made vite the workspace's one bundler). `pnpm build` in a plugin writes:
 
 - `dist/bundle.mjs` — one ESM file with every third-party dependency the
-  plugin has inlined, and exactly three bare imports left for the host:
-  `effect`, `zod`, `@spaces/sdk` (plus `node:*`). A plugin never ships its own
+  plugin has inlined, and exactly two bare imports left for the host:
+  `effect` and `@spaces/sdk` (plus `node:*`). A plugin never ships its own
   Effect or its own SDK: two copies of the SDK's service tags in one process
-  is "service not found" at best. The loader (sdk-11) resolves the three to
-  the host's copies.
+  is "service not found" at best. The loader (sdk-11) resolves the two to
+  the host's copies, and nothing else.
 - `dist/manifest.json` — the bundle's `default.manifest` through
-  `toManifestJson`, validated by `manifestSchema` on the way out, so a build
+  `toManifestJson`, read by `decodeManifest` on the way out, so a build
   that would write a manifest the loader refuses fails at build time.
 
 `vite` is an optional peer of this package: only `@spaces/sdk/build` uses it,

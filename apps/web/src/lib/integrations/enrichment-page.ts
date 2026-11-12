@@ -10,7 +10,7 @@ import {
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { workspace } from '@spaces/db/schema/workspace'
-import { manifestSchema } from '@spaces/sdk'
+import { decodeManifest } from '@spaces/sdk'
 import type { Manifest } from '@spaces/sdk'
 import { utcDayStart } from '@spaces/core/ai/caps'
 import { DEFAULT_REUSE_DAYS } from '@spaces/core/enrichment/auto'
@@ -167,7 +167,7 @@ const readSettings = query(async () => {
 })
 
 const manifestOf = (stored: unknown): Manifest | null => {
-  const parsed = manifestSchema.safeParse(stored)
+  const parsed = decodeManifest(stored)
   return parsed.success ? parsed.data : null
 }
 

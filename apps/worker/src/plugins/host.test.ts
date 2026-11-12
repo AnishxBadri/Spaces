@@ -68,7 +68,7 @@ const writeBundle = (
   options: {
     readonly uses?: ReadonlyArray<PortName>
     readonly hooks?: string
-    /** The bundle's settings schema, as zod source; `z.object({})` when omitted. */
+    /** The bundle's settings schema, as Effect source; `Schema.Struct({})` when omitted. */
     readonly settings?: string
   },
 ) => {
@@ -80,7 +80,7 @@ const writeBundle = (
       manifestVersion: 1,
       id,
       version: '0.1.0',
-      sdk: '^1.0',
+      sdk: '^2.0',
       name: id,
       description: 'A plugin host test bundle.',
       settings: {},
@@ -91,10 +91,10 @@ const writeBundle = (
     path.join(dir, 'bundle.mjs'),
     [
       "import { Effect } from 'effect'",
-      "import { z } from 'zod'",
+      "import { Schema } from 'effect'",
       `const calls = globalThis[Symbol.for('spaces.worker.host-test.hooks')]`,
       'export default {',
-      `  manifest: { id: '${id}', settings: ${options.settings ?? 'z.object({})'} },`,
+      `  manifest: { id: '${id}', settings: ${options.settings ?? 'Schema.Struct({})'} },`,
       '  jobs: { ping: () => Effect.void },',
       options.hooks ?? '',
       '}',
@@ -373,7 +373,7 @@ describe('a Layer per (integration, job)', () => {
 
 describe('a config the settings schema refuses', () => {
   const settings =
-    'z.object({ feedUrl: z.string(), maxItems: z.int().default(20) })'
+    'Schema.Struct({ feedUrl: Schema.String, maxItems: Schema.Int.pipe(Schema.withDecodingDefaultKey(Effect.succeed(20))) })'
 
   it('a required setting with no value degrades as “missing settings”; saving it runs the plugin', async () => {
     const root = newPluginsRoot()

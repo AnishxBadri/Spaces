@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gunzipSync } from 'node:zlib'
+import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import {
   TarFormatError,
@@ -119,7 +120,7 @@ describe('packPlugin', () => {
     const entry = JSON.parse(
       readFileSync(join(out, 'packed-2.1.0.json'), 'utf8'),
     )
-    expect(registrySchema.parse([entry])).toEqual([r.entry])
+    expect(Schema.decodeUnknownSync(registrySchema)([entry])).toEqual([r.entry])
     expect(entry).not.toHaveProperty('kind')
     expect(entry.tarball).toBe(
       'https://github.com/AnishxBadri/Spaces/releases/download/plugin-packed@2.1.0/packed-2.1.0.tgz',
@@ -168,7 +169,9 @@ describe('packPlugin', () => {
       })
     const roled = await pack({ ...manifest, roles: ['import', 'feeds'] })
     expect(roled.entry?.roles).toEqual(['import', 'feeds'])
-    expect(registrySchema.parse([roled.entry])).toEqual([roled.entry])
+    expect(Schema.decodeUnknownSync(registrySchema)([roled.entry])).toEqual([
+      roled.entry,
+    ])
     const plain = await pack(manifest)
     expect(plain.entry).not.toHaveProperty('roles')
   })
@@ -192,6 +195,8 @@ describe('the committed registry.json', () => {
         'utf8',
       ),
     )
-    expect(() => registrySchema.parse(registry)).not.toThrow()
+    expect(() =>
+      Schema.decodeUnknownSync(registrySchema)(registry),
+    ).not.toThrow()
   })
 })

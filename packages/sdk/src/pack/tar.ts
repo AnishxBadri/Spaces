@@ -1,7 +1,7 @@
 /**
  * A small ustar (POSIX.1-1988) reader and writer — the plugin tarball's
- * format. Hand-rolled rather than a dependency: the SDK may depend on effect,
- * zod and tldts only, and owning the reader makes the verifier's
+ * format. Hand-rolled rather than a dependency: the SDK may depend on effect
+ * and tldts only, and owning the reader makes the verifier's
  * path-traversal check ours by construction — it sees every header field,
  * including the ones a permissive extractor would quietly honour.
  *

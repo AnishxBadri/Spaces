@@ -1,5 +1,4 @@
-import { Clock, Effect, Redacted } from 'effect'
-import { z } from 'zod'
+import { Clock, Effect, Redacted, Schema } from 'effect'
 import {
   Ai,
   Content,
@@ -111,7 +110,7 @@ const exaAnswer = Effect.fn('exa.answer')(function* (
   }
   const body = yield* responseJson(response, label)
   return yield* Effect.try({
-    try: (): JsonValue => z.json().parse(body),
+    try: (): JsonValue => Schema.decodeUnknownSync(Schema.Json)(body),
     catch: () => new JobPermanent({ reason: `${label} returned no JSON` }),
   })
 })
@@ -180,7 +179,7 @@ const priorState = (input: WatchInput) =>
   input.state === null
     ? Effect.succeed(null)
     : decode(`watch ${input.watchId}'s state`, () =>
-        watchState.parse(input.state),
+        Schema.decodeUnknownSync(watchState)(input.state),
       )
 
 /** The jobs as written; `definePlugin` checks each `R` against its `uses`. */

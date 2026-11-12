@@ -1,6 +1,5 @@
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { z } from 'zod'
 import { defineManifest } from './manifest.ts'
 import { definePlugin } from './plugin.ts'
 import type { Plugin, StorageSourceProvider } from './plugin.ts'
@@ -14,7 +13,7 @@ const manifest = defineManifest({
   sdk: '^1.0',
   name: 'Apollo',
   description: 'Enriches companies and people.',
-  settings: z.object({}),
+  settings: Schema.Struct({}),
   jobs: { enrich: { trigger: 'action', uses: ['Identity', 'Facts'] } },
 })
 
@@ -55,7 +54,7 @@ const sourceManifest = defineManifest({
   name: 'Drive-like',
   description: 'A storage source.',
   provides: 'storage-source',
-  settings: z.object({}),
+  settings: Schema.Struct({}),
   jobs: { list: { trigger: 'action', uses: ['Http'] } },
 })
 

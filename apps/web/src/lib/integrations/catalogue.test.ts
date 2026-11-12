@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { Schema } from 'effect'
 import { ROLES, manifestSchema } from '@spaces/sdk'
 import type { Manifest } from '@spaces/sdk'
 import {
@@ -20,7 +21,7 @@ import {
  */
 
 const manifest = (over: Partial<Manifest> = {}): Manifest =>
-  manifestSchema.parse({
+  Schema.decodeUnknownSync(manifestSchema)({
     manifestVersion: 1,
     id: 'probe',
     version: '0.1.0',
