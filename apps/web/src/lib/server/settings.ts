@@ -1,14 +1,22 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
+import { Effect, Schema } from 'effect'
 import { auth } from '../auth'
 import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
 import { requireAdmin, requireUser } from './shared'
+import { serverQuery } from './query'
 
-export const getSession = createServerFn().handler(async () => {
-  const session = await auth.api.getSession({
-    headers: getRequest().headers,
-  })
+/** A workspace logo refused before it is stored, with the reason General shows. */
+class LogoRefused extends Schema.TaggedError<LogoRefused>()('LogoRefused', {
+  message: Schema.String,
+}) {}
+
+const getSessionProgram = Effect.fn('getSessionProgram')(function* () {
+  // A failing session lookup rejects as it always has, untouched.
+  const session = yield* Effect.promise(() =>
+    auth.api.getSession({ headers: getRequest().headers }),
+  )
   if (!session) return null
   return {
     user: {
@@ -20,9 +28,26 @@ export const getSession = createServerFn().handler(async () => {
   }
 })
 
+export const getSession = createServerFn().handler(async () =>
+  Effect.runPromise(getSessionProgram()),
+)
+
+const listUsersProgram = Effect.fn('listUsersProgram')(function* () {
+  return yield* serverQuery(() =>
+    db.select({ id: user.id, name: user.name }).from(user),
+  )
+})
+
 export const listUsers = createServerFn().handler(async () => {
   await requireUser()
-  return db.select({ id: user.id, name: user.name }).from(user)
+  return Effect.runPromise(listUsersProgram())
+})
+
+const seedDemoProgram = Effect.fn('seedDemoProgram')(function* (
+  userId: string,
+) {
+  const { seedDemoData } = yield* Effect.promise(() => import('../seeds/demo'))
+  return yield* Effect.promise(() => seedDemoData(userId))
 })
 
 /**
@@ -31,8 +56,30 @@ export const listUsers = createServerFn().handler(async () => {
  */
 export const seedDemo = createServerFn({ method: 'POST' }).handler(async () => {
   const u = await requireUser()
-  const { seedDemoData } = await import('../seeds/demo')
-  return seedDemoData(u.id)
+  return Effect.runPromise(seedDemoProgram(u.id))
+})
+
+const setWorkspaceLogoProgram = Effect.fn('setWorkspaceLogoProgram')(function* (
+  file: File,
+  by: string,
+) {
+  const { LOGO_MAX_BYTES, LOGO_TOO_LARGE } = yield* Effect.promise(
+    () => import('../members/workspace-logo-file'),
+  )
+  // Refused before the bytes are read into memory.
+  if (file.size > LOGO_MAX_BYTES)
+    return yield* new LogoRefused({ message: LOGO_TOO_LARGE })
+  const { setLogoProgram, logoPath } = yield* Effect.promise(
+    () => import('../members/workspace-logo'),
+  )
+  const { reclaimBlobIfOrphaned } = yield* Effect.promise(
+    () => import('../documents/blob-refs'),
+  )
+  const bytes = new Uint8Array(yield* Effect.promise(() => file.arrayBuffer()))
+  const { sha, previous } = yield* setLogoProgram({ bytes, by })
+  if (previous !== null)
+    yield* Effect.promise(() => reclaimBlobIfOrphaned(previous))
+  return { logo: logoPath(sha) }
 })
 
 /**
@@ -42,35 +89,33 @@ export const seedDemo = createServerFn({ method: 'POST' }).handler(async () => {
 export const setWorkspaceLogo = createServerFn({ method: 'POST' })
   .validator((data: FormData) => {
     const file = data.get('file')
-    if (!(file instanceof File)) throw new Error('Choose an image')
+    if (!(file instanceof File))
+      throw new LogoRefused({ message: 'Choose an image' })
     return { file }
   })
   .handler(async ({ data }) => {
     const u = await requireAdmin()
-    const { LOGO_MAX_BYTES, LOGO_TOO_LARGE } =
-      await import('../members/workspace-logo-file')
-    // Refused before the bytes are read into memory.
-    if (data.file.size > LOGO_MAX_BYTES) throw new Error(LOGO_TOO_LARGE)
-    const { setLogoProgram, logoPath } =
-      await import('../members/workspace-logo')
-    const { reclaimBlobIfOrphaned } = await import('../documents/blob-refs')
-    const { effectFn } = await import('./effect')
-    const { sha, previous } = await effectFn(setLogoProgram)({
-      bytes: new Uint8Array(await data.file.arrayBuffer()),
-      by: u.id,
-    })
-    if (previous !== null) await reclaimBlobIfOrphaned(previous)
-    return { logo: logoPath(sha) }
+    return Effect.runPromise(setWorkspaceLogoProgram(data.file, u.id))
   })
+
+const clearWorkspaceLogoProgram = Effect.fn('clearWorkspaceLogoProgram')(
+  function* () {
+    const { clearLogoProgram } = yield* Effect.promise(
+      () => import('../members/workspace-logo'),
+    )
+    const { reclaimBlobIfOrphaned } = yield* Effect.promise(
+      () => import('../documents/blob-refs'),
+    )
+    const { previous } = yield* clearLogoProgram()
+    if (previous !== null)
+      yield* Effect.promise(() => reclaimBlobIfOrphaned(previous))
+    return { logo: null }
+  },
+)
 
 export const clearWorkspaceLogo = createServerFn({ method: 'POST' }).handler(
   async () => {
     await requireAdmin()
-    const { clearLogoProgram } = await import('../members/workspace-logo')
-    const { reclaimBlobIfOrphaned } = await import('../documents/blob-refs')
-    const { effectFn } = await import('./effect')
-    const { previous } = await effectFn(clearLogoProgram)()
-    if (previous !== null) await reclaimBlobIfOrphaned(previous)
-    return { logo: null }
+    return Effect.runPromise(clearWorkspaceLogoProgram())
   },
 )

@@ -1,4 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
+import { Effect, Schema } from 'effect'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
@@ -6,7 +7,9 @@ import { workspace } from '@spaces/db/schema'
 import { fxRate } from '@spaces/db/schema/portfolio'
 import { baseCurrency, loadFxRates, loadPortfolio } from '../portfolio/detail'
 import { ccy, isoDate, markInput, money, roundInput } from '../portfolio/inputs'
-import { requireUser } from './shared'
+import { requireAdmin, requireUser } from './shared'
+import { input } from './input'
+import { serverQuery } from './query'
 
 /**
  * The financial engine's server layer. Events are append-only; every
@@ -17,24 +20,49 @@ import { requireUser } from './shared'
  * - These handlers are the auth gate and the write paths.
  */
 
+const uuid = Schema.String.check(Schema.isUUID())
+
+const listHoldingsProgram = Effect.fn('listHoldingsProgram')(function* (
+  asOf: string | undefined,
+) {
+  return yield* Effect.promise(() => loadPortfolio(asOf))
+})
+
 /**
  * The book: per-holding metrics in native-or-base, plus the base-currency
  * roll-up. Portfolio and Today both read it; the body is `loadPortfolio`.
  */
 export const listHoldings = createServerFn()
-  .validator(z.object({ asOf: z.string().optional() }).optional())
+  .validator(
+    input(
+      Schema.UndefinedOr(
+        Schema.Struct({ asOf: Schema.optional(Schema.String) }),
+      ),
+    ),
+  )
   .handler(async ({ data }) => {
     await requireUser()
-    return loadPortfolio(data?.asOf)
+    return Effect.runPromise(listHoldingsProgram(data?.asOf))
   })
+
+const getHoldingProgram = Effect.fn('getHoldingProgram')(function* (
+  id: string,
+  asOf: string | undefined,
+) {
+  const { loadHoldingDetail } = yield* Effect.promise(
+    () => import('../portfolio/detail'),
+  )
+  return yield* Effect.promise(() => loadHoldingDetail(id, asOf))
+})
 
 /** The tear-sheet read: every event, plus computed metrics and ownership. */
 export const getHolding = createServerFn()
-  .validator(z.object({ id: z.string().uuid(), asOf: z.string().optional() }))
+  .validator(
+    input(Schema.Struct({ id: uuid, asOf: Schema.optional(Schema.String) })),
+  )
   .handler(async ({ data }) => {
     await requireUser()
-    const { loadHoldingDetail } = await import('../portfolio/detail')
-    return loadHoldingDetail(data.id, data.asOf)
+    return Effect.runPromise(getHoldingProgram(data.id, data.asOf))
   })
 
 /**
@@ -131,6 +159,27 @@ export const addDistribution = createServerFn({ method: 'POST' })
     }
   })
 
+const setFxRateProgram = Effect.fn('setFxRateProgram')(function* (
+  data: { currency: string; date: string; rateToBase: number },
+  actorId: string,
+) {
+  yield* serverQuery(() =>
+    db
+      .insert(fxRate)
+      .values({
+        currency: data.currency,
+        date: data.date,
+        rateToBase: data.rateToBase.toString(),
+        createdBy: actorId,
+      })
+      .onConflictDoUpdate({
+        target: [fxRate.currency, fxRate.date],
+        set: { rateToBase: data.rateToBase.toString() },
+      }),
+  )
+  return { ok: true }
+})
+
 /** Upsert on (currency, date): correcting a rate just recomputes. */
 export const setFxRate = createServerFn({ method: 'POST' })
   .validator(
@@ -142,25 +191,41 @@ export const setFxRate = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    await db
-      .insert(fxRate)
-      .values({
-        currency: data.currency,
-        date: data.date,
-        rateToBase: data.rateToBase.toString(),
-        createdBy: u.id,
-      })
-      .onConflictDoUpdate({
-        target: [fxRate.currency, fxRate.date],
-        set: { rateToBase: data.rateToBase.toString() },
-      })
-    return { ok: true }
+    return Effect.runPromise(setFxRateProgram(data, u.id))
   })
+
+const listFxRatesProgram = Effect.fn('listFxRatesProgram')(function* () {
+  const [base, rates] = yield* Effect.all(
+    [Effect.promise(() => baseCurrency()), Effect.promise(() => loadFxRates())],
+    { concurrency: 'unbounded' },
+  )
+  return { baseCurrency: base, rates }
+})
 
 export const listFxRates = createServerFn().handler(async () => {
   await requireUser()
-  const [base, rates] = await Promise.all([baseCurrency(), loadFxRates()])
-  return { baseCurrency: base, rates }
+  return Effect.runPromise(listFxRatesProgram())
+})
+
+const setBaseCurrencyProgram = Effect.fn('setBaseCurrencyProgram')(function* (
+  currency: string,
+) {
+  const ws = (yield* serverQuery(() =>
+    db.select({ settings: workspace.settings }).from(workspace),
+  )).at(0)
+  yield* serverQuery(() =>
+    db
+      .update(workspace)
+      .set({
+        settings: {
+          ...(ws?.settings ?? {}),
+          base_currency: currency,
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(workspace.id, 1)),
+  )
+  return { ok: true }
 })
 
 /**
@@ -170,22 +235,8 @@ export const listFxRates = createServerFn().handler(async () => {
 export const setBaseCurrency = createServerFn({ method: 'POST' })
   .validator(z.object({ currency: ccy }))
   .handler(async ({ data }) => {
-    const { requireAdmin } = await import('./shared')
     await requireAdmin()
-    const ws = (
-      await db.select({ settings: workspace.settings }).from(workspace)
-    ).at(0)
-    await db
-      .update(workspace)
-      .set({
-        settings: {
-          ...(ws?.settings ?? {}),
-          base_currency: data.currency,
-        },
-        updatedAt: new Date(),
-      })
-      .where(eq(workspace.id, 1))
-    return { ok: true }
+    return Effect.runPromise(setBaseCurrencyProgram(data.currency))
   })
 
 /**
@@ -197,10 +248,12 @@ export const setBaseCurrency = createServerFn({ method: 'POST' })
  */
 export const voidLedgerEvent = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      table: z.enum(['investment', 'mark', 'distribution']),
-      id: z.string().uuid(),
-    }),
+    input(
+      Schema.Struct({
+        table: Schema.Literals(['investment', 'mark', 'distribution']),
+        id: uuid,
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
@@ -220,7 +273,7 @@ export const voidLedgerEvent = createServerFn({ method: 'POST' })
  * already voided leaves the batch exactly as it was.
  */
 export const voidLedgerBatch = createServerFn({ method: 'POST' })
-  .validator(z.object({ batchId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ batchId: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { voidLedgerBatchProgram, ledgerVoidMessage } =

@@ -6,6 +6,7 @@ import { task, taskEntity } from '@spaces/db/schema/tasks'
 import { user } from '@spaces/db/schema/auth'
 import { requireUser } from './shared'
 import { input } from './input'
+import { serverQuery } from './query'
 
 /**
  * Tasks. Any member sees and completes any task — a
@@ -18,17 +19,6 @@ const isoDate = Schema.String.check(
 )
 
 const uuid = Schema.String.check(Schema.isUUID())
-
-class TaskQueryFailed extends Schema.TaggedError<TaskQueryFailed>()(
-  'TaskQueryFailed',
-  { cause: Schema.Defect() },
-) {}
-
-const query = <T>(run: () => Promise<T>) =>
-  Effect.tryPromise({
-    try: run,
-    catch: (cause) => new TaskQueryFailed({ cause }),
-  })
 
 export const createTask = createServerFn({ method: 'POST' })
   .validator(
@@ -101,7 +91,7 @@ export const listDueTaskDays = createServerFn().handler(async () => {
 const listEntityTasksProgram = Effect.fn('listEntityTasksProgram')(function* (
   entityId: string,
 ) {
-  return yield* query(() =>
+  return yield* serverQuery(() =>
     db
       .select({
         id: task.id,
@@ -129,7 +119,7 @@ const setTaskDoneProgram = Effect.fn('setTaskDoneProgram')(function* (
   id: string,
   done: boolean,
 ) {
-  yield* query(() =>
+  yield* serverQuery(() =>
     db
       .update(task)
       .set({ doneAt: done ? new Date() : null })
@@ -178,7 +168,7 @@ export const setTaskAssignee = createServerFn({ method: 'POST' })
 const deleteTaskProgram = Effect.fn('deleteTaskProgram')(function* (
   id: string,
 ) {
-  yield* query(() => db.delete(task).where(eq(task.id, id)))
+  yield* serverQuery(() => db.delete(task).where(eq(task.id, id)))
   return { ok: true }
 })
 

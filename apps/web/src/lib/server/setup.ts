@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import { requireAdmin, requireSettingsReader, requireUser } from './shared'
+import { input } from './input'
 
 export type { DemoSummary } from '../seeds/demo'
 export type { SetupAudience } from '../integrations/setup-status'
@@ -8,9 +9,23 @@ export type { SetupAudience } from '../integrations/setup-status'
 /**
  * The first run without a checklist: What's set up and the demo's
  * removal on General, and Enrich pressed on a record.
- * Programs are imported inside the handlers so their database code never
- * reaches the client bundle.
+ * The programs they run are imported dynamically, so their database code
+ * never reaches the client bundle.
  */
+
+const getSetupStateProgram = Effect.fn('getSetupStateProgram')(function* () {
+  const { setupGateProgram } = yield* Effect.promise(
+    () => import('../integrations/setup-status'),
+  )
+  const gate = yield* setupGateProgram()
+  if (gate.needsSetup) {
+    const { printSetupToken } = yield* Effect.promise(
+      () => import('../setup-token'),
+    )
+    yield* Effect.sync(printSetupToken)
+  }
+  return gate
+})
 
 /**
  * True until the first admin exists — drives the /setup redirect — and the
@@ -18,16 +33,9 @@ export type { SetupAudience } from '../integrations/setup-status'
  * Asking while setup is needed (re)prints the one-time token to the server
  * logs, so the operator who just opened /setup finds it in the terminal.
  */
-export const getSetupState = createServerFn().handler(async () => {
-  const { setupGateProgram } = await import('../integrations/setup-status')
-  const { effectFn } = await import('./effect')
-  const gate = await effectFn(setupGateProgram)()
-  if (gate.needsSetup) {
-    const { printSetupToken } = await import('../setup-token')
-    printSetupToken()
-  }
-  return gate
-})
+export const getSetupState = createServerFn().handler(async () =>
+  Effect.runPromise(getSetupStateProgram()),
+)
 
 /** General's foot: whether each of the seven pieces is set up. */
 export const getWhatsSetUp = createServerFn().handler(async () => {
@@ -55,16 +63,25 @@ export const removeDemoData = createServerFn({ method: 'POST' }).handler(
   },
 )
 
+const enrichRecordProgram = Effect.fn('enrichRecordProgram')(function* (
+  entityId: string,
+) {
+  const { enqueue } = yield* Effect.promise(() => import('../queue'))
+  const { QUEUES } = yield* Effect.promise(
+    () => import('@spaces/core/queue/names'),
+  )
+  const jobId = yield* Effect.promise(() =>
+    enqueue(QUEUES.enrichmentRun, { entityId, reason: 'Enrich pressed' }),
+  )
+  return { queued: jobId !== null }
+})
+
 /** Runs the host's enrichment on one record now: `enrichment.run`. Any member. */
 export const enrichRecord = createServerFn({ method: 'POST' })
-  .validator(z.object({ entityId: z.uuid() }))
+  .validator(
+    input(Schema.Struct({ entityId: Schema.String.check(Schema.isUUID()) })),
+  )
   .handler(async ({ data }) => {
     await requireUser()
-    const { enqueue } = await import('../queue')
-    const { QUEUES } = await import('@spaces/core/queue/names')
-    const jobId = await enqueue(QUEUES.enrichmentRun, {
-      entityId: data.entityId,
-      reason: 'Enrich pressed',
-    })
-    return { queued: jobId !== null }
+    return Effect.runPromise(enrichRecordProgram(data.entityId))
   })

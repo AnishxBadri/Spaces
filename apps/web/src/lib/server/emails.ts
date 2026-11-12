@@ -1,10 +1,12 @@
 import { createServerFn } from '@tanstack/react-start'
+import { Effect, Schema } from 'effect'
 import { z } from 'zod'
 import {
   draftAttachmentsSchema,
   draftRecipientsSchema,
 } from '@spaces/core/json'
 import { requireUser } from './shared'
+import { input } from './input'
 
 export type {
   EmailAttachment,
@@ -29,15 +31,20 @@ export type {
 } from '../interactions/email-variables'
 export type { EmailSender, Sent } from '../interactions/email-send'
 
+const uuid = Schema.String.check(Schema.isUUID())
+
+/** A uuid the caller may leave out; absent reads as null. */
+const uuidOrNull = Schema.NullOr(uuid).pipe(
+  Schema.withDecodingDefault(Effect.succeed(null)),
+)
+
 /**
  * The email window's read and its privacy writes.
  * The programs are imported inside the handlers so their sanitizer and
  * database code never reach the client bundle.
  */
 export const getEmail = createServerFn()
-  .validator(
-    z.object({ id: z.uuid(), recordId: z.uuid().nullable().default(null) }),
-  )
+  .validator(input(Schema.Struct({ id: uuid, recordId: uuidOrNull })))
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { emailDetailProgram, emailMessage } =
@@ -60,14 +67,17 @@ export const getEmail = createServerFn()
  */
 export const setEmailAudience = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      interactionId: z.uuid(),
-      userIds: z.array(z.string().min(1)).max(200),
-      record: z
-        .object({ id: z.uuid(), workspace: z.boolean() })
-        .nullable()
-        .default(null),
-    }),
+    input(
+      Schema.Struct({
+        interactionId: uuid,
+        userIds: Schema.Array(Schema.String.check(Schema.isMinLength(1))).check(
+          Schema.isMaxLength(200),
+        ),
+        record: Schema.NullOr(
+          Schema.Struct({ id: uuid, workspace: Schema.Boolean }),
+        ).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const user = await requireUser()
@@ -84,7 +94,7 @@ export const setEmailAudience = createServerFn({ method: 'POST' })
 
 /** Whether the caller's emails with this record are open to the workspace. */
 export const getRecordEmailVisibility = createServerFn()
-  .validator(z.object({ entityId: z.uuid() }))
+  .validator(input(Schema.Struct({ entityId: uuid })))
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { recordEmailVisibilityProgram } =
@@ -98,7 +108,9 @@ export const getRecordEmailVisibility = createServerFn()
 
 /** Opens or closes the caller's emails with this record to the workspace. */
 export const setRecordEmailVisibility = createServerFn({ method: 'POST' })
-  .validator(z.object({ entityId: z.uuid(), workspace: z.boolean() }))
+  .validator(
+    input(Schema.Struct({ entityId: uuid, workspace: Schema.Boolean })),
+  )
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { setRecordEmailVisibilityProgram, emailPrivacyMessage } =
@@ -132,7 +144,7 @@ export const countEmailDrafts = createServerFn().handler(async () => {
 })
 
 export const getEmailDraft = createServerFn()
-  .validator(z.object({ id: z.uuid() }))
+  .validator(input(Schema.Struct({ id: uuid })))
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { getDraftProgram, draftMessage } =
@@ -174,7 +186,7 @@ export const saveEmailDraft = createServerFn({ method: 'POST' })
 
 /** Trash. */
 export const deleteEmailDraft = createServerFn({ method: 'POST' })
-  .validator(z.object({ id: z.uuid() }))
+  .validator(input(Schema.Struct({ id: uuid })))
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { deleteDraftProgram } = await import('../interactions/email-drafts')
@@ -185,7 +197,7 @@ export const deleteEmailDraft = createServerFn({ method: 'POST' })
 
 /** Reply, reply all or forward from the email window. */
 export const openEmailReply = createServerFn()
-  .validator(z.object({ parentId: z.uuid() }))
+  .validator(input(Schema.Struct({ parentId: uuid })))
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { openReplyProgram, draftMessage } =
@@ -200,7 +212,9 @@ export const openEmailReply = createServerFn()
 
 /** The recipient chips' search: people by name or email alias. */
 export const searchEmailRecipients = createServerFn()
-  .validator(z.object({ q: z.string().max(200) }))
+  .validator(
+    input(Schema.Struct({ q: Schema.String.check(Schema.isMaxLength(200)) })),
+  )
   .handler(async ({ data }) => {
     await requireUser()
     const { searchRecipientsProgram } =
@@ -243,7 +257,7 @@ export const listEmailVariables = createServerFn().handler(async () => {
 
 /** Whether the composer may send: the viewer's Gmail, or the account to reconnect. */
 export const getEmailSender = createServerFn()
-  .validator(z.object({ parentId: z.uuid().nullable().default(null) }))
+  .validator(input(Schema.Struct({ parentId: uuidOrNull })))
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { emailSenderProgram } = await import('../interactions/email-send')
@@ -252,21 +266,39 @@ export const getEmailSender = createServerFn()
   })
 
 /**
+ * Every key of a record at most `max` characters. A key schema cannot say
+ * it: a record drops a key its key schema refuses rather than failing.
+ */
+const keysAtMost = (max: number) =>
+  Schema.makeFilter(
+    (o: { readonly [k: string]: unknown }) =>
+      Object.keys(o).every((k) => k.length <= max) ||
+      `Expected keys of at most ${max} characters`,
+  )
+
+/**
  * Send: the draft through the Gmail plugin, awaited. Review's fills come
  * with it; the server resolves every variable again.
  */
 export const sendEmailDraft = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      draftId: z.uuid(),
-      fills: z
-        .record(
-          z.string().max(320),
-          z.record(z.string().max(200), z.string().max(2000)),
+    input(
+      Schema.Struct({
+        draftId: uuid,
+        fills: Schema.Record(
+          Schema.String,
+          Schema.Record(
+            Schema.String,
+            Schema.String.check(Schema.isMaxLength(2000)),
+          ).check(keysAtMost(200)),
         )
-        .default({}),
-      accepted: z.array(z.string().max(320)).max(500).default([]),
-    }),
+          .check(keysAtMost(320))
+          .pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+        accepted: Schema.Array(Schema.String.check(Schema.isMaxLength(320)))
+          .check(Schema.isMaxLength(500))
+          .pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const user = await requireUser()
