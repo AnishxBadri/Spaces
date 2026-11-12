@@ -30,7 +30,7 @@ import type { AskResult } from '../../enrichment/sources'
 import { WebsiteReader } from '../../enrichment/website'
 import type { FetchedPage } from '../../enrichment/website'
 import { ModelCall } from '../ports/ai'
-import { jsonRecord, jsonValue } from '../../json'
+import { jsonRecord, toJson } from '../../json'
 import { Enqueue } from '../../queue/enqueue'
 import { createAttributeProgram } from '../attributes/create'
 import { setValues } from '../attributes/values'
@@ -79,7 +79,7 @@ const ports = (row: Row) =>
 
 const manifestFor = (id: string, name: string) =>
   jsonRecord(
-    jsonValue.parse(
+    toJson(
       toManifestJson(
         defineManifest({
           manifestVersion: 1,

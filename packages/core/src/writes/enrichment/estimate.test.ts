@@ -10,7 +10,7 @@ import { nextUtcMidnight } from '../../ai/caps'
 import { BULK_REASON } from '../../enrichment/estimate'
 import { EnrichmentSources } from '../../enrichment/sources'
 import { WebsiteReader } from '../../enrichment/website'
-import { jsonRecord, jsonValue } from '../../json'
+import { jsonRecord, toJson } from '../../json'
 import { capRefusal } from '@spaces/core/plugins/credit'
 import { Enqueue } from '../../queue/enqueue'
 import type { EnqueueOptions } from '../../queue/sender'
@@ -62,7 +62,7 @@ const at = <TOut, TErr>(effect: Effect.Effect<TOut, TErr, Enqueue>) =>
   )
 
 const manifest = jsonRecord(
-  jsonValue.parse(
+  toJson(
     toManifestJson(
       defineManifest({
         manifestVersion: 1,

@@ -1,4 +1,12 @@
-import { z } from 'zod'
+import {
+  Effect,
+  Result,
+  Schema,
+  SchemaIssue,
+  SchemaParser,
+  SchemaTransformation,
+} from 'effect'
+import type { SchemaAST } from 'effect'
 import { ENRICHMENT_VOCABULARY, isVocabularyKey } from '@spaces/sdk/vocabulary'
 import type { VocabularyType } from '@spaces/sdk/vocabulary'
 import type {
@@ -8,6 +16,7 @@ import type {
 } from '@spaces/db/schema/attributes'
 import type { IdentityKey } from '@spaces/db/schema/objects'
 import type { CoreIdentityKey } from '@spaces/db/schema/entities'
+import type { Json } from '@spaces/db/json'
 import {
   domainHost,
   isRoleEmail,
@@ -195,9 +204,140 @@ export type AttributeDef = {
   sortOrder: number
 }
 
-const dateString = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
+// ---------------------------------------------------------------------------
+// The words a refused value is given.
+// The record page, the import preview, the attribute dialog and the AI
+// review queue print a refusal as written, so every check below spells its
+// message out rather than taking Effect's default.
+// ---------------------------------------------------------------------------
+
+/** The runtime type a refusal says it received: `NaN` apart from `number`, a class by its name. */
+function receivedOf(u: unknown): string {
+  if (typeof u === 'number') return Number.isNaN(u) ? 'NaN' : 'number'
+  if (typeof u === 'object') {
+    if (u === null) return 'null'
+    if (Array.isArray(u)) return 'array'
+    const ctor: unknown = Reflect.get(u, 'constructor')
+    if (Object.getPrototypeOf(u) !== Object.prototype && ctor)
+      return String(Reflect.get(Object(ctor), 'name'))
+  }
+  return typeof u
+}
+
+/** `Invalid input: expected string, received number`. */
+const typeWords = (expected: string, input: unknown): string =>
+  `Invalid input: expected ${expected}, received ${receivedOf(input)}`
+
+const EXPECTED: Partial<Record<SchemaAST.AST['_tag'], string>> = {
+  String: 'string',
+  Number: 'number',
+  Boolean: 'boolean',
+  Arrays: 'array',
+  Objects: 'object',
+  Never: 'never',
+}
+
+const words = SchemaIssue.makeFormatterStandardSchemaV1({
+  leafHook: (issue) =>
+    issue._tag === 'InvalidType' && SchemaIssue.hasInput(issue)
+      ? typeWords(EXPECTED[issue.ast._tag] ?? 'value', issue.input)
+      : SchemaIssue.defaultLeafHook(issue),
+})
+
+const unit = { string: 'characters', array: 'items' } as const
+
+/** A string or list at most `max` long. */
+const atMost = (max: number, origin: 'string' | 'array') =>
+  Schema.makeFilter(
+    (v: { readonly length: number }) =>
+      v.length <= max ||
+      `Too big: expected ${origin} to have <=${max} ${unit[origin]}`,
+  )
+
+/** A number that is not NaN and not infinite. */
+export const finite = Schema.makeFilter(
+  (n: number) => Number.isFinite(n) || typeWords('number', n),
+)
+
+/** A whole number in the safe integer range. */
+export const int = Schema.makeFilter((n: number) => {
+  if (!Number.isInteger(n))
+    return 'Invalid input: expected int, received number'
+  if (n > Number.MAX_SAFE_INTEGER)
+    return `Too big: expected int to be <=${Number.MAX_SAFE_INTEGER}`
+  if (n < Number.MIN_SAFE_INTEGER)
+    return `Too small: expected int to be >=${Number.MIN_SAFE_INTEGER}`
+  return undefined
+})
+
+/** A number from `min` to `max`, inclusive. */
+export const between = (min: number, max: number) =>
+  Schema.makeFilter((n: number) => {
+    if (n < min) return `Too small: expected number to be >=${min}`
+    if (n > max) return `Too big: expected number to be <=${max}`
+    return undefined
+  })
+
+const EMAIL =
+  /^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9-]*\.)+[A-Za-z]{2,}$/
+
+/** An email address, by the shape the browser's address fields accept. */
+export const emailString = Schema.String.check(
+  Schema.isPattern(EMAIL, { message: 'Invalid email address' }),
+)
+
+const UUID =
+  /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/
+
+/** An RFC 9562 UUID, or the nil and max UUIDs (the max one lower-case). */
+export const uuidString = Schema.String.check(
+  Schema.isPattern(UUID, { message: 'Invalid UUID' }),
+)
+
+/**
+ * A URL `new URL` can parse once trimmed, held trimmed. Any scheme: a URL
+ * attribute is a field like any other.
+ */
+const urlString = Schema.String.pipe(
+  Schema.decode(
+    SchemaTransformation.transformOrFail({
+      decode: (raw: string) =>
+        URL.canParse(raw.trim())
+          ? Effect.succeed(raw.trim())
+          : Effect.fail(
+              new SchemaIssue.InvalidValue({ message: 'Invalid URL' }),
+            ),
+      encode: (url: string) => Effect.succeed(url),
+    }),
+  ),
+)
+
+/** One value as the write path keeps it, or the first refusal in words. */
+export type DecodedValue<T> =
+  | { readonly success: true; readonly data: T; readonly message?: never }
+  | { readonly success: false; readonly data?: never; readonly message: string }
+
+/**
+ * `raw` decoded by one of this module's schemas, refused with the first
+ * issue's message — the one sentence each surface prints.
+ */
+export function decodeValue<T>(
+  schema: Schema.Decoder<T>,
+  raw: unknown,
+): DecodedValue<T> {
+  const decoded = SchemaParser.decodeUnknownResult(schema, {
+    reportInput: true,
+  })(raw)
+  if (Result.isSuccess(decoded)) return { success: true, data: decoded.success }
+  return {
+    success: false,
+    message: words(decoded.failure).issues.at(0)?.message ?? 'Invalid value',
+  }
+}
+
+const dateString = Schema.String.check(
+  Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/, { message: 'Expected YYYY-MM-DD' }),
+)
 
 /**
  * The normal form each identity key is compared in — the same functions
@@ -244,10 +384,10 @@ export function storableIdentity(
   const { slug } = CORE_IDENTITY[kind]
   const def = SYSTEM_ATTRIBUTES[kind].find((d) => d.slug === slug)
   if (!def) return false
-  return valueValidator({
-    type: def.type,
-    options: def.options ?? {},
-  }).safeParse([raw]).success
+  return decodeValue(
+    valueValidator({ type: def.type, options: def.options ?? {} }),
+    [raw],
+  ).success
 }
 
 /**
@@ -266,28 +406,31 @@ export function identityForm(key: CoreIdentityKey, raw: string): string | null {
   return IDENTITY_FORMS[key](raw)
 }
 
+type Text = Schema.Decoder<string>
+
 /**
  * An identity-backed value has to survive normalization, because the claim
  * it makes is the normalized form; a role address survives it and
- * is stored as non-identity (`isNonIdentityValue`). `domain` is `z.string().max(255)`
- * for everyone else — deliberately permissive, it is a field like any other
- * — but on an attribute carrying `options.identityKey` a value that
- * normalizes to null would be stored and then silently claim nothing, which
- * is the one failure the whole mirror exists to prevent. Free mail is the
- * everyday case: gmail.com is a real domain and a real string, and it
- * identifies nobody.
+ * is stored as non-identity (`isNonIdentityValue`). `domain` is a string of
+ * at most 255 for everyone else — deliberately permissive, it is a field
+ * like any other — but on an attribute carrying `options.identityKey` a
+ * value that normalizes to null would be stored and then silently claim
+ * nothing, which is the one failure the whole mirror exists to prevent. Free
+ * mail is the everyday case: gmail.com is a real domain and a real string,
+ * and it identifies nobody.
  */
-const identityValue = (
-  base: z.ZodType<string, string>,
-  key: CoreIdentityKey,
-): z.ZodType<string, string> =>
-  base.superRefine((raw, ctx) => {
-    if (IDENTITY_FORMS[key](raw) !== null) return
-    ctx.addIssue({
-      code: 'custom',
-      message: `${raw.trim().toLowerCase()} never identifies a record`,
-    })
-  })
+const identityValue = (base: Text, key: CoreIdentityKey): Text =>
+  base.pipe(
+    Schema.decodeTo(
+      Schema.String.check(
+        Schema.makeFilter(
+          (raw: string) =>
+            IDENTITY_FORMS[key](raw) !== null ||
+            `${raw.trim().toLowerCase()} never identifies a record`,
+        ),
+      ),
+    ),
+  )
 
 /** Elements a multi-valued `email` or `domain` attribute may hold. */
 const MAX_MULTI_TEXT = 50
@@ -299,28 +442,35 @@ const MAX_MULTI_TEXT = 50
  * otherwise. The first spelling wins.
  */
 const multiText = (
-  element: z.ZodType<string, string>,
+  element: Text,
   key: CoreIdentityKey | undefined,
   type: 'email' | 'domain',
-) =>
-  z
-    .array(z.string().trim().pipe(element))
-    .max(MAX_MULTI_TEXT)
-    .transform((items) => {
-      const seen = new Set<string>()
-      const out: Array<string> = []
-      for (const raw of items) {
-        const value = identityElement(type, raw)
-        const norm = key ? (identityForm(key, value) ?? value) : value
-        if (seen.has(norm)) continue
-        seen.add(norm)
-        out.push(value)
-      }
-      return out
-    })
+): Schema.Decoder<Array<string>> =>
+  Schema.mutable(Schema.Array(Schema.Trim.pipe(Schema.decodeTo(element))))
+    .check(atMost(MAX_MULTI_TEXT, 'array'))
+    .pipe(
+      Schema.decode(
+        SchemaTransformation.transform({
+          decode: (items: Array<string>) => {
+            const seen = new Set<string>()
+            const out: Array<string> = []
+            for (const raw of items) {
+              const value = identityElement(type, raw)
+              const norm = key ? (identityForm(key, value) ?? value) : value
+              if (seen.has(norm)) continue
+              seen.add(norm)
+              out.push(value)
+            }
+            return out
+          },
+          encode: (items: Array<string>) => items,
+        }),
+      ),
+    )
 
 /**
- * Validator for one attribute's value (null clears — always allowed).
+ * The schema for one attribute's value (null clears — always allowed, and
+ * never handed here). Decode with `decodeValue`, which words a refusal.
  *
  * `held` is the value the record currently stores. An archived option is
  * history, not vocabulary: a write may keep one the record already
@@ -330,90 +480,94 @@ const multiText = (
 export function valueValidator(
   def: Pick<AttributeDef, 'type' | 'options'>,
   held?: unknown,
-) {
+): Schema.Decoder<Json> {
   const options = def.options.options ?? []
   const identityKey = def.options.identityKey
   const heldIds = new Set(
     Array.isArray(held) ? held.map(String) : held == null ? [] : [String(held)],
   )
-  // Not z.enum: that wants a non-empty literal tuple, which an option list
-  // read out of the registry can never be without an assertion.
-  const liveOption = () =>
-    z.string().superRefine((id, ctx) => {
+  const liveOption = Schema.String.check(
+    Schema.makeFilter((id: string) => {
       const opt = options.find((o) => o.id === id)
-      if (!opt) {
-        ctx.addIssue({ code: 'custom', message: 'Not one of the options' })
-        return
-      }
+      if (!opt) return 'Not one of the options'
       if (opt.archived && !heldIds.has(id))
-        ctx.addIssue({
-          code: 'custom',
-          message: `"${opt.label}" is archived — pick a current option`,
-        })
-    })
+        return `"${opt.label}" is archived — pick a current option`
+      return undefined
+    }),
+  )
   switch (def.type) {
     case 'text':
-      return z.string().max(2000)
+      return Schema.String.check(atMost(2000, 'string'))
     case 'domain': {
-      const base = z.string().max(255)
+      const base = Schema.String.check(atMost(255, 'string'))
       const one = identityKey ? identityValue(base, identityKey) : base
       return def.options.multi ? multiText(one, identityKey, 'domain') : one
     }
     case 'phone': {
       // A number the record already holds is kept as written, so a value
       // stored before E.164 does not block the write that adds a second.
-      const one = z
-        .string()
-        .trim()
-        .max(40)
-        .transform((raw, ctx) => {
-          if (heldIds.has(raw)) return raw
-          const e164 = toE164(raw)
-          if (e164 !== null) return e164
-          ctx.addIssue({ code: 'custom', message: phoneProblem(raw) })
-          return z.NEVER
-        })
+      const one = Schema.Trim.check(atMost(40, 'string')).pipe(
+        Schema.decode(
+          SchemaTransformation.transformOrFail({
+            decode: (raw: string) => {
+              if (heldIds.has(raw)) return Effect.succeed(raw)
+              const e164 = toE164(raw)
+              return e164 !== null
+                ? Effect.succeed(e164)
+                : Effect.fail(
+                    new SchemaIssue.InvalidValue({
+                      message: phoneProblem(raw),
+                    }),
+                  )
+            },
+            encode: (phone: string) => Effect.succeed(phone),
+          }),
+        ),
+      )
       return def.options.multi
-        ? z
-            .array(one)
-            .max(MAX_MULTI_TEXT)
-            .transform((items) => [...new Set(items)])
+        ? Schema.mutable(Schema.Array(one))
+            .check(atMost(MAX_MULTI_TEXT, 'array'))
+            .pipe(
+              Schema.decode(
+                SchemaTransformation.transform({
+                  decode: (items: Array<string>) => [...new Set(items)],
+                  encode: (items: Array<string>) => items,
+                }),
+              ),
+            )
         : one
     }
     case 'email': {
-      const base = z.string().email().max(255)
+      const base = emailString.check(atMost(255, 'string'))
       const one = identityKey ? identityValue(base, identityKey) : base
       return def.options.multi ? multiText(one, identityKey, 'email') : one
     }
     case 'url': {
-      const base = z.string().url().max(500)
+      const base = urlString.check(atMost(500, 'string'))
       return identityKey ? identityValue(base, identityKey) : base
     }
     case 'number':
-      return z.number().finite()
     case 'currency':
-      return z.number().finite()
+      return Schema.Number.check(finite)
     case 'rating':
-      return z
-        .number()
-        .int()
-        .min(1)
-        .max(def.options.max ?? 5)
+      return Schema.Number.check(finite, int, between(1, def.options.max ?? 5))
     case 'date':
       return dateString
     case 'checkbox':
-      return z.boolean()
+      return Schema.Boolean
     case 'select':
     case 'status':
-      return options.length > 0 ? liveOption() : z.never()
+      return options.length > 0 ? liveOption : Schema.Never
     case 'multi_select':
-      return options.length > 0 ? z.array(liveOption()).max(50) : z.never()
+      return options.length > 0
+        ? Schema.mutable(Schema.Array(liveOption)).check(atMost(50, 'array'))
+        : Schema.Never
     case 'record_reference':
       return def.options.multi
-        ? z.array(z.string().uuid()).max(100)
-        : z.string().uuid()
+        ? Schema.mutable(Schema.Array(uuidString)).check(atMost(100, 'array'))
+        : uuidString
     case 'actor_reference':
-      return z.string().max(64)
+      return Schema.String.check(atMost(64, 'string'))
   }
 }
 

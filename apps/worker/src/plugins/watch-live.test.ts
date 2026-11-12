@@ -16,7 +16,7 @@ import {
   spaceWatch,
 } from '@spaces/db/schema'
 import type { SpaceWatchState } from '@spaces/db/schema'
-import { jsonRecord, jsonValue } from '@spaces/core/json'
+import { jsonRecord, toJson } from '@spaces/core/json'
 import { Enqueue } from '@spaces/core/queue/enqueue'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { runWatchNowProgram } from '@spaces/core/writes/watches/run'
@@ -194,7 +194,7 @@ beforeAll(async () => {
   await db
     .update(integration)
     .set({
-      manifest: jsonRecord(jsonValue.parse(wired?.manifest)),
+      manifest: jsonRecord(toJson(wired?.manifest)),
       status: 'enabled',
     })
     .where(eq(integration.id, integrationId))

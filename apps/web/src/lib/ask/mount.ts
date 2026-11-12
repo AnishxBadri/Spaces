@@ -8,7 +8,7 @@ import type { IntegrationConfig } from '@spaces/db/schema'
 import { Http, decodeManifest } from '@spaces/sdk'
 import type { JobError, JsonValue, Manifest } from '@spaces/sdk'
 import { utcDayStart } from '@spaces/core/ai/caps'
-import { jsonValue } from '@spaces/core/json'
+import { toJson } from '@spaces/core/json'
 import {
   capRefusal,
   creditDefaults,
@@ -376,7 +376,7 @@ const mountOne = Effect.fn('ask.mountOne')(function* (
               .values({
                 entityId: null,
                 provider: source.pluginId,
-                raw: jsonValue.parse({ via: 'ask', tool, arguments: args }),
+                raw: toJson({ via: 'ask', tool, arguments: args }),
                 creditsUsed: MCP_CALL_CREDITS,
                 integrationId: source.integrationId,
               })
@@ -425,7 +425,7 @@ const mountOne = Effect.fn('ask.mountOne')(function* (
           db
             .update(enrichmentRecord)
             .set({
-              raw: jsonValue.parse({ via: 'ask', tool, arguments: args, text }),
+              raw: toJson({ via: 'ask', tool, arguments: args, text }),
             })
             .where(eq(enrichmentRecord.id, charged.receiptId)),
         ),

@@ -21,7 +21,7 @@ import { recordContextProgram } from '@spaces/core/writes/context/record'
 import { SimilarLaneLive } from './similar'
 import { ref } from '@spaces/core/context/ref'
 import type { ContextItem } from '@spaces/core/context/types'
-import { jsonValue } from '@spaces/core/json'
+import { readJson } from '@spaces/core/json'
 import { enqueue, jobsByKey } from '#/lib/queue'
 import type { QueuedJob } from '#/lib/queue'
 import { storage } from '@spaces/core/writes/storage'
@@ -621,7 +621,7 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
     if (Object.keys(read.proposal).length > 0) {
       // The values came off the wire as JSON and passed the validators, so
       // this decode is the type's claim made once, not a filter that bites.
-      const payload = jsonValue.safeParse(read.proposal)
+      const payload = readJson(read.proposal)
       if (!payload.success)
         return yield* new ReadDeckRefused({
           message: 'The model answered with something that is not JSON',

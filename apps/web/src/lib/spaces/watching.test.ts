@@ -11,7 +11,7 @@ import {
   spaceWatch,
 } from '@spaces/db/schema'
 import { defineManifest, toManifestJson } from '@spaces/sdk'
-import { jsonRecord, jsonValue } from '@spaces/core/json'
+import { jsonRecord, toJson } from '@spaces/core/json'
 import {
   addSpaceWatchProgram,
   spaceMovingProgram,
@@ -25,7 +25,7 @@ import {
 
 const manifest = (id: string, name: string, watch: boolean) =>
   jsonRecord(
-    jsonValue.parse(
+    toJson(
       toManifestJson(
         defineManifest({
           manifestVersion: 1,

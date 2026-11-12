@@ -1,7 +1,7 @@
 import { ENRICHMENT_VOCABULARY, isVocabularyKey } from '@spaces/sdk/vocabulary'
 import type { VocabularyKey } from '@spaces/sdk/vocabulary'
 import type { Json } from '@spaces/db/json'
-import { valueValidator } from '../attributes/registry'
+import { decodeValue, valueValidator } from '../attributes/registry'
 import type { AttributeDef } from '../attributes/registry'
 import { normalizeDomain } from '@spaces/sdk/identity'
 import { toE164 } from '../attributes/phone'
@@ -225,7 +225,7 @@ const fieldOf = (
   answer: SourceAnswer,
 ): { value: Json; outcome: FieldOutcome } => {
   const value = toAttributeValue(def, raw)
-  const valid = valueValidator(def, holding.value).safeParse(value)
+  const valid = decodeValue(valueValidator(def, holding.value), value)
   return valid.success
     ? {
         value: valid.data,

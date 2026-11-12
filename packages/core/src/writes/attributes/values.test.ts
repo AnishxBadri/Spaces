@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { valueValidator } from '../../attributes/registry'
+import { decodeValue, valueValidator } from '../../attributes/registry'
 import type {
   AttributeDef,
   AttributeOptions,
@@ -14,26 +14,26 @@ describe('valueValidator', () => {
       type: 'select' as const,
       options: { options: [{ id: 'seed', label: 'Seed' }] },
     }
-    expect(valueValidator(def).safeParse('seed').success).toBe(true)
-    expect(valueValidator(def).safeParse('ipo').success).toBe(false)
+    expect(decodeValue(valueValidator(def), 'seed').success).toBe(true)
+    expect(decodeValue(valueValidator(def), 'ipo').success).toBe(false)
   })
   it('validates rating bounds from options', () => {
     const def = { type: 'rating' as const, options: { max: 5 } }
-    expect(valueValidator(def).safeParse(5).success).toBe(true)
-    expect(valueValidator(def).safeParse(6).success).toBe(false)
+    expect(decodeValue(valueValidator(def), 5).success).toBe(true)
+    expect(decodeValue(valueValidator(def), 6).success).toBe(false)
   })
   it('validates date shape', () => {
     const def = { type: 'date' as const, options: {} }
-    expect(valueValidator(def).safeParse('2026-07-30').success).toBe(true)
-    expect(valueValidator(def).safeParse('30/07/2026').success).toBe(false)
+    expect(decodeValue(valueValidator(def), '2026-07-30').success).toBe(true)
+    expect(decodeValue(valueValidator(def), '30/07/2026').success).toBe(false)
   })
   it('multi record_reference wants uuid arrays', () => {
     const def = {
       type: 'record_reference' as const,
       options: { multi: true },
     }
-    expect(valueValidator(def).safeParse([randomUUID()]).success).toBe(true)
-    expect(valueValidator(def).safeParse(randomUUID()).success).toBe(false)
+    expect(decodeValue(valueValidator(def), [randomUUID()]).success).toBe(true)
+    expect(decodeValue(valueValidator(def), randomUUID()).success).toBe(false)
   })
 
   it('rejects an archived option with a clear message unless already held', () => {
@@ -44,24 +44,24 @@ describe('valueValidator', () => {
       ],
     }
     const select = { type: 'select' as const, options }
-    const fresh = valueValidator(select).safeParse('angel')
+    const fresh = decodeValue(valueValidator(select), 'angel')
     expect(fresh.success).toBe(false)
-    expect(fresh.error?.issues[0]?.message).toBe(
+    expect(fresh.message).toBe(
       '"Angel round" is archived — pick a current option',
     )
-    expect(valueValidator(select).safeParse('seed').success).toBe(true)
+    expect(decodeValue(valueValidator(select), 'seed').success).toBe(true)
     // Re-asserting what the record already holds is not a new assertion.
-    expect(valueValidator(select, 'angel').safeParse('angel').success).toBe(
+    expect(decodeValue(valueValidator(select, 'angel'), 'angel').success).toBe(
       true,
     )
 
     const multi = { type: 'multi_select' as const, options }
-    expect(valueValidator(multi).safeParse(['seed', 'angel']).success).toBe(
+    expect(decodeValue(valueValidator(multi), ['seed', 'angel']).success).toBe(
       false,
     )
     // A multi-select gaining a tag keeps its retired one.
     expect(
-      valueValidator(multi, ['angel']).safeParse(['angel', 'seed']).success,
+      decodeValue(valueValidator(multi, ['angel']), ['angel', 'seed']).success,
     ).toBe(true)
   })
 })

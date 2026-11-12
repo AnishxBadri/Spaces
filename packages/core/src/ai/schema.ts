@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { liveOptions } from '../attributes/options'
-import { valueValidator } from '../attributes/registry'
+import { decodeValue, valueValidator } from '../attributes/registry'
 import { isDerived } from '../attributes/relationship'
 import type { AttributeDef } from '../attributes/registry'
 
@@ -245,16 +245,27 @@ const fieldValidator = z
   })
   .strict()
 
-function validateValue(def: SchemaAttribute, value: unknown) {
-  if (def.type === 'record_reference')
-    return def.options.multi
+/** One answer's value, refused with the first issue's message. */
+function validateValue(
+  def: SchemaAttribute,
+  value: unknown,
+): { success: true; data: unknown } | { success: false; message: string } {
+  if (def.type === 'record_reference') {
+    const claims = def.options.multi
       ? z.array(claimValidator).max(100).safeParse(value)
       : claimValidator.safeParse(value)
+    return claims.success
+      ? { success: true, data: claims.data }
+      : {
+          success: false,
+          message: claims.error.issues[0]?.message ?? 'Invalid value',
+        }
+  }
   // No `held`: a proposal is always a fresh assertion. A record keeping an
   // archived option it already holds is the write path's allowance for a
   // human editing around history; a model naming that option is asserting
   // it anew, which is exactly what archiving forbids.
-  return valueValidator(def).safeParse(value)
+  return decodeValue(valueValidator(def), value)
 }
 
 /**
@@ -301,7 +312,7 @@ export function validateProposal(
     if (!value.success) {
       issues.push({
         slug,
-        message: `${slug}: ${value.error.issues[0]?.message ?? 'Invalid value'}`,
+        message: `${slug}: ${value.message}`,
       })
       continue
     }

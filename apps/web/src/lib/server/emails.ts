@@ -1,10 +1,10 @@
 import { createServerFn } from '@tanstack/react-start'
 import { Effect, Schema } from 'effect'
-import { z } from 'zod'
 import {
   draftAttachmentsSchema,
   draftRecipientsSchema,
 } from '@spaces/core/json'
+import { uuidString } from '@spaces/core/attributes/registry'
 import { requireUser } from './shared'
 import { input } from './input'
 
@@ -160,17 +160,19 @@ export const getEmailDraft = createServerFn()
 /** The autosave: one upsert by the id the composer minted. */
 export const saveEmailDraft = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      id: z.uuid(),
-      mode: z.enum(['new', 'reply', 'reply_all', 'forward']),
-      inReplyToId: z.uuid().nullable(),
-      to: draftRecipientsSchema,
-      cc: draftRecipientsSchema,
-      bcc: draftRecipientsSchema,
-      subject: z.string().max(998),
-      bodyMd: z.string().max(200_000),
-      attachments: draftAttachmentsSchema,
-    }),
+    input(
+      Schema.Struct({
+        id: uuidString,
+        mode: Schema.Literals(['new', 'reply', 'reply_all', 'forward']),
+        inReplyToId: Schema.NullOr(uuidString),
+        to: draftRecipientsSchema,
+        cc: draftRecipientsSchema,
+        bcc: draftRecipientsSchema,
+        subject: Schema.String.check(Schema.isMaxLength(998)),
+        bodyMd: Schema.String.check(Schema.isMaxLength(200_000)),
+        attachments: draftAttachmentsSchema,
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const user = await requireUser()
@@ -226,13 +228,15 @@ export const searchEmailRecipients = createServerFn()
 /** Review: every variable the draft uses, resolved per recipient. */
 export const reviewEmailVariables = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      to: draftRecipientsSchema,
-      cc: draftRecipientsSchema,
-      bcc: draftRecipientsSchema,
-      subject: z.string().max(998),
-      bodyMd: z.string().max(200_000),
-    }),
+    input(
+      Schema.Struct({
+        to: draftRecipientsSchema,
+        cc: draftRecipientsSchema,
+        bcc: draftRecipientsSchema,
+        subject: Schema.String.check(Schema.isMaxLength(998)),
+        bodyMd: Schema.String.check(Schema.isMaxLength(200_000)),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     await requireUser()

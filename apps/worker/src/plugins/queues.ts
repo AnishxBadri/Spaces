@@ -12,7 +12,8 @@ import {
 import { runLinePrefix } from '@spaces/core/import/commit'
 import { fileJobData } from '@spaces/core/import/dialect'
 import type { FileJobData } from '@spaces/core/import/dialect'
-import { jsonRecord, jsonValue } from '@spaces/core/json'
+import { jsonRecord } from '@spaces/core/json'
+import { jsonValueZod } from '@spaces/core/json-zod'
 import type { Json } from '@spaces/core/json'
 import { pluginQueueName } from '@spaces/core/queue/names'
 import type { PluginQueueName } from '@spaces/core/queue/names'
@@ -543,7 +544,7 @@ const tickData = z.object({})
 
 /** What a watch job hands back, decoded once for the column. */
 const watchState = z.object({
-  state: z.record(z.string(), jsonValue).nullable(),
+  state: z.record(z.string(), jsonValueZod).nullable(),
 })
 
 const watchFailed = (what: string) => (cause: unknown) =>

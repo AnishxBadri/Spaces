@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { SYSTEM_ATTRIBUTES, valueValidator } from '../attributes/registry'
+import {
+  SYSTEM_ATTRIBUTES,
+  decodeValue,
+  valueValidator,
+} from '../attributes/registry'
 import type { AttributeDef, AttributeType } from '../attributes/registry'
 import { schemaFor, toPatch, validateProposal, proposalRefs } from './schema'
 import type { JsonSchema, SchemaAttribute } from './schema'
@@ -227,10 +231,10 @@ describe('validateProposal', () => {
     // a fresh assertion of one never does.
     const sector = everyType.find((d) => d.slug === 'sector')
     if (!sector) throw new Error('fixture')
-    expect(valueValidator(sector, 'crypto').safeParse('crypto').success).toBe(
-      true,
-    )
-    expect(valueValidator(sector).safeParse('crypto').success).toBe(false)
+    expect(
+      decodeValue(valueValidator(sector, 'crypto'), 'crypto').success,
+    ).toBe(true)
+    expect(decodeValue(valueValidator(sector), 'crypto').success).toBe(false)
   })
 
   it('validates as a fresh write, even for a value the record already holds', () => {

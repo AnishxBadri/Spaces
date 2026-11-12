@@ -30,6 +30,7 @@ import {
 import type { EmbedSource } from '../ai/chunk-sources'
 import {
   coreKindOf,
+  decodeValue,
   identityNorm,
   isNonIdentityValue,
   toObjectKind,
@@ -179,13 +180,8 @@ export const planPatch = Effect.fn('planPatch')(function* (
         Array.isArray(raw)
       )
         return yield* invalid(slug, holdsOne(def))
-      const parsed = valueValidator(def, current[slug]).safeParse(raw)
-      if (!parsed.success) {
-        return yield* invalid(
-          slug,
-          parsed.error.issues[0]?.message ?? 'Invalid value',
-        )
-      }
+      const parsed = decodeValue(valueValidator(def, current[slug]), raw)
+      if (!parsed.success) return yield* invalid(slug, parsed.message)
       value = parsed.data
     }
 
@@ -1086,12 +1082,8 @@ async function planInverse(
     if (raw !== undefined && raw !== null && raw !== '') {
       if (!def.options.multi && Array.isArray(raw))
         throw invalid(def.slug, holdsOne(def))
-      const parsed = valueValidator(def).safeParse(raw)
-      if (!parsed.success)
-        throw invalid(
-          def.slug,
-          parsed.error.issues[0]?.message ?? 'Invalid value',
-        )
+      const parsed = decodeValue(valueValidator(def), raw)
+      if (!parsed.success) throw invalid(def.slug, parsed.message)
       value = parsed.data
     }
     const pairId = def.options.inverseOf

@@ -1,3 +1,4 @@
+import { Schema } from 'effect'
 import { z } from 'zod'
 import type {
   AiAttributeConfig,
@@ -93,11 +94,11 @@ export function renderAiPrompt(
 }
 
 /** The config panel's write, as the update boundary decodes it. */
-export const aiConfigInput = z.object({
-  mode: z.enum(AI_ATTRIBUTE_MODES),
-  prompt: z.string().trim().max(2000),
+export const aiConfigInput = Schema.Struct({
+  mode: Schema.Literals(AI_ATTRIBUTE_MODES),
+  prompt: Schema.Trim.check(Schema.isMaxLength(2000)),
 })
-export type AiConfigInput = z.infer<typeof aiConfigInput>
+export type AiConfigInput = typeof aiConfigInput.Type
 
 /**
  * The stored shape, read leniently: a row written before a mode was

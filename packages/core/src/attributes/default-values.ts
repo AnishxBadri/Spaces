@@ -1,4 +1,4 @@
-import { valueValidator } from './registry'
+import { decodeValue, valueValidator } from './registry'
 import type { AttributeDef } from './registry'
 
 /**
@@ -60,10 +60,9 @@ export function validateDefault(
       : "Expected 'current-user' or a user id"
   }
   if (def.type === 'date' && isIsoDuration(value)) return null
-  const parsed = valueValidator(def).safeParse(value)
+  const parsed = decodeValue(valueValidator(def), value)
   if (parsed.success) return null
-  const detail = parsed.error.issues[0]?.message ?? 'Invalid value'
   return def.type === 'date'
-    ? `${detail}, or an ISO-8601 duration such as P7D`
-    : detail
+    ? `${parsed.message}, or an ISO-8601 duration such as P7D`
+    : parsed.message
 }

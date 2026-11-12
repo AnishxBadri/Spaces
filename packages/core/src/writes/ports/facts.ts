@@ -18,7 +18,7 @@ import type {
 } from '@spaces/sdk'
 import { EnrichmentCollector } from '../../enrichment/collector'
 import type { Collector } from '../../enrichment/collector'
-import { jsonRecord, jsonValue } from '../../json'
+import { jsonRecord, readJson } from '../../json'
 import { applyRun, linksForEntity } from '../enrichment/apply'
 import { ref } from '../../context/ref'
 import type { Enqueue } from '../../queue/enqueue'
@@ -238,7 +238,7 @@ export const FactsLive = (
           return yield* new JobPermanent({
             reason: `Facts.answer: asOf ${claim.asOf ?? ''} is not a date`,
           })
-        const answers = jsonValue.safeParse(claim.answers)
+        const answers = readJson(claim.answers)
         const decoded = answers.success ? jsonRecord(answers.data) : null
         if (decoded === null)
           return yield* new JobPermanent({

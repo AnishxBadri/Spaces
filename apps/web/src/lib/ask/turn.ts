@@ -4,7 +4,7 @@ import type { LanguageModel, ToolSet } from 'ai'
 import { z } from 'zod'
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { jsonRecord, jsonValue } from '@spaces/core/json'
+import { jsonRecord, readJson } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
 import type { FetchLike } from '@spaces/core/writes/ports/http'
 import { askThread, askTurn, entity, objectDef } from '@spaces/db/schema'
@@ -718,7 +718,7 @@ export async function* askEvents(asked: AskInput): AsyncGenerator<AskEvent> {
             description: `${t.description} (via ${via.name})`,
             inputSchema: jsonSchema<{ [k: string]: Json }>(t.inputSchema),
             execute: async (raw, { toolCallId }) => {
-              const args = jsonRecord(jsonValue.catch({}).parse(raw))
+              const args = jsonRecord(readJson(raw).data ?? {})
               const words = inputWords(args)
               if (gate.sensitive) {
                 calls.set(toolCallId, {

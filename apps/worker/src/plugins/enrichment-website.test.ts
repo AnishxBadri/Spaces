@@ -22,7 +22,7 @@ import {
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { EnrichmentSources } from '@spaces/core/enrichment/sources'
-import { jsonRecord, jsonValue } from '@spaces/core/json'
+import { jsonRecord, toJson } from '@spaces/core/json'
 import { Enqueue } from '@spaces/core/queue/enqueue'
 import { createAttributeProgram } from '@spaces/core/writes/attributes/create'
 import { updateAttributeProgram } from '@spaces/core/writes/attributes/update'
@@ -174,7 +174,7 @@ const PaidSource = Layer.succeed(
 
 const installPaidSource = async () => {
   const manifest = jsonRecord(
-    jsonValue.parse(
+    toJson(
       toManifestJson(
         defineManifest({
           manifestVersion: 1,

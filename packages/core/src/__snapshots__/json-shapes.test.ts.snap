@@ -1,0 +1,1194 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`aiConfigInput, characterised > a blank prompt 1`] = `
+[
+  {
+    "data": {
+      "mode": "summarize",
+      "prompt": "",
+    },
+    "ok": true,
+  },
+]
+`;
+
+exports[`aiConfigInput, characterised > a long padded prompt 1`] = `
+[
+  {
+    "data": {
+      "mode": "summarize",
+      "prompt": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    },
+    "ok": true,
+  },
+]
+`;
+
+exports[`aiConfigInput, characterised > a long prompt 1`] = `
+[
+  {
+    "ok": false,
+  },
+]
+`;
+
+exports[`aiConfigInput, characterised > a stray key 1`] = `
+[
+  {
+    "data": {
+      "mode": "summarize",
+      "prompt": "x",
+    },
+    "ok": true,
+  },
+]
+`;
+
+exports[`aiConfigInput, characterised > a summary 1`] = `
+[
+  {
+    "data": {
+      "mode": "summarize",
+      "prompt": "Why now?",
+    },
+    "ok": true,
+  },
+]
+`;
+
+exports[`aiConfigInput, characterised > an empty prompt 1`] = `
+[
+  {
+    "data": {
+      "mode": "summarize",
+      "prompt": "",
+    },
+    "ok": true,
+  },
+]
+`;
+
+exports[`aiConfigInput, characterised > every mode 1`] = `
+[
+  {
+    "data": {
+      "mode": "classify",
+      "prompt": "x",
+    },
+    "ok": true,
+  },
+  {
+    "data": {
+      "mode": "summarize",
+      "prompt": "x",
+    },
+    "ok": true,
+  },
+  {
+    "data": {
+      "mode": "research",
+      "prompt": "x",
+    },
+    "ok": true,
+  },
+  {
+    "ok": false,
+  },
+]
+`;
+
+exports[`aiConfigInput, characterised > no mode 1`] = `
+[
+  {
+    "ok": false,
+  },
+]
+`;
+
+exports[`aiConfigInput, characterised > no prompt 1`] = `
+[
+  {
+    "ok": false,
+  },
+]
+`;
+
+exports[`aiConfigInput, characterised > null 1`] = `
+[
+  {
+    "ok": false,
+  },
+]
+`;
+
+exports[`draftAttachmentsSchema, characterised > a bad id 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`draftAttachmentsSchema, characterised > a nil id 1`] = `
+{
+  "data": [
+    {
+      "documentId": "00000000-0000-0000-0000-000000000000",
+    },
+  ],
+  "ok": true,
+}
+`;
+
+exports[`draftAttachmentsSchema, characterised > a stray key 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`draftAttachmentsSchema, characterised > empty 1`] = `
+{
+  "data": [],
+  "ok": true,
+}
+`;
+
+exports[`draftAttachmentsSchema, characterised > fifty 1`] = `
+{
+  "data": [
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+  ],
+  "ok": true,
+}
+`;
+
+exports[`draftAttachmentsSchema, characterised > fifty-one 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`draftAttachmentsSchema, characterised > missing id 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`draftAttachmentsSchema, characterised > null 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`draftAttachmentsSchema, characterised > one 1`] = `
+{
+  "data": [
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+  ],
+  "ok": true,
+}
+`;
+
+exports[`draftRecipientsSchema, characterised > a bad address 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`draftRecipientsSchema, characterised > a bad entity id 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`draftRecipientsSchema, characterised > a full chip 1`] = `
+{
+  "data": [
+    {
+      "email": "ana@acme.io",
+      "entityId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+      "name": "Ana",
+    },
+  ],
+  "ok": true,
+}
+`;
+
+exports[`draftRecipientsSchema, characterised > a hundred 1`] = `
+{
+  "data": [
+    {
+      "email": "p0@acme.io",
+    },
+    {
+      "email": "p1@acme.io",
+    },
+    {
+      "email": "p2@acme.io",
+    },
+    {
+      "email": "p3@acme.io",
+    },
+    {
+      "email": "p4@acme.io",
+    },
+    {
+      "email": "p5@acme.io",
+    },
+    {
+      "email": "p6@acme.io",
+    },
+    {
+      "email": "p7@acme.io",
+    },
+    {
+      "email": "p8@acme.io",
+    },
+    {
+      "email": "p9@acme.io",
+    },
+    {
+      "email": "p10@acme.io",
+    },
+    {
+      "email": "p11@acme.io",
+    },
+    {
+      "email": "p12@acme.io",
+    },
+    {
+      "email": "p13@acme.io",
+    },
+    {
+      "email": "p14@acme.io",
+    },
+    {
+      "email": "p15@acme.io",
+    },
+    {
+      "email": "p16@acme.io",
+    },
+    {
+      "email": "p17@acme.io",
+    },
+    {
+      "email": "p18@acme.io",
+    },
+    {
+      "email": "p19@acme.io",
+    },
+    {
+      "email": "p20@acme.io",
+    },
+    {
+      "email": "p21@acme.io",
+    },
+    {
+      "email": "p22@acme.io",
+    },
+    {
+      "email": "p23@acme.io",
+    },
+    {
+      "email": "p24@acme.io",
+    },
+    {
+      "email": "p25@acme.io",
+    },
+    {
+      "email": "p26@acme.io",
+    },
+    {
+      "email": "p27@acme.io",
+    },
+    {
+      "email": "p28@acme.io",
+    },
+    {
+      "email": "p29@acme.io",
+    },
+    {
+      "email": "p30@acme.io",
+    },
+    {
+      "email": "p31@acme.io",
+    },
+    {
+      "email": "p32@acme.io",
+    },
+    {
+      "email": "p33@acme.io",
+    },
+    {
+      "email": "p34@acme.io",
+    },
+    {
+      "email": "p35@acme.io",
+    },
+    {
+      "email": "p36@acme.io",
+    },
+    {
+      "email": "p37@acme.io",
+    },
+    {
+      "email": "p38@acme.io",
+    },
+    {
+      "email": "p39@acme.io",
+    },
+    {
+      "email": "p40@acme.io",
+    },
+    {
+      "email": "p41@acme.io",
+    },
+    {
+      "email": "p42@acme.io",
+    },
+    {
+      "email": "p43@acme.io",
+    },
+    {
+      "email": "p44@acme.io",
+    },
+    {
+      "email": "p45@acme.io",
+    },
+    {
+      "email": "p46@acme.io",
+    },
+    {
+      "email": "p47@acme.io",
+    },
+    {
+      "email": "p48@acme.io",
+    },
+    {
+      "email": "p49@acme.io",
+    },
+    {
+      "email": "p50@acme.io",
+    },
+    {
+      "email": "p51@acme.io",
+    },
+    {
+      "email": "p52@acme.io",
+    },
+    {
+      "email": "p53@acme.io",
+    },
+    {
+      "email": "p54@acme.io",
+    },
+    {
+      "email": "p55@acme.io",
+    },
+    {
+      "email": "p56@acme.io",
+    },
+    {
+      "email": "p57@acme.io",
+    },
+    {
+      "email": "p58@acme.io",
+    },
+    {
+      "email": "p59@acme.io",
+    },
+    {
+      "email": "p60@acme.io",
+    },
+    {
+      "email": "p61@acme.io",
+    },
+    {
+      "email": "p62@acme.io",
+    },
+    {
+      "email": "p63@acme.io",
+    },
+    {
+      "email": "p64@acme.io",
+    },
+    {
+      "email": "p65@acme.io",
+    },
+    {
+      "email": "p66@acme.io",
+    },
+    {
+      "email": "p67@acme.io",
+    },
+    {
+      "email": "p68@acme.io",
+    },
+    {
+      "email": "p69@acme.io",
+    },
+    {
+      "email": "p70@acme.io",
+    },
+    {
+      "email": "p71@acme.io",
+    },
+    {
+      "email": "p72@acme.io",
+    },
+    {
+      "email": "p73@acme.io",
+    },
+    {
+      "email": "p74@acme.io",
+    },
+    {
+      "email": "p75@acme.io",
+    },
+    {
+      "email": "p76@acme.io",
+    },
+    {
+      "email": "p77@acme.io",
+    },
+    {
+      "email": "p78@acme.io",
+    },
+    {
+      "email": "p79@acme.io",
+    },
+    {
+      "email": "p80@acme.io",
+    },
+    {
+      "email": "p81@acme.io",
+    },
+    {
+      "email": "p82@acme.io",
+    },
+    {
+      "email": "p83@acme.io",
+    },
+    {
+      "email": "p84@acme.io",
+    },
+    {
+      "email": "p85@acme.io",
+    },
+    {
+      "email": "p86@acme.io",
+    },
+    {
+      "email": "p87@acme.io",
+    },
+    {
+      "email": "p88@acme.io",
+    },
+    {
+      "email": "p89@acme.io",
+    },
+    {
+      "email": "p90@acme.io",
+    },
+    {
+      "email": "p91@acme.io",
+    },
+    {
+      "email": "p92@acme.io",
+    },
+    {
+      "email": "p93@acme.io",
+    },
+    {
+      "email": "p94@acme.io",
+    },
+    {
+      "email": "p95@acme.io",
+    },
+    {
+      "email": "p96@acme.io",
+    },
+    {
+      "email": "p97@acme.io",
+    },
+    {
+      "email": "p98@acme.io",
+    },
+    {
+      "email": "p99@acme.io",
+    },
+  ],
+  "ok": true,
+}
+`;
+
+exports[`draftRecipientsSchema, characterised > a hundred and one 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`draftRecipientsSchema, characterised > a long address 1`] = `
+{
+  "data": [
+    {
+      "email": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@acme.io",
+    },
+  ],
+  "ok": true,
+}
+`;
+
+exports[`draftRecipientsSchema, characterised > a long name 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`draftRecipientsSchema, characterised > a null name 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`draftRecipientsSchema, characterised > a padded address 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`draftRecipientsSchema, characterised > a stray key 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`draftRecipientsSchema, characterised > a string 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`draftRecipientsSchema, characterised > an undefined entity id 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`draftRecipientsSchema, characterised > an upper-case address 1`] = `
+{
+  "data": [
+    {
+      "email": "Ana@Acme.IO",
+    },
+  ],
+  "ok": true,
+}
+`;
+
+exports[`draftRecipientsSchema, characterised > an upper-case entity id 1`] = `
+{
+  "data": [
+    {
+      "email": "ana@acme.io",
+      "entityId": "0B6AD7A2-6A3E-4C4F-9A43-5D1F1D8B6C11",
+    },
+  ],
+  "ok": true,
+}
+`;
+
+exports[`draftRecipientsSchema, characterised > empty 1`] = `
+{
+  "data": [],
+  "ok": true,
+}
+`;
+
+exports[`draftRecipientsSchema, characterised > not a list 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`draftRecipientsSchema, characterised > one address 1`] = `
+{
+  "data": [
+    {
+      "email": "ana@acme.io",
+    },
+  ],
+  "ok": true,
+}
+`;
+
+exports[`jsonValue, characterised > Infinity 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`jsonValue, characterised > NaN 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`jsonValue, characterised > a bigint 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`jsonValue, characterised > a class instance 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`jsonValue, characterised > a date 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`jsonValue, characterised > a function 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`jsonValue, characterised > a map 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`jsonValue, characterised > a negative 1`] = `
+{
+  "data": -1.5,
+  "ok": true,
+}
+`;
+
+exports[`jsonValue, characterised > a null-prototype object 1`] = `
+{
+  "data": {
+    "a": 1,
+  },
+  "ok": true,
+}
+`;
+
+exports[`jsonValue, characterised > a sparse array 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`jsonValue, characterised > a string 1`] = `
+{
+  "data": "x",
+  "ok": true,
+}
+`;
+
+exports[`jsonValue, characterised > a symbol 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`jsonValue, characterised > an array holding undefined 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`jsonValue, characterised > an array of mixed 1`] = `
+{
+  "data": [
+    1,
+    "a",
+    null,
+    false,
+  ],
+  "ok": true,
+}
+`;
+
+exports[`jsonValue, characterised > an empty array 1`] = `
+{
+  "data": [],
+  "ok": true,
+}
+`;
+
+exports[`jsonValue, characterised > an empty string 1`] = `
+{
+  "data": "",
+  "ok": true,
+}
+`;
+
+exports[`jsonValue, characterised > an object holding NaN 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`jsonValue, characterised > an object holding a date 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`jsonValue, characterised > an object holding a function 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`jsonValue, characterised > an object of objects 1`] = `
+{
+  "data": {
+    "a": {
+      "b": {
+        "c": "d",
+      },
+    },
+    "e": [],
+  },
+  "ok": true,
+}
+`;
+
+exports[`jsonValue, characterised > an object whose constructor is not a function 1`] = `
+{
+  "data": {
+    "a": 1,
+    "constructor": 1,
+  },
+  "ok": true,
+}
+`;
+
+exports[`jsonValue, characterised > an object with a __proto__ key 1`] = `
+{
+  "data": {
+    "a": 1,
+  },
+  "ok": true,
+}
+`;
+
+exports[`jsonValue, characterised > an object with a symbol key 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`jsonValue, characterised > an object with an undefined value 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`jsonValue, characterised > nested 1`] = `
+{
+  "data": {
+    "a": [
+      {
+        "b": {
+          "c": [
+            1,
+            {
+              "d": null,
+            },
+          ],
+        },
+      },
+    ],
+  },
+  "ok": true,
+}
+`;
+
+exports[`jsonValue, characterised > null 1`] = `
+{
+  "data": null,
+  "ok": true,
+}
+`;
+
+exports[`jsonValue, characterised > true 1`] = `
+{
+  "data": true,
+  "ok": true,
+}
+`;
+
+exports[`jsonValue, characterised > undefined 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`jsonValue, characterised > zero 1`] = `
+{
+  "data": 0,
+  "ok": true,
+}
+`;
+
+exports[`the json readers, characterised > readEmailTemplateBody: a bad attachment 1`] = `null`;
+
+exports[`the json readers, characterised > readEmailTemplateBody: a body 1`] = `
+{
+  "attachments": [
+    {
+      "documentId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+  ],
+  "body_md": "Hello",
+  "subject": "Hi",
+}
+`;
+
+exports[`the json readers, characterised > readEmailTemplateBody: a long subject 1`] = `null`;
+
+exports[`the json readers, characterised > readEmailTemplateBody: a stray key 1`] = `null`;
+
+exports[`the json readers, characterised > readEmailTemplateBody: missing attachments 1`] = `null`;
+
+exports[`the json readers, characterised > readEmailTemplateBody: null 1`] = `null`;
+
+exports[`the json readers, characterised > readInteractionMeta: a string 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`the json readers, characterised > readInteractionMeta: an unknown kind 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`the json readers, characterised > readInteractionMeta: call 1`] = `
+{
+  "meta": {
+    "duration_seconds": 60,
+    "kind": "call",
+    "provider_event_id": "e1",
+  },
+  "ok": true,
+}
+`;
+
+exports[`the json readers, characterised > readInteractionMeta: call with fractional duration 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`the json readers, characterised > readInteractionMeta: call with negative duration 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`the json readers, characterised > readInteractionMeta: call with null duration 1`] = `
+{
+  "meta": {
+    "duration_seconds": null,
+    "kind": "call",
+    "provider_event_id": "e1",
+  },
+  "ok": true,
+}
+`;
+
+exports[`the json readers, characterised > readInteractionMeta: email 1`] = `
+{
+  "meta": {
+    "cc": [],
+    "date": "2026-01-01T00:00:00Z",
+    "from": "a@acme.io",
+    "kind": "email",
+    "mime_blob_sha": null,
+    "to": [
+      "b@acme.io",
+    ],
+  },
+  "ok": true,
+}
+`;
+
+exports[`the json readers, characterised > readInteractionMeta: email missing cc 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`the json readers, characterised > readInteractionMeta: meeting 1`] = `
+{
+  "meta": {
+    "conference_url": null,
+    "ends_at": "2026-01-01T01:00:00Z",
+    "kind": "meeting",
+    "organizer": null,
+    "recurring_instance_id": null,
+    "rsvp": {
+      "a@acme.io": "accepted",
+    },
+    "status": "scheduled",
+  },
+  "ok": true,
+}
+`;
+
+exports[`the json readers, characterised > readInteractionMeta: meeting with a bad rsvp 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`the json readers, characterised > readInteractionMeta: meeting with recorder events 1`] = `
+{
+  "meta": {
+    "conference_url": null,
+    "ends_at": "2026-01-01T01:00:00Z",
+    "kind": "meeting",
+    "organizer": null,
+    "recorder_events": [
+      {
+        "provider_event_id": "p",
+        "receipt_id": "r",
+      },
+    ],
+    "recurring_instance_id": null,
+    "rsvp": {
+      "a@acme.io": "accepted",
+    },
+    "status": "scheduled",
+  },
+  "ok": true,
+}
+`;
+
+exports[`the json readers, characterised > readInteractionMeta: no kind 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`the json readers, characterised > readRecorderSettings: a full form 1`] = `
+{
+  "folderIds": [
+    "a",
+    "b",
+  ],
+  "transcript": true,
+  "typedNotes": true,
+}
+`;
+
+exports[`the json readers, characterised > readRecorderSettings: a stray key 1`] = `
+{
+  "folderIds": [
+    "a",
+  ],
+  "transcript": false,
+  "typedNotes": false,
+}
+`;
+
+exports[`the json readers, characterised > readRecorderSettings: a string list 1`] = `
+{
+  "folderIds": [],
+  "transcript": false,
+  "typedNotes": false,
+}
+`;
+
+exports[`the json readers, characterised > readRecorderSettings: an array 1`] = `
+{
+  "folderIds": [],
+  "transcript": false,
+  "typedNotes": false,
+}
+`;
+
+exports[`the json readers, characterised > readRecorderSettings: blank ids 1`] = `
+{
+  "folderIds": [],
+  "transcript": false,
+  "typedNotes": false,
+}
+`;
+
+exports[`the json readers, characterised > readRecorderSettings: null 1`] = `
+{
+  "folderIds": [],
+  "transcript": false,
+  "typedNotes": false,
+}
+`;
+
+exports[`the json readers, characterised > readRecorderSettings: strings for flags 1`] = `
+{
+  "folderIds": [],
+  "transcript": false,
+  "typedNotes": false,
+}
+`;

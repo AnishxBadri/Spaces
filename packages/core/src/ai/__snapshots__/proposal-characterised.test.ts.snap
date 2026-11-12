@@ -1,0 +1,700 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`validateProposal, characterised > a claim as a string 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid input: expected object, received string",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a claim list of 101 bad claims 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "founders: Too small: expected string to have >=1 characters",
+        "slug": "founders",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a claim list of strings 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "founders: Invalid input: expected object, received string",
+        "slug": "founders",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a claim list on a single reference 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid input: expected object, received array",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a claim list with a bad second claim 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "founders: Too small: expected string to have >=1 characters",
+        "slug": "founders",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a claim list with a blank role 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "founders: Too small: expected string to have >=1 characters",
+        "slug": "founders",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a claim that is a date 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid input: expected string, received undefined",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a claim that is null 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid input: expected object, received null",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a claim with a bad domain and a bad email 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid input: expected string, received number",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a claim with a bad email 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid email address",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a claim with a blank name 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Too small: expected string to have >=1 characters",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a claim with a long domain 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Too big: expected string to have <=255 characters",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a claim with a long name 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Too big: expected string to have <=500 characters",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a claim with an extra key 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Unrecognized key: "id"",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a claim with an extra key and a blank name 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Too small: expected string to have >=1 characters",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a claim with an extra key before a bad email 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid email address",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a claim with two extra keys 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Unrecognized keys: "id", "url"",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a claim without a name 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid input: expected string, received undefined",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a company claim 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "domain": "acme.io",
+          "name": "Acme",
+        },
+      },
+    },
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "domain": "acme.io",
+          "name": "Acme",
+        },
+      ],
+    },
+    "patch": {},
+  },
+}
+`;
+
+exports[`validateProposal, characterised > a date 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "A proposal is an object keyed by slug",
+        "slug": "",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a person claim list 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "founders": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": [
+          {
+            "linkedin": "https://linkedin.com/in/ana",
+            "name": "Ana",
+            "role": "CEO",
+          },
+          {
+            "email": "bo@acme.io",
+            "name": "Bo",
+          },
+        ],
+      },
+    },
+  },
+  "patch": {
+    "claims": {
+      "founders": [
+        {
+          "linkedin": "https://linkedin.com/in/ana",
+          "name": "Ana",
+          "role": "CEO",
+        },
+        {
+          "email": "bo@acme.io",
+          "name": "Bo",
+        },
+      ],
+    },
+    "patch": {},
+  },
+}
+`;
+
+exports[`validateProposal, characterised > a rating as a string 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "rating: Invalid input: expected number, received string",
+        "slug": "rating",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a rating of 2.5 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "rating: Invalid input: expected int, received number",
+        "slug": "rating",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a single claim on a list 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "founders: Invalid input: expected array, received object",
+        "slug": "founders",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a text too long 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: Too big: expected string to have <=2000 characters",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > a valid text 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "summary": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": "A fund",
+      },
+    },
+  },
+  "patch": {
+    "claims": {},
+    "patch": {
+      "summary": "A fund",
+    },
+  },
+}
+`;
+
+exports[`validateProposal, characterised > an archived attribute 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "gone: Unknown attribute",
+        "slug": "gone",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > an archived option 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "sector: "Crypto" is archived — pick a current option",
+        "slug": "sector",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > an array 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "A proposal is an object keyed by slug",
+        "slug": "",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > an envelope that is a string 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > an envelope with a numeric ref 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > an envelope with an extra key 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > an envelope with confidence 2 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > an envelope with confidence NaN 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > an envelope without value 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > an owner 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "owner: an owner is assigned by a person, never proposed",
+        "slug": "owner",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > an unknown option 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "sector: Not one of the options",
+        "slug": "sector",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > an unknown slug 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "nope: Unknown attribute",
+        "slug": "nope",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > empty 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {},
+  },
+  "patch": {
+    "claims": {},
+    "patch": {},
+  },
+}
+`;
+
+exports[`validateProposal, characterised > not an object 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "A proposal is an object keyed by slug",
+        "slug": "",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > null 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "A proposal is an object keyed by slug",
+        "slug": "",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > too many claims 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "founders: Too big: expected array to have <=100 items",
+        "slug": "founders",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;
+
+exports[`validateProposal, characterised > two bad fields at once 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: Invalid input: expected string, received number",
+        "slug": "summary",
+      },
+      {
+        "message": "rating: Too big: expected number to be <=5",
+        "slug": "rating",
+      },
+    ],
+    "ok": false,
+  },
+  "patch": null,
+}
+`;

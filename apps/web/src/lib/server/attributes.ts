@@ -1,12 +1,17 @@
 import { createServerFn } from '@tanstack/react-start'
-import { Effect, Schema } from 'effect'
+import { Effect, Schema, SchemaTransformation } from 'effect'
 import { and, asc, eq, inArray } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { attribute, objectDef } from '@spaces/db/schema'
 import { BADGE_COLORS } from '@spaces/core/attributes/colors'
 import { aiConfigInput } from '@spaces/core/ai/attribute-ai'
 import { isDerived } from '@spaces/core/attributes/relationship'
+import {
+  between,
+  finite,
+  int,
+  uuidString,
+} from '@spaces/core/attributes/registry'
 import { requireAdmin, requireUser } from './shared'
 import { jsonValue } from '@spaces/core/json'
 import { input } from './input'
@@ -144,66 +149,81 @@ export const reorderAttributes = createServerFn({ method: 'POST' })
     return effectFn(reorderAttributesProgram)(data.objectId, [...data.ids])
   })
 
-// The option, update and create boundaries stay zod: they compose core's
-// zod shapes `aiConfigInput` and `jsonValue`.
-const optionEdit = z.object({
+/** Optional on the way in: absent, or explicitly undefined. */
+const opt = Schema.optional
+
+/** Trimmed, then between `min` and `max` long. */
+const trimmed = (min: number, max: number) =>
+  Schema.Trim.check(Schema.isMinLength(min), Schema.isMaxLength(max))
+
+/** An ISO 4217 code, trimmed and upper-cased before it is checked. */
+const currencyCode = Schema.Trim.pipe(
+  Schema.decode(SchemaTransformation.toUpperCase()),
+).check(
+  Schema.isPattern(/^[A-Z]{3}$/, { message: 'Three-letter currency code' }),
+)
+
+/** A whole number from `min` to `max`. */
+const wholeNumber = (min: number, max: number) =>
+  Schema.Number.check(finite, int, between(min, max))
+
+const optionFields = {
   /** absent id = new option (id derived from label) */
-  id: z.string().max(60).optional(),
-  label: z.string().trim().min(1).max(60),
-  group: z.enum(['active', 'parked', 'closed']).optional(),
+  id: opt(Schema.String.check(Schema.isMaxLength(60))),
+  label: trimmed(1, 60),
+  group: opt(Schema.Literals(['active', 'parked', 'closed'])),
   /** Constrained to the shipped palette, never a free colour string — a free
    *  field is how someone stores 2:1 grey-on-white and the badge stops being
    *  readable. Structure fixed, content free. */
-  color: z.enum(BADGE_COLORS).optional(),
+  color: opt(Schema.Literals(BADGE_COLORS)),
   /** archive replaces removal — stored values keep resolving */
-  archived: z.boolean().optional(),
-})
+  archived: opt(Schema.Boolean),
+}
+
+const optionEdit = Schema.Struct(optionFields)
 
 /**
  * The update boundary.
- * - `type`, `slug`, `targetKind` and `config.multi` are not here: zod strips
- *   unknown keys, so those edits cannot reach `updateAttributeProgram`.
+ * - `type`, `slug`, `targetKind` and `config.multi` are not here: unknown
+ *   keys are dropped, so those edits cannot reach `updateAttributeProgram`.
  * - The one shape change is top-level `multi`, which widens and is refused
  *   when it would narrow.
  */
-export const updateAttributeInput = z.object({
-  id: z.string().uuid(),
-  name: z.string().trim().min(1).max(80).optional(),
-  description: z.string().trim().max(500).nullable().optional(),
-  required: z.boolean().optional(),
-  archived: z.boolean().optional(),
+export const updateAttributeInput = Schema.Struct({
+  id: uuidString,
+  name: opt(trimmed(1, 80)),
+  description: opt(Schema.NullOr(Schema.Trim.check(Schema.isMaxLength(500)))),
+  required: opt(Schema.Boolean),
+  archived: opt(Schema.Boolean),
   /** true widens to a list, wrapping every stored value; false is refused on a list */
-  multi: z.boolean().optional(),
-  move: z.enum(['up', 'down']).optional(),
+  multi: opt(Schema.Boolean),
+  move: opt(Schema.Literals(['up', 'down'])),
   /** "Filter and sort on this" — sets attribute.filterable and .sortable together */
-  indexed: z.boolean().optional(),
-  options: z.array(optionEdit).max(50).optional(),
-  config: z
-    .object({
+  indexed: opt(Schema.Boolean),
+  options: opt(
+    Schema.mutable(Schema.Array(optionEdit)).check(Schema.isMaxLength(50)),
+  ),
+  config: opt(
+    Schema.Struct({
       /** currency — ISO 4217 */
-      code: z
-        .string()
-        .trim()
-        .toUpperCase()
-        .regex(/^[A-Z]{3}$/, 'Three-letter currency code')
-        .optional(),
+      code: opt(currencyCode),
       /** rating */
-      max: z.number().int().min(1).max(10).optional(),
+      max: opt(wholeNumber(1, 10)),
       /** number — decimals shown */
-      precision: z.number().int().min(0).max(6).optional(),
+      precision: opt(wholeNumber(0, 6)),
       /** the default value — shape checked by the program, per type */
-      default: jsonValue.optional(),
+      default: opt(jsonValue),
       /**
        * The attribute's AI config, stored as `options.ai`; null clears. The
        * mode is checked against the type by the program.
        */
-      ai: aiConfigInput.nullable().optional(),
+      ai: opt(Schema.NullOr(aiConfigInput)),
       /** "Fill from": the vocabulary key to link; null unlinks. Checked by the program. */
-      enrichmentKey: z.string().trim().min(1).max(80).nullable().optional(),
+      enrichmentKey: opt(Schema.NullOr(trimmed(1, 80))),
       /** text — "Long text": a paragraph in Overview, not a rail row */
-      longText: z.boolean().optional(),
-    })
-    .optional(),
+      longText: opt(Schema.Boolean),
+    }),
+  ),
 })
 
 /**
@@ -222,7 +242,7 @@ const reconcileIndexesProgram = Effect.fn('reconcileIndexesProgram')(
 )
 
 const editAttributeProgram = Effect.fn('editAttributeProgram')(function* (
-  data: z.infer<typeof updateAttributeInput>,
+  data: typeof updateAttributeInput.Type,
   actorId: string,
 ) {
   const core = yield* Effect.promise(
@@ -243,7 +263,7 @@ const editAttributeProgram = Effect.fn('editAttributeProgram')(function* (
 })
 
 export const updateAttribute = createServerFn({ method: 'POST' })
-  .validator(updateAttributeInput)
+  .validator(input(updateAttributeInput))
   .handler(async ({ data }) => {
     // canWrite's admin edge: renames, option edits, and archiving reshape
     // shared vocabulary for everyone, so they are settings — admin-owned.
@@ -276,40 +296,42 @@ const ATTRIBUTE_TYPES = [
  * No slug — derived server-side, immutable forever. Option ids are derived
  * from labels the same way the dialog previews them (`deriveOptionIds`).
  */
-export const createAttributeInput = z.object({
-  objectKind: z.enum(['company', 'person', 'deal']).optional(),
-  objectId: z.string().uuid().optional(),
-  name: z.string().trim().min(1).max(80),
-  description: z.string().trim().max(500).optional(),
-  type: z.enum(ATTRIBUTE_TYPES),
-  options: z
-    .array(optionEdit.omit({ id: true, archived: true }))
-    .max(50)
-    .optional(),
-  config: z
-    .object({
-      code: z
-        .string()
-        .trim()
-        .toUpperCase()
-        .regex(/^[A-Z]{3}$/, 'Three-letter currency code')
-        .optional(),
-      max: z.number().int().min(1).max(10).optional(),
-      precision: z.number().int().min(0).max(6).optional(),
-      targetKind: z.enum(['company', 'person', 'deal']).optional(),
-      targetObjectId: z.string().uuid().optional(),
-      multi: z.boolean().optional(),
-      longText: z.boolean().optional(),
-    })
-    .optional(),
-  default: jsonValue.optional(),
-  required: z.boolean().optional(),
+export const createAttributeInput = Schema.Struct({
+  objectKind: opt(coreKind),
+  objectId: opt(uuidString),
+  name: trimmed(1, 80),
+  description: opt(Schema.Trim.check(Schema.isMaxLength(500))),
+  type: Schema.Literals(ATTRIBUTE_TYPES),
+  options: opt(
+    Schema.mutable(
+      Schema.Array(
+        Schema.Struct({
+          label: optionFields.label,
+          group: optionFields.group,
+          color: optionFields.color,
+        }),
+      ),
+    ).check(Schema.isMaxLength(50)),
+  ),
+  config: opt(
+    Schema.Struct({
+      code: opt(currencyCode),
+      max: opt(wholeNumber(1, 10)),
+      precision: opt(wholeNumber(0, 6)),
+      targetKind: opt(coreKind),
+      targetObjectId: opt(uuidString),
+      multi: opt(Schema.Boolean),
+      longText: opt(Schema.Boolean),
+    }),
+  ),
+  default: opt(jsonValue),
+  required: opt(Schema.Boolean),
   /** "Filter and sort on this" — sets attribute.filterable and .sortable together */
-  indexed: z.boolean().optional(),
+  indexed: opt(Schema.Boolean),
 })
 
 const addAttributeProgram = Effect.fn('addAttributeProgram')(function* (
-  data: z.infer<typeof createAttributeInput>,
+  data: typeof createAttributeInput.Type,
   createdBy: string,
 ) {
   const core = yield* Effect.promise(
@@ -322,7 +344,7 @@ const addAttributeProgram = Effect.fn('addAttributeProgram')(function* (
 })
 
 export const createAttribute = createServerFn({ method: 'POST' })
-  .validator(createAttributeInput)
+  .validator(input(createAttributeInput))
   .handler(async ({ data }) => {
     // Additive, so member-level: a two-person fund should not need ceremony
     // to add a field. Reshaping (rename, options, archive) is admin — see

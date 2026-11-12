@@ -2,7 +2,6 @@ import { excerpt } from '@spaces/core/context/excerpt'
 import { createServerFn } from '@tanstack/react-start'
 import { Effect, Schema } from 'effect'
 import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
   entity,
@@ -18,6 +17,7 @@ import { canRead, requireUser } from './shared'
 import { liveSpaceSql } from '#/lib/spaces/live'
 import { noteKindInput } from '#/lib/notes/kind-input'
 import { jsonValue } from '@spaces/core/json'
+import { uuidString } from '@spaces/core/attributes/registry'
 import { input } from './input'
 import { serverQuery } from './query'
 
@@ -449,22 +449,24 @@ export const unfileNoteFrom = createServerFn({ method: 'POST' })
     }
   })
 
-const saveNoteInput = z.object({
-  id: z.string().uuid(),
-  title: z.string().max(300),
+const saveNoteInput = Schema.Struct({
+  id: uuidString,
+  title: Schema.String.check(Schema.isMaxLength(300)),
   /** Body fields absent = title-only save; body stays untouched. */
-  body: z
-    .object({
-      bodyJson: z.array(jsonValue),
-      bodyMd: z.string().max(500_000),
+  body: Schema.optional(
+    Schema.Struct({
+      bodyJson: Schema.mutable(Schema.Array(jsonValue)),
+      bodyMd: Schema.String.check(Schema.isMaxLength(500_000)),
       /** entity ids mentioned in the doc — extracted client-side from JSON */
-      mentionIds: z.array(z.string().uuid()).max(500),
-    })
-    .optional(),
+      mentionIds: Schema.mutable(Schema.Array(uuidString)).check(
+        Schema.isMaxLength(500),
+      ),
+    }),
+  ),
 })
 
 export const saveNote = createServerFn({ method: 'POST' })
-  .validator(saveNoteInput)
+  .validator(input(saveNoteInput))
   .handler(async ({ data }) => {
     const u = await requireUser()
     // `saveNoteProgram` also diff-syncs the note's `mentions` edges,

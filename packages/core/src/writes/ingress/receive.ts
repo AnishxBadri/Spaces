@@ -6,7 +6,7 @@ import { ingressPayload, integration } from '@spaces/db/schema'
 import type { IngressHeaders } from '@spaces/db/schema'
 import { decodeManifest } from '@spaces/sdk'
 import type { Json } from '../../json'
-import { jsonValue } from '../../json'
+import { readJson } from '../../json'
 import { Enqueue } from '../../queue/enqueue'
 import { pluginQueueName } from '../../queue/names'
 import type { PluginQueueName } from '../../queue/names'
@@ -144,7 +144,7 @@ export const readLimited = async (
 export const payloadOf = (body: Uint8Array): Json => {
   const text = new TextDecoder().decode(body)
   try {
-    const parsed = jsonValue.safeParse(JSON.parse(text))
+    const parsed = readJson(JSON.parse(text))
     return parsed.success ? parsed.data : text
   } catch {
     return text

@@ -22,6 +22,7 @@
     "./writes/vault": "./src/writes/vault/index.ts",
     "./writes/storage": "./src/writes/storage/index.ts",
     "./json": "./src/json.ts",
+    "./json-zod": "./src/json-zod.ts",
     "./queue/*": "./src/queue/*.ts",
     "./timeline/*": "./src/timeline/*.ts",
     "./interactions/*": "./src/interactions/*.ts",

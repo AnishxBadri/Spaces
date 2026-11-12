@@ -12,7 +12,7 @@ import { enrichmentRunData } from '@spaces/core/enrichment/auto'
 import { EnrichmentSources } from '@spaces/core/enrichment/sources'
 import type { AskResult } from '@spaces/core/enrichment/sources'
 import { WebsiteReader } from '@spaces/core/enrichment/website'
-import { jsonRecord, jsonValue } from '@spaces/core/json'
+import { jsonRecord, toJson } from '@spaces/core/json'
 import type { Enqueue } from '@spaces/core/queue/enqueue'
 import { QUEUES } from '@spaces/core/queue/names'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
@@ -58,7 +58,7 @@ afterAll(async () => {
 })
 
 const paid = jsonRecord(
-  jsonValue.parse(
+  toJson(
     toManifestJson(
       defineManifest({
         manifestVersion: 1,

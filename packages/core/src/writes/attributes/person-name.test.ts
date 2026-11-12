@@ -6,7 +6,7 @@ import { entity, entityAlias } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { joinName, splitName } from '../../attributes/person-name'
 import { formatPhone, toE164 } from '../../attributes/phone'
-import { valueValidator } from '../../attributes/registry'
+import { decodeValue, valueValidator } from '../../attributes/registry'
 import { resolveEntity } from '../entities/resolve'
 import { renameRecordProgram } from '../entities/rename'
 import { AttributeValidationError, setValues } from './values'
@@ -164,22 +164,25 @@ describe('phone', () => {
 
   it('refuses a non-E.164 value naming the shape', () => {
     const single = valueValidator({ type: 'phone', options: {} })
-    expect(single.safeParse('+44 7911 123456').data).toBe('+447911123456')
-    const refused = single.safeParse('call me')
-    expect(refused.error?.issues[0]?.message).toBe(
+    expect(decodeValue(single, '+44 7911 123456').data).toBe('+447911123456')
+    const refused = decodeValue(single, 'call me')
+    expect(refused.message).toBe(
       'call me is not a phone number — expected + then 2–15 digits, like +14155550100',
     )
     const multi = valueValidator({ type: 'phone', options: { multi: true } })
-    expect(multi.safeParse(['+1 415 555 0100', '+14155550100']).data).toEqual([
-      '+14155550100',
-    ])
-    expect(multi.safeParse('+14155550100').success).toBe(false)
-    expect(multi.safeParse(['+14155550100', '555-0100']).success).toBe(false)
+    expect(
+      decodeValue(multi, ['+1 415 555 0100', '+14155550100']).data,
+    ).toEqual(['+14155550100'])
+    expect(decodeValue(multi, '+14155550100').success).toBe(false)
+    expect(decodeValue(multi, ['+14155550100', '555-0100']).success).toBe(false)
     // A number the record already holds is kept as written.
     expect(
-      valueValidator({ type: 'phone', options: { multi: true } }, [
-        '555-0100',
-      ]).safeParse(['555-0100', '+14155550100']).data,
+      decodeValue(
+        valueValidator({ type: 'phone', options: { multi: true } }, [
+          '555-0100',
+        ]),
+        ['555-0100', '+14155550100'],
+      ).data,
     ).toEqual(['555-0100', '+14155550100'])
   })
 

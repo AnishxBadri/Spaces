@@ -335,7 +335,8 @@ describe('identity-backed attribute writes', () => {
 
   it('refuses a value that normalizes to nothing, and only when the key is declared', async () => {
     const { setValues } = await import('@spaces/core/writes/attributes/values')
-    const { valueValidator } = await import('@spaces/core/attributes/registry')
+    const { decodeValue, valueValidator } =
+      await import('@spaces/core/attributes/registry')
     const { objectId, actorId } = await fundWithDomainKey()
     const tag = randomUUID().slice(0, 8)
     const id = await makeRecord(objectId, actorId, `Freemail ${tag}`)
@@ -353,15 +354,17 @@ describe('identity-backed attribute writes', () => {
     // The refinement rides `options.identityKey`, not the type: a plain
     // `domain` attribute is a field like any other and stays permissive.
     const plain = { type: 'domain' as const, options: {} }
-    expect(valueValidator(plain).safeParse('gmail.com').success).toBe(true)
-    expect(valueValidator(plain).safeParse('not a domain').success).toBe(true)
+    expect(decodeValue(valueValidator(plain), 'gmail.com').success).toBe(true)
+    expect(decodeValue(valueValidator(plain), 'not a domain').success).toBe(
+      true,
+    )
 
     const backed = {
       type: 'domain' as const,
       options: { identityKey: 'domain' as const },
     }
-    expect(valueValidator(backed).safeParse('gmail.com').success).toBe(false)
-    expect(valueValidator(backed).safeParse('acme.io').success).toBe(true)
+    expect(decodeValue(valueValidator(backed), 'gmail.com').success).toBe(false)
+    expect(decodeValue(valueValidator(backed), 'acme.io').success).toBe(true)
 
     // linkedin is backed by a `url` attribute, and refines the same way.
     const linkedin = {
@@ -369,11 +372,13 @@ describe('identity-backed attribute writes', () => {
       options: { identityKey: 'linkedin' as const },
     }
     expect(
-      valueValidator(linkedin).safeParse('https://example.com/team').success,
+      decodeValue(valueValidator(linkedin), 'https://example.com/team').success,
     ).toBe(false)
     expect(
-      valueValidator(linkedin).safeParse('https://www.linkedin.com/in/anish/')
-        .success,
+      decodeValue(
+        valueValidator(linkedin),
+        'https://www.linkedin.com/in/anish/',
+      ).success,
     ).toBe(true)
   })
 

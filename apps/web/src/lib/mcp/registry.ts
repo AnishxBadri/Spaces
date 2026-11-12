@@ -6,7 +6,7 @@ import {
   DEFAULT_BUDGET_CHARS,
   recordContextProgram,
 } from '@spaces/core/writes/context/record'
-import { jsonValue } from '@spaces/core/json'
+import { jsonValueZod } from '@spaces/core/json-zod'
 import { SimilarLaneLive } from '#/lib/ai/similar'
 import {
   McpToolRefused,
@@ -237,7 +237,7 @@ const proposeSuggestion = defineTool({
       .min(1)
       .describe('Record id (uuid), or the record’s exact name'),
     patch: z
-      .record(z.string(), jsonValue)
+      .record(z.string(), jsonValueZod)
       .describe(
         '{[attribute slug]: {value, refs: string[], confidence: 0..1}}',
       ),

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 /**
@@ -10,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 describe('updateAttributeInput (zod boundary)', () => {
   it('strips type, slug, targetKind and config.multi rather than carrying them', async () => {
     const { updateAttributeInput } = await import('./attributes')
-    const parsed = updateAttributeInput.parse({
+    const parsed = Schema.decodeUnknownSync(updateAttributeInput)({
       id: randomUUID(),
       name: 'Renamed',
       type: 'text',
@@ -26,7 +27,7 @@ describe('updateAttributeInput (zod boundary)', () => {
 
   it('carries the widening flag at the top level only (D69)', async () => {
     const { updateAttributeInput } = await import('./attributes')
-    const parsed = updateAttributeInput.parse({
+    const parsed = Schema.decodeUnknownSync(updateAttributeInput)({
       id: randomUUID(),
       multi: true,
       config: { multi: true },
@@ -37,7 +38,7 @@ describe('updateAttributeInput (zod boundary)', () => {
 
   it('carries an option archive flag', async () => {
     const { updateAttributeInput } = await import('./attributes')
-    const parsed = updateAttributeInput.parse({
+    const parsed = Schema.decodeUnknownSync(updateAttributeInput)({
       id: randomUUID(),
       options: [{ id: 'a', label: 'A', archived: true }],
     })
@@ -50,13 +51,16 @@ describe('updateAttributeInput (ai config)', () => {
     const { updateAttributeInput } = await import('./attributes')
     const id = randomUUID()
     expect(
-      updateAttributeInput.parse({
+      Schema.decodeUnknownSync(updateAttributeInput)({
         id,
         config: { ai: { mode: 'summarize', prompt: ' Why now? ' } },
       }).config,
     ).toEqual({ ai: { mode: 'summarize', prompt: 'Why now?' } })
     expect(
-      updateAttributeInput.parse({ id, config: { ai: null } }).config,
+      Schema.decodeUnknownSync(updateAttributeInput)({
+        id,
+        config: { ai: null },
+      }).config,
     ).toEqual({ ai: null })
   })
 })

@@ -5,7 +5,7 @@ import { db } from '@spaces/db'
 import { extractionCache } from '@spaces/db/schema'
 import type { JsonSchema } from '@spaces/core/ai/schema'
 import type { ContextItem } from '@spaces/core/context/types'
-import { jsonValue } from '@spaces/core/json'
+import { readJson } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
 import { completeProgram, laneTargetProgram } from './complete'
 import type {
@@ -195,9 +195,7 @@ export const cachedExtractProgram = Effect.fn('cachedExtract')(function* (
     route: target,
   })
   const stored =
-    answered.output.kind === 'object'
-      ? jsonValue.safeParse(answered.output.object)
-      : null
+    answered.output.kind === 'object' ? readJson(answered.output.object) : null
   if (stored?.success === true)
     yield* Effect.tryPromise(() =>
       db

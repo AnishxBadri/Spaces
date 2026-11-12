@@ -1,0 +1,3550 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`valueValidator, characterised > actor_reference 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": "user_1",
+      "ok": true,
+      "value": "user_1",
+    },
+    {
+      "data": "current-user",
+      "ok": true,
+      "value": "current-user",
+    },
+    {
+      "data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "ok": true,
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    },
+    {
+      "message": "Too big: expected string to have <=64 characters",
+      "ok": false,
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    },
+    {
+      "data": "",
+      "ok": true,
+      "value": "",
+    },
+    {
+      "data": " ",
+      "ok": true,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected string, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected string, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "data": "5",
+      "ok": true,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected string, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected string, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected string, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > checkbox 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": false,
+      "ok": true,
+      "value": false,
+    },
+    {
+      "message": "Invalid input: expected boolean, received string",
+      "ok": false,
+      "value": "true",
+    },
+    {
+      "message": "Invalid input: expected boolean, received number",
+      "ok": false,
+      "value": 1,
+    },
+    {
+      "message": "Invalid input: expected boolean, received string",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid input: expected boolean, received string",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected boolean, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected boolean, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected boolean, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected boolean, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Invalid input: expected boolean, received string",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "data": true,
+      "ok": true,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected boolean, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected boolean, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected boolean, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected boolean, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected boolean, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > currency 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": -1.5,
+      "ok": true,
+      "value": -1.5,
+    },
+    {
+      "data": 1000000.25,
+      "ok": true,
+      "value": 1000000.25,
+    },
+    {
+      "message": "Invalid input: expected number, received string",
+      "ok": false,
+      "value": "1000",
+    },
+    {
+      "message": "Invalid input: expected number, received string",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid input: expected number, received string",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected number, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected number, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "data": 0,
+      "ok": true,
+      "value": 0,
+    },
+    {
+      "data": 5,
+      "ok": true,
+      "value": 5,
+    },
+    {
+      "message": "Invalid input: expected number, received string",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected number, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected number, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected number, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected number, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected number, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected number, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > date 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": "2026-07-30",
+      "ok": true,
+      "value": "2026-07-30",
+    },
+    {
+      "message": "Expected YYYY-MM-DD",
+      "ok": false,
+      "value": "30/07/2026",
+    },
+    {
+      "message": "Expected YYYY-MM-DD",
+      "ok": false,
+      "value": "2026-7-30",
+    },
+    {
+      "data": "2026-13-45",
+      "ok": true,
+      "value": "2026-13-45",
+    },
+    {
+      "message": "Expected YYYY-MM-DD",
+      "ok": false,
+      "value": " 2026-07-30",
+    },
+    {
+      "message": "Expected YYYY-MM-DD",
+      "ok": false,
+      "value": "2026-07-30T00:00:00Z",
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 20260730,
+    },
+    {
+      "message": "Expected YYYY-MM-DD",
+      "ok": false,
+      "value": "P7D",
+    },
+    {
+      "message": "Expected YYYY-MM-DD",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Expected YYYY-MM-DD",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected string, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected string, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Expected YYYY-MM-DD",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected string, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected string, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected string, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > domain 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": "acme.io",
+      "ok": true,
+      "value": "acme.io",
+    },
+    {
+      "data": "not a domain",
+      "ok": true,
+      "value": "not a domain",
+    },
+    {
+      "data": "gmail.com",
+      "ok": true,
+      "value": "gmail.com",
+    },
+    {
+      "data": " ACME.io ",
+      "ok": true,
+      "value": " ACME.io ",
+    },
+    {
+      "data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "ok": true,
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    },
+    {
+      "message": "Too big: expected string to have <=255 characters",
+      "ok": false,
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [
+        "acme.io",
+      ],
+    },
+    {
+      "data": "",
+      "ok": true,
+      "value": "",
+    },
+    {
+      "data": " ",
+      "ok": true,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected string, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected string, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "data": "5",
+      "ok": true,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected string, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected string, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected string, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > domain identity 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": "acme.io",
+      "ok": true,
+      "value": "acme.io",
+    },
+    {
+      "message": "gmail.com never identifies a record",
+      "ok": false,
+      "value": "gmail.com",
+    },
+    {
+      "data": " ACME.io ",
+      "ok": true,
+      "value": " ACME.io ",
+    },
+    {
+      "message": "not a domain never identifies a record",
+      "ok": false,
+      "value": "not a domain",
+    },
+    {
+      "message": "Too big: expected string to have <=255 characters",
+      "ok": false,
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    },
+    {
+      "message": " never identifies a record",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": " never identifies a record",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected string, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected string, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "5 never identifies a record",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected string, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected string, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected string, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > domain multi 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": [
+        "acme.io",
+      ],
+      "ok": true,
+      "value": [
+        "acme.io",
+        "acme.io",
+      ],
+    },
+    {
+      "data": [
+        "acme.io",
+      ],
+      "ok": true,
+      "value": [
+        " https://www.Acme.io/about ",
+      ],
+    },
+    {
+      "data": [
+        "acme.io",
+      ],
+      "ok": true,
+      "value": [
+        "acme.io",
+        "ACME.io",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "acme.io",
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": [
+        5,
+      ],
+    },
+    {
+      "message": "Too big: expected string to have <=255 characters",
+      "ok": false,
+      "value": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      ],
+    },
+    {
+      "message": "Too big: expected array to have <=50 items",
+      "ok": false,
+      "value": [
+        "d0.io",
+        "d1.io",
+        "d2.io",
+        "d3.io",
+        "d4.io",
+        "d5.io",
+        "d6.io",
+        "d7.io",
+        "d8.io",
+        "d9.io",
+        "d10.io",
+        "d11.io",
+        "d12.io",
+        "d13.io",
+        "d14.io",
+        "d15.io",
+        "d16.io",
+        "d17.io",
+        "d18.io",
+        "d19.io",
+        "d20.io",
+        "d21.io",
+        "d22.io",
+        "d23.io",
+        "d24.io",
+        "d25.io",
+        "d26.io",
+        "d27.io",
+        "d28.io",
+        "d29.io",
+        "d30.io",
+        "d31.io",
+        "d32.io",
+        "d33.io",
+        "d34.io",
+        "d35.io",
+        "d36.io",
+        "d37.io",
+        "d38.io",
+        "d39.io",
+        "d40.io",
+        "d41.io",
+        "d42.io",
+        "d43.io",
+        "d44.io",
+        "d45.io",
+        "d46.io",
+        "d47.io",
+        "d48.io",
+        "d49.io",
+        "d50.io",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected array, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected array, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected array, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "data": [],
+      "ok": true,
+      "value": [],
+    },
+    {
+      "data": [
+        "x",
+      ],
+      "ok": true,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected array, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > domain multi identity 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": [
+        "acme.io",
+      ],
+      "ok": true,
+      "value": [
+        "acme.io",
+        "ACME.IO",
+        "www.acme.io",
+      ],
+    },
+    {
+      "data": [
+        "acme.io",
+      ],
+      "ok": true,
+      "value": [
+        " https://www.acme.io/about ",
+      ],
+    },
+    {
+      "message": "gmail.com never identifies a record",
+      "ok": false,
+      "value": [
+        "gmail.com",
+      ],
+    },
+    {
+      "message": "gmail.com never identifies a record",
+      "ok": false,
+      "value": [
+        "acme.io",
+        "gmail.com",
+      ],
+    },
+    {
+      "message": "not a domain never identifies a record",
+      "ok": false,
+      "value": [
+        "not a domain",
+      ],
+    },
+    {
+      "message": " never identifies a record",
+      "ok": false,
+      "value": [
+        "",
+      ],
+    },
+    {
+      "message": " never identifies a record",
+      "ok": false,
+      "value": [
+        " ",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "acme.io",
+    },
+    {
+      "message": "Too big: expected array to have <=50 items",
+      "ok": false,
+      "value": [
+        "d0.io",
+        "d1.io",
+        "d2.io",
+        "d3.io",
+        "d4.io",
+        "d5.io",
+        "d6.io",
+        "d7.io",
+        "d8.io",
+        "d9.io",
+        "d10.io",
+        "d11.io",
+        "d12.io",
+        "d13.io",
+        "d14.io",
+        "d15.io",
+        "d16.io",
+        "d17.io",
+        "d18.io",
+        "d19.io",
+        "d20.io",
+        "d21.io",
+        "d22.io",
+        "d23.io",
+        "d24.io",
+        "d25.io",
+        "d26.io",
+        "d27.io",
+        "d28.io",
+        "d29.io",
+        "d30.io",
+        "d31.io",
+        "d32.io",
+        "d33.io",
+        "d34.io",
+        "d35.io",
+        "d36.io",
+        "d37.io",
+        "d38.io",
+        "d39.io",
+        "d40.io",
+        "d41.io",
+        "d42.io",
+        "d43.io",
+        "d44.io",
+        "d45.io",
+        "d46.io",
+        "d47.io",
+        "d48.io",
+        "d49.io",
+        "d50.io",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected array, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected array, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected array, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "data": [],
+      "ok": true,
+      "value": [],
+    },
+    {
+      "message": "x never identifies a record",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected array, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > email 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": "ana@acme.io",
+      "ok": true,
+      "value": "ana@acme.io",
+    },
+    {
+      "data": "Ana@Acme.io",
+      "ok": true,
+      "value": "Ana@Acme.io",
+    },
+    {
+      "message": "Invalid email address",
+      "ok": false,
+      "value": "not an email",
+    },
+    {
+      "message": "Invalid email address",
+      "ok": false,
+      "value": "ana@",
+    },
+    {
+      "message": "Invalid email address",
+      "ok": false,
+      "value": " ana@acme.io ",
+    },
+    {
+      "message": "Too big: expected string to have <=255 characters",
+      "ok": false,
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@acme.io",
+    },
+    {
+      "message": "Invalid email address",
+      "ok": false,
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [
+        "ana@acme.io",
+      ],
+    },
+    {
+      "message": "Invalid email address",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid email address",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected string, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected string, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Invalid email address",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected string, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected string, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected string, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > email identity 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": "ana@acme.io",
+      "ok": true,
+      "value": "ana@acme.io",
+    },
+    {
+      "data": "info@acme.io",
+      "ok": true,
+      "value": "info@acme.io",
+    },
+    {
+      "message": "Invalid email address",
+      "ok": false,
+      "value": "not an email",
+    },
+    {
+      "message": "Invalid email address",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid email address",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected string, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected string, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Invalid email address",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected string, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected string, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected string, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > email multi 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": [
+        "ana@acme.io",
+      ],
+      "ok": true,
+      "value": [
+        "ana@acme.io",
+        "ana@acme.io",
+      ],
+    },
+    {
+      "data": [
+        "Ana@acme.io",
+        "ana@acme.io",
+      ],
+      "ok": true,
+      "value": [
+        "Ana@acme.io",
+        "ana@acme.io",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected array, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected array, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected array, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "data": [],
+      "ok": true,
+      "value": [],
+    },
+    {
+      "message": "Invalid email address",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected array, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > email multi identity 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": [
+        "ana@acme.io",
+      ],
+      "ok": true,
+      "value": [
+        "ana@acme.io",
+        "Ana@Acme.io",
+      ],
+    },
+    {
+      "data": [
+        "ana@acme.io",
+      ],
+      "ok": true,
+      "value": [
+        " ana@acme.io ",
+      ],
+    },
+    {
+      "data": [
+        "info@acme.io",
+      ],
+      "ok": true,
+      "value": [
+        "info@acme.io",
+      ],
+    },
+    {
+      "message": "Invalid email address",
+      "ok": false,
+      "value": [
+        "not an email",
+      ],
+    },
+    {
+      "message": "Invalid email address",
+      "ok": false,
+      "value": [
+        "ana@acme.io",
+        "bad",
+      ],
+    },
+    {
+      "message": "Invalid email address",
+      "ok": false,
+      "value": [
+        "",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "ana@acme.io",
+    },
+    {
+      "message": "Too big: expected string to have <=255 characters",
+      "ok": false,
+      "value": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@acme.io",
+      ],
+    },
+    {
+      "message": "Too big: expected array to have <=50 items",
+      "ok": false,
+      "value": [
+        "p0@acme.io",
+        "p1@acme.io",
+        "p2@acme.io",
+        "p3@acme.io",
+        "p4@acme.io",
+        "p5@acme.io",
+        "p6@acme.io",
+        "p7@acme.io",
+        "p8@acme.io",
+        "p9@acme.io",
+        "p10@acme.io",
+        "p11@acme.io",
+        "p12@acme.io",
+        "p13@acme.io",
+        "p14@acme.io",
+        "p15@acme.io",
+        "p16@acme.io",
+        "p17@acme.io",
+        "p18@acme.io",
+        "p19@acme.io",
+        "p20@acme.io",
+        "p21@acme.io",
+        "p22@acme.io",
+        "p23@acme.io",
+        "p24@acme.io",
+        "p25@acme.io",
+        "p26@acme.io",
+        "p27@acme.io",
+        "p28@acme.io",
+        "p29@acme.io",
+        "p30@acme.io",
+        "p31@acme.io",
+        "p32@acme.io",
+        "p33@acme.io",
+        "p34@acme.io",
+        "p35@acme.io",
+        "p36@acme.io",
+        "p37@acme.io",
+        "p38@acme.io",
+        "p39@acme.io",
+        "p40@acme.io",
+        "p41@acme.io",
+        "p42@acme.io",
+        "p43@acme.io",
+        "p44@acme.io",
+        "p45@acme.io",
+        "p46@acme.io",
+        "p47@acme.io",
+        "p48@acme.io",
+        "p49@acme.io",
+        "p50@acme.io",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected array, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected array, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected array, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "data": [],
+      "ok": true,
+      "value": [],
+    },
+    {
+      "message": "Invalid email address",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected array, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > multi_select 1`] = `
+{
+  "held": [
+    {
+      "data": [
+        "angel",
+        "seed",
+      ],
+      "held": [
+        "angel",
+      ],
+      "ok": true,
+      "value": [
+        "angel",
+        "seed",
+      ],
+    },
+    {
+      "data": [
+        "angel",
+      ],
+      "held": "angel",
+      "ok": true,
+      "value": [
+        "angel",
+      ],
+    },
+  ],
+  "results": [
+    {
+      "data": [
+        "seed",
+        "series_a",
+      ],
+      "ok": true,
+      "value": [
+        "seed",
+        "series_a",
+      ],
+    },
+    {
+      "data": [
+        "seed",
+        "seed",
+      ],
+      "ok": true,
+      "value": [
+        "seed",
+        "seed",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "seed",
+    },
+    {
+      "message": "Not one of the options",
+      "ok": false,
+      "value": [
+        "ipo",
+      ],
+    },
+    {
+      "message": "Not one of the options",
+      "ok": false,
+      "value": [
+        "seed",
+        "ipo",
+      ],
+    },
+    {
+      "message": ""Angel" is archived — pick a current option",
+      "ok": false,
+      "value": [
+        "angel",
+      ],
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": [
+        5,
+      ],
+    },
+    {
+      "message": "Too big: expected array to have <=50 items",
+      "ok": false,
+      "value": [
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+        "seed",
+      ],
+    },
+    {
+      "message": "Not one of the options",
+      "ok": false,
+      "value": [
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+        "ipo",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected array, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected array, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected array, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "data": [],
+      "ok": true,
+      "value": [],
+    },
+    {
+      "message": "Not one of the options",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected array, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > multi_select without options 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "message": "Invalid input: expected never, received array",
+      "ok": false,
+      "value": [
+        "seed",
+      ],
+    },
+    {
+      "message": "Invalid input: expected never, received string",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid input: expected never, received string",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected never, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected never, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected never, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected never, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Invalid input: expected never, received string",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected never, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected never, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected never, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected never, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected never, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected never, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > number 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": -1.5,
+      "ok": true,
+      "value": -1.5,
+    },
+    {
+      "data": 1e+21,
+      "ok": true,
+      "value": 1e+21,
+    },
+    {
+      "data": 9007199254740991,
+      "ok": true,
+      "value": 9007199254740991,
+    },
+    {
+      "message": "Invalid input: expected number, received string",
+      "ok": false,
+      "value": "1.5",
+    },
+    {
+      "message": "Invalid input: expected number, received array",
+      "ok": false,
+      "value": [
+        5,
+      ],
+    },
+    {
+      "message": "Invalid input: expected number, received string",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid input: expected number, received string",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected number, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected number, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "data": 0,
+      "ok": true,
+      "value": 0,
+    },
+    {
+      "data": 5,
+      "ok": true,
+      "value": 5,
+    },
+    {
+      "message": "Invalid input: expected number, received string",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected number, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected number, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected number, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected number, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected number, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected number, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > phone 1`] = `
+{
+  "held": [
+    {
+      "data": "415-555-2671",
+      "held": "415-555-2671",
+      "ok": true,
+      "value": "415-555-2671",
+    },
+    {
+      "data": "415-555-2671",
+      "held": [
+        "415-555-2671",
+      ],
+      "ok": true,
+      "value": " 415-555-2671 ",
+    },
+  ],
+  "results": [
+    {
+      "data": "+14155552671",
+      "ok": true,
+      "value": "+14155552671",
+    },
+    {
+      "data": "+14155552671",
+      "ok": true,
+      "value": "+1 (415) 555-2671",
+    },
+    {
+      "data": "+442079460958",
+      "ok": true,
+      "value": " +44 20 7946 0958 ",
+    },
+    {
+      "message": "4155552671 is not a phone number — expected + then 2–15 digits, like +14155550100",
+      "ok": false,
+      "value": "4155552671",
+    },
+    {
+      "message": "call me is not a phone number — expected + then 2–15 digits, like +14155550100",
+      "ok": false,
+      "value": "call me",
+    },
+    {
+      "message": "+1 is not a phone number — expected + then 2–15 digits, like +14155550100",
+      "ok": false,
+      "value": "+1",
+    },
+    {
+      "message": "+1111111111111111 is not a phone number — expected + then 2–15 digits, like +14155550100",
+      "ok": false,
+      "value": "+1111111111111111",
+    },
+    {
+      "message": "Too big: expected string to have <=40 characters",
+      "ok": false,
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    },
+    {
+      "message": "Too big: expected string to have <=40 characters",
+      "ok": false,
+      "value": "+1 55555555555555555555555555555555555555",
+    },
+    {
+      "message": " is not a phone number — expected + then 2–15 digits, like +14155550100",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": " is not a phone number — expected + then 2–15 digits, like +14155550100",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected string, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected string, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "5 is not a phone number — expected + then 2–15 digits, like +14155550100",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected string, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected string, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected string, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > phone multi 1`] = `
+{
+  "held": [
+    {
+      "data": [
+        "415-555-2671",
+        "+14155552671",
+      ],
+      "held": [
+        "415-555-2671",
+      ],
+      "ok": true,
+      "value": [
+        "415-555-2671",
+        "+14155552671",
+      ],
+    },
+  ],
+  "results": [
+    {
+      "data": [
+        "+14155552671",
+      ],
+      "ok": true,
+      "value": [
+        "+1 415 555 2671",
+        "+14155552671",
+      ],
+    },
+    {
+      "message": "call me is not a phone number — expected + then 2–15 digits, like +14155550100",
+      "ok": false,
+      "value": [
+        "+14155552671",
+        "call me",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "+14155552671",
+    },
+    {
+      "message": "Too big: expected array to have <=50 items",
+      "ok": false,
+      "value": [
+        "+14155550000",
+        "+14155550001",
+        "+14155550002",
+        "+14155550003",
+        "+14155550004",
+        "+14155550005",
+        "+14155550006",
+        "+14155550007",
+        "+14155550008",
+        "+14155550009",
+        "+14155550010",
+        "+14155550011",
+        "+14155550012",
+        "+14155550013",
+        "+14155550014",
+        "+14155550015",
+        "+14155550016",
+        "+14155550017",
+        "+14155550018",
+        "+14155550019",
+        "+14155550020",
+        "+14155550021",
+        "+14155550022",
+        "+14155550023",
+        "+14155550024",
+        "+14155550025",
+        "+14155550026",
+        "+14155550027",
+        "+14155550028",
+        "+14155550029",
+        "+14155550030",
+        "+14155550031",
+        "+14155550032",
+        "+14155550033",
+        "+14155550034",
+        "+14155550035",
+        "+14155550036",
+        "+14155550037",
+        "+14155550038",
+        "+14155550039",
+        "+14155550040",
+        "+14155550041",
+        "+14155550042",
+        "+14155550043",
+        "+14155550044",
+        "+14155550045",
+        "+14155550046",
+        "+14155550047",
+        "+14155550048",
+        "+14155550049",
+        "+14155550050",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected array, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected array, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected array, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "data": [],
+      "ok": true,
+      "value": [],
+    },
+    {
+      "message": "x is not a phone number — expected + then 2–15 digits, like +14155550100",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected array, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > rating 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": 1,
+      "ok": true,
+      "value": 1,
+    },
+    {
+      "data": 3,
+      "ok": true,
+      "value": 3,
+    },
+    {
+      "message": "Too big: expected number to be <=5",
+      "ok": false,
+      "value": 6,
+    },
+    {
+      "message": "Too small: expected number to be >=1",
+      "ok": false,
+      "value": -1,
+    },
+    {
+      "message": "Invalid input: expected int, received number",
+      "ok": false,
+      "value": 2.5,
+    },
+    {
+      "message": "Invalid input: expected number, received string",
+      "ok": false,
+      "value": "3",
+    },
+    {
+      "message": "Invalid input: expected number, received string",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid input: expected number, received string",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected number, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected number, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Too small: expected number to be >=1",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "data": 5,
+      "ok": true,
+      "value": 5,
+    },
+    {
+      "message": "Invalid input: expected number, received string",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected number, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected number, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected number, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected number, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected number, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected number, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > rating max 10 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": 10,
+      "ok": true,
+      "value": 10,
+    },
+    {
+      "message": "Too big: expected number to be <=10",
+      "ok": false,
+      "value": 11,
+    },
+    {
+      "data": 1,
+      "ok": true,
+      "value": 1,
+    },
+    {
+      "message": "Invalid input: expected number, received string",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid input: expected number, received string",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected number, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected number, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Too small: expected number to be >=1",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "data": 5,
+      "ok": true,
+      "value": 5,
+    },
+    {
+      "message": "Invalid input: expected number, received string",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected number, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected number, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected number, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected number, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected number, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected number, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > record_reference 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+      "ok": true,
+      "value": "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+    },
+    {
+      "data": "7F8C2B1E-4C1D-4B6E-9A3F-2D1E0C9B8A7F",
+      "ok": true,
+      "value": "7F8C2B1E-4C1D-4B6E-9A3F-2D1E0C9B8A7F",
+    },
+    {
+      "message": "Invalid UUID",
+      "ok": false,
+      "value": "not-a-uuid",
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+      ],
+    },
+    {
+      "message": "Invalid UUID",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid UUID",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected string, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected string, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Invalid UUID",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected string, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected string, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected string, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > record_reference multi 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": [
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+      ],
+      "ok": true,
+      "value": [
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+      ],
+    },
+    {
+      "data": [
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+      ],
+      "ok": true,
+      "value": [
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+    },
+    {
+      "message": "Invalid UUID",
+      "ok": false,
+      "value": [
+        "not-a-uuid",
+      ],
+    },
+    {
+      "data": [
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+      ],
+      "ok": true,
+      "value": [
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+      ],
+    },
+    {
+      "message": "Too big: expected array to have <=100 items",
+      "ok": false,
+      "value": [
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+        "7f8c2b1e-4c1d-4b6e-9a3f-2d1e0c9b8a7f",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected array, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected array, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Invalid input: expected array, received string",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected array, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "data": [],
+      "ok": true,
+      "value": [],
+    },
+    {
+      "message": "Invalid UUID",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected array, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected array, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected array, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > select 1`] = `
+{
+  "held": [
+    {
+      "data": "angel",
+      "held": "angel",
+      "ok": true,
+      "value": "angel",
+    },
+    {
+      "held": "seed",
+      "message": ""Angel" is archived — pick a current option",
+      "ok": false,
+      "value": "angel",
+    },
+    {
+      "data": "angel",
+      "held": [
+        "angel",
+      ],
+      "ok": true,
+      "value": "angel",
+    },
+  ],
+  "results": [
+    {
+      "data": "seed",
+      "ok": true,
+      "value": "seed",
+    },
+    {
+      "message": "Not one of the options",
+      "ok": false,
+      "value": "ipo",
+    },
+    {
+      "message": "Not one of the options",
+      "ok": false,
+      "value": "Seed",
+    },
+    {
+      "message": ""Angel" is archived — pick a current option",
+      "ok": false,
+      "value": "angel",
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [
+        "seed",
+      ],
+    },
+    {
+      "message": "Not one of the options",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Not one of the options",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected string, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected string, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Not one of the options",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected string, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected string, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected string, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > select without options 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "message": "Invalid input: expected never, received string",
+      "ok": false,
+      "value": "seed",
+    },
+    {
+      "message": "Invalid input: expected never, received string",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid input: expected never, received string",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected never, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected never, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected never, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected never, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Invalid input: expected never, received string",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected never, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected never, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected never, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected never, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected never, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected never, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > status 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": "seed",
+      "ok": true,
+      "value": "seed",
+    },
+    {
+      "message": "Not one of the options",
+      "ok": false,
+      "value": "ipo",
+    },
+    {
+      "message": ""Angel" is archived — pick a current option",
+      "ok": false,
+      "value": "angel",
+    },
+    {
+      "message": "Not one of the options",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Not one of the options",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected string, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected string, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Not one of the options",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected string, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected string, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected string, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > text 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": "hello",
+      "ok": true,
+      "value": "hello",
+    },
+    {
+      "data": "  padded  ",
+      "ok": true,
+      "value": "  padded  ",
+    },
+    {
+      "data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "ok": true,
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    },
+    {
+      "message": "Too big: expected string to have <=2000 characters",
+      "ok": false,
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    },
+    {
+      "data": "",
+      "ok": true,
+      "value": "",
+    },
+    {
+      "data": " ",
+      "ok": true,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected string, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected string, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "data": "5",
+      "ok": true,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected string, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected string, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected string, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > url 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": "https://acme.io",
+      "ok": true,
+      "value": "https://acme.io",
+    },
+    {
+      "data": "http://acme.io/a?b=c",
+      "ok": true,
+      "value": "http://acme.io/a?b=c",
+    },
+    {
+      "message": "Invalid URL",
+      "ok": false,
+      "value": "acme.io",
+    },
+    {
+      "data": "ftp://acme.io",
+      "ok": true,
+      "value": "ftp://acme.io",
+    },
+    {
+      "data": "mailto:ana@acme.io",
+      "ok": true,
+      "value": "mailto:ana@acme.io",
+    },
+    {
+      "data": "javascript:alert(1)",
+      "ok": true,
+      "value": "javascript:alert(1)",
+    },
+    {
+      "message": "Invalid URL",
+      "ok": false,
+      "value": "https://",
+    },
+    {
+      "data": "https://acme.io",
+      "ok": true,
+      "value": " https://acme.io",
+    },
+    {
+      "data": "https://acme.io/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "ok": true,
+      "value": "https://acme.io/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    },
+    {
+      "message": "Too big: expected string to have <=500 characters",
+      "ok": false,
+      "value": "https://acme.io/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    },
+    {
+      "message": "Invalid URL",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid URL",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected string, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected string, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Invalid URL",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected string, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected string, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected string, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;
+
+exports[`valueValidator, characterised > url identity linkedin 1`] = `
+{
+  "held": [],
+  "results": [
+    {
+      "data": "https://www.linkedin.com/in/anish/",
+      "ok": true,
+      "value": "https://www.linkedin.com/in/anish/",
+    },
+    {
+      "message": "https://example.com/team never identifies a record",
+      "ok": false,
+      "value": "https://example.com/team",
+    },
+    {
+      "message": "Invalid URL",
+      "ok": false,
+      "value": "linkedin.com/in/anish",
+    },
+    {
+      "message": "Invalid URL",
+      "ok": false,
+      "value": "",
+    },
+    {
+      "message": "Invalid URL",
+      "ok": false,
+      "value": " ",
+    },
+    {
+      "message": "Invalid input: expected string, received null",
+      "ok": false,
+      "value": null,
+    },
+    {
+      "message": "Invalid input: expected string, received undefined",
+      "ok": false,
+      "value": undefined,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 0,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": 5,
+    },
+    {
+      "message": "Invalid URL",
+      "ok": false,
+      "value": "5",
+    },
+    {
+      "message": "Invalid input: expected string, received boolean",
+      "ok": false,
+      "value": true,
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [],
+    },
+    {
+      "message": "Invalid input: expected string, received array",
+      "ok": false,
+      "value": [
+        "x",
+      ],
+    },
+    {
+      "message": "Invalid input: expected string, received object",
+      "ok": false,
+      "value": {},
+    },
+    {
+      "message": "Invalid input: expected string, received NaN",
+      "ok": false,
+      "value": NaN,
+    },
+    {
+      "message": "Invalid input: expected string, received number",
+      "ok": false,
+      "value": Infinity,
+    },
+  ],
+}
+`;

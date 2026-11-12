@@ -19,7 +19,7 @@ import { readNotePayload } from '@spaces/core/ai/note'
 import { QUEUES } from '@spaces/core/queue/names'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { enqueued } from '#/test/queue-stub'
-import { jsonValue } from '@spaces/core/json'
+import { toJson } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import {
@@ -191,7 +191,7 @@ const usageCount = async () =>
   (await db.select({ value: count() }).from(aiUsage))[0].value
 
 function stored(doc: unknown): Array<Json> {
-  const round = jsonValue.parse(JSON.parse(JSON.stringify(doc)))
+  const round = toJson(JSON.parse(JSON.stringify(doc)))
   return Array.isArray(round) ? round : []
 }
 

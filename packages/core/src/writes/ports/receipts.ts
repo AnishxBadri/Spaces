@@ -4,7 +4,7 @@ import { db } from '@spaces/db'
 import { enrichmentRecord } from '@spaces/db/schema'
 import { JobRetryable, Receipts } from '@spaces/sdk'
 import type { ReceiptClaim } from '@spaces/sdk'
-import { jsonValue } from '../../json'
+import { toJson } from '../../json'
 import type { Tx } from '../attributes/values'
 import type { BoundIntegration } from './binding'
 
@@ -56,7 +56,7 @@ export async function insertReceipt(
       .values({
         entityId: receipt.entityId,
         provider: row.capabilityId,
-        raw: jsonValue.parse(receipt.raw),
+        raw: toJson(receipt.raw),
         creditsUsed: receipt.creditsUsed,
         integrationId: row.id,
       })

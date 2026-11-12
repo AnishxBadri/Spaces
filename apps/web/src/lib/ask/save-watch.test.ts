@@ -14,7 +14,7 @@ import {
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { defineManifest, toManifestJson } from '@spaces/sdk'
-import { jsonRecord, jsonValue } from '@spaces/core/json'
+import { jsonRecord, toJson } from '@spaces/core/json'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { addFindRowProgram, dismissFindRowProgram } from './find'
 import { saveFindAsWatchProgram } from './save-watch'
@@ -37,7 +37,7 @@ const me = FIXTURE_ACTOR.id
 
 const anEngine = async () => {
   const manifest = jsonRecord(
-    jsonValue.parse(
+    toJson(
       toManifestJson(
         defineManifest({
           manifestVersion: 1,

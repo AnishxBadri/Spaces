@@ -12,7 +12,7 @@ import {
   suggestion,
 } from '@spaces/db/schema'
 import { defineManifest, toManifestJson } from '@spaces/sdk'
-import { jsonRecord, jsonValue } from '../../json'
+import { jsonRecord, toJson } from '../../json'
 import { Enqueue } from '../../queue/enqueue'
 import type { EnqueueOptions } from '../../queue/sender'
 import {
@@ -74,7 +74,7 @@ const anIntegration = async (values: { manifest?: unknown } = {}) => {
         version: '0.1.0',
         enabled: true,
         status: 'enabled',
-        manifest: jsonRecord(jsonValue.parse(values.manifest ?? manifest)),
+        manifest: jsonRecord(toJson(values.manifest ?? manifest)),
       })
       .returning({ id: integration.id })
   ).at(0)

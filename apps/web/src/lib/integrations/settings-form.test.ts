@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
-import { jsonValue } from '@spaces/core/json'
+import { toJson } from '@spaces/core/json'
 import { settingsJsonSchema } from '@spaces/sdk'
 import {
   checkSettings,
@@ -65,7 +65,7 @@ describe('settingsFormOf', () => {
           version: '1.0.0',
           manifest: {
             name: 'Order fixture',
-            settings: jsonValue.parse(settings),
+            settings: toJson(settings),
           },
         })
         .returning({ id: integration.id })

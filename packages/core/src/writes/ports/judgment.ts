@@ -2,7 +2,7 @@ import { Effect, Layer } from 'effect'
 import { Judgment, JobPermanent, JobRetryable } from '@spaces/sdk'
 import type { JudgmentClaim } from '@spaces/sdk'
 import { parseRef } from '../../context/ref'
-import { jsonValue } from '../../json'
+import { readJson } from '../../json'
 import type { Json } from '../../json'
 import { EntityNotFound } from '../attributes/values'
 import { canonicalId } from '../entities/sweep'
@@ -108,7 +108,7 @@ const inputFor = (
       refs: [...refs],
       proposedBy: { type: 'integration', id: integrationId },
     })
-  const value = jsonValue.safeParse(proposal.value)
+  const value = readJson(proposal.value)
   return value.success
     ? Effect.succeed(
         integrationPatch({

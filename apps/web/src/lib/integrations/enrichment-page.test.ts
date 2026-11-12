@@ -6,7 +6,7 @@ import { attributeEvent, entity, integration, space } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { workspace } from '@spaces/db/schema/workspace'
 import { defineManifest, toManifestJson } from '@spaces/sdk'
-import { jsonRecord, jsonValue } from '@spaces/core/json'
+import { jsonRecord, toJson } from '@spaces/core/json'
 import {
   enrichmentSettingsOf,
   scopeFor,
@@ -33,7 +33,7 @@ import { whereFromProgram } from './enrichment-record'
 
 const manifestFor = (id: string, name: string) =>
   jsonRecord(
-    jsonValue.parse(
+    toJson(
       toManifestJson(
         defineManifest({
           manifestVersion: 1,

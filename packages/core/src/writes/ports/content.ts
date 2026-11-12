@@ -32,7 +32,8 @@ import type {
 } from '@spaces/sdk'
 import { ref } from '../../context/ref'
 import { DOCUMENT_KINDS } from '../../documents'
-import { jsonValue } from '../../json'
+import { toJson } from '../../json'
+import { jsonValueZod } from '../../json-zod'
 import {
   documentIntakeMessage,
   intakeDocumentProgram,
@@ -321,7 +322,7 @@ const recorderShape = z
     icalUid: text.optional(),
     calendarEventId: text.optional(),
     durationSeconds: z.number().int().nonnegative().optional(),
-    raw: jsonValue,
+    raw: jsonValueZod,
     artifacts: z.array(artifactShape).max(50).optional(),
   })
   .strict()
@@ -434,7 +435,7 @@ const recordedNoteShape = z.discriminatedUnion('_tag', [
         .optional(),
       folderIds: z.array(text).max(1000).optional(),
       deletedAt: instant.optional(),
-      raw: jsonValue,
+      raw: jsonValueZod,
     })
     .strict(),
   z
@@ -875,7 +876,7 @@ export const ContentLive = (
       })
     }
     const payload = yield* Effect.try({
-      try: () => jsonValue.parse(signalPayload(claim)),
+      try: () => toJson(signalPayload(claim)),
       catch: () =>
         new JobPermanent({
           reason: 'Content.emitSignal: the payload is not JSON',

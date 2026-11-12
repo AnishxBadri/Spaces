@@ -1,5 +1,5 @@
 import { splitImportList } from '@spaces/sdk/import-grid'
-import { valueValidator } from '../attributes/registry'
+import { decodeValue, valueValidator } from '../attributes/registry'
 import { PHONE_SHAPE, toE164 } from '../attributes/phone'
 import type {
   AttributeOptions,
@@ -345,10 +345,9 @@ export function coerce(
   if (raw === null || raw.trim() === '') return accept(null)
   const out = coerceShape(type, options, raw)
   if (!out.ok || out.value === null) return out
-  const check = valueValidator({ type, options }).safeParse(out.value)
+  const check = decodeValue(valueValidator({ type, options }), out.value)
   if (check.success) return out
-  const issue = check.error.issues.at(0)
-  return refuse(`${quote(raw)}: ${issue ? issue.message : 'not accepted'}`)
+  return refuse(`${quote(raw)}: ${check.message}`)
 }
 
 export type ColumnFailure = { row: number; raw: string; reason: string }

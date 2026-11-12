@@ -1,7 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { Effect, Schema } from 'effect'
 import { and, asc, eq, isNull } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { entity, space, term } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
@@ -245,12 +244,14 @@ export const saveRecordAsTemplate = createServerFn({ method: 'POST' })
 /** Save as template from the composer: its subject, body and files. */
 export const saveEmailAsTemplate = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      name: z.string().trim().min(1).max(120),
-      subject: z.string().max(998),
-      bodyMd: z.string().max(200_000),
-      attachments: draftAttachmentsSchema,
-    }),
+    input(
+      Schema.Struct({
+        name: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+        subject: Schema.String.check(Schema.isMaxLength(998)),
+        bodyMd: Schema.String.check(Schema.isMaxLength(200_000)),
+        attachments: draftAttachmentsSchema,
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()

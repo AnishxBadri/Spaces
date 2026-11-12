@@ -4,7 +4,7 @@ import { db } from '@spaces/db'
 import { credential } from '@spaces/db/schema'
 import { credentialKind, credentialScope } from '@spaces/db/schema/vault'
 import type { CredentialMeta } from '@spaces/db/schema/vault'
-import { jsonValue } from '../../json'
+import { jsonValueZod } from '../../json-zod'
 import { decryptSecret, encryptSecret, redact } from './crypto'
 
 export { redact }
@@ -35,7 +35,7 @@ export const credentialInput = z
      * paste into a keyed provider's field cannot pass for a key.
      */
     keyless: z.literal(true).optional(),
-    meta: z.record(z.string(), jsonValue).optional(),
+    meta: z.record(z.string(), jsonValueZod).optional(),
     createdBy: z.string().min(1),
   })
   .superRefine((input, ctx) => {

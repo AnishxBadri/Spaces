@@ -1,0 +1,587 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`createAttributeInput, characterised > a bad kind 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`createAttributeInput, characterised > a bad object id 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`createAttributeInput, characterised > a bad type 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`createAttributeInput, characterised > a blank name 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`createAttributeInput, characterised > a config 1`] = `
+{
+  "data": {
+    "config": {
+      "code": "USD",
+      "longText": false,
+      "max": 3,
+      "multi": true,
+      "precision": 2,
+      "targetKind": "person",
+      "targetObjectId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    },
+    "name": "Raise",
+    "type": "currency",
+  },
+  "ok": true,
+}
+`;
+
+exports[`createAttributeInput, characterised > a config with a bad target 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`createAttributeInput, characterised > a config with a stray key 1`] = `
+{
+  "data": {
+    "config": {},
+    "name": "Ref",
+    "type": "text",
+  },
+  "ok": true,
+}
+`;
+
+exports[`createAttributeInput, characterised > a default 1`] = `
+{
+  "data": {
+    "default": true,
+    "name": "Flag",
+    "type": "checkbox",
+  },
+  "ok": true,
+}
+`;
+
+exports[`createAttributeInput, characterised > a null description 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`createAttributeInput, characterised > a padded description 1`] = `
+{
+  "data": {
+    "description": "Why",
+    "name": "Notes",
+    "type": "text",
+  },
+  "ok": true,
+}
+`;
+
+exports[`createAttributeInput, characterised > a padded name 1`] = `
+{
+  "data": {
+    "name": "Notes",
+    "type": "text",
+  },
+  "ok": true,
+}
+`;
+
+exports[`createAttributeInput, characterised > a required flag 1`] = `
+{
+  "data": {
+    "indexed": false,
+    "name": "Flag",
+    "required": true,
+    "type": "checkbox",
+  },
+  "ok": true,
+}
+`;
+
+exports[`createAttributeInput, characterised > a stray key 1`] = `
+{
+  "data": {
+    "name": "Flag",
+    "type": "checkbox",
+  },
+  "ok": true,
+}
+`;
+
+exports[`createAttributeInput, characterised > a text 1`] = `
+{
+  "data": {
+    "name": "Notes",
+    "type": "text",
+  },
+  "ok": true,
+}
+`;
+
+exports[`createAttributeInput, characterised > an object default 1`] = `
+{
+  "data": {
+    "default": {
+      "a": 1,
+    },
+    "name": "Flag",
+    "type": "checkbox",
+  },
+  "ok": true,
+}
+`;
+
+exports[`createAttributeInput, characterised > an option archived 1`] = `
+{
+  "data": {
+    "name": "Stage",
+    "options": [
+      {
+        "label": "A",
+      },
+    ],
+    "type": "select",
+  },
+  "ok": true,
+}
+`;
+
+exports[`createAttributeInput, characterised > an option with an id 1`] = `
+{
+  "data": {
+    "name": "Stage",
+    "options": [
+      {
+        "label": "A",
+      },
+    ],
+    "type": "select",
+  },
+  "ok": true,
+}
+`;
+
+exports[`createAttributeInput, characterised > no name 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`createAttributeInput, characterised > no type 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`createAttributeInput, characterised > on a kind 1`] = `
+{
+  "data": {
+    "name": "Notes",
+    "objectKind": "company",
+    "type": "text",
+  },
+  "ok": true,
+}
+`;
+
+exports[`createAttributeInput, characterised > on an object id 1`] = `
+{
+  "data": {
+    "name": "Notes",
+    "objectId": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    "type": "text",
+  },
+  "ok": true,
+}
+`;
+
+exports[`createAttributeInput, characterised > options 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a NaN default 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a bad ai mode 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a bad currency code 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a bad id 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a bad move 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a blank enrichment key 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a blank name 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a currency code 1`] = `
+{
+  "data": {
+    "config": {
+      "code": "EUR",
+    },
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a default 1`] = `
+{
+  "data": {
+    "config": {
+      "default": {
+        "a": [
+          1,
+          "b",
+          null,
+        ],
+      },
+    },
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a fractional max 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a long description 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a long name 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a move 1`] = `
+{
+  "data": {
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    "move": "up",
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a null ai config 1`] = `
+{
+  "data": {
+    "config": {
+      "ai": null,
+    },
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a null config 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a null default 1`] = `
+{
+  "data": {
+    "config": {
+      "default": null,
+    },
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a null description 1`] = `
+{
+  "data": {
+    "description": null,
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a null enrichment key 1`] = `
+{
+  "data": {
+    "config": {
+      "enrichmentKey": null,
+    },
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a numeric currency code 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a padded description 1`] = `
+{
+  "data": {
+    "description": "Why",
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a padded name 1`] = `
+{
+  "data": {
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    "name": "Stage",
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a precision 1`] = `
+{
+  "data": {
+    "config": {
+      "precision": 0,
+    },
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a precision of 7 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a rating max 1`] = `
+{
+  "data": {
+    "config": {
+      "max": 10,
+    },
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a rating max of 11 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > a string flag 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > an ai config 1`] = `
+{
+  "data": {
+    "config": {
+      "ai": {
+        "mode": "classify",
+        "prompt": "Sector?",
+      },
+    },
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > an enrichment key 1`] = `
+{
+  "data": {
+    "config": {
+      "enrichmentKey": "company.location",
+    },
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > an id alone 1`] = `
+{
+  "data": {
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > an option with a bad group 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > an option with a blank label 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > an option with a free colour 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > an option with a long id 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > an option with a stray key 1`] = `
+{
+  "data": {
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    "options": [
+      {
+        "label": "A",
+      },
+    ],
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > fifty-one options 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > flags 1`] = `
+{
+  "data": {
+    "archived": false,
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    "indexed": true,
+    "multi": true,
+    "required": true,
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > immutable fields 1`] = `
+{
+  "data": {
+    "config": {},
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > long text 1`] = `
+{
+  "data": {
+    "config": {
+      "longText": true,
+    },
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > no id 1`] = `
+{
+  "ok": false,
+}
+`;
+
+exports[`updateAttributeInput, characterised > options 1`] = `
+{
+  "data": {
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    "options": [
+      {
+        "label": "Seed",
+      },
+      {
+        "archived": true,
+        "color": "blue",
+        "group": "active",
+        "id": "a",
+        "label": "A",
+      },
+    ],
+  },
+  "ok": true,
+}
+`;
+
+exports[`updateAttributeInput, characterised > undefined fields 1`] = `
+{
+  "data": {
+    "id": "0b6ad7a2-6a3e-4c4f-9a43-5d1f1d8b6c11",
+    "name": undefined,
+    "required": undefined,
+  },
+  "ok": true,
+}
+`;

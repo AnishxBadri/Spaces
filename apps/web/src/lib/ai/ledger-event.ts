@@ -20,7 +20,7 @@ import type {
 import { JSON_SCHEMA_DRAFT } from '@spaces/core/ai/schema'
 import type { JsonSchema } from '@spaces/core/ai/schema'
 import { ref } from '@spaces/core/context/ref'
-import { jsonValue } from '@spaces/core/json'
+import { readJson } from '@spaces/core/json'
 import {
   heldLedgerEvent,
   proposeProgram,
@@ -582,7 +582,7 @@ const proposeInRun = Effect.fn('proposeLedgerEvent.inRun')(function* (
       : { ...base, event: 'mark', proposed: choice.proposed }
   // Built from decoded numbers and strings, so this decode is the type's
   // claim made once, not a filter that bites.
-  const json = jsonValue.safeParse(payload)
+  const json = readJson(payload)
   if (!json.success) {
     yield* step(null)
     return { status: 'skipped', reason: 'The proposal is not JSON' }

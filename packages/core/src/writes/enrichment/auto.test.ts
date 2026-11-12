@@ -14,7 +14,7 @@ import type { AutoEnrichOutcome } from '../../enrichment/auto'
 import { enrichmentSettingsOf } from '../../enrichment/settings'
 import { EnrichmentSources } from '../../enrichment/sources'
 import { WebsiteReader } from '../../enrichment/website'
-import { jsonRecord, jsonValue } from '../../json'
+import { jsonRecord, toJson } from '../../json'
 import { capRefusal } from '@spaces/core/plugins/credit'
 import { Enqueue } from '../../queue/enqueue'
 import type { EnqueueOptions } from '../../queue/sender'
@@ -72,7 +72,7 @@ const withClock = <TOut, TErr>(
 
 const manifest = (id: string) =>
   jsonRecord(
-    jsonValue.parse(
+    toJson(
       toManifestJson(
         defineManifest({
           manifestVersion: 1,

@@ -22,7 +22,7 @@ import type { JsonSchema } from '@spaces/core/ai/schema'
 import { liveOptions } from '@spaces/core/attributes/options'
 import type { AttributeDef } from '@spaces/core/attributes/registry'
 import { QUEUES } from '@spaces/core/queue/names'
-import { jsonRecord, jsonValue } from '@spaces/core/json'
+import { jsonRecord, readJson } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
 import { enqueue, jobsByKey } from '#/lib/queue'
 import type { QueuedJob } from '#/lib/queue'
@@ -616,7 +616,7 @@ const attributeRunInRun = Effect.fn('attributeRun.inRun')(function* (
   if (value !== undefined) {
     const envelope = { value, refs: fieldRefs, confidence }
     const checked = validateProposal([def], { [def.slug]: envelope })
-    const payload = jsonValue.safeParse({ [def.slug]: envelope })
+    const payload = readJson({ [def.slug]: envelope })
     if (!checked.ok || !payload.success)
       dropped.push(
         checked.ok

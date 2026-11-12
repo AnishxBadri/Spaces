@@ -14,7 +14,7 @@ import { workspace } from '@spaces/db/schema/workspace'
 import type { Json } from '@spaces/db/json'
 import { defineManifest, toManifestJson } from '@spaces/sdk'
 import type { DomainEvent } from '@spaces/sdk'
-import { jsonRecord, jsonValue } from '../../json'
+import { jsonRecord, toJson } from '../../json'
 import { Enqueue } from '../../queue/enqueue'
 import { setValues } from '../attributes/values'
 import { enrichmentRow } from '../enrichment/apply'
@@ -103,7 +103,7 @@ const install = async (row: Row = {}) => {
     enabled: row.enabled ?? true,
     status: row.status ?? 'enabled',
     config: row.config ?? { autoEnrichScopes: ['deal'] },
-    manifest: jsonRecord(jsonValue.parse(row.manifest ?? apollo)),
+    manifest: jsonRecord(toJson(row.manifest ?? apollo)),
   })
 }
 
