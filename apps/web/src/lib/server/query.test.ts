@@ -34,10 +34,7 @@ describe('serverQuery', () => {
   })
 
   it('prints a cause that is not an Error', async () => {
-    const refused = Effect.runPromise(
-       
-      serverQuery(() => Promise.reject('gone')),
-    )
+    const refused = Effect.runPromise(serverQuery(() => Promise.reject('gone')))
     await expect(refused).rejects.toThrow('gone')
   })
 })

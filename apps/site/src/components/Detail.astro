@@ -15,7 +15,7 @@ const at = (r: Rect, z: number) =>
 {
   detail.kind === 'research' && (
     <>
-      <div class="card memo" style={at(detail.memo, 2)}>
+      <div class="memo card" style={at(detail.memo, 2)}>
         <p class="filed">
           <span class="k">{detail.memo.filed}</span>
           <span class="where">{detail.memo.space}</span>
@@ -33,7 +33,7 @@ const at = (r: Rect, z: number) =>
           ))}
         </p>
       </div>
-      <div class="card term" style={at(detail.glossary, 3)}>
+      <div class="term card" style={at(detail.glossary, 3)}>
         <p class="row-between">
           <span class="term-name mono">{detail.glossary.term}</span>
           <span class="term-where mono">{detail.glossary.where}</span>
