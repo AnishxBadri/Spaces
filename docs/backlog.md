@@ -52,7 +52,7 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 
 #### `effect-3` (SPA-405) · afk · L — Documents, notes, views, records and the portfolio loader become Effect
 
-**Blocked by:** nothing. **Owns**, in `apps/web/src/lib/`: `portfolio/inputs.ts`, `notes/kind-input.ts`, the draft shapes `draftRecipientsSchema` and `draftAttachmentsSchema` where they are defined, and the `.validator()` of each server fn that takes one of them; `views/page-input.ts` and the `.validator()` of each server fn that takes `pagedListInput`; `documents/` (`blob-refs.ts`, `fetch-guard.ts`, `preview-card.ts`, `record-files.ts`, `unfiled.ts`, `upload.ts`), `notes/` (`from-suggestion.ts`, `list-rows.ts`, `ordering.ts`, `templates.ts`), `views/` (`paging.ts`, `resolve.ts`, `scope.ts`, `sql.ts`), `records/` (`head.ts`, `pictures.ts`), `portfolio/` (`detail.ts`, `holding.ts`), and their tests. 2,300 lines.
+**Blocked by:** nothing. **Owns**, in `apps/web/src/lib/`: `portfolio/inputs.ts`, `notes/kind-input.ts`, and the `.validator()` of each server fn that takes one of their shapes; `views/page-input.ts` and the `.validator()` of each server fn that takes `pagedListInput`; `documents/` (`blob-refs.ts`, `fetch-guard.ts`, `preview-card.ts`, `record-files.ts`, `unfiled.ts`, `upload.ts`), `notes/` (`from-suggestion.ts`, `list-rows.ts`, `ordering.ts`, `templates.ts`), `views/` (`paging.ts`, `resolve.ts`, `scope.ts`, `sql.ts`), `records/` (`head.ts`, `pictures.ts`), `portfolio/` (`detail.ts`, `holding.ts`), and their tests. 2,300 lines.
 
 **Does not touch** `packages/sdk/**`, `plugins/**`, `packages/core/**` or `lib/integrations/**` (`schema-2` runs beside this slice).
 
@@ -67,7 +67,7 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 **Acceptance criteria**
 
 - [ ] Each listed file imports `effect`, or the report names it as pure with the reason.
-- [ ] No file imports a zod `pagedListInput`, and the shapes of `portfolio/inputs.ts`, `notes/kind-input.ts` and the two draft shapes are Effect schemas. The money shapes accept and refuse exactly what they did (a test per shape on the edge values: an empty string, a negative, a non-number, a number as a string), and `lib/ai/propose.ts`, which shares them with the suggestion accept path, still reads one set.
+- [ ] No file imports a zod `pagedListInput`, and the shapes of `portfolio/inputs.ts` and `notes/kind-input.ts` are Effect schemas. The money shapes accept and refuse exactly what they did (a test per shape on the edge values: an empty string, a negative, a non-number, a number as a string), and `lib/ai/propose.ts`, which shares them with the suggestion accept path, still reads one set.
 - [ ] `value-index-plan.test.ts`, the fetch-guard tests and the portfolio as-of tests pass unchanged.
 - [ ] No file outside the list changed, bar tests that asserted on an error class.
 - [ ] Gates: typecheck, lint, the `@spaces/web` and `@spaces/worker` tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
@@ -129,7 +129,7 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 
 #### `schema-3` (SPA-404) · afk · M — `valueValidator` on Effect Schema: one type system for attribute values, inside and at `/api/v1`
 
-**Blocked by:** `schema-2`. **Owns** `packages/core/src/attributes/registry.ts`, `attributes/default-values.ts`, `writes/attributes/values.ts`, `import/coerce.ts`, `enrichment/plan.ts`, `ai/schema.ts`, the `lib/rpc/**` handlers that decode a record's values, the three input shapes in `lib/server/attributes.ts`, and their tests.
+**Blocked by:** `schema-2`. **Owns** `packages/core/src/attributes/registry.ts`, `attributes/default-values.ts`, `writes/attributes/values.ts`, `import/coerce.ts`, `enrichment/plan.ts`, `ai/schema.ts`, the `lib/rpc/**` handlers that decode a record's values, `packages/core/src/json.ts`, the validators in `lib/server/` named in step 0, and their tests.
 
 **Does not touch** the files `effect-4` lists (it runs beside this slice).
 
@@ -137,7 +137,7 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 
 **What to build.**
 
-0. **The shapes `lib/server/attributes.ts` still takes as zod.** `aiConfigInput` and `jsonValue` in core become Effect schemas, and `optionEdit`, `updateAttributeInput` and `createAttributeInput` in `attributes.ts` with them, through `input()`. `update-attribute-input.test.ts` keeps its expectations.
+0. **The shapes the server modules still take from core as zod.** `aiConfigInput`, and in `packages/core/src/json.ts` `jsonValue`, `draftRecipientsSchema` and `draftAttachmentsSchema`, become Effect schemas. The validators that use them move to `input()`: `saveNote` in `notes.ts`, `saveEmailDraft` and `reviewEmailVariables` in `emails.ts`, `saveEmailAsTemplate` in `templates.ts`. In `attributes.ts`, `optionEdit`, `updateAttributeInput` and `createAttributeInput` follow. `update-attribute-input.test.ts` keeps its expectations.
 1. **`valueValidator` returns an Effect schema** for an attribute, with every constraint it has today (type, options, required, uniqueness is not its job) and the same messages.
 2. **The one write path decodes with it.** `setValues` and its helpers in `writes/attributes/values.ts`; the import coercer; the enrichment plan; the AI column's answer schema.
 3. **`/api/v1` uses it directly.** The handlers that take record values compose the same schema into their HttpApi payloads; any zod-to-Schema bridge at that seam goes.
