@@ -165,7 +165,7 @@ const listCompaniesTableProgram = Effect.fn('listCompaniesTableProgram')(
  * re-exported by the client-imported barrel, and a test can call it directly.
  */
 export const listCompaniesTable = createServerFn()
-  .validator(pagedListInput)
+  .validator(input(pagedListInput))
   .handler(async ({ data }) => {
     await requireUser()
     return Effect.runPromise(

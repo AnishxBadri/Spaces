@@ -1,49 +1,65 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import type { ListPageOptions } from './paging'
 
 /**
  * What a paged list surface accepts over the wire; `listObjectRecords`,
  * `listCompaniesTable` and `listPeopleTable` all validate against it.
- * Imports zod and types only: it is reachable from the client-imported barrel.
+ * Imports Effect Schema and types only: it is reachable from the
+ * client-imported barrel.
  */
 export const pagedListShape = {
-  conditions: z
-    .array(
-      z.object({
-        slug: z.string().min(1).max(120),
-        op: z.enum([
-          'is',
-          'is_not',
-          'contains',
-          'empty',
-          'not_empty',
-          'gt',
-          'lt',
-        ]),
-        value: z
-          .union([
-            z.string().max(400),
-            z.number(),
-            z.boolean(),
-            z.null(),
-            z.array(z.string().max(400)).max(50),
-          ])
-          .optional(),
-      }),
-    )
-    .max(20)
-    .optional(),
+  conditions: Schema.optional(
+    Schema.mutable(
+      Schema.Array(
+        Schema.Struct({
+          slug: Schema.String.check(
+            Schema.isMinLength(1),
+            Schema.isMaxLength(120),
+          ),
+          op: Schema.Literals([
+            'is',
+            'is_not',
+            'contains',
+            'empty',
+            'not_empty',
+            'gt',
+            'lt',
+          ]),
+          value: Schema.optional(
+            Schema.Union([
+              Schema.String.check(Schema.isMaxLength(400)),
+              Schema.Finite,
+              Schema.Boolean,
+              Schema.Null,
+              Schema.mutable(
+                Schema.Array(Schema.String.check(Schema.isMaxLength(400))),
+              ).check(Schema.isMaxLength(50)),
+            ]),
+          ),
+        }),
+      ),
+    ).check(Schema.isMaxLength(20)),
+  ),
   // Opaque to the client: it round-trips whatever `nextCursor` said.
-  cursor: z.string().max(400).nullish(),
-  limit: z.number().int().min(1).max(200).optional(),
+  cursor: Schema.optional(
+    Schema.NullOr(Schema.String.check(Schema.isMaxLength(400))),
+  ),
+  limit: Schema.optional(
+    Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 200 })),
+  ),
   // The table's own column id — `name`, `createdAt`, `attr:<slug>`.
-  sort: z
-    .object({ id: z.string().min(1).max(160), desc: z.boolean() })
-    .nullish(),
-  q: z.string().max(200).optional(),
+  sort: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({
+        id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(160)),
+        desc: Schema.Boolean,
+      }),
+    ),
+  ),
+  q: Schema.optional(Schema.String.check(Schema.isMaxLength(200))),
 }
 
-export const pagedListInput = z.object(pagedListShape)
+export const pagedListInput = Schema.Struct(pagedListShape)
 
 /**
  * The validated request as the program takes it. `exactOptionalPropertyTypes`

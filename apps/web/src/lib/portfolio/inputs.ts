@@ -1,35 +1,41 @@
-import { z } from 'zod'
+import { Schema, SchemaTransformation } from 'effect'
 
 /**
  * The portfolio event validators: the server fns' inputs, and what a
  * `ledger_event` suggestion's numbers are held to at accept. One set, so a
  * proposal is refused for exactly what a person typing it would be.
- * - Client-safe: zod only, no db.
+ * - Client-safe: Effect Schema only, no db.
  */
 
-export const isoDate = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
-export const ccy = z.string().length(3).toUpperCase()
-export const money = z.number().finite().nonnegative()
+const uuid = Schema.String.check(Schema.isUUID())
 
-export const roundInput = z.object({
-  companyId: z.string().uuid(),
+export const isoDate = Schema.String.check(
+  Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/, { message: 'Expected YYYY-MM-DD' }),
+)
+export const ccy = Schema.String.check(Schema.isLengthBetween(3, 3)).pipe(
+  Schema.decode(SchemaTransformation.toUpperCase()),
+)
+export const money = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))
+
+export const roundInput = Schema.Struct({
+  companyId: uuid,
   date: isoDate,
-  kind: z.string().trim().min(1).max(60),
-  raised: money.optional(),
-  currency: ccy.optional(),
-  preMoney: money.optional(),
-  postMoney: money.optional(),
-  pricePerShare: money.optional(),
-  sharesOutstanding: money.optional(),
-  coInvestorIds: z.array(z.string().uuid()).max(50).optional(),
+  kind: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(60)),
+  raised: Schema.optional(money),
+  currency: Schema.optional(ccy),
+  preMoney: Schema.optional(money),
+  postMoney: Schema.optional(money),
+  pricePerShare: Schema.optional(money),
+  sharesOutstanding: Schema.optional(money),
+  coInvestorIds: Schema.optional(
+    Schema.mutable(Schema.Array(uuid)).check(Schema.isMaxLength(50)),
+  ),
 })
 
-export const markInput = z.object({
-  holdingId: z.string().uuid(),
+export const markInput = Schema.Struct({
+  holdingId: uuid,
   date: isoDate,
   fairValue: money,
   currency: ccy,
-  basis: z.enum(['round_price', 'manual', '409a']),
+  basis: Schema.Literals(['round_price', 'manual', '409a']),
 })

@@ -1,3 +1,5 @@
+import { Effect } from 'effect'
+
 /**
  * **The one URL guard** (SSRF). A self-hosted server sits beside metadata
  * endpoints, private databases and intranets, so "fetch this URL" is answered
@@ -263,7 +265,26 @@ export type GuardedFetchOptions = {
  * The timeout is one signal created before the loop, not one per hop: five
  * hops each given the full budget is five times the budget.
  */
-export async function guardedFetch(
+export const guardedFetchProgram = Effect.fn('guardedFetch')(function* (
+  raw: string,
+  options: GuardedFetchOptions,
+) {
+  // Never rejects for a refusal or a network failure: both are values.
+  return yield* Effect.promise(() => walkHops(raw, options))
+})
+
+/** {@link guardedFetchProgram}, for a caller that is not a program. */
+export const guardedFetch = (
+  raw: string,
+  options: GuardedFetchOptions,
+): Promise<GuardedFetchResult> =>
+  Effect.runPromise(guardedFetchProgram(raw, options))
+
+/**
+ * The hops themselves, in the order the guard depends on: the table, then
+ * the fetch, then the next `Location` back through the table.
+ */
+async function walkHops(
   raw: string,
   { maxBytes, timeoutMs }: GuardedFetchOptions,
 ): Promise<GuardedFetchResult> {

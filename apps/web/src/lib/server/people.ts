@@ -50,7 +50,7 @@ const listPeopleTableProgram = Effect.fn('listPeopleTableProgram')(function* (
  * module is re-exported by the client-imported barrel.
  */
 export const listPeopleTable = createServerFn()
-  .validator(pagedListInput)
+  .validator(input(pagedListInput))
   .handler(async ({ data }) => {
     await requireUser()
     return Effect.runPromise(

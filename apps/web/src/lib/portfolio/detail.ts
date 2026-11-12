@@ -1,3 +1,4 @@
+import { Effect, Schema } from 'effect'
 import { asc, eq, inArray } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity, workspace } from '@spaces/db/schema'
@@ -16,6 +17,7 @@ import { ownership } from '@spaces/core/portfolio/ownership'
 import type { OwnershipSale } from '@spaces/core/portfolio/ownership'
 import { portfolioRollup } from '@spaces/core/portfolio/rollup'
 import type { FxRate } from '@spaces/core/portfolio/fx'
+import { portfolioQuery } from './query'
 
 /**
  * The portfolio read layer — the loader the server fns call once they have a
@@ -39,28 +41,44 @@ import type { FxRate } from '@spaces/core/portfolio/fx'
 export const num = (s: string | null): number | null =>
   s === null ? null : Number(s)
 
-export async function baseCurrency(): Promise<string> {
-  const ws = (
-    await db.select({ settings: workspace.settings }).from(workspace)
-  ).at(0)
+/** The tear sheet names a holding that is not there. */
+export class HoldingDetailNotFound extends Schema.TaggedError<HoldingDetailNotFound>()(
+  'HoldingDetailNotFound',
+  { message: Schema.String },
+) {}
+
+export const baseCurrencyProgram = Effect.fn('baseCurrency')(function* () {
+  const ws = (yield* portfolioQuery(() =>
+    db.select({ settings: workspace.settings }).from(workspace),
+  )).at(0)
   const base = ws?.settings.base_currency
   return base !== undefined && base.length === 3 ? base : 'USD'
-}
+})
 
-export async function loadFxRates(): Promise<Array<FxRate>> {
-  const rows = await db
-    .select({
-      currency: fxRate.currency,
-      date: fxRate.date,
-      rateToBase: fxRate.rateToBase,
-    })
-    .from(fxRate)
-  return rows.map((r) => ({
+/** {@link baseCurrencyProgram}, for a caller that is not a program. */
+export const baseCurrency = (): Promise<string> =>
+  Effect.runPromise(baseCurrencyProgram())
+
+export const loadFxRatesProgram = Effect.fn('loadFxRates')(function* () {
+  const rows = yield* portfolioQuery(() =>
+    db
+      .select({
+        currency: fxRate.currency,
+        date: fxRate.date,
+        rateToBase: fxRate.rateToBase,
+      })
+      .from(fxRate),
+  )
+  return rows.map((r): FxRate => ({
     currency: r.currency,
     date: r.date,
     rateToBase: Number(r.rateToBase),
   }))
-}
+})
+
+/** {@link loadFxRatesProgram}, for a caller that is not a program. */
+export const loadFxRates = (): Promise<Array<FxRate>> =>
+  Effect.runPromise(loadFxRatesProgram())
 
 /**
  * One table's rows split into what the pure libs read and what the timeline
@@ -174,82 +192,97 @@ export type LoadedHolding = {
   ownershipSales: Array<OwnershipSale>
 }
 
-export async function loadHoldingEvents(
+export const loadHoldingEventsProgram = Effect.fn('loadHoldingEvents')(
+  function* (holdingIds: Array<string>) {
+    const byHolding = new Map<string, LoadedHolding>()
+    for (const id of holdingIds) {
+      byHolding.set(id, {
+        events: { investments: [], marks: [], distributions: [] },
+        ownershipInputs: [],
+        ownershipSales: [],
+      })
+    }
+    if (holdingIds.length === 0) return byHolding
+    const [investments, marks, distributions] = yield* Effect.all(
+      [
+        portfolioQuery(() =>
+          db
+            .select()
+            .from(investment)
+            .where(inArray(investment.holdingId, holdingIds))
+            .orderBy(asc(investment.date)),
+        ),
+        portfolioQuery(() =>
+          db
+            .select()
+            .from(mark)
+            .where(inArray(mark.holdingId, holdingIds))
+            .orderBy(asc(mark.date)),
+        ),
+        portfolioQuery(() =>
+          db
+            .select()
+            .from(distribution)
+            .where(inArray(distribution.holdingId, holdingIds))
+            .orderBy(asc(distribution.date)),
+        ),
+      ],
+      { concurrency: 'unbounded' },
+    )
+    const inv = partitionReversals(investments)
+    const mk = partitionReversals(marks)
+    const dist = partitionReversals(distributions)
+    for (const r of inv.originals) {
+      const h = byHolding.get(r.holdingId)
+      const reversedAt = reversedAtOf(inv.reversalOf, r.id)
+      h?.events.investments.push({
+        date: r.date,
+        amount: Number(r.amount),
+        currency: r.currency,
+        reversedAt,
+      })
+      h?.ownershipInputs.push({
+        date: r.date,
+        amount: Number(r.amount),
+        instrument: r.instrument,
+        shares: num(r.shares),
+        cap: num(r.cap),
+        reversedAt,
+      })
+    }
+    for (const r of mk.originals) {
+      byHolding.get(r.holdingId)?.events.marks.push({
+        date: r.date,
+        fairValue: Number(r.fairValue),
+        currency: r.currency,
+        reversedAt: reversedAtOf(mk.reversalOf, r.id),
+      })
+    }
+    for (const r of dist.originals) {
+      const h = byHolding.get(r.holdingId)
+      const reversedAt = reversedAtOf(dist.reversalOf, r.id)
+      h?.events.distributions.push({
+        date: r.date,
+        amount: Number(r.amount),
+        currency: r.currency,
+        kind: r.kind,
+        reversedAt,
+      })
+      h?.ownershipSales.push({
+        date: r.date,
+        sharesSold: num(r.sharesSold),
+        reversedAt,
+      })
+    }
+    return byHolding
+  },
+)
+
+/** {@link loadHoldingEventsProgram}, for a caller that is not a program. */
+export const loadHoldingEvents = (
   holdingIds: Array<string>,
-): Promise<Map<string, LoadedHolding>> {
-  const byHolding = new Map<string, LoadedHolding>()
-  for (const id of holdingIds) {
-    byHolding.set(id, {
-      events: { investments: [], marks: [], distributions: [] },
-      ownershipInputs: [],
-      ownershipSales: [],
-    })
-  }
-  if (holdingIds.length === 0) return byHolding
-  const [investments, marks, distributions] = await Promise.all([
-    db
-      .select()
-      .from(investment)
-      .where(inArray(investment.holdingId, holdingIds))
-      .orderBy(asc(investment.date)),
-    db
-      .select()
-      .from(mark)
-      .where(inArray(mark.holdingId, holdingIds))
-      .orderBy(asc(mark.date)),
-    db
-      .select()
-      .from(distribution)
-      .where(inArray(distribution.holdingId, holdingIds))
-      .orderBy(asc(distribution.date)),
-  ])
-  const inv = partitionReversals(investments)
-  const mk = partitionReversals(marks)
-  const dist = partitionReversals(distributions)
-  for (const r of inv.originals) {
-    const h = byHolding.get(r.holdingId)
-    const reversedAt = reversedAtOf(inv.reversalOf, r.id)
-    h?.events.investments.push({
-      date: r.date,
-      amount: Number(r.amount),
-      currency: r.currency,
-      reversedAt,
-    })
-    h?.ownershipInputs.push({
-      date: r.date,
-      amount: Number(r.amount),
-      instrument: r.instrument,
-      shares: num(r.shares),
-      cap: num(r.cap),
-      reversedAt,
-    })
-  }
-  for (const r of mk.originals) {
-    byHolding.get(r.holdingId)?.events.marks.push({
-      date: r.date,
-      fairValue: Number(r.fairValue),
-      currency: r.currency,
-      reversedAt: reversedAtOf(mk.reversalOf, r.id),
-    })
-  }
-  for (const r of dist.originals) {
-    const h = byHolding.get(r.holdingId)
-    const reversedAt = reversedAtOf(dist.reversalOf, r.id)
-    h?.events.distributions.push({
-      date: r.date,
-      amount: Number(r.amount),
-      currency: r.currency,
-      kind: r.kind,
-      reversedAt,
-    })
-    h?.ownershipSales.push({
-      date: r.date,
-      sharesSold: num(r.sharesSold),
-      reversedAt,
-    })
-  }
-  return byHolding
-}
+): Promise<Map<string, LoadedHolding>> =>
+  Effect.runPromise(loadHoldingEventsProgram(holdingIds))
 
 /**
  * The book — every holding with its metrics and ownership, and the roll-up.
@@ -259,45 +292,55 @@ export async function loadHoldingEvents(
  * - `omit`: holding ids left out of the rows and the roll-up alike, as
  *   though absent from the book (the MCP tools drop sensitive holdings).
  */
-export async function loadPortfolio(
+export const loadPortfolioProgram = Effect.fn('loadPortfolio')(function* (
   asOf?: string,
   opts?: { omit: ReadonlySet<string> },
 ) {
-  const [base, rates, allRows] = await Promise.all([
-    baseCurrency(),
-    loadFxRates(),
-    db
-      .select({
-        id: holding.id,
-        companyId: holding.companyId,
-        openedAt: holding.openedAt,
-        companyName: entity.canonicalName,
-        sensitive: entity.sensitive,
-      })
-      .from(holding)
-      .innerJoin(entity, eq(entity.id, holding.companyId))
-      .orderBy(asc(holding.openedAt)),
-  ])
+  const [base, rates, allRows] = yield* Effect.all(
+    [
+      baseCurrencyProgram(),
+      loadFxRatesProgram(),
+      portfolioQuery(() =>
+        db
+          .select({
+            id: holding.id,
+            companyId: holding.companyId,
+            openedAt: holding.openedAt,
+            companyName: entity.canonicalName,
+            sensitive: entity.sensitive,
+          })
+          .from(holding)
+          .innerJoin(entity, eq(entity.id, holding.companyId))
+          .orderBy(asc(holding.openedAt)),
+      ),
+    ],
+    { concurrency: 'unbounded' },
+  )
   const rows =
     opts === undefined ? allRows : allRows.filter((r) => !opts.omit.has(r.id))
   // Rounds power the ownership ledger — one query for every company,
   // fetched alongside the events (independent queries, one round-trip).
   const companyIds = rows.map((r) => r.companyId)
-  const [loaded, roundRows] = await Promise.all([
-    loadHoldingEvents(rows.map((r) => r.id)),
-    companyIds.length > 0
-      ? db
-          .select({
-            companyId: round.companyId,
-            date: round.date,
-            kind: round.kind,
-            sharesOutstanding: round.sharesOutstanding,
-          })
-          .from(round)
-          .where(inArray(round.companyId, companyIds))
-          .orderBy(asc(round.date))
-      : Promise.resolve([]),
-  ])
+  const [loaded, roundRows] = yield* Effect.all(
+    [
+      loadHoldingEventsProgram(rows.map((r) => r.id)),
+      portfolioQuery(() =>
+        companyIds.length > 0
+          ? db
+              .select({
+                companyId: round.companyId,
+                date: round.date,
+                kind: round.kind,
+                sharesOutstanding: round.sharesOutstanding,
+              })
+              .from(round)
+              .where(inArray(round.companyId, companyIds))
+              .orderBy(asc(round.date))
+          : Promise.resolve([]),
+      ),
+    ],
+    { concurrency: 'unbounded' },
+  )
   const roundsByCompany = new Map<
     string,
     Array<{ date: string; kind: string; sharesOutstanding: number | null }>
@@ -347,7 +390,13 @@ export async function loadPortfolio(
       { baseCurrency: base, fxRates: rates, asOf },
     ),
   }
-}
+})
+
+/** {@link loadPortfolioProgram}, for a caller that is not a program. */
+export const loadPortfolio = (
+  asOf?: string,
+  opts?: { omit: ReadonlySet<string> },
+) => Effect.runPromise(loadPortfolioProgram(asOf, opts))
 
 /**
  * The tear-sheet read: every event, plus computed metrics and ownership.
@@ -355,166 +404,186 @@ export async function loadPortfolio(
  * with its correction beneath it; the pure libs still get every original
  * and apply the as-of day themselves.
  */
-export async function loadHoldingDetail(id: string, asOf?: string) {
-  const row = (
-    await db
-      .select({
-        id: holding.id,
-        companyId: holding.companyId,
-        openedAt: holding.openedAt,
-        companyName: entity.canonicalName,
-      })
-      .from(holding)
-      .innerJoin(entity, eq(entity.id, holding.companyId))
-      .where(eq(holding.id, id))
-  ).at(0)
-  if (!row) throw new Error('Holding not found')
+export const loadHoldingDetailProgram = Effect.fn('loadHoldingDetail')(
+  function* (id: string, asOf?: string) {
+    const row = (yield* portfolioQuery(() =>
+      db
+        .select({
+          id: holding.id,
+          companyId: holding.companyId,
+          openedAt: holding.openedAt,
+          companyName: entity.canonicalName,
+        })
+        .from(holding)
+        .innerJoin(entity, eq(entity.id, holding.companyId))
+        .where(eq(holding.id, id)),
+    )).at(0)
+    if (!row)
+      return yield* new HoldingDetailNotFound({ message: 'Holding not found' })
 
-  const [base, rates, invRows, markRows, distRows, roundRows] =
-    await Promise.all([
-      baseCurrency(),
-      loadFxRates(),
-      db
-        .select()
-        .from(investment)
-        .where(eq(investment.holdingId, row.id))
-        .orderBy(asc(investment.date)),
-      db
-        .select()
-        .from(mark)
-        .where(eq(mark.holdingId, row.id))
-        .orderBy(asc(mark.date)),
-      db
-        .select()
-        .from(distribution)
-        .where(eq(distribution.holdingId, row.id))
-        .orderBy(asc(distribution.date)),
-      db
-        .select()
-        .from(round)
-        .where(eq(round.companyId, row.companyId))
-        .orderBy(asc(round.date)),
-    ])
+    const [base, rates, invRows, markRows, distRows, roundRows] =
+      yield* Effect.all(
+        [
+          baseCurrencyProgram(),
+          loadFxRatesProgram(),
+          portfolioQuery(() =>
+            db
+              .select()
+              .from(investment)
+              .where(eq(investment.holdingId, row.id))
+              .orderBy(asc(investment.date)),
+          ),
+          portfolioQuery(() =>
+            db
+              .select()
+              .from(mark)
+              .where(eq(mark.holdingId, row.id))
+              .orderBy(asc(mark.date)),
+          ),
+          portfolioQuery(() =>
+            db
+              .select()
+              .from(distribution)
+              .where(eq(distribution.holdingId, row.id))
+              .orderBy(asc(distribution.date)),
+          ),
+          portfolioQuery(() =>
+            db
+              .select()
+              .from(round)
+              .where(eq(round.companyId, row.companyId))
+              .orderBy(asc(round.date)),
+          ),
+        ],
+        { concurrency: 'unbounded' },
+      )
 
-  const inv = partitionReversals(invRows)
-  const mk = partitionReversals(markRows)
-  const dist = partitionReversals(distRows)
-  // What the ledgers show: an original goes with its correction, which
-  // carries the original's date.
-  const dated = <T extends { date: string }>(rows: Array<T>): Array<T> =>
-    asOf === undefined ? rows : rows.filter((r) => r.date <= asOf)
-  const shown = <T extends { date: string }>(part: {
-    originals: Array<T>
-    reversalOf: Map<string, T>
-  }) => ({ originals: dated(part.originals), reversalOf: part.reversalOf })
+    const inv = partitionReversals(invRows)
+    const mk = partitionReversals(markRows)
+    const dist = partitionReversals(distRows)
+    // What the ledgers show: an original goes with its correction, which
+    // carries the original's date.
+    const dated = <T extends { date: string }>(rows: Array<T>): Array<T> =>
+      asOf === undefined ? rows : rows.filter((r) => r.date <= asOf)
+    const shown = <T extends { date: string }>(part: {
+      originals: Array<T>
+      reversalOf: Map<string, T>
+    }) => ({ originals: dated(part.originals), reversalOf: part.reversalOf })
 
-  // The voiders, named once: the timeline says who struck each entry.
-  const voiderIds = [
-    ...new Set(
-      [...inv.reversalOf, ...mk.reversalOf, ...dist.reversalOf].flatMap(
-        ([, r]) => (r.createdBy === null ? [] : [r.createdBy]),
+    // The voiders, named once: the timeline says who struck each entry.
+    const voiderIds = [
+      ...new Set(
+        [...inv.reversalOf, ...mk.reversalOf, ...dist.reversalOf].flatMap(
+          ([, r]) => (r.createdBy === null ? [] : [r.createdBy]),
+        ),
       ),
-    ),
-  ]
-  const voiderRows =
-    voiderIds.length > 0
-      ? await db
-          .select({ id: user.id, name: user.name })
-          .from(user)
-          .where(inArray(user.id, voiderIds))
-      : []
-  const voiders = new Map(voiderRows.map((u) => [u.id, u.name]))
-  const voidedBy = (createdBy: string | null): string | null =>
-    createdBy === null ? null : (voiders.get(createdBy) ?? null)
+    ]
+    const voiderRows =
+      voiderIds.length > 0
+        ? yield* portfolioQuery(() =>
+            db
+              .select({ id: user.id, name: user.name })
+              .from(user)
+              .where(inArray(user.id, voiderIds)),
+          )
+        : []
+    const voiders = new Map(voiderRows.map((u) => [u.id, u.name]))
+    const voidedBy = (createdBy: string | null): string | null =>
+      createdBy === null ? null : (voiders.get(createdBy) ?? null)
 
-  const events: HoldingEvents = {
-    investments: inv.originals.map((r) => ({
-      date: r.date,
-      amount: Number(r.amount),
-      currency: r.currency,
-      reversedAt: reversedAtOf(inv.reversalOf, r.id),
-    })),
-    marks: mk.originals.map((r) => ({
-      date: r.date,
-      fairValue: Number(r.fairValue),
-      currency: r.currency,
-      reversedAt: reversedAtOf(mk.reversalOf, r.id),
-    })),
-    distributions: dist.originals.map((r) => ({
-      date: r.date,
-      amount: Number(r.amount),
-      currency: r.currency,
-      kind: r.kind,
-      reversedAt: reversedAtOf(dist.reversalOf, r.id),
-    })),
-  }
-
-  return {
-    ...row,
-    metrics: holdingMetrics(events, {
-      baseCurrency: base,
-      fxRates: rates,
-      asOf: asOf,
-    }),
-    ownership: ownership(
-      inv.originals.map((r) => ({
+    const events: HoldingEvents = {
+      investments: inv.originals.map((r) => ({
         date: r.date,
         amount: Number(r.amount),
+        currency: r.currency,
+        reversedAt: reversedAtOf(inv.reversalOf, r.id),
+      })),
+      marks: mk.originals.map((r) => ({
+        date: r.date,
+        fairValue: Number(r.fairValue),
+        currency: r.currency,
+        reversedAt: reversedAtOf(mk.reversalOf, r.id),
+      })),
+      distributions: dist.originals.map((r) => ({
+        date: r.date,
+        amount: Number(r.amount),
+        currency: r.currency,
+        kind: r.kind,
+        reversedAt: reversedAtOf(dist.reversalOf, r.id),
+      })),
+    }
+
+    return {
+      ...row,
+      metrics: holdingMetrics(events, {
+        baseCurrency: base,
+        fxRates: rates,
+        asOf: asOf,
+      }),
+      ownership: ownership(
+        inv.originals.map((r) => ({
+          date: r.date,
+          amount: Number(r.amount),
+          instrument: r.instrument,
+          shares: num(r.shares),
+          cap: num(r.cap),
+          reversedAt: reversedAtOf(inv.reversalOf, r.id),
+        })),
+        roundRows.map((r) => ({
+          date: r.date,
+          kind: r.kind,
+          sharesOutstanding: num(r.sharesOutstanding),
+        })),
+        ownershipSales(dist),
+        asOf,
+      ),
+      rounds: dated(roundRows).map((r) => ({
+        id: r.id,
+        date: r.date,
+        kind: r.kind,
+        raised: num(r.raised),
+        currency: r.currency,
+        preMoney: num(r.preMoney),
+        postMoney: num(r.postMoney),
+        pricePerShare: num(r.pricePerShare),
+        sharesOutstanding: num(r.sharesOutstanding),
+      })),
+      investments: withReversalsBeneath(shown(inv), voidedBy, (r) => ({
+        id: r.id,
+        date: r.date,
+        amount: Number(r.amount),
+        currency: r.currency,
         instrument: r.instrument,
         shares: num(r.shares),
         cap: num(r.cap),
-        reversedAt: reversedAtOf(inv.reversalOf, r.id),
+        discount: num(r.discount),
+        vehicle: r.vehicle,
+        dealId: r.dealId,
+        roundId: r.roundId,
+        batchId: r.batchId,
       })),
-      roundRows.map((r) => ({
+      marks: withReversalsBeneath(shown(mk), voidedBy, (r) => ({
+        id: r.id,
         date: r.date,
-        kind: r.kind,
-        sharesOutstanding: num(r.sharesOutstanding),
+        fairValue: Number(r.fairValue),
+        currency: r.currency,
+        basis: r.basis,
+        batchId: r.batchId,
       })),
-      ownershipSales(dist),
-      asOf,
-    ),
-    rounds: dated(roundRows).map((r) => ({
-      id: r.id,
-      date: r.date,
-      kind: r.kind,
-      raised: num(r.raised),
-      currency: r.currency,
-      preMoney: num(r.preMoney),
-      postMoney: num(r.postMoney),
-      pricePerShare: num(r.pricePerShare),
-      sharesOutstanding: num(r.sharesOutstanding),
-    })),
-    investments: withReversalsBeneath(shown(inv), voidedBy, (r) => ({
-      id: r.id,
-      date: r.date,
-      amount: Number(r.amount),
-      currency: r.currency,
-      instrument: r.instrument,
-      shares: num(r.shares),
-      cap: num(r.cap),
-      discount: num(r.discount),
-      vehicle: r.vehicle,
-      dealId: r.dealId,
-      roundId: r.roundId,
-      batchId: r.batchId,
-    })),
-    marks: withReversalsBeneath(shown(mk), voidedBy, (r) => ({
-      id: r.id,
-      date: r.date,
-      fairValue: Number(r.fairValue),
-      currency: r.currency,
-      basis: r.basis,
-      batchId: r.batchId,
-    })),
-    distributions: withReversalsBeneath(shown(dist), voidedBy, (r) => ({
-      id: r.id,
-      date: r.date,
-      amount: Number(r.amount),
-      currency: r.currency,
-      kind: r.kind,
-      sharesSold: num(r.sharesSold),
-      pricePerShare: num(r.pricePerShare),
-      batchId: r.batchId,
-    })),
-  }
-}
+      distributions: withReversalsBeneath(shown(dist), voidedBy, (r) => ({
+        id: r.id,
+        date: r.date,
+        amount: Number(r.amount),
+        currency: r.currency,
+        kind: r.kind,
+        sharesSold: num(r.sharesSold),
+        pricePerShare: num(r.pricePerShare),
+        batchId: r.batchId,
+      })),
+    }
+  },
+)
+
+/** {@link loadHoldingDetailProgram}, for a caller that is not a program. */
+export const loadHoldingDetail = (id: string, asOf?: string) =>
+  Effect.runPromise(loadHoldingDetailProgram(id, asOf))

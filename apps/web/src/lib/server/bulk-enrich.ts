@@ -1,8 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { BULK_MAX } from '@spaces/core/enrichment/estimate'
 import { requireUser } from './shared'
 import { pagedListShape } from '#/lib/views/page-input'
+import { input } from './input'
 
 /**
  * Bulk Enrich from a list: the estimate window's read and its Enrich n.
@@ -11,17 +12,21 @@ import { pagedListShape } from '#/lib/views/page-input'
  * - The estimate spends nothing; `bulkEnrich` recomputes it before it sends.
  */
 
-const bulkInput = z.object({
-  kind: z.enum(['company', 'person']),
-  target: z.union([
-    z.object({ ids: z.array(z.uuid()).min(1).max(BULK_MAX) }),
-    z.object({
+const bulkInput = Schema.Struct({
+  kind: Schema.Literals(['company', 'person']),
+  target: Schema.Union([
+    Schema.Struct({
+      ids: Schema.mutable(
+        Schema.Array(Schema.String.check(Schema.isUUID())),
+      ).check(Schema.isMinLength(1), Schema.isMaxLength(BULK_MAX)),
+    }),
+    Schema.Struct({
       conditions: pagedListShape.conditions,
       q: pagedListShape.q,
     }),
   ]),
 })
-type BulkInput = z.infer<typeof bulkInput>
+type BulkInput = typeof bulkInput.Type
 
 /** The records a target names: the ids given, or the view's first `BULK_MAX`. */
 async function idsOf(data: BulkInput) {
@@ -39,7 +44,7 @@ async function idsOf(data: BulkInput) {
 
 /** What Enrich would ask, skip and spend, per source. Any member; a read. */
 export const estimateBulkEnrich = createServerFn()
-  .validator(bulkInput)
+  .validator(input(bulkInput))
   .handler(async ({ data }) => {
     await requireUser()
     const { ids, total } = await idsOf(data)
@@ -62,7 +67,7 @@ export const estimateBulkEnrich = createServerFn()
 
 /** Enrich n: one `enrichment.run` per record asked, parked past a cap. */
 export const bulkEnrich = createServerFn({ method: 'POST' })
-  .validator(bulkInput)
+  .validator(input(bulkInput))
   .handler(async ({ data }) => {
     await requireUser()
     const { ids } = await idsOf(data)

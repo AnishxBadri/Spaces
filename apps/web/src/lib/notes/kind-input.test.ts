@@ -1,14 +1,17 @@
+import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { noteKindInput } from './kind-input'
 
+const accepts = Schema.is(noteKindInput)
+
 describe('noteKindInput', () => {
   it('accepts the two kinds', () => {
-    expect(noteKindInput.options).toEqual(['note', 'memo'])
-    expect(noteKindInput.safeParse('note').success).toBe(true)
-    expect(noteKindInput.safeParse('memo').success).toBe(true)
+    expect(noteKindInput.literals).toEqual(['note', 'memo'])
+    expect(accepts('note')).toBe(true)
+    expect(accepts('memo')).toBe(true)
   })
 
   it('refuses scratch', () => {
-    expect(noteKindInput.safeParse('scratch').success).toBe(false)
+    expect(accepts('scratch')).toBe(false)
   })
 })

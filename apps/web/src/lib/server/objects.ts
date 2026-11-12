@@ -14,6 +14,7 @@ import {
 import { pagedListShape, pageOptions } from '#/lib/views/page-input'
 import type { IdentityKey } from '@spaces/core/attributes/registry'
 import { recordSpaces } from '#/lib/spaces/filed-in'
+import { input } from './input'
 
 /**
  * The object registry, read side. One list serves the settings index and the
@@ -207,7 +208,14 @@ export const updateObject = createServerFn({ method: 'POST' })
  *   re-exported by the client-imported barrel.
  */
 export const listObjectRecords = createServerFn()
-  .validator(z.object({ objectId: z.string().uuid(), ...pagedListShape }))
+  .validator(
+    input(
+      Schema.Struct({
+        objectId: Schema.String.check(Schema.isUUID()),
+        ...pagedListShape,
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     await requireUser()
     const { listRecordsProgram } = await import('../views/records')

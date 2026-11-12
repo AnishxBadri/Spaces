@@ -33,22 +33,26 @@ class NoteRefused extends Schema.TaggedError<NoteRefused>()('NoteRefused', {
 
 export const createNote = createServerFn({ method: 'POST' })
   .validator(
-    z
-      .object({
-        /** Pre-link the note to an entity: starter block with its mention. */
-        about: z
-          .object({
-            entityId: z.string().uuid(),
-            label: z.string().max(200),
-            kind: z.string().max(30),
-            /** custom records route through their object's slug */
-            objectSlug: z.string().max(80).optional(),
-          })
-          .optional(),
-        /** memo: the note IS the memo of `about` (tagged_in, not mentions). */
-        noteKind: noteKindInput.optional(),
-      })
-      .optional(),
+    input(
+      Schema.UndefinedOr(
+        Schema.Struct({
+          /** Pre-link the note to an entity: starter block with its mention. */
+          about: Schema.optional(
+            Schema.Struct({
+              entityId: uuid,
+              label: Schema.String.check(Schema.isMaxLength(200)),
+              kind: Schema.String.check(Schema.isMaxLength(30)),
+              /** custom records route through their object's slug */
+              objectSlug: Schema.optional(
+                Schema.String.check(Schema.isMaxLength(80)),
+              ),
+            }),
+          ),
+          /** memo: the note IS the memo of `about` (tagged_in, not mentions). */
+          noteKind: Schema.optional(noteKindInput),
+        }),
+      ),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
@@ -389,12 +393,7 @@ export const setNoteVisibility = createServerFn({ method: 'POST' })
  * `Schema.TaggedError`, which carries no `message`.
  */
 export const setNoteKind = createServerFn({ method: 'POST' })
-  .validator(
-    z.object({
-      id: z.string().uuid(),
-      kind: noteKindInput,
-    }),
-  )
+  .validator(input(Schema.Struct({ id: uuid, kind: noteKindInput })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { setNoteKindProgram, noteKindMessage } =

@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import type { z } from 'zod'
+import { Effect, Predicate, Result, SchemaIssue, SchemaParser } from 'effect'
+import type { Schema } from 'effect'
 import { and, asc, eq, isNull, notInArray, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
@@ -708,13 +708,23 @@ async function acceptLedgerEventInTx(
   return { event: ledger.event, eventId: written.success.id }
 }
 
+const formatIssues = SchemaIssue.makeFormatterStandardSchemaV1()
+
 /** A portfolio input through its server fn's validator, or its refusal. */
-function portfolioChecked<T>(validator: z.ZodType<T>, input: unknown): T {
-  const checked = validator.safeParse(input)
-  if (checked.success) return checked.data
+function portfolioChecked<TSchema extends Schema.ConstraintDecoder<unknown>>(
+  validator: TSchema,
+  input: unknown,
+): TSchema['Type'] {
+  const checked = SchemaParser.decodeUnknownResult(validator, {
+    errors: 'all',
+  })(input)
+  if (Result.isSuccess(checked)) return checked.success
   throw invalid(
-    checked.error.issues.map((i) => {
-      const slug = i.path.map(String).join('.') || 'ledger_event'
+    formatIssues(checked.failure).issues.map((i) => {
+      const slug =
+        (i.path ?? [])
+          .map((s) => String(Predicate.isObject(s) ? s.key : s))
+          .join('.') || 'ledger_event'
       return { slug, message: `${slug}: ${i.message}` }
     }),
   )

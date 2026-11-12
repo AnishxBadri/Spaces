@@ -1,7 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { Effect, Schema } from 'effect'
 import { eq } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { workspace } from '@spaces/db/schema'
 import { fxRate } from '@spaces/db/schema/portfolio'
@@ -71,7 +70,7 @@ export const getHolding = createServerFn()
  * writer.
  */
 export const addRound = createServerFn({ method: 'POST' })
-  .validator(roundInput)
+  .validator(input(roundInput))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { addRoundProgram, portfolioWriteMessage } =
@@ -86,24 +85,28 @@ export const addRound = createServerFn({ method: 'POST' })
 
 export const addInvestment = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      companyId: z.string().uuid(),
-      dealId: z.string().uuid().optional(),
-      roundId: z.string().uuid().optional(),
-      date: isoDate,
-      amount: money,
-      currency: ccy,
-      instrument: z.enum([
-        'priced',
-        'safe_post_money',
-        'safe_pre_money',
-        'ccd',
-      ]),
-      shares: money.optional(),
-      cap: money.optional(),
-      discount: z.number().finite().min(0).max(1).optional(),
-      vehicle: z.string().trim().max(120).optional(),
-    }),
+    input(
+      Schema.Struct({
+        companyId: uuid,
+        dealId: Schema.optional(uuid),
+        roundId: Schema.optional(uuid),
+        date: isoDate,
+        amount: money,
+        currency: ccy,
+        instrument: Schema.Literals([
+          'priced',
+          'safe_post_money',
+          'safe_pre_money',
+          'ccd',
+        ]),
+        shares: Schema.optional(money),
+        cap: Schema.optional(money),
+        discount: Schema.optional(
+          Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 1 })),
+        ),
+        vehicle: Schema.optional(Schema.Trim.check(Schema.isMaxLength(120))),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
@@ -122,7 +125,7 @@ export const addInvestment = createServerFn({ method: 'POST' })
   })
 
 export const addMark = createServerFn({ method: 'POST' })
-  .validator(markInput)
+  .validator(input(markInput))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { addMarkProgram, portfolioWriteMessage } =
@@ -137,15 +140,17 @@ export const addMark = createServerFn({ method: 'POST' })
 
 export const addDistribution = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      holdingId: z.string().uuid(),
-      date: isoDate,
-      amount: money,
-      currency: ccy,
-      kind: z.enum(['exit', 'secondary', 'dividend', 'writeoff']),
-      sharesSold: money.optional(),
-      pricePerShare: money.optional(),
-    }),
+    input(
+      Schema.Struct({
+        holdingId: uuid,
+        date: isoDate,
+        amount: money,
+        currency: ccy,
+        kind: Schema.Literals(['exit', 'secondary', 'dividend', 'writeoff']),
+        sharesSold: Schema.optional(money),
+        pricePerShare: Schema.optional(money),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
@@ -183,11 +188,13 @@ const setFxRateProgram = Effect.fn('setFxRateProgram')(function* (
 /** Upsert on (currency, date): correcting a rate just recomputes. */
 export const setFxRate = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      currency: ccy,
-      date: isoDate,
-      rateToBase: z.number().positive(),
-    }),
+    input(
+      Schema.Struct({
+        currency: ccy,
+        date: isoDate,
+        rateToBase: Schema.Finite.check(Schema.isGreaterThan(0)),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
@@ -233,7 +240,7 @@ const setBaseCurrencyProgram = Effect.fn('setBaseCurrencyProgram')(function* (
  * re-denominates every roll-up at next read (nothing stored converts).
  */
 export const setBaseCurrency = createServerFn({ method: 'POST' })
-  .validator(z.object({ currency: ccy }))
+  .validator(input(Schema.Struct({ currency: ccy })))
   .handler(async ({ data }) => {
     await requireAdmin()
     return Effect.runPromise(setBaseCurrencyProgram(data.currency))
