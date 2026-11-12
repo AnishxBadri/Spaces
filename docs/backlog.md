@@ -34,7 +34,7 @@ Slices of Linear project P-SPA-35, "31. Edges and the AI shape". `edges-1` (SPA-
 
 ## 32. One backend grammar
 
-Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2026-11-12 (owner): D84, a module in `apps/web/src/lib` that does I/O is Effect, and the 53 that are not get converted in a planned sweep; D85, Effect Schema is the one schema language and Zod leaves. `schema-1` (SPA-400) shipped 2026-11-12: `input()` in `lib/server/input.ts` is the helper, and `lib/server/tasks.ts` with `lib/tasks/create.ts` is the reference module every later slice copies. `effect-1` (SPA-401) shipped 2026-11-12: nine server modules, the typed session gate (`requireUserProgram`, `requireAdminProgram`, `requireSettingsReaderProgram` beside the async three), and `lib/server/query.ts`, whose `ServerQueryFailed` and `serverQuery` every module under `lib/server/` shares. `effect-2` (SPA-403) shipped 2026-11-12: the other seven server modules, so every file in `lib/server/` that imports `db` imports `effect`. The `effect-*` slices own disjoint files and run one after another, each beside a slice from another area.
+Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2026-11-12 (owner): D84, a module in `apps/web/src/lib` that does I/O is Effect, and the 53 that are not get converted in a planned sweep; D85, Effect Schema is the one schema language and Zod leaves. `schema-1` (SPA-400) shipped 2026-11-12: `input()` in `lib/server/input.ts` is the helper, and `lib/server/tasks.ts` with `lib/tasks/create.ts` is the reference module every later slice copies. `effect-1` (SPA-401) shipped 2026-11-12: nine server modules, the typed session gate (`requireUserProgram`, `requireAdminProgram`, `requireSettingsReaderProgram` beside the async three), and `lib/server/query.ts`, whose `ServerQueryFailed` and `serverQuery` every module under `lib/server/` shares. `effect-2` (SPA-403) shipped 2026-11-12: the other seven server modules, so every file in `lib/server/` that imports `db` imports `effect`. `schema-2` (SPA-402) shipped 2026-11-12: the plugin contract is Effect Schema, SDK 2.0.0, with no zod under `packages/sdk/src` or `plugins/`. The `effect-*` slices own disjoint files and run one after another, each beside a slice from another area.
 
 **What a conversion is, for every `effect-*` slice.** It changes the grammar and nothing a user or a caller can see.
 
@@ -54,7 +54,7 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 
 **Blocked by:** nothing. **Owns**, in `apps/web/src/lib/`: `portfolio/inputs.ts`, `notes/kind-input.ts`, and the `.validator()` of each server fn that takes one of their shapes; `views/page-input.ts` and the `.validator()` of each server fn that takes `pagedListInput`; `documents/` (`blob-refs.ts`, `fetch-guard.ts`, `preview-card.ts`, `record-files.ts`, `unfiled.ts`, `upload.ts`), `notes/` (`from-suggestion.ts`, `list-rows.ts`, `ordering.ts`, `templates.ts`), `views/` (`paging.ts`, `resolve.ts`, `scope.ts`, `sql.ts`), `records/` (`head.ts`, `pictures.ts`), `portfolio/` (`detail.ts`, `holding.ts`), and their tests. 2,300 lines.
 
-**Does not touch** `packages/sdk/**`, `plugins/**`, `packages/core/**` or `lib/integrations/**` (`schema-2` runs beside this slice).
+**Does not touch** `packages/sdk/**`, `plugins/**`, `packages/core/**` or `lib/integrations/**`.
 
 **Spec.** D84, and the conversion rules at the head of this section. Three cautions:
 
@@ -85,9 +85,10 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 **What to build.**
 
 1. **The listed files,** by the rules. With `members/suspend.ts` converted, the three handlers `effect-1` left plain in `lib/server/members.ts` (`setMemberBanned`, `createResetLink`, `getResetPreview`) run programs too.
-2. **The enforcer.** An eslint rule, `effect/io-is-effect`: a non-test file under `apps/web/src/lib/` that imports the `db` value (from `@spaces/db` or `#/db`) must import from `effect`. Type-only imports do not count. A file that is exempt for a stated reason carries an `eslint-disable` with that reason on the import; expect a handful and list them. The rule has its own tests, on the pattern of the rules beside it, and `turbo.json`'s lint inputs already cover the directory.
-3. **The worker's gates hash what the worker reads.** The worker imports `apps/web/src` through `#web/*`, but only `@spaces/worker#build` names it as an input, so an edit under `apps/web/src/lib` replays the worker's cached `test`, `typecheck` and `lint` (found by `effect-1`). `turbo.json` gives those three tasks `$TURBO_ROOT$/apps/web/src/**`; the report shows a comment edit in `lib/server/shared.ts` turning the worker's three cache hits into misses.
-4. **Docs.** `CLAUDE.md` Principles gains the principle and its enforcer ("I/O is an Effect program; a pure helper, a type module and client code stay plain"); the Backend paradigm section's "existing modules convert only when already open" sentence is replaced by the rule.
+2. **The SDK and plugin zones refuse zod.** The eslint sdk zone's message and allow-list still say "effect, zod and tldts", and `packages/sdk/src/fence.test.ts` asserts zod is allowed. Both zones refuse a `zod` import; the fence test proves it on the real packages.
+3. **The enforcer.** An eslint rule, `effect/io-is-effect`: a non-test file under `apps/web/src/lib/` that imports the `db` value (from `@spaces/db` or `#/db`) must import from `effect`. Type-only imports do not count. A file that is exempt for a stated reason carries an `eslint-disable` with that reason on the import; expect a handful and list them. The rule has its own tests, on the pattern of the rules beside it, and `turbo.json`'s lint inputs already cover the directory.
+4. **The worker's gates hash what the worker reads.** The worker imports `apps/web/src` through `#web/*`, but only `@spaces/worker#build` names it as an input, so an edit under `apps/web/src/lib` replays the worker's cached `test`, `typecheck` and `lint` (found by `effect-1`). `turbo.json` gives those three tasks `$TURBO_ROOT$/apps/web/src/**`; the report shows a comment edit in `lib/server/shared.ts` turning the worker's three cache hits into misses.
+5. **Docs.** `CLAUDE.md` Principles gains the principle and its enforcer ("I/O is an Effect program; a pure helper, a type module and client code stay plain"); the Backend paradigm section's "existing modules convert only when already open" sentence is replaced by the rule.
 
 **Acceptance criteria**
 
@@ -98,38 +99,9 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 
 ---
 
-#### `schema-2` (SPA-402) · afk · L — The plugin contract on Effect Schema: SDK 2.0, every plugin, no zod
-
-**Blocked by:** `schema-1`. **Owns** `packages/sdk/**`, `plugins/**`, the host's manifest readers and resolve hook (`packages/core/src/plugins/**`, `apps/worker/src/plugins/**`), and the `lib/integrations/**` files that read a manifest through the SDK.
-
-**Does not touch** the files `effect-3` lists (it runs beside this slice), or `packages/core/src/attributes/registry.ts` beyond the import of the enrichment vocabulary.
-
-**Spec.** D85. The registry is empty and no plugin release key is published, so no plugin outside this repo exists: the contract is cheapest to change now, before the first public release. Size L because the contract and its nine plugins move together or not at all.
-
-**What to build.**
-
-1. **The contract.** `manifest.ts` (`manifestSchema`, the `settings` and job `settings` an author writes, `settingsJsonSchema`), `vocabulary.ts`, `ports.ts` (the AI port's `schema`, `configOf`, `watchSettingsOf`) and `pack/` read and write Effect Schema. `zod` leaves the SDK's dependencies and `src/package.test.ts`'s pinned list.
-2. **The emitted manifest does not change shape.** `manifest.json` still carries the settings as JSON Schema. For the echo fixture and for apollo, the emitted `manifest.json` before and after differs only in its `sdk` range, or the report names each other difference and why it is harmless to the settings form.
-3. **Every plugin and fixture.** The nine plugins under `plugins/` and the fixtures under `plugins/_fixtures/` author their settings and AI schemas in Effect Schema. `zod` leaves their peers. Each `manifest.sdk` range becomes `^2`.
-4. **The host.** `host-resolve.ts` stops handing a bundle `zod`. The loader refuses a 1.x bundle as it refuses any range it does not satisfy, and a refused plugin reads as degraded, as now.
-5. **The version.** `SDK_VERSION` and the package are `2.0.0`, with a major changeset that says what an author changes. The pending 1.5 changesets fold into it.
-6. **The bundled plugins.** `pnpm bundle-plugins` re-run, so first boot installs 2.0 builds.
-7. **Docs.** `docs/spec-plugin-sdk.md` and the SDK's README: every zod example becomes Effect Schema.
-
-**Acceptance criteria**
-
-- [ ] No file under `packages/sdk/src` or `plugins/` imports `zod`, and no `package.json` there names it.
-- [ ] The manifest comparison of step 2 is in the report.
-- [ ] The loader's tests cover a 1.x bundle refused and a 2.0 bundle loaded.
-- [ ] Every plugin's own suite passes.
-- [ ] The report says which plugins a running install must reinstall (those not bundled).
-- [ ] Gates: the full `turbo run build`, typecheck, lint and test over every package, prettier on touched files.
-
----
-
 #### `schema-3` (SPA-404) · afk · M — `valueValidator` on Effect Schema: one type system for attribute values, inside and at `/api/v1`
 
-**Blocked by:** `schema-2`. **Owns** `packages/core/src/attributes/registry.ts`, `attributes/default-values.ts`, `writes/attributes/values.ts`, `import/coerce.ts`, `enrichment/plan.ts`, `ai/schema.ts`, the `lib/rpc/**` handlers that decode a record's values, `packages/core/src/json.ts`, the validators in `lib/server/` named in step 0, and their tests.
+**Blocked by:** nothing. **Owns** `packages/core/src/attributes/registry.ts`, `attributes/default-values.ts`, `writes/attributes/values.ts`, `import/coerce.ts`, `enrichment/plan.ts`, `ai/schema.ts`, the `lib/rpc/**` handlers that decode a record's values, `packages/core/src/json.ts`, the validators in `lib/server/` named in step 0, and their tests.
 
 **Does not touch** the files `effect-4` lists (it runs beside this slice).
 
