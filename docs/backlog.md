@@ -76,7 +76,7 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 
 **Blocked by:** `effect-1`. **Owns** `documents.ts`, `emails.ts`, `notes.ts`, `portfolio.ts`, `settings.ts`, `setup.ts` and `templates.ts` in `lib/server/` (1,950 lines, 77 server fns), and their tests.
 
-**Does not touch** `lib/server/shared.ts`, `packages/core/src/portfolio/**`, `lib/portfolio/**` or the holding route (`ownership-1` runs beside this slice).
+**Does not touch** `lib/server/shared.ts` or `lib/portfolio/**`.
 
 **Spec.** D84, and the conversion rules at the head of this section. The portfolio void flow (`lib/portfolio/reverse.ts`) is already Effect and its tagged errors carry an empty `message` on purpose: `ledgerVoidMessage` is what the dialog shows. Leave that as it is.
 
@@ -93,7 +93,7 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 
 #### `effect-3` (SPA-405) · afk · L — Documents, notes, views, records and the portfolio loader become Effect
 
-**Blocked by:** `effect-2`, `ownership-1`. **Owns**, in `apps/web/src/lib/`: `documents/` (`blob-refs.ts`, `fetch-guard.ts`, `preview-card.ts`, `record-files.ts`, `unfiled.ts`, `upload.ts`), `notes/` (`from-suggestion.ts`, `list-rows.ts`, `ordering.ts`, `templates.ts`), `views/` (`paging.ts`, `resolve.ts`, `scope.ts`, `sql.ts`), `records/` (`head.ts`, `pictures.ts`), `portfolio/` (`detail.ts`, `holding.ts`), and their tests. 2,300 lines.
+**Blocked by:** `effect-2`. **Owns**, in `apps/web/src/lib/`: `documents/` (`blob-refs.ts`, `fetch-guard.ts`, `preview-card.ts`, `record-files.ts`, `unfiled.ts`, `upload.ts`), `notes/` (`from-suggestion.ts`, `list-rows.ts`, `ordering.ts`, `templates.ts`), `views/` (`paging.ts`, `resolve.ts`, `scope.ts`, `sql.ts`), `records/` (`head.ts`, `pictures.ts`), `portfolio/` (`detail.ts`, `holding.ts`), and their tests. 2,300 lines.
 
 **Does not touch** `packages/sdk/**`, `plugins/**`, `packages/core/**` or `lib/integrations/**` (`schema-2` runs beside this slice).
 
@@ -187,36 +187,6 @@ Slices of Linear project P-SPA-36, "32. One backend grammar". Two decisions of 2
 - [ ] One test per attribute type feeds the same bad value through `setValues` and through `/api/v1` and gets the same refusal.
 - [ ] The listed files import no `zod`.
 - [ ] Gates: typecheck, lint, the `@spaces/core`, `@spaces/web` and `@spaces/worker` tests, prettier on touched files, the web build and `scripts/check-client-bundle.sh`.
-
----
-
-## Corrections
-
-Slices of Linear project P-SPA-28, "Corrections".
-
----
-
-#### `ownership-1` (SPA-399) · afk · S — Ownership counts the shares sold
-
-**Blocked by:** nothing. **Owns** `packages/core/src/portfolio/ownership.ts` and its tests, the two call sites in `lib/portfolio/detail.ts`, the one in `lib/records/readouts.ts`, and the ownership figure's fixtures in `lib/seeds/dev.ts` if a seeded holding's number moves.
-
-**Does not touch** `lib/server/**` (`effect-2` runs beside this slice). No migration.
-
-**Spec.** `ownership()` sums the shares bought and never subtracts `distribution.shares_sold`, so after a secondary or a partial exit the percentage is overstated (found 2026-11-12). The correction policy is unchanged: the loader passes originals only, each stamped with `reversedAt`, and a voided sale stops counting once the as-of day reaches the void (`liveAt`).
-
-**What to build.**
-
-1. **Sales in.** `ownership()` takes the holding's sales (date, shares sold, `reversedAt`), filtered by as-of and `liveAt` as the checks are. At each counted round, our shares are those bought on or before it less those sold on or before it.
-2. **A sale after the last counted round still shows.** The history gains a point at the sale's date over the last known fully-diluted count, so `currentPct` is honest. Its `roundKind` is `sale`; the timeline prints it as a sale, not as a round.
-3. **Sold out reads zero.** A round before the first purchase is still skipped; a point after the last share is sold reads 0%, and is not skipped.
-4. **Implied and cost-basis-only are untouched.** A SAFE has no shares to sell.
-5. **Callers.** The holding loader, the as-of loader and the record readout pass the sales. If MCP's `standingAt` computes ownership on its own, name it in the report.
-
-**Acceptance criteria**
-
-- [ ] Tests: a partial sale between two rounds, a sale after the last round, a full exit, a voided sale before and after the void's instant under `asOf`, and a holding with no sales (unchanged output).
-- [ ] The dev seed's two holdings with `sharesSold` show the reduced percentage on the holding page (stated in the report with before and after).
-- [ ] Gates: typecheck, lint, the `@spaces/core` and `@spaces/web` tests, prettier on touched files.
 
 ---
 
