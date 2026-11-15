@@ -38,10 +38,10 @@ _what_ is true, so past judgment becomes precedent people and agents can query.
 
 ## Feeds, after the built-in — 2026-10-16
 
-Feeds are decided (D87); two parts of the drawing are not.
+Feeds are decided (D87), the reader pane included. Two ideas are not.
 
-- **A reader:** the fuller blurb in a pane on the Feeds page, the same reader
-  as a window elsewhere.
+- **The reader as a window elsewhere:** a headline in a space's What's moving
+  opens the same reader as a window instead of the publisher's site.
 - **A keyword filter per tag:** a feed tagged to several spaces sends every
   headline to each. Start by tagging general sources narrowly; add a filter if
   the noise bites.
@@ -153,6 +153,29 @@ Sixteen pages in four groups, and one provider can sit on four of them
 - Folding Search into Models and Email forwarding into Email & calendar
   makes fourteen. It reopens the settings map (D81), so it waits for the
   owner to ask.
+
+## Direct MCP writes for low-stakes things — 2026-11-15
+
+Today an MCP token only proposes (`propose_suggestion`, `propose_card`); even
+a task waits in Review. Attio's MCP writes as the user and leaves the
+confirmation to the client's tool prompt.
+
+- **The ladder:** write directly where a mistake is cheap and additive; keep
+  proposals where it changes a value, money, identity or filing.
+  - **Direct:** tasks, notes, comments, then people and companies with
+    guards.
+  - **Proposal:** deals (the funnel is judgment), attribute values, filing,
+    merges, portfolio events.
+- **Guards on a record create:** people and companies only, through
+  `resolveEntity` with a domain or email required (no name-only births, so
+  dedupe works); a silent birth, so no enrichment or plugin job spends credits
+  until a person touches it; a per-token daily cap, so an injected page cannot
+  flood the graph; `source_class: integration` so agent births are filterable.
+- **Why not all of Attio's set:** client confirmation is soft ("always allow",
+  headless agents), the content agents read is adversarial (founders' decks),
+  merge has no unmerge, and portfolio history is append-only.
+- **Precedent to square:** a space watch's find is an `add_record` proposal,
+  not a birth.
 
 ## Smaller open questions
 

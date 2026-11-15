@@ -44,15 +44,24 @@ Plus the UI sweep (the printed sheets landing) and Corrections.
 - `SPA-389` `ai-b` — the mandate in every judging lane, and cached tokens on the ledger. Project 31; `migration`, `hitl`: the owner confirms AI column answers may change under the mandate.
 - `SPA-188` `ship-10` — install, upgrade and rollback docs. Project 16, In Progress. `docs/install.md` and `docs/upgrade.md` exist; check what is left.
 - `SPA-190` `ship-12` — one-click templates for Coolify, Railway, Render and Unraid. Project 16, In Progress; each needs a human deploy.
+- `SPA-407` — the record table to a screen reader: named by its view, the sort read aloud, the name as row header, a Tab stop and `n more columns →` while columns overflow. `afk`, size S.
+- `SPA-408` — a list is a fixed pane (D106): the card fills the window, rows scroll inside, the foot holds the bottom, the row `···` pins right, the search ends on the card's edge. `afk`, size M; shares the foot with `SPA-407`.
+- `SPA-409` `notes-2` — the note page on the bone ground: the body a paper card, the rail unboxed with rule dividers, the head on the 24px page edge and the prose on the card's own 56px gutter (D107 keeps the page scroll). `afk`, size S.
+- `SPA-410` `notes-3` — a failed note save says `Not saved · Retry` in crimson, retries once by itself, leaving warns while an edit has not landed, and the delete window says only `Can’t be undone.` above what the note leaves. `afk`, size S.
+- `SPA-411` `feeds-1` — feed tables, the 30-minute poller with conditional fetch, site-to-feed discovery and 90-day retention (D87). Project 33; `migration`, `touches:entity-refs`, `afk`, size L.
+- `SPA-412` `feeds-2` — logos and item photos fetched and stored by the worker, never hotlinked, held by the orphan sweep. `afk`, size M; after feeds-1.
+- `SPA-413` `feeds-3` — the Feeds page (`G R`), its Sources tab and the one feed window that adds, edits, fixes and removes. `afk`, size M; after feeds-1 and `SPA-408`.
+- `SPA-414` `feeds-4` — Headlines: stories beside a reader that shows the feed's own text, the space filter, the states and narrow. `afk`, size M; after feeds-3 and `SPA-408`.
+- `SPA-415` `feeds-5` — two headlines at most in a space's What's moving, each feed a row in Watching, one line on Today. `afk`, size M; after feeds-3.
+- `SPA-416` `feeds-6` — `plugins/rss` deleted, the SDK's `feeds` role dropped inside the unreleased 2.0.0, the catalogue's Feeds group gone. `afk`, size S; last.
 
 ## Next, in order
 
 1. **The Ask set**, which the owner has not picked from yet.
 2. **Zod leaves** (approved, not ticketed) — finish D85 as a sweep. Zod is imported by 169 files: web 88 (`lib/server` 30, routes 16, `lib/ai` 11), worker 47 (`jobs` 32, `plugins` 11), core 31 (`ai` 11), and one each in `packages/db`, the sdk's fence test and `scripts/release`. Four slices: the web server-fn validators onto `input()` (about 210 of 270 are still zod); the worker's job payloads; core, where `ai/schema.ts` failed four characterisation rows on a first port and `jsonValueZod` goes with its last caller; then `zod` out of the five `package.json` files and the lint ban widened from the SDK and plugin zones to every package. Each conversion is pinned by a characterisation table recorded against zod first.
-3. **Feeds, built in** (D87, decided, not ticketed). Slices to write: feed tables and their migration, the worker poller, the Feeds page, space tagging, the What's moving and Watching lanes, image fetch and storage, and retiring `plugins/rss` with the SDK's `feeds` role and the Plugins catalogue's Feeds group.
-4. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided, not ticketed.
-5. **Small decided slices** (not ticketed): the sign-in rate rule, 5 per 60 seconds per IP, in `apps/web/src/lib/auth.ts`; workspace export (D42); a staged import on Today's Needs-you (D43).
-6. **One design doc** — `DESIGN.md`, `docs/design-contract.md` and `docs/product-map.md` merge into one, checked against the Paper library.
+3. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided, not ticketed.
+4. **Small decided slices** (not ticketed): the sign-in rate rule, 5 per 60 seconds per IP, in `apps/web/src/lib/auth.ts`; workspace export (D42); a staged import on Today's Needs-you (D43).
+5. **One design doc** — `DESIGN.md`, `docs/design-contract.md` and `docs/product-map.md` merge into one, checked against the Paper library.
 
 ## Owner calls
 
