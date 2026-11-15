@@ -710,7 +710,7 @@ all five and still be the wrong surface — that is what the checklist is for.
 
 ### The review checklist
 
-Twenty-seven questions. A merge needs a yes to each.
+Twenty-eight questions. A merge needs a yes to each.
 
 **Vocabulary**
 
@@ -791,6 +791,19 @@ Twenty-seven questions. A merge needs a yes to each.
     tabs, column heads, lane heads, property and field labels and readout labels
     sentence-case sans, the labels 12 graphite; and does nothing start lowercase except
     a mono state word in an end lane? (§1, "The Casing Rule")
+
+**States**
+
+28. **States** — does the surface handle every state it can reach, and does the
+    issue's "Done when" name each one? Full; empty (P5, or one `Name +` row); no
+    matches (with its way out); loading (the `Twinkle`, never a blank); couldn't load
+    (one line and Retry); working (the `Twinkle` and present-tense words); a failed
+    write (said where the write shows, with Retry, never silent and never only a
+    toast); long (names wrap or truncate by rule, long lists fold); not yours or
+    read-only (the control goes, the words stay); scrolled (D106 for a list, D107 for
+    a document); narrow (390px). A state the surface cannot reach is neither built
+    nor drawn. On the canvas a state that looks the same everywhere is drawn once, on
+    the Kit page; a page draws only the states that look different there.
 
 ### afk or hitl
 
