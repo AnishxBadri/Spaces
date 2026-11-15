@@ -40,30 +40,15 @@ _what_ is true, so past judgment becomes precedent people and agents can query.
   did next, to learn whether the call was right.
 - No graph database needed; the gap is capture, not architecture.
 
-## Feeds, built in — 2026-10-16
+## Feeds, after the built-in — 2026-10-16
 
-RSS today is `plugins/rss`: one install per feed, a pasted record id, items
-as signals on that record.
+Feeds are decided (D87); two parts of the drawing are not.
 
-- **Leaning:** built in, not a plugin — no key, no account, no credits (the
-  D76 Website-source reasoning), and a plugin cannot draw the page this needs.
-- **Shape (owner):** a Feeds page in the Library group; paste a URL, the
-  worker fetches every 30 minutes; a feed is tagged to spaces and its
-  headlines show in their What's moving; a feed is just another watch in the
-  space's Watching lane. Workspace-wide, no read state, plain headlines (no
-  company matching). Today shows one line at most.
-- Drawn on the canvas: Lists page, `09 Feeds · proposed`.
-- A feed tagged to several spaces sends every headline to each; start by
-  tagging general sources narrowly, add a keyword filter per tag later if the
-  noise bites. Shortcut `G R`; a failing source's Fix › reopens its window.
-- Feeds carry more than headlines: a summary per item (the plugin already
-  reads it), a source logo (RSS `<image>`, Atom `<icon>`/`<logo>`, else the
-  site's favicon) and often an item image (`media:thumbnail`, an image
-  enclosure, or the first `<img>`). Fetch and store images in the worker —
-  never hotlink, so reading never pings the publisher.
-- Rows: logo + headline + one summary line (variant A, owner 10-16); no
-  thumbnail in the row. The fuller blurb belongs in a reader (proposed: a
-  pane on the Feeds page, the same reader as a window elsewhere).
+- **A reader:** the fuller blurb in a pane on the Feeds page, the same reader
+  as a window elsewhere.
+- **A keyword filter per tag:** a feed tagged to several spaces sends every
+  headline to each. Start by tagging general sources narrowly; add a filter if
+  the noise bites.
 
 ## From the Taghash comparison — 2026-10-18
 
