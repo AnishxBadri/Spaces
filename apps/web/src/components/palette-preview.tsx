@@ -36,8 +36,8 @@ import { cn } from '#/lib/utils'
 /**
  * Cmd-K's preview pane: the highlighted result, right of the list. Always
  * mounted, and blank bone when nothing previewable is highlighted.
- * - A record: its stamp, glyph and name, a company's domain, the double
- *   rule, its readouts two-up (only those with a value), then its first six
+ * - A record: its stamp, glyph and name, a company's domain, a rule, its
+ *   readouts two-up (only those with a value), then its first six
  *   filled attributes as a label grid.
  * - An object: its glyph and name, `All` with the record total, then its
  *   saved views with their counts.

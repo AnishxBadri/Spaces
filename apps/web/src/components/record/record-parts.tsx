@@ -12,7 +12,7 @@ import { cn } from '#/lib/utils'
 /**
  * Record page anatomy. Header: the stamp alone on its row, then the mark,
  * the serif name, its suffix and badges with the actions bottom-aligned at
- * the right, the double rule under — no readout strip; scrolled past its
+ * the right, one rule under — no readout strip; scrolled past its
  * name it folds to `HeadBar`.
  * Body: `RecordBody details=… groups` — on the bone ground, the 320px rail
  * left with no box (the attribute rows, then the relationship groups), the

@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 import { RecordNotices } from './record-notices'
 
 /**
- * The band under a record head's double rule: a line per possible duplicate
+ * The band under a record head's rule: a line per possible duplicate
  * and one for a parked enrichment, each with the link that settles it, and
  * nothing at all when neither is there.
  */

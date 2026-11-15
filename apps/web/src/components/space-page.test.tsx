@@ -377,7 +377,7 @@ const buttonNamed = (name: RegExp) => {
 const CLOCK_NOW = '2026-10-26T12:00:00.000Z'
 
 describe('the space head', () => {
-  it('draws the stamp alone, the path of ancestors after the name, the double rule', async () => {
+  it('draws the stamp alone, the path of ancestors after the name, one rule under', async () => {
     await mount('notes')
     const head = header()
     expect(text(head.querySelector('[data-stamp]'))).toBe('Space')
