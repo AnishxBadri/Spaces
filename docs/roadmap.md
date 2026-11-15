@@ -1,6 +1,6 @@
 # Roadmap
 
-What is shipped, what is open, and what comes next. Linear (team `Spaces`) holds the scheduled work; `docs/backlog.md` holds the full bodies of its open slices; `docs/considerations.md` holds ideas not yet decided.
+What is shipped, what is open, and what comes next. Linear (team `Spaces`) holds live work, with each open slice's spec in its issue body; shipped issues are closed and archived, and this file and git are the record. Decisions are in `docs/decisions.md`; ideas not yet decided are in `docs/considerations.md`.
 
 ## Shipped
 
@@ -19,7 +19,7 @@ What is shipped, what is open, and what comes next. Linear (team `Spaces`) holds
 13. Doors that are not an upload — a mailbox, a link, an API with a spec
 14. Import and export
 15. `packages/core` and `apps/worker`
-16. A published image anyone can run (two slices still open, below)
+16. A published image anyone can run (two slices open, below)
 17. The plugin SDK
 18. Plugins run unattended, Apollo enriches
 19. Install from the app, no redeploy
@@ -33,22 +33,25 @@ What is shipped, what is open, and what comes next. Linear (team `Spaces`) holds
 27. Instrument, printed — the decided design lands
 28. Spaces, research and watches
 29. Enrichment is the host's
-30. The canvas lands — the instrument port (shipped 2026-10-30, with the Clean UI leftovers `SPA-355` and `SPA-356`; its follow-ups `port-C1` SPA-385 and `port-C2` SPA-386 shipped 2026-11-09)
-31. Edges and the AI shape — `edges-1` SPA-387 (the 12px edge, cards, folder tabs, the toolbar, `+ New x`, one icon list, `ProviderMark`) and `ai-a` SPA-388 (system and user parts, Anthropic cache markers, one shared prefix per lane, `tokensCached`) shipped 2026-11-10, and `notes-1` SPA-391 (the note page as a record: kind stamp, meta line, the ··· with the kind, the rail with Filed on · Mentions · Mentioned in · Visibility · History) the same day; `edges-2` SPA-392 (the 24px edge, the 12px gutter, the bone ground, paper cards, the folder as the page's one ink object), `record-1` SPA-393 (the rail as unboxed rows, Long text as an Overview paragraph, each relationship once and removable there, registry order with identity first) and `settings-1` SPA-394 (settings on the shared head, group cards 800px wide, the sheet differences) shipped 2026-11-11; `ai-b` SPA-389 is open below
+30. The canvas lands — the instrument port, with its follow-ups `port-C1` and `port-C2`
+31. Edges and the AI shape — the edge, cards and folder tabs, one icon list, the prompt's system and user parts with cache markers, the note page as a record, the bone ground, the record rail, settings in group cards and the owner's review fixes (one slice open, below)
+32. One backend grammar — I/O is Effect (D84), Effect Schema with SDK 2.0 (D85), two note kinds (D83), ownership counts sales
 
 Plus the UI sweep (the printed sheets landing) and Corrections.
 
 ## Open
 
-- **Project 16** (`afk`, In Progress in Linear): `SPA-188` install, upgrade and rollback docs, `SPA-190` one-click templates. `docs/install.md` and `docs/upgrade.md` exist, so check whether 188 is done.
+- `SPA-389` `ai-b` — the mandate in every judging lane, and cached tokens on the ledger. Project 31; `migration`, `hitl`: the owner confirms AI column answers may change under the mandate.
+- `SPA-188` `ship-10` — install, upgrade and rollback docs. Project 16, In Progress. `docs/install.md` and `docs/upgrade.md` exist; check what is left.
+- `SPA-190` `ship-12` — one-click templates for Coolify, Railway, Render and Unraid. Project 16, In Progress; each needs a human deploy.
 
 ## Next, in order
 
-1. **Project 31, the rest** (P-SPA-35), body in `docs/backlog.md` § 31: `ai-b` SPA-389 (migration, hitl: the owner confirms AI column answers may change under the mandate). `settings-2` SPA-395, `shell-2` SPA-396 and `record-2` SPA-397 shipped 2026-11-12. Then the Ask set, which the owner has not picked from yet.
-2. ~~**Project 32, one backend grammar**~~ shipped 2026-11-12 (D84, D85; P-SPA-36, SPA-400 to SPA-406), with `notes-kind` SPA-398 (D83, migration 0092) and `ownership-1` SPA-399 from Corrections. Every `lib/` module that imports `db` is Effect, held by `effect/io-is-effect`; new server-fn inputs go through `input()` (about 60 of 270 validators so far); the plugin contract is Effect Schema as SDK 2.0.0; `valueValidator` and core's json shapes are Effect schemas. Zod is still imported by 169 files (web 88, worker 47, core 31, three elsewhere) and converts when each file is next opened.
-3. **Zod leaves** (owner approved 2026-11-12, not yet ticketed) — finish D85 as a sweep instead of file by file. Zod is imported by 169 files: web 88 (`lib/server` 30, routes 16, `lib/ai` 11), worker 47 (`jobs` 32, `plugins` 11), core 31 (`ai` 11), and one each in `packages/db`, the sdk's fence test and `scripts/release`. Four slices on the Effect sweep's shape: the web server-fn validators onto `input()` (about 210 of 270 are still zod); the worker's job payloads; core, where `ai/schema.ts` failed four characterisation rows on a first port and `jsonValueZod` goes with its last caller; then `zod` out of the five `package.json` files and the lint ban widened from the SDK and plugin zones to every package. Each conversion is pinned by a characterisation table recorded against zod first, as `schema-3` did.
-4. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided; starts after project 30.
-5. **Docs consolidation** — `DESIGN.md` and `docs/design-contract.md` merge into one design doc, checked against the Paper library; `CONTEXT.md` rewritten to current state only.
+1. **The Ask set**, which the owner has not picked from yet.
+2. **Zod leaves** (approved, not ticketed) — finish D85 as a sweep. Zod is imported by 169 files: web 88 (`lib/server` 30, routes 16, `lib/ai` 11), worker 47 (`jobs` 32, `plugins` 11), core 31 (`ai` 11), and one each in `packages/db`, the sdk's fence test and `scripts/release`. Four slices: the web server-fn validators onto `input()` (about 210 of 270 are still zod); the worker's job payloads; core, where `ai/schema.ts` failed four characterisation rows on a first port and `jsonValueZod` goes with its last caller; then `zod` out of the five `package.json` files and the lint ban widened from the SDK and plugin zones to every package. Each conversion is pinned by a characterisation table recorded against zod first.
+3. **Feeds, built in** (D87, decided, not ticketed). Slices to write: feed tables and their migration, the worker poller, the Feeds page, space tagging, the What's moving and Watching lanes, image fetch and storage, and retiring `plugins/rss`.
+4. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided, not ticketed.
+5. **One design doc** — `DESIGN.md`, `docs/design-contract.md` and `docs/product-map.md` merge into one, checked against the Paper library.
 
 ## Owner calls
 
