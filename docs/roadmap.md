@@ -49,9 +49,10 @@ Plus the UI sweep (the printed sheets landing) and Corrections.
 
 1. **The Ask set**, which the owner has not picked from yet.
 2. **Zod leaves** (approved, not ticketed) — finish D85 as a sweep. Zod is imported by 169 files: web 88 (`lib/server` 30, routes 16, `lib/ai` 11), worker 47 (`jobs` 32, `plugins` 11), core 31 (`ai` 11), and one each in `packages/db`, the sdk's fence test and `scripts/release`. Four slices: the web server-fn validators onto `input()` (about 210 of 270 are still zod); the worker's job payloads; core, where `ai/schema.ts` failed four characterisation rows on a first port and `jsonValueZod` goes with its last caller; then `zod` out of the five `package.json` files and the lint ban widened from the SDK and plugin zones to every package. Each conversion is pinned by a characterisation table recorded against zod first.
-3. **Feeds, built in** (D87, decided, not ticketed). Slices to write: feed tables and their migration, the worker poller, the Feeds page, space tagging, the What's moving and Watching lanes, image fetch and storage, and retiring `plugins/rss`.
+3. **Feeds, built in** (D87, decided, not ticketed). Slices to write: feed tables and their migration, the worker poller, the Feeds page, space tagging, the What's moving and Watching lanes, image fetch and storage, and retiring `plugins/rss` with the SDK's `feeds` role and the Plugins catalogue's Feeds group.
 4. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided, not ticketed.
-5. **One design doc** — `DESIGN.md`, `docs/design-contract.md` and `docs/product-map.md` merge into one, checked against the Paper library.
+5. **Small decided slices** (not ticketed): the sign-in rate rule, 5 per 60 seconds per IP, in `apps/web/src/lib/auth.ts`; workspace export (D42); a staged import on Today's Needs-you (D43).
+6. **One design doc** — `DESIGN.md`, `docs/design-contract.md` and `docs/product-map.md` merge into one, checked against the Paper library.
 
 ## Owner calls
 
