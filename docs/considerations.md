@@ -9,13 +9,9 @@ or a slice when it earns it; delete it when it stops being interesting.
 Every CRM has one; we have email only on records.
 
 - **Shape:** a threads list across all records — Mine / Team, plus a filter
-  for threads that matched no record. Same one-row-per-thread rows and the
-  same thread viewer as the record's Interactions tab; nothing new to design
-  beyond the page.
-- **Threads first, everywhere:** the record list and the viewer group by
-  `thread_id` (already stored and indexed) — one row per thread, the whole
-  thread in the window, earlier messages folded. Drawn on Record 05 and
-  Windows 02; not built.
+  for threads that matched no record. The same `ThreadRow` rows and email
+  window as the record's Interactions tab; nothing new to design beyond the
+  page.
 - Answers "what came in this week" without opening each record.
 - **Place:** sidebar Library — Notes · Emails · Meetings · Files · Feeds;
   shortcut `G I` (`G E` is Meetings, `G M` Mandate).
