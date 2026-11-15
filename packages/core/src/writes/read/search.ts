@@ -161,7 +161,7 @@ export function fusedStatement({
         limit 40
       ),
 
-      -- Tasks: a plain table, not an entity (CONTEXT.md 15b), so this lane
+      -- Tasks: a plain table, not an entity, so this lane
       -- ranks task ids, not entity ids. No canRead clause, unlike the
       -- private carve-out in the three lanes above, and on purpose: a
       -- task carries no visibility flag — any member sees any task, the

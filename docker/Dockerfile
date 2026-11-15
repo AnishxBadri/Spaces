@@ -30,7 +30,7 @@
 # loads, including what it reaches through the `#web/*` crossings, and the
 # boot entry's closure is a subset of it.
 #
-# Bundler: `vite build --ssr` (D26, CONTEXT.md). The bundles inline the
+# Bundler: `vite build --ssr` (D26, docs/architecture.md). The bundles inline the
 # workspace's own code (@spaces/db, @spaces/core, apps/web's server modules the
 # worker crosses into) and import every npm package from node_modules at run
 # time; apps/worker/vite.config.ts and apps/web/vite.boot.config.ts say why.

@@ -1,4 +1,4 @@
-# Spaces — the worked HTTPS example (CONTEXT.md hostability contract #3).
+# Spaces — the worked HTTPS example (hostability contract #3, docs/architecture.md).
 #
 # One templated block is the entire configuration. Caddy obtains and renews
 # the certificate by itself, redirects http to https, and proxies to the app

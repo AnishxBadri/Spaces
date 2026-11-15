@@ -1,6 +1,6 @@
 name: spaces
 # Production self-host: `docker compose up` works first try.
-# Three containers, two volumes. Full env surface documented in CONTEXT.md.
+# Three containers, two volumes. Full env surface documented in docs/architecture.md (Hosting).
 #
 # Web and worker run apart so a worker that dies or runs out of memory never
 # takes the web app down with it, and a worker that stops working shows as

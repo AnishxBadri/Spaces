@@ -15,7 +15,7 @@ description: How to run Spaces on your own machine, and how it is built.
 The decision record lives beside the code, in [`docs/` on GitHub](https://github.com/AnishxBadri/Spaces/tree/main/docs). It is written for contributors and is the deeper read:
 
 - `architecture.md`, the whole system: every model, the packages, how a request flows.
-- `CONTEXT.md` (at the repository root), every decision with its date and reasons, including the ones that were reversed.
+- `decisions.md`, every decision with its current answer and reason.
 - `roadmap.md`, what is shipped and what comes next.
 - `design-contract.md` and `DESIGN.md`, the Instrument design system.
 - `spec-plugin-sdk.md`, the plugin contract.

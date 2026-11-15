@@ -1,4 +1,4 @@
-# HTTPS overlay — CONTEXT.md hostability contract #3.
+# HTTPS overlay — hostability contract #3 (docs/architecture.md).
 #
 # The app never terminates TLS. Caddy sits in front, gets a certificate on
 # its own, and talks plain HTTP to `app` on the compose network. APP_URL is

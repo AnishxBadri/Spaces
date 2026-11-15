@@ -153,3 +153,19 @@ Sixteen pages in four groups, and one provider can sit on four of them
 - Folding Search into Models and Email forwarding into Email & calendar
   makes fourteen. It reopens the settings map (D81), so it waits for the
   owner to ask.
+
+## Smaller open questions
+
+- **`object.kind`:** one column naming "what machinery" an object has, so the
+  code-only link between a core entity kind and its object row becomes
+  structural and promoting a custom object is an `UPDATE`. Cheap now, painful
+  after the first promotion.
+- **A plugin asking for a custom object by shape:** created as an ordinary
+  user-owned object on enable, so plugin data is visible in the graph without
+  plugin UI (Twenty does this).
+- **A comparison page for launch** (against Twenty, Attio and the vertical
+  tools), on an honest-claims rule: never claim a storage advantage (Twenty
+  has the same local-default answer); claim the research half, two-container
+  ops, BYOK down to Ollama, the investor schema and the financial engine.
+- **A funding-status and runway lens** over the portfolio, as the first
+  consumer if founder metrics (MIS) ever land.

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Backup — both-or-neither (CONTEXT.md hostability contract #5).
+# Backup — both-or-neither (hostability contract #5, docs/architecture.md).
 #
 # The database and the blob directory are worthless apart: blobs are
 # content-addressed sha256 files with no filenames, and the rows that name

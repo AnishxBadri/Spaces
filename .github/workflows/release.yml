@@ -1,7 +1,7 @@
 # Published images (SPA-187, ship-8). A `core@X.Y.Z` tag builds
 # docker/Dockerfile once for linux/amd64 and linux/arm64 and pushes the one
 # manifest — one digest — to GHCR and Docker Hub, tagged `X.Y.Z` and `X.Y`.
-# Never `latest` (CONTEXT.md, Hosting: docs tell people to pin, and a moving
+# Never `latest` (docs/architecture.md, Hosting: docs tell people to pin, and a moving
 # tag would contradict them).
 #
 # Order is the contract, and nothing reaches a registry until the end:
@@ -171,7 +171,7 @@ jobs:
             "$SRC" docker-daemon:spaces:release-arm64
           docker images spaces
 
-      # arm64 is the audience's hardware (CONTEXT.md, Hosting), so it is
+      # arm64 is the audience's hardware (docs/architecture.md, Hosting), so it is
       # booted, not just built: under QEMU, against a real Postgres, through
       # the real entrypoint — migrations, seeds, the privilege drop.
       - name: arm64 is genuinely arm64 — uid 1000, boots and migrates

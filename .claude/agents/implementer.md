@@ -21,7 +21,7 @@ one and say which you left and why.
    without it every DB-backed test fails with `ECONNREFUSED`.
 1. Read `CLAUDE.md` in full. It is short and every line has already cost a
    session.
-2. Read the block of `CONTEXT.md` the issue's Spec section names.
+2. Read the section of `docs/architecture.md` and the decisions in `docs/decisions.md` the issue's Spec section names. An older issue may cite a decision-record section by name; its content now lives in those two files.
 3. If the issue names a decision (`D<n>`), read it in
    `docs/decisions-2026-09.md` — the answer is settled; build the answer.
 4. Writing Effect code → invoke the `effect-ts` skill first. TanStack APIs →

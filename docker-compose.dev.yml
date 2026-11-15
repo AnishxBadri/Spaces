@@ -3,7 +3,7 @@ name: spaces-dev
 # Production compose (app + db) is docker-compose.yml.
 #
 # MinIO exists here ONLY to develop/test the S3 driver — it is never part of
-# the production compose (CONTEXT.md: nothing bundled, local FS default).
+# the production compose (docs/architecture.md, Storage: nothing bundled, local FS default).
 # Exercise it with:
 #   STORAGE_DRIVER=s3 S3_BUCKET=spaces-dev S3_ENDPOINT=http://localhost:9000 \
 #   S3_ACCESS_KEY_ID=minioadmin S3_SECRET_ACCESS_KEY=minioadmin pnpm dev

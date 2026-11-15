@@ -1,5 +1,5 @@
 #!/bin/sh
-# Restore — the other half of both-or-neither (CONTEXT.md hostability #5).
+# Restore — the other half of both-or-neither (hostability contract #5, docs/architecture.md).
 #
 # A dump on its own is worthless: blobs are content-addressed files the
 # database only names, and secret.key is the only thing that can decrypt a

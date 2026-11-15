@@ -11,7 +11,7 @@
 # The recipe is scripts/upgrade-check.sh — CI's `roundtrip` job with two
 # images — so it runs by hand against any pair.
 #
-# The window (scripts/upgrade-tags.sh, recorded in CONTEXT.md, Hosting): the
+# The window (scripts/upgrade-tags.sh, recorded in docs/architecture.md, Hosting): the
 # newest prior tag, always, plus every other published tag with the same
 # major as package.json's version. Never "every prior release".
 #

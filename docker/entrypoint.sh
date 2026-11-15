@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-# Hostability contract #1 (CONTEXT.md): ./data ownership is fixed
+# Hostability contract #1 (docs/architecture.md): ./data ownership is fixed
 # structurally, not by docs. Two phases — root repairs, then su-exec drops to
 # UID 1000 and the same script runs again as the app user. Everything below
 # the drop (migrate, the ROLE case, the supervision block) runs unprivileged.
@@ -77,7 +77,7 @@ case "$ROLE" in
     # Web must never run CPU-bound extraction/embedding inline — that's
     # what the worker is for.
     #
-    # Supervision contract (CONTEXT.md hostability #2): EITHER process dying
+    # Supervision contract (hostability contract #2, docs/architecture.md): EITHER process dying
     # kills the container, so `restart: unless-stopped` heals it. Waiting on
     # the web PID alone left a crashed worker invisible — a "healthy"
     # container where extraction silently never runs. `wait -n` isn't in

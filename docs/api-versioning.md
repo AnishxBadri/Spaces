@@ -46,8 +46,8 @@ field will be added.
 | `apiVersion`           | `API_VERSION`            | a v2-forcing change above; the path moves with it                                            |
 | `captureSchemaVersion` | `CAPTURE_SCHEMA_VERSION` | the capture extension's payload shape changes; this happens inside v1 and the path stays put |
 
-The capture extension ships on its own release cycle (CONTEXT.md integration
-map #8), so its payload has its own version inside v1 on purpose. An installed
+The capture extension ships on its own release cycle (`docs/architecture.md`,
+the integration map), so its payload has its own version inside v1 on purpose. An installed
 extension calls the handshake first and compares both numbers. If
 `apiVersion` differs, the API it was built for is gone. If only
 `captureSchemaVersion` differs, it should update itself.

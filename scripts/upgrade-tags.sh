@@ -11,7 +11,7 @@
 # `upgrade-ci: one published tag (0.1.0), nothing to upgrade from — skipping`
 # — with an empty array. Exit 0 both ways; the workflow reads the array.
 #
-# The window, pinned here (CONTEXT.md, Hosting, says the same):
+# The window, pinned here (docs/architecture.md, Hosting, says the same):
 #
 #   N-1  the newest published tag other than the one being released, always
 #   +    every other published tag with the same major as --version

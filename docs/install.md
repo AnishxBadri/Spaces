@@ -32,7 +32,7 @@ changing the tag on purpose, after a backup. See [upgrade.md](upgrade.md).
 
 The same bytes are on Docker Hub as `docker.io/anishbadri/spaces:0.1.0`; both
 registries carry a cosign signature and GHCR carries SLSA provenance
-(`CONTEXT.md`, _Hosting_, has the `cosign verify` invocation).
+(`docs/architecture.md`, _Hosting_, has the `cosign verify` invocation).
 
 First boot pulls both images and runs every migration before anything
 serves traffic. Wait for the health endpoint to say the worker is up:

@@ -5,9 +5,9 @@ against the code, not yet built). **Amended 2026-09-30 at project 17's
 publish (`docs/decisions.md` → Addenda 2026-09-30, D51–D58): kinds
 are gone — each job declares a trigger and the ports it uses (§3–§5); a job
 calls ports, it does not return claims (§5); plugin signing mechanics (§9).**
-Detailed contract behind the CONTEXT.md
-"Plugin architecture" decision (which reversed backend-paradigm decision 7).
-Builds on: the claim-type lanes (CONTEXT "Machine-write design"), the BYOK
+Detailed contract behind the plugin decisions (D51–D57, D89; the record is
+`docs/architecture.md` "Plugins").
+Builds on: the claim-type lanes (`docs/architecture.md`, machine writes), the BYOK
 vault, `resolveEntity()`, the Effect ratchet, the AI substrate
 (`spec-ai-substrate.md` (removed) — AI sits _below_ this SDK, never inside it),
 and the hostability contracts. Competitive grounding: Twenty's apps
@@ -340,7 +340,7 @@ storage-source: { resolveLink(url); listFolder(id, { cursor?, pageSize? }); getF
 
 A plugin that implements it says `provides: 'storage-source'` in the
 manifest. It never decides filing — core's `resolveItem` (storage design,
-CONTEXT "Storage sources") maps folders to entities; the plugin is a bytes
+`docs/architecture.md` "Research") maps folders to entities; the plugin is a bytes
 pipe with hints (`source_path`, folder names). Its body is owned by the
 storage area (project 20).
 
@@ -453,7 +453,7 @@ Import.stage(grid: {
 
 - **`Content.logMeeting(MeetingClaim | MeetingCancellation) → { outcome: created | updated, interactionId } | { outcome: refused, reason }`.** A meeting claim is one calendar event: `uid` (the iCalUID, plus `#<original start>` for an instance of a series — every instance shares the UID), the calendar's `eventId`, `status`, `startsAt`/`endsAt`, `subject?`, `organizer?`, `conferenceUrl?`, `recurringInstanceId?` and `attendees: [{ email, name?, rsvp, self? }]`. A cancellation names only `eventId` (and `uid` when it has one) — what a change feed sends for a deleted event.
 - **The host decides, through core's `MeetingLane` service**, whose live Layer is the arrival lane (`logMeetingProgram`, beside the mailbox): the organizer and attendees are addresses judged by `decideParticipants` and resolved by the same program mail uses, and `meetingRefusal` (beside the mail refusals) refuses a birth when the event was cancelled before it was seen, the owner declined, or no attendee is from outside. A meeting already held follows its event whatever it became: `occurred_at`, the meeting `meta` (with `calendar_event_id`, how a bare cancellation finds its row) and the edges — added for new attendees, dropped for what only a departed attendee matched. The row is keyed by `message_id = uid` through `interaction_message_id_unique`, so the same event synced from two calendars is one row: the second insert conflicts and follows.
-- **`ScheduleInput.connectedAt`** is the bound connection's `created_at`, else the integration's: the forward-only floor (CONTEXT "Email / calendar ingestion"). A syncer's first pull is bounded by it, and nothing that ended before it is written even when a change feed reports an edit.
+- **`ScheduleInput.connectedAt`** is the bound connection's `created_at`, else the integration's: the forward-only floor (`docs/architecture.md` "Arrival"). A syncer's first pull is bounded by it, and nothing that ended before it is written even when a change feed reports an edit.
 - **`CursorInvalid`** is a schedule job's typed outcome for an expired cursor (Google's 410). The host closes the run `succeeded` with `cursor invalid, cleared: <reason>` in `job_run.summary` and writes the cursor null; the next run starts as the first did, from `connectedAt`.
 - The testing kit's `makeFakeCalendarApi` is `events.list` over a fake calendar (`timeMin`, `syncToken`, `showDeleted`, `singleEvents`, paging), with `expireSyncTokens`, `rateLimit` and `revoke`; `SPACES_FAKE_PROVIDERS=1` stands it in for `google-calendar`.
 
@@ -560,8 +560,8 @@ optional `DROP SCHEMA`.
 the migration runner as the owning user and entered with `SET ROLE`; it reads
 `public`, writes only the `plugin_<id>` schema it owns, and a database that
 refuses `CREATE ROLE` degrades the plugin. Migrations are `migrations/*.sql`
-in lexical order, journaled in `plugin_<id>.spaces_migrations`. CONTEXT.md
-"Plugin architecture" (runtime and hosting contracts) has the whole record.
+in lexical order, journaled in `plugin_<id>.spaces_migrations`. `docs/architecture.md`
+"Plugins" (runtime, as built) has the whole record.
 
 ## 9. Registry, signing, install from the running deployment
 
@@ -573,7 +573,7 @@ registry.json  [{ id, version, sdk, name, description, requires?, roles?,
 The format is `registryEntrySchema` in `@spaces/sdk/pack` (sdk-21a), which
 also packs: `<id>-<version>.tgz` (gzip'd ustar of manifest.json, bundle.mjs,
 migrations/) + `.sha256` + `.sig`. `verifyPlugin` is
-`@spaces/core/plugins/verify`; CONTEXT.md "Plugin architecture" records the
+`@spaces/core/plugins/verify`; `docs/architecture.md` "Plugins" records the
 key id format, the key directory and the tar choice.
 
 v0: tarballs on GitHub Releases, index committed in-repo and copied into
@@ -581,8 +581,8 @@ the image (offline installs see the shipped list; live refresh when
 outbound HTTPS exists). v1 upgrade: OCI artifacts in GHCR (one auth, one
 mirror story) — not now. As built (ship-9): a `plugin-<id>@X.Y.Z` tag runs
 `plugin-release.yml` → `scripts/release-plugin.ts`, which publishes the
-release and commits the entry; the procedure is in CONTEXT.md "Plugin
-architecture".
+release and commits the entry; the procedure is in `docs/architecture.md`
+"Releases".
 
 **Install flow, admin only, no redeploy:**
 
@@ -631,8 +631,8 @@ upsert the row (`installing`, enabled) and NOTIFY after commit. Upgrade keeps
 one version back and prunes older ones. Uninstall soft-deletes the row
 (`integration.removed_at`, migration 0065) so provenance survives ("Apollo,
 since removed"), deletes the files, the lock entry and the key, and drops
-`plugin_<id>` only when asked; a reinstall reuses the row. CONTEXT.md
-"Plugin architecture" has the decision.
+`plugin_<id>` only when asked; a reinstall reuses the row. `docs/architecture.md`
+"Plugins" has the decision.
 
 **As built (sdk-22).** Two more doors, no second code path: `installPlugin`
 has exactly three callers — the registry install, the upload and first
@@ -649,7 +649,7 @@ entry whose `sdk` range and `minCore` this box satisfies; the key is seeded
 only when the vault has none for that provider, bound to the row, as the
 page writes it. Tarballs are fetched by `fetchPluginTarball`
 (`@spaces/core/plugins/source`, `https:` or `file:`), the one fetcher the
-registry install and first boot share. CONTEXT.md Hostability contract 6 has the rules.
+registry install and first boot share. Hostability contract 6 in `docs/architecture.md` has the rules.
 
 ## 10. Hosting lifecycle
 
@@ -1008,7 +1008,7 @@ first, enrichment second, calendar/recordings third.
 ## 15. Deferred, with the reason on record
 
 - **Companion containers (tier 2)** — the WhatsApp bridge shape is
-  deliberated in CONTEXT; a `kind: 'companion'` manifest row with a
+  deliberated in `docs/architecture.md` (the integration map); a `kind: 'companion'` manifest row with a
   heartbeat via ingress is the likely form. Designed when the first one is
   near.
 - **Third-party in-process plugins (tier 3)** — rejected: no Node sandbox,

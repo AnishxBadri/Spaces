@@ -9,8 +9,9 @@ do not re-derive them.
 
 - [`docs/architecture.md`](docs/architecture.md) — every model, the
   packages, how a request flows and where things live. Start here.
-- [`CONTEXT.md`](CONTEXT.md) — the decision record, dated. Read the block
-  for the area you are touching before designing anything.
+- [`docs/decisions.md`](docs/decisions.md) — the decision ledger: each
+  decision's current answer and reason. Read the ones for the area you are
+  touching before designing anything.
 - [`CLAUDE.md`](CLAUDE.md) — the agent card: gates, traps, conventions.
   Humans should read it too; every trap in it has already cost a session.
 - [`docs/design-contract.md`](docs/design-contract.md) — before writing any

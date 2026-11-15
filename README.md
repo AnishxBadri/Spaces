@@ -330,7 +330,7 @@ arriving with the SDK.
 
 - [`docs/architecture.md`](docs/architecture.md) — every model, the packages,
   how a request flows and where things live, in one read
-- [`CONTEXT.md`](CONTEXT.md) — the decision record, dated
+- [`docs/decisions.md`](docs/decisions.md) — the decision ledger
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup, the gates, how to pick
   up an issue
 

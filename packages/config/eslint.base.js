@@ -245,7 +245,7 @@ const PLUGIN_IMPORTS_SDK_ONLY = {
     climbsInto(['apps', 'plugins', 'packages']),
   ].join('|'),
   message:
-    'A plugin imports @spaces/sdk only, never @spaces/core and never @spaces/db — it calls the ports the host provides, and each port writes through its lane (docs/spec-plugin-sdk.md §2: "plugins/* → sdk. Never core, db"; D52; CONTEXT.md "Plugin architecture").',
+    'A plugin imports @spaces/sdk only, never @spaces/core and never @spaces/db — it calls the ports the host provides, and each port writes through its lane (docs/spec-plugin-sdk.md §2: "plugins/* → sdk. Never core, db"; D52; docs/architecture.md "Plugins").',
 }
 
 export default [
@@ -332,7 +332,7 @@ export default [
             {
               name: 'effect',
               message:
-                'Effect never crosses into React — the seam is effectFn() / HttpApi handlers (CONTEXT.md "Backend paradigm").',
+                'Effect never crosses into React — the seam is effectFn() / HttpApi handlers (docs/architecture.md "Backend paradigm").',
             },
             {
               name: 'effect/unstable/httpapi',
@@ -348,7 +348,7 @@ export default [
             {
               regex: '^effect/(?!unstable/httpapi$)',
               message:
-                'Effect never crosses into React — the seam is effectFn() / HttpApi handlers (CONTEXT.md "Backend paradigm").',
+                'Effect never crosses into React — the seam is effectFn() / HttpApi handlers (docs/architecture.md "Backend paradigm").',
             },
             // …and the web boundary, carried here because this
             // block owns `no-restricted-imports` for routes/ and components/

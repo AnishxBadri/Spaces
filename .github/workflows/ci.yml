@@ -241,7 +241,7 @@ jobs:
           path: spaces-ci.tar.gz
           retention-days: 1
 
-  # Hostability contract #1 (CONTEXT.md): the entrypoint owns /data. A macOS
+  # Hostability contract #1 (docs/architecture.md): the entrypoint owns /data. A macOS
   # bind mount rewrites ownership on the way through, so a Linux runner is the
   # only place the trap is real. Deliberately a separate job: it boots an
   # image and must never sit in front of the gates above.
@@ -603,7 +603,7 @@ jobs:
         with:
           image: spaces:ci
 
-  # Hostability contract #5 (CONTEXT.md): backup is both-or-neither, and
+  # Hostability contract #5 (docs/architecture.md): backup is both-or-neither, and
   # rollback is restore. Prose cannot prove that, so this job destroys the box
   # and puts it back: up → plant a document, its blob and a credential →
   # backup.sh → `docker compose down -v` + `rm -rf ./data` → restore.sh → the
