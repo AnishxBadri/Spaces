@@ -266,7 +266,7 @@ Every integration classifies into an existing lane: identity → aliases through
 - Keys are write-only in the UI (`sk-...4f2a`), redacted in logs, decrypted only in the worker. Resolution order: user key, then workspace key, then none. Pasted keys are workspace-scoped in the UI; the `user` scope exists for later. OAuth grants are per user by nature; the OAuth client is a workspace credential. A provider (Google, Microsoft, Box) is one client under which several uses hang, each asking incremental scopes; the OAuth dance lives in core. Plugin install and workspace keys are admin-only.
 - **No key, feature hidden**; everything else works, and every integration is skippable.
 - **Models.** The Vercel AI SDK over Anthropic, OpenAI, Google, Ollama and OpenRouter. Lanes map to models (cheap for tagging, frontier for drafting), routed by sensitivity (D20). Ollama is first-class: the self-host audience overlaps the local-model audience. A token counter gives the operator cost visibility (D46).
-- **AI proposes, a person accepts.** A model's output (an attribute value, a document kind, a space tag, a note, an identity claim) lands as a `suggestion` row with its rationale, refs and run; a rejection is remembered. See D41 for the open question on pre-filled controls.
+- **AI proposes, a person accepts.** A model's output (an attribute value, a document kind, a space tag, a note, an identity claim) lands as a `suggestion` row with its rationale, refs and run; a rejection is remembered. A guess on a screen a person is confirming, such as an import column mapping, is a pre-selected control instead, and the import batch records it as AI-proposed (D41).
 
 ### Embeddings
 
