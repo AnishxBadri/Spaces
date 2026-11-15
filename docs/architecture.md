@@ -58,6 +58,14 @@ deploy/                         one-click templates: coolify, railway, render, u
 scripts/                        backup.sh, restore.sh, screenshots
 ```
 
+What the less obvious packages hold:
+
+- **core `writes/`** — the attribute engine and seed, the identity write path (resolve, merge, sweep, delete, rename, provenance), the view store, chunk sources, the BYOK vault, the blob backend, the graph's read half (MCP's `get_record`, entity search, the lexical fused search with `canReadNoteSql`), the interaction writer (row, body note, edges, dedupe by `message_id`), document birth, intake and prepare, `proposeProgram` (a partial unique index makes an identical open integration proposal a no-op), the db-coupled context assembler, and boot (`writes/boot.ts` with the starter taxonomy; `apps/web/src/db/boot.ts` is the process shell that runs it).
+- **core ports** (`writes/ports/`) — Layer constructors over the bound `integration` row: Config, Secrets, Log, Http (with a per-process throttle), Read, Identity, Receipts, Content and the rest. Provenance (`source_ref`, `enrichment_record.integration_id`, `signal.source_class`) comes from the row, never the plugin. Work a port hands back goes through core's `Enqueue` service (`@spaces/core/queue/enqueue`); the worker's Live is `apps/worker/src/plugins/enqueue.ts`, the web's `webEnqueue` in `lib/enqueue-live.ts`.
+- **core pure half** — also the context ranker, ref grammar and renderer (`context/`), `canRead` (`read-policy.ts`) and the `SimilarLane` service tag, whose one live Layer is `apps/web/src/lib/ai/similar.ts` beside the embedding pin.
+- **sdk** — the manifest (`manifestSchema`, `defineManifest`), `SDK_VERSION` and `satisfiesSdk`, `definePlugin`, the port tags and `@spaces/sdk/testing`, the identity-key normalizers (`@spaces/sdk/identity`, imported by core and web too), the plugin build (`@spaces/sdk/build`) and the packer (`@spaces/sdk/pack`: ustar + ed25519). Core's `plugins/verify.ts` is the other half of the packer; `registry.json` and `plugin-keys/` are copied into the image.
+- **worker `plugins/`** — boot reconciles enabled `integration` rows against `<dataDir>/plugins/<id>/current/` before any queue registers; a `node:module` resolve hook (`host-resolve.ts`) hands a bundle's bare `effect` and `@spaces/sdk` imports the worker's own copies, which is why the worker build leaves `@spaces/sdk` external.
+
 Boundaries, enforced by eslint zones in `packages/config`: `db` imports nothing internal; `core` reaches `db` for values only inside `writes/`; `sdk` imports nothing internal; the worker reaches `apps/web/src/lib` only through the `#web/*` alias, for modules not yet moved into core; `site` and `e2e` import nothing internal. In `apps/web`, `#/` means `apps/web/src`.
 
 ## How a request flows
@@ -78,7 +86,7 @@ Data on a page comes from its route loader, which calls server functions; a save
 ### Workspace and access
 
 - One workspace per deployment today (a singleton row). One install holding several workspaces is decided, not built.
-- First-run signup is open only while no user exists, gated by a setup token printed to the logs; after that, invites only.
+- First-run signup is open only while no user exists, gated by a setup token printed to the logs; after that, invites only. Setup ends on `/today` (Start empty) or `/spaces` (Load demo data).
 - Roles are `admin` and `member`. Every mutation goes through `canWrite()`.
 - Rows that can be personal carry an author and a visibility. The default is shared; private is per-row opt-in, enforced in SQL wherever a title or body could leak. `canRead` decides visibility, including for AI context.
 
