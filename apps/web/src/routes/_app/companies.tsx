@@ -14,7 +14,7 @@ import {
 } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { ViewBar, viewBarPin } from '#/components/views/view-bar'
+import { ViewBar } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
 import { useColumnRun } from '#/components/views/column-run'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
@@ -39,6 +39,7 @@ import {
 import {
   Card,
   FolderGround,
+  ListPage,
   PageBody,
   PageHeader,
 } from '#/components/page-header'
@@ -424,8 +425,9 @@ function CompaniesPage() {
   )
 
   return (
-    <div className="flex flex-col">
+    <ListPage>
       <PageHeader
+        folds={false}
         title="Companies"
         action={
           firstRun ? (
@@ -451,7 +453,7 @@ function CompaniesPage() {
       ) : (
         <>
           {actions.selectionBar ? (
-            <FolderGround pinned>{actions.selectionBar}</FolderGround>
+            <FolderGround>{actions.selectionBar}</FolderGround>
           ) : (
             <ViewBar
               objectId={objectId}
@@ -470,7 +472,6 @@ function CompaniesPage() {
               onSaved={() => void router.invalidate()}
               canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
               plural="Companies"
-              pinned
               refNames={refNames}
               tools={
                 <TableTools
@@ -483,7 +484,7 @@ function CompaniesPage() {
               }
             />
           )}
-          <PageBody className="pt-0">
+          <PageBody className="min-h-0 pt-0">
             <AiCellsProvider
               table
               entityIds={table.getRowModel().rows.map((r) => r.original.id)}
@@ -502,9 +503,6 @@ function CompaniesPage() {
                 rowEnd={actions.rowMenu}
                 stickyColumnId="name"
                 notice={notice}
-                pinUnder={
-                  actions.selectionBar ? 'bar' : viewBarPin(vs.conditions)
-                }
                 page={{
                   total,
                   hasMore: records.hasNextPage,
@@ -527,6 +525,6 @@ function CompaniesPage() {
         </>
       )}
       {actions.dialogs}
-    </div>
+    </ListPage>
   )
 }

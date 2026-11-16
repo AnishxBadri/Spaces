@@ -1,8 +1,15 @@
 import { flexRender } from '@tanstack/react-table'
 import type { Column, Header, RowData, Table } from '@tanstack/react-table'
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import type { ComponentProps, ReactNode, RefObject } from 'react'
-import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
 import { FolderGround } from '#/components/page-header'
 import { ChevronsUpDown, icon } from '#/components/icons'
 import type { LucideIcon } from '#/components/icons'
@@ -42,10 +49,11 @@ declare module '@tanstack/react-table' {
  *   column, row → record, row checkboxes. Deliberately absent: bulk edit,
  *   calculations row, CSV, virtualization.
  *
- * The head is its own table, pinned under the folded page head: the page
- * scrolls vertically, and a horizontal scroller around one table would trap a
- * sticky `thead` inside it. The body scrolls sideways and drives the head's
- * `scrollLeft`; both tables share one set of fixed column widths.
+ * A list is a fixed pane: the table's card fills what the page leaves it and
+ * is the one scroller, both ways. The column head holds the card's top, the
+ * foot its bottom, the name column its left and a row's trailing lane (its
+ * `···`) its right; everything else scrolls under them. The cells keep their
+ * own borders (`border-separate`) so a pinned cell's rules travel with it.
  * - Every cell's content is bounded to the 36px row.
  * - The table is the page's folder body (`folder`: a hairline frame under
  *   its tab bar) or, with no tabs over it, a rule card; a line between
@@ -69,23 +77,8 @@ const TRAILING_WIDTH = 56
 const grouped = (n: number) => n.toLocaleString('en-US')
 
 /**
- * What sits pinned between the folded head bar and the column head: nothing
- * (a shelf, whose bar scrolls away), a list's 44px view bar, or the bar with
- * its 36px filter-chips row under it.
- */
-export type TablePin = 'head' | 'bar' | 'chips'
-
-const HEAD_PIN: Record<TablePin, string> = {
-  head: PIN_UNDER_HEAD_BAR,
-  // The folded bar's line (top-24 / md:top-12) plus the bar's 12px of
-  // ground and its 44px, then plus 36px.
-  bar: 'sticky top-38 z-sticky md:top-26',
-  chips: 'sticky top-47 z-sticky md:top-35',
-}
-
-/**
  * What a paged surface tells its foot. Absent on every unpaged
- * surface, which keeps reading `getPreFilteredRowModel()` — those tables
+ * surface, whose foot reads `getPreFilteredRowModel()` — those tables
  * hold every row they could show, so the pre-filtered model *is* the truth
  * there and a server round trip would only be able to agree with it.
  */
@@ -135,7 +128,6 @@ export function RecordTable<T>({
   columnActions,
   select,
   notice,
-  pinUnder = 'head',
   rowEnd,
   rowEndWidth = TRAILING_WIDTH,
   joined = false,
@@ -161,9 +153,9 @@ export function RecordTable<T>({
    */
   onRowClick?: (row: T) => void
   /**
-   * Set only where the rows arrive a page at a time. The foot shows only
-   * while another page exists: what is loaded of the server's total, and
-   * `Load N more`.
+   * Set only where the rows arrive a page at a time: the foot counts what
+   * is loaded of the server's total and offers `Load N more` while another
+   * page exists.
    */
   page?: TablePage
   /**
@@ -172,15 +164,13 @@ export function RecordTable<T>({
    * `Nothing matches that filter.` alone.
    */
   notice?: ReactNode
-  /** What is pinned above the column head; the folded head bar alone by default. */
-  pinUnder?: TablePin
   /** The surface's verbs for one column, by its id; none when omitted. */
   columnActions?: (columnId: string) => ReadonlyArray<ColumnAction>
   /** Row checkboxes; absent, the table has none. */
   select?: TableSelect<T>
   /**
-   * What a row ends on, in the trailing lane: its `···` (shown on hover),
-   * or a shelf's exception lane.
+   * What a row ends on, in the trailing lane pinned to the card's right
+   * edge: its `···` (shown on hover), or a shelf's exception lane.
    */
   rowEnd?: (row: T) => ReactNode
   /** The trailing lane's width when a row ends on more than a `···`. */
@@ -196,21 +186,29 @@ export function RecordTable<T>({
    */
   folder?: boolean | undefined
 }) {
-  const headRef = useRef<HTMLDivElement>(null)
-  const bodyRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const rows = table.getRowModel().rows
-  const more = useMoreToTheRight(bodyRef, table.getTotalSize())
+  const visible = table.getVisibleLeafColumns()
+  // The pinned lanes' width from the card's left: the checkbox lane and the
+  // name column. A column revealed by `n more columns →` lands after them.
+  const pinnedWidth =
+    (select ? SELECT_WIDTH : 0) +
+    (visible.find((c) => c.id === stickyColumnId)?.getSize() ?? 0)
+  const overflow = useColumnOverflow(scrollRef, {
+    width: table.getTotalSize(),
+    columns: visible.length,
+    endWidth: rowEndWidth,
+  })
   const resizing = table.getState().columnSizingInfo.isResizingColumn
-  // The dragged column's right edge, from the body's left: where the guide
+  // The dragged column's right edge, from the table's left: where the guide
   // runs while the drag lasts.
   const guideAt =
     resizing === false
       ? null
       : (() => {
-          const cols = table.getVisibleLeafColumns()
-          const at = cols.findIndex((c) => c.id === resizing)
+          const at = visible.findIndex((c) => c.id === resizing)
           if (at === -1) return null
-          return cols
+          return visible
             .slice(0, at + 1)
             .reduce((x, c) => x + c.getSize(), select ? SELECT_WIDTH : 0)
         })()
@@ -222,16 +220,17 @@ export function RecordTable<T>({
     select.rows.among(keys).length === keys.length
   // The pinned column sits after the checkbox lane when there is one.
   const stickyLeft = select ? 'left-9' : 'left-0'
-  // Both tables: the columns at their widths plus the trailing lane, never
-  // narrower than the pane — the trailing lane takes the slack.
+  // The columns at their widths plus the trailing lane, never narrower than
+  // the card — the trailing lane takes the slack.
   const tableStyle = {
     width: table.getTotalSize() + (select ? SELECT_WIDTH : 0) + rowEndWidth,
     minWidth: '100%',
   }
 
-  // `isolate`: the pinned head and the pinned column order themselves with
-  // small local z values inside one stacking context, so the page's
-  // five-step z-index scale never has to climb.
+  // `isolate`: the pinned head, column and lane order themselves with small
+  // local z values inside one stacking context, so the page's five-step
+  // z-index scale never has to climb. Body pins sit at 10, the head at 20,
+  // the head's own pinned corners at 30.
   return (
     <div
       role="table"
@@ -239,92 +238,63 @@ export function RecordTable<T>({
       data-table-box
       data-frame={folder ? 'folder' : 'card'}
       className={cn(
-        'isolate flex flex-col border-x border-b bg-paper',
+        'isolate flex min-h-0 flex-1 flex-col border-x border-b bg-paper',
         folder ? 'border-hairline' : 'border-rule',
         !joined && 'border-t',
       )}
     >
-      <div
-        ref={headRef}
-        data-table-head
-        // A sideways wheel over the head scrolls the body; the head follows.
-        onWheel={(e) => {
-          const body = bodyRef.current
-          if (body && e.deltaX !== 0) body.scrollLeft += e.deltaX
-        }}
-        className={cn('overflow-hidden bg-paper', HEAD_PIN[pinUnder])}
-      >
-        <table
-          role="presentation"
-          className="table-fixed border-collapse text-ui"
-          style={tableStyle}
-        >
-          <thead role="rowgroup">
-            {table.getHeaderGroups().map((hg) => (
-              <tr key={hg.id} role="row" className="border-b border-rule">
-                {select ? (
-                  <th
-                    role="columnheader"
-                    style={{ width: SELECT_WIDTH }}
-                    className="sticky left-0 z-20 bg-paper pl-2.75 align-middle"
-                  >
-                    <Checkbox
-                      checked={allChecked}
-                      onCheckedChange={(on) => select.rows.set(keys, on)}
-                      aria-label={`Select every loaded row of ${label}`}
-                    />
-                  </th>
-                ) : null}
-                {hg.headers.map((header) => (
-                  <HeaderCell
-                    key={header.id}
-                    header={header}
-                    table={table}
-                    sticky={header.column.id === stickyColumnId}
-                    stickyLeft={stickyLeft}
-                    actions={columnActions?.(header.column.id) ?? []}
-                  />
-                ))}
-                <th
-                  role="columnheader"
-                  style={{ minWidth: rowEndWidth }}
-                  className="px-1"
-                >
-                  <div className="flex items-center justify-end gap-0.5">
-                    {addColumn ?? null}
-                    <ColumnsMenu table={table} />
-                  </div>
-                </th>
-              </tr>
-            ))}
-          </thead>
-        </table>
-      </div>
-
-      <div className="relative">
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <div
-          ref={bodyRef}
-          data-table-body
-          onScroll={(e) => {
-            const head = headRef.current
-            if (head) head.scrollLeft = e.currentTarget.scrollLeft
-            more.check()
-          }}
-          className="relative overflow-x-auto overflow-y-hidden"
+          ref={scrollRef}
+          data-table-scroller
+          onScroll={overflow.check}
+          className="relative min-h-0 flex-1 overflow-auto"
         >
-          {guideAt === null ? null : (
-            <div
-              aria-hidden
-              data-resize-guide
-              className="pointer-events-none absolute inset-y-0 z-20 border-l border-dashed border-foreground"
-              style={{ left: guideAt - 1 }}
-            />
-          )}
           <table
             role="presentation"
-            className="table-fixed border-collapse text-ui"
+            className="table-fixed border-separate border-spacing-0 text-ui"
             style={tableStyle}
           >
+            <thead role="rowgroup" data-table-head>
+              {table.getHeaderGroups().map((hg) => (
+                <tr key={hg.id} role="row">
+                  {select ? (
+                    <th
+                      role="columnheader"
+                      style={{ width: SELECT_WIDTH }}
+                      className={cn(HEAD_CELL, 'left-0 z-30 pl-2.75')}
+                    >
+                      <Checkbox
+                        checked={allChecked}
+                        onCheckedChange={(on) => select.rows.set(keys, on)}
+                        aria-label={`Select every loaded row of ${label}`}
+                      />
+                    </th>
+                  ) : null}
+                  {hg.headers.map((header) => (
+                    <HeaderCell
+                      key={header.id}
+                      header={header}
+                      table={table}
+                      sticky={header.column.id === stickyColumnId}
+                      stickyLeft={stickyLeft}
+                      actions={columnActions?.(header.column.id) ?? []}
+                    />
+                  ))}
+                  <th
+                    role="columnheader"
+                    data-head-end
+                    style={{ minWidth: rowEndWidth }}
+                    className={cn(HEAD_CELL, 'right-0 z-30 px-1')}
+                  >
+                    <div className="flex items-center justify-end gap-0.5">
+                      {addColumn ?? null}
+                      <ColumnsMenu table={table} />
+                    </div>
+                  </th>
+                </tr>
+              ))}
+            </thead>
             <tbody role="rowgroup">
               {instead !== null
                 ? null
@@ -337,7 +307,7 @@ export function RecordTable<T>({
                         onRowClick ? () => onRowClick(row.original) : undefined
                       }
                       className={cn(
-                        'group h-row border-b border-rule transition-colors duration-150 ease-out-quart hover:bg-row-hover',
+                        'group h-row transition-colors duration-150 ease-out-quart hover:bg-row-hover',
                         onRowClick && 'cursor-pointer',
                       )}
                     >
@@ -357,13 +327,9 @@ export function RecordTable<T>({
                           role="cell"
                           style={{ width: cell.column.getSize() }}
                           className={cn(
-                            'h-row border-r border-rule px-0.75 py-0 align-middle first:pl-1.75',
+                            'h-row border-r border-b border-rule px-0.75 py-0 align-middle first:pl-1.75',
                             cell.column.id === stickyColumnId &&
-                              // Opaque at rest and on hover: a translucent tint here
-                              // would let the scrolled-under columns bleed through.
-                              'sticky z-10 bg-paper transition-colors duration-150 ease-out-quart group-hover:bg-row-hover',
-                            cell.column.id === stickyColumnId && STICKY_RULE,
-                            cell.column.id === stickyColumnId && stickyLeft,
+                              cn(BODY_PIN, stickyLeft),
                           )}
                         >
                           {/* The row bound: the 36px row less its 1px rule. Content that
@@ -379,106 +345,197 @@ export function RecordTable<T>({
                           </div>
                         </td>
                       ))}
-                      {rowEnd ? (
-                        <td
-                          role="cell"
-                          data-row-end
-                          onClick={(e) => e.stopPropagation()}
-                          style={{ minWidth: rowEndWidth }}
-                          className="h-row px-1 py-0 align-middle"
-                        >
-                          {rowEnd(row.original)}
-                        </td>
-                      ) : (
-                        <td role="cell" />
-                      )}
+                      <td
+                        role="cell"
+                        data-row-end
+                        onClick={
+                          rowEnd ? (e) => e.stopPropagation() : undefined
+                        }
+                        style={{ minWidth: rowEndWidth }}
+                        className={cn(
+                          'h-row border-b border-rule px-1 py-0 align-middle',
+                          BODY_PIN,
+                          'right-0',
+                        )}
+                      >
+                        {rowEnd ? rowEnd(row.original) : null}
+                      </td>
                     </tr>
                   ))}
             </tbody>
-            {instead === null && page?.hasMore === true ? (
-              // The foot, while paging: how much of the list is loaded, and more.
-              <tfoot role="rowgroup">
-                <tr
-                  role="row"
-                  data-table-foot
-                  className="h-8 border-t border-hairline"
-                >
-                  <td
-                    role="cell"
-                    colSpan={
-                      table.getVisibleLeafColumns().length +
-                      1 +
-                      (select ? 1 : 0)
-                    }
-                    className="px-2 align-middle"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="field-label text-graphite">
-                        {grouped(rows.length)} of {grouped(page.total)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={page.onLoadMore}
-                        disabled={page.loading}
-                        className="focus-ring rounded-md text-label text-foreground underline-offset-4 hover:underline disabled:text-graphite disabled:no-underline"
-                      >
-                        {page.loading
-                          ? 'Loading…'
-                          : `Load ${grouped(page.step)} more`}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              </tfoot>
-            ) : null}
           </table>
 
           {instead}
         </div>
-        {more.right ? (
+        {guideAt === null ? null : (
+          <ResizeGuide at={guideAt} scroller={scrollRef} />
+        )}
+        {overflow.hidden > 0 ? (
+          // Over the last columns that show, before the pinned trailing lane.
           <div
             aria-hidden
             data-table-fade
-            className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-linear-to-l from-paper to-transparent"
+            style={{ right: rowEndWidth }}
+            className="pointer-events-none absolute inset-y-0 z-10 w-6 bg-linear-to-l from-paper to-transparent"
           />
+        ) : null}
+      </div>
+      <div
+        data-table-foot
+        className={cn(
+          'flex h-8 shrink-0 items-center justify-between gap-3 border-t px-2.75',
+          folder ? 'border-hairline' : 'border-rule',
+        )}
+      >
+        <span className="flex min-w-0 items-center gap-1.5">
+          {instead === null ? (
+            <span className="tabular field-label text-graphite">
+              {grouped(rows.length)} of{' '}
+              {grouped(
+                page?.total ?? table.getPreFilteredRowModel().rows.length,
+              )}
+            </span>
+          ) : null}
+          {instead === null && page?.hasMore === true ? (
+            <>
+              <span aria-hidden className="field-label text-graphite">
+                ·
+              </span>
+              <button
+                type="button"
+                onClick={page.onLoadMore}
+                disabled={page.loading}
+                className="focus-ring rounded-md text-label text-foreground underline-offset-4 hover:underline disabled:text-graphite disabled:no-underline"
+              >
+                {page.loading ? 'Loading…' : `Load ${grouped(page.step)} more`}
+              </button>
+            </>
+          ) : null}
+        </span>
+        {overflow.hidden > 0 ? (
+          <button
+            type="button"
+            data-more-columns
+            onClick={() => overflow.reveal(pinnedWidth)}
+            className="focus-ring shrink-0 rounded-md text-label text-graphite underline-offset-4 hover:text-foreground hover:underline"
+          >
+            {overflow.hidden} more column{overflow.hidden === 1 ? '' : 's'} →
+          </button>
         ) : null}
       </div>
     </div>
   )
 }
 
-/** The rule on the pinned column's right edge; a border would stay behind
- *  in a collapsed table while the cell scrolls over it. */
-const STICKY_RULE =
-  'after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-rule'
+/** Every head cell: pinned to the card's top, opaque over the rows. */
+const HEAD_CELL = 'sticky top-0 border-b border-rule bg-paper'
 
 /**
- * Whether the sideways scroller holds more to the right than it shows: the
- * table's right edge fades while it does. Rechecked on scroll, on resize and
- * when the columns' total width moves.
+ * A body cell pinned while the row scrolls sideways under it: opaque at rest
+ * and on hover, since a translucent tint would let the scrolled-under
+ * columns bleed through.
  */
-function useMoreToTheRight(
+const BODY_PIN =
+  'sticky z-10 bg-paper transition-colors duration-150 ease-out-quart group-hover:bg-row-hover'
+
+/**
+ * The dashed line a column drag draws, over the visible card from head to
+ * foot. Placed against the card rather than inside the scroller, so it never
+ * scrolls away under a long list; it follows a sideways scroll.
+ */
+function ResizeGuide({
+  at,
+  scroller,
+}: {
+  /** The dragged column's right edge, from the table's left. */
+  at: number
+  scroller: RefObject<HTMLDivElement | null>
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = scroller.current
+    const guide = ref.current
+    if (!el || !guide) return
+    const place = () => {
+      guide.style.left = `${at - 1 - el.scrollLeft}px`
+    }
+    place()
+    el.addEventListener('scroll', place, { passive: true })
+    return () => el.removeEventListener('scroll', place)
+  }, [at, scroller])
+  return (
+    <div
+      ref={ref}
+      aria-hidden
+      data-resize-guide
+      className="pointer-events-none absolute inset-y-0 z-20 border-l border-dashed border-foreground"
+    />
+  )
+}
+
+/**
+ * How many columns lie past the card's right edge — under the pinned
+ * trailing lane or beyond it — and the step that brings the first of them
+ * in. Rechecked on scroll, on resize and when the columns change. The fade
+ * and the foot's `n more columns →` both read it.
+ */
+function useColumnOverflow(
   ref: RefObject<HTMLDivElement | null>,
-  width: number,
-): { right: boolean; check: () => void } {
-  const [right, setRight] = useState(false)
-  const check = () => {
+  {
+    width,
+    columns,
+    endWidth,
+  }: {
+    /** The columns' total width: a resize moves the count. */
+    width: number
+    /** How many columns show: hiding one moves the count. */
+    columns: number
+    /** The pinned trailing lane, which covers whatever scrolls under it. */
+    endWidth: number
+  },
+): {
+  hidden: number
+  check: () => void
+  reveal: (pinnedWidth: number) => void
+} {
+  const [hidden, setHidden] = useState(0)
+  const past = useCallback(
+    (el: HTMLDivElement) => {
+      // Not laid out (hidden, or a DOM with no layout): nothing to count.
+      if (el.clientWidth === 0) return []
+      const edge = el.scrollLeft + el.clientWidth - endWidth
+      return [...el.querySelectorAll('[data-column]')].filter(
+        (th): th is HTMLElement =>
+          th instanceof HTMLElement &&
+          th.offsetLeft + th.offsetWidth > edge + 1,
+      )
+    },
+    [endWidth],
+  )
+  const check = useCallback(() => {
     const el = ref.current
-    if (!el) return
-    setRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
-  }
+    if (el) setHidden(past(el).length)
+  }, [ref, past])
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    const update = () =>
-      setRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
-    update()
+    check()
     if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(update)
+    const observer = new ResizeObserver(check)
     observer.observe(el)
     return () => observer.disconnect()
-  }, [ref, width])
-  return { right, check }
+  }, [ref, check, width, columns])
+  const reveal = (pinnedWidth: number) => {
+    const el = ref.current
+    const next = el ? past(el).at(0) : undefined
+    if (!el || !next) return
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollTo({
+      left: next.offsetLeft - pinnedWidth,
+      behavior: still ? 'auto' : 'smooth',
+    })
+  }
+  return { hidden, check, reveal }
 }
 
 /** One row's checkbox, shown on hover, focus, or while any row is checked. */
@@ -498,7 +555,10 @@ function SelectCell({
       role="cell"
       onClick={(e) => e.stopPropagation()}
       style={{ width: SELECT_WIDTH }}
-      className="sticky left-0 z-10 h-row bg-paper py-0 pl-2.75 align-middle transition-colors duration-150 ease-out-quart group-hover:bg-row-hover"
+      className={cn(
+        BODY_PIN,
+        'left-0 h-row border-b border-rule py-0 pl-2.75 align-middle',
+      )}
     >
       <Checkbox
         checked={checked}
@@ -569,13 +629,13 @@ function HeaderCell<T>({
             ? 'descending'
             : 'none'
       }
+      {...(sticky ? {} : { 'data-column': true })}
       className={cn(
         // The row's first lane insets 11px, on the page's 24px line.
-        'relative h-8 border-r border-rule px-1.75 align-middle text-label font-normal text-graphite first:pl-2.75',
+        HEAD_CELL,
+        'h-8 border-r px-1.75 align-middle text-label font-normal text-graphite first:pl-2.75',
         numeric ? 'text-right' : 'text-left',
-        sticky && 'sticky z-20 bg-paper',
-        sticky && stickyLeft,
-        sticky && STICKY_RULE,
+        sticky ? cn('z-30', stickyLeft) : 'z-20',
       )}
     >
       {column.getCanSort() || column.getCanHide() || actions.length > 0 ? (
@@ -927,8 +987,8 @@ export function ColumnsMenu<T>({ table }: { table: Table<T> }) {
 /**
  * A shelf's bar — a list with no saved views: its own filter as folder tabs
  * (`All · Unfiled`, or one `All` with the count), a divider, Sort, and the
- * search box right, on the ground over the table. An object list's bar is
- * `ViewBar`.
+ * search box right on the card's edge, on the ground over the table. An
+ * object list's bar is `ViewBar`.
  */
 export function TableToolbar<T, TKey extends string>({
   table,
@@ -959,6 +1019,7 @@ export function TableToolbar<T, TKey extends string>({
         items={tabs}
         value={value}
         onValueChange={onValueChange}
+        flush
         trail={
           <>
             <TabDivider />

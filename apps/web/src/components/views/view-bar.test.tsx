@@ -170,7 +170,6 @@ async function mount(opts: {
           onSaved={() => {}}
           canEdit={() => opts.canEdit}
           plural="Companies"
-          pinned
         />
       </QueryClientProvider>,
     )

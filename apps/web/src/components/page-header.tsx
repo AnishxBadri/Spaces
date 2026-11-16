@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import {
   HeadActions,
   HeadBar,
+  OPEN,
   PIN_UNDER_HEAD_BAR,
   useHeadFold,
 } from './head-fold'
@@ -15,7 +16,8 @@ import { cn } from '#/lib/utils'
  * edge, the `···` ending 24px from the right, level with the last control of
  * the content under it; one rule under, 104px tall at least, so every page's
  * title and rule land on the same lines. Scrolled past its title, it folds
- * to `HeadBar`.
+ * to `HeadBar` — except on a list page (`folds={false}`), which never
+ * scrolls, so its head never folds.
  * - `tabs` is the page's folder bar, set on the bone ground under the rule
  *   (`FolderGround`); scrolled, it pins under the folded bar rather than
  *   riding into it. A list's count is on its All tab; a page with no tab bar
@@ -28,6 +30,7 @@ export function PageHeader({
   description,
   action,
   tabs,
+  folds = true,
   className,
 }: {
   /** Mono caps line above the title — "Today · Wednesday · 2026-09-10". */
@@ -40,12 +43,15 @@ export function PageHeader({
   action?: ReactNode
   /** The page's `Tabs` bar; pins under the folded bar. */
   tabs?: ReactNode
+  /** False on a list page (`ListPage`): the page never scrolls. */
+  folds?: boolean | undefined
   className?: string
 }) {
-  const { titleRef, actionsRef, fold } = useHeadFold()
+  const head = useHeadFold(folds)
+  const fold = folds ? head.fold : OPEN
   return (
     <>
-      <HeadBar fold={fold} title={title} meta={foldMeta} />
+      {folds ? <HeadBar fold={fold} title={title} meta={foldMeta} /> : null}
       <header
         className={cn(
           // One height on every page, the title on one line from the top:
@@ -61,7 +67,7 @@ export function PageHeader({
               {eyebrow}
             </div>
           ) : null}
-          <h1 ref={titleRef} className="title-serif">
+          <h1 ref={head.titleRef} className="title-serif">
             {title}
           </h1>
           {description ? (
@@ -71,7 +77,7 @@ export function PageHeader({
           ) : null}
         </div>
         {action ? (
-          <HeadActions fold={fold} slotRef={actionsRef}>
+          <HeadActions fold={fold} slotRef={head.actionsRef}>
             {action}
           </HeadActions>
         ) : null}
@@ -87,6 +93,37 @@ export function PageHeader({
 
 /** The page edge: the title, and every card's content, sit 24px in. */
 export const PAGE_EDGE = 'px-6'
+
+/**
+ * A list page: a fixed pane the height of the view (less the mobile top
+ * bar). Nothing in it pins and the window never scrolls; the table's card
+ * takes what the head and the bar leave and scrolls its rows inside.
+ * Pair it with `PageHeader folds={false}` and a `PageBody` given `min-h-0`.
+ * - `fixed={false}` keeps the same element as a page that scrolls (the
+ *   Deals board), so switching shape never remounts what is inside.
+ */
+export function ListPage({
+  children,
+  fixed = true,
+}: {
+  children: ReactNode
+  fixed?: boolean | undefined
+}) {
+  return (
+    <div
+      data-list-page={fixed}
+      className={cn(
+        'flex flex-col',
+        // The shell's `main` grows its page to content (`flex-1` over an
+        // unbounded column), so the cap is a max-height, not only a height.
+        fixed &&
+          'h-[calc(100dvh-3rem)] max-h-[calc(100dvh-3rem)] min-h-0 md:h-dvh md:max-h-dvh',
+      )}
+    >
+      {children}
+    </div>
+  )
+}
 
 /**
  * A page's body under its head: the bone ground, filling the view's height,

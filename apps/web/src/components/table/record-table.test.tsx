@@ -14,10 +14,11 @@ import { ListErrorRow, ListLoadingRow, ListZeroRow } from './list-states'
 import { declared } from '#/test/tailwind-css'
 
 /**
- * The record table's head and rows: the head is its own table pinned under
- * the folded page head, outside the sideways scroller, and follows the body's
- * `scrollLeft`; every cell is bounded to the 36px row; a figures column
- * right-aligns its head. A shelf's bar is real tabs with the tools right.
+ * The record table as a fixed pane: its card is the one scroller, the column
+ * head holds its top, the foot its bottom, the name column its left and the
+ * trailing lane its right; every cell is bounded to the 36px row; a figures
+ * column right-aligns its head. A shelf's bar is real tabs with the tools
+ * right, the search box on the card's edge.
  * - happy-dom's DOM globals are installed by hand before React loads, as in
  *   the other window tests.
  */
@@ -79,10 +80,12 @@ function Grid({
   page,
   notice,
   rows = ROWS,
+  rowEnd,
 }: {
   page?: TablePage
   notice?: ReactNode
   rows?: Array<Row>
+  rowEnd?: (row: Row) => ReactNode
 } = {}) {
   const table = useReactTable({
     data: rows,
@@ -107,6 +110,7 @@ function Grid({
         label="Portfolio"
         stickyColumnId="name"
         {...(page ? { page } : {})}
+        {...(rowEnd ? { rowEnd } : {})}
         notice={notice}
       />
     </>
@@ -148,21 +152,34 @@ function one(selector: string): HTMLElement {
 
 const classes = (el: Element) => el.className.split(/\s+/)
 
-describe('the sticky head', () => {
-  it('is its own row group, pinned under the folded bar, outside the sideways scroller', () => {
+describe('the pane', () => {
+  it('is a card that takes what the page leaves it, one scroller both ways inside', () => {
     mount()
-    const head = one('[data-table-head]')
-    const body = one('[data-table-body]')
-    expect(classes(head)).toEqual(
-      expect.arrayContaining(['sticky', 'top-24', 'md:top-12', 'z-sticky']),
+    const box = one('[data-table-box]')
+    expect(classes(box)).toEqual(
+      expect.arrayContaining(['flex', 'flex-col', 'flex-1', 'min-h-0']),
     )
-    // Opaque, so rows scrolling under it never show through.
-    expect(classes(head)).toContain('bg-paper')
-    expect(head.querySelector('thead')).not.toBeNull()
-    expect(body.querySelector('thead')).toBeNull()
-    // The body scrolls sideways; the head is never inside it.
-    expect(classes(body)).toContain('overflow-x-auto')
-    expect(body.contains(head)).toBe(false)
+    const scroller = one('[data-table-scroller]')
+    expect(classes(scroller)).toEqual(
+      expect.arrayContaining(['overflow-auto', 'flex-1', 'min-h-0']),
+    )
+    // One table: the head and the rows scroll in the same box.
+    expect(box.querySelectorAll('table')).toHaveLength(1)
+    expect(scroller.contains(one('[data-table-head]'))).toBe(true)
+  })
+
+  it('holds the column head at the card’s top, opaque over the rows', () => {
+    mount()
+    const heads = [...document.querySelectorAll('thead th')]
+    expect(heads.length).toBeGreaterThan(0)
+    for (const th of heads)
+      expect(classes(th)).toEqual(
+        expect.arrayContaining(['sticky', 'top-0', 'bg-paper', 'border-b']),
+      )
+    // The pinned corner sits over the rest of the head.
+    const company = heads.find((h) => h.textContent.includes('Company'))
+    if (!company) throw new Error('no Company head')
+    expect(classes(company)).toEqual(expect.arrayContaining(['z-30', 'left-0']))
   })
 
   it('is one table to assistive tech: column heads and cells under one name', () => {
@@ -176,27 +193,47 @@ describe('the sticky head', () => {
     expect(grid.querySelectorAll('tbody [role="row"]')).toHaveLength(2)
   })
 
-  it('follows the body when it scrolls sideways', () => {
+  it('is fixed-width, never narrower than the card, each cell keeping its own rules', () => {
     mount()
-    const head = one('[data-table-head]')
-    const body = one('[data-table-body]')
-    act(() => {
-      body.scrollLeft = 120
-      body.dispatchEvent(new Event('scroll'))
-    })
-    expect(head.scrollLeft).toBe(body.scrollLeft)
+    const table = one('[role="table"] table')
+    expect(table.style.minWidth).toBe('100%')
+    expect(classes(table)).toEqual(
+      expect.arrayContaining(['table-fixed', 'border-separate']),
+    )
+    // Separate borders travel with a pinned cell; a row's rule is its cells'.
+    expect(classes(one('tbody td'))).toEqual(
+      expect.arrayContaining(['border-b', 'border-r']),
+    )
+  })
+})
+
+describe('the trailing lane', () => {
+  it('pins a row’s `···` to the card’s right edge, opaque like the name cell', () => {
+    mount({ rowEnd: () => <button type="button">···</button> })
+    const ends = [...document.querySelectorAll('[data-row-end]')]
+    expect(ends).toHaveLength(2)
+    for (const end of ends)
+      expect(classes(end)).toEqual(
+        expect.arrayContaining([
+          'sticky',
+          'right-0',
+          'z-10',
+          'bg-paper',
+          'group-hover:bg-row-hover',
+        ]),
+      )
+    // Its head is pinned at the same edge, over the rows.
+    expect(classes(one('[data-head-end]'))).toEqual(
+      expect.arrayContaining(['sticky', 'right-0', 'top-0', 'z-30']),
+    )
   })
 
-  it('shares one fixed width with the body, never narrower than the pane', () => {
+  it('stays pinned with no row menu, so the head’s Columns lane has a body under it', () => {
     mount()
-    const [headTable, bodyTable] = [
-      ...document.querySelectorAll('[role="table"] table'),
-    ]
-    if (!(headTable instanceof HTMLElement && bodyTable instanceof HTMLElement))
-      throw new Error('two tables expected')
-    expect(headTable.style.width).toBe(bodyTable.style.width)
-    expect(bodyTable.style.minWidth).toBe('100%')
-    expect(classes(bodyTable)).toContain('table-fixed')
+    expect(classes(one('[data-row-end]'))).toEqual(
+      expect.arrayContaining(['sticky', 'right-0']),
+    )
+    expect(one('[data-row-end]').textContent).toBe('')
   })
 })
 
@@ -249,6 +286,8 @@ describe("a shelf's bar", () => {
           ? el.getAttribute('aria-label')
           : (el.getAttribute('aria-label') ?? el.textContent.trim()),
       )
+    // The search box ends on the card's right edge: no inset after it.
+    expect(classes(one('[data-tab-trail]'))).not.toContain('pr-3')
     // Columns is not on the bar: it ends the column head row.
     expect(controls).toEqual(['Sort', 'Filter holdings'])
     expect(one('thead [data-columns-menu]').getAttribute('aria-label')).toBe(
@@ -262,22 +301,34 @@ describe("a shelf's bar", () => {
 })
 
 describe('the foot', () => {
-  it('is absent on a table that does not page', () => {
+  it('holds the card’s bottom, outside the scroller', () => {
     mount()
-    expect(document.querySelector('[data-table-foot]')).toBeNull()
+    const foot = one('[data-table-foot]')
+    expect(one('[data-table-scroller]').contains(foot)).toBe(false)
+    expect(one('[data-table-box]').lastElementChild).toBe(foot)
+    expect(classes(foot)).toContain('shrink-0')
   })
 
-  it('is absent once every page is loaded — no `end`', () => {
+  it('is there on a table that does not page: what shows of what it holds, no Load', () => {
+    mount()
+    const foot = one('[data-table-foot]')
+    expect(foot.textContent).toBe('2 of 2')
+    expect(foot.querySelector('button')).toBeNull()
+  })
+
+  it('stays once every page is loaded, with no Load and no `end`', () => {
     mount({ page: paging({ hasMore: false }) })
-    expect(document.querySelector('[data-table-foot]')).toBeNull()
+    const foot = one('[data-table-foot]')
+    expect(foot.textContent).toBe('2 of 120')
+    expect(foot.querySelector('button')).toBeNull()
     expect(document.body.textContent).not.toContain('end')
   })
 
-  it('shows while paging: loaded of total, and Load 50 more', () => {
+  it('while paging: loaded of total · Load 50 more, on the left', () => {
     let asked = 0
     mount({ page: paging({ onLoadMore: () => asked++ }) })
     const foot = one('[data-table-foot]')
-    expect(foot.textContent).toContain('2 of 120')
+    expect(foot.textContent).toBe('2 of 120·Load 50 more')
     const more = [...foot.querySelectorAll('button')].find(
       (b) => b.textContent === 'Load 50 more',
     )
@@ -289,6 +340,40 @@ describe('the foot', () => {
   it('reads Loading… while the next page is in flight', () => {
     mount({ page: paging({ loading: true }) })
     expect(one('[data-table-foot]').textContent).toContain('Loading…')
+  })
+
+  it('stays in place under a loading, error or no-match row, with no count', () => {
+    mount({ notice: <ListLoadingRow plural="Companies" />, rows: [] })
+    expect(one('[data-table-foot]').textContent).toBe('')
+  })
+
+  it('counts the columns past the card’s right edge, and steps to the first', () => {
+    mount()
+    const scroller = one('[data-table-scroller]')
+    const invested = [...document.querySelectorAll('[data-column]')].at(0)
+    if (!(invested instanceof HTMLElement)) throw new Error('no column')
+    // A 300px card: the name column (240) shows, Invested (240–370) runs
+    // under the 56px trailing lane.
+    Object.defineProperty(scroller, 'clientWidth', { value: 300 })
+    Object.defineProperty(invested, 'offsetLeft', { value: 240 })
+    Object.defineProperty(invested, 'offsetWidth', { value: 130 })
+    const scrollTo = vi.fn()
+    scroller.scrollTo = scrollTo
+    act(() => {
+      scroller.dispatchEvent(new Event('scroll'))
+    })
+    const more = one('[data-more-columns]')
+    expect(more.textContent).toBe('1 more column →')
+    expect(document.querySelector('[data-table-fade]')).not.toBeNull()
+    act(() => more.click())
+    // Invested's left edge lands just after the pinned name column.
+    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left: 0 }))
+  })
+
+  it('names no hidden columns while every column fits', () => {
+    mount()
+    expect(document.querySelector('[data-more-columns]')).toBeNull()
+    expect(document.querySelector('[data-table-fade]')).toBeNull()
   })
 })
 
@@ -341,7 +426,7 @@ describe('the body states', () => {
 })
 
 describe('the pinned column', () => {
-  it('carries a rule on its right edge, head and body', () => {
+  it('carries its own rule on its right edge, head and body, opaque over what scrolls', () => {
     mount()
     const head = [...document.querySelectorAll('thead th')].find((h) =>
       h.textContent.includes('Company'),
@@ -350,7 +435,13 @@ describe('the pinned column', () => {
     for (const el of [head, cell]) {
       if (!el) throw new Error('no pinned cell')
       expect(classes(el)).toEqual(
-        expect.arrayContaining(['sticky', 'after:bg-rule', 'after:right-0']),
+        expect.arrayContaining([
+          'sticky',
+          'left-0',
+          'border-r',
+          'border-rule',
+          'bg-paper',
+        ]),
       )
     }
   })

@@ -212,6 +212,30 @@ describe('a pinned head', () => {
   })
 })
 
+describe('a trail', () => {
+  const trailOf = (flush: boolean) => {
+    win.document.body.innerHTML = renderToStaticMarkup(
+      <Tabs
+        label="Views"
+        items={items}
+        value="notes"
+        onValueChange={() => {}}
+        flush={flush}
+        trail={<input aria-label="Search" />}
+      />,
+    )
+    return win.document.querySelector('[data-tab-trail]')
+  }
+
+  it('ends 12px in from the folder’s edge by default', () => {
+    expect(classes(trailOf(false))).toContain('pr-3')
+  })
+
+  it('ends on the edge itself when flush: a list’s search box on the card’s border', () => {
+    expect(classes(trailOf(true))).not.toContain('pr-3')
+  })
+})
+
 describe('a tab switch', () => {
   // The open tab is an ink fill under a paper pane; fading that fill leaves
   // both tabs half-inked for a frame. Only the text colour may move.

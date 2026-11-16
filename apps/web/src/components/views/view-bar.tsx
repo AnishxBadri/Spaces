@@ -15,7 +15,6 @@ import type {
 import { FolderGround } from '#/components/page-header'
 import { icon } from '#/components/icons'
 import { AfterSort, ToolButton } from '#/components/table/record-table'
-import type { TablePin } from '#/components/table/record-table'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
@@ -73,8 +72,9 @@ import { FilterChips } from './filter-chips'
  *   view…` is in the view's `···`. The page owns
  * its table state and hands the bar a snapshot to compare and to save.
  * `?view=` in the URL makes a view linkable.
- * - `pinned`, the bar and its chips stick under the folded head bar, and
- *   the table's column head pins under them (`viewBarPin`).
+ * - Over a table the page never scrolls (`ListPage`), so the bar stands
+ *   still. `pinned` is for a page that does scroll — the Deals board —
+ *   where the bar and its chips stick under the folded head bar.
  * - A dirty view — its snapshot moved off the saved one — carries a pine
  *   square after its count and prints its count at 0.
  * - The active view's `···` pins it to the sidebar (an object list's views
@@ -85,11 +85,6 @@ import { FilterChips } from './filter-chips'
 
 /** The `All` tab's id; a view id is a uuid, so the two never meet. */
 const ALL = 'all'
-
-/** What the column head pins under, for the filter the bar is showing. */
-export function viewBarPin(conditions: ReadonlyArray<Condition>): TablePin {
-  return conditions.length > 0 ? 'chips' : 'bar'
-}
 
 export type ViewSnapshot = {
   filter: Array<Condition>
@@ -154,7 +149,7 @@ export function ViewBar({
   plural: string
   /** Names for reference values, so a chip reads a name, not an id. */
   refNames?: RefNames | undefined
-  /** Stick under the folded head bar while the list scrolls. */
+  /** Stick under the folded head bar while the page scrolls. */
   pinned?: boolean | undefined
 }) {
   const active = views.find((v) => v.id === activeId) ?? null
@@ -313,6 +308,8 @@ export function ViewBar({
         onValueChange={(id) =>
           onApply(id === ALL ? null : (views.find((v) => v.id === id) ?? null))
         }
+        // A list's tools end in the search box, on the card's right edge.
+        flush={tools !== undefined}
         trail={
           <>
             {active ? (

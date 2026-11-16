@@ -11,6 +11,7 @@ import { NewButton, SplitNewButton } from './new-button'
 import {
   Card,
   FolderGround,
+  ListPage,
   PAGE_EDGE,
   PageBody,
   PageHeader,
@@ -183,9 +184,10 @@ describe('E1 · the 24px edge', () => {
     // Today sits in one PageBody: 12px gutter, cards 12px apart.
     expect(read('routes/_app/today.tsx')).toContain('<PageBody>')
     // A list's table hangs from its bar inside the PageBody gutter.
+    // `min-h-0`: in the fixed pane the body may shrink to what is left.
     for (const list of ['companies', 'people', 'deals', 'files'])
-      expect(read(`routes/_app/${list}.tsx`), list).toContain(
-        '<PageBody className="pt-0">',
+      expect(read(`routes/_app/${list}.tsx`), list).toMatch(
+        /<PageBody className=(?:"min-h-0 pt-0"|\{cn\('pt-0', asTable && 'min-h-0'\)\})>/,
       )
     // Portfolio's figures are a boxed strip, its cells on the card inset.
     expect(read('components/portfolio-headline.tsx')).toContain(
@@ -365,6 +367,36 @@ describe('E10 · one ink object on a page: the folder', () => {
     expect(read('routes/_app/portfolio.tsx')).not.toMatch(/\bfolder\b/)
     const table = read('components/table/record-table.tsx')
     expect(table).toContain("folder ? 'border-hairline' : 'border-rule'")
+  })
+
+  it('makes every record list a fixed pane whose head never folds', () => {
+    for (const list of [
+      'companies',
+      'people',
+      'deals',
+      'o.$objectSlug',
+      'files',
+      'portfolio',
+    ]) {
+      const text = read(`routes/_app/${list}.tsx`)
+      expect(text, list).toMatch(/<ListPage(?: fixed=\{asTable\})?>/)
+      expect(text, list).toMatch(/folds=\{(?:false|!asTable)\}/)
+      // Nothing on a list pins under a folded head any more.
+      expect(text, list).not.toMatch(/FolderGround pinned|pinUnder/)
+    }
+    const pane = classesAt(
+      renderToStaticMarkup(<ListPage>x</ListPage>),
+      'data-list-page',
+    )
+    expect(pane).toEqual(
+      expect.arrayContaining([
+        'flex',
+        'flex-col',
+        'min-h-0',
+        'h-[calc(100dvh-3rem)]',
+        'md:h-dvh',
+      ]),
+    )
   })
 
   it('gives a tabbed page exactly one folder and a tabless page none', () => {

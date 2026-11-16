@@ -24,7 +24,9 @@ import { cn } from '#/lib/utils'
  *   scrolls, on bone so nothing shows through it.
  * - `trail` sits on the same bar after the tabs, outside the tablist: a
  *   list's toolbar (`TabDivider`, Filter, Sort, the search box). It ends
- *   12px in from the folder's right edge, level with the head's `···`.
+ *   12px in from the folder's right edge, level with the head's `···`;
+ *   `flush`, it ends on the edge itself, so a list's search box lines up
+ *   with the table card's right border under it.
  * - A switch transitions the text colour only: the open tab's fill
  *   switches at once, so no frame shows two half-drawn tabs.
  *
@@ -92,6 +94,7 @@ export function Tabs<T extends string>({
   pinned = false,
   plain = false,
   trail,
+  flush = false,
   children,
   className,
 }: {
@@ -107,6 +110,8 @@ export function Tabs<T extends string>({
   plain?: boolean | undefined
   /** Controls on the bar after the tabs; never inside the tablist. */
   trail?: ReactNode
+  /** The trail ends on the folder's right edge: a list's search box. */
+  flush?: boolean | undefined
   /** The open tab's body; rendered as its `tabpanel` when given. */
   children?: ReactNode
   className?: string | undefined
@@ -203,7 +208,13 @@ export function Tabs<T extends string>({
       ) : (
         <div data-tab-bar className={bar}>
           {list}
-          <div className="flex h-9 min-w-0 flex-1 items-center gap-1 pr-3">
+          <div
+            data-tab-trail
+            className={cn(
+              'flex h-9 min-w-0 flex-1 items-center gap-1',
+              !flush && 'pr-3',
+            )}
+          >
             {trail}
           </div>
         </div>

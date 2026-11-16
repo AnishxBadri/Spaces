@@ -20,7 +20,7 @@ import {
 import { DocumentTile } from '#/components/document-tile'
 import { KIND_ICONS } from '#/components/editor/mention'
 import { EmptyRow } from '#/components/ledger-section'
-import { Card, PageBody, PageHeader } from '#/components/page-header'
+import { Card, ListPage, PageBody, PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'
 import { RecordTable, TableToolbar } from '#/components/table/record-table'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
@@ -265,9 +265,10 @@ function DocumentsPage() {
     void navigate({ search: (prev) => ({ ...prev, filed: next }) })
 
   return (
-    <div className="flex flex-col">
+    <ListPage>
       <PageHeader
         title="Files"
+        folds={false}
         action={
           /* The upload door on the shelf that lists what it produces. The
              dialog lives in the app shell; the chassis and ⌘K open it too. */
@@ -300,10 +301,10 @@ function DocumentsPage() {
             filterPlaceholder="Search files"
             filterLabel="Search files"
           />
-          <PageBody className="pt-0">
+          <PageBody className="min-h-0 pt-0">
             {documents.length === 0 ? (
               // The inbox is clear: good news, one line. `All` is the way back.
-              <p className="folder px-(--inset) py-6 font-serif text-body text-graphite">
+              <p className="flex-1 folder px-(--inset) py-6 font-serif text-body text-graphite">
                 Nothing unfiled.
               </p>
             ) : (
@@ -325,7 +326,7 @@ function DocumentsPage() {
         doc={previewing}
         onOpenChange={(open) => !open && setPreviewing(null)}
       />
-    </div>
+    </ListPage>
   )
 }
 

@@ -11,7 +11,7 @@ import { Handshake } from '#/components/icons'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { ViewBar, viewBarPin } from '#/components/views/view-bar'
+import { ViewBar } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
 import { useColumnRun } from '#/components/views/column-run'
 import { matchesConditions } from '@spaces/core/views/filter'
@@ -40,6 +40,7 @@ import { statColumns } from '#/components/table/stat-columns'
 import {
   Card,
   FolderGround,
+  ListPage,
   PageBody,
   PageHeader,
 } from '#/components/page-header'
@@ -417,10 +418,12 @@ function DealsPage() {
   const firstRun = deals.rows.length === 0
   const asTable = shape === 'table'
 
+  // The table is a fixed pane; the board scrolls as a page.
   return (
-    <div className="flex flex-col">
+    <ListPage fixed={asTable}>
       <PageHeader
         title="Deals"
+        folds={!asTable}
         action={
           firstRun ? (
             listMenu
@@ -445,7 +448,7 @@ function DealsPage() {
       ) : (
         <>
           {asTable && actions.selectionBar ? (
-            <FolderGround pinned>{actions.selectionBar}</FolderGround>
+            <FolderGround>{actions.selectionBar}</FolderGround>
           ) : (
             <ViewBar
               objectId={objectId}
@@ -464,7 +467,8 @@ function DealsPage() {
               onFilterChange={vs.setConditions}
               onSaved={() => router.invalidate()}
               canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
-              pinned
+              // The board's page scrolls, so its bar pins; a table's never does.
+              pinned={!asTable}
               refNames={refNames}
               lead={
                 <StageChip
@@ -500,7 +504,7 @@ function DealsPage() {
               }
             />
           )}
-          <PageBody className="pt-0">
+          <PageBody className={cn('pt-0', asTable && 'min-h-0')}>
             {asTable ? (
               <AiCellsProvider
                 entityIds={shown.map((r) => r.id)}
@@ -515,9 +519,6 @@ function DealsPage() {
                   stickyColumnId="name"
                   select={actions.select}
                   rowEnd={actions.rowMenu}
-                  pinUnder={
-                    actions.selectionBar ? 'bar' : viewBarPin(vs.conditions)
-                  }
                   addColumn={
                     <AttributeCreateDialog
                       objectKind="deal"
@@ -550,7 +551,7 @@ function DealsPage() {
         </>
       )}
       {actions.dialogs}
-    </div>
+    </ListPage>
   )
 }
 

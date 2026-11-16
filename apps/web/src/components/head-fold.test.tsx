@@ -301,4 +301,19 @@ describe('the folded head', () => {
     press('l')
     expect(logged).toHaveBeenCalledTimes(1)
   })
+
+  it('never folds a list page’s head: no bar, no watched title, the actions in place', () => {
+    mount(
+      <div className="flex min-h-full flex-col">
+        <PageHeader title="Companies" folds={false} action={<LogButton />} />
+        <main data-body>Rows</main>
+      </div>,
+    )
+    expect(document.querySelector('[data-head-bar]')).toBeNull()
+    // The observer has nothing to watch, so nothing can fold the head.
+    expect(StubObserver.last).toBeNull()
+    expect(q('[data-head-actions]').dataset.folded).toBe('false')
+    press('l')
+    expect(logged).toHaveBeenCalledTimes(1)
+  })
 })

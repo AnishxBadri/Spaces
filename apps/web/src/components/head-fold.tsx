@@ -27,17 +27,22 @@ const FOLD_LINE_PX = 48
 export type HeadFold =
   { folded: false } | { folded: true; width: number; height: number }
 
-const OPEN: HeadFold = { folded: false }
+/** The head as drawn, unfolded: a list page's head always is. */
+export const OPEN: HeadFold = { folded: false }
 
-/** Watch the head's title; measure the actions slot at the moment it folds. */
-export function useHeadFold() {
+/**
+ * Watch the head's title; measure the actions slot at the moment it folds.
+ * Off (`enabled` false, a list page) it watches nothing.
+ */
+export function useHeadFold(enabled = true) {
   const titleRef = useRef<HTMLHeadingElement>(null)
   const actionsRef = useRef<HTMLDivElement>(null)
   const [fold, setFold] = useState<HeadFold>(OPEN)
 
   useEffect(() => {
     const title = titleRef.current
-    if (!title || typeof IntersectionObserver === 'undefined') return
+    if (!enabled || !title || typeof IntersectionObserver === 'undefined')
+      return
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries.at(-1)
@@ -61,7 +66,7 @@ export function useHeadFold() {
     )
     observer.observe(title)
     return () => observer.disconnect()
-  }, [])
+  }, [enabled])
 
   return { titleRef, actionsRef, fold }
 }

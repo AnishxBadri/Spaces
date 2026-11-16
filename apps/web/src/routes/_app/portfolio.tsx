@@ -13,7 +13,13 @@ import { RecordCheckDialog } from '#/components/holding/record-check-dialog'
 import { EmptyRow } from '#/components/ledger-section'
 import { IconBadge, RecordLinkCell } from '#/components/table/cells'
 import { RecordTable } from '#/components/table/record-table'
-import { Card, HeadCount, PageBody, PageHeader } from '#/components/page-header'
+import {
+  Card,
+  HeadCount,
+  ListPage,
+  PageBody,
+  PageHeader,
+} from '#/components/page-header'
 import { PortfolioHeadlineStrip } from '#/components/portfolio-headline'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
@@ -268,8 +274,9 @@ function PortfolioPage() {
   const showSearch = searching || globalFilter !== ''
 
   return (
-    <div className="flex flex-col">
+    <ListPage>
       <PageHeader
+        folds={false}
         title={
           <HeadCount
             title="Portfolio"
@@ -310,14 +317,14 @@ function PortfolioPage() {
           </Card>
         </PageBody>
       ) : (
-        <PageBody>
+        <PageBody className="min-h-0">
           <PortfolioHeadlineStrip
             rollup={rollup}
             baseCurrency={data.baseCurrency}
           />
-          <div>
+          <div className="flex min-h-0 flex-1 flex-col">
             {showSearch ? (
-              <div className="flex h-11 items-center border-x border-t border-rule bg-bone px-2.75">
+              <div className="flex h-11 shrink-0 items-center border-x border-t border-rule bg-bone px-2.75">
                 <Input
                   autoFocus
                   value={globalFilter}
@@ -345,7 +352,7 @@ function PortfolioPage() {
           </div>
         </PageBody>
       )}
-    </div>
+    </ListPage>
   )
 }
 
