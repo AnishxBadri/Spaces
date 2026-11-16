@@ -28,6 +28,8 @@ import { failingLine, spacesLine } from './feed-words'
 const col = createColumnHelper<FeedSource>()
 // FROZEN: renaming resets saved column layouts with no recovery path.
 const PREFS_KEY = 'spaces.feed-sources-table.v1'
+// The four columns and the trailing lane fit a 1280px window's card, so
+// `Fix ›` is never under the overflow fade.
 
 export function SourcesTable({
   sources,
@@ -57,7 +59,7 @@ export function SourcesTable({
       col.accessor((r) => r.name.toLowerCase(), {
         id: 'name',
         header: 'Name',
-        size: 260,
+        size: 220,
         enableHiding: false,
         cell: (info) => {
           const r = info.row.original
@@ -81,7 +83,7 @@ export function SourcesTable({
       col.accessor((r) => urlAtRest(r.url), {
         id: 'feed',
         header: 'Feed',
-        size: 320,
+        size: 280,
         cell: (info) => (
           <span
             title={info.row.original.url}
@@ -94,7 +96,7 @@ export function SourcesTable({
       col.accessor((r) => spacesLine(r.spaces, pathOf), {
         id: 'spaces',
         header: 'Spaces',
-        size: 240,
+        size: 220,
         cell: (info) => {
           const line = String(info.getValue())
           return line === '' ? (
@@ -111,7 +113,7 @@ export function SourcesTable({
       col.accessor((r) => (r.state === 'failing' ? '' : (r.newestAt ?? '~')), {
         id: 'latest',
         header: 'Latest',
-        size: 320,
+        size: 240,
         cell: (info) => (
           <LatestCell
             source={info.row.original}

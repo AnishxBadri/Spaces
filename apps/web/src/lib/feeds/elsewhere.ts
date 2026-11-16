@@ -40,7 +40,10 @@ export type SpaceHeadline = {
 }
 
 export type SpaceFeeds = {
-  /** The feeds tagged to the space or a space under it, by name. */
+  /**
+   * The feeds tagged to the space or a space under it: newest story first,
+   * a failing feed last.
+   */
   readonly feeds: ReadonlyArray<FeedSource>
   /** Their newest headlines, at most `SPACE_HEADLINES_MAX`, newest first. */
   readonly headlines: ReadonlyArray<SpaceHeadline>
@@ -91,7 +94,13 @@ export const spaceFeedsProgram = Effect.fn('feeds.spaceFeeds')(function* (
   )
   const mine = new Set(ids)
   return {
-    feeds: sources.filter((s) => mine.has(s.id)),
+    feeds: sources
+      .filter((s) => mine.has(s.id))
+      .sort(
+        (x, y) =>
+          Number(x.state === 'failing') - Number(y.state === 'failing') ||
+          (y.newestAt ?? '').localeCompare(x.newestAt ?? ''),
+      ),
     headlines: rows.map((r) => ({
       ...r,
       publishedAt: r.publishedAt.toISOString(),

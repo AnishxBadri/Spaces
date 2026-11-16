@@ -84,9 +84,10 @@ describe('spaceFeedsProgram', () => {
     ])
 
     const got = await Effect.runPromise(spaceFeedsProgram(root.id))
+    // Newest story first, the failing feed last.
     expect(got.feeds.map((f) => [f.name, f.state])).toEqual([
-      ['Inc42', 'failing'],
       ['SpaceNews', 'ok'],
+      ['Inc42', 'failing'],
     ])
     expect(got.headlines.map((h) => [h.title, h.feedName])).toEqual([
       ['Skyroot fires', 'SpaceNews'],
