@@ -11,17 +11,17 @@ import { ClockProvider } from '#/components/clock'
 import { NOTE_INSET } from '#/components/editor/note-column'
 import { MENU_RULE, MoreMenu, menuLayout } from '#/components/ui/more-menu'
 import type { MoreMenuEntry } from '#/components/ui/more-menu'
-import { NOTE_EDGE, NoteHead, SaveWord } from './note-head'
+import { NoteHead, SaveWord } from './note-head'
 import type { NoteData, SaveState } from './note-head'
 import { NoteMoreMenu, noteMenuEntries } from './note-menu'
-import { NoteRail, kindLane, noteHistory } from './note-rail'
+import { NoteRail, noteHistory } from './note-rail'
 import { NoteSheet } from './note-sheet'
 
 /**
  * The note page as its parts draw it: the record head in each of the meta
- * line's four states, the `···` in its order, the body that is the editor
- * alone, and the rail on fixture notes — plain, private, via a tool,
- * replaced, unfiled. The moved controls run in a happy-dom `Window` on this
+ * line's four states, the `···` in its order, the body card that is the
+ * editor alone on the bone ground, and the label-lane rail on fixture notes
+ * — plain, private, via a tool, replaced, unfiled. The moved controls run in a happy-dom `Window` on this
  * file's globals, against mocked server fns.
  */
 
@@ -209,11 +209,6 @@ function text(el: Element | null | undefined): string {
   return (el?.textContent ?? '').replace(/\s+/g, ' ').trim()
 }
 
-/** A row's cells, each its own text: `Acme | company`. */
-function cells(el: Element): string {
-  return [...el.children].map((c) => text(c)).join(' | ')
-}
-
 describe('the head', () => {
   function check(note: NoteData) {
     const html = head(note)
@@ -321,6 +316,7 @@ describe('the body', () => {
           kind: 'company',
           objectSlug: 'companies',
           objectLabel: 'Company',
+          objectIcon: null,
         },
       ],
     })
@@ -359,18 +355,37 @@ describe('the body', () => {
     expect(header?.querySelector('[data-chip]')).toBeNull()
   })
 
-  it('starts the head and the body on one left edge, the note inset', () => {
+  it('stands the head on the 24px edge, and the body in one paper card on the bone ground', () => {
     const root = sheet()
-    expect(NOTE_EDGE).toBe(NOTE_INSET)
+    // The head is every record head: the page edge, no note inset.
     const headClasses = root.querySelector('header')?.className.split(' ')
-    const bodyClasses = root
-      .querySelector('[data-note-body]')
+    expect(headClasses).toContain('px-6')
+    expect(headClasses).not.toContain(NOTE_INSET)
+    expect(headClasses?.some((c) => /^(pl|ps)-/.test(c))).toBe(false)
+    // Under it, the record body's ground: bone, the 12px gutter round it.
+    const ground = root
+      .querySelector('[data-note-ground]')
       ?.className.split(' ')
-    expect(headClasses).toContain(NOTE_INSET)
-    expect(bodyClasses).toContain(NOTE_INSET)
-    // Nothing after it moves the head's left edge back.
-    const after = headClasses?.slice(headClasses.indexOf(NOTE_INSET) + 1)
-    expect(after?.some((c) => /^(pl|px|ps)-/.test(c))).toBe(false)
+    expect(ground).toEqual(
+      expect.arrayContaining(['bg-bone', 'p-3', 'gap-3', 'md:flex-row']),
+    )
+    // The card: paper in a 1px ink edge, the prose on its own gutter.
+    const card = root.querySelector('[data-note-card]')
+    expect(card?.className.split(' ')).toEqual(
+      expect.arrayContaining(['border', 'border-hairline', 'bg-paper']),
+    )
+    const body = card?.querySelector('[data-note-body]')
+    expect(body?.className.split(' ')).toEqual(
+      expect.arrayContaining([NOTE_INSET, 'max-w-[72ch]']),
+    )
+    expect(body?.className).not.toMatch(/\bmx-auto\b/)
+    // Nothing from the editor up to the page clips the floating sheets.
+    for (
+      let el: Element | null | undefined = body;
+      el !== null && el !== undefined && el !== root;
+      el = el.parentElement
+    )
+      expect(el.className).not.toMatch(/\boverflow-(hidden|clip)\b/)
   })
 })
 
@@ -627,6 +642,7 @@ const FLENT = {
   kind: 'company' as const,
   objectSlug: 'companies',
   objectLabel: 'Company',
+  objectIcon: null,
 }
 const FUND = {
   id: 'f1',
@@ -634,12 +650,22 @@ const FUND = {
   kind: 'custom' as const,
   objectSlug: 'funds',
   objectLabel: 'Fund',
+  objectIcon: 'landmark',
 }
 const FINTECH = { id: 's1', name: 'Fintech', archived: false }
 const SPACES = [
   { id: 's1', name: 'Fintech', parentId: null, companies: 4 },
   { id: 's2', name: 'Payments', parentId: 's1', companies: 2 },
 ]
+const IC_PREP = {
+  fromId: 'n9',
+  name: 'IC prep',
+  kind: 'note' as const,
+  objectSlug: null,
+  objectLabel: null,
+  objectIcon: null,
+  noteKind: 'memo' as const,
+}
 
 function rail(note: NoteData): HTMLElement {
   return dom(
@@ -651,49 +677,114 @@ function rail(note: NoteData): HTMLElement {
   )
 }
 
-/** A rail section's head and its rows' text. */
-function section(host: HTMLElement, name: string) {
-  const body = host.querySelector(`[data-rail-section="${name}"]`)
-  if (body === null) return null
+/** A value as the rail draws it: `[Company] Flent×`, its kind icon's name first. */
+function value(el: Element): string {
+  const kind = el.querySelector('[data-kind-icon]')?.getAttribute('aria-label')
+  return kind === undefined || kind === null
+    ? text(el)
+    : `[${kind}] ${text(el)}`
+}
+
+/** A rail group's labels and its values, in order. */
+function group(host: HTMLElement, name: string) {
+  const el = host.querySelector(`[data-rail-section="${name}"]`)
+  if (el === null) return null
   return {
-    head: text(body.parentElement?.querySelector('h2')),
-    rows: [...body.children].map(cells),
+    labels: [...el.querySelectorAll('[data-rail-label]')].map(text),
+    values: [...el.querySelectorAll('[data-rail-value]')].map(value),
   }
 }
 
 describe('the rail', () => {
-  it('FILED ON: records then spaces, each with its kind lane, ending + File on…', () => {
+  it('is a label lane on the ground: sentence-case labels, no caps heads, no ink, pinned under the bar and the gutter', () => {
+    const host = rail(
+      fixture({
+        filedAgainst: [FLENT],
+        mentions: [{ ...FLENT, noteKind: null }],
+        backlinks: [IC_PREP],
+        updatedAt: oct(15, 10, 0),
+      }),
+    )
+    expect([...host.querySelectorAll('[data-rail-label]')].map(text)).toEqual([
+      'Filed on',
+      'Mentions',
+      'Mentioned in',
+      'Visible to',
+      'Written',
+      'Edited',
+    ])
+    for (const label of host.querySelectorAll('[data-rail-label]'))
+      expect(label.className.split(' ')).toEqual(
+        expect.arrayContaining(['w-20', 'text-label', 'text-graphite']),
+      )
+    expect(host.querySelector('h2, .label-caps')).toBeNull()
+    expect(host.innerHTML).not.toMatch(/border-hairline|bg-bone|bg-paper/)
+    // One rule under each group but the last; none between a group's values.
+    for (const g of host.querySelectorAll('[data-rail-section]'))
+      expect(g.className.split(' ')).toEqual(
+        expect.arrayContaining(['border-b', 'border-rule', 'last:border-b-0']),
+      )
+    for (const v of host.querySelectorAll('[data-rail-value]'))
+      expect(v.className).not.toMatch(/\bborder/)
+    const aside = host.querySelector('aside')?.className.split(' ')
+    expect(aside).toEqual(
+      expect.arrayContaining([
+        'px-3',
+        'md:sticky',
+        'md:top-15',
+        'md:max-h-[calc(100dvh-4.5rem)]',
+        'md:self-start',
+        'md:overflow-y-auto',
+      ]),
+    )
+    expect(aside?.some((c) => /^(bg|border)/.test(c))).toBe(false)
+  })
+
+  it('Filed on: records then spaces, each led by its kind icon, no kind word, ending + File on…', () => {
     const filedRail = rail(
       fixture({ filedAgainst: [FLENT, FUND], spaces: [FINTECH] }),
     )
-    const filed = section(filedRail, 'filed-on')
-    expect(filed?.head).toBe('Filed on · 3')
-    expect(filed?.rows).toEqual([
-      'Flent | company×',
-      'Seed Fund II | fund×',
-      'Fintech | space×',
-      '+ | File on…',
-    ])
+    expect(group(filedRail, 'filed-on')).toEqual({
+      labels: ['Filed on'],
+      values: [
+        '[Company] Flent×',
+        '[Fund] Seed Fund II×',
+        '[Space] Fintech×',
+        '+File on…',
+      ],
+    })
+    const section = filedRail.querySelector('[data-rail-section="filed-on"]')
+    expect(text(section)).not.toMatch(/company|fund|space/)
+    // Graphite, with the word as its tooltip; a custom record wears its
+    // object's own glyph.
+    const flent = section?.querySelector('[data-kind-icon="company"]')
+    expect(flent?.getAttribute('title')).toBe('Company')
+    expect(flent?.getAttribute('role')).toBe('img')
+    expect(flent?.className).toContain('text-graphite')
+    expect(flent?.querySelector('[data-icon="building"]')).not.toBeNull()
     expect(
-      filedRail
-        .querySelector('[data-rail-section="filed-on"] a')
-        ?.getAttribute('href'),
-    ).toBe('/companies/c1')
+      section?.querySelector('[data-kind-icon="custom"] [data-icon="finance"]'),
+    ).not.toBeNull()
+    expect(
+      section?.querySelector('[data-kind-icon="space"] [data-icon="layers"]'),
+    ).not.toBeNull()
+    expect(section?.querySelector('a')?.getAttribute('href')).toBe(
+      '/companies/c1',
+    )
     expect(filedRail.querySelector('a[href="/o/funds/f1"]')).not.toBeNull()
     expect(filedRail.querySelector('a[href="/spaces/s1"]')).not.toBeNull()
-    expect(kindLane({ kind: 'space' })).toBe('space')
   })
 
-  it('FILED ON keeps an archived space: its name graphite, its lane marked', () => {
+  it('Filed on keeps an archived space: its name graphite, the state word after it', () => {
     const host = rail(
       fixture({
         spaces: [FINTECH, { id: 's9', name: 'Harbour', archived: true }],
       }),
     )
-    expect(section(host, 'filed-on')?.rows).toEqual([
-      'Fintech | space×',
-      'Harbour | space · archived×',
-      '+ | File on…',
+    expect(group(host, 'filed-on')?.values).toEqual([
+      '[Space] Fintech×',
+      '[Space] Harbourarchived×',
+      '+File on…',
     ])
     expect(host.querySelector('a[href="/spaces/s1"]')?.className).toContain(
       'text-foreground',
@@ -703,79 +794,84 @@ describe('the rail', () => {
     )
   })
 
-  it('FILED ON with nothing filed: Not filed, then + File on…', () => {
-    const filed = section(rail(fixture()), 'filed-on')
-    expect(filed?.head).toBe('Filed on')
-    expect(filed?.rows).toEqual(['Not filed | ', '+ | File on…'])
+  it('Filed on with nothing filed: Not filed, then + File on…', () => {
+    expect(group(rail(fixture()), 'filed-on')).toEqual({
+      labels: ['Filed on'],
+      values: ['Not filed', '+File on…'],
+    })
   })
 
-  it('MENTIONS and MENTIONED IN only when they hold something', () => {
+  it('Mentions and Mentioned in only when they hold something, a note by its own kind', () => {
     const plain = rail(fixture())
-    expect(section(plain, 'mentions')).toBeNull()
-    expect(section(plain, 'mentioned-in')).toBeNull()
+    expect(group(plain, 'mentions')).toBeNull()
+    expect(group(plain, 'mentioned-in')).toBeNull()
     const linked = rail(
       fixture({
-        mentions: [FLENT],
-        backlinks: [{ fromId: 'n9', name: 'IC prep', kind: 'note' }],
+        mentions: [{ ...FLENT, noteKind: null }],
+        backlinks: [IC_PREP],
       }),
     )
-    expect(section(linked, 'mentions')).toEqual({
-      head: 'Mentions · 1',
-      rows: ['Flent | company'],
+    expect(group(linked, 'mentions')).toEqual({
+      labels: ['Mentions'],
+      values: ['[Company] Flent'],
     })
-    expect(section(linked, 'mentioned-in')).toEqual({
-      head: 'Mentioned in · 1',
-      rows: ['IC prep | note'],
+    expect(group(linked, 'mentioned-in')).toEqual({
+      labels: ['Mentioned in'],
+      values: ['[Memo] IC prep'],
     })
+    expect(
+      linked.querySelector(
+        '[data-rail-section="mentioned-in"] [data-note-kind="memo"]',
+      ),
+    ).not.toBeNull()
     expect(linked.querySelector('a[href="/notes/n9"]')).not.toBeNull()
   })
 
-  it('VISIBILITY: the switch for the author alone; private reads Only you', () => {
+  it('Visible to: Workspace or Only you, the switch beside the word for the author alone', () => {
     const mine = rail(fixture())
+    expect(group(mine, 'visibility')).toEqual({
+      labels: ['Visible to'],
+      values: ['Workspace'],
+    })
     const sw = mine.querySelector(
       '[data-rail-section="visibility"] [role="switch"]',
     )
     expect(sw?.getAttribute('aria-checked')).toBe('true')
-    expect(text(sw)).toBe('Shared with the workspace')
+    expect(text(sw)).toBe('Workspace')
     const theirs = rail(fixture({ isMine: false }))
     expect(theirs.querySelector('[role="switch"]')).toBeNull()
-    expect(text(theirs.querySelector('[data-rail-section="visibility"]'))).toBe(
-      'Shared with the workspace',
-    )
+    expect(group(theirs, 'visibility')?.values).toEqual(['Workspace'])
     const secret = rail(fixture({ isPrivate: true }))
     expect(
       secret
         .querySelector('[data-rail-section="visibility"] [role="switch"]')
         ?.getAttribute('aria-checked'),
     ).toBe('false')
-    expect(text(secret.querySelector('[data-rail-section="visibility"]'))).toBe(
-      'Only you',
-    )
+    expect(group(secret, 'visibility')?.values).toEqual(['Only you'])
   })
 
-  it('HISTORY: exactly the rows the data supports, newest first', () => {
-    const history = (note: NoteData) => section(rail(note), 'history')?.rows
-    expect(history(fixture())).toEqual(['Written | 13 Oct · Anish Badri'])
-    expect(history(fixture({ isPrivate: true }))).toEqual([
-      'Written | 13 Oct · Anish Badri',
-    ])
+  it('Written and Edited: two rows, the day and who, then the day of the last edit', () => {
+    const history = (note: NoteData) => group(rail(note), 'history')
+    expect(history(fixture())).toEqual({
+      labels: ['Written'],
+      values: ['13 Oct · Anish Badri'],
+    })
     // Saved inside the first minute is the writing, not an edit.
-    expect(history(fixture({ updatedAt: oct(13, 14, 2) }))).toHaveLength(1)
-    expect(history(fixture({ updatedAt: oct(15, 10, 0) }))).toEqual([
-      'Edited | 15 Oct',
-      'Written | 13 Oct · Anish Badri',
+    expect(history(fixture({ updatedAt: oct(13, 14, 2) }))?.labels).toEqual([
+      'Written',
     ])
-    expect(history(fixture(VIA))).toEqual([
-      'Landed from Granola | 13 Oct · Priya Raman',
-      'Written | 13 Oct · Priya Raman',
-    ])
+    expect(history(fixture({ updatedAt: oct(15, 10, 0) }))).toEqual({
+      labels: ['Written', 'Edited'],
+      values: ['13 Oct · Anish Badri', '15 Oct'],
+    })
+    // Where it landed from and what replaced it are the head's meta line.
+    expect(history(fixture(VIA))).toEqual({
+      labels: ['Written'],
+      values: ['13 Oct · Priya Raman'],
+    })
     expect(
-      history(fixture({ ...REPLACED, updatedAt: oct(15, 10, 0) })),
-    ).toEqual([
-      'Replaced by Flent thesis v2 | 20 Oct',
-      'Edited | 15 Oct',
-      'Written | 13 Oct · Anish Badri',
-    ])
+      history(fixture({ ...REPLACED, updatedAt: oct(15, 10, 0) }))?.labels,
+    ).toEqual(['Written', 'Edited'])
     // No kind change is logged, so none is shown.
     expect(noteHistory(fixture({ kind: 'memo' })).map((h) => h.event)).toEqual([
       'Written',
@@ -815,8 +911,9 @@ describe('the rail’s controls', () => {
     click(add)
     await settle(200)
     const options = [...document.querySelectorAll('[role="option"]')]
-    // Fintech is already filed; its child is offered by its path.
-    expect(options.map(cells)).toEqual(['Fintech › Payments | space'])
+    // Fintech is already filed; its child is offered by its path, led by
+    // its kind icon rather than a trailing word.
+    expect(options.map(value)).toEqual(['[Space] Fintech › Payments'])
     act(() => {
       options[0]?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
     })
@@ -850,8 +947,9 @@ describe('the rail’s controls', () => {
       data: { q: 'acme', kinds: ['company', 'person', 'deal', 'custom'] },
     })
     const acme = [...document.querySelectorAll('[role="option"]')].find(
-      (o) => cells(o) === 'Acme | company',
+      (o) => value(o) === '[Company] Acme',
     )
+    expect(acme).toBeDefined()
     act(() => {
       acme?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
     })
@@ -869,7 +967,11 @@ describe('the rail’s controls', () => {
       data: { id: 'n1', visibility: 'private' },
     })
     expect(
-      text(document.querySelector('[data-rail-section="visibility"]')),
+      text(
+        document.querySelector(
+          '[data-rail-section="visibility"] [data-rail-value]',
+        ),
+      ),
     ).toBe('Only you')
   })
 })

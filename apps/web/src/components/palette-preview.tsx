@@ -1,15 +1,4 @@
-import {
-  BookA,
-  Boxes,
-  Building2,
-  File,
-  FileText,
-  Kanban,
-  Layers,
-  Paperclip,
-  Pilcrow,
-  Users,
-} from '#/components/icons'
+import { File, FileText, KIND_ICONS, Pilcrow } from '#/components/icons'
 import type { IconComponent } from '#/components/icons'
 import { forwardRef } from 'react'
 import type { KeyboardEvent } from 'react'
@@ -92,18 +81,6 @@ export type PaneAction = {
   readonly id: string
   readonly label: string
   readonly run: () => void
-}
-
-/** Each kind's glyph, in the list and in the pane alike. */
-export const KIND_ICONS: Record<string, IconComponent> = {
-  company: Building2,
-  person: Users,
-  deal: Kanban,
-  space: Layers,
-  note: FileText,
-  document: Paperclip,
-  custom: Boxes,
-  term: BookA,
 }
 
 /** A count in the pane: a zero says nothing, so it reads as a dash. */

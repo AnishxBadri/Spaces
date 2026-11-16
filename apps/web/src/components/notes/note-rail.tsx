@@ -1,15 +1,12 @@
 import { Link, useRouter } from '@tanstack/react-router'
 import { useCallback, useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { toast } from 'sonner'
 import { formatDay } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
+import { KindIcon } from '#/components/kind-icon'
+import type { KindOf } from '#/components/kind-icon'
 import { PickPopover } from '#/components/record/details-add'
-import {
-  DetailsAddRow,
-  RailRow,
-  RailSection,
-} from '#/components/record/record-parts'
 import { Switch } from '#/components/ui/switch'
 import { spacePathLabel } from '#/lib/file-in-space'
 import { recordPath } from '#/lib/record-path'
@@ -39,47 +36,32 @@ const SPACES_SHOWN = 8
 const EDIT_AFTER_MS = 60_000
 
 /**
- * The kind a row's end lane prints: an object's singular (`company`, a
- * custom object's own), else the entity kind (`space`, `note`, `document`).
+ * The rail's 80px label lane: 8px over a 16px line, so a label's first line
+ * sits on the centre of the 32px value row beside it.
  */
-export function kindLane(row: {
-  kind: string
-  objectLabel?: string | null | undefined
-}): string {
-  return row.objectLabel ? row.objectLabel.toLowerCase() : row.kind
-}
+const LABEL_LANE = 'w-20 shrink-0 py-2'
 
 export type HistoryRow = { event: string; at: string; who: string | null }
 
 /**
- * What the note's own rows can say about its life, newest first: written,
- * edited (past the first minute), landed from a tool, replaced. A kind change
- * is not logged anywhere, so it is not a row.
+ * The note's life as its own rows record it: `Written` (the day and who),
+ * then `Edited` (the day) once an edit lands past the first minute. Where it
+ * landed from and what replaced it are the head's meta line.
  */
 export function noteHistory(note: NoteData): Array<HistoryRow> {
   const rows: Array<HistoryRow> = [
     { event: 'Written', at: note.createdAt, who: note.author },
   ]
-  if (note.via !== null)
-    rows.push({
-      event: `Landed from ${note.via.tool}`,
-      at: note.createdAt,
-      who: note.via.author,
-    })
   if (Date.parse(note.updatedAt) - Date.parse(note.createdAt) > EDIT_AFTER_MS)
     rows.push({ event: 'Edited', at: note.updatedAt, who: null })
-  if (note.replacedBy !== null)
-    rows.push({
-      event: `Replaced by ${note.replacedBy.title}`,
-      at: note.replacedBy.at,
-      who: null,
-    })
-  // Rows at one instant: the later step first, so a landed note reads
-  // landed above written.
   return rows
-    .map((row, i) => ({ row, i }))
-    .sort((a, b) => Date.parse(b.row.at) - Date.parse(a.row.at) || b.i - a.i)
-    .map(({ row }) => row)
+}
+
+/** A rail record: what its name links to and what its icon reads. */
+type RailRecord = KindOf & {
+  id: string
+  name: string
+  objectSlug?: string | null
 }
 
 /** A rail row's name: its page when it has one, the preview for a document. */
@@ -88,12 +70,12 @@ function RowName({
   dim = false,
   onPreview,
 }: {
-  row: { id: string; name: string; kind: string; objectSlug?: string | null }
+  row: RailRecord
   dim?: boolean
   onPreview: (id: string) => void
 }) {
   const cls = cn(
-    'focus-ring block truncate text-ui hover:underline',
+    'focus-ring min-w-0 truncate text-ui hover:underline',
     dim ? 'text-graphite' : 'text-foreground',
   )
   if (row.kind === 'document')
@@ -116,18 +98,90 @@ function RowName({
   )
 }
 
-/** The mono end lane: the kind, and an action after it when the row has one. */
-function Lane({ children, end }: { children: string; end?: ReactNode }) {
+/**
+ * A group of the rail: its rows, one rule under it. Rules fall between
+ * groups, never between the values of one.
+ */
+function LaneGroup({ name, children }: { name: string; children: ReactNode }) {
   return (
-    <span className="flex items-center gap-2 text-micro font-normal text-graphite">
+    <div
+      data-rail-section={name}
+      className="flex flex-col border-b border-rule py-1 last:border-b-0"
+    >
       {children}
-      {end}
-    </span>
+    </div>
   )
 }
 
-function countLabel(label: string, n: number): string {
-  return n > 0 ? `${label} · ${String(n)}` : label
+/** One labelled row: the label in the 80px lane, its values stacked right. */
+function LaneRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 items-start gap-2">
+      <span
+        data-rail-label
+        className={cn(LABEL_LANE, 'text-label break-words text-graphite')}
+      >
+        {label}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+    </div>
+  )
+}
+
+/** One 32px value. */
+function Value({ children }: { children: ReactNode }) {
+  return (
+    <div data-rail-value className="flex h-8 min-w-0 items-center gap-2">
+      {children}
+    </div>
+  )
+}
+
+/** A record value: its kind icon, its name, and an action at the end. */
+function RecordValue({
+  row,
+  dim,
+  end,
+  onPreview,
+}: {
+  row: RailRecord
+  dim?: boolean
+  end?: ReactNode
+  onPreview: (id: string) => void
+}) {
+  return (
+    <Value>
+      <KindIcon of={row} />
+      <RowName row={row} dim={dim ?? false} onPreview={onPreview} />
+      {end === undefined ? null : (
+        <span className="ml-auto flex shrink-0 items-center gap-2">{end}</span>
+      )}
+    </Value>
+  )
+}
+
+/**
+ * The value a group ends on: `+ File on…` in graphite, the `+` in the icon's
+ * lane. A plain button that spreads its props, so a popover trigger can hand
+ * it its own.
+ */
+function AddValue({ children, className, ...props }: ComponentProps<'button'>) {
+  return (
+    <button
+      type="button"
+      data-rail-value
+      {...props}
+      className={cn(
+        'focus-ring flex h-8 w-full min-w-0 items-center gap-2 text-left text-ui text-graphite transition-colors hover:text-foreground',
+        className,
+      )}
+    >
+      <span className="w-4 shrink-0 text-center mono text-ui text-primary">
+        +
+      </span>
+      <span className="min-w-0 flex-1 truncate">{children}</span>
+    </button>
+  )
 }
 
 /** Run a filing write, then let the loader say what the rail now is. */
@@ -154,7 +208,7 @@ function useWrite() {
 type FileHit = {
   id: string
   name: string
-  lane: string
+  of: KindOf
   target: 'record' | 'space'
 }
 
@@ -165,6 +219,7 @@ type FileHit = {
  * for a record, `entity_space` for a space — and the hit says which.
  * - `searchEntities`' `kinds` keeps spaces, notes and documents out of the
  *   record lane; `fileNoteAgainstProgram` refuses the same targets anyway.
+ * - Each hit leads on its kind icon.
  */
 function FileOnPicker({
   note,
@@ -194,7 +249,7 @@ function FileOnPicker({
         .map((s) => ({
           id: s.id,
           name: paths.get(s.id) ?? s.name,
-          lane: 'space',
+          of: { kind: 'space' },
           target: 'space' as const,
         }))
         .filter((s) => s.name.toLowerCase().includes(term))
@@ -208,7 +263,7 @@ function FileOnPicker({
         .map((r) => ({
           id: r.id,
           name: r.name,
-          lane: r.kind === 'custom' ? 'record' : r.kind,
+          of: { kind: r.kind },
           target: 'record' as const,
         }))
       return [...records, ...spaces]
@@ -217,11 +272,11 @@ function FileOnPicker({
   )
   return (
     <PickPopover
-      trigger={<DetailsAddRow>File on…</DetailsAddRow>}
+      trigger={<AddValue>File on…</AddValue>}
       placeholder="File on a record or space…"
       eager
       search={search}
-      lane={(hit) => hit.lane}
+      lead={(hit) => <KindIcon of={hit.of} />}
       onPick={(hit) =>
         run(() =>
           hit.target === 'space'
@@ -261,54 +316,52 @@ function FiledOn({
     </button>
   )
   return (
-    <RailSection caps label={countLabel('Filed on', n)}>
-      <div data-rail-section="filed-on" className="flex flex-col">
-        {n === 0 ? <RailRow label="Not filed" value={null} /> : null}
+    <LaneGroup name="filed-on">
+      <LaneRow label="Filed on">
+        {n === 0 ? (
+          <Value>
+            <span className="text-ui text-graphite">Not filed</span>
+          </Value>
+        ) : null}
         {note.filedAgainst.map((r) => (
-          <RailRow
+          <RecordValue
             key={r.id}
-            label={<RowName row={r} onPreview={onPreview} />}
-            value={
-              <Lane
-                end={unfile(r.name, () =>
-                  unfileNoteFrom({ data: { id: note.id, targetId: r.id } }),
-                )}
-              >
-                {kindLane(r)}
-              </Lane>
-            }
+            row={r}
+            onPreview={onPreview}
+            end={unfile(r.name, () =>
+              unfileNoteFrom({ data: { id: note.id, targetId: r.id } }),
+            )}
           />
         ))}
         {note.spaces.map((s) => (
-          <RailRow
+          <RecordValue
             key={s.id}
-            label={
-              <RowName
-                row={{ ...s, kind: 'space' }}
-                dim={s.archived}
-                onPreview={onPreview}
-              />
-            }
-            value={
-              <Lane
-                end={unfile(s.name, () =>
+            row={{ ...s, kind: 'space' }}
+            dim={s.archived}
+            onPreview={onPreview}
+            end={
+              <>
+                {s.archived ? (
+                  <span className="mono text-micro text-graphite">
+                    archived
+                  </span>
+                ) : null}
+                {unfile(s.name, () =>
                   untagFromSpace({
                     data: { entityId: note.id, spaceId: s.id },
                   }),
                 )}
-              >
-                {s.archived ? 'space · archived' : 'space'}
-              </Lane>
+              </>
             }
           />
         ))}
         <FileOnPicker note={note} allSpaces={allSpaces} run={run} />
-      </div>
-    </RailSection>
+      </LaneRow>
+    </LaneGroup>
   )
 }
 
-/** A derived list — mentions out, mentions in: name and kind, no controls. */
+/** A derived list — mentions out, mentions in: icon and name, no controls. */
 function LinkList({
   name,
   label,
@@ -317,40 +370,30 @@ function LinkList({
 }: {
   name: string
   label: string
-  rows: ReadonlyArray<{
-    id: string
-    name: string
-    kind: string
-    objectSlug?: string | null
-    objectLabel?: string | null
-  }>
+  rows: ReadonlyArray<RailRecord>
   onPreview: (id: string) => void
 }) {
   if (rows.length === 0) return null
   return (
-    <RailSection caps label={countLabel(label, rows.length)}>
-      <div data-rail-section={name} className="flex flex-col">
+    <LaneGroup name={name}>
+      <LaneRow label={label}>
         {rows.map((r) => (
-          <RailRow
-            key={r.id}
-            label={<RowName row={r} onPreview={onPreview} />}
-            value={<Lane>{kindLane(r)}</Lane>}
-          />
+          <RecordValue key={r.id} row={r} onPreview={onPreview} />
         ))}
-      </div>
-    </RailSection>
+      </LaneRow>
+    </LaneGroup>
   )
 }
 
 /**
- * Who may read the note. The author holds the switch; any other reader sees
- * the words alone.
+ * Who may read the note: `Workspace` or `Only you`. The author holds the
+ * switch beside the word; any other reader sees the word alone.
  */
 function Visibility({ note }: { note: NoteData }) {
   const router = useRouter()
   const [isPrivate, setIsPrivate] = useState(note.isPrivate)
   const [pending, setPending] = useState(false)
-  const words = isPrivate ? 'Only you' : 'Shared with the workspace'
+  const words = isPrivate ? 'Only you' : 'Workspace'
 
   async function toggle(shared: boolean) {
     setPending(true)
@@ -369,56 +412,55 @@ function Visibility({ note }: { note: NoteData }) {
   }
 
   return (
-    <RailSection caps label="Visibility">
-      <div
-        data-rail-section="visibility"
-        className="flex h-row items-center border-t border-rule"
-      >
-        {note.isMine ? (
-          <Switch
-            checked={!isPrivate}
-            disabled={pending}
-            title="Private notes are read by you alone"
-            onCheckedChange={(shared) => void toggle(shared)}
-            className="text-ui text-foreground"
-          >
-            {words}
-          </Switch>
-        ) : (
-          <span className="text-ui text-foreground">{words}</span>
-        )}
-      </div>
-    </RailSection>
+    <LaneGroup name="visibility">
+      <LaneRow label="Visible to">
+        <Value>
+          {note.isMine ? (
+            <Switch
+              checked={!isPrivate}
+              disabled={pending}
+              title="Private notes are read by you alone"
+              onCheckedChange={(shared) => void toggle(shared)}
+              className="text-ui text-foreground"
+            >
+              {words}
+            </Switch>
+          ) : (
+            <span className="text-ui text-foreground">{words}</span>
+          )}
+        </Value>
+      </LaneRow>
+    </LaneGroup>
   )
 }
 
 function History({ note }: { note: NoteData }) {
   const { today } = useClock()
   return (
-    <RailSection caps label="History">
-      <div data-rail-section="history" className="flex flex-col">
-        {noteHistory(note).map((h) => (
-          <RailRow
-            key={h.event}
-            label={h.event}
-            value={
-              <span className="text-micro font-normal text-graphite">
-                {[formatDay(h.at, today), h.who]
-                  .filter((part) => part !== null)
-                  .join(' · ')}
-              </span>
-            }
-          />
-        ))}
-      </div>
-    </RailSection>
+    <LaneGroup name="history">
+      {noteHistory(note).map((h) => (
+        <LaneRow key={h.event} label={h.event}>
+          <Value>
+            <span className="truncate mono text-micro text-graphite">
+              {[formatDay(h.at, today), h.who]
+                .filter((part) => part !== null)
+                .join(' · ')}
+            </span>
+          </Value>
+        </LaneRow>
+      ))}
+    </LaneGroup>
   )
 }
 
 /**
- * The note's record rail, right of the body on bone: where it is filed, what
- * it mentions, what mentions it, who may read it, and its history. Below
- * `md` it stacks under the body.
+ * The note's rail, right of the body card on the bone ground and unboxed,
+ * read as a property grid: where it is filed, what it mentions, what
+ * mentions it, who may read it, when it was written and edited.
+ * - `px-3` in the ground's 12px gutter lands its labels on the 24px edge.
+ * - Pinned under the folded head bar and the gutter, scrolling on its own
+ *   only when it is taller than the window. Below `md` it stacks under the
+ *   card.
  */
 export function NoteRail({
   note,
@@ -433,7 +475,7 @@ export function NoteRail({
     <aside
       aria-label="Details"
       data-note-rail
-      className="flex w-full shrink-0 flex-col bg-bone md:sticky md:top-12 md:max-h-[calc(100dvh-3rem)] md:w-72 md:overflow-y-auto"
+      className="flex w-full shrink-0 flex-col px-3 md:sticky md:top-15 md:max-h-[calc(100dvh-4.5rem)] md:w-72 md:self-start md:overflow-y-auto"
     >
       <FiledOn note={note} allSpaces={allSpaces} onPreview={onPreview} />
       <LinkList
@@ -445,11 +487,7 @@ export function NoteRail({
       <LinkList
         name="mentioned-in"
         label="Mentioned in"
-        rows={note.backlinks.map((b) => ({
-          id: b.fromId,
-          name: b.name,
-          kind: b.kind,
-        }))}
+        rows={note.backlinks.map((b) => ({ ...b, id: b.fromId }))}
         onPreview={onPreview}
       />
       <Visibility note={note} />

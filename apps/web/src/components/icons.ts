@@ -11,6 +11,7 @@
  *   unless a `size-*` class says 20, and take no stroke props.
  * - Our own concepts are not Carbon's: the note kinds are `NoteKindIcon`,
  *   drawn on the same 32-grid; a brand is `ProviderMark`.
+ * - `KIND_ICONS` is the one map from an entity kind to its glyph.
  */
 import {
   Add,
@@ -94,9 +95,13 @@ import {
 } from '@carbon/icons-react'
 import type { CarbonIconProps, CarbonIconType } from '@carbon/icons-react'
 import { createElement, forwardRef } from 'react'
+import { NoteIcon } from './note-kind-icon'
 
 /** An icon from this list, for a prop that takes one. */
 export type IconComponent = CarbonIconType
+
+/** What an icon from this list takes. */
+export type IconProps = CarbonIconProps
 
 /**
  * Carbon's glyph, stamped `data-icon` with its Carbon name so the DOM (and a
@@ -205,3 +210,19 @@ export const Tags = carbon(TagGroup, 'tag--group')
 export const Type = carbon(TextFont, 'text--font')
 export const User = carbon(CarbonUser, 'user')
 export const Users = carbon(UserMultiple, 'user--multiple')
+
+/**
+ * Each entity kind's glyph, wherever a row, a chip or a picker names a
+ * record of mixed kinds. A custom record's own glyph is its object's
+ * (`objectIcon`); `custom` is the fallback for one whose object is unknown.
+ */
+export const KIND_ICONS: Readonly<Partial<Record<string, IconComponent>>> = {
+  company: Building2,
+  person: Users,
+  deal: Kanban,
+  space: Layers,
+  note: NoteIcon,
+  document: Paperclip,
+  custom: Boxes,
+  term: BookA,
+}

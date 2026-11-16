@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import * as icons from './icons'
+import { KindIcon } from './kind-icon'
 import { LedgerRow, LedgerSection } from './ledger-section'
 import { NewButton, SplitNewButton } from './new-button'
 import { NoteKindIcon } from './note-kind-icon'
@@ -735,6 +736,31 @@ describe('E7 · one icon list, one brand mark', () => {
       expect(html, kind).not.toContain('stroke')
       expect(html, kind).toContain('class="size-4 shrink-0"')
     }
+  })
+
+  it('keeps one kind-icon map, in the icon list, that the sidebar agrees with', () => {
+    const definers = sourceFiles(src)
+      .filter((f) => /\bconst KIND_ICONS\b/.test(readFileSync(f, 'utf8')))
+      .map((f) => relative(src, f))
+    expect(definers).toEqual(['components/icons.ts'])
+    // A person record wears the People page's glyph; a note its own.
+    expect(icons.KIND_ICONS.person).toBe(icons.Users)
+    expect(read('components/app-sidebar.tsx')).toMatch(
+      /to: '\/people', label: 'People', icon: Users\b/,
+    )
+    expect(
+      renderToStaticMarkup(<KindIcon of={{ kind: 'person' }} />),
+    ).toContain('data-icon="user--multiple"')
+    const note = renderToStaticMarkup(
+      <KindIcon of={{ kind: 'note', noteKind: 'memo' }} />,
+    )
+    expect(note).toContain('data-note-kind="memo"')
+    expect(note).toContain('aria-label="Memo"')
+    expect(note).toContain('title="Memo"')
+    expect(note).toContain('class="size-4 shrink-0"')
+    const Note = icons.KIND_ICONS.note
+    if (Note === undefined) throw new Error('no note glyph')
+    expect(renderToStaticMarkup(<Note />)).toContain('data-note-kind="note"')
   })
 
   it('maps each verb to one glyph and does not hand a verb glyph out by name', () => {

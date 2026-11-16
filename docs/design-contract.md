@@ -73,9 +73,9 @@ is the record chassis. The head folds as before; its bar and pinned actions sit 
 - **E1 · The content edge is 24px.** The page title sits on it, and so does every
   card's content: the body gutter is 12px, a card is a 1px box with 12px between cards
   and an 11px inset, so 12 + 1 + 11 lands card content on the 24px line. The space
-  outside a card is never smaller than the inset inside it. The one exception is a
-  page that holds a note editor: its head and body start at `NOTE_INSET` (§3, "A
-  note").
+  outside a card is never smaller than the inset inside it. A note editor keeps its
+  own margin inside its sheet (`NOTE_INSET`, §3, "A note"); its head stands on the
+  edge like every other.
 - **E2 · One ink line under the head.** A single 1px ink line (`border-hairline`), never
   the double, and the head stays 104px and paper on every page; a line inside the head
   and between rows stays the rule. On a page that scrolls the head folds to the 48px bar
@@ -234,7 +234,7 @@ the time and which the day is H3.
 ### Kinds
 
 Where a row, a chip or a picker names a record of mixed kinds, its kind is a leading
-icon, never a word: the one map from the shared icon list (company `Building`, person `User`, deal
+icon, never a word: the one map from the shared icon list (company `Building`, person `UserMultiple`, deal
 `Column`, space `Layers`, note `NoteKindIcon`, document `Attachment`) and a custom object's
 own `objectIcon`, with the kind word as its tooltip and `aria-label`. Never the icon
 and the word side by side. A word stays where the word is the data: a stamp (`MEMO`),
@@ -656,21 +656,31 @@ in `apps/web/src/components/notes/` (`NoteHead`, `NoteMoreMenu`, `NoteSheet`,
   the title, the save word and the `···` and nothing else: `KIND` (three checked rows),
   a rule, Save as new version · Save as template… · Copy link, a rule, Delete…. No back
   link — the sidebar is the way back. One ink line under.
-- **Body.** The editor alone at 72ch, 17px serif, its headings 20 / 17 / 15 sans medium
-  under the 28px serif title; nothing sits between the title and the editor.
-- **Rail.** Right, `w-72` on the bone ground with no rule, stacked under the body below
-  `md`; the body is one paper sheet:
-  `RailSection`s with mono caps labels. `FILED ON · n` — records then spaces in the
-  order they were filed, the name an ink link, the kind in the mono end lane, `×` to
-  unfile, ending on `+ File on…`, one picker for records and spaces (`Not filed` when
-  there is nothing). `MENTIONS · n` and `MENTIONED IN · n` — derived, absent at zero.
-  `VISIBILITY` — the switch for the author alone, the words for anyone else.
-  `HISTORY` — `Written`, `Edited`, `Landed from <tool>`, `Replaced by <title>`: only
-  what the rows record.
-- **The one exception to E1.** The head and the body start at `NOTE_INSET`
-  (`--note-gutter`), not the 24px edge, because BlockNote's side menu floats left of
-  every block and needs the room. The mandate's prose takes the same inset; nothing
-  else does.
+- **Body.** Under the head, the bone ground with the record body's 12px gutter, and on
+  it one paper card in a 1px ink edge holding the editor alone at 72ch, left on the
+  card's gutter, not centred: 17px serif, its headings 20 / 17 / 15 sans medium under
+  the 28px serif title; nothing sits between the title and the editor. Nothing from
+  the card up to the scroller clips: the editor's floating sheets, side menu, table
+  handles and drag preview draw outside the text column. `/` offers twelve block
+  types (three headings, three lists, quote, table, code block, image, file,
+  divider); a block turns back into text from the toolbar's block-type select.
+- **Rail.** Right of the card, `w-72` on the bone with no box and no ink, stacked
+  under the card below `md`, pinned under the folded bar and the gutter (D107). A
+  property grid: an 80px lane of sentence-case graphite labels, the values right, one
+  rule between groups and none between a group's values. `Filed on` — records then
+  spaces in the order they were filed, each led by its kind icon (Kinds), the name an
+  ink link, `×` to unfile, ending on `+ File on…`, one picker for records and spaces
+  (`Not filed` when there is nothing). `Mentions` and `Mentioned in` — derived, absent
+  at zero. `Visible to` — `Workspace` or `Only you`, the author's switch beside the
+  word. `Written` (day · who) and `Edited` (day): what the rows record. Where it landed
+  from and what replaced it are the head's meta line.
+- **The editor's margin.** The head stands on the 24px edge like every head, so the
+  title holds its place from the Notes list. Inside the card the editor keeps
+  `NOTE_INSET` (`--note-gutter`, 56px; 24px below `md`, where no hover shows the side
+  menu), because BlockNote's side menu floats left of every block and needs the room:
+  the prose stands at 68px, the sheet's own margin, not under the title. The
+  mandate's facts and prose take the same inset inside their sheet; nothing else
+  does.
 
 **A ledger of a stream** — Ask's sources footer, a run log, a feed.
 → **Today's spine**, `apps/web/src/routes/_app/today.tsx:320`. `LedgerSection` with a

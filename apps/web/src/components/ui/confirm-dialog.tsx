@@ -18,8 +18,11 @@ export type ConfirmOptions = {
   title: string
   /** One sans sentence saying what happens, and what does not. */
   body?: ReactNode
-  /** The things affected — name left, mono meta right — when there are several. */
-  rows?: Array<{ name: string; meta?: string }>
+  /**
+   * The things affected — name left, mono meta right — when there are
+   * several; `icon` leads a row, a kind icon where the kinds are mixed.
+   */
+  rows?: Array<{ name: string; meta?: string; icon?: ReactNode }>
   /**
    * The verb on the acting button: "Delete", "Archive 3". Omitted, the sheet
    * is a notice — one way out and no button that promises something the
@@ -94,8 +97,11 @@ export function ConfirmDialog({
                     key={`${row.name}-${i}`}
                     className="flex h-[1.625rem] items-center justify-between gap-3 border-b border-rule px-2.5 last:border-b-0"
                   >
-                    <span className="min-w-0 truncate text-label">
-                      {row.name}
+                    <span className="flex min-w-0 items-center gap-2">
+                      {row.icon}
+                      <span className="min-w-0 truncate text-label">
+                        {row.name}
+                      </span>
                     </span>
                     {row.meta ? (
                       <span className="shrink-0 mono text-micro text-graphite">

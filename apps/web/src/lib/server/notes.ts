@@ -142,16 +142,24 @@ const getNoteProgram = Effect.fn('getNoteProgram')(function* (
   // "Not found" on purpose — a 403 would confirm a private note exists.
   if (!row || !canRead(viewer, row))
     return yield* new NoteRefused({ message: 'Note not found' })
-  // Backlinks: anything whose content mentions this note.
+  // Backlinks: anything whose content mentions this note. The object and
+  // the note kind ride along for the rail's kind icon and a custom record's
+  // route.
   const backlinks = yield* serverQuery(() =>
     db
       .select({
         fromId: link.fromEntityId,
         name: entity.canonicalName,
         kind: entity.kind,
+        objectSlug: objectDef.slug,
+        objectLabel: objectDef.singular,
+        objectIcon: objectDef.icon,
+        noteKind: note.kind,
       })
       .from(link)
       .innerJoin(entity, eq(entity.id, link.fromEntityId))
+      .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
+      .leftJoin(note, eq(note.entityId, entity.id))
       .where(and(eq(link.toEntityId, noteId), eq(link.relation, 'mentions'))),
   )
   // What the body mentions: the outbound direction of the edge above,
@@ -165,6 +173,8 @@ const getNoteProgram = Effect.fn('getNoteProgram')(function* (
         kind: entity.kind,
         objectSlug: objectDef.slug,
         objectLabel: objectDef.singular,
+        objectIcon: objectDef.icon,
+        noteKind: note.kind,
         visibility: note.visibility,
         authorId: note.authorId,
       })
@@ -182,13 +192,17 @@ const getNoteProgram = Effect.fn('getNoteProgram')(function* (
       .orderBy(asc(link.createdAt)),
   ))
     .filter((r) => canRead(viewer, r))
-    .map(({ id, name, kind, objectSlug, objectLabel }) => ({
-      id,
-      name,
-      kind,
-      objectSlug,
-      objectLabel,
-    }))
+    .map(
+      ({ id, name, kind, objectSlug, objectLabel, objectIcon, noteKind }) => ({
+        id,
+        name,
+        kind,
+        objectSlug,
+        objectLabel,
+        objectIcon,
+        noteKind,
+      }),
+    )
   // Spaces this note is filed in, in the order it was filed; an archived
   // one stays, flagged, and its row dims.
   const spaces = yield* serverQuery(() =>
@@ -217,6 +231,7 @@ const getNoteProgram = Effect.fn('getNoteProgram')(function* (
         kind: entity.kind,
         objectSlug: objectDef.slug,
         objectLabel: objectDef.singular,
+        objectIcon: objectDef.icon,
       })
       .from(link)
       .innerJoin(entity, eq(entity.id, link.toEntityId))

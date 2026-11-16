@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { CalendarDays } from '#/components/icons'
+import { KindIcon } from '#/components/kind-icon'
 import { Band, Day, EmptyRow } from '#/components/ledger-section'
 import { recordNoteGroups } from '#/lib/notes/record-groups'
 import type { NoteLanes } from '#/lib/notes/record-groups'
@@ -12,10 +13,11 @@ import { cn } from '#/lib/utils'
  * here (memos first), a `FROM MEETINGS` band over the meetings' notes, and
  * every superseded note last on one graphite line. With no notes it is the
  * one `Notes +` row.
- * - A row: the glyph, the serif title, its people (the author, or the
- *   meeting's attendees), the kind in mono and the day, then the excerpt.
- * - The kind lane prints `memo`, `via Granola` or `superseded`,
- *   never `note`.
+ * - A row: the kind icon (note or memo; a meeting's note its calendar),
+ *   the serif title, its people (the author, or the meeting's attendees),
+ *   the state lane in mono and the day, then the excerpt.
+ * - The state lane prints `via Granola` or `superseded` and nothing else:
+ *   the kind is the icon.
  */
 
 export type RecordNoteRow = {
@@ -30,11 +32,11 @@ export type RecordNoteRow = {
   supersededBy: string | null
 }
 
-/** The mono kind lane: never `note`, which is every note. */
+/** The mono lane: a state word only, never the kind, which the icon says. */
 export function noteKindLane(n: RecordNoteRow): string {
   if (n.supersededBy !== null) return 'superseded'
   if (n.via !== null) return `via ${n.via.tool}`
-  return n.kind === 'note' ? '' : n.kind
+  return ''
 }
 
 /** The people lane: a meeting's attendees, else the author. */
@@ -117,13 +119,19 @@ function NoteRow({
         )}
       >
         <span className="flex min-h-5 min-w-0 items-center gap-3">
-          <span aria-hidden className="flex w-4 shrink-0 justify-center">
-            {meeting ? (
+          {meeting ? (
+            <span aria-hidden className="flex w-4 shrink-0 justify-center">
               <CalendarDays className="size-4 text-graphite" />
-            ) : (
-              <span className="font-serif text-ui text-graphite">¶</span>
-            )}
-          </span>
+            </span>
+          ) : (
+            // As the Notes list draws it: a memo in ink, a note in graphite.
+            <KindIcon
+              of={{ kind: 'note', noteKind: n.kind }}
+              className={
+                n.kind === 'memo' && !superseded ? 'text-foreground' : undefined
+              }
+            />
+          )}
           <span
             className={cn(
               'min-w-0 flex-1 truncate font-serif text-title',

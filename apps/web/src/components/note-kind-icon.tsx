@@ -1,3 +1,6 @@
+import { forwardRef } from 'react'
+import type { Ref } from 'react'
+import type { IconComponent, IconProps } from '#/components/icons'
 import type { NoteKind } from '#/lib/notes/ordering'
 import { cn } from '#/lib/utils'
 
@@ -20,12 +23,15 @@ const PATHS: Record<NoteKind, Array<string>> = {
 export function NoteKindIcon({
   kind,
   className,
+  ref,
 }: {
   kind: NoteKind
   className?: string | undefined
+  ref?: Ref<SVGSVGElement> | undefined
 }) {
   return (
     <svg
+      ref={ref}
       aria-hidden
       data-note-kind={kind}
       viewBox="0 0 32 32"
@@ -39,6 +45,17 @@ export function NoteKindIcon({
     </svg>
   )
 }
+
+/**
+ * The note glyph as an icon-list entry, for a row that names a note without
+ * knowing its kind (a mention chip, a Cmd-K hit). Honours `className` alone:
+ * the glyph is always 16px and always decorative.
+ */
+export const NoteIcon: IconComponent = forwardRef<SVGSVGElement, IconProps>(
+  function NoteIcon({ className }, ref) {
+    return <NoteKindIcon ref={ref} kind="note" className={className} />
+  },
+)
 
 /** The kind's name, for a glyph's label. */
 export const NOTE_KIND_LABEL: Record<NoteKind, string> = {

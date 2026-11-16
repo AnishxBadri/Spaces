@@ -23,6 +23,7 @@ import {
 import { TextSelection } from '@tiptap/pm/state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Mention } from './mention'
+import { noteSlashMenu } from './slash-menu'
 import { createGlossaryExtension } from './glossary-decoration'
 import type { GlossaryTerm } from './glossary-decoration'
 import {
@@ -35,6 +36,7 @@ import {
   NOTE_DROP_LABEL,
   noteDropInsertPos,
 } from '#/lib/documents/note-drop'
+import { KindIcon } from '#/components/kind-icon'
 import { searchEntities } from '#/lib/server-fns'
 import type { Json } from '@spaces/core/json'
 import type { NoteBody } from '@spaces/db/schema/kinds'
@@ -315,7 +317,8 @@ export function NoteEditor({
       return filterSuggestionItems(
         results.map((r) => ({
           title: r.name,
-          badge: r.kind,
+          // The kind leads as its icon, never as a trailing word.
+          icon: <KindIcon of={r} />,
           onItemClick: () => {
             editor.insertInlineContent([
               // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- @blocknote's generics collapse to the default schema under exactOptionalPropertyTypes, so the mention spec is invisible here
@@ -335,6 +338,11 @@ export function NoteEditor({
         query,
       )
     },
+    [editor],
+  )
+  const getSlashItems = useMemo(
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- @blocknote's editor generics are not exactOptionalPropertyTypes-clean (PartialBlock variance)
+    () => noteSlashMenu(editor as never),
     [editor],
   )
 
@@ -388,6 +396,7 @@ export function NoteEditor({
           shouldOpen={(tr) =>
             !tr.selection.$from.parent.type.isInGroup('tableContent')
           }
+          getItems={getSlashItems}
           floatingUIOptions={SHEET_MOTION}
         />
         <SuggestionMenuController

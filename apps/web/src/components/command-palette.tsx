@@ -1,6 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useRouter } from '@tanstack/react-router'
-import { CheckSquare, icon, Mail, Settings, Table2 } from '#/components/icons'
+import {
+  CheckSquare,
+  icon,
+  KIND_ICONS,
+  Mail,
+  Settings,
+  Table2,
+} from '#/components/icons'
 import type { IconComponent } from '#/components/icons'
 import { useCommandState } from 'cmdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -11,7 +18,7 @@ import { NAV_ITEMS } from './app-sidebar'
 import { useClock } from './clock'
 import { ASKS_REASON, MoveStageDialog } from './deal-board'
 import { DocumentPreview } from './document-preview'
-import { KIND_ICONS, PreviewPane } from './palette-preview'
+import { PreviewPane } from './palette-preview'
 import type {
   PaneAction,
   PreviewData,

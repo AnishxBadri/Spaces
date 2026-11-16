@@ -158,9 +158,9 @@
      gutter + 1px edge + 11px lands a card's content on the page's 24px line. */
   --inset: 1.5rem;
 
-  /* A note page's left inset (`NOTE_INSET`): where the editor's side menu
-     (`+` and the drag handle, 48px) floats. At least the menu's width, so
-     the menu stays inside the page and never reaches the chassis. */
+  /* A note editor's margin inside its sheet (`NOTE_INSET`): where the side
+     menu (`+` and the drag handle, 48px) floats. At least the menu's width,
+     so the menu stays inside the sheet and never reaches the chassis. */
   --note-gutter: 3.5rem;
 
   /* The z-index scale (DESIGN.md, Interaction Engineering): five values, no
@@ -172,6 +172,14 @@
   --z-dropdown: 250;
   --z-tooltip: 300;
   --z-toast: 400;
+}
+
+/* Below `md` no hover shows the side menu, so the note gutter is the page's
+   24px edge (`md` is 48rem). */
+@media (width < 48rem) {
+  :root {
+    --note-gutter: 1.5rem;
+  }
 }
 
 @theme inline {

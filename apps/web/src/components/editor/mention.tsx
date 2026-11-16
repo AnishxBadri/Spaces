@@ -1,14 +1,5 @@
 import { createReactInlineContentSpec } from '@blocknote/react'
-import {
-  Boxes,
-  Building2,
-  FileText,
-  Kanban,
-  Layers,
-  Paperclip,
-  User,
-} from '#/components/icons'
-import type { IconComponent } from '#/components/icons'
+import { Boxes, KIND_ICONS } from '#/components/icons'
 import { documentPreviewEvent } from '#/lib/editor/document-preview-event'
 import { recordPath } from '#/lib/record-path'
 
@@ -17,18 +8,6 @@ import { recordPath } from '#/lib/record-path'
  * entityId is authoritative; label is a cached display string.
  * Serialized into derived markdown as [[label|entity:id]] by the exporter.
  */
-
-export const KIND_ICONS: Record<string, IconComponent | undefined> = {
-  company: Building2,
-  person: User,
-  deal: Kanban,
-  space: Layers,
-  note: FileText,
-  // A document has no page, so its chip is the only place the paperclip has
-  // to say what was mentioned.
-  document: Paperclip,
-  custom: Boxes,
-}
 
 export const Mention = createReactInlineContentSpec(
   {
@@ -45,7 +24,7 @@ export const Mention = createReactInlineContentSpec(
   {
     render: (props) => {
       const { entityId, label, kind, objectSlug } = props.inlineContent.props
-      const Icon = KIND_ICONS[kind] ?? Building2
+      const Icon = KIND_ICONS[kind] ?? Boxes
       // Plain anchor, not router Link — renders inside BlockNote's tree.
       // One route table for the whole app: a chip whose kind has no record
       // page renders as text rather than guessing a page it might have.

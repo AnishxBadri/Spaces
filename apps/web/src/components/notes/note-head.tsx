@@ -3,7 +3,6 @@ import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { formatDay, formatTime } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
-import { NOTE_INSET } from '#/components/editor/note-column'
 import { ViaMark } from '#/components/open-in'
 import { RecordHeader } from '#/components/record/record-parts'
 import type { getNote } from '#/lib/server-fns'
@@ -19,13 +18,6 @@ const STAMPS: Record<NoteKind, string> = {
   note: 'Note',
   memo: 'Memo',
 }
-
-/**
- * The note's head is a record head with a wider left edge: the editor's side
- * menu floats left of every block, so the body starts at `NOTE_INSET` and the
- * head moves with it rather than leaving the title 12px left of the prose.
- */
-export const NOTE_EDGE = NOTE_INSET
 
 /** The day and the time it was written: `13 Oct 14:02`. */
 function dayAndTime(at: string, today: string): string {
@@ -173,6 +165,8 @@ export function NoteTitleField({
  * it), the title as its name field, the meta line, and at the right only the
  * save word and the `···`. The sidebar is the way back, so there is no back
  * link.
+ * - On the page's 24px edge like every head, so the title holds its place
+ *   from the Notes list; the prose keeps its own margin inside the card.
  */
 export function NoteHead({
   note,
@@ -189,7 +183,6 @@ export function NoteHead({
 }) {
   return (
     <RecordHeader
-      className={NOTE_EDGE}
       stamp={{ kind: STAMPS[note.kind] }}
       stampAside={
         note.isPrivate ? (

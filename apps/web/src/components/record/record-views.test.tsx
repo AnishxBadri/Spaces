@@ -778,7 +778,8 @@ describe('the Notes tab', () => {
 
     const lane = (id: string, slot: string) =>
       el.querySelector(`li[data-note="${id}"] [data-${slot}]`)?.textContent
-    expect(lane('memo', 'kind')).toBe('memo')
+    // The kind is the icon; the lane holds state words only.
+    expect(lane('memo', 'kind')).toBe('')
     expect(lane('s', 'kind')).toBe('')
     expect(lane('x', 'kind')).toBe('')
     expect(lane('g', 'kind')).toBe('via Granola')
@@ -786,6 +787,25 @@ describe('the Notes tab', () => {
     expect(lane('s', 'people')).toBe('Priya Raman')
     expect(lane('g', 'people')).toBe('Maya Iyer · Ravi Shah')
     expect(lane('s', 'excerpt')).toBe('Ask about churn in the Pune cohort.')
+
+    // Each row leads on its kind icon, named by its word; a meeting's note
+    // keeps its calendar. No serif pilcrow is left.
+    const icon = (id: string) =>
+      el.querySelector(`li[data-note="${id}"] [data-kind-icon]`)
+    expect(icon('memo')?.getAttribute('aria-label')).toBe('Memo')
+    expect(
+      icon('memo')?.querySelector('[data-note-kind="memo"]'),
+    ).not.toBeNull()
+    expect(icon('memo')?.className).toContain('text-foreground')
+    expect(icon('s')?.getAttribute('aria-label')).toBe('Note')
+    expect(icon('s')?.getAttribute('title')).toBe('Note')
+    expect(icon('s')?.className).toContain('text-graphite')
+    expect(icon('old')?.className).toContain('text-graphite')
+    expect(icon('g')).toBeNull()
+    expect(
+      el.querySelector('li[data-note="g"] [data-icon="event"]'),
+    ).not.toBeNull()
+    expect(el.textContent).not.toContain('¶')
 
     // A superseded note is one graphite line with no excerpt.
     expect(

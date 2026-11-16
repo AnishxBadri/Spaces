@@ -7,7 +7,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
-import { icon, Layers } from '#/components/icons'
+import { icon, KIND_ICONS, Layers } from '#/components/icons'
 import type { IconComponent } from '#/components/icons'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
@@ -18,7 +18,6 @@ import {
   OpenSourceButton,
 } from '#/components/document-source'
 import { DocumentTile } from '#/components/document-tile'
-import { KIND_ICONS } from '#/components/editor/mention'
 import { EmptyRow } from '#/components/ledger-section'
 import { Card, ListPage, PageBody, PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'

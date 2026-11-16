@@ -184,6 +184,7 @@ export function PickPopover<THit extends PickHit>({
   search,
   onPick,
   lane,
+  lead,
   foot,
   eager = false,
   open: held,
@@ -195,6 +196,8 @@ export function PickPopover<THit extends PickHit>({
   /** Write the pick; a throw reads as a toast and keeps the popover open. */
   onPick: (hit: THit) => Promise<void>
   lane?: ((hit: THit) => ReactNode) | undefined
+  /** A mark before the name: a hit's kind icon where the kinds are mixed. */
+  lead?: ((hit: THit) => ReactNode) | undefined
   foot?: ((close: () => void) => ReactNode) | undefined
   eager?: boolean | undefined
   open?: boolean | undefined
@@ -307,6 +310,7 @@ export function PickPopover<THit extends PickHit>({
                   i === active && 'bg-bone',
                 )}
               >
+                {lead ? lead(h) : null}
                 <span className="min-w-0 flex-1 truncate">{h.name}</span>
                 {lane ? (
                   <span className="shrink-0 mono text-micro text-graphite">

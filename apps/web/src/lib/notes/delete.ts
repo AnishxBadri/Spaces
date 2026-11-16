@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { asc, eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { entity, entitySpace, link, note } from '@spaces/db/schema'
+import { entity, entitySpace, link, note, objectDef } from '@spaces/db/schema'
 import type { linkRelation } from '@spaces/db/schema'
 import {
   Blocked,
@@ -10,6 +10,7 @@ import {
 } from '@spaces/core/writes/entities/delete'
 import type { DeleteQueryFailed } from '@spaces/core/writes/entities/delete'
 import { canRead } from '#/lib/server/shared'
+import type { NoteKind } from './ordering'
 
 /**
  * Note deletion: hard delete, no trash, like documents and terms.
@@ -67,8 +68,18 @@ const INCOMING: Record<LinkRelation, string> = {
   references: 'references this note',
 }
 
-/** One line of the confirm's ledger: what loses its edge to this note. */
-export type NoteUnlink = { name: string; meta: string }
+/**
+ * One line of the confirm's ledger: what loses its edge to this note, and
+ * what the dialog's kind icon reads off it.
+ */
+export type NoteUnlink = {
+  name: string
+  meta: string
+  kind: string
+  objectLabel: string | null
+  objectIcon: string | null
+  noteKind: NoteKind | null
+}
 
 export type NoteDeleteImpact = {
   title: string
@@ -129,9 +140,18 @@ export const noteDeleteImpactProgram = Effect.fn('noteDeleteImpactProgram')(
     const outgoing = yield* Effect.tryPromise({
       try: () =>
         db
-          .select({ name: entity.canonicalName, relation: link.relation })
+          .select({
+            name: entity.canonicalName,
+            relation: link.relation,
+            kind: entity.kind,
+            objectLabel: objectDef.singular,
+            objectIcon: objectDef.icon,
+            noteKind: note.kind,
+          })
           .from(link)
           .innerJoin(entity, eq(entity.id, link.toEntityId))
+          .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
+          .leftJoin(note, eq(note.entityId, entity.id))
           .where(eq(link.fromEntityId, id))
           .orderBy(asc(entity.canonicalName)),
       catch: (cause) => new NoteQueryFailed({ cause }),
@@ -140,9 +160,18 @@ export const noteDeleteImpactProgram = Effect.fn('noteDeleteImpactProgram')(
     const incoming = yield* Effect.tryPromise({
       try: () =>
         db
-          .select({ name: entity.canonicalName, relation: link.relation })
+          .select({
+            name: entity.canonicalName,
+            relation: link.relation,
+            kind: entity.kind,
+            objectLabel: objectDef.singular,
+            objectIcon: objectDef.icon,
+            noteKind: note.kind,
+          })
           .from(link)
           .innerJoin(entity, eq(entity.id, link.fromEntityId))
+          .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
+          .leftJoin(note, eq(note.entityId, entity.id))
           .where(eq(link.toEntityId, id))
           .orderBy(asc(entity.canonicalName)),
       catch: (cause) => new NoteQueryFailed({ cause }),
@@ -153,9 +182,22 @@ export const noteDeleteImpactProgram = Effect.fn('noteDeleteImpactProgram')(
     return {
       title,
       unlinks: [
-        ...spaces.map((s) => ({ name: s.name, meta: 'filed in space' })),
-        ...outgoing.map((l) => ({ name: l.name, meta: OUTGOING[l.relation] })),
-        ...incoming.map((l) => ({ name: l.name, meta: INCOMING[l.relation] })),
+        ...spaces.map((s) => ({
+          name: s.name,
+          meta: 'filed in space',
+          kind: 'space',
+          objectLabel: null,
+          objectIcon: null,
+          noteKind: null,
+        })),
+        ...outgoing.map(({ relation, ...l }) => ({
+          ...l,
+          meta: OUTGOING[relation],
+        })),
+        ...incoming.map(({ relation, ...l }) => ({
+          ...l,
+          meta: INCOMING[relation],
+        })),
       ],
       blockedReason: refusal === null ? null : refusal.reason,
     }

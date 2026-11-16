@@ -2,6 +2,7 @@ import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { icon } from '#/components/icons'
+import { KindIcon } from '#/components/kind-icon'
 import { SaveAsTemplateAction } from '#/components/templates'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import { MENU_RULE, MoreMenu } from '#/components/ui/more-menu'
@@ -175,7 +176,11 @@ export function NoteMoreMenu({
           impact.unlinks.length > 0
             ? 'The note and its text go for good. Everything listed below keeps its own row — only its link to this note goes.'
             : 'The note and its text go for good. This cannot be undone.',
-        rows: impact.unlinks,
+        rows: impact.unlinks.map((u) => ({
+          name: u.name,
+          meta: u.meta,
+          icon: <KindIcon of={u} />,
+        })),
         action: 'Delete',
       })
       if (!ok) return

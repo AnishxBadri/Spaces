@@ -3,7 +3,6 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 
 import { NOTE_INSET } from './note-column'
-import { NOTE_EDGE } from '#/components/notes/note-head'
 import { cn } from '#/lib/utils'
 import { declared } from '#/test/tailwind-css'
 
@@ -12,9 +11,10 @@ import { declared } from '#/test/tailwind-css'
  * BlockNote floats the menu left of the hovered block, so its left edge is
  * the block's left edge minus the menu's width. Two guards keep it off the
  * sidebar at every width the sidebar shows at (1440 and 1100 included):
- * - a note page's columns start at `NOTE_INSET`, at least the menu's width,
- *   and the editor adds no inset of its own — so the menu stays inside the
- *   page and the head and the body share one left edge;
+ * - the editor's column starts at `NOTE_INSET` inside its own sheet, at
+ *   least the menu's width, and the editor adds no inset of its own — so the
+ *   menu stays inside the sheet; the head keeps the page's 24px edge;
+ * - below `md`, where no hover shows the menu, the inset is the 24px edge;
  * - the chassis is its own stacking context on the z-scale, so a layer from
  *   `main` cannot paint over it even if one does cross.
  */
@@ -66,6 +66,13 @@ describe('the note inset', () => {
     ])
   })
 
+  it('drops to the 24px edge below md', () => {
+    const narrow = css.indexOf('\n@media (width < 48rem) {\n  :root {')
+    expect(narrow, 'a top-level :root under md').toBeGreaterThan(-1)
+    const block = css.slice(narrow, css.indexOf('\n}', narrow))
+    expect(block).toMatch(/--note-gutter:\s*1\.5rem;/)
+  })
+
   it('survives a page column’s own px-3 under cn', () => {
     expect(cn('px-3 pt-7', NOTE_INSET).split(' ')).toContain(NOTE_INSET)
   })
@@ -81,20 +88,26 @@ describe('the note inset', () => {
   })
 })
 
-describe('a note page: the body columns share the inset', () => {
-  it('on /notes/$id, the record head and the body column', () => {
-    expect(NOTE_EDGE).toBe(NOTE_INSET)
-    // The head is the record head moved onto the note's edge.
+describe('a note page: the head on the page edge, the inset inside the card', () => {
+  it('on /notes/$id, the record head at 24px and the body column on the inset', () => {
+    // The head is every record head: no class of its own moves it.
     const head = between(noteHead, '<RecordHeader', '/>\n  )')
-    expect(head).toContain('className={NOTE_EDGE}')
-    // The body column holds the editor's wrapper and nothing else.
+    expect(head).not.toMatch(/^ {6}className=/m)
+    expect(noteHead).not.toMatch(/NOTE_INSET|NOTE_EDGE/)
+    // The card holds the body column, and the column the editor's wrapper.
+    const card = between(noteSheet, 'data-note-card', '{editor}')
+    expect(card).toContain("cn('max-w-[72ch] pt-6 pr-8 pb-8', NOTE_INSET)")
+    expect(card).toContain('prose-note')
+    // The card adds no inset of its own and clips nothing.
+    const cardClass = /className="([^"]*)"/.exec(card)?.[1] ?? ''
+    expect(cardClass).not.toMatch(LEFT_INSET)
+    expect(noteSheet).not.toMatch(/overflow-(hidden|clip)/)
+    // Nothing between the column and the editor moves the prose off it.
     const column = between(
       noteSheet,
-      "cn('max-w-[72ch] pt-6 pr-8 pb-8', NOTE_EDGE)",
+      "cn('max-w-[72ch] pt-6 pr-8 pb-8', NOTE_INSET)",
       '{editor}',
     )
-    expect(column).toContain('prose-note')
-    // Nothing between them moves the prose off that edge.
     expect(column.slice(column.indexOf('>'))).not.toMatch(LEFT_INSET)
   })
 
