@@ -13,6 +13,8 @@
   - **The bundle** leaves two bare imports to the host, `effect` and `@spaces/sdk`. Take `zod` out of the plugin's `peerDependencies` and `devDependencies`; the host no longer resolves it, so a bundle that still imports it fails to load.
   - **`manifest.sdk` is `^2.0`.** The host refuses a 1.x bundle as it refuses any range it does not satisfy: the plugin reads as degraded until it is rebuilt.
 
+- `ROLES` loses `feeds`: feeds are built into Spaces (D87), so the catalogue has no Feeds group. A manifest or registry entry that still declares `roles: ['feeds']` is refused as an unknown role; drop the role, or name another.
+
 ### Minor Changes
 
 - Also carries what was pending for 1.5: the `watch` trigger with its own settings and `watchSettingsOf`; manifest `roles`, `mcp` and an action's `answers`; the enrichment vocabulary with `Facts.answer` and its picture, company and signal keys; the `identity.added` event; the mail, meeting and recorder lanes (`logEmail` with its snippet, `logMeeting`, `logRecordedNote`, `logInteraction`'s recorder payload) and payload actions (`input: 'payload'`); the storage-source provider, its typed read and write halves, `putFile`'s `changeToken` and `Http.stream`; settings `propertyOrder`; and the testing kit's `AiTest`, fake Box, fake Drive seeds and nudge, and the storage-source chaos list.

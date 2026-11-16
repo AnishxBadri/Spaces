@@ -46,30 +46,30 @@ describe('catalogueTabs', () => {
     const plugins = [
       { roles: ['email-calendar', 'files'] as const },
       { roles: ['import'] as const },
-      { roles: ['feeds'] as const },
+      { roles: ['research'] as const },
     ]
     expect(catalogueTabs(plugins)).toEqual([
       { id: 'all', label: 'All', count: 3 },
+      { id: 'research', label: 'Research', count: 1 },
       { id: 'email-calendar', label: 'Email & calendar', count: 1 },
       { id: 'files', label: 'Files', count: 1 },
       { id: 'import', label: 'Import', count: 1 },
-      { id: 'feeds', label: 'Feeds', count: 1 },
     ])
   })
 
   it('adds Other only when an entry names no role', () => {
     expect(
-      catalogueTabs([{ roles: ['feeds'] }]).map((t) => t.id),
+      catalogueTabs([{ roles: ['research'] }]).map((t) => t.id),
     ).not.toContain('other')
-    const withPlain = [{ roles: ['feeds'] as const }, { roles: [] }]
+    const withPlain = [{ roles: ['research'] as const }, { roles: [] }]
     expect(catalogueTabs(withPlain).at(-1)).toEqual({
       id: 'other',
       label: 'Other',
       count: 1,
     })
     expect(inTab({ roles: [] }, 'other')).toBe(true)
-    expect(inTab({ roles: ['feeds'] }, 'other')).toBe(false)
-    expect(inTab({ roles: ['feeds'] }, 'feeds')).toBe(true)
+    expect(inTab({ roles: ['research'] }, 'other')).toBe(false)
+    expect(inTab({ roles: ['research'] }, 'research')).toBe(true)
     expect(inTab({ roles: [] }, 'all')).toBe(true)
   })
 })
@@ -81,7 +81,7 @@ describe('figureOf', () => {
     signals: 0,
     people: 0,
   }
-  it('counts credits for an enrichment source, signals for a feed or researcher, people for an account', () => {
+  it('counts credits for an enrichment source, signals for a researcher, people for an account', () => {
     expect(
       figureOf({
         ...none,
@@ -92,7 +92,9 @@ describe('figureOf', () => {
     expect(
       figureOf({ ...none, roles: ['research', 'enrichment'], signals: 5 }),
     ).toBe('5 signals')
-    expect(figureOf({ ...none, roles: ['feeds'], signals: 1 })).toBe('1 signal')
+    expect(figureOf({ ...none, roles: ['research'], signals: 1 })).toBe(
+      '1 signal',
+    )
     expect(figureOf({ ...none, roles: ['files'], people: 1 })).toBe('1 person')
     expect(
       figureOf({ ...none, roles: ['email-calendar', 'files'], people: 3 }),
@@ -186,7 +188,7 @@ describe('capabilitiesOf', () => {
       ),
     ).toEqual([{ what: 'Fills company fields', owner: 'enrichment' }])
     expect(
-      capabilitiesOf(manifest({ roles: ['import', 'feeds'] })).map(
+      capabilitiesOf(manifest({ roles: ['import', 'research'] })).map(
         (c) => c.owner,
       ),
     ).toEqual(['import', 'watching'])

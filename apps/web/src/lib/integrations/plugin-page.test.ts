@@ -59,12 +59,12 @@ const run = <TValue, TError>(program: Effect.Effect<TValue, TError>) =>
   Effect.runPromise(program)
 
 describe('the page reads', () => {
-  it('what a feed sends and switches on, and no runs before it ran', async () => {
-    const rss = await install(manifest('rss', { roles: ['feeds'] }))
-    const detail = await run(integrationDetailProgram(rss))
+  it('what a researcher sends and switches on, and no runs before it ran', async () => {
+    const exa = await install(manifest('exa', { roles: ['research'] }))
+    const detail = await run(integrationDetailProgram(exa))
     expect(detail.sends).toEqual(['only the addresses its settings name'])
     expect(detail.capabilities).toEqual([
-      { what: 'Adds feed items as signals', owner: 'watching' },
+      { what: 'Researches records and spaces', owner: 'watching' },
     ])
     // Runs are runJob's to write; the worker's plugin-page-runs test reads them.
     expect(detail.runs).toEqual([])
@@ -72,8 +72,8 @@ describe('the page reads', () => {
 })
 
 describe('the one number', () => {
-  it('counts the signals a feed wrote and the people connected to the product a plugin reads', async () => {
-    const rss = await install(manifest('rss', { roles: ['feeds'] }))
+  it('counts the signals a researcher wrote and the people connected to the product a plugin reads', async () => {
+    const exa = await install(manifest('exa', { roles: ['research'] }))
     const drive = await install(
       manifest('google-drive', {
         roles: ['files'],
@@ -92,10 +92,10 @@ describe('the one number', () => {
     await db.insert(signal).values(
       [1, 2].map((n) => ({
         entityId: target.id,
-        source: 'rss',
+        source: 'exa',
         payload: { n },
         sourceClass: 'integration' as const,
-        sourceRef: rss,
+        sourceRef: exa,
       })),
     )
     // One person with two Drive accounts, and a Gmail account Drive does not read.
@@ -115,9 +115,9 @@ describe('the one number', () => {
 
     const rows = await run(integrationLedgerProgram())
     expect(rows.map((r) => [r.pluginId, r.roles, r.figure])).toEqual([
+      ['exa', ['research'], '2 signals'],
       ['google-drive', ['files'], '1 person'],
-      ['rss', ['feeds'], '2 signals'],
     ])
-    expect(drive).toBe(rows.at(0)?.id)
+    expect(drive).toBe(rows.at(1)?.id)
   })
 })

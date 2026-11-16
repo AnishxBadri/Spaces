@@ -70,7 +70,7 @@ describe('RegistryPane', () => {
   it('groups the registry by job in a Segmented, a count in each segment, every plugin under All', () => {
     const html = pane([
       plugin('airtable', ['import']),
-      plugin('rss', ['feeds']),
+      plugin('granola', ['meeting-notes']),
       plugin('m365', ['email-calendar', 'files']),
     ])
     expect(html).toContain('Available')
@@ -82,8 +82,8 @@ describe('RegistryPane', () => {
       'All 3',
       'Email &amp; calendar 1',
       'Files 1',
+      'Meeting notes 1',
       'Import 1',
-      'Feeds 1',
     ])
     expect(html.match(/data-plugin=/g)).toHaveLength(3)
     expect(html).toContain('>Import<')
@@ -92,17 +92,20 @@ describe('RegistryPane', () => {
   })
 
   it('opens an Other tab only when an entry names no role', () => {
-    expect(tabsOf(pane([plugin('rss', ['feeds'])]))).toEqual([
+    expect(tabsOf(pane([plugin('granola', ['meeting-notes'])]))).toEqual([
       'All 1',
-      'Feeds 1',
+      'Meeting notes 1',
     ])
-    const html = pane([plugin('rss', ['feeds']), plugin('legacy', [])])
-    expect(tabsOf(html)).toEqual(['All 2', 'Feeds 1', 'Other 1'])
+    const html = pane([
+      plugin('granola', ['meeting-notes']),
+      plugin('legacy', []),
+    ])
+    expect(tabsOf(html)).toEqual(['All 2', 'Meeting notes 1', 'Other 1'])
     expect(html).toContain('>Other<')
   })
 
   it('lets a member read every segment but install nothing', () => {
-    const html = pane([plugin('rss', ['feeds'])], true)
+    const html = pane([plugin('granola', ['meeting-notes'])], true)
     expect(html).not.toMatch(/role="radio"[^>]*disabled=""/)
     expect(html).toMatch(/disabled=""[^>]*>Install<\/button>/)
   })

@@ -14,7 +14,6 @@ export const ROLE_LABEL: { readonly [R in PluginRole]: string } = {
   files: 'Files',
   'meeting-notes': 'Meeting notes',
   import: 'Import',
-  feeds: 'Feeds',
 }
 
 export const ROLE_ORDER: ReadonlyArray<PluginRole> = [
@@ -24,7 +23,6 @@ export const ROLE_ORDER: ReadonlyArray<PluginRole> = [
   'files',
   'meeting-notes',
   'import',
-  'feeds',
 ]
 
 /** `Research · Enrichment`, in the manifest's order; empty for none. */
@@ -74,8 +72,8 @@ const plural = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`
 
 /**
- * The ledger's one number, by the job the plugin does: signals for a feed or
- * a researcher, credits for an enrichment source, people connected for an
+ * The ledger's one number, by the job the plugin does: signals for a
+ * researcher, credits for an enrichment source, people connected for an
  * account-backed plugin. With no role it falls back on what the manifest
  * asks for; a dash when nothing counts.
  */
@@ -93,7 +91,7 @@ export function figureOf(input: {
     credits.cap === null
       ? `${credits.used} credits`
       : `${credits.used} / ${credits.cap} credits`
-  if (roles.includes('feeds') || roles.includes('research')) return signals
+  if (roles.includes('research')) return signals
   if (roles.includes('enrichment')) return spent
   if (
     roles.includes('email-calendar') ||
@@ -200,8 +198,6 @@ export function capabilitiesOf(
         }
       case 'research':
         return { what: 'Researches records and spaces', owner: 'watching' }
-      case 'feeds':
-        return { what: 'Adds feed items as signals', owner: 'watching' }
       case 'email-calendar':
         return { what: 'Syncs mail and calendars', owner: 'email-calendar' }
       case 'files':

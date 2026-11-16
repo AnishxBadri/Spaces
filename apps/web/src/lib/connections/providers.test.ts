@@ -94,12 +94,12 @@ describe('the bundled plugins and Plugins', () => {
       .values([
         { capabilityId: 'gmail', version: '0.1.0', enabled: true },
         { capabilityId: 'box', version: '0.1.0', enabled: true },
-        { capabilityId: 'rss', version: '0.1.0', enabled: true },
+        { capabilityId: 'airtable', version: '0.1.0', enabled: true },
       ])
       .returning({ id: integration.id, capabilityId: integration.capabilityId })
 
     expect((await listIntegrationsHandler()).map((r) => r.pluginId)).toEqual([
-      'rss',
+      'airtable',
     ])
     expect(await countIntegrationsHandler()).toBe(1)
 

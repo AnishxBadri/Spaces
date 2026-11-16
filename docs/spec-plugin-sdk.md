@@ -66,7 +66,7 @@ packages/
   sdk/            @spaces/sdk — manifest, port interfaces, trigger shapes, claims, definePlugin, testing/
   config/         tsconfig.base, eslint, prettier
 plugins/
-  apollo/ exa/ rss/ gmail/ google-drive/ …   each imports sdk only; builds to bundle.mjs + manifest.json + migrations/
+  apollo/ exa/ gmail/ google-drive/ …        each imports sdk only; builds to bundle.mjs + manifest.json + migrations/
 docker/           Dockerfile (turbo prune --scope=web --scope=worker --docker), compose*.yml, entrypoint.sh
 registry.json     plugin index; committed; copied into the image
 ```
@@ -118,7 +118,7 @@ it without loading the bundle.
   sdk: '^2.0',                           // semver range against SDK_VERSION
   name, description, icon?,
   roles?: ['enrichment' | 'research' | 'email-calendar' | 'files'
-           | 'meeting-notes' | 'import' | 'feeds'],   // catalogue grouping (D81, SDK 1.4)
+           | 'meeting-notes' | 'import'],   // catalogue grouping (D81, SDK 1.4)
   requires: {
     credential?: { kind: 'enrichment' | 'search' | 'llm', scope: 'workspace' },
     connection?: { provider: 'google', scopes: ['drive.readonly'] },   // §12
@@ -597,7 +597,7 @@ Settings → Integrations → Available → [Install]
 ```
 
 Web moves bytes and writes rows; it never executes plugin code.
-`SPACES_PLUGINS=apollo,rss` is an optional first-boot convenience that runs
+`SPACES_PLUGINS=apollo,exa` is an optional first-boot convenience that runs
 the same installer; `SPACES_CREDENTIAL_<ID>=…` seeds the vault once, then
 is ignored (env is an input to the vault, never the store). Required env
 stays `{DATABASE_URL, APP_URL}`.

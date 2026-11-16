@@ -422,7 +422,7 @@ export type HttpStreamResponse = {
  * says, and maps a 429 to `JobRateLimited`; any other status comes back as a
  * response for the job to judge.
  *
- * - `request` reads the body as text: JSON and feeds.
+ * - `request` reads the body as text: JSON, XML, HTML.
  * - `stream` never buffers the body and never decodes it: bytes, of any
  *   size. Same throttle, same 429 rule.
  */

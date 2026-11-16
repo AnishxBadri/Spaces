@@ -55,7 +55,7 @@ packages/db     @spaces/db      drizzle schema, migrations, ENTITY_REFS, heartbe
 packages/core   @spaces/core    the domain: pure logic, and writes/ (the only db-coupled half)
 packages/sdk    @spaces/sdk     the plugin contract: manifest, ports, testing kit, build, packer
 packages/config @spaces/config  tsconfig base, eslint base and rules, prettier base
-plugins/*                       apollo, box, exa, gmail, google-calendar, google-drive, granola, rss, airtable
+plugins/*                       apollo, box, exa, gmail, google-calendar, google-drive, granola, airtable
 plugins/_fixtures/*             test plugins for the loader and the ports
 docker/                         Dockerfile (turbo prune) and the entrypoint
 deploy/                         one-click templates: coolify, railway, render, unraid
@@ -246,7 +246,7 @@ The tier where an investing CRM stops being a pipeline tracker: pure graph, regi
 
 Every integration classifies into an existing lane: identity → aliases through `resolveEntity`; sourced facts → fill-blanks with receipts; content → the document pipeline; generated judgment → suggestions. No category needs a new lane.
 
-- Built: storage sources (Drive, Box), mail and calendar, recorders, enrichment (Apollo, Exa), AI, import dialects (Airtable through the `Import` port), outbound MCP and `/api/v1`. Feeds are decided as built in (D87).
+- Built: storage sources (Drive, Box), mail and calendar, recorders, enrichment (Apollo, Exa), AI, import dialects (Airtable through the `Import` port), outbound MCP and `/api/v1`. Feeds are built in, not a plugin (D87): the parser in `packages/core/src/feeds/`, the half-hourly poller in the worker, the Feeds page in Library.
 - Mapped, not built: **native forms** rendered from the registry outward (pitch submission, founder updates, DD questionnaires, referral intake). **WhatsApp**: lane 0 parses the native "export chat" upload (no ToS exposure); lane 1 is an opt-in companion container on the WhatsApp Web protocol, read-only, 1:1 chats, opt-in per chat, documented plainly as ToS-violating at the user's risk, and last on the map; the Business Cloud API is the wrong shape. **A capture extension**: an MV3 thin client that posts visible page text to the user's own instance with a token; extraction happens server-side against the registry; manual and user-initiated only, versioned so drift reads "update me". **Outbound delivery** stays pull (D28).
 
 ## Team, auth and tokens

@@ -49,7 +49,6 @@ export const ROLES = [
   'files',
   'meeting-notes',
   'import',
-  'feeds',
 ] as const
 export type PluginRole = (typeof ROLES)[number]
 

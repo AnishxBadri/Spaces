@@ -56,7 +56,6 @@
     "@spaces/plugin-poller": "workspace:*",
     "@spaces/plugin-recorder-webhook": "workspace:*",
     "@spaces/plugin-researcher": "workspace:*",
-    "@spaces/plugin-rss": "workspace:*",
     "@spaces/plugin-syncer": "workspace:*",
     "@spaces/plugin-tabled": "workspace:*",
     "@spaces/plugin-tampered": "workspace:*",

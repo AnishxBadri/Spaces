@@ -154,7 +154,7 @@ describe('the Available pane', () => {
     serve(
       echo('1.0.0'),
       echo('1.2.0'),
-      fixturePlugin({ id: 'rss', version: '0.1.0', signer }),
+      fixturePlugin({ id: 'granola', version: '0.1.0', signer }),
     )
     expect(await run(availableProgram(source))).toEqual({
       available: [
@@ -167,9 +167,9 @@ describe('the Available pane', () => {
           needs: 'Echo key',
         },
         {
-          pluginId: 'rss',
-          name: 'Rss',
-          description: 'The rss fixture.',
+          pluginId: 'granola',
+          name: 'Granola',
+          description: 'The granola fixture.',
           version: '0.1.0',
           roles: [],
           needs: 'no key',
@@ -178,7 +178,7 @@ describe('the Available pane', () => {
       error: null,
     })
 
-    await run(installFromRegistryProgram(FIXTURE_ACTOR.id, 'rss', source))
+    await run(installFromRegistryProgram(FIXTURE_ACTOR.id, 'granola', source))
     expect(
       (await run(availableProgram(source))).available.map((a) => a.pluginId),
     ).toEqual(['echo'])
@@ -196,13 +196,13 @@ describe('the Available pane', () => {
     }
     serve(
       roled('airtable', ['import']),
-      roled('rss', ['feeds']),
+      roled('granola', ['meeting-notes']),
       fixturePlugin({ id: 'legacy', version: '0.1.0', signer }),
     )
     const view = await run(availableProgram(source))
     expect(view.available.map((a) => [a.pluginId, a.roles])).toEqual([
       ['airtable', ['import']],
-      ['rss', ['feeds']],
+      ['granola', ['meeting-notes']],
       ['legacy', []],
     ])
 
@@ -210,7 +210,7 @@ describe('the Available pane', () => {
     await run(installFromRegistryProgram(FIXTURE_ACTOR.id, 'airtable', source))
     expect(
       (await run(availableProgram(source))).available.map((a) => a.pluginId),
-    ).toEqual(['rss', 'legacy'])
+    ).toEqual(['granola', 'legacy'])
   })
 
   it('says why when the registry cannot be read', async () => {

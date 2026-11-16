@@ -954,7 +954,7 @@ port, the shipped nav and pages stand; build toward this:
     and Disconnect.
 - **Plugins is a catalogue:** Installed as a ledger, then Available from the registry
   under tabs by job (Enrichment, Research, Email & calendar, Files, Meeting notes,
-  Import, Feeds).
+  Import).
 
 An object's attributes are a settings ledger too (2026-09-11): a caps column head on a
 hairline — ATTRIBUTE · TYPE · CONSTRAINTS · ORIGIN · ORDER · EDIT — with the lanes shared

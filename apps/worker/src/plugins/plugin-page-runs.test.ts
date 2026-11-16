@@ -80,7 +80,7 @@ const install = async (id: string) => {
           sdk: '^1.4',
           name: id,
           description: `The ${id} plugin.`,
-          roles: ['feeds'],
+          roles: ['research'],
           settings: {},
           jobs: { poll: { trigger: 'action', uses: ['Http'] } },
         },
@@ -111,19 +111,19 @@ const attempt = (
 
 describe('Recent runs on the plugin page', () => {
   it('reads job_run for that integration only, newest first, with the provider error text', async () => {
-    const rss = await install('rss')
+    const exa = await install('exa')
     const other = await install('other')
-    await attempt('rss', rss, Effect.succeed('fetched 3 · written 1'))
+    await attempt('exa', exa, Effect.succeed('fetched 3 · written 1'))
     await attempt('other', other, Effect.succeed('not this plugin'))
     await attempt(
-      'rss',
-      rss,
-      Effect.fail(new JobPermanent({ reason: 'feed answered 404 Not Found' })),
+      'exa',
+      exa,
+      Effect.fail(new JobPermanent({ reason: 'Exa answered 404 Not Found' })),
     )
 
-    const detail = await Effect.runPromise(integrationDetailProgram(rss))
+    const detail = await Effect.runPromise(integrationDetailProgram(exa))
     expect(detail.runs.map((r) => [r.job, r.status, r.line])).toEqual([
-      ['poll', 'failed', 'permanent: feed answered 404 Not Found'],
+      ['poll', 'failed', 'permanent: Exa answered 404 Not Found'],
       ['poll', 'succeeded', 'fetched 3 · written 1'],
     ])
     for (const run of detail.runs) {

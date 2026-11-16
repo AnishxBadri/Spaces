@@ -17,7 +17,7 @@ x-env: &env
   # SMTP_URL:
   # STORAGE_DRIVER: local
   # First-boot plugin install and key seed; see docs/install.md.
-  # SPACES_PLUGINS: apollo,rss
+  # SPACES_PLUGINS: apollo,exa
   # SPACES_CREDENTIAL_APOLLO:
 
 services:

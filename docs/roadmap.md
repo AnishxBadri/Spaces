@@ -36,6 +36,7 @@ What is shipped, what is open, and what comes next. Linear (team `Spaces`) holds
 30. The canvas lands — the instrument port, with its follow-ups `port-C1` and `port-C2`
 31. Edges and the AI shape — the edge, cards and folder tabs, one icon list, the prompt's system and user parts with cache markers, the note page as a record, the bone ground, the record rail, settings in group cards and the owner's review fixes (one slice open, below)
 32. One backend grammar — I/O is Effect (D84), Effect Schema with SDK 2.0 (D85), two note kinds (D83), ownership counts sales
+33. Feeds are built in — the poller and parser, stored logos and photos, the Feeds page with Sources and Headlines, feeds in spaces and on Today; the RSS plugin and the SDK's `feeds` role retire (D87)
 
 Plus the UI sweep (the printed sheets landing) and Corrections.
 
@@ -48,12 +49,6 @@ Plus the UI sweep (the printed sheets landing) and Corrections.
 - `SPA-408` — a list is a fixed pane (D106): the card fills the window, rows scroll inside, the foot holds the bottom, the row `···` pins right, the search ends on the card's edge. `afk`, size M; shares the foot with `SPA-407`.
 - `SPA-409` `notes-2` — the note page on the bone ground: the body a paper card, the rail unboxed with rule dividers, the head on the 24px page edge and the prose on the card's own 56px gutter (D107 keeps the page scroll). `afk`, size S.
 - `SPA-410` `notes-3` — a failed note save says `Not saved · Retry` in crimson, retries once by itself, leaving warns while an edit has not landed, and the delete window says only `Can’t be undone.` above what the note leaves. `afk`, size S.
-- `SPA-411` `feeds-1` — feed tables, the 30-minute poller with conditional fetch, site-to-feed discovery and 90-day retention (D87). Project 33; `migration`, `touches:entity-refs`, `afk`, size L.
-- `SPA-412` `feeds-2` — logos and item photos fetched and stored by the worker, never hotlinked, held by the orphan sweep. `afk`, size M; after feeds-1.
-- `SPA-413` `feeds-3` — the Feeds page (`G R`), its Sources tab and the one feed window that adds, edits, fixes and removes. `afk`, size M; after feeds-1 and `SPA-408`.
-- `SPA-414` `feeds-4` — Headlines: stories beside a reader that shows the feed's own text, the space filter, the states and narrow. `afk`, size M; after feeds-3 and `SPA-408`.
-- `SPA-415` `feeds-5` — two headlines at most in a space's What's moving, each feed a row in Watching, one line on Today. `afk`, size M; after feeds-3.
-- `SPA-416` `feeds-6` — `plugins/rss` deleted, the SDK's `feeds` role dropped inside the unreleased 2.0.0, the catalogue's Feeds group gone. `afk`, size S; last.
 
 ## Next, in order
 
@@ -65,7 +60,7 @@ Plus the UI sweep (the printed sheets landing) and Corrections.
 
 ## Owner calls
 
-- **Plugin release** — the SDK is 2.0.0 on main with its notes in `packages/sdk/CHANGELOG.md`, and the nine plugins are still 0.1.0 with 1.x builds released nowhere. To release: bump each plugin that changed (`pnpm release:bump <id> minor`), push, and the Tag workflow pushes `plugin-<id>@X.Y.Z` (it needs `RELEASE_TOKEN`, and the plugin workflow needs the signing key). The push that carries the 2.0.0 bump tags `sdk@2.0.0`; no workflow listens for an sdk tag. A running install must reinstall apollo, exa, rss, granola and airtable after that release; the four bundled plugins upgrade on first boot once their version is above 0.1.0, and read as degraded on a 2.0 host until then.
+- **Plugin release** — the SDK is 2.0.0 on main with its notes in `packages/sdk/CHANGELOG.md`, and the eight plugins are still 0.1.0 with 1.x builds released nowhere. To release: bump each plugin that changed (`pnpm release:bump <id> minor`), push, and the Tag workflow pushes `plugin-<id>@X.Y.Z` (it needs `RELEASE_TOKEN`, and the plugin workflow needs the signing key). The push that carries the 2.0.0 bump tags `sdk@2.0.0`; no workflow listens for an sdk tag. A running install must reinstall apollo, exa, rss, granola and airtable after that release; the four bundled plugins upgrade on first boot once their version is above 0.1.0, and read as degraded on a 2.0 host until then.
 - **Gmail reconnect** — older connections lack `gmail.send` and must reconnect before sending.
 
 ## Unticketed follow-ups

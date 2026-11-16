@@ -75,21 +75,21 @@ const apollo: IntegrationDetail = {
   ],
 }
 
-const rss: IntegrationDetail = {
+const exa: IntegrationDetail = {
   ...apollo,
   id: '00000000-0000-4000-8000-000000000002',
-  pluginId: 'rss',
-  name: 'RSS',
-  roles: ['feeds'],
+  pluginId: 'exa',
+  name: 'Exa',
+  roles: ['research'],
   figure: '5 signals',
   secrets: [],
   sends: ['only the addresses its settings name'],
-  capabilities: [{ what: 'Adds feed items as signals', owner: 'watching' }],
+  capabilities: [{ what: 'Researches records and spaces', owner: 'watching' }],
   runs: [],
 }
 
 const unread: IntegrationDetail = {
-  ...rss,
+  ...exa,
   id: '00000000-0000-4000-8000-000000000003',
   pluginId: 'unread',
   name: 'unread',
@@ -142,7 +142,7 @@ describe('PluginTemplate', () => {
         }),
       ),
     ).toEqual([...PLUGIN_BLOCKS])
-    expect(blocksOf(render(rss))).toEqual(['status', 'sends', 'used-by'])
+    expect(blocksOf(render(exa))).toEqual(['status', 'sends', 'used-by'])
     // Unread: only Status, which says why.
     expect(blocksOf(render(unread))).toEqual(['status'])
   })
@@ -164,7 +164,7 @@ describe('PluginTemplate', () => {
     expect(block(html, 'key')).toContain('key rows')
     expect(block(html, 'key')).toContain('saved')
     expect(block(html, 'settings')).toContain('settings form')
-    const plain = render(rss)
+    const plain = render(exa)
     expect(plain).not.toContain('No workspace key.')
     expect(plain).not.toContain('No settings.')
   })
@@ -176,7 +176,7 @@ describe('PluginTemplate', () => {
     expect(on).toContain('href="/settings/enrichment')
     expect(on).toContain('Fields ›')
     expect(on).not.toMatch(/<(input|button|select)/)
-    expect(block(render(rss), 'used-by')).toContain('href="/spaces"')
+    expect(block(render(exa), 'used-by')).toContain('href="/spaces"')
   })
 
   it('lists recent runs newest first with the provider error text', () => {

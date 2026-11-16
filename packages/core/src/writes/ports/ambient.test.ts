@@ -136,7 +136,7 @@ describe('ConfigLive', () => {
     })
   })
 
-  /** rss's shape: two required settings with no default, one with. */
+  /** Two required settings with no default, one with. */
   const required = Schema.Struct({
     feedUrl: Schema.String.check(
       Schema.makeFilter((text: string) => /^https?:\/\//.test(text)),

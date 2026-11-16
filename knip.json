@@ -123,7 +123,6 @@
         "@spaces/plugin-poller",
         "@spaces/plugin-recorder-webhook",
         "@spaces/plugin-researcher",
-        "@spaces/plugin-rss",
         "@spaces/plugin-syncer",
         "@spaces/plugin-tabled",
         "@spaces/plugin-tampered",

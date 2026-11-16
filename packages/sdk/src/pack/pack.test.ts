@@ -167,8 +167,8 @@ describe('packPlugin', () => {
         outDir: mkdtempSync(join(tmpdir(), 'spaces-pack-out-')),
         privateKey,
       })
-    const roled = await pack({ ...manifest, roles: ['import', 'feeds'] })
-    expect(roled.entry?.roles).toEqual(['import', 'feeds'])
+    const roled = await pack({ ...manifest, roles: ['import', 'files'] })
+    expect(roled.entry?.roles).toEqual(['import', 'files'])
     expect(Schema.decodeUnknownSync(registrySchema)([roled.entry])).toEqual([
       roled.entry,
     ])

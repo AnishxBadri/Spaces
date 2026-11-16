@@ -116,7 +116,7 @@ describe('the grant', () => {
   it('flag on: a plugin with no cassette stays on the live transport', async () => {
     const live = liveTransport()
     const { http } = await granted(
-      boundRow('rss'),
+      boundRow('airtable'),
       live.fetch,
       cassetteProviders(),
     )

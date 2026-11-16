@@ -105,7 +105,7 @@ describe('manifestSchema', () => {
       expect(parse(base())).not.toHaveProperty('roles')
     })
 
-    it('takes any of the seven jobs the catalogue groups by (D81)', () => {
+    it('takes any of the six jobs the catalogue groups by (D81)', () => {
       expect(ROLES).toEqual([
         'enrichment',
         'research',
@@ -113,7 +113,6 @@ describe('manifestSchema', () => {
         'files',
         'meeting-notes',
         'import',
-        'feeds',
       ])
       expect(issues({ ...base(), roles: ['research', 'enrichment'] })).toEqual(
         [],
@@ -128,7 +127,7 @@ describe('manifestSchema', () => {
 
     it('refuses an empty list and a repeated role', () => {
       expect(issues({ ...base(), roles: [] })).toHaveLength(1)
-      expect(issues({ ...base(), roles: ['feeds', 'feeds'] })).toEqual([
+      expect(issues({ ...base(), roles: ['files', 'files'] })).toEqual([
         'roles: roles names each role once',
       ])
     })

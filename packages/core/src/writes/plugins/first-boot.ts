@@ -34,7 +34,7 @@ import type { InstallerError } from './install.ts'
  *   tarballs in the image's `bundled-plugins/`. Each gets one live row: a
  *   missing or uninstalled one is installed, an older one upgraded to the
  *   image's version, and the same version is left alone.
- * - `SPACES_PLUGINS=apollo,rss` installs each named plugin that has no live
+ * - `SPACES_PLUGINS=apollo,exa` installs each named plugin that has no live
  *   row, from the bundled registry's newest satisfying entry, through
  *   `installPlugin`. A plugin with a live row is skipped before any fetch,
  *   so the second boot reads nothing and writes nothing. Unsetting the
@@ -80,11 +80,11 @@ export type FirstBootResult = {
   readonly seeded: ReadonlyArray<string>
 }
 
-/** The env var that seeds a plugin's key: `rss-feeds` → `SPACES_CREDENTIAL_RSS_FEEDS`. */
+/** The env var that seeds a plugin's key: `google-drive` → `SPACES_CREDENTIAL_GOOGLE_DRIVE`. */
 export const credentialVariable = (pluginId: string): string =>
   `${CREDENTIAL_PREFIX}${pluginId.toUpperCase().replaceAll('-', '_')}`
 
-/** `apollo, rss` → the ids, and the tokens that are not plugin ids. */
+/** `apollo, exa` → the ids, and the tokens that are not plugin ids. */
 export const namedPlugins = (
   value: string | undefined,
 ): { readonly ids: Array<string>; readonly invalid: Array<string> } => {

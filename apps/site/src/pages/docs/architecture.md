@@ -46,7 +46,7 @@ A pnpm workspace, built with Turborepo. Each package's dependencies are an allow
 | `packages/core`   | The domain: the attribute engine, entity resolution and merge, the vault, storage, portfolio math. | shipped |
 | `packages/config` | Shared TypeScript, ESLint and Prettier configuration, including the dependency rules.              | shipped |
 | `packages/sdk`    | `@spaces/sdk`: the plugin manifest, port interfaces and `definePlugin`. Imports nothing internal.  | shipped |
-| `plugins/*`       | Integrations such as Apollo, RSS, Gmail and Google Drive. Each imports the SDK only.               | shipped |
+| `plugins/*`       | Integrations such as Apollo, Exa, Gmail and Google Drive. Each imports the SDK only.               | shipped |
 
 The dependency rules:
 

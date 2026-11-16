@@ -88,7 +88,7 @@ Everything else is optional and has a default:
 | `STORAGE_DRIVER`         | `local`                     | `s3` puts blobs in a bucket instead of `./data` (`S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`)       |
 | `BETTER_AUTH_SECRET`     | derived from the master key | set it only if you want the session-signing secret rotated separately                                                                                              |
 | `ROLE`                   | `all`                       | the shipped compose sets `web` and `worker`; `all` runs both in one container, for hosts that run only one (see _Web and worker_, below)                           |
-| `SPACES_PLUGINS`         | unset                       | plugins to install on first boot (`apollo,rss`) from the image's registry snapshot; one already installed is skipped, and removing the variable uninstalls nothing |
+| `SPACES_PLUGINS`         | unset                       | plugins to install on first boot (`apollo,exa`) from the image's registry snapshot; one already installed is skipped, and removing the variable uninstalls nothing |
 | `SPACES_CREDENTIAL_<ID>` | unset                       | seeds a plugin's workspace key once, when none is stored (`SPACES_CREDENTIAL_APOLLO`); a key changed in Settings wins from then on                                 |
 
 AI providers, enrichment keys and everything a user can configure are set

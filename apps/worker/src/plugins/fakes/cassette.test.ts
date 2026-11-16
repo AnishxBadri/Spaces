@@ -173,7 +173,7 @@ describe('cassetteProviders', () => {
   })
 
   it('stands in for nothing else, and for nothing outside a workspace', () => {
-    expect(cassetteProviders().standIn('rss')).toBeNull()
+    expect(cassetteProviders().standIn('airtable')).toBeNull()
     expect(cassetteProviders().standIn('../apollo')).toBeNull()
     expect(cassetteProviders(null).standIn('apollo')).toBeNull()
   })
