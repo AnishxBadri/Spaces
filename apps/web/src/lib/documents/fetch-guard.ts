@@ -29,8 +29,14 @@ export type GuardedFetchResult =
       readonly ok: true
       /** The URL the bytes actually came from — after every redirect. */
       readonly url: string
+      /**
+       * 2xx, or 304 when the request carried a validator and the site
+       * answered that nothing changed: no body, `bytes` empty.
+       */
       readonly status: number
       readonly contentType: string | null
+      /** The final response's headers: a feed reads its validators here. */
+      readonly headers: Headers
       readonly bytes: Uint8Array
     }
   | {
@@ -46,6 +52,10 @@ export type GuardedFetchResult =
       readonly reason: string
       /** The body passed `maxBytes`: a refusal a caller may name apart. */
       readonly tooLarge?: boolean
+      /** The site answered, with this non-2xx status. */
+      readonly status?: number
+      /** The shared timeout ran out, mid-hop or mid-body. */
+      readonly timedOut?: boolean
     }
 
 /** Parse, or say why it is not a URL at all. */
@@ -248,6 +258,11 @@ export type GuardedFetchOptions = {
   readonly maxBytes: number
   /** Total wall clock for the whole chain — every hop and the body read. */
   readonly timeoutMs: number
+  /**
+   * Request headers laid over the defaults, sent on every hop: a feed's
+   * `if-none-match`, its own `accept` and `user-agent`. Lower-case names.
+   */
+  readonly headers?: Readonly<Record<string, string>>
 }
 
 /**
@@ -286,7 +301,7 @@ export const guardedFetch = (
  */
 async function walkHops(
   raw: string,
-  { maxBytes, timeoutMs }: GuardedFetchOptions,
+  { maxBytes, timeoutMs, headers = {} }: GuardedFetchOptions,
 ): Promise<GuardedFetchResult> {
   const signal = AbortSignal.timeout(timeoutMs)
   let target = raw.trim()
@@ -307,16 +322,22 @@ async function walkHops(
           'user-agent': 'Spaces/1.0 (+self-hosted document clipper)',
           accept:
             'text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8',
+          ...headers,
         },
       })
     } catch (err) {
-      return {
-        ok: false,
-        kind: 'network',
-        reason: signal.aborted
-          ? `The page did not answer within ${String(timeoutMs)}ms.`
-          : `Could not reach ${target}: ${messageOf(err)}`,
-      }
+      return signal.aborted
+        ? {
+            ok: false,
+            kind: 'network',
+            reason: `The page did not answer within ${String(timeoutMs)}ms.`,
+            timedOut: true,
+          }
+        : {
+            ok: false,
+            kind: 'network',
+            reason: `Could not reach ${target}: ${messageOf(err)}`,
+          }
     }
 
     if (isRedirect(res.status)) {
@@ -339,12 +360,29 @@ async function walkHops(
       continue
     }
 
-    if (!res.ok)
+    // Only a request that sent a validator can be answered 304; the body
+    // is empty by definition, so nothing is read.
+    if (res.status === 304) {
+      await res.body?.cancel().catch(() => {})
+      return {
+        ok: true,
+        url: target,
+        status: 304,
+        contentType: res.headers.get('content-type'),
+        headers: res.headers,
+        bytes: new Uint8Array(),
+      }
+    }
+
+    if (!res.ok) {
+      await res.body?.cancel().catch(() => {})
       return {
         ok: false,
         kind: 'network',
         reason: `${target} answered ${String(res.status)}.`,
+        status: res.status,
       }
+    }
 
     const read = await readCapped(res, maxBytes).catch((err: unknown) => ({
       reason: signal.aborted
@@ -352,16 +390,25 @@ async function walkHops(
         : `Could not read ${target}: ${messageOf(err)}`,
       tooLarge: false,
     }))
-    if ('reason' in read)
-      return read.tooLarge
-        ? { ok: false, kind: 'refused', reason: read.reason, tooLarge: true }
+    if ('reason' in read) {
+      if (read.tooLarge)
+        return {
+          ok: false,
+          kind: 'refused',
+          reason: read.reason,
+          tooLarge: true,
+        }
+      return signal.aborted
+        ? { ok: false, kind: 'refused', reason: read.reason, timedOut: true }
         : { ok: false, kind: 'refused', reason: read.reason }
+    }
 
     return {
       ok: true,
       url: target,
       status: res.status,
       contentType: res.headers.get('content-type'),
+      headers: res.headers,
       bytes: read.bytes,
     }
   }

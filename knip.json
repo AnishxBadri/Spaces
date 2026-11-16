@@ -16,6 +16,8 @@
         "src/test/*.ts",
         "src/lib/ai/route.ts!",
         "src/lib/queue.ts!",
+        "src/lib/feeds/poll.ts!",
+        "src/lib/feeds/fixtures.ts",
         "src/test/queue-stub.ts",
         "src/lib/documents/refile.ts!",
         "src/lib/server/shared.ts!",

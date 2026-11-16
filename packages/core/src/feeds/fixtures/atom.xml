@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title type="text">Contoso Labs Engineering</title>
+  <link rel="self" href="https://contoso-labs.example/blog/atom.xml" />
+  <link rel="alternate" href="https://contoso-labs.example/blog" />
+  <id>urn:uuid:7b0c55f4-2a1e-4c0b-9a51-3f3d2b1c0a10</id>
+  <updated>2026-10-02T12:00:00Z</updated>
+  <author><name>Contoso Labs</name></author>
+  <entry>
+    <title type="html">Shipping &lt;code&gt;v2&lt;/code&gt; of the inference engine</title>
+    <link rel="alternate" type="text/html" href="https://contoso-labs.example/blog/engine-v2" />
+    <link rel="replies" href="https://contoso-labs.example/blog/engine-v2#comments" />
+    <id>tag:contoso-labs.example,2026:blog/engine-v2</id>
+    <published>2026-10-02T12:00:00Z</published>
+    <updated>2026-10-02T12:30:00Z</updated>
+    <summary>Twice the throughput on the same hardware.</summary>
+  </entry>
+  <entry>
+    <title>Contoso Labs opens a Berlin office</title>
+    <link href="https://contoso-labs.example/blog/berlin" />
+    <id>tag:contoso-labs.example,2026:blog/berlin</id>
+    <updated>2026-09-18T09:15:00+02:00</updated>
+    <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>Our second office, opening in <strong>November</strong>.</p></div></content>
+  </entry>
+  <entry>
+    <title>Notes from our seed round</title>
+    <link rel="alternate" href="https://contoso-labs.example/blog/seed" />
+    <id>tag:contoso-labs.example,2026:blog/seed</id>
+    <published>2026-08-30T16:00:00Z</published>
+    <summary type="html">&lt;p&gt;What we learned raising &amp;#163;2M.&lt;/p&gt;</summary>
+  </entry>
+</feed>

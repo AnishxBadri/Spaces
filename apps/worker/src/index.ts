@@ -41,6 +41,7 @@ import { pluginBreakerLayer } from './plugins/breaker'
 import { dedupeSweep } from './jobs/dedupe-sweep'
 import { sweepOrphanBlobs } from './jobs/sweep-orphan-blobs'
 import { pruneIngress } from './jobs/prune-ingress'
+import { feedEnqueue, feedFetch, feedPoll, feedPrune } from './jobs/feeds'
 import { rollInteractionStats } from './jobs/roll-interaction-stats'
 import { readDeck } from './jobs/read-deck'
 import { summarize } from './jobs/summarize'
@@ -278,6 +279,35 @@ async function main() {
         pluginBreakerLayer(plugins),
       ),
     }),
+  )
+  // Feeds: the half-hourly poll sends one fetch per feed and is never
+  // retried; a fetch is `stately` with `singletonKey = feedId`, so one feed
+  // is never fetched twice at once, and retries a timeout or a 5xx within
+  // the half hour. Created before the plain create loop below.
+  await boss
+    .createQueue(QUEUES.feedPoll, { policy: 'singleton' })
+    .catch(() => {})
+  await boss
+    .createQueue(QUEUES.feedFetch, { policy: 'stately' })
+    .catch(() => {})
+  for (const def of [feedPoll, feedFetch]) {
+    const retry = def.retry
+    if (retry)
+      await boss.updateQueue(def.name, {
+        retryLimit: retry.limit,
+        retryDelay: retry.delaySeconds,
+        retryBackoff: retry.backoff,
+      })
+  }
+  await boss.work(
+    QUEUES.feedPoll,
+    { batchSize: 1, includeMetadata: true },
+    runJob(feedPoll, { host, layer: feedEnqueue }),
+  )
+  await boss.work(
+    QUEUES.feedFetch,
+    { batchSize: 1, includeMetadata: true },
+    runJob(feedFetch, { host, layer: Layer.empty }),
   )
   // An enrichment run: `stately` with `singletonKey = entityId`, so a
   // burst of triggers on one record is one queued run. Its sources run in
@@ -704,6 +734,12 @@ async function main() {
     { includeMetadata: true },
     runJob(pruneIngress, { host, layer: Layer.empty }),
   )
+  // Headlines past their 90 days: one delete, no Layer.
+  await boss.work(
+    QUEUES.feedPrune,
+    { includeMetadata: true },
+    runJob(feedPrune, { host, layer: Layer.empty }),
+  )
   // A next meeting that has started becomes last contact: one recompute.
   await boss.work(
     QUEUES.rollInteractionStats,
@@ -712,7 +748,7 @@ async function main() {
   )
 
   // The clock's jobs (`CORE_SCHEDULES`): dedupe, orphan blobs, ingress
-  // prune, stats roll, storage change poll.
+  // prune, stats roll, storage change poll, feed poll and prune.
   await scheduleCoreJobs(boss)
 
   // The heartbeat. Last, so the row only appears once this process

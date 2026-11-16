@@ -12,7 +12,7 @@ import { CORE_SCHEDULES, CORE_SCHEDULE_TZ, scheduleCoreJobs } from './schedules'
 const ENRICHMENT_QUEUES: ReadonlyArray<string> = [QUEUES.enrichmentRun]
 
 describe('the worker’s schedule list', () => {
-  it('schedules the four nightly scans, the stats roll, the storage poll and no enrichment queue', () => {
+  it('schedules the four nightly scans, the stats roll, the storage poll, the feed poll and prune, and no enrichment queue', () => {
     expect(CORE_SCHEDULES.map((s) => s.queue)).toEqual([
       QUEUES.dedupeSweep,
       QUEUES.sweepOrphanBlobs,
@@ -20,6 +20,8 @@ describe('the worker’s schedule list', () => {
       QUEUES.summarizeEmailBackfill,
       QUEUES.rollInteractionStats,
       QUEUES.pollStorageChanges,
+      QUEUES.feedPoll,
+      QUEUES.feedPrune,
     ])
     for (const { queue } of CORE_SCHEDULES)
       expect(ENRICHMENT_QUEUES).not.toContain(queue)
@@ -40,6 +42,9 @@ describe('the worker’s schedule list', () => {
     expect(
       CORE_SCHEDULES.find((s) => s.queue === QUEUES.pollStorageChanges)?.cron,
     ).toBe('*/15 * * * *')
+    expect(CORE_SCHEDULES.find((s) => s.queue === QUEUES.feedPoll)?.cron).toBe(
+      '*/30 * * * *',
+    )
     const connectionString = process.env.DATABASE_URL
     if (connectionString === undefined) throw new Error('DATABASE_URL is unset')
     // The cron clock and maintenance stay off: only the rows are read.

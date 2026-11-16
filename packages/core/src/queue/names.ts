@@ -211,6 +211,20 @@ export const QUEUES = {
    * `Content.logRecordedNote`. `stately` with `singletonKey = noteId`.
    */
   recordedNoteTasks: 'interaction.recorded-note-tasks',
+  /**
+   * The half-hourly feed poll: one `feed.fetch` sent per feed, nothing
+   * fetched here. Never retried: the next tick is the retry.
+   */
+  feedPoll: 'feed.poll',
+  /**
+   * One feed fetched, conditional on its validators, its new headlines
+   * kept and its state written. `stately` with `singletonKey = feedId`, so a
+   * slow feed is never fetched twice at once; a timeout, 5xx or 429 retries
+   * within the half hour, another 4xx does not.
+   */
+  feedFetch: 'feed.fetch',
+  /** Daily delete of headlines past their 90 days. Retried: idempotent. */
+  feedPrune: 'feed.prune',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

@@ -223,3 +223,82 @@ describe('guardedFetch', () => {
     expect(spy).not.toHaveBeenCalled()
   })
 })
+
+describe('guardedFetch for a conditional fetch', () => {
+  it('sends the caller’s headers on every hop and answers the final headers', async () => {
+    const sent: Array<Headers> = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init: RequestInit) => {
+        sent.push(new Headers(init.headers))
+        return Promise.resolve(
+          url === 'https://example.com/feed'
+            ? response({ status: 301, headers: { location: '/feed.xml' } })
+            : response(
+                { status: 200, headers: { etag: '"v1"' } },
+                '<rss></rss>',
+              ),
+        )
+      }),
+    )
+
+    const out = await guardedFetch('https://example.com/feed', {
+      maxBytes: 1024,
+      timeoutMs: 1000,
+      headers: { 'if-none-match': '"v0"', accept: 'application/rss+xml' },
+    })
+
+    expect(out.ok).toBe(true)
+    if (!out.ok) throw new Error('unreachable')
+    expect(out.headers.get('etag')).toBe('"v1"')
+    expect(sent.map((h) => h.get('if-none-match'))).toEqual(['"v0"', '"v0"'])
+    expect(sent.at(0)?.get('accept')).toBe('application/rss+xml')
+    expect(sent.at(0)?.get('user-agent')).toContain('Spaces')
+  })
+
+  it('answers a 304 as a success with no body', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(response({ status: 304 }))),
+    )
+    const out = await guardedFetch('https://example.com/feed.xml', {
+      maxBytes: 1024,
+      timeoutMs: 1000,
+      headers: { 'if-none-match': '"v1"' },
+    })
+    expect(out).toMatchObject({ ok: true, status: 304 })
+    if (!out.ok) throw new Error('unreachable')
+    expect(out.bytes.byteLength).toBe(0)
+  })
+
+  it('carries a non-2xx status on the failure', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(response({ status: 503 }))),
+    )
+    const out = await guardedFetch('https://example.com/feed.xml', {
+      maxBytes: 1024,
+      timeoutMs: 1000,
+    })
+    expect(out).toMatchObject({ ok: false, kind: 'network', status: 503 })
+  })
+
+  it('says a timeout is one', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () => {
+              reject(new Error('aborted'))
+            })
+          }),
+      ),
+    )
+    const out = await guardedFetch('https://example.com/slow', {
+      maxBytes: 1024,
+      timeoutMs: 20,
+    })
+    expect(out).toMatchObject({ ok: false, kind: 'network', timedOut: true })
+  })
+})

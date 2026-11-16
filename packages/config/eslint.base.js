@@ -79,7 +79,7 @@ const DB_SERVER_MODULES = [
   // Settings → Connections' reads and writes; the rest of lib/connections is
   // client-safe.
   'apps/web/src/lib/connections/providers.ts',
-  'apps/web/src/lib/{ai,arrival,ask,deals,documents,glossary,import,inbox,integrations,interactions,mcp,members,notes,people,portfolio,records,rpc,search,seeds,spaces,tasks,timeline,tokens,views}/**',
+  'apps/web/src/lib/{ai,arrival,ask,deals,documents,feeds,glossary,import,inbox,integrations,interactions,mcp,members,notes,people,portfolio,records,rpc,search,seeds,spaces,tasks,timeline,tokens,views}/**',
 ]
 // Client modules inside those directories (the client build's module graph):
 // they stay fenced.
@@ -167,13 +167,14 @@ const WEB_NEVER_PLUGINS_NEVER_WORKER = {
 //   lib/arrival/{meeting, poll, schedule, synced}
 //   lib/documents/{blob-refs, fetch-guard, on-extracted, refile, retain,
 //     vision-gate}
-//   lib/glossary/link-terms · lib/import/commit · lib/queue · lib/server/env
+//   lib/feeds/poll · lib/glossary/link-terms · lib/import/commit · lib/queue
+//     · lib/server/env
 // and, from tests only:
 //   lib/ai/{embed-chunks, embedding-pin, propose, route, providers/embed/ids,
 //     providers/embed/settings}
 //   lib/arrival/{fixtures, noise, settings}
 //   lib/documents/{attach-link, clip, read-deck-gate, shelf, space-sources}
-//     · lib/import/{mapping, plan, stage} · lib/inbox/queue
+//     · lib/feeds/fixtures · lib/import/{mapping, plan, stage} · lib/inbox/queue
 //     · lib/integrations/{job-status, ledger, status}
 //     · lib/interactions/{email-drafts, email-send}
 //   lib/rpc/{api, versions} · lib/search/{query, query-embedding}

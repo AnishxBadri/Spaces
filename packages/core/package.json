@@ -33,7 +33,8 @@
     "./providers/*": "./src/providers/*.ts",
     "./search/*": "./src/search/*.ts",
     "./notes/*": "./src/notes/*.ts",
-    "./templates/*": "./src/templates/*.ts"
+    "./templates/*": "./src/templates/*.ts",
+    "./feeds/*": "./src/feeds/*.ts"
   },
   "scripts": {
     "test": "vitest run",

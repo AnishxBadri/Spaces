@@ -11,6 +11,7 @@ import {
   entity,
   entityAlias,
   entitySpace,
+  feedSpace,
   holding,
   importRow,
   interaction,
@@ -462,6 +463,17 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
     merge: { kind: 'none', why: 'space kind is not mergeable' },
     del: { kind: 'cascade' }, // "not here" means nothing once here is gone
     context: null,
+  },
+
+  // --- feeds ---------------------------------------------------------------
+  {
+    key: 'feed_space.space',
+    table: feedSpace,
+    column: feedSpace.spaceId,
+    // A space merge, if one is added, must union the two spaces' feeds.
+    merge: { kind: 'none', why: 'space kind is not mergeable' },
+    del: { kind: 'cascade' }, // the feed stays; only this tag goes
+    context: null, // a reading list, never AI-visible
   },
 
   // --- storage bindings ---------------------------------------------------
