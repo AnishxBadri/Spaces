@@ -38,15 +38,14 @@ What is shipped, what is open, and what comes next. Linear (team `Spaces`) holds
 32. One backend grammar — I/O is Effect (D84), Effect Schema with SDK 2.0 (D85), two note kinds (D83), ownership counts sales
 33. Feeds are built in — the poller and parser, stored logos and photos, the Feeds page with Sources and Headlines, feeds in spaces and on Today; the RSS plugin and the SDK's `feeds` role retire (D87)
 
-Plus the UI sweep (the printed sheets landing) and Corrections.
+Plus the UI sweep (the printed sheets landing), Corrections, and the list as a fixed pane (D106).
 
 ## Open
 
 - `SPA-389` `ai-b` — the mandate in every judging lane, and cached tokens on the ledger. Project 31; `migration`, `hitl`: the owner confirms AI column answers may change under the mandate.
 - `SPA-188` `ship-10` — install, upgrade and rollback docs. Project 16, In Progress. `docs/install.md` and `docs/upgrade.md` exist; check what is left.
 - `SPA-190` `ship-12` — one-click templates for Coolify, Railway, Render and Unraid. Project 16, In Progress; each needs a human deploy.
-- `SPA-407` — the record table to a screen reader: named by its view, the sort read aloud, the name as row header, a Tab stop and `n more columns →` while columns overflow. `afk`, size S.
-- `SPA-408` — a list is a fixed pane (D106): the card fills the window, rows scroll inside, the foot holds the bottom, the row `···` pins right, the search ends on the card's edge. `afk`, size M; shares the foot with `SPA-407`.
+- `SPA-407` — the record table to a screen reader: named by its view, the sort read aloud, the name as row header, a Tab stop while columns overflow; the `n more columns →` foot line already shipped with the fixed pane. `afk`, size S.
 - `SPA-409` `notes-2` — the note page on the bone ground: the body a paper card, the rail unboxed with rule dividers, the head on the 24px page edge and the prose on the card's own 56px gutter (D107 keeps the page scroll). `afk`, size S.
 - `SPA-410` `notes-3` — a failed note save says `Not saved · Retry` in crimson, retries once by itself, leaving warns while an edit has not landed, and the delete window says only `Can’t be undone.` above what the note leaves. `afk`, size S.
 
