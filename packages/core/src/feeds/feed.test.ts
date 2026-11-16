@@ -1,6 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { SUMMARY_MAX, feedAddressOf, feedLinksOf, parseFeed } from './feed'
+import {
+  SUMMARY_MAX,
+  feedAddressOf,
+  feedLinksOf,
+  iconLinksOf,
+  parseFeed,
+} from './feed'
 
 const fixture = (name: string) =>
   readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
@@ -270,6 +276,74 @@ describe('feedLinksOf', () => {
     expect(
       feedLinksOf('<html><head></head></html>', 'https://x.example/'),
     ).toEqual([])
+  })
+})
+
+describe('the feed’s own image', () => {
+  it('is the RSS channel’s <image><url>, absolute against the site', () => {
+    const feed = parseFeed(
+      rss(
+        '<item><guid>a</guid><title>A</title><enclosure url="https://cdn.example/a.jpg" type="image/jpeg"/></item>',
+        '<image><url>/logo.png</url><title>T</title><link>https://site.example/</link></image>',
+      ),
+    )
+    expect(feed?.imageUrl).toBe('https://site.example/logo.png')
+  })
+
+  it('is the itunes:image when the channel has no <image>', () => {
+    const feed = parseFeed(
+      rss('', '<itunes:image href="https://cdn.example/show.jpg"/>'),
+    )
+    expect(feed?.imageUrl).toBe('https://cdn.example/show.jpg')
+  })
+
+  it('is never an item’s photo', () => {
+    const feed = parseFeed(
+      rss(
+        '<item><guid>a</guid><image><url>https://cdn.example/item.png</url></image></item>',
+      ),
+    )
+    expect(feed?.imageUrl).toBeNull()
+  })
+
+  it('is Atom’s <logo>, else its <icon>', () => {
+    expect(
+      parseFeed(
+        atom(
+          '<icon>/favicon.png</icon><logo>https://site.example/logo.png</logo>',
+        ),
+      )?.imageUrl,
+    ).toBe('https://site.example/logo.png')
+    expect(parseFeed(atom('<icon>/favicon.png</icon>'))?.imageUrl).toBe(
+      'https://site.example/favicon.png',
+    )
+  })
+
+  it('is null when the feed names none', () => {
+    expect(parseFeed(fixture('rss2.xml'))?.imageUrl).toBeNull()
+    expect(parseFeed(fixture('atom.xml'))?.imageUrl).toBeNull()
+  })
+})
+
+describe('iconLinksOf', () => {
+  it('lists icons, then apple-touch-icons, then /favicon.ico, each once', () => {
+    const html = `<html><head>
+      <link rel="apple-touch-icon" href="/touch.png">
+      <link rel="stylesheet" href="/s.css">
+      <link rel="shortcut icon" href="/favicon.ico">
+      <link rel="icon" type="image/png" sizes="32x32" href="https://cdn.example/32.png">
+    </head></html>`
+    expect(iconLinksOf(html, 'https://spacenews.com/news/')).toEqual([
+      'https://spacenews.com/favicon.ico',
+      'https://cdn.example/32.png',
+      'https://spacenews.com/touch.png',
+    ])
+  })
+
+  it('is /favicon.ico at the origin for a page that names no icon', () => {
+    expect(
+      iconLinksOf('<html><head></head></html>', 'https://x.example/a/b'),
+    ).toEqual(['https://x.example/favicon.ico'])
   })
 })
 

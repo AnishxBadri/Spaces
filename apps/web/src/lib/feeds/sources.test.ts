@@ -1,10 +1,28 @@
+import { createHash } from 'node:crypto'
 import { Effect, Exit } from 'effect'
-import { eq } from 'drizzle-orm'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { eq, inArray } from 'drizzle-orm'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  expectTypeOf,
+  it,
+  vi,
+} from 'vitest'
 import { db } from '@spaces/db'
-import { entity, feed, feedItem, feedSpace, space } from '@spaces/db/schema'
+import {
+  entity,
+  feed,
+  feedItem,
+  feedSpace,
+  pendingBlob,
+  space,
+} from '@spaces/db/schema'
 import { QUEUES } from '@spaces/core/queue/names'
+import { storage } from '@spaces/core/writes/storage'
 import { pollFeedProgram } from './poll'
+import { fetchFeedLogoProgram, fetchItemImagesProgram } from './images'
 import {
   addFeedProgram,
   editFeedProgram,
@@ -12,7 +30,11 @@ import {
   listHeadlinesProgram,
   removeFeedProgram,
 } from './sources'
-import { rssOf, stubSite } from './fixtures'
+import type { FeedSource, Headline } from './sources'
+import { pictureOf, rssOf, stubSite } from './fixtures'
+
+const shaOf = (bytes: Uint8Array) =>
+  createHash('sha256').update(bytes).digest('hex')
 
 /**
  * The Feeds page's programs against a stubbed web and this worker's test
@@ -102,6 +124,11 @@ describe('Add feed', () => {
     expect(enqueued).toEqual([
       {
         name: QUEUES.feedFetch,
+        data: { feedId: added.source.id },
+        options: { singletonKey: added.source.id },
+      },
+      {
+        name: QUEUES.feedLogo,
         data: { feedId: added.source.id },
         options: { singletonKey: added.source.id },
       },
@@ -225,7 +252,10 @@ describe('Edit and remove', () => {
     expect(
       (await db.select().from(feed).where(eq(feed.id, id))).at(0)?.etag,
     ).toBeNull()
-    expect(enqueued.map((e) => e.name)).toEqual([QUEUES.feedFetch])
+    expect(enqueued.map((e) => e.name)).toEqual([
+      QUEUES.feedFetch,
+      QUEUES.feedLogo,
+    ])
 
     await db
       .insert(feedItem)
@@ -320,10 +350,13 @@ describe('Headlines', () => {
     )
     expect(inParent.headlines.at(0)).toMatchObject({
       title: 'Launch 4',
-      imageUrl: 'https://h.example/4.jpg',
       imageSha: null,
+      photoUrl: null,
+      logoUrl: null,
       publishedAt: '2026-11-10T04:00:00.000Z',
     })
+    // Where the feed said the photo is never reaches a page.
+    expect(inParent.headlines.at(0)).not.toHaveProperty('imageUrl')
     expect(inParent.nextCursor).toBeNull()
 
     // A forged cursor is page one, never a database error.
@@ -331,5 +364,118 @@ describe('Headlines', () => {
       listHeadlinesProgram({ cursor: 'not-a-cursor', limit: 1 }),
     )
     expect(forged.headlines).toHaveLength(1)
+  })
+})
+
+describe('Pictures', () => {
+  it('serves the stored logo and photo from our own blob URLs, signed once per digest, and never the publisher’s', async () => {
+    expectTypeOf<Headline>().not.toHaveProperty('imageUrl')
+    expectTypeOf<Headline['photoUrl']>().toEqualTypeOf<string | null>()
+    expectTypeOf<FeedSource['logoUrl']>().toEqualTypeOf<string | null>()
+
+    const logo = pictureOf('png')
+    const photo = pictureOf('jpeg')
+    stubSite({
+      'https://pub.example/feed': () => ({
+        status: 200,
+        body: `<rss version="2.0"><channel><title>Pub</title><link>https://pub.example/</link><image><url>https://pub.example/logo.png</url></image><item><guid>p1</guid><title>P1</title><enclosure url="https://cdn.pub.example/p.jpg" type="image/jpeg"/></item><item><guid>p2</guid><title>P2</title><enclosure url="https://cdn.pub.example/p.jpg" type="image/jpeg"/></item></channel></rss>`,
+      }),
+      'https://pub.example/logo.png': () => ({ status: 200, body: logo }),
+      'https://cdn.pub.example/p.jpg': () => ({ status: 200, body: photo }),
+    })
+    const added = await Effect.runPromise(
+      addFeedProgram(await me(), {
+        address: 'https://pub.example/feed',
+        spaceIds: [],
+      }),
+    )
+    expect(added.source.logoUrl).toBeNull()
+    const id = added.source.id
+    const polled = await Effect.runPromise(pollFeedProgram(id))
+    if (polled._tag !== 'Fetched') throw new Error('expected a fetch')
+    await Effect.runPromise(fetchItemImagesProgram(polled.withImages))
+    await Effect.runPromise(fetchFeedLogoProgram(id))
+
+    const source = (await Effect.runPromise(listFeedSourcesProgram())).find(
+      (s) => s.id === id,
+    )
+    const page = await Effect.runPromise(listHeadlinesProgram({ limit: 100 }))
+    const mine = page.headlines.filter((h) => h.feedId === id)
+    expect(mine).toHaveLength(2)
+    const ours = (url: string | null | undefined, bytes: Uint8Array) => {
+      if (url == null) throw new Error('expected a URL')
+      const parsed = new URL(url)
+      expect(parsed.pathname).toBe(`/api/blob/${shaOf(bytes)}`)
+      expect(parsed.hostname).not.toMatch(/pub\.example$/)
+      expect(parsed.searchParams.get('sig')).toBeTruthy()
+    }
+    ours(source?.logoUrl, logo)
+    for (const h of mine) {
+      ours(h.logoUrl, logo)
+      ours(h.photoUrl, photo)
+      // The site is a link out; neither picture's address is anywhere.
+      expect(JSON.stringify(h)).not.toContain('cdn.pub.example')
+      expect(JSON.stringify(h)).not.toContain('logo.png')
+    }
+    // One digest, one signature: both headlines carry the same URL.
+    expect(new Set(mine.map((h) => h.photoUrl)).size).toBe(1)
+  })
+
+  it('removing a feed reclaims its logo and photos, and leaves a blob another row holds', async () => {
+    const lone = pictureOf('png')
+    const shared = pictureOf('png')
+    const put = async (bytes: Uint8Array) => {
+      await storage().put(shaOf(bytes), Buffer.from(bytes), {
+        mime: 'image/png',
+      })
+      return shaOf(bytes)
+    }
+    const gone = (
+      await db
+        .insert(feed)
+        .values({
+          url: 'https://rm.example/a',
+          name: 'A',
+          logoSha: await put(lone),
+        })
+        .returning({ id: feed.id })
+    ).at(0)
+    const kept = (
+      await db
+        .insert(feed)
+        .values({ url: 'https://rm.example/b', name: 'B' })
+        .returning({ id: feed.id })
+    ).at(0)
+    if (gone === undefined || kept === undefined) throw new Error('no feed')
+    const sha = await put(shared)
+    await db.insert(feedItem).values([
+      {
+        feedId: gone.id,
+        key: 'x',
+        title: 'X',
+        publishedAt: new Date(),
+        imageSha: sha,
+      },
+      {
+        feedId: kept.id,
+        key: 'y',
+        title: 'Y',
+        publishedAt: new Date(),
+        imageSha: sha,
+      },
+    ])
+
+    expect(await Effect.runPromise(removeFeedProgram(gone.id))).toEqual({
+      removed: true,
+    })
+
+    expect(await storage().exists(shaOf(lone))).toBe(false)
+    expect(await storage().exists(sha)).toBe(true)
+    expect(
+      await db
+        .select()
+        .from(pendingBlob)
+        .where(inArray(pendingBlob.sha, [shaOf(lone), sha])),
+    ).toEqual([])
   })
 })

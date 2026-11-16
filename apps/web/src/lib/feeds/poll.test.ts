@@ -57,8 +57,14 @@ describe('pollFeedProgram', () => {
 
     const polled = await Effect.runPromise(pollFeedProgram(id, now))
 
-    expect(polled).toEqual({ _tag: 'Fetched', seen: 2, added: 2 })
     const items = await itemsOf(id)
+    // Both name a photo, handed back for `feed.images` rather than fetched.
+    expect(polled).toEqual({
+      _tag: 'Fetched',
+      seen: 2,
+      added: 2,
+      withImages: expect.arrayContaining(items.map((i) => i.id)),
+    })
     expect(items.map((i) => i.title).sort()).toEqual(['A deal', 'A launch'])
     expect(items.find((i) => i.key === 'launch')).toMatchObject({
       url: 'https://spacenews.com/launch/',
@@ -97,7 +103,12 @@ describe('pollFeedProgram', () => {
       '"v1"',
     ])
     expect(second).toEqual({ _tag: 'NotModified' })
-    expect(third).toEqual({ _tag: 'Fetched', seen: 2, added: 0 })
+    expect(third).toEqual({
+      _tag: 'Fetched',
+      seen: 2,
+      added: 0,
+      withImages: [],
+    })
     expect(await itemsOf(id)).toHaveLength(2)
     expect((await rowOf(id))?.lastStatus).toBe('ok')
   })

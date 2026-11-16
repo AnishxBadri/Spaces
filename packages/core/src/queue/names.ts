@@ -223,8 +223,25 @@ export const QUEUES = {
    * within the half hour, another 4xx does not.
    */
   feedFetch: 'feed.fetch',
-  /** Daily delete of headlines past their 90 days. Retried: idempotent. */
+  /**
+   * Daily delete of headlines past their 90 days, and their photos with
+   * them unless another row holds the blob. Retried: idempotent.
+   */
   feedPrune: 'feed.prune',
+  /**
+   * The photos of a fetch's new headlines, fetched and stored as blobs, on
+   * their own queue so a slow image host never holds up a feed fetch. The
+   * job carries its item ids; a photo that fails is never tried again.
+   */
+  feedImages: 'feed.images',
+  /**
+   * One source's logo: the feed's own image, else the site's icon, stored
+   * as a blob. Sent when a feed is added or its address moves, and weekly.
+   * `stately` with `singletonKey = feedId`.
+   */
+  feedLogo: 'feed.logo',
+  /** The weekly fan-out: one `feed.logo` per feed. Never retried. */
+  feedLogos: 'feed.logos',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

@@ -1,7 +1,7 @@
 import type { PgBoss } from 'pg-boss'
 import { QUEUES } from '@spaces/core/queue/names'
 import type { QueueName } from '@spaces/core/queue/names'
-import { FEED_POLL_CRON } from '@spaces/core/feeds/fetch'
+import { FEED_LOGO_CRON, FEED_POLL_CRON } from '@spaces/core/feeds/fetch'
 
 /**
  * The worker's own clock-driven jobs, scheduled at boot in UTC. Each nightly
@@ -13,7 +13,8 @@ import { FEED_POLL_CRON } from '@spaces/core/feeds/fetch'
  * - The storage change poll is a clock, not a push channel: Drive's webhooks
  *   need a public URL and expire weekly, which a box behind a router cannot
  *   promise.
- * - Feeds are polled every half hour and their old headlines deleted nightly.
+ * - Feeds are polled every half hour, their old headlines deleted nightly
+ *   and their logos fetched again weekly.
  */
 export const CORE_SCHEDULES: ReadonlyArray<{
   readonly queue: QueueName
@@ -28,6 +29,7 @@ export const CORE_SCHEDULES: ReadonlyArray<{
   { queue: QUEUES.pollStorageChanges, cron: '*/15 * * * *' },
   { queue: QUEUES.feedPoll, cron: FEED_POLL_CRON },
   { queue: QUEUES.feedPrune, cron: '20 5 * * *' },
+  { queue: QUEUES.feedLogos, cron: FEED_LOGO_CRON },
 ]
 
 export const CORE_SCHEDULE_TZ = 'Etc/UTC'

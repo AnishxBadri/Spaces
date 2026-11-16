@@ -42,14 +42,16 @@ export type FetchedFeed =
       readonly validators: FeedValidators
     }
 
-const USER_AGENT = 'Spaces/1.0 (+self-hosted feed reader)'
+/** Named honestly on every feed, page and picture request. */
+export const FEED_USER_AGENT = 'Spaces/1.0 (+self-hosted feed reader)'
 
 const conditional = (v: FeedValidators): Record<string, string> => ({
   ...(v.etag === null ? {} : { 'if-none-match': v.etag }),
   ...(v.lastModified === null ? {} : { 'if-modified-since': v.lastModified }),
 })
 
-const NO_VALIDATORS: FeedValidators = { etag: null, lastModified: null }
+/** A fetch that wants the whole document whatever the site last sent. */
+export const NO_VALIDATORS: FeedValidators = { etag: null, lastModified: null }
 
 /** The body as text; a feed that is not UTF-8 says so in its prolog. */
 const textOf = (bytes: Uint8Array, contentType: string | null): string => {
@@ -81,7 +83,7 @@ const fetchPage = Effect.fn('feeds.fetchPage')(function* (
     timeoutMs: FEED_TIMEOUT_MS,
     headers: {
       accept: FEED_ACCEPT,
-      'user-agent': USER_AGENT,
+      'user-agent': FEED_USER_AGENT,
       ...conditional(validators),
     },
   })

@@ -41,7 +41,15 @@ import { pluginBreakerLayer } from './plugins/breaker'
 import { dedupeSweep } from './jobs/dedupe-sweep'
 import { sweepOrphanBlobs } from './jobs/sweep-orphan-blobs'
 import { pruneIngress } from './jobs/prune-ingress'
-import { feedEnqueue, feedFetch, feedPoll, feedPrune } from './jobs/feeds'
+import {
+  feedEnqueue,
+  feedFetch,
+  feedImages,
+  feedLogo,
+  feedLogos,
+  feedPoll,
+  feedPrune,
+} from './jobs/feeds'
 import { rollInteractionStats } from './jobs/roll-interaction-stats'
 import { readDeck } from './jobs/read-deck'
 import { summarize } from './jobs/summarize'
@@ -283,14 +291,22 @@ async function main() {
   // Feeds: the half-hourly poll sends one fetch per feed and is never
   // retried; a fetch is `stately` with `singletonKey = feedId`, so one feed
   // is never fetched twice at once, and retries a timeout or a 5xx within
-  // the half hour. Created before the plain create loop below.
+  // the half hour. A fetch sends its new headlines' photos to `feed.images`
+  // (plain: each job carries its own item ids), so a slow image host never
+  // holds a fetch. A logo is `stately` per feed, sent on add and by the
+  // weekly `feed.logos` fan-out. Created before the plain create loop below.
   await boss
     .createQueue(QUEUES.feedPoll, { policy: 'singleton' })
     .catch(() => {})
   await boss
     .createQueue(QUEUES.feedFetch, { policy: 'stately' })
     .catch(() => {})
-  for (const def of [feedPoll, feedFetch]) {
+  await boss.createQueue(QUEUES.feedLogo, { policy: 'stately' }).catch(() => {})
+  await boss
+    .createQueue(QUEUES.feedLogos, { policy: 'singleton' })
+    .catch(() => {})
+  await boss.createQueue(QUEUES.feedImages).catch(() => {})
+  for (const def of [feedPoll, feedFetch, feedImages, feedLogo, feedLogos]) {
     const retry = def.retry
     if (retry)
       await boss.updateQueue(def.name, {
@@ -307,7 +323,22 @@ async function main() {
   await boss.work(
     QUEUES.feedFetch,
     { batchSize: 1, includeMetadata: true },
-    runJob(feedFetch, { host, layer: Layer.empty }),
+    runJob(feedFetch, { host, layer: feedEnqueue }),
+  )
+  await boss.work(
+    QUEUES.feedImages,
+    { batchSize: 1, includeMetadata: true },
+    runJob(feedImages, { host, layer: Layer.empty }),
+  )
+  await boss.work(
+    QUEUES.feedLogo,
+    { batchSize: 1, includeMetadata: true },
+    runJob(feedLogo, { host, layer: Layer.empty }),
+  )
+  await boss.work(
+    QUEUES.feedLogos,
+    { batchSize: 1, includeMetadata: true },
+    runJob(feedLogos, { host, layer: feedEnqueue }),
   )
   // An enrichment run: `stately` with `singletonKey = entityId`, so a
   // burst of triggers on one record is one queued run. Its sources run in
@@ -748,7 +779,7 @@ async function main() {
   )
 
   // The clock's jobs (`CORE_SCHEDULES`): dedupe, orphan blobs, ingress
-  // prune, stats roll, storage change poll, feed poll and prune.
+  // prune, stats roll, storage change poll, feed poll, prune and logos.
   await scheduleCoreJobs(boss)
 
   // The heartbeat. Last, so the row only appears once this process

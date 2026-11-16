@@ -6,6 +6,8 @@ import {
   documentRevision,
   entity,
   extractionCache,
+  feed,
+  feedItem,
   importBatch,
   interaction,
   workspace,
@@ -15,7 +17,8 @@ import { documentsQuery } from './query'
 
 /**
  * **Is any row still holding this digest?** A `stored` document, a prior
- * revision, a staged import batch, a record's picture or the workspace logo.
+ * revision, a staged import batch, a record's picture, the workspace logo,
+ * an email's raw MIME, a feed's logo or a headline's photo.
  * - Content addressing means one file backs several rows, so the bytes go
  *   only when the last row goes.
  * - Both directions of blob GC (the delete path and the orphan sweep) ask
@@ -86,7 +89,20 @@ export const blobIsReferencedProgram = Effect.fn('blobIsReferenced')(function* (
       .from(interaction)
       .where(sql`${interaction.meta} ->> 'mime_blob_sha' = ${sha}`),
   )).at(0)
-  return (mime?.value ?? 0) > 0
+  if ((mime?.value ?? 0) > 0) return true
+  // A feed's logo and a headline's photo name their bytes by digest: two
+  // feeds on one site share a favicon, and a stock photo recurs.
+  const feedLogo = (yield* documentsQuery(() =>
+    db.select({ value: count() }).from(feed).where(eq(feed.logoSha, sha)),
+  )).at(0)
+  if ((feedLogo?.value ?? 0) > 0) return true
+  const photo = (yield* documentsQuery(() =>
+    db
+      .select({ value: count() })
+      .from(feedItem)
+      .where(eq(feedItem.imageSha, sha)),
+  )).at(0)
+  return (photo?.value ?? 0) > 0
 })
 
 /** {@link blobIsReferencedProgram}, for a caller that is not a program. */

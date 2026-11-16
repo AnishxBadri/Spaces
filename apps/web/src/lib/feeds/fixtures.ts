@@ -8,7 +8,7 @@ import { vi } from 'vitest'
 export type Route = (headers: Headers) => {
   readonly status: number
   readonly headers?: Record<string, string>
-  readonly body?: string
+  readonly body?: string | Uint8Array
 }
 
 export const stubSite = (routes: Record<string, Route>) => {
@@ -23,8 +23,14 @@ export const stubSite = (routes: Record<string, Route>) => {
       if (route === undefined)
         return Promise.resolve(new Response(null, { status: 404 }))
       const answer = route(headers)
+      const body =
+        answer.body === undefined
+          ? null
+          : typeof answer.body === 'string'
+            ? answer.body
+            : new Blob([Uint8Array.from(answer.body)])
       return Promise.resolve(
-        new Response(answer.body ?? null, {
+        new Response(body, {
           status: answer.status,
           ...(answer.headers === undefined ? {} : { headers: answer.headers }),
         }),
@@ -49,3 +55,20 @@ export const rssOf = (
         `<item><guid>${i.guid}</guid><title>${i.title}</title><link>https://spacenews.com/${i.guid}/</link><pubDate>${new Date(i.date).toUTCString()}</pubDate><description><![CDATA[<p>${i.title}, the story.</p><p>Second paragraph.</p>]]></description><media:thumbnail url="https://spacenews.com/img/${i.guid}.jpg"/></item>`,
     )
     .join('')}</channel></rss>`
+
+const MAGIC = {
+  png: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+  jpeg: [0xff, 0xd8, 0xff, 0xe0],
+  ico: [0x00, 0x00, 0x01, 0x00, 0x01, 0x00],
+} as const
+
+/**
+ * A picture by its bytes: the type's magic number, then random filler, so
+ * no two calls share a digest. The local store outlives the database.
+ */
+export const pictureOf = (type: keyof typeof MAGIC, size = 64): Uint8Array => {
+  const out = new Uint8Array(Math.max(size, 80))
+  out.set(crypto.getRandomValues(new Uint8Array(64)), 16)
+  out.set(MAGIC[type])
+  return out
+}

@@ -21,7 +21,8 @@ import { enqueue } from '#/lib/queue'
 import { decodeCursor, encodeCursor } from '#/lib/views/paging'
 import { resolveFeedProgram } from './fetch'
 import type { FeedFetchFailed, ResolvedFeed } from './fetch'
-import { FeedStoreFailed } from './poll'
+import { FeedStoreFailed, deleteAndReclaimProgram } from './poll'
+import { feedPictureUrlsProgram } from './images'
 
 /**
  * The Feeds page's reads and writes: add, edit and remove a source, the
@@ -41,14 +42,18 @@ export type FeedSpaceTag = { readonly id: string; readonly name: string }
  * One row of the Sources table.
  * - `state`: `new` before the first fetch lands, `failing` while the last
  *   fetch failed (`lastError` says why), else `ok`.
- * - `logoSha` is a blob digest, null until the worker stores the logo.
+ * - `logoUrl` is a short-lived URL on our own blob store, null until the
+ *   worker stores a logo or when the site has none: the page draws the
+ *   monogram then. Never the publisher's address.
  */
 export type FeedSource = {
   readonly id: string
   readonly name: string
   readonly url: string
   readonly siteUrl: string | null
+  /** The stored logo's blob digest. */
   readonly logoSha: string | null
+  readonly logoUrl: string | null
   readonly state: 'new' | 'ok' | 'failing'
   readonly lastFetchedAt: string | null
   readonly lastSuccessAt: string | null
@@ -60,22 +65,29 @@ export type FeedSource = {
   readonly createdAt: string
 }
 
-/** One story in the Headlines list and the reader beside it. */
+/**
+ * One story in the Headlines list and the reader beside it.
+ * - `logoUrl` and `photoUrl` are short-lived URLs on our own blob store;
+ *   the address the feed named the photo at is never handed to a page, so
+ *   no page can load it from the publisher.
+ */
 export type Headline = {
   readonly id: string
   readonly feedId: string
   readonly feedName: string
   readonly siteUrl: string | null
+  /** The source's stored logo digest. */
   readonly logoSha: string | null
+  readonly logoUrl: string | null
   readonly title: string
   /** The article, which the reader links to and never fetches. */
   readonly url: string | null
   /** Plain paragraphs split by a blank line: the reader's body. */
   readonly summary: string | null
   readonly publishedAt: string
-  readonly imageUrl: string | null
-  /** A blob digest, null until the worker stores the photo. */
+  /** The stored photo's digest, null until the worker stores one. */
   readonly imageSha: string | null
+  readonly photoUrl: string | null
 }
 
 export type HeadlinePage = {
@@ -110,11 +122,12 @@ const store = <T>(run: () => Promise<T>) =>
 const iso = (d: Date | null): string | null =>
   d === null ? null : d.toISOString()
 
-/** The feed's first fetch, now; one queued per feed. */
+/** The feed's first fetch and its logo, now; one of each queued per feed. */
 const enqueueFetch = (feedId: string) =>
-  Effect.promise(() =>
-    enqueue(QUEUES.feedFetch, { feedId }, { singletonKey: feedId }),
-  )
+  Effect.promise(async () => {
+    await enqueue(QUEUES.feedFetch, { feedId }, { singletonKey: feedId })
+    await enqueue(QUEUES.feedLogo, { feedId }, { singletonKey: feedId })
+  })
 
 const unknownSpaces = Effect.fn('feeds.unknownSpaces')(function* (
   spaceIds: ReadonlyArray<string>,
@@ -167,6 +180,7 @@ const sourcesProgram = Effect.fn('feeds.sources')(function* (
       .orderBy(asc(entity.canonicalName)),
   )
   const countOf = new Map(counts.map((c) => [c.feedId, c]))
+  const logos = yield* feedPictureUrlsProgram(rows.map((r) => r.logoSha))
   return rows.map((r): FeedSource => {
     const c = countOf.get(r.id)
     return {
@@ -175,6 +189,7 @@ const sourcesProgram = Effect.fn('feeds.sources')(function* (
       url: r.url,
       siteUrl: r.siteUrl,
       logoSha: r.logoSha,
+      logoUrl: r.logoSha === null ? null : (logos.get(r.logoSha) ?? null),
       state:
         r.lastStatus === 'failed'
           ? 'failing'
@@ -233,8 +248,8 @@ const siteOf = (resolved: ResolvedFeed): string =>
 
 /**
  * Add feed: the address resolved to its feed and fetched once, the row
- * saved under the feed's own name, tagged, and its first fetch sent at once
- * so its headlines land without waiting for the clock.
+ * saved under the feed's own name, tagged, and its first fetch and its logo
+ * sent at once so its headlines land without waiting for the clock.
  */
 export const addFeedProgram = Effect.fn('feeds.add')(function* (
   actorId: string,
@@ -302,7 +317,8 @@ export const addFeedProgram = Effect.fn('feeds.add')(function* (
 /**
  * Edit a feed: its address, its name, its spaces, any of the three.
  * - A new address is resolved like an added one; the fetch state and the
- *   validators start over and a fetch is sent at once. Kept headlines stay.
+ *   validators start over and a fetch and a logo are sent at once. Kept
+ *   headlines stay.
  * - `spaceIds` replaces the tags.
  */
 export const editFeedProgram = Effect.fn('feeds.edit')(function* (data: {
@@ -365,14 +381,30 @@ export const editFeedProgram = Effect.fn('feeds.edit')(function* (data: {
   return yield* oneSource(data.id)
 })
 
-/** Remove a feed, its tags and its headlines. Removing a gone feed is a no-op. */
+/**
+ * Remove a feed, its tags and its headlines, and the logo and photos they
+ * held unless another row holds the same blob. Removing a gone feed is a
+ * no-op.
+ */
 export const removeFeedProgram = Effect.fn('feeds.remove')(function* (
   id: string,
 ) {
-  const gone = yield* store(() =>
-    db.delete(feed).where(eq(feed.id, id)).returning({ id: feed.id }),
+  const { deleted } = yield* deleteAndReclaimProgram(
+    async (tx) => {
+      // The headlines' digests are read before the cascade takes the rows.
+      const photos = await tx
+        .select({ sha: feedItem.imageSha })
+        .from(feedItem)
+        .where(eq(feedItem.feedId, id))
+      const gone = await tx
+        .delete(feed)
+        .where(eq(feed.id, id))
+        .returning({ logoSha: feed.logoSha })
+      return gone.map((g) => [g.logoSha, ...photos.map((p) => p.sha)])
+    },
+    (shas) => shas,
   )
-  return { removed: gone.length > 0 }
+  return { removed: deleted > 0 }
 })
 
 /** `timestamptz::text` under the ISO date style: `2026-11-16 12:00:00.5+00`. */
@@ -444,7 +476,6 @@ export const listHeadlinesProgram = Effect.fn('feeds.listHeadlines')(
           summary: feedItem.summary,
           publishedAt: feedItem.publishedAt,
           sortKey: sql<string>`${feedItem.publishedAt}::text`,
-          imageUrl: feedItem.imageUrl,
           imageSha: feedItem.imageSha,
         })
         .from(feedItem)
@@ -455,11 +486,18 @@ export const listHeadlinesProgram = Effect.fn('feeds.listHeadlines')(
     )
     const page = rows.slice(0, limit)
     const last = page.at(-1)
+    const urls = yield* feedPictureUrlsProgram(
+      page.flatMap((h) => [h.logoSha, h.imageSha]),
+    )
+    const urlOf = (sha: string | null) =>
+      sha === null ? null : (urls.get(sha) ?? null)
     return {
       headlines: page.map(
         ({ sortKey: _sortKey, publishedAt, ...h }): Headline => ({
           ...h,
+          logoUrl: urlOf(h.logoSha),
           publishedAt: publishedAt.toISOString(),
+          photoUrl: urlOf(h.imageSha),
         }),
       ),
       nextCursor:

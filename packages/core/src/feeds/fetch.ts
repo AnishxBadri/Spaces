@@ -1,9 +1,11 @@
+import { PICTURE_MAX_BYTES } from '../enrichment/picture'
 import type { FeedItem } from './feed'
 
 /**
  * The poller's rules, pure: its clock, its caps, the sentences a failing
  * feed shows, which failures are worth a retry, and how a parsed item
- * becomes a stored headline.
+ * becomes a stored headline; and the caps and clocks of a feed's pictures,
+ * which the worker stores as blobs and never hotlinks.
  */
 
 /** Every feed is fetched on this clock (UTC). */
@@ -136,3 +138,31 @@ export const itemRowsOf = (
     ]
   })
 }
+
+/**
+ * The cap on one item photo. Larger than a record picture's: a story's
+ * lead image is a photograph at article width, stored as fetched.
+ */
+export const FEED_IMAGE_MAX_BYTES = 5 * 1024 * 1024
+
+/** A logo is an icon or a masthead: a record picture's cap. */
+export const FEED_LOGO_MAX_BYTES = PICTURE_MAX_BYTES
+
+/** One picture fetch, every redirect and the body read included. */
+export const FEED_IMAGE_TIMEOUT_MS = 15_000
+
+/** Item photos fetched at once within one job: polite to one host. */
+export const FEED_IMAGE_CONCURRENCY = 4
+
+/** Item ids one `feed.images` job carries; a larger batch is split. */
+export const FEED_IMAGE_BATCH = 50
+
+/** Every source's logo is fetched again weekly (UTC, Sunday early). */
+export const FEED_LOGO_CRON = '40 5 * * 0'
+
+/**
+ * What a picture fetch asks for: the raster types `judgePicture` takes. No
+ * AVIF, which the sniffer does not read, so a negotiating CDN sends another.
+ */
+export const FEED_IMAGE_ACCEPT =
+  'image/webp, image/png, image/jpeg, image/gif, image/x-icon, */*;q=0.5'

@@ -65,6 +65,15 @@ describe('judgePicture', () => {
       ok: false,
       why: 'too large',
     })
+    // A caller with its own cap: a feed photo may be larger.
+    expect(judgePicture('image/png', big, PICTURE_MAX_BYTES * 2)).toEqual({
+      ok: true,
+      type: 'image/png',
+    })
+    expect(judgePicture('image/png', PNG, 4)).toEqual({
+      ok: false,
+      why: 'too large',
+    })
   })
 })
 

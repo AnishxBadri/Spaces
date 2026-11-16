@@ -28,6 +28,12 @@ export type Feed = {
   readonly title: string | null
   /** The site the feed belongs to (RSS channel link, Atom alternate link). */
   readonly siteUrl: string | null
+  /**
+   * The feed's own picture, absolute http(s): RSS `<image><url>` or
+   * `itunes:image`, Atom `<logo>` or `<icon>`. What a source's logo is
+   * fetched from first.
+   */
+  readonly imageUrl: string | null
   /** In document order: newest first, by convention. */
   readonly items: ReadonlyArray<FeedItem>
 }
@@ -317,6 +323,19 @@ const head = (xml: string, tag: string): string => {
   return at < 0 ? xml : xml.slice(0, at)
 }
 
+/** The channel's `<image><url>`, else its `itunes:image href`. */
+const rssImage = (top: string, site: string | null): string | null => {
+  for (const image of elements(top, 'image')) {
+    const url = absolute(first(image.inner, 'url'), site)
+    if (url !== null) return url
+  }
+  return mediaImage(top, 'itunes:image', 'href', site, false)
+}
+
+/** Atom's `<logo>`, else its `<icon>`. */
+const atomImage = (top: string, site: string | null): string | null =>
+  absolute(first(top, 'logo'), site) ?? absolute(first(top, 'icon'), site)
+
 /** The feed, or null when `xml` is neither RSS nor Atom. */
 export const parseFeed = (xml: string): Feed | null => {
   const doc = xml.replace(/<!--[\s\S]*?-->/g, '')
@@ -327,15 +346,18 @@ export const parseFeed = (xml: string): Feed | null => {
       format: 'rss',
       title: first(top, 'title'),
       siteUrl: site,
+      imageUrl: rssImage(top, site),
       items: elements(doc, 'item').flatMap((e) => rssItem(e.inner, site)),
     }
   }
   if (/<feed[\s>]/.test(doc)) {
-    const site = atomLink(head(doc, 'entry'), null)
+    const top = head(doc, 'entry')
+    const site = atomLink(top, null)
     return {
       format: 'atom',
-      title: first(head(doc, 'entry'), 'title'),
+      title: first(top, 'title'),
       siteUrl: site,
+      imageUrl: atomImage(top, site),
       items: elements(doc, 'entry').flatMap((e) => atomEntry(e.inner, site)),
     }
   }
@@ -364,6 +386,36 @@ export const feedLinksOf = (
     const href = absolute(attr(attrs, 'href'), pageUrl)
     return href === null ? [] : [href]
   })
+
+/**
+ * Where a site's icon may be, best first: every `<link rel="icon">` (and
+ * `shortcut icon`), then `apple-touch-icon`, in document order, then
+ * `/favicon.ico` at the page's origin, which a site serves without saying.
+ * Made absolute against `pageUrl`, each once.
+ */
+export const iconLinksOf = (
+  html: string,
+  pageUrl: string,
+): ReadonlyArray<string> => {
+  const icons: Array<string> = []
+  const touch: Array<string> = []
+  for (const m of html.matchAll(/<link\b([^>]*)>/gi)) {
+    const attrs = m.at(1) ?? ''
+    const rel = (attr(attrs, 'rel') ?? '').toLowerCase().split(/\s+/)
+    const href = absolute(attr(attrs, 'href'), pageUrl)
+    if (href === null) continue
+    if (rel.includes('icon')) icons.push(href)
+    else if (
+      rel.includes('apple-touch-icon') ||
+      rel.includes('apple-touch-icon-precomposed')
+    )
+      touch.push(href)
+  }
+  const fallback = absolute('/favicon.ico', pageUrl)
+  return [
+    ...new Set([...icons, ...touch, ...(fallback === null ? [] : [fallback])]),
+  ]
+}
 
 /**
  * What a person typed, as a URL to fetch: `spacenews.com` is

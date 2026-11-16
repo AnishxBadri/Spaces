@@ -53,15 +53,17 @@ export type PictureRefusal = 'not an image' | 'too large' | 'unreachable'
  * Why a response cannot be a picture, or its type when it can:
  * - a declared type other than a raster image is refused before the bytes;
  * - the bytes must sniff as a raster image whatever was declared;
- * - more than `PICTURE_MAX_BYTES` is too large.
+ * - more than `maxBytes` (a record picture's `PICTURE_MAX_BYTES` unless the
+ *   caller names its own cap) is too large.
  */
 export const judgePicture = (
   contentType: string | null,
   bytes: Uint8Array,
+  maxBytes: number = PICTURE_MAX_BYTES,
 ):
   | { readonly ok: true; readonly type: PictureType }
   | { readonly ok: false; readonly why: PictureRefusal } => {
-  if (bytes.length > PICTURE_MAX_BYTES) return { ok: false, why: 'too large' }
+  if (bytes.length > maxBytes) return { ok: false, why: 'too large' }
   const declared = (contentType ?? '').split(';')[0].trim().toLowerCase()
   if (
     declared !== '' &&
