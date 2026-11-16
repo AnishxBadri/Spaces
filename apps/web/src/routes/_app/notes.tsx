@@ -8,12 +8,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { EmptyState } from '#/components/empty-state'
 import { FileText } from '#/components/icons'
-import {
-  Band,
-  FoldRow,
-  LedgerFigure,
-  LedgerRow,
-} from '#/components/ledger-section'
+import { Band, Day, FoldRow, LedgerRow } from '#/components/ledger-section'
 import { NewButton, SplitNewButton } from '#/components/new-button'
 import { NOTE_KIND_LABEL, NoteKindIcon } from '#/components/note-kind-icon'
 import { Card, PageBody, PageHeader } from '#/components/page-header'
@@ -23,7 +18,6 @@ import { TemplatePicker } from '#/components/templates'
 import { FolderBody, Tabs } from '#/components/ui/tabs'
 import { createNote, createNoteFromTemplate, listNotes } from '#/lib/server-fns'
 import { useHotkey } from '#/lib/use-hotkey'
-import { formatDay } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 
 export const Route = createFileRoute('/_app/notes')({
@@ -168,7 +162,7 @@ function NotesPage() {
                 <Band label="This week" />
                 <ol>
                   {thisWeek.map((n) => (
-                    <NoteLedgerRow key={n.id} note={n} now={now} />
+                    <NoteLedgerRow key={n.id} note={n} />
                   ))}
                 </ol>
               </section>
@@ -179,7 +173,7 @@ function NotesPage() {
                 <ol>
                   {(unfolded ? earlier : earlier.slice(0, EARLIER_SHOWN)).map(
                     (n) => (
-                      <NoteLedgerRow key={n.id} note={n} now={now} />
+                      <NoteLedgerRow key={n.id} note={n} />
                     ),
                   )}
                   {!unfolded && earlier.length > EARLIER_SHOWN ? (
@@ -216,7 +210,12 @@ function NotesBox({
   )
 }
 
-function NoteLedgerRow({ note, now }: { note: NoteRow; now: string }) {
+/**
+ * One note: kind glyph, title, snippet, and the day it was last edited on
+ * the 88px no-wrap lane, so a day from another year holds one line. Below
+ * `sm` the snippet goes and the title takes the row.
+ */
+function NoteLedgerRow({ note }: { note: NoteRow }) {
   return (
     <LedgerRow>
       <Link
@@ -234,15 +233,19 @@ function NoteLedgerRow({ note, now }: { note: NoteRow; now: string }) {
             }
           />
         </span>
-        <span className="max-w-[40%] shrink-0 truncate text-body font-medium">
+        <span
+          data-note-title
+          className="min-w-0 flex-1 truncate text-body font-medium sm:max-w-[40%] sm:flex-none sm:shrink-0"
+        >
           {note.title}
         </span>
-        <span className="min-w-0 flex-1 truncate text-ui text-graphite">
+        <span
+          data-note-snippet
+          className="min-w-0 flex-1 truncate text-ui text-graphite max-sm:hidden"
+        >
           {note.snippet || 'Empty so far'}
         </span>
-        <LedgerFigure tone="muted">
-          {formatDay(note.updatedAt, now)}
-        </LedgerFigure>
+        <Day at={note.updatedAt} />
       </Link>
     </LedgerRow>
   )

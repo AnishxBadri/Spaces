@@ -394,6 +394,28 @@ describe('Notes', () => {
     })
     expect(earlier()?.querySelectorAll('a')).toHaveLength(23)
   })
+
+  it('ends a row on the no-wrap day lane, and drops the snippet below sm', async () => {
+    await mount('notes', '/notes', () => [aNote(1, '2025-10-04T10:00:00.000Z')])
+    await until('the row', () => document.querySelector('ol a') !== null)
+    const row = document.querySelector('ol a')
+    // A day from another year holds one line on the 88px lane.
+    const day = row?.querySelector('time')
+    expect(day?.textContent).toBe('4 Oct 2025')
+    expect(day?.className.split(' ')).toEqual(
+      expect.arrayContaining(['w-22', 'whitespace-nowrap', 'text-right']),
+    )
+    expect(row?.lastElementChild).toBe(day)
+    const snippet = row?.querySelector('[data-note-snippet]')
+    expect(snippet?.textContent).toBe('Body')
+    expect(snippet?.className.split(' ')).toContain('max-sm:hidden')
+    // Below sm the title takes the row; the 40% cap is from sm up.
+    const name = row?.querySelector('[data-note-title]')?.className.split(' ')
+    expect(name).toEqual(
+      expect.arrayContaining(['flex-1', 'sm:max-w-[40%]', 'sm:flex-none']),
+    )
+    expect(name).not.toContain('max-w-[40%]')
+  })
 })
 
 // ---------------------------------------------------------------------------
