@@ -14,6 +14,7 @@ import {
   RecordBody,
   RecordHeader,
 } from './record/record-parts'
+import { ListPage } from './page-header'
 import { SpaceCriteria } from './space-criteria'
 import { SpaceGlossary } from './space-glossary'
 import { SpaceMoveDialog } from './space-move-dialog'
@@ -151,8 +152,9 @@ export function SpacePageView({
   )
 
   return (
-    <div className="flex min-h-full flex-col">
+    <ListPage from="xl">
       <RecordHeader
+        pane
         stamp={stampOf(spc.archive?.on ?? null, sensitivity)}
         archived={archived}
         {...(renaming
@@ -342,7 +344,7 @@ export function SpacePageView({
           onNewNote={(kind) => void newNote(kind)}
         />
       </RecordBody>
-    </div>
+    </ListPage>
   )
 }
 

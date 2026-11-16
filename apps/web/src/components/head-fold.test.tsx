@@ -317,3 +317,70 @@ describe('the folded head', () => {
     expect(logged).toHaveBeenCalledTimes(1)
   })
 })
+
+/**
+ * The window's width against `xl`, as `matchMedia` answers it; the returned
+ * function resizes across the line and tells the listeners.
+ */
+function viewAt(wide: boolean) {
+  const listeners = new Set<() => void>()
+  const state = { matches: wide }
+  Object.defineProperty(win, 'matchMedia', {
+    configurable: true,
+    value: (query: string) => ({
+      media: query,
+      get matches() {
+        return state.matches
+      },
+      addEventListener: (_: string, l: () => void) => listeners.add(l),
+      removeEventListener: (_: string, l: () => void) => listeners.delete(l),
+    }),
+  })
+  return (next: boolean) =>
+    act(() => {
+      state.matches = next
+      for (const l of listeners) l()
+    })
+}
+
+const pane = (
+  <div className="flex flex-col">
+    <RecordHeader
+      pane
+      stamp={{ kind: 'Company' }}
+      name="Flent"
+      actions={<LogButton />}
+    />
+    <main data-body>Overview</main>
+  </div>
+)
+
+describe('a record in its fixed pane', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(win, 'matchMedia')
+  })
+
+  it('never folds at xl: no bar, no watched title, the actions in place', () => {
+    viewAt(true)
+    mount(pane)
+    expect(document.querySelector('[data-head-bar]')).toBeNull()
+    expect(StubObserver.last).toBeNull()
+    expect(q('[data-head-actions]').dataset.folded).toBe('false')
+    press('l')
+    expect(logged).toHaveBeenCalledTimes(1)
+  })
+
+  it('folds below xl, where the page scrolls as one, and unfolds on widening', () => {
+    const resize = viewAt(false)
+    mount(pane)
+    measureSlot()
+    titleVisible(false)
+    expect(q('[data-head-bar]').dataset.folded).toBe('true')
+    expect(q('[data-head-actions]').dataset.folded).toBe('true')
+
+    resize(true)
+    expect(document.querySelector('[data-head-bar]')).toBeNull()
+    expect(q('[data-head-actions]').dataset.folded).toBe('false')
+    expect(q('[data-head-actions-slot]').getAttribute('style')).toBeNull()
+  })
+})

@@ -1,6 +1,10 @@
 import { useId, useRef } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
-import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
+import {
+  PIN_UNDER_HEAD_BAR,
+  PIN_UNDER_HEAD_BAR_NARROW,
+} from '#/components/head-fold'
+import type { FolderScroll } from '#/lib/folder-scroll'
 import { cn } from '#/lib/utils'
 
 /**
@@ -22,6 +26,9 @@ import { cn } from '#/lib/utils'
  * - A nested switch under the bar is a `Segmented`, never a second tab row.
  * - `pinned` keeps the bar under the folded `HeadBar` while its body
  *   scrolls, on bone so nothing shows through it.
+ * - `pane` is a tabbed record's fixed pane: at `xl` the body takes the
+ *   height left under the bar and scrolls inside it (`data-folder-scroll`),
+ *   while the bar never moves, so `pinned` holds only below `xl`.
  * - `trail` sits on the same bar after the tabs, outside the tablist: a
  *   list's toolbar (`TabDivider`, Filter, Sort, the search box). It ends
  *   12px in from the folder's right edge, level with the head's `···`;
@@ -92,12 +99,15 @@ export function Tabs<T extends string>({
   label,
   disabled,
   pinned = false,
+  pane,
   plain = false,
   trail,
   flush = false,
   children,
   className,
 }: {
+  /** The body's scroller at `xl`, from `useFolderScroll`. */
+  pane?: FolderScroll | undefined
   items: ReadonlyArray<TabItem<T>>
   value: T
   onValueChange: (id: T) => void
@@ -139,7 +149,9 @@ export function Tabs<T extends string>({
   const bar = cn(
     'relative flex h-11 items-end before:absolute before:inset-x-0 before:bottom-0 before:h-px',
     plain ? 'before:bg-rule' : 'before:bg-hairline',
-    pinned && cn('bg-bone', PIN_UNDER_HEAD_BAR),
+    pinned &&
+      cn('bg-bone', pane ? PIN_UNDER_HEAD_BAR_NARROW : PIN_UNDER_HEAD_BAR),
+    pane && 'shrink-0',
   )
   const list = (
     <div
@@ -208,7 +220,9 @@ export function Tabs<T extends string>({
   )
 
   return (
-    <div className={cn('flex flex-col', className)}>
+    <div
+      className={cn('flex flex-col', pane && 'xl:min-h-0 xl:flex-1', className)}
+    >
       {trail === undefined ? (
         list
       ) : (
@@ -230,7 +244,20 @@ export function Tabs<T extends string>({
           role="tabpanel"
           id={panelId}
           aria-labelledby={tabId(selected)}
-          className={cn('flex flex-1 flex-col', plain ? 'bg-paper' : 'folder')}
+          {...(pane
+            ? {
+                ref: pane.ref,
+                onScroll: pane.onScroll,
+                'data-folder-scroll': true,
+              }
+            : {})}
+          className={cn(
+            'flex flex-1 flex-col',
+            plain ? 'bg-paper' : 'folder',
+            // In the pane the body scrolls rather than squeezing its rows:
+            // each child keeps its own height.
+            pane && 'xl:min-h-0 xl:overflow-y-auto xl:*:shrink-0',
+          )}
         >
           {children}
         </div>

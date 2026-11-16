@@ -26,6 +26,7 @@ import {
   StageStepper,
   RailReadout,
 } from '#/components/record/record-parts'
+import { ListPage } from '#/components/page-header'
 import {
   MoveStageVerb,
   RecordHeadActions,
@@ -288,7 +289,7 @@ function DealRecordPage() {
   ])
 
   return (
-    <div className="flex min-h-full flex-col">
+    <ListPage from="xl">
       {moveOpen && liveStages.length > 0 ? (
         // Same post-mortem gate the board's drag path has — Passed/Lost ask
         // for a reason inside the dialog.
@@ -309,6 +310,7 @@ function DealRecordPage() {
       ) : null}
 
       <RecordHeader
+        pane
         stamp={recordStamp('Deal', sensitivity, archive)}
         archived={archive !== null}
         actions={
@@ -487,6 +489,7 @@ function DealRecordPage() {
       >
         <RecordTabs
           label={deal.name}
+          recordId={deal.id}
           tab={tab}
           onTabChange={changeTab}
           counts={recordTabCounts({ notes, timeline, documents })}
@@ -562,6 +565,6 @@ function DealRecordPage() {
         }}
         onChanged={() => void router.invalidate()}
       />
-    </div>
+    </ListPage>
   )
 }

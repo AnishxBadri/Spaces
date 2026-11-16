@@ -16,8 +16,10 @@ import {
   RailGroupRow,
   RailSection,
   RecordBody,
+  RecordHeader,
   StageStepper,
 } from './record-parts.tsx'
+import { ListPage } from '../page-header.tsx'
 import { RecordTabs } from './record-tabs.tsx'
 
 /**
@@ -58,6 +60,7 @@ function record(tab: 'overview' | 'notes' | 'files' = 'notes') {
     >
       <RecordTabs
         label="Vayu Orbital"
+        recordId="vayu"
         tab={tab}
         counts={counts}
         onTabChange={() => {}}
@@ -190,6 +193,79 @@ describe('the details slot', () => {
   })
 })
 
+describe('the fixed pane at xl', () => {
+  it('scrolls the rail in its own full-height column, never sticking under a bar', () => {
+    const rail = classes(record().querySelector('[data-record-rail]'))
+    expect(rail).toEqual(
+      expect.arrayContaining(['xl:h-full', 'xl:overflow-y-auto', 'xl:w-80']),
+    )
+    expect(rail.filter((c) => /sticky|top-|max-h-|self-start/.test(c))).toEqual(
+      [],
+    )
+  })
+
+  it('lets the view and the folder take the height, and scrolls the folder body inside', () => {
+    const doc = record()
+    const body = classes(doc.querySelector('[data-record-body="details"]'))
+    expect(body).toEqual(expect.arrayContaining(['min-h-0', 'flex-1']))
+    const view = doc.querySelector('[data-record-view]')
+    expect(classes(view)).toEqual(
+      expect.arrayContaining(['flex-1', 'xl:min-h-0']),
+    )
+    const tabs = view?.firstElementChild ?? null
+    expect(classes(tabs)).toEqual(
+      expect.arrayContaining(['xl:min-h-0', 'xl:flex-1']),
+    )
+    const folder = doc.querySelector('[data-folder-scroll]')
+    expect(folder?.getAttribute('role')).toBe('tabpanel')
+    expect(classes(folder)).toEqual(
+      expect.arrayContaining([
+        'folder',
+        'flex-1',
+        'xl:min-h-0',
+        'xl:overflow-y-auto',
+        // Rows keep their height and the folder scrolls, not squeezes.
+        'xl:*:shrink-0',
+      ]),
+    )
+    // Nothing on the way down clips: a popover's anchor stays unclipped.
+    for (const el of [view, tabs, folder])
+      expect(
+        classes(el).filter((c) => /overflow-(clip|hidden)/.test(c)),
+      ).toEqual([])
+  })
+
+  it('caps the record shell at the view’s height from xl only', () => {
+    const doc = render(<ListPage from="xl">x</ListPage>)
+    const pane = classes(doc.querySelector('[data-pane-from="xl"]'))
+    expect(pane).toEqual(
+      expect.arrayContaining([
+        'flex',
+        'flex-col',
+        'xl:h-dvh',
+        'xl:max-h-dvh',
+        'xl:min-h-0',
+      ]),
+    )
+    // Below xl the rail stacks and the page scrolls as one.
+    expect(pane.filter((c) => !c.startsWith('xl:') && /h-/.test(c))).toEqual([])
+  })
+
+  it('hides the folded head bar at xl, and keeps it below for the page scroll', () => {
+    const head = render(
+      <RecordHeader pane stamp={{ kind: 'Company' }} name="Vayu Orbital" />,
+    )
+    const anchor = classes(head.querySelector('[data-head-anchor]'))
+    expect(anchor).toEqual(expect.arrayContaining(['sticky', 'xl:hidden']))
+    const document = render(
+      <RecordHeader stamp={{ kind: 'Note' }} name="Memo" />,
+    )
+    expect(classes(document.querySelector('[data-head-anchor]'))).not.toContain(
+      'xl:hidden',
+    )
+  })
+})
+
 describe('the tab head', () => {
   it('shows Overview first and uncounted, then the four tabs with their counts, and no Context', () => {
     const doc = record()
@@ -208,9 +284,18 @@ describe('the tab head', () => {
     expect(classes(overview)).toContain('text-foreground')
     expect(doc.body.textContent).not.toMatch(/Context/)
     const list = doc.querySelector('[role="tablist"]')
+    // Pinned under the folded head only below `xl`; in the pane it never moves.
     expect(classes(list)).toEqual(
-      expect.arrayContaining(['h-11', 'bg-bone', 'sticky', 'md:top-12']),
+      expect.arrayContaining([
+        'h-11',
+        'bg-bone',
+        'shrink-0',
+        'max-xl:sticky',
+        'md:max-xl:top-12',
+      ]),
     )
+    expect(classes(list)).not.toContain('sticky')
+    expect(classes(list)).not.toContain('md:top-12')
   })
 
   it('draws an empty tab graphite with no count, a closed tab with content in ink', () => {

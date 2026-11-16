@@ -67,8 +67,8 @@ folder bar and, given `children`, its body; `FolderBody` is the body when the ba
 drawn apart from it (a list's view bar, Notes, Meetings, Review); `plain` is the inner
 bar inside a rule card. `RecordTable`'s `folder` frames a list's table in hairline;
 without it a table is a rule card. `RecordBody` (`components/record/record-parts.tsx`)
-is the record chassis. The head folds as before; its bar and pinned actions sit on the
-24px edge (`components/head-fold.tsx`).
+is the record chassis. On a page that scrolls the head folds; its bar and pinned actions
+sit on the 24px edge (`components/head-fold.tsx`).
 
 - **E1 · The content edge is 24px.** The page title sits on it, and so does every
   card's content: the body gutter is 12px, a card is a 1px box with 12px between cards
@@ -79,7 +79,8 @@ is the record chassis. The head folds as before; its bar and pinned actions sit 
 - **E2 · One ink line under the head.** A single 1px ink line (`border-hairline`), never
   the double, and the head stays 104px and paper on every page; a line inside the head
   and between rows stays the rule. On a page that scrolls the head folds to the 48px bar
-  with its tabs and toolbar pinned; a list page is a fixed pane and never folds. The `···` is the rightmost head control and its right edge
+  with its tabs and toolbar pinned; a list page, and a tabbed record or a space at `xl`,
+  is a fixed pane and never folds (D106). The `···` is the rightmost head control and its right edge
   lines up with the last control in the content below. The title (`title-serif`) is 28
   on 32 from `md` up and the page step, 22 on 28, below it.
 - **E3 · Windows take one 16px inset all round.**
@@ -631,6 +632,12 @@ anatomy (D74 amended 2026-10-25):
   with their composer, the latest three threads and the latest files, each group
   a `Band` ending on a link to its tab. A list table keeps a long text to its one
   truncated line.
+- **The pane.** From `xl` the page is a fixed pane (`ListPage from="xl"`, D106): the
+  head never folds, the folder runs to the window's foot less the 12px gutter whatever
+  the tab holds, the open tab scrolls inside it (`data-folder-scroll`) and each tab
+  keeps its own place (`useFolderScroll`), and the rail scrolls in its own full-height
+  column. Below `xl` the rail stacks over the body and the page scrolls as one, the
+  head folding and the tab bar pinning under it.
 - **A space** is the same anatomy: the head is `···` only and the stamp prints no
   depth; Overview holds its readouts (in pipeline, last filed, the funding-stage bar),
   What's moving, open tasks and the latest companies; the rail is Criteria, Watching

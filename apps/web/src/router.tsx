@@ -12,6 +12,11 @@ export function getRouter() {
     routeTree,
     context,
     scrollRestoration: true,
+    // A record pane's own scrollers start at the top on a new page rather
+    // than inheriting the last page's offsets by DOM path; Back still
+    // restores them. A tab switch passes `resetScroll: false` and leaves the
+    // folder to `useFolderScroll`.
+    scrollToTopSelectors: ['[data-folder-scroll]', '[data-record-rail]'],
     defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
     // Every route that names no screens of its own: a path or a record that

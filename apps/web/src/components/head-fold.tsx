@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode, Ref } from 'react'
 import { cn } from '#/lib/utils'
 
@@ -21,8 +21,40 @@ import { cn } from '#/lib/utils'
  */
 export const PIN_UNDER_HEAD_BAR = 'sticky top-24 z-sticky md:top-12'
 
+/**
+ * `PIN_UNDER_HEAD_BAR` below `xl` only: a tabbed record's bar, which pins
+ * while the page scrolls as one and simply never moves in the fixed pane.
+ */
+export const PIN_UNDER_HEAD_BAR_NARROW =
+  'max-xl:sticky max-xl:top-24 max-xl:z-sticky md:max-xl:top-12'
+
 /** The title folds once it passes under this line: the mobile top bar. */
 const FOLD_LINE_PX = 48
+
+/** Tailwind's `xl`: from here a tabbed record is a fixed pane. */
+const PANE_QUERY = '(min-width: 80rem)'
+
+function subscribePane(onChange: () => void) {
+  if (typeof window.matchMedia !== 'function') return () => {}
+  const query = window.matchMedia(PANE_QUERY)
+  query.addEventListener('change', onChange)
+  return () => query.removeEventListener('change', onChange)
+}
+
+/**
+ * True at `xl` and up, where a tabbed record's head never folds. The server
+ * render and hydration read false, which draws the same unfolded head, so
+ * nothing flashes when the browser's answer arrives.
+ */
+export function useXlPane(): boolean {
+  return useSyncExternalStore(
+    subscribePane,
+    () =>
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia(PANE_QUERY).matches,
+    () => false,
+  )
+}
 
 export type HeadFold =
   { folded: false } | { folded: true; width: number; height: number }
@@ -84,17 +116,22 @@ export function HeadBar({
   title,
   mark,
   meta,
+  className,
 }: {
   fold: HeadFold
   title: ReactNode
   mark?: ReactNode
   /** Mono beside the title, on its baseline. */
   meta?: ReactNode
+  className?: string | undefined
 }) {
   return (
     <div
       data-head-anchor
-      className="pointer-events-none sticky top-12 z-sticky h-0 md:top-0"
+      className={cn(
+        'pointer-events-none sticky top-12 z-sticky h-0 md:top-0',
+        className,
+      )}
     >
       <div
         aria-hidden

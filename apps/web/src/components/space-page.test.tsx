@@ -454,6 +454,18 @@ describe('the rail', () => {
     expect(column?.className).toContain('xl:w-80')
   })
 
+  it('stands in a fixed pane at xl: the rail and the open tab each scroll on their own', async () => {
+    await mount('notes')
+    const shell = document.querySelector('[data-pane-from="xl"]')
+    expect(shell?.className).toContain('xl:h-dvh')
+    const column = shell?.querySelector('[data-record-rail]')
+    expect(column?.className).toContain('xl:overflow-y-auto')
+    expect(column?.className).not.toMatch(/\bxl:sticky\b/)
+    const folder = shell?.querySelector('[data-folder-scroll]')
+    expect(folder?.getAttribute('role')).toBe('tabpanel')
+    expect(folder?.className).toContain('xl:overflow-y-auto')
+  })
+
   it('heads Map with its count of subspaces and ends it on + Subspace', async () => {
     await mount('notes')
     const map = lane('Map')

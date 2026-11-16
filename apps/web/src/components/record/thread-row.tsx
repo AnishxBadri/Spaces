@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { CalendarDays, Mail, Paperclip, Phone } from '#/components/icons'
@@ -113,8 +114,14 @@ export function ThreadRow({
 }) {
   const Glyph = KIND_GLYPHS[item.kind] ?? Mail
   const people = threadPeople(item)
+  // Opened from a link, the row may sit below the folder's fold.
+  const row = useRef<HTMLLIElement>(null)
+  useEffect(() => {
+    if (highlighted) row.current?.scrollIntoView({ block: 'nearest' })
+  }, [highlighted])
   return (
     <li
+      ref={row}
       data-thread={item.id}
       data-row
       data-highlighted={highlighted ? '' : undefined}

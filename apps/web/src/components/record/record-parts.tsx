@@ -1,7 +1,13 @@
 import { Link, useRouter } from '@tanstack/react-router'
 import { createContext, useContext, useEffect } from 'react'
 import type { ComponentProps, ReactElement, ReactNode } from 'react'
-import { HeadActions, HeadBar, useHeadFold } from '#/components/head-fold'
+import {
+  HeadActions,
+  HeadBar,
+  OPEN,
+  useHeadFold,
+  useXlPane,
+} from '#/components/head-fold'
 import { EmptyRow, SectionHead } from '#/components/ledger-section'
 import { Card, PageBody } from '#/components/page-header'
 import { Twinkle } from '#/components/twinkle'
@@ -14,12 +20,14 @@ import { cn } from '#/lib/utils'
 /**
  * Record page anatomy. Header: the stamp alone on its row, then the mark,
  * the serif name, its suffix and badges with the actions bottom-aligned at
- * the right, one rule under — no readout strip; scrolled past its
- * name it folds to `HeadBar`.
+ * the right, one rule under — no readout strip; on a page that scrolls,
+ * scrolled past its name it folds to `HeadBar`.
  * Body: `RecordBody details=… groups` — on the bone ground, the 320px rail
  * left with no box (the attribute rows, then the relationship groups), the
- * record's folder right, Overview first. Every part is markup only;
- * the pages keep their data and handlers.
+ * record's folder right, Overview first. At `xl` a tabbed record is a fixed
+ * pane: the folder runs to the window's foot and the rail and the open tab
+ * each scroll on their own. Every part is markup only; the pages keep their
+ * data and handlers.
  */
 
 /**
@@ -63,8 +71,14 @@ export function RecordHeader({
   badges,
   stampAside,
   meta,
+  pane = false,
   className,
 }: {
+  /**
+   * A tabbed record or a space in its fixed pane (`ListPage from="xl"`): at
+   * `xl` the head never folds; below it, where the page scrolls, it does.
+   */
+  pane?: boolean | undefined
   /** The page's one stamp, alone on the row above the name. */
   stamp: StampProps
   suffix?: RecordSuffix | undefined
@@ -86,10 +100,22 @@ export function RecordHeader({
   /** The head's left edge, where the page's body holds a wider one. */
   className?: string | undefined
 }) {
-  const { titleRef, actionsRef, fold } = useHeadFold()
+  const wide = useXlPane()
+  const folds = !(pane && wide)
+  const head = useHeadFold(folds)
+  const fold = folds ? head.fold : OPEN
+  const { titleRef, actionsRef } = head
   return (
     <>
-      <HeadBar fold={fold} title={name} mark={mark} />
+      {folds ? (
+        <HeadBar
+          fold={fold}
+          title={name}
+          mark={mark}
+          // Before hydration learns the width, CSS keeps the pane bar-less.
+          className={pane ? 'xl:hidden' : undefined}
+        />
+      ) : null}
       <header
         className={cn(
           'flex shrink-0 flex-col gap-3 border-b border-hairline bg-paper px-6 pt-5 pb-4',
@@ -476,9 +502,9 @@ export function PreviewHead({
 /**
  * Body, on the bone ground in the 12px gutter. With `details` it is the
  * tabbed record: the rail left, printed straight on the ground with no box
- * and its content on the 24px edge, sticking under the folded bar on wide
- * screens; then `children` — the record's folder — taking the rest and the
- * height. Below `xl` the two stack.
+ * and its content on the 24px edge, scrolling in its own full-height column
+ * on wide screens; then `children` — the record's folder — taking the rest
+ * and the height. Below `xl` the two stack and the page scrolls as one.
  * - `groups`: a record's or a space's rail of `RailGroup`s, `gap-3` apart.
  *   Without it, a column of edge-to-edge `RailSection`s.
  * - Without `details`, the older shape the term and holding pages keep:
@@ -505,13 +531,18 @@ export function RecordBody({
           aria-label="Details"
           data-record-rail
           className={cn(
-            'flex w-full shrink-0 flex-col px-3 xl:sticky xl:top-15 xl:max-h-[calc(100dvh-4.5rem)] xl:w-80 xl:self-start xl:overflow-y-auto',
+            'flex w-full shrink-0 flex-col px-3 xl:h-full xl:w-80 xl:overflow-y-auto',
             groups && 'gap-3 pt-2 pb-4',
           )}
         >
           {details}
         </aside>
-        <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+        <div
+          data-record-view
+          className="flex min-w-0 flex-1 flex-col xl:min-h-0"
+        >
+          {children}
+        </div>
       </div>
     )
   }

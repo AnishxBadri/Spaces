@@ -36,6 +36,7 @@ import {
 import type { SpaceMoving, getSpace } from '#/lib/server-fns'
 import { formatWhen } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
+import { useFolderScroll } from '#/lib/folder-scroll'
 import { cn } from '#/lib/utils'
 
 /**
@@ -98,9 +99,12 @@ export function SpaceTabs({
       ? { id, label: TAB_LABELS[id], uncounted: true }
       : { id, label: TAB_LABELS[id], count: counts[id] },
   )
+  // At `xl` the space is a fixed pane: each tab scrolls in the folder.
+  const pane = useFolderScroll(spc.id, tab)
   return (
     <Tabs
       label={spc.name}
+      pane={pane}
       items={items}
       value={tab}
       onValueChange={onTabChange}

@@ -101,23 +101,31 @@ export const PAGE_EDGE = 'px-6'
  * Pair it with `PageHeader folds={false}` and a `PageBody` given `min-h-0`.
  * - `fixed={false}` keeps the same element as a page that scrolls (the
  *   Deals board), so switching shape never remounts what is inside.
+ * - `from="xl"`: a tabbed record or a space, a pane only where its rail sits
+ *   beside the body; below `xl` the rail stacks over it and the page
+ *   scrolls as one.
  */
 export function ListPage({
   children,
   fixed = true,
+  from = 'md',
 }: {
   children: ReactNode
   fixed?: boolean | undefined
+  from?: 'md' | 'xl' | undefined
 }) {
   return (
     <div
       data-list-page={fixed}
+      {...(from === 'xl' ? { 'data-pane-from': 'xl' } : {})}
       className={cn(
         'flex flex-col',
         // The shell's `main` grows its page to content (`flex-1` over an
         // unbounded column), so the cap is a max-height, not only a height.
         fixed &&
-          'h-[calc(100dvh-3rem)] max-h-[calc(100dvh-3rem)] min-h-0 md:h-dvh md:max-h-dvh',
+          (from === 'xl'
+            ? 'xl:h-dvh xl:max-h-dvh xl:min-h-0'
+            : 'h-[calc(100dvh-3rem)] max-h-[calc(100dvh-3rem)] min-h-0 md:h-dvh md:max-h-dvh'),
       )}
     >
       {children}

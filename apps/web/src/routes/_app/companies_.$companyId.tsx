@@ -19,6 +19,7 @@ import {
   RecordHeader,
   RailReadout,
 } from '#/components/record/record-parts'
+import { ListPage } from '#/components/page-header'
 import { RecordHeadActions } from '#/components/record/record-heads'
 import { RecordNotices } from '#/components/record/record-notices'
 import { recordStamp } from '#/components/record/record-archive'
@@ -244,8 +245,9 @@ function CompanyRecordPage() {
   ])
 
   return (
-    <div className="flex min-h-full flex-col">
+    <ListPage from="xl">
       <RecordHeader
+        pane
         stamp={recordStamp('Company', sensitivity, archive)}
         archived={archive !== null}
         actions={
@@ -407,6 +409,7 @@ function CompanyRecordPage() {
       >
         <RecordTabs
           label={company.name}
+          recordId={company.id}
           tab={tab}
           onTabChange={changeTab}
           counts={recordTabCounts({ notes, timeline, documents })}
@@ -478,6 +481,6 @@ function CompanyRecordPage() {
         }}
         onChanged={() => void router.invalidate()}
       />
-    </div>
+    </ListPage>
   )
 }
