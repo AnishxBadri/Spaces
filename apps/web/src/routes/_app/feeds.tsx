@@ -38,11 +38,22 @@ import type { FeedSource } from '#/lib/server-fns'
 
 type FeedsTab = 'headlines' | 'sources'
 
-type FeedsSearch = { tab?: FeedsTab | undefined }
+type FeedsSearch = {
+  tab?: FeedsTab | undefined
+  /** The space Headlines is narrowed to; absent is every space. */
+  space?: string | undefined
+}
+
+const SPACE_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Only `sources` is spelled in the URL; anything else is the default tab. */
-const feedsSearch = (raw: Record<string, unknown>): FeedsSearch =>
-  raw.tab === 'sources' ? { tab: 'sources' } : {}
+const feedsSearch = (raw: Record<string, unknown>): FeedsSearch => ({
+  ...(raw.tab === 'sources' ? { tab: 'sources' as const } : {}),
+  ...(typeof raw.space === 'string' && SPACE_ID.test(raw.space)
+    ? { space: raw.space }
+    : {}),
+})
 
 export const Route = createFileRoute('/_app/feeds')({
   validateSearch: feedsSearch,
