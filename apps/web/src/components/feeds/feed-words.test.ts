@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FeedSource } from '#/lib/server-fns'
-import {
-  failingLine,
-  fixNotice,
-  logoOf,
-  removeBody,
-  spacesLine,
-} from './feed-words'
+import { failingLine, fixNotice, removeBody, spacesLine } from './feed-words'
 
 const source = (over: Partial<FeedSource> = {}): FeedSource => ({
   id: 'f1',
@@ -14,6 +8,7 @@ const source = (over: Partial<FeedSource> = {}): FeedSource => ({
   url: 'https://orbitnotes.substack.com/feed',
   siteUrl: 'https://orbitnotes.substack.com/',
   logoSha: null,
+  logoUrl: null,
   state: 'failing',
   lastFetchedAt: '2026-11-16T09:00:00.000Z',
   lastSuccessAt: '2026-11-13T09:00:00.000Z',
@@ -72,13 +67,5 @@ describe('Remove…', () => {
     expect(removeBody(0)).toBeUndefined()
     expect(removeBody(1)).toBe('Its one headline goes with it.')
     expect(removeBody(1214)).toBe('Its 1,214 headlines go with it.')
-  })
-})
-
-describe('the logo', () => {
-  it('is the stored logo once the source carries one, else none', () => {
-    expect(logoOf(source())).toBeNull()
-    const stored = { ...source(), logoUrl: '/api/blobs/abc' }
-    expect(logoOf(stored)).toBe('/api/blobs/abc')
   })
 })

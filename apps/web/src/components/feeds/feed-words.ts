@@ -45,16 +45,6 @@ export function spacesLine(
   return tags.map((t) => pathOf.get(t.id) ?? t.name).join(', ')
 }
 
-/**
- * The feed's stored logo, once the worker has one. Read through `in` so the
- * table draws the monogram until `FeedSource` carries the field.
- */
-export function logoOf(source: FeedSource): string | null {
-  if (!('logoUrl' in source)) return null
-  const url: unknown = source.logoUrl
-  return typeof url === 'string' ? url : null
-}
-
 /** `Its 214 headlines go with it.`; nothing when it holds none. */
 export function removeBody(count: number): string | undefined {
   if (count === 0) return undefined

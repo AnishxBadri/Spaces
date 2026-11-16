@@ -128,6 +128,7 @@ const source = (n: number, over: Partial<FeedSource>): FeedSource => ({
   url: `https://feed${String(n)}.example/feed`,
   siteUrl: null,
   logoSha: null,
+  logoUrl: null,
   state: 'ok',
   lastFetchedAt: NOW,
   lastSuccessAt: NOW,

@@ -16,7 +16,7 @@ import { Twinkle } from '#/components/twinkle'
 import { MoreMenu } from '#/components/ui/more-menu'
 import type { FeedSource } from '#/lib/server-fns'
 import { FeedLogo } from './feed-logo'
-import { failingLine, logoOf, spacesLine } from './feed-words'
+import { failingLine, spacesLine } from './feed-words'
 
 /**
  * The Sources tab: every feed as a row of the fixed pane's table — Name
@@ -72,7 +72,7 @@ export function SourcesTable({
               title={`Edit ${r.name}`}
               className="focus-ring-inset flex h-full min-w-0 items-center gap-2 px-1 text-left"
             >
-              <FeedLogo name={r.name} logoUrl={logoOf(r)} />
+              <FeedLogo name={r.name} logoUrl={r.logoUrl} />
               <span className="truncate">{r.name}</span>
             </button>
           )
