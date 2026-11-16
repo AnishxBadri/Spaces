@@ -16,6 +16,7 @@ import type { NoteData, SaveState } from './note-head'
 import { NoteMoreMenu, noteMenuEntries } from './note-menu'
 import { NoteRail, noteHistory } from './note-rail'
 import { NoteSheet } from './note-sheet'
+import type { NoteDeleteImpact } from '#/lib/notes/delete'
 
 /**
  * The note page as its parts draw it: the record head in each of the meta
@@ -66,7 +67,7 @@ const fns = vi.hoisted(() => ({
   setNoteKind: vi.fn(() => Promise.resolve()),
   setNoteVisibility: vi.fn(() => Promise.resolve()),
   saveNoteAsTemplate: vi.fn(() => Promise.resolve()),
-  previewNoteDeletion: vi.fn(() =>
+  previewNoteDeletion: vi.fn((): Promise<NoteDeleteImpact> =>
     Promise.resolve({
       title: 'Flent thesis',
       blockedReason: null,
@@ -192,6 +193,7 @@ function head(note: NoteData, saveState: SaveState = 'idle'): string {
         title={note.title}
         onTitleChange={noop}
         saveState={saveState}
+        onRetry={noop}
         menu={menu(note.kind)}
       />
     </ClockProvider>,
@@ -295,14 +297,38 @@ describe('the head', () => {
 
   it('says the save state in mono, and nothing before the first edit', () => {
     const word = (s: SaveState) =>
-      text(dom(renderToStaticMarkup(<SaveWord state={s} />)))
+      text(dom(renderToStaticMarkup(<SaveWord state={s} onRetry={noop} />)))
     expect(word('idle')).toBe('')
     expect(word('dirty')).toBe('Unsaved changes')
     expect(word('saving')).toBe('Saving…')
     expect(word('saved')).toBe('Saved')
-    expect(renderToStaticMarkup(<SaveWord state="saved" />)).toMatch(
-      /class="mono[^"]*" role="status"/,
+    expect(word('failed')).toBe('Not saved · Retry')
+    expect(
+      renderToStaticMarkup(<SaveWord state="saved" onRetry={noop} />),
+    ).toMatch(/class="mono[^"]*" role="status"/)
+  })
+
+  it('says a failed save at once, in crimson, with Retry', () => {
+    const quiet = dom(
+      renderToStaticMarkup(<SaveWord state="saved" onRetry={noop} />),
     )
+    expect(quiet.querySelector('[role="alert"]')).toBeNull()
+    expect(quiet.querySelector('button')).toBeNull()
+
+    const onRetry = vi.fn()
+    mount(<SaveWord state="failed" onRetry={onRetry} />)
+    const alert = document.querySelector('[role="alert"]')
+    expect(text(alert)).toBe('Not saved · Retry')
+    expect(alert?.className.split(' ')).toContain('text-destructive')
+    // Its own node: the polite status stays mounted, empty, beside it.
+    const status = document.querySelector('[role="status"]')
+    expect(status?.getAttribute('aria-live')).toBe('polite')
+    expect(text(status)).toBe('')
+    expect(status?.contains(alert ?? null)).toBe(false)
+    const retry = alert?.querySelector('button')
+    expect(retry?.getAttribute('type')).toBe('button')
+    click(retry)
+    expect(onRetry).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -330,6 +356,7 @@ describe('the body', () => {
                 title={note.title}
                 onTitleChange={noop}
                 saveState="idle"
+                onRetry={noop}
                 menu={menu()}
               />
             }
@@ -477,6 +504,7 @@ beforeEach(() => {
   nav.navigate.mockClear()
   nav.invalidate.mockClear()
   toast.success.mockClear()
+  toast.error.mockClear()
 })
 
 afterEach(() => {
@@ -525,7 +553,9 @@ describe('the ··· menu', () => {
     ].find((el) => text(el) === name)
   }
 
-  const saveNewVersion = vi.fn(() => Promise.resolve('n2'))
+  const saveNewVersion = vi.fn((): Promise<string | null> =>
+    Promise.resolve('n2'),
+  )
 
   function mountMenu(kind: NoteData['kind'] = 'note') {
     mount(
@@ -581,7 +611,22 @@ describe('the ··· menu', () => {
     expect(nav.navigate).toHaveBeenCalledWith({
       to: '/notes/$noteId',
       params: { noteId: 'n2' },
+      ignoreBlocker: true,
     })
+  })
+
+  it('makes no copy when the pending edit did not land', async () => {
+    saveNewVersion.mockClear()
+    saveNewVersion.mockResolvedValueOnce(null)
+    mountMenu()
+    await open()
+    click(item('Save as new version'))
+    await settle()
+    expect(saveNewVersion).toHaveBeenCalledTimes(1)
+    // The head's save word says it; no toast, no navigation.
+    expect(toast.success).not.toHaveBeenCalled()
+    expect(toast.error).not.toHaveBeenCalled()
+    expect(nav.navigate).not.toHaveBeenCalled()
   })
 
   it('copies the page URL and says so', async () => {
@@ -632,7 +677,51 @@ describe('the ··· menu', () => {
     click(confirmButton)
     await settle()
     expect(fns.deleteNote).toHaveBeenCalledWith({ data: { id: 'n1' } })
-    expect(nav.navigate).toHaveBeenCalledWith({ to: '/notes' })
+    expect(nav.navigate).toHaveBeenCalledWith({
+      to: '/notes',
+      ignoreBlocker: true,
+    })
+  })
+
+  async function deleteWindow() {
+    mountMenu()
+    await open()
+    click(item('Delete…'))
+    await settle(50)
+    const win = document.querySelector('[role="alertdialog"], [role="dialog"]')
+    if (win === null) throw new Error('no delete window')
+    return win
+  }
+
+  it('says less in the delete window: linked to nothing', async () => {
+    const win = await deleteWindow()
+    expect(text(win)).toContain('Delete “Flent thesis”?')
+    expect(text(win)).toContain('Can’t be undone.')
+    expect(text(win)).not.toContain('no longer show on')
+    expect(text(win)).not.toContain('go for good')
+  })
+
+  it('says less in the delete window: filed or mentioned somewhere', async () => {
+    fns.previewNoteDeletion.mockResolvedValueOnce({
+      title: 'Flent thesis',
+      blockedReason: null,
+      unlinks: [
+        {
+          name: 'Flent',
+          meta: 'Company',
+          kind: 'company',
+          objectLabel: null,
+          objectIcon: null,
+          noteKind: null,
+        },
+      ],
+    })
+    const win = await deleteWindow()
+    // The body, then the list it introduces.
+    expect(text(win)).toContain(
+      'Can’t be undone. It will no longer show on:FlentCompany',
+    )
+    expect(text(win)).not.toContain('keeps its own row')
   })
 })
 

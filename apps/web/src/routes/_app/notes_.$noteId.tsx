@@ -1,22 +1,20 @@
 import {
   ClientOnly,
   createFileRoute,
+  useBlocker,
   useNavigate,
 } from '@tanstack/react-router'
+import type { ShouldBlockFn } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { DocumentPreview } from '#/components/document-preview'
-import {
-  deriveMarkdown,
-  extractMentionIds,
-  NoteEditor,
-} from '#/components/editor/note-editor'
+import { NoteEditor } from '#/components/editor/note-editor'
 import type { DroppedDocument } from '#/components/editor/note-editor'
 import { NoteHead } from '#/components/notes/note-head'
-import type { SaveState } from '#/components/notes/note-head'
 import { NoteSheet } from '#/components/notes/note-sheet'
 import { NoteMoreMenu } from '#/components/notes/note-menu'
 import { NoteRail } from '#/components/notes/note-rail'
+import { useNoteSave } from '#/components/notes/use-note-save'
 import {
   RecordGone,
   RecordHeadPending,
@@ -34,15 +32,10 @@ import {
 } from '#/lib/documents/note-drop'
 import { uploadDocument } from '#/lib/documents/upload'
 import type { UploadPhase } from '#/lib/documents/upload'
-import type { NoteBody } from '@spaces/db/schema/kinds'
 import { fileInSpaceAction } from '#/lib/file-in-space'
 import { loadNotePage } from '#/lib/notes/page-load'
 import { usePageActions } from '#/lib/page-actions'
-import {
-  getDocumentPreview,
-  saveNote,
-  saveNoteAsNewVersion,
-} from '#/lib/server-fns'
+import { getDocumentPreview, saveNoteAsNewVersion } from '#/lib/server-fns'
 
 /**
  * The prose register: this page reads like a page, not a dashboard. A
@@ -72,54 +65,10 @@ const DROP_PHASES: Record<UploadPhase, string> = {
 function NotePage() {
   const { note, allSpaces, terms } = Route.useLoaderData()
   const [title, setTitle] = useState(note.title)
-  const [saveState, setSaveState] = useState<SaveState>('idle')
+  const save = useNoteSave({ noteId: note.id, initialTitle: note.title })
   const preview = useDocumentPreview()
   const onFileDrop = useNoteFileDrop(note.spaces)
-
-  const latest = useRef<{
-    document: NoteBody
-    blocksToMarkdownLossy: () => Promise<string>
-  } | null>(null)
-  const titleRef = useRef(note.title)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const flush = useCallback(async () => {
-    const snapshot = latest.current
-    setSaveState('saving')
-    try {
-      // No editor change yet → title-only save; body stays untouched.
-      let body
-      if (snapshot) {
-        const doc = snapshot.document
-        const lossyMd = await snapshot.blocksToMarkdownLossy()
-        body = {
-          bodyJson: doc,
-          bodyMd: deriveMarkdown(lossyMd, doc),
-          mentionIds: extractMentionIds(doc),
-        }
-      }
-      await saveNote({
-        data: { id: note.id, title: titleRef.current, body },
-      })
-      setSaveState('saved')
-    } catch {
-      setSaveState('dirty') // retried on next change
-    }
-  }, [note.id])
-
-  const scheduleSave = useCallback(() => {
-    setSaveState('dirty')
-    if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(() => {
-      void flush()
-    }, 800)
-  }, [flush])
-
-  useEffect(() => {
-    return () => {
-      if (timer.current) clearTimeout(timer.current)
-    }
-  }, [])
+  useLeaveGuard(save.hasPending)
 
   usePageActions([
     fileInSpaceAction({
@@ -138,10 +87,10 @@ function NotePage() {
             title={title}
             onTitleChange={(next) => {
               setTitle(next)
-              titleRef.current = next
-              scheduleSave()
+              save.editTitle(next)
             }}
-            saveState={saveState}
+            saveState={save.state}
+            onRetry={save.retry}
             menu={
               <NoteMoreMenu
                 noteId={note.id}
@@ -149,12 +98,9 @@ function NotePage() {
                 kind={note.kind}
                 saveNewVersion={async () => {
                   // The pending autosave lands first, so the copy carries
-                  // the latest body.
-                  if (timer.current !== null) {
-                    clearTimeout(timer.current)
-                    timer.current = null
-                    await flush()
-                  }
+                  // the latest body; if it fails there is no copy of older
+                  // text, and the save word says so.
+                  if (!(await save.flushNow())) return null
                   const { id } = await saveNoteAsNewVersion({
                     data: { id: note.id },
                   })
@@ -169,10 +115,7 @@ function NotePage() {
             <NoteEditor
               initialContent={note.bodyJson}
               terms={terms}
-              onChange={(editor) => {
-                latest.current = editor
-                scheduleSave()
-              }}
+              onChange={save.edit}
               onFileDrop={onFileDrop}
             />
           </ClientOnly>
@@ -193,6 +136,27 @@ function NotePage() {
       <DocumentPreview doc={preview.doc} onOpenChange={preview.onOpenChange} />
     </>
   )
+}
+
+/** What the leave guard asks; the browser's own confirm says it. */
+const LEAVE_QUESTION = 'Your last edit has not been saved. Leave anyway?'
+
+/**
+ * Leaving the note asks first while an edit has not landed: in-app
+ * navigation through the router's blocker, closing or reloading the tab
+ * through `beforeunload`. A search change on this same note (`?modal=`) is
+ * not leaving.
+ */
+function useLeaveGuard(hasPending: () => boolean) {
+  // Stable, so the blocker registers once rather than on every keystroke.
+  const shouldBlockFn = useCallback<ShouldBlockFn>(
+    ({ current, next }) => {
+      if (next.pathname === current.pathname || !hasPending()) return false
+      return !window.confirm(LEAVE_QUESTION)
+    },
+    [hasPending],
+  )
+  useBlocker({ shouldBlockFn, enableBeforeUnload: hasPending })
 }
 
 /**

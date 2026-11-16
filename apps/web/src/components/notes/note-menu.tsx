@@ -90,7 +90,10 @@ export function noteMenuEntries({
  *   gated on authorship — a shared note's genre is the team's reading of it.
  * - A new version is a copy filed where this note is, superseding it. The
  *   page writes it, because only the page holds the pending autosave that
- *   must land first; this opens the copy it hands back.
+ *   must land first; this opens the copy it hands back. When that autosave
+ *   fails there is no copy, and the head's save word says why.
+ * - Leaving after a delete or a new version skips the page's leave guard:
+ *   the note it guards is gone or superseded.
  * - Delete is hard, no trash. The preview runs before the confirm opens, so
  *   the confirm names what loses its edge, and a refusal (the mandate's
  *   note) is said in the window rather than by a toast after a yes.
@@ -104,8 +107,11 @@ export function NoteMoreMenu({
   noteId: string
   title: string
   kind: NoteKind
-  /** Saves the pending edit, then the copy; resolves to the copy's id. */
-  saveNewVersion: () => Promise<string>
+  /**
+   * Saves the pending edit, then the copy; resolves to the copy's id, or to
+   * null when the pending edit did not land and no copy was made.
+   */
+  saveNewVersion: () => Promise<string | null>
 }) {
   const navigate = useNavigate()
   const router = useRouter()
@@ -136,8 +142,13 @@ export function NoteMoreMenu({
     setBusy(true)
     try {
       const id = await saveNewVersion()
+      if (id === null) return
       toast.success('New version saved')
-      await navigate({ to: '/notes/$noteId', params: { noteId: id } })
+      await navigate({
+        to: '/notes/$noteId',
+        params: { noteId: id },
+        ignoreBlocker: true,
+      })
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Could not save a new version',
@@ -174,8 +185,8 @@ export function NoteMoreMenu({
         title: `Delete “${name}”?`,
         body:
           impact.unlinks.length > 0
-            ? 'The note and its text go for good. Everything listed below keeps its own row — only its link to this note goes.'
-            : 'The note and its text go for good. This cannot be undone.',
+            ? 'Can’t be undone. It will no longer show on:'
+            : 'Can’t be undone.',
         rows: impact.unlinks.map((u) => ({
           name: u.name,
           meta: u.meta,
@@ -187,7 +198,7 @@ export function NoteMoreMenu({
       await deleteNote({ data: { id: noteId } })
       // Leave first, then invalidate: this route's loader would otherwise
       // refetch a note that is no longer there.
-      await navigate({ to: '/notes' })
+      await navigate({ to: '/notes', ignoreBlocker: true })
       void router.invalidate()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not delete')

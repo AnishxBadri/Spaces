@@ -12,7 +12,7 @@ export type NoteData = NonNullable<Awaited<ReturnType<typeof getNote>>>
 
 export type NoteKind = NoteData['kind']
 
-export type SaveState = 'idle' | 'dirty' | 'saving' | 'saved'
+export type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'failed'
 
 const STAMPS: Record<NoteKind, string> = {
   note: 'Note',
@@ -104,22 +104,51 @@ export function NoteMeta({ note }: { note: NoteData }) {
   )
 }
 
-/** `Saved`, `Saving…` or `Unsaved changes`; nothing before the first edit. */
-export function SaveWord({ state }: { state: SaveState }) {
+/**
+ * `Saved`, `Saving…` or `Unsaved changes`, quiet; nothing before the first
+ * edit. A failed save is `Not saved · Retry` in crimson, said at once.
+ * - The failure is its own `alert` node beside the polite `status`, which
+ *   stays mounted: some readers drop a live region whose role flips.
+ */
+export function SaveWord({
+  state,
+  onRetry,
+}: {
+  state: SaveState
+  onRetry: () => void
+}) {
   return (
-    <span
-      data-save-word
-      className="mono text-micro text-graphite"
-      role="status"
-      aria-live="polite"
-    >
-      {state === 'saving'
-        ? 'Saving…'
-        : state === 'saved'
-          ? 'Saved'
-          : state === 'dirty'
-            ? 'Unsaved changes'
-            : ''}
+    <span className="flex items-center">
+      <span
+        data-save-word
+        className="mono text-micro text-graphite"
+        role="status"
+        aria-live="polite"
+      >
+        {state === 'saving'
+          ? 'Saving…'
+          : state === 'saved'
+            ? 'Saved'
+            : state === 'dirty'
+              ? 'Unsaved changes'
+              : ''}
+      </span>
+      {state === 'failed' ? (
+        <span
+          data-save-word="failed"
+          role="alert"
+          className="mono text-micro text-destructive"
+        >
+          Not saved ·{' '}
+          <button
+            type="button"
+            onClick={onRetry}
+            className="focus-ring underline underline-offset-2"
+          >
+            Retry
+          </button>
+        </span>
+      ) : null}
     </span>
   )
 }
@@ -173,12 +202,15 @@ export function NoteHead({
   title,
   onTitleChange,
   saveState,
+  onRetry,
   menu,
 }: {
   note: NoteData
   title: string
   onTitleChange: (next: string) => void
   saveState: SaveState
+  /** Runs the failed save again. */
+  onRetry: () => void
   menu: ReactNode
 }) {
   return (
@@ -197,7 +229,7 @@ export function NoteHead({
       meta={<NoteMeta note={note} />}
       actions={
         <span className="flex items-center gap-3">
-          <SaveWord state={saveState} />
+          <SaveWord state={saveState} onRetry={onRetry} />
           {menu}
         </span>
       }
