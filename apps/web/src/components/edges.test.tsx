@@ -738,19 +738,16 @@ describe('E7 · one icon list, one brand mark', () => {
     }
   })
 
-  it('keeps one kind-icon map, in the icon list, that the sidebar agrees with', () => {
+  it('keeps one kind-icon map, in the icon list', () => {
     const definers = sourceFiles(src)
       .filter((f) => /\bconst KIND_ICONS\b/.test(readFileSync(f, 'utf8')))
       .map((f) => relative(src, f))
     expect(definers).toEqual(['components/icons.ts'])
-    // A person record wears the People page's glyph; a note its own.
-    expect(icons.KIND_ICONS.person).toBe(icons.Users)
-    expect(read('components/app-sidebar.tsx')).toMatch(
-      /to: '\/people', label: 'People', icon: Users\b/,
-    )
+    // One person wears the single figure; the People page keeps the group.
+    expect(icons.KIND_ICONS.person).toBe(icons.User)
     expect(
       renderToStaticMarkup(<KindIcon of={{ kind: 'person' }} />),
-    ).toContain('data-icon="user--multiple"')
+    ).toContain('data-icon="user"')
     const note = renderToStaticMarkup(
       <KindIcon of={{ kind: 'note', noteKind: 'memo' }} />,
     )

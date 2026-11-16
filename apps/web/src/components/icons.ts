@@ -218,7 +218,7 @@ export const Users = carbon(UserMultiple, 'user--multiple')
  */
 export const KIND_ICONS: Readonly<Partial<Record<string, IconComponent>>> = {
   company: Building2,
-  person: Users,
+  person: User,
   deal: Kanban,
   space: Layers,
   note: NoteIcon,

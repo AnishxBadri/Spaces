@@ -234,7 +234,7 @@ the time and which the day is H3.
 ### Kinds
 
 Where a row, a chip or a picker names a record of mixed kinds, its kind is a leading
-icon, never a word: the one map from the shared icon list (company `Building`, person `UserMultiple`, deal
+icon, never a word: the one map from the shared icon list (company `Building`, person `User`, deal
 `Column`, space `Layers`, note `NoteKindIcon`, document `Attachment`) and a custom object's
 own `objectIcon`, with the kind word as its tooltip and `aria-label`. Never the icon
 and the word side by side. A word stays where the word is the data: a stamp (`MEMO`),
