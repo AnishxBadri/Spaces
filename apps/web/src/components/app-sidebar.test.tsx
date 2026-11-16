@@ -245,6 +245,7 @@ describe('the chassis', () => {
       'Notes',
       'Meetings',
       'Files',
+      'Feeds',
       'Companies',
       'People',
       'Deals',
@@ -282,7 +283,7 @@ describe('the chassis', () => {
     expect(rows()).toEqual(
       ['Today', 'Tasks', 'Spaces'].concat(['Companies', 'People', 'Deals']),
     )
-    expect(button(/^Library/).textContent).toContain('▸ 3')
+    expect(button(/^Library/).textContent).toContain('▸ 4')
     expect(button(/^Library/).getAttribute('aria-expanded')).toBe('false')
     expect(button(/^Capital/).textContent).toContain('▸ 2')
 
@@ -320,7 +321,7 @@ describe('the chassis', () => {
     for (const n of [1, 2, 3, 4, 5, 6])
       prefs.toggleStarredSpace({ id: `s${n}`, name: `Space ${n}` })
     await mount('/today')
-    const after = rows().slice(rows().indexOf('Spaces') + 1, -8)
+    const after = rows().slice(rows().indexOf('Spaces') + 1, -9)
     expect(after).toEqual([
       'Space 1',
       'Space 2',
@@ -430,7 +431,7 @@ describe('the chassis', () => {
     expect(document.body.textContent).not.toContain('Drafts')
   })
 
-  it('draws Drafts after Files with the count, a button that opens the drafts window', async () => {
+  it('draws Drafts after the last Library row with the count, a button that opens the drafts window', async () => {
     served.drafts = 2
     const opened = vi.mocked(compose.openDrafts)
     opened.mockClear()
@@ -439,11 +440,11 @@ describe('the chassis', () => {
     expect(row.tagName).toBe('BUTTON')
     expect(row.textContent).toBe('Drafts2')
     expect(row.hasAttribute('aria-current')).toBe(false)
-    const files = nav().querySelector('a[href="/files"]')
-    expect(files?.nextElementSibling).toBe(row)
+    const feeds = nav().querySelector('a[href="/feeds"]')
+    expect(feeds?.nextElementSibling).toBe(row)
     // Library counts it while folded.
     click(button(/^Library/))
-    expect(button(/^Library/).textContent).toContain('▸ 4')
+    expect(button(/^Library/).textContent).toContain('▸ 5')
     click(button(/^Library/))
     if (!(row instanceof HTMLElement)) throw new Error('no Drafts row')
     act(() => row.click())
@@ -455,8 +456,8 @@ describe('the chassis', () => {
     await mount('/today', [], { collapsed: true })
     const row = one('[data-drafts-row]')
     expect(row.getAttribute('aria-label')).toBe('Drafts · 2')
-    const files = nav().querySelector('a[href="/files"]')
-    expect(files?.nextElementSibling).toBe(row)
+    const feeds = nav().querySelector('a[href="/feeds"]')
+    expect(feeds?.nextElementSibling).toBe(row)
   })
 
   it('draws Drafts in the phone drawer too', async () => {

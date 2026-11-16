@@ -77,10 +77,10 @@ describe('the nav grammar', () => {
     )
   })
 
-  it('holds Notes, Meetings and Files in the Library, between the work and the objects', () => {
+  it('holds Notes, Meetings, Files and Feeds in the Library, between the work and the objects', () => {
     expect(
       NAV_GROUPS.library.map((item) => `${item.label} ${item.key}`),
-    ).toEqual(['Notes G N', 'Meetings G E', 'Files G L'])
+    ).toEqual(['Notes G N', 'Meetings G E', 'Files G L', 'Feeds G R'])
     // The chords kept clear: Mandate and Portfolio stand.
     const chord = (to: string) => NAV_ITEMS.find((item) => item.to === to)?.key
     expect(chord('/mandate')).toBe('G M')
@@ -99,7 +99,7 @@ describe('the nav grammar', () => {
       capital: NAV_GROUPS.capital.map((item) => item.label),
     }).toEqual({
       work: ['Today', 'Tasks', 'Spaces'],
-      library: ['Notes', 'Meetings', 'Files'],
+      library: ['Notes', 'Meetings', 'Files', 'Feeds'],
       objects: ['Companies', 'People', 'Deals'],
       capital: ['Portfolio', 'Mandate'],
     })

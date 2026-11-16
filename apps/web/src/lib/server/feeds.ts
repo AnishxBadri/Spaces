@@ -16,6 +16,7 @@ export type {
   Headline,
   HeadlinePage,
 } from '../feeds/sources'
+export type { FeedPreview } from '../feeds/preview'
 
 const uuid = Schema.String.check(Schema.isUUID())
 const address = Schema.Trim.check(
@@ -36,6 +37,19 @@ export const addFeed = createServerFn({ method: 'POST' })
     const { addFeedProgram } = await import('../feeds/sources')
     const { effectFn } = await import('./effect')
     return effectFn(addFeedProgram)(u.id, data)
+  })
+
+/**
+ * Add feed's look ahead, as the address is typed: the feed it resolves to,
+ * or why it will not add. Saves nothing.
+ */
+export const previewFeed = createServerFn({ method: 'POST' })
+  .validator(input(Schema.Struct({ address })))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { previewFeedProgram } = await import('../feeds/preview')
+    const { effectFn } = await import('./effect')
+    return effectFn(previewFeedProgram)(data.address, new Date())
   })
 
 /** Edit a feed's address, name or spaces; `spaceIds` replaces the tags. */

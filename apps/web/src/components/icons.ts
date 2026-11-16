@@ -121,6 +121,7 @@ export {
   Phone,
   Pilcrow,
   Rocket,
+  Rss,
   Settings,
   Square,
   SquareCheck,

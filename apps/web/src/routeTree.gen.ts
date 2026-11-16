@@ -20,6 +20,7 @@ import { Route as AppCompaniesRouteImport } from './routes/_app/companies'
 import { Route as AppDealsRouteImport } from './routes/_app/deals'
 import { Route as AppDedupeRouteImport } from './routes/_app/dedupe'
 import { Route as AppDocumentsRouteImport } from './routes/_app/documents'
+import { Route as AppFeedsRouteImport } from './routes/_app/feeds'
 import { Route as AppFilesRouteImport } from './routes/_app/files'
 import { Route as AppImportRouteImport } from './routes/_app/import'
 import { Route as AppInboxRouteImport } from './routes/_app/inbox'
@@ -136,6 +137,11 @@ const AppDedupeRoute = AppDedupeRouteImport.update({
 const AppDocumentsRoute = AppDocumentsRouteImport.update({
   id: '/documents',
   path: '/documents',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFeedsRoute = AppFeedsRouteImport.update({
+  id: '/feeds',
+  path: '/feeds',
   getParentRoute: () => AppRoute,
 } as any)
 const AppFilesRoute = AppFilesRouteImport.update({
@@ -476,6 +482,7 @@ export interface FileRoutesByFullPath {
   '/deals': typeof AppDealsRoute
   '/dedupe': typeof AppDedupeRoute
   '/documents': typeof AppDocumentsRoute
+  '/feeds': typeof AppFeedsRoute
   '/files': typeof AppFilesRoute
   '/import': typeof AppImportRoute
   '/inbox': typeof AppInboxRoute
@@ -551,6 +558,7 @@ export interface FileRoutesByTo {
   '/deals': typeof AppDealsRoute
   '/dedupe': typeof AppDedupeRoute
   '/documents': typeof AppDocumentsRoute
+  '/feeds': typeof AppFeedsRoute
   '/files': typeof AppFilesRoute
   '/import': typeof AppImportRoute
   '/inbox': typeof AppInboxRoute
@@ -627,6 +635,7 @@ export interface FileRoutesById {
   '/_app/deals': typeof AppDealsRoute
   '/_app/dedupe': typeof AppDedupeRoute
   '/_app/documents': typeof AppDocumentsRoute
+  '/_app/feeds': typeof AppFeedsRoute
   '/_app/files': typeof AppFilesRoute
   '/_app/import': typeof AppImportRoute
   '/_app/inbox': typeof AppInboxRoute
@@ -704,6 +713,7 @@ export interface FileRouteTypes {
     | '/deals'
     | '/dedupe'
     | '/documents'
+    | '/feeds'
     | '/files'
     | '/import'
     | '/inbox'
@@ -779,6 +789,7 @@ export interface FileRouteTypes {
     | '/deals'
     | '/dedupe'
     | '/documents'
+    | '/feeds'
     | '/files'
     | '/import'
     | '/inbox'
@@ -854,6 +865,7 @@ export interface FileRouteTypes {
     | '/_app/deals'
     | '/_app/dedupe'
     | '/_app/documents'
+    | '/_app/feeds'
     | '/_app/files'
     | '/_app/import'
     | '/_app/inbox'
@@ -1016,6 +1028,13 @@ declare module '@tanstack/react-router' {
       path: '/documents'
       fullPath: '/documents'
       preLoaderRoute: typeof AppDocumentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/feeds': {
+      id: '/_app/feeds'
+      path: '/feeds'
+      fullPath: '/feeds'
+      preLoaderRoute: typeof AppFeedsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/files': {
@@ -1538,6 +1557,7 @@ interface AppRouteChildren {
   AppDealsRoute: typeof AppDealsRoute
   AppDedupeRoute: typeof AppDedupeRoute
   AppDocumentsRoute: typeof AppDocumentsRoute
+  AppFeedsRoute: typeof AppFeedsRoute
   AppFilesRoute: typeof AppFilesRoute
   AppImportRoute: typeof AppImportRoute
   AppInboxRoute: typeof AppInboxRoute
@@ -1569,6 +1589,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDealsRoute: AppDealsRoute,
   AppDedupeRoute: AppDedupeRoute,
   AppDocumentsRoute: AppDocumentsRoute,
+  AppFeedsRoute: AppFeedsRoute,
   AppFilesRoute: AppFilesRoute,
   AppImportRoute: AppImportRoute,
   AppInboxRoute: AppInboxRoute,

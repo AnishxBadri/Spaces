@@ -11,6 +11,7 @@ import {
   Mail,
   MessageSquareText,
   Paperclip,
+  Rss,
   Sunrise,
   Users,
 } from '#/components/icons'
@@ -132,6 +133,8 @@ export const NAV_ITEMS = [
     key: 'G L',
     group: 'library',
   },
+  // Feeds takes R (RSS): F is Portfolio.
+  { to: '/feeds', label: 'Feeds', icon: Rss, key: 'G R', group: 'library' },
   {
     to: '/companies',
     label: 'Companies',
