@@ -20,7 +20,7 @@ import type { Space } from './space-tabs'
 import type { SensitivityState } from './sensitive-toggle'
 import type * as RouterModule from '@tanstack/react-router'
 import type { SpaceTab } from '#/lib/spaces/page'
-import type { SpaceWatching } from '#/lib/server-fns'
+import type { FeedSource, SpaceWatching } from '#/lib/server-fns'
 
 /**
  * The space page, mounted under a memory
@@ -53,6 +53,7 @@ vi.mock('#/lib/server-fns', () => {
     'createTerm',
     'deleteDocument',
     'deleteTerm',
+    'editFeed',
     'finalizeDocumentUpload',
     'getDocumentDownloadUrl',
     'getDocumentText',
@@ -61,6 +62,8 @@ vi.mock('#/lib/server-fns', () => {
     'moveIntoSubspace',
     'moveSpace',
     'prepareDocumentUpload',
+    'previewFeed',
+    'removeFeed',
     'renameSpace',
     'restoreSpace',
     'runWatchNow',
@@ -288,7 +291,7 @@ const terms = [
 
 /** What the server holds now; a stubbed write may change it. */
 const served: { current: SpaceWatching } = {
-  current: { watches: [], engines: [], installed: [], moving: [] },
+  current: { watches: [], engines: [], installed: [], feeds: [], moving: [] },
 }
 
 /** No watch, no engine: the lanes' resting state. */
@@ -296,6 +299,7 @@ const noWatches: SpaceWatching = {
   watches: [],
   engines: [],
   installed: [],
+  feeds: [],
   moving: [],
 }
 
@@ -1120,6 +1124,31 @@ describe('Add watch', () => {
   })
 })
 
+/** A feed as the Sources table reads it. */
+function feedSource(
+  id: string,
+  name: string,
+  over: Partial<FeedSource> = {},
+): FeedSource {
+  return {
+    id,
+    name,
+    url: `https://${id}.example/feed`,
+    siteUrl: null,
+    logoSha: null,
+    logoUrl: null,
+    state: 'ok',
+    lastFetchedAt: null,
+    lastSuccessAt: null,
+    lastError: null,
+    spaces: [],
+    headlineCount: 12,
+    newestAt: null,
+    createdAt: '2026-10-01T09:00:00.000Z',
+    ...over,
+  }
+}
+
 describe("What's moving", () => {
   const signal = (
     id: string,
@@ -1127,17 +1156,71 @@ describe("What's moving", () => {
     observedAt: string,
     via: { id: string; name: string } | null,
   ): SpaceWatching['moving'][number] => ({
-    id,
-    recordId: `rec-${id}`,
-    recordName,
-    recordKind: 'company',
-    via,
-    source: 'Exa',
-    title: `${recordName} raised`,
-    kind: 'funding',
-    url: 'https://www.example.com/news',
-    refs: [],
-    observedAt,
+    kind: 'signal',
+    signal: {
+      id,
+      recordId: `rec-${id}`,
+      recordName,
+      recordKind: 'company',
+      via,
+      source: 'Exa',
+      title: `${recordName} raised`,
+      kind: 'funding',
+      url: 'https://www.example.com/news',
+      refs: [],
+      observedAt,
+    },
+  })
+
+  const headline = (
+    id: string,
+    title: string,
+    publishedAt: string,
+  ): SpaceWatching['moving'][number] => ({
+    kind: 'headline',
+    headline: {
+      id,
+      feedId: 'feed-1',
+      feedName: 'SpaceNews',
+      title,
+      url: `https://spacenews.example/${id}`,
+      publishedAt,
+    },
+  })
+
+  it('reads a headline over its source, opens it in a new tab, and links Headlines › to Feeds on the space', async () => {
+    await mount('overview', undefined, {
+      ...noWatches,
+      feeds: [feedSource('feed-1', 'SpaceNews')],
+      moving: [
+        headline('h1', 'Skyroot static-fires its third stage', CLOCK_NOW),
+        signal('s1', 'Varda', '2026-10-10T09:00:00.000Z', null),
+      ],
+    })
+    const moving = lane("What's moving")
+    const story = moving.querySelector('[data-headline="h1"]')
+    const link = story?.querySelector('a')
+    expect(text(link ?? null)).toBe('Skyroot static-fires its third stage')
+    expect(link?.getAttribute('href')).toBe('https://spacenews.example/h1')
+    expect(link?.getAttribute('target')).toBe('_blank')
+    expect(link?.getAttribute('rel')).toBe('noreferrer')
+    expect(text(story ?? null)).toContain('SpaceNews')
+    expect(
+      moving.querySelectorAll('li').item(1).hasAttribute('data-signal'),
+    ).toBe(true)
+    const feeds = Array.from(moving.querySelectorAll('a')).find(
+      (a) => text(a) === 'Headlines ›',
+    )
+    expect(feeds?.getAttribute('href')).toBe(`/feeds?space=${spc.id}`)
+    expect(() => buttonNamed(/^All signals ›$/)).toThrow()
+  })
+
+  it('has no Headlines › when no feed is tagged to the space', async () => {
+    await mount('overview', undefined, {
+      ...noWatches,
+      moving: [signal('s1', 'Varda', '2026-10-10T09:00:00.000Z', null)],
+    })
+    expect(text(lane("What's moving"))).not.toContain('Headlines ›')
   })
 
   it('lists headlines and days on the Overview, unfolding past three from All signals ›', async () => {
@@ -1169,6 +1252,101 @@ describe("What's moving", () => {
       's4',
       's5',
     ])
+  })
+})
+
+describe('feeds in the Watching lane', () => {
+  const ORBIT = feedSource('feed-2', 'Orbit Notes', {
+    url: 'https://orbitnotes.example/feed',
+    state: 'failing',
+    lastSuccessAt: '2026-10-23T09:00:00.000Z',
+    lastError: 'The site answered 404',
+    spaces: [{ id: spc.id, name: spc.name }],
+  })
+
+  it('lists each feed after the watches, `feed · 10:12`, with no Run now', async () => {
+    const newest = new Date(2026, 9, 26, 10, 12).toISOString()
+    await mount('notes', undefined, {
+      ...noWatches,
+      engines: [exa],
+      installed: ['Exa'],
+      watches: [watch('w1', 'Orbital fabs')],
+      feeds: [feedSource('feed-1', 'SpaceNews', { newestAt: newest })],
+    })
+    const watching = lane('Watching')
+    const rows = Array.from(watching.querySelectorAll('li'))
+    expect(rows.at(0)?.getAttribute('data-watch')).toBe('w1')
+    const feed = rows.at(1) ?? null
+    expect(feed?.querySelector('[data-feed="feed-1"]')).not.toBeNull()
+    expect(text(feed)).toBe('SpaceNewsfeed · 10:12')
+    expect(feed?.querySelector('button')).toBeNull()
+  })
+
+  it('draws the lane for a feed alone, with no watch and no engine', async () => {
+    await mount('notes', undefined, {
+      ...noWatches,
+      feeds: [feedSource('feed-1', 'SpaceNews')],
+    })
+    expect(text(lane('Watching'))).toContain('SpaceNews')
+    expect(text(lane('Watching'))).toContain('feed · —')
+  })
+
+  it("reads a failing feed as Couldn't fetch; Fix › opens the fix window, and saving it settles the row", async () => {
+    fns
+      .get('listSpaces')
+      .mockResolvedValueOnce([
+        { id: spc.id, name: spc.name, parentId: null, companies: 0 },
+      ])
+    const fixed: SpaceWatching = {
+      ...noWatches,
+      feeds: [
+        {
+          ...ORBIT,
+          url: 'https://orbitnotes.example/rss',
+          state: 'ok',
+          lastError: null,
+          newestAt: new Date(2026, 9, 26, 9, 40).toISOString(),
+        },
+      ],
+    }
+    fns.get('editFeed').mockResolvedValueOnce(fixed.feeds[0])
+    await mount('notes', undefined, { ...noWatches, feeds: [ORBIT] })
+    const watching = lane('Watching')
+    expect(text(watching)).toContain('Couldn’t fetch')
+    await act(async () => buttonNamed(/^Fix Orbit Notes$/).click())
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    const dialog = document.querySelector('[role="dialog"]')
+    expect(text(dialog?.querySelector('h2') ?? null)).toBe('Orbit Notes')
+    expect(text(dialog?.querySelector('[data-feed-notice]') ?? null)).toContain(
+      'the feed has likely moved',
+    )
+    const url = dialog?.querySelector('input.mono')
+    if (!(url instanceof HTMLInputElement)) throw new Error('no Feed URL')
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )?.set
+    await act(async () => {
+      setter?.call(url, 'https://orbitnotes.example/rss')
+      url.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    // What the server holds once the save lands.
+    served.current = fixed
+    await act(async () => {
+      url.form?.requestSubmit()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(fns.get('editFeed')).toHaveBeenCalledWith({
+      data: { id: ORBIT.id, address: 'https://orbitnotes.example/rss' },
+    })
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(text(lane('Watching'))).not.toContain('Couldn’t fetch')
+    expect(text(lane('Watching'))).toContain('feed · 09:40')
   })
 })
 

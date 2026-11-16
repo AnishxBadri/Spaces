@@ -5,6 +5,9 @@ import { db } from '@spaces/db'
 import {
   entity,
   entitySpace,
+  feed,
+  feedItem,
+  feedSpace,
   integration,
   signal,
   space,
@@ -17,6 +20,7 @@ import {
   spaceMovingProgram,
   spaceWatchingProgram,
 } from './watching'
+import type { SpaceMoving } from './watching'
 
 /**
  * The space page's watching reads and Add watch's write, against this
@@ -335,5 +339,90 @@ describe('spaceMovingProgram', () => {
       url: 'https://news.example/varda',
       refs: ['event:00000000-0000-4000-8000-000000000009'],
     })
+  })
+})
+
+describe("What's moving with feeds", () => {
+  const aFeedWith = async (
+    name: string,
+    spaceId: string,
+    stories: ReadonlyArray<{ title: string; at: string }>,
+  ) => {
+    const row = (
+      await db
+        .insert(feed)
+        .values({ name, url: `https://${name}.example/feed`, lastStatus: 'ok' })
+        .returning({ id: feed.id })
+    ).at(0)
+    if (!row) throw new Error('no feed')
+    await db.insert(feedSpace).values({ feedId: row.id, spaceId })
+    await db.insert(feedItem).values(
+      stories.map((s) => ({
+        feedId: row.id,
+        key: s.title,
+        title: s.title,
+        url: `https://${name}.example/${s.title}`,
+        publishedAt: new Date(s.at),
+      })),
+    )
+    return row.id
+  }
+
+  const signalOn = (entityId: string, title: string, at: string) => ({
+    entityId,
+    source: 'manual',
+    payload: { kind: 'web', title },
+    sourceClass: 'manual' as const,
+    observedAt: new Date(at),
+  })
+
+  const kinds = (moving: ReadonlyArray<SpaceMoving>) =>
+    moving.map((m) =>
+      m.kind === 'signal'
+        ? `signal:${m.signal.title ?? ''}`
+        : `headline:${m.headline.title}`,
+    )
+
+  it('merges a feed’s headlines among three signals, newest first, at most two of them', async () => {
+    const s = await aSpace('Launch vehicles')
+    const skyroot = await aCompany('Skyroot', [s.id])
+    await db
+      .insert(signal)
+      .values([
+        signalOn(skyroot, 'Fired', '2026-11-16T10:00:00Z'),
+        signalOn(skyroot, 'Hired', '2026-11-14T10:00:00Z'),
+        signalOn(skyroot, 'Raised', '2026-11-12T10:00:00Z'),
+      ])
+    await aFeedWith('spacenews', s.id, [
+      { title: 'Newest', at: '2026-11-16T12:00:00Z' },
+      { title: 'Second', at: '2026-11-15T12:00:00Z' },
+      { title: 'Third', at: '2026-11-13T12:00:00Z' },
+    ])
+    const watching = await Effect.runPromise(spaceWatchingProgram(s.id))
+    expect(watching.feeds.map((f) => f.name)).toEqual(['spacenews'])
+    expect(kinds(watching.moving)).toEqual([
+      'headline:Newest',
+      'signal:Fired',
+      'headline:Second',
+      'signal:Hired',
+      'signal:Raised',
+    ])
+  })
+
+  it('holds ten fresh headlines and no signals to two', async () => {
+    const s = await aSpace('Busy feed')
+    await aFeedWith(
+      'firehose',
+      s.id,
+      Array.from({ length: 10 }, (_, i) => ({
+        title: `Story ${String(i)}`,
+        at: new Date(Date.UTC(2026, 10, 16, 12, i)).toISOString(),
+      })),
+    )
+    const watching = await Effect.runPromise(spaceWatchingProgram(s.id))
+    expect(kinds(watching.moving)).toEqual([
+      'headline:Story 9',
+      'headline:Story 8',
+    ])
   })
 })

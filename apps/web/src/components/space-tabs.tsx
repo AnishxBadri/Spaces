@@ -33,7 +33,7 @@ import {
   tagIntoSpace,
   untagFromSpace,
 } from '#/lib/server-fns'
-import type { SpaceSignal, getSpace } from '#/lib/server-fns'
+import type { SpaceMoving, getSpace } from '#/lib/server-fns'
 import { formatWhen } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
@@ -74,15 +74,18 @@ export function spaceTabCounts(spc: Space): Record<CountedTab, number> {
 
 export function SpaceTabs({
   spc,
-  signals,
+  moving,
+  hasFeeds,
   tab,
   into,
   onTabChange,
   onNewNote,
 }: {
   spc: Space
-  /** What's moving on the space's members, for Overview. */
-  signals: ReadonlyArray<SpaceSignal>
+  /** What's moving on the space's members and its feeds, for Overview. */
+  moving: ReadonlyArray<SpaceMoving>
+  /** A feed is tagged to the space or under it. */
+  hasFeeds: boolean
   tab: SpaceTab
   /** The subspace a split moves companies into, from the link. */
   into: string | null
@@ -103,7 +106,12 @@ export function SpaceTabs({
       onValueChange={onTabChange}
     >
       {tab === 'overview' ? (
-        <SpaceOverview spc={spc} signals={signals} onTab={onTabChange} />
+        <SpaceOverview
+          spc={spc}
+          moving={moving}
+          hasFeeds={hasFeeds}
+          onTab={onTabChange}
+        />
       ) : tab === 'companies' ? (
         <CompaniesTab spc={spc} into={into} />
       ) : tab === 'notes' ? (

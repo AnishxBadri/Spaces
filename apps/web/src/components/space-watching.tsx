@@ -8,8 +8,12 @@ import {
   SettingControl,
   settingInputId,
 } from './integrations/integration-settings'
+import { FeedWindow } from './feeds/feed-window'
+import { removeBody } from './feeds/feed-words'
+import type { SpaceOption } from './feeds/feed-words'
 import { RailGroup, RailGroupRow } from './record/record-parts'
 import { Button } from './ui/button'
+import { useConfirm } from './ui/confirm-dialog'
 import {
   Dialog,
   DialogClose,
@@ -19,8 +23,14 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { Select } from './ui/select'
-import { addSpaceWatch, runWatchNow } from '#/lib/server-fns'
+import {
+  addSpaceWatch,
+  listSpaces,
+  removeFeed,
+  runWatchNow,
+} from '#/lib/server-fns'
 import type {
+  FeedSource,
   FormValue,
   FormValues,
   SpaceWatching,
@@ -46,12 +56,14 @@ import type { WatchStatusState } from '#/lib/spaces/watch-status'
 import type { JobStatusEvent } from '@spaces/core/queue/job-status'
 import { formatWhen } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
+import { feedWatchLine } from '#/lib/feeds/elsewhere-words'
+import { spacePathLabel } from '#/lib/file-in-space'
 import { cn } from '#/lib/utils'
 
 /**
  * The space rail's Watching group — a row per watch with its live status
- * off the space's job-status stream — and the Add watch window its `+`
- * opens.
+ * off the space's job-status stream, then a row per feed — and the Add
+ * watch window its `+` opens.
  */
 
 type Action =
@@ -137,9 +149,10 @@ const whenOf = (iso: string | null, now: string) =>
 /**
  * The rail's Watching group: `Watching +`, then a row per watch — the
  * engine and what it looks for, under it how often and when it last ran,
- * and Run now at the end. With no watch it is the one `Watching +` row; with
- * no engine enabled it names the installed ones, and with none installed it
- * draws nothing.
+ * and Run now at the end — then a row per feed of the space or a space
+ * under it. With neither it is the one `Watching +` row; with no engine
+ * enabled it names the installed ones, and with none installed it draws
+ * nothing.
  */
 export function WatchingLane({
   spaceId,
@@ -148,13 +161,14 @@ export function WatchingLane({
   onAdd,
 }: {
   spaceId: string
-  watching: Pick<SpaceWatching, 'watches' | 'installed'>
+  watching: Pick<SpaceWatching, 'watches' | 'installed' | 'feeds'>
   /** A watch to mark and scroll to: "Already watching this" lands here. */
   marked?: string | null
   /** Opens Add watch from the head's `+`; absent with no engine to add. */
   onAdd?: (() => void) | undefined
 }) {
   const { state, dispatch } = useWatchStatus(spaceId, watching.watches)
+  const fix = useFeedFix()
 
   async function runNow(watch: WatchRow) {
     dispatch({ kind: 'fired', watchId: watch.id })
@@ -168,41 +182,158 @@ export function WatchingLane({
     }
   }
 
-  const empty = watching.watches.length === 0
+  const empty = watching.watches.length === 0 && watching.feeds.length === 0
   return (
-    <RailGroup
-      label="Watching"
-      empty={empty && (onAdd !== undefined || watching.installed.length === 0)}
-      add={
-        onAdd === undefined
-          ? undefined
-          : (trigger) => (
-              <Slot.Root onClick={onAdd} aria-label="Add watch">
-                {trigger}
-              </Slot.Root>
-            )
-      }
-    >
-      {empty
-        ? watching.installed.map((name) => (
-            <RailGroupRow key={name}>
-              <PluginMark name={name} offered />
-              <span className="min-w-0 flex-1 truncate text-graphite">
-                {name}
-              </span>
-            </RailGroupRow>
-          ))
-        : watching.watches.map((w) => (
-            <WatchLine
-              key={w.id}
-              watch={w}
-              state={state}
-              marked={w.id === marked}
-              onRun={() => void runNow(w)}
-            />
-          ))}
-    </RailGroup>
+    <>
+      <RailGroup
+        label="Watching"
+        empty={
+          empty && (onAdd !== undefined || watching.installed.length === 0)
+        }
+        add={
+          onAdd === undefined
+            ? undefined
+            : (trigger) => (
+                <Slot.Root onClick={onAdd} aria-label="Add watch">
+                  {trigger}
+                </Slot.Root>
+              )
+        }
+      >
+        {empty
+          ? watching.installed.map((name) => (
+              <RailGroupRow key={name}>
+                <PluginMark name={name} offered />
+                <span className="min-w-0 flex-1 truncate text-graphite">
+                  {name}
+                </span>
+              </RailGroupRow>
+            ))
+          : watching.watches.map((w) => (
+              <WatchLine
+                key={w.id}
+                watch={w}
+                state={state}
+                marked={w.id === marked}
+                onRun={() => void runNow(w)}
+              />
+            ))}
+        {watching.feeds.map((f) => (
+          <FeedLine key={f.id} feed={f} onFix={() => void fix.open(f)} />
+        ))}
+      </RailGroup>
+      {fix.windows}
+    </>
   )
+}
+
+/**
+ * A feed among the watches: its name, then `feed · 10:12`, its newest
+ * headline's time. A failing feed reads `■ Couldn't fetch` and `Fix ›`.
+ * The worker fetches every feed on its own clock, so there is no Run now.
+ */
+function FeedLine({ feed, onFix }: { feed: FeedSource; onFix: () => void }) {
+  const { now } = useClock()
+  return (
+    <RailGroupRow>
+      <span data-feed={feed.id} className="min-w-0 flex-1 truncate">
+        {feed.name}
+      </span>
+      {feed.state === 'failing' ? (
+        <>
+          <span aria-hidden className="size-1.5 shrink-0 bg-destructive" />
+          <span
+            data-failing
+            className="shrink-0 text-label text-foreground"
+            {...(feed.lastError === null ? {} : { title: feed.lastError })}
+          >
+            Couldn’t fetch
+          </span>
+          <button
+            type="button"
+            aria-label={`Fix ${feed.name}`}
+            onClick={onFix}
+            className="focus-ring shrink-0 text-label font-medium text-foreground hover:underline"
+          >
+            Fix ›
+          </button>
+        </>
+      ) : (
+        <span className="shrink-0 mono text-micro text-graphite">
+          {feedWatchLine(feed.newestAt, now)}
+        </span>
+      )}
+    </RailGroupRow>
+  )
+}
+
+/**
+ * The feed window over the space page, opened in Fix from a failing row.
+ * The picker's spaces are read as it opens; a save or a removal rereads the
+ * page, so the row settles to what the feed is now.
+ */
+function useFeedFix() {
+  const router = useRouter()
+  const { confirm, confirmDialog } = useConfirm()
+  const [fixing, setFixing] = useState<{
+    source: FeedSource
+    spaces: ReadonlyArray<SpaceOption>
+  } | null>(null)
+
+  async function open(source: FeedSource) {
+    try {
+      const rows = await listSpaces()
+      const byId = new Map(rows.map((r) => [r.id, r]))
+      setFixing({
+        source,
+        spaces: rows.map((r) => ({ id: r.id, path: spacePathLabel(r, byId) })),
+      })
+    } catch {
+      toast.error(`Could not open ${source.name}`)
+    }
+  }
+
+  async function remove(source: FeedSource) {
+    const ok = await confirm({
+      title: `Remove ${source.name}?`,
+      body: removeBody(source.headlineCount),
+      action: 'Remove',
+      note: "Can't be undone",
+    })
+    if (!ok) return
+    try {
+      await removeFeed({ data: { id: source.id } })
+    } catch (err) {
+      toast.error(
+        err instanceof Error && err.message !== ''
+          ? err.message
+          : `Could not remove ${source.name}`,
+      )
+    }
+    void router.invalidate()
+  }
+
+  return {
+    open,
+    windows: (
+      <>
+        <FeedWindow
+          mode={
+            fixing === null
+              ? null
+              : { kind: 'edit', source: fixing.source, fix: true }
+          }
+          onOpenChange={(next) => {
+            if (!next) setFixing(null)
+          }}
+          spaces={fixing?.spaces ?? []}
+          onSaved={() => void router.invalidate()}
+          onRemove={(s) => void remove(s)}
+        />
+        {confirmDialog}
+      </>
+    ),
+  }
 }
 
 /**

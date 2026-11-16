@@ -127,6 +127,7 @@ function loaded() {
       waiting: [],
       failing: [],
     }),
+    headlines: Promise.resolve({ count: 0, feeds: [] }),
     meetings: {
       calendar: false,
       audience: { isAdmin: true, admins: ['Anish'] },

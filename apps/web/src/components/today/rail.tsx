@@ -5,7 +5,11 @@ import { formatWhen } from '@spaces/core/format'
 import type { PortfolioRollup } from '@spaces/core/portfolio/rollup'
 import { PortfolioHeadlineRail } from '#/components/portfolio-headline'
 import { Twinkle } from '#/components/twinkle'
-import type { MovingSignal } from '#/lib/server-fns'
+import {
+  headlineFeedsLine,
+  newHeadlinesLine,
+} from '#/lib/feeds/elsewhere-words'
+import type { MovingSignal, TodayHeadlines } from '#/lib/server-fns'
 import { teamLine } from '#/lib/today/team'
 import type { TeamEntry } from '#/lib/today/team'
 import { cn } from '#/lib/utils'
@@ -115,18 +119,22 @@ function RailRow({
 export type MovingState = 'loading' | 'failed' | ReadonlyArray<MovingSignal>
 
 /**
- * What's moving, a small paper card: signals from the last seven days on the reader's
- * companies, newest first, each citing where it was read. Four show; the
- * foot unfolds the rest (`5 more`) and opens the team's last day in place
- * (`Team activity ›`).
+ * What's moving, a small paper card: first, when any came in, one line for
+ * the day's headlines across every feed; then signals from the last seven
+ * days on the reader's companies, newest first, each citing where it was
+ * read. Four show; the foot unfolds the rest (`5 more`) and opens the
+ * team's last day in place (`Team activity ›`).
  */
 export function WhatsMoving({
   signals,
+  headlines = null,
   team,
   today,
   onRetry,
 }: {
   signals: MovingState
+  /** Today's headlines; null while unread, and the line is absent at zero. */
+  headlines?: TodayHeadlines | null
   team: ReadonlyArray<TeamEntry>
   today: string
   onRetry: () => void
@@ -136,39 +144,32 @@ export function WhatsMoving({
   const list = typeof signals === 'string' ? [] : signals
   const shown = all ? list : list.slice(0, MOVING_SHOWN)
   const hidden = list.length - shown.length
+  const line = headlines !== null && headlines.count > 0 ? headlines : null
+  // A row below the headlines line draws the rule the line's own row drops.
+  const underLine = line !== null && 'border-t border-rule'
   return (
     <section aria-label="What's moving" className="flex flex-col card">
       <RailHead label="What's moving" />
-      {signals === 'loading' ? (
-        <p
-          data-moving-loading
-          className="flex h-8 items-center gap-2 px-(--inset) text-label text-graphite"
-        >
-          <Twinkle />
-          Reading signals
-        </p>
-      ) : signals === 'failed' ? (
-        <p
-          data-moving-failed
-          className="flex h-8 items-center gap-2 px-(--inset) text-label text-graphite"
-        >
-          <Square tone="bad" />
-          <span className="min-w-0 flex-1 truncate">
-            Could not load signals
-          </span>
-          <button type="button" onClick={onRetry} className={railLink}>
-            Retry ›
-          </button>
-        </p>
-      ) : list.length === 0 ? (
-        <p
-          data-moving-empty
-          className="flex h-8 items-center px-(--inset) text-label text-graphite"
-        >
-          Nothing new.
-        </p>
-      ) : (
+      {line !== null || shown.length > 0 ? (
         <ol>
+          {line !== null ? (
+            <RailRow
+              when="Today"
+              sub={
+                <span data-headlines-feeds className="min-w-0 truncate">
+                  {headlineFeedsLine(line.feeds)}
+                </span>
+              }
+            >
+              <Link
+                to="/feeds"
+                data-headlines-line
+                className="focus-ring truncate text-ui text-foreground hover:underline"
+              >
+                {newHeadlinesLine(line.count)}
+              </Link>
+            </RailRow>
+          ) : null}
           {shown.map((s) => {
             const host = s.url === null ? null : hostOf(s.url)
             return (
@@ -204,7 +205,42 @@ export function WhatsMoving({
             )
           })}
         </ol>
-      )}
+      ) : null}
+      {signals === 'loading' ? (
+        <p
+          data-moving-loading
+          className={cn(
+            'flex h-8 items-center gap-2 px-(--inset) text-label text-graphite',
+            underLine,
+          )}
+        >
+          <Twinkle />
+          Reading signals
+        </p>
+      ) : signals === 'failed' ? (
+        <p
+          data-moving-failed
+          className={cn(
+            'flex h-8 items-center gap-2 px-(--inset) text-label text-graphite',
+            underLine,
+          )}
+        >
+          <Square tone="bad" />
+          <span className="min-w-0 flex-1 truncate">
+            Could not load signals
+          </span>
+          <button type="button" onClick={onRetry} className={railLink}>
+            Retry ›
+          </button>
+        </p>
+      ) : list.length === 0 && line === null ? (
+        <p
+          data-moving-empty
+          className="flex h-8 items-center px-(--inset) text-label text-graphite"
+        >
+          Nothing new.
+        </p>
+      ) : null}
       {hidden > 0 || team.length > 0 ? (
         <div className="flex h-8 items-center justify-between gap-3 border-t border-rule px-(--inset)">
           {hidden > 0 ? (

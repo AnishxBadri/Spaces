@@ -337,7 +337,8 @@ export function SpacePageView({
       >
         <SpaceTabs
           spc={spc}
-          signals={watching.moving}
+          moving={watching.moving}
+          hasFeeds={watching.feeds.length > 0}
           tab={tab}
           into={into}
           onTabChange={onTabChange}

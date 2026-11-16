@@ -8,7 +8,7 @@ import { Band, Day, EmptyRow } from '#/components/ledger-section'
 import { DitherMark } from '#/components/record/record-parts'
 import type { Space } from '#/components/space-tabs'
 import { TasksBand } from '#/components/tasks-rail'
-import type { SpaceSignal } from '#/lib/server-fns'
+import type { SpaceHeadline, SpaceMoving, SpaceSignal } from '#/lib/server-fns'
 import { recordPath } from '#/lib/record-path'
 import { stageLabel, stageMix } from '#/lib/spaces/page'
 import type { SpaceTab, StageSegment } from '#/lib/spaces/page'
@@ -59,11 +59,14 @@ export function spaceReadouts(spc: Space, today: string): Array<SpaceReadout> {
 
 export function SpaceOverview({
   spc,
-  signals,
+  moving,
+  hasFeeds,
   onTab,
 }: {
   spc: Space
-  signals: ReadonlyArray<SpaceSignal>
+  moving: ReadonlyArray<SpaceMoving>
+  /** A feed is tagged to the space or under it: the lane links to Headlines. */
+  hasFeeds: boolean
   onTab: (tab: SpaceTab) => void
 }) {
   const { today } = useClock()
@@ -103,7 +106,7 @@ export function SpaceOverview({
         </div>
       ) : null}
 
-      <MovingGroup signals={signals} />
+      <MovingGroup spaceId={spc.id} moving={moving} hasFeeds={hasFeeds} />
 
       <TasksBand entityId={spc.id} entityName={spc.name} entityKind="space" />
 
@@ -136,58 +139,112 @@ function BandLink({
 }
 
 /**
- * What's moving: the latest signals on the space's members, a headline and
- * its day. There is no signals page, so `All signals ›` unfolds the rest
- * in place. Absent while nothing has moved.
+ * What's moving: the latest signals on the space's members and at most two
+ * headlines from its feeds, newest first. There is no signals page, so
+ * `All signals ›` unfolds the rest in place; `Headlines ›` opens Feeds
+ * narrowed to the space. Absent while nothing has moved.
  */
-function MovingGroup({ signals }: { signals: ReadonlyArray<SpaceSignal> }) {
+function MovingGroup({
+  spaceId,
+  moving,
+  hasFeeds,
+}: {
+  spaceId: string
+  moving: ReadonlyArray<SpaceMoving>
+  hasFeeds: boolean
+}) {
   const [open, setOpen] = useState(false)
-  if (signals.length === 0) return null
-  const shown = open ? signals : signals.slice(0, LATEST)
-  const hidden = signals.length - shown.length
+  if (moving.length === 0) return null
+  const shown = open ? moving : moving.slice(0, LATEST)
+  const hidden = moving.length - shown.length
   return (
     <section aria-label="What's moving" className="flex flex-col">
       <Band
         label="What's moving"
         link={
-          hidden > 0 ? (
-            <BandLink onClick={() => setOpen(true)}>All signals ›</BandLink>
+          hidden > 0 || hasFeeds ? (
+            <span className="flex items-center gap-3">
+              {hidden > 0 ? (
+                <BandLink onClick={() => setOpen(true)}>All signals ›</BandLink>
+              ) : null}
+              {hasFeeds ? (
+                <Link
+                  to="/feeds"
+                  search={{ space: spaceId }}
+                  className="focus-ring hover:text-foreground"
+                >
+                  Headlines ›
+                </Link>
+              ) : null}
+            </span>
           ) : null
         }
       />
       <ul>
-        {shown.map((s) => {
-          const href = recordPath({ kind: s.recordKind, id: s.recordId })
-          const headline = s.title ?? s.kind ?? s.recordName
-          return (
-            <li
-              key={s.id}
-              data-signal={s.id}
-              className="flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset)"
-            >
-              {href ? (
-                <Link
-                  to={href}
-                  className="focus-ring min-w-0 flex-1 truncate text-ui text-foreground hover:underline"
-                >
-                  {headline}
-                </Link>
-              ) : (
-                <span className="min-w-0 flex-1 truncate text-ui text-foreground">
-                  {headline}
-                </span>
-              )}
-              <span className="w-40 shrink-0 truncate text-label text-graphite">
-                {s.via === null
-                  ? s.recordName
-                  : `${s.recordName} · ${s.via.name}`}
-              </span>
-              <Day at={s.observedAt} when />
-            </li>
-          )
-        })}
+        {shown.map((m) =>
+          m.kind === 'signal' ? (
+            <SignalRow key={m.signal.id} s={m.signal} />
+          ) : (
+            <HeadlineRow key={m.headline.id} h={m.headline} />
+          ),
+        )}
       </ul>
     </section>
+  )
+}
+
+const MOVING_ROW =
+  'flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset)'
+
+/** A signal: its headline, the record and the subspace it came via, its day. */
+function SignalRow({ s }: { s: SpaceSignal }) {
+  const href = recordPath({ kind: s.recordKind, id: s.recordId })
+  const headline = s.title ?? s.kind ?? s.recordName
+  return (
+    <li data-signal={s.id} className={MOVING_ROW}>
+      {href ? (
+        <Link
+          to={href}
+          className="focus-ring min-w-0 flex-1 truncate text-ui text-foreground hover:underline"
+        >
+          {headline}
+        </Link>
+      ) : (
+        <span className="min-w-0 flex-1 truncate text-ui text-foreground">
+          {headline}
+        </span>
+      )}
+      <span className="w-40 shrink-0 truncate text-label text-graphite">
+        {s.via === null ? s.recordName : `${s.recordName} · ${s.via.name}`}
+      </span>
+      <Day at={s.observedAt} when />
+    </li>
+  )
+}
+
+/** A feed's headline: the story, opened in a new tab, then its source. */
+function HeadlineRow({ h }: { h: SpaceHeadline }) {
+  return (
+    <li data-headline={h.id} className={MOVING_ROW}>
+      {h.url !== null ? (
+        <a
+          href={h.url}
+          target="_blank"
+          rel="noreferrer"
+          className="focus-ring min-w-0 flex-1 truncate text-ui text-foreground hover:underline"
+        >
+          {h.title}
+        </a>
+      ) : (
+        <span className="min-w-0 flex-1 truncate text-ui text-foreground">
+          {h.title}
+        </span>
+      )}
+      <span className="w-40 shrink-0 truncate text-label text-graphite">
+        {h.feedName}
+      </span>
+      <Day at={h.publishedAt} when />
+    </li>
   )
 }
 

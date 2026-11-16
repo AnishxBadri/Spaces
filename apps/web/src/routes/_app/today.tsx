@@ -26,6 +26,7 @@ import {
   countUnfiledDocuments,
   dealFunnelStats,
   getTodayAttention,
+  getTodayHeadlines,
   getTodayMeetings,
   getWorkspaceActivity,
   listHoldings,
@@ -47,7 +48,7 @@ import {
   todayStamp,
 } from '#/lib/today/needs-you'
 import type { NeedsFilter, ReadoutFilter } from '#/lib/today/needs-you'
-import { stripLabel, whoLine } from '#/lib/meetings/day'
+import { dayWindow, stripLabel, whoLine } from '#/lib/meetings/day'
 import { flattenInbox } from '#/lib/today/proposals'
 import { useSettled } from '#/lib/today/use-settled'
 import { useHeldView } from '#/lib/held-decisions'
@@ -82,6 +83,9 @@ async function loadToday() {
     }
   // Deferred: Review, the notices and What's moving arrive after the page.
   const attention = getTodayAttention()
+  // The day's headlines, counted over the loader's local day as the page's
+  // `today` is.
+  const headlines = getTodayHeadlines({ data: dayWindow(dayKey(new Date())) })
   const [
     tasks,
     holdings,
@@ -113,6 +117,7 @@ async function loadToday() {
     unfiledCount,
     stoppedPlugins,
     attention,
+    headlines,
     meetings,
   }
 }
@@ -176,6 +181,7 @@ function TodayLedger({
     meetings,
   } = data
   const attention = useSettled(data.attention)
+  const headlines = useSettled(data.headlines)
   // The composer row reports what it made; the wash is for arrivals only.
   const { washes, bear } = useBornRows()
   const taskMenu = useTaskMenu({ me, today })
@@ -484,6 +490,7 @@ function TodayLedger({
                     ? 'failed'
                     : 'loading'
               }
+              headlines={headlines.state === 'done' ? headlines.value : null}
               team={team}
               today={today}
               onRetry={() => void router.invalidate()}

@@ -16,12 +16,16 @@ import { decodeManifest } from '@spaces/sdk'
 import { jsonRecord, jsonString } from '@spaces/core/json'
 import { checkSettings, settingsFormOf } from '#/lib/integrations/settings-form'
 import type { FormValues, SettingsForm } from '#/lib/integrations/settings-form'
+import { SPACE_HEADLINES_MAX, spaceFeedsProgram } from '#/lib/feeds/elsewhere'
+import type { SpaceHeadline } from '#/lib/feeds/elsewhere'
+import type { FeedSource } from '#/lib/feeds/sources'
 import { watchLabel } from './watch-status'
 
 /**
  * The watching half of a space page: its watches with their latest
- * run, the engines a watch can be added with, and What's moving on its
- * members. Outside the server-fn module so tests call the programs directly.
+ * run, its feeds, the engines a watch can be added with, and What's moving
+ * on its members and feeds. Outside the server-fn module so tests call the
+ * programs directly.
  */
 
 export class WatchingFailed extends Schema.TaggedError<WatchingFailed>()(
@@ -102,13 +106,44 @@ export type SpaceSignal = {
   observedAt: string
 }
 
+/** One row of What's moving: a signal on a member, or a feed's headline. */
+export type SpaceMoving =
+  | { readonly kind: 'signal'; readonly signal: SpaceSignal }
+  | { readonly kind: 'headline'; readonly headline: SpaceHeadline }
+
 export type SpaceWatching = {
   watches: Array<WatchRow>
   /** Enabled engines, for the Add watch window. */
   engines: Array<WatchEngine>
   /** Installed engines' names, for the empty lane. */
   installed: Array<string>
-  moving: Array<SpaceSignal>
+  /** The feeds tagged to the space or a space under it, after the watches. */
+  feeds: ReadonlyArray<FeedSource>
+  moving: Array<SpaceMoving>
+}
+
+const movedAt = (m: SpaceMoving): string =>
+  m.kind === 'signal' ? m.signal.observedAt : m.headline.publishedAt
+
+/**
+ * What's moving: the signals and at most `SPACE_HEADLINES_MAX` headlines,
+ * newest first. The cap applies before the lane folds, so ten fresh
+ * headlines still leave room for the space's own news.
+ */
+export function mergeMoving(
+  signals: ReadonlyArray<SpaceSignal>,
+  headlines: ReadonlyArray<SpaceHeadline>,
+): Array<SpaceMoving> {
+  return [
+    ...signals.map((s): SpaceMoving => ({ kind: 'signal', signal: s })),
+    ...headlines
+      .slice(0, SPACE_HEADLINES_MAX)
+      .map((headline): SpaceMoving => ({ kind: 'headline', headline })),
+  ].sort((a, b) => {
+    const x = movedAt(a)
+    const y = movedAt(b)
+    return x < y ? 1 : x > y ? -1 : 0
+  })
 }
 
 /** How many signals What's moving reads; the lane folds at three. */
@@ -316,7 +351,7 @@ export const spaceMovingProgram = Effect.fn('spaceMovingProgram')(function* (
 /** Everything the space page's Watching and What's moving lanes draw. */
 export const spaceWatchingProgram = Effect.fn('spaceWatchingProgram')(
   function* (spaceId: string): Effect.fn.Return<SpaceWatching, WatchingFailed> {
-    const [engines, watchRows, moving] = yield* Effect.all(
+    const [engines, watchRows, signals, spaceFeeds] = yield* Effect.all(
       [
         watchEngines(),
         query(() =>
@@ -333,6 +368,9 @@ export const spaceWatchingProgram = Effect.fn('spaceWatchingProgram')(
             .orderBy(asc(spaceWatch.createdAt), asc(spaceWatch.id)),
         ),
         spaceMovingProgram(spaceId),
+        spaceFeedsProgram(spaceId).pipe(
+          Effect.mapError((cause) => new WatchingFailed({ cause })),
+        ),
       ],
       { concurrency: 'unbounded' },
     )
@@ -352,7 +390,12 @@ export const spaceWatchingProgram = Effect.fn('spaceWatchingProgram')(
         stopped: engine === undefined ? 'Removed' : engine.stopped,
       }
     })
-    return { watches, ...offeredOf(engines), moving }
+    return {
+      watches,
+      ...offeredOf(engines),
+      feeds: spaceFeeds.feeds,
+      moving: mergeMoving(signals, spaceFeeds.headlines),
+    }
   },
 )
 

@@ -150,6 +150,7 @@ function loaded() {
       waiting: [],
       failing: [],
     }),
+    headlines: Promise.resolve({ count: 0, feeds: [] }),
     meetings: {
       calendar: true,
       audience: { isAdmin: true, admins: ['Anish'] },
