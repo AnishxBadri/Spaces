@@ -223,20 +223,20 @@ IBM Plex Mono, at their default letterforms — all self-hosted via Fontsource a
 weights (400 to 700), no font CDN calls from a privacy product. The landing site still
 draws Inter, Source Serif 4 and JetBrains Mono.
 
-| voice | step             | size / leading | role                                                    |
-| ----- | ---------------- | -------------- | ------------------------------------------------------- |
-| serif | display · 600    | 28 / 32        | page titles, record names, the Today sentence           |
-| serif | section · 600    | 18 / 22–24     | dialog titles, settings sections, empty states          |
-| serif | prose · 400      | 17 / 27        | note bodies, theses, reasons                            |
-| sans  | title · 500      | 15 / 22        | a name inside a readout cell                            |
-| sans  | ui · 400 / 500   | 13 / 20        | rows, forms, buttons, the workhorse                     |
-| sans  | body · 400       | 14 / 20        | composer inputs, running UI text                        |
-| mono  | readout · 500    | 18–20 / 22–24  | the readout strip                                       |
-| mono  | numeral · 400    | 13 / 16        | money, counts, dates, IDs, domains in rows              |
-| sans  | label · 400      | 12 / 16        | column, lane, property, field and readout labels        |
-| mono  | label · 500 caps | 11 / 14, .08em | kinds, stamps, band and group labels                    |
-| mono  | data word · 400  | 11 / 16        | state words and units in an end lane — `field-label`    |
-| mono  | key hint · 400   | 11 / 14        | `⌘K G T ↵ ⇧↵ M` — tooltips, composer end lanes, sidebar |
+| voice | step             | size / leading | role                                                              |
+| ----- | ---------------- | -------------- | ----------------------------------------------------------------- |
+| serif | display · 600    | 28 / 32        | page titles, record names, the Today sentence; 22 / 28 below `md` |
+| serif | section · 600    | 18 / 22–24     | dialog titles, settings sections, empty states                    |
+| serif | prose · 400      | 17 / 27        | note bodies, theses, reasons                                      |
+| sans  | title · 500      | 15 / 22        | a name inside a readout cell                                      |
+| sans  | ui · 400 / 500   | 13 / 20        | rows, forms, buttons, the workhorse                               |
+| sans  | body · 400       | 14 / 20        | composer inputs, running UI text                                  |
+| mono  | readout · 500    | 18–20 / 22–24  | the readout strip                                                 |
+| mono  | numeral · 400    | 13 / 16        | money, counts, dates, IDs, domains in rows                        |
+| sans  | label · 400      | 12 / 16        | column, lane, property, field and readout labels                  |
+| mono  | label · 500 caps | 11 / 14, .08em | kinds, stamps, band and group labels                              |
+| mono  | data word · 400  | 11 / 16        | state words and units in an end lane — `field-label`              |
+| mono  | key hint · 400   | 11 / 14        | `⌘K G T ↵ ⇧↵ M` — tooltips, composer end lanes, sidebar           |
 
 **Who wrote it decides the voice** (owner 2026-10-08; D78):
 
@@ -437,7 +437,7 @@ carrying its own accept.
 
 **One page mode, Field.** Every route's outermost container is
 `flex min-h-full flex-col`, edge to edge: the `PageHeader` or `RecordHeader` runs the
-full width on paper with one rule under it, its title on the 24px content edge. Under
+full width on paper with one ink line under it, its title on the 24px content edge. Under
 the head the body is the bone ground, filling the view's height, with a 12px gutter;
 every card on it is paper, and the page's tabbed object is its one ink folder (design
 contract, The edges, E1–E11). Content starts at the same left edge on every page;
@@ -905,7 +905,7 @@ Decided 2026-10-09 (D80; port: `first-run-1`):
 ### Settings
 
 The section pattern: the shared page head (`PageHeader`) — the serif title on the 24px
-edge, one rule across the full width, the section's one action right, ending where the
+edge, one ink line across the full width, the section's one action right, ending where the
 800px column ends; no eyebrow, the nav already says where the reader is. Under it the
 bone ground holds a column of paper group cards, 800px wide from the 12px gutter, 12px
 apart: each a rule box with a 28px paper head (mono caps label, an optional count, an

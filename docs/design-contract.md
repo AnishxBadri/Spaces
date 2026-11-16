@@ -76,10 +76,12 @@ is the record chassis. The head folds as before; its bar and pinned actions sit 
   outside a card is never smaller than the inset inside it. The one exception is a
   page that holds a note editor: its head and body start at `NOTE_INSET` (§3, "A
   note").
-- **E2 · One rule under the head.** A single 1px rule, never the double, and the head
-  stays 104px and paper on every page. On a page that scrolls it folds to the 48px bar
+- **E2 · One ink line under the head.** A single 1px ink line (`border-hairline`), never
+  the double, and the head stays 104px and paper on every page; a line inside the head
+  and between rows stays the rule. On a page that scrolls the head folds to the 48px bar
   with its tabs and toolbar pinned; a list page is a fixed pane and never folds. The `···` is the rightmost head control and its right edge
-  lines up with the last control in the content below.
+  lines up with the last control in the content below. The title (`title-serif`) is 28
+  on 32 from `md` up and the page step, 22 on 28, below it.
 - **E3 · Windows take one 16px inset all round.**
 - **E4 · Settings and form pages cap at 800px**: a column of cards 800px wide from the
   gutter, 12px apart, under the shared head, whose action (and `···`) ends where the
@@ -211,7 +213,7 @@ Three ladders order everything on a surface, and none of them needs a new token.
   mono caps. Nothing is lighter than graphite.
 - **Surface.** Paper is work, bone is frame, bone-deep is pressed. A record's
   attribute rows are printed on the bone ground of its rail, no cell of either.
-- **Line.** One rule under every head (E2); ink is structure; a rule separates inside
+- **Line.** One ink line under every head (E2); ink is structure; a rule separates inside
   a pane; space separates inside a group.
 
 ### Dates
@@ -394,14 +396,14 @@ hand-rolling one.
 
 | primitive                                                                         | file                                                     | for                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | --------------------------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PageHeader`, `ReadoutStrip`                                                      | `apps/web/src/components/page-header.tsx`                | P1 — paper, the serif title on the 24px edge, `[outline?] [Primary] [···]` right ending 24px in, one rule under; keys in tooltips (A2), and a count only in the title (`HeadCount`) when the page has no tab bar; `tabs` stands on a pinned `FolderGround`                                                                                                                                                                                   |
+| `PageHeader`, `ReadoutStrip`                                                      | `apps/web/src/components/page-header.tsx`                | P1 — paper, the serif title on the 24px edge, `[outline?] [Primary] [···]` right ending 24px in, one ink line under; keys in tooltips (A2), and a count only in the title (`HeadCount`) when the page has no tab bar; `tabs` stands on a pinned `FolderGround`                                                                                                                                                                               |
 | `PageBody`, `Card`, `PAGE_EDGE`                                                   | `apps/web/src/components/page-header.tsx`                | E1, E9 — `PageBody` is the bone ground under the head, the 12px gutter round it and cards 12px apart, filling the height; a card is the `card` utility, paper in a 1px rule box whose rows inset by `--inset` (11px), so its content lands on the 24px edge, and a `SectionHead` that opens it is its paper head. `FolderGround`: the gutter and bone a folder bar stands on, pinned under the folded head                                   |
 | `NewButton`, `SplitNewButton`                                                     | `apps/web/src/components/new-button.tsx`                 | E6 — `+ New x` in pine; the split `[+ New x \| ▾]` with the templates behind the `▾` (Notes, Spaces only)                                                                                                                                                                                                                                                                                                                                    |
 | `icon`, the nouns, `NoteKindIcon`                                                 | `apps/web/src/components/icons.ts`, `note-kind-icon.tsx` | E7 — the only icon-library import site (Carbon, D19): one glyph per verb (`icon.new`, `icon.filter`, …), nouns by name; the note kinds drawn on Carbon's grid; 16px, 20px leading a window head                                                                                                                                                                                                                                              |
 | `ProviderMark`, `brandOf`                                                         | `apps/web/src/components/provider-mark.tsx`              | E7 — every brand mark, in its own colours, Simple Icons paths or the brand's app icon where Simple Icons has none                                                                                                                                                                                                                                                                                                                            |
 | `SectionHead`, `LedgerSection`, `LedgerRow`, `LedgerFigure`, `ReferenceBar`       | `apps/web/src/components/ledger-section.tsx`             | P2/P3 — bone head band (title left, mono ink count or a `Segmented` right, never both), 40px rows on rules, a fixed mono lane, value-vs-median                                                                                                                                                                                                                                                                                               |
 | `Band`, `EmptyRow`, `FoldRow` (_decided_), `Day`                                  | `apps/web/src/components/ledger-section.tsx`             | `Band`: the 28px bone group head inside a pane, mono caps label, optional link right. `EmptyRow`: H1's `Name +` row on bone, the whole row the button; replaces `RailEmpty`. `FoldRow`: a 40px `25 more` row that unfolds in place. `Day`: the 88px right-aligned mono day lane a row ends on (`13 Oct`, `4 Oct 2024`, never wrapped; `when` prints today's time)                                                                            |
-| `RecordHeader`, `RecordBody`, `RecordSection`, `PropertyGrid`, `PropertyCell`     | `apps/web/src/components/record/record-parts.tsx`        | P7 — the record anatomy: the stamp alone above the title, no readout strip, one rule, property grid, sections                                                                                                                                                                                                                                                                                                                                |
+| `RecordHeader`, `RecordBody`, `RecordSection`, `PropertyGrid`, `PropertyCell`     | `apps/web/src/components/record/record-parts.tsx`        | P7 — the record anatomy: the stamp alone above the title, no readout strip, one ink line, property grid, sections                                                                                                                                                                                                                                                                                                                            |
 | `RailSection`, `RailRow`, `RailItem`, `RailEmpty`, `StageStepper`                 | `apps/web/src/components/record/record-parts.tsx`        | the rail left of a record, printed on the ground with no box (E11)                                                                                                                                                                                                                                                                                                                                                                           |
 | `InitialsMark`, `DitherMark`, `initialsOf`                                        | `apps/web/src/components/record/record-parts.tsx`        | ink initials squares and 1-bit fallback marks                                                                                                                                                                                                                                                                                                                                                                                                |
 | `RecordTable`, `TableToolbar`, `AddColumnButton`                                  | `apps/web/src/components/table/record-table.tsx`         | the signature grid — a boxed card with column lines and white heads, sticky head, 36px rows, Columns as an icon ending the head row, `N OF M` foot; `TableTools` is Sort and the search box with its `/`                                                                                                                                                                                                                                     |
@@ -503,7 +505,7 @@ row is a decision, not a cell.
 (`apps/web/src/components/settings/settings-section.tsx`). The section is the page: the
 shell draws no head of its own, so the section draws the shared `PageHeader` — the serif
 title on the 24px edge, **no eyebrow and no sentence under it** (page blurbs go, D81),
-the one action right, one rule under across the full width, the action ending where the
+the one action right, one ink line under across the full width, the action ending where the
 800px column ends its content (`SETTINGS_HEAD_CAP`, E4). A page drilled into from a list
 (a connection, a plugin) puts its way back above the title (`SettingsBack`,
 `‹ Connections`) and its mark beside it; the head's mono line carries a member's
@@ -581,7 +583,7 @@ anatomy (D74 amended 2026-10-25):
   with `[verb] [verb] [···]` (A4) at the right of that row — all outlined, keys in
   tooltips, a record head has no single affirmative to give pine to. Seven things at
   most. A custom object's head carries Log interaction when the object links people.
-  Then one rule, and **no readout strip**. A notices band sits under the rule only
+  Then one ink line, and **no readout strip**. A notices band sits under the line only
   while something needs saying (a possible duplicate, enrichment parked, the
   record archived).
 - **Rail.** Left, 320px on the bone ground with no card and no border, its content on
@@ -653,7 +655,7 @@ in `apps/web/src/components/notes/` (`NoteHead`, `NoteMoreMenu`, `NoteSheet`,
   a replaced note's line in graphite ending `→ <newer title> ›`. Right of
   the title, the save word and the `···` and nothing else: `KIND` (three checked rows),
   a rule, Save as new version · Save as template… · Copy link, a rule, Delete…. No back
-  link — the sidebar is the way back. One rule under.
+  link — the sidebar is the way back. One ink line under.
 - **Body.** The editor alone at 72ch, 17px serif, its headings 20 / 17 / 15 sans medium
   under the 28px serif title; nothing sits between the title and the editor.
 - **Rail.** Right, `w-72` on the bone ground with no rule, stacked under the body below

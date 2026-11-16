@@ -889,10 +889,10 @@ describe('every settings page', () => {
     async (path) => {
       await mount(path)
       const head = document.querySelector('[data-settings-head] header')
-      // The shared PageHeader: the 104px paper head on the 24px edge, one rule.
+      // The shared PageHeader: the 104px paper head on the 24px edge, one ink line.
       expect(head?.className).toContain('min-h-26')
       expect(head?.className).toContain('px-6')
-      expect(head?.className).toContain('border-rule')
+      expect(head?.className).toContain('border-hairline')
       expect(head?.className).not.toContain('double-rule')
       expect(head?.textContent).not.toMatch(/Settings · /)
       // Nothing under the title but the head's mono line, if any.

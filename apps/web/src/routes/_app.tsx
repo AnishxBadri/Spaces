@@ -128,7 +128,7 @@ function AppShell() {
         </aside>
 
         {/* Mobile top bar */}
-        <header className="fixed inset-x-0 top-0 z-sticky flex h-12 items-center gap-3 border-b border-rule bg-paper px-4 md:hidden">
+        <header className="fixed inset-x-0 top-0 z-sticky flex h-12 items-center gap-3 border-b border-hairline bg-paper px-4 md:hidden">
           <button
             type="button"
             aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}

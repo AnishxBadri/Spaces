@@ -203,12 +203,37 @@ describe('E1 · the 24px edge', () => {
   })
 })
 
-describe('E2 · one rule under the head, the ··· on the content’s right edge', () => {
-  it('closes the head on one 1px rule, never the double', () => {
+describe('E2 · one ink line under the head, the ··· on the content’s right edge', () => {
+  it('closes the head on one 1px ink line, never the double', () => {
     const html = renderToStaticMarkup(<PageHeader title="Notes" />)
     const head = classesOf(html, 'min-h-26')
-    expect(head).toEqual(expect.arrayContaining(['border-b', 'border-rule']))
+    expect(head).toEqual(
+      expect.arrayContaining(['border-b', 'border-hairline']),
+    )
     expect(html).not.toContain('double-rule')
+  })
+
+  it('draws the same ink line under the 48px bars: the phone top bar and the Ask heads', () => {
+    const bar = /flex h-12 [^'"]*\bborder-b border-(\w+)/g
+    const lines = (file: string) =>
+      [...read(file).matchAll(bar)].map((m) => m[1])
+    expect(lines('routes/_app.tsx')).toEqual(['hairline'])
+    // The Threads list head and the thread head stand side by side.
+    expect(lines('routes/_app/ask.tsx')).toEqual(['hairline', 'hairline'])
+    expect(lines('components/ask/ask-dock.tsx')).toEqual(['hairline'])
+  })
+
+  it('sets the title at the page step below md and 28 on 32 from md up', () => {
+    const at = css.indexOf('@utility title-serif {')
+    const title = css.slice(at, css.indexOf('\n}', at))
+    // Mobile first: the base is the page step, and `md` lifts it, so the
+    // folded bar's `text-title` and every other step stay untouched.
+    expect(title).toMatch(
+      /font-size: var\(--text-page\);\s*line-height: var\(--text-page--line-height\);/,
+    )
+    expect(title).toMatch(
+      /@variant md \{\s*font-size: 1\.75rem;\s*line-height: 2rem;\s*\}/,
+    )
   })
 
   it('ends the head’s actions 24px in, where a folder bar’s last control ends', () => {
@@ -499,10 +524,15 @@ describe('E4 · settings: the shared head, then group cards 800px wide on the gr
     </SettingsSection>,
   )
 
-  it('draws the shared PageHeader: title on the 24px edge, one rule, no eyebrow', () => {
+  it('draws the shared PageHeader: title on the 24px edge, one ink line, no eyebrow', () => {
     const head = classesOf(page, 'min-h-26')
     expect(head).toEqual(
-      expect.arrayContaining(['bg-paper', 'border-b', 'border-rule', 'px-6']),
+      expect.arrayContaining([
+        'bg-paper',
+        'border-b',
+        'border-hairline',
+        'px-6',
+      ]),
     )
     expect(page).not.toMatch(/Settings · /)
     expect(page).toContain('<h1')

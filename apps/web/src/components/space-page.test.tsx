@@ -392,7 +392,7 @@ describe('the space head', () => {
     expect(text(path)).toContain('Spaces')
     expect(text(path)).toContain('Proptech')
     expect(text(path)).not.toContain('created')
-    expect(head.className).toContain('border-rule')
+    expect(head.className).toContain('border-hairline')
     expect(head.className).not.toContain('double-rule')
     expect(text(head.querySelector('h1'))).toBe('Property ops')
   })

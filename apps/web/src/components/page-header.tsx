@@ -14,11 +14,11 @@ import { cn } from '#/lib/utils'
  * eyebrow, or below as a readout); `[outline?] [Primary] [···]` right, all
  * 32px on the title's line, keys in their tooltips. Paper, on the 24px page
  * edge, the `···` ending 24px from the right, level with the last control of
- * the content under it; one rule under, 104px tall at least, so every page's
- * title and rule land on the same lines. Scrolled past its title, it folds
- * to `HeadBar` — except on a list page (`folds={false}`), which never
+ * the content under it; one ink line under, 104px tall at least, so every
+ * page's title and line land on the same lines. Scrolled past its title, it
+ * folds to `HeadBar` — except on a list page (`folds={false}`), which never
  * scrolls, so its head never folds.
- * - `tabs` is the page's folder bar, set on the bone ground under the rule
+ * - `tabs` is the page's folder bar, set on the bone ground under the line
  *   (`FolderGround`); scrolled, it pins under the folded bar rather than
  *   riding into it. A list's count is on its All tab; a page with no tab bar
  *   puts it in the title (`HeadCount`).
@@ -55,8 +55,8 @@ export function PageHeader({
       <header
         className={cn(
           // One height on every page, the title on one line from the top:
-          // moving between pages, the title and the rule never jump.
-          'flex min-h-26 shrink-0 items-start justify-between gap-4 border-b border-rule bg-paper pt-7 pb-4',
+          // moving between pages, the title and the line never jump.
+          'flex min-h-26 shrink-0 items-start justify-between gap-4 border-b border-hairline bg-paper pt-7 pb-4',
           PAGE_EDGE,
           className,
         )}

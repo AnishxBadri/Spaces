@@ -256,7 +256,7 @@ function AskPage() {
           aria-label="Threads"
           className="flex w-70 shrink-0 flex-col border-r border-hairline bg-paper"
         >
-          <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-rule bg-bone px-3">
+          <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-hairline bg-bone px-3">
             <h1 className="text-title font-medium">Threads</h1>
             <div className="flex items-center gap-1">
               <Link
@@ -301,7 +301,7 @@ function AskPage() {
       ) : null}
 
       <section className="@container flex min-w-0 flex-1 flex-col">
-        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-rule bg-bone px-4">
+        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-hairline bg-bone px-4">
           {listOpen ? null : (
             <Button variant="ghost" size="sm" onClick={() => setListOpen(true)}>
               Threads

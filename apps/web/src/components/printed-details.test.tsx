@@ -58,19 +58,19 @@ const companyStamp = { kind: 'Company' }
 /** The instant the dates on these sheets are printed against. */
 const NOW = '2026-10-26T12:00:00.000Z'
 
-describe('one rule under a head', () => {
+describe('one ink line under a head', () => {
   it('is no longer a utility: the double rule is retired', () => {
     expect(css).not.toMatch(/@utility double-rule/)
   })
 
-  it('draws one rule under every page head and record head', () => {
+  it('draws one ink line under every page head and record head', () => {
     for (const html of [
       renderToStaticMarkup(<PageHeader title="Companies" />),
       renderToStaticMarkup(<RecordHeader stamp={companyStamp} name="Flent" />),
     ]) {
       const head = headOf(html)
       expect(head).toMatch(
-        /<header class="[^"]*\bborder-b\b[^"]*\bborder-rule\b/,
+        /<header class="[^"]*\bborder-b\b[^"]*\bborder-hairline\b/,
       )
       expect(head).not.toContain('double-rule')
     }

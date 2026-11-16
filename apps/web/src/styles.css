@@ -450,13 +450,21 @@
   letter-spacing: 0;
 }
 
-/* Page and record titles: serif, because a human named the thing. */
+/*
+ * Page and record titles: serif, because a human named the thing. 28 on 32
+ * from `md` up; below it the page step, 22 on 28, so a long title on a
+ * phone does not run to seven lines.
+ */
 @utility title-serif {
   font-family: var(--font-serif);
-  font-size: 1.75rem;
-  line-height: 2rem;
+  font-size: var(--text-page);
+  line-height: var(--text-page--line-height);
   font-weight: 600;
   letter-spacing: -0.01em;
+  @variant md {
+    font-size: 1.75rem;
+    line-height: 2rem;
+  }
 }
 
 /*

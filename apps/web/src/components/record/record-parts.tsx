@@ -92,7 +92,7 @@ export function RecordHeader({
       <HeadBar fold={fold} title={name} mark={mark} />
       <header
         className={cn(
-          'flex shrink-0 flex-col gap-3 border-b border-rule bg-paper px-6 pt-5 pb-4',
+          'flex shrink-0 flex-col gap-3 border-b border-hairline bg-paper px-6 pt-5 pb-4',
           className,
         )}
       >
@@ -151,7 +151,7 @@ export function RecordHeadPending({ kind }: { kind: string }) {
     <div className="flex min-h-full flex-col">
       <header
         data-record-pending
-        className="flex shrink-0 flex-col gap-3 border-b border-rule bg-paper px-6 pt-5 pb-4"
+        className="flex shrink-0 flex-col gap-3 border-b border-hairline bg-paper px-6 pt-5 pb-4"
       >
         <div data-stamp-row className="flex">
           <Stamp kind={kind} />
@@ -187,14 +187,14 @@ function RecordStateHead({
   return stamp === null ? (
     <header
       data-record-state
-      className="flex min-h-26 shrink-0 items-start border-b border-rule bg-paper px-6 pt-7 pb-4"
+      className="flex min-h-26 shrink-0 items-start border-b border-hairline bg-paper px-6 pt-7 pb-4"
     >
       {heading}
     </header>
   ) : (
     <header
       data-record-state
-      className="flex shrink-0 flex-col gap-3 border-b border-rule bg-paper px-6 pt-5 pb-4"
+      className="flex shrink-0 flex-col gap-3 border-b border-hairline bg-paper px-6 pt-5 pb-4"
     >
       <div data-stamp-row className="flex">
         {stamp}

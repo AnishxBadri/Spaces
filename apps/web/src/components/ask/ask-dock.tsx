@@ -147,7 +147,7 @@ export function AskDock() {
       className="sticky top-0 hidden h-dvh shrink-0 flex-col self-start border-l border-hairline bg-paper md:flex"
     >
       <ResizeEdge width={dock.width} />
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-rule bg-bone px-4">
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-bone px-4">
         <h2 className="min-w-0 flex-1 truncate text-title font-medium">
           {thread?.title ?? 'Ask'}
         </h2>

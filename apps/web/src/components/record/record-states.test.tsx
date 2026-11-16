@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ClockProvider } from '#/components/clock'
-import { RecordGone, RecordLoadFailed } from './record-parts'
+import { RecordGone, RecordHeadPending, RecordLoadFailed } from './record-parts'
 
 /**
  * A record route's not-found and couldn't-load screens: the head says the
@@ -121,5 +121,28 @@ describe('RecordLoadFailed', () => {
     )
     act(() => retry?.click())
     expect(router.invalidate).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('the state heads', () => {
+  it('close on the one ink line, stamped or not, and while loading', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    for (const node of [
+      <RecordGone key="gone" kind="Note" />,
+      <RecordGone key="bare" />,
+      <RecordLoadFailed key="failed" kind="Note" error={new Error('boom')} />,
+      <RecordHeadPending key="pending" kind="Company" />,
+    ]) {
+      const head = mount(node).querySelector('header')
+      const classes = head?.className.split(' ') ?? []
+      expect(classes).toEqual(
+        expect.arrayContaining(['border-b', 'border-hairline']),
+      )
+      expect(classes).not.toContain('border-rule')
+      act(() => root?.unmount())
+      host?.remove()
+      root = null
+      host = null
+    }
   })
 })
