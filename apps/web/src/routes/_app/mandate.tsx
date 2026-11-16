@@ -1,4 +1,9 @@
-import { ClientOnly, createFileRoute, useRouter } from '@tanstack/react-router'
+import {
+  ClientOnly,
+  createFileRoute,
+  notFound,
+  useRouter,
+} from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
@@ -40,6 +45,8 @@ export const Route = createFileRoute('/_app/mandate')({
     const stageOptions = stageAttr?.options.options ?? []
     if (!m) return { mandate: null, note: null, stageOptions }
     const note = await getNote({ data: { id: m.noteEntityId } })
+    // The mandate's prose is a note; with the note gone there is no page.
+    if (note === null) throw notFound()
     return { mandate: m, note, stageOptions }
   },
   component: MandatePage,

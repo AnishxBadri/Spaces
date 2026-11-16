@@ -291,7 +291,13 @@ export const getNote = createServerFn()
   .validator(input(Schema.Struct({ id: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
-    return Effect.runPromise(getNoteProgram(u.id, data.id))
+    // A note the reader may not read resolves to `null`, which the page
+    // turns into its not-found screen; any other failure still rejects.
+    return Effect.runPromise(
+      getNoteProgram(u.id, data.id).pipe(
+        Effect.catchTag('NoteRefused', () => Effect.succeed(null)),
+      ),
+    )
   })
 
 /**

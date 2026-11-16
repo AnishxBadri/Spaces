@@ -1,4 +1,9 @@
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  Link,
+  useNavigate,
+  useRouter,
+} from '@tanstack/react-router'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { EmptyState } from '#/components/empty-state'
@@ -12,6 +17,8 @@ import {
 import { NewButton, SplitNewButton } from '#/components/new-button'
 import { NOTE_KIND_LABEL, NoteKindIcon } from '#/components/note-kind-icon'
 import { Card, PageBody, PageHeader } from '#/components/page-header'
+import { useLoggedRouteError } from '#/components/record/record-parts'
+import { ListErrorRow, ListLoadingRow } from '#/components/table/list-states'
 import { TemplatePicker } from '#/components/templates'
 import { FolderBody, Tabs } from '#/components/ui/tabs'
 import { createNote, createNoteFromTemplate, listNotes } from '#/lib/server-fns'
@@ -22,7 +29,46 @@ import { useClock } from '#/components/clock'
 export const Route = createFileRoute('/_app/notes')({
   loader: () => listNotes(),
   component: NotesPage,
+  pendingComponent: NotesPending,
+  errorComponent: NotesLoadFailed,
 })
+
+// A list-state row carries its own rule under it; as a card's only row the
+// card's border is that rule.
+const STATE_CARD = '[&>[data-list-state]]:border-b-0'
+
+/** The list while it loads: the head with no actions yet, one loading row. */
+function NotesPending() {
+  return (
+    <div className="flex min-h-full flex-col">
+      <PageHeader title="Notes" />
+      <PageBody>
+        <Card label="Notes" className={STATE_CARD}>
+          <ListLoadingRow plural="Notes" />
+        </Card>
+      </PageBody>
+    </div>
+  )
+}
+
+/** The list's read failed: the same head, one row with Retry. */
+function NotesLoadFailed({ error }: { error: unknown }) {
+  const router = useRouter()
+  useLoggedRouteError(error)
+  return (
+    <div className="flex min-h-full flex-col">
+      <PageHeader title="Notes" />
+      <PageBody>
+        <Card label="Notes" className={STATE_CARD}>
+          <ListErrorRow
+            plural="Notes"
+            onRetry={() => void router.invalidate()}
+          />
+        </Card>
+      </PageBody>
+    </div>
+  )
+}
 
 type NoteRow = Awaited<ReturnType<typeof listNotes>>[number]
 

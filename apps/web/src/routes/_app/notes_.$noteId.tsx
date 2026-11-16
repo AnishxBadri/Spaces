@@ -18,6 +18,11 @@ import { NoteSheet } from '#/components/notes/note-sheet'
 import { NoteMoreMenu } from '#/components/notes/note-menu'
 import { NoteRail } from '#/components/notes/note-rail'
 import {
+  RecordGone,
+  RecordHeadPending,
+  RecordLoadFailed,
+} from '#/components/record/record-parts'
+import {
   DOCUMENT_PREVIEW_EVENT,
   documentPreviewRequest,
 } from '#/lib/editor/document-preview-event'
@@ -31,12 +36,10 @@ import { uploadDocument } from '#/lib/documents/upload'
 import type { UploadPhase } from '#/lib/documents/upload'
 import type { NoteBody } from '@spaces/db/schema/kinds'
 import { fileInSpaceAction } from '#/lib/file-in-space'
+import { loadNotePage } from '#/lib/notes/page-load'
 import { usePageActions } from '#/lib/page-actions'
 import {
   getDocumentPreview,
-  getNote,
-  listSpaces,
-  listTermsForNote,
   saveNote,
   saveNoteAsNewVersion,
 } from '#/lib/server-fns'
@@ -47,18 +50,16 @@ import {
  * where the note is filed and who may read it.
  */
 export const Route = createFileRoute('/_app/notes_/$noteId')({
-  loader: async ({ params }) => {
-    const [note, spaces, terms] = await Promise.all([
-      getNote({ data: { id: params.noteId } }),
-      listSpaces(),
-      listTermsForNote({ data: { noteId: params.noteId } }),
-    ])
-    return { note, allSpaces: spaces, terms }
-  },
+  loader: ({ params }) => loadNotePage(params.noteId),
   // The page holds the title and the editor in state: another note, such as
   // a new version, mounts fresh rather than inheriting them.
   remountDeps: ({ params }) => params.noteId,
   component: NotePage,
+  pendingComponent: () => <RecordHeadPending kind="Note" />,
+  notFoundComponent: () => (
+    <RecordGone kind="Note" listTo="/notes" listLabel="Open Notes" />
+  ),
+  errorComponent: ({ error }) => <RecordLoadFailed kind="Note" error={error} />,
 })
 
 /** One toast, rewritten in place, for the three phases of a dropped file. */

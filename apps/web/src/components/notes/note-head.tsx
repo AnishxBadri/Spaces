@@ -9,7 +9,7 @@ import { RecordHeader } from '#/components/record/record-parts'
 import type { getNote } from '#/lib/server-fns'
 
 /** A note as its page loads it. */
-export type NoteData = Awaited<ReturnType<typeof getNote>>
+export type NoteData = NonNullable<Awaited<ReturnType<typeof getNote>>>
 
 export type NoteKind = NoteData['kind']
 

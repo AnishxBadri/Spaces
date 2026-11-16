@@ -15,6 +15,7 @@ import { Route as JoinRouteImport } from './routes/join'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ResetRouteImport } from './routes/reset'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as AppSplatRouteImport } from './routes/_app/$'
 import { Route as AppAskRouteImport } from './routes/_app/ask'
 import { Route as AppCompaniesRouteImport } from './routes/_app/companies'
 import { Route as AppDealsRouteImport } from './routes/_app/deals'
@@ -113,6 +114,11 @@ const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppSplatRoute = AppSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppAskRoute = AppAskRouteImport.update({
   id: '/ask',
@@ -477,6 +483,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/reset': typeof ResetRoute
   '/setup': typeof SetupRoute
+  '/$': typeof AppSplatRoute
   '/ask': typeof AppAskRoute
   '/companies': typeof AppCompaniesRoute
   '/deals': typeof AppDealsRoute
@@ -553,6 +560,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reset': typeof ResetRoute
   '/setup': typeof SetupRoute
+  '/$': typeof AppSplatRoute
   '/ask': typeof AppAskRoute
   '/companies': typeof AppCompaniesRoute
   '/deals': typeof AppDealsRoute
@@ -630,6 +638,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/reset': typeof ResetRoute
   '/setup': typeof SetupRoute
+  '/_app/$': typeof AppSplatRoute
   '/_app/ask': typeof AppAskRoute
   '/_app/companies': typeof AppCompaniesRoute
   '/_app/deals': typeof AppDealsRoute
@@ -708,6 +717,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset'
     | '/setup'
+    | '/$'
     | '/ask'
     | '/companies'
     | '/deals'
@@ -784,6 +794,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset'
     | '/setup'
+    | '/$'
     | '/ask'
     | '/companies'
     | '/deals'
@@ -860,6 +871,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset'
     | '/setup'
+    | '/_app/$'
     | '/_app/ask'
     | '/_app/companies'
     | '/_app/deals'
@@ -994,6 +1006,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/setup'
       preLoaderRoute: typeof SetupRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/$': {
+      id: '/_app/$'
+      path: '/$'
+      fullPath: '/$'
+      preLoaderRoute: typeof AppSplatRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/ask': {
       id: '/_app/ask'
@@ -1552,6 +1571,7 @@ const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
 )
 
 interface AppRouteChildren {
+  AppSplatRoute: typeof AppSplatRoute
   AppAskRoute: typeof AppAskRoute
   AppCompaniesRoute: typeof AppCompaniesRoute
   AppDealsRoute: typeof AppDealsRoute
@@ -1584,6 +1604,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppSplatRoute: AppSplatRoute,
   AppAskRoute: AppAskRoute,
   AppCompaniesRoute: AppCompaniesRoute,
   AppDealsRoute: AppDealsRoute,

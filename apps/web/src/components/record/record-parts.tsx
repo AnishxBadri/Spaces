@@ -1,9 +1,11 @@
-import { Link } from '@tanstack/react-router'
-import { createContext, useContext } from 'react'
+import { Link, useRouter } from '@tanstack/react-router'
+import { createContext, useContext, useEffect } from 'react'
 import type { ComponentProps, ReactElement, ReactNode } from 'react'
 import { HeadActions, HeadBar, useHeadFold } from '#/components/head-fold'
 import { EmptyRow, SectionHead } from '#/components/ledger-section'
+import { Card, PageBody } from '#/components/page-header'
 import { Twinkle } from '#/components/twinkle'
+import { Button } from '#/components/ui/button'
 import { Stamp } from '#/components/ui/stamp'
 import type { StampProps } from '#/components/ui/stamp'
 import type { ShownReadout } from '#/lib/records/overview'
@@ -165,6 +167,134 @@ export function RecordHeadPending({ kind }: { kind: string }) {
       </header>
     </div>
   )
+}
+
+/**
+ * A record head with no record under it: the stamp, when the route names its
+ * kind, and the state in graphite where the name would stand. With no stamp
+ * it keeps the page head's 104px, so the rule lands where every page's does.
+ */
+function RecordStateHead({
+  stamp,
+  title,
+}: {
+  stamp: ReactNode
+  title: string
+}) {
+  const heading = (
+    <h1 className="min-w-0 truncate title-serif text-graphite">{title}</h1>
+  )
+  return stamp === null ? (
+    <header
+      data-record-state
+      className="flex min-h-26 shrink-0 items-start border-b border-rule bg-paper px-6 pt-7 pb-4"
+    >
+      {heading}
+    </header>
+  ) : (
+    <header
+      data-record-state
+      className="flex shrink-0 flex-col gap-3 border-b border-rule bg-paper px-6 pt-5 pb-4"
+    >
+      <div data-stamp-row className="flex">
+        {stamp}
+      </div>
+      <div className="flex min-h-7 min-w-0 items-center">{heading}</div>
+    </header>
+  )
+}
+
+/** The one card under a state head: a single row, its way out at the right. */
+const STATE_ROW =
+  'flex min-h-ledger-row items-center gap-3 px-(--inset) py-1.5 text-ui'
+
+/**
+ * A route's not-found screen: the kind's outlined stamp, `Not found`, and one
+ * card that says why and leads back to the list. With no `kind` it is the
+ * app-wide fallback for any path or record that is not there, back to Today.
+ */
+export function RecordGone({
+  kind,
+  listTo = '/today',
+  listLabel = 'Open Today',
+}: {
+  kind?: string | undefined
+  listTo?: string | undefined
+  listLabel?: string | undefined
+}) {
+  return (
+    <div className="flex min-h-full flex-col">
+      <RecordStateHead
+        title="Not found"
+        stamp={
+          kind === undefined ? null : (
+            <span data-stamp="gone" className="stamp stamp-outline">
+              {kind}
+            </span>
+          )
+        }
+      />
+      <PageBody>
+        <Card label="Not found">
+          <div data-record-gone className={STATE_ROW}>
+            <span className="min-w-0 flex-1">
+              It was deleted, or the link is wrong.
+            </span>
+            <Button size="sm" variant="outline" asChild>
+              <Link to={listTo}>{listLabel}</Link>
+            </Button>
+          </div>
+        </Card>
+      </PageBody>
+    </div>
+  )
+}
+
+/**
+ * A route's error screen: the kind's stamp, `Couldn't load`, and one card
+ * with Retry, which re-runs the route's loaders. The error goes to the
+ * console and never to the page, which says only the fixed sentence: a raw
+ * message is a stack's vocabulary, not the reader's.
+ */
+export function RecordLoadFailed({
+  kind,
+  error,
+}: {
+  kind?: string | undefined
+  error: unknown
+}) {
+  const router = useRouter()
+  useLoggedRouteError(error)
+  return (
+    <div className="flex min-h-full flex-col">
+      <RecordStateHead
+        title="Couldn't load"
+        stamp={kind === undefined ? null : <Stamp kind={kind} />}
+      />
+      <PageBody>
+        <Card label="Couldn't load">
+          <div role="alert" data-record-load-failed className={STATE_ROW}>
+            <span aria-hidden className="size-2 shrink-0 bg-destructive" />
+            <span className="min-w-0 flex-1">The database did not answer.</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void router.invalidate()}
+            >
+              Retry
+            </Button>
+          </div>
+        </Card>
+      </PageBody>
+    </div>
+  )
+}
+
+/** Logs a route's caught error once per error, for a screen that hides it. */
+export function useLoggedRouteError(error: unknown) {
+  useEffect(() => {
+    console.error(error)
+  }, [error])
 }
 
 /**
