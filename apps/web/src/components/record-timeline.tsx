@@ -1,10 +1,21 @@
 import { useNavigate, useRouter, useSearch } from '@tanstack/react-router'
-import { Layers } from '#/components/icons'
+import {
+  BookA,
+  ChevronDown,
+  Compass,
+  HandCoins,
+  Kanban,
+  Layers,
+  Paperclip,
+  icon,
+} from '#/components/icons'
+import type { IconComponent } from '#/components/icons'
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import { toast } from 'sonner'
 import { OptionChip, optionLabel, refName } from './attributes/value-editor'
 import { EmailModal } from './email-dialog'
+import { NoteKindIcon } from './note-kind-icon'
 import { Band, Day, EmptyRow, FoldRow } from './ledger-section'
 import { PickPopover } from './record/details-add'
 import { ThreadRow } from './record/thread-row'
@@ -160,29 +171,33 @@ export const VERB_TYPES: Record<string, string> = {
 }
 
 /**
- * The glyph lane: mark ■, stage ▤, enrich ✦, file ▯, a burst ›, merge ⇄,
- * a space its layers; the ledger's other verbs wear the mark's square.
+ * The glyph lane, one 16px icon per kind: a birth or a deal `new`, a note
+ * the note kind's page, a term its book, the mandate its compass, a file
+ * its paperclip, a merge `merge`, a rename or a burst `edit`, a signal or
+ * an enrichment `enrich`, a stage move the board's column, a space its
+ * layers, the money verbs coins, and a write-off or a void `void`.
  */
-export const HISTORY_GLYPHS: Record<string, string> = {
-  born: '+',
-  deal: '+',
-  note: '¶',
-  file: '▯',
-  merge: '⇄',
-  rename: '›',
-  term: '¶',
-  mandate: '¶',
-  signal: '✦',
-  enrich: '✦',
-  holding: '■',
-  writeoff: '■',
-  invest: '■',
-  round: '■',
-  mark: '■',
-  distrib: '■',
-  void: '■',
-  stage: '▤',
-  edit: '›',
+export const HISTORY_GLYPHS: Record<string, IconComponent | 'note'> = {
+  born: icon.new,
+  deal: icon.new,
+  note: 'note',
+  file: Paperclip,
+  merge: icon.merge,
+  rename: icon.edit,
+  term: BookA,
+  mandate: Compass,
+  signal: icon.enrich,
+  enrich: icon.enrich,
+  holding: HandCoins,
+  writeoff: icon.void,
+  invest: HandCoins,
+  round: HandCoins,
+  mark: HandCoins,
+  distrib: HandCoins,
+  void: icon.void,
+  stage: Kanban,
+  space: Layers,
+  edit: icon.edit,
 }
 
 /** How many History rows show before the fold. */
@@ -653,18 +668,19 @@ function Row({
   )
 }
 
-/** The 16px glyph lane; a space wears its layers. */
+/** The 16px glyph lane; a kind with no glyph of its own wears `edit`. */
 function Glyph({ kind }: { kind: string }) {
+  const Mark = HISTORY_GLYPHS[kind] ?? icon.edit
   return (
     <span
       aria-hidden
       data-glyph={kind}
-      className="flex w-4 shrink-0 justify-center mono text-ui text-graphite"
+      className="flex w-4 shrink-0 justify-center text-graphite"
     >
-      {kind === 'space' ? (
-        <Layers className="size-4" />
+      {Mark === 'note' ? (
+        <NoteKindIcon kind="note" />
       ) : (
-        (HISTORY_GLYPHS[kind] ?? '·')
+        <Mark className="size-4" />
       )}
     </span>
   )
@@ -772,9 +788,9 @@ function AttrBurst({
         {open ? (
           <span
             aria-hidden
-            className="flex w-4 shrink-0 justify-center mono text-ui text-graphite"
+            className="flex w-4 shrink-0 justify-center text-graphite"
           >
-            ⌄
+            <ChevronDown className="size-4" />
           </span>
         ) : (
           <Glyph kind={kind} />

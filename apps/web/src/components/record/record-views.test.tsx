@@ -603,11 +603,20 @@ describe('the History tab', () => {
     ])
     const mark = entries[0]
     expect(mark.className).toContain('h-ledger-row')
-    expect(mark.querySelector('[data-glyph]')?.textContent).toBe('■')
+    // Every lane leads on one 16px icon and no text character.
+    const glyphs = entries.map((r) => r.querySelector('[data-glyph]'))
+    expect(glyphs.map((g) => g?.textContent)).toEqual(['', '', '', ''])
+    expect(
+      glyphs.map((g) => g?.querySelector('svg')?.getAttribute('data-icon')),
+    ).toEqual(['money', 'layers', 'column', 'edit'])
+    expect(
+      glyphs.every((g) =>
+        g?.querySelector('svg')?.getAttribute('class')?.includes('size-4'),
+      ),
+    ).toBe(true)
     expect(mark.textContent).toContain('Priya Raman recorded a mark')
     expect(mark.querySelector('[data-figure]')?.textContent).toBe('$4.5M')
     expect(mark.querySelector('time')?.textContent).toBe('3 Oct')
-    expect(entries[1].querySelector('[data-glyph] svg')).not.toBeNull()
     expect(entries[2].querySelector('[data-figure]')?.textContent).toBe(
       'Diligence→Term sheet',
     )
@@ -632,10 +641,13 @@ describe('the History tab', () => {
         registry={registry}
       />,
     )
-    const head = button(/^›Priya Raman changed 2 attributes/)
+    const head = button(/^Priya Raman changed 2 attributes/)
+    expect(head.getAttribute('aria-expanded')).toBe('false')
+    expect(head.querySelector('[data-icon="edit"]')).not.toBeNull()
     await click(head)
     expect(head.className).toContain('bg-bone')
-    expect(head.textContent).toContain('⌄Priya Raman changed 2 attributes')
+    expect(head.getAttribute('aria-expanded')).toBe('true')
+    expect(head.querySelector('[data-icon="chevron--down"]')).not.toBeNull()
     const changes = [...el.querySelectorAll('[data-change]')].map(
       (c) => c.textContent,
     )

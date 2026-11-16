@@ -52,8 +52,13 @@ describe('record ledger verbs', () => {
     expect(VERB_LABELS[verb], `label for ${verb}`).toBeTruthy()
     const kind = VERB_TYPES[verb]
     expect(kind, `kind for ${verb}`).toBeTruthy()
-    // A space wears its layers icon; every other kind a mono glyph.
-    if (kind !== 'space')
-      expect(HISTORY_GLYPHS[kind], `glyph for ${verb}`).toBeTruthy()
+    expect(HISTORY_GLYPHS[kind], `glyph for ${verb}`).toBeTruthy()
+  })
+
+  it('leads every kind on an icon, never a text character', () => {
+    // The one string is the note kind's own drawing; the rest are icons.
+    expect(
+      Object.values(HISTORY_GLYPHS).filter((g) => typeof g === 'string'),
+    ).toEqual(['note'])
   })
 })
