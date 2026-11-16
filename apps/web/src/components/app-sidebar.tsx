@@ -15,7 +15,7 @@ import {
   Sunrise,
   Users,
 } from '#/components/icons'
-import type { LucideIcon } from '#/components/icons'
+import type { IconComponent } from '#/components/icons'
 import { useEffect, useId, useMemo, useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
@@ -88,7 +88,7 @@ export type NavGroupId = (typeof NAV_GROUP_IDS)[number]
 type NavItem = {
   readonly to: string
   readonly label: string
-  readonly icon: LucideIcon
+  readonly icon: IconComponent
   /**
    * The G-chord printed in the row's right lane. The shell binds it, the
    * keyboard sheet lists it, and the nav grammar test names both pages if
@@ -838,7 +838,7 @@ function DraftsRow({
       }}
       className="focus-ring flex h-[1.875rem] shrink-0 items-center gap-2.5 rounded-md border border-transparent pr-2.5 pl-2.5 text-left text-ui text-foreground transition-colors hover:bg-bone-deep"
     >
-      <Mail className="size-3.5 shrink-0" strokeWidth={1.75} />
+      <Mail className="size-4 shrink-0" />
       <span className="min-w-0 flex-1 truncate">Drafts</span>
       <span
         data-lane="count"
@@ -955,7 +955,7 @@ function CollapsedSidebar({
               aria-label={`Drafts · ${String(drafts)}`}
               className="focus-ring flex h-[1.875rem] w-8 shrink-0 items-center justify-center rounded-md border border-transparent transition-colors hover:bg-bone-deep"
             >
-              <Mail className="size-3.5 shrink-0" strokeWidth={1.75} />
+              <Mail className="size-4 shrink-0" />
             </button>
           </IconTip>
         ) : null}
@@ -1002,7 +1002,7 @@ function CollapsedSidebar({
             className="focus-ring-inset flex h-10 w-12 items-center justify-center text-graphite transition-colors hover:bg-bone-deep hover:text-foreground aria-[current=page]:text-foreground"
             activeProps={{ 'aria-current': 'page' }}
           >
-            <MessageSquareText className="size-3.5" strokeWidth={1.75} />
+            <MessageSquareText className="size-4" />
           </Link>
         </IconTip>
         <DropdownMenu>
@@ -1075,7 +1075,7 @@ function CollapsedNavLink({
 }: {
   to: string
   params?: Record<string, string> | undefined
-  icon: LucideIcon
+  icon: IconComponent
   keys?: string | undefined
   children: string
 }) {
@@ -1088,7 +1088,7 @@ function CollapsedNavLink({
         className="focus-ring flex h-[1.875rem] w-8 shrink-0 items-center justify-center rounded-md border border-transparent transition-colors hover:bg-bone-deep aria-[current=page]:border-hairline aria-[current=page]:bg-paper"
         activeProps={{ 'aria-current': 'page' }}
       >
-        <Icon className="size-3.5 shrink-0" strokeWidth={1.75} />
+        <Icon className="size-4 shrink-0" />
       </Link>
     </IconTip>
   )
@@ -1191,7 +1191,7 @@ function NavLink({
    * tab — an explicit undefined must be absent from the URL.
    */
   search?: Record<string, string | undefined> | undefined
-  icon?: LucideIcon | undefined
+  icon?: IconComponent | undefined
   /** The chord printed in the right lane — graphite, ink on the current page. */
   hint?: string | undefined
   /**
@@ -1228,7 +1228,7 @@ function NavLink({
       )}
       activeProps={{ 'aria-current': 'page' }}
     >
-      {Icon ? <Icon className="size-3.5 shrink-0" strokeWidth={1.75} /> : null}
+      {Icon ? <Icon className="size-4 shrink-0" /> : null}
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {hint ? (
         <span

@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-table'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import { icon, Layers } from '#/components/icons'
-import type { LucideIcon } from '#/components/icons'
+import type { IconComponent } from '#/components/icons'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { DocumentPreview } from '#/components/document-preview'
@@ -273,7 +273,7 @@ function DocumentsPage() {
           /* The upload door on the shelf that lists what it produces. The
              dialog lives in the app shell; the chassis and ⌘K open it too. */
           <Button onClick={openUploadDialog}>
-            <icon.upload className="size-4" strokeWidth={2} />
+            <icon.upload className="size-4" />
             Upload
           </Button>
         }
@@ -393,7 +393,7 @@ type Chip = {
   /** Null for a kind with no page — it reads as text rather than a dead link. */
   href: string | null
   /** Undefined for a kind with no mark; the chip is then its name alone. */
-  icon: LucideIcon | undefined
+  icon: IconComponent | undefined
 }
 
 /**
@@ -417,9 +417,7 @@ function ChipLane({ chips }: { chips: Array<Chip> }) {
         const Icon = chip.icon
         const inside = (
           <>
-            {Icon ? (
-              <Icon className="size-2.5 shrink-0" strokeWidth={1.75} />
-            ) : null}
+            {Icon ? <Icon className="size-4 shrink-0" /> : null}
             <span className="truncate">{chip.label}</span>
           </>
         )

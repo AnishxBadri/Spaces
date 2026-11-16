@@ -12,7 +12,7 @@ import {
 import type { ComponentProps, ReactNode, RefObject } from 'react'
 import { FolderGround } from '#/components/page-header'
 import { ChevronsUpDown, icon } from '#/components/icons'
-import type { LucideIcon } from '#/components/icons'
+import type { IconComponent } from '#/components/icons'
 import { useHotkey } from '#/lib/use-hotkey'
 import {
   DropdownMenu,
@@ -549,10 +549,9 @@ function SortChevron({ className }: { className: string }) {
   return (
     <ChevronsUpDown
       className={cn(
-        'size-3 shrink-0 opacity-0 transition-opacity duration-150 ease-out-quart group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100 group-data-[state=open]/sort:opacity-100',
+        'size-4 shrink-0 opacity-0 transition-opacity duration-150 ease-out-quart group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100 group-data-[state=open]/sort:opacity-100',
         className,
       )}
-      strokeWidth={2}
       aria-hidden
     />
   )
@@ -744,7 +743,7 @@ export function ToolButton({
   ...props
 }: ComponentProps<'button'> & {
   active: boolean
-  icon?: LucideIcon | undefined
+  icon?: IconComponent | undefined
   /** The tool's name: its accessible name and tooltip when it is an icon. */
   label?: string | undefined
 }) {
@@ -764,9 +763,7 @@ export function ToolButton({
         className,
       )}
     >
-      {Icon === undefined ? null : (
-        <Icon aria-hidden className="size-3.5" strokeWidth={2} />
-      )}
+      {Icon === undefined ? null : <Icon aria-hidden className="size-4" />}
       {bare ? null : children}
     </button>
   )
@@ -920,7 +917,7 @@ export function ColumnsMenu<T>({ table }: { table: Table<T> }) {
           data-columns-menu
           className="focus-ring flex size-6 items-center justify-center rounded-md text-graphite transition-colors duration-150 ease-out-quart hover:bg-bone hover:text-foreground data-[state=open]:bg-bone"
         >
-          <icon.columns aria-hidden className="size-3.5" strokeWidth={2} />
+          <icon.columns aria-hidden className="size-4" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -1021,7 +1018,7 @@ export function AddColumnButton() {
       title="Add column"
       className="focus-ring flex size-6 items-center justify-center rounded-md text-graphite transition-colors duration-150 ease-out-quart hover:bg-bone hover:text-foreground"
     >
-      <icon.new className="size-3.5" strokeWidth={2} />
+      <icon.new className="size-4" />
     </button>
   )
 }

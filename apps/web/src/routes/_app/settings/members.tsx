@@ -341,7 +341,6 @@ function InviteMark({ open }: { open: boolean }) {
       aria-hidden
       data-invite-mark={open ? 'link' : 'mail'}
       className="size-4 shrink-0 text-graphite"
-      strokeWidth={1.75}
     />
   )
 }
@@ -458,7 +457,7 @@ function InviteDialog({
                 {url}
               </code>
               <Button size="xs" variant="outline" onClick={() => copy(url)}>
-                <icon.copy className="size-3" strokeWidth={2} />
+                <icon.copy className="size-4" />
                 Copy link
               </Button>
             </div>

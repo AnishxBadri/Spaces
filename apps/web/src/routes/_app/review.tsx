@@ -359,7 +359,7 @@ function ScopeChip({ name }: { name: string }) {
         aria-label={`Show the whole queue, not just ${name}`}
         className="focus-ring -mr-0.5 text-graphite hover:text-foreground"
       >
-        <icon.close className="size-3" strokeWidth={2} />
+        <icon.close className="size-4" />
       </Link>
     </span>
   )
@@ -386,7 +386,7 @@ function FilterChip({ filter }: { filter: InboxFilterLabels }) {
         aria-label={`Show the whole queue, not just ${name}`}
         className="focus-ring -mr-0.5 text-graphite hover:text-foreground"
       >
-        <icon.close className="size-3" strokeWidth={2} />
+        <icon.close className="size-4" />
       </Link>
     </span>
   )
@@ -495,7 +495,7 @@ function SideHead({
           keep ? 'bg-primary text-paper' : 'bg-paper',
         )}
       >
-        {keep ? <Check className="size-2.5" strokeWidth={2.5} /> : null}
+        {keep ? <Check className="size-2.5" /> : null}
       </span>
       <span className="text-label text-foreground">
         {keep ? 'Keep' : 'Merge in'} · {letter}
@@ -565,7 +565,7 @@ function PairCard({ pair }: { pair: DuplicateCandidateRow }) {
             onClick={() => setKeep((k) => (k === 'a' ? 'b' : 'a'))}
             className="focus-ring-inset flex w-10 shrink-0 items-center justify-center border-x border-rule text-graphite transition-colors duration-150 ease-out-quart hover:bg-bone hover:text-foreground"
           >
-            <icon.merge className="size-3.5" strokeWidth={1.75} />
+            <icon.merge className="size-4" />
           </button>
           <SideHead
             letter="B"

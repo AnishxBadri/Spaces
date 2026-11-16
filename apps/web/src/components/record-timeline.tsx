@@ -662,7 +662,7 @@ function Glyph({ kind }: { kind: string }) {
       className="flex w-4 shrink-0 justify-center mono text-ui text-graphite"
     >
       {kind === 'space' ? (
-        <Layers className="size-3.5" strokeWidth={1.75} />
+        <Layers className="size-4" />
       ) : (
         (HISTORY_GLYPHS[kind] ?? '·')
       )}

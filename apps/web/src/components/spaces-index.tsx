@@ -219,10 +219,7 @@ function MapRow({
         style={{ paddingLeft: `calc(var(--inset) + ${s.depth * 24}px)` }}
       >
         {mark === null ? (
-          <Layers
-            className="size-3.5 shrink-0 text-foreground"
-            strokeWidth={1.75}
-          />
+          <Layers className="size-4 shrink-0 text-foreground" />
         ) : (
           <span
             aria-hidden

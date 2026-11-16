@@ -49,7 +49,7 @@ export function Stamp(props: StampProps) {
       {props.kind}
       {props.state === 'sensitive' ? (
         <>
-          <Lock aria-hidden className="size-3" strokeWidth={2} />
+          <Lock aria-hidden className="size-4" />
           Sensitive
         </>
       ) : null}

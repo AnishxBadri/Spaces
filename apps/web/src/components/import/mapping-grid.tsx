@@ -532,11 +532,7 @@ function TargetPicker({
             {label.type}
           </span>
         ) : null}
-        <ChevronDown
-          aria-hidden
-          className="size-3 shrink-0 text-graphite"
-          strokeWidth={2}
-        />
+        <ChevronDown aria-hidden className="size-4 shrink-0 text-graphite" />
       </PopoverTrigger>
       <PopoverContent
         align="start"

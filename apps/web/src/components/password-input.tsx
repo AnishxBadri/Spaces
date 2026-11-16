@@ -28,9 +28,9 @@ export function PasswordInput({
         className="focus-ring absolute inset-y-0 right-0 flex w-9 items-center justify-center rounded-r-md text-graphite transition-colors hover:text-foreground"
       >
         {visible ? (
-          <icon.conceal className="size-4" strokeWidth={1.75} />
+          <icon.conceal className="size-4" />
         ) : (
-          <icon.reveal className="size-4" strokeWidth={1.75} />
+          <icon.reveal className="size-4" />
         )}
       </button>
     </div>

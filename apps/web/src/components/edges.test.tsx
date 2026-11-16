@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest'
 import * as icons from './icons'
 import { LedgerRow, LedgerSection } from './ledger-section'
 import { NewButton, SplitNewButton } from './new-button'
+import { NoteKindIcon } from './note-kind-icon'
 import {
   Card,
   FolderGround,
@@ -575,7 +576,7 @@ describe('E6 · every create is + New x, in pine', () => {
   it('draws `+ New x` as the primary with the new glyph', () => {
     const html = renderToStaticMarkup(<NewButton noun="company" />)
     expect(html).toContain('data-variant="default"')
-    expect(html).toMatch(/<svg[^>]*lucide-plus/)
+    expect(html).toMatch(/<svg[^>]*data-icon="add"/)
     expect(html).toMatch(/>New company<\/button>$/)
   })
 
@@ -632,11 +633,78 @@ describe('E6 · every create is + New x, in pine', () => {
 })
 
 describe('E7 · one icon list, one brand mark', () => {
-  it('is the only lucide-react import in the app', () => {
+  it('is the only icon-library import in the app, and that library is Carbon', () => {
     const importers = sourceFiles(src)
-      .filter((f) => /from ['"]lucide-react['"]/.test(readFileSync(f, 'utf8')))
+      .filter((f) =>
+        /from ['"]@carbon\/icons-react['"]/.test(readFileSync(f, 'utf8')),
+      )
       .map((f) => relative(src, f))
     expect(importers).toEqual(['components/icons.ts'])
+    const lucide = sourceFiles(src)
+      .filter((f) => /from ['"]lucide-react['"]/.test(readFileSync(f, 'utf8')))
+      .map((f) => relative(src, f))
+    expect(lucide).toEqual([])
+  })
+
+  it('draws a glyph at 16px unless a class says otherwise, filled, named by Carbon', () => {
+    const html = renderToStaticMarkup(<icons.icon.new />)
+    expect(html).toContain('width="16"')
+    expect(html).toContain('height="16"')
+    expect(html).toContain('viewBox="0 0 32 32"')
+    expect(html).toContain('fill="currentColor"')
+    expect(html).toContain('data-icon="add"')
+    expect(html).toContain('aria-hidden="true"')
+    const sized = renderToStaticMarkup(<icons.FileText className="size-5" />)
+    expect(sized).toContain('class="size-5"')
+    expect(sized).toContain('data-icon="document"')
+  })
+
+  it('passes no stroke to an icon and draws none below 16px', () => {
+    // Carbon glyphs are filled; a stroke prop is only ever our own drawing's.
+    const stroked = sourceFiles(src)
+      .filter((f) => f.endsWith('.tsx') && !f.endsWith('.test.tsx'))
+      .filter((f) => /strokeWidth/.test(readFileSync(f, 'utf8')))
+      .map((f) => relative(src, f))
+    expect(stroked).toEqual(['components/provider-mark.tsx'])
+    // An element named from the list (or the verb map) carrying size-3 or
+    // size-3.5 in its own tag.
+    const offenders = sourceFiles(src)
+      .filter((f) => f.endsWith('.tsx') && !f.endsWith('.test.tsx'))
+      .filter((f) => {
+        const text = readFileSync(f, 'utf8')
+        const imported = /import \{([^}]*)\} from '#\/components\/icons'/.exec(
+          text,
+        )
+        if (imported === null) return false
+        const names = imported[1]
+          .split(',')
+          .map(
+            (n) =>
+              n
+                .trim()
+                .split(/\s+as\s+/)
+                .at(-1) ?? '',
+          )
+          .filter((n) => /^[A-Za-z]\w*$/.test(n))
+          .map((n) => (n === 'icon' ? 'icon\\.\\w+' : n))
+        if (names.length === 0) return false
+        const tag = new RegExp(
+          `<(${names.join('|')})\\b[^<]*?\\bsize-3(\\.5)?\\b[^<]*?\\/>`,
+        )
+        return tag.test(text)
+      })
+      .map((f) => relative(src, f))
+    expect(offenders).toEqual([])
+  })
+
+  it('draws the note kinds on the Carbon grid, filled', () => {
+    for (const kind of ['note', 'memo'] as const) {
+      const html = renderToStaticMarkup(<NoteKindIcon kind={kind} />)
+      expect(html, kind).toContain('viewBox="0 0 32 32"')
+      expect(html, kind).toContain('fill="currentColor"')
+      expect(html, kind).not.toContain('stroke')
+      expect(html, kind).toContain('class="size-4 shrink-0"')
+    }
   })
 
   it('maps each verb to one glyph and does not hand a verb glyph out by name', () => {
@@ -666,6 +734,14 @@ describe('E7 · one icon list, one brand mark', () => {
       'Columns3',
       'Ellipsis',
       'Sparkles',
+      'Add',
+      'Close',
+      'TrashCan',
+      'Filter',
+      'ArrowsVertical',
+      'ColumnInsert',
+      'OverflowMenuHorizontal',
+      'MagicWand',
     ])
       expect(name in icons, name).toBe(false)
   })

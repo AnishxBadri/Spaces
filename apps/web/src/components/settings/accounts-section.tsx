@@ -341,7 +341,7 @@ function ForwardingAddress({ address }: { address: string | null }) {
             onClick={() => copy(address)}
             aria-label={`Copy ${address}`}
           >
-            <icon.copy className="size-3" strokeWidth={2} />
+            <icon.copy className="size-4" />
             Copy
           </Button>
         </div>

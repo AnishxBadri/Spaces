@@ -239,7 +239,7 @@ function ObjectRecordPage() {
         }
         mark={
           <span className="flex size-7 shrink-0 items-center justify-center border border-hairline bg-paper">
-            <Icon className="size-3.5 text-foreground" strokeWidth={1.75} />
+            <Icon className="size-4 text-foreground" />
           </span>
         }
         name={

@@ -113,12 +113,7 @@ function TemplateKindMark({
         ? Mail
         : objectIcon({ slug: OBJECT_SLUG[template.objectKind ?? ''] ?? null })
   return (
-    <Glyph
-      aria-hidden
-      data-template-kind={template.kind}
-      className={ink}
-      strokeWidth={1.75}
-    />
+    <Glyph aria-hidden data-template-kind={template.kind} className={ink} />
   )
 }
 

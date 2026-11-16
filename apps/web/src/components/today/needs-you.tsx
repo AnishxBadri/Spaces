@@ -180,7 +180,7 @@ function SensitiveMark({ name }: { name: string }) {
           aria-label={`Sensitive · AI never reads ${name}`}
           className="focus-ring flex text-graphite"
         >
-          <Lock className="size-3" strokeWidth={1.75} aria-hidden />
+          <Lock className="size-4" aria-hidden />
         </span>
       </TooltipTrigger>
       <TooltipContent>Sensitive · AI never reads {name}</TooltipContent>

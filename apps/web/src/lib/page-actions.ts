@@ -1,6 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { icon } from '#/components/icons'
-import type { LucideIcon } from '#/components/icons'
+import type { IconComponent } from '#/components/icons'
 import { openUploadDialog } from './upload-dialog-store'
 
 /**
@@ -67,7 +67,7 @@ type ActionFields = {
   readonly label: string
   /** The printed binding — `M`, `G T` — when the page binds one. */
   readonly key?: string
-  readonly icon?: LucideIcon
+  readonly icon?: IconComponent
   /** Words a typed query may match besides the label; never drawn. */
   readonly words?: string
   /** Graphite lane before the key: `in 2 now`. */

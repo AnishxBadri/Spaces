@@ -170,7 +170,6 @@ function Setup({ state }: { state: SetupState }) {
                 data-setup-done
                 aria-label="Set up"
                 className="size-4 text-primary"
-                strokeWidth={2}
               />
             ) : (
               <Link to={item.to} className={SETTINGS_LINK}>

@@ -17,7 +17,7 @@ export function NewButton({
 }) {
   return (
     <Button data-new-button {...props} className={className}>
-      <icon.new aria-hidden className="size-4" strokeWidth={2} />
+      <icon.new aria-hidden className="size-4" />
       New {noun}
     </Button>
   )
@@ -59,7 +59,7 @@ export function SplitNewButton({
           data-split-new-menu
           className="w-7 rounded-l-none"
         >
-          <ChevronDown aria-hidden className="size-3.5" strokeWidth={2} />
+          <ChevronDown aria-hidden className="size-4" />
         </Button>,
       )}
     </span>

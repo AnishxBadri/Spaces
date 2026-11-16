@@ -245,7 +245,7 @@ function ObjectForm(
               id: name,
               name,
               tip: name,
-              label: <Icon className="size-3.5" strokeWidth={1.75} />,
+              label: <Icon className="size-4" />,
             }
           })}
           onChange={setIcon}

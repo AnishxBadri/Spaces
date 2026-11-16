@@ -390,9 +390,7 @@ function CollisionBlock({
                 d !== 'keep-first' && taken === d && 'bg-selected',
               )}
             >
-              {taken === d ? (
-                <Check className="size-3" strokeWidth={2} aria-hidden />
-              ) : null}
+              {taken === d ? <Check className="size-4" aria-hidden /> : null}
               {decisionLabel(d, first.rowNum, second.rowNum)}
             </Button>
           ))}

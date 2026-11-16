@@ -10,7 +10,7 @@ import {
   Pilcrow,
   Users,
 } from '#/components/icons'
-import type { LucideIcon } from '#/components/icons'
+import type { IconComponent } from '#/components/icons'
 import { forwardRef } from 'react'
 import type { KeyboardEvent } from 'react'
 import { formatDay } from '@spaces/core/format'
@@ -61,7 +61,7 @@ export type PreviewTarget =
       readonly key: string
       readonly slug: string
       readonly label: string
-      readonly icon: LucideIcon
+      readonly icon: IconComponent
       /** The object's list. */
       readonly href: string
     }
@@ -95,7 +95,7 @@ export type PaneAction = {
 }
 
 /** Each kind's glyph, in the list and in the pane alike. */
-export const KIND_ICONS: Record<string, LucideIcon> = {
+export const KIND_ICONS: Record<string, IconComponent> = {
   company: Building2,
   person: Users,
   deal: Kanban,
@@ -294,10 +294,10 @@ function Actions({ actions }: { actions: ReadonlyArray<PaneAction> }) {
   )
 }
 
-function Glyph({ icon: Icon }: { icon: LucideIcon }) {
+function Glyph({ icon: Icon }: { icon: IconComponent }) {
   return (
     <span className="flex size-4 shrink-0 items-center justify-center">
-      <Icon aria-hidden className="size-3.5 text-graphite" strokeWidth={1.75} />
+      <Icon aria-hidden className="size-4 text-graphite" />
     </span>
   )
 }
@@ -397,7 +397,7 @@ function ObjectPane({
   actions,
 }: {
   label: string
-  icon: LucideIcon
+  icon: IconComponent
   data: ObjectPreview | null | undefined
   actions: ReadonlyArray<PaneAction>
 }) {
@@ -487,11 +487,7 @@ function PassagePane({
   return (
     <>
       <div className="flex min-w-0 items-center gap-2 px-5 pt-4">
-        <Icon
-          aria-hidden
-          className="size-3.5 shrink-0 text-graphite"
-          strokeWidth={1.75}
-        />
+        <Icon aria-hidden className="size-4 shrink-0 text-graphite" />
         <span className="min-w-0 flex-1 truncate mono text-micro">
           {passage.name}
         </span>

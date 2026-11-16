@@ -384,7 +384,7 @@ export function WidenDialog({
                   }
                   className="focus-ring shrink-0 text-graphite hover:text-foreground"
                 >
-                  <icon.close className="size-3" strokeWidth={2} />
+                  <icon.close className="size-4" />
                 </button>
               </LedgerRow>
             ))}
@@ -460,11 +460,7 @@ function ThreadLine({
         </span>
         {line.attachments > 0 ? (
           <span className="flex shrink-0 items-center gap-1 mono text-micro text-graphite">
-            <Paperclip
-              aria-label="Attachments"
-              className="size-3"
-              strokeWidth={1.75}
-            />
+            <Paperclip aria-label="Attachments" className="size-4" />
             {line.attachments}
           </span>
         ) : null}

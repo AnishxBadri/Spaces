@@ -16,7 +16,7 @@ export function SpaceRailRow({
 }) {
   return (
     <RailGroupRow className="group">
-      <Layers className="size-3.5 shrink-0 text-graphite" strokeWidth={1.75} />
+      <Layers className="size-4 shrink-0 text-graphite" />
       <Link
         to="/spaces/$spaceId"
         params={{ spaceId: space.id }}
@@ -36,7 +36,7 @@ export function SpaceRailRow({
           onClick={onRemove}
           className="focus-ring hidden size-5 items-center justify-center text-graphite group-hover:flex hover:text-foreground focus-visible:flex"
         >
-          <icon.close className="size-3" strokeWidth={2} />
+          <icon.close className="size-4" />
         </button>
       )}
     </RailGroupRow>

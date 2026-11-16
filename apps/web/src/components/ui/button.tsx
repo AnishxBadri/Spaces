@@ -23,11 +23,11 @@ const buttonVariants = cva(
       },
       size: {
         default: 'h-8 px-3 has-[>svg]:px-2.5',
-        xs: "h-6 gap-1 rounded-md px-2 text-label has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
+        xs: "h-6 gap-1 rounded-md px-2 text-label has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-4",
         sm: 'h-[1.625rem] gap-1.5 rounded-md px-2 text-label has-[>svg]:px-1.5',
         lg: 'h-9 rounded-md px-4 has-[>svg]:px-3',
         icon: 'size-8',
-        'icon-xs': "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
+        'icon-xs': "size-6 rounded-md [&_svg:not([class*='size-'])]:size-4",
         'icon-sm': 'size-8',
         'icon-lg': 'size-10',
       },

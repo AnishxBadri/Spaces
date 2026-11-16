@@ -1,4 +1,4 @@
-import type { LucideIcon } from '#/components/icons'
+import type { IconComponent } from '#/components/icons'
 import type { ReactNode } from 'react'
 import { DitherBlock } from './dither'
 
@@ -14,7 +14,7 @@ export function EmptyState({
   action,
   hint,
 }: {
-  icon?: LucideIcon
+  icon?: IconComponent
   title: string
   body: string
   action?: ReactNode

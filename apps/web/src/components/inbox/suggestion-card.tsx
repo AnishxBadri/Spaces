@@ -540,7 +540,7 @@ export function ProposedValue({
           aria-label={on ? 'Checked' : 'Unchecked'}
           className={checkboxClasses({ checked: on })}
         >
-          {on ? <Check className="size-2.5" strokeWidth={3} /> : null}
+          {on ? <Check className="size-2.5" /> : null}
         </span>
       )
     }
@@ -815,7 +815,7 @@ function FieldGrid({
                   title={`Accept ${f.name} on every record that proposes it`}
                   onClick={() => actions.onAcceptColumn(f)}
                 >
-                  <icon.acceptAll className="size-3" strokeWidth={2} />
+                  <icon.acceptAll className="size-4" />
                   Accept column
                 </Button>
               </div>
@@ -889,7 +889,7 @@ export function AcceptAllButton({
       title="Accept every open suggestion on this record, field by field"
       onClick={onClick}
     >
-      <icon.acceptAll className="size-3" strokeWidth={2} />
+      <icon.acceptAll className="size-4" />
       Accept all
     </Button>
   )

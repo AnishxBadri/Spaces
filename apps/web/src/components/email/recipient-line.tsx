@@ -75,7 +75,7 @@ function Chip({
             className="focus-ring flex items-center gap-1 mono text-micro text-graphite hover:text-foreground"
           >
             {chip.email}
-            <ChevronDown className="size-3" strokeWidth={1.75} />
+            <ChevronDown className="size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             {aliases.map((email) => (
@@ -107,7 +107,7 @@ function Chip({
         onClick={onRemove}
         className="focus-ring text-graphite hover:text-foreground"
       >
-        <icon.close className="size-2.5" strokeWidth={2} />
+        <icon.close className="size-4" />
       </button>
     </span>
   )

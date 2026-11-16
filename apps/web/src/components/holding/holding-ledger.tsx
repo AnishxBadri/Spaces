@@ -99,7 +99,7 @@ function AsOfControl({
         onClick={open}
       >
         As of {formatDay(day, today)}
-        <ChevronDown className="size-3.5 text-graphite" />
+        <ChevronDown className="size-4 text-graphite" />
       </Button>
       <input
         ref={field}

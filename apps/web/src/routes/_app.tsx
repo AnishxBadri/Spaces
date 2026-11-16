@@ -137,9 +137,9 @@ function AppShell() {
             className="focus-ring -ml-1 flex size-8 items-center justify-center rounded-md text-graphite hover:bg-bone"
           >
             {mobileNavOpen ? (
-              <icon.close className="size-4.5" strokeWidth={1.75} />
+              <icon.close className="size-4" />
             ) : (
-              <icon.menu className="size-4.5" strokeWidth={1.75} />
+              <icon.menu className="size-4" />
             )}
           </button>
           <Wordmark />

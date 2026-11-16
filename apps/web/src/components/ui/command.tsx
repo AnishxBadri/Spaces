@@ -160,7 +160,7 @@ function CommandItem({
       data-slot="command-item"
       className={cn(
         // Highlighted option = bone (No-Bar Rule); the ↵ hint shows on it.
-        "relative flex min-h-8 cursor-default items-center gap-2.5 rounded-none px-2.5 py-1.5 text-ui outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-bone [&_[data-hint]]:invisible data-[selected=true]:[&_[data-hint]]:visible [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg:not([class*='text-'])]:text-graphite",
+        "relative flex min-h-8 cursor-default items-center gap-2.5 rounded-none px-2.5 py-1.5 text-ui outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-bone [&_[data-hint]]:invisible data-[selected=true]:[&_[data-hint]]:visible [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-graphite",
         className,
       )}
       {...props}

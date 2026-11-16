@@ -62,7 +62,7 @@ describe('the palette task row', () => {
     const html = renderToStaticMarkup(
       <HitLine hit={taskHit(false, '2026-10-01')} today={TODAY} />,
     )
-    expect(html).toContain('lucide-square-check')
+    expect(html).toContain('data-icon="checkbox--checked"')
     expect(html).toMatch(/class="[^"]*mono[^"]*">1 Oct</)
     expect(html).not.toContain('line-through')
     // The inline snippet column is gone: the name and the lane only.
@@ -90,8 +90,8 @@ describe('the palette task row', () => {
     const html = renderToStaticMarkup(
       <HitLine hit={companyHit} today={TODAY} />,
     )
-    expect(html).toContain('lucide-building')
-    expect(html).not.toContain('lucide-square-check')
+    expect(html).toContain('data-icon="building"')
+    expect(html).not.toContain('data-icon="checkbox--checked"')
   })
 
   it('draws a record’s stored picture in place of its kind icon', () => {
@@ -101,7 +101,7 @@ describe('the palette task row', () => {
     )
     expect(html).toContain(`src="${picture.replaceAll('&', '&amp;')}"`)
     expect(html).toContain('object-cover')
-    expect(html).not.toContain('lucide-building')
+    expect(html).not.toContain('data-icon="building"')
   })
 })
 

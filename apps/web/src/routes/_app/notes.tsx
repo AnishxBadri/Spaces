@@ -183,8 +183,8 @@ function NoteLedgerRow({ note, now }: { note: NoteRow; now: string }) {
             kind={note.kind}
             className={
               note.kind === 'note'
-                ? 'size-3.5 text-graphite'
-                : 'size-3.5 text-foreground'
+                ? 'size-4 text-graphite'
+                : 'size-4 text-foreground'
             }
           />
         </span>

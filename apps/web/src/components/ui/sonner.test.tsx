@@ -48,7 +48,7 @@ describe('toast.error', () => {
 
 describe('the Toaster', () => {
   it('draws no icon, and the Twinkle while a toast is working', () => {
-    expect(source).not.toMatch(/lucide-react/)
+    expect(source).not.toMatch(/@carbon\/icons-react|#\/components\/icons/)
     for (const kind of ['success', 'info', 'warning', 'error'])
       expect(source).toContain(`${kind}: null`)
     expect(source).toContain('loading: <Twinkle tone="paper" />')

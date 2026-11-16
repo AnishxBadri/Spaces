@@ -204,11 +204,7 @@ function LinePicker({
         <span className="min-w-0 flex-1 truncate mono text-micro">
           {letters ?? 'not in this sheet'}
         </span>
-        <ChevronDown
-          aria-hidden
-          className="size-3 shrink-0 text-graphite"
-          strokeWidth={2}
-        />
+        <ChevronDown aria-hidden className="size-4 shrink-0 text-graphite" />
       </PopoverTrigger>
       <PopoverContent align="start" className="flex w-80 flex-col p-0">
         {line.fields.map((field) => {

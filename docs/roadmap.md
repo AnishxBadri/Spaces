@@ -88,7 +88,7 @@ Plus the UI sweep (the printed sheets landing), Corrections, and the list as a f
 - Two `no-shadow` warnings in `record-details.test.tsx`.
 - Note page: `Edited` and `Replaced by` history rows carry no who (nothing records it); a tool-landed note shows `Landed from` and `Written` at one instant; the `+ File on…` picker prints `record` for a custom object because search returns no singular.
 - `buildRequest` hands `renderPrompt` a negative budget when a lane's system part alone exceeds `budgetChars`, and the subject is then dropped silently; guard it (every lane's budget is far above its instructions today).
-- `MoreMenu` draws Lucide's `Ellipsis` now, not the mono `···` text; the contract's wording still says `···`.
+- `MoreMenu` draws Carbon's `overflow-menu--horizontal` now, not the mono `···` text; the contract's wording still says `···`.
 - The `···`/last-control alignment is proved by shared padding, not a measured box; a Playwright check at 1280px would make it mechanical.
 - Watch delete path.
 - Today and search links to `?modal=email`.

@@ -94,11 +94,7 @@ export function RefPreviewBody({
   return (
     <>
       <div className="flex min-w-0 items-center gap-2 px-3 pt-2.5">
-        <Icon
-          aria-hidden
-          className="size-3.5 shrink-0 text-graphite"
-          strokeWidth={1.75}
-        />
+        <Icon aria-hidden className="size-4 shrink-0 text-graphite" />
         <span className="min-w-0 flex-1 truncate mono text-micro">
           {preview.name}
         </span>

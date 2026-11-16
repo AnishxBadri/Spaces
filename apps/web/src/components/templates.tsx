@@ -74,9 +74,9 @@ export function TemplatePicker({
       <DropdownMenuTrigger asChild onPointerDown={load} onFocus={load}>
         {trigger ?? (
           <Button size="sm" variant="outline">
-            <icon.template className="size-3.5" strokeWidth={1.75} />
+            <icon.template className="size-4" />
             {label}
-            <ChevronDown className="size-3" strokeWidth={2} />
+            <ChevronDown className="size-4" />
           </Button>
         )}
       </DropdownMenuTrigger>
@@ -166,7 +166,7 @@ export function SaveAsTemplateAction({
           onClick={() => setOpen(true)}
           className="focus-ring flex items-center gap-1 rounded-md px-1.5 py-0.5 text-label font-medium text-graphite hover:bg-bone hover:text-foreground"
         >
-          <icon.template className="size-3" strokeWidth={1.75} />
+          <icon.template className="size-4" />
           Save as template
         </button>
       )}

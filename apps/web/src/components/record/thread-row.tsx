@@ -129,8 +129,7 @@ export function ThreadRow({
           <Glyph
             role="img"
             aria-label={item.kind}
-            className="size-3.5 text-graphite"
-            strokeWidth={1.75}
+            className="size-4 text-graphite"
           />
         </span>
         <span className="flex min-w-0 flex-1 items-baseline gap-2">
@@ -156,11 +155,7 @@ export function ThreadRow({
         >
           {item.attachments > 0 ? (
             <>
-              <Paperclip
-                aria-label="attachments"
-                className="size-3"
-                strokeWidth={1.75}
-              />
+              <Paperclip aria-label="attachments" className="size-4" />
               {item.attachments}
             </>
           ) : null}

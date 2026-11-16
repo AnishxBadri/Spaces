@@ -76,7 +76,7 @@ function ObjectsSection({
             onSaved={() => router.invalidate()}
             trigger={
               <Button variant="outline">
-                <icon.new className="size-3" strokeWidth={2} />
+                <icon.new className="size-4" />
                 New object
               </Button>
             }
@@ -147,8 +147,7 @@ function ObjectMark({
       )}
     >
       <Icon
-        className={cn('size-3', muted ? 'text-graphite' : 'text-foreground')}
-        strokeWidth={1.75}
+        className={cn('size-4', muted ? 'text-graphite' : 'text-foreground')}
       />
     </span>
   )
@@ -177,10 +176,7 @@ function ObjectList({
             <span className="shrink-0 mono text-micro text-graphite">
               {o.attributeCount} attribute{o.attributeCount === 1 ? '' : 's'}
             </span>
-            <ChevronRight
-              className="size-3.5 shrink-0 text-graphite"
-              strokeWidth={1.75}
-            />
+            <ChevronRight className="size-4 shrink-0 text-graphite" />
           </Link>
         </li>
       ))}

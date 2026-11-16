@@ -215,7 +215,7 @@ export function SpacePageView({
             aria-hidden
             className="flex size-7 shrink-0 items-center justify-center border border-hairline bg-paper"
           >
-            <Layers className="size-3.5" strokeWidth={1.75} />
+            <Layers className="size-4" />
           </span>
         }
         name={spc.name}
@@ -302,10 +302,7 @@ export function SpacePageView({
               ) : null}
               {spc.children.map((c) => (
                 <RailGroupRow key={c.id}>
-                  <Layers
-                    className="size-3.5 shrink-0 text-graphite"
-                    strokeWidth={1.75}
-                  />
+                  <Layers className="size-4 shrink-0 text-graphite" />
                   <Link
                     to="/spaces/$spaceId"
                     params={{ spaceId: c.id }}
@@ -636,10 +633,7 @@ function NewSubspace({
         onClick={() => setEditing(true)}
         className="focus-ring flex min-w-0 flex-1 items-center gap-2.5 text-left text-graphite transition-colors hover:text-foreground"
       >
-        <icon.new
-          className="size-3.5 shrink-0 text-primary"
-          strokeWidth={2.5}
-        />
+        <icon.new className="size-4 shrink-0 text-primary" />
         <span className="min-w-0 flex-1 truncate">Subspace</span>
       </button>
     </RailGroupRow>

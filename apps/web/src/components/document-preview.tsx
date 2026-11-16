@@ -411,7 +411,7 @@ function Notice({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-full items-center justify-center p-8">
       <div className="flex max-w-sm flex-col items-center text-center">
-        <FileWarning className="mb-3 size-5 text-graphite" strokeWidth={1.75} />
+        <FileWarning className="mb-3 size-5 text-graphite" />
         <p className="text-ui text-graphite">{children}</p>
       </div>
     </div>

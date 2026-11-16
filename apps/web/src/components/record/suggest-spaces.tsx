@@ -133,7 +133,7 @@ export function SuggestSpacesRow({
       title="Ask the classify lane which spaces this record belongs in; each lands in Review as a suggestion"
       className="focus-ring-inset flex h-8 items-center gap-2 bg-bone px-3 text-left text-ui text-foreground hover:underline disabled:text-graphite"
     >
-      <icon.enrich className="size-3" strokeWidth={1.75} aria-hidden />
+      <icon.enrich className="size-4" aria-hidden />
       {running ? 'Suggesting spaces…' : 'Suggest spaces'}
     </button>
   )

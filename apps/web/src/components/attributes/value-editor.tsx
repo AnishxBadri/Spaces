@@ -754,7 +754,7 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
             ))
           )}
         </span>
-        <ChevronDown className="size-3 shrink-0 text-graphite opacity-0 transition-opacity group-hover/pick:opacity-100 group-focus-visible/pick:opacity-100 group-data-[state=open]/pick:opacity-100" />
+        <ChevronDown className="size-4 shrink-0 text-graphite opacity-0 transition-opacity group-hover/pick:opacity-100 group-focus-visible/pick:opacity-100 group-data-[state=open]/pick:opacity-100" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
         <div className="p-1.5">
@@ -882,7 +882,7 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
             <span className="mono text-micro text-graphite">+{more}</span>
           ) : null}
         </span>
-        <ChevronDown className="size-3 shrink-0 text-graphite opacity-0 transition-opacity group-hover/pick:opacity-100 group-focus-visible/pick:opacity-100 group-data-[state=open]/pick:opacity-100" />
+        <ChevronDown className="size-4 shrink-0 text-graphite opacity-0 transition-opacity group-hover/pick:opacity-100 group-focus-visible/pick:opacity-100 group-data-[state=open]/pick:opacity-100" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
         <div className="p-1.5">
@@ -934,10 +934,7 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
               onSave(next.length === 0 ? null : next)
             }}
           >
-            <icon.close
-              className="size-3 shrink-0 text-graphite"
-              strokeWidth={2}
-            />
+            <icon.close className="size-4 shrink-0 text-graphite" />
             {/* Whole, never cut: on touch, the menu is where a long value
                 is read in full. */}
             <span className="min-w-0 mono text-label break-all">
@@ -998,7 +995,7 @@ function ActorPicker({ def, value, onSave, variant, refNames }: Props) {
             <EmptyDash />
           )}
         </span>
-        <ChevronDown className="size-3 shrink-0 text-graphite opacity-0 transition-opacity group-hover/pick:opacity-100 group-focus-visible/pick:opacity-100 group-data-[state=open]/pick:opacity-100" />
+        <ChevronDown className="size-4 shrink-0 text-graphite opacity-0 transition-opacity group-hover/pick:opacity-100 group-focus-visible/pick:opacity-100 group-data-[state=open]/pick:opacity-100" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {users.map((u) => (
@@ -1073,7 +1070,7 @@ function OptionPicker({
             ))
           )}
         </span>
-        <ChevronDown className="size-3 shrink-0 text-graphite opacity-0 transition-opacity group-hover/pick:opacity-100 group-focus-visible/pick:opacity-100 group-data-[state=open]/pick:opacity-100" />
+        <ChevronDown className="size-4 shrink-0 text-graphite opacity-0 transition-opacity group-hover/pick:opacity-100 group-focus-visible/pick:opacity-100 group-data-[state=open]/pick:opacity-100" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
         {multi

@@ -12,14 +12,14 @@ import {
   Star,
   Users,
 } from '#/components/icons'
-import type { LucideIcon } from '#/components/icons'
+import type { IconComponent } from '#/components/icons'
 
 /**
  * The icons a custom object may wear — a curated dozen, stored by name in
  * `object.icon`. A fixed menu rather than a free string: every entry is
  * known to read at 16px in the sidebar, and a typo can't blank a nav item.
  */
-export const OBJECT_ICONS: Record<string, LucideIcon> = {
+export const OBJECT_ICONS: Record<string, IconComponent> = {
   boxes: Boxes,
   landmark: Landmark,
   briefcase: Briefcase,
@@ -39,7 +39,7 @@ export const OBJECT_ICON_NAMES = Object.keys(OBJECT_ICONS)
 /** System objects keep their fixed icons; customs fall back to the box. */
 export function objectIcon(
   o: { slug?: string | null; icon?: string | null } | null | undefined,
-): LucideIcon {
+): IconComponent {
   if (o?.slug === 'companies') return Building2
   if (o?.slug === 'people') return Users
   if (o?.slug === 'deals') return Kanban

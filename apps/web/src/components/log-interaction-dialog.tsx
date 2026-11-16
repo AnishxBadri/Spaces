@@ -111,7 +111,7 @@ export function LogInteractionDialog({
         <DialogTrigger asChild>
           {trigger ?? (
             <Button size="xs" variant="outline">
-              <Phone className="size-3" strokeWidth={1.75} />
+              <Phone className="size-4" />
               Log meeting
             </Button>
           )}
@@ -333,7 +333,7 @@ function AttendeeField({
                 }}
                 className="focus-ring text-graphite hover:text-foreground"
               >
-                <icon.close className="size-2.5" strokeWidth={2} />
+                <icon.close className="size-4" />
               </button>
             </span>
           ))}

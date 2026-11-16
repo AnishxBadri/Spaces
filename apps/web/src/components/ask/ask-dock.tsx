@@ -158,7 +158,7 @@ export function AskDock() {
           title="New thread"
           onClick={() => setDockThread(null)}
         >
-          <icon.new className="size-4" strokeWidth={1.75} />
+          <icon.new className="size-4" />
         </Button>
         <Button
           variant="ghost"
@@ -167,7 +167,7 @@ export function AskDock() {
           title="Close (⌘J)"
           onClick={closeAsk}
         >
-          <icon.close className="size-4" strokeWidth={1.75} />
+          <icon.close className="size-4" />
         </Button>
       </header>
       <div ref={body} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">

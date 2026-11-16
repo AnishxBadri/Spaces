@@ -387,7 +387,7 @@ function ScopeChip({ name }: { name: string }) {
         aria-label={`Show every task, not just ${name}'s`}
         className="focus-ring -mr-0.5 text-graphite hover:text-foreground"
       >
-        <icon.close className="size-3" strokeWidth={2} />
+        <icon.close className="size-4" />
       </Link>
     </span>
   )

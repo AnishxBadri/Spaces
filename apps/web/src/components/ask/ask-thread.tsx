@@ -786,7 +786,7 @@ export function ComposerChips({
               onClick={() => onRemove(c)}
               className="focus-ring -mr-0.5 text-graphite hover:text-foreground"
             >
-              <icon.close className="size-3" strokeWidth={1.75} />
+              <icon.close className="size-4" />
             </button>
           </span>
         )

@@ -178,8 +178,7 @@ export function RecordCheckDialog({
                     </span>
                     <ChevronDown
                       aria-hidden
-                      className="size-3.5 shrink-0 text-graphite"
-                      strokeWidth={1.75}
+                      className="size-4 shrink-0 text-graphite"
                     />
                   </button>
                 }

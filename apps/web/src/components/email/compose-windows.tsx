@@ -172,7 +172,7 @@ export function DraftsDialog({
                       onClick={() => void trash(r.id)}
                       className="focus-ring flex size-7 shrink-0 items-center justify-center rounded-md text-graphite hover:bg-bone hover:text-foreground"
                     >
-                      <icon.delete className="size-3.5" strokeWidth={1.75} />
+                      <icon.delete className="size-4" />
                     </button>
                   </LedgerRow>
                 ))}

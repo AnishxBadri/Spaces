@@ -799,7 +799,7 @@ function Attachments({
             }
             className="focus-ring text-graphite hover:text-foreground"
           >
-            <icon.close className="size-2.5" strokeWidth={2} />
+            <icon.close className="size-4" />
           </button>
         </span>
       ))}

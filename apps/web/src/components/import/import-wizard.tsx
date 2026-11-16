@@ -237,8 +237,7 @@ export function StepStrip({
             >
               {done ? (
                 <Check
-                  className="size-3.5 shrink-0 text-success"
-                  strokeWidth={2}
+                  className="size-4 shrink-0 text-success"
                   aria-label="done"
                 />
               ) : null}

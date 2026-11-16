@@ -1,5 +1,5 @@
 import { createLink } from '@tanstack/react-router'
-import type { LucideIcon } from '#/components/icons'
+import type { IconComponent } from '#/components/icons'
 import type { AnchorHTMLAttributes, ReactNode, Ref } from 'react'
 import { readAiConfig } from '@spaces/core/ai/attribute-ai'
 import { formatAge, formatDay } from '@spaces/core/format'
@@ -47,10 +47,10 @@ export const RecordLinkCell = createLink(function RecordLinkAnchor({
 })
 
 /** Square icon badge — companies, deals, anything with a mark rather than a face. */
-export function IconBadge({ icon: Icon }: { icon: LucideIcon }) {
+export function IconBadge({ icon: Icon }: { icon: IconComponent }) {
   return (
     <span className="flex size-[1.125rem] shrink-0 items-center justify-center border border-hairline bg-paper">
-      <Icon className="size-2.5 text-foreground" strokeWidth={1.75} />
+      <Icon className="size-4 text-foreground" />
     </span>
   )
 }
@@ -76,7 +76,7 @@ export const ChipLink = createLink(function ChipAnchor({
   label,
   className,
   ...props
-}: AnchorProps & { icon: LucideIcon; label: string }) {
+}: AnchorProps & { icon: IconComponent; label: string }) {
   return (
     <a
       {...props}
@@ -85,7 +85,7 @@ export const ChipLink = createLink(function ChipAnchor({
         className,
       )}
     >
-      <Icon className="size-2.5 shrink-0" strokeWidth={1.75} />
+      <Icon className="size-4 shrink-0" />
       <span className="truncate">{label}</span>
     </a>
   )

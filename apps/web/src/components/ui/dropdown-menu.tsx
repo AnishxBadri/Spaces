@@ -98,7 +98,7 @@ function DropdownMenuCheckboxItem({
         )}
       >
         <DropdownMenuPrimitive.ItemIndicator>
-          <CheckIcon className="size-2.5" strokeWidth={3} />
+          <CheckIcon className="size-2.5" />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
       {children}

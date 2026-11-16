@@ -197,11 +197,7 @@ export function Select<T extends string>({
             <span className="truncate text-graphite">{placeholder}</span>
           )}
         </span>
-        <ChevronDown
-          aria-hidden
-          className="size-3 shrink-0 text-graphite"
-          strokeWidth={2}
-        />
+        <ChevronDown aria-hidden className="size-4 shrink-0 text-graphite" />
       </PopoverTrigger>
       {name === undefined ? null : (
         <input type="hidden" name={name} value={value} />

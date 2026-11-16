@@ -148,7 +148,7 @@ function TermRow({ term, spaceId }: { term: Term; spaceId: string }) {
             }}
             className="focus-ring ml-auto flex size-5 shrink-0 items-center justify-center self-center rounded-md text-graphite opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100"
           >
-            <icon.close className="size-3" strokeWidth={2} />
+            <icon.close className="size-4" />
           </button>
         )}
       </div>

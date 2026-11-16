@@ -353,7 +353,7 @@ function DealRecordPage() {
                   to="/mandate"
                   title="This company's stage is outside the mandate's stages. Click to review the mandate."
                 >
-                  <Compass className="size-3" strokeWidth={2} />
+                  <Compass className="size-4" />
                   Outside mandate
                 </Link>
               </Badge>

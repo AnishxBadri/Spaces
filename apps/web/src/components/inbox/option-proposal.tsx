@@ -69,7 +69,7 @@ export function OptionProposalBody({
               title={`Add "${p.label}" to ${p.name}'s options — a registry change, for everyone`}
               onClick={() => void add(p)}
             >
-              <icon.new className="size-3" strokeWidth={2} />
+              <icon.new className="size-4" />
               Add option “{p.label}” to {p.name}
             </Button>
           </dd>

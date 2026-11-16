@@ -34,7 +34,7 @@ export function SpaceFilter({
       data-space-filter
       className="flex h-9 min-w-0 items-center gap-1.5 pl-2 text-ui"
     >
-      <Layers aria-hidden className="size-3.5 shrink-0" strokeWidth={2} />
+      <Layers aria-hidden className="size-4 shrink-0" />
       <Select
         aria-label="Space"
         value={value ?? ALL}

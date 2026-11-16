@@ -313,7 +313,7 @@ export function AiCell({
           onClick={(e) => e.stopPropagation()}
           className="mention-chip focus-ring shrink-0"
         >
-          <icon.enrich size={12} strokeWidth={1.75} aria-hidden />
+          <icon.enrich aria-hidden />
           proposed
         </Link>
       ) : (
@@ -356,7 +356,7 @@ function AskButton({
       }}
       className="focus-ring flex size-6 shrink-0 items-center justify-center rounded-md text-graphite transition-colors duration-150 ease-out-quart hover:bg-bone hover:text-foreground disabled:animate-pulse disabled:hover:bg-transparent"
     >
-      <icon.enrich className="size-3" strokeWidth={1.75} aria-hidden />
+      <icon.enrich className="size-4" aria-hidden />
     </button>
   )
 }

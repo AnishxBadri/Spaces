@@ -373,11 +373,7 @@ function SpacesPicker({
         <span className="min-w-0 flex-1 truncate">
           {spacesLabel(chosen, options)}
         </span>
-        <ChevronDown
-          aria-hidden
-          className="size-3 shrink-0 text-graphite"
-          strokeWidth={2}
-        />
+        <ChevronDown aria-hidden className="size-4 shrink-0 text-graphite" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-72 max-w-88">
         <DropdownMenuCheckboxItem

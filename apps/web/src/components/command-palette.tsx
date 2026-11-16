@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { CheckSquare, icon, Mail, Settings, Table2 } from '#/components/icons'
-import type { LucideIcon } from '#/components/icons'
+import type { IconComponent } from '#/components/icons'
 import { useCommandState } from 'cmdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -219,10 +219,10 @@ function GlyphSlot({ children }: { children?: ReactNode }) {
   )
 }
 
-function Glyph({ icon: Icon }: { icon: LucideIcon }) {
+function Glyph({ icon: Icon }: { icon: IconComponent }) {
   return (
     <GlyphSlot>
-      <Icon className="size-3.5 text-graphite" strokeWidth={1.75} />
+      <Icon className="size-4 text-graphite" />
     </GlyphSlot>
   )
 }
@@ -325,7 +325,7 @@ export type JumpTarget = {
   readonly key?: string
   /** A saved view's lane: its object's plural. */
   readonly lane?: string
-  readonly icon: LucideIcon
+  readonly icon: IconComponent
   /** An object's slug: highlighting it previews its saved views. */
   readonly preview?: string
 }

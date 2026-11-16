@@ -8,7 +8,7 @@ import {
   Paperclip,
   User,
 } from '#/components/icons'
-import type { LucideIcon } from '#/components/icons'
+import type { IconComponent } from '#/components/icons'
 import { documentPreviewEvent } from '#/lib/editor/document-preview-event'
 import { recordPath } from '#/lib/record-path'
 
@@ -18,7 +18,7 @@ import { recordPath } from '#/lib/record-path'
  * Serialized into derived markdown as [[label|entity:id]] by the exporter.
  */
 
-export const KIND_ICONS: Record<string, LucideIcon | undefined> = {
+export const KIND_ICONS: Record<string, IconComponent | undefined> = {
   company: Building2,
   person: User,
   deal: Kanban,
@@ -56,7 +56,7 @@ export const Mention = createReactInlineContentSpec(
       })
       const inside = (
         <>
-          <Icon size={12} strokeWidth={1.75} aria-hidden />
+          <Icon aria-hidden />
           {label}
         </>
       )

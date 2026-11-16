@@ -175,7 +175,7 @@ function ObjectAttributesPage() {
             shortcut="A"
             onClick={() => setCreating(true)}
           >
-            <icon.new className="size-3" strokeWidth={2} />
+            <icon.new className="size-4" />
             New attribute
           </Button>
           {/* Copy link is on every object, so the `···` never folds into a

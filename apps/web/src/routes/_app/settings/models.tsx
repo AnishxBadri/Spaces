@@ -16,7 +16,7 @@ import {
 import type { SettingsTone } from '#/components/settings/settings-section'
 import { LedgerRow } from '#/components/ledger-section'
 import { FileText, Globe, Hash, Image, PenLine, Tags } from '#/components/icons'
-import type { LucideIcon } from '#/components/icons'
+import type { IconComponent } from '#/components/icons'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Segmented } from '#/components/ui/segmented'
@@ -463,7 +463,7 @@ const LANE_JOB: Record<AiLane, string> = {
 }
 
 /** Each job's glyph, the one mark that tells the grid's rows apart. */
-const LANE_ICON: Record<AiLane, LucideIcon> = {
+const LANE_ICON: Record<AiLane, IconComponent> = {
   extract: FileText,
   classify: Tags,
   synthesize: PenLine,
@@ -474,13 +474,7 @@ const LANE_ICON: Record<AiLane, LucideIcon> = {
 
 function LaneIcon({ lane }: { lane: AiLane }) {
   const Glyph = LANE_ICON[lane]
-  return (
-    <Glyph
-      aria-hidden
-      className="size-4 shrink-0 text-graphite"
-      strokeWidth={1.75}
-    />
-  )
+  return <Glyph aria-hidden className="size-4 shrink-0 text-graphite" />
 }
 
 const SENSITIVITY_COLUMN: Record<AiSensitivity, string> = {

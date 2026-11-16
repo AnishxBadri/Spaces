@@ -120,7 +120,7 @@ export function RelationSection({
                 onClick={() => onRemove(row)}
                 className="focus-ring hidden size-5 shrink-0 items-center justify-center text-graphite group-hover/row:flex hover:text-foreground focus-visible:flex"
               >
-                <icon.close className="size-3" strokeWidth={2} />
+                <icon.close className="size-4" />
               </button>
             ) : null}
           </RailGroupRow>

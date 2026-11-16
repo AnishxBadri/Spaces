@@ -58,7 +58,7 @@ function Checkbox({
       className={checkboxClasses({ checked, className })}
       {...props}
     >
-      {checked ? <Check className="size-2.5" strokeWidth={3} /> : null}
+      {checked ? <Check className="size-2.5" /> : null}
     </button>
   )
 }

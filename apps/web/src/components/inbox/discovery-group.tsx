@@ -169,11 +169,11 @@ export function DiscoveryEntry({
               ? {}
               : { title: words.rejectTitle })}
           >
-            <icon.close className="size-3" strokeWidth={2} />
+            <icon.close className="size-4" />
             {words.reject}
           </Button>
           <Button size="xs" disabled={pending} onClick={onAccept}>
-            <Check className="size-3" strokeWidth={2} />
+            <Check className="size-4" />
             {words.accept}
           </Button>
         </div>

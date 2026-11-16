@@ -119,10 +119,7 @@ function NoteRow({
         <span className="flex min-h-5 min-w-0 items-center gap-3">
           <span aria-hidden className="flex w-4 shrink-0 justify-center">
             {meeting ? (
-              <CalendarDays
-                className="size-3.5 text-graphite"
-                strokeWidth={1.75}
-              />
+              <CalendarDays className="size-4 text-graphite" />
             ) : (
               <span className="font-serif text-ui text-graphite">¶</span>
             )}

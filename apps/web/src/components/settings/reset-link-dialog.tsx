@@ -50,7 +50,7 @@ export function ResetLinkDialog({
                 variant="outline"
                 onClick={() => copy(link.url)}
               >
-                <icon.copy className="size-3" strokeWidth={2} />
+                <icon.copy className="size-4" />
                 Copy link
               </Button>
             </div>

@@ -195,7 +195,7 @@ function FeedsPage() {
         folds={false}
         action={
           <Button onClick={openAdd}>
-            <icon.new aria-hidden className="size-4" strokeWidth={2} />
+            <icon.new aria-hidden className="size-4" />
             Add feed
           </Button>
         }

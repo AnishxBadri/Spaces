@@ -516,7 +516,7 @@ function RecordsPill({
             className="focus-ring text-graphite hover:text-foreground"
             onClick={() => onChange(records.filter((x) => x.id !== r.id))}
           >
-            <icon.close className="size-3" strokeWidth={2} />
+            <icon.close className="size-4" />
           </button>
         </span>
       ))}

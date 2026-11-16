@@ -162,7 +162,7 @@ export function SpaceSources({
             onClick={() => inputRef.current?.click()}
             className="focus-ring flex items-center gap-1 text-primary hover:underline"
           >
-            <icon.upload className="size-3" strokeWidth={2} />
+            <icon.upload className="size-4" />
             upload
           </button>
         }
@@ -171,10 +171,7 @@ export function SpaceSources({
           <LedgerRow key={p.key}>
             <span className="w-3.5 shrink-0 text-center">
               {p.error ? (
-                <FileText
-                  className="size-3.5 text-destructive"
-                  strokeWidth={1.75}
-                />
+                <FileText className="size-4 text-destructive" />
               ) : (
                 <Twinkle />
               )}
@@ -226,10 +223,7 @@ export function SpaceSources({
           <li>
             <details className="group/inherited">
               <summary className="focus-ring flex h-ledger-row cursor-pointer list-none items-center gap-2 border-b border-rule px-(--inset) mono text-micro text-graphite transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
-                <ChevronRight
-                  className="size-3 shrink-0 transition-transform group-open/inherited:rotate-90"
-                  strokeWidth={2}
-                />
+                <ChevronRight className="size-4 shrink-0 transition-transform group-open/inherited:rotate-90" />
                 {inherited.length} from companies in this space
               </summary>
               <ol>
@@ -316,10 +310,7 @@ function SourceRow({
 
   return (
     <li className="group flex items-center gap-3 border-b border-rule px-(--inset) py-2.5">
-      <FileText
-        className="size-3.5 shrink-0 text-graphite"
-        strokeWidth={1.75}
-      />
+      <FileText className="size-4 shrink-0 text-graphite" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <button
           type="button"
@@ -416,10 +407,7 @@ function InheritedRow({
 
   return (
     <li className="group flex items-center gap-3 border-b border-rule px-(--inset) py-2.5">
-      <FileText
-        className="size-3.5 shrink-0 text-graphite"
-        strokeWidth={1.75}
-      />
+      <FileText className="size-4 shrink-0 text-graphite" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <button
           type="button"
