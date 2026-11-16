@@ -77,8 +77,8 @@ is the record chassis. The head folds as before; its bar and pinned actions sit 
   page that holds a note editor: its head and body start at `NOTE_INSET` (§3, "A
   note").
 - **E2 · One rule under the head.** A single 1px rule, never the double, and the head
-  stays 104px and paper on every page; it folds to the 48px bar on scroll with its
-  tabs and toolbar pinned. The `···` is the rightmost head control and its right edge
+  stays 104px and paper on every page. On a page that scrolls it folds to the 48px bar
+  with its tabs and toolbar pinned; a list page is a fixed pane and never folds. The `···` is the rightmost head control and its right edge
   lines up with the last control in the content below.
 - **E3 · Windows take one 16px inset all round.**
 - **E4 · Settings and form pages cap at 800px**: a column of cards 800px wide from the
@@ -91,7 +91,7 @@ is the record chassis. The head folds as before; its bar and pinned actions sit 
   runs straight into the body under it; a closed tab is plain text. The list toolbar
   is tabs · a divider · Filter and Sort as icon buttons, each outlined only while in
   use and then reading its state (`Filter 2`, `Last contact ↓`); search alone on the
-  right with its `/` hint; Columns is an icon at the end of the column-head row. Save
+  right with its `/` hint, ending on the table card's right edge; Columns is an icon at the end of the column-head row. Save
   view appears only with something to save: `Save as view…` on a filtered All,
   `Update view` + `Reset` on a changed view; `Save as new view…` lives in the view's
   `···`. Tables keep their column lines and white column heads.
