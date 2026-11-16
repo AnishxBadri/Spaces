@@ -213,7 +213,7 @@ describe('Today', () => {
     const html = await renderToday(loadedWith({}))
     expect(html).toContain('aria-label="Needs you by kind"')
     expect(html).toMatch(
-      /aria-selected="true"[^>]*>Needs you<span data-tab-count/,
+      /aria-selected="true"[^>]*><span[^>]*>Needs you<span data-tab-count/,
     )
     expect(html).toMatch(/>Tasks<span data-tab-count[^>]*>10</)
     expect(html).toMatch(/>Meetings<span data-tab-count[^>]*>1</)

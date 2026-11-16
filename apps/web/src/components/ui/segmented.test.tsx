@@ -103,6 +103,28 @@ describe('a segment', () => {
     expect(segment(doc, 'All').querySelector('[data-segment-count]')).toBeNull()
   })
 
+  it('sets the count on the label’s baseline, the pair centred in the segment', () => {
+    const email = segment(render(), 'Email')
+    expect(classes(email)).toEqual(
+      expect.arrayContaining(['items-center', 'gap-1.5']),
+    )
+    const pair = email.querySelector('[data-segment-count]')?.parentElement
+    expect(pair?.parentElement).toBe(email)
+    expect(classes(pair)).toEqual(
+      expect.arrayContaining(['inline-flex', 'items-baseline', 'gap-1.5']),
+    )
+    expect(pair?.textContent).toBe('Email17')
+  })
+
+  it('leaves a segment without a count as its bare label, no pair and no count span', () => {
+    const doc = render()
+    for (const name of ['All', 'Calls']) {
+      const s = segment(doc, name)
+      expect(s.children).toHaveLength(0)
+      expect(s.innerHTML).toBe(name)
+    }
+  })
+
   it('names a mark-only segment for screen readers', () => {
     const doc = win.document
     doc.body.innerHTML = renderToStaticMarkup(

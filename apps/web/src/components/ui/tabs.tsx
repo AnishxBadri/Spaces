@@ -185,15 +185,21 @@ export function Tabs<T extends string>({
                   : 'h-9 text-graphite hover:text-foreground',
             )}
           >
-            {t.label}
+            {/* The 13px sans label and the 11px mono count share a baseline;
+                the pair is centred as one, the suffix centred apart. */}
             {counted ? (
-              <span
-                data-tab-count
-                className="tabular mono text-micro text-foreground"
-              >
-                {t.count}
+              <span className="inline-flex items-baseline gap-1.5">
+                {t.label}
+                <span
+                  data-tab-count
+                  className="tabular mono text-micro text-foreground"
+                >
+                  {t.count}
+                </span>
               </span>
-            ) : null}
+            ) : (
+              t.label
+            )}
             {t.suffix}
           </button>
         )

@@ -47,7 +47,7 @@ function tab(doc: Doc, name: string) {
   return found
 }
 
-const classes = (el: { className: string } | null) =>
+const classes = (el: { className: string } | null | undefined) =>
   (el?.className ?? '').split(/\s+/)
 
 describe('the bar', () => {
@@ -88,6 +88,44 @@ describe('a counted tab', () => {
     expect(classes(count)).toEqual(
       expect.arrayContaining(['mono', 'text-micro', 'text-foreground']),
     )
+  })
+
+  it('sets the count on the label’s baseline, the pair centred in the tab', () => {
+    const notes = tab(render('history'), 'Notes')
+    expect(classes(notes)).toEqual(
+      expect.arrayContaining(['items-center', 'gap-1.5']),
+    )
+    const pair = notes.querySelector('[data-tab-count]')?.parentElement
+    expect(pair?.parentElement).toBe(notes)
+    expect(classes(pair)).toEqual(
+      expect.arrayContaining(['inline-flex', 'items-baseline', 'gap-1.5']),
+    )
+    expect(pair?.textContent).toBe('Notes3')
+  })
+
+  it('keeps the suffix outside the baseline pair, centred on its own', () => {
+    const doc = win.document
+    doc.body.innerHTML = renderToStaticMarkup(
+      <Tabs
+        label="Views"
+        items={[
+          { id: 'a', label: 'All', count: 4, suffix: <span data-dirty /> },
+        ]}
+        value="a"
+        onValueChange={() => {}}
+      />,
+    )
+    const all = tab(doc, 'All')
+    const pair = all.querySelector('[data-tab-count]')?.parentElement
+    expect(pair?.querySelector('[data-dirty]')).toBeNull()
+    expect(all.lastElementChild.hasAttribute('data-dirty')).toBe(true)
+    expect(all.lastElementChild.previousElementSibling).toBe(pair)
+  })
+
+  it('leaves a tab without a count as its bare label, no pair and no count span', () => {
+    const files = tab(render('notes'), 'Files')
+    expect(files.children).toHaveLength(0)
+    expect(files.innerHTML).toBe('Files')
   })
 })
 

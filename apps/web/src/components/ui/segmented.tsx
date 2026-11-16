@@ -76,12 +76,17 @@ export function Segmented<T extends string>({
                 : 'border-transparent text-graphite hover:bg-bone-deep hover:text-foreground',
             )}
           >
-            {o.label}
+            {/* The label and its mono count share a baseline, centred as one. */}
             {o.count !== undefined && o.count > 0 ? (
-              <span data-segment-count className="tabular mono text-micro">
-                {o.count}
+              <span className="inline-flex items-baseline gap-1.5">
+                {o.label}
+                <span data-segment-count className="tabular mono text-micro">
+                  {o.count}
+                </span>
               </span>
-            ) : null}
+            ) : (
+              o.label
+            )}
           </button>
         )
         return o.tip === undefined ? (

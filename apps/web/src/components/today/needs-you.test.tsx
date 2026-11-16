@@ -514,7 +514,7 @@ describe('the Needs-you folder', () => {
     expect(html).not.toContain('data-section-count')
     expect(html).toContain('aria-label="Needs you by kind"')
     expect(html).toMatch(
-      /aria-selected="true"[^>]*>Needs you<span data-tab-count[^>]*>3</,
+      /aria-selected="true"[^>]*><span[^>]*>Needs you<span data-tab-count[^>]*>3</,
     )
     for (const label of ['Tasks', 'Deals', 'Marks'])
       expect(html).toMatch(new RegExp(`>${label}<span data-tab-count[^>]*>1<`))
