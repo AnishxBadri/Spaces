@@ -88,13 +88,33 @@ export type Headline = {
   /** The stored photo's digest, null until the worker stores one. */
   readonly imageSha: string | null
   readonly photoUrl: string | null
+  /**
+   * The item names a photo the worker has not stored yet and was first
+   * seen within {@link PHOTO_PENDING_MS}: the fetch is still to come. Past
+   * that window a missing photo was skipped for good and the story is text.
+   */
+  readonly photoPending: boolean
 }
 
 export type HeadlinePage = {
   readonly headlines: ReadonlyArray<Headline>
   /** Hand back for the next page; null at the end. */
   readonly nextCursor: string | null
+  /** Every headline under the same space filter, across all pages. */
+  readonly total: number
 }
+
+/**
+ * How long after a headline first lands its photo still counts as on the
+ * way: the images job runs right after the fetch that found it and is
+ * never retried, so ten minutes is generous.
+ */
+export const PHOTO_PENDING_MS = 10 * 60 * 1000
+
+/** {@link PHOTO_PENDING_MS} as a SQL interval: a constant, never input. */
+const PENDING_WINDOW = sql.raw(
+  `interval '${String(PHOTO_PENDING_MS / 1000)} seconds'`,
+)
 
 /** What Add feed found: the source as saved and its newest story. */
 export type AddedFeed = {
@@ -424,7 +444,8 @@ const cursorOf = (
 
 /**
  * Headlines, newest first, a page at a time.
- * - `spaceId` keeps the feeds tagged to that space or any space under it.
+ * - `spaceId` keeps the feeds tagged to that space or any space under it;
+ *   `total` counts under that filter alone, never the cursor.
  * - The cursor is opaque; an unreadable one is page one.
  */
 export const listHeadlinesProgram = Effect.fn('feeds.listHeadlines')(
@@ -439,19 +460,20 @@ export const listHeadlinesProgram = Effect.fn('feeds.listHeadlines')(
     )
     const after = cursorOf(query.cursor)
     const where: Array<SQL> = []
-    if (query.spaceId !== undefined)
-      where.push(
-        inArray(
-          feedItem.feedId,
-          db
-            .select({ id: feedSpace.feedId })
-            .from(feedSpace)
-            .innerJoin(space, eq(space.entityId, feedSpace.spaceId))
-            .where(
-              sql`${space.path} <@ (select path from ${space} where entity_id = ${query.spaceId})`,
-            ),
-        ),
-      )
+    const inSpace =
+      query.spaceId === undefined
+        ? undefined
+        : inArray(
+            feedItem.feedId,
+            db
+              .select({ id: feedSpace.feedId })
+              .from(feedSpace)
+              .innerJoin(space, eq(space.entityId, feedSpace.spaceId))
+              .where(
+                sql`${space.path} <@ (select path from ${space} where entity_id = ${query.spaceId})`,
+              ),
+          )
+    if (inSpace !== undefined) where.push(inSpace)
     if (after !== null) {
       const at = sql`${after.k}::timestamptz`
       const before = or(
@@ -477,12 +499,16 @@ export const listHeadlinesProgram = Effect.fn('feeds.listHeadlines')(
           publishedAt: feedItem.publishedAt,
           sortKey: sql<string>`${feedItem.publishedAt}::text`,
           imageSha: feedItem.imageSha,
+          photoPending: sql<boolean>`(${feedItem.imageUrl} is not null and ${feedItem.imageSha} is null and ${feedItem.firstSeenAt} > now() - ${PENDING_WINDOW})`,
         })
         .from(feedItem)
         .innerJoin(feed, eq(feed.id, feedItem.feedId))
         .where(and(...where))
         .orderBy(desc(feedItem.publishedAt), desc(feedItem.id))
         .limit(limit + 1),
+    )
+    const counted = yield* store(() =>
+      db.select({ n: count() }).from(feedItem).where(inSpace),
     )
     const page = rows.slice(0, limit)
     const last = page.at(-1)
@@ -504,6 +530,7 @@ export const listHeadlinesProgram = Effect.fn('feeds.listHeadlines')(
         rows.length > limit && last !== undefined
           ? encodeCursor({ id: last.id, k: last.sortKey })
           : null,
+      total: counted.at(0)?.n ?? 0,
     }
   },
 )

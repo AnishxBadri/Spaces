@@ -27,6 +27,8 @@ import { Checkbox } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
 import { TabDivider, Tabs } from '#/components/ui/tabs'
 import type { TabItem } from '#/components/ui/tabs'
+import { ListFoot } from './list-foot'
+import type { ListFootPage } from './list-foot'
 import { ListZeroRow } from './list-states'
 import type { RowSelection } from './selection-bar'
 import { cn } from '#/lib/utils'
@@ -71,27 +73,14 @@ const SELECT_WIDTH = 36
 const TRAILING_WIDTH = 56
 
 /**
- * Grouped, never compact — `Intl.NumberFormat` compact notation prints
- * differently under Node and Chrome and takes hydration down with it. The locale is named so the two agree on the separator.
- */
-const grouped = (n: number) => n.toLocaleString('en-US')
-
-/**
  * What a paged surface tells its foot. Absent on every unpaged
  * surface, whose foot reads `getPreFilteredRowModel()` — those tables
  * hold every row they could show, so the pre-filtered model *is* the truth
  * there and a server round trip would only be able to agree with it.
  */
-export type TablePage = {
+export type TablePage = ListFootPage & {
   /** The server's `count(*)` over the same `where` the page was cut from. */
   total: number
-  /** Another page exists after the ones loaded. */
-  hasMore: boolean
-  /** A page is in flight. */
-  loading: boolean
-  /** Rows per page — the number the link offers to add. */
-  step: number
-  onLoadMore: () => void
 }
 
 /**
@@ -380,49 +369,31 @@ export function RecordTable<T>({
           />
         ) : null}
       </div>
-      <div
-        data-table-foot
-        className={cn(
-          'flex h-8 shrink-0 items-center justify-between gap-3 border-t px-2.75',
-          folder ? 'border-hairline' : 'border-rule',
-        )}
-      >
-        <span className="flex min-w-0 items-center gap-1.5">
-          {instead === null ? (
-            <span className="tabular field-label text-graphite">
-              {grouped(rows.length)} of{' '}
-              {grouped(
-                page?.total ?? table.getPreFilteredRowModel().rows.length,
-              )}
-            </span>
-          ) : null}
-          {instead === null && page?.hasMore === true ? (
-            <>
-              <span aria-hidden className="field-label text-graphite">
-                ·
-              </span>
-              <button
-                type="button"
-                onClick={page.onLoadMore}
-                disabled={page.loading}
-                className="focus-ring rounded-md text-label text-foreground underline-offset-4 hover:underline disabled:text-graphite disabled:no-underline"
-              >
-                {page.loading ? 'Loading…' : `Load ${grouped(page.step)} more`}
-              </button>
-            </>
-          ) : null}
-        </span>
-        {overflow.hidden > 0 ? (
-          <button
-            type="button"
-            data-more-columns
-            onClick={() => overflow.reveal(pinnedWidth)}
-            className="focus-ring shrink-0 rounded-md text-label text-graphite underline-offset-4 hover:text-foreground hover:underline"
-          >
-            {overflow.hidden} more column{overflow.hidden === 1 ? '' : 's'} →
-          </button>
-        ) : null}
-      </div>
+      <ListFoot
+        folder={folder}
+        {...(instead === null
+          ? {
+              count: {
+                shown: rows.length,
+                total:
+                  page?.total ?? table.getPreFilteredRowModel().rows.length,
+              },
+            }
+          : {})}
+        {...(page === undefined ? {} : { page })}
+        end={
+          overflow.hidden > 0 ? (
+            <button
+              type="button"
+              data-more-columns
+              onClick={() => overflow.reveal(pinnedWidth)}
+              className="focus-ring shrink-0 rounded-md text-label text-graphite underline-offset-4 hover:text-foreground hover:underline"
+            >
+              {overflow.hidden} more column{overflow.hidden === 1 ? '' : 's'} →
+            </button>
+          ) : null
+        }
+      />
     </div>
   )
 }

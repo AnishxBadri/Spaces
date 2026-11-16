@@ -15,7 +15,8 @@ import {
 import type * as RouterModule from '@tanstack/react-router'
 import type { RouteComponent } from '@tanstack/react-router'
 import { ClockProvider } from '#/components/clock'
-import type { FeedSource } from '#/lib/server-fns'
+import { readDock } from '#/lib/ask/dock-store'
+import type { FeedSource, Headline, HeadlinePage } from '#/lib/server-fns'
 
 /**
  * The Feeds page under a memory router whose ids mirror the app's:
@@ -32,6 +33,7 @@ import type { FeedSource } from '#/lib/server-fns'
 const fns = vi.hoisted(() => ({
   listFeedSources: vi.fn(),
   listSpaces: vi.fn(),
+  listHeadlines: vi.fn(),
   previewFeed: vi.fn(),
   addFeed: vi.fn(),
   editFeed: vi.fn(),
@@ -113,10 +115,13 @@ const AEROSPACE = '00000000-0000-4000-8000-0000000000a1'
 const LAUNCH = '00000000-0000-4000-8000-0000000000a2'
 const PROPTECH = '00000000-0000-4000-8000-0000000000a3'
 
+const FINTECH = '00000000-0000-4000-8000-0000000000a4'
+
 const SPACES = [
   { id: AEROSPACE, name: 'Aerospace', parentId: null, companies: 0 },
   { id: LAUNCH, name: 'Launch', parentId: AEROSPACE, companies: 0 },
   { id: PROPTECH, name: 'Proptech', parentId: null, companies: 0 },
+  { id: FINTECH, name: 'Fintech', parentId: null, companies: 0 },
 ]
 
 const at = (day: string, time: string) =>
@@ -165,11 +170,70 @@ const TECHCRUNCH = source(3, {
   newestAt: at('2026-11-15', '18:00'),
 })
 
+const story = (n: number, over: Partial<Headline>): Headline => ({
+  id: `00000000-0000-4000-9000-${String(n).padStart(12, '0')}`,
+  feedId: SPACENEWS.id,
+  feedName: 'SpaceNews',
+  siteUrl: 'https://spacenews.com/',
+  logoSha: null,
+  logoUrl: null,
+  title: `Story ${String(n)}`,
+  url: `https://spacenews.com/story-${String(n)}`,
+  summary: null,
+  publishedAt: at('2026-11-16', '10:12'),
+  imageSha: null,
+  photoUrl: null,
+  photoPending: false,
+  ...over,
+})
+
+const SKYROOT = story(1, {
+  title: 'Skyroot static-fires the Vikram-1 third stage',
+  summary:
+    'Skyroot Aerospace ran the third stage through a full burn.\n\nThe stage reached its rated thrust with no anomalies.',
+  imageSha: 'p1',
+  photoUrl: 'http://localhost/api/blob/p1?sig=x',
+})
+const NOBROKER = story(2, {
+  feedId: TECHCRUNCH.id,
+  feedName: 'TechCrunch',
+  siteUrl: 'https://techcrunch.com/',
+  title: 'NoBroker trims listing fees for Pune landlords',
+  url: 'https://techcrunch.com/nobroker',
+  publishedAt: at('2026-11-16', '08:55'),
+})
+const LICENCES = story(3, {
+  title: 'IN-SPACe clears three private launch licences',
+  summary: 'Skyroot, Agnikul and a third operator.',
+  publishedAt: at('2026-11-15', '18:20'),
+  photoPending: true,
+})
+const DIGANTARA = story(4, {
+  feedId: TECHCRUNCH.id,
+  feedName: 'TechCrunch',
+  title: 'Digantara raises $18M for space situational awareness',
+  url: 'https://techcrunch.com/digantara',
+  summary: 'Led by Peak XV.',
+  publishedAt: at('2026-11-13', '15:05'),
+})
+const STORIES = [SKYROOT, NOBROKER, LICENCES, DIGANTARA]
+
+const pageOf = (
+  headlines: Array<Headline>,
+  over: Partial<HeadlinePage> = {},
+): HeadlinePage => ({
+  headlines,
+  nextCursor: null,
+  total: headlines.length,
+  ...over,
+})
+
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
   fns.listSpaces.mockResolvedValue(SPACES)
   fns.listFeedSources.mockResolvedValue([SPACENEWS, ORBIT, TECHCRUNCH])
+  fns.listHeadlines.mockResolvedValue(pageOf([]))
   const host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -200,9 +264,12 @@ async function mount(search = '') {
     getParentRoute: () => app,
     path: 'feeds',
     component: page,
+    // Page one is left to the tab, as after a failed read in the loader:
+    // the tab's own query is what these tests drive.
     loader: async () => ({
       sources: await fns.listFeedSources(),
       spaces: await fns.listSpaces(),
+      headlines: { space: null, page: null },
     }),
   })
   const r = createRouter({
@@ -212,13 +279,18 @@ async function mount(search = '') {
   await act(async () => {
     await r.load()
     root.render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        }
+      >
         <ClockProvider now={NOW}>
           <RouterProvider router={r} />
         </ClockProvider>
       </QueryClientProvider>,
     )
   })
+  return r
 }
 
 async function until(what: string, done: () => boolean) {
@@ -289,6 +361,7 @@ async function rowMenu(name: string): Promise<Array<string>> {
 
 describe('the frame', () => {
   it('opens on Headlines with Sources n and the failing square, and says there are no headlines yet', async () => {
+    fns.listHeadlines.mockResolvedValue(pageOf([]))
     await mount()
     expect(text(document.querySelector('h1'))).toBe('Feeds')
     expect(button(/^Add feed$/)).toBeDefined()
@@ -298,6 +371,9 @@ describe('the frame', () => {
     expect(
       tabs.at(1)?.querySelector('[aria-label="A feed is failing"]'),
     ).not.toBeNull()
+    await until('the list answers', () =>
+      Boolean(document.querySelector('[data-list-state="none"]')),
+    )
     expect(document.body.textContent).toContain('No headlines yet.')
   })
 
@@ -307,11 +383,14 @@ describe('the frame', () => {
     expect(document.querySelector('[data-failing-mark]')).toBeNull()
   })
 
-  it('with no feeds draws one Feeds + row and no tabs', async () => {
+  it('with no feeds says so with a way to add one, and draws no tabs', async () => {
     fns.listFeedSources.mockResolvedValue([])
     await mount()
     expect(document.querySelector('[role="tab"]')).toBeNull()
-    expect(text(document.querySelector('[data-empty-row]'))).toBe('Feeds+')
+    const row = document.querySelector('[data-list-state="no-feeds"]')
+    expect(text(row)).toBe('No feeds yet.Add a feed')
+    await click(row?.querySelector('button'))
+    expect(text(dialog()?.querySelector('h2'))).toBe('Add feed')
   })
 })
 
@@ -483,5 +562,261 @@ describe('Add feed', () => {
     )
     expect(alert?.className).toContain('text-destructive')
     expect(inDialog('Add feed')?.disabled).toBe(true)
+  })
+})
+
+describe('Headlines', () => {
+  const stories = () =>
+    [...document.querySelectorAll('[data-story]')].map((el) => ({
+      id: el.getAttribute('data-story'),
+      selected: el.getAttribute('aria-current') === 'true',
+      photo: el.querySelector('[data-story-photo]') !== null,
+    }))
+  const selectedTitle = () =>
+    text(
+      document.querySelector(
+        '[data-story][aria-current="true"] .headline-serif',
+      ),
+    )
+  const reader = () => document.querySelector('[data-reader]')
+  const key = async (k: string, target: Element = document.body) => {
+    await act(async () => {
+      target.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: k,
+          bubbles: true,
+          cancelable: true,
+        }),
+      )
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+  }
+  const listed = () => until('the stories draw', () => stories().length > 0)
+
+  it('draws stories under day bands beside the reader, the newest selected', async () => {
+    fns.listHeadlines.mockResolvedValue(
+      pageOf(STORIES, { total: 312, nextCursor: 'next' }),
+    )
+    await mount()
+    await listed()
+    expect(fns.listHeadlines).toHaveBeenCalledWith({ data: { limit: 50 } })
+    expect(
+      [...document.querySelectorAll('[data-story-list] [data-band]')].map((b) =>
+        text(b),
+      ),
+    ).toEqual(['Today', 'Yesterday', 'Fri 13 Nov'])
+    // A photo only where the story has one stored; none while it fetches.
+    expect(stories()).toEqual([
+      { id: SKYROOT.id, selected: true, photo: true },
+      { id: NOBROKER.id, selected: false, photo: false },
+      { id: LICENCES.id, selected: false, photo: false },
+      { id: DIGANTARA.id, selected: false, photo: false },
+    ])
+    const first = document.querySelector(`[data-story="${SKYROOT.id}"]`)
+    expect(text(first)).toBe(
+      'SSpaceNews10:12Skyroot static-fires the Vikram-1 third stageSkyroot Aerospace ran the third stage through a full burn. The stage reached its rated thrust with no anomalies.',
+    )
+    expect(first?.getAttribute('href')).toBe(SKYROOT.url)
+    expect(first?.getAttribute('target')).toBe('_blank')
+
+    // The reader: bar, headline, photo, prose, and the hand-off with spaces.
+    expect(text(reader()?.querySelector('h2'))).toBe(SKYROOT.title)
+    expect(text(reader()?.querySelector('time'))).toBe('16 Nov · 10:12')
+    expect(
+      reader()?.querySelector('[data-reader-photo]')?.getAttribute('src'),
+    ).toBe(SKYROOT.photoUrl)
+    expect(
+      [...(reader()?.querySelectorAll('article p') ?? [])].map((p) => text(p)),
+    ).toEqual([
+      'Skyroot Aerospace ran the third stage through a full burn.',
+      'The stage reached its rated thrust with no anomalies.',
+    ])
+    const out = [...(reader()?.querySelectorAll('a') ?? [])].map((a) => [
+      text(a),
+      a.getAttribute('href'),
+    ])
+    expect(out).toEqual([
+      ['Open article ↗', SKYROOT.url],
+      ['Continue on spacenews.com ↗', SKYROOT.url],
+    ])
+    expect(reader()?.querySelector('footer')?.textContent).toContain(
+      'Aerospace › Launch',
+    )
+
+    // The foot counts the loaded of the total and loads the next 50.
+    const foot = document.querySelector('[data-story-list] [data-table-foot]')
+    expect(text(foot)).toBe('4 of 312·Load 50 more')
+    fns.listHeadlines.mockResolvedValue(
+      pageOf([story(5, { publishedAt: at('2026-11-12', '09:00') })], {
+        total: 312,
+      }),
+    )
+    await click(button('Load 50 more'))
+    await until('the next page lands', () => stories().length === 5)
+    expect(fns.listHeadlines).toHaveBeenLastCalledWith({
+      data: { limit: 50, cursor: 'next' },
+    })
+    expect(selectedTitle()).toBe(SKYROOT.title)
+  })
+
+  it('J and K walk the list, O and Enter open the article, a click selects', async () => {
+    const open = vi.spyOn(win, 'open').mockReturnValue(null)
+    // Wide: the reader is beside the list.
+    const always = win.matchMedia('(min-width: 1px)')
+    const wide = vi.spyOn(win, 'matchMedia').mockReturnValue(always)
+    fns.listHeadlines.mockResolvedValue(pageOf(STORIES))
+    await mount()
+    await listed()
+    await key('j')
+    await key('j')
+    expect(selectedTitle()).toBe(LICENCES.title)
+    expect(text(reader()?.querySelector('h2'))).toBe(LICENCES.title)
+    // A photo the worker has yet to store: a bone plate with the Twinkle.
+    expect(
+      reader()
+        ?.querySelector('[data-reader-photo="pending"]')
+        ?.querySelector('[data-twinkle]'),
+    ).not.toBeNull()
+    await key('k')
+    expect(selectedTitle()).toBe(NOBROKER.title)
+    // A feed with no text of its own says so, and the bar still opens it.
+    expect(text(reader()?.querySelector('[data-headlines-only]'))).toBe(
+      'TechCrunch sends headlines only. The story is on its site.',
+    )
+    await key('j')
+    await key('j')
+    await key('j')
+    expect(selectedTitle()).toBe(DIGANTARA.title)
+
+    await key('o')
+    expect(open).toHaveBeenLastCalledWith(
+      DIGANTARA.url,
+      '_blank',
+      'noopener,noreferrer',
+    )
+    await key('Enter')
+    expect(open).toHaveBeenCalledTimes(2)
+
+    // A wide click selects. (Whether the link also follows is the
+    // browser's to say; happy-dom follows an anchor whatever the handler.)
+    await click(document.querySelector(`[data-story="${SKYROOT.id}"]`))
+    expect(selectedTitle()).toBe(SKYROOT.title)
+    open.mockClear()
+
+    // Not while typing, and not inside a window.
+    const input = document.createElement('input')
+    document.body.append(input)
+    await key('j', input)
+    await key('o', input)
+    expect(selectedTitle()).toBe(SKYROOT.title)
+    expect(open).not.toHaveBeenCalled()
+    await click(button(/^Add feed$/))
+    await key('j', dialog() ?? document.body)
+    expect(selectedTitle()).toBe(SKYROOT.title)
+    open.mockRestore()
+    wide.mockRestore()
+  })
+
+  it('narrow, a tap is the article link and there is no reader', async () => {
+    const open = vi.spyOn(win, 'open').mockReturnValue(null)
+    const never = win.matchMedia('(min-width: 100000px)')
+    expect(never.matches).toBe(false)
+    const narrow = vi.spyOn(win, 'matchMedia').mockReturnValue(never)
+    fns.listHeadlines.mockResolvedValue(pageOf(STORIES))
+    await mount()
+    await listed()
+    const tapped = document.querySelector(`[data-story="${NOBROKER.id}"]`)
+    // The link is left to open the article: the selection does not move.
+    await click(tapped)
+    expect(tapped?.getAttribute('href')).toBe(NOBROKER.url)
+    expect(selectedTitle()).toBe(SKYROOT.title)
+    // The reader's pane is drawn only from `md` up.
+    expect(reader()?.parentElement?.className).toContain('hidden')
+    expect(reader()?.parentElement?.className).toContain('md:flex')
+    narrow.mockRestore()
+    open.mockRestore()
+  })
+
+  it('Ask about this opens Ask with the headline and its link; Copy link is there', async () => {
+    fns.listHeadlines.mockResolvedValue(pageOf(STORIES))
+    await mount()
+    await listed()
+    const items = await rowMenu(SKYROOT.title)
+    expect(items).toEqual(['Copy link', 'Ask about this'])
+    const ask = [...document.querySelectorAll('[role="menuitem"]')].find(
+      (el) => text(el) === 'Ask about this',
+    )
+    await click(ask)
+    await until('Ask opens', () => readDock().open)
+    expect(readDock().draft).toBe(`${SKYROOT.title}\n${SKYROOT.url ?? ''}\n\n`)
+  })
+
+  it('narrows to a space, keeps it in the URL, and keeps the story while it is listed', async () => {
+    fns.listHeadlines.mockResolvedValue(pageOf(STORIES))
+    const r = await mount()
+    await listed()
+    await click(document.querySelector(`[data-story="${DIGANTARA.id}"]`))
+    expect(selectedTitle()).toBe(DIGANTARA.title)
+
+    await click(document.querySelector('[data-space-filter] button'))
+    const options = [...document.querySelectorAll('[cmdk-item]')].map((el) =>
+      text(el),
+    )
+    expect(options).toEqual(['All spaces', 'Aerospace › Launch', 'Proptech'])
+    fns.listHeadlines.mockResolvedValue(pageOf([NOBROKER, DIGANTARA]))
+    await click(
+      [...document.querySelectorAll('[cmdk-item]')].find(
+        (el) => text(el) === 'Proptech',
+      ),
+    )
+    await until('the narrowed list lands', () => stories().length === 2)
+    expect(fns.listHeadlines).toHaveBeenLastCalledWith({
+      data: { limit: 50, spaceId: PROPTECH },
+    })
+    expect(r.state.location.search).toMatchObject({ space: PROPTECH })
+    expect(text(document.querySelector('[data-space-filter]'))).toBe('Proptech')
+    expect(selectedTitle()).toBe(DIGANTARA.title)
+  })
+
+  it('a space no feed is tagged to says so, with the way back to all spaces', async () => {
+    const r = await mount(`?space=${FINTECH}`)
+    await until('the list answers', () =>
+      Boolean(document.querySelector('[data-list-state="no-feed"]')),
+    )
+    const row = document.querySelector('[data-list-state="no-feed"]')
+    expect(text(row)).toBe('No feed is tagged to Fintech.All spaces')
+    expect(text(document.querySelector('[data-space-filter]'))).toBe('Fintech')
+    await click(row?.querySelector('button'))
+    await until(
+      'the filter clears',
+      () => !('space' in r.state.location.search),
+    )
+  })
+
+  it('twinkles while loading, then says it could not load and retries', async () => {
+    let fail: (e: Error) => void = () => undefined
+    fns.listHeadlines.mockReturnValue(
+      new Promise((_, reject) => {
+        fail = reject
+      }),
+    )
+    await mount()
+    const loading = document.querySelector('[data-list-state="loading"]')
+    expect(text(loading)).toBe('Loading headlines')
+    expect(loading?.querySelector('[data-twinkle]')).not.toBeNull()
+
+    await act(async () => {
+      fail(new Error('down'))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    await until('the error shows', () =>
+      Boolean(document.querySelector('[data-list-state="error"]')),
+    )
+    expect(text(document.querySelector('[data-list-state="error"]'))).toBe(
+      "Couldn't load headlines. The database did not answer.Retry",
+    )
+    fns.listHeadlines.mockResolvedValue(pageOf(STORIES))
+    await click(button('Retry'))
+    await listed()
   })
 })

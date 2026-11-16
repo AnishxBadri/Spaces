@@ -5,11 +5,16 @@ import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { FeedWindow } from '#/components/feeds/feed-window'
 import type { FeedWindowMode } from '#/components/feeds/feed-window'
-import { removeBody } from '#/components/feeds/feed-words'
+import {
+  HEADLINES_STEP,
+  filterSpaces,
+  removeBody,
+} from '#/components/feeds/feed-words'
 import type { SpaceOption } from '#/components/feeds/feed-words'
+import { HeadlinesPane } from '#/components/feeds/headlines'
 import { SourcesTable } from '#/components/feeds/sources-table'
+import { SpaceFilter } from '#/components/feeds/space-filter'
 import { icon } from '#/components/icons'
-import { EmptyRow } from '#/components/ledger-section'
 import {
   Card,
   FolderGround,
@@ -20,9 +25,14 @@ import {
 import { ListErrorRow } from '#/components/table/list-states'
 import { Button } from '#/components/ui/button'
 import { useConfirm } from '#/components/ui/confirm-dialog'
-import { FolderBody, Tabs } from '#/components/ui/tabs'
+import { TabDivider, Tabs } from '#/components/ui/tabs'
 import { spacePathLabel } from '#/lib/file-in-space'
-import { listFeedSources, listSpaces, removeFeed } from '#/lib/server-fns'
+import {
+  listFeedSources,
+  listHeadlines,
+  listSpaces,
+  removeFeed,
+} from '#/lib/server-fns'
 import type { FeedSource } from '#/lib/server-fns'
 
 /**
@@ -33,7 +43,10 @@ import type { FeedSource } from '#/lib/server-fns'
  *   first fetch the query reads again every few seconds, so its Latest fills
  *   in without a reload; otherwise once a minute, which is how a feed that
  *   starts failing marks the tab.
- * - The tab bar takes a `trail` for the space filter beside the tabs.
+ * - Headlines' space filter sits on the tab bar after the tabs; the space
+ *   is `?space=`, so a reload keeps it. It is a loader dep: page one of the
+ *   narrowed list comes with the load, and a failed read leaves it to the
+ *   tab, which says so and retries.
  */
 
 type FeedsTab = 'headlines' | 'sources'
@@ -57,12 +70,19 @@ const feedsSearch = (raw: Record<string, unknown>): FeedsSearch => ({
 
 export const Route = createFileRoute('/_app/feeds')({
   validateSearch: feedsSearch,
-  loader: async () => {
-    const [sources, spaces] = await Promise.all([
+  loaderDeps: ({ search }) => ({ space: search.space ?? null }),
+  loader: async ({ deps }) => {
+    const [sources, spaces, page] = await Promise.all([
       listFeedSources(),
       listSpaces(),
+      listHeadlines({
+        data: {
+          limit: HEADLINES_STEP,
+          ...(deps.space === null ? {} : { spaceId: deps.space }),
+        },
+      }).catch(() => null),
     ])
-    return { sources, spaces }
+    return { sources, spaces, headlines: { space: deps.space, page } }
   },
   component: FeedsPage,
 })
@@ -76,7 +96,7 @@ const SOURCES_POLL_MS = 60_000
 
 function FeedsPage() {
   const loaded = Route.useLoaderData()
-  const { tab = 'headlines' } = Route.useSearch()
+  const { tab = 'headlines', space = null } = Route.useSearch()
   const navigate = Route.useNavigate()
   const queryClient = useQueryClient()
   const [windowMode, setWindowMode] = useState<FeedWindowMode | null>(null)
@@ -105,6 +125,11 @@ function FeedsPage() {
     () => new Map(spaces.map((s) => [s.id, s.path])),
     [spaces],
   )
+  const parentOf = useMemo(
+    () => new Map(loaded.spaces.map((s) => [s.id, s.parentId])),
+    [loaded.spaces],
+  )
+  const tagged = useMemo(() => filterSpaces(sources, pathOf), [sources, pathOf])
 
   const refresh = useCallback(
     () => void queryClient.invalidateQueries({ queryKey: FEED_SOURCES_QUERY }),
@@ -117,6 +142,14 @@ function FeedsPage() {
           ...prev,
           tab: next === 'sources' ? 'sources' : undefined,
         }),
+        replace: true,
+      }),
+    [navigate],
+  )
+  const setSpace = useCallback(
+    (next: string | null) =>
+      void navigate({
+        search: (prev) => ({ ...prev, space: next ?? undefined }),
         replace: true,
       }),
     [navigate],
@@ -170,8 +203,20 @@ function FeedsPage() {
       {sources.length === 0 ? (
         // First run: no feed yet — one row that adds one.
         <PageBody>
-          <Card>
-            <EmptyRow name="Feeds" onAdd={openAdd} />
+          <Card className="flex-1">
+            <p
+              data-list-state="no-feeds"
+              className="flex h-ledger-row shrink-0 items-center gap-2.5 border-b border-rule px-3 text-ui"
+            >
+              <span className="text-graphite">No feeds yet.</span>
+              <button
+                type="button"
+                onClick={openAdd}
+                className="focus-ring rounded-md font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Add a feed
+              </button>
+            </p>
           </Card>
         </PageBody>
       ) : (
@@ -181,6 +226,19 @@ function FeedsPage() {
             onTab={setTab}
             sourceCount={sources.length}
             failing={failing}
+            trail={
+              tab === 'headlines' && (tagged.length > 0 || space !== null) ? (
+                <>
+                  <TabDivider />
+                  <SpaceFilter
+                    value={space}
+                    spaces={tagged}
+                    pathOf={pathOf}
+                    onChange={setSpace}
+                  />
+                </>
+              ) : undefined
+            }
           />
           <PageBody className="min-h-0 pt-0">
             {tab === 'sources' ? (
@@ -200,7 +258,18 @@ function FeedsPage() {
                 onRemove={(s) => void onRemove(s)}
               />
             ) : (
-              <HeadlinesBody />
+              <HeadlinesPane
+                spaceId={space}
+                initial={
+                  loaded.headlines.space === space
+                    ? loaded.headlines.page
+                    : null
+                }
+                sources={sources}
+                pathOf={pathOf}
+                parentOf={parentOf}
+                onAllSpaces={() => setSpace(null)}
+              />
             )}
           </PageBody>
         </>
@@ -267,16 +336,5 @@ function FeedsTabs({
         {...(trail === undefined ? {} : { trail })}
       />
     </FolderGround>
-  )
-}
-
-/** The Headlines tab's body until the list and the reader land. */
-function HeadlinesBody() {
-  return (
-    <FolderBody label="Headlines" className="flex-1">
-      <p className="px-(--inset) py-6 font-serif text-body text-graphite">
-        No headlines yet.
-      </p>
-    </FolderBody>
   )
 }

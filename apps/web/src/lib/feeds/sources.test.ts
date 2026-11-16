@@ -28,6 +28,7 @@ import {
   editFeedProgram,
   listFeedSourcesProgram,
   listHeadlinesProgram,
+  PHOTO_PENDING_MS,
   removeFeedProgram,
 } from './sources'
 import type { FeedSource, Headline } from './sources'
@@ -359,11 +360,71 @@ describe('Headlines', () => {
     expect(inParent.headlines.at(0)).not.toHaveProperty('imageUrl')
     expect(inParent.nextCursor).toBeNull()
 
+    // The total counts the filter, not the page or the cursor.
+    const firstTwo = await Effect.runPromise(
+      listHeadlinesProgram({ spaceId: parent.id, limit: 2 }),
+    )
+    expect(firstTwo.headlines).toHaveLength(2)
+    expect(firstTwo.total).toBe(5)
+    if (firstTwo.nextCursor === null) throw new Error('expected a next page')
+    const rest = await Effect.runPromise(
+      listHeadlinesProgram({
+        spaceId: parent.id,
+        limit: 2,
+        cursor: firstTwo.nextCursor,
+      }),
+    )
+    expect(rest.total).toBe(5)
+    expect(
+      (await Effect.runPromise(listHeadlinesProgram({ spaceId: other.id })))
+        .total,
+    ).toBe(2)
+
     // A forged cursor is page one, never a database error.
     const forged = await Effect.runPromise(
       listHeadlinesProgram({ cursor: 'not-a-cursor', limit: 1 }),
     )
     expect(forged.headlines).toHaveLength(1)
+  })
+
+  it('tells a photo still on the way from one that will not come', async () => {
+    const s = await aSpace('Photos')
+    const row = (
+      await db
+        .insert(feed)
+        .values({ url: 'https://ph.example/feed', name: 'Photo wire' })
+        .returning({ id: feed.id })
+    ).at(0)
+    if (row === undefined) throw new Error('no feed')
+    await db.insert(feedSpace).values({ feedId: row.id, spaceId: s.id })
+    const at = new Date('2026-11-12T00:00:00Z')
+    const long = new Date(Date.now() - PHOTO_PENDING_MS - 60_000)
+    await db.insert(feedItem).values([
+      // Just landed, names a photo: the worker has yet to store it.
+      {
+        feedId: row.id,
+        key: 'fresh',
+        title: 'Fresh',
+        publishedAt: at,
+        imageUrl: 'https://ph.example/a.jpg',
+      },
+      // Named a photo long ago and none was stored: skipped for good.
+      {
+        feedId: row.id,
+        key: 'stale',
+        title: 'Stale',
+        publishedAt: at,
+        firstSeenAt: long,
+        imageUrl: 'https://ph.example/b.jpg',
+      },
+      // Names no photo at all.
+      { feedId: row.id, key: 'bare', title: 'Bare', publishedAt: at },
+    ])
+    const got = await Effect.runPromise(listHeadlinesProgram({ spaceId: s.id }))
+    const pending = Object.fromEntries(
+      got.headlines.map((h) => [h.title, h.photoPending]),
+    )
+    expect(pending).toEqual({ Fresh: true, Stale: false, Bare: false })
   })
 })
 

@@ -459,6 +459,24 @@
   letter-spacing: -0.01em;
 }
 
+/*
+ * The prose register outside the editor, at the note body's 17px: a
+ * headline in a story list (wrapping, so a tighter leading) and the
+ * feed's own text in the reader.
+ */
+@utility headline-serif {
+  font-family: var(--font-serif);
+  font-size: 1.0625rem;
+  line-height: 1.375rem;
+  font-weight: 600;
+}
+
+@utility prose-serif {
+  font-family: var(--font-serif);
+  font-size: 1.0625rem;
+  line-height: 1.75rem;
+}
+
 /**
  * The Tabular Rule (DESIGN.md §3) made structural rather than remembered.
  * `.numeric` is the primitive: comparable figures are tabular AND right-aligned
