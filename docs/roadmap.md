@@ -46,8 +46,18 @@ Plus the UI sweep (the printed sheets landing), Corrections, and the list as a f
 - `SPA-188` `ship-10` — install, upgrade and rollback docs. Project 16, In Progress. `docs/install.md` and `docs/upgrade.md` exist; check what is left.
 - `SPA-190` `ship-12` — one-click templates for Coolify, Railway, Render and Unraid. Project 16, In Progress; each needs a human deploy.
 - `SPA-407` — the record table to a screen reader: named by its view, the sort read aloud, the name as row header, a Tab stop while columns overflow; the `n more columns →` foot line already shipped with the fixed pane. `afk`, size S.
-- `SPA-409` `notes-2` — the note page on the bone ground: the body a paper card, the rail unboxed with rule dividers, the head on the 24px page edge and the prose on the card's own 56px gutter (D107 keeps the page scroll). `afk`, size S.
+- `SPA-409` `notes-2` — the note page on the bone ground: the body a paper card, the rail a label lane like the record's property grid, record kinds as icons (rail, File on picker, `@` menu, Delete's list; one kind-icon map), a twelve-item slash menu, the head on the 24px page edge and the prose on the card's own 56px gutter (D107 keeps the page scroll). `afk`, size M.
 - `SPA-410` `notes-3` — a failed note save says `Not saved · Retry` in crimson, retries once by itself, leaving warns while an edit has not landed, and the delete window says only `Can’t be undone.` above what the note leaves. `afk`, size S.
+- `SPA-417` `notes-4` — loading, not-found and couldn't-load screens on the notes routes, and an app-wide default not-found and error in `router.tsx`. `afk`, size S.
+- `SPA-418` `heads-1` — one ink line under every head (the code still draws the rule), and the title steps to 22px below `md`. `afk`, size S.
+- `SPA-419` `notes-5` — the notes list's day lane fits a year (`Day`), and below `sm` the snippet goes. `afk`, size S.
+- `SPA-420` `history-glyphs` — a record's History rows lead on icons from the shared list at one size (`size-4`), not mixed text glyphs. `afk`, size S.
+- `SPA-421` `icons-carbon` — the shared icon list moves from Lucide to IBM Carbon at 16px, `NoteKindIcon` redrawn on its grid (D19). Blocks SPA-420. `afk`, size M.
+- `SPA-422` `record-pane` — a tabbed record and a space page become fixed panes at `xl`: the head stays whole, the folder runs to the window's foot and each tab scrolls inside it (D106). `afk`, size M.
+- `SPA-423` `note-window` — a record's Notes tab gets a toolbar (filter, `New note ⌄` with templates) and superseded notes fold; a note opens in a window over the record (D108). After SPA-409. `afk`, size M.
+- `SPA-424` `brand-colour` — `ProviderMark` draws each brand's official logo in its own colours; Granola, Apollo, Exa and OpenAI get their real marks (D19, E7). `afk`, size S.
+- `SPA-425` `count-baseline` — a tab's and a segment's count sits on its label's baseline (`Tabs`, `Segmented`). `afk`, size S.
+- `SPA-426` `interactions-3` — thread rows put the clip under the day and clamp the summary at two lines; the email thread unfolds in place; the meeting and email windows end on `Done`; logging gains a Summary and opens the write-up over the record (D109). After SPA-423. `afk`, size M.
 
 ## Next, in order
 

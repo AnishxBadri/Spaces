@@ -98,9 +98,12 @@ is the record chassis. The head folds as before; its bar and pinned actions sit 
 - **E6 · Every create is `+ New x`, in pine.** The split `[+ New x | ▾]` only where
   creating is instant and templates exist (Notes, Spaces). Files' create is `Upload`;
   Portfolio's primary is `Record a check`. A window's confirm carries no icon.
-- **E7 · One icon per verb, Lucide first**, from one shared icon list; a custom SVG only
-  for our own concepts (the note kinds), drawn on Lucide's grid. Brand marks only
-  through `ProviderMark`: monochrome official logos, Simple Icons where available.
+- **E7 · One icon per verb, Carbon first**, from one shared icon list; a custom SVG only
+  for our own concepts (the note kinds), drawn on Carbon's 32px grid. Brand marks only
+  through `ProviderMark`: the brand's official logo in its own colours (Simple Icons where available, else the brand's app icon), the one place colour other than the tokens appears.
+  Two sizes: 16px (Carbon's own size) in rows, menus, tabs, buttons and a rail, a brand mark
+  included; 20px for the one mark that leads a window's head or an empty state. Never 12px or
+  14px: Carbon's line goes soft below its grid.
 - **E8 · A date band carries no count.**
 - **E9 · The ground is bone, the sheets are paper.** Under its head a page's body is
   bone, and every card on it is paper: material separates a sheet from the desk before
@@ -226,6 +229,16 @@ string. Table date columns print the day. An age (`12d`) appears only in a stat 
 prints the day. A readout prints the day with no `· Nd` tail (A8). Which rows print
 the time and which the day is H3.
 
+### Kinds
+
+Where a row, a chip or a picker names a record of mixed kinds, its kind is a leading
+icon, never a word: the one map from the shared icon list (company `Building`, person `User`, deal
+`Column`, space `Layers`, note `NoteKindIcon`, document `Attachment`) and a custom object's
+own `objectIcon`, with the kind word as its tooltip and `aria-label`. Never the icon
+and the word side by side. A word stays where the word is the data: a stamp (`MEMO`),
+a state word, a table cell. A custom object with no chosen icon prints its word. A group that already names its kind (a
+record's Team, Associated deals) needs no icon on its rows.
+
 ### Dither
 
 Dither is 1-bit and never under text, and **it never moves at rest**. The one animated
@@ -269,7 +282,7 @@ queue elsewhere — never the count a section head on the same page already prin
 are equal lanes on rules with the number in mono 22 above a sentence-case graphite label;
 a ratio prints as `1 / 2`. A readout is a number or a date, never a word: a state
 (`needs a key`, `webhook`) belongs in the head's mono meta line, not in a cell. Providers
-are shown by their own mark at 14–16px, never a monogram; degraded is the same mark at
+are shown by their own mark at 16px (E7), never a monogram; degraded is the same mark at
 reduced opacity.
 
 Instrument density is measured density: readouts, ledger rows, five numbers in a
@@ -384,8 +397,8 @@ hand-rolling one.
 | `PageHeader`, `ReadoutStrip`                                                      | `apps/web/src/components/page-header.tsx`                | P1 — paper, the serif title on the 24px edge, `[outline?] [Primary] [···]` right ending 24px in, one rule under; keys in tooltips (A2), and a count only in the title (`HeadCount`) when the page has no tab bar; `tabs` stands on a pinned `FolderGround`                                                                                                                                                                                   |
 | `PageBody`, `Card`, `PAGE_EDGE`                                                   | `apps/web/src/components/page-header.tsx`                | E1, E9 — `PageBody` is the bone ground under the head, the 12px gutter round it and cards 12px apart, filling the height; a card is the `card` utility, paper in a 1px rule box whose rows inset by `--inset` (11px), so its content lands on the 24px edge, and a `SectionHead` that opens it is its paper head. `FolderGround`: the gutter and bone a folder bar stands on, pinned under the folded head                                   |
 | `NewButton`, `SplitNewButton`                                                     | `apps/web/src/components/new-button.tsx`                 | E6 — `+ New x` in pine; the split `[+ New x \| ▾]` with the templates behind the `▾` (Notes, Spaces only)                                                                                                                                                                                                                                                                                                                                    |
-| `icon`, the nouns, `NoteKindIcon`                                                 | `apps/web/src/components/icons.ts`, `note-kind-icon.tsx` | E7 — the only Lucide import site: one glyph per verb (`icon.new`, `icon.filter`, …), nouns by name; the note kinds drawn on Lucide's grid                                                                                                                                                                                                                                                                                                    |
-| `ProviderMark`, `brandOf`                                                         | `apps/web/src/components/provider-mark.tsx`              | E7 — every brand mark, monochrome, Simple Icons paths or a monogram where Simple Icons has none                                                                                                                                                                                                                                                                                                                                              |
+| `icon`, the nouns, `NoteKindIcon`                                                 | `apps/web/src/components/icons.ts`, `note-kind-icon.tsx` | E7 — the only icon-library import site (Carbon, D19): one glyph per verb (`icon.new`, `icon.filter`, …), nouns by name; the note kinds drawn on Carbon's grid; 16px, 20px leading a window head                                                                                                                                                                                                                                              |
+| `ProviderMark`, `brandOf`                                                         | `apps/web/src/components/provider-mark.tsx`              | E7 — every brand mark, in its own colours, Simple Icons paths or the brand's app icon where Simple Icons has none                                                                                                                                                                                                                                                                                                                            |
 | `SectionHead`, `LedgerSection`, `LedgerRow`, `LedgerFigure`, `ReferenceBar`       | `apps/web/src/components/ledger-section.tsx`             | P2/P3 — bone head band (title left, mono ink count or a `Segmented` right, never both), 40px rows on rules, a fixed mono lane, value-vs-median                                                                                                                                                                                                                                                                                               |
 | `Band`, `EmptyRow`, `FoldRow` (_decided_), `Day`                                  | `apps/web/src/components/ledger-section.tsx`             | `Band`: the 28px bone group head inside a pane, mono caps label, optional link right. `EmptyRow`: H1's `Name +` row on bone, the whole row the button; replaces `RailEmpty`. `FoldRow`: a 40px `25 more` row that unfolds in place. `Day`: the 88px right-aligned mono day lane a row ends on (`13 Oct`, `4 Oct 2024`, never wrapped; `when` prints today's time)                                                                            |
 | `RecordHeader`, `RecordBody`, `RecordSection`, `PropertyGrid`, `PropertyCell`     | `apps/web/src/components/record/record-parts.tsx`        | P7 — the record anatomy: the stamp alone above the title, no readout strip, one rule, property grid, sections                                                                                                                                                                                                                                                                                                                                |
@@ -800,8 +813,8 @@ Twenty-eight questions. A merge needs a yes to each.
     (one line and Retry); working (the `Twinkle` and present-tense words); a failed
     write (said where the write shows, with Retry, never silent and never only a
     toast); long (names wrap or truncate by rule, long lists fold); not yours or
-    read-only (the control goes, the words stay); scrolled (D106 for a list, D107 for
-    a document); narrow (390px). A state the surface cannot reach is neither built
+    read-only (the control goes, the words stay); scrolled (D106 for a list or a
+    record, D107 for a document); narrow (390px). A state the surface cannot reach is neither built
     nor drawn. On the canvas a state that looks the same everywhere is drawn once, on
     the Kit page; a page draws only the states that look different there.
 
