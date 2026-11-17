@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { noteExcerpt } from './excerpt'
-import { recordNoteGroups, recordNotesCount } from './record-groups'
+import {
+  filterNoteGroups,
+  noteFilterCounts,
+  recordNoteGroups,
+  recordNotesCount,
+} from './record-groups'
+import type { NoteFilter } from './record-groups'
 
 /**
  * A record's Notes tab order: filed and mentioning notes first with memos
@@ -62,6 +68,47 @@ describe('recordNoteGroups', () => {
     expect(groups.notes.map((n) => n.id)).toEqual(['v2'])
     expect(groups.meetings.map((n) => n.id)).toEqual(['call'])
     expect(groups.superseded.map((n) => n.id)).toEqual(['old call', 'v1'])
+  })
+
+  it('splits the current notes into memos, notes and meetings, and filters to each', () => {
+    const groups = recordNoteGroups({
+      filed: [
+        note('memo', { kind: 'memo' }),
+        note('loose'),
+        note('v1', { supersededBy: 'loose' }),
+      ],
+      fromMeetings: [note('call'), note('call memo', { kind: 'memo' })],
+      mentions: [note('aside')],
+    })
+    expect(noteFilterCounts(groups)).toEqual({ memo: 1, note: 2, meeting: 2 })
+    const ids = (filter: NoteFilter) => {
+      const shown = filterNoteGroups(groups, filter)
+      return {
+        notes: shown.notes.map((n) => n.id),
+        meetings: shown.meetings.map((n) => n.id),
+        superseded: shown.superseded.map((n) => n.id),
+      }
+    }
+    expect(ids('all')).toEqual({
+      notes: ['memo', 'loose', 'aside'],
+      meetings: ['call', 'call memo'],
+      superseded: ['v1'],
+    })
+    expect(ids('memo')).toEqual({
+      notes: ['memo'],
+      meetings: [],
+      superseded: [],
+    })
+    expect(ids('note')).toEqual({
+      notes: ['loose', 'aside'],
+      meetings: [],
+      superseded: [],
+    })
+    expect(ids('meeting')).toEqual({
+      notes: [],
+      meetings: ['call', 'call memo'],
+      superseded: [],
+    })
   })
 
   it('counts each note once, superseded ones included', () => {

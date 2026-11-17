@@ -1,3 +1,5 @@
+import { useBlocker } from '@tanstack/react-router'
+import type { ShouldBlockFn } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { NoteBody } from '@spaces/db/schema/kinds'
 import {
@@ -168,4 +170,25 @@ export function useNoteSave({
     retry,
     flushNow,
   }
+}
+
+/** What the leave guard asks; the browser's own confirm says it. */
+const LEAVE_QUESTION = 'Your last edit has not been saved. Leave anyway?'
+
+/**
+ * Leaving the note asks first while an edit has not landed: in-app
+ * navigation through the router's blocker, closing or reloading the tab
+ * through `beforeunload`. A search change on the same path (`?modal=`, or
+ * Back out of a note's window) is not leaving.
+ */
+export function useNoteLeaveGuard(hasPending: () => boolean) {
+  // Stable, so the blocker registers once rather than on every keystroke.
+  const shouldBlockFn = useCallback<ShouldBlockFn>(
+    ({ current, next }) => {
+      if (next.pathname === current.pathname || !hasPending()) return false
+      return !window.confirm(LEAVE_QUESTION)
+    },
+    [hasPending],
+  )
+  useBlocker({ shouldBlockFn, enableBeforeUnload: hasPending })
 }

@@ -37,7 +37,8 @@ export const KIND_GLYPHS: Record<string, typeof Mail> = {
 
 /**
  * A thread's subject: an email opens its window (`?modal=email&id=`), a
- * written-up row opens its note, anything else is plain text.
+ * written-up row its note's (`?modal=note&id=`), anything else is plain
+ * text.
  */
 export function ThreadSubject({
   item,
@@ -45,7 +46,7 @@ export function ThreadSubject({
   className,
 }: {
   item: Pick<ThreadItem, 'id' | 'kind' | 'subject' | 'noteId'>
-  /** The tab the email's window opens over; the link's own when absent. */
+  /** The tab the window opens over; the link's own when absent. */
   tab?: RecordTab | undefined
   className?: string | undefined
 }) {
@@ -69,11 +70,18 @@ export function ThreadSubject({
         {item.subject || 'Untitled'}
       </Link>
     )
-  if (item.noteId)
+  const noteId = item.noteId
+  if (noteId)
     return (
       <Link
-        to="/notes/$noteId"
-        params={{ noteId: item.noteId }}
+        to="."
+        search={(prev) => ({
+          ...prev,
+          ...(tab === undefined ? {} : { tab }),
+          modal: 'note',
+          id: noteId,
+        })}
+        resetScroll={false}
         className={link}
       >
         {item.subject || 'Untitled'}

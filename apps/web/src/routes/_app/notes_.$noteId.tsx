@@ -1,10 +1,8 @@
 import {
   ClientOnly,
   createFileRoute,
-  useBlocker,
   useNavigate,
 } from '@tanstack/react-router'
-import type { ShouldBlockFn } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { DocumentPreview } from '#/components/document-preview'
@@ -14,7 +12,10 @@ import { NoteHead } from '#/components/notes/note-head'
 import { NoteSheet } from '#/components/notes/note-sheet'
 import { NoteMoreMenu } from '#/components/notes/note-menu'
 import { NoteRail } from '#/components/notes/note-rail'
-import { useNoteSave } from '#/components/notes/use-note-save'
+import {
+  useNoteLeaveGuard,
+  useNoteSave,
+} from '#/components/notes/use-note-save'
 import {
   RecordGone,
   RecordHeadPending,
@@ -68,7 +69,7 @@ function NotePage() {
   const save = useNoteSave({ noteId: note.id, initialTitle: note.title })
   const preview = useDocumentPreview()
   const onFileDrop = useNoteFileDrop(note.spaces)
-  useLeaveGuard(save.hasPending)
+  useNoteLeaveGuard(save.hasPending)
 
   usePageActions([
     fileInSpaceAction({
@@ -136,27 +137,6 @@ function NotePage() {
       <DocumentPreview doc={preview.doc} onOpenChange={preview.onOpenChange} />
     </>
   )
-}
-
-/** What the leave guard asks; the browser's own confirm says it. */
-const LEAVE_QUESTION = 'Your last edit has not been saved. Leave anyway?'
-
-/**
- * Leaving the note asks first while an edit has not landed: in-app
- * navigation through the router's blocker, closing or reloading the tab
- * through `beforeunload`. A search change on this same note (`?modal=`) is
- * not leaving.
- */
-function useLeaveGuard(hasPending: () => boolean) {
-  // Stable, so the blocker registers once rather than on every keystroke.
-  const shouldBlockFn = useCallback<ShouldBlockFn>(
-    ({ current, next }) => {
-      if (next.pathname === current.pathname || !hasPending()) return false
-      return !window.confirm(LEAVE_QUESTION)
-    },
-    [hasPending],
-  )
-  useBlocker({ shouldBlockFn, enableBeforeUnload: hasPending })
 }
 
 /**

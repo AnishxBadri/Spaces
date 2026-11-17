@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { Effect } from 'effect'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { db } from '@spaces/db'
@@ -16,7 +17,7 @@ import {
   granolaNote,
 } from '#/test/recorded-note'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
-import { listRecordNotesProgram } from './list-record'
+import { listRecordNotesProgram, noteAttendeesProgram } from './list-record'
 import { noteViaProgram } from './via'
 
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
@@ -149,6 +150,25 @@ describe('the From meetings lane', () => {
     const notes = await run(listRecordNotesProgram(OWNER.id, company))
     expect(notes.fromMeetings).toEqual([])
     expect(await run(noteViaProgram(written.noteId))).toBeNull()
+  })
+})
+
+describe('a note window’s people', () => {
+  it("names the meeting's attendees for its write-up and its second note, as the row does", async () => {
+    const f = await granolaCall()
+    const notes = await run(listRecordNotesProgram(OWNER.id, f.company))
+    const row = notes.fromMeetings.find((n) => n.id === f.writeUp)
+    expect(row?.attendees.length).toBeGreaterThan(0)
+    expect(await run(noteAttendeesProgram(OWNER.id, f.writeUp))).toEqual(
+      row?.attendees,
+    )
+    expect(await run(noteAttendeesProgram(OWNER.id, f.typed))).toEqual(
+      row?.attendees,
+    )
+  })
+
+  it('names nobody for a note no meeting holds', async () => {
+    expect(await run(noteAttendeesProgram(OWNER.id, randomUUID()))).toEqual([])
   })
 })
 

@@ -2,10 +2,11 @@ import { z } from 'zod'
 
 /**
  * The window a page opens over itself from its URL: `?modal=meeting&id=`,
- * and `?modal=email&id=` beside it. Anything else reads as no window.
- * Spread `modalSearchShape` into a route's own search schema.
+ * `?modal=email&id=` and `?modal=note&id=` (the id is the note's). Anything
+ * else reads as no window. Spread `modalSearchShape` into a route's own
+ * search schema.
  */
-export const MODALS = ['meeting', 'email'] as const
+export const MODALS = ['meeting', 'email', 'note'] as const
 export type Modal = (typeof MODALS)[number]
 
 export const modalSearchShape = {

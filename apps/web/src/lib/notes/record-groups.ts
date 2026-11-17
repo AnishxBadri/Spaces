@@ -17,9 +17,11 @@ export type NoteLanes<T extends { id: string }> = {
 
 type Groupable = NoteOrder & { id: string; supersededBy: string | null }
 
+type Groups<T> = { notes: Array<T>; meetings: Array<T>; superseded: Array<T> }
+
 export function recordNoteGroups<T extends Groupable>(
   lanes: NoteLanes<T>,
-): { notes: Array<T>; meetings: Array<T>; superseded: Array<T> } {
+): Groups<T> {
   const seen = new Set<string>()
   const once = (rows: ReadonlyArray<T>) =>
     rows.filter((n) => {
@@ -38,6 +40,48 @@ export function recordNoteGroups<T extends Groupable>(
       .sort((a, b) =>
         a.updatedAt === b.updatedAt ? 0 : a.updatedAt > b.updatedAt ? -1 : 1,
       ),
+  }
+}
+
+/** The Notes tab's filter: every note, or one of the three it splits into. */
+export const NOTE_FILTERS = ['all', 'memo', 'note', 'meeting'] as const
+export type NoteFilter = (typeof NOTE_FILTERS)[number]
+
+/**
+ * What each filter holds, current notes only: the memos and the notes filed
+ * here or mentioning it, and the meetings' notes whatever their kind. The
+ * three never overlap.
+ */
+export function noteFilterCounts<T extends Groupable>(
+  groups: Groups<T>,
+): Record<Exclude<NoteFilter, 'all'>, number> {
+  return {
+    memo: groups.notes.filter((n) => n.kind === 'memo').length,
+    note: groups.notes.filter((n) => n.kind === 'note').length,
+    meeting: groups.meetings.length,
+  }
+}
+
+/**
+ * The groups a filter shows. A superseded note is history rather than a
+ * kind, so only `all` keeps the superseded fold.
+ */
+export function filterNoteGroups<T extends Groupable>(
+  groups: Groups<T>,
+  filter: NoteFilter,
+): Groups<T> {
+  switch (filter) {
+    case 'all':
+      return groups
+    case 'meeting':
+      return { notes: [], meetings: groups.meetings, superseded: [] }
+    case 'memo':
+    case 'note':
+      return {
+        notes: groups.notes.filter((n) => n.kind === filter),
+        meetings: [],
+        superseded: [],
+      }
   }
 }
 

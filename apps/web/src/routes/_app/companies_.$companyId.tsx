@@ -1,10 +1,5 @@
 import { splitReadouts } from '#/lib/records/overview'
-import {
-  createFileRoute,
-  redirect,
-  useNavigate,
-  useRouter,
-} from '@tanstack/react-router'
+import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
@@ -63,8 +58,8 @@ import {
 } from '#/lib/records/record-tabs'
 import { openModalId } from '#/lib/modal-search'
 import { MeetingDialog } from '#/components/meeting-dialog'
+import { NoteModal } from '#/components/notes/note-window'
 import {
-  createNote,
   getCompany,
   getRecordEnrichment,
   getEntitySensitivity,
@@ -167,7 +162,6 @@ function CompanyRecordPage() {
   } = Route.useLoaderData()
   const stageDef = dealRegistry.find((d) => d.slug === 'stage')
   const router = useRouter()
-  const navigate = useNavigate()
   const go = Route.useNavigate()
   const search = Route.useSearch()
   const [tab, changeTab] = useRecordTab(
@@ -194,19 +188,6 @@ function CompanyRecordPage() {
     },
     [team],
   )
-
-  async function newNoteAboutThis() {
-    try {
-      const { id } = await createNote({
-        data: {
-          about: { entityId: company.id, label: company.name, kind: 'company' },
-        },
-      })
-      void navigate({ to: '/notes/$noteId', params: { noteId: id } })
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not create note')
-    }
-  }
 
   usePageActions(
     [
@@ -441,7 +422,16 @@ function CompanyRecordPage() {
                 )}
               />
             ),
-            notes: <RecordNotes notes={notes} onNewNote={newNoteAboutThis} />,
+            notes: (
+              <RecordNotes
+                notes={notes}
+                about={{
+                  entityId: company.id,
+                  label: company.name,
+                  kind: 'company',
+                }}
+              />
+            ),
             interactions: (
               <RecordInteractions
                 items={timeline}
@@ -481,6 +471,7 @@ function CompanyRecordPage() {
         }}
         onChanged={() => void router.invalidate()}
       />
+      <NoteModal />
     </ListPage>
   )
 }

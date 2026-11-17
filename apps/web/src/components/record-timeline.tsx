@@ -399,7 +399,7 @@ function hereWith(search: Record<string, string>): string {
 /**
  * A thread row's `···`: Open · Write up · Copy link · File on a deal… ·
  * rule · Unlink from <record>….
- * - Open is the email's window, the meeting's, or the write-up.
+ * - Open is the email's window, the meeting's, or the write-up's.
  * - Write up is offered while there is no body and the body is not private.
  * - Unlink only where this record holds its own edge, not one a deal reads
  *   through its company or people.
@@ -442,8 +442,20 @@ function ThreadMenu({
       })
       return
     }
-    if (item.noteId !== null)
-      void navigate({ to: '/notes/$noteId', params: { noteId: item.noteId } })
+    if (item.noteId !== null) openNote(item.noteId)
+  }
+
+  function openNote(noteId: string) {
+    void navigate({
+      to: '.',
+      search: (prev) => ({
+        ...prev,
+        tab: 'interactions' as const,
+        modal: 'note' as const,
+        id: noteId,
+      }),
+      resetScroll: false,
+    })
   }
 
   async function writeUp() {
@@ -453,7 +465,7 @@ function ThreadMenu({
         data: { interactionId: item.id },
       })
       void router.invalidate()
-      void navigate({ to: '/notes/$noteId', params: { noteId } })
+      openNote(noteId)
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Could not write it up')
     } finally {
@@ -465,7 +477,7 @@ function ThreadMenu({
     windowOf !== null
       ? hereWith({ tab: 'interactions', modal: windowOf, id: item.id })
       : item.noteId !== null
-        ? new URL(`/notes/${item.noteId}`, window.location.href).toString()
+        ? hereWith({ tab: 'interactions', modal: 'note', id: item.noteId })
         : hereWith({ tab: 'interactions' })
 
   async function unlink(from: { id: string; name: string }) {

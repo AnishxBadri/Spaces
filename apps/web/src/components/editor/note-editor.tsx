@@ -135,6 +135,7 @@ export function NoteEditor({
   terms = [],
   onChange,
   onFileDrop,
+  portalRoot,
 }: {
   initialContent: NoteBody | null
   /**
@@ -156,6 +157,14 @@ export function NoteEditor({
    * so giving them the gesture would mean inventing an answer for them.
    */
   onFileDrop?: FileDropHandler
+  /**
+   * Where the floating UI (menus, toolbars, side menu, table handles)
+   * mounts, read once when the editor mounts. Omitted, it is the editor's own
+   * container. A window hands an element inside its sheet but outside its
+   * scroller, wrapped in `.prose-note`, so the focus trap lets the menus be
+   * clicked and the scroller never clips them.
+   */
+  portalRoot?: HTMLElement | undefined
 }) {
   const editor = useCreateBlockNote(
     {
@@ -373,6 +382,9 @@ export function NoteEditor({
          *    four default controllers are off and re-rendered here.
          */
         shadCNComponents={instrumentChrome}
+        {...(portalRoot === undefined
+          ? {}
+          : { portalElements: { default: portalRoot } })}
         formattingToolbar={false}
         linkToolbar={false}
         slashMenu={false}

@@ -336,3 +336,41 @@ export const listRecordNotesProgram = Effect.fn('listRecordNotesProgram')(
     }
   },
 )
+
+/**
+ * The attendees of the meeting or call a note writes up (its body or a
+ * second note), by name, the viewer left out; empty for any other note.
+ * The caller has already decided the viewer may read the note.
+ */
+export const noteAttendeesProgram = Effect.fn('noteAttendeesProgram')(
+  function* (userId: string, noteId: string) {
+    const onMeeting = inArray(interaction.kind, ['meeting', 'call'])
+    const [writeUp, carried] = yield* Effect.all(
+      [
+        query(() =>
+          db
+            .select({ id: interaction.id })
+            .from(interaction)
+            .where(and(eq(interaction.noteId, noteId), onMeeting)),
+        ),
+        query(() =>
+          db
+            .select({ id: interaction.id })
+            .from(interactionNote)
+            .innerJoin(
+              interaction,
+              eq(interaction.id, interactionNote.interactionId),
+            )
+            .where(and(eq(interactionNote.noteId, noteId), onMeeting)),
+        ),
+      ],
+      { concurrency: 'unbounded' },
+    )
+    const meeting = [...writeUp, ...carried].at(0)
+    if (meeting === undefined) return []
+    const people = yield* rowPeople(userId, [
+      { authorId: null, interactionId: meeting.id },
+    ])
+    return people.attendees.get(meeting.id) ?? []
+  },
+)

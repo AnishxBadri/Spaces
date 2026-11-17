@@ -316,6 +316,25 @@ export const getNote = createServerFn()
   })
 
 /**
+ * A note as its window over a record reads it: the note as `getNote` has
+ * it, and the attendees of the meeting it writes up for the head's people.
+ * `null` for a note the reader may not read, as `getNote`.
+ */
+export const getNoteWindow = createServerFn()
+  .validator(input(Schema.Struct({ id: uuid })))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { noteAttendeesProgram } = await import('../notes/list-record')
+    return Effect.runPromise(
+      Effect.gen(function* () {
+        const found = yield* getNoteProgram(u.id, data.id)
+        const attendees = yield* noteAttendeesProgram(u.id, data.id)
+        return { note: found, attendees }
+      }).pipe(Effect.catchTag('NoteRefused', () => Effect.succeed(null))),
+    )
+  })
+
+/**
  * What deleting this note would unlink, and what would refuse it — the two
  * things the confirm dialog has to say before it offers a Delete button.
  */

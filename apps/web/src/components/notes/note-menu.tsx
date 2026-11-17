@@ -6,7 +6,7 @@ import { KindIcon } from '#/components/kind-icon'
 import { SaveAsTemplateAction } from '#/components/templates'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import { MENU_RULE, MoreMenu } from '#/components/ui/more-menu'
-import type { MoreMenuEntry } from '#/components/ui/more-menu'
+import type { MoreMenuCheck, MoreMenuEntry } from '#/components/ui/more-menu'
 import {
   deleteNote,
   previewNoteDeletion,
@@ -19,6 +19,57 @@ const KINDS: ReadonlyArray<{ id: NoteKind; label: string }> = [
   { id: 'note', label: 'Note' },
   { id: 'memo', label: 'Memo' },
 ]
+
+/**
+ * The two checked kind rows, `Note` and `Memo`: the `KIND` group of the
+ * note's `···`, and the whole menu of a note window's leading mark.
+ */
+export function noteKindEntries({
+  kind,
+  busy,
+  onKind,
+}: {
+  kind: NoteKind
+  busy: boolean
+  onKind: (next: NoteKind) => void
+}): Array<MoreMenuCheck> {
+  return KINDS.map((k) => ({
+    label: k.label,
+    checked: k.id === kind,
+    disabled: busy,
+    // Choosing the checked row again is not a change.
+    onCheckedChange: () => {
+      if (k.id !== kind) onKind(k.id)
+    },
+  }))
+}
+
+/**
+ * A note's kind as the reader changes it: optimistic, the row checks on the
+ * click and rolls back on a refusal; the router reloads once it lands.
+ * `busy` is true while a change is in flight.
+ */
+export function useNoteKind(noteId: string, initial: NoteKind) {
+  const router = useRouter()
+  const [kind, setKind] = useState(initial)
+  const [busy, setBusy] = useState(false)
+  async function change(next: NoteKind) {
+    if (busy) return
+    const previous = kind
+    setKind(next)
+    setBusy(true)
+    try {
+      await setNoteKind({ data: { id: noteId, kind: next } })
+      await router.invalidate()
+    } catch (e) {
+      setKind(previous)
+      toast.error(e instanceof Error ? e.message : 'Could not change that')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return { kind, busy, change }
+}
 
 /**
  * The note head's `···`, in order: the `KIND` group of two checked rows;
@@ -44,15 +95,7 @@ export function noteMenuEntries({
 }): Array<MoreMenuEntry> {
   return [
     { group: 'Kind' },
-    ...KINDS.map((k) => ({
-      label: k.label,
-      checked: k.id === kind,
-      disabled: busy,
-      // Choosing the checked row again is not a change.
-      onCheckedChange: () => {
-        if (k.id !== kind) onKind(k.id)
-      },
-    })),
+    ...noteKindEntries({ kind, busy, onKind }),
     MENU_RULE,
     {
       label: 'Save as new version',
@@ -116,26 +159,10 @@ export function NoteMoreMenu({
   const navigate = useNavigate()
   const router = useRouter()
   const { confirm, confirmDialog } = useConfirm()
-  const [kind, setKind] = useState(initialKind)
+  const kind = useNoteKind(noteId, initialKind)
   const [templating, setTemplating] = useState(false)
-  const [busy, setBusy] = useState(false)
-
-  async function changeKind(next: NoteKind) {
-    if (busy) return
-    const previous = kind
-    // Optimistic: the row checks on the click and rolls back on a refusal.
-    setKind(next)
-    setBusy(true)
-    try {
-      await setNoteKind({ data: { id: noteId, kind: next } })
-      await router.invalidate()
-    } catch (e) {
-      setKind(previous)
-      toast.error(e instanceof Error ? e.message : 'Could not change that')
-    } finally {
-      setBusy(false)
-    }
-  }
+  const [acting, setBusy] = useState(false)
+  const busy = acting || kind.busy
 
   async function newVersion() {
     if (busy) return
@@ -214,9 +241,9 @@ export function NoteMoreMenu({
         label="this note"
         forceMenu
         items={noteMenuEntries({
-          kind,
+          kind: kind.kind,
           busy,
-          onKind: (next) => void changeKind(next),
+          onKind: (next) => void kind.change(next),
           onNewVersion: () => void newVersion(),
           onTemplate: () => setTemplating(true),
           onCopyLink: copyLink,

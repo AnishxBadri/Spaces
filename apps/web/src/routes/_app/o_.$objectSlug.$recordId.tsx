@@ -4,7 +4,6 @@ import {
   Link,
   notFound,
   redirect,
-  useNavigate,
   useRouter,
 } from '@tanstack/react-router'
 import { useState } from 'react'
@@ -57,8 +56,8 @@ import {
 } from '#/lib/records/record-tabs'
 import { openModalId } from '#/lib/modal-search'
 import { MeetingDialog } from '#/components/meeting-dialog'
+import { NoteModal } from '#/components/notes/note-window'
 import {
-  createNote,
   getObjectRecord,
   getRecordTimeline,
   listRecordDocuments,
@@ -150,7 +149,6 @@ function ObjectRecordPage() {
     duplicates,
   } = Route.useLoaderData()
   const router = useRouter()
-  const navigate = useNavigate()
   const Icon = objectIcon(record.object)
   const values = withDerived(record.values, record.relations)
   const go = Route.useNavigate()
@@ -165,24 +163,6 @@ function ObjectRecordPage() {
   async function saveValue(slug: string, v: unknown) {
     await updateRecord({ data: { id: record.id, patch: { [slug]: v } } })
     void router.invalidate()
-  }
-
-  async function newNoteAboutThis() {
-    try {
-      const { id } = await createNote({
-        data: {
-          about: {
-            entityId: record.id,
-            label: record.name,
-            kind: 'custom',
-            objectSlug: record.object.slug,
-          },
-        },
-      })
-      void navigate({ to: '/notes/$noteId', params: { noteId: id } })
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not create note')
-    }
   }
 
   // Interactions are logged with people: only an object that links them
@@ -406,7 +386,17 @@ function ObjectRecordPage() {
                 }
               />
             ),
-            notes: <RecordNotes notes={notes} onNewNote={newNoteAboutThis} />,
+            notes: (
+              <RecordNotes
+                notes={notes}
+                about={{
+                  entityId: record.id,
+                  label: record.name,
+                  kind: 'custom',
+                  objectSlug: record.object.slug,
+                }}
+              />
+            ),
             interactions: (
               <RecordInteractions
                 items={timeline}
@@ -448,6 +438,7 @@ function ObjectRecordPage() {
         }}
         onChanged={() => void router.invalidate()}
       />
+      <NoteModal />
     </ListPage>
   )
 }

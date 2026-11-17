@@ -4,7 +4,6 @@ import {
   createFileRoute,
   Link,
   redirect,
-  useNavigate,
   useRouter,
 } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
@@ -67,8 +66,8 @@ import {
 } from '#/lib/records/record-tabs'
 import { openModalId } from '#/lib/modal-search'
 import { MeetingDialog } from '#/components/meeting-dialog'
+import { NoteModal } from '#/components/notes/note-window'
 import {
-  createNote,
   getEntitySensitivity,
   getRecordArchive,
   getPerson,
@@ -165,7 +164,6 @@ function PersonRecordPage() {
     duplicates,
   } = Route.useLoaderData()
   const router = useRouter()
-  const navigate = useNavigate()
   const go = Route.useNavigate()
   const search = Route.useSearch()
   const [tab, changeTab] = useRecordTab(
@@ -208,19 +206,6 @@ function PersonRecordPage() {
   async function saveValue(slug: string, value: unknown) {
     await updateRecord({ data: { id: person.id, patch: { [slug]: value } } })
     void router.invalidate()
-  }
-
-  async function newNoteAboutThis() {
-    try {
-      const { id } = await createNote({
-        data: {
-          about: { entityId: person.id, label: person.name, kind: 'person' },
-        },
-      })
-      void navigate({ to: '/notes/$noteId', params: { noteId: id } })
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not create note')
-    }
   }
 
   usePageActions(
@@ -499,7 +484,16 @@ function PersonRecordPage() {
                 )}
               />
             ),
-            notes: <RecordNotes notes={notes} onNewNote={newNoteAboutThis} />,
+            notes: (
+              <RecordNotes
+                notes={notes}
+                about={{
+                  entityId: person.id,
+                  label: person.name,
+                  kind: 'person',
+                }}
+              />
+            ),
             interactions: (
               <RecordInteractions
                 items={timeline}
@@ -545,6 +539,7 @@ function PersonRecordPage() {
         }}
         onChanged={() => void router.invalidate()}
       />
+      <NoteModal />
     </ListPage>
   )
 }

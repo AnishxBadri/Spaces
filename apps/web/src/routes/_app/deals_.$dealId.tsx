@@ -3,7 +3,6 @@ import {
   createFileRoute,
   Link,
   redirect,
-  useNavigate,
   useRouter,
 } from '@tanstack/react-router'
 import { Compass } from '#/components/icons'
@@ -69,8 +68,8 @@ import {
 } from '#/lib/records/record-tabs'
 import { openModalId } from '#/lib/modal-search'
 import { MeetingDialog } from '#/components/meeting-dialog'
+import { NoteModal } from '#/components/notes/note-window'
 import {
-  createNote,
   getDeal,
   getRecordTimeline,
   listRecordActions,
@@ -159,7 +158,6 @@ function DealRecordPage() {
     duplicates,
   } = Route.useLoaderData()
   const router = useRouter()
-  const navigate = useNavigate()
   const [moveOpen, setMoveOpen] = useState(false)
   const go = Route.useNavigate()
   const search = Route.useSearch()
@@ -227,17 +225,6 @@ function DealRecordPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not save')
       void router.invalidate()
-    }
-  }
-
-  async function newNoteAboutThis() {
-    try {
-      const { id } = await createNote({
-        data: { about: { entityId: deal.id, label: deal.name, kind: 'deal' } },
-      })
-      void navigate({ to: '/notes/$noteId', params: { noteId: id } })
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not create note')
     }
   }
 
@@ -523,7 +510,12 @@ function DealRecordPage() {
                 )}
               />
             ),
-            notes: <RecordNotes notes={notes} onNewNote={newNoteAboutThis} />,
+            notes: (
+              <RecordNotes
+                notes={notes}
+                about={{ entityId: deal.id, label: deal.name, kind: 'deal' }}
+              />
+            ),
             interactions: (
               <RecordInteractions
                 items={timeline}
@@ -565,6 +557,7 @@ function DealRecordPage() {
         }}
         onChanged={() => void router.invalidate()}
       />
+      <NoteModal />
     </ListPage>
   )
 }

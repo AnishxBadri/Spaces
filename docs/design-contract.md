@@ -99,7 +99,8 @@ sit on the 24px edge (`components/head-fold.tsx`).
   `Update view` + `Reset` on a changed view; `Save as new view…` lives in the view's
   `···`. Tables keep their column lines and white column heads.
 - **E6 · Every create is `+ New x`, in pine.** The split `[+ New x | ▾]` only where
-  creating is instant and templates exist (Notes, Spaces). Files' create is `Upload`;
+  creating is instant and templates exist (Notes, Spaces); at the right end of a
+  tab's toolbar (a record's Notes tab) it is the bordered secondary, as Files' `Upload`. Files' create is `Upload`;
   Portfolio's primary is `Record a check`. A window's confirm carries no icon.
 - **E7 · One icon per verb, Carbon first**, from one shared icon list; a custom SVG only
   for our own concepts (the note kinds), drawn on Carbon's 32px grid. Brand marks only
@@ -399,7 +400,7 @@ hand-rolling one.
 | --------------------------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PageHeader`, `ReadoutStrip`                                                      | `apps/web/src/components/page-header.tsx`                | P1 — paper, the serif title on the 24px edge, `[outline?] [Primary] [···]` right ending 24px in, one ink line under; keys in tooltips (A2), and a count only in the title (`HeadCount`) when the page has no tab bar; `tabs` stands on a pinned `FolderGround`                                                                                                                                                                               |
 | `PageBody`, `Card`, `PAGE_EDGE`                                                   | `apps/web/src/components/page-header.tsx`                | E1, E9 — `PageBody` is the bone ground under the head, the 12px gutter round it and cards 12px apart, filling the height; a card is the `card` utility, paper in a 1px rule box whose rows inset by `--inset` (11px), so its content lands on the 24px edge, and a `SectionHead` that opens it is its paper head. `FolderGround`: the gutter and bone a folder bar stands on, pinned under the folded head                                   |
-| `NewButton`, `SplitNewButton`                                                     | `apps/web/src/components/new-button.tsx`                 | E6 — `+ New x` in pine; the split `[+ New x \| ▾]` with the templates behind the `▾` (Notes, Spaces only)                                                                                                                                                                                                                                                                                                                                    |
+| `NewButton`, `SplitNewButton`                                                     | `apps/web/src/components/new-button.tsx`                 | E6 — `+ New x` in pine; the split `[+ New x \| ▾]` with the templates behind the `▾` (Notes, Spaces only), `variant="secondary"` bordered in a tab's toolbar                                                                                                                                                                                                                                                                                 |
 | `icon`, the nouns, `NoteKindIcon`                                                 | `apps/web/src/components/icons.ts`, `note-kind-icon.tsx` | E7 — the only icon-library import site (Carbon, D19): one glyph per verb (`icon.new`, `icon.filter`, …), nouns by name; the note kinds drawn on Carbon's grid; 16px, 20px leading a window head                                                                                                                                                                                                                                              |
 | `ProviderMark`, `brandOf`                                                         | `apps/web/src/components/provider-mark.tsx`              | E7 — every brand mark, in its own colours: Simple Icons paths, the multi-colour Google logos, or the brand's app icon from `public/brands/`; an unknown plugin gets its initial from `PluginMark`                                                                                                                                                                                                                                            |
 | `SectionHead`, `LedgerSection`, `LedgerRow`, `LedgerFigure`, `ReferenceBar`       | `apps/web/src/components/ledger-section.tsx`             | P2/P3 — bone head band (title left, mono ink count or a `Segmented` right, never both), 40px rows on rules, a fixed mono lane, value-vs-median                                                                                                                                                                                                                                                                                               |
@@ -431,9 +432,10 @@ hand-rolling one.
 
 ### Windows
 
-A window takes one of four widths: **S 440 · M 560 · L 768 · viewer 1152**. A confirm
+A window takes one of five widths: **S 440 · M 560 · L 768 · note 900 · viewer 1152**. A confirm
 or a one-field window is S, a form is M, a reading window (an email, a meeting, the
-keyboard sheet) is L, and the file viewer is 1152 in every case. The size is the
+keyboard sheet) is L, a note opened over a record is 900 by the window's height less
+80px (D108), and the file viewer is 1152 in every case. The size is the
 primitive's prop, never a width the caller spells. A window opened from a window steps
 down under its parent, and at most one is stacked: a third is refused. Cmd-K owns its
 own size (D70).

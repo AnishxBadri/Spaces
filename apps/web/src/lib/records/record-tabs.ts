@@ -25,20 +25,24 @@ export const DEFAULT_RECORD_TAB: RecordTab = 'overview'
 
 /**
  * `?tab=` deep-links a tab; anything else reads as no tab. `?modal=` opens a
- * window over the Interactions tab.
+ * window over the record (`linkedRecordTab` picks the tab behind it).
  */
 export const recordSearch = z.object({
   tab: z.enum(RECORD_TABS).optional().catch(undefined),
   ...modalSearchShape,
 })
 
-/** The tab a link asks for: its own, else Interactions under a window. */
+/**
+ * The tab a link asks for: its own, else Notes under a note's window and
+ * Interactions under any other.
+ */
 export function linkedRecordTab(search: {
   tab?: RecordTab | undefined
   modal?: string | undefined
 }): RecordTab | undefined {
   if (search.tab !== undefined) return search.tab
-  return search.modal === undefined ? undefined : 'interactions'
+  if (search.modal === undefined) return undefined
+  return search.modal === 'note' ? 'notes' : 'interactions'
 }
 
 /** The tab to show: the link's, else Overview. */

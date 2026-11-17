@@ -62,6 +62,14 @@ await vi.hoisted(async () => {
   Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true)
 })
 
+/** The note fns the Notes tab's toolbar calls. */
+const noteFns = vi.hoisted(() => ({
+  createNote: vi.fn(() => Promise.resolve({ id: 'born' })),
+  createNoteFromTemplate: vi.fn(() => Promise.resolve({ id: 'stamped' })),
+  fileNoteAgainst: vi.fn(() => Promise.resolve()),
+  listTemplates: vi.fn(() => Promise.resolve([])),
+}))
+
 vi.mock('#/lib/server-fns', () => ({
   getRecordEmailVisibility: vi.fn(() => Promise.resolve({ workspace: false })),
   setRecordEmailVisibility: vi.fn(() => Promise.resolve()),
@@ -70,20 +78,44 @@ vi.mock('#/lib/server-fns', () => ({
   unlinkInteractionFromEntity: vi.fn(),
   listUsers: vi.fn(),
   searchEntities: vi.fn(),
+  ...noteFns,
 }))
 /** The page's search; empty, so the email window stays shut, unless a test sets it. */
 const routerSearch = vi.hoisted(() => {
-  const current: { modal?: 'email'; id?: string } = {}
+  const current: { modal?: 'email' | 'note'; id?: string } = {}
   return { current }
 })
+
+/** Every navigation, as the router was asked for it. */
+const navigate = vi.hoisted(() => vi.fn((_to: unknown) => Promise.resolve()))
 
 // The window has its own suite; here only the row.
 vi.mock('#/components/email-dialog', () => ({ EmailModal: () => null }))
 vi.mock('@tanstack/react-router', () => ({
   useRouter: () => ({ invalidate: () => Promise.resolve() }),
   useSearch: () => routerSearch.current,
-  useNavigate: () => () => Promise.resolve(),
-  Link: ({ children }: { children: ReactNode }) => <a href="#">{children}</a>,
+  useNavigate: () => navigate,
+  Link: ({
+    children,
+    search,
+  }: {
+    children: ReactNode
+    search?: (prev: Record<string, unknown>) => Record<string, unknown>
+  }) => (
+    <a
+      href={
+        search === undefined
+          ? '#'
+          : `?${new URLSearchParams(
+              Object.entries(search({ tab: 'notes' })).flatMap(([k, v]) =>
+                typeof v === 'string' ? [[k, v]] : [],
+              ),
+            ).toString()}`
+      }
+    >
+      {children}
+    </a>
+  ),
 }))
 
 let root: Root | null = null
@@ -91,6 +123,10 @@ let host: HTMLElement | null = null
 
 afterEach(() => {
   routerSearch.current = {}
+  navigate.mockClear()
+  noteFns.createNote.mockClear()
+  noteFns.createNoteFromTemplate.mockClear()
+  noteFns.fileNoteAgainst.mockClear()
   act(() => root?.unmount())
   host?.remove()
   root = null
@@ -718,23 +754,138 @@ describe('the Notes tab', () => {
     ...over,
   })
 
-  it('is one Notes + row with no notes: no composer, no sentence', async () => {
-    const onNewNote = vi.fn()
+  const about = { entityId: 'rec', label: 'Flent', kind: 'company' }
+
+  it('is its toolbar alone with no notes: No notes yet, and New note ⌄', async () => {
     const el = await mount(
       <RecordNotes
         notes={{ filed: [], fromMeetings: [], mentions: [] }}
-        onNewNote={onNewNote}
+        about={about}
       />,
     )
-    expect(el.textContent).toBe('Notes+')
-    const empty = el.querySelector('[data-empty-row]')
-    if (empty === null) throw new Error('no empty row')
-    await click(empty)
-    expect(onNewNote).toHaveBeenCalledOnce()
+    const toolbar = el.querySelector('[data-notes-toolbar]')
+    expect(toolbar?.textContent).toBe('No notes yetNew note')
+    expect(el.querySelector('[role="radiogroup"]')).toBeNull()
+    expect(el.querySelector('[data-empty-row]')).toBeNull()
+    expect(el.querySelector('li')).toBeNull()
+    // The split, bordered as a tab toolbar's secondary, not pine.
+    const split = el.querySelector('[data-split-new]')
+    expect(split?.getAttribute('data-split-new')).toBe('secondary')
+    expect(
+      split?.querySelector('[data-new-button]')?.getAttribute('data-variant'),
+    ).toBe('outline')
   })
 
-  it('opens on its composer, then filed notes, a FROM MEETINGS band, and superseded notes last', async () => {
-    const onNewNote = vi.fn()
+  it('makes a blank note filed here and opens it in the window', async () => {
+    await mount(
+      <RecordNotes
+        notes={{ filed: [], fromMeetings: [], mentions: [] }}
+        about={about}
+      />,
+    )
+    await click(button(/^New note$/))
+    expect(noteFns.createNote).toHaveBeenCalledWith({ data: { about } })
+    const to = navigate.mock.calls.at(0)?.at(0)
+    if (typeof to !== 'object' || to === null || !('search' in to))
+      throw new Error('no navigation')
+    const { search } = to
+    if (typeof search !== 'function') throw new Error('no search')
+    expect(search({ tab: 'overview', q: 'x' })).toEqual({
+      tab: 'notes',
+      q: 'x',
+      modal: 'note',
+      id: 'born',
+    })
+  })
+
+  it('counts each filter above zero, and narrows the rows to it', async () => {
+    const el = await mount(
+      <RecordNotes
+        notes={{
+          filed: [
+            row('m', 'IC memo', { kind: 'memo' }),
+            row('n1', 'Loose ends'),
+            row('n2', 'Aside'),
+          ],
+          fromMeetings: [],
+          mentions: [],
+        }}
+        about={about}
+      />,
+    )
+    const segments = [...el.querySelectorAll('[role="radio"]')].map(
+      (s) => s.textContent,
+    )
+    // No meetings: the segment stays, with no count.
+    expect(segments).toEqual(['All', 'Memos1', 'Notes2', 'Meetings'])
+    await click(button(/^Memos1$/))
+    expect(
+      [...el.querySelectorAll('li[data-note]')].map((l) =>
+        l.getAttribute('data-note'),
+      ),
+    ).toEqual(['m'])
+    await click(button(/^Meetings$/))
+    expect(el.querySelector('li[data-note]')).toBeNull()
+    expect(el.textContent).toContain('Nothing matches that filter.')
+  })
+
+  it('folds superseded notes into one row that unfolds them in place', async () => {
+    const el = await mount(
+      <RecordNotes
+        notes={{
+          filed: [
+            row('old', 'IC memo v1', { kind: 'memo', supersededBy: 'memo' }),
+            row('older', 'IC memo v0', { kind: 'memo', supersededBy: 'old' }),
+            row('memo', 'IC memo', { kind: 'memo' }),
+          ],
+          fromMeetings: [row('g', 'Call')],
+          mentions: [],
+        }}
+        about={about}
+      />,
+    )
+    const ids = () =>
+      [...el.querySelectorAll('li[data-note]')].map((l) =>
+        l.getAttribute('data-note'),
+      )
+    expect(ids()).toEqual(['memo', 'g'])
+    const fold = el.querySelector('[data-fold-row]')
+    expect(fold?.textContent).toBe('2 superseded')
+    // The fold ends the list, after the meetings band.
+    expect(
+      el.querySelector('[data-notes-toolbar]')?.parentElement?.lastElementChild,
+    ).toBe(fold)
+    if (fold === null) throw new Error('no fold')
+    await click(fold)
+    expect(ids()).toEqual(['memo', 'g', 'old', 'older'])
+    expect(el.querySelector('[data-fold-row]')).toBeNull()
+  })
+
+  it('opens a row in the window, its row on bone behind it', async () => {
+    routerSearch.current = { modal: 'note', id: 's' }
+    const el = await mount(
+      <RecordNotes
+        notes={{
+          filed: [row('s', 'Loose ends'), row('t', 'Aside')],
+          fromMeetings: [],
+          mentions: [],
+        }}
+        about={about}
+      />,
+    )
+    const open = el.querySelector('li[data-note="s"]')
+    expect(open?.hasAttribute('data-highlighted')).toBe(true)
+    expect(open?.className).toContain('bg-bone')
+    expect(
+      el.querySelector('li[data-note="t"]')?.hasAttribute('data-highlighted'),
+    ).toBe(false)
+    const href = open?.querySelector('a')?.getAttribute('href')
+    expect(new URLSearchParams(href?.slice(1)).get('modal')).toBe('note')
+    expect(new URLSearchParams(href?.slice(1)).get('id')).toBe('s')
+    expect(new URLSearchParams(href?.slice(1)).get('tab')).toBe('notes')
+  })
+
+  it('lists filed notes, a FROM MEETINGS band, each row on one leading mark', async () => {
     const el = await mount(
       <RecordNotes
         notes={{
@@ -754,13 +905,11 @@ describe('the Notes tab', () => {
           ],
           mentions: [row('x', 'Aside', { author: 'Sam Lee' })],
         }}
-        onNewNote={onNewNote}
+        about={about}
       />,
     )
-    expect(el.querySelector('button')?.textContent).toBe('+Write a note…N')
-    await click(button(/^\+Write a note…N$/))
-    expect(onNewNote).toHaveBeenCalledOnce()
-    expect(el.querySelector('[role="group"]')).toBeNull()
+    expect(el.textContent).not.toContain('Write a note')
+    await click(button(/^1 superseded$/))
 
     const titles = [
       ...el.querySelectorAll('li[data-note] .font-serif.text-title'),
@@ -778,20 +927,20 @@ describe('the Notes tab', () => {
 
     const lane = (id: string, slot: string) =>
       el.querySelector(`li[data-note="${id}"] [data-${slot}]`)?.textContent
-    // The kind is the icon; the lane holds state words only.
-    expect(lane('memo', 'kind')).toBe('')
-    expect(lane('s', 'kind')).toBe('')
-    expect(lane('x', 'kind')).toBe('')
-    expect(lane('g', 'kind')).toBe('via Granola')
-    expect(lane('old', 'kind')).toBe('superseded')
+    // No kind lane: the mark says the kind, and the recorder.
+    expect(el.querySelector('[data-kind]')).toBeNull()
+    expect(el.textContent).not.toContain('via Granola')
     expect(lane('s', 'people')).toBe('Priya Raman')
     expect(lane('g', 'people')).toBe('Maya Iyer · Ravi Shah')
     expect(lane('s', 'excerpt')).toBe('Ask about churn in the Pune cohort.')
 
-    // Each row leads on its kind icon, named by its word; a meeting's note
-    // keeps its calendar. No serif pilcrow is left.
+    // A person's note leads on its kind icon, named by its word; a
+    // recorder's note on the recorder's logo in the same slot, never a
+    // calendar.
     const icon = (id: string) =>
       el.querySelector(`li[data-note="${id}"] [data-kind-icon]`)
+    const marks = (id: string) =>
+      el.querySelectorAll(`li[data-note="${id}"] [data-note-mark] > *`).length
     expect(icon('memo')?.getAttribute('aria-label')).toBe('Memo')
     expect(
       icon('memo')?.querySelector('[data-note-kind="memo"]'),
@@ -803,8 +952,12 @@ describe('the Notes tab', () => {
     expect(icon('old')?.className).toContain('text-graphite')
     expect(icon('g')).toBeNull()
     expect(
-      el.querySelector('li[data-note="g"] [data-icon="event"]'),
-    ).not.toBeNull()
+      el
+        .querySelector('li[data-note="g"] [data-provider-mark]')
+        ?.getAttribute('data-provider-mark'),
+    ).toBe('granola')
+    expect(el.querySelector('li[data-note="g"] [data-icon="event"]')).toBeNull()
+    for (const id of ['memo', 's', 'x', 'g', 'old']) expect(marks(id)).toBe(1)
     expect(el.textContent).not.toContain('¶')
 
     // A superseded note is one graphite line with no excerpt.

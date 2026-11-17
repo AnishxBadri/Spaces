@@ -182,12 +182,15 @@ export function EmptyRow({
  */
 export function FoldRow({
   hidden,
+  noun = 'more',
   detail,
   onShow,
   className,
 }: {
   /** How many rows the fold holds back. */
   hidden: number
+  /** What follows the count: `more`, or what the rows are (`superseded`). */
+  noun?: string | undefined
   /** What the held-back rows are, after a `·`: `Seed 3, Pre-seed 2`. */
   detail?: string | undefined
   onShow: () => void
@@ -203,7 +206,7 @@ export function FoldRow({
         className,
       )}
     >
-      {hidden} more
+      {`${String(hidden)} ${noun}`}
       {detail ? ` · ${detail}` : null}
     </button>
   )

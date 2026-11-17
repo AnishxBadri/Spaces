@@ -45,13 +45,18 @@ function DialogOverlay({
   )
 }
 
-/** The four window widths: a confirm, a form, a reading window, the file viewer. */
-export type WindowSize = 's' | 'm' | 'l' | 'viewer'
+/**
+ * The five window widths: a confirm, a form, a reading window, a note, the
+ * file viewer. A note's window is the window's height less 80px and lays out
+ * its own head and foot, so it takes no padding.
+ */
+export type WindowSize = 's' | 'm' | 'l' | 'note' | 'viewer'
 
 const WINDOW_SIZE: Record<WindowSize, string> = {
   s: 'sm:max-w-[27.5rem]',
   m: 'sm:max-w-[35rem]',
   l: 'sm:max-w-[48rem] max-h-[85vh] flex flex-col',
+  note: 'sm:max-w-[min(56.25rem,calc(100%-2rem))] h-[calc(100dvh-80px)] p-0 flex flex-col',
   viewer: 'sm:max-w-[72rem] h-[85vh] p-0 flex flex-col',
 }
 
