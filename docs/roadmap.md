@@ -43,6 +43,11 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 ## Open
 
 - `SPA-389` `ai-b` — the mandate in every judging lane, and cached tokens on the ledger. Project 31; `migration`, `hitl`: the owner confirms AI column answers may change under the mandate.
+- `SPA-427` `mentioned-in-read` — a note's `Mentioned in` lists only what the reader can open; today a private note's title leaks there. High, `afk`.
+- `SPA-428` `memo-graphite` — a memo's kind icon is graphite in the Notes list and on a record's Notes tab (D19). `afk`.
+- `SPA-429` `interactions-4` — email threads as message cards with one sender line, reply as the last card, the meeting window in two columns (D109). `afk`.
+- `SPA-430` `attachments-text` — email attachments keep their text and stay in Gmail until someone keeps them; raw MIME without attachment bodies; a folded `From email` band on the Files tab (D110). `afk`.
+- `SPA-431` `menus-icons` — every menu item leads with its 16px icon or service mark, a fixed lane, the same icon per verb (E12). `afk`.
 - `SPA-188` `ship-10` — install, upgrade and rollback docs. Project 16, In Progress. `docs/install.md` and `docs/upgrade.md` exist; check what is left.
 - `SPA-190` `ship-12` — one-click templates for Coolify, Railway, Render and Unraid. Project 16, In Progress; each needs a human deploy.
 
@@ -61,8 +66,8 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 
 ## Unticketed follow-ups
 
-- Notes: `getNote`'s `backlinks` are not filtered by `canRead`, so a private note that mentions a note shows its title under `Mentioned in`; in the note window a file-mention chip does not open its preview and a dropped file does nothing (the note page does both); an edit still inside the 800ms debounce is dropped when you confirm leaving.
-- Icons: History draws a mark, a stage move, a filed document and a merge with the glyphs the issue's table named, where Paper Record board 07 draws a line chart, an arrow, a page and a branch; export names in `components/icons.ts` are still Lucide's; the list's menus and Sort button keep `↑`/`↓` text glyphs; `apps/web/components.json` still says `lucide`.
+- Notes: in the note window a file-mention chip does not open its preview and a dropped file does nothing (the note page does both); an edit still inside the 800ms debounce is dropped when you confirm leaving.
+- Icons: export names in `components/icons.ts` are still Lucide's; the list's menus and Sort button keep `↑`/`↓` text glyphs; `apps/web/components.json` still says `lucide`.
 - The app-wide error screen says `The database did not answer.` for every failure; an unknown `/api/…` path falls to the app's catch-all route and its sign-in guard.
 - Brand marks: Granola, Apollo and Exa marks were not seen on a live screen (no such rows in the dev database); `Voyage` has no mark.
 - Edges: Import's inner grids and the empty-state pages are not carded.
