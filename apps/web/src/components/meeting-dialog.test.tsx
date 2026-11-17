@@ -232,15 +232,72 @@ describe('the meeting window', () => {
     expect(links()[0].getAttribute('href')).toContain('calendar.google.com')
   })
 
-  it('has one close, in the foot, and prints no esc or ↵', async () => {
+  it('has one close, Done, in the foot, and prints no esc or ↵', async () => {
     await open()
-    expect(buttons('Cancel')).toHaveLength(1)
+    expect(buttons('Cancel')).toHaveLength(0)
+    expect(buttons('Done')).toHaveLength(1)
     expect(
-      buttons('Cancel')[0].closest('[data-slot="dialog-footer"]'),
+      buttons('Done')[0].closest('[data-slot="dialog-footer"]'),
     ).not.toBeNull()
     const text = dialog()?.textContent ?? ''
     expect(text).not.toMatch(/\besc\b/i)
     expect(text).not.toContain('↵')
+  })
+
+  it('leads its head on the 20px calendar glyph', async () => {
+    await open()
+    const mark = dialog()?.querySelector(
+      '[data-slot="dialog-header"] [data-window-mark]',
+    )
+    expect(mark?.getAttribute('class')).toContain('size-5')
+  })
+
+  it('reads a participant as a name and an answer, the address a tooltip', async () => {
+    await open()
+    const ana = dialog()?.querySelector('[data-participant="ana@flent.io"]')
+    expect(ana?.textContent).toBe('Ana Reyes')
+    expect(ana?.getAttribute('title')).toBe('ana@flent.io')
+    const row = ana?.parentElement
+    expect(row?.textContent).toBe('Ana Reyes✓ Accepted')
+    expect(row?.querySelectorAll('.mono')).toHaveLength(1)
+  })
+
+  it('leads a linked record on its kind icon, never the kind word', async () => {
+    await open()
+    const linked = dialog()?.querySelector('[aria-label="Linked records"]')
+    const icon = linked?.querySelector('[data-kind-icon="company"]')
+    expect(icon?.getAttribute('aria-label')).toBe('Company')
+    expect(linked?.textContent).not.toMatch(/company/i)
+  })
+
+  it('opens the write-up in the note window when it sits over a record', async () => {
+    fns.getMeeting.mockResolvedValue({
+      ...DETAIL,
+      note: {
+        id: NOTE,
+        title: 'Flent intro',
+        body: null,
+        at: '2026-10-14T16:02:00.000Z',
+        openIn: null,
+        via: null,
+      },
+    } satisfies MeetingDetail)
+    const opened: Array<string> = []
+    act(() =>
+      root.render(
+        <MeetingDialog
+          id={ID}
+          onOpenChange={() => {}}
+          onOpenNote={(noteId) => opened.push(noteId)}
+        />,
+      ),
+    )
+    await settle()
+    const title = dialog()?.querySelector(`[data-note-link="${NOTE}"]`)
+    if (!(title instanceof HTMLElement)) throw new Error('no note link')
+    act(() => title.click())
+    expect(opened).toEqual([NOTE])
+    expect(navigate).not.toHaveBeenCalled()
   })
 
   it('lists artifacts by role: a recording opens the provider, a transcript the Files preview', async () => {

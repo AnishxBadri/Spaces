@@ -7,7 +7,7 @@ import { openFile } from '#/components/files/file-row'
 import type { RecordDocument } from '#/components/files/types'
 import { FileViewerSidebar } from '#/components/files/viewer-sidebar'
 import { Band, Day, EmptyRow } from '#/components/ledger-section'
-import { ThreadRow } from '#/components/record/thread-row'
+import { ThreadRow, useThreadHighlight } from '#/components/record/thread-row'
 import type { ThreadItem } from '#/components/record/thread-row'
 import { TasksBand } from '#/components/tasks-rail'
 import { fileType } from '#/lib/documents/files-tab'
@@ -59,6 +59,7 @@ export function RecordOverview({
   /** Above the readouts: the long text paragraphs. */
   lead?: ReactNode
 }) {
+  const highlighted = useThreadHighlight()
   const threads = latestThreads(
     timeline.filter(
       (r): r is Extract<TimelineRow, { type: 'interaction' }> =>
@@ -132,6 +133,7 @@ export function RecordOverview({
                 item={t.row}
                 messages={t.messages}
                 tab="overview"
+                highlighted={highlighted(t.row)}
               />
             ))}
           </ul>

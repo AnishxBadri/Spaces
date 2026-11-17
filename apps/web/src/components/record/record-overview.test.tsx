@@ -137,6 +137,7 @@ const thread = (
   attendees: [],
   sent: false,
   attachments: 0,
+  attachmentNames: [],
   summary: null,
   threadId: null,
   ...extra,
@@ -523,17 +524,111 @@ describe('a thread row', () => {
       'To Ada Lovelace',
     )
     expect(cls(row?.querySelector('[data-people]'))).toEqual(
-      expect.arrayContaining(['w-50', 'text-label', 'text-graphite']),
+      expect.arrayContaining(['w-60', 'text-label', 'text-graphite']),
     )
     expect(row?.textContent).not.toContain('Anish')
     expect(row?.querySelector('[data-messages]')?.textContent).toBe('3')
-    expect(row?.querySelector('[data-clip]')?.textContent).toBe('2')
     expect(row?.querySelector('time')?.textContent).toBe('21 Oct')
+    // Line one holds no clip: it sits on line two, at its right end.
+    const one = row?.firstElementChild
+    const two = row?.querySelector('[data-line-two]')
+    expect(one?.querySelector('[data-clip]')).toBeNull()
+    const clip = two?.querySelector('[data-clip]')
+    expect(clip?.textContent).toBe('2')
+    expect(two?.lastElementChild).toBe(clip)
+    // Under the day: the day's 88px lane, ending where it ends.
+    expect(cls(clip)).toEqual(expect.arrayContaining(['w-22', 'justify-end']))
+    expect(cls(one?.querySelector('time'))).toContain('w-22')
     const summary = row?.querySelector('[data-summary]')
     expect(summary?.textContent).toBe('Sends the Q3 deck.')
     expect(cls(summary)).toEqual(
-      expect.arrayContaining(['pl-7', 'pr-81', 'text-label', 'text-graphite']),
+      expect.arrayContaining([
+        'flex-1',
+        'min-w-0',
+        'truncate',
+        'text-label',
+        'text-graphite',
+      ]),
     )
+    expect(cls(two)).toEqual(expect.arrayContaining(['pl-7', 'gap-6']))
+  })
+
+  it('prints two names and +N past them', () => {
+    const p = (name: string) => ({ name, self: false })
+    const four = [
+      p('Priya Raman'),
+      p('Dev Shah'),
+      p('Ada Lovelace'),
+      p('Bo Li'),
+    ]
+    expect(threadPeople({ attendees: four, sent: false })).toBe(
+      'Priya Raman, Dev Shah +2',
+    )
+    expect(threadPeople({ attendees: [me, ...four], sent: true })).toBe(
+      'To Priya Raman, Dev Shah +2',
+    )
+    expect(
+      threadPeople({
+        attendees: [p('Priya Raman'), p('Dev Shah')],
+        sent: false,
+      }),
+    ).toBe('Priya Raman, Dev Shah')
+  })
+
+  it('names the files on line two when there is no summary, the clip in its place', async () => {
+    const el = await mount(
+      <ul>
+        <ThreadRow
+          item={{
+            ...thread('f', '2026-10-21T10:00:00.000Z'),
+            attachments: 2,
+            attachmentNames: ['acme-q3.pdf', 'cap-table.xlsx'],
+          }}
+        />
+      </ul>,
+    )
+    const row = el.querySelector('[data-thread="f"]')
+    expect(row?.querySelector('[data-summary]')).toBeNull()
+    const files = row?.querySelector('[data-files]')
+    expect(files?.textContent).toBe('acme-q3.pdf, cap-table.xlsx')
+    expect(cls(files)).toEqual(
+      expect.arrayContaining(['text-graphite', 'truncate']),
+    )
+    expect(files?.nextElementSibling?.hasAttribute('data-clip')).toBe(true)
+  })
+
+  it('keeps Latest to one line: the summary truncates', async () => {
+    const el = await mount(
+      <RecordOverview
+        record={RECORD}
+        readouts={[]}
+        timeline={[
+          thread('a', '2026-10-20T10:00:00.000Z', {
+            summary: 'A long summary that would run past one line.',
+          }),
+        ]}
+        documents={[]}
+        onTab={() => {}}
+      />,
+    )
+    const summary = el.querySelector('[data-thread="a"] [data-summary]')
+    expect(cls(summary)).toContain('truncate')
+    expect(cls(summary)).not.toContain('line-clamp-2')
+  })
+
+  it('hides the summary with a body private to someone else', async () => {
+    const el = await mount(
+      <ul>
+        <ThreadRow
+          item={{
+            ...thread('p', '2026-10-21T10:00:00.000Z'),
+            privateBody: true,
+            summary: 'Not for you.',
+          }}
+        />
+      </ul>,
+    )
+    expect(el.querySelector('[data-line-two]')).toBeNull()
   })
 
   it('draws no second line without a summary', async () => {

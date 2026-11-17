@@ -1,15 +1,33 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
+import { EMAIL_SUMMARY_MAX } from '@spaces/core/interactions/email-listing'
+import { input } from './input'
 import { requireUser } from './shared'
 
-const logInteractionInput = z.object({
-  kind: z.enum(['meeting', 'call']),
-  subject: z.string().trim().min(1).max(300),
-  occurredAt: z.string().datetime({ local: true }).or(z.string().datetime()),
+const uuid = Schema.String.check(Schema.isUUID())
+
+/** The `datetime-local` control's value, or an instant in UTC. */
+const moment = Schema.String.check(
+  Schema.isPattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?Z?$/, {
+    message: 'Expected a date and time',
+  }),
+)
+
+const logInteractionInput = Schema.Struct({
+  kind: Schema.Literals(['meeting', 'call']),
+  subject: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(300)),
+  occurredAt: moment,
   /** every entity in the room: people, companies, deals */
-  attendeeIds: z.array(z.string().uuid()).min(1).max(50),
+  attendeeIds: Schema.Array(uuid).check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(50),
+  ),
   /** "Log and write up": create the body note and hand back its id */
-  writeUp: z.boolean().optional(),
+  writeUp: Schema.optional(Schema.Boolean),
+  /** The row's second line; as long as the row prints, two lines at most. */
+  summary: Schema.optional(
+    Schema.Trim.check(Schema.isMaxLength(EMAIL_SUMMARY_MAX)),
+  ),
 })
 
 /**
@@ -18,7 +36,7 @@ const logInteractionInput = z.object({
  * beside it would reach the browser bundle. Tests call the program directly.
  */
 export const logInteraction = createServerFn({ method: 'POST' })
-  .validator(logInteractionInput)
+  .validator(input(logInteractionInput))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { interactionLogMessage, logInteractionProgram } =
@@ -29,17 +47,20 @@ export const logInteraction = createServerFn({ method: 'POST' })
         kind: data.kind,
         subject: data.subject,
         occurredAt: new Date(data.occurredAt),
-        attendeeIds: data.attendeeIds,
+        attendeeIds: [...data.attendeeIds],
         writeUp: data.writeUp ?? false,
+        // A blank Summary is no summary.
+        summary:
+          data.summary === undefined || data.summary === ''
+            ? null
+            : data.summary,
       })
     } catch (failure) {
       throw new Error(interactionLogMessage(failure))
     }
   })
 
-const writeUpInteractionInput = z.object({
-  interactionId: z.string().uuid(),
-})
+const writeUpInteractionInput = Schema.Struct({ interactionId: uuid })
 
 /**
  * Write up an interaction that was logged without a body — the
@@ -48,7 +69,7 @@ const writeUpInteractionInput = z.object({
  * in one editor rather than forking a second body.
  */
 export const writeUpInteraction = createServerFn({ method: 'POST' })
-  .validator(writeUpInteractionInput)
+  .validator(input(writeUpInteractionInput))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { writeUpInteractionProgram, writeUpMessage } =
@@ -61,14 +82,14 @@ export const writeUpInteraction = createServerFn({ method: 'POST' })
     }
   })
 
-const interactionEdgeInput = z.object({
-  interactionId: z.string().uuid(),
-  entityId: z.string().uuid(),
+const interactionEdgeInput = Schema.Struct({
+  interactionId: uuid,
+  entityId: uuid,
 })
 
 /** File on a deal… from a thread's row: one more record it belongs to. */
 export const fileInteractionOnEntity = createServerFn({ method: 'POST' })
-  .validator(interactionEdgeInput)
+  .validator(input(interactionEdgeInput))
   .handler(async ({ data }) => {
     await requireUser()
     const { fileInteractionOnEntityProgram, interactionEdgeMessage } =
@@ -86,7 +107,7 @@ export const fileInteractionOnEntity = createServerFn({ method: 'POST' })
 
 /** Unlink from <record>… from a thread's row: that one edge goes. */
 export const unlinkInteractionFromEntity = createServerFn({ method: 'POST' })
-  .validator(interactionEdgeInput)
+  .validator(input(interactionEdgeInput))
   .handler(async ({ data }) => {
     await requireUser()
     const { unlinkInteractionFromEntityProgram, interactionEdgeMessage } =

@@ -537,6 +537,13 @@ function PersonRecordPage() {
               resetScroll: false,
             })
         }}
+        onOpenNote={(noteId) =>
+          void go({
+            search: { tab: tab, modal: 'note', id: noteId },
+            replace: true,
+            resetScroll: false,
+          })
+        }
         onChanged={() => void router.invalidate()}
       />
       <NoteModal />

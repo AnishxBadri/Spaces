@@ -99,6 +99,7 @@ describe('logInteractionProgram', () => {
         occurredAt: new Date('2026-09-18T10:00:00Z'),
         attendeeIds: [companyId, founderId],
         writeUp: true,
+        summary: null,
       }),
     )
     expect(noteId).toBeTruthy()
@@ -182,6 +183,7 @@ describe('logInteractionProgram', () => {
         occurredAt: new Date('2026-09-18T11:00:00Z'),
         attendeeIds: [companyId],
         writeUp: false,
+        summary: null,
       }),
     )
     expect(noteId).toBeNull()
@@ -221,6 +223,7 @@ describe('logInteractionProgram', () => {
         occurredAt: new Date('2026-09-18T12:00:00Z'),
         attendeeIds: [companyId],
         writeUp: true,
+        summary: null,
       }),
     )
 
@@ -271,6 +274,7 @@ describe('logInteractionProgram', () => {
         occurredAt: new Date('2026-09-18T16:00:00Z'),
         attendeeIds: [companyId, founderId],
         writeUp: true,
+        summary: null,
       }),
     )
 
@@ -325,6 +329,7 @@ describe('logInteractionProgram', () => {
         occurredAt: new Date('2026-09-18T15:00:00Z'),
         attendeeIds: [rec.id],
         writeUp: true,
+        summary: null,
       }),
     )
 
@@ -353,6 +358,7 @@ describe('logInteractionProgram', () => {
         occurredAt: new Date('2026-09-18T17:00:00Z'),
         attendeeIds: [companyId],
         writeUp: false,
+        summary: null,
       }),
     )
 
@@ -360,7 +366,89 @@ describe('logInteractionProgram', () => {
       recordTimelineProgram(companyId, FIXTURE_ACTOR),
     )
     const logged = items.find((i) => i.type === 'interaction' && i.id === id)
-    expect(logged).toMatchObject({ noteId: null })
+    expect(logged).toMatchObject({ noteId: null, summary: null })
+  })
+
+  it('keeps the Summary on the log and reads it as the row’s second line', async () => {
+    const { logInteractionProgram } = await import('./log')
+    const { recordTimelineProgram } = await import('#/lib/timeline/record')
+    const { db } = await import('@spaces/db')
+    const { activity } = await import('@spaces/db/schema/activity')
+    const { sql } = await import('drizzle-orm')
+
+    const tag = randomUUID().slice(0, 8)
+    const companyId = await aCompany(`Tern ${tag}`)
+    const { id } = await Effect.runPromise(
+      logInteractionProgram(await actorId(), {
+        kind: 'call',
+        subject: `Pricing ${tag}`,
+        occurredAt: new Date('2026-09-18T17:00:00Z'),
+        attendeeIds: [companyId],
+        writeUp: false,
+        summary: 'Wants a lead by March; sending the deck Friday.',
+      }),
+    )
+
+    const rows = await db
+      .select({ meta: activity.meta })
+      .from(activity)
+      .where(sql`${activity.meta} ->> 'interactionId' = ${id}`)
+    expect(rows.map((r) => r.meta)).toEqual([
+      {
+        interactionId: id,
+        summary: 'Wants a lead by March; sending the deck Friday.',
+      },
+    ])
+    const items = await Effect.runPromise(
+      recordTimelineProgram(companyId, FIXTURE_ACTOR),
+    )
+    expect(
+      items.find((i) => i.type === 'interaction' && i.id === id),
+    ).toMatchObject({
+      summary: 'Wants a lead by March; sending the deck Friday.',
+    })
+  })
+
+  it('names the files a row carries, for a line two with no summary', async () => {
+    const { logInteractionProgram } = await import('./log')
+    const { recordTimelineProgram } = await import('#/lib/timeline/record')
+    const { db } = await import('@spaces/db')
+    const { document, entity, interactionDocument } =
+      await import('@spaces/db/schema')
+
+    const tag = randomUUID().slice(0, 8)
+    const companyId = await aCompany(`Skua ${tag}`)
+    const { id } = await Effect.runPromise(
+      logInteractionProgram(await actorId(), {
+        kind: 'meeting',
+        subject: `Data room ${tag}`,
+        occurredAt: new Date('2026-09-18T17:00:00Z'),
+        attendeeIds: [companyId],
+        writeUp: false,
+        summary: null,
+      }),
+    )
+    for (const name of ['term-sheet.pdf', 'cap-table.xlsx']) {
+      const [doc] = await db
+        .insert(entity)
+        .values({ kind: 'document', canonicalName: name })
+        .returning({ id: entity.id })
+      await db.insert(document).values({ entityId: doc.id, filename: name })
+      await db
+        .insert(interactionDocument)
+        .values({ interactionId: id, documentId: doc.id, role: 'attachment' })
+    }
+
+    const items = await Effect.runPromise(
+      recordTimelineProgram(companyId, FIXTURE_ACTOR),
+    )
+    expect(
+      items.find((i) => i.type === 'interaction' && i.id === id),
+    ).toMatchObject({
+      summary: null,
+      attachments: 2,
+      attachmentNames: ['cap-table.xlsx', 'term-sheet.pdf'],
+    })
   })
 })
 
@@ -382,6 +470,7 @@ describe('deleting a write-up', () => {
         occurredAt: new Date('2026-09-18T18:00:00Z'),
         attendeeIds: [companyId],
         writeUp: true,
+        summary: null,
       }),
     )
     if (!noteId) throw new Error('no note')

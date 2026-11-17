@@ -1,5 +1,5 @@
-import { useNavigate, useSearch } from '@tanstack/react-router'
-import { icon, Paperclip } from '#/components/icons'
+import { useNavigate, useRouter, useSearch } from '@tanstack/react-router'
+import { icon, Mail, Paperclip } from '#/components/icons'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -13,9 +13,11 @@ import { NewerVersionDialog } from '#/components/files/newer-version-dialog'
 import { FilingPickers } from '#/components/files/viewer-sidebar'
 import type { RecordDocument } from '#/components/files/types'
 import { LabelHead, LedgerRow } from '#/components/ledger-section'
+import { PickPopover } from '#/components/record/details-add'
 import { Twinkle } from '#/components/twinkle'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
+import { useConfirm } from '#/components/ui/confirm-dialog'
 import {
   Dialog,
   DialogContent,
@@ -24,16 +26,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from '#/components/ui/dialog'
-import { MoreMenu } from '#/components/ui/more-menu'
+import { MENU_RULE, MoreMenu } from '#/components/ui/more-menu'
+import type { MoreMenuEntry } from '#/components/ui/more-menu'
 import { Select } from '#/components/ui/select'
 import {
   fileDocument,
+  fileInteractionOnEntity,
   getDocumentPreview,
   getEmail,
   listMembers,
   listRecordDocuments,
   openEmailReply,
+  searchEntities,
   setEmailAudience,
+  unlinkInteractionFromEntity,
 } from '#/lib/server-fns'
 import type {
   EmailAttachment,
@@ -52,19 +58,22 @@ import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 /**
- * The email window: the subject and the thread's size in the bone head,
- * then who reads it, the earlier messages one line each, and the message
- * itself open with its body and files. Cancel is the one close.
+ * The email window: the email glyph, the subject and the thread's size in
+ * the bone head, then the earlier messages one line each, and the message
+ * itself open with its body and files. The foot is Done, the `···` and
+ * Reply; Done is the one close.
  * - The body is the server's sanitized document in an iframe sandboxed with
  *   no scripts and no forms; popups are allowed so a link opens a new tab.
  * - Same-origin lets the window size the frame to its content; with no
  *   scripts in the frame and a CSP refusing every load, it grants nothing.
  * - A body private to someone else is a bone panel, never fetched.
- * - A body private by default says who reads it; its owner widens it from
- *   there, for `recordId` (the record it was opened from) or members.
- * - An earlier message's line opens that message in this window.
+ * - A body private by default says who reads it at the foot's left; its
+ *   owner widens it from `Who can read this…`, for `recordId` (the record
+ *   it was opened from) or members.
+ * - An earlier message's line unfolds it in place, with its own files;
+ *   several can be open at once.
  * - Reply is the foot's primary: the draft grows under the message,
- *   which folds to one line.
+ *   which folds to one line. Forward is the same draft in its forward mode.
  */
 export function EmailDialog({
   id,
@@ -212,46 +221,28 @@ export function attachmentLane(
 }
 
 /**
- * The privacy line's words and its one control: who reads the body, and
- * `Widen…` or `Change…` for its owner. A shared body (a forwarded one) is
- * read by the workspace and offers nothing.
+ * Who reads a body private by default, as the foot's left says it:
+ * `Visible to you`, `Visible to you, Maya`, `Visible to Anish`. Null for a
+ * body the workspace reads (a shared one, or one its owner opened up),
+ * which says nothing.
  */
-export function privacyLine(p: EmailPrivacy | null): {
-  text: string
-  control: 'Widen…' | 'Change…' | null
-} {
-  if (p === null) return { text: 'Visible to the workspace', control: null }
-  if (p.workspace)
-    return {
-      text:
-        p.record === null
-          ? 'Visible to the workspace'
-          : `Visible to the workspace · all your email with ${p.record.name}`,
-      control: p.mine ? 'Change…' : null,
-    }
+export function privacyNote(p: EmailPrivacy | null): string | null {
+  if (p === null || p.workspace) return null
   const names = [
     p.mine ? 'you' : p.owner.name,
     ...p.grantees.filter((g) => !(p.mine && g.you)).map((g) => g.name),
   ]
-  return {
-    text: `Visible to ${names.join(', ')}`,
-    control: p.mine ? 'Widen…' : null,
-  }
+  return `Visible to ${names.join(', ')}`
 }
 
 const CATEGORY_WORD = (c: string) => c.charAt(0).toUpperCase() + c.slice(1)
 
-function PrivacyRow({
-  email,
-  onWiden,
-}: {
-  email: EmailDetail
-  onWiden: () => void
-}) {
-  const { text, control } = privacyLine(email.privacy)
+/** The classify lane's labels, as chips over the thread. */
+function Categories({ categories }: { categories: ReadonlyArray<string> }) {
+  if (categories.length === 0) return null
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {email.categories.map((c) => (
+      {categories.map((c) => (
         <span
           key={c}
           data-category={c}
@@ -260,23 +251,16 @@ function PrivacyRow({
           {CATEGORY_WORD(c)}
         </span>
       ))}
-      <p data-privacy className="text-label text-graphite">
-        {text}
-        {control === null ? null : (
-          <>
-            {'  '}
-            <button
-              type="button"
-              onClick={onWiden}
-              className="focus-ring text-foreground underline"
-            >
-              {control}
-            </button>
-          </>
-        )}
-      </p>
     </div>
   )
+}
+
+/** The message in this window's own address, for Copy link. */
+function emailLink(id: string): string {
+  const url = new URL(window.location.href)
+  url.searchParams.set('modal', 'email')
+  url.searchParams.set('id', id)
+  return url.toString()
 }
 
 type Member = { id: string; name: string }
@@ -434,23 +418,169 @@ export function WidenDialog({
 /** How many of the earliest lines fold, with more than two before the message. */
 const SHOWN_EARLIER = 2
 
-/** An earlier message: who, a graphite preview, its files, the stamp. */
+/** What a message's files do: open the viewer, file it, mark it a newer version. */
+type FileActions = {
+  recordId: string | null
+  onOpen: (a: EmailAttachment) => void
+  onFileOn: (a: EmailAttachment) => void
+  onNewer: (a: EmailAttachment) => void
+}
+
+/** A message's sender, their address and its stamp, on one line. */
+function Sender({ email, today }: { email: EmailDetail; today: string }) {
+  return (
+    <div className="flex items-baseline gap-2">
+      {email.from === null ? (
+        <span className="text-ui text-graphite">Unknown sender</span>
+      ) : (
+        <>
+          <span className="text-ui">{email.from.name ?? email.from.email}</span>
+          {email.from.name === null ? null : (
+            <span className="min-w-0 truncate mono text-micro text-graphite">
+              {email.from.email}
+            </span>
+          )}
+        </>
+      )}
+      <span className="ml-auto shrink-0 mono text-micro text-graphite">
+        {messageStamp(email.occurredAt, today)}
+      </span>
+    </div>
+  )
+}
+
+/** The body as the window prints it, with its remote-image line. */
+function MessageBody({ email }: { email: EmailDetail }) {
+  if (email.body.kind === 'none') return null
+  const remote = remoteLine(email.body)
+  const owner = email.privacy?.owner.name ?? email.via ?? 'its owner'
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Body body={email.body} owner={owner} />
+      {remote === null ? null : (
+        <span data-remote-images className="mono text-micro text-graphite">
+          {remote}
+        </span>
+      )}
+    </div>
+  )
+}
+
+/** The files a message came with, under it. */
+function MessageFiles({
+  email,
+  today,
+  actions,
+}: {
+  email: EmailDetail
+  today: string
+  actions: FileActions
+}) {
+  if (email.attachments.length === 0) return null
+  return (
+    <section
+      aria-label="Attachments"
+      data-files-of={email.id}
+      className="flex flex-col"
+    >
+      <LabelHead label={`Attachments · ${String(email.attachments.length)}`} />
+      <ol>
+        {email.attachments.map((a, i) => (
+          <AttachmentRow
+            key={a.documentId}
+            a={a}
+            last={i === email.attachments.length - 1}
+            today={today}
+            recordId={actions.recordId}
+            onOpen={() => actions.onOpen(a)}
+            onFileOn={() => actions.onFileOn(a)}
+            onNewer={() => actions.onNewer(a)}
+          />
+        ))}
+      </ol>
+    </section>
+  )
+}
+
+/** An earlier message unfolded under its line: its sender, body and files. */
+function EarlierMessage({
+  id,
+  today,
+  actions,
+}: {
+  id: string
+  today: string
+  actions: FileActions
+}) {
+  const [email, setEmail] = useState<EmailDetail | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const recordId = actions.recordId
+  useEffect(() => {
+    let live = true
+    getEmail({ data: { id, recordId } })
+      .then((e) => {
+        if (live) setEmail(e)
+      })
+      .catch((err: unknown) => {
+        if (live)
+          setError(
+            err instanceof Error ? err.message : 'Could not read the email',
+          )
+      })
+    return () => {
+      live = false
+    }
+  }, [id, recordId])
+  return (
+    <div
+      data-message={id}
+      className="flex flex-col gap-3 border-b border-rule px-3 py-3"
+    >
+      {email === null ? (
+        error === null ? (
+          <Twinkle size={14} />
+        ) : (
+          <p className="text-ui text-destructive">{error}</p>
+        )
+      ) : (
+        <>
+          <Sender email={email} today={today} />
+          <MessageBody email={email} />
+          <MessageFiles email={email} today={today} actions={actions} />
+        </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * An earlier message: who, a graphite preview, its files and the stamp on
+ * one line, which unfolds the message under it and folds it again.
+ */
 function ThreadLine({
   line,
   today,
-  onOpen,
+  open,
+  onToggle,
+  actions,
 }: {
   line: EmailThreadLine
   today: string
-  onOpen: () => void
+  open: boolean
+  onToggle: () => void
+  actions: FileActions
 }) {
   return (
     <li>
       <button
         type="button"
         data-thread-line={line.id}
-        onClick={onOpen}
-        className="focus-ring-inset flex h-9 w-full items-center gap-3 border-b border-rule px-3 text-left hover:bg-bone"
+        aria-expanded={open}
+        onClick={onToggle}
+        className={cn(
+          'focus-ring-inset flex h-9 w-full items-center gap-3 border-b border-rule px-3 text-left hover:bg-bone',
+          open && 'bg-bone',
+        )}
       >
         <span className="w-40 shrink-0 truncate text-ui">
           {line.sent ? `To ${line.who}` : line.who}
@@ -468,20 +598,34 @@ function ThreadLine({
           {messageStamp(line.occurredAt, today)}
         </span>
       </button>
+      {open ? (
+        <EarlierMessage id={line.id} today={today} actions={actions} />
+      ) : null}
     </li>
   )
 }
 
+/**
+ * The messages before the open one, oldest first, each one line until it
+ * is unfolded; past two, the earliest fold to `N earlier messages`.
+ */
 function Thread({
   earlier,
   today,
-  onOpen,
+  actions,
 }: {
   earlier: ReadonlyArray<EmailThreadLine>
   today: string
-  onOpen: (id: string) => void
+  actions: FileActions
 }) {
   const [unfolded, setUnfolded] = useState(false)
+  const [open, setOpen] = useState<ReadonlySet<string>>(new Set())
+  const toggle = (id: string) =>
+    setOpen((prev) => {
+      const next = new Set(prev)
+      if (!next.delete(id)) next.add(id)
+      return next
+    })
   if (earlier.length === 0) return null
   const folded =
     !unfolded && earlier.length > SHOWN_EARLIER
@@ -506,7 +650,9 @@ function Thread({
           key={line.id}
           line={line}
           today={today}
-          onOpen={() => onOpen(line.id)}
+          open={open.has(line.id)}
+          onToggle={() => toggle(line.id)}
+          actions={actions}
         />
       ))}
     </ol>
@@ -626,7 +772,7 @@ function FileOnDialog({
 }
 
 function EmailWindow({
-  id: openedId,
+  id,
   recordId,
   onClose,
 }: {
@@ -635,7 +781,8 @@ function EmailWindow({
   onClose: () => void
 }) {
   const { today } = useClock()
-  const [id, setId] = useState(openedId)
+  const router = useRouter()
+  const { confirm, confirmDialog } = useConfirm()
   const [email, setEmail] = useState<EmailDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [viewer, setViewer] = useState<Awaited<
@@ -643,6 +790,7 @@ function EmailWindow({
   > | null>(null)
   const [widening, setWidening] = useState(false)
   const [filing, setFiling] = useState<EmailAttachment | null>(null)
+  const [filingDeal, setFilingDeal] = useState(false)
   const [versioning, setVersioning] = useState<{
     doc: RecordDocument
     older: Array<RecordDocument>
@@ -673,11 +821,13 @@ function EmailWindow({
     }
   }, [id, recordId, reads])
 
-  function openMessage(next: string) {
-    setEmail(null)
-    setReply(null)
-    setId(next)
-  }
+  const searchDeals = useCallback(
+    async (q: string) => {
+      const rows = await searchEntities({ data: { q, kinds: ['deal'] } })
+      return rows.filter((r) => r.id !== recordId)
+    },
+    [recordId],
+  )
 
   async function openAttachment(a: EmailAttachment) {
     const doc = await getDocumentPreview({ data: { id: a.documentId } })
@@ -707,7 +857,15 @@ function EmailWindow({
     }
   }
 
-  async function startReply() {
+  const actions: FileActions = {
+    recordId,
+    onOpen: (a) => void openAttachment(a),
+    onFileOn: setFiling,
+    onNewer: (a) => void newerVersion(a),
+  }
+
+  /** Reply, or Forward from the `···`; a draft held on the email reopens as it was. */
+  async function startDraft(mode: 'reply' | 'forward') {
     setReplyError(null)
     try {
       const opened = await openEmailReply({ data: { parentId: id } })
@@ -716,7 +874,7 @@ function EmailWindow({
         opened.draft === null
           ? {
               modes: opened.modes,
-              draft: { ...opened.modes.reply, id: crypto.randomUUID() },
+              draft: { ...opened.modes[mode], id: crypto.randomUUID() },
               savedAt: null,
             }
           : {
@@ -726,17 +884,108 @@ function EmailWindow({
             },
       )
     } catch (err) {
-      setReplyError(err instanceof Error ? err.message : 'Could not reply')
+      setReplyError(
+        err instanceof Error
+          ? err.message
+          : mode === 'reply'
+            ? 'Could not reply'
+            : 'Could not forward',
+      )
     }
   }
 
+  async function unlink(from: { id: string; name: string }) {
+    const ok = await confirm({
+      title: `Unlink from ${from.name}?`,
+      body: `${email?.subject || 'This email'} leaves ${from.name}. It stays on every other record it is filed on.`,
+      action: 'Unlink',
+    })
+    if (!ok) return
+    try {
+      await unlinkInteractionFromEntity({
+        data: { interactionId: id, entityId: from.id },
+      })
+      onClose()
+      await router.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not unlink')
+    }
+  }
+
+  const menu: Array<MoreMenuEntry> =
+    email === null
+      ? []
+      : [
+          {
+            label: 'Forward',
+            opens: true,
+            onSelect: () => void startDraft('forward'),
+          },
+          ...(email.gmailUrl === null
+            ? []
+            : [{ label: 'Open in Gmail', href: email.gmailUrl }]),
+          { label: 'Copy link', copy: () => emailLink(email.id) },
+          {
+            label: 'File on a deal…',
+            opens: true,
+            onSelect: () => setFilingDeal(true),
+          },
+          ...(email.privacy?.mine
+            ? [
+                {
+                  label: 'Who can read this…',
+                  opens: true,
+                  onSelect: () => setWidening(true),
+                },
+              ]
+            : []),
+          MENU_RULE,
+          ...(email.record?.linked
+            ? [
+                {
+                  label: `Unlink from ${email.record.name}…`,
+                  destructive: true,
+                  opens: true,
+                  onSelect: () => {
+                    const from = email.record
+                    if (from !== null) void unlink(from)
+                  },
+                },
+              ]
+            : []),
+        ]
+
+  const note =
+    replyError ?? (email === null ? null : privacyNote(email.privacy))
   const foot = (
-    <DialogFooter {...(replyError === null ? {} : { note: replyError })}>
+    <DialogFooter {...(note === null ? {} : { note })}>
       <Button variant="outline" onClick={onClose}>
-        Cancel
+        Done
       </Button>
       {email === null ? null : (
-        <Button onClick={() => void startReply()}>Reply</Button>
+        <>
+          <MoreMenu
+            variant="head"
+            label={email.subject || 'email'}
+            forceMenu
+            items={menu}
+          />
+          <PickPopover
+            open={filingDeal}
+            onOpenChange={setFilingDeal}
+            trigger={<span aria-hidden className="size-0" />}
+            placeholder="File on a deal…"
+            search={searchDeals}
+            onPick={async (deal) => {
+              const { filed } = await fileInteractionOnEntity({
+                data: { interactionId: id, entityId: deal.id },
+              })
+              toast(filed ? `Filed on ${deal.name}` : `Already on ${deal.name}`)
+              void router.invalidate()
+            }}
+          />
+          <Button onClick={() => void startDraft('reply')}>Reply</Button>
+        </>
       )}
     </DialogFooter>
   )
@@ -745,6 +994,7 @@ function EmailWindow({
     return (
       <>
         <DialogHeader>
+          <Mail aria-hidden className="size-5 self-center text-graphite" />
           <DialogTitle>Email</DialogTitle>
         </DialogHeader>
         <DialogDescription className="sr-only">
@@ -761,40 +1011,20 @@ function EmailWindow({
       </>
     )
 
-  const remote = remoteLine(email.body)
   const isPrivate = email.body.kind === 'private'
-  const owner = email.privacy?.owner.name ?? email.via ?? 'its owner'
   const message = (
     <>
-      <PrivacyRow email={email} onWiden={() => setWidening(true)} />
+      <Categories categories={email.categories} />
 
-      <Thread
-        earlier={email.thread.earlier}
-        today={today}
-        onOpen={openMessage}
-      />
+      <Thread earlier={email.thread.earlier} today={today} actions={actions} />
 
-      <section aria-label="Message" className="flex flex-col gap-3">
+      <section
+        aria-label="Message"
+        data-message={email.id}
+        className="flex flex-col gap-3"
+      >
         <div className="flex flex-col gap-1">
-          <div className="flex items-baseline gap-2">
-            {email.from === null ? (
-              <span className="text-ui text-graphite">Unknown sender</span>
-            ) : (
-              <>
-                <span className="text-ui">
-                  {email.from.name ?? email.from.email}
-                </span>
-                {email.from.name === null ? null : (
-                  <span className="min-w-0 truncate mono text-micro text-graphite">
-                    {email.from.email}
-                  </span>
-                )}
-              </>
-            )}
-            <span className="ml-auto shrink-0 mono text-micro text-graphite">
-              {messageStamp(email.occurredAt, today)}
-            </span>
-          </div>
+          <Sender email={email} today={today} />
           {isPrivate && email.from !== null ? (
             <Lane label="From">
               <Who p={email.from} />
@@ -834,42 +1064,10 @@ function EmailWindow({
             </Lane>
           )}
         </div>
-        {email.body.kind === 'none' ? null : (
-          <div className="flex flex-col gap-1.5">
-            <Body body={email.body} owner={owner} />
-            {remote === null ? null : (
-              <span
-                data-remote-images
-                className="mono text-micro text-graphite"
-              >
-                {remote}
-              </span>
-            )}
-          </div>
-        )}
+        <MessageBody email={email} />
       </section>
 
-      {email.attachments.length === 0 ? null : (
-        <section aria-label="Attachments" className="flex flex-col">
-          <LabelHead
-            label={`Attachments · ${String(email.attachments.length)}`}
-          />
-          <ol>
-            {email.attachments.map((a, i) => (
-              <AttachmentRow
-                key={a.documentId}
-                a={a}
-                last={i === email.attachments.length - 1}
-                today={today}
-                recordId={recordId}
-                onOpen={() => void openAttachment(a)}
-                onFileOn={() => setFiling(a)}
-                onNewer={() => void newerVersion(a)}
-              />
-            ))}
-          </ol>
-        </section>
-      )}
+      <MessageFiles email={email} today={today} actions={actions} />
     </>
   )
   const extras = (
@@ -905,10 +1103,16 @@ function EmailWindow({
           onSaved={() => setReads((n) => n + 1)}
         />
       ) : null}
+      {confirmDialog}
     </>
   )
   const head = (
     <DialogHeader>
+      <Mail
+        data-window-mark
+        aria-hidden
+        className="size-5 self-center text-graphite"
+      />
       <DialogTitle>{email.subject || 'Untitled'}</DialogTitle>
       <DialogDescription className={cn(email.thread.messages < 2 && 'sr-only')}>
         {plural(email.thread.messages, 'message')}

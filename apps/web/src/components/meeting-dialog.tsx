@@ -4,6 +4,8 @@ import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { dayKey, formatDay, formatTime } from '@spaces/core/format'
 import { DocumentPreview } from '#/components/document-preview'
+import { CalendarDays } from '#/components/icons'
+import { KindIcon } from '#/components/kind-icon'
 import { EmptyRow, LabelHead, LedgerRow } from '#/components/ledger-section'
 import { OpenIn } from '#/components/open-in'
 import { DetailsPickRow } from '#/components/record/details-add'
@@ -257,16 +259,53 @@ function CarriedRow({
   )
 }
 
-function NoteRow({ n }: { n: MeetingCarriedNote }) {
+/**
+ * A note the window names: its window over the record when `onOpenNote` is
+ * given, else its page.
+ */
+function NoteLink({
+  id,
+  onOpenNote,
+  className,
+  children,
+}: {
+  id: string
+  onOpenNote: ((noteId: string) => void) | undefined
+  className: string
+  children: ReactNode
+}) {
+  return onOpenNote === undefined ? (
+    <Link to="/notes/$noteId" params={{ noteId: id }} className={className}>
+      {children}
+    </Link>
+  ) : (
+    <button
+      type="button"
+      data-note-link={id}
+      onClick={() => onOpenNote(id)}
+      className={cn('text-left', className)}
+    >
+      {children}
+    </button>
+  )
+}
+
+function NoteRow({
+  n,
+  onOpenNote,
+}: {
+  n: MeetingCarriedNote
+  onOpenNote: ((noteId: string) => void) | undefined
+}) {
   return (
     <CarriedRow end={<OpenIn link={n.openIn} />}>
-      <Link
-        to="/notes/$noteId"
-        params={{ noteId: n.id }}
+      <NoteLink
+        id={n.id}
+        onOpenNote={onOpenNote}
         className="focus-ring min-w-0 flex-1 truncate text-body hover:underline"
       >
         {n.title}
-      </Link>
+      </NoteLink>
       {n.via === null ? null : (
         <span className="shrink-0 mono text-micro text-graphite">
           {`Via ${n.via.tool} · ${n.via.author}`}
@@ -322,8 +361,10 @@ function ArtifactRow({
  * private to the reader; and Prep, before the start only, streamed and
  * never stored unless saved.
  * - Opens from a Meetings row and from `?modal=meeting&id=`.
- * - Cancel is the one close; Prep, then Save as note, is the one commit,
+ * - Done is the one close; Prep, then Save as note, is the one commit,
  *   and Save as note stays put, reading `Saved as note` once it is.
+ * - Over a record (`onOpenNote`), the write-up and the meeting's notes open
+ *   in the note window; elsewhere they open their page.
  */
 export function MeetingDialog({
   id,
@@ -331,6 +372,7 @@ export function MeetingDialog({
   onOpenChange,
   onChanged,
   onPrepRunning,
+  onOpenNote,
 }: {
   id: string | null
   /** Start Prep once the meeting is read: the row's Prep. */
@@ -340,6 +382,8 @@ export function MeetingDialog({
   onChanged?: () => void
   /** Prep started or stopped, so the row behind can say it is running. */
   onPrepRunning?: (running: boolean) => void
+  /** Opens a note in the window over the record, in this window's place. */
+  onOpenNote?: ((noteId: string) => void) | undefined
 }) {
   return (
     <Dialog open={id !== null} onOpenChange={onOpenChange}>
@@ -352,6 +396,7 @@ export function MeetingDialog({
             onClose={() => onOpenChange(false)}
             {...(onChanged === undefined ? {} : { onChanged })}
             {...(onPrepRunning === undefined ? {} : { onPrepRunning })}
+            onOpenNote={onOpenNote}
           />
         )}
       </DialogContent>
@@ -365,12 +410,14 @@ function MeetingWindow({
   onClose,
   onChanged,
   onPrepRunning,
+  onOpenNote,
 }: {
   id: string
   prepOnOpen: boolean
   onClose: () => void
   onChanged?: () => void
   onPrepRunning?: (running: boolean) => void
+  onOpenNote: ((noteId: string) => void) | undefined
 }) {
   const router = useRouter()
   const { now, today } = useClock()
@@ -479,6 +526,12 @@ function MeetingWindow({
         data: { interactionId: id },
       })
       onChanged?.()
+      // Over a record the note window takes this one's place; elsewhere
+      // the window closes on the way to the note's page.
+      if (onOpenNote !== undefined) {
+        onOpenNote(noteId)
+        return
+      }
       onClose()
       await router.navigate({ to: '/notes/$noteId', params: { noteId } })
     } catch (err) {
@@ -507,6 +560,10 @@ function MeetingWindow({
     return (
       <>
         <DialogHeader>
+          <CalendarDays
+            aria-hidden
+            className="size-5 self-center text-graphite"
+          />
           <DialogTitle>Meeting</DialogTitle>
         </DialogHeader>
         <DialogDescription className="sr-only">
@@ -521,7 +578,7 @@ function MeetingWindow({
         )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            Done
           </Button>
         </DialogFooter>
       </>
@@ -541,6 +598,11 @@ function MeetingWindow({
   return (
     <>
       <DialogHeader>
+        <CalendarDays
+          data-window-mark
+          aria-hidden
+          className="size-5 self-center text-graphite"
+        />
         <DialogTitle
           className={cn(meeting.cancelled && 'text-graphite line-through')}
         >
@@ -598,14 +660,13 @@ function MeetingWindow({
           >
             {meeting.participants.map((p) => (
               <LedgerRow key={p.email}>
-                <span className="min-w-0 flex-1 truncate text-body">
+                <span
+                  data-participant={p.email}
+                  title={p.email}
+                  className="min-w-0 flex-1 truncate text-body"
+                >
                   {participantName(p)}
                 </span>
-                {p.name === null ? null : (
-                  <span className="min-w-0 truncate mono text-micro text-graphite">
-                    {p.email}
-                  </span>
-                )}
                 <span
                   data-rsvp={p.rsvp}
                   className="w-24 shrink-0 text-right mono text-micro text-graphite"
@@ -622,6 +683,7 @@ function MeetingWindow({
             const to = recordPath(r)
             return (
               <LedgerRow key={r.id}>
+                <KindIcon of={{ kind: r.kind }} />
                 {to === null ? (
                   <span className="min-w-0 flex-1 truncate text-body">
                     {r.name}
@@ -631,9 +693,6 @@ function MeetingWindow({
                     <span className="min-w-0 truncate text-body">{r.name}</span>
                   </Link>
                 )}
-                <span className="w-16 shrink-0 text-right label-caps text-graphite">
-                  {r.kind}
-                </span>
               </LedgerRow>
             )
           })}
@@ -662,7 +721,7 @@ function MeetingWindow({
             {carried ? (
               <ul className="flex flex-col gap-1.5">
                 {sharedNotes.map((n) => (
-                  <NoteRow key={n.id} n={n} />
+                  <NoteRow key={n.id} n={n} onOpenNote={onOpenNote} />
                 ))}
                 {sharedArtifacts.map((a) => (
                   <ArtifactRow
@@ -690,13 +749,13 @@ function MeetingWindow({
                 <p className="text-ui text-graphite">Private to its author.</p>
               ) : (
                 <>
-                  <Link
-                    to="/notes/$noteId"
-                    params={{ noteId: writeUpNote.id }}
+                  <NoteLink
+                    id={writeUpNote.id}
+                    onOpenNote={onOpenNote}
                     className="focus-ring self-start text-ui text-foreground hover:underline"
                   >
                     {writeUpNote.title}
-                  </Link>
+                  </NoteLink>
                   {writeUpNote.body === null ||
                   writeUpNote.body.trim() === '' ? null : (
                     <div
@@ -711,7 +770,7 @@ function MeetingWindow({
               {carried ? (
                 <ul className="flex flex-col gap-1.5">
                   {sharedNotes.map((n) => (
-                    <NoteRow key={n.id} n={n} />
+                    <NoteRow key={n.id} n={n} onOpenNote={onOpenNote} />
                   ))}
                   {sharedArtifacts.map((a) => (
                     <ArtifactRow
@@ -753,7 +812,7 @@ function MeetingWindow({
                 />
               ))}
               {privateNotes.map((n) => (
-                <NoteRow key={n.id} n={n} />
+                <NoteRow key={n.id} n={n} onOpenNote={onOpenNote} />
               ))}
             </ul>
           </section>
@@ -768,7 +827,7 @@ function MeetingWindow({
 
       <DialogFooter {...(done ? { note: 'Not kept unless saved' } : {})}>
         <Button variant="outline" onClick={onClose}>
-          Cancel
+          Done
         </Button>
         {!ahead ? null : done ? (
           <Button

@@ -307,6 +307,7 @@ describe('the record timeline, for a deal', () => {
         occurredAt: new Date('2026-09-18T11:00:00Z'),
         attendeeIds: [deal.id],
         writeUp: false,
+        summary: null,
       }),
     )
 

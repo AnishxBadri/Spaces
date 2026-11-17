@@ -184,6 +184,7 @@ describe('interaction provenance', () => {
         occurredAt: new Date('2026-09-18T10:00:00Z'),
         attendeeIds: [recordId],
         writeUp: false,
+        summary: null,
       }),
     )
 

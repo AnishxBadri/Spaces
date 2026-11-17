@@ -5,8 +5,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@spaces/db'
 import {
   accountConnection,
+  company,
+  entity,
   integration,
   interaction,
+  interactionEntity,
   pendingBlob,
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
@@ -19,7 +22,7 @@ import { saveMailboxSyncProgram } from '#/lib/arrival/mailbox-sync'
 import { logSyncedEmailProgram } from '#/lib/arrival/synced'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { TRACKER, htmlEmail } from '#/lib/email/fixtures'
-import { emailDetailProgram } from './email-read'
+import { emailDetailProgram, gmailUrl } from './email-read'
 
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
@@ -220,6 +223,53 @@ describe('the email window', () => {
     expect(email.body.srcdoc).toContain('Q3 closed ahead of plan.')
     expect(email.body.srcdoc).not.toContain(TRACKER)
     expect(email.body.srcdoc).not.toMatch(/<script/i)
+  })
+
+  it('opens in Gmail by its Message-ID, and can unlink only from a record it is filed on', async () => {
+    const id = await synced()
+    const row = (
+      await db.select().from(interaction).where(eq(interaction.id, id))
+    ).at(0)
+    if (!row?.messageId) throw new Error('no message id')
+    const aCompany = async (name: string) => {
+      const ent = (
+        await db
+          .insert(entity)
+          .values({ kind: 'company', canonicalName: name })
+          .returning({ id: entity.id })
+      ).at(0)
+      if (!ent) throw new Error('no company')
+      await db.insert(company).values({ entityId: ent.id })
+      return ent.id
+    }
+    const filed = await aCompany('Acme Robotics')
+    const elsewhere = await aCompany('Petrel')
+    await db
+      .insert(interactionEntity)
+      .values({ interactionId: id, entityId: filed })
+
+    const here = await Effect.runPromise(
+      emailDetailProgram(FIXTURE_ACTOR, id, filed),
+    )
+    expect(here.gmailUrl).toBe(gmailUrl(row.messageId))
+    expect(here.record).toEqual({
+      id: filed,
+      name: 'Acme Robotics',
+      linked: true,
+    })
+    const there = await Effect.runPromise(
+      emailDetailProgram(FIXTURE_ACTOR, id, elsewhere),
+    )
+    expect(there.record).toMatchObject({ linked: false })
+  })
+
+  it('builds the Gmail search for a Message-ID, angle brackets or not', () => {
+    expect(gmailUrl('<q3@acme.example>')).toBe(
+      'https://mail.google.com/mail/#search/rfc822msgid%3Aq3%40acme.example',
+    )
+    expect(gmailUrl('q3@acme.example')).toBe(gmailUrl('<q3@acme.example>'))
+    expect(gmailUrl(null)).toBeNull()
+    expect(gmailUrl('  ')).toBeNull()
   })
 
   it('shows a teammate the headers and a private body, never the HTML (D67)', async () => {

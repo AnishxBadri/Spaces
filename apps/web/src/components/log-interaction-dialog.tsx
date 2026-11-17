@@ -3,6 +3,7 @@ import { icon, Phone } from '#/components/icons'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { formatDay, formatTime } from '@spaces/core/format'
+import { EMAIL_SUMMARY_MAX } from '@spaces/core/interactions/email-listing'
 import { useClock } from '#/components/clock'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
@@ -18,17 +19,29 @@ import {
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { Segmented } from '#/components/ui/segmented'
-import { logInteraction, searchEntities } from '#/lib/server-fns'
+import {
+  logInteraction,
+  searchEntities,
+  writeUpInteraction,
+} from '#/lib/server-fns'
+import { clearLogged, markLogged } from '#/lib/timeline/log-state'
+import type { LoggableKind } from '#/lib/timeline/log-state'
 import { useHotkey } from '#/lib/use-hotkey'
 import { cn } from '#/lib/utils'
 
 /**
  * Manual interaction logging — the calendar primitive, hand-fed. Twenty
- * seconds after a founder call: kind, title, when, who was in the room.
- * Calendar sync (`Content.logMeeting`) writes the same kind of interaction row.
+ * seconds after a founder call: kind, title, when, who was in the room, and
+ * a line of what happened. Calendar sync (`Content.logMeeting`) writes the
+ * same kind of interaction row.
  */
 
 type Attendee = { id: string; name: string; kind: string }
+
+const KIND_WORD: Record<LoggableKind, string> = {
+  call: 'Call',
+  meeting: 'Meeting',
+}
 
 function localNow(): string {
   const d = new Date()
@@ -37,10 +50,19 @@ function localNow(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+/**
+ * The log window.
+ * - Opened over a record (`seed`), a write-up opens in the note window over
+ *   it (`?modal=note&id=`); with no record underneath (Today) it is the
+ *   note's page.
+ * - The logged row sits on bone until its toast goes; the toast offers
+ *   `Write it up` unless the write-up is already open.
+ */
 export function LogInteractionDialog({
   seed,
   trigger,
   hotkey,
+  defaultKind = null,
 }: {
   /**
    * The record the dialog was opened from — pre-added as an attendee.
@@ -54,21 +76,50 @@ export function LogInteractionDialog({
   trigger?: React.ReactNode
   /** Bare key that opens the dialog from the page. */
   hotkey?: string
+  /** The kind it opens on: the Interactions tab's Calls or Meetings. */
+  defaultKind?: LoggableKind | null | undefined
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  useHotkey(hotkey, () => setOpen(true))
-  const [kind, setKind] = useState<'meeting' | 'call'>('meeting')
+  const [kind, setKind] = useState<LoggableKind>('meeting')
+  const show = () => {
+    setKind(defaultKind ?? 'meeting')
+    setOpen(true)
+  }
+  useHotkey(hotkey, show)
   const [subject, setSubject] = useState('')
   const [occurredAt, setOccurredAt] = useState(localNow)
   const [attendees, setAttendees] = useState<Array<Attendee>>(
     seed ? [seed] : [],
   )
+  const [summary, setSummary] = useState('')
   // The one variant of the one commit: the same log, plus its note, with
   // the editor as the landing.
   const [writeUp, setWriteUp] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+
+  function openNote(noteId: string) {
+    if (seed === undefined) {
+      void router.navigate({ to: '/notes/$noteId', params: { noteId } })
+      return
+    }
+    void router.navigate({
+      to: '.',
+      search: (prev) => ({ ...prev, modal: 'note' as const, id: noteId }),
+      resetScroll: false,
+    })
+  }
+
+  async function writeItUp(interactionId: string) {
+    try {
+      const { noteId } = await writeUpInteraction({ data: { interactionId } })
+      void router.invalidate()
+      openNote(noteId)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not write it up')
+    }
+  }
 
   async function submit() {
     setError(null)
@@ -83,21 +134,32 @@ export function LogInteractionDialog({
           occurredAt,
           attendeeIds: attendees.map((a) => a.id),
           writeUp,
+          ...(summary.trim() === '' ? {} : { summary: summary.trim() }),
         },
       })
       setOpen(false)
       setSubject('')
       setOccurredAt(localNow())
       setAttendees(seed ? [seed] : [])
+      setSummary('')
       setWriteUp(false)
-      toast(`${kind === 'meeting' ? 'Meeting' : 'Call'} logged`)
+      markLogged(logged.id)
+      const done = () => clearLogged(logged.id)
+      const noteId = logged.noteId
+      toast(`${KIND_WORD[kind]} logged`, {
+        onDismiss: done,
+        onAutoClose: done,
+        ...(noteId === null
+          ? {
+              action: {
+                label: 'Write it up',
+                onClick: () => void writeItUp(logged.id),
+              },
+            }
+          : {}),
+      })
       void router.invalidate()
-      if (logged.noteId) {
-        await router.navigate({
-          to: '/notes/$noteId',
-          params: { noteId: logged.noteId },
-        })
-      }
+      if (noteId !== null) openNote(noteId)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not log it')
     } finally {
@@ -106,7 +168,10 @@ export function LogInteractionDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => (next ? show() : setOpen(false))}
+    >
       {trigger === null ? null : (
         <DialogTrigger asChild>
           {trigger ?? (
@@ -170,6 +235,19 @@ export function LogInteractionDialog({
           </div>
 
           <AttendeeField attendees={attendees} onChange={setAttendees} />
+
+          <div className="space-y-1.5">
+            <Label htmlFor="int-summary">Summary</Label>
+            <textarea
+              id="int-summary"
+              rows={2}
+              maxLength={EMAIL_SUMMARY_MAX}
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              placeholder="What happened, in a line or two"
+              className="focus-ring w-full resize-none rounded-md border border-rule bg-paper px-2.5 py-1.5 text-ui outline-none placeholder:text-graphite"
+            />
+          </div>
 
           {error ? (
             <p role="alert" className="text-ui text-destructive">

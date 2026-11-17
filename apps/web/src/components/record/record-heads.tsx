@@ -6,6 +6,7 @@ import { Button } from '#/components/ui/button'
 import type { MoreMenuEntry } from '#/components/ui/more-menu'
 import type { SensitivityState } from '#/components/sensitive-toggle'
 import { jobToast } from '#/lib/integrations/job-status-view'
+import { useLogKindFor } from '#/lib/timeline/log-state'
 import type { LastRun, RecordAction } from '#/lib/server-fns'
 import {
   ENRICH_QUEUE,
@@ -67,6 +68,8 @@ export function RecordHeadActions({
   more?: ReadonlyArray<MoreMenuEntry> | undefined
 }) {
   const navigate = useNavigate()
+  // Opened while the Interactions tab shows Calls or Meetings, it logs that.
+  const logKind = useLogKindFor(record.id)
   const offered = offeredActions(pluginActions, enrich !== undefined)
   const pluginOf = new Map<string, string>(
     offered.map((a) => [a.queue, a.pluginName]),
@@ -126,6 +129,7 @@ export function RecordHeadActions({
         <LogInteractionDialog
           seed={{ id: record.id, name: record.name, kind: record.kind }}
           hotkey="l"
+          defaultKind={logKind}
           trigger={
             <Button variant="outline" shortcut="L">
               Log interaction

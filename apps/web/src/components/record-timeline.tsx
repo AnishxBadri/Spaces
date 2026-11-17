@@ -1,4 +1,4 @@
-import { useNavigate, useRouter, useSearch } from '@tanstack/react-router'
+import { useNavigate, useRouter } from '@tanstack/react-router'
 import {
   BookA,
   ChevronDown,
@@ -16,9 +16,10 @@ import { toast } from 'sonner'
 import { OptionChip, optionLabel, refName } from './attributes/value-editor'
 import { EmailModal } from './email-dialog'
 import { NoteKindIcon } from './note-kind-icon'
-import { Band, Day, EmptyRow, FoldRow } from './ledger-section'
+import { Band, Day, FoldRow } from './ledger-section'
 import { PickPopover } from './record/details-add'
-import { ThreadRow } from './record/thread-row'
+import { ThreadRow, useThreadHighlight } from './record/thread-row'
+import { Button } from './ui/button'
 import { useConfirm } from './ui/confirm-dialog'
 import { MENU_RULE, MoreMenu } from './ui/more-menu'
 import type { MoreMenuEntry } from './ui/more-menu'
@@ -37,7 +38,6 @@ import {
   writeUpInteraction,
 } from '#/lib/server-fns'
 import type { getRecordTimeline } from '#/lib/server-fns'
-import { openModalId } from '#/lib/modal-search'
 import {
   THREAD_KINDS,
   threadCounts,
@@ -45,6 +45,7 @@ import {
   threadsOf,
 } from '#/lib/timeline/threads'
 import type { Thread, ThreadKind } from '#/lib/timeline/threads'
+import { setInteractionsFilter } from '#/lib/timeline/log-state'
 import { byWeek } from '#/lib/timeline/weeks'
 import { cn } from '#/lib/utils'
 
@@ -287,12 +288,15 @@ function EmailVisibilityMenu({ recordId }: { recordId: string }) {
 /**
  * The Interactions tab.
  * - `record` lets the email window widen for this record, names it in
- *   `Unlink from <record>…`, and puts the override in the toolbar once the
- *   viewer has private emails here.
- * - The email `?modal=email&id=` opens stays highlighted behind its window,
- *   unfolded to when it sits past the fold.
- * - Empty, it is one `Interactions +` row, which `logInteraction` wraps in
- *   the log window.
+ *   `Unlink from <record>…`, puts the override in the toolbar once the
+ *   viewer has private emails here, and hands its Calls or Meetings filter
+ *   to the head's `Log interaction`.
+ * - The row whose email, meeting or write-up window is open stays on bone
+ *   behind it, as does the one just logged, unfolded to when it sits past
+ *   the fold.
+ * - Empty, it is its toolbar: `No interactions yet` and `Log interaction`,
+ *   which `logInteraction` wraps in the log window. Filled, the head's
+ *   `Log interaction` is the one way in.
  */
 export function RecordInteractions({
   items,
@@ -308,18 +312,30 @@ export function RecordInteractions({
   const [kind, setKind] = useState<ThreadKind>('all')
   const [withFiles, setWithFiles] = useState(false)
   const [unfolded, setUnfolded] = useState(false)
-  const opened = openModalId(useSearch({ strict: false }), 'email')
+  const highlighted = useThreadHighlight()
+  const recordId = record?.id
+  useEffect(() => {
+    if (recordId === undefined) return
+    setInteractionsFilter(recordId, kind)
+    return () => setInteractionsFilter(recordId, null)
+  }, [recordId, kind])
   const threads = threadsOf(interactions)
   if (threads.length === 0)
-    return logInteraction ? (
-      <>{logInteraction(<EmptyRow name="Interactions" />)}</>
-    ) : (
-      <EmptyRow name="Interactions" />
+    return (
+      <div
+        data-interactions-empty
+        className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-rule px-3"
+      >
+        <span className="text-ui text-graphite">No interactions yet</span>
+        {logInteraction
+          ? logInteraction(<Button variant="outline">Log interaction</Button>)
+          : null}
+      </div>
     )
 
   const counts = threadCounts(threads)
   const listed = threads.filter((t) => threadShown(t, kind, withFiles))
-  const openedAt = listed.findIndex((t) => t.row.id === opened)
+  const openedAt = listed.findIndex((t) => highlighted(t.row))
   const shown =
     unfolded || openedAt >= INTERACTIONS_FOLD
       ? listed
@@ -366,7 +382,8 @@ export function RecordInteractions({
                 item={t.row}
                 messages={t.messages}
                 tab="interactions"
-                highlighted={t.row.id === opened}
+                highlighted={highlighted(t.row)}
+                summaryLines={2}
                 menu={<ThreadMenu thread={t} record={record} />}
               />
             ))}

@@ -11,8 +11,12 @@ export type ThreadPerson = {
   self: boolean
 }
 
+/** How many names the people lane prints before `+N`. */
+const PEOPLE_SHOWN = 2
+
 /**
- * The people lane: never the viewer, and `To <names>` on a row the viewer
+ * The people lane: never the viewer, the first two names and `+N` for the
+ * rest (`Priya Raman, Dev Shah +2`), and `To <names>` on a row the viewer
  * sent. Empty when nobody else is on it.
  */
 export function threadPeople(row: {
@@ -21,7 +25,9 @@ export function threadPeople(row: {
 }): string {
   const names = row.attendees.filter((a) => !a.self).map((a) => a.name)
   if (names.length === 0) return ''
-  const joined = names.join(' · ')
+  const rest = names.length - PEOPLE_SHOWN
+  const shown = names.slice(0, PEOPLE_SHOWN).join(', ')
+  const joined = rest > 0 ? `${shown} +${String(rest)}` : shown
   return row.sent ? `To ${joined}` : joined
 }
 

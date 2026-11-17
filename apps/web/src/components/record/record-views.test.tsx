@@ -16,6 +16,11 @@ import { PropertyFold } from './property-fold'
 import { RecordNotes } from './record-notes'
 import type { RecordNoteRow } from './record-notes'
 import type { MacroFacts } from '#/lib/timeline/record'
+import {
+  clearLogged,
+  markLogged,
+  useLogKindFor,
+} from '#/lib/timeline/log-state'
 
 /**
  * Inside a record's tabs and details column: the empties fold, the
@@ -82,7 +87,7 @@ vi.mock('#/lib/server-fns', () => ({
 }))
 /** The page's search; empty, so the email window stays shut, unless a test sets it. */
 const routerSearch = vi.hoisted(() => {
-  const current: { modal?: 'email' | 'note'; id?: string } = {}
+  const current: { modal?: 'email' | 'meeting' | 'note'; id?: string } = {}
   return { current }
 })
 
@@ -174,6 +179,7 @@ const interaction = (
     linked: boolean
     via: string | null
     attachments: number
+    attachmentNames: Array<string>
     answer: string | null
     noteId: string | null
     privateBody: boolean
@@ -200,6 +206,7 @@ const interaction = (
   attendees: [],
   via: null,
   attachments: 0,
+  attachmentNames: [],
   hasAttachments: false,
   answer: null,
   summary: null,
@@ -451,7 +458,7 @@ describe('the Interactions tab', () => {
     expect(bands).toEqual(['This week', 'Last week', 'Earlier'])
   })
 
-  it('has no composer: empty, it is one Interactions + row, which the log window wraps', async () => {
+  it('is its toolbar when empty: No interactions yet, and an outlined Log interaction the log window wraps', async () => {
     const wrapped: Array<string> = []
     const el = await mount(
       <RecordInteractions
@@ -462,9 +469,97 @@ describe('the Interactions tab', () => {
         }}
       />,
     )
-    expect(el.textContent).toBe('Interactions+')
-    expect(el.querySelector('[data-empty-row]')).not.toBeNull()
+    const bar = el.querySelector('[data-interactions-empty]')
+    expect(bar?.textContent).toBe('No interactions yetLog interaction')
+    expect(bar?.className).toContain('justify-between')
+    expect(el.querySelector('[data-empty-row]')).toBeNull()
     expect(wrapped).toEqual(['log'])
+  })
+
+  it('holds no log button once filled: the head’s Log interaction is the way in', async () => {
+    const wrapped: Array<string> = []
+    const el = await mount(
+      <RecordInteractions
+        items={items}
+        logInteraction={(trigger) => {
+          wrapped.push('log')
+          return trigger
+        }}
+      />,
+    )
+    expect(wrapped).toEqual([])
+    expect(el.textContent).not.toContain('Log interaction')
+  })
+
+  it('runs a summary to two lines in the tab, the clip under the day', async () => {
+    const el = await mount(
+      <RecordInteractions
+        items={[
+          interaction('s', 'call', {
+            summary: 'Wants a lead by March.',
+            attachments: 1,
+            attachmentNames: ['deck.pdf'],
+            hasAttachments: true,
+          }),
+        ]}
+        record={FLENT}
+      />,
+    )
+    const row = el.querySelector('li[data-thread="s"]')
+    const summary = row?.querySelector('[data-summary]')
+    expect(summary?.className).toContain('line-clamp-2')
+    expect(summary?.className).not.toContain('truncate')
+    const two = row?.querySelector('[data-line-two]')
+    // The `···` lane is cleared, so the clip ends where the day does.
+    expect(two?.className).toContain('pr-9')
+    expect(two?.lastElementChild?.hasAttribute('data-clip')).toBe(true)
+  })
+
+  it('puts the row of the open write-up, and of a just-logged one, on bone', async () => {
+    routerSearch.current = { modal: 'note', id: 'n1' }
+    const el = await mount(<RecordInteractions items={items} />)
+    expect(
+      [...el.querySelectorAll('li[data-highlighted]')].map((r) =>
+        r.getAttribute('data-thread'),
+      ),
+    ).toEqual(['d'])
+
+    act(() => root?.unmount())
+    routerSearch.current = {}
+    markLogged('e')
+    const logged = await mount(<RecordInteractions items={items} />)
+    expect(
+      [...logged.querySelectorAll('li[data-highlighted]')].map((r) =>
+        r.getAttribute('data-thread'),
+      ),
+    ).toEqual(['e'])
+    act(() => clearLogged('e'))
+    expect(logged.querySelector('li[data-highlighted]')).toBeNull()
+  })
+
+  it('hands its Calls or Meetings filter to the head’s log window, and forgets it when it goes', async () => {
+    let seen: string | null = 'unread'
+    function Head() {
+      seen = useLogKindFor(FLENT.id)
+      return null
+    }
+    await mount(
+      <>
+        <Head />
+        <RecordInteractions items={items} record={FLENT} />
+      </>,
+    )
+    expect(seen).toBeNull()
+    await click(button(/^Calls1$/))
+    expect(seen).toBe('call')
+    await click(button(/^Email2$/))
+    expect(seen).toBeNull()
+    await click(button(/^Meetings1$/))
+    expect(seen).toBe('meeting')
+    // The tab goes (another tab opened): the head's window opens on Meeting.
+    act(() => root?.render(<Head />))
+    await flush()
+    expect(seen).toBeNull()
   })
 
   it('holds Write up in the row ···, with Unlink from the record last', async () => {

@@ -7,9 +7,12 @@ import { LogInteractionDialog } from './log-interaction-dialog'
 
 /**
  * Log interaction's room is one field of chips: a suggestion picked adds a
- * chip, its × takes it away, the seed included. `Write it up next` is the
- * one variant of the one commit: the log carries `writeUp` and lands in the
- * write-up. Mounted in happy-dom, through Radix.
+ * chip, its × takes it away, the seed included. An optional Summary rides
+ * the log. `Write it up next` is the one variant of the one commit: the log
+ * carries `writeUp` and lands in the write-up's window over the record, or
+ * its page with no record underneath. The toast names the kind and offers
+ * `Write it up` when nothing is written yet. Mounted in happy-dom, through
+ * Radix.
  */
 
 await vi.hoisted(async () => {
@@ -20,6 +23,10 @@ await vi.hoisted(async () => {
 const fns = vi.hoisted(() => ({
   logInteraction: vi.fn(),
   searchEntities: vi.fn(),
+  writeUpInteraction: vi.fn(),
+}))
+const toasts = vi.hoisted(() => ({
+  toast: vi.fn((_text: string, _options?: unknown) => undefined),
 }))
 const nav = vi.hoisted(() => ({
   navigate: vi.fn(() => Promise.resolve()),
@@ -28,7 +35,7 @@ const nav = vi.hoisted(() => ({
 
 vi.mock('#/lib/server-fns', () => fns)
 vi.mock('@tanstack/react-router', () => ({ useRouter: () => nav }))
-vi.mock('sonner', () => ({ toast: () => undefined }))
+vi.mock('sonner', () => ({ toast: toasts.toast }))
 
 const SEED = { id: 'acme', name: 'Acme', kind: 'company' }
 
@@ -41,7 +48,7 @@ beforeEach(() => {
     { id: 'ada', name: 'Ada Lovelace', kind: 'person' },
     { id: 'acme', name: 'Acme', kind: 'company' },
   ])
-  fns.logInteraction.mockResolvedValue({ noteId: 'note-1' })
+  fns.logInteraction.mockResolvedValue({ id: 'int-1', noteId: 'note-1' })
 })
 
 afterEach(() => {
@@ -92,14 +99,32 @@ const chips = () =>
     c.getAttribute('data-attendee'),
   )
 
-async function openDialog() {
+async function openDialog(
+  props: Partial<Parameters<typeof LogInteractionDialog>[0]> = {
+    seed: SEED,
+  },
+) {
   host = document.createElement('div')
   document.body.append(host)
   const r = createRoot(host)
   root = r
-  act(() => r.render(<LogInteractionDialog seed={SEED} />))
+  act(() => r.render(<LogInteractionDialog {...props} />))
   await click(button('Log meeting'))
   expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+}
+
+const kindPicked = () =>
+  [...document.querySelectorAll('[role="radio"]')]
+    .find((r) => r.getAttribute('aria-checked') === 'true')
+    ?.textContent.trim()
+
+/** The search the log handed `router.navigate`, applied to `prev`. */
+function searchOf(call: unknown, prev: Record<string, unknown>): unknown {
+  if (typeof call !== 'object' || call === null || !('search' in call))
+    throw new Error('no search')
+  const search = call.search
+  if (typeof search !== 'function') throw new Error('not a function')
+  return search(prev)
 }
 
 describe('LogInteractionDialog', () => {
@@ -184,10 +209,121 @@ describe('LogInteractionDialog', () => {
         writeUp: true,
       },
     })
+    // Over a record, the write-up opens in its window there.
+    expect(nav.navigate).toHaveBeenCalledTimes(1)
+    const call: unknown = nav.navigate.mock.calls.at(0)?.at(0)
+    expect(call).toMatchObject({ to: '.', resetScroll: false })
+    expect(searchOf(call, { tab: 'interactions' })).toEqual({
+      tab: 'interactions',
+      modal: 'note',
+      id: 'note-1',
+    })
+    // The write-up is open: the toast offers no second one.
+    expect(toasts.toast).toHaveBeenCalledTimes(1)
+    expect(toasts.toast.mock.calls.at(0)?.at(0)).toBe('Meeting logged')
+    expect(toasts.toast.mock.calls.at(0)?.at(1)).not.toHaveProperty('action')
+  })
+
+  it('lands on the note page where no record is underneath', async () => {
+    host = document.createElement('div')
+    document.body.append(host)
+    const r = createRoot(host)
+    root = r
+    act(() => r.render(<LogInteractionDialog hotkey="l" trigger={null} />))
+    act(() => {
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'l', bubbles: true }),
+      )
+    })
+    await wait(0)
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+    await type(input('int-subject'), 'Series B intro')
+    await type(input('int-attendees'), 'ad')
+    await wait(250)
+    const pick = document.querySelector('[role="option"] button')
+    if (!pick) throw new Error('no suggestion')
+    await click(pick)
+    const tick = document.querySelector('[role="checkbox"]')
+    if (!tick) throw new Error('no checkbox')
+    await click(tick)
+    await click(footButton('Log meeting'))
+    await wait(0)
     expect(nav.navigate).toHaveBeenCalledWith({
       to: '/notes/$noteId',
       params: { noteId: 'note-1' },
     })
+  })
+
+  it('carries the Summary, and toasts Call logged with Write it up', async () => {
+    fns.logInteraction.mockResolvedValue({ id: 'int-2', noteId: null })
+    fns.writeUpInteraction.mockResolvedValue({ noteId: 'note-2' })
+    await openDialog()
+    await click(
+      [...document.querySelectorAll('[role="radio"]')].find(
+        (r) => r.textContent.trim() === 'Call',
+      ) ?? document.body,
+    )
+    await type(input('int-subject'), 'Pricing call')
+    const summary = document.getElementById('int-summary')
+    if (!(summary instanceof HTMLTextAreaElement)) throw new Error('no Summary')
+    expect(summary.getAttribute('rows')).toBe('2')
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      'value',
+    )?.set
+    act(() => {
+      setter?.call(summary, '  Wants a lead by March.  ')
+      summary.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(footButton('Log call'))
+    await wait(0)
+    expect(fns.logInteraction.mock.calls[0]?.[0]).toMatchObject({
+      data: { kind: 'call', summary: 'Wants a lead by March.', writeUp: false },
+    })
+    expect(nav.navigate).not.toHaveBeenCalled()
+    const [text, options] = toasts.toast.mock.calls.at(0) ?? []
+    expect(text).toBe('Call logged')
+    const action: unknown =
+      typeof options === 'object' && options !== null && 'action' in options
+        ? options.action
+        : null
+    if (
+      typeof action !== 'object' ||
+      action === null ||
+      !('label' in action) ||
+      !('onClick' in action) ||
+      typeof action.onClick !== 'function'
+    )
+      throw new Error('no Write it up')
+    expect(action.label).toBe('Write it up')
+    action.onClick()
+    await wait(0)
+    expect(fns.writeUpInteraction).toHaveBeenCalledWith({
+      data: { interactionId: 'int-2' },
+    })
+    expect(searchOf(nav.navigate.mock.calls.at(0)?.at(0), {})).toEqual({
+      modal: 'note',
+      id: 'note-2',
+    })
+  })
+
+  it('sends no summary when the field is left blank', async () => {
+    await openDialog()
+    await type(input('int-subject'), 'Series B intro')
+    await click(footButton('Log meeting'))
+    expect(fns.logInteraction.mock.calls[0]?.[0]).not.toHaveProperty(
+      'data.summary',
+    )
+  })
+
+  it('opens on the kind the Interactions tab is filtered to', async () => {
+    await openDialog({ seed: SEED, defaultKind: 'call' })
+    expect(kindPicked()).toBe('Call')
+    act(() => root?.unmount())
+    host?.remove()
+    root = null
+    await openDialog({ seed: SEED, defaultKind: null })
+    expect(kindPicked()).toBe('Meeting')
   })
 })
 

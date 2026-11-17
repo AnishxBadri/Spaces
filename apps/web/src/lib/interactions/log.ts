@@ -54,6 +54,11 @@ export type LogInteractionInput = {
   attendeeIds: Array<string>
   /** Write the body note now, and hand back its id so the caller can land in it. */
   writeUp: boolean
+  /**
+   * What happened, in a line or two: the row's second line. Kept on the
+   * log's activity row, which the timeline already reads for who logged it.
+   */
+  summary: string | null
 }
 
 /** `noteId` is null exactly when the caller did not ask for a write-up. */
@@ -192,7 +197,10 @@ export const logInteractionProgram = Effect.fn('logInteractionProgram')(
           actorId,
           verb: `interaction.${input.kind}`,
           subjectEntityId: seed,
-          meta: { interactionId: row.id },
+          meta:
+            input.summary === null
+              ? { interactionId: row.id }
+              : { interactionId: row.id, summary: input.summary },
         })
 
         return { id: row.id, noteId: bodyId }

@@ -19,6 +19,7 @@ import {
   integration,
   interaction,
   interactionDocument,
+  interactionEntity,
   note,
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
@@ -123,8 +124,14 @@ export type EmailDetail = {
   /** The classify lane's labels; empty while the body is not the reader's. */
   categories: Array<EmailCategory>
   thread: EmailThread
-  /** The record the window was opened from, by name: whose files a reply attaches. */
-  record: { id: string; name: string } | null
+  /**
+   * The record the window was opened from, by name: whose files a reply
+   * attaches. `linked` when the email is filed on it by its own edge, so
+   * the window can unlink it there.
+   */
+  record: { id: string; name: string; linked: boolean } | null
+  /** The message in Gmail, for an email that came through Gmail. */
+  gmailUrl: string | null
 }
 
 const uploader = alias(user, 'uploader')
@@ -194,6 +201,8 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
         meta: interaction.meta,
         threadId: interaction.threadId,
         noteId: interaction.noteId,
+        messageId: interaction.messageId,
+        lane: integration.capabilityId,
         bodyMd: note.bodyMd,
         visibility: note.visibility,
         authorId: note.authorId,
@@ -203,6 +212,7 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
       .from(interaction)
       .leftJoin(note, eq(note.entityId, interaction.noteId))
       .leftJoin(user, eq(user.id, note.authorId))
+      .leftJoin(integration, eq(integration.id, interaction.sourceRef))
       .where(and(eq(interaction.id, id), eq(interaction.kind, 'email'))),
   )).at(0)
   if (!row) return yield* new EmailNotFound({ id })
@@ -296,6 +306,20 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
             .from(entity)
             .where(and(eq(entity.id, recordId), isNull(entity.mergedIntoId))),
         )).at(0)
+  const linked =
+    record === undefined
+      ? false
+      : (yield* query(() =>
+          db
+            .select({ id: interactionEntity.entityId })
+            .from(interactionEntity)
+            .where(
+              and(
+                eq(interactionEntity.interactionId, id),
+                eq(interactionEntity.entityId, record.id),
+              ),
+            ),
+        )).length > 0
 
   return {
     id: row.id,
@@ -311,9 +335,20 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
     privacy,
     categories: emailListing(row.meta, readable).categories,
     thread,
-    record: record ?? null,
+    record: record === undefined ? null : { ...record, linked },
+    gmailUrl: row.lane === 'gmail' ? gmailUrl(row.messageId) : null,
   }
 })
+
+/**
+ * The message in the reader's Gmail, found by its Message-ID: the one key
+ * every mailbox that holds it shares. Null without one.
+ */
+export function gmailUrl(messageId: string | null): string | null {
+  const bare = messageId?.trim().replace(/^<|>$/g, '') ?? ''
+  if (bare === '') return null
+  return `https://mail.google.com/mail/#search/rfc822msgid%3A${encodeURIComponent(bare)}`
+}
 
 /** How long a thread line's preview runs before it is cut on a word. */
 const PREVIEW_MAX = 140

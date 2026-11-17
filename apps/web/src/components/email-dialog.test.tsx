@@ -15,8 +15,9 @@ import { EmailModal } from './email-dialog'
 /**
  * The email window opened from `?modal=email&id=`: the
  * sandboxed frame, the remote-image count printed once, a private body as
- * a bone panel, one close in the foot that drops the two params, the
- * privacy line with its widen window, and the thread's earlier messages.
+ * a bone panel, a foot of Done, `···` and Reply with Done dropping the two
+ * params, who reads a private body at the foot's left with its widen
+ * window in the `···`, and the thread's earlier messages unfolding in place.
  */
 
 await vi.hoisted(async () => {
@@ -74,9 +75,13 @@ const fns = vi.hoisted(() => ({
   fileDocument: vi.fn(),
   listRecordDocuments: vi.fn(),
   listEmailVariables: vi.fn(),
+  searchEntities: vi.fn(),
+  fileInteractionOnEntity: vi.fn(),
+  unlinkInteractionFromEntity: vi.fn(),
 }))
 const router = vi.hoisted(() => ({
   navigate: vi.fn(),
+  invalidate: vi.fn(() => Promise.resolve()),
   search: { modal: 'email', id: '00000000-0000-4000-8000-000000000001' },
 }))
 
@@ -84,6 +89,7 @@ vi.mock('#/lib/server-fns', () => fns)
 vi.mock('@tanstack/react-router', () => ({
   useSearch: () => router.search,
   useNavigate: () => router.navigate,
+  useRouter: () => ({ invalidate: router.invalidate }),
 }))
 
 const HTML: EmailDetail = {
@@ -116,6 +122,7 @@ const HTML: EmailDetail = {
   categories: [],
   thread: { messages: 1, earlier: [] },
   record: null,
+  gmailUrl: null,
 }
 
 const RECORD = '00000000-0000-4000-8000-0000000000aa'
@@ -258,10 +265,24 @@ describe('the email window', () => {
     expect(dialog()?.querySelector('iframe')).toBeNull()
   })
 
-  it('has one close, in the foot, which drops the modal params', async () => {
+  it('leads its head on the 20px email glyph', async () => {
     await open()
-    expect(buttons('Cancel')).toHaveLength(1)
-    const cancel = buttons('Cancel')[0]
+    const mark = dialog()?.querySelector(
+      '[data-slot="dialog-header"] [data-window-mark]',
+    )
+    expect(mark?.getAttribute('class')).toContain('size-5')
+  })
+
+  it('ends on Done, the ··· and Reply, and Done drops the modal params', async () => {
+    await open()
+    const foot = dialog()?.querySelector('[data-slot="dialog-footer"]')
+    expect(
+      [...(foot?.querySelectorAll('button') ?? [])].map(
+        (b) => b.getAttribute('aria-label') ?? b.textContent.trim(),
+      ),
+    ).toEqual(['Done', 'More for Acme Robotics — Q3 update', 'Reply'])
+    expect(buttons('Cancel')).toHaveLength(0)
+    const cancel = buttons('Done')[0]
     expect(cancel.closest('[data-slot="dialog-footer"]')).not.toBeNull()
     expect(dialog()?.textContent ?? '').not.toMatch(/\besc\b/i)
     act(() => cancel.click())
@@ -279,27 +300,51 @@ describe('the email window', () => {
   })
 })
 
-describe('the privacy row', () => {
-  const privacyRow = () =>
-    dialog()?.querySelector('[data-privacy]')?.textContent ?? null
+describe('who reads it', () => {
+  const footNote = () =>
+    dialog()?.querySelector('[data-slot="dialog-footer"] > span.mono')
+      ?.textContent ?? null
 
-  it('reads the workspace with no control on a shared (forwarded) body, beside its label chip', async () => {
+  async function openMore() {
+    const trigger = document.querySelector(
+      '[aria-label="More for Acme Robotics — Q3 update"]',
+    )
+    if (trigger === null) throw new Error('no ···')
+    act(() => {
+      trigger.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      )
+    })
+    await settle()
+    const menu = document.querySelector('[role="menu"]')
+    if (menu === null) throw new Error('no menu')
+    return [...menu.children].map((el) =>
+      el.getAttribute('role') === 'separator' ? '—' : el.textContent.trim(),
+    )
+  }
+
+  it('says nothing at the foot for a shared (forwarded) body, its label chip kept', async () => {
     fns.getEmail.mockResolvedValue({ ...HTML, categories: ['pitch'] })
     await open()
-    expect(privacyRow()).toBe('Visible to the workspace')
-    expect(buttons('Widen…')).toHaveLength(0)
+    expect(footNote()).toBeNull()
     expect(
       dialog()?.querySelector('[data-category="pitch"]')?.textContent,
     ).toBe('Pitch')
+    expect(await openMore()).toEqual([
+      'Forward',
+      'Copy link',
+      'File on a deal…',
+    ])
   })
 
-  it('reads "Visible to you  Widen…" to the owner', async () => {
+  it('reads Visible to you at the foot while the owner’s body is private', async () => {
     fns.getEmail.mockResolvedValue(OWN)
     await open(RECORD)
     expect(fns.getEmail).toHaveBeenCalledWith({
       data: { id: ID, recordId: RECORD },
     })
-    expect(privacyRow()).toBe('Visible to you  Widen…')
+    expect(footNote()).toBe('Visible to you')
+    expect(dialog()?.querySelector('[data-privacy]')).toBeNull()
   })
 
   it('names the owner and offers no widen to anyone else', async () => {
@@ -316,8 +361,8 @@ describe('the privacy row', () => {
       },
     })
     await open(RECORD)
-    expect(privacyRow()).toBe('Visible to Anish')
-    expect(buttons('Widen…')).toHaveLength(0)
+    expect(footNote()).toBe('Visible to Anish')
+    expect(await openMore()).not.toContain('Who can read this…')
     // Private: the From lane appears, and the body is a bone panel.
     expect(dialog()?.textContent).toContain('From')
     expect(dialog()?.querySelector('[data-body-private]')?.textContent).toBe(
@@ -325,7 +370,7 @@ describe('the privacy row', () => {
     )
   })
 
-  it('reads the grantees, and the workspace once an override covers it', async () => {
+  it('reads the grantees, and nothing once an override opens it to the workspace', async () => {
     fns.getEmail.mockResolvedValue({
       ...OWN,
       privacy: {
@@ -334,7 +379,7 @@ describe('the privacy row', () => {
       },
     })
     await open(RECORD)
-    expect(privacyRow()).toBe('Visible to you, Maya  Widen…')
+    expect(footNote()).toBe('Visible to you, Maya')
     act(() => root.unmount())
     root = createRoot(host)
     fns.getEmail.mockResolvedValue({
@@ -342,9 +387,81 @@ describe('the privacy row', () => {
       privacy: { ...MINE, workspace: true },
     })
     await open(RECORD)
-    expect(privacyRow()).toBe(
-      'Visible to the workspace · all your email with Flent  Change…',
+    expect(footNote()).toBeNull()
+  })
+
+  it('holds Forward, Open in Gmail, Copy link, File on a deal…, Who can read this…, then Unlink', async () => {
+    fns.getEmail.mockResolvedValue({
+      ...OWN,
+      gmailUrl: 'https://mail.google.com/mail/#search/rfc822msgid%3Aq3%40acme',
+      record: { id: RECORD, name: 'Flent', linked: true },
+    })
+    await open(RECORD)
+    expect(await openMore()).toEqual([
+      'Forward',
+      'Open in Gmail',
+      'Copy link',
+      'File on a deal…',
+      'Who can read this…',
+      '—',
+      'Unlink from Flent…',
+    ])
+  })
+
+  it('forwards from the ···: the draft opens in its forward mode', async () => {
+    fns.openEmailReply.mockResolvedValue({
+      draft: null,
+      modes: {
+        reply: {
+          mode: 'reply',
+          inReplyToId: ID,
+          to: [],
+          cc: [],
+          bcc: [],
+          subject: 'Re: Acme',
+          bodyMd: '',
+          attachments: [],
+        },
+        reply_all: {
+          mode: 'reply_all',
+          inReplyToId: ID,
+          to: [],
+          cc: [],
+          bcc: [],
+          subject: 'Re: Acme',
+          bodyMd: '',
+          attachments: [],
+        },
+        forward: {
+          mode: 'forward',
+          inReplyToId: ID,
+          to: [],
+          cc: [],
+          bcc: [],
+          subject: 'Fwd: Acme',
+          bodyMd: '---------- Forwarded message ----------',
+          attachments: [],
+        },
+      },
+    })
+    await open()
+    await openMore()
+    const forward = [...document.querySelectorAll('[role="menuitem"]')].find(
+      (el) => el.textContent.trim() === 'Forward',
     )
+    if (!(forward instanceof HTMLElement)) throw new Error('no Forward')
+    act(() => forward.click())
+    await settle()
+    expect(
+      document.querySelector<HTMLTextAreaElement>(
+        'textarea[aria-label="Message"]',
+      )?.value,
+    ).toBe('---------- Forwarded message ----------')
+    expect(
+      [...document.querySelectorAll('[role="radio"]')].find(
+        (t) => t.getAttribute('aria-checked') === 'true',
+      )?.textContent,
+    ).toBe('Forward')
   })
 
   it('widens in "Who can read this": the owner, the grantees with ×, every email with the record', async () => {
@@ -362,13 +479,19 @@ describe('the privacy row', () => {
     ])
     fns.setEmailAudience.mockResolvedValue({ ok: true })
     await open(RECORD)
-    act(() => buttons('Widen…')[0]?.click())
-    await settle()
-    const widen = [...document.querySelectorAll('[role="dialog"]')].at(-1)
-    if (widen === undefined) throw new Error('no widen window')
-    expect(widen.querySelector('[data-slot="dialog-title"]')?.textContent).toBe(
-      'Who can read this',
+    await openMore()
+    const who = [...document.querySelectorAll('[role="menuitem"]')].find(
+      (el) => el.textContent.trim() === 'Who can read this…',
     )
+    if (!(who instanceof HTMLElement)) throw new Error('no Who can read this…')
+    act(() => who.click())
+    await settle()
+    const widen = [...document.querySelectorAll('[role="dialog"]')].find(
+      (d) =>
+        d.querySelector('[data-slot="dialog-title"]')?.textContent ===
+        'Who can read this',
+    )
+    if (widen === undefined) throw new Error('no widen window')
     const text = widen.textContent
     expect(text).toContain('AnishOwner')
     expect(text).toContain('Maya')
@@ -415,20 +538,49 @@ describe('the thread', () => {
     occurredAt: '2026-09-02T18:40:00.000Z',
     ...over,
   })
+  const B1 = '00000000-0000-4000-8000-0000000000b1'
+  const B2 = '00000000-0000-4000-8000-0000000000b2'
+  const B3 = '00000000-0000-4000-8000-0000000000b3'
   const THREADED: EmailDetail = {
     ...HTML,
     thread: {
       messages: 4,
       earlier: [
-        line('00000000-0000-4000-8000-0000000000b1'),
-        line('00000000-0000-4000-8000-0000000000b2', {
-          who: 'Jane Founder',
-          sent: true,
-          preview: null,
-        }),
-        line('00000000-0000-4000-8000-0000000000b3', { attachments: 2 }),
+        line(B1),
+        line(B2, { who: 'Jane Founder', sent: true, preview: null }),
+        line(B3, { attachments: 2 }),
       ],
     },
+  }
+  /** Each message as `getEmail` reads it: the newest is the window's own. */
+  const byId = (id: string): EmailDetail =>
+    id === B2
+      ? {
+          ...HTML,
+          id: B2,
+          body: { kind: 'text', text: 'Sending the Q2 pack.' },
+          attachments: [],
+        }
+      : id === B3
+        ? {
+            ...HTML,
+            id: B3,
+            body: { kind: 'text', text: 'Q2 numbers attached.' },
+            attachments: [
+              {
+                ...HTML.attachments[0],
+                documentId: 'd-q2',
+                name: 'acme-q2.pdf',
+                filename: 'acme-q2.pdf',
+              },
+            ],
+          }
+        : THREADED
+
+  const lineButton = (id: string) => {
+    const el = document.querySelector<HTMLElement>(`[data-thread-line="${id}"]`)
+    if (el === null) throw new Error(`no line ${id}`)
+    return el
   }
 
   it('heads with the count and folds the oldest past two, a sent line reading To <name>', async () => {
@@ -442,8 +594,8 @@ describe('the thread', () => {
     )
     const shown = [...document.querySelectorAll('[data-thread-line]')]
     expect(shown.map((l) => l.getAttribute('data-thread-line'))).toEqual([
-      '00000000-0000-4000-8000-0000000000b2',
-      '00000000-0000-4000-8000-0000000000b3',
+      B2,
+      B3,
     ])
     expect(shown[0]?.textContent).toContain('To Jane Founder')
     expect(shown[1]?.querySelector('[aria-label="Attachments"]')).not.toBeNull()
@@ -453,20 +605,46 @@ describe('the thread', () => {
     expect(document.querySelectorAll('[data-thread-line]')).toHaveLength(3)
   })
 
-  it('opens an earlier message in the same window', async () => {
+  it('opens the newest message, and every earlier one folded to its line', async () => {
     fns.getEmail.mockResolvedValue(THREADED)
     await open()
-    act(() =>
-      document
-        .querySelector<HTMLElement>(
-          '[data-thread-line="00000000-0000-4000-8000-0000000000b3"]',
-        )
-        ?.click(),
+    expect(document.querySelector(`[data-message="${ID}"]`)).not.toBeNull()
+    expect(dialog()?.querySelector('iframe')).not.toBeNull()
+    expect(document.querySelector(`[data-message="${B3}"]`)).toBeNull()
+    expect(lineButton(B3).getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('unfolds an earlier message in place, with its own files, and keeps the open one', async () => {
+    fns.getEmail.mockImplementation(({ data }: { data: { id: string } }) =>
+      Promise.resolve(byId(data.id)),
     )
+    await open()
+    act(() => lineButton(B3).click())
     await settle()
     expect(fns.getEmail).toHaveBeenLastCalledWith({
-      data: { id: '00000000-0000-4000-8000-0000000000b3', recordId: null },
+      data: { id: B3, recordId: null },
     })
+    const unfolded = document.querySelector(`[data-message="${B3}"]`)
+    expect(unfolded?.textContent).toContain('Jane Founder')
+    expect(unfolded?.textContent).toContain('Q2 numbers attached.')
+    // Its files sit under it, the open message keeps its own.
+    expect(
+      unfolded?.querySelector(`[data-files-of="${B3}"]`)?.textContent,
+    ).toContain('acme-q2.pdf')
+    expect(
+      document.querySelector(`[data-files-of="${ID}"]`)?.textContent,
+    ).toContain('acme-q3.pdf')
+    expect(document.querySelector(`[data-message="${ID}"]`)).not.toBeNull()
+    expect(lineButton(B3).getAttribute('aria-expanded')).toBe('true')
+
+    // A second one opens beside it; a click on an open line folds it.
+    act(() => lineButton(B2).click())
+    await settle()
+    expect(document.querySelector(`[data-message="${B2}"]`)).not.toBeNull()
+    expect(document.querySelector(`[data-message="${B3}"]`)).not.toBeNull()
+    act(() => lineButton(B3).click())
+    expect(document.querySelector(`[data-message="${B3}"]`)).toBeNull()
+    expect(document.querySelector(`[data-message="${B2}"]`)).not.toBeNull()
   })
 })
 
@@ -559,7 +737,7 @@ describe('a reply (E3)', () => {
       (t) => t.textContent,
     )
     expect(modes).toEqual(['Reply', 'Reply all', 'Forward'])
-    // Still one close.
+    // The composer's own foot: its Cancel is the one close.
     expect(buttons('Cancel')).toHaveLength(1)
   })
 

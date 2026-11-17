@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { and, desc, eq, inArray, isNotNull, like, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNotNull, like, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { condenseBursts } from '@spaces/core/timeline/bursts'
 import { db } from '@spaces/db'
@@ -25,7 +25,7 @@ import { investment } from '@spaces/db/schema/portfolio'
 import { jsonRecord, jsonString, jsonStrings } from '@spaces/core/json'
 import { sinceRemoved } from '@spaces/core/plugins/registry'
 import { canRead } from '@spaces/core/read-policy'
-import { emailListing } from '@spaces/core/interactions/email-listing'
+import { clean, emailListing } from '@spaces/core/interactions/email-listing'
 import {
   canReadDocumentSql,
   noteWidenedSql,
@@ -210,7 +210,8 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           )
         : []
     // The row's end lane: who logged it or which integration wrote it, and
-    // how many attachments hang off it.
+    // how many attachments hang off it. A hand-logged row's summary is the
+    // one its logger typed, kept on the log's own activity row.
     const loggers =
       interactionIds.length > 0
         ? yield* query(() =>
@@ -218,6 +219,7 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
               .select({
                 interactionId: sql<string>`${activity.meta} ->> 'interactionId'`,
                 actorId: activity.actorId,
+                summary: sql<string | null>`${activity.meta} ->> 'summary'`,
               })
               .from(activity)
               .where(
@@ -238,19 +240,26 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
         return name === undefined ? [] : [[l.interactionId, name] as const]
       }),
     )
+    const loggedSummary = new Map(
+      loggers.flatMap((l) => {
+        const text = l.summary === null ? null : clean(l.summary)
+        return text === null ? [] : [[l.interactionId, text] as const]
+      }),
+    )
     const attachmentRows =
       interactionIds.length > 0
         ? yield* query(() =>
             db
               .select({
                 interactionId: interactionDocument.interactionId,
-                n: sql<number>`count(*)::int`,
+                name: entity.canonicalName,
               })
               .from(interactionDocument)
               .innerJoin(
                 document,
                 eq(document.entityId, interactionDocument.documentId),
               )
+              .innerJoin(entity, eq(entity.id, interactionDocument.documentId))
               .where(
                 and(
                   inArray(interactionDocument.interactionId, interactionIds),
@@ -259,12 +268,15 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
                   canReadDocumentSql(viewer.id),
                 ),
               )
-              .groupBy(interactionDocument.interactionId),
+              .orderBy(asc(entity.canonicalName)),
           )
         : []
-    const attachmentsBy = new Map(
-      attachmentRows.map((r) => [r.interactionId, r.n]),
-    )
+    const attachmentsBy = new Map<string, Array<string>>()
+    for (const r of attachmentRows)
+      attachmentsBy.set(r.interactionId, [
+        ...(attachmentsBy.get(r.interactionId) ?? []),
+        r.name,
+      ])
     // canRead on every write-up: a body the viewer may not read is not
     // linked, and its row says so. Subject, participants and date stay; an
     // email its owner widened to the viewer reads like their own.
@@ -436,11 +448,18 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
             ? (integrationNames.get(i.sourceRef) ?? null)
             : (loggedBy.get(i.id) ?? null),
           // Attachments are private with the body: no count, no filter.
-          attachments: privateBody ? 0 : (attachmentsBy.get(i.id) ?? 0),
+          attachments: privateBody ? 0 : (attachmentsBy.get(i.id) ?? []).length,
+          /** The files' names, line two of a row with no summary. */
+          attachmentNames: privateBody ? [] : (attachmentsBy.get(i.id) ?? []),
           hasAttachments: !privateBody && i.hasAttachments,
           answer: meetingAnswer(i.meta, ownEmails),
-          /** The cached one-line summary; null until a lane writes one. */
-          summary: listing.summary,
+          /**
+           * The email's cached summary, else the one typed when it was
+           * logged; null until either exists, and private with the body.
+           */
+          summary: privateBody
+            ? null
+            : (listing.summary ?? loggedSummary.get(i.id) ?? null),
           /** The mailbox's preview, shown unmarked when there is no summary. */
           snippet: listing.snippet,
           categories: listing.categories,

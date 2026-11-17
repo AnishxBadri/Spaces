@@ -41,6 +41,7 @@ const logCall = (
       occurredAt: at,
       attendeeIds: [personId],
       writeUp: false,
+      summary: null,
     }),
   )
 

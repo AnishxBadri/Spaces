@@ -358,7 +358,9 @@ company head went from sixteen things to seven by this rule.
 - **A6 · A dialog foot is `note? · Cancel · Primary`.** Cancel is outline, the primary
   is filled, neither carries an icon or a printed key. There is one commit; a variant
   is a toggle beside it. The note is for cost, privacy or irreversibility only, and it
-  wraps rather than truncates.
+  wraps rather than truncates. A window with nothing pending to cancel ends on `Done`
+  instead (D108); the email window's foot is `Done · ··· · Reply`, with `Visible to
+you` as its note while the body is private (D109).
 - **A7 · State is never a control.** No disabled button or menu item announces a
   missing setup; a `···` with no enabled item does not render; a menu of one frequent
   verb is that verb as a button, while a lone rare verb stays in the menu
@@ -380,9 +382,14 @@ Three more rules govern what a section or a list prints rather than how it is ac
 
 - **H1 · An empty section is one `Name +` row.** The name in graphite and a `+`, with
   no sentence, no composer and no 0. The absence sentence survives only where absence
-  is news (`Nothing matches that filter.`).
+  is news (`Nothing matches that filter.`). A record's empty Interactions tab is its
+  toolbar instead: `No interactions yet` left and an outlined `Log interaction` right
+  (D109).
 - **H2 · You are never listed among a row's people.** The viewer is left out of the
-  people lane; a sent row reads `To X`.
+  people lane, which prints two names and `+N` (`Priya Raman, Dev Shah +2`); a sent
+  row reads `To X`. A thread row's second line is its summary (two lines in the
+  Interactions tab, one elsewhere), or its file names when it has none, with the clip
+  and its count at the line's right end under the day (D109).
 - **H3 · A list prints the day.** The time lives in the viewer or a tooltip, and a long
   list breaks by week on bone bands. Today's rows and scheduled meetings show the time,
   because the time is what they are about.
