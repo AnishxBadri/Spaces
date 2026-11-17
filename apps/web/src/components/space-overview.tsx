@@ -206,8 +206,8 @@ function MovingGroup({
 }
 
 /**
- * One row of What's moving: the 44px day lane, then the title over one
- * graphite line, each cut to a single line.
+ * One row of What's moving: the 44px day lane, then the title, wrapping to
+ * two lines at most, over one graphite line cut to a single line.
  */
 function MovingRow({
   at,
@@ -245,7 +245,7 @@ function MovingRow({
 
 // The title's own width, so the row's empty end is not a link.
 const MOVING_TITLE =
-  'focus-ring max-w-full self-start truncate text-ui text-foreground'
+  'focus-ring line-clamp-2 max-w-full self-start text-ui text-foreground'
 
 /**
  * A signal: its headline, then the record, the subspace it is filed in when
