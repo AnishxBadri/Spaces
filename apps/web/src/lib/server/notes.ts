@@ -142,67 +142,12 @@ const getNoteProgram = Effect.fn('getNoteProgram')(function* (
   // "Not found" on purpose — a 403 would confirm a private note exists.
   if (!row || !canRead(viewer, row))
     return yield* new NoteRefused({ message: 'Note not found' })
-  // Backlinks: anything whose content mentions this note. The object and
-  // the note kind ride along for the rail's kind icon and a custom record's
-  // route.
-  const backlinks = yield* serverQuery(() =>
-    db
-      .select({
-        fromId: link.fromEntityId,
-        name: entity.canonicalName,
-        kind: entity.kind,
-        objectSlug: objectDef.slug,
-        objectLabel: objectDef.singular,
-        objectIcon: objectDef.icon,
-        noteKind: note.kind,
-      })
-      .from(link)
-      .innerJoin(entity, eq(entity.id, link.fromEntityId))
-      .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
-      .leftJoin(note, eq(note.entityId, entity.id))
-      .where(and(eq(link.toEntityId, noteId), eq(link.relation, 'mentions'))),
+  // Mentioned in, and what the body mentions: both read-checked, so a
+  // private note the reader cannot open never reaches the rail by title.
+  const { noteMentionEdgesProgram } = yield* Effect.promise(
+    () => import('../notes/mention-edges'),
   )
-  // What the body mentions: the outbound direction of the edge above,
-  // written from the body at save. A private note the reader cannot see
-  // drops out rather than leaking its name; so does a merged-away target.
-  const mentions = (yield* serverQuery(() =>
-    db
-      .select({
-        id: entity.id,
-        name: entity.canonicalName,
-        kind: entity.kind,
-        objectSlug: objectDef.slug,
-        objectLabel: objectDef.singular,
-        objectIcon: objectDef.icon,
-        noteKind: note.kind,
-        visibility: note.visibility,
-        authorId: note.authorId,
-      })
-      .from(link)
-      .innerJoin(entity, eq(entity.id, link.toEntityId))
-      .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
-      .leftJoin(note, eq(note.entityId, entity.id))
-      .where(
-        and(
-          eq(link.fromEntityId, noteId),
-          eq(link.relation, 'mentions'),
-          isNull(entity.mergedIntoId),
-        ),
-      )
-      .orderBy(asc(link.createdAt)),
-  ))
-    .filter((r) => canRead(viewer, r))
-    .map(
-      ({ id, name, kind, objectSlug, objectLabel, objectIcon, noteKind }) => ({
-        id,
-        name,
-        kind,
-        objectSlug,
-        objectLabel,
-        objectIcon,
-        noteKind,
-      }),
-    )
+  const { backlinks, mentions } = yield* noteMentionEdgesProgram(userId, noteId)
   // Spaces this note is filed in, in the order it was filed; an archived
   // one stays, flagged, and its row dims.
   const spaces = yield* serverQuery(() =>
