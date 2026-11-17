@@ -383,6 +383,12 @@ describe('Notes', () => {
         .slice(0, 3)
         .map((el) => el.getAttribute('data-note-kind')),
     ).toEqual(['memo', 'note', 'note'])
+    // A memo's glyph is graphite like a note's: the seal tells them apart.
+    for (const glyph of document.querySelectorAll('[data-note-kind]')) {
+      const classes = (glyph.getAttribute('class') ?? '').split(' ')
+      expect(classes).toContain('text-graphite')
+      expect(classes).not.toContain('text-foreground')
+    }
     expect(document.querySelector('[data-kind-lane]')).toBeNull()
     const earlier = () =>
       document.querySelector('section[aria-label="Earlier"]')

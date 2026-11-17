@@ -240,16 +240,7 @@ function NoteRow({
       >
         <span className="flex min-h-5 min-w-0 items-center gap-3">
           <span data-note-mark className="flex w-4 shrink-0 justify-center">
-            <NoteMark
-              kind={n.kind}
-              via={n.via}
-              // As the Notes list draws it: a memo in ink, a note in graphite.
-              className={
-                n.kind === 'memo' && n.via === null && !superseded
-                  ? 'text-foreground'
-                  : undefined
-              }
-            />
+            <NoteMark kind={n.kind} via={n.via} />
           </span>
           <span
             className={cn(

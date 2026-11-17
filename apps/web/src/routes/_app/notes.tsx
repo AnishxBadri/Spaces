@@ -224,14 +224,7 @@ function NoteLedgerRow({ note }: { note: NoteRow }) {
         className="focus-ring-inset -mx-(--inset) flex h-full min-w-0 flex-1 items-center gap-3 px-(--inset) transition-colors hover:bg-bone"
       >
         <span title={NOTE_KIND_LABEL[note.kind]} className="flex shrink-0">
-          <NoteKindIcon
-            kind={note.kind}
-            className={
-              note.kind === 'note'
-                ? 'size-4 text-graphite'
-                : 'size-4 text-foreground'
-            }
-          />
+          <NoteKindIcon kind={note.kind} className="size-4 text-graphite" />
         </span>
         <span
           data-note-title

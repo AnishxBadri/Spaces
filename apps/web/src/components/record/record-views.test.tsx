@@ -1040,7 +1040,9 @@ describe('the Notes tab', () => {
     expect(
       icon('memo')?.querySelector('[data-note-kind="memo"]'),
     ).not.toBeNull()
-    expect(icon('memo')?.className).toContain('text-foreground')
+    // Every kind icon is graphite: the memo's seal, not ink, tells it apart.
+    expect(icon('memo')?.className).toContain('text-graphite')
+    expect(icon('memo')?.className).not.toContain('text-foreground')
     expect(icon('s')?.getAttribute('aria-label')).toBe('Note')
     expect(icon('s')?.getAttribute('title')).toBe('Note')
     expect(icon('s')?.className).toContain('text-graphite')
