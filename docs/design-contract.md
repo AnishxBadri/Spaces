@@ -77,13 +77,16 @@ sit on the 24px edge (`components/head-fold.tsx`).
   own margin inside its sheet (`NOTE_INSET`, §3, "A note"); its head stands on the
   edge like every other.
 - **E2 · One ink line under the head.** A single 1px ink line (`border-hairline`), never
-  the double, and the head stays 104px and paper on every page; a line inside the head
-  and between rows stays the rule. On a page that scrolls the head folds to the 48px bar
+  the double, and the head is paper on every page; a line inside the head and between
+  rows stays the rule. An index page's head is 48px (D114): the title at the page step,
+  any mono notice on its baseline, actions at 32px, never folded, pinned from `md` where
+  the page scrolls. A page about one thing keeps the 104px head; on a page that scrolls it
+  folds to the 48px bar
   with its tabs and toolbar pinned; a list page, and a tabbed record or a space at `xl`,
   is a fixed pane and never folds (D106); below `md` a list scrolls with the window, its
   head scrolling away and its column head sticking under the top bar. The `···` is the rightmost head control and its right edge
-  lines up with the last control in the content below. The title (`title-serif`) is 28
-  on 32 from `md` up and the page step, 22 on 28, below it.
+  lines up with the last control in the content below. The 104px head's title
+  (`title-serif`) is 28 on 32 from `md` up and the page step, 22 on 28, below it.
 - **E3 · Windows take one 16px inset all round.**
 - **E4 · Settings and form pages cap at 800px**: a column of cards 800px wide from the
   gutter, 12px apart, under the shared head, whose action (and `···`) ends where the
@@ -357,8 +360,10 @@ company head went from sixteen things to seven by this rule.
   `Add task`).
 - **A4 · A record head is `[verb] [verb] [···]` on every kind.** The verbs are the two
   most frequent for that object; Sensitive, Save as template, Copy link and Archive
-  live in the `···`, which every record has. Navigation is a link in the title or the
-  crumb, never an outlined button.
+  live in the `···`, which every record has. Before the verbs stand two quick icons,
+  New note and New task, icon-only and outlined, keys in their tooltips; each opens its
+  window over the record, already filed on it. Navigation is a link in the title or
+  the crumb, never an outlined button.
 - **A5 · A row ends on a mono lane and a bare `···`.** The lane holds the row's figure
   or state word; the `···` appears on hover; the row itself is the link. No word that
   would read the same on every row (`void`, `record mark ›`, `raised`), and delete is
@@ -413,7 +418,7 @@ hand-rolling one.
 
 | primitive                                                                         | file                                                     | for                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | --------------------------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PageHeader`, `ReadoutStrip`                                                      | `apps/web/src/components/page-header.tsx`                | P1 — paper, the serif title on the 24px edge, `[outline?] [Primary] [···]` right ending 24px in, one ink line under; keys in tooltips (A2), and a count only in the title (`HeadCount`) when the page has no tab bar; `tabs` stands on a pinned `FolderGround`                                                                                                                                                                               |
+| `PageHeader`, `ReadoutStrip`                                                      | `apps/web/src/components/page-header.tsx`                | P1 — paper, the serif title on the 24px edge, `[outline?] [Primary] [···]` right ending 24px in, one ink line under, 48px on an index page and 104px on a page about one thing (D114); keys in tooltips (A2), and a count only in the title (`HeadCount`) when the page has no tab bar; `tabs` stands on a pinned `FolderGround`                                                                                                             |
 | `PageBody`, `Card`, `PAGE_EDGE`                                                   | `apps/web/src/components/page-header.tsx`                | E1, E9 — `PageBody` is the bone ground under the head, the 12px gutter round it and cards 12px apart, filling the height; a card is the `card` utility, paper in a 1px rule box whose rows inset by `--inset` (11px), so its content lands on the 24px edge, and a `SectionHead` that opens it is its paper head. `FolderGround`: the gutter and bone a folder bar stands on, pinned under the folded head                                   |
 | `NewButton`, `SplitNewButton`                                                     | `apps/web/src/components/new-button.tsx`                 | E6 — `+ New x` in pine; the split `[+ New x \| ▾]` with the templates behind the `▾` (Notes, Spaces only), `variant="secondary"` bordered in a tab's toolbar                                                                                                                                                                                                                                                                                 |
 | `icon`, the nouns, `NoteKindIcon`                                                 | `apps/web/src/components/icons.ts`, `note-kind-icon.tsx` | E7, E12 — the only icon-library import site (Carbon, D19): one glyph per verb (`icon.new`, `icon.filter`, …), nouns by name; the note kinds drawn on Carbon's grid; 16px, 20px leading a window head; every menu item's mark                                                                                                                                                                                                                 |
@@ -430,7 +435,7 @@ hand-rolling one.
 | `ViewBar`, `useViewState`                                                         | `apps/web/src/components/views/`                         | saved views — **object surfaces only** (`/companies`, `/deals`, `/people`, `/o/$slug`)                                                                                                                                                                                                                                                                                                                                                       |
 | `SettingsSection`, `SettingsGroup`, `SettingsRow`                                 | `apps/web/src/components/settings/settings-section.tsx`  | a section of the settings shell — the shared `PageHeader` (back link and mark on a drill-in page), then `SettingsGroup` paper cards on the bone ground: a 28px paper `SettingsGroupHead`, `SettingsColumns` for a table, 48px `SettingsRow`s with an end lane, `SettingsState` for a status square                                                                                                                                           |
 | `SettingsNav`, `SETTINGS_SECTIONS`                                                | `apps/web/src/components/settings/settings-nav.tsx`      | the settings nav grammar — one row per section, groups derived, `Admin` in the lane                                                                                                                                                                                                                                                                                                                                                          |
-| `EmptyState`                                                                      | `apps/web/src/components/empty-state.tsx`                | P5 — dither block, serif sentence, one sans line, the primary with its key                                                                                                                                                                                                                                                                                                                                                                   |
+| `EmptyState`                                                                      | `apps/web/src/components/empty-state.tsx`                | P5 (D116) — the kind's dithered noun, serif title, the primary with its key; no subline. A filter that matched nothing is one icon-and-line row, not this                                                                                                                                                                                                                                                                                    |
 | `DitherBlock`, `DensityRamp`                                                      | `apps/web/src/components/dither.tsx`                     | the only texture; loading is a density ramp, never a shimmer                                                                                                                                                                                                                                                                                                                                                                                 |
 | `Dialog`, `DialogContent`, `DialogHeader`, `DialogFooter`, …                      | `apps/web/src/components/ui/dialog.tsx`                  | P8 — 48px serif head + mono context, nothing right; 20px body; 52px bone foot, Cancel + primary; sizes below                                                                                                                                                                                                                                                                                                                                 |
 | `useConfirm`, `ConfirmDialog`                                                     | `apps/web/src/components/ui/confirm-dialog.tsx`          | the destructive confirm; it replaces `window.confirm` everywhere                                                                                                                                                                                                                                                                                                                                                                             |
@@ -609,7 +614,10 @@ anatomy (D74 amended 2026-10-25):
   over the first and under each, a 104px label lane in sans 12 graphite that wraps and
   never truncates, then the value, 32px at least, whose editor opens in place and grows
   the row downward, never sideways. Rows print in registry order (`sort_order`; a new
-  attribute takes `max + 10`) and the empty ones fold into one `n empty +` row.
+  attribute takes `max + 10`) and the empty ones fold into one `n empty` row. It
+  opens in place into one row per empty attribute, its label on the lane and `Set
+<attribute>` in graphite where the value goes, a click opening that editor; the
+  last row is `New attribute…`, and `Fewer` folds them back.
   - A value is never cut silently: sans text wraps; a mono value (domain, email,
     phone, url) that does not fit beside its label drops under it at full width, one
     value per line, with no chip at rest, and one too long even then is cut in the

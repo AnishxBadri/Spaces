@@ -45,12 +45,29 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 - `SPA-389` `ai-b` — the mandate in every judging lane, and cached tokens on the ledger. Project 31; `migration`, `hitl`: the owner confirms AI column answers may change under the mandate.
 - `SPA-429` `interactions-4` — email threads as message cards with one sender line, reply as the last card, the meeting window in two columns (D109). `afk`.
 - `SPA-430` `attachments-text` — email attachments keep their text and stay in Gmail until someone keeps them; raw MIME without attachment bodies; a folded `From email` band on the Files tab (D110). `afk`.
+- `SPA-460` `email-1` — the Email page: Threads and Drafts in two panes, the sidebar row always there (D111). Project 35; `afk`, after SPA-429.
+- `SPA-461` `email-2` — New email ⌄ in a record's Interactions toolbar, the composer as a window over the record, To filled (D111). Project 35; `afk`, after SPA-429.
+- `SPA-464` `email-3` — every send passes Review, shown as the message card it will become (D111). Project 35; `afk`, after SPA-461.
+- `SPA-466` `email-4` — a failed send keeps its window with Retry, Reconnect Gmail returns to the draft, `Not sent` on Drafts and Today (D111). Project 35; `afk`, `migration`, after SPA-460 and SPA-464.
+- `SPA-462` `email-5` — sync skips threads with nobody outside the workspace; the exclude lists become chips (D111). Project 35; `afk`.
+- `SPA-463` `email-6` — Who can read this says when the body is already open wider, and saves (D111). Project 35; `afk`, after SPA-429.
+- `SPA-465` `email-7` — a member's email signature, added once to new emails and replies (D111). Project 35; `afk`, `migration`, after SPA-461.
+- `SPA-437` `heads-2` — an index page's head is 48px and never folds; a page about one thing keeps 104 (D114). `afk`.
+- `SPA-438` — a Button inside a menu or dialog trigger keeps `data-slot="button"`, so the folded head's buttons are all 26px and the split create's halves line up. `afk`.
+- `SPA-439` — a note's preview strips its markdown on the notes list, a record's notes and Ask. `afk`.
 - `SPA-440` `meetings-1` — the Meetings page: Upcoming and Past tabs, a person chip (`Mine` by default), thread rows, a `No write-up` band with a recorder's grace hour, `Log interaction` in the head, a fixed pane (D112). Project 34; `afk`.
 - `SPA-441` `meetings-2` — Prep lives only in an upcoming meeting's window: a cited brief where the write-up will go, `Ask about this`, `Save as note` (D112). Project 34; `afk`, after SPA-429.
 - `SPA-442` `meetings-3` — `Write it up` opens the note window on any page; action items are read from every shared write-up and decided in the meeting window and on Today under Tasks (D112). Project 34; `afk`, after SPA-429.
 - `SPA-443` `meetings-4` — calendar sync keeps only timed, ordinary, non-private events with an outside attendee off the exclude list; `Remove from Spaces…` is remembered (D112). Project 34; `migration`, `afk`, google-calendar bump.
 - `SPA-444` `meetings-5` — Today's Write-ups are yours with the grace hour; the day strip's head names the next meeting and shows `Join ↗` near a call (D112). Project 34; `afk`, after SPA-440.
 - `SPA-445` `meetings-6` — a record's Interactions tab opens with an `Upcoming` band; `This week` holds only the past; the `Next meeting` readout opens the meeting (D112). Project 34; `afk`.
+- `SPA-446` — a multi-value field's rows: clicking a value copies it, remove is its own action with Undo, rows lead with the value's own icon. `afk`.
+- `SPA-447` — Add to Team lists likely people before you type (this company's interaction participants first) and no rail picker opens empty. `afk`.
+- `SPA-452` `record-tabs` — the many side of a paired relationship is a record tab with a table (Team, Associated deals, People, Companies, custom objects'); the rail keeps a three-row preview with `All n ›` (D115). `afk`.
+- `SPA-453` `rail-icons` — every rail attribute label leads with its type's 16px glyph; section heads stay bare. `afk`.
+- `SPA-457` `empty-states` — each kind's empty page draws its dithered noun, title and create button, no sentence; a filter that matched nothing is one icon-and-line row (D116). `afk`.
+- `SPA-458` `head-quick` — a record head offers New note and New task as two icons before its verbs (A4). After SPA-450. `afk`.
+- `SPA-459` `rail-set` — the rail's `n empty` row opens in place into `Set <attribute>` rows, then `New attribute…` and `Fewer`. `afk`.
 - `SPA-450` `tasks-1` — one task window for new and edit; `T` opens it on every page; the row menu drops its two edit windows (D113). Project 36; `afk`.
 - `SPA-451` `tasks-2` — the Tasks page: a fixed pane, a person chip (`Mine` by default), plain bands, a Done log in week bands (D113). Project 36; `afk`, after SPA-450 and SPA-440.
 - `SPA-454` `tasks-3` — a record's and a space's Tasks section: everyone's open tasks, five rows then `n more ›`, Undo on a tick (D113). Project 36; `afk`, after SPA-450.
