@@ -846,6 +846,42 @@
 }
 
 /**
+ * Below `md` a list page scrolls with the window (`ListPage`), and its
+ * table's scroller, which scrolls sideways only, still traps `sticky`: the
+ * column head could only pin inside it. So the head rides a scroll-driven
+ * animation instead, travelling down with the window from the moment the
+ * rows reach the top bar's foot (3rem) until it sits on the last row
+ * (`--head-travel`, measured by `RecordTable`). It runs on the compositor,
+ * so it never lags the scroll. A record page is left out: below `xl` its
+ * own folded bar and tabs pin there. Without scroll timelines the head
+ * scrolls away with the rows.
+ */
+@keyframes list-head-drop {
+  from {
+    translate: 0 0;
+  }
+  to {
+    translate: 0 var(--head-travel, 0px);
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (width < 48rem) {
+    [data-list-page='true']:not([data-pane-from]) [data-table-scroller] {
+      view-timeline-name: --list-rows;
+      view-timeline-axis: block;
+      view-timeline-inset: 3rem 0;
+    }
+
+    [data-list-page='true']:not([data-pane-from]) [data-table-head] th {
+      animation: list-head-drop auto linear both;
+      animation-timeline: --list-rows;
+      animation-range: exit-crossing 0% exit-crossing var(--head-travel, 0px);
+    }
+  }
+}
+
+/**
  * Toast — rises 8px as it fades in (DESIGN.md §5, Micro-interactions — SPA-53).
  * sonner ships a 400ms slide from a whole toast-height away and transitions
  * `height` and `box-shadow` alongside it; the instrument's frequency scale puts

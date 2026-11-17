@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
@@ -194,6 +196,40 @@ describe('the pane', () => {
     const company = heads.find((h) => h.textContent.includes('Company'))
     if (!company) throw new Error('no Company head')
     expect(classes(company)).toEqual(expect.arrayContaining(['z-30', 'left-0']))
+  })
+
+  it('measures how far the head may ride down the rows: the pane less the head', () => {
+    // happy-dom lays nothing out, so the two heights are given.
+    const client = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockReturnValue(400)
+    const offset = vi
+      .spyOn(HTMLElement.prototype, 'offsetHeight', 'get')
+      .mockReturnValue(32)
+    try {
+      mount()
+      expect(
+        one('[data-table-scroller]').style.getPropertyValue('--head-travel'),
+      ).toBe('368px')
+    } finally {
+      client.mockRestore()
+      offset.mockRestore()
+    }
+  })
+
+  it('below md, on a list page, carries the head down under the top bar', () => {
+    const css = readFileSync(
+      fileURLToPath(new URL('../../styles.css', import.meta.url)),
+      'utf8',
+    )
+    const block = css.slice(css.indexOf('@keyframes list-head-drop'))
+    expect(block).toMatch(/@media \(width < 48rem\)/)
+    // A list page only: a record page pins its own bar and tabs there.
+    expect(block).toContain(
+      "[data-list-page='true']:not([data-pane-from]) [data-table-head] th",
+    )
+    expect(block).toContain('view-timeline-inset: 3rem 0')
+    expect(block).toContain('translate: 0 var(--head-travel, 0px)')
   })
 
   it('is one table to assistive tech: column heads and cells under one name', () => {

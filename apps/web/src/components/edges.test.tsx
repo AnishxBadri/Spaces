@@ -419,11 +419,13 @@ describe('E10 · one ink object on a page: the folder', () => {
       expect.arrayContaining([
         'flex',
         'flex-col',
-        'min-h-0',
-        'h-[calc(100dvh-3rem)]',
+        'md:min-h-0',
         'md:h-dvh',
+        'md:max-h-dvh',
       ]),
     )
+    // Below md the list scrolls with the window: no height of its own.
+    expect(pane.filter((c) => !c.startsWith('md:') && /h-/.test(c))).toEqual([])
   })
 
   it('gives a tabbed page exactly one folder and a tabless page none', () => {

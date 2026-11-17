@@ -16,8 +16,8 @@ import { cn } from '#/lib/utils'
  * edge, the `···` ending 24px from the right, level with the last control of
  * the content under it; one ink line under, 104px tall at least, so every
  * page's title and line land on the same lines. Scrolled past its title, it
- * folds to `HeadBar` — except on a list page (`folds={false}`), which never
- * scrolls, so its head never folds.
+ * folds to `HeadBar` — except on a list page (`folds={false}`), whose head
+ * never folds.
  * - `tabs` is the page's folder bar, set on the bone ground under the line
  *   (`FolderGround`); scrolled, it pins under the folded bar rather than
  *   riding into it. A list's count is on its All tab; a page with no tab bar
@@ -44,7 +44,10 @@ export function PageHeader({
   action?: ReactNode
   /** The page's `Tabs` bar; pins under the folded bar. */
   tabs?: ReactNode
-  /** False on a list page (`ListPage`): the page never scrolls. */
+  /**
+   * False on a list page (`ListPage`): from `md` the page never scrolls, and
+   * below it the head simply scrolls away.
+   */
   folds?: boolean | undefined
   /** The title's id, for what it names: a list's table. */
   titleId?: string | undefined
@@ -98,9 +101,11 @@ export function PageHeader({
 export const PAGE_EDGE = 'px-6'
 
 /**
- * A list page: a fixed pane the height of the view (less the mobile top
- * bar). Nothing in it pins and the window never scrolls; the table's card
- * takes what the head and the bar leave and scrolls its rows inside.
+ * A list page: from `md` a fixed pane the height of the view. Nothing in it
+ * pins and the window never scrolls; the table's card takes what the head
+ * and the bar leave and scrolls its rows inside. Below `md` the page scrolls
+ * with the window, as a phone expects: the head scrolls away and the table's
+ * column head rides down under the top bar (`list-head-drop`).
  * Pair it with `PageHeader folds={false}` and a `PageBody` given `min-h-0`.
  * - `fixed={false}` keeps the same element as a page that scrolls (the
  *   Deals board), so switching shape never remounts what is inside.
@@ -128,7 +133,7 @@ export function ListPage({
         fixed &&
           (from === 'xl'
             ? 'xl:h-dvh xl:max-h-dvh xl:min-h-0'
-            : 'h-[calc(100dvh-3rem)] max-h-[calc(100dvh-3rem)] min-h-0 md:h-dvh md:max-h-dvh'),
+            : 'md:h-dvh md:max-h-dvh md:min-h-0'),
       )}
     >
       {children}

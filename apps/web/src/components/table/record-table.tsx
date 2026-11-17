@@ -202,6 +202,7 @@ export function RecordTable<T>({
     columns: visible.length,
     endWidth: rowEndWidth,
   })
+  useHeadTravel(scrollRef)
   // ← → move by about one column: the mean of the columns that scroll.
   const scrolling = visible.filter((c) => c.id !== stickyColumnId)
   const columnStep =
@@ -461,7 +462,10 @@ export function RecordTable<T>({
   )
 }
 
-/** Every head cell: pinned to the card's top, opaque over the rows. */
+/**
+ * Every head cell: pinned to the card's top, opaque over the rows. Below
+ * `md` on a list page `list-head-drop` carries it down under the top bar.
+ */
 const HEAD_CELL = 'sticky top-0 border-b border-rule bg-paper'
 
 /**
@@ -578,6 +582,33 @@ function useColumnOverflow(
   const scrollBy = (left: number) =>
     ref.current?.scrollBy({ left, behavior: behavior() })
   return { hidden, scrolled, check, reveal, scrollBy }
+}
+
+/**
+ * How far the column head may ride down the rows (`--head-travel` on the
+ * scroller): its height less the head's, so the head stops on the last row.
+ * Below `md` a list scrolls with the window and the sideways scroller traps
+ * `sticky`, so the head travels by a scroll-driven animation instead
+ * (`list-head-drop` in the stylesheet); this is the one length CSS cannot
+ * read for itself.
+ */
+function useHeadTravel(ref: RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const el = ref.current
+    const head = el?.querySelector('[data-table-head]')
+    if (!el || !(head instanceof HTMLElement)) return
+    if (typeof ResizeObserver === 'undefined') return
+    const measure = () =>
+      el.style.setProperty(
+        '--head-travel',
+        `${Math.max(0, el.clientHeight - head.offsetHeight)}px`,
+      )
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    observer.observe(head)
+    return () => observer.disconnect()
+  }, [ref])
 }
 
 /** One row's checkbox, shown on hover, focus, or while any row is checked. */

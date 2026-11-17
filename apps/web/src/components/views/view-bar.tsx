@@ -72,8 +72,8 @@ import { FilterChips } from './filter-chips'
  *   view…` is in the view's `···`. The page owns
  * its table state and hands the bar a snapshot to compare and to save.
  * `?view=` in the URL makes a view linkable.
- * - Over a table the page never scrolls (`ListPage`), so the bar stands
- *   still. `pinned` is for a page that does scroll — the Deals board —
+ * - Over a table the page never scrolls from `md` (`ListPage`), so the bar
+ *   stands still; below it the bar scrolls away. `pinned` is for a page that does scroll — the Deals board —
  *   where the bar and its chips stick under the folded head bar.
  * - A dirty view — its snapshot moved off the saved one — carries a pine
  *   square after its count and prints its count at 0.

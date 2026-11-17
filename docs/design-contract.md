@@ -80,7 +80,8 @@ sit on the 24px edge (`components/head-fold.tsx`).
   the double, and the head stays 104px and paper on every page; a line inside the head
   and between rows stays the rule. On a page that scrolls the head folds to the 48px bar
   with its tabs and toolbar pinned; a list page, and a tabbed record or a space at `xl`,
-  is a fixed pane and never folds (D106). The `···` is the rightmost head control and its right edge
+  is a fixed pane and never folds (D106); below `md` a list scrolls with the window, its
+  head scrolling away and its column head sticking under the top bar. The `···` is the rightmost head control and its right edge
   lines up with the last control in the content below. The title (`title-serif`) is 28
   on 32 from `md` up and the page step, 22 on 28, below it.
 - **E3 · Windows take one 16px inset all round.**
