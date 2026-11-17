@@ -35,17 +35,22 @@ const query = <T>(run: () => Promise<T>) =>
   })
 
 /**
- * How many headlines a space's What's moving holds: a busy feed never
- * pushes out the space's own news.
+ * How many of each feed's headlines a space's What's moving holds: a busy
+ * feed never pushes out the space's own news.
  */
 export const SPACE_HEADLINES_MAX = 2
 
-/** A headline as a space's What's moving lists it: the story over its source. */
+/**
+ * A headline as a space's What's moving lists it: the story over its source
+ * and the lead of its summary.
+ */
 export type SpaceHeadline = {
   readonly id: string
   readonly feedId: string
   readonly feedName: string
   readonly title: string
+  /** The summary's first paragraph; the row prints it on one line. */
+  readonly summary: string | null
   /** The article, opened in a new tab. */
   readonly url: string | null
   readonly publishedAt: string
@@ -57,8 +62,32 @@ export type SpaceFeeds = {
    * a failing feed last.
    */
   readonly feeds: ReadonlyArray<FeedSource>
-  /** Their newest headlines, at most `SPACE_HEADLINES_MAX`, newest first. */
+  /** Each feed's newest `SPACE_HEADLINES_MAX` headlines, newest first. */
   readonly headlines: ReadonlyArray<SpaceHeadline>
+}
+
+// A newer headline of the same feed, to keep each feed's newest few.
+const newer = alias(feedItem, 'newer')
+
+/** How many of its feed's headlines are newer than this one. */
+const newerInFeed = db
+  .select({ n: count() })
+  .from(newer)
+  .where(
+    and(
+      eq(newer.feedId, feedItem.feedId),
+      sql`(${newer.publishedAt}, ${newer.id}) > (${feedItem.publishedAt}, ${feedItem.id})`,
+    ),
+  )
+
+/** The summary's first paragraph: all a one-line row can print. */
+const leadOf = (summary: string | null): string | null => {
+  const lead =
+    summary
+      ?.split(/\n\s*\n/)
+      .at(0)
+      ?.trim() ?? ''
+  return lead === '' ? null : lead
 }
 
 /**
@@ -92,14 +121,19 @@ export const spaceFeedsProgram = Effect.fn('feeds.spaceFeeds')(function* (
             feedId: feedItem.feedId,
             feedName: feed.name,
             title: feedItem.title,
+            summary: feedItem.summary,
             url: feedItem.url,
             publishedAt: feedItem.publishedAt,
           })
           .from(feedItem)
           .innerJoin(feed, eq(feed.id, feedItem.feedId))
-          .where(inArray(feedItem.feedId, ids))
-          .orderBy(desc(feedItem.publishedAt), desc(feedItem.id))
-          .limit(SPACE_HEADLINES_MAX),
+          .where(
+            and(
+              inArray(feedItem.feedId, ids),
+              lt(newerInFeed, SPACE_HEADLINES_MAX),
+            ),
+          )
+          .orderBy(desc(feedItem.publishedAt), desc(feedItem.id)),
       ),
     ],
     { concurrency: 'unbounded' },
@@ -115,6 +149,7 @@ export const spaceFeedsProgram = Effect.fn('feeds.spaceFeeds')(function* (
       ),
     headlines: rows.map((r) => ({
       ...r,
+      summary: leadOf(r.summary),
       publishedAt: r.publishedAt.toISOString(),
     })),
   }

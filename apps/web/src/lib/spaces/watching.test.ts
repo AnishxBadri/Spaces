@@ -425,4 +425,24 @@ describe("What's moving with feeds", () => {
       'headline:Story 8',
     ])
   })
+
+  it('holds two headlines from each feed, not two in all', async () => {
+    const s = await aSpace('Two feeds')
+    await aFeedWith('launchwire', s.id, [
+      { title: 'Skyroot fires', at: '2026-11-16T12:00:00Z' },
+      { title: 'Agnikul pad', at: '2026-11-16T10:00:00Z' },
+      { title: 'Older', at: '2026-11-10T10:00:00Z' },
+    ])
+    await aFeedWith('orbitdesk', s.id, [
+      { title: 'Licences', at: '2026-11-15T12:00:00Z' },
+      { title: 'Bridge', at: '2026-11-09T12:00:00Z' },
+    ])
+    const watching = await Effect.runPromise(spaceWatchingProgram(s.id))
+    expect(kinds(watching.moving)).toEqual([
+      'headline:Skyroot fires',
+      'headline:Agnikul pad',
+      'headline:Licences',
+      'headline:Bridge',
+    ])
+  })
 })

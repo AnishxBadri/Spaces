@@ -16,7 +16,7 @@ import { decodeManifest } from '@spaces/sdk'
 import { jsonRecord, jsonString } from '@spaces/core/json'
 import { checkSettings, settingsFormOf } from '#/lib/integrations/settings-form'
 import type { FormValues, SettingsForm } from '#/lib/integrations/settings-form'
-import { SPACE_HEADLINES_MAX, spaceFeedsProgram } from '#/lib/feeds/elsewhere'
+import { spaceFeedsProgram } from '#/lib/feeds/elsewhere'
 import type { SpaceHeadline } from '#/lib/feeds/elsewhere'
 import type { FeedSource } from '#/lib/feeds/sources'
 import { watchLabel } from './watch-status'
@@ -126,9 +126,9 @@ const movedAt = (m: SpaceMoving): string =>
   m.kind === 'signal' ? m.signal.observedAt : m.headline.publishedAt
 
 /**
- * What's moving: the signals and at most `SPACE_HEADLINES_MAX` headlines,
- * newest first. The cap applies before the lane folds, so ten fresh
- * headlines still leave room for the space's own news.
+ * What's moving: the signals and the headlines, newest first. The headlines
+ * arrive capped per feed (`SPACE_HEADLINES_MAX`) before the lane folds, so
+ * ten fresh headlines from one feed still leave room for the space's own news.
  */
 export function mergeMoving(
   signals: ReadonlyArray<SpaceSignal>,
@@ -136,9 +136,10 @@ export function mergeMoving(
 ): Array<SpaceMoving> {
   return [
     ...signals.map((s): SpaceMoving => ({ kind: 'signal', signal: s })),
-    ...headlines
-      .slice(0, SPACE_HEADLINES_MAX)
-      .map((headline): SpaceMoving => ({ kind: 'headline', headline })),
+    ...headlines.map((headline): SpaceMoving => ({
+      kind: 'headline',
+      headline,
+    })),
   ].sort((a, b) => {
     const x = movedAt(a)
     const y = movedAt(b)
@@ -146,7 +147,7 @@ export function mergeMoving(
   })
 }
 
-/** How many signals What's moving reads; the lane folds at three. */
+/** How many signals What's moving reads; the lane folds at four. */
 const MOVING_MAX = 20
 
 /** Why an engine's watches cannot run now; null when they can. */

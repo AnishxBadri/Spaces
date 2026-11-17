@@ -1188,6 +1188,7 @@ describe("What's moving", () => {
     id: string,
     title: string,
     publishedAt: string,
+    summary: string | null = null,
   ): SpaceWatching['moving'][number] => ({
     kind: 'headline',
     headline: {
@@ -1195,9 +1196,17 @@ describe("What's moving", () => {
       feedId: 'feed-1',
       feedName: 'SpaceNews',
       title,
+      summary,
       url: `https://spacenews.example/${id}`,
       publishedAt,
     },
+  })
+
+  /** A row's day lane, title and second line, as printed. */
+  const lines = (li: Element | null) => ({
+    day: text(li?.querySelector('time') ?? null),
+    title: text(li?.querySelector('time + div > :first-child') ?? null),
+    sub: text(li?.querySelector('[data-moving-sub]') ?? null),
   })
 
   it('reads a headline over its source, opens it in a new tab, and links Headlines › to Feeds on the space', async () => {
@@ -1216,54 +1225,118 @@ describe("What's moving", () => {
     expect(link?.getAttribute('href')).toBe('https://spacenews.example/h1')
     expect(link?.getAttribute('target')).toBe('_blank')
     expect(link?.getAttribute('rel')).toBe('noreferrer')
-    expect(text(story ?? null)).toContain('SpaceNews')
     expect(
       moving.querySelectorAll('li').item(1).hasAttribute('data-signal'),
     ).toBe(true)
-    const feeds = Array.from(moving.querySelectorAll('a')).find(
+    // The way to Feeds is in the foot, not the band, and nothing folds.
+    const foot = moving.querySelector('[data-moving-foot]')
+    const feeds = Array.from(foot?.querySelectorAll('a') ?? []).find(
       (a) => text(a) === 'Headlines ›',
     )
     expect(feeds?.getAttribute('href')).toBe(`/feeds?space=${spc.id}`)
-    expect(() => buttonNamed(/^All signals ›$/)).toThrow()
+    expect(text(moving.querySelector('[data-band]'))).not.toContain('›')
+    expect(foot?.querySelector('button')).toBeNull()
   })
 
-  it('has no Headlines › when no feed is tagged to the space', async () => {
+  it('has no foot when nothing folds and no feed is tagged to the space', async () => {
     await mount('overview', undefined, {
       ...noWatches,
       moving: [signal('s1', 'Varda', '2026-10-10T09:00:00.000Z', null)],
     })
-    expect(text(lane("What's moving"))).not.toContain('Headlines ›')
+    const moving = lane("What's moving")
+    expect(text(moving)).not.toContain('Headlines ›')
+    expect(moving.querySelector('[data-moving-foot]')).toBeNull()
   })
 
-  it('lists headlines and days on the Overview, unfolding past three from All signals ›', async () => {
+  it('prints a headline on two lines under its day: the title, then the source and the summary', async () => {
+    await mount('overview', undefined, {
+      ...noWatches,
+      feeds: [feedSource('feed-1', 'SpaceNews')],
+      moving: [
+        headline(
+          'h1',
+          'Skyroot static-fires the Vikram-1 third stage',
+          '2026-10-16T09:00:00.000Z',
+          'The stage burned for its full duration at Sriharikota.',
+        ),
+        headline(
+          'h2',
+          'IN-SPACe clears three licences',
+          '2026-10-15T09:00:00.000Z',
+        ),
+      ],
+    })
+    const moving = lane("What's moving")
+    expect(lines(moving.querySelector('[data-headline="h1"]'))).toEqual({
+      day: '16 Oct',
+      title: 'Skyroot static-fires the Vikram-1 third stage',
+      sub: 'SpaceNews · The stage burned for its full duration at Sriharikota.',
+    })
+    // With no summary the second line is the source alone.
+    expect(lines(moving.querySelector('[data-headline="h2"]'))).toEqual({
+      day: '15 Oct',
+      title: 'IN-SPACe clears three licences',
+      sub: 'SpaceNews',
+    })
+    expect(
+      moving
+        .querySelector('[data-headline="h1"] time')
+        ?.getAttribute('dateTime'),
+    ).toBe('2026-10-16T09:00:00.000Z')
+  })
+
+  it('prints a signal on the same two lines: its title, then the record, the subspace and its source', async () => {
     const leasing = { id: spc.children[0].id, name: 'Leasing' }
     await mount('overview', undefined, {
       ...noWatches,
       moving: [
         signal('s1', 'Varda', '2026-10-10T09:00:00.000Z', leasing),
-        signal('s2', 'Varda', '2026-10-09T09:00:00.000Z', null),
-        signal('s3', 'Tenantry', '2026-10-08T09:00:00.000Z', null),
-        signal('s4', 'Arbor', '2026-10-07T09:00:00.000Z', null),
-        signal('s5', 'Corbel', '2026-10-06T09:00:00.000Z', null),
+        signal('s2', 'Tenantry', '2026-10-09T09:00:00.000Z', null),
       ],
     })
     const moving = lane("What's moving")
-    const items = () => Array.from(moving.querySelectorAll('[data-signal]'))
-    expect(items()).toHaveLength(3)
-    const first = items().at(0) ?? null
-    expect(text(first?.querySelector('a') ?? null)).toBe('Varda raised')
-    expect(text(first)).toContain('Varda · Leasing')
-    expect(text(first)).toContain('10 Oct')
-    expect(text(items().at(1) ?? null)).not.toContain('Leasing')
+    expect(lines(moving.querySelector('[data-signal="s1"]'))).toEqual({
+      day: '10 Oct',
+      title: 'Varda raised',
+      sub: 'Varda · in Leasing · via Exa',
+    })
+    expect(lines(moving.querySelector('[data-signal="s2"]'))).toEqual({
+      day: '9 Oct',
+      title: 'Tenantry raised',
+      sub: 'Tenantry · via Exa',
+    })
     expect(moving.closest('aside')).toBeNull()
-    await act(async () => buttonNamed(/^All signals ›$/).click())
-    expect(items().map((li) => li.getAttribute('data-signal'))).toEqual([
-      's1',
-      's2',
-      's3',
-      's4',
-      's5',
-    ])
+  })
+
+  it('shows four rows and unfolds the rest in place from `n more`', async () => {
+    await mount('overview', undefined, {
+      ...noWatches,
+      feeds: [feedSource('feed-1', 'SpaceNews')],
+      moving: [
+        headline('h1', 'Skyroot fires', '2026-10-11T09:00:00.000Z'),
+        signal('s1', 'Varda', '2026-10-10T09:00:00.000Z', null),
+        signal('s2', 'Varda', '2026-10-09T09:00:00.000Z', null),
+        signal('s3', 'Tenantry', '2026-10-08T09:00:00.000Z', null),
+        headline('h2', 'Agnikul pad', '2026-10-07T09:00:00.000Z'),
+        signal('s4', 'Arbor', '2026-10-06T09:00:00.000Z', null),
+      ],
+    })
+    const moving = lane("What's moving")
+    const rows = () =>
+      Array.from(moving.querySelectorAll('li')).map(
+        (li) =>
+          li.getAttribute('data-signal') ?? li.getAttribute('data-headline'),
+      )
+    expect(rows()).toEqual(['h1', 's1', 's2', 's3'])
+    const more = buttonNamed(/^2 more$/)
+    expect(more.closest('[data-moving-foot]')).not.toBeNull()
+    expect(more.getAttribute('aria-expanded')).toBe('false')
+    await act(async () => more.click())
+    expect(rows()).toEqual(['h1', 's1', 's2', 's3', 'h2', 's4'])
+    const fewer = buttonNamed(/^Fewer$/)
+    expect(fewer.getAttribute('aria-expanded')).toBe('true')
+    await act(async () => fewer.click())
+    expect(rows()).toEqual(['h1', 's1', 's2', 's3'])
   })
 })
 

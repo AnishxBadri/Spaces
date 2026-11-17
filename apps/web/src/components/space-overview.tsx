@@ -138,11 +138,15 @@ function BandLink({
   )
 }
 
+/** What's moving shows this many rows before its `n more`. */
+const MOVING_SHOWN = 4
+
 /**
- * What's moving: the latest signals on the space's members and at most two
- * headlines from its feeds, newest first. There is no signals page, so
- * `All signals ›` unfolds the rest in place; `Headlines ›` opens Feeds
- * narrowed to the space. Absent while nothing has moved.
+ * What's moving: the latest signals on the space's members and each feed's
+ * newest two headlines, newest first, on two-line rows under a day lane.
+ * Four show; the foot unfolds the rest in place (`9 more`) and, with a feed
+ * tagged here, opens Feeds narrowed to the space (`Headlines ›`). Absent
+ * while nothing has moved.
  */
 function MovingGroup({
   spaceId,
@@ -155,31 +159,11 @@ function MovingGroup({
 }) {
   const [open, setOpen] = useState(false)
   if (moving.length === 0) return null
-  const shown = open ? moving : moving.slice(0, LATEST)
-  const hidden = moving.length - shown.length
+  const folded = moving.length - MOVING_SHOWN
+  const shown = open ? moving : moving.slice(0, MOVING_SHOWN)
   return (
     <section aria-label="What's moving" className="flex flex-col">
-      <Band
-        label="What's moving"
-        link={
-          hidden > 0 || hasFeeds ? (
-            <span className="flex items-center gap-3">
-              {hidden > 0 ? (
-                <BandLink onClick={() => setOpen(true)}>All signals ›</BandLink>
-              ) : null}
-              {hasFeeds ? (
-                <Link
-                  to="/feeds"
-                  search={{ space: spaceId }}
-                  className="focus-ring hover:text-foreground"
-                >
-                  Headlines ›
-                </Link>
-              ) : null}
-            </span>
-          ) : null
-        }
-      />
+      <Band label="What's moving" />
       <ul>
         {shown.map((m) =>
           m.kind === 'signal' ? (
@@ -189,62 +173,132 @@ function MovingGroup({
           ),
         )}
       </ul>
+      {folded > 0 || hasFeeds ? (
+        <div
+          data-moving-foot
+          className="flex h-9 shrink-0 items-center justify-between gap-3 px-(--inset) text-label text-graphite"
+        >
+          {folded > 0 ? (
+            <button
+              type="button"
+              aria-expanded={open}
+              onClick={() => setOpen((o) => !o)}
+              className="focus-ring hover:text-foreground"
+            >
+              {open ? 'Fewer' : `${String(folded)} more`}
+            </button>
+          ) : (
+            <span />
+          )}
+          {hasFeeds ? (
+            <Link
+              to="/feeds"
+              search={{ space: spaceId }}
+              className="focus-ring hover:text-foreground"
+            >
+              Headlines ›
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   )
 }
 
-const MOVING_ROW =
-  'flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset)'
-
-/** A signal: its headline, the record and the subspace it came via, its day. */
-function SignalRow({ s }: { s: SpaceSignal }) {
-  const href = recordPath({ kind: s.recordKind, id: s.recordId })
-  const headline = s.title ?? s.kind ?? s.recordName
+/**
+ * One row of What's moving: the 44px day lane, then the title over one
+ * graphite line, each cut to a single line.
+ */
+function MovingRow({
+  at,
+  title,
+  sub,
+  ...data
+}: {
+  at: string
+  title: ReactNode
+  sub: string
+  'data-signal'?: string
+  'data-headline'?: string
+}) {
+  const { today } = useClock()
   return (
-    <li data-signal={s.id} className={MOVING_ROW}>
-      {href ? (
-        <Link
-          to={href}
-          className="focus-ring min-w-0 flex-1 truncate text-ui text-foreground hover:underline"
-        >
-          {headline}
-        </Link>
-      ) : (
-        <span className="min-w-0 flex-1 truncate text-ui text-foreground">
-          {headline}
+    <li
+      {...data}
+      className="flex items-start gap-3 border-b border-rule px-(--inset) py-2.5"
+    >
+      <time
+        dateTime={at}
+        className="w-11 shrink-0 mono text-micro leading-5 text-graphite"
+      >
+        {formatDay(at, today)}
+      </time>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        {title}
+        <span data-moving-sub className="truncate text-label text-graphite">
+          {sub}
         </span>
-      )}
-      <span className="w-40 shrink-0 truncate text-label text-graphite">
-        {s.via === null ? s.recordName : `${s.recordName} · ${s.via.name}`}
-      </span>
-      <Day at={s.observedAt} when />
+      </div>
     </li>
   )
 }
 
-/** A feed's headline: the story, opened in a new tab, then its source. */
+// The title's own width, so the row's empty end is not a link.
+const MOVING_TITLE =
+  'focus-ring max-w-full self-start truncate text-ui text-foreground'
+
+/**
+ * A signal: its headline, then the record, the subspace it is filed in when
+ * not here directly, and where it was read.
+ */
+function SignalRow({ s }: { s: SpaceSignal }) {
+  const href = recordPath({ kind: s.recordKind, id: s.recordId })
+  const headline = s.title ?? s.kind ?? s.recordName
+  const sub = [
+    s.recordName,
+    ...(s.via === null ? [] : [`in ${s.via.name}`]),
+    `via ${s.source}`,
+  ].join(' · ')
+  return (
+    <MovingRow
+      data-signal={s.id}
+      at={s.observedAt}
+      sub={sub}
+      title={
+        href ? (
+          <Link to={href} className={cn(MOVING_TITLE, 'hover:underline')}>
+            {headline}
+          </Link>
+        ) : (
+          <span className={MOVING_TITLE}>{headline}</span>
+        )
+      }
+    />
+  )
+}
+
+/** A feed's headline: the story, opened in a new tab, over its source and summary. */
 function HeadlineRow({ h }: { h: SpaceHeadline }) {
   return (
-    <li data-headline={h.id} className={MOVING_ROW}>
-      {h.url !== null ? (
-        <a
-          href={h.url}
-          target="_blank"
-          rel="noreferrer"
-          className="focus-ring min-w-0 flex-1 truncate text-ui text-foreground hover:underline"
-        >
-          {h.title}
-        </a>
-      ) : (
-        <span className="min-w-0 flex-1 truncate text-ui text-foreground">
-          {h.title}
-        </span>
-      )}
-      <span className="w-40 shrink-0 truncate text-label text-graphite">
-        {h.feedName}
-      </span>
-      <Day at={h.publishedAt} when />
-    </li>
+    <MovingRow
+      data-headline={h.id}
+      at={h.publishedAt}
+      sub={h.summary === null ? h.feedName : `${h.feedName} · ${h.summary}`}
+      title={
+        h.url !== null ? (
+          <a
+            href={h.url}
+            target="_blank"
+            rel="noreferrer"
+            className={cn(MOVING_TITLE, 'hover:underline')}
+          >
+            {h.title}
+          </a>
+        ) : (
+          <span className={MOVING_TITLE}>{h.title}</span>
+        )
+      }
+    />
   )
 }
 

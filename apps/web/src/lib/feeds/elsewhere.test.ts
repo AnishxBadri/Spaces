@@ -49,13 +49,19 @@ const aFeed = async (
 
 const items = async (
   feedId: string,
-  stories: ReadonlyArray<{ title: string; at: string; seen?: string }>,
+  stories: ReadonlyArray<{
+    title: string
+    at: string
+    seen?: string
+    summary?: string
+  }>,
 ) => {
   await db.insert(feedItem).values(
     stories.map((s) => ({
       feedId,
       key: s.title,
       title: s.title,
+      summary: s.summary ?? null,
       url: `https://news.example/${encodeURIComponent(s.title)}`,
       publishedAt: new Date(s.at),
       firstSeenAt: new Date(s.seen ?? s.at),
@@ -64,7 +70,7 @@ const items = async (
 }
 
 describe('spaceFeedsProgram', () => {
-  it('reads the feeds of the space and its subspaces, and only their newest two headlines', async () => {
+  it("reads the feeds of the space and its subspaces, and each feed's newest two headlines", async () => {
     const root = await aSpace('Launch')
     const sub = await aSpace('Small launchers', root.path)
     const other = await aSpace('Proptech')
@@ -75,10 +81,17 @@ describe('spaceFeedsProgram', () => {
     })
     const elsewhere = await aFeed('Elsewhere', [other.id])
     await items(spaceNews, [
-      { title: 'Skyroot fires', at: '2026-11-16T09:00:00Z' },
-      { title: 'Older news', at: '2026-11-10T09:00:00Z' },
+      {
+        title: 'Skyroot fires',
+        at: '2026-11-16T09:00:00Z',
+        summary: 'The third stage burned in full.\n\nA second paragraph.',
+      },
+      { title: 'Agnikul pad', at: '2026-11-15T10:00:00Z' },
+      { title: 'Oldest news', at: '2026-11-10T09:00:00Z' },
     ])
-    await items(inc42, [{ title: 'Agnikul pad', at: '2026-11-15T09:00:00Z' }])
+    await items(inc42, [
+      { title: 'IN-SPACe licences', at: '2026-11-08T09:00:00Z' },
+    ])
     await items(elsewhere, [
       { title: 'Not this space', at: '2026-11-16T12:00:00Z' },
     ])
@@ -89,11 +102,19 @@ describe('spaceFeedsProgram', () => {
       ['SpaceNews', 'ok'],
       ['Inc42', 'failing'],
     ])
+    // A busy feed keeps its newest two: Inc42's older story still shows.
     expect(got.headlines.map((h) => [h.title, h.feedName])).toEqual([
       ['Skyroot fires', 'SpaceNews'],
-      ['Agnikul pad', 'Inc42'],
+      ['Agnikul pad', 'SpaceNews'],
+      ['IN-SPACe licences', 'Inc42'],
     ])
     expect(got.headlines.at(0)?.publishedAt).toBe('2026-11-16T09:00:00.000Z')
+    // The summary's lead only, for a one-line row; none reads null.
+    expect(got.headlines.map((h) => h.summary)).toEqual([
+      'The third stage burned in full.',
+      null,
+      null,
+    ])
 
     // A subspace reads its own feed only, never its parent's.
     const below = await Effect.runPromise(spaceFeedsProgram(sub.id))
