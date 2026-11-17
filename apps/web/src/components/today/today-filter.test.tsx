@@ -28,6 +28,11 @@ vi.mock('#/components/task-composer', () => ({
 vi.mock('sonner', () => ({
   toast: Object.assign(() => {}, { error: () => {}, success: () => {} }),
 }))
+// The page's own headline read is not under test: a quiet day.
+vi.mock('#/lib/server-fns', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  getTodayHeadlines: () => Promise.resolve({ count: 0, feeds: [] }),
+}))
 
 const win = new Window({ url: 'http://localhost/' })
 let createRoot: typeof CreateRoot
@@ -127,7 +132,6 @@ function loaded() {
       waiting: [],
       failing: [],
     }),
-    headlines: Promise.resolve({ count: 0, feeds: [] }),
     meetings: {
       calendar: false,
       audience: { isAdmin: true, admins: ['Anish'] },

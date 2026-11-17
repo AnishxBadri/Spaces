@@ -12,6 +12,7 @@ import {
   vi,
 } from 'vitest'
 import { dayKey, formatWeekday } from '@spaces/core/format'
+import { dayWindow } from '#/lib/meetings/day'
 import type { TodayMeeting } from '#/lib/server-fns'
 
 import type * as TodayModule from '#/routes/_app/today'
@@ -20,7 +21,8 @@ import type * as RouterModule from '@tanstack/react-router'
 /**
  * Today mounted on a happy-dom `Window`: `‹ ›` moves the Meetings day and
  * the day strip follows it — the day it reads, its blocks and its dither —
- * and `Back to today` brings both home.
+ * and `Back to today` brings both home. The headline count reads the same
+ * browser day.
  */
 
 // The composer reads the session from the app route; it is not under test.
@@ -53,10 +55,16 @@ const listDayMeetings = vi.fn(
     return Promise.resolve([meeting])
   },
 )
+/** The day's headline count: three, from one feed. */
+const getTodayHeadlines = vi.fn((_: { data: { from: string; to: string } }) =>
+  Promise.resolve({ count: 3, feeds: ['Inc42'] }),
+)
 vi.mock('#/lib/server-fns', async (original) => ({
   ...(await original<Record<string, unknown>>()),
   listDayMeetings: (input: { data: { from: string; to: string } }) =>
     listDayMeetings(input),
+  getTodayHeadlines: (input: { data: { from: string; to: string } }) =>
+    getTodayHeadlines(input),
   // The window's own read is not under test: it stays reading.
   getMeeting: () => new Promise(() => {}),
 }))
@@ -103,6 +111,7 @@ let root: Root
 
 beforeEach(() => {
   listDayMeetings.mockClear()
+  getTodayHeadlines.mockClear()
   const host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -150,7 +159,6 @@ function loaded() {
       waiting: [],
       failing: [],
     }),
-    headlines: Promise.resolve({ count: 0, feeds: [] }),
     meetings: {
       calendar: true,
       audience: { isAdmin: true, admins: ['Anish'] },
@@ -272,5 +280,20 @@ describe("Today's day nav", () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull()
     await click(document.querySelector('[data-meeting-block]'))
     expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+  })
+})
+
+describe("Today's headline count", () => {
+  it("is read in the browser over the reader's day, not handed down by the loader", async () => {
+    await mount()
+    const day = dayKey(new Date())
+    // Every read (one per load of the page's data) is for the browser
+    // clock's day: midnight to midnight local.
+    const reads = getTodayHeadlines.mock.calls.map(([c]) => c.data)
+    expect(reads.length).toBeGreaterThan(0)
+    for (const read of reads) expect(read).toEqual(dayWindow(day))
+    expect(
+      document.querySelector('[data-headlines-line]')?.textContent,
+    ).toContain('3 new headlines')
   })
 })

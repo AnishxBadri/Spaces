@@ -1,5 +1,17 @@
 import { Effect, Schema } from 'effect'
-import { and, asc, count, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  exists,
+  gte,
+  inArray,
+  lt,
+  sql,
+} from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { db } from '@spaces/db'
 import { feed, feedItem, feedSpace, space } from '@spaces/db/schema'
 import { listFeedSourcesProgram } from './sources'
@@ -115,9 +127,33 @@ export type TodayHeadlines = {
   readonly feeds: ReadonlyArray<string>
 }
 
+// The same feed's headlines, to ask whether one came in before another.
+const earlier = alias(feedItem, 'earlier')
+
 /**
- * Headlines first seen in `[from, to)` across every feed. The caller hands
- * in the reader's day, as the Today page reads it.
+ * Whether a headline came in after its feed's first fetch. One fetch stamps
+ * every row it adds with the same `first_seen_at`, so the feed's earliest
+ * stamp is its first fetch: the backfill a newly added feed brings with it,
+ * which is not news. Derived on the read, so nothing is stored for it.
+ * Once retention has deleted a whole first fetch, the feed's next fetch
+ * reads as its first: a rare undercount, never an inflated one.
+ */
+const afterFirstFetch = exists(
+  db
+    .select({ one: sql`1` })
+    .from(earlier)
+    .where(
+      and(
+        eq(earlier.feedId, feedItem.feedId),
+        lt(earlier.firstSeenAt, feedItem.firstSeenAt),
+      ),
+    ),
+)
+
+/**
+ * Headlines first seen in `[from, to)` across every feed, leaving out each
+ * feed's first fetch. The caller hands in the reader's day, from the
+ * browser's clock.
  */
 export const todayHeadlinesProgram = Effect.fn('feeds.todayHeadlines')(
   function* (
@@ -131,7 +167,11 @@ export const todayHeadlinesProgram = Effect.fn('feeds.todayHeadlines')(
         .from(feedItem)
         .innerJoin(feed, eq(feed.id, feedItem.feedId))
         .where(
-          and(gte(feedItem.firstSeenAt, from), lt(feedItem.firstSeenAt, to)),
+          and(
+            gte(feedItem.firstSeenAt, from),
+            lt(feedItem.firstSeenAt, to),
+            afterFirstFetch,
+          ),
         )
         .groupBy(feed.id, feed.name)
         .orderBy(desc(n), asc(sql`lower(${feed.name})`)),

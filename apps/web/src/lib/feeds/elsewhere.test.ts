@@ -113,6 +113,9 @@ describe('todayHeadlinesProgram', () => {
   it('counts headlines first seen in the day across every feed, the busiest feed first', async () => {
     const a = await aFeed('TechCrunch Daily', [])
     const b = await aFeed('Rest of World', [])
+    // Each feed's first fetch, days before: the backfill under test below.
+    await items(a, [{ title: 'Backfill A', at: '2026-11-10T09:00:00Z' }])
+    await items(b, [{ title: 'Backfill B', at: '2026-11-10T09:00:00Z' }])
     await items(a, [
       // Published days ago, first seen today: it came in today.
       {
@@ -141,5 +144,43 @@ describe('todayHeadlinesProgram', () => {
       ),
     )
     expect(none).toEqual({ count: 0, feeds: [] })
+  })
+
+  it("leaves a new feed's first fetch out as backfill, and counts what its next fetch brings", async () => {
+    const added = await aFeed('The Ken', [])
+    // A day of its own: the file's earlier rows stay until the next file.
+    const firstFetch = '2026-11-25T08:00:00Z'
+    // One fetch stamps all forty with the same instant.
+    await items(
+      added,
+      Array.from({ length: 40 }, (_, i) => ({
+        title: `Archive ${String(i)}`,
+        at: `2026-11-${String(10 + (i % 10)).padStart(2, '0')}T09:00:00Z`,
+        seen: firstFetch,
+      })),
+    )
+    const day = () =>
+      Effect.runPromise(
+        todayHeadlinesProgram(
+          new Date('2026-11-25T00:00:00Z'),
+          new Date('2026-11-26T00:00:00Z'),
+        ),
+      )
+    expect(await day()).toEqual({ count: 0, feeds: [] })
+
+    // The half-hourly poll later the same day: two new stories.
+    await items(added, [
+      {
+        title: 'Fresh one',
+        at: '2026-11-25T08:20:00Z',
+        seen: '2026-11-25T08:30:00Z',
+      },
+      {
+        title: 'Fresh two',
+        at: '2026-11-25T08:25:00Z',
+        seen: '2026-11-25T08:30:00Z',
+      },
+    ])
+    expect(await day()).toEqual({ count: 2, feeds: ['The Ken'] })
   })
 })

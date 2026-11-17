@@ -20,13 +20,13 @@ import type { NeedsYouRow, ProposalActions } from '#/components/today/needs-you'
 import { NoticesBand } from '#/components/today/notices'
 import { PortfolioRail, WhatsMoving } from '#/components/today/rail'
 import { todayReadouts } from '#/components/today/readouts'
+import { useTodayHeadlines } from '#/components/today/today-headlines'
 import { useBornRows } from '#/lib/born-rows'
 import {
   countCompanies,
   countUnfiledDocuments,
   dealFunnelStats,
   getTodayAttention,
-  getTodayHeadlines,
   getTodayMeetings,
   getWorkspaceActivity,
   listHoldings,
@@ -48,7 +48,7 @@ import {
   todayStamp,
 } from '#/lib/today/needs-you'
 import type { NeedsFilter, ReadoutFilter } from '#/lib/today/needs-you'
-import { dayWindow, stripLabel, whoLine } from '#/lib/meetings/day'
+import { stripLabel, whoLine } from '#/lib/meetings/day'
 import { flattenInbox } from '#/lib/today/proposals'
 import { useSettled } from '#/lib/today/use-settled'
 import { useHeldView } from '#/lib/held-decisions'
@@ -82,10 +82,8 @@ async function loadToday() {
       registry: await listRegistry({ data: { kind: 'company' } }),
     }
   // Deferred: Review, the notices and What's moving arrive after the page.
+  // The day's headline count is the page's own read, in the reader's day.
   const attention = getTodayAttention()
-  // The day's headlines, counted over the loader's local day as the page's
-  // `today` is.
-  const headlines = getTodayHeadlines({ data: dayWindow(dayKey(new Date())) })
   const [
     tasks,
     holdings,
@@ -117,7 +115,6 @@ async function loadToday() {
     unfiledCount,
     stoppedPlugins,
     attention,
-    headlines,
     meetings,
   }
 }
@@ -181,7 +178,6 @@ function TodayLedger({
     meetings,
   } = data
   const attention = useSettled(data.attention)
-  const headlines = useSettled(data.headlines)
   // The composer row reports what it made; the wash is for arrivals only.
   const { washes, bear } = useBornRows()
   const taskMenu = useTaskMenu({ me, today })
@@ -238,6 +234,8 @@ function TodayLedger({
   )
   // A meeting's day is the reader's, so its figure waits for the browser clock.
   const now = useNow()
+  // So does the headline count; a reload of the page's data counts again.
+  const headlines = useTodayHeadlines(now === null ? null : dayKey(now), data)
 
   const dueTasks = tasks.open.filter((t) => t.dueDate && t.dueDate <= today)
   const overdue = dueTasks.filter((t) => t.dueDate && t.dueDate < today).length
