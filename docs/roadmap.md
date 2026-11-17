@@ -45,7 +45,6 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 - `SPA-389` `ai-b` — the mandate in every judging lane, and cached tokens on the ledger. Project 31; `migration`, `hitl`: the owner confirms AI column answers may change under the mandate.
 - `SPA-429` `interactions-4` — email threads as message cards with one sender line, reply as the last card, the meeting window in two columns (D109). `afk`.
 - `SPA-430` `attachments-text` — email attachments keep their text and stay in Gmail until someone keeps them; raw MIME without attachment bodies; a folded `From email` band on the Files tab (D110). `afk`.
-- `SPA-431` `menus-icons` — every menu item leads with its 16px icon or service mark, a fixed lane, the same icon per verb (E12). `afk`.
 - `SPA-188` `ship-10` — install, upgrade and rollback docs. Project 16, In Progress. `docs/install.md` and `docs/upgrade.md` exist; check what is left.
 - `SPA-190` `ship-12` — one-click templates for Coolify, Railway, Render and Unraid. Project 16, In Progress; each needs a human deploy.
 
@@ -64,6 +63,8 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 
 ## Unticketed follow-ups
 
+- Phone and feeds, after the backlog run: a phone list's column head pins by a scroll-driven animation, so Firefox and Safari before 26 let it scroll away with the rows; a space page at 390px scrolls sideways (its tab bar and readouts strip overflow); a headline photo that failed before the retry count existed is never retried, and the Feeds page's photo-pending flag does not cover a photo that arrives by a late retry; a refetch after a feed's address changes still counts as new on Today.
+- Menus (E12): a list where one item is current (Sort's columns, a view's columns) leads with a check or an empty lane, not a glyph; the editor's block and table menus take their marks by BlockNote's English label, and a label BlockNote adds later keeps an empty lane.
 - Notes: in the note window a file-mention chip does not open its preview and a dropped file does nothing (the note page does both); an edit still inside the 800ms debounce is dropped when you confirm leaving.
 - Icons: export names in `components/icons.ts` are still Lucide's; the list's menus and Sort button keep `↑`/`↓` text glyphs; `apps/web/components.json` still says `lucide`.
 - The app-wide error screen says `The database did not answer.` for every failure; an unknown `/api/…` path falls to the app's catch-all route and its sign-in guard.
