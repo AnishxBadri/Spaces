@@ -73,16 +73,19 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 - `SPA-454` `tasks-3` — a record's and a space's Tasks section: everyone's open tasks, five rows then `n more ›`, Undo on a tick (D113). Project 36; `afk`, after SPA-450.
 - `SPA-455` `tasks-4` — Today's tasks and the sidebar's `n due` are your own; a task opens in the window (D113). Project 36; `afk`, after SPA-450.
 - `SPA-456` `tasks-5` — a task made from an action item keeps its write-up; pending items head Tasks › Open (D113). Project 36; `migration`, `afk`, after SPA-442 and SPA-451.
+- `SPA-467` `zod-1` — the web app validates with Effect Schema: every server-fn validator through `input()`, no zod import left in `apps/web` (D85). Project 37; `afk`.
+- `SPA-468` `zod-2` — the worker decodes job payloads and plugin calls with Effect Schema (D85). Project 37; `afk`, beside zod-1.
+- `SPA-469` `zod-3` — core converts, `ai/schema` from its four failing rows first, and `jsonValueZod` goes (D85). Project 37; `afk`, after zod-1 and zod-2.
+- `SPA-470` `zod-4` — zod leaves every `package.json` and lint refuses it in every package (D85). Project 37; `afk`, last.
 - `SPA-188` `ship-10` — install, upgrade and rollback docs. Project 16, In Progress. `docs/install.md` and `docs/upgrade.md` exist; check what is left.
 - `SPA-190` `ship-12` — one-click templates for Coolify, Railway, Render and Unraid. Project 16, In Progress; each needs a human deploy.
 
 ## Next, in order
 
 1. **The Ask set**, which the owner has not picked from yet.
-2. **Zod leaves** (approved, not ticketed) — finish D85 as a sweep. Zod is imported by 169 files: web 88 (`lib/server` 30, routes 16, `lib/ai` 11), worker 47 (`jobs` 32, `plugins` 11), core 31 (`ai` 11), and one each in `packages/db`, the sdk's fence test and `scripts/release`. Four slices: the web server-fn validators onto `input()` (about 210 of 270 are still zod); the worker's job payloads; core, where `ai/schema.ts` failed four characterisation rows on a first port and `jsonValueZod` goes with its last caller; then `zod` out of the five `package.json` files and the lint ban widened from the SDK and plugin zones to every package. Each conversion is pinned by a characterisation table recorded against zod first.
-3. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided, not ticketed.
-4. **Small decided slices** (not ticketed): the sign-in rate rule, 5 per 60 seconds per IP, in `apps/web/src/lib/auth.ts`; workspace export (D42); a staged import on Today's Needs-you (D43).
-5. **One design doc** — `DESIGN.md`, `docs/design-contract.md` and `docs/product-map.md` merge into one, checked against the Paper library.
+2. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided, not ticketed.
+3. **Small decided slices** (not ticketed): the sign-in rate rule, 5 per 60 seconds per IP, in `apps/web/src/lib/auth.ts`; workspace export (D42); a staged import on Today's Needs-you (D43).
+4. **One design doc** — `DESIGN.md`, `docs/design-contract.md` and `docs/product-map.md` merge into one, checked against the Paper library.
 
 ## Owner calls
 
