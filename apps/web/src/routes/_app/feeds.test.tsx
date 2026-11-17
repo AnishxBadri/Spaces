@@ -396,6 +396,104 @@ describe('the frame', () => {
   })
 })
 
+describe('the narrow head', () => {
+  // Both heads are in the DOM; CSS shows this one below `md` only.
+  const line = () => document.querySelector('[data-feeds-head-line]')
+  const tabMenu = async () => {
+    const trigger = line()?.querySelector('button[aria-haspopup="menu"]')
+    if (!(trigger instanceof HTMLElement)) throw new Error('no tab trigger')
+    await act(async () => {
+      trigger.focus()
+      trigger.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      )
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+  }
+
+  it('reads Headlines · All spaces, the space a picker that writes ?space=', async () => {
+    const r = await mount()
+    expect(line()?.className).toContain('md:hidden')
+    expect(text(line())).toBe('Headlines·All spaces')
+    expect(
+      line()
+        ?.querySelector('button[aria-haspopup="menu"]')
+        ?.getAttribute('aria-label'),
+    ).toBe('View: Headlines, a feed is failing')
+    const space = line()?.querySelector('[data-space-filter-line] button')
+    expect(space?.getAttribute('aria-label')).toBe('Space: All spaces')
+
+    await click(space)
+    expect(
+      [...document.querySelectorAll('[cmdk-item]')].map((el) => text(el)),
+    ).toEqual(['All spaces', 'Aerospace › Launch', 'Proptech'])
+    await click(
+      [...document.querySelectorAll('[cmdk-item]')].find(
+        (el) => text(el) === 'Proptech',
+      ),
+    )
+    await until(
+      'the space is in the URL',
+      () => 'space' in r.state.location.search,
+    )
+    expect(r.state.location.search).toMatchObject({ space: PROPTECH })
+    expect(text(line())).toBe('Headlines·Proptech')
+    // The bar's filter is the same state.
+    expect(text(document.querySelector('[data-space-filter]'))).toBe('Proptech')
+  })
+
+  it('the tab is a menu of the tabs, the open one checked, and Sources reads alone', async () => {
+    const r = await mount()
+    await tabMenu()
+    const items = [...document.querySelectorAll('[role="menuitemradio"]')]
+    expect(
+      items.map((el) => [text(el), el.getAttribute('aria-checked')]),
+    ).toEqual([
+      ['Headlines', 'true'],
+      ['Sources3', 'false'],
+    ])
+    expect(
+      [...document.querySelectorAll('[role="menuitem"]')].map((el) => text(el)),
+    ).toEqual(['Add feed…'])
+    await click(items.at(1))
+    await until('Sources opens', () => 'tab' in r.state.location.search)
+    expect(r.state.location.search).toMatchObject({ tab: 'sources' })
+    expect(text(line())).toBe('Sources')
+    expect(line()?.querySelector('[data-space-filter-line]')).toBeNull()
+  })
+
+  it('Add feed… opens the feed window', async () => {
+    await mount()
+    await tabMenu()
+    await click(
+      [...document.querySelectorAll('[role="menuitem"]')].find(
+        (el) => text(el) === 'Add feed…',
+      ),
+    )
+    await until('the window opens', () => dialog() !== null)
+    expect(text(dialog()?.querySelector('h2'))).toBe('Add feed')
+  })
+
+  it('from md the button and the tab bar are the head, and the folder joins the bar', async () => {
+    await mount()
+    expect(button(/^Add feed$/)?.className).toContain('max-md:hidden')
+    expect(
+      document
+        .querySelector('[role="tablist"]')
+        ?.closest('[class*="max-md:hidden"]'),
+    ).not.toBeNull()
+    expect(document.querySelector('[data-page-body]')?.className).toContain(
+      'md:pt-0',
+    )
+  })
+
+  it('with no feeds draws no line', async () => {
+    fns.listFeedSources.mockResolvedValue([])
+    await mount()
+    expect(line()).toBeNull()
+  })
+})
+
 describe('Sources', () => {
   it('lists every feed by name with its feed URL, spaces by path and its latest', async () => {
     await mount('?tab=sources')

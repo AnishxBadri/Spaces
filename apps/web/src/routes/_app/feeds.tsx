@@ -4,6 +4,8 @@ import { useCallback, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { FeedWindow } from '#/components/feeds/feed-window'
+import { FeedsHeadLine } from '#/components/feeds/feeds-head-line'
+import type { FeedsTab } from '#/components/feeds/feeds-head-line'
 import type { FeedWindowMode } from '#/components/feeds/feed-window'
 import {
   HEADLINES_STEP,
@@ -47,9 +49,10 @@ import type { FeedSource } from '#/lib/server-fns'
  *   is `?space=`, so a reload keeps it. It is a loader dep: page one of the
  *   narrowed list comes with the load, and a failed read leaves it to the
  *   tab, which says so and retries.
+ * - Below `md` the head has no folder bar and no button: one mono line on
+ *   the title's baseline (`FeedsHeadLine`) holds the tabs, the same space
+ *   filter and Add feed, and the body takes the gutter's top back.
  */
-
-type FeedsTab = 'headlines' | 'sources'
 
 type FeedsSearch = {
   tab?: FeedsTab | undefined
@@ -187,17 +190,43 @@ function FeedsPage() {
   )
 
   const failing = sources.some((s) => s.state === 'failing')
+  const scoped = tab === 'headlines' && (tagged.length > 0 || space !== null)
+  const spaceFilter = (variant: 'bar' | 'line') => (
+    <SpaceFilter
+      value={space}
+      spaces={tagged}
+      pathOf={pathOf}
+      onChange={setSpace}
+      variant={variant}
+    />
+  )
 
   return (
     <ListPage>
       <PageHeader
         title="Feeds"
         folds={false}
+        // Below `md` the line sits on the title's baseline, as the narrow
+        // board draws it; from `md` the button keeps the head's top line.
+        className="max-md:items-baseline"
         action={
-          <Button onClick={openAdd}>
-            <icon.new aria-hidden className="size-4" />
-            Add feed
-          </Button>
+          <>
+            {sources.length === 0 ? null : (
+              <FeedsHeadLine
+                tab={tab}
+                onTab={setTab}
+                sourceCount={sources.length}
+                failing={failing}
+                onAdd={openAdd}
+                {...(scoped ? { scope: spaceFilter('line') } : {})}
+                className="md:hidden"
+              />
+            )}
+            <Button onClick={openAdd} className="max-md:hidden">
+              <icon.new aria-hidden className="size-4" />
+              Add feed
+            </Button>
+          </>
         }
       />
       {sources.length === 0 ? (
@@ -227,20 +256,17 @@ function FeedsPage() {
             sourceCount={sources.length}
             failing={failing}
             trail={
-              tab === 'headlines' && (tagged.length > 0 || space !== null) ? (
+              scoped ? (
                 <>
                   <TabDivider />
-                  <SpaceFilter
-                    value={space}
-                    spaces={tagged}
-                    pathOf={pathOf}
-                    onChange={setSpace}
-                  />
+                  {spaceFilter('bar')}
                 </>
               ) : undefined
             }
           />
-          <PageBody className="min-h-0 pt-0">
+          {/* Below `md` there is no bar to join, so the body keeps the
+              gutter above and the folder its top edge. */}
+          <PageBody className="min-h-0 md:pt-0 max-md:[&>[data-folder]]:border-t max-md:[&>[data-frame=folder]]:border-t">
             {tab === 'sources' ? (
               <SourcesTable
                 sources={sources}
@@ -292,9 +318,9 @@ function FeedsPage() {
 }
 
 /**
- * The page's folder bar: Headlines, then Sources with its count and, while
- * any feed is failing, the crimson square after it. `trail` is the space
- * filter's place beside the tabs.
+ * The page's folder bar, from `md` up: Headlines, then Sources with its
+ * count and, while any feed is failing, the crimson square after it.
+ * `trail` is the space filter's place beside the tabs.
  */
 function FeedsTabs({
   tab,
@@ -310,7 +336,7 @@ function FeedsTabs({
   trail?: ReactNode
 }) {
   return (
-    <FolderGround>
+    <FolderGround className="max-md:hidden">
       <Tabs
         label="Feeds"
         items={[
