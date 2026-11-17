@@ -10,7 +10,9 @@ import { expect, test } from '../harness/fixtures.ts'
  * companies are written straight into the instance's own database, as
  * `userCount` reads it, since this suite imports nothing internal.
  *
- * Serial: each test adds companies to the one shared instance.
+ * Serial: each test adds companies to the one shared instance. Other specs
+ * write companies of their own to it, so every count here is topped up to a
+ * total, never assumed from an empty list.
  */
 test.describe.configure({ mode: 'serial' })
 
@@ -40,6 +42,27 @@ async function addCompanies(n: number) {
   } finally {
     await client.end()
   }
+}
+
+/** How many companies the instance holds now. */
+async function countCompanies() {
+  const client = new Client({ connectionString: fromEnv(ENV.mainDb) })
+  await client.connect()
+  try {
+    const got = await client.query<{ n: number }>(
+      `select count(*)::int as n from entity where kind = 'company'`,
+    )
+    return got.rows.at(0)?.n ?? 0
+  } finally {
+    await client.end()
+  }
+}
+
+/** Tops the list up to `total` companies; a list already past it fails. */
+async function fillTo(total: number) {
+  const missing = total - (await countCompanies())
+  expect(missing).toBeGreaterThanOrEqual(0)
+  if (missing > 0) await addCompanies(missing)
 }
 
 /** The geometry the criteria name, read in one go. */
@@ -85,16 +108,18 @@ for (const [width, height] of [
   test.describe(`at ${width}×${height}`, () => {
     test.use({ viewport: { width, height } })
 
-    test('three rows: the card still fills, the foot at its bottom', async ({
+    test('a short list: the card still fills, the foot at its bottom', async ({
       adminPage,
       main,
     }) => {
-      // Only the first viewport adds them; the second sees the same three.
-      if (width === 1280) await addCompanies(3)
+      // At least three rows, and far too few to fill the card.
+      if ((await countCompanies()) < 3) await fillTo(3)
+      const total = await countCompanies()
+      expect(total).toBeLessThan(10)
       await adminPage.goto(`${main.url}/companies`)
-      await expectPane(adminPage, 3)
+      await expectPane(adminPage, total)
       await expect(adminPage.locator('[data-table-foot]')).toContainText(
-        '3 of 3',
+        `${total} of ${total}`,
       )
     })
   })
@@ -107,7 +132,7 @@ test.describe('at 1280×800, a full list', () => {
     adminPage,
     main,
   }) => {
-    await addCompanies(47)
+    await fillTo(50)
     await adminPage.goto(`${main.url}/companies`)
     const before = await expectPane(adminPage, 50)
     await adminPage
