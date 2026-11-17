@@ -38,15 +38,13 @@ What is shipped, what is open, and what comes next. Linear (team `Spaces`) holds
 32. One backend grammar — I/O is Effect (D84), Effect Schema with SDK 2.0 (D85), two note kinds (D83), ownership counts sales
 33. Feeds are built in — the poller and parser, stored logos and photos, the Feeds page with Sources and Headlines, feeds in spaces and on Today; the RSS plugin and the SDK's `feeds` role retire (D87)
 
-Plus the UI sweep (the printed sheets landing), Corrections, and the list as a fixed pane (D106).
+Plus the UI sweep (the printed sheets landing), Corrections, the list and the record as fixed panes (D106), IBM Carbon icons and brand marks in their own colours (D19), the note page on bone and its messages (D107), the note window over a record (D108), the interaction rows and windows (D109), one ink line under every head, and the record table read by a screen reader.
 
 ## Open
 
 - `SPA-389` `ai-b` — the mandate in every judging lane, and cached tokens on the ledger. Project 31; `migration`, `hitl`: the owner confirms AI column answers may change under the mandate.
 - `SPA-188` `ship-10` — install, upgrade and rollback docs. Project 16, In Progress. `docs/install.md` and `docs/upgrade.md` exist; check what is left.
 - `SPA-190` `ship-12` — one-click templates for Coolify, Railway, Render and Unraid. Project 16, In Progress; each needs a human deploy.
-- `SPA-407` — the record table to a screen reader: named by its view, the sort read aloud, the name as row header, a Tab stop while columns overflow; the `n more columns →` foot line already shipped with the fixed pane. `afk`, size S.
-- `SPA-426` `interactions-3` — thread rows put the clip under the day and clamp the summary at two lines; the email thread unfolds in place; the meeting and email windows end on `Done`; logging gains a Summary and opens the write-up over the record (D109). After SPA-423. `afk`, size M.
 
 ## Next, in order
 
@@ -63,6 +61,11 @@ Plus the UI sweep (the printed sheets landing), Corrections, and the list as a f
 
 ## Unticketed follow-ups
 
+- Notes: `getNote`'s `backlinks` are not filtered by `canRead`, so a private note that mentions a note shows its title under `Mentioned in`; in the note window a file-mention chip does not open its preview and a dropped file does nothing (the note page does both); an edit still inside the 800ms debounce is dropped when you confirm leaving.
+- Icons: History draws a mark, a stage move, a filed document and a merge with the glyphs the issue's table named, where Paper Record board 07 draws a line chart, an arrow, a page and a branch; export names in `components/icons.ts` are still Lucide's; the list's menus and Sort button keep `↑`/`↓` text glyphs; `apps/web/components.json` still says `lucide`.
+- The app-wide error screen says `The database did not answer.` for every failure; an unknown `/api/…` path falls to the app's catch-all route and its sign-in guard.
+- Brand marks: Granola, Apollo and Exa marks were not seen on a live screen (no such rows in the dev database); `Voyage` has no mark.
+- `list-pane.spec.ts` assumes exactly three companies and passes only because it runs before the specs that add more.
 - Edges: Import's inner grids and the empty-state pages are not carded.
 - Windows (E3): a window's head, body and foot pad 16px, but a ledger row inside a padded body insets a further 12px, so its text stands at 28px while the title stands at 16px (the meeting window's Linked records); edge-to-edge windows (the file viewer) need the row inset itself to be 16px. One sweep over the 40 windows, `windows-1`: every window's text on one 16px line.
 - Record rail: a deal's Company group swaps the company from its `+` (the attribute is required), which reads as add; an existing install keeps its attribute order (only a fresh seed leads with identity), so a one-off `Reset to default order` on the object's settings page would let it catch up.
