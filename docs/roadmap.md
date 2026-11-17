@@ -77,6 +77,7 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 - `SPA-468` `zod-2` — the worker decodes job payloads and plugin calls with Effect Schema (D85). Project 37; `afk`, beside zod-1.
 - `SPA-469` `zod-3` — core converts, `ai/schema` from its four failing rows first, and `jsonValueZod` goes (D85). Project 37; `afk`, after zod-1 and zod-2.
 - `SPA-470` `zod-4` — zod leaves every `package.json` and lint refuses it in every package (D85). Project 37; `afk`, last.
+- `SPA-471` `deps-1` — drop `@tailwindcss/typography` (unused) and `dotenv`/`dotenv-cli` (Node 22 reads env files); the site sets in IBM Plex. `afk`.
 - `SPA-188` `ship-10` — install, upgrade and rollback docs. Project 16, In Progress. `docs/install.md` and `docs/upgrade.md` exist; check what is left.
 - `SPA-190` `ship-12` — one-click templates for Coolify, Railway, Render and Unraid. Project 16, In Progress; each needs a human deploy.
 
