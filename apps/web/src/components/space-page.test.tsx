@@ -950,7 +950,7 @@ describe('the Watching lane', () => {
     const watching = lane('Watching')
     expect(
       Array.from(watching.querySelectorAll('li')).map((li) => text(li)),
-    ).toEqual(['EExa', 'WWatcher'])
+    ).toEqual(['Exa', 'WWatcher'])
     expect(watching.querySelectorAll('p, button')).toHaveLength(0)
   })
 

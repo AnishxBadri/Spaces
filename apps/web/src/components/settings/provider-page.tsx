@@ -196,7 +196,7 @@ function UseRow({ provider, use }: { provider: ProviderId; use: ProviderUse }) {
       </span>
       <ProviderMark
         brand={productBrand(provider, use.product)}
-        className={use.enabled ? 'text-foreground' : 'text-graphite'}
+        className={use.enabled ? undefined : 'opacity-50'}
       />
       <span className="w-36 shrink-0 truncate text-ui font-medium">
         {use.label}

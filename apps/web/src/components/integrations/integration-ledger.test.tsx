@@ -106,7 +106,8 @@ describe('IntegrationLedger', () => {
   it('lists every row with its mark, version, jobs, state, one number and Open', () => {
     const html = render()
     expect(html).toContain('Installed')
-    expect(html.match(/<li/g)).toHaveLength(5)
+    // `<li\b`: React preloads an app-icon mark with a `<link>`.
+    expect(html.match(/<li\b/g)).toHaveLength(5)
     const apollo = rowFor(html, 'enabled')
     // A known brand draws its ProviderMark, not its initial.
     expect(apollo).toContain('data-provider-mark="apollo"')

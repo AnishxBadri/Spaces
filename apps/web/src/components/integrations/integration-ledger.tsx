@@ -94,8 +94,10 @@ export function versionNoteOf(row: IntegrationRow): string | null {
 }
 
 /**
- * A plugin's mark: its brand's `ProviderMark` when it has one, else its
- * initial on a square; ink when installed, graphite on rule when offered.
+ * A plugin's mark: its brand's `ProviderMark` in the brand's own colours,
+ * installed or offered alike. A name with no brand (a third-party plugin)
+ * gets its initial on a square: ink when installed, graphite on rule when
+ * offered.
  */
 export function PluginMark({
   name,
@@ -109,10 +111,7 @@ export function PluginMark({
     return (
       <span
         aria-hidden
-        className={cn(
-          'flex size-5 shrink-0 items-center justify-center',
-          offered ? 'text-graphite' : 'text-foreground',
-        )}
+        className="flex size-5 shrink-0 items-center justify-center"
       >
         <ProviderMark brand={brand} />
       </span>

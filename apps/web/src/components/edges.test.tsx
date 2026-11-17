@@ -696,7 +696,7 @@ describe('E7 · one icon list, one brand mark', () => {
       .filter((f) => f.endsWith('.tsx') && !f.endsWith('.test.tsx'))
       .filter((f) => /strokeWidth/.test(readFileSync(f, 'utf8')))
       .map((f) => relative(src, f))
-    expect(stroked).toEqual(['components/provider-mark.tsx'])
+    expect(stroked).toEqual([])
     // An element named from the list (or the verb map) carrying size-3 or
     // size-3.5 in its own tag.
     const offenders = sourceFiles(src)
@@ -799,13 +799,14 @@ describe('E7 · one icon list, one brand mark', () => {
       expect(name in icons, name).toBe(false)
   })
 
-  it('draws a brand only through ProviderMark, monochrome', () => {
+  it('draws a brand only through ProviderMark, in its own colours', () => {
     const html = renderToStaticMarkup(<ProviderMark brand="googleDrive" />)
-    expect(html).toContain('fill="currentColor"')
+    expect(html).not.toContain('currentColor')
+    expect(html).toContain('fill="#0066DA"')
     expect(html).toContain('aria-label="Google Drive"')
-    expect(renderToStaticMarkup(<ProviderMark brand="granola" />)).toContain(
-      '>G</text>',
-    )
+    const granola = renderToStaticMarkup(<ProviderMark brand="granola" />)
+    expect(granola).toContain('src="/brands/granola.png"')
+    expect(granola).not.toContain('<text')
     expect(brandOf('Apollo.io')).toBe('apollo')
     expect(brandOf('google-drive')).toBe('googleDrive')
     expect(brandOf('Echo')).toBeNull()
@@ -814,7 +815,7 @@ describe('E7 · one icon list, one brand mark', () => {
     const drawers = sourceFiles(src)
       .filter((f) => brandColour.test(readFileSync(f, 'utf8')))
       .map((f) => relative(src, f))
-    expect(drawers).toEqual([])
+    expect(drawers).toEqual(['components/provider-mark.tsx'])
     const svgs = sourceFiles(src)
       .filter((f) => readFileSync(f, 'utf8').includes('<svg'))
       .map((f) => relative(src, f))
