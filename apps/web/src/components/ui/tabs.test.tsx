@@ -130,12 +130,14 @@ describe('a counted tab', () => {
 })
 
 describe('the open tab', () => {
-  it('is paper with the ink edge, a pixel taller and a pixel low', () => {
+  it('is paper with the ink edge, standing on the foot line', () => {
     const notes = tab(render('notes'), 'Notes')
     expect(notes.getAttribute('aria-selected')).toBe('true')
     expect(classes(notes)).toEqual(
-      expect.arrayContaining(['tab-open', 'h-9.25', 'top-px', 'px-3']),
+      expect.arrayContaining(['tab-open', 'h-9', 'px-3']),
     )
+    // A pixel low would put its ink sides one row into the body's paper.
+    expect(classes(notes)).not.toContain('top-px')
     for (const t of Array.from(
       render('notes').querySelectorAll('[role="tab"][aria-selected="false"]'),
     )) {

@@ -10,7 +10,7 @@ import { cn } from '#/lib/utils'
 /**
  * The folder: the page's one ink object. A 44px bar on the ground — no
  * fill, a hairline along its foot — whose open tab is paper with a hairline
- * top, left and right, a pixel taller than the bar so it covers the foot
+ * top, left and right, standing on the foot line so its paper covers the
  * line and runs straight into the body under it (`FolderBody`, or the
  * `tabpanel` it renders for `children`); a closed tab is plain text on the
  * ground. The caller sets the bar on the gutter (`FolderGround`, or a column
@@ -150,8 +150,8 @@ export function Tabs<T extends string>({
     refs.current[next]?.focus()
   }
 
-  // No overflow clip: the open tab hangs 1px over this foot line. The line
-  // is a `before:` so it paints under the open tab rather than over it.
+  // No overflow clip: the open tab stands on this foot line. The line is a
+  // `before:` so it paints under the open tab rather than over it.
   const bar = cn(
     'relative flex h-11 items-end before:absolute before:inset-x-0 before:bottom-0 before:h-px',
     plain ? 'before:bg-rule' : 'before:bg-hairline',
@@ -196,14 +196,12 @@ export function Tabs<T extends string>({
             }}
             className={cn(
               'focus-ring-inset flex shrink-0 items-center gap-1.5 px-3 text-ui whitespace-nowrap transition-[color] duration-150 ease-out-quart disabled:opacity-50',
-              // Open: a pixel taller and a pixel low, so its paper covers
-              // the bar's foot line. Closed: ink when it holds something,
-              // graphite when empty.
+              // Open: its foot is the bar's foot line, so its paper covers
+              // that line and its ink sides end on it, never below it into
+              // the body. Closed: ink when it holds something, graphite when
+              // empty.
               open
-                ? cn(
-                    'tab-open top-px h-9.25 text-foreground',
-                    plain && 'tab-open-plain',
-                  )
+                ? cn('tab-open h-9 text-foreground', plain && 'tab-open-plain')
                 : counted || t.uncounted === true
                   ? 'h-9 text-foreground'
                   : 'h-9 text-graphite hover:text-foreground',

@@ -345,9 +345,10 @@ describe('real tabs', () => {
     expect(html).not.toContain('bg-bone')
     expect(count(html, /\btab-open\b/g)).toBe(1)
     const open = classesOf(html, 'tab-open')
-    // A pixel taller and a pixel low, over the bar's foot: no rule under
-    // the open tab.
-    expect(open).toEqual(expect.arrayContaining(['h-9.25', 'top-px']))
+    // Standing on the bar's foot, not below it: no rule under the open tab
+    // and no ink side poking into the body.
+    expect(open).toContain('h-9')
+    expect(open).not.toContain('top-px')
     expect(open).not.toContain('border-b')
     expect(html).toMatch(/aria-selected="true"[^>]*class="[^"]*tab-open/)
   })

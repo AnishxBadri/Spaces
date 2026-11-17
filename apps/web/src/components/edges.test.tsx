@@ -351,10 +351,9 @@ describe('E10 · one ink object on a page: the folder', () => {
       expect.arrayContaining(['h-11', 'items-end', 'before:bg-hairline']),
     )
     expect(bar.some((c) => c.startsWith('bg-'))).toBe(false)
-    // The open tab is a pixel taller and a pixel low, over the foot line.
-    expect(classesOf(html, 'tab-open')).toEqual(
-      expect.arrayContaining(['top-px', 'h-9.25']),
-    )
+    // The open tab stands on the foot line: its foot is the line's row.
+    expect(classesOf(html, 'tab-open')).toContain('h-9')
+    expect(classesOf(html, 'tab-open')).not.toContain('top-px')
     // The body is the folder: paper, hairline sides and foot, no top.
     expect(classesAt(html, 'role="tabpanel"')).toContain('folder')
     expect(folderBlock).toMatch(/border: 1px solid var\(--hairline\)/)
