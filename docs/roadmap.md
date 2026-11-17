@@ -43,14 +43,11 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 ## Open
 
 - `SPA-389` `ai-b` — the mandate in every judging lane, and cached tokens on the ledger. Project 31; `migration`, `hitl`: the owner confirms AI column answers may change under the mandate.
-- `SPA-428` `memo-graphite` — a memo's kind icon is graphite in the Notes list and on a record's Notes tab (D19). `afk`.
 - `SPA-429` `interactions-4` — email threads as message cards with one sender line, reply as the last card, the meeting window in two columns (D109). `afk`.
 - `SPA-430` `attachments-text` — email attachments keep their text and stay in Gmail until someone keeps them; raw MIME without attachment bodies; a folded `From email` band on the Files tab (D110). `afk`.
 - `SPA-431` `menus-icons` — every menu item leads with its 16px icon or service mark, a fixed lane, the same icon per verb (E12). `afk`.
 - `SPA-433` `space-moving` — a space's What's moving as Feeds board 03 draws it (date column, two-line rows, `n more`). `afk`.
-- `SPA-434` `feeds-narrow-head` — at 390px the Feeds head reads `Headlines · All spaces`. `afk`.
 - `SPA-435` `feeds-photos-retry` — a failed feed photo retries with backoff; `feed_item.image_sha` indexed. `afk`, `migration`.
-- `SPA-436` `feeds-today-count` — Today's headline count on the reader's day; a new feed's first fetch is not new. `afk`.
 - `SPA-188` `ship-10` — install, upgrade and rollback docs. Project 16, In Progress. `docs/install.md` and `docs/upgrade.md` exist; check what is left.
 - `SPA-190` `ship-12` — one-click templates for Coolify, Railway, Render and Unraid. Project 16, In Progress; each needs a human deploy.
 
