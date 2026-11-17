@@ -125,6 +125,7 @@ export function NoteWindow({
   const flush = useRef<(() => Promise<boolean>) | null>(null)
   const sheet = useRef<HTMLDivElement>(null)
   const leaving = useRef(false)
+  const menuTookEscape = useRef(false)
 
   /** Lands the pending edit, then leaves; a failed save stays open. */
   const leave = useCallback(async (then: () => void) => {
@@ -143,7 +144,12 @@ export function NoteWindow({
     <Dialog
       open={id !== null}
       onOpenChange={(open) => {
-        if (!open) close()
+        if (open) return
+        if (menuTookEscape.current) {
+          menuTookEscape.current = false
+          return
+        }
+        close()
       }}
     >
       <DialogContent
@@ -151,6 +157,16 @@ export function NoteWindow({
         size="note"
         data-note-window
         aria-describedby={undefined}
+        // Escape belongs to an open slash or mention menu first: the editor
+        // closes its menu and the window stays. The key is left unprevented,
+        // because the editor ignores a key another handler has prevented.
+        onEscapeKeyDown={() => {
+          menuTookEscape.current =
+            sheet.current?.querySelector('.bn-suggestion-menu') != null
+          queueMicrotask(() => {
+            menuTookEscape.current = false
+          })
+        }}
         // The sheet takes focus, not its first control (the kind menu): the
         // title takes the caret itself when the note has none.
         onOpenAutoFocus={(e) => {
