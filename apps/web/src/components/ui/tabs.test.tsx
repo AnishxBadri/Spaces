@@ -142,6 +142,27 @@ describe('the open tab', () => {
       expect(classes(t)).toEqual(expect.arrayContaining(['h-9', 'px-3']))
     }
   })
+
+  it('carries a `labelId` on its label alone, the count outside it', () => {
+    const doc = win.document
+    doc.body.innerHTML = renderToStaticMarkup(
+      <Tabs
+        label="Views"
+        labelId="open-view"
+        items={items}
+        value="notes"
+        onValueChange={() => {}}
+      />,
+    )
+    const named = Array.from(doc.querySelectorAll('#open-view'))
+    expect(named).toHaveLength(1)
+    const label = named.at(0)
+    if (!label) throw new Error('no label')
+    expect(label.textContent).toBe('Notes')
+    expect(tab(doc, 'Notes').contains(label)).toBe(true)
+    // A closed tab keeps its bare label.
+    expect(tab(doc, 'Files').innerHTML).toBe('Files')
+  })
 })
 
 describe('an empty tab', () => {

@@ -6,7 +6,7 @@ import {
 } from '@tanstack/react-table'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Layers } from '#/components/icons'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -132,6 +132,9 @@ const col = createColumnHelper<Row>()
 const PREFS_KEY = 'dealos.companies-table.v1'
 
 function CompaniesPage() {
+  // The page's title and open tab name its table to a screen reader.
+  const titleId = useId()
+  const viewId = useId()
   const {
     conditions,
     sort: loaderSort,
@@ -429,6 +432,7 @@ function CompaniesPage() {
       <PageHeader
         folds={false}
         title="Companies"
+        titleId={titleId}
         action={
           firstRun ? (
             listMenu
@@ -473,6 +477,7 @@ function CompaniesPage() {
               canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
               plural="Companies"
               refNames={refNames}
+              labelId={viewId}
               tools={
                 <TableTools
                   table={table}
@@ -499,6 +504,11 @@ function CompaniesPage() {
                 ]}
                 table={table}
                 label="Companies"
+                // The selection bar stands in for the tabs while rows are
+                // checked: only the title is left to name the table.
+                labelledBy={
+                  actions.selectionBar ? [titleId] : [titleId, viewId]
+                }
                 select={actions.select}
                 rowEnd={actions.rowMenu}
                 stickyColumnId="name"

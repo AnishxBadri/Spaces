@@ -111,6 +111,7 @@ export function ViewBar({
   plural,
   refNames,
   pinned = false,
+  labelId,
 }: {
   /**
    * The object row this list's records belong to, or null on a surface that
@@ -151,6 +152,8 @@ export function ViewBar({
   refNames?: RefNames | undefined
   /** Stick under the folded head bar while the page scrolls. */
   pinned?: boolean | undefined
+  /** The open view's name carries this id: the table under it names itself by it. */
+  labelId?: string | undefined
 }) {
   const active = views.find((v) => v.id === activeId) ?? null
   const dirty =
@@ -310,6 +313,7 @@ export function ViewBar({
         }
         // A list's tools end in the search box, on the card's right edge.
         flush={tools !== undefined}
+        labelId={labelId}
         trail={
           <>
             {active ? (

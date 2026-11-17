@@ -9,9 +9,9 @@ import {
   useRef,
   useState,
 } from 'react'
-import type { ComponentProps, ReactNode, RefObject } from 'react'
+import type { ComponentProps, KeyboardEvent, ReactNode, RefObject } from 'react'
 import { FolderGround } from '#/components/page-header'
-import { ChevronsUpDown, icon } from '#/components/icons'
+import { ArrowDown, ArrowUp, ChevronsUpDown, icon } from '#/components/icons'
 import type { IconComponent } from '#/components/icons'
 import { useHotkey } from '#/lib/use-hotkey'
 import {
@@ -50,6 +50,10 @@ declare module '@tanstack/react-table' {
  * - In scope: show/hide/resize, single sort, sticky header, sticky first
  *   column, row → record, row checkboxes. Deliberately absent: bulk edit,
  *   calculations row, CSV, virtualization.
+ * - To a screen reader it is a table named by the page's title and open
+ *   view, the sorted head says which way, and the name cell heads its row.
+ *   While columns run past the right edge the scroller is one Tab stop,
+ *   named for how many, and ← → scroll it.
  *
  * A list is a fixed pane: the table's card fills what the page leaves it and
  * is the one scroller, both ways. The column head holds the card's top, the
@@ -112,6 +116,7 @@ export function RecordTable<T>({
   stickyColumnId,
   addColumn,
   label,
+  labelledBy,
   onRowClick,
   page,
   columnActions,
@@ -127,8 +132,17 @@ export function RecordTable<T>({
   stickyColumnId?: string
   /** The "+ Add column" control, rendered in the trailing header cell. */
   addColumn?: ReactNode
-  /** Accessible name for the grid, e.g. "Companies". */
+  /**
+   * The list's noun, "Companies": the table's name when nothing on the
+   * page names it, and the start of the sideways pane's name.
+   */
   label: string
+  /**
+   * Ids of what names the table on the page, in reading order: the title,
+   * then the open view's tab. Each must be in the DOM; absent or empty,
+   * `label` names the table.
+   */
+  labelledBy?: ReadonlyArray<string> | undefined
   /**
    * What a click anywhere on the row does, when the row's own subject has no
    * page to link to — `/files`, whose rows open a preview modal (a
@@ -188,6 +202,39 @@ export function RecordTable<T>({
     columns: visible.length,
     endWidth: rowEndWidth,
   })
+  // ← → move by about one column: the mean of the columns that scroll.
+  const scrolling = visible.filter((c) => c.id !== stickyColumnId)
+  const columnStep =
+    scrolling.length === 0
+      ? MIN_COLUMN_WIDTH
+      : Math.round(
+          scrolling.reduce((x, c) => x + c.getSize(), 0) / scrolling.length,
+        )
+  // A Tab stop only while there is somewhere to scroll: columns past the
+  // right edge, or a scroll already taken that the keyboard must undo.
+  const sideways = overflow.hidden > 0 || overflow.scrolled
+  const more =
+    overflow.hidden > 0
+      ? `${overflow.hidden} more column${overflow.hidden === 1 ? '' : 's'}`
+      : null
+  function onPaneKey(e: KeyboardEvent<HTMLDivElement>) {
+    // A control inside a cell keeps its own arrows.
+    if (e.target !== e.currentTarget) return
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
+    const by =
+      e.key === 'ArrowRight'
+        ? columnStep
+        : e.key === 'ArrowLeft'
+          ? -columnStep
+          : 0
+    if (by === 0) return
+    e.preventDefault()
+    overflow.scrollBy(by)
+  }
+  const named =
+    labelledBy !== undefined && labelledBy.length > 0
+      ? { 'aria-labelledby': labelledBy.join(' ') }
+      : { 'aria-label': label }
   const resizing = table.getState().columnSizingInfo.isResizingColumn
   // The dragged column's right edge, from the table's left: where the guide
   // runs while the drag lasts.
@@ -219,11 +266,9 @@ export function RecordTable<T>({
   // `isolate`: the pinned head, column and lane order themselves with small
   // local z values inside one stacking context, so the page's five-step
   // z-index scale never has to climb. Body pins sit at 10, the head at 20,
-  // the head's own pinned corners at 30.
+  // the head's own pinned corners at 30, a focused pane's marks at 40.
   return (
     <div
-      role="table"
-      aria-label={label}
       data-table-box
       data-frame={folder ? 'folder' : 'card'}
       className={cn(
@@ -232,15 +277,27 @@ export function RecordTable<T>({
         !joined && 'border-t',
       )}
     >
-      <div className="relative flex min-h-0 flex-1 flex-col">
+      {/* The frame draws the scroller's focus marks: on the scroller they
+          would scroll away with the rows and sit under its pinned lanes. */}
+      <div className="focus-ring-pane relative flex min-h-0 flex-1 flex-col">
         <div
           ref={scrollRef}
           data-table-scroller
+          data-focus-pane
           onScroll={overflow.check}
+          {...(sideways
+            ? {
+                role: 'group',
+                tabIndex: 0,
+                'aria-label': more === null ? label : `${label}, ${more}`,
+                onKeyDown: onPaneKey,
+              }
+            : {})}
           className="relative min-h-0 flex-1 overflow-auto"
         >
           <table
-            role="presentation"
+            role="table"
+            {...named}
             className="table-fixed border-separate border-spacing-0 text-ui"
             style={tableStyle}
           >
@@ -313,7 +370,13 @@ export function RecordTable<T>({
                       {row.getVisibleCells().map((cell) => (
                         <td
                           key={cell.id}
-                          role="cell"
+                          // The name cell heads its row: moving along the
+                          // row reads the record's name with each value.
+                          role={
+                            cell.column.id === stickyColumnId
+                              ? 'rowheader'
+                              : 'cell'
+                          }
                           style={{ width: cell.column.getSize() }}
                           className={cn(
                             'h-row border-r border-b border-rule px-0.75 py-0 align-middle first:pl-1.75',
@@ -382,16 +445,16 @@ export function RecordTable<T>({
           : {})}
         {...(page === undefined ? {} : { page })}
         end={
-          overflow.hidden > 0 ? (
+          more === null ? null : (
             <button
               type="button"
               data-more-columns
               onClick={() => overflow.reveal(pinnedWidth)}
               className="focus-ring shrink-0 rounded-md text-label text-graphite underline-offset-4 hover:text-foreground hover:underline"
             >
-              {overflow.hidden} more column{overflow.hidden === 1 ? '' : 's'} →
+              {more} →
             </button>
-          ) : null
+          )
         }
       />
     </div>
@@ -446,9 +509,10 @@ function ResizeGuide({
 
 /**
  * How many columns lie past the card's right edge — under the pinned
- * trailing lane or beyond it — and the step that brings the first of them
- * in. Rechecked on scroll, on resize and when the columns change. The fade
- * and the foot's `n more columns →` both read it.
+ * trailing lane or beyond it — whether the card is scrolled sideways, and
+ * the steps that move it: the first hidden column in, or a distance either
+ * way. Rechecked on scroll, on resize and when the columns change. The fade,
+ * the foot's `n more columns →` and the scroller's Tab stop all read it.
  */
 function useColumnOverflow(
   ref: RefObject<HTMLDivElement | null>,
@@ -466,10 +530,13 @@ function useColumnOverflow(
   },
 ): {
   hidden: number
+  scrolled: boolean
   check: () => void
   reveal: (pinnedWidth: number) => void
+  scrollBy: (left: number) => void
 } {
   const [hidden, setHidden] = useState(0)
+  const [scrolled, setScrolled] = useState(false)
   const past = useCallback(
     (el: HTMLDivElement) => {
       // Not laid out (hidden, or a DOM with no layout): nothing to count.
@@ -485,7 +552,9 @@ function useColumnOverflow(
   )
   const check = useCallback(() => {
     const el = ref.current
-    if (el) setHidden(past(el).length)
+    if (!el) return
+    setHidden(past(el).length)
+    setScrolled(el.scrollLeft > 0)
   }, [ref, past])
   useEffect(() => {
     const el = ref.current
@@ -496,17 +565,19 @@ function useColumnOverflow(
     observer.observe(el)
     return () => observer.disconnect()
   }, [ref, check, width, columns])
+  const behavior = (): ScrollBehavior =>
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ? 'auto'
+      : 'smooth'
   const reveal = (pinnedWidth: number) => {
     const el = ref.current
     const next = el ? past(el).at(0) : undefined
     if (!el || !next) return
-    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    el.scrollTo({
-      left: next.offsetLeft - pinnedWidth,
-      behavior: still ? 'auto' : 'smooth',
-    })
+    el.scrollTo({ left: next.offsetLeft - pinnedWidth, behavior: behavior() })
   }
-  return { hidden, check, reveal }
+  const scrollBy = (left: number) =>
+    ref.current?.scrollBy({ left, behavior: behavior() })
+  return { hidden, scrolled, check, reveal, scrollBy }
 }
 
 /** One row's checkbox, shown on hover, focus, or while any row is checked. */
@@ -629,10 +700,12 @@ function HeaderCell<T>({
               {flexRender(column.columnDef.header, header.getContext())}
             </span>
             {column.columnDef.meta?.ai === true ? <AiTag /> : null}
+            {/* Drawn in currentColor rather than a text glyph, so it holds in
+                forced colours; `aria-sort` on the head says the direction. */}
             {sorted === 'asc' ? (
-              <span className="shrink-0">↑</span>
+              <ArrowUp aria-hidden className="size-4 shrink-0" />
             ) : sorted === 'desc' ? (
-              <span className="shrink-0">↓</span>
+              <ArrowDown aria-hidden className="size-4 shrink-0" />
             ) : null}
             {numeric ? null : <SortChevron className="ml-auto" />}
           </DropdownMenuTrigger>
@@ -968,10 +1041,13 @@ export function TableToolbar<T, TKey extends string>({
   onFilterChange,
   filterPlaceholder,
   filterLabel,
+  labelId,
 }: {
   table: Table<T>
   /** Names the tablist — "Files by filing". */
   label: string
+  /** The open tab's label carries this id: the table names itself by it. */
+  labelId?: string | undefined
   tabs: ReadonlyArray<TabItem<TKey>>
   value: TKey
   onValueChange: (id: TKey) => void
@@ -988,6 +1064,7 @@ export function TableToolbar<T, TKey extends string>({
         value={value}
         onValueChange={onValueChange}
         flush
+        labelId={labelId}
         trail={
           <>
             <TabDivider />

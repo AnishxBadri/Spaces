@@ -338,10 +338,12 @@ async function type(input: Element | null | undefined, value: string) {
   })
 }
 
-/** Each row's cells, as text. */
+/** Each row's cells, as text: the name that heads it, then its values. */
 const rows = () =>
   [...document.querySelectorAll('[data-row]')].map((r) =>
-    [...r.querySelectorAll('[role="cell"]')].map((c) => text(c)),
+    [...r.querySelectorAll('[role="rowheader"], [role="cell"]')].map((c) =>
+      text(c),
+    ),
   )
 
 async function rowMenu(name: string): Promise<Array<string>> {

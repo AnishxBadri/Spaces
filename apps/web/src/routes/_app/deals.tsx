@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-table'
 import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
 import { Handshake } from '#/components/icons'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { ViewBar } from '#/components/views/view-bar'
@@ -198,6 +198,9 @@ function sortValue(
 }
 
 function DealsPage() {
+  // The page's title and open tab name its table to a screen reader.
+  const titleId = useId()
+  const viewId = useId()
   const {
     deals,
     registry,
@@ -423,6 +426,7 @@ function DealsPage() {
     <ListPage fixed={asTable}>
       <PageHeader
         title="Deals"
+        titleId={titleId}
         folds={!asTable}
         action={
           firstRun ? (
@@ -459,6 +463,7 @@ function DealsPage() {
               activeId={activeId ?? null}
               snapshot={vs.snapshot}
               plural="Deals"
+              labelId={viewId}
               onApply={(v) => {
                 vs.apply(v)
                 selectView(v?.id ?? null)
@@ -516,6 +521,11 @@ function DealsPage() {
                   columnActions={columnRun.columnActions}
                   table={table}
                   label="Deals"
+                  // The selection bar stands in for the tabs while rows are
+                  // checked: only the title is left to name the table.
+                  labelledBy={
+                    actions.selectionBar ? [titleId] : [titleId, viewId]
+                  }
                   stickyColumnId="name"
                   select={actions.select}
                   rowEnd={actions.rowMenu}

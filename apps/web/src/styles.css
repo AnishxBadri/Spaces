@@ -426,6 +426,56 @@
   }
 }
 
+/* The inset marks on a scroll pane's frame while the pane itself (its
+   `data-focus-pane` child) has keyboard focus: the frame does not scroll, so
+   the marks stay on the visible corners, over the pane's pinned lanes. A
+   control inside the pane draws its own. */
+@utility focus-ring-pane {
+  --reticle-ink: linear-gradient(var(--ring), var(--ring));
+
+  & > [data-focus-pane] {
+    outline: none;
+  }
+
+  &:has(> [data-focus-pane]:focus-visible)::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    pointer-events: none;
+    background-image:
+      var(--reticle-ink), var(--reticle-ink), var(--reticle-ink),
+      var(--reticle-ink), var(--reticle-ink), var(--reticle-ink),
+      var(--reticle-ink), var(--reticle-ink);
+    background-repeat: no-repeat;
+    background-position:
+      left top,
+      left top,
+      right top,
+      right top,
+      left bottom,
+      left bottom,
+      right bottom,
+      right bottom;
+    background-size:
+      8px 2px,
+      2px 8px,
+      8px 2px,
+      2px 8px,
+      8px 2px,
+      2px 8px,
+      8px 2px,
+      2px 8px;
+  }
+
+  @media (forced-colors: active) {
+    &:has(> [data-focus-pane]:focus-visible)::after {
+      outline: 2px solid;
+      outline-offset: -2px;
+    }
+  }
+}
+
 /**
  * The Numeral Rule (Instrument): every measured thing is mono — money, counts,
  * dates, durations, IDs, domains, column labels. Prose and names never are.

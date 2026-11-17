@@ -103,6 +103,7 @@ export function Tabs<T extends string>({
   plain = false,
   trail,
   flush = false,
+  labelId,
   children,
   className,
 }: {
@@ -122,6 +123,11 @@ export function Tabs<T extends string>({
   trail?: ReactNode
   /** The trail ends on the folder's right edge: a list's search box. */
   flush?: boolean | undefined
+  /**
+   * The open tab's label carries this id, so what the tab shows (a list's
+   * table) can be named by it; the count stays out of the name.
+   */
+  labelId?: string | undefined
   /** The open tab's body; rendered as its `tabpanel` when given. */
   children?: ReactNode
   className?: string | undefined
@@ -165,6 +171,12 @@ export function Tabs<T extends string>({
         const counted =
           t.count !== undefined && (t.count > 0 || t.showZero === true)
         const empty = t.count === 0 && !counted
+        const name =
+          open && labelId !== undefined ? (
+            <span id={labelId}>{t.label}</span>
+          ) : (
+            t.label
+          )
         return (
           <button
             key={t.id}
@@ -201,7 +213,7 @@ export function Tabs<T extends string>({
                 the pair is centred as one, the suffix centred apart. */}
             {counted ? (
               <span className="inline-flex items-baseline gap-1.5">
-                {t.label}
+                {name}
                 <span
                   data-tab-count
                   className="tabular mono text-micro text-foreground"
@@ -210,7 +222,7 @@ export function Tabs<T extends string>({
                 </span>
               </span>
             ) : (
-              t.label
+              name
             )}
             {t.suffix}
           </button>

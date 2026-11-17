@@ -16,10 +16,12 @@
 import {
   Add,
   Archive,
+  ArrowDown as CarbonArrowDown,
   ArrowDownRight,
   ArrowLeft,
   ArrowsHorizontal,
   ArrowsVertical,
+  ArrowUp as CarbonArrowUp,
   At,
   Attachment,
   Book,
@@ -157,6 +159,8 @@ export const icon = {
 
 // Nouns and drawing glyphs, by name. Two names share a glyph only where they
 // mean the same thing: `Link` and `Link2`, `CheckSquare` and `SquareCheck`.
+export const ArrowDown = carbon(CarbonArrowDown, 'arrow--down')
+export const ArrowUp = carbon(CarbonArrowUp, 'arrow--up')
 export const AtSign = carbon(At, 'at')
 export const BookA = carbon(Book, 'book')
 export const BookOpen = carbon(Notebook, 'notebook')

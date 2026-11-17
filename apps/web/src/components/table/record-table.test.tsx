@@ -7,11 +7,12 @@ import {
   getCoreRowModel,
   useReactTable,
 } from '@tanstack/react-table'
+import type { SortingState } from '@tanstack/react-table'
 import type { ReactNode } from 'react'
 import { RecordTable, TableToolbar } from './record-table'
 import type { TablePage } from './record-table'
 import { ListErrorRow, ListLoadingRow, ListZeroRow } from './list-states'
-import { declared } from '#/test/tailwind-css'
+import { classCss, declared } from '#/test/tailwind-css'
 
 /**
  * The record table as a fixed pane: its card is the one scroller, the column
@@ -81,20 +82,28 @@ function Grid({
   notice,
   rows = ROWS,
   rowEnd,
+  named,
+  sorting,
 }: {
   page?: TablePage
   notice?: ReactNode
   rows?: Array<Row>
   rowEnd?: (row: Row) => ReactNode
+  /** What on the page names the table: its title, and the open tab too. */
+  named?: 'title' | 'title and tab'
+  sorting?: SortingState
 } = {}) {
   const table = useReactTable({
     data: rows,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    ...(sorting ? { initialState: { sorting } } : {}),
   })
   return (
     <>
+      {named === undefined ? null : <h1 id="list-title">Holdings</h1>}
       <TableToolbar
+        {...(named === 'title and tab' ? { labelId: 'list-view' } : {})}
         table={table}
         label="Holdings"
         tabs={[{ id: 'all', label: 'All', count: ROWS.length }]}
@@ -109,6 +118,11 @@ function Grid({
         table={table}
         label="Portfolio"
         stickyColumnId="name"
+        {...(named === 'title'
+          ? { labelledBy: ['list-title'] }
+          : named === 'title and tab'
+            ? { labelledBy: ['list-title', 'list-view'] }
+            : {})}
         {...(page ? { page } : {})}
         {...(rowEnd ? { rowEnd } : {})}
         notice={notice}
@@ -195,7 +209,7 @@ describe('the pane', () => {
 
   it('is fixed-width, never narrower than the card, each cell keeping its own rules', () => {
     mount()
-    const table = one('[role="table"] table')
+    const table = one('table[role="table"]')
     expect(table.style.minWidth).toBe('100%')
     expect(classes(table)).toEqual(
       expect.arrayContaining(['table-fixed', 'border-separate']),
@@ -204,6 +218,70 @@ describe('the pane', () => {
     expect(classes(one('tbody td'))).toEqual(
       expect.arrayContaining(['border-b', 'border-r']),
     )
+  })
+})
+
+describe('to a screen reader', () => {
+  /** The words an `aria-labelledby` reads, id by id. */
+  const nameOf = (el: Element) =>
+    (el.getAttribute('aria-labelledby') ?? '')
+      .split(' ')
+      .map((id) => document.getElementById(id)?.textContent ?? `#${id}?`)
+
+  it('is named by the page title and the open tab, the tab’s count left out', () => {
+    mount({ named: 'title and tab' })
+    const grid = one('[role="table"]')
+    expect(nameOf(grid)).toEqual(['Holdings', 'All'])
+    expect(grid.hasAttribute('aria-label')).toBe(false)
+  })
+
+  it('falls back to the title alone with no tabs over it', () => {
+    mount({ named: 'title' })
+    const grid = one('[role="table"]')
+    expect(nameOf(grid)).toEqual(['Holdings'])
+    expect(grid.hasAttribute('aria-label')).toBe(false)
+  })
+
+  it('keeps its own label when nothing on the page names it', () => {
+    mount()
+    const grid = one('[role="table"]')
+    expect(grid.getAttribute('aria-label')).toBe('Portfolio')
+    expect(grid.hasAttribute('aria-labelledby')).toBe(false)
+  })
+
+  it('heads each row with its name cell', () => {
+    mount()
+    const row = one('tbody [role="row"]')
+    const headers = [...row.querySelectorAll('[role="rowheader"]')]
+    expect(headers.map((h) => h.textContent)).toEqual(['Aarogya'])
+    expect(headers[0]?.tagName).toBe('TD')
+    expect(
+      [...row.querySelectorAll('[role="cell"]')].map((c) => c.textContent),
+    ).toEqual(['$120K', ''])
+  })
+
+  it('reads the sort on the head, its arrow drawn, not typed', () => {
+    mount({ sorting: [{ id: 'name', desc: false }] })
+    const head = [...document.querySelectorAll('thead th')].find((h) =>
+      h.textContent.includes('Company'),
+    )
+    if (!head) throw new Error('no Company head')
+    expect(head.getAttribute('aria-sort')).toBe('ascending')
+    const arrow = head.querySelector('svg[data-icon="arrow--up"]')
+    expect(arrow?.getAttribute('aria-hidden')).toBe('true')
+    expect(arrow?.getAttribute('fill')).toBe('currentColor')
+    expect(arrow?.getAttribute('class')).toBe('size-4 shrink-0')
+    expect(head.textContent).not.toMatch(/[↑↓]/)
+  })
+
+  it('draws the arrow down for a descending sort', () => {
+    mount({ sorting: [{ id: 'invested', desc: true }] })
+    const head = [...document.querySelectorAll('thead th')].find((h) =>
+      h.textContent.includes('Invested'),
+    )
+    if (!head) throw new Error('no Invested head')
+    expect(head.getAttribute('aria-sort')).toBe('descending')
+    expect(head.querySelector('svg[data-icon="arrow--down"]')).not.toBeNull()
   })
 })
 
@@ -374,6 +452,116 @@ describe('the foot', () => {
     mount()
     expect(document.querySelector('[data-more-columns]')).toBeNull()
     expect(document.querySelector('[data-table-fade]')).toBeNull()
+  })
+
+  it('keeps the count and Load on the left beside the hidden columns on the right', () => {
+    mount({ page: paging() })
+    overflowInvested()
+    const foot = one('[data-table-foot]')
+    expect(foot.textContent).toBe('2 of 120·Load 50 more1 more column →')
+    expect(foot.lastElementChild).toBe(one('[data-more-columns]'))
+  })
+})
+
+/**
+ * A 300px card: the name column (240) shows, Invested (240–370) runs under
+ * the 56px trailing lane. Returns the scroller with its `scrollBy` watched.
+ */
+function overflowInvested() {
+  const scroller = one('[data-table-scroller]')
+  const invested = [...document.querySelectorAll('[data-column]')].at(0)
+  if (!(invested instanceof HTMLElement)) throw new Error('no column')
+  Object.defineProperty(scroller, 'clientWidth', { value: 300 })
+  Object.defineProperty(invested, 'offsetLeft', { value: 240 })
+  Object.defineProperty(invested, 'offsetWidth', { value: 130 })
+  const scrollBy = vi.fn()
+  scroller.scrollBy = scrollBy
+  act(() => {
+    scroller.dispatchEvent(new Event('scroll'))
+  })
+  return { scroller, scrollBy }
+}
+
+function press(el: Element, key: string, init: KeyboardEventInit = {}) {
+  act(() => {
+    el.dispatchEvent(
+      new KeyboardEvent('keydown', { key, bubbles: true, ...init }),
+    )
+  })
+}
+
+describe('the sideways pane', () => {
+  it('is one Tab stop, named for the columns past the edge, while they overflow', () => {
+    mount()
+    const { scroller } = overflowInvested()
+    expect(scroller.getAttribute('role')).toBe('group')
+    expect(scroller.tabIndex).toBe(0)
+    expect(scroller.getAttribute('aria-label')).toBe('Portfolio, 1 more column')
+    // The table inside it is still the table.
+    expect(scroller.querySelector('table')?.getAttribute('role')).toBe('table')
+  })
+
+  it('is no Tab stop and no group while every column fits', () => {
+    mount()
+    const scroller = one('[data-table-scroller]')
+    expect(scroller.hasAttribute('tabindex')).toBe(false)
+    expect(scroller.hasAttribute('role')).toBe(false)
+    expect(scroller.hasAttribute('aria-label')).toBe(false)
+  })
+
+  it('stays a Tab stop once scrolled right, so the keyboard can scroll back', () => {
+    mount()
+    const scroller = one('[data-table-scroller]')
+    // Scrolled to the end: nothing past the edge, but the start is hidden.
+    Object.defineProperty(scroller, 'scrollLeft', { value: 120 })
+    act(() => {
+      scroller.dispatchEvent(new Event('scroll'))
+    })
+    expect(scroller.tabIndex).toBe(0)
+    expect(scroller.getAttribute('aria-label')).toBe('Portfolio')
+    expect(document.querySelector('[data-more-columns]')).toBeNull()
+  })
+
+  it('scrolls about one column per ← →', () => {
+    mount()
+    const { scroller, scrollBy } = overflowInvested()
+    press(scroller, 'ArrowRight')
+    // Invested, the one column that scrolls, is 130 wide.
+    expect(scrollBy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ left: 130 }),
+    )
+    press(scroller, 'ArrowLeft')
+    expect(scrollBy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ left: -130 }),
+    )
+    expect(scrollBy).toHaveBeenCalledTimes(2)
+  })
+
+  it('leaves other keys, chords and a focused control’s arrows alone', () => {
+    mount({ rowEnd: () => <button type="button">···</button> })
+    const { scroller, scrollBy } = overflowInvested()
+    press(scroller, 'ArrowDown')
+    press(scroller, 'ArrowRight', { shiftKey: true })
+    press(scroller, 'ArrowRight', { metaKey: true })
+    press(one('[data-row-end] button'), 'ArrowRight')
+    expect(scrollBy).not.toHaveBeenCalled()
+  })
+
+  it('draws its focus marks on the frame, which does not scroll, over the pinned lanes', async () => {
+    mount()
+    const scroller = one('[data-table-scroller]')
+    expect(scroller.hasAttribute('data-focus-pane')).toBe(true)
+    expect(classes(scroller.parentElement ?? scroller)).toContain(
+      'focus-ring-pane',
+    )
+    const [css = ''] = await classCss(['focus-ring-pane'])
+    expect(css).toContain(':has(> [data-focus-pane]:focus-visible)::after')
+    // Above the head's pinned corners (z-30); an outline in forced colours.
+    expect(await declared('focus-ring-pane', 'z-index')).toEqual(['40'])
+    expect(await declared('focus-ring-pane', 'outline')).toEqual([
+      'none',
+      '2px solid',
+    ])
   })
 })
 

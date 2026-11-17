@@ -9,7 +9,7 @@ import {
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import { icon, KIND_ICONS, Layers } from '#/components/icons'
 import type { IconComponent } from '#/components/icons'
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { DocumentPreview } from '#/components/document-preview'
 import {
@@ -96,6 +96,9 @@ function chipSortKey(names: Array<string>): string {
 }
 
 function DocumentsPage() {
+  // The page's title and open tab name its table to a screen reader.
+  const titleId = useId()
+  const viewId = useId()
   const { documents, counts } = Route.useLoaderData()
   const { filed } = Route.useSearch()
   const navigate = Route.useNavigate()
@@ -267,6 +270,7 @@ function DocumentsPage() {
     <ListPage>
       <PageHeader
         title="Files"
+        titleId={titleId}
         folds={false}
         action={
           /* The upload door on the shelf that lists what it produces. The
@@ -289,6 +293,7 @@ function DocumentsPage() {
           <TableToolbar
             table={table}
             label="Files by filing"
+            labelId={viewId}
             tabs={[
               { id: 'all', label: 'All', count: counts.all },
               { id: 'unfiled', label: 'Unfiled', count: counts.unfiled },
@@ -312,6 +317,7 @@ function DocumentsPage() {
                 folder
                 table={table}
                 label="Files"
+                labelledBy={[titleId, viewId]}
                 stickyColumnId="filename"
                 onRowClick={setPreviewing}
                 rowEnd={(r) => <ExceptionLane doc={r} />}

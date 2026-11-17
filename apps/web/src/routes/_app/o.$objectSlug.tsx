@@ -11,7 +11,7 @@ import {
 } from '@tanstack/react-table'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Layers } from '#/components/icons'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -152,6 +152,9 @@ type Row = Awaited<ReturnType<typeof listObjectRecords>>['rows'][number]
 const col = createColumnHelper<Row>()
 
 function ObjectListPage() {
+  // The page's title and open tab name its table to a screen reader.
+  const titleId = useId()
+  const viewId = useId()
   const {
     object,
     registry,
@@ -448,6 +451,7 @@ function ObjectListPage() {
       <PageHeader
         folds={false}
         title={object.plural}
+        titleId={titleId}
         action={
           firstRun ? (
             listMenu
@@ -499,6 +503,7 @@ function ObjectListPage() {
               canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
               plural={object.plural}
               refNames={refNames}
+              labelId={viewId}
               tools={
                 <TableTools
                   table={table}
@@ -525,6 +530,11 @@ function ObjectListPage() {
                 ]}
                 table={table}
                 label={object.plural}
+                // The selection bar stands in for the tabs while rows are
+                // checked: only the title is left to name the table.
+                labelledBy={
+                  actions.selectionBar ? [titleId] : [titleId, viewId]
+                }
                 stickyColumnId="name"
                 notice={notice}
                 select={actions.select}

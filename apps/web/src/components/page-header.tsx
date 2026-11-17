@@ -31,6 +31,7 @@ export function PageHeader({
   action,
   tabs,
   folds = true,
+  titleId,
   className,
 }: {
   /** Mono caps line above the title — "Today · Wednesday · 2026-09-10". */
@@ -45,6 +46,8 @@ export function PageHeader({
   tabs?: ReactNode
   /** False on a list page (`ListPage`): the page never scrolls. */
   folds?: boolean | undefined
+  /** The title's id, for what it names: a list's table. */
+  titleId?: string | undefined
   className?: string
 }) {
   const head = useHeadFold(folds)
@@ -67,7 +70,7 @@ export function PageHeader({
               {eyebrow}
             </div>
           ) : null}
-          <h1 ref={head.titleRef} className="title-serif">
+          <h1 ref={head.titleRef} id={titleId} className="title-serif">
             {title}
           </h1>
           {description ? (
