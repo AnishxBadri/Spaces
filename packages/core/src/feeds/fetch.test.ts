@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { FEED_REASONS, fetchFailureOf, itemRowsOf } from './fetch'
+import {
+  FEED_IMAGE_GIVEN_UP,
+  FEED_REASONS,
+  fetchFailureOf,
+  itemRowsOf,
+  photoFetchDue,
+  photoRetryCutoffs,
+} from './fetch'
 import type { FeedItem } from './feed'
 
 describe('fetchFailureOf', () => {
@@ -97,5 +104,41 @@ describe('itemRowsOf', () => {
       'https://x.example/b',
       'c',
     ])
+  })
+})
+
+describe('photoFetchDue', () => {
+  const HOUR = 60 * 60 * 1000
+  const now = new Date('2026-11-17T12:00:00Z')
+  const ago = (hours: number) => new Date(now.getTime() - hours * HOUR)
+
+  it.each([
+    [0, null, true],
+    [1, ago(0.99), false],
+    [1, ago(1), true],
+    [2, ago(5.99), false],
+    [2, ago(6), true],
+    [3, ago(23.99), false],
+    [3, ago(24), true],
+    [4, ago(1000), false],
+    [9, ago(1000), false],
+  ])('failed %i times, last at %s, is due: %s', (failures, failedAt, due) => {
+    expect(photoFetchDue(failures, failedAt, now)).toBe(due)
+  })
+
+  it('gives up at the fourth failure', () => {
+    expect(FEED_IMAGE_GIVEN_UP).toBe(4)
+    expect(photoFetchDue(FEED_IMAGE_GIVEN_UP, ago(10_000), now)).toBe(false)
+  })
+
+  it('agrees with the cutoffs a query uses', () => {
+    const cutoffs = photoRetryCutoffs(now)
+    expect(cutoffs.map((c) => c.failures)).toEqual([1, 2, 3])
+    for (const { failures, failedBy } of cutoffs) {
+      expect(photoFetchDue(failures, failedBy, now)).toBe(true)
+      expect(
+        photoFetchDue(failures, new Date(failedBy.getTime() + 1), now),
+      ).toBe(false)
+    }
   })
 })

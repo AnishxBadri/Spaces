@@ -1,6 +1,16 @@
 import { Readable } from 'node:stream'
 import { Effect } from 'effect'
-import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { feed, feedItem, pendingBlob } from '@spaces/db/schema'
 import { judgePicture } from '@spaces/core/enrichment/picture'
@@ -8,11 +18,16 @@ import { iconLinksOf } from '@spaces/core/feeds/feed'
 import {
   FEED_IMAGE_ACCEPT,
   FEED_IMAGE_CONCURRENCY,
+  FEED_IMAGE_GIVEN_UP,
   FEED_IMAGE_MAX_BYTES,
+  FEED_IMAGE_RETRIES_PER_POLL,
   FEED_IMAGE_TIMEOUT_MS,
   FEED_LOGO_MAX_BYTES,
   FEED_MAX_BYTES,
   FEED_TIMEOUT_MS,
+  fetchFailureOf,
+  photoFetchDue,
+  photoRetryCutoffs,
 } from '@spaces/core/feeds/fetch'
 import { putBlobProgram } from '@spaces/core/writes/documents/intake'
 import { guardedFetchProgram } from '#/lib/documents/fetch-guard'
@@ -45,12 +60,18 @@ const storeFailed = (cause: { readonly _tag: string }) =>
 
 type Pictured =
   | { readonly _tag: 'Stored'; readonly sha: string }
-  | { readonly _tag: 'Skipped'; readonly reason: string }
+  | {
+      readonly _tag: 'Skipped'
+      readonly reason: string
+      /** No later try can change it: the feed fetch's own non-retry rule. */
+      readonly final: boolean
+    }
 
 /**
  * One picture fetched and stored under `maxBytes`, or why not: refused by
  * the guard, unreachable, over the cap, or not a raster image by its bytes.
- * Only the store failing is a failure.
+ * Only the store failing is a failure. Bytes that were read and judged not
+ * a picture (AVIF included) are final.
  */
 const storePicture = Effect.fn('feeds.storePicture')(function* (
   url: string,
@@ -61,9 +82,14 @@ const storePicture = Effect.fn('feeds.storePicture')(function* (
     timeoutMs: FEED_IMAGE_TIMEOUT_MS,
     headers: { accept: FEED_IMAGE_ACCEPT, 'user-agent': FEED_USER_AGENT },
   })
-  if (!res.ok) return { _tag: 'Skipped', reason: res.reason }
+  if (!res.ok)
+    return {
+      _tag: 'Skipped',
+      reason: res.reason,
+      final: !fetchFailureOf(res).retryable,
+    }
   const judged = judgePicture(res.contentType, res.bytes, maxBytes)
-  if (!judged.ok) return { _tag: 'Skipped', reason: judged.why }
+  if (!judged.ok) return { _tag: 'Skipped', reason: judged.why, final: true }
   const { sha } = yield* putBlobProgram({
     stream: Readable.from(Buffer.from(res.bytes)),
     mime: judged.type,
@@ -78,18 +104,25 @@ export type FeedImagesFetched = {
 }
 
 /**
- * The photos of `itemIds` that name one and have none stored yet. A photo
- * two headlines share is fetched once. A skipped photo leaves its headline
- * without one, for good: nothing marks it for a later try.
+ * The photos of `itemIds` that name one, have none stored yet and are due
+ * at `now` by `photoFetchDue`. A photo two headlines share is fetched once.
+ * A skipped photo is counted on its headlines with the instant, so the
+ * poll tries it again later; a final refusal gives up at once.
  */
 export const fetchItemImagesProgram = Effect.fn('feeds.fetchItemImages')(
   function* (
     itemIds: ReadonlyArray<string>,
+    now: Date = new Date(),
   ): Effect.fn.Return<FeedImagesFetched, FeedStoreFailed> {
     if (itemIds.length === 0) return { stored: 0, skipped: 0 }
     const rows = yield* store(() =>
       db
-        .select({ id: feedItem.id, imageUrl: feedItem.imageUrl })
+        .select({
+          id: feedItem.id,
+          imageUrl: feedItem.imageUrl,
+          failures: feedItem.imageFailures,
+          failedAt: feedItem.imageFailedAt,
+        })
         .from(feedItem)
         .where(
           and(
@@ -102,6 +135,7 @@ export const fetchItemImagesProgram = Effect.fn('feeds.fetchItemImages')(
     const byUrl = new Map<string, Array<string>>()
     for (const r of rows) {
       if (r.imageUrl === null) continue
+      if (!photoFetchDue(r.failures, r.failedAt, now)) continue
       byUrl.set(r.imageUrl, [...(byUrl.get(r.imageUrl) ?? []), r.id])
     }
     const outcomes = yield* Effect.forEach(
@@ -110,7 +144,7 @@ export const fetchItemImagesProgram = Effect.fn('feeds.fetchItemImages')(
         storePicture(url, FEED_IMAGE_MAX_BYTES).pipe(
           Effect.flatMap((pictured) =>
             pictured._tag === 'Skipped'
-              ? Effect.succeed(false)
+              ? setItemFailed(ids, pictured.final, now).pipe(Effect.as(false))
               : setItemImage(ids, pictured.sha).pipe(Effect.as(true)),
           ),
         ),
@@ -120,6 +154,54 @@ export const fetchItemImagesProgram = Effect.fn('feeds.fetchItemImages')(
     return { stored, skipped: outcomes.length - stored }
   },
 )
+
+/**
+ * One more failure on every headline still without the photo, or the
+ * give-up count when no later try can change the answer.
+ */
+const setItemFailed = (ids: ReadonlyArray<string>, final: boolean, at: Date) =>
+  store(() =>
+    db
+      .update(feedItem)
+      .set({
+        imageFailures: final
+          ? FEED_IMAGE_GIVEN_UP
+          : sql`${feedItem.imageFailures} + 1`,
+        imageFailedAt: at,
+      })
+      .where(and(inArray(feedItem.id, [...ids]), isNull(feedItem.imageSha))),
+  )
+
+/**
+ * Headlines whose failed photo is due another try at `now`, longest
+ * waiting first, at most `limit`: what the half-hourly poll sends back to
+ * `feed.images`. The query form of `photoFetchDue`.
+ */
+export const photoRetryIdsProgram = Effect.fn('feeds.photoRetryIds')(function* (
+  now: Date = new Date(),
+  limit: number = FEED_IMAGE_RETRIES_PER_POLL,
+): Effect.fn.Return<ReadonlyArray<string>, FeedStoreFailed> {
+  const due = or(
+    ...photoRetryCutoffs(now).map(({ failures, failedBy }) =>
+      and(
+        eq(feedItem.imageFailures, failures),
+        or(
+          isNull(feedItem.imageFailedAt),
+          lte(feedItem.imageFailedAt, failedBy),
+        ),
+      ),
+    ),
+  )
+  const rows = yield* store(() =>
+    db
+      .select({ id: feedItem.id })
+      .from(feedItem)
+      .where(and(isNull(feedItem.imageSha), isNotNull(feedItem.imageUrl), due))
+      .orderBy(asc(feedItem.imageFailedAt), asc(feedItem.id))
+      .limit(limit),
+  )
+  return rows.map((r) => r.id)
+})
 
 /**
  * The digest on every headline still without a photo; the intent is spent

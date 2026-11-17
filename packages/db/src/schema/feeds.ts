@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import {
   check,
   index,
+  integer,
   pgTable,
   primaryKey,
   text,
@@ -79,6 +80,9 @@ export const feedSpace = pgTable(
  *   reader's only body, since the article page is never fetched.
  * - `image_url` is where the feed says the photo is; `image_sha` is the copy
  *   the worker stores.
+ * - `image_failures` counts failed photo fetches and `image_failed_at` is
+ *   the last one: what the poll's retry backs off from. A refusal no later
+ *   try can change jumps the count to its give-up value.
  */
 export const feedItem = pgTable(
   'feed_item',
@@ -97,10 +101,16 @@ export const feedItem = pgTable(
       .defaultNow(),
     imageUrl: text('image_url'),
     imageSha: text('image_sha'),
+    imageFailures: integer('image_failures').notNull().default(0),
+    imageFailedAt: timestamp('image_failed_at', { withTimezone: true }),
   },
   (t) => [
     uniqueIndex('feed_item_key_unique').on(t.feedId, t.key),
     index('feed_item_published_idx').on(t.publishedAt, t.id),
     index('feed_item_feed_published_idx').on(t.feedId, t.publishedAt),
+    // Who still holds a photo blob: the reclaim and the orphan sweep ask.
+    index('feed_item_image_sha_idx')
+      .on(t.imageSha)
+      .where(sql`${t.imageSha} is not null`),
   ],
 )

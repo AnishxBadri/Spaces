@@ -12,6 +12,7 @@ import {
 import {
   fetchFeedLogoProgram,
   fetchItemImagesProgram,
+  photoRetryIdsProgram,
 } from '#web/lib/feeds/images'
 import type { FeedLogoFetched } from '#web/lib/feeds/images'
 import type { FeedPolled, FeedStoreFailed } from '#web/lib/feeds/poll'
@@ -20,8 +21,8 @@ import { JobPermanent, JobRetryable } from '../run-job'
 import type { JobDef, JobRetryPolicy } from '../run-job'
 
 /**
- * Feeds on the worker: the half-hourly poll that sends one fetch per feed,
- * the fetch itself, the photos of its new headlines on their own queue,
+ * Feeds on the worker: the half-hourly poll that sends one fetch per feed
+ * and the failed photos due another try, the fetch itself, the photos of its new headlines on their own queue,
  * each source's logo (on add and weekly), and the daily delete past 90 days.
  * - Zod data, because `JobDef.schema` is still a zod type.
  * - Nullish data on the two scheduled jobs: pg-boss stores `null` for a
@@ -69,15 +70,40 @@ const sendPerFeed = Effect.fn('feeds.sendPerFeed')(function* (
 
 const sendFetches = () => sendPerFeed(QUEUES.feedFetch, 'fetches')
 
+/** Headline ids onto `feed.images`, a batch per job. */
+const sendImageBatches = Effect.fn('feeds.sendImageBatches')(function* (
+  itemIds: ReadonlyArray<string>,
+) {
+  const sender = yield* Enqueue
+  for (let at = 0; at < itemIds.length; at += FEED_IMAGE_BATCH)
+    yield* sender.enqueue(QUEUES.feedImages, {
+      itemIds: itemIds.slice(at, at + FEED_IMAGE_BATCH),
+    })
+})
+
+/** The failed photos due another try, bounded per poll. */
+const sendPhotoRetries = Effect.fn('feeds.sendPhotoRetries')(function* () {
+  const ids = yield* photoRetryIdsProgram().pipe(Effect.mapError(storeRetry))
+  yield* sendImageBatches(ids)
+  return ids.length
+})
+
 /**
  * feed.poll: one `feed.fetch` per feed, keyed by the feed, so a fetch still
- * queued from the last tick is not queued twice.
+ * queued from the last tick is not queued twice; and the failed photos due
+ * another try sent back to `feed.images`, which fetches only what is still
+ * due when it runs, so a batch sent twice fetches once.
  */
 export const feedPoll: JobDef<z.infer<typeof scheduled>, Enqueue> = {
   name: QUEUES.feedPoll,
   schema: scheduled,
   retry: feedPollRetry,
-  run: () => sendFetches(),
+  run: () =>
+    Effect.gen(function* () {
+      const fetches = yield* sendFetches()
+      const retries = yield* sendPhotoRetries()
+      return `${fetches}, ${String(retries)} photo retries sent`
+    }),
 }
 
 export const feedFetchData = z.object({ feedId: z.uuid() })
@@ -108,11 +134,7 @@ const sendImages = Effect.fn('feeds.sendImages')(function* (
   polled: FeedPolled,
 ) {
   if (polled._tag !== 'Fetched') return
-  const sender = yield* Enqueue
-  for (let at = 0; at < polled.withImages.length; at += FEED_IMAGE_BATCH)
-    yield* sender.enqueue(QUEUES.feedImages, {
-      itemIds: polled.withImages.slice(at, at + FEED_IMAGE_BATCH),
-    })
+  yield* sendImageBatches(polled.withImages)
 })
 
 /**
@@ -175,9 +197,11 @@ export const feedImagesRetry: JobRetryPolicy = {
 }
 
 /**
- * feed.images: the photos of a batch of new headlines. A photo the guard
- * refuses, over the cap or not an image is skipped, not a failure; only the
- * store failing retries, and a retry fetches only what is still missing.
+ * feed.images: the photos of a batch of headlines, new or due another try.
+ * A photo the guard refuses, over the cap or not an image is skipped and
+ * counted on its headline for the poll's later try, not a job failure; only
+ * the store failing retries the job, and that retry fetches only what is
+ * still missing.
  */
 export const feedImages: JobDef<z.infer<typeof feedImagesData>> = {
   name: QUEUES.feedImages,

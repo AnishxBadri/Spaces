@@ -4,9 +4,16 @@ import { eq, inArray } from 'drizzle-orm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@spaces/db'
 import { feed, feedItem, pendingBlob } from '@spaces/db/schema'
-import { FEED_IMAGE_MAX_BYTES } from '@spaces/core/feeds/fetch'
+import {
+  FEED_IMAGE_GIVEN_UP,
+  FEED_IMAGE_MAX_BYTES,
+} from '@spaces/core/feeds/fetch'
 import { storage } from '@spaces/core/writes/storage'
-import { fetchFeedLogoProgram, fetchItemImagesProgram } from './images'
+import {
+  fetchFeedLogoProgram,
+  fetchItemImagesProgram,
+  photoRetryIdsProgram,
+} from './images'
 import { pollFeedProgram, pruneFeedItemsProgram } from './poll'
 import { pictureOf, stubSite } from './fixtures'
 
@@ -22,6 +29,8 @@ afterEach(() => {
 
 const shaOf = (bytes: Uint8Array) =>
   createHash('sha256').update(bytes).digest('hex')
+
+const HOUR = 60 * 60 * 1000
 
 let n = 0
 const aFeed = async (siteUrl: string | null = null) => {
@@ -127,8 +136,104 @@ describe('fetchItemImagesProgram', () => {
     const out = await Effect.runPromise(fetchItemImagesProgram(ids))
 
     expect(out).toEqual({ stored: 0, skipped: 2 })
-    for (const id of ids) expect((await itemOf(id))?.imageSha).toBeNull()
+    for (const id of ids) {
+      const row = await itemOf(id)
+      expect(row?.imageSha).toBeNull()
+      // Bytes judged not a photo stay that way: given up at once.
+      expect(row?.imageFailures).toBe(FEED_IMAGE_GIVEN_UP)
+    }
     expect(await storage().exists(shaOf(big))).toBe(false)
+  })
+
+  it('counts a failure that may pass, retries it once due, and stores it then', async () => {
+    const f = await aFeed()
+    const photo = pictureOf('png')
+    let up = false
+    const requests = stubSite({
+      'https://cdn.pics.example/flaky.png': () =>
+        up
+          ? {
+              status: 200,
+              headers: { 'content-type': 'image/png' },
+              body: photo,
+            }
+          : { status: 503 },
+    })
+    const id = await anItem(f.id, 'flaky', 'https://cdn.pics.example/flaky.png')
+    const t0 = new Date('2026-11-17T08:00:00Z')
+
+    expect(await Effect.runPromise(fetchItemImagesProgram([id], t0))).toEqual({
+      stored: 0,
+      skipped: 1,
+    })
+    expect(await itemOf(id)).toMatchObject({
+      imageSha: null,
+      imageFailures: 1,
+      imageFailedAt: t0,
+    })
+
+    // Not yet due: nothing is asked for and nothing is counted.
+    const early = new Date(t0.getTime() + HOUR - 1)
+    expect(await Effect.runPromise(photoRetryIdsProgram(early))).toEqual([])
+    await Effect.runPromise(fetchItemImagesProgram([id], early))
+    expect(requests).toHaveLength(1)
+    expect((await itemOf(id))?.imageFailures).toBe(1)
+
+    const due = new Date(t0.getTime() + HOUR)
+    expect(await Effect.runPromise(photoRetryIdsProgram(due))).toEqual([id])
+    up = true
+    expect(await Effect.runPromise(fetchItemImagesProgram([id], due))).toEqual({
+      stored: 1,
+      skipped: 0,
+    })
+    expect(requests).toHaveLength(2)
+    expect((await itemOf(id))?.imageSha).toBe(shaOf(photo))
+    expect(await Effect.runPromise(photoRetryIdsProgram(due))).toEqual([])
+  })
+
+  it('backs off 1h, 6h, 24h, then gives up for good', async () => {
+    const f = await aFeed()
+    const requests = stubSite({
+      'https://cdn.pics.example/down.png': () => ({ status: 503 }),
+    })
+    const id = await anItem(f.id, 'down', 'https://cdn.pics.example/down.png')
+    let at = new Date('2026-11-17T08:00:00Z')
+    await Effect.runPromise(fetchItemImagesProgram([id], at))
+
+    for (const [hours, failures] of [
+      [1, 2],
+      [6, 3],
+      [24, FEED_IMAGE_GIVEN_UP],
+    ] as const) {
+      const before = new Date(at.getTime() + hours * HOUR - 1)
+      expect(await Effect.runPromise(photoRetryIdsProgram(before))).toEqual([])
+      at = new Date(at.getTime() + hours * HOUR)
+      expect(await Effect.runPromise(photoRetryIdsProgram(at))).toEqual([id])
+      await Effect.runPromise(fetchItemImagesProgram([id], at))
+      expect(await itemOf(id)).toMatchObject({
+        imageFailures: failures,
+        imageFailedAt: at,
+      })
+    }
+
+    const much = new Date(at.getTime() + 1000 * HOUR)
+    expect(await Effect.runPromise(photoRetryIdsProgram(much))).toEqual([])
+    await Effect.runPromise(fetchItemImagesProgram([id], much))
+    expect(requests).toHaveLength(4)
+  })
+
+  it('gives up at once on a 404, and never asks again', async () => {
+    const f = await aFeed()
+    const requests = stubSite({})
+    const id = await anItem(f.id, 'gone', 'https://cdn.pics.example/gone.png')
+    const t0 = new Date('2026-11-17T08:00:00Z')
+
+    await Effect.runPromise(fetchItemImagesProgram([id], t0))
+    expect((await itemOf(id))?.imageFailures).toBe(FEED_IMAGE_GIVEN_UP)
+    const later = new Date(t0.getTime() + 1000 * HOUR)
+    expect(await Effect.runPromise(photoRetryIdsProgram(later))).toEqual([])
+    await Effect.runPromise(fetchItemImagesProgram([id], later))
+    expect(requests).toHaveLength(1)
   })
 
   it('fetches a photo two headlines share once, and never one already stored', async () => {

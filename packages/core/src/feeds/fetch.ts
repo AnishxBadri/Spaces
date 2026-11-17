@@ -157,6 +157,58 @@ export const FEED_IMAGE_CONCURRENCY = 4
 /** Item ids one `feed.images` job carries; a larger batch is split. */
 export const FEED_IMAGE_BATCH = 50
 
+const HOUR_MS = 60 * 60 * 1000
+
+/**
+ * How long a headline's photo waits after its first, second and third
+ * failed fetch before it is tried again. A fourth failure is final.
+ */
+export const FEED_IMAGE_RETRY_WAITS_MS = [
+  1 * HOUR_MS,
+  6 * HOUR_MS,
+  24 * HOUR_MS,
+] as const
+
+/**
+ * The failure count at which a photo is never fetched again: every wait
+ * spent, or a refusal that no later try can change.
+ */
+export const FEED_IMAGE_GIVEN_UP = FEED_IMAGE_RETRY_WAITS_MS.length + 1
+
+/** Photos one poll sends back for another try, in `FEED_IMAGE_BATCH` jobs. */
+export const FEED_IMAGE_RETRIES_PER_POLL = 4 * FEED_IMAGE_BATCH
+
+/**
+ * Whether a headline's photo may be fetched at `now`, given how many times
+ * it has failed and when it last did. Never failed is due; failed n times
+ * (1 to 3) is due once the nth wait has passed since `failedAt`; given up
+ * is never due.
+ */
+export const photoFetchDue = (
+  failures: number,
+  failedAt: Date | null,
+  now: Date,
+): boolean => {
+  if (failures <= 0) return true
+  const wait = FEED_IMAGE_RETRY_WAITS_MS.at(failures - 1)
+  if (wait === undefined) return false
+  // A count with no instant has nothing to wait from.
+  if (failedAt === null) return true
+  return now.getTime() - failedAt.getTime() >= wait
+}
+
+/**
+ * The same rule as {@link photoFetchDue} for a query: per failure count, the
+ * latest failure instant that is due at `now`.
+ */
+export const photoRetryCutoffs = (
+  now: Date,
+): Array<{ readonly failures: number; readonly failedBy: Date }> =>
+  FEED_IMAGE_RETRY_WAITS_MS.map((wait, i) => ({
+    failures: i + 1,
+    failedBy: new Date(now.getTime() - wait),
+  }))
+
 /** Every source's logo is fetched again weekly (UTC, Sunday early). */
 export const FEED_LOGO_CRON = '40 5 * * 0'
 

@@ -156,6 +156,41 @@ describe('feed.poll and feed.logos', () => {
       })
     }
   })
+
+  it('sends a failed photo back to feed.images once its wait has passed, and no other', async () => {
+    const id = await aFeed('https://w.example/retry')
+    const hoursAgo = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000)
+    const items = await db
+      .insert(feedItem)
+      .values(
+        (
+          [
+            ['due', 1, hoursAgo(2)],
+            ['waiting', 2, hoursAgo(2)],
+            ['given-up', 4, hoursAgo(100)],
+            ['new', 0, null],
+          ] as const
+        ).map(([key, failures, at]) => ({
+          feedId: id,
+          key,
+          title: key,
+          publishedAt: new Date(),
+          imageUrl: `https://w.example/${key}.png`,
+          imageFailures: failures,
+          imageFailedAt: at,
+        })),
+      )
+      .returning({ id: feedItem.id, key: feedItem.key })
+    const due = items.find((i) => i.key === 'due')?.id
+
+    const polls = recorder()
+    expect(await run(feedPoll, {}, polls.layer)).toMatchObject({
+      ok: expect.stringContaining('1 photo retries sent'),
+    })
+    expect(polls.sent.filter((s) => s.queue === QUEUES.feedImages)).toEqual([
+      { queue: QUEUES.feedImages, data: { itemIds: [due] }, key: undefined },
+    ])
+  })
 })
 
 describe('feed.images and feed.logo', () => {
@@ -184,6 +219,11 @@ describe('feed.images and feed.logo', () => {
     expect(
       await run(feedImages, { itemIds: items.map((i) => i.id) }, Layer.empty),
     ).toEqual({ ok: '1 photos stored, 1 skipped' })
+    // A 403 is the site's answer and will be the same later: given up.
+    const refused = (
+      await db.select().from(feedItem).where(eq(feedItem.key, 'b'))
+    ).at(0)
+    expect(refused?.imageFailures).toBe(4)
     expect(await run(feedLogo, { feedId: id }, Layer.empty)).toEqual({
       ok: 'logo stored',
     })
