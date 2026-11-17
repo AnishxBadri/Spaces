@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { dayKey, formatDay, formatTime } from '@spaces/core/format'
 import { DocumentPreview } from '#/components/document-preview'
 import { CalendarDays } from '#/components/icons'
+import { ProviderMark } from '#/components/provider-mark'
 import { KindIcon } from '#/components/kind-icon'
 import { EmptyRow, LabelHead, LedgerRow } from '#/components/ledger-section'
 import { OpenIn } from '#/components/open-in'
@@ -634,6 +635,7 @@ function MeetingWindow({
             items={[
               {
                 label: 'Open in Google',
+                icon: <ProviderMark brand="googleCalendar" />,
                 href: googleDayUrl(meeting.startsAt),
                 title: 'Opens the day in Google Calendar',
               },

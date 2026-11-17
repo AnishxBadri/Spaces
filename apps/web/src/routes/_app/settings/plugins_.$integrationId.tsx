@@ -9,6 +9,7 @@ import {
   SettingsFields,
   WebhookUrlRow,
 } from '#/components/integrations/integration-settings'
+import { icon } from '#/components/icons'
 import { PluginMark } from '#/components/integrations/integration-ledger'
 import { PluginTemplate } from '#/components/integrations/plugin-template'
 import { useSettingsDraft } from '#/components/settings/settings-form'
@@ -238,6 +239,7 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
               ? [
                   {
                     label: 'Reset',
+                    icon: <icon.restore />,
                     onSelect: () => {
                       if (pending) return
                       void act(
@@ -252,6 +254,7 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
               ? [
                   {
                     label: `Update to ${detail.update}`,
+                    icon: <icon.update />,
                     onSelect: () => {
                       if (pending) return
                       void act(
@@ -264,6 +267,7 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
               : []),
             {
               label: detail.enabled ? 'Disable' : 'Enable',
+              icon: <icon.enable />,
               onSelect: () => {
                 if (pending) return
                 const enabled = !detail.enabled
@@ -280,6 +284,7 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
             },
             {
               label: 'Uninstall…',
+              icon: <icon.delete />,
               destructive: true,
               opens: true,
               onSelect: () => {

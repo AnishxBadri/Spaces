@@ -1,8 +1,11 @@
+import type { ReactElement } from 'react'
 import { MoreMenu } from '#/components/ui/more-menu'
 
 /** One verb in a list head's `···`. */
 export type ListVerb = {
   label: string
+  /** The verb's 16px mark in the menu. */
+  icon: ReactElement
   /** Runs once the menu has closed, so a window it opens keeps its focus. */
   onSelect: () => void
 }
@@ -29,6 +32,7 @@ export function ListMenu({
       forceMenu={forceMenu}
       items={verbs.map((v) => ({
         label: v.label,
+        icon: v.icon,
         onSelect: v.onSelect,
         opens: true,
       }))}

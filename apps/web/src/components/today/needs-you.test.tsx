@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-router'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
+import { Calendar, User } from '#/components/icons'
 import { NeedsYou } from './needs-you'
 import type { NeedsYouRow, ProposalActions } from './needs-you'
 import type { NeedsFilter } from '#/lib/today/needs-you'
@@ -116,8 +117,8 @@ async function render(
         onComplete={() => {}}
         onOpen={() => {}}
         taskMenu={() => [
-          { label: 'Due date…', onSelect: () => {} },
-          { label: 'Assign…', onSelect: () => {} },
+          { label: 'Due date…', icon: <Calendar />, onSelect: () => {} },
+          { label: 'Assign…', icon: <User />, onSelect: () => {} },
         ]}
         onCreated={() => {}}
         washes={() => false}

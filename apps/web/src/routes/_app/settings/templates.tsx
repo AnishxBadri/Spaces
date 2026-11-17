@@ -1,7 +1,7 @@
 import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Layers, Mail } from '#/components/icons'
+import { icon, Layers, Mail } from '#/components/icons'
 import { NoteKindIcon } from '#/components/note-kind-icon'
 import {
   SettingsColumns,
@@ -195,11 +195,13 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
                   items={[
                     {
                       label: 'Edit…',
+                      icon: <icon.edit />,
                       opens: true,
                       onSelect: () => setEditing(t),
                     },
                     {
                       label: 'Archive',
+                      icon: <icon.archive />,
                       onSelect: () =>
                         void patch(
                           t.id,

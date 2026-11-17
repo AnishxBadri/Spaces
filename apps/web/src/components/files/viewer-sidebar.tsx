@@ -6,6 +6,8 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Select } from '../ui/select'
+import { Layers } from '../icons'
+import { KindIcon } from '../kind-icon'
 import { FollowedRevisions } from './revision-ledger'
 import type { FilingEdge, RecordDocument } from './types'
 import { DOCUMENT_KIND_LABELS } from '@spaces/core/documents'
@@ -506,9 +508,10 @@ function RecordPicker({
                   onPick(r.id)
                   setQuery('')
                 }}
-                className="focus-ring flex h-7 w-full items-center px-2 text-left text-ui hover:bg-bone"
+                className="focus-ring flex h-7 w-full items-center gap-2 px-2 text-left text-ui hover:bg-bone"
               >
-                {r.name}
+                <KindIcon of={r} />
+                <span className="min-w-0 truncate">{r.name}</span>
               </button>
             </li>
           ))}
@@ -568,6 +571,12 @@ function SpacePicker({
           value: s.id,
           label: s.name,
           depth: s.depth,
+          render: (
+            <span className="flex min-w-0 items-center gap-2">
+              <Layers aria-hidden className="size-4 shrink-0 text-graphite" />
+              <span className="min-w-0 truncate">{s.name}</span>
+            </span>
+          ),
         }))}
         width="content"
         placeholder="+ File into a space…"

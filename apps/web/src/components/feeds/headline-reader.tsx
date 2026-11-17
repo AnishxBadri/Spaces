@@ -1,4 +1,5 @@
 import { useClock } from '#/components/clock'
+import { icon, MessageSquareText } from '#/components/icons'
 import { Twinkle } from '#/components/twinkle'
 import { Button } from '#/components/ui/button'
 import { MoreMenu } from '#/components/ui/more-menu'
@@ -39,9 +40,12 @@ export function HeadlineReader({
   const site = siteOf(h)
   const url = h.url
   const menu: Array<MoreMenuEntry> = [
-    ...(url === null ? [] : [{ label: 'Copy link', copy: () => url }]),
+    ...(url === null
+      ? []
+      : [{ label: 'Copy link', icon: <icon.copyLink />, copy: () => url }]),
     {
       label: 'Ask about this',
+      icon: <MessageSquareText />,
       title: 'Ask with this headline and its link',
       onSelect: () => openAsk({ draft: askDraft(h) }),
       opens: true,

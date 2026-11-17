@@ -1,5 +1,6 @@
 import { useRouter } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
+import type { ReactElement } from 'react'
 import { toast } from 'sonner'
 import { readAiConfig } from '@spaces/core/ai/attribute-ai'
 import { AttributeDialog } from './attribute-dialog'
@@ -8,6 +9,7 @@ import {
   SettingsGroup,
   rowOpens,
 } from '#/components/settings/settings-section'
+import { icon } from '#/components/icons'
 import { Button } from '#/components/ui/button'
 import { MoreMenu } from '#/components/ui/more-menu'
 import { reorderAttributes, updateAttribute } from '#/lib/server-fns'
@@ -361,17 +363,19 @@ function AttributeRow({
   }
 
   const verbs: Array<RowVerb> = [
-    { label: 'Edit…', onSelect: () => setEditing(true) },
+    { label: 'Edit…', icon: <icon.edit />, onSelect: () => setEditing(true) },
     ...(onMove === undefined
       ? []
       : [
           {
             label: 'Move up',
+            icon: <icon.moveUp />,
             disabled: isFirst,
             onSelect: () => onMove('up'),
           },
           {
             label: 'Move down',
+            icon: <icon.moveDown />,
             disabled: isLast,
             onSelect: () => onMove('down'),
           },
@@ -382,6 +386,7 @@ function AttributeRow({
       : [
           {
             label: 'Archive',
+            icon: <icon.archive />,
             onSelect: () =>
               void act({ archived: true }, `${attr.name} archived`),
           },
@@ -483,6 +488,7 @@ function AttributeRow({
 
 type RowVerb = {
   label: string
+  icon: ReactElement
   disabled?: boolean
   /** Runs once the menu has closed, so a window it opens keeps its focus. */
   onSelect: () => void
@@ -502,6 +508,7 @@ function RowMenu({
       label={name}
       items={verbs.map((v) => ({
         label: v.label,
+        icon: v.icon,
         disabled: v.disabled === true,
         opens: true,
         onSelect: v.onSelect,

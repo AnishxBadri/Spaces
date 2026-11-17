@@ -27,6 +27,7 @@ import {
   Book,
   Building,
   Calendar as CarbonCalendar,
+  Category,
   Chat,
   ChatOperational,
   Checkbox,
@@ -37,26 +38,34 @@ import {
   ChevronRight as CarbonChevronRight,
   ChevronSort,
   Close,
+  ColorPalette,
   Column,
   ColumnInsert,
   Compass as CarbonCompass,
   Copy,
   CubeView,
   Currency,
+  DataRefinery,
   Document,
   DocumentBlank,
   DocumentImport,
+  DocumentView,
   Download,
   Earth,
   Edit,
   Email,
+  Erase,
   Event,
   Filter,
   Finance,
   Flag as CarbonFlag,
+  Folder as CarbonFolder,
+  FolderAdd,
   FolderMoveTo,
   Hashtag,
   Image as CarbonImage,
+  ImageSearch,
+  Keyboard as CarbonKeyboard,
   Launch,
   Layers as CarbonLayers,
   Link as CarbonLink,
@@ -70,27 +79,48 @@ import {
   MisuseOutline,
   Money,
   Notebook,
+  Notification,
+  NotificationOff,
   OverflowMenuHorizontal,
   Paragraph,
   Partnership,
+  Password,
   Pen,
   Phone as CarbonPhone,
+  Pin,
+  Play,
+  Plug as CarbonPlug,
   Portfolio,
+  Power,
+  Renew,
+  Reply,
+  ReplyAll,
   Reset,
   Rocket as CarbonRocket,
   Rss as CarbonRss,
+  Save,
   Search,
+  Send,
   Settings as CarbonSettings,
+  SortAscending,
+  SortDescending,
+  Split,
   Star as CarbonStar,
   Sunrise as CarbonSunrise,
   Table,
   TagGroup,
   Template,
   TextFont,
+  TextLongParagraph,
   TrashCan,
+  Unlink,
   Upload,
   User as CarbonUser,
+  UserAccess,
+  UserAdmin,
+  UserFollow,
   UserMultiple,
+  Version,
   View,
   ViewOff,
   WarningAlt,
@@ -133,7 +163,10 @@ export const icon = {
   sort: carbon(ArrowsVertical, 'arrows--vertical'),
   columns: carbon(ColumnInsert, 'column--insert'),
   search: carbon(Search, 'search'),
-  open: carbon(Launch, 'launch'),
+  /** Opens the thing here, in the app. */
+  open: carbon(View, 'view'),
+  /** Leaves the app (`Open ↗`) for a place with no mark of its own. */
+  openOutside: carbon(Launch, 'launch'),
   upload: carbon(Upload, 'upload'),
   download: carbon(Download, 'download'),
   enrich: carbon(MagicWand, 'magic-wand'),
@@ -155,6 +188,36 @@ export const icon = {
   menu: carbon(Menu, 'menu'),
   reveal: carbon(View, 'view'),
   conceal: carbon(ViewOff, 'view--off'),
+  keep: carbon(Save, 'save'),
+  fileOn: carbon(FolderAdd, 'folder--add'),
+  version: carbon(Version, 'version'),
+  access: carbon(UserAccess, 'user--access'),
+  unlink: carbon(Unlink, 'unlink'),
+  reply: carbon(Reply, 'reply'),
+  replyAll: carbon(ReplyAll, 'reply--all'),
+  forward: carbon(Send, 'send'),
+  invite: carbon(UserFollow, 'user--follow'),
+  moveUp: carbon(CarbonArrowUp, 'arrow--up'),
+  moveDown: carbon(CarbonArrowDown, 'arrow--down'),
+  clear: carbon(Erase, 'erase'),
+  sortAscending: carbon(SortAscending, 'sort--ascending'),
+  sortDescending: carbon(SortDescending, 'sort--descending'),
+  follow: carbon(Notification, 'notification'),
+  unfollow: carbon(NotificationOff, 'notification--off'),
+  changeKind: carbon(Category, 'category'),
+  read: carbon(DocumentView, 'document--view'),
+  readVision: carbon(ImageSearch, 'image--search'),
+  summarize: carbon(TextLongParagraph, 'text--long-paragraph'),
+  extract: carbon(DataRefinery, 'data--refinery'),
+  writeUp: carbon(Pen, 'pen'),
+  run: carbon(Play, 'play'),
+  pin: carbon(Pin, 'pin'),
+  role: carbon(UserAdmin, 'user--admin'),
+  resetPassword: carbon(Password, 'password'),
+  update: carbon(Renew, 'renew'),
+  enable: carbon(Power, 'power'),
+  color: carbon(ColorPalette, 'color-palette'),
+  split: carbon(Split, 'split'),
 } as const satisfies Record<string, IconComponent>
 
 // Nouns and drawing glyphs, by name. Two names share a glyph only where they
@@ -181,11 +244,13 @@ export const File = carbon(DocumentBlank, 'document--blank')
 export const FileText = carbon(Document, 'document')
 export const FileWarning = carbon(WarningAlt, 'warning--alt')
 export const Flag = carbon(CarbonFlag, 'flag')
+export const Folder = carbon(CarbonFolder, 'folder')
 export const Globe = carbon(Earth, 'earth')
 export const HandCoins = carbon(Money, 'money')
 export const Handshake = carbon(Partnership, 'partnership')
 export const Hash = carbon(Hashtag, 'hashtag')
 export const Image = carbon(CarbonImage, 'image')
+export const Keyboard = carbon(CarbonKeyboard, 'keyboard')
 export const Inbox = carbon(MailAll, 'mail--all')
 export const Kanban = carbon(Column, 'column')
 export const Landmark = carbon(Finance, 'finance')
@@ -202,6 +267,8 @@ export const Paperclip = carbon(Attachment, 'attachment')
 export const PenLine = carbon(Pen, 'pen')
 export const Phone = carbon(CarbonPhone, 'phone')
 export const Pilcrow = carbon(Paragraph, 'paragraph')
+/** A plugin with no mark of its own, where its action leads a menu item. */
+export const Plug = carbon(CarbonPlug, 'plug')
 export const Rocket = carbon(CarbonRocket, 'rocket')
 export const Rss = carbon(CarbonRss, 'rss')
 export const Settings = carbon(CarbonSettings, 'settings')

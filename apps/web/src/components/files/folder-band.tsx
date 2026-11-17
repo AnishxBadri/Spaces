@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { formatSince } from '@spaces/core/format'
+import { icon } from '../icons'
 import { MoreMenu } from '../ui/more-menu'
 import { FolderGlyph } from './file-glyph'
 import { FileRow } from './file-row'
@@ -71,7 +72,15 @@ export function FolderBand({
           items={
             onUnlink === null
               ? []
-              : [{ label: 'Unlink', opens: true, onSelect: onUnlink }]
+              : [
+                  {
+                    label: 'Unlink',
+                    icon: <icon.unlink />,
+                    destructive: true,
+                    opens: true,
+                    onSelect: onUnlink,
+                  },
+                ]
           }
         />
       </div>

@@ -516,24 +516,31 @@ function ThreadMenu({
 
   const items: Array<MoreMenuEntry> = [
     ...(windowOf !== null || item.noteId !== null
-      ? [{ label: 'Open', onSelect: open }]
+      ? [{ label: 'Open', icon: <icon.open />, onSelect: open }]
       : []),
     ...(item.noteId === null && !item.privateBody
       ? [
           {
             label: writing ? 'Writing up…' : 'Write up',
+            icon: <icon.writeUp />,
             disabled: writing,
             onSelect: () => void writeUp(),
           },
         ]
       : []),
-    { label: 'Copy link', copy: link },
-    { label: 'File on a deal…', opens: true, onSelect: () => setFiling(true) },
+    { label: 'Copy link', icon: <icon.copyLink />, copy: link },
+    {
+      label: 'File on a deal…',
+      icon: <icon.fileOn />,
+      opens: true,
+      onSelect: () => setFiling(true),
+    },
     MENU_RULE,
     ...(record !== undefined && item.linked
       ? [
           {
             label: `Unlink from ${record.name}…`,
+            icon: <icon.unlink />,
             destructive: true,
             opens: true,
             onSelect: () => void unlink(record),

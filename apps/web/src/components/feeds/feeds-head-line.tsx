@@ -1,12 +1,13 @@
 import { useRef } from 'react'
 import type { ReactNode } from 'react'
-import { Check, icon } from '#/components/icons'
+import { icon } from '#/components/icons'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  MenuCheck,
 } from '#/components/ui/dropdown-menu'
 import { cn } from '#/lib/utils'
 
@@ -85,11 +86,9 @@ export function FeedsHeadLine({
               key={id}
               role="menuitemradio"
               aria-checked={id === tab}
+              icon={<MenuCheck checked={id === tab} />}
               onSelect={() => onTab(id)}
             >
-              <span aria-hidden className="flex size-4 shrink-0">
-                {id === tab ? <Check className="size-4" /> : null}
-              </span>
               {TAB_LABEL[id]}
               {id === 'sources' ? (
                 <span className="ml-auto flex items-center gap-1.5 pl-3">
@@ -109,11 +108,11 @@ export function FeedsHeadLine({
           ))}
           <DropdownMenuSeparator />
           <DropdownMenuItem
+            icon={<icon.new />}
             onSelect={() => {
               adding.current = true
             }}
           >
-            <icon.new aria-hidden className="size-4" />
             Add feed…
           </DropdownMenuItem>
         </DropdownMenuContent>

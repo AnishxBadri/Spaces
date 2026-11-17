@@ -1,10 +1,12 @@
-import { act } from 'react'
+import { Component, act } from 'react'
 import type { ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { icon } from '#/components/icons'
+import { ProviderMark } from '#/components/provider-mark'
 import { MENU_RULE, MoreMenu, menuLayout } from './more-menu'
 import type { MoreMenuEntry } from './more-menu'
 
@@ -103,9 +105,19 @@ describe('MoreMenu', () => {
           variant="row"
           label="Flent"
           items={[
-            { label: 'Rename', disabled: true, onSelect: noop },
+            {
+              label: 'Rename',
+              icon: <icon.edit />,
+              disabled: true,
+              onSelect: noop,
+            },
             MENU_RULE,
-            { label: 'Archive', disabled: true, onSelect: noop },
+            {
+              label: 'Archive',
+              icon: <icon.edit />,
+              disabled: true,
+              onSelect: noop,
+            },
           ]}
         />,
       ),
@@ -118,7 +130,9 @@ describe('MoreMenu', () => {
       <MoreMenu
         variant="head"
         label="Flent"
-        items={[{ label: 'Save as template…', onSelect: run }]}
+        items={[
+          { label: 'Save as template…', icon: <icon.edit />, onSelect: run },
+        ]}
       />,
     )
     expect(document.querySelector('[aria-label="More for Flent"]')).toBeNull()
@@ -137,7 +151,9 @@ describe('MoreMenu', () => {
         variant="head"
         label="Deals"
         forceMenu
-        items={[{ label: 'Import…', onSelect: run, opens: true }]}
+        items={[
+          { label: 'Import…', icon: <icon.edit />, onSelect: run, opens: true },
+        ]}
       />,
     )
     const trigger = document.querySelector('[aria-label="More for Deals"]')
@@ -152,7 +168,7 @@ describe('MoreMenu', () => {
       <MoreMenu
         variant="row"
         label="Acme Data Room"
-        items={[{ label: 'Unlink', onSelect: noop }]}
+        items={[{ label: 'Unlink', icon: <icon.edit />, onSelect: noop }]}
       />,
     )
     expect(out).toMatch(/data-variant="outline" data-size="xs"/)
@@ -162,8 +178,8 @@ describe('MoreMenu', () => {
 
   it('draws the head trigger boxed at 32px and the row trigger bare at 24px', () => {
     const items: Array<MoreMenuEntry> = [
-      { label: 'Open', onSelect: noop },
-      { label: 'Download', onSelect: noop },
+      { label: 'Open', icon: <icon.edit />, onSelect: noop },
+      { label: 'Download', icon: <icon.edit />, onSelect: noop },
     ]
     const head = html(<MoreMenu variant="head" label="Flent" items={items} />)
     expect(head).toMatch(/aria-label="More for Flent"/)
@@ -182,11 +198,16 @@ describe('MoreMenu', () => {
         label="Flent"
         items={[
           MENU_RULE,
-          { label: 'Ask about this', onSelect: noop },
-          { label: 'Remove…', destructive: true, onSelect: noop },
+          { label: 'Ask about this', icon: <icon.edit />, onSelect: noop },
+          {
+            label: 'Remove…',
+            icon: <icon.edit />,
+            destructive: true,
+            onSelect: noop,
+          },
           MENU_RULE,
           MENU_RULE,
-          { label: 'Rename', onSelect: noop },
+          { label: 'Rename', icon: <icon.edit />, onSelect: noop },
           MENU_RULE,
         ]}
       />,
@@ -208,8 +229,12 @@ describe('MoreMenu', () => {
         variant="head"
         label="Flent"
         items={[
-          { label: 'Ask about this', onSelect: noop },
-          { label: 'Copy link', copy: () => 'http://localhost/companies/x' },
+          { label: 'Ask about this', icon: <icon.edit />, onSelect: noop },
+          {
+            label: 'Copy link',
+            icon: <icon.edit />,
+            copy: () => 'http://localhost/companies/x',
+          },
         ]}
       />,
     )
@@ -226,8 +251,103 @@ describe('MoreMenu', () => {
   })
 })
 
+/** Catches what the menu below it throws while it draws. */
+class Caught extends Component<
+  { children: ReactNode; onError: (e: Error) => void },
+  { failed: boolean }
+> {
+  override state = { failed: false }
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+  override componentDidCatch(e: Error) {
+    this.props.onError(e)
+  }
+  override render() {
+    return this.state.failed ? null : this.props.children
+  }
+}
+
+describe('the lead lane (E12)', () => {
+  it('leads every item with its mark in a 16px lane, a check item with its box', async () => {
+    mount(
+      <MoreMenu
+        variant="head"
+        label="Flent"
+        items={[
+          { label: 'Open', icon: <icon.open />, onSelect: noop },
+          {
+            label: 'Open in Gmail',
+            icon: <ProviderMark brand="gmail" />,
+            href: 'https://mail.google.com',
+          },
+          { label: 'Pinned', checked: true, onCheckedChange: noop },
+          {
+            label: 'Delete…',
+            icon: <icon.delete />,
+            destructive: true,
+            onSelect: noop,
+          },
+        ]}
+      />,
+    )
+    await open('Flent')
+    const items = [
+      ...document.querySelectorAll(
+        '[role="menuitem"], [role="menuitemcheckbox"]',
+      ),
+    ]
+    expect(items).toHaveLength(4)
+    for (const item of items) {
+      const lead = item.firstElementChild
+      expect(lead?.hasAttribute('data-menu-lead'), item.textContent).toBe(true)
+      expect(lead?.getAttribute('aria-hidden')).toBe('true')
+      expect(lead?.className).toMatch(/\bsize-4\b/)
+      expect(lead?.className).toMatch(/\bshrink-0\b/)
+      expect(lead?.childElementCount).toBe(1)
+    }
+    // The mark is outside the item's name: the label alone names it.
+    expect(items.map((el) => el.textContent)).toEqual([
+      'Open',
+      'Open in Gmail',
+      'Pinned',
+      'Delete…',
+    ])
+    expect(
+      items[1]?.querySelector('[data-provider-mark="gmail"]'),
+    ).not.toBeNull()
+    expect(items[3]?.querySelector('[data-icon="trash-can"]')).not.toBeNull()
+  })
+
+  it('refuses an item whose mark draws nothing', async () => {
+    const errors: Array<Error> = []
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mount(
+      <Caught onError={(e) => errors.push(e)}>
+        <MoreMenu
+          variant="head"
+          label="Flent"
+          items={[
+            { label: 'Open', icon: <icon.open />, onSelect: noop },
+            { label: 'Download', icon: <></>, onSelect: noop },
+          ]}
+        />
+      </Caught>,
+    )
+    await open('Flent')
+    quiet.mockRestore()
+    expect(errors.map((e) => e.message)).toEqual([
+      'A menu item leads with its 16px mark (E12).',
+    ])
+  })
+})
+
 describe('menuLayout with groups', () => {
-  const item = (label: string) => ({ label, onSelect: noop })
+  const item = (label: string) => ({
+    label,
+    icon: <icon.edit />,
+    onSelect: noop,
+  })
 
   it('keeps a group over its items, after a rule', () => {
     const laid = menuLayout([

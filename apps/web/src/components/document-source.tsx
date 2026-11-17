@@ -65,7 +65,7 @@ export function OpenInSourceButton({
         aria-label={`Open ${filename} in ${where}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <icon.open />
+        <icon.openOutside />
       </a>
     </Button>
   )
@@ -106,7 +106,7 @@ export function OpenSourceButton({
         aria-label={`Open source ${filename}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <icon.open />
+        <icon.openOutside />
       </a>
     </Button>
   )

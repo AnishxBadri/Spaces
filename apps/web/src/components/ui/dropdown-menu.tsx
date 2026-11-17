@@ -3,7 +3,7 @@ import {
   Check as CheckIcon,
   ChevronRight as ChevronRightIcon,
 } from '#/components/icons'
-import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui'
+import { DropdownMenu as DropdownMenuPrimitive, Slot } from 'radix-ui'
 
 import { useWindowSheet } from '#/components/ui/dialog.tsx'
 import { cn } from '#/lib/utils.ts'
@@ -48,14 +48,55 @@ function DropdownMenuContent({
   )
 }
 
+/**
+ * The 16px lane every menu item leads with, 8px before its label: a verb's
+ * glyph, a service's `ProviderMark`, a thing's noun, or a check. Hidden from
+ * the accessibility tree, so an item's name stays its label.
+ * - Outside production it throws on an empty mark, so a test that opens any
+ *   menu fails on an item drawn without one.
+ */
+function MenuLead({ mark }: { mark: React.ReactElement }) {
+  if (import.meta.env.DEV && !drawsMark(mark))
+    throw new Error('A menu item leads with its 16px mark (E12).')
+  return (
+    <span
+      data-menu-lead
+      aria-hidden
+      className="flex size-4 shrink-0 items-center justify-center"
+    >
+      {mark}
+    </span>
+  )
+}
+
+// An empty fragment is the one element that passes the type and draws
+// nothing; `MenuCheck` is the deliberate empty lane of an unchecked item.
+function drawsMark(mark: React.ReactElement): boolean {
+  if (!React.isValidElement<{ children?: React.ReactNode }>(mark)) return false
+  if (mark.type !== React.Fragment) return true
+  return React.Children.count(mark.props.children) > 0
+}
+
+/**
+ * The lead of an item in a list where one is current: the check when it is,
+ * the empty lane when it is not, so the labels stay on one line.
+ */
+function MenuCheck({ checked }: { checked: boolean }) {
+  return checked ? <CheckIcon data-menu-check /> : null
+}
+
 function DropdownMenuItem({
   className,
   inset,
   variant = 'default',
+  icon,
+  children,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Item> & {
   inset?: boolean
   variant?: 'default' | 'destructive'
+  /** The item's 16px mark: a glyph from `icon`, a `ProviderMark`, a noun. */
+  icon: React.ReactElement
 }) {
   return (
     <DropdownMenuPrimitive.Item
@@ -63,11 +104,16 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "relative flex h-7 cursor-default items-center gap-2 rounded-none px-2 py-0 text-ui outline-hidden select-none focus:bg-bone focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-graphite data-[variant=destructive]:*:[svg]:text-destructive!",
+        "relative flex h-7 cursor-default items-center gap-2 rounded-none px-2 py-0 text-ui outline-hidden select-none focus:bg-bone focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-graphite data-[variant=destructive]:**:[svg]:text-destructive!",
         className,
       )}
       {...props}
-    />
+    >
+      <MenuLead mark={icon} />
+      {/* With `asChild` the child (a link) is the item, and the lead goes
+          inside it, before its label. */}
+      <Slot.Slottable>{children}</Slot.Slottable>
+    </DropdownMenuPrimitive.Item>
   )
 }
 
@@ -82,25 +128,30 @@ function DropdownMenuCheckboxItem({
     <DropdownMenuPrimitive.CheckboxItem
       data-slot="dropdown-menu-checkbox-item"
       className={cn(
-        "relative flex h-7 cursor-default items-center gap-2 rounded-none py-0 pr-2 pl-7 text-ui outline-hidden select-none focus:bg-bone data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "relative flex h-7 cursor-default items-center gap-2 rounded-none px-2 py-0 text-ui outline-hidden select-none focus:bg-bone data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
       {...checkedProp}
       {...props}
     >
-      {/* A square box, pine when checked — the same checkbox the cells use. */}
-      <span
-        className={cn(
-          'pointer-events-none absolute left-2 flex size-3 items-center justify-center border',
-          checked
-            ? 'border-primary bg-primary text-paper'
-            : 'border-hairline bg-paper',
-        )}
-      >
-        <DropdownMenuPrimitive.ItemIndicator>
-          <CheckIcon className="size-2.5" />
-        </DropdownMenuPrimitive.ItemIndicator>
-      </span>
+      {/* The item's mark is its box, in the lead lane: a square, pine when
+          checked — the same checkbox the cells use. */}
+      <MenuLead
+        mark={
+          <span
+            className={cn(
+              'pointer-events-none flex size-3 items-center justify-center border',
+              checked
+                ? 'border-primary bg-primary text-paper'
+                : 'border-hairline bg-paper',
+            )}
+          >
+            <DropdownMenuPrimitive.ItemIndicator>
+              <CheckIcon className="size-2.5" />
+            </DropdownMenuPrimitive.ItemIndicator>
+          </span>
+        }
+      />
       {children}
     </DropdownMenuPrimitive.CheckboxItem>
   )
@@ -148,10 +199,13 @@ function DropdownMenuSub({
 function DropdownMenuSubTrigger({
   className,
   inset,
+  icon,
   children,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.SubTrigger> & {
   inset?: boolean
+  /** The trigger's 16px mark, as `DropdownMenuItem` takes it. */
+  icon: React.ReactElement
 }) {
   return (
     <DropdownMenuPrimitive.SubTrigger
@@ -163,6 +217,7 @@ function DropdownMenuSubTrigger({
       )}
       {...props}
     >
+      <MenuLead mark={icon} />
       {children}
       <ChevronRightIcon className="ml-auto size-4" />
     </DropdownMenuPrimitive.SubTrigger>
@@ -196,4 +251,5 @@ export {
   DropdownMenuSub,
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
+  MenuCheck,
 }

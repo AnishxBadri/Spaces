@@ -10,6 +10,7 @@ import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import { formatWhen } from '@spaces/core/format'
 import { urlAtRest } from '#/components/attributes/value-editor'
 import { useClock } from '#/components/clock'
+import { icon } from '#/components/icons'
 import { RecordTable } from '#/components/table/record-table'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Twinkle } from '#/components/twinkle'
@@ -158,10 +159,20 @@ export function SourcesTable({
           label={r.name}
           forceMenu
           items={[
-            { label: 'Edit…', opens: true, onSelect: () => onEdit(r) },
-            { label: 'Copy feed URL', copy: () => r.url },
+            {
+              label: 'Edit…',
+              icon: <icon.edit />,
+              opens: true,
+              onSelect: () => onEdit(r),
+            },
+            {
+              label: 'Copy feed URL',
+              icon: <icon.copyLink />,
+              copy: () => r.url,
+            },
             {
               label: 'Remove…',
+              icon: <icon.delete />,
               opens: true,
               destructive: true,
               onSelect: () => onRemove(r),

@@ -1,6 +1,8 @@
 import { Toggle as TogglePrimitive } from 'radix-ui'
+import { Children, isValidElement } from 'react'
 import type * as React from 'react'
 
+import { icon } from '#/components/icons'
 import { Button, buttonVariants } from '#/components/ui/button.tsx'
 import {
   DropdownMenu,
@@ -13,6 +15,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
+  MenuCheck,
 } from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
@@ -76,6 +79,92 @@ function EditorToggle({
 }
 
 /**
+ * The mark for each item BlockNote draws in our menus (the block and table
+ * handle menus), by its English label: BlockNote hands most of them no icon.
+ * A label missing here (a BlockNote release may add one) keeps the empty
+ * lane rather than failing the editor: the labels are not ours to enforce.
+ */
+const EDITOR_MARKS: Readonly<Record<string, React.ReactElement>> = {
+  Delete: <icon.delete />,
+  'Delete row': <icon.delete />,
+  'Delete column': <icon.delete />,
+  Colors: <icon.color />,
+  'Background color': <icon.color />,
+  'Add row above': <icon.new />,
+  'Add row below': <icon.new />,
+  'Add column left': <icon.new />,
+  'Add column right': <icon.new />,
+  'Split cell': <icon.split />,
+  'Merge cells': <icon.merge />,
+}
+
+const DESTRUCTIVE = new Set(['Delete', 'Delete row', 'Delete column'])
+
+/** The icon BlockNote passed (a colour swatch), else the label's mark. */
+function editorMark(
+  given: React.ReactNode,
+  label: React.ReactNode,
+): React.ReactElement {
+  if (isValidElement(given)) return given
+  return (
+    (typeof label === 'string' ? EDITOR_MARKS[label] : undefined) ?? (
+      <MenuCheck checked={false} />
+    )
+  )
+}
+
+/**
+ * BlockNote's item hands its icon and label as children, `[icon, label]`;
+ * the icon moves into the lead lane, or the label's mark when it has none.
+ */
+function EditorMenuItem({
+  children,
+  ...props
+}: Omit<React.ComponentProps<typeof DropdownMenuItem>, 'icon'>) {
+  const parts = Children.toArray(children)
+  const [first] = parts
+  const given = parts.length > 1 && isValidElement(first) ? first : undefined
+  const label = given === undefined ? parts : parts.slice(1)
+  const text = label.length === 1 ? label[0] : undefined
+  return (
+    <DropdownMenuItem
+      {...(typeof text === 'string' && DESTRUCTIVE.has(text)
+        ? { variant: 'destructive' as const }
+        : {})}
+      {...props}
+      icon={editorMark(given, text)}
+    >
+      {label}
+    </DropdownMenuItem>
+  )
+}
+
+/**
+ * A sub-menu's trigger: BlockNote hands it its own item element, whose
+ * `icon` and label are read here so the mark draws once, in the lead lane.
+ */
+function EditorMenuSubTrigger({
+  children,
+  ...props
+}: Omit<React.ComponentProps<typeof DropdownMenuSubTrigger>, 'icon'>) {
+  const item = isValidElement<{
+    icon?: React.ReactNode
+    children?: React.ReactNode
+  }>(children)
+    ? children
+    : null
+  const label = item === null ? children : item.props.children
+  return (
+    <DropdownMenuSubTrigger
+      {...props}
+      icon={editorMark(item?.props.icon, label)}
+    >
+      {label}
+    </DropdownMenuSubTrigger>
+  )
+}
+
+/**
  * The components map handed to `BlockNoteView`. Only the groups the app
  * already owns are listed: `Select`, `Badge`, `Card`, `Avatar`, `Skeleton`,
  * `Tabs` and `Form` have no Instrument primitive behind them, so BlockNote
@@ -87,12 +176,12 @@ export const instrumentChrome = {
     DropdownMenu,
     DropdownMenuCheckboxItem,
     DropdownMenuContent,
-    DropdownMenuItem,
+    DropdownMenuItem: EditorMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuSub,
     DropdownMenuSubContent,
-    DropdownMenuSubTrigger,
+    DropdownMenuSubTrigger: EditorMenuSubTrigger,
     DropdownMenuTrigger,
   },
   Input: { Input },

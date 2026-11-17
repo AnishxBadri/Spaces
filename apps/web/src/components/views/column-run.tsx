@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { readAiConfig } from '@spaces/core/ai/attribute-ai'
 import { formatNumber } from '@spaces/core/format'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
+import { icon } from '#/components/icons'
 import type { ColumnAction } from '#/components/table/record-table'
 import { ConfirmDialog } from '#/components/ui/confirm-dialog'
 import type { ConfirmOptions } from '#/components/ui/confirm-dialog'
@@ -134,6 +135,7 @@ export function useColumnRun({
       return [
         {
           label: 'Run on this view',
+          icon: <icon.run />,
           onSelect: () => open(attributeId, def.name, viewId),
         },
       ]

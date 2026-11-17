@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { useEffect, useReducer, useState } from 'react'
 import { toast } from 'sonner'
+import { icon } from '#/components/icons'
 import { Twinkle } from '#/components/twinkle'
 import { Button } from '#/components/ui/button'
 import { MoreMenu } from '#/components/ui/more-menu'
@@ -232,6 +233,7 @@ function FindRow({
                 ? [
                     {
                       label: 'Add and file here',
+                      icon: <icon.fileIn />,
                       disabled: pending,
                       onSelect: () => void act('file'),
                     },
@@ -241,6 +243,7 @@ function FindRow({
                 ? [
                     {
                       label: 'Dismiss',
+                      icon: <icon.close />,
                       title: `Never shown again for ${table.space?.name ?? 'this space'}`,
                       disabled: pending,
                       onSelect: () => void act('dismiss'),

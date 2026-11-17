@@ -3,6 +3,8 @@ import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Checkbox } from './ui/checkbox'
+import { File, Folder } from './icons'
+import { ProviderMark } from './provider-mark'
 import {
   Dialog,
   DialogContent,
@@ -342,6 +344,7 @@ export function attachFromDriveItem(
     case 'ready':
       return {
         label: LABEL,
+        icon: <ProviderMark brand="googleDrive" />,
         disabled: picker.opening,
         opens: true,
         onSelect: () => void picker.open(),
@@ -349,6 +352,7 @@ export function attachFromDriveItem(
     case 'consent':
       return {
         label: `${LABEL}…`,
+        icon: <ProviderMark brand="googleDrive" />,
         title: 'Google asks once more, for the files you pick.',
         onSelect: () => window.location.assign(readiness.href),
       }
@@ -411,6 +415,11 @@ export function FakePickList({
                 onCheckedChange={(on) => toggle(f.id, on)}
                 aria-label={`Pick ${f.name}`}
               />
+              {folders ? (
+                <Folder aria-hidden className="size-4 shrink-0 text-graphite" />
+              ) : (
+                <File aria-hidden className="size-4 shrink-0 text-graphite" />
+              )}
               <span className="min-w-0 flex-1 truncate">{f.name}</span>
               {f.path === null ? null : (
                 <span className="min-w-0 shrink truncate mono text-micro text-graphite">

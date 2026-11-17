@@ -189,6 +189,7 @@ function ObjectAttributesPage() {
                 : [
                     {
                       label: 'New relationship…',
+                      icon: <icon.new />,
                       opens: true,
                       onSelect: () => setRelating(true),
                     },
@@ -197,17 +198,27 @@ function ObjectAttributesPage() {
                 ? [
                     {
                       label: 'Edit…',
+                      icon: <icon.edit />,
                       opens: true,
                       onSelect: () => setEditingObject(true),
                     },
                   ]
                 : []),
               MENU_RULE,
-              { label: 'Copy link', copy: () => window.location.href },
+              {
+                label: 'Copy link',
+                icon: <icon.copyLink />,
+                copy: () => window.location.href,
+              },
               ...(reshapes
                 ? [
                     {
                       label: object.archived ? 'Restore' : 'Archive…',
+                      icon: object.archived ? (
+                        <icon.restore />
+                      ) : (
+                        <icon.archive />
+                      ),
                       opens: !object.archived,
                       onSelect: () => void toggleArchived(),
                     },

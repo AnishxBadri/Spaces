@@ -372,7 +372,7 @@ describe('a folder just linked', () => {
     expect(html).toContain('never synced · read-only')
     expect(html).not.toContain('aria-label="More for Acme Data Room"')
     expect(html).toMatch(
-      /data-variant="outline" data-size="xs"[^>]*>Unlink<\/button>/,
+      /data-variant="outline" data-size="xs"[^>]*><svg[^>]*data-icon="unlink"[^]*?<\/svg>Unlink<\/button>/,
     )
   })
 })

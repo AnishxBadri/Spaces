@@ -526,11 +526,13 @@ export function DraftComposer({
               items={[
                 {
                   label: 'Save as template…',
+                  icon: <icon.template />,
                   opens: true,
                   onSelect: () => setTemplating(true),
                 },
                 {
                   label: 'Delete draft…',
+                  icon: <icon.delete />,
                   opens: true,
                   destructive: true,
                   onSelect: () => void deleteDraft(),

@@ -6,12 +6,15 @@ import {
   CheckSquare,
   Compass,
   FileText,
+  icon,
   Kanban,
+  Keyboard,
   Layers,
   Mail,
   MessageSquareText,
   Paperclip,
   Rss,
+  Settings,
   Sunrise,
   Users,
 } from '#/components/icons'
@@ -706,6 +709,7 @@ function WorkspaceHead({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" sideOffset={8} className="w-55">
         <DropdownMenuItem
+          icon={<Settings />}
           onSelect={() => void navigate({ to: '/settings/general' })}
         >
           General
@@ -717,6 +721,7 @@ function WorkspaceHead({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem
+              icon={<icon.invite />}
               onSelect={() =>
                 void navigate({
                   to: '/settings/members',
@@ -746,7 +751,7 @@ function MembersItem({ onSelect }: { onSelect: () => void }) {
     refetchOnMount: 'always',
   })
   return (
-    <DropdownMenuItem onSelect={onSelect}>
+    <DropdownMenuItem icon={<Users />} onSelect={onSelect}>
       Members
       {data === undefined ? null : (
         <span
@@ -762,8 +767,7 @@ function MembersItem({ onSelect }: { onSelect: () => void }) {
 
 /**
  * The account menu opens to the right of the chassis, never up into the
- * screen corner. Words only: Settings and Keyboard with their keys, then
- * Sign out.
+ * screen corner: Settings and Keyboard with their keys, then Sign out.
  */
 function AccountMenu({
   email,
@@ -793,6 +797,7 @@ function AccountMenu({
       </DropdownMenuLabel>
       <DropdownMenuSeparator />
       <DropdownMenuItem
+        icon={<Settings />}
         onSelect={() => {
           void navigate({ to: '/settings' })
           onSettings?.()
@@ -806,13 +811,15 @@ function AccountMenu({
         ) : null}
       </DropdownMenuItem>
       {onKeyboard ? (
-        <DropdownMenuItem onSelect={onKeyboard}>
+        <DropdownMenuItem icon={<Keyboard />} onSelect={onKeyboard}>
           Keyboard
           <span className="ml-auto mono text-micro text-graphite">?</span>
         </DropdownMenuItem>
       ) : null}
       <DropdownMenuSeparator />
-      <DropdownMenuItem onSelect={onSignOut}>Sign out</DropdownMenuItem>
+      <DropdownMenuItem icon={<icon.signOut />} onSelect={onSignOut}>
+        Sign out
+      </DropdownMenuItem>
     </DropdownMenuContent>
   )
 }

@@ -2,6 +2,8 @@ import { useRouter } from '@tanstack/react-router'
 import { useEffect, useReducer, useRef, useState } from 'react'
 import type { ActionDispatch } from 'react'
 import { toast } from 'sonner'
+import { Plug } from '#/components/icons'
+import { brandOf, ProviderMark } from '#/components/provider-mark'
 import { Button } from '#/components/ui/button'
 import { MENU_RULE } from '#/components/ui/more-menu'
 import type { MoreMenuEntry } from '#/components/ui/more-menu'
@@ -193,6 +195,12 @@ export function usePluginEntries(
 
   const entries: Array<MoreMenuEntry> = []
   let plugin: string | null = null
+  // An action goes to its plugin's service: the service's own mark, or the
+  // plug for a plugin with no mark of its own.
+  const markOf = (name: string) => {
+    const brand = brandOf(name)
+    return brand === null ? <Plug /> : <ProviderMark brand={brand} />
+  }
   for (const action of actions) {
     if (action.integrationId !== plugin) {
       plugin = action.integrationId
@@ -202,6 +210,7 @@ export function usePluginEntries(
       jobStatusFigure(jobs.state, action.queue)?.text === 'running…'
     entries.push({
       label: action.label,
+      icon: markOf(action.pluginName),
       title: `${action.label} with ${action.pluginName}`,
       hint: running ? 'running…' : undefined,
       onSelect: () => void fire(action),

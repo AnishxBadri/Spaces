@@ -82,9 +82,11 @@ export function TemplatePicker({
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className="w-56">
         {items === null ? (
-          <DropdownMenuItem disabled>Loading…</DropdownMenuItem>
+          <DropdownMenuItem icon={<icon.template />} disabled>
+            Loading…
+          </DropdownMenuItem>
         ) : items.length === 0 ? (
-          <DropdownMenuItem disabled>
+          <DropdownMenuItem icon={<icon.template />} disabled>
             No templates yet — save one from an existing{' '}
             {kind === 'record' ? (objectKind ?? 'record') : kind}.
           </DropdownMenuItem>
@@ -97,7 +99,11 @@ export function TemplatePicker({
             // kind at all.
             const genre = t.noteKind === 'note' ? null : t.noteKind
             return (
-              <DropdownMenuItem key={t.id} onSelect={() => onPick(t)}>
+              <DropdownMenuItem
+                key={t.id}
+                icon={<icon.template />}
+                onSelect={() => onPick(t)}
+              >
                 <span className="min-w-0 flex-1 truncate">{t.name}</span>
                 {genre ? (
                   <span className="shrink-0 mono text-micro text-graphite">

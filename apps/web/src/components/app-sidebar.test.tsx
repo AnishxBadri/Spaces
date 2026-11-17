@@ -394,7 +394,7 @@ describe('the chassis', () => {
     expect(document.querySelector('[data-workspace-head]')).toBeNull()
   })
 
-  it('lists the account menu in words: Settings, Keyboard, then Sign out', async () => {
+  it('lists the account menu: Settings, Keyboard, then Sign out, each on its mark', async () => {
     await mount('/today', [], { onOpenKeyboard: () => {} })
     await openMenu(button(/Anish Badri/))
     expect(document.body.textContent).toContain(
@@ -402,7 +402,11 @@ describe('the chassis', () => {
     )
     expect(menuItems()).toEqual(['SettingsG ,', 'Keyboard?', 'Sign out'])
     const menu = one('[role="menu"]')
-    expect(menu.querySelector('svg')).toBeNull()
+    expect(
+      Array.from(menu.querySelectorAll('[role="menuitem"]')).map((el) =>
+        el.querySelector('[data-menu-lead] svg')?.getAttribute('data-icon'),
+      ),
+    ).toEqual(['settings', 'keyboard', 'logout'])
     // A rule under the email, and one before Sign out.
     const parts = Array.from(menu.children).map((el) =>
       el.getAttribute('role') === 'separator' ? '—' : el.textContent.trim(),

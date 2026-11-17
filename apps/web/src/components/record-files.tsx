@@ -1,6 +1,7 @@
 import { useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { Folder, icon } from './icons'
 import { Button } from './ui/button'
 import { MoreMenu } from './ui/more-menu'
 import { Band } from './ledger-section'
@@ -149,6 +150,7 @@ export function RecordFiles({
     if (reader !== null) {
       out.push({
         label: 'Read deck',
+        icon: <icon.read />,
         busyLabel: 'Reading deck…',
         busy: reader.reading,
         run: reader.onRead,
@@ -156,6 +158,7 @@ export function RecordFiles({
       if (reader.onReadAndSummarize !== null)
         out.push({
           label: 'Read deck and summarize',
+          icon: <icon.summarize />,
           busyLabel: 'Reading deck…',
           busy: reader.reading,
           run: reader.onReadAndSummarize,
@@ -166,6 +169,7 @@ export function RecordFiles({
     if (summarizer !== null)
       out.push({
         label: 'Summarize',
+        icon: <icon.summarize />,
         busyLabel: 'Summarizing…',
         busy: summarizer.summarizing,
         run: summarizer.onSummarize,
@@ -174,6 +178,7 @@ export function RecordFiles({
     if (keyTerms !== null)
       out.push({
         label: 'Extract key terms',
+        icon: <icon.extract />,
         busyLabel: 'Extracting…',
         busy: keyTerms.extracting,
         run: keyTerms.onExtract,
@@ -182,6 +187,7 @@ export function RecordFiles({
     if (vision !== null)
       out.push({
         label: 'Read with vision',
+        icon: <icon.readVision />,
         busyLabel: 'Reading…',
         busy: vision.reading,
         run: vision.onRead,
@@ -380,6 +386,7 @@ export function RecordFiles({
               ? [
                   {
                     label: 'Link a folder…',
+                    icon: <Folder />,
                     onSelect: () => void folderPicker.open(),
                     opens: true,
                   },

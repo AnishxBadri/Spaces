@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react'
 import type { listRecordDocuments } from '#/lib/server-fns'
 
 /** One row of a record's Files tab, as `listRecordDocuments` answers it. */
@@ -14,6 +15,8 @@ export type FilingEdge = RecordDocument['filedIn'][number]
  */
 export type FileAction = {
   readonly label: string
+  /** Its 16px mark in the `···`. */
+  readonly icon: ReactElement
   /** The word while it runs: `reading…`. */
   readonly busyLabel: string
   readonly busy: boolean

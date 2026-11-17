@@ -99,7 +99,7 @@ export function noteMenuEntries({
     MENU_RULE,
     {
       label: 'Save as new version',
-      icon: <icon.new className="size-4" />,
+      icon: <icon.version className="size-4" />,
       disabled: busy,
       onSelect: onNewVersion,
     },

@@ -330,6 +330,7 @@ export function ViewBar({
                           label: pins.includes(active.id)
                             ? 'Unpin from sidebar'
                             : 'Pin to sidebar',
+                          icon: <icon.pin />,
                           onSelect: () => {
                             const wasPinned = pins.includes(active.id)
                             togglePinnedView(active.id)
@@ -344,6 +345,7 @@ export function ViewBar({
                     : []),
                   {
                     label: 'Save as new view…',
+                    icon: <icon.keep />,
                     opens: true,
                     onSelect: () => setSaving('new'),
                   },
@@ -352,11 +354,13 @@ export function ViewBar({
                     ? [
                         {
                           label: 'Rename…',
+                          icon: <icon.edit />,
                           opens: true,
                           onSelect: () => setSaving('rename'),
                         },
                         {
                           label: 'Delete view',
+                          icon: <icon.delete />,
                           destructive: true,
                           onSelect: () => void deleteActive(active),
                         },

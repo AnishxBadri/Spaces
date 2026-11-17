@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
 import type { EditableAttribute } from '#/components/attributes/attribute-dialog'
+import { icon } from '#/components/icons'
 import type { ColumnAction } from './record-table'
 
 /**
@@ -41,6 +42,7 @@ export function useEditAttribute<
       return [
         {
           label: 'Edit attribute…',
+          icon: <icon.edit />,
           opens: true,
           onSelect: () => setEditing(def),
         },

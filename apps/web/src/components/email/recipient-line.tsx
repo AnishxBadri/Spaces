@@ -6,6 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  MenuCheck,
 } from '#/components/ui/dropdown-menu'
 import { addRecipient, looksLikeEmail } from '#/lib/email/compose'
 import { searchEmailRecipients } from '#/lib/server-fns'
@@ -79,7 +80,11 @@ function Chip({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             {aliases.map((email) => (
-              <DropdownMenuItem key={email} onSelect={() => onPick(email)}>
+              <DropdownMenuItem
+                key={email}
+                icon={<MenuCheck checked={email === chip.email} />}
+                onSelect={() => onPick(email)}
+              >
                 <span className="mono text-micro">{email}</span>
               </DropdownMenuItem>
             ))}

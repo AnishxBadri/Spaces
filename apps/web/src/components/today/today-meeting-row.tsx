@@ -1,6 +1,8 @@
 import { formatTime } from '@spaces/core/format'
 import { PrepButton } from '#/components/meetings/meeting-row'
 import { WriteUpButton } from '#/components/meetings/write-up-button'
+import { icon } from '#/components/icons'
+import { ProviderMark } from '#/components/provider-mark'
 import { MoreMenu } from '#/components/ui/more-menu'
 import type { MoreMenuEntry } from '#/components/ui/more-menu'
 import { googleDayUrl, whoLine } from '#/lib/meetings/day'
@@ -69,9 +71,14 @@ export function TodayMeetingRow({
   const when = whenOf(meeting, tense, now)
   const title = meeting.title ?? 'Meeting'
   const menu: Array<MoreMenuEntry> = [
-    { label: 'Open in Google Calendar', href: googleDayUrl(meeting.startsAt) },
+    {
+      label: 'Open in Google Calendar',
+      icon: <ProviderMark brand="googleCalendar" />,
+      href: googleDayUrl(meeting.startsAt),
+    },
     {
       label: 'Copy link',
+      icon: <icon.copyLink />,
       copy: () =>
         `${window.location.origin}/meetings?modal=meeting&id=${meeting.id}`,
     },

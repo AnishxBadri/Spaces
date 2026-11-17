@@ -159,7 +159,7 @@ export function ProviderSetup({ view }: { view: ProviderPageView }) {
           end={
             <Button size="sm" variant="outline" asChild>
               <a href={step.href} target="_blank" rel="noreferrer">
-                <icon.open className="size-4" />
+                <icon.openOutside className="size-4" />
                 {step.link}
               </a>
             </Button>

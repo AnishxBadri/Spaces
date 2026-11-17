@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
+import { icon } from '#/components/icons'
 import { Button } from '#/components/ui/button'
 import { MENU_RULE, MoreMenu } from '#/components/ui/more-menu'
 import type { MoreMenuEntry } from '#/components/ui/more-menu'
@@ -101,9 +102,10 @@ export function useListActions<T extends { id: string; name: string }>({
   const rowMenu = (row: T): ReactNode => {
     const href = hrefOf(row)
     const items: Array<MoreMenuEntry> = [
-      { label: 'Open in a new tab', href },
+      { label: 'Open in a new tab', icon: <icon.openOutside />, href },
       {
         label: 'Add to space…',
+        icon: <icon.fileIn />,
         opens: true,
         onSelect: () => setAdding({ ids: [row.id], name: row.name }),
       },
@@ -112,13 +114,22 @@ export function useListActions<T extends { id: string; name: string }>({
         : [
             {
               label: 'Enrich…',
+              icon: <icon.enrich />,
               opens: true,
               onSelect: () => setEnriching({ ids: [row.id] }),
             },
           ]),
-      { label: 'Copy link', copy: () => new URL(href, location.origin).href },
+      {
+        label: 'Copy link',
+        icon: <icon.copyLink />,
+        copy: () => new URL(href, location.origin).href,
+      },
       MENU_RULE,
-      { label: 'Archive', onSelect: () => void archive(row) },
+      {
+        label: 'Archive',
+        icon: <icon.archive />,
+        onSelect: () => void archive(row),
+      },
     ]
     return <MoreMenu variant="row" label={row.name} items={items} />
   }
@@ -160,7 +171,11 @@ export function useListActions<T extends { id: string; name: string }>({
     enrichVerb:
       enrich === null
         ? null
-        : { label: 'Enrich…', onSelect: () => setEnriching(enrich.view) },
+        : {
+            label: 'Enrich…',
+            icon: <icon.enrich />,
+            onSelect: () => setEnriching(enrich.view),
+          },
     rowMenu,
     dialogs: (
       <>

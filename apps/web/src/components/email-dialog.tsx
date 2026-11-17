@@ -14,6 +14,7 @@ import { FilingPickers } from '#/components/files/viewer-sidebar'
 import type { RecordDocument } from '#/components/files/types'
 import { LabelHead, LedgerRow } from '#/components/ledger-section'
 import { PickPopover } from '#/components/record/details-add'
+import { ProviderMark } from '#/components/provider-mark'
 import { Twinkle } from '#/components/twinkle'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
@@ -706,15 +707,28 @@ function AttachmentRow({
         variant="row"
         label={a.name}
         items={[
-          { label: 'Open', opens: true, onSelect: onOpen },
+          { label: 'Open', icon: <icon.open />, opens: true, onSelect: onOpen },
           {
             label: 'Download',
+            icon: <icon.download />,
             onSelect: () => void downloadDocument(a.documentId),
           },
-          { label: 'File on…', opens: true, onSelect: onFileOn },
+          {
+            label: 'File on…',
+            icon: <icon.fileOn />,
+            opens: true,
+            onSelect: onFileOn,
+          },
           ...(recordId === null
             ? []
-            : [{ label: 'Newer version of…', opens: true, onSelect: onNewer }]),
+            : [
+                {
+                  label: 'Newer version of…',
+                  icon: <icon.version />,
+                  opens: true,
+                  onSelect: onNewer,
+                },
+              ]),
         ]}
       />
     </LedgerRow>
@@ -918,15 +932,27 @@ function EmailWindow({
       : [
           {
             label: 'Forward',
+            icon: <icon.forward />,
             opens: true,
             onSelect: () => void startDraft('forward'),
           },
           ...(email.gmailUrl === null
             ? []
-            : [{ label: 'Open in Gmail', href: email.gmailUrl }]),
-          { label: 'Copy link', copy: () => emailLink(email.id) },
+            : [
+                {
+                  label: 'Open in Gmail',
+                  icon: <ProviderMark brand="gmail" />,
+                  href: email.gmailUrl,
+                },
+              ]),
+          {
+            label: 'Copy link',
+            icon: <icon.copyLink />,
+            copy: () => emailLink(email.id),
+          },
           {
             label: 'File on a deal…',
+            icon: <icon.fileOn />,
             opens: true,
             onSelect: () => setFilingDeal(true),
           },
@@ -934,6 +960,7 @@ function EmailWindow({
             ? [
                 {
                   label: 'Who can read this…',
+                  icon: <icon.access />,
                   opens: true,
                   onSelect: () => setWidening(true),
                 },
@@ -944,6 +971,7 @@ function EmailWindow({
             ? [
                 {
                   label: `Unlink from ${email.record.name}…`,
+                  icon: <icon.unlink />,
                   destructive: true,
                   opens: true,
                   onSelect: () => {

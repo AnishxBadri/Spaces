@@ -7,7 +7,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef, SortingState, Table } from '@tanstack/react-table'
-import { Briefcase } from '#/components/icons'
+import { Briefcase, icon } from '#/components/icons'
 import { useMemo, useState } from 'react'
 import { RecordCheckDialog } from '#/components/holding/record-check-dialog'
 import { EmptyRow } from '#/components/ledger-section'
@@ -23,6 +23,7 @@ import {
 import { PortfolioHeadlineStrip } from '#/components/portfolio-headline'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
+import { MenuCheck } from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
 import { MENU_RULE, MoreMenu } from '#/components/ui/more-menu'
 import type { MoreMenuEntry } from '#/components/ui/more-menu'
@@ -85,10 +86,16 @@ function headMenu(
   const current = table.getState().sorting.at(0)
   const hideable = table.getAllLeafColumns().filter((c) => c.getCanHide())
   return [
-    { label: 'Search…', opens: true, onSelect: onSearch },
+    {
+      label: 'Search…',
+      icon: <icon.search />,
+      opens: true,
+      onSelect: onSearch,
+    },
     MENU_RULE,
     {
       label: 'Sort',
+      icon: <icon.sort />,
       items: [
         ...table
           .getVisibleLeafColumns()
@@ -98,6 +105,7 @@ function headMenu(
             const desc = current?.desc === true
             return {
               label: titleOf(c),
+              icon: <MenuCheck checked={on} />,
               ...(on ? { hint: desc ? '↓' : '↑' } : {}),
               // A second pick of the sorted column turns it round.
               onSelect: () => c.toggleSorting(on && !desc),
@@ -106,12 +114,17 @@ function headMenu(
         ...(current === undefined
           ? []
           : [
-              { label: 'Clear sort', onSelect: () => table.resetSorting(true) },
+              {
+                label: 'Clear sort',
+                icon: <icon.clear />,
+                onSelect: () => table.resetSorting(true),
+              },
             ]),
       ],
     },
     {
       label: 'Columns',
+      icon: <icon.columns />,
       items: hideable.map((c) => ({
         label: titleOf(c),
         checked: c.getIsVisible(),

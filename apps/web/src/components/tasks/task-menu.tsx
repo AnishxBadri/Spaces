@@ -2,6 +2,8 @@ import { useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
+import { Calendar, icon, User } from '#/components/icons'
+import { KindIcon } from '#/components/kind-icon'
 import { DueField, MemberList } from '#/components/task-composer'
 import { Button } from '#/components/ui/button'
 import { useConfirm } from '#/components/ui/confirm-dialog'
@@ -96,27 +98,32 @@ export function useTaskMenu({
         ? [
             {
               label: `Open ${first.name}`,
+              icon: <KindIcon of={first} />,
               onSelect: () => void router.navigate({ to: path }),
             },
           ]
         : []),
       {
         label: 'Due date…',
+        icon: <Calendar />,
         opens: true,
         onSelect: () => setEditing({ kind: 'due', task: t }),
       },
       {
         label: 'Assign…',
+        icon: <User />,
         opens: true,
         onSelect: () => setEditing({ kind: 'assign', task: t }),
       },
       {
         label: 'Copy link',
+        icon: <icon.copyLink />,
         copy: () => `${window.location.origin}/tasks?task=${t.id}`,
       },
       MENU_RULE,
       {
         label: 'Delete task',
+        icon: <icon.delete />,
         destructive: true,
         opens: true,
         onSelect: () => void remove(t),

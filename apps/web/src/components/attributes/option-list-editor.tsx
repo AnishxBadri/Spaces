@@ -323,9 +323,11 @@ export function ColorPicker({
               aria-label={c}
               title={c}
               onSelect={() => onPick(c)}
-              style={badgeStyle(c)}
+              // The colour is the item: its swatch is the mark, and there
+              // is no label beside it.
+              icon={<span className="size-4" style={badgeStyle(c)} />}
               className={cn(
-                'focus-ring size-5 rounded-none p-0 transition-[outline-color] duration-150 ease-out-quart',
+                'focus-ring size-5 justify-center rounded-none p-0 transition-[outline-color] duration-150 ease-out-quart',
                 c === value && 'outline outline-1 outline-hairline',
               )}
             />

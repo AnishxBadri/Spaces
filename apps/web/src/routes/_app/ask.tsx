@@ -13,6 +13,7 @@ import {
   SaveAsNote,
   useAskThread,
 } from '#/components/ask/ask-thread'
+import { icon } from '#/components/icons'
 import { Band } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import {
@@ -122,9 +123,15 @@ function ThreadRow({
         variant="row"
         label={row.title}
         items={[
-          { label: 'Rename', opens: true, onSelect: () => setRenaming(true) },
+          {
+            label: 'Rename',
+            icon: <icon.edit />,
+            opens: true,
+            onSelect: () => setRenaming(true),
+          },
           {
             label: 'Delete…',
+            icon: <icon.delete />,
             destructive: true,
             opens: true,
             onSelect: () => onDelete(row),

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { Button } from './button'
 import {
   DropdownMenu,
@@ -31,11 +31,11 @@ import { cn } from '#/lib/utils'
  * - `copy` swaps its label to `Copied` for 1.2s and keeps the menu open.
  * - A `group` heads the items after it in mono caps (a plugin's name); it is
  *   dropped when nothing follows it.
+ * - Every item leads with its 16px mark (E12), a check item with its box.
  */
 
 type ItemBase = {
   label: string
-  icon?: ReactNode
   /** Mono micro in the item's end lane: `keeps revisions`. Never a key. */
   hint?: string | undefined
   disabled?: boolean | undefined
@@ -43,31 +43,42 @@ type ItemBase = {
   title?: string | undefined
 }
 
-export type MoreMenuAction = ItemBase & {
-  onSelect: () => void
-  /** Opens a window or a field: runs after the menu closes. */
-  opens?: boolean | undefined
-  destructive?: boolean | undefined
-}
+/**
+ * The 16px mark the item leads with: the verb's glyph from `icon`, the
+ * service's `ProviderMark` when the item goes there, the thing's own noun.
+ */
+type Marked = { icon: ReactElement }
 
-export type MoreMenuLink = ItemBase & {
-  /** Opens in a new tab. */
-  href: string
-}
+export type MoreMenuAction = ItemBase &
+  Marked & {
+    onSelect: () => void
+    /** Opens a window or a field: runs after the menu closes. */
+    opens?: boolean | undefined
+    destructive?: boolean | undefined
+  }
 
-export type MoreMenuCopy = ItemBase & {
-  /** The text the item copies, read when it is chosen. */
-  copy: () => string
-}
+export type MoreMenuLink = ItemBase &
+  Marked & {
+    /** Opens in a new tab. */
+    href: string
+  }
 
+export type MoreMenuCopy = ItemBase &
+  Marked & {
+    /** The text the item copies, read when it is chosen. */
+    copy: () => string
+  }
+
+/** Its box is its mark, in the same lane. */
 export type MoreMenuCheck = ItemBase & {
   checked: boolean
   onCheckedChange: (next: boolean) => void
 }
 
-export type MoreMenuSub = ItemBase & {
-  items: ReadonlyArray<MoreMenuAction | MoreMenuCheck>
-}
+export type MoreMenuSub = ItemBase &
+  Marked & {
+    items: ReadonlyArray<MoreMenuAction | MoreMenuCheck>
+  }
 
 export type MoreMenuItem =
   MoreMenuAction | MoreMenuLink | MoreMenuCopy | MoreMenuCheck | MoreMenuSub
@@ -232,8 +243,7 @@ export function MoreMenu({
     if ('items' in item) {
       return (
         <DropdownMenuSub key={key}>
-          <DropdownMenuSubTrigger {...common}>
-            {item.icon}
+          <DropdownMenuSubTrigger {...common} icon={item.icon}>
             {item.label}
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="min-w-44">
@@ -257,9 +267,8 @@ export function MoreMenu({
     }
     if ('href' in item) {
       return (
-        <DropdownMenuItem key={key} {...common} asChild>
+        <DropdownMenuItem key={key} {...common} icon={item.icon} asChild>
           <a href={item.href} target="_blank" rel="noopener noreferrer">
-            {item.icon}
             {item.label}
             <Hint hint={item.hint} />
           </a>
@@ -271,12 +280,12 @@ export function MoreMenu({
         <DropdownMenuItem
           key={key}
           {...common}
+          icon={item.icon}
           onSelect={(e) => {
             e.preventDefault()
             copy(item.copy())
           }}
         >
-          {item.icon}
           {copied ? 'Copied' : item.label}
           <Hint hint={item.hint} />
         </DropdownMenuItem>
@@ -287,12 +296,12 @@ export function MoreMenu({
         key={key}
         {...common}
         {...(item.destructive === true ? { variant: 'destructive' } : {})}
+        icon={item.icon}
         onSelect={() => {
           if (item.opens === true) afterClose.current = item.onSelect
           else item.onSelect()
         }}
       >
-        {item.icon}
         {item.label}
         <Hint hint={item.hint} />
       </DropdownMenuItem>

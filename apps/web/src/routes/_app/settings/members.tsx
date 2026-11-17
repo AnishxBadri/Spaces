@@ -1,5 +1,5 @@
 import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
-import { Link2, Mail, icon } from '#/components/icons'
+import { Link2, Lock, Mail, icon } from '#/components/icons'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -247,6 +247,7 @@ function MembersSection({
                     items={[
                       {
                         label: `Make ${roleOf(m.role) === 'admin' ? 'member' : 'admin'}`,
+                        icon: <icon.role />,
                         onSelect: () =>
                           void setRole(
                             m,
@@ -258,12 +259,14 @@ function MembersSection({
                         : [
                             {
                               label: 'Send a reset link…',
+                              icon: <icon.resetPassword />,
                               opens: true,
                               onSelect: () => void sendResetLink(m),
                             },
                           ]),
                       {
                         label: m.banned ? 'Restore access' : 'Suspend access…',
+                        icon: m.banned ? <icon.restore /> : <Lock />,
                         destructive: !m.banned,
                         opens: true,
                         onSelect: () => void setBanned(m),

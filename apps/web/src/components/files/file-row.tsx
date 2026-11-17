@@ -7,6 +7,8 @@ import { useConfirm } from '../ui/confirm-dialog'
 import type { ConfirmOptions } from '../ui/confirm-dialog'
 import { cellsFor } from '../dither'
 import { FileGlyph } from './file-glyph'
+import { icon } from '#/components/icons'
+import { brandOf, ProviderMark } from '#/components/provider-mark'
 import { NewerVersionDialog } from './newer-version-dialog'
 import type { FileAction, FilingEdge, RecordDocument } from './types'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
@@ -175,12 +177,20 @@ export function FileRow({
     }
   }
 
+  const link =
+    doc.externalUrl === null ? null : storageLinkProvider(doc.externalUrl)
   const where =
     doc.externalUrl === null
       ? null
-      : (storageLinkProvider(doc.externalUrl)?.label ??
-        doc.sourceCapability ??
-        'source')
+      : (link?.label ?? doc.sourceCapability ?? 'source')
+  // `Open in Drive ↗` leads with Drive's mark; a source with no mark of its
+  // own leaves the app on the launch glyph.
+  const whereBrand =
+    link !== null
+      ? brandOf(`${link.provider} ${link.product}`)
+      : where === null
+        ? null
+        : brandOf(where)
 
   return (
     <li
@@ -219,22 +229,39 @@ export function FileRow({
         variant="row"
         label={doc.filename}
         items={[
-          { label: 'Open', onSelect: () => openFile(doc, onView) },
+          {
+            label: 'Open',
+            icon: <icon.open />,
+            onSelect: () => openFile(doc, onView),
+          },
           ...(doc.blobSha === null
             ? []
             : [
                 {
                   label: 'Download',
+                  icon: <icon.download />,
                   onSelect: () => void downloadDocument(doc.id),
                 },
               ]),
           ...(doc.externalUrl === null || where === null
             ? []
-            : [{ label: `Open in ${where}`, href: doc.externalUrl }]),
+            : [
+                {
+                  label: `Open in ${where}`,
+                  icon:
+                    whereBrand === null ? (
+                      <icon.openOutside />
+                    ) : (
+                      <ProviderMark brand={whereBrand} />
+                    ),
+                  href: doc.externalUrl,
+                },
+              ]),
           ...(isFollowing(doc)
             ? [
                 {
                   label: 'Unfollow',
+                  icon: <icon.unfollow />,
                   disabled: follow.busy,
                   onSelect: () => void follow.toggle(doc),
                 },
@@ -243,6 +270,7 @@ export function FileRow({
               ? [
                   {
                     label: 'Follow',
+                    icon: <icon.follow />,
                     hint: 'keeps revisions',
                     disabled: follow.busy,
                     onSelect: () => void follow.toggle(doc),
@@ -254,6 +282,7 @@ export function FileRow({
             : [
                 {
                   label: 'Change kind',
+                  icon: <icon.changeKind />,
                   items: KIND_ORDER.map((kind) => ({
                     label: DOCUMENT_KIND_LABELS[kind],
                     checked: kind === doc.kind,
@@ -265,6 +294,7 @@ export function FileRow({
                   : [
                       {
                         label: 'Newer version of…',
+                        icon: <icon.version />,
                         opens: true,
                         onSelect: () => setVersioning(true),
                       },
@@ -273,11 +303,13 @@ export function FileRow({
           MENU_RULE,
           ...actions.map((a) => ({
             label: a.busy ? a.busyLabel : a.label,
+            icon: a.icon,
             disabled: a.busy,
             onSelect: a.run,
           })),
           {
             label: inFolder ? 'Remove from record…' : 'Remove…',
+            icon: inFolder ? <icon.unlink /> : <icon.delete />,
             destructive: true,
             opens: true,
             onSelect: () => void remove(doc, 'record'),

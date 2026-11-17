@@ -9,7 +9,13 @@ import {
   useRef,
   useState,
 } from 'react'
-import type { ComponentProps, KeyboardEvent, ReactNode, RefObject } from 'react'
+import type {
+  ComponentProps,
+  KeyboardEvent,
+  ReactElement,
+  ReactNode,
+  RefObject,
+} from 'react'
 import { FolderGround } from '#/components/page-header'
 import { ArrowDown, ArrowUp, ChevronsUpDown, icon } from '#/components/icons'
 import type { IconComponent } from '#/components/icons'
@@ -22,6 +28,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  MenuCheck,
 } from '#/components/ui/dropdown-menu'
 import { Checkbox } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
@@ -95,6 +102,8 @@ export type TablePage = ListFootPage & {
  */
 export type ColumnAction = {
   label: string
+  /** Its 16px mark in the column's menu. */
+  icon: ReactElement
   onSelect: () => void
   /** Opens a window: runs once the menu has let go of focus. */
   opens?: boolean | undefined
@@ -753,20 +762,29 @@ function HeaderCell<T>({
           >
             {column.getCanSort() ? (
               <>
-                <DropdownMenuItem onSelect={() => column.toggleSorting(false)}>
+                <DropdownMenuItem
+                  icon={<icon.sortAscending />}
+                  onSelect={() => column.toggleSorting(false)}
+                >
                   Sort A → Z
                   <span className="ml-auto mono text-micro text-graphite">
                     ↑
                   </span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => column.toggleSorting(true)}>
+                <DropdownMenuItem
+                  icon={<icon.sortDescending />}
+                  onSelect={() => column.toggleSorting(true)}
+                >
                   Sort Z → A
                   <span className="ml-auto mono text-micro text-graphite">
                     ↓
                   </span>
                 </DropdownMenuItem>
                 {sorted ? (
-                  <DropdownMenuItem onSelect={() => column.clearSorting()}>
+                  <DropdownMenuItem
+                    icon={<icon.clear />}
+                    onSelect={() => column.clearSorting()}
+                  >
                     Clear sort
                   </DropdownMenuItem>
                 ) : null}
@@ -776,7 +794,10 @@ function HeaderCell<T>({
               <DropdownMenuSeparator />
             ) : null}
             {column.getCanHide() ? (
-              <DropdownMenuItem onSelect={() => column.toggleVisibility(false)}>
+              <DropdownMenuItem
+                icon={<icon.conceal />}
+                onSelect={() => column.toggleVisibility(false)}
+              >
                 Hide column
               </DropdownMenuItem>
             ) : null}
@@ -787,6 +808,7 @@ function HeaderCell<T>({
             {actions.map((a) => (
               <DropdownMenuItem
                 key={a.label}
+                icon={a.icon}
                 onSelect={() => {
                   if (a.opens === true) afterClose.current = a.onSelect
                   else a.onSelect()
@@ -978,6 +1000,7 @@ export function SortMenu<T>({ table }: { table: Table<T> }) {
           return (
             <DropdownMenuItem
               key={c.id}
+              icon={<MenuCheck checked={on} />}
               // A second pick of the sorted column turns it round.
               onSelect={() => c.toggleSorting(on && !desc)}
             >
@@ -993,7 +1016,10 @@ export function SortMenu<T>({ table }: { table: Table<T> }) {
         {active ? (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => table.resetSorting(true)}>
+            <DropdownMenuItem
+              icon={<icon.clear />}
+              onSelect={() => table.resetSorting(true)}
+            >
               Clear sort
             </DropdownMenuItem>
           </>

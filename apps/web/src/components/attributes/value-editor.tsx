@@ -7,6 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  MenuCheck,
 } from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
 import { Popover, PopoverAnchor, PopoverContent } from '#/components/ui/popover'
@@ -770,6 +771,7 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
         {results.map((r) => (
           <DropdownMenuItem
             key={r.id}
+            icon={mark(r.name)}
             onSelect={() => {
               if (multi) {
                 if (!selected.includes(r.id)) onSave([...selected, r.id])
@@ -779,12 +781,12 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
               setQuery('')
             }}
           >
-            {mark(r.name)}
             {r.name}
           </DropdownMenuItem>
         ))}
         {selected.length > 0 ? (
           <DropdownMenuItem
+            icon={<icon.clear />}
             onSelect={() => onSave(null)}
             className={cn(
               'text-graphite',
@@ -929,12 +931,12 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
           <DropdownMenuItem
             key={v}
             aria-label={`Remove ${v}`}
+            icon={<icon.close />}
             onSelect={() => {
               const next = selected.filter((s) => s !== v)
               onSave(next.length === 0 ? null : next)
             }}
           >
-            <icon.close className="size-4 shrink-0 text-graphite" />
             {/* Whole, never cut: on touch, the menu is where a long value
                 is read in full. */}
             <span className="min-w-0 mono text-label break-all">
@@ -999,12 +1001,17 @@ function ActorPicker({ def, value, onSave, variant, refNames }: Props) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {users.map((u) => (
-          <DropdownMenuItem key={u.id} onSelect={() => onSave(u.id)}>
+          <DropdownMenuItem
+            key={u.id}
+            icon={<InitialsMark name={u.name} size="xs" />}
+            onSelect={() => onSave(u.id)}
+          >
             {u.name}
           </DropdownMenuItem>
         ))}
         {selected ? (
           <DropdownMenuItem
+            icon={<icon.clear />}
             onSelect={() => onSave(null)}
             className="text-graphite"
           >
@@ -1104,13 +1111,18 @@ function OptionPicker({
             ]
           : [
               ...opts.map((o) => (
-                <DropdownMenuItem key={o.id} onSelect={() => onSave(o.id)}>
+                <DropdownMenuItem
+                  key={o.id}
+                  icon={<MenuCheck checked={selected.includes(o.id)} />}
+                  onSelect={() => onSave(o.id)}
+                >
                   <OptionChip def={def} id={o.id} />
                 </DropdownMenuItem>
               )),
               selected.length > 0 ? (
                 <DropdownMenuItem
                   key="__clear"
+                  icon={<icon.clear />}
                   onSelect={() => onSave(null)}
                   className="text-graphite"
                 >
