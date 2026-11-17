@@ -46,8 +46,6 @@ Plus the UI sweep (the printed sheets landing), Corrections, and the list as a f
 - `SPA-188` `ship-10` — install, upgrade and rollback docs. Project 16, In Progress. `docs/install.md` and `docs/upgrade.md` exist; check what is left.
 - `SPA-190` `ship-12` — one-click templates for Coolify, Railway, Render and Unraid. Project 16, In Progress; each needs a human deploy.
 - `SPA-407` — the record table to a screen reader: named by its view, the sort read aloud, the name as row header, a Tab stop while columns overflow; the `n more columns →` foot line already shipped with the fixed pane. `afk`, size S.
-- `SPA-423` `note-window` — a record's Notes tab gets a toolbar (filter, `New note ⌄` with templates) and superseded notes fold; a note opens in a window over the record (D108). After SPA-409. `afk`, size M.
-- `SPA-424` `brand-colour` — `ProviderMark` draws each brand's official logo in its own colours; Granola, Apollo, Exa and OpenAI get their real marks (D19, E7). `afk`, size S.
 - `SPA-426` `interactions-3` — thread rows put the clip under the day and clamp the summary at two lines; the email thread unfolds in place; the meeting and email windows end on `Done`; logging gains a Summary and opens the write-up over the record (D109). After SPA-423. `afk`, size M.
 
 ## Next, in order
