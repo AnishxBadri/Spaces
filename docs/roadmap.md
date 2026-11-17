@@ -51,6 +51,11 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 - `SPA-443` `meetings-4` — calendar sync keeps only timed, ordinary, non-private events with an outside attendee off the exclude list; `Remove from Spaces…` is remembered (D112). Project 34; `migration`, `afk`, google-calendar bump.
 - `SPA-444` `meetings-5` — Today's Write-ups are yours with the grace hour; the day strip's head names the next meeting and shows `Join ↗` near a call (D112). Project 34; `afk`, after SPA-440.
 - `SPA-445` `meetings-6` — a record's Interactions tab opens with an `Upcoming` band; `This week` holds only the past; the `Next meeting` readout opens the meeting (D112). Project 34; `afk`.
+- `SPA-450` `tasks-1` — one task window for new and edit; `T` opens it on every page; the row menu drops its two edit windows (D113). Project 36; `afk`.
+- `SPA-451` `tasks-2` — the Tasks page: a fixed pane, a person chip (`Mine` by default), plain bands, a Done log in week bands (D113). Project 36; `afk`, after SPA-450 and SPA-440.
+- `SPA-454` `tasks-3` — a record's and a space's Tasks section: everyone's open tasks, five rows then `n more ›`, Undo on a tick (D113). Project 36; `afk`, after SPA-450.
+- `SPA-455` `tasks-4` — Today's tasks and the sidebar's `n due` are your own; a task opens in the window (D113). Project 36; `afk`, after SPA-450.
+- `SPA-456` `tasks-5` — a task made from an action item keeps its write-up; pending items head Tasks › Open (D113). Project 36; `migration`, `afk`, after SPA-442 and SPA-451.
 - `SPA-188` `ship-10` — install, upgrade and rollback docs. Project 16, In Progress. `docs/install.md` and `docs/upgrade.md` exist; check what is left.
 - `SPA-190` `ship-12` — one-click templates for Coolify, Railway, Render and Unraid. Project 16, In Progress; each needs a human deploy.
 
