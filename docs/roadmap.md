@@ -87,7 +87,6 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 1. **The Ask set**, which the owner has not picked from yet.
 2. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided, not ticketed.
 3. **Small decided slices** (not ticketed): the sign-in rate rule, 5 per 60 seconds per IP, in `apps/web/src/lib/auth.ts`; workspace export (D42); a staged import on Today's Needs-you (D43).
-4. **One design doc** — `DESIGN.md`, `docs/design-contract.md` and `docs/product-map.md` merge into one, checked against the Paper library.
 
 ## Owner calls
 
@@ -104,7 +103,7 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 - Edges: Import's inner grids and the empty-state pages are not carded.
 - Windows (E3): a window's head, body and foot pad 16px, but a ledger row inside a padded body insets a further 12px, so its text stands at 28px while the title stands at 16px (the meeting window's Linked records); edge-to-edge windows (the file viewer) need the row inset itself to be 16px. One sweep over the 40 windows, `windows-1`: every window's text on one 16px line.
 - Record rail: a deal's Company group swaps the company from its `+` (the attribute is required), which reads as add; an existing install keeps its attribute order (only a fresh seed leads with identity), so a one-off `Reset to default order` on the object's settings page would let it catch up.
-- Settings: the folded head's actions pin to the page edge, not the 800px column; `listStatusOf`'s `tone` is unused; `DESIGN.md` "Printed details" still names a double rule under a settings head.
+- Settings: the folded head's actions pin to the page edge, not the 800px column; `listStatusOf`'s `tone` is unused.
 - Settings heads, after `settings-2`: Search's `Catch up` reads as a verb and the account page's `Used for` is borderline; Enrichment Sources' `first answer wins` and Routing's `sensitive lists local models only` print the same on every instance, which the invariant-line rule says is documentation.
 - Portfolio, after `ownership-1`: `holdingNow().ourShares` in `lib/ai/ledger-event.ts` sums the shares bought and never subtracts a sale; the dev seed has no priced holding with both a counted round before its check and a sale, so no seeded page shows a sale point (Aarogya's check postdates its only counted round, Garuda is a SAFE); the holding page's `Sale` label has no render test.
 - Plugins, after `schema-2`: zod is still imported by host-internal plugin files it did not have to touch (`core/plugins/{credit,lock,auto-enrich}.ts`, the worker's `host.ts`, `queues.ts`, `credit.ts`, `plugin-db.ts`, `run-job.ts`); the pre-commit eslint hook runs out of memory on a 200-file commit (the per-package `turbo run lint` is the gate that passed).

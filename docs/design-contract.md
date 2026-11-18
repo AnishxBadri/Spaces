@@ -1,44 +1,86 @@
 # The design contract
 
-Instrument is the design of Spaces. `DESIGN.md` describes it — what the system is and
-why every part of it is that way. This file is the other half: what an agent does
-before it builds a surface. Read this; open `DESIGN.md` only for the section a line
-here sends you to.
+Instrument is the design of Spaces, and this file is its one rulebook: what the system
+is, the vocabulary you may spell, the primitives that already exist, the precedent every
+new surface copies, the line between what lint enforces and what a reviewer judges, and
+what is decided but not yet built. Read it before writing tsx.
 
-`DESIGN.md` is the source. Nothing below invents language it does not already carry;
-every statement traces to a `DESIGN.md` section or to a file that shipped. Where the
-two disagree, `DESIGN.md` is right and this file is a bug — fix it here, not there.
+Values live in `apps/web/src/styles.css`; that file decides, this one names. `DESIGN.md`
+at the repo root carries only the tokens, as front matter for design tools, and points
+here. `docs/product-map.md` tracks which surface is drawn and built, not how it looks;
+`docs/decisions.md` holds why. Where this file and shipped code disagree, one of them is
+a bug: say which in the PR.
 
-Five parts: the vocabulary you may spell, the primitives that already exist, the
-precedent every new surface copies, the line between what lint enforces and what a
-reviewer judges, and what is decided but not yet built.
+---
+
+## Instrument
+
+**"Instrument, printed": a measuring instrument for capital, and the sheet it prints.**
+Paper for the data field, bone for the chassis, one ink for structure, one LED (pine)
+for the action. Everything the instrument measured (money, counts, dates, durations,
+IDs, domains) is mono, because a reading is a reading; everything a human wrote (a
+company's name, a page title, a thesis) is serif, because a person named it; sans
+carries the interface between them. Density done the Attio way, speed felt the Linear
+way, character carried by type and material, never by the surface.
+
+It rejects enterprise CRM chrome, the generic SaaS template look (shadcn defaults,
+gradient heroes, purple accents, identical card grids) and the dark terminal aesthetic.
+Mono is a voice for readings, not a costume for the whole app. Nothing blurs, nothing
+rounds past 2px, nothing is a pill. WCAG AA is a floor, not a target.
+
+The Paper canvas is the drafting table and this repo is truth. File `spaces`
+(`01M19X8AY9DZD3PZMJK7RWVMTB`): Foundations, Kit and Grammar hold the library, and each
+area has its own page. Open a page, find nodes with `get_tree_summary`, read exact
+values with `get_jsx(nodeId, "inline-styles")`; never read a value off a screenshot.
 
 ---
 
 ## 1. The vocabulary
 
-### Materials (`DESIGN.md` §2)
+### Materials
 
-Two untinted neutrals, one ink, one LED. Every value is live in
-`apps/web/src/styles.css`; that file decides, this table names.
+Two untinted neutrals, one ink, one LED.
 
-| token       | class                       | role                                                                                              |
-| ----------- | --------------------------- | ------------------------------------------------------------------------------------------------- |
-| `paper`     | `bg-paper`                  | the data field — tables, records, dialogs                                                         |
-| `bone`      | `bg-bone`                   | the chassis — sidebar, rails, dialog feet                                                         |
-| `bone-deep` | `bg-bone-deep`              | pressed, disabled, archived rows (an archived option badge is struck on plain bone — see `Badge`) |
-| `rule`      | `border-rule`               | inner rules — rows, cells, inputs                                                                 |
-| `hairline`  | `border-hairline`           | 1px structure — sections, sheets, the edge                                                        |
-| `graphite`  | `text-graphite`             | the second text colour, and the only one                                                          |
-| `ink`       | `text-foreground`           | text                                                                                              |
-| `pine`      | `bg-primary`/`text-primary` | the LED — primary action, active tab, end-dots                                                    |
-| wash        | `bg-selected`               | the selection tint                                                                                |
+| token       | value                   | class                       | role                                                                                              |
+| ----------- | ----------------------- | --------------------------- | ------------------------------------------------------------------------------------------------- |
+| `paper`     | `#FFFFFF`               | `bg-paper`                  | the data field — tables, records, dialogs                                                         |
+| `bone`      | `#F4F3EF`               | `bg-bone`                   | the chassis — sidebar, rails, dialog feet                                                         |
+| `bone-deep` | `#E9E7E1`               | `bg-bone-deep`              | pressed, disabled, archived rows (an archived option badge is struck on plain bone — see `Badge`) |
+| `rule`      | `#D6D4CD`               | `border-rule`               | inner rules — rows, cells, inputs                                                                 |
+| `hairline`  | `#1C1C1A`               | `border-hairline`           | 1px structure — sections, sheets, the edge                                                        |
+| `graphite`  | `#5C5B56`               | `text-graphite`             | the second text colour, and the only one; 5.9:1 on paper                                          |
+| `ink`       | `oklch(0.24 .012 155)`  | `text-foreground`           | text, 13:1 on paper                                                                               |
+| `pine`      | `oklch(0.55 .14 155)`   | `bg-primary`/`text-primary` | the LED — primary action, live segments, end-dots                                                 |
+| wash        | `oklch(0.962 .022 155)` | `bg-selected`               | the selection tint, 14.8:1 under ink                                                              |
 
-Semantic colour only where it encodes state: `text-destructive`, `text-warning`,
-`text-success`, `text-info`. A readout is coloured only when its value is nonzero and
-bad; a zero reads graphite.
+The neutrals are hex on purpose: they are the bench's materials, not points on the
+brand hue; ink keeps a whisper of 155° so text and pine belong together. Row hover is
+opaque bone, never a translucent tint, which would let a sticky column's scrolled-under
+cells bleed through.
 
-**Material and scale** (`DESIGN.md` §4). Radius is `rounded-md` (2px) on controls and
+**Pine** (≈ `#00884B`) is the primary action, the filled segments of a stage stepper,
+sparkline end-dots and the `+` that starts a composer. Its lightness is pinned by
+contrast: 0.55 measures 4.52:1 under white text by proper OKLCH→sRGB conversion, never
+eyeballed. Hover deepens to `oklch(0.5 0.14 155)`, 5.51:1.
+
+**Light only, by decision.** `:root` declares `color-scheme: light`, so native controls
+follow the app rather than the OS; there is no `dark` variant, and every colour is a
+token (a raw colour in tsx is a lint error), so dark, when it is built, is a second
+token file and not a redraw.
+
+Semantic colour only where it encodes state: `text-destructive` (crimson
+`oklch(0.48 0.17 12)`: delete, overdue, past 2× median), `text-warning` (amber
+`oklch(0.7 0.13 75)`: unpriced, missing FX; as a row wash, the amber badge tint with
+amber ink), `text-success` (teal `oklch(0.55 0.09 190)`, never green, because pine owns
+green and a state never shares the action's hue), `text-info` (`oklch(0.55 0.1 240)`).
+A readout is coloured only when its value is nonzero and bad; a zero reads graphite.
+
+**The badge palette** is twelve hues (slate → cyan) for select, status and stage
+options, each a pale tint at L 0.955 with same-hue ink at L 0.45, chroma the largest
+the sRGB gamut allows; the worst pair measures 6.26:1. An option gets a hue
+auto-assigned and a person can override it.
+
+**Material and scale.** Radius is `rounded-md` (2px) on controls and
 inputs, `rounded-none` everywhere else — no 4, 6, 8 or 12, no pills, no circles.
 Shadows are named by kind and chosen by the primitive: a popover `shadow-dither` (4px,
 Bayer 8/16), a window over the scrim `shadow-solid` (3px ink); a call site passes none
@@ -47,6 +89,11 @@ page edge is 24 and the body gutter 12 (The edges, below). Heights: table row 36
 section head 44, tab bar 44, control 32, `Band` 28, `Segmented` 28, small 26, a row's `···`
 24, badge 20, nav row 30, dialog head 48, dialog foot 52. The readout strip (56–64) stays
 for Today and the holding's figures only; a record's readouts live in its Overview tab.
+The record table keeps 36 because it is a spreadsheet and density is its job; every
+ledger is 40. Structure is 1px ink (`hairline`) for sections, sheets and the chassis
+edge; `rule` for rows, cells and inputs; 2px ink for the reticle. A card sits at 0 on
+its rule, a popover and a window lift as above, a toast is ink. Initials sit in ink
+squares, never circles. The only texture is dither (the Dither Rule).
 
 ### The edges (2026-11-11, drawn on the Paper page "Edges options", boards D)
 
@@ -91,7 +138,9 @@ sit on the 24px edge (`components/head-fold.tsx`).
 - **E4 · Settings and form pages cap at 800px**: a column of cards 800px wide from the
   gutter, 12px apart, under the shared head, whose action (and `···`) ends where the
   column's content ends (`SETTINGS_HEAD_CAP`); the Save bar sits on the 24px edge under
-  the same cap. Lists and tables stay full width. A settings row opens Edit as a whole,
+  the same cap. Lists and tables stay full width. Prose caps its measure and sits left,
+  never centred: a memo, the mandate or a glossary definition under `max-w-160`, the
+  note editor at 72ch, Dedupe's wide body at 880px. A settings row opens Edit as a whole,
   and its actions are always visible, never hover-only: a settings row carries no
   `data-row`, so no `row-reveal` hides them.
 - **E5 · Folder tabs.** The open tab has an ink outline on top, left and right and
@@ -137,9 +186,11 @@ sit on the 24px edge (`components/head-fold.tsx`).
   folder's folder, a record's kind). A destructive item's glyph is destructive with its
   label. The label keeps `…` for a window and `↗` for leaving; keys stay in tooltips.
 
-### The named type steps (`DESIGN.md` §3)
+### The named type steps
 
-Eight steps, fixed rem, never fluid. The list is the `--text-*` custom properties in
+One family in three cuts, IBM Plex Sans, Serif and Mono at their default letterforms,
+self-hosted through Fontsource as static weights 400 to 700: a privacy product makes no
+font CDN calls. Eight steps, fixed rem, never fluid. The list is the `--text-*` custom properties in
 `apps/web/src/styles.css` and the `NAMED_STEPS` table in `packages/config/eslint-rules/vocabulary.js`,
 which a test keeps in sync.
 
@@ -154,6 +205,11 @@ which a test keeps in sync.
 | `page`    | 22 / 28        | page titles                         |
 | `display` | 26 / 32        | record names                        |
 
+Three sizes sit outside the steps, each carried whole by a utility: `title-serif` (the
+page step below `md`, 28 / 32 from `md` up), `label-caps` (mono 11 / 16, 500, 0.08em
+caps) and the prose register, serif 17 / 27, for note bodies, theses and reasons
+(`styles.css` names it beside the editor).
+
 **An unnamed size does not ship.** `text-[…]` and `leading-[…]` are rejected by
 `instrument/vocabulary`, which names the nearest step in the message; the only way
 onto the list is `apps/web/src/styles.css`. A genuine optical one-off (initials inside
@@ -162,7 +218,7 @@ a 16–22px square) takes an inline comment saying why plus a scoped disable.
 Utilities that carry a step whole: `title-serif`, `label-caps`, `field-label`, `mono`,
 `numeric` (tabular + right-aligned in one class), `tabular`.
 
-### The three voices (`DESIGN.md` §3)
+### The three voices
 
 **Serif** where a human wrote it · **sans** for the interface · **mono** for everything
 the instrument measured.
@@ -176,10 +232,14 @@ the instrument measured.
 Never a name or a sentence in mono, never a number in sans — with one shipped
 exception: the fixed mono lanes a ledger row or a board card **ends** on are the
 instrument's filing stamp, not prose, and a record or person name printed there is mono
-graphite (`DESIGN.md` §5 P2's `LedgerFigure` and P4's `company · check`;
-`apps/web/src/routes/_app/today.tsx:348`, `apps/web/src/components/deal-board.tsx:267`).
+graphite (`LedgerFigure`, and the board card's `company · check`).
 
-### The Casing Rule — three tiers (`DESIGN.md` §3)
+**Who wrote it decides the voice** (D78). A note a person filed from a tool (a Granola
+note in a ticked folder) is serif with a mono `via <tool>` mark: the person chose to
+file it. Text a model wrote that nobody chose is sans: an Ask answer, Exa's brief, an
+unfiled summary.
+
+### The Casing Rule — three tiers
 
 The tier is decided by who is speaking, never by how small the text is. **Nothing starts
 lowercase.**
@@ -200,10 +260,12 @@ A mono state word in an end lane is data, not a label: `fetching.`, `following`,
 `■ gone` are what the instrument read, and keep their case (`field-label`, untransformed).
 A key hint is data the same way, in the lanes A2 allows.
 
-### The Separation Rule (`DESIGN.md` §5, 2026-10-05)
+### The Separation Rule
 
-Every section separates itself by at least two of **material**, **space** and **ink
-weight**:
+A page reads as stacked sections. Every section separates itself by at least two of
+**material**, **space** and **ink weight**, and the shared primitives draw it
+(`SectionHead`, `LedgerSection`, `RecordSection`, `SettingsGroup`, `LedgerRow`,
+`DialogHeader`, the confirm), so a surface built on them follows:
 
 - a hairline opens the section, then a 44px **bone head band** (`SectionHead`) carrying
   the title in sentence case at the title step, plus its tabs, filters and one action;
@@ -254,11 +316,96 @@ and the word side by side. A word stays where the word is the data: a stamp (`ME
 a state word, a table cell. A custom object with no chosen icon prints its word. A group that already names its kind (a
 record's Team, Associated deals) needs no icon on its rows.
 
-### Dither
+### The seven rules
 
-Dither is 1-bit and never under text, and **it never moves at rest**. The one animated
-dither is the `Twinkle`, and it is used only for a working state: a spinner never ships.
-A popover is dithered (`shadow-dither`); a window is solid (`shadow-solid`).
+**The Meaning Rule.** Colour only encodes: action, selection, state, stage, status. A
+colour that cannot name what it encodes is forbidden.
+
+**The Two-Tier Rule.** Pine is the only fully saturated fill on a surface. Badges are a
+pale tint with same-hue ink, square.
+
+**The Numeral Rule.** Every measured thing is mono: money, counts, dates, durations,
+IDs, domains. Prose, names and column labels never are. Comparable figures are tabular
+and right-aligned, one class (`numeric`); figures inside a sentence take `tabular`.
+
+**The Reticle Rule.** Focus is four 2px ink crop marks 3px outside the control
+(`focus-ring`), inset inside a scroll container (`focus-ring-inset`). Never pine, never
+a ring.
+
+**The Dither Rule.** Dither is 1-bit, pine or ink, Bayer 4×4 at 2px cells. Never under
+text, never moving at rest, never a third colour. **Dither is data**: a chart, a
+readout's history, a 1-bit fallback mark, a space's funding-stage bar, an empty page's
+noun and a popover's shadow (`shadow-dither`; a window is solid, `shadow-solid`). One
+dither moment per region; a section head, a button or a page background never is. The
+one animated dither is the `Twinkle`, a 4×4 grid stepping in Bayer order, for a working
+state only: a spinner never ships, and loading is a density ramp, never a shimmer.
+
+**The Contrast Floor.** Body ≥ 4.5:1, graphite 5.9:1, no sub-100% opacity text. Key
+hints on pine are the one exception, at 85% and still ≥ 4.5:1.
+
+**The No-Bar Rule.** Pine never appears as an edge bar. The current nav row is a
+hairline box on paper; a selected row is wash + check; a highlighted option is bone; a
+winner is ink against graphite.
+
+### Motion
+
+Pure CSS, used extensively, never decoratively. No JS animation runtime: Radix
+`data-state` attributes, `tw-animate-css` keyframes and Tailwind transitions carry
+everything, which is what lets the one global `prefers-reduced-motion` query silence the
+whole app.
+
+- **The Compositor Rule.** Animate `transform` and `opacity` only, never width, height,
+  top or margin; a motion that can't be said in those two doesn't ship. It holds inside
+  controls too: a switch's knob travels on `translate-x`.
+- **Every transient surface enters and exits**: fade plus a slight scale (0.95 → 1),
+  from its trigger (Radix's placement origin), never from the screen's centre.
+- **Exit is faster than enter, and frequency scales the numbers.** Dialogs and the
+  palette 180 in / 120 out, menus 150 / 100, tooltips 120 / 80, cell edits and hovers
+  ≤100ms or nothing, all on `--ease-out-quart`. Nothing over 250ms.
+- **Interruptible, never blocking, no load choreography**: a page appears settled.
+- **A press is physical**: a button compresses to `scale(0.97)`; no bounce, no springs.
+- **Composer add.** A row a composer just created lands on a bone wash that fades over
+  250ms (`row-wash`, `LedgerRow`'s `wash`). Who created it decides, never its age:
+  `useBornRows` grows only when a composer reports the id its write returned, so a list
+  the loader filled washes nothing.
+- **A refused field edit** snaps back to the stored value and the cell holds crimson in
+  place for 2s, a pane over the cell rather than a border, so nothing moves; it leaves
+  on opacity over 120ms (`rejectPaneClass`). The hold is a state, so it survives
+  reduced motion.
+- **Row exit.** A row that leaves because you acted on it strikes through and fades over
+  150ms, the write held until the transition ends; it keeps its height until it
+  unmounts. An irreversible-feeling exit pairs with Undo in the toast; a truly
+  irreversible one (delete) asks first.
+- **Toast** rises 8px as it fades in, 180 / 120ms, sonner's own slide overridden.
+- **A pending button** disarms, swaps its label (`Save` → `Saving…`) and holds the width
+  it had armed (No-Shift). No spinner.
+
+`micro-interactions.test.ts` reads the stylesheet and the class helpers and holds these.
+
+### Interaction engineering
+
+The floor under the look, vendored in full as the `design-engineering` skill; where
+the skill and this file disagree, this file wins.
+
+- **The No-Shift Rule.** Dynamic content never moves its neighbours: fixed dimensions on
+  async slots, tabular figures on changing numbers, and **weight never changes with
+  state**; hover and selected speak through colour and the wash.
+- **Name your transitions.** `transition: all` is banned.
+- **Hover is an enhancement.** Nothing needs hover to work; Tailwind gates `hover:`
+  behind `(hover: hover)`, never undo it. Controls take `touch-action: manipulation`; on
+  a coarse pointer an input renders ≥16px (iOS zoom) and a hit area reaches 44px even
+  when the visual is smaller.
+- **Keyboard parity.** Tab reaches only what is visible (`inert` the hidden), keyboard
+  focus scrolls into view, Enter submits a form, Cmd/Ctrl+Enter a textarea or a dialog,
+  an icon-only button carries `aria-label`. Bare-key shortcuts (`useHotkey`) are off
+  while typing and inside dialogs, and each is in its control's tooltip, the `?` sheet
+  and Cmd-K (A2).
+- **The z-index scale.** sticky 150 · modal 200 · dropdown 250 · tooltip 300 · toast
+  400, as `z-sticky … z-toast`, and no other values. A menu sits above a modal because a
+  picker opened in a dialog floats over it. Prefer `isolation: isolate` to climbing (the
+  record table isolates its sticky head and pinned column).
+- **Virtualize past ~200 rows.** A ledger stays dense by drawing less, never by
+  paginating (checklist 17 says where that stands).
 
 ### The Commentary Rule — data is dense, commentary is scarce
 
@@ -352,8 +499,8 @@ company head went from sixteen things to seven by this rule.
   secondary; a rare verb stays in the `···` even when it is the only one (A7).
 - **A2 · No key is printed inside a button.** A key lives in the button's tooltip, the
   `?` sheet and Cmd-K. Keys print on the surface only in a composer row's end lane and
-  in the sidebar lane, where they are the row's data. Amends "printed inside the
-  control it triggers" (`DESIGN.md`, Keyboard parity).
+  in the sidebar lane, where they are the row's data. Keyboard parity holds the
+  same line.
 - **A3 · One act has one control per surface, and one label everywhere.** If a section
   has a composer row for a verb, the head does not also carry it; the key focuses the
   composer. The label is the same on every surface (`New task`, never `Task` /
@@ -462,9 +609,9 @@ own size (D70).
 
 ### Pickers and dates (SPA-38)
 
-**A picker is a paper sheet, never the operating system's.** `DESIGN.md` §5
-"Menus / pickers" — paper, 1px ink, the dithered shadow, 28px rows, the highlighted row
-in bone, 150/100ms — and `Select` (`apps/web/src/components/ui/select.tsx`) is that
+**A picker is a paper sheet, never the operating system's.** A menu or picker is
+paper, 1px ink, the dithered shadow, 28px rows, the highlighted row in bone, 150/100ms
+(Overlays, below), and `Select` (`apps/web/src/components/ui/select.tsx`) is that
 sheet with a trigger in front of it. A native `<select>` draws the OS list instead:
 rounded on macOS, a different font, a blue system highlight, and on a machine set to
 dark OS chrome a dark list dropping out of a paper form. There are none left in
@@ -488,9 +635,8 @@ A search box appears at `SEARCH_FROM` rows and above (cmdk's own filtering); bel
 the list gets letter type-ahead, ↑↓, ↵ and esc and no input, because a search field in
 front of three words is chrome.
 
-**A date field stays native, and that is a decision, not an omission.** `DESIGN.md` §5
-"Inputs / Fields": _native control in forms_. A hand-built calendar is a month of work
-and an accessibility regression — the platform picker already carries locale, keyboard
+**A date field stays native, and that is a decision, not an omission.** A hand-built
+calendar is a month of work and an accessibility regression — the platform picker already carries locale, keyboard
 entry, screen readers and mobile. What makes it survivable is `color-scheme: light` on
 `:root` (SPA-52, `apps/web/src/styles.css`): `color-scheme` is an **inherited**
 property, so the one declaration reaches every `<input type="date">` and every
@@ -501,6 +647,146 @@ declaration is the only way a field could go back to drawing dark, and
 cell, where `<input type="date">` would print a `mm/dd/yyyy` skeleton and a picker
 glyph in every empty row; `DateCellEditor` (`value-editor.tsx`) reads as ISO text until
 clicked, then hands over to the native control.
+
+### Controls
+
+Every interactive element ships default, hover, focus-visible, active and disabled.
+
+- **Buttons.** 2px radius, 26 / 32 (`sm` / default), the 24px `xs` for icon-only.
+  Primary is pine under white text, hover pine-hover, press 0.97, and its key lives in
+  its tooltip (`shortcut`, A2). Outline is paper in a 1px hairline that tints to bone on
+  hover. Ghost is transparent until hover, for quiet in-context acts. Destructive is a
+  crimson fill, never beside a primary without space. `pending` is the Motion rule's.
+- **Inputs.** Transparent, 1px rule, 2px radius, 32px. The reticle draws on the input's
+  own background (an input can't host `::after`), with two exceptions: a title input
+  that _is_ the head of a sheet draws no marks (the caret is the focus), and a
+  borderless input inside a bordered composer row draws them on the row
+  (`focus-ring-within`). `Label` is sans 12 graphite, 6px above its control; an error
+  sits under it in destructive 12; a placeholder is full-strength graphite. Invalid
+  turns the border destructive; required-and-empty is an amber square, not a red
+  border.
+- **Switch.** A 24×14 square track with a 10px square knob, no radius. Off is a rule
+  track on paper with a graphite knob; on is the wash with a pine border and a pine
+  knob. State reads from one switch alone: a track that only moves an ink block is a
+  bug. A `<button role="switch">`, not Radix's, so the reticle has no exception;
+  `children` is its label, one hit area and one reticle.
+- **Checkbox.** A 14px square that fills with pine and carries a 10px check; unchecked
+  rests on paper in a hairline and tints to bone on hover. A `<button role="checkbox">`:
+  every call site writes through a server fn when toggled, so no form needs its value.
+- **Badge.** Square, 18–20px, mono 11 medium, 6px inset, the option's tint and ink.
+  `Badge` takes the option row and its index, never a colour the caller resolved, so the
+  board, Today and the registry land on one hue for one stage. `archived` is struck
+  graphite on bone, `unselected` a dashed graphite rule. It renders a `<span>`;
+  `asChild` wears a button or a link, which alone turns on hover, press and the
+  reticle. The instrument's own badges (`unpriced`, `Outside mandate`) name amber as a
+  stored colour and go through the same primitive.
+- **Typed value editors.** One implementation for table cells, record rows and create
+  windows; `variant` changes chrome only. `field` rests as a value (rule on hover,
+  reticle on focus); `cell` is borderless in its row. Selects render option badges, the
+  actor picker an initials square, references a 1-bit mark, ratings ink squares with a
+  mono `n/max`.
+- **`···`** names the more menu everywhere in this file; it draws the Carbon overflow
+  glyph (`icon.more`), never three typed dots.
+
+### Lists, ledgers and the board
+
+- **The record table** is the hardest-working surface: spreadsheet-grade or the
+  audience leaves. One 36px row height for head and body, rules between rows. The head
+  is 32px, sticky, paper, sans 12 graphite labels; each head cell is a button whose menu
+  carries Sort A→Z / Z→A, Clear and Hide, the direction a mono arrow after the label.
+  Cells are `text-ui`, measured columns `numeric`, an empty cell a graphite em dash.
+  Editors open in place, ↵ commits, Esc reverts. A stage is never cell-edited: it reads
+  as a badge, and M opens Move stage so the reason is logged. The foot is 32px on a
+  hairline, `N OF M` caps left.
+- **A ledger row** leads with one 40px line and ends on a fixed mono lane
+  (`LedgerFigure`, 64 or 80px, right-aligned). A number is never alone when a median
+  exists: `ReferenceBar` draws the value in ink, the median a graphite tick, the track a
+  rule. An interaction row is two lines: the subject with its badges, marks and RSVP,
+  then in graphite who took part and the ✦ summary (H2).
+- **The composer row.** Adding to a stream never starts from a corner button: a 40px
+  row with a pine `+`, graphite hint text and the key that opens the real window
+  (`+ Log a call, meeting, or note…  L`). The Tasks page grows it into the composer
+  band.
+- **The board.** 224px columns whose head is a mini readout (stage badge, count, Σ,
+  median) on a hairline. Paper cards on rules: the 1-bit mark and name, a mono
+  `company · check` with days in stage (crimson past 2× median), `close 13 Oct · Nd`
+  with the owner's initials. A dashed `+ N more` folds a long column; a pine dashed
+  `drop → Stage` box shows while dragging over one.
+
+### Overlays
+
+- **Window anatomy.** Paper, 1px ink, `shadow-solid`, 0 radius. A 48px bone head with
+  the serif title 18/600 and its mono context, a hairline under it and nothing right; a
+  20px paper body; a 52px bone foot (A6). The first field takes the reticle on open.
+  The quick task has no title bar: the input is the title. A modal must be argued for;
+  inline and progressive disclosure come first.
+- **Confirm.** S. The 8px crimson square and the serif question in the bone head; one
+  sans sentence saying what happens and what does not, an optional rule-bordered list of
+  what is affected; Keep takes focus and the destructive button carries ⌘↵.
+  `useConfirm()` replaces `window.confirm`; a confirm exists to be read.
+- **Menus and pickers.** Paper, 1px ink, `shadow-dither`, 28px rows, the highlighted
+  row bone, 150 / 100ms, every item led by its mark (E12).
+- **The attribute sheet.** 660px, two panes under the head (`New attribute` · mono
+  `on Companies · 19 → 20`): a 236px type pane with the pine `›` search and 26px rows,
+  the form right (name with its frozen mono slug under it, description, the per-type
+  slot, default and required on one line). In edit the type pane stays, greyed: the type
+  is the record of what this is. Its options editor is a rule box of 30px rows (grip,
+  14px square swatch, label, mono status) ending on a composer that takes a pasted list;
+  a saved option archives, struck with a mono `restore`, and only unsaved rows delete.
+- **The object sheet.** Singular and plural side by side, the plural marked `guessed`
+  until touched; a 1-bit icon grid of 32px tiles, the chosen one ink; the derived slug
+  frozen in a bone box.
+- **Command palette.** One fixed size, `min(1060px, 100vw−2rem)` ×
+  `min(560px, 100dvh−4rem)`, every state in the same box, the preview pane always
+  mounted (blank bone when nothing previewable is highlighted). A pine `›` prompt, caps
+  group labels, 32px rows, a 32px bone foot. It **finds only**; Tab hands the query to
+  Ask, and an action that needs one more answer asks it in place. With an embedding
+  model, a meaning query runs 600ms after the last key and replaces the list, never
+  once the selection has moved; a row found by meaning alone reads `· meaning`.
+- **Ask.** A docked column (360–560px, resized from its left edge, remembered per
+  browser, closed by ⌘J or ×) and `/ask` in a 760px column with a collapsible thread
+  list, over one thread store. Answers are sans with ref chips and sit left at full
+  measure with no box; your turn is a right-aligned bone block at most three quarters
+  wide; a scope change is a centred mono divider. Scope chips sit in the composer; a
+  citation previews its passage on hover; action cards propose and the person applies.
+- **The keyboard sheet.** `?` opens it. Two columns of 26px rows on rules with 18px
+  keycaps (hairline, 2px foot, mono 10); only keys that work are printed; chords wait
+  800ms and every key is off while typing.
+- **Tooltips** are inverted (ink, paper text, `text-label`), 120 / 80ms. **Toasts** are
+  sonner, bottom right, ink.
+
+### The chassis
+
+232px of bone with a hairline right edge. The workspace head (a menu: General,
+Members, Invite a member…), Search (`⌘K`), then Today, Tasks and Spaces with its starred
+spaces (five, then `▸ n more`), then Library (Notes, Meetings, Files, and Drafts only
+while the reader has one), Objects (the objects, then customs, each object's pinned
+views under it) and Capital (Portfolio, Mandate), each folding per browser
+(`Library ▸ 3`). Overflow expands inline, never a dropdown. Rows are 30px with a 16px
+mark lane; the current row is a hairline box on paper, every row carries the same box,
+so nothing shifts. Counts only on Tasks and Drafts, ink, destructive only when a task
+is overdue. The foot is the Ask row (`⌘J`) above one account row, the initials square
+and the name, whose menu opens to the right: `Signed in as …`, Settings (`G ,`),
+Keyboard (`?`), Sign out. Collapsed it is 48px of marks with no headings, names as ink
+tooltips; width snaps and is kept per browser. Below `md` it is a drawer under a 48px
+top bar that prints no keys. `NAV_ITEMS` is the one list (the nav grammar, §3).
+
+### The auth sheet
+
+Login, setup and join share `AuthShell`: a 400px column on paper, the mark, a mono caps
+eyebrow naming the step (`SIGN IN`, `SETUP · STEP 1 OF 2`), a serif title, one sans
+sentence, a hairline, the form, a mono foot. Errors are a crimson square and one
+sentence. No card and no centring flourish: a page head printed at the top of an empty
+field.
+
+### Empty pages and first run
+
+An empty page shows what will live there (D116): the kind's dithered noun, the serif
+title and the primary with its key; the set is on the Kit page "Empty states". A filter
+that matched nothing is one icon-and-line row; an empty section is H1's row. An empty
+workspace's Today is the onboarding (D80): Import a file, Drop a deck, Add a company,
+gone once data exists, with no checklist. A missing setup is named where it is used
+(A7); the whole picture is Settings → General → Setup, never shown unprompted.
 
 ---
 
@@ -573,6 +859,14 @@ Four rules keep a settings page plain (D81 amended):
    with three or more named columns, never two (Members has none). It is the list
    table's head cell — 32px, `text-label` graphite, the column rule closing each named
    lane, as `RecordTable`'s `th` draws it.
+
+An object's attributes are a settings ledger too: column heads shared by head and rows
+(Attribute · Type · Constraints · Origin · Order · Edit), a grip lane, the name with its
+description under it, the raw type slug in mono, a mono constraints lane (option count,
+target, currency, out of n, required, default), an origin tag (system on bone, custom on
+the wash) and always-visible order and edit marks. Select rows carry their option
+badges beneath. Archived attributes fold into a closed Archived section with Restore and
+no grip. `A` opens New attribute.
 
 **A settings section is a child route under the settings shell** (SPA-26). `/settings`
 is a layout — `apps/web/src/routes/_app/settings.tsx` — and every section is one file
@@ -731,7 +1025,7 @@ on the canvas and have it approved before it is coded. Do not derive it from
 A page reaches the chassis as **one row of data** in `NAV_ITEMS`
 (`apps/web/src/components/app-sidebar.tsx`), and the row decides everything about
 its place there. It joins one of the four groups — `work`, `library`, `objects`,
-`capital` (`DESIGN.md` §5, "Navigation — the chassis"; Library, Objects and Capital
+`capital` (§2, "The chassis"; Library, Objects and Capital
 fold per browser) — by naming it in the row's `group` field; the groups are derived by filter, so a row may be appended or inserted
 anywhere without reshuffling them. Its G-chord is the row's `key` field: **data, not
 a decision the slice that adds the page makes by hand.**
@@ -777,7 +1071,7 @@ Twenty-eight questions. A merge needs a yes to each.
    and sentences in serif or sans outside the row's mono end lane?
 4. Does the casing follow the three tiers? See 27.
 
-**The seven rules** (`DESIGN.md`, "The seven rules")
+**The seven rules** (§1, "The seven rules")
 
 5. **Meaning** — does every colour name what it encodes (action, selection, state,
    stage, status)?
@@ -793,7 +1087,7 @@ Twenty-eight questions. A merge needs a yes to each.
 11. **No-Bar** — no pine edge bar; current page is paper + rule + weight, a selected row
     is wash + check, a highlighted option is bone?
 
-**Engineering** (`DESIGN.md` §5, "Interaction Engineering")
+**Engineering** (§1, "Motion" and "Interaction engineering")
 
 12. **No-Shift** — fixed dimensions on async slots, tabular figures on changing numbers,
     and weight never changes with state?
@@ -806,7 +1100,7 @@ Twenty-eight questions. A merge needs a yes to each.
     Cmd-K (printed on the surface only in a composer row's end lane or the sidebar
     lane), `aria-label` on icon-only buttons, Enter submits, bare keys off while typing?
 17. Does the surface bound what it draws rather than paginating — a server-side
-    cap, a grouping, or a `+ N more` fold? (`DESIGN.md` names virtualization past
+    cap, a grouping, or a `+ N more` fold? (§1 names virtualization past
     ~200 rows as the target; `RecordTable` deliberately does not carry it yet
     (`apps/web/src/components/table/record-table.tsx:27`), so a new surface
     inherits that limit rather than inventing a solution for it.)
@@ -927,24 +1221,8 @@ anatomy in §3. The surfaces:
   Connections · Plugins · Enrichment · Email forwarding; a settings head carries one
   outline 32px action at most beside its `···`.
 
-**The printed details** (`DESIGN.md` §1, §5 "Printed details"; project 27, `print-*`). The
-stamp and real tabs are built (§2) as the `stamp`, `stamp-outline` and `tab-open`
-utilities (the double rule is retired by E2) in `apps/web/src/styles.css`. So are the elevation split
-(`shadow-dither` on a popover, `shadow-solid` on a window, chosen in the primitives) and
-the sticky head (`HeadBar`, inside `PageHeader` and `RecordHeader`).
-
-- **Dither is data**: charts, readout history, 1-bit marks, popover elevation; one moment
-  per region.
-
 **The frame** (project 27, `shell-*`; D68 amended, D70 amended)
 
-- **Sidebar A** with the collapsible Library group: `DESIGN.md` §5 "Navigation — the
-  chassis". `NAV_ITEMS` gains the `library` group and the nav-grammar test with it;
-  Documents becomes Files (keeping `G L`), Meetings is new (`G E`).
-- **The sidebar's current row is a hairline box on paper** (`border-hairline`, `bg-paper`),
-  inside the chassis, expanded and collapsed alike — never a tab cut through the
-  chassis edge, never a pine bar. Decided by the owner 2026-10-10, reversing the
-  2026-10-08 shell verdict "active row as a tab cut".
 - **Cmd-K finds only**; Tab hands the query to Ask. **Ask** is a docked 408px column
   plus `/ask`, one thread store, answers in sans (D70 amended; project 24). Its sidebar
   row moves to the foot (project 30, above).
@@ -958,8 +1236,13 @@ the sticky head (`HeadBar`, inside `PageHeader` and `RecordHeader`).
   identity key.
 - A member sees an admin page read-only, with who can change it; no "Admins only" page.
 - No footer caption strips.
-- **The plugin page template** and **the account page** (`DESIGN.md` §5 "Settings");
-  Plugins is a catalogue, Installed then Available by job.
+- **The plugin page template**: status and version, the workspace key, what it sent,
+  its manifest settings, Used by (linking to the page that owns each capability, never
+  repeating its settings), recent runs and errors, an empty block not drawn, Disable and
+  Uninstall… in the head's `···`. **The account page** (Options ›): the person's
+  choices for that account, last sync and Disconnect. Plugins is a catalogue: Installed
+  as a ledger, then Available from the registry under tabs by job (Enrichment,
+  Research, Email & calendar, Files, Meeting notes, Import).
 - The sensitivity floor sits at the top of AI → Models; Search reuses the Models key;
   the Models grid has no Embed row.
 

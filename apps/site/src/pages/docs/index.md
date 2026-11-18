@@ -17,7 +17,7 @@ The decision record lives beside the code, in [`docs/` on GitHub](https://github
 - `architecture.md`, the whole system: every model, the packages, how a request flows.
 - `decisions.md`, every decision with its current answer and reason.
 - `roadmap.md`, what is shipped and what comes next.
-- `design-contract.md` and `DESIGN.md`, the Instrument design system.
+- `design-contract.md`, the Instrument design system.
 - `spec-plugin-sdk.md`, the plugin contract.
 
 Spaces is AGPL-3.0. Issues and pull requests are welcome on [GitHub](https://github.com/AnishxBadri/Spaces).

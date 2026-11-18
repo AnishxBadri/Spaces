@@ -5,8 +5,8 @@ description: Design engineering principles for polished, accessible UI — Emil 
 
 # Design Engineering (Emil Kowalski, adapted for Spaces)
 
-Engineering-grade rules for interaction quality. **DESIGN.md is the tiebreaker** —
-where this skill and DESIGN.md disagree, DESIGN.md wins.
+Engineering-grade rules for interaction quality. **`docs/design-contract.md` is the
+tiebreaker**: where this skill and the contract disagree, the contract wins.
 
 ## Spaces overrides — do NOT apply these upstream rules here
 

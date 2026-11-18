@@ -1,6 +1,6 @@
 # Architecture
 
-How Spaces is put together now: what it models, the domain language, how the code is laid out, and where to look. Decisions and their reasons are in `docs/decisions.md`; build mechanics and the gates are in `CLAUDE.md`; the plugin contract is `docs/spec-plugin-sdk.md`; the design system is `DESIGN.md` and `docs/design-contract.md`.
+How Spaces is put together now: what it models, the domain language, how the code is laid out, and where to look. Decisions and their reasons are in `docs/decisions.md`; build mechanics and the gates are in `CLAUDE.md`; the plugin contract is `docs/spec-plugin-sdk.md`; the design system is `docs/design-contract.md` (`DESIGN.md` holds only its tokens).
 
 ## What it is
 
@@ -37,7 +37,7 @@ Worker ── jobs · plugins ─────┘
 | Table      | TanStack Table                      | headless grid; the hardest UI, owned                                                                               |
 | Storage    | local FS or S3                      | content-addressed sha256 blobs; presigned PUTs; the worker re-verifies digests                                     |
 | Extraction | unpdf · mammoth · fflate            | in-process on the worker                                                                                           |
-| UI         | Tailwind 4 + Radix                  | the Instrument design system (`DESIGN.md`)                                                                         |
+| UI         | Tailwind 4 + Radix                  | the Instrument design system (`docs/design-contract.md`)                                                           |
 | Validation | Effect Schema at boundaries         | hand-written, so validators carry business rules; zod is leaving                                                   |
 | Backend    | Effect v4                           | typed errors; Layers are the plugin port model and per-job privilege; never crosses into React                     |
 | AI         | core substrate over AI SDK adapters | `complete` and `embed`, lanes routed by sensitivity, propose-only writes, embeddings pinned at one dimension       |

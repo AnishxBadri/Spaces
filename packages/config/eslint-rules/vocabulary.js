@@ -361,11 +361,11 @@ export const rule = {
     schema: [],
     messages: {
       notInstrument:
-        '`{{token}}` is not an Instrument token — use {{use}} (DESIGN.md "The seven rules").',
+        '`{{token}}` is not an Instrument token — use {{use}} (design contract, "The seven rules").',
       arbitraryType:
-        'arbitrary type size `{{token}}` — use {{fix}}. DESIGN.md §3: if a size isn’t on the list it does not go in the app.',
+        'arbitrary type size `{{token}}` — use {{fix}}. Design contract: if a size isn’t on the list it does not go in the app.',
       rawColour:
-        'raw colour `{{literal}}` in `{{token}}` — every colour in the app is a token. Use the vocabulary (bg-paper, bg-bone, border-rule, text-graphite, the --badge-* tints) or read the custom property, e.g. bg-[var(--badge-amber)]. DESIGN.md §2: the app is light by decision (2026-09-19) and stays token-only, which is what makes dark a token file later and not a redraw.',
+        'raw colour `{{literal}}` in `{{token}}` — every colour in the app is a token. Use the vocabulary (bg-paper, bg-bone, border-rule, text-graphite, the --badge-* tints) or read the custom property, e.g. bg-[var(--badge-amber)]. Design contract: the app is light by decision (2026-09-19) and stays token-only, which is what makes dark a token file later and not a redraw.',
     },
   },
   create(context) {

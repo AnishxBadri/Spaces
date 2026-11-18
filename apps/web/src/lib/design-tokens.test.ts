@@ -303,7 +303,7 @@ describe('the named type steps', () => {
     expect(stepsFromStyles()).toEqual(NAMED_STEPS)
   })
 
-  it('include the field step — DESIGN.md §3’s sixth mono step, 10/12', () => {
+  it('include the field step — the design contract’s smallest step, 10/12', () => {
     expect(css).toContain('--text-field: 0.625rem;')
     expect(css).toContain('--text-field--line-height: 0.75rem;')
   })

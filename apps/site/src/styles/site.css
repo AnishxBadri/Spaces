@@ -5,7 +5,7 @@
  * build must not depend on the app's Tailwind pipeline. If a token changes
  * there, change it here.
  *
- * Light only, by decision (DESIGN.md). Radius 2px on controls, 0 elsewhere.
+ * Light only, by decision (the design contract). Radius 2px on controls, 0 elsewhere.
  * No gradients, no blur, nothing round; the only shadow is a hard ink offset
  * on a picked-up screenshot. Texture is dither, and only on a figure or
  * under the nav's hairline.
@@ -34,7 +34,7 @@
   --font-mono:
     'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
 
-  /* The product's named steps (DESIGN.md §3) … */
+  /* The product's named steps (the design contract) … */
   --text-field: 0.625rem;
   --text-micro: 0.6875rem;
   --text-label: 0.75rem;

@@ -23,7 +23,7 @@
 @import 'tw-animate-css';
 
 /**
- * Spaces tokens — DESIGN.md ("Instrument") made concrete.
+ * Spaces tokens — Instrument (docs/design-contract.md) made concrete.
  * Pure white ground; character lives in Pine and type, never the surface.
  * The primary appears only as: primary action, current selection, focus.
  * All neutrals carry a whisper of the primary hue (~155°) at near-zero
@@ -113,7 +113,7 @@
    * fall below the floor — the worst pair measures 6.26:1, the best 7.02:1.
    *
    * These are data colours, never decoration: a badge is tinted because the
-   * option it names has an identity, per DESIGN.md's Meaning Rule.
+   * option it names has an identity, per the Meaning Rule.
    */
   --badge-slate: oklch(0.955 0.005 255);
   --badge-slate-ink: oklch(0.45 0.014 255); /* 6.52:1 */
@@ -163,7 +163,7 @@
      so the menu stays inside the sheet and never reaches the chassis. */
   --note-gutter: 3.5rem;
 
-  /* The z-index scale (DESIGN.md, Interaction Engineering): five values, no
+  /* The z-index scale (the design contract, Interaction engineering): five values, no
      others. Anything that needs local ordering isolates instead of climbing.
      Menus sit above modals: a picker opened from inside a dialog must float
      over the sheet that opened it. */
@@ -190,12 +190,12 @@
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   /**
-   * Type scale — named steps, fixed rem, never fluid. DESIGN.md §3 asks for a
+   * Type scale — named steps, fixed rem, never fluid. The design contract asks for a
    * tight ratio (~1.125–1.2) and modest sizes: this is product UI, nothing
    * shouts. Each step maps to one role in the hierarchy; if a size isn't on
    * this list it does not go in the app.
    *
-   *   field   10px  Label — DESIGN.md §3's sixth mono step: a small mono
+   *   field   10px  Label — the design contract's smallest step: a small mono
    *                 figure or caption inside a cell or a readout.
    *   micro   11px  Label — timestamps, chip counts, avatar initials
    *   label   12px  Label — field labels, metadata
@@ -222,7 +222,7 @@
   --text-display: 1.625rem;
   --text-display--line-height: 2rem;
 
-  /* Motion — DESIGN.md: 150–250ms, ease-out, state-conveying only. */
+  /* Motion — the design contract: 150–250ms, ease-out, state-conveying only. */
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
 
   --spacing-row: var(--row-h);
@@ -544,7 +544,7 @@
 }
 
 /**
- * The Tabular Rule (DESIGN.md §3) made structural rather than remembered.
+ * The Numeral Rule (design contract) made structural rather than remembered.
  * `.numeric` is the primitive: comparable figures are tabular AND right-aligned
  * in one class, so the two halves of the rule cannot drift apart.
  */
@@ -587,7 +587,7 @@
 }
 
 /**
- * Printed details (DESIGN.md §5): the ink stamp and the open tab. Each shape
+ * Printed details (design contract): the ink stamp and the open tab. Each shape
  * lives here once so no surface spells a clip-path or a border stack by hand.
  */
 
@@ -735,7 +735,7 @@
 }
 
 /**
- * Elevation by kind (DESIGN.md §4). The primitives choose; no call site
+ * Elevation by kind (design contract, Material and scale). The primitives choose; no call site
  * passes a shadow, and gate 5 refuses an arbitrary `shadow-[…]`.
  */
 
@@ -811,7 +811,7 @@
 }
 
 /**
- * Composer wash (DESIGN.md §5, Micro-interactions — SPA-53). A row a composer
+ * Composer wash (design contract, Motion). A row a composer
  * just created lands washed in bone, and the wash fades out over 250ms: the
  * eye is told where the new row went without the list moving a pixel.
  *
@@ -883,7 +883,7 @@
 }
 
 /**
- * Toast — rises 8px as it fades in (DESIGN.md §5, Micro-interactions — SPA-53).
+ * Toast — rises 8px as it fades in (design contract, Motion).
  * sonner ships a 400ms slide from a whole toast-height away and transitions
  * `height` and `box-shadow` alongside it; the instrument's frequency scale puts
  * a toast on the dialog tier — 180ms in, 120ms out — and the travel is 8px.
@@ -963,7 +963,7 @@
     color: var(--foreground);
   }
 
-  /* Interaction Engineering (DESIGN.md): no double-tap zoom on controls; on
+  /* Interaction engineering (design contract): no double-tap zoom on controls; on
      coarse pointers inputs render ≥16px so iOS Safari never zooms on focus. */
   button,
   a,
@@ -1213,7 +1213,7 @@
  * ancestor of the element its floating UI portals into — except where a Radix
  * portal escapes that scope, which is said where it happens.
  *
- * DESIGN.md §4 Depth and §5 "Menus / pickers" are the contract: paper, a 1px
+ * The design contract's "Menus and pickers": paper, a 1px
  * ink edge, the dithered popover shadow, radius 0, 28px rows highlighting in
  * bone, caps mono group labels. No blur anywhere.
  */
@@ -1259,7 +1259,7 @@
 /**
  * Every lifted sheet in the editor: the slash menu, the @-mention menu, the
  * emoji picker, the formatting toolbar, the link toolbar, the file panel.
- * One rule, because DESIGN.md gives them one anatomy.
+ * One rule, because the design contract gives them one anatomy.
  */
 .prose-note .bn-suggestion-menu,
 .prose-note .bn-grid-suggestion-menu,
