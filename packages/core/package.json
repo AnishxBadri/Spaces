@@ -34,7 +34,8 @@
     "./search/*": "./src/search/*.ts",
     "./notes/*": "./src/notes/*.ts",
     "./templates/*": "./src/templates/*.ts",
-    "./feeds/*": "./src/feeds/*.ts"
+    "./feeds/*": "./src/feeds/*.ts",
+    "./export/*": "./src/export/*.ts"
   },
   "scripts": {
     "test": "vitest run",

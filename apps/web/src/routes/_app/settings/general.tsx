@@ -5,7 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Check } from '#/components/icons'
 import { useSettingsDraft } from '#/components/settings/settings-form'
@@ -14,6 +14,8 @@ import {
   SettingsGroup,
   SettingsRow,
   SettingsSection,
+  SettingsState,
+  SettingsTip,
 } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { useConfirm } from '#/components/ui/confirm-dialog'
@@ -23,39 +25,48 @@ import { WorkspaceMark } from '#/components/workspace-mark'
 import { baseCurrencyCodes, currencyLabel } from '#/lib/currency-names'
 import {
   clearWorkspaceLogo,
+  downloadWorkspaceExport,
   getDemoSummary,
   getWhatsSetUp,
+  getWorkspaceExport,
   removeDemoData,
   saveWorkspace,
   setBaseCurrency,
   setWorkspaceLogo,
+  startWorkspaceExport,
 } from '#/lib/server-fns'
-import type { DemoSummary } from '#/lib/server-fns'
+import type { DemoSummary, WorkspaceExport } from '#/lib/server-fns'
 import { SETUP_ITEMS } from '#/lib/setup/whats-set-up'
 import type { SetupState } from '#/lib/setup/whats-set-up'
 import { cn } from '#/lib/utils'
+import { formatBytes } from '@spaces/core/documents'
+import { formatTime } from '@spaces/core/format'
 
 const shell = getRouteApi('/_app/settings')
 
 /**
  * The workspace singleton: Identity (the logo tile and the name, one row),
- * Defaults (the currency it prices in), the demo while it is loaded, and
- * Setup at the foot until every piece is set up.
+ * Defaults (the currency it prices in), Data (the workspace export), the
+ * demo while it is loaded, and Setup at the foot until every piece is set up.
  * - Name and currency are drafts: they collect into the page's Save bar.
  * - The logo's Upload and Remove write at once, with a toast.
  * - Only an admin changes them; a member reads them disabled.
  */
 export const Route = createFileRoute('/_app/settings/general')({
   loader: async () => {
-    const [demo, setUp] = await Promise.all([getDemoSummary(), getWhatsSetUp()])
-    return { demo, setUp }
+    const [demo, setUp, exported] = await Promise.all([
+      getDemoSummary(),
+      getWhatsSetUp(),
+      getWorkspaceExport(),
+    ])
+    return { demo, setUp, exported }
   },
   component: GeneralRoute,
 })
 
 function GeneralRoute() {
   const data = shell.useLoaderData()
-  const { demo, setUp } = Route.useLoaderData()
+  const { demo, setUp, exported } = Route.useLoaderData()
   return (
     <SettingsSection title="General" adminOnly>
       <SettingsGroup title="Identity">
@@ -67,9 +78,109 @@ function GeneralRoute() {
       <SettingsGroup title="Defaults">
         <BaseCurrencyRow baseCurrency={data.fx.baseCurrency} />
       </SettingsGroup>
+      <SettingsGroup title="Data">
+        <ExportRow initial={exported} />
+      </SettingsGroup>
       {demo === null ? null : <DemoDataRow demo={demo} />}
       <Setup state={setUp} />
     </SettingsSection>
+  )
+}
+
+const EXPORT_TIP =
+  'One zip: a CSV per object, notes as markdown, files with a manifest. Private notes, private email bodies and private files are left out. Kept for 24 hours.'
+
+/**
+ * The whole workspace as one zip, built on the worker. Export sends it and
+ * the row follows the job, polling while it is queued or running; a finished
+ * zip offers Download with its size until its day is over, and Export again
+ * beside it.
+ */
+function ExportRow({ initial }: { initial: WorkspaceExport }) {
+  const [view, setView] = useState<WorkspaceExport>(initial)
+  const [pending, setPending] = useState<'start' | 'download' | null>(null)
+  useEffect(() => setView(initial), [initial])
+
+  const running = view.state === 'running'
+  useEffect(() => {
+    if (!running) return
+    const timer = setInterval(() => {
+      void getWorkspaceExport()
+        .then(setView)
+        .catch(() => undefined)
+    }, 3000)
+    return () => clearInterval(timer)
+  }, [running])
+
+  async function start() {
+    setPending('start')
+    try {
+      setView(await startWorkspaceExport())
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Could not start the export',
+      )
+    } finally {
+      setPending(null)
+    }
+  }
+
+  async function download() {
+    setPending('download')
+    try {
+      const { url } = await downloadWorkspaceExport()
+      window.location.assign(url)
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Could not download the export',
+      )
+      setView(await getWorkspaceExport().catch(() => view))
+    } finally {
+      setPending(null)
+    }
+  }
+
+  const exportButton = (
+    <SettingsTip tip={EXPORT_TIP}>
+      <Button
+        variant={view.state === 'ready' ? 'ghost' : 'outline'}
+        pending={pending === 'start'}
+        disabled={running}
+        onClick={() => void start()}
+      >
+        {view.state === 'ready' ? 'Export again' : 'Export'}
+      </Button>
+    </SettingsTip>
+  )
+
+  return (
+    <SettingsRow
+      label="Export workspace"
+      end={
+        view.state === 'running' ? (
+          <SettingsState tone="wait">Exporting</SettingsState>
+        ) : view.state === 'ready' ? (
+          <SettingsState tone="ok">
+            Ready until {formatTime(view.expiresAt)}
+          </SettingsState>
+        ) : view.state === 'failed' ? (
+          <SettingsState tone="bad" className="max-w-64">
+            {view.reason}
+          </SettingsState>
+        ) : undefined
+      }
+    >
+      {view.state === 'ready' ? (
+        <Button
+          variant="outline"
+          pending={pending === 'download'}
+          onClick={() => void download()}
+        >
+          Download · {formatBytes(view.sizeBytes)}
+        </Button>
+      ) : null}
+      {exportButton}
+    </SettingsRow>
   )
 }
 

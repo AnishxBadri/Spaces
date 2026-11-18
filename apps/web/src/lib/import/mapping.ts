@@ -1,8 +1,8 @@
 import { Effect } from 'effect'
 import { asc, eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { attribute, importBatch, importRow, objectDef } from '@spaces/db/schema'
-import { coreKindOf, identityKeysOf } from '@spaces/core/attributes/registry'
+import { importBatch, importRow } from '@spaces/db/schema'
+import { importObjectOf } from '@spaces/core/writes/import/registry'
 import {
   assignColumn,
   autoMap,
@@ -85,50 +85,27 @@ export type MappingObject = {
   registry: MappingRegistry
 }
 
-/** The target object's attributes and identity keys, read once. */
+/**
+ * The target object's attributes and identity keys, read once through
+ * `importObjectOf`, the registry read the workspace export writes from.
+ */
 export const mappingObjectOf = Effect.fn('mappingObjectOf')(function* (
   objectId: string,
 ): Effect.fn.Return<MappingObject, ImportRefused | ImportFailed> {
-  const object = yield* query(() =>
-    db
-      .select({
-        id: objectDef.id,
-        slug: objectDef.slug,
-        singular: objectDef.singular,
-        plural: objectDef.plural,
-        isSystem: objectDef.isSystem,
-        archived: objectDef.archived,
-        identityKeys: objectDef.identityKeys,
-      })
-      .from(objectDef)
-      .where(eq(objectDef.id, objectId))
-      .then((rows) => rows.at(0)),
+  const object = yield* importObjectOf(objectId).pipe(
+    Effect.mapError((e) => new ImportFailed({ cause: e.cause })),
   )
   if (!object || object.archived)
     return yield* new ImportRefused({
       reason: 'That object is archived or no longer exists',
     })
-  const attributes: Array<MappingAttribute> = yield* query(() =>
-    db
-      .select({
-        id: attribute.id,
-        slug: attribute.slug,
-        name: attribute.name,
-        type: attribute.type,
-        options: attribute.options,
-        archived: attribute.archived,
-      })
-      .from(attribute)
-      .where(eq(attribute.objectId, objectId))
-      .orderBy(asc(attribute.sortOrder), asc(attribute.createdAt)),
-  )
   return {
     id: object.id,
     slug: object.slug,
-    kind: coreKindOf(object),
+    kind: object.kind,
     singular: object.singular,
     plural: object.plural,
-    registry: { attributes, identityKeys: identityKeysOf(object) },
+    registry: object.registry,
   }
 })
 

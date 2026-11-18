@@ -6,7 +6,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-import type { Readable } from 'node:stream'
+import { Readable } from 'node:stream'
 import type { Storage } from './types'
 
 /**
@@ -61,21 +61,31 @@ export class S3Storage implements Storage {
     })
   }
 
-  /** Server-side write (rare) — checksum still declared, bucket verifies. */
-  async put(key: string, data: Readable | Buffer, meta: { mime?: string }) {
-    const body = Buffer.isBuffer(data)
-      ? data
-      : await new Promise<Buffer>((resolve, reject) => {
-          const chunks: Array<Buffer> = []
-          data.on('data', (c: Buffer) => chunks.push(c))
-          data.on('end', () => resolve(Buffer.concat(chunks)))
-          data.on('error', reject)
-        })
+  /**
+   * Server-side write — checksum still declared, bucket verifies. A stream
+   * whose `size` the caller measured goes up as it reads; one without must
+   * be read whole first, because a PUT needs its length.
+   */
+  async put(
+    key: string,
+    data: Readable | Buffer,
+    meta: { mime?: string; size?: number },
+  ) {
+    const body =
+      Buffer.isBuffer(data) || meta.size !== undefined
+        ? data
+        : await new Promise<Buffer>((resolve, reject) => {
+            const chunks: Array<Buffer> = []
+            data.on('data', (c: Buffer) => chunks.push(c))
+            data.on('end', () => resolve(Buffer.concat(chunks)))
+            data.on('error', reject)
+          })
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
         Key: key,
         Body: body,
+        ...(meta.size === undefined ? {} : { ContentLength: meta.size }),
         ContentType: meta.mime ?? 'application/octet-stream',
         ChecksumSHA256: hexToBase64(key),
       }),
@@ -130,6 +140,17 @@ export class S3Storage implements Storage {
     )
     if (!res.Body) throw new Error(`Blob ${key} has no body`)
     return res.Body.transformToByteArray()
+  }
+
+  async getStream(key: string) {
+    const res = await this.client.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+    )
+    // Node's SDK answers with an `IncomingMessage`; anything else is a
+    // runtime this driver was not built for.
+    if (!(res.Body instanceof Readable))
+      throw new Error(`Blob ${key} did not arrive as a stream`)
+    return res.Body
   }
 
   async delete(key: string) {

@@ -35,6 +35,11 @@ const writes = vi.hoisted(() => ({
   saveWorkspace: vi.fn(async () => ({ ok: true })),
   setBaseCurrency: vi.fn(async () => ({ ok: true })),
   removeDemoData: vi.fn(async () => ({ removed: 8, kept: 0 })),
+  startWorkspaceExport: vi.fn(async () => ({ state: 'running' })),
+  getWorkspaceExport: vi.fn(async () => ({ state: 'running' })),
+  downloadWorkspaceExport: vi.fn(async () => ({
+    url: 'http://localhost/api/blob/zip',
+  })),
   saveMailbox: vi.fn(async () => ({ queued: true })),
   setSensitivityDefault: vi.fn(
     async ({ data }: { data: { sensitivity: string } }) => data.sensitivity,
@@ -564,6 +569,11 @@ const enrichmentPage = {
 const loaders: Record<string, () => object> = {
   general: () => ({
     demo: { total: 8, byKind: { company: 3, person: 1, term: 3, note: 1 } },
+    exported: {
+      state: 'ready',
+      sizeBytes: 4_404_019,
+      expiresAt: '2026-11-19T12:00:00.000Z',
+    },
     setUp: {
       model: true,
       team: false,
@@ -1218,6 +1228,55 @@ describe('General, by sheet 01', () => {
     expect(writes.setBaseCurrency).toHaveBeenCalledWith({
       data: { currency: 'GBP' },
     })
+  })
+})
+
+describe('General · Data, the workspace export', () => {
+  const row = () =>
+    Array.from(document.querySelectorAll('[data-settings-row]')).find(
+      (el) =>
+        el.querySelector('.font-medium')?.textContent === 'Export workspace',
+    )
+
+  it('offers Download with the zip size beside Export again, under Data', async () => {
+    await mount('/settings/general')
+    const card = row()?.closest('.card')
+    expect(card?.querySelector('[data-settings-group] h3')?.textContent).toBe(
+      'Data',
+    )
+    expect(byText('Download · 4.2 MB', row())).toBeDefined()
+    expect(byText('Export again', row())).toBeDefined()
+    expect(
+      row()?.querySelector('[data-state-tone="ok"]')?.textContent,
+    ).toContain('Ready until')
+  })
+
+  it('starts an export and follows it to Exporting', async () => {
+    const original = loaders.general
+    loaders.general = () => ({ ...original(), exported: { state: 'none' } })
+    try {
+      await mount('/settings/general')
+      expect(byText('Download · 4.2 MB', row())).toBeUndefined()
+      await click(byText('Export', row()))
+      expect(writes.startWorkspaceExport).toHaveBeenCalledTimes(1)
+      expect(
+        row()?.querySelector('[data-state-tone="wait"]')?.textContent,
+      ).toBe('Exporting')
+      expect(byText('Export', row())?.disabled).toBe(true)
+    } finally {
+      loaders.general = original
+    }
+  })
+
+  it('is read-only for a member', async () => {
+    await mount('/settings/general', false)
+    const controls = Array.from(row()?.querySelectorAll('button') ?? [])
+    expect(controls.map((b) => b.textContent.trim())).toEqual([
+      'Download · 4.2 MB',
+      'Export again',
+    ])
+    for (const c of controls)
+      expect(c.closest('fieldset[disabled]')).not.toBeNull()
   })
 })
 

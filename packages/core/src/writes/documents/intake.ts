@@ -196,33 +196,81 @@ const storeBlob = Effect.fn('documentIntake.storeBlob')(function* (
 > {
   const path = join(dir, 'arriving')
   const { sha, sizeBytes } = yield* drainToTempFile(stream, path)
+  const stored = yield* storeMeasured(
+    { path, sha, sizeBytes, mime, declareSize: false },
+    intent,
+  )
+  return { sha, sizeBytes, stored }
+})
 
+/**
+ * A file on disk whose digest and size are already measured, to the store
+ * under that digest unless it holds it; true when this call stored it.
+ * - `declareSize` hands the store the length, so S3 takes the file as a
+ *   stream instead of reading it whole first.
+ */
+const storeMeasured = Effect.fn('documentIntake.storeMeasured')(function* (
+  file: {
+    path: string
+    sha: string
+    sizeBytes: number
+    mime: string | null
+    declareSize: boolean
+  },
+  intent: { preparedBy: string | null } | null,
+): Effect.fn.Return<boolean, DocumentIntakeFailed> {
+  const { path, sha, sizeBytes, mime } = file
   // The same deck arriving from two providers costs one blob: content
   // addressing means the stored bytes are already these bytes.
   const stored = yield* io(() => storage().exists(sha))
-  if (!stored) {
-    if (intent !== null) {
-      yield* io(() =>
-        db
-          .insert(pendingBlob)
-          .values({ sha, sizeBytes, preparedBy: intent.preparedBy })
-          .onConflictDoUpdate({
-            target: pendingBlob.sha,
-            set: {
-              sizeBytes,
-              preparedBy: intent.preparedBy,
-              preparedAt: new Date(),
-            },
-          }),
-      )
-    }
-    // `put`, not `putContentAddressed`: the key is the digest this module
-    // measured, not a claim anybody made.
-    const meta = mime === null ? {} : { mime }
-    yield* io(() => storage().put(sha, createReadStream(path), meta))
+  if (stored) return false
+  if (intent !== null) {
+    yield* io(() =>
+      db
+        .insert(pendingBlob)
+        .values({ sha, sizeBytes, preparedBy: intent.preparedBy })
+        .onConflictDoUpdate({
+          target: pendingBlob.sha,
+          set: {
+            sizeBytes,
+            preparedBy: intent.preparedBy,
+            preparedAt: new Date(),
+          },
+        }),
+    )
   }
-  return { sha, sizeBytes, stored: !stored }
+  // `put`, not `putContentAddressed`: the key is the digest this module
+  // measured, not a claim anybody made.
+  const meta = {
+    ...(mime === null ? {} : { mime }),
+    ...(file.declareSize ? { size: sizeBytes } : {}),
+  }
+  yield* io(() => storage().put(sha, createReadStream(path), meta))
+  return true
 })
+
+/**
+ * **A file the server wrote itself, to a blob**: the workspace export's
+ * zip, hashed and counted as it was written. No meter: the upload limit is
+ * for bytes that arrive, and this file is the whole workspace. The new
+ * blob gets its `pending_blob` row first, as `putBlobProgram`'s does; no
+ * row ever names it, so the orphan sweep is its expiry.
+ */
+export const putMeasuredFileProgram = Effect.fn('putMeasuredFileProgram')(
+  function* (input: {
+    path: string
+    sha: string
+    sizeBytes: number
+    mime: string | null
+    preparedBy: string | null
+  }): Effect.fn.Return<{ stored: boolean }, DocumentIntakeFailed> {
+    const stored = yield* storeMeasured(
+      { ...input, declareSize: true },
+      { preparedBy: input.preparedBy },
+    )
+    return { stored }
+  },
+)
 
 const storeAndBirth = Effect.fn('documentIntake.storeAndBirth')(function* (
   dir: string,

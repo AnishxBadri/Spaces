@@ -242,6 +242,13 @@ export const QUEUES = {
   feedLogo: 'feed.logo',
   /** The weekly fan-out: one `feed.logo` per feed. Never retried. */
   feedLogos: 'feed.logos',
+  /**
+   * The workspace as one zip, streamed to a blob held under a `pending_blob`
+   * intent so the orphan sweep is its expiry. `exclusive` on one fixed
+   * `singletonKey`, so a second press while one is queued or running is
+   * refused; never retried — the admin presses again.
+   */
+  exportWorkspace: 'workspace.export',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

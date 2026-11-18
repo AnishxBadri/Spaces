@@ -9,10 +9,14 @@ import type { Readable } from 'node:stream'
  * local driver fakes it with a short-lived HMAC token on /api/blob/:key.
  */
 export interface Storage {
+  /**
+   * `size`, when the caller measured it, lets S3 take a stream as it comes;
+   * without it the S3 driver must read the stream whole to learn its length.
+   */
   put: (
     key: string,
     data: Readable | Buffer,
-    meta: { mime?: string },
+    meta: { mime?: string; size?: number },
   ) => Promise<void>
   /**
    * `filename` is the name the download lands under — the key is a digest
@@ -36,6 +40,8 @@ export interface Storage {
   ) => Promise<{ url: string; headers: Record<string, string> }>
   /** Whole blob into memory — the extraction worker's read path. */
   getBytes: (key: string) => Promise<Uint8Array>
+  /** The blob as a stream, for a reader that must not hold it whole. */
+  getStream: (key: string) => Promise<Readable>
   delete: (key: string) => Promise<void>
   exists: (key: string) => Promise<boolean>
 }

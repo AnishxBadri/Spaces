@@ -4,7 +4,7 @@ import {
   randomUUID,
   timingSafeEqual,
 } from 'node:crypto'
-import { createWriteStream } from 'node:fs'
+import { createReadStream, createWriteStream } from 'node:fs'
 import { mkdir, readFile, rename, rm, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
@@ -56,7 +56,11 @@ function appUrl(): string {
 }
 
 export class LocalStorage implements Storage {
-  async put(key: string, data: Readable | Buffer, _meta: { mime?: string }) {
+  async put(
+    key: string,
+    data: Readable | Buffer,
+    _meta: { mime?: string; size?: number },
+  ) {
     const path = blobPath(key)
     await mkdir(dirname(path), { recursive: true })
     const source = Buffer.isBuffer(data) ? Readable.from(data) : data
@@ -139,6 +143,14 @@ export class LocalStorage implements Storage {
 
   async getBytes(key: string) {
     return new Uint8Array(await readFile(blobPath(key)))
+  }
+
+  async getStream(key: string) {
+    // Opened before it is handed over, so a missing blob rejects here rather
+    // than as an error event on a stream the caller is already reading.
+    const path = blobPath(key)
+    await stat(path)
+    return createReadStream(path)
   }
 
   async delete(key: string) {

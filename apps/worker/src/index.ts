@@ -86,6 +86,10 @@ import {
   IMPORT_COMMIT_EXPIRE_SECONDS,
   importCommit,
 } from './jobs/import-commit'
+import {
+  EXPORT_WORKSPACE_EXPIRE_SECONDS,
+  exportWorkspace,
+} from './jobs/export-workspace'
 
 /**
  * The worker process. Second process in the app container (or run locally
@@ -639,6 +643,22 @@ async function main() {
     QUEUES.importCommit,
     { batchSize: 1, includeMetadata: true },
     runJob(importCommit, { host, layer: Layer.empty }),
+  )
+  // The workspace export: one fixed key on an `exclusive` queue, so a
+  // second press while one is queued or running is refused; never retried —
+  // the admin presses again. Created before the plain create loop below; a
+  // queue's policy is fixed at create.
+  await boss
+    .createQueue(QUEUES.exportWorkspace, {
+      policy: 'exclusive',
+      retryLimit: 0,
+      expireInSeconds: EXPORT_WORKSPACE_EXPIRE_SECONDS,
+    })
+    .catch(() => {})
+  await boss.work(
+    QUEUES.exportWorkspace,
+    { batchSize: 1, includeMetadata: true },
+    runJob(exportWorkspace, { host, layer: Layer.empty }),
   )
   for (const queue of Object.values(QUEUES)) {
     await boss.createQueue(queue).catch(() => {}) // idempotent across boots
