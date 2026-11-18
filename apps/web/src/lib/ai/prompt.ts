@@ -1,5 +1,7 @@
+import { Effect, Schema } from 'effect'
 import type { ModelMessage, SystemModelMessage } from 'ai'
 import type { ContextItem } from '@spaces/core/context/types'
+import type { AiLane } from './lanes'
 
 /**
  * The user part's renderer behind `complete()`: `[ref] text` blocks, then the
@@ -78,6 +80,8 @@ export type PromptFile = {
 export type PromptTurn = { role: 'user' | 'assistant'; text: string }
 
 export type BuildRequestInput = {
+  /** The lane the call is for, named by `PromptOverBudget`. */
+  lane: AiLane
   /** The lane's fixed text: what to produce and in what form. */
   instructions: string
   /**
@@ -115,21 +119,45 @@ const CACHE_MARK: NonNullable<SystemModelMessage['providerOptions']> = {
 }
 
 /**
+ * The lane's system part leaves the subject no room: sending the call would
+ * drop it silently, so the call is refused instead.
+ */
+export class PromptOverBudget extends Schema.TaggedError<PromptOverBudget>()(
+  'PromptOverBudget',
+  {
+    lane: Schema.String,
+    systemChars: Schema.Number,
+    budgetChars: Schema.Number,
+    message: Schema.String,
+  },
+) {}
+
+/**
  * A call as a system part and messages, built so calls of one lane share a
  * prefix byte for byte: the system part is the lane's fixed text, the user
  * part the context and then the subject, so only the tail differs.
  * - The budget is spent on the system part first and never cuts it; the
- *   subject next; the context fills what is left (`renderPrompt`).
+ *   subject next; the context fills what is left (`renderPrompt`). A system
+ *   part that fills the budget fails `PromptOverBudget`.
  * - With `cache`, the system part carries Anthropic's marker; a conversation
  *   also marks its last two messages, so each turn re-reads the one before.
  *   Without, the shape is the same and no marker is set.
  * - Files follow the text of the last user message.
  */
-export function buildRequest(input: BuildRequestInput): BuiltRequest {
+export const buildRequest = Effect.fn('buildRequest')(function* (
+  input: BuildRequestInput,
+): Effect.fn.Return<BuiltRequest, PromptOverBudget> {
   const system =
     input.mandate === undefined || input.mandate === ''
       ? input.instructions
       : input.instructions + BLOCK_SEPARATOR + input.mandate
+  if (system.length >= input.budgetChars)
+    return yield* new PromptOverBudget({
+      lane: input.lane,
+      systemChars: system.length,
+      budgetChars: input.budgetChars,
+      message: `The ${input.lane} lane's instructions are ${String(system.length)} characters, which leaves no room for the subject in its ${String(input.budgetChars)}-character budget`,
+    })
   const rendered = renderPrompt({
     items: input.items,
     task: input.subject,
@@ -169,7 +197,7 @@ export function buildRequest(input: BuildRequestInput): BuiltRequest {
     },
     messages: marked,
   }
-}
+})
 
 /** The request's length in characters, as the cap and an estimate count it. */
 export function requestChars(request: BuiltRequest): number {

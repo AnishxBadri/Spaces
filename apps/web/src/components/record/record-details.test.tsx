@@ -116,12 +116,12 @@ function type(el: HTMLTextAreaElement, text: string) {
 }
 
 const def = (
-  type: string,
+  attrType: string,
   options: RegistryEntry['options'] = null,
 ): RegistryEntry => ({
-  slug: type,
-  name: type,
-  type,
+  slug: attrType,
+  name: attrType,
+  type: attrType,
   options,
   isSystem: false,
 })
@@ -471,11 +471,11 @@ describe('the fold and long text', () => {
 })
 
 describe('the attribute window’s Long text switch', () => {
-  const attr = (type: EditableAttribute['type'], longText?: boolean) => ({
-    id: `00000000-0000-4000-8000-0000000000${type === 'text' ? '01' : '02'}`,
+  const attr = (attrType: EditableAttribute['type'], longText?: boolean) => ({
+    id: `00000000-0000-4000-8000-0000000000${attrType === 'text' ? '01' : '02'}`,
     name: 'Thesis',
     slug: 'thesis',
-    type,
+    type: attrType,
     options: longText === undefined ? {} : { longText },
   })
   const longSwitch = () =>

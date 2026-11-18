@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
+import { Effect } from 'effect'
 import type { ContextItem } from '@spaces/core/context/types'
-import { buildRequest, renderBlock, renderPrompt } from './prompt'
-import type { BuiltRequest } from './prompt'
+import {
+  buildRequest as buildRequestProgram,
+  renderBlock,
+  renderPrompt,
+} from './prompt'
+import type { BuildRequestInput, BuiltRequest } from './prompt'
 
 /**
  * The prompt renderer is pure — this file imports nothing that
@@ -99,6 +104,8 @@ describe('renderPrompt', () => {
 })
 
 describe('buildRequest', () => {
+  const build = (input: Omit<BuildRequestInput, 'lane'>): BuiltRequest =>
+    Effect.runSync(buildRequestProgram({ lane: 'classify', ...input }))
   const INSTRUCTIONS = 'Classify the company stage. Cite the [ref] you read.'
   const MARK = { anthropic: { cacheControl: { type: 'ephemeral' } } }
 
@@ -113,7 +120,7 @@ describe('buildRequest', () => {
   }
 
   const call = (subject: string, cache = true) =>
-    buildRequest({
+    build({
       instructions: INSTRUCTIONS,
       items: ITEMS,
       subject,
@@ -154,7 +161,7 @@ describe('buildRequest', () => {
   })
 
   it('sends a conversation as real messages, the last two marked and the earlier ones not', () => {
-    const r = buildRequest({
+    const r = build({
       instructions: INSTRUCTIONS,
       items: [],
       subject: 'And who led it?',
@@ -183,7 +190,7 @@ describe('buildRequest', () => {
     ])
     expect(lastText(r)).toBe('And who led it?')
 
-    const unmarked = buildRequest({
+    const unmarked = build({
       instructions: INSTRUCTIONS,
       items: [],
       subject: 'And who led it?',
@@ -197,7 +204,7 @@ describe('buildRequest', () => {
 
   it('keeps file parts after the text of the user part', () => {
     const data = new Uint8Array([1, 2, 3])
-    const r = buildRequest({
+    const r = build({
       instructions: INSTRUCTIONS,
       items: [],
       subject: 'Pages 1–2 of "deck.pdf".',
@@ -222,7 +229,7 @@ describe('buildRequest', () => {
   it('cuts the context to the budget, never the system part or the subject', () => {
     const subject = 'The company is "Acme".'
     const budget = INSTRUCTIONS.length + subject.length + 40
-    const r = buildRequest({
+    const r = build({
       instructions: INSTRUCTIONS,
       items: ITEMS,
       subject,
@@ -235,17 +242,33 @@ describe('buildRequest', () => {
     expect(text).toContain('[attr:e1:stage] Stage: Seed')
     expect(text).not.toContain('[doc:d1#p2]')
     expect(INSTRUCTIONS.length + text.length).toBeLessThanOrEqual(budget)
+  })
 
-    // A budget the system part alone overruns still sends it whole.
-    const tight = buildRequest({
-      instructions: INSTRUCTIONS,
-      items: ITEMS,
-      subject,
-      budgetChars: 10,
-      cache: false,
+  it('refuses a system part that leaves the subject no room, naming the lane and both lengths', () => {
+    const mandate = 'Only seed and Series A count. '.repeat(10)
+    const system = INSTRUCTIONS + '\n\n' + mandate
+    const failure = Effect.runSync(
+      Effect.flip(
+        buildRequestProgram({
+          lane: 'synthesize',
+          instructions: INSTRUCTIONS,
+          mandate,
+          items: ITEMS,
+          subject: 'The company is "Acme".',
+          budgetChars: 100,
+          cache: false,
+        }),
+      ),
+    )
+    expect(failure._tag).toBe('PromptOverBudget')
+    expect(failure).toMatchObject({
+      lane: 'synthesize',
+      systemChars: system.length,
+      budgetChars: 100,
     })
-    expect(tight.instructions.content).toBe(INSTRUCTIONS)
-    expect(lastText(tight)).not.toContain('[attr:e1:stage]')
+    expect(failure.message).toContain('synthesize')
+    expect(failure.message).toContain(String(system.length))
+    expect(failure.message).toContain('100')
   })
 
   it('renders the context alone when the lane has no subject', () => {

@@ -19,6 +19,7 @@ const retryable = (failure: CompleteFailure): boolean => {
     case 'CapExceeded':
     case 'LaneNotRouted':
     case 'NoCredential':
+    case 'PromptOverBudget':
       return false
     case 'ProviderCallFailed':
     case 'RouteReadFailed':

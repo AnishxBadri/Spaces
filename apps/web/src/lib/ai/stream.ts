@@ -8,7 +8,7 @@ import type { ContextItem } from '@spaces/core/context/types'
 import { resolveLanguageModel } from './providers'
 import type { ResolveModelFailure } from './providers'
 import { buildRequest, requestChars } from './prompt'
-import type { PromptTurn } from './prompt'
+import type { PromptOverBudget, PromptTurn } from './prompt'
 import { checkCapProgram } from './caps'
 import type { CapExceeded, CapReadFailed } from './caps'
 import {
@@ -75,6 +75,7 @@ export type StreamOpenFailure =
   | ResolveModelFailure
   | CapExceeded
   | CapReadFailed
+  | PromptOverBudget
 
 export type OpenedStream = {
   target: AiTarget
@@ -97,7 +98,8 @@ export const openStreamProgram = Effect.fn('openStream')(function* (
       modelId: target.model,
       ...(opts.caller.type === 'user' ? { userId: opts.caller.id } : {}),
     })).model
-  const request = buildRequest({
+  const request = yield* buildRequest({
+    lane,
     instructions: opts.instructions,
     items,
     subject: opts.subject ?? '',

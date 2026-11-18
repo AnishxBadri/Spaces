@@ -9,7 +9,7 @@ import { resolveLanguageModel } from './providers'
 import type { ResolveModelFailure } from './providers'
 import { PROVIDER_LABEL } from './providers/ids'
 import { buildRequest } from './prompt'
-import type { PromptFile } from './prompt'
+import type { PromptFile, PromptOverBudget } from './prompt'
 import { aiRouteProgram, isLocalProvider } from './route'
 import { capMessage, checkCapProgram } from './caps'
 import type { CapExceeded, CapReadFailed } from './caps'
@@ -149,6 +149,7 @@ export type CompleteFailure =
   | UsageWriteFailed
   | CapExceeded
   | CapReadFailed
+  | PromptOverBudget
   // Not raised here: a feature's run-log write. Named in this
   // union so every feature's message, which falls through to
   // `completeMessage`, already has a sentence for it.
@@ -159,8 +160,8 @@ const providerLabel = (provider: string): string =>
   provider
 
 /**
- * The sentence a caller is shown. Tagged errors here carry no `message`, so
- * `Effect.runPromise`'s rejection would otherwise reach a toast empty.
+ * The sentence a caller is shown. Most tagged errors here carry no `message`,
+ * so `Effect.runPromise`'s rejection would otherwise reach a toast empty.
  */
 export function completeMessage(failure: CompleteFailure): string {
   switch (failure._tag) {
@@ -182,6 +183,8 @@ export function completeMessage(failure: CompleteFailure): string {
       return capMessage(failure)
     case 'CapReadFailed':
       return 'Could not read the AI cap'
+    case 'PromptOverBudget':
+      return failure.message
     case 'RunWriteFailed':
       return 'Could not record the AI run'
   }
@@ -255,7 +258,8 @@ export const completeProgram = Effect.fn('complete')(function* (
       : { model: opts.model, credentialId: null }
   const model = resolved.model
 
-  const request = buildRequest({
+  const request = yield* buildRequest({
+    lane,
     instructions: opts.instructions,
     items,
     subject: opts.subject ?? '',
