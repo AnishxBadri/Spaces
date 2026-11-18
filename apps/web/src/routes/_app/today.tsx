@@ -520,6 +520,8 @@ function TodayLedger({
               if (!open) setMarkFor(null)
             },
           }}
+          // Today reads the mark through its loader, not the Portfolio keys.
+          onSaved={() => void router.invalidate()}
         />
       )}
       <MeetingDialog

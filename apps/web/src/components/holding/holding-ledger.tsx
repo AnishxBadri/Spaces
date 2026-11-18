@@ -1,4 +1,4 @@
-import { useRouter } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, icon, Link2 } from '#/components/icons'
 import { useRef } from 'react'
 import type { ReactNode } from 'react'
@@ -9,6 +9,7 @@ import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import { MoreMenu } from '#/components/ui/more-menu'
+import { refreshPortfolio } from '#/lib/page-queries'
 import type { HoldingFigure } from '#/lib/portfolio/figures'
 import { voidLedgerEvent } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
@@ -156,7 +157,7 @@ export function EventSection({
   /** What stands in for the section with no rows: its `Name +` row. */
   empty?: ReactNode
 }) {
-  const router = useRouter()
+  const queryClient = useQueryClient()
   const { today } = useClock()
   const { confirm, confirmDialog } = useConfirm()
 
@@ -177,7 +178,7 @@ export function EventSection({
     try {
       await voidLedgerEvent({ data: { table, id: r.id } })
       toast('Voided — the correction is on the record')
-      void router.invalidate()
+      void refreshPortfolio(queryClient)
     } catch (err) {
       // The server names the refusal ("already voided", "a reversal cannot
       // be reversed"); never a generic toast.

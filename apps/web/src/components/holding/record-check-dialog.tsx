@@ -1,4 +1,4 @@
-import { useRouter } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { ChevronDown } from '#/components/icons'
 import { useCallback, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -18,6 +18,7 @@ import {
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { Select, selectClasses } from '#/components/ui/select'
+import { refreshPortfolio } from '#/lib/page-queries'
 import { addInvestment, searchEntities } from '#/lib/server-fns'
 
 /* The portfolio event windows' shared parts: code-owned forms, not the
@@ -27,9 +28,13 @@ import { addInvestment, searchEntities } from '#/lib/server-fns'
 /** A window's open state: its own, or the page's when the page opens it. */
 export type Opened = { open: boolean; onOpenChange: (open: boolean) => void }
 
-/** A portfolio event form's open state, its write and its one error line. */
-export function useEventForm(controlled?: Opened) {
-  const router = useRouter()
+/**
+ * A portfolio event form's open state, its write and its one error line. A
+ * write refreshes the Portfolio keys; `onSaved` is for a page outside them
+ * that shows the event too.
+ */
+export function useEventForm(controlled?: Opened, onSaved?: () => void) {
+  const queryClient = useQueryClient()
   const [own, setOwn] = useState(false)
   const open = controlled?.open ?? own
   const setOpen = controlled?.onOpenChange ?? setOwn
@@ -42,7 +47,8 @@ export function useEventForm(controlled?: Opened) {
       await fn()
       setOpen(false)
       toast(doneMsg)
-      void router.invalidate()
+      void refreshPortfolio(queryClient)
+      onSaved?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save')
     } finally {

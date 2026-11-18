@@ -1,3 +1,4 @@
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { HandCoins, Layers } from '#/components/icons'
 import { useState } from 'react'
@@ -40,12 +41,9 @@ import {
   TooltipTrigger,
 } from '#/components/ui/tooltip'
 import { Select } from '#/components/ui/select'
-import {
-  addDistribution,
-  addMark,
-  addRound,
-  getHolding,
-} from '#/lib/server-fns'
+import { addDistribution, addMark, addRound } from '#/lib/server-fns'
+import type { getHolding } from '#/lib/server-fns'
+import { portfolioQueries } from '#/lib/page-queries'
 import { formatDay } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 import { usePageActions } from '#/lib/page-actions'
@@ -67,13 +65,13 @@ import type { CostBasisReason } from '@spaces/core/portfolio/ownership'
 export const Route = createFileRoute('/_app/portfolio_/$holdingId')({
   validateSearch: holdingSearch,
   loaderDeps: ({ search }) => ({ asOf: search.asOf }),
-  loader: async ({ params, deps }) =>
-    getHolding({
-      data: {
-        id: params.holdingId,
-        ...(deps.asOf === undefined ? {} : { asOf: deps.asOf }),
-      },
-    }),
+  // Into the query cache only; the component reads it from there.
+  loader: async ({ context, params, deps }) => {
+    await context.queryClient.ensureQueryData({
+      ...portfolioQueries.holding(params.holdingId, deps.asOf),
+      revalidateIfStale: true,
+    })
+  },
   pendingComponent: () => <RecordHeadPending kind="Holding" />,
   component: HoldingPage,
 })
@@ -84,8 +82,11 @@ type Holding = Awaited<ReturnType<typeof getHolding>>
 const count = (n: number) => n.toLocaleString('en-US')
 
 function HoldingPage() {
-  const h = Route.useLoaderData()
+  const { holdingId } = Route.useParams()
   const { asOf } = Route.useSearch()
+  const { data: h } = useSuspenseQuery(
+    portfolioQueries.holding(holdingId, asOf),
+  )
   const navigate = Route.useNavigate()
   const m = h.metrics.ok ? h.metrics.metrics : null
   const router = useRouter()
@@ -571,13 +572,16 @@ export function AddMarkDialog({
   holdingId,
   trigger,
   opened,
+  onSaved,
 }: {
   holdingId: string
   /** Its opener: the head's verb. */
   trigger?: ReactNode
   opened?: Opened | undefined
+  /** After the mark is written, for a page outside the Portfolio keys. */
+  onSaved?: (() => void) | undefined
 }) {
-  const f = useEventForm(opened)
+  const f = useEventForm(opened, onSaved)
   const [form, setForm] = useState<{
     date: string
     fairValue: string

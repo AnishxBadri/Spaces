@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, useState } from 'react'
 import type { ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -53,13 +54,9 @@ await vi.hoisted(async () => {
 
 const fns = vi.hoisted(() => ({
   voidLedgerEvent: vi.fn(async () => ({ id: 'rev' })),
-  invalidate: vi.fn(async () => {}),
 }))
 
 vi.mock('#/lib/server-fns', () => ({ voidLedgerEvent: fns.voidLedgerEvent }))
-vi.mock('@tanstack/react-router', () => ({
-  useRouter: () => ({ invalidate: fns.invalidate }),
-}))
 vi.mock('sonner', () => ({ toast: Object.assign(() => {}, {}) }))
 
 let root: Root | null = null
@@ -84,7 +81,9 @@ function mount(node: ReactNode) {
   root = createRoot(host)
   act(() =>
     root?.render(
-      <ClockProvider now="2026-10-26T12:00:00.000Z">{node}</ClockProvider>,
+      <QueryClientProvider client={new QueryClient()}>
+        <ClockProvider now="2026-10-26T12:00:00.000Z">{node}</ClockProvider>
+      </QueryClientProvider>,
     ),
   )
 }

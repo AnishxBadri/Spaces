@@ -1,3 +1,4 @@
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import {
   createColumnHelper,
@@ -28,7 +29,8 @@ import { Input } from '#/components/ui/input'
 import { MENU_RULE, MoreMenu } from '#/components/ui/more-menu'
 import type { MoreMenuEntry } from '#/components/ui/more-menu'
 import { useClock } from '#/components/clock'
-import { listHoldings } from '#/lib/server-fns'
+import type { listHoldings } from '#/lib/server-fns'
+import { portfolioQueries } from '#/lib/page-queries'
 import { cn } from '#/lib/utils'
 import { formatDay } from '@spaces/core/format'
 import {
@@ -50,7 +52,15 @@ import {
  * Columns are rare enough to live in the head's `···`.
  */
 export const Route = createFileRoute('/_app/portfolio')({
-  loader: async () => listHoldings(),
+  // The reference route for page data as keyed queries (`page-queries`). The
+  // data lives in the query cache, not the match: returning it too would
+  // send it twice in the first paint.
+  loader: async ({ context }) => {
+    await context.queryClient.ensureQueryData({
+      ...portfolioQueries.list(),
+      revalidateIfStale: true,
+    })
+  },
   component: PortfolioPage,
 })
 
@@ -135,7 +145,7 @@ function headMenu(
 }
 
 function PortfolioPage() {
-  const data = Route.useLoaderData()
+  const { data } = useSuspenseQuery(portfolioQueries.list())
   const [globalFilter, setGlobalFilter] = useState('')
   const [searching, setSearching] = useState(false)
   const [sorting, setSorting] = useState<SortingState>([])

@@ -32,6 +32,7 @@ const fns = vi.hoisted(() => ({
   countViews: vi.fn(async () => ({})),
   searchEntities: vi.fn(),
   addInvestment: vi.fn(),
+  listHoldings: vi.fn(),
   reExtractDocument: vi.fn(),
 }))
 
@@ -430,6 +431,9 @@ describe('Deals', () => {
 })
 
 describe('Portfolio', () => {
+  // The page reads its keyed query, not the match's loader data.
+  beforeEach(() => fns.listHoldings.mockResolvedValue(portfolioData()))
+
   it('no tab bar; the count rides the title; the head is Record a check and ···', async () => {
     await mount('portfolio')
     await until('the head', () => title()?.startsWith('Portfolio') === true)
@@ -494,6 +498,11 @@ describe('Portfolio', () => {
         instrument: 'priced',
       },
     })
+    // The write refreshes the list it shows under.
+    await until(
+      'the list refetched',
+      () => fns.listHoldings.mock.calls.length === 2,
+    )
   })
 })
 
