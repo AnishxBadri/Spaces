@@ -284,18 +284,19 @@ describe('the tab head', () => {
     expect(classes(overview)).toContain('text-foreground')
     expect(doc.body.textContent).not.toMatch(/Context/)
     const list = doc.querySelector('[role="tablist"]')
+    expect(classes(list)).toContain('h-11')
     // Pinned under the folded head only below `xl`; in the pane it never moves.
-    expect(classes(list)).toEqual(
+    const bar = list?.parentElement ?? null
+    expect(classes(bar)).toEqual(
       expect.arrayContaining([
-        'h-11',
         'bg-bone',
         'shrink-0',
         'max-xl:sticky',
         'md:max-xl:top-12',
       ]),
     )
-    expect(classes(list)).not.toContain('sticky')
-    expect(classes(list)).not.toContain('md:top-12')
+    expect(classes(bar)).not.toContain('sticky')
+    expect(classes(bar)).not.toContain('md:top-12')
   })
 
   it('draws an empty tab graphite with no count, a closed tab with content in ink', () => {

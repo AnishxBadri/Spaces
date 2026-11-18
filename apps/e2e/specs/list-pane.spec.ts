@@ -200,6 +200,41 @@ test.describe('at 1280×800, a full list', () => {
 /** The phone's top bar: the column head stops at its foot. */
 const TOP_BAR = 48
 
+/**
+ * The list, hydrated: the count of columns past the edge is the client's
+ * own, so the router has restored its scroll by the time it shows.
+ */
+async function openPhoneList(page: Page, url: string) {
+  await page.goto(`${url}/companies`)
+  await expect(page.locator('tbody [data-row]')).toHaveCount(50)
+  await expect(page.locator('[data-more-columns]')).toBeVisible()
+}
+
+/** Scrolls the window to `y`, or its end, and waits until it stays there. */
+async function scrollWindow(page: Page, y: number | 'end') {
+  await expect
+    .poll(() =>
+      page.evaluate(async (to) => {
+        const top =
+          to === 'end' ? document.documentElement.scrollHeight : Number(to)
+        window.scrollTo(0, top)
+        await new Promise((done) => requestAnimationFrame(done))
+        const max = document.documentElement.scrollHeight - window.innerHeight
+        return Math.abs(window.scrollY - Math.min(top, max)) <= 1
+      }, y),
+    )
+    .toBe(true)
+}
+
+/** Every column head cell's top edge, rounded. */
+function headTops(page: Page) {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('thead th')].map((th) =>
+      Math.round(th.getBoundingClientRect().top),
+    ),
+  )
+}
+
 test.describe('at 390×844, a phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
@@ -209,8 +244,7 @@ test.describe('at 390×844, a phone', () => {
   }) => {
     // A full first page, whether or not the tests above ran first.
     if ((await countCompanies()) < 50) await fillTo(50)
-    await adminPage.goto(`${main.url}/companies`)
-    await expect(adminPage.locator('tbody [data-row]')).toHaveCount(50)
+    await openPhoneList(adminPage, main.url)
     const at = () =>
       adminPage.evaluate(() => {
         const rect = (sel: string) => {
@@ -239,22 +273,63 @@ test.describe('at 390×844, a phone', () => {
     expect(before.paneScroll).toBe(0)
     expect(before.head).toBeGreaterThan(TOP_BAR)
 
-    await adminPage.evaluate(() => window.scrollBy(0, 800))
-    // The head is scrolled away; the column head rides at the top bar's foot.
-    await expect.poll(async () => Math.round((await at()).head)).toBe(TOP_BAR)
+    await scrollWindow(adminPage, 800)
+    // The head is scrolled away; the column head rides at the top bar's
+    // foot, every cell of it, the pinned name column's included.
     const mid = await at()
     expect(mid.scrollY).toBe(800)
     expect(mid.title).toBeLessThan(0)
+    expect(new Set(await headTops(adminPage))).toEqual(new Set([TOP_BAR]))
 
     // At the foot of the list it is still there, over the last rows.
-    await adminPage.evaluate(() =>
-      window.scrollTo(0, document.documentElement.scrollHeight),
-    )
-    await expect.poll(async () => Math.round((await at()).head)).toBe(TOP_BAR)
+    await scrollWindow(adminPage, 'end')
     const end = await at()
+    expect(Math.round(end.head)).toBe(TOP_BAR)
     expect(end.headBottom).toBeLessThanOrEqual(end.lastRow)
     expect(
       Math.abs(end.scrollY + end.innerHeight - end.scrollHeight),
     ).toBeLessThanOrEqual(1)
+  })
+
+  test('sideways, the column head follows the rows, and the page never widens', async ({
+    adminPage,
+    main,
+  }) => {
+    await openPhoneList(adminPage, main.url)
+    await scrollWindow(adminPage, 800)
+    // The name column and the first column that scrolls: head and cell.
+    const edges = () =>
+      adminPage.evaluate(() => {
+        const left = (el: Element | null | undefined) => {
+          if (!el) throw new Error('no column')
+          return el.getBoundingClientRect().left
+        }
+        const row = document.querySelector('tbody [data-row]')
+        return {
+          head: left(document.querySelector('thead th[data-column]')),
+          cell: left(row?.querySelector('td:not(.sticky)')),
+          nameHead: left(document.querySelector('thead th:not([data-column])')),
+          nameCell: left(row?.querySelector('td.sticky')),
+          scrollWidth: document.documentElement.scrollWidth,
+          clientWidth: document.documentElement.clientWidth,
+        }
+      })
+    const before = await edges()
+    expect(before.head).toBe(before.cell)
+    expect(before.nameHead).toBe(before.nameCell)
+    expect(before.scrollWidth).toBe(before.clientWidth)
+    // A swipe across the rows: the head moves with them, the name stays.
+    await adminPage
+      .locator('[data-table-body]')
+      .evaluate((el) => el.scrollBy(120, 0))
+    await expect
+      .poll(async () => (await edges()).head)
+      .toBeLessThan(before.head)
+    const after = await edges()
+    expect(after.head).toBe(after.cell)
+    expect(after.nameHead).toBe(before.nameHead)
+    expect(after.nameCell).toBe(before.nameCell)
+    expect(new Set(await headTops(adminPage))).toEqual(new Set([TOP_BAR]))
+    expect(after.scrollWidth).toBe(after.clientWidth)
   })
 })

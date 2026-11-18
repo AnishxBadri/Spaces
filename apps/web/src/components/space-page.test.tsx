@@ -539,6 +539,23 @@ describe('the Overview tab', () => {
     expect(cells.at(2)?.querySelector('[data-stage-bar]')).not.toBeNull()
   })
 
+  it('stacks the readouts below md, one ruled row each, and runs them as a strip from md', async () => {
+    await mount('overview')
+    const strip = document.querySelector('[data-overview-readouts]')
+    const cls = (el: Element | null | undefined) =>
+      (el?.className ?? '').split(/\s+/)
+    expect(cls(strip)).toEqual(
+      expect.arrayContaining(['flex-col', 'md:flex-row', 'md:h-19']),
+    )
+    // No fixed width below md: nothing runs past a phone's edge.
+    const cells = Array.from(document.querySelectorAll('[data-readout]'))
+    for (const c of cells)
+      expect(cls(c).filter((k) => /^w-/.test(k))).toEqual([])
+    expect(cls(cells.at(1))).toEqual(
+      expect.arrayContaining(['border-t', 'md:border-t-0']),
+    )
+  })
+
   it('draws Tasks with none open as its one Tasks + row', async () => {
     await mount('overview')
     const row = buttonNamed(/^Tasks\+$/)

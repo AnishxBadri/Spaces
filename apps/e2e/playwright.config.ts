@@ -1,4 +1,5 @@
-import { defineConfig, devices } from '@playwright/test'
+import { existsSync } from 'node:fs'
+import { defineConfig, devices, firefox, webkit } from '@playwright/test'
 import { launchOptions } from './harness/shared.ts'
 
 /**
@@ -20,6 +21,25 @@ import { launchOptions } from './harness/shared.ts'
  */
 const imageUrl = process.env.E2E_IMAGE_URL
 const image = imageUrl !== undefined && imageUrl !== ''
+
+/**
+ * The phone specs again in Firefox and WebKit, whose layout and `sticky`
+ * differ from Chromium's — each only where that browser is installed
+ * (`playwright install firefox webkit`). CI installs Chromium alone, so its
+ * run neither grows nor needs them; a machine that has them runs them.
+ */
+const otherEngines = [
+  { name: 'firefox', type: firefox, device: devices['Desktop Firefox'] },
+  { name: 'webkit', type: webkit, device: devices['Desktop Safari'] },
+]
+  .filter((e) => existsSync(e.type.executablePath()))
+  .map((e) => ({
+    name: e.name,
+    testMatch: ['list-pane.spec.ts', 'space-phone.spec.ts'],
+    grep: /a phone/,
+    // The Chromium override in `launchOptions` is Chromium's alone.
+    use: { ...e.device, launchOptions: {} },
+  }))
 
 export default defineConfig({
   testDir: './specs',
@@ -52,5 +72,6 @@ export default defineConfig({
           testIgnore: 'image/**',
           use: { ...devices['Desktop Chrome'] },
         },
+        ...otherEngines,
       ],
 })

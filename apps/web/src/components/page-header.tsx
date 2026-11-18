@@ -105,7 +105,7 @@ export const PAGE_EDGE = 'px-6'
  * pins and the window never scrolls; the table's card takes what the head
  * and the bar leave and scrolls its rows inside. Below `md` the page scrolls
  * with the window, as a phone expects: the head scrolls away and the table's
- * column head rides down under the top bar (`list-head-drop`).
+ * column head pins under the top bar (`RecordTable` splits its table there).
  * Pair it with `PageHeader folds={false}` and a `PageBody` given `min-h-0`.
  * - `fixed={false}` keeps the same element as a page that scrolls (the
  *   Deals board), so switching shape never remounts what is inside.

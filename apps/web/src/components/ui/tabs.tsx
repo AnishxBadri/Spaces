@@ -1,4 +1,4 @@
-import { useId, useRef } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import {
   PIN_UNDER_HEAD_BAR,
@@ -24,6 +24,8 @@ import { cn } from '#/lib/utils'
  * - Keyboard: ←→ move and wrap, Home/End jump, and moving selects (automatic
  *   activation). Only the open tab is in the tab order.
  * - A nested switch under the bar is a `Segmented`, never a second tab row.
+ * - Tabs wider than the bar, a space's six on a phone, scroll sideways
+ *   inside it, never the page; the open tab is kept in view.
  * - `pinned` keeps the bar under the folded `HeadBar` while its body
  *   scrolls, on bone so nothing shows through it.
  * - `pane` is a tabbed record's fixed pane: at `xl` the body takes the
@@ -141,6 +143,20 @@ export function Tabs<T extends string>({
     items.findIndex((t) => t.id === value),
   )
 
+  // The open tab is brought into the bar whenever it changes, a deep link
+  // included; only the bar scrolls, never the window.
+  const scrollRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const bar = scrollRef.current
+    const open = refs.current[selected]
+    if (!bar || !open) return
+    const start = open.offsetLeft
+    const end = start + open.offsetWidth
+    if (start < bar.scrollLeft) bar.scrollLeft = start
+    else if (end > bar.scrollLeft + bar.clientWidth)
+      bar.scrollLeft = end - bar.clientWidth
+  }, [selected])
+
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     const next = nextTabIndex(e.key, selected, items.length)
     const item = next === null ? undefined : items[next]
@@ -150,11 +166,13 @@ export function Tabs<T extends string>({
     refs.current[next]?.focus()
   }
 
-  // No overflow clip: the open tab stands on this foot line. The line is a
-  // `before:` so it paints under the open tab rather than over it.
-  const bar = cn(
+  // The open tab stands on this foot line. The line is a `before:` so it
+  // paints under the open tab rather than over it.
+  const line = cn(
     'relative flex h-11 items-end before:absolute before:inset-x-0 before:bottom-0 before:h-px',
     plain ? 'before:bg-rule' : 'before:bg-hairline',
+  )
+  const pin = cn(
     pinned &&
       cn('bg-bone', pane ? PIN_UNDER_HEAD_BAR_NARROW : PIN_UNDER_HEAD_BAR),
     pane && 'shrink-0',
@@ -164,7 +182,13 @@ export function Tabs<T extends string>({
       role="tablist"
       aria-label={label}
       onKeyDown={onKeyDown}
-      className={trail === undefined ? bar : 'flex shrink-0 items-end'}
+      // Alone, the tablist is the line, as wide as its tabs or the bar,
+      // whichever is wider, so the line runs under every tab as it scrolls.
+      className={
+        trail === undefined
+          ? cn(line, 'w-max min-w-full')
+          : 'flex shrink-0 items-end'
+      }
     >
       {items.map((t, i) => {
         const open = i === selected
@@ -234,9 +258,20 @@ export function Tabs<T extends string>({
       className={cn('flex flex-col', pane && 'xl:min-h-0 xl:flex-1', className)}
     >
       {trail === undefined ? (
-        list
+        // Tabs wider than the bar scroll inside it, never the page; the
+        // bar's own scrollbar is hidden, the cut-off tab says there is more.
+        <div
+          ref={scrollRef}
+          data-tab-scroll
+          className={cn(
+            '[scrollbar-width:none] overflow-x-auto overflow-y-hidden',
+            pin,
+          )}
+        >
+          {list}
+        </div>
       ) : (
-        <div data-tab-bar className={bar}>
+        <div data-tab-bar className={cn(line, pin)}>
           {list}
           <div
             data-tab-trail

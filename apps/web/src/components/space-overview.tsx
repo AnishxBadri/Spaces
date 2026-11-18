@@ -74,9 +74,11 @@ export function SpaceOverview({
   return (
     <div data-overview className="flex flex-col">
       {readouts.length > 0 ? (
+        // Below `md` the readouts stack, one ruled row each, rather than
+        // run past a phone's edge; from `md` they are the strip.
         <div
           data-overview-readouts
-          className="flex h-19 shrink-0 overflow-x-auto border-b border-rule px-(--inset)"
+          className="flex shrink-0 flex-col border-b border-rule px-(--inset) md:h-19 md:flex-row md:overflow-x-auto"
         >
           {readouts.map((r, i) => {
             const bar = typeof r.value !== 'string'
@@ -85,9 +87,10 @@ export function SpaceOverview({
                 key={r.label}
                 data-readout
                 className={cn(
-                  'flex shrink-0 flex-col justify-center gap-0.5',
-                  i === 0 ? 'w-55 border-r border-rule' : 'pl-4',
-                  bar ? 'w-90 shrink' : i > 0 && 'w-45',
+                  'flex shrink-0 flex-col justify-center gap-0.5 py-2.5 md:py-0',
+                  i > 0 && 'border-t border-rule md:border-t-0',
+                  i === 0 ? 'md:w-55 md:border-r md:border-rule' : 'md:pl-4',
+                  bar ? 'md:w-90 md:shrink' : i > 0 && 'md:w-45',
                 )}
               >
                 {bar ? (

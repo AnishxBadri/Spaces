@@ -316,7 +316,7 @@ describe('E9 · the ground is bone, the sheets are paper', () => {
         onValueChange={() => {}}
       />,
     )
-    expect(classesAt(pinned, 'role="tablist"')).toContain('bg-bone')
+    expect(classesAt(pinned, 'data-tab-scroll')).toContain('bg-bone')
   })
 
   it('turns Today’s rail into two paper cards: no bone rail, no ink edge', () => {

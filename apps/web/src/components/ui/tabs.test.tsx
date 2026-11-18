@@ -259,17 +259,34 @@ describe('an empty tab', () => {
 
 describe('a pinned head', () => {
   it('sticks directly under the 48px folded bar, above the body', () => {
-    const list = render('notes', true).querySelector('[role="tablist"]')
-    expect(classes(list)).toEqual(
+    const bar = render('notes', true).querySelector('[data-tab-scroll]')
+    expect(classes(bar)).toEqual(
       expect.arrayContaining(['sticky', 'md:top-12', 'top-24', 'z-sticky']),
     )
     // Opaque bone, so rows scrolling under it never show through.
-    expect(classes(list)).toContain('bg-bone')
+    expect(classes(bar)).toContain('bg-bone')
   })
 
   it('scrolls with the page when not pinned', () => {
-    const list = render('notes').querySelector('[role="tablist"]')
-    expect(classes(list)).not.toContain('sticky')
+    const bar = render('notes').querySelector('[data-tab-scroll]')
+    expect(classes(bar)).not.toContain('sticky')
+  })
+})
+
+describe('a bar too narrow for its tabs', () => {
+  it('scrolls its tabs inside itself, the line running under all of them', () => {
+    const doc = render('notes')
+    const bar = doc.querySelector('[data-tab-scroll]')
+    const list = doc.querySelector('[role="tablist"]')
+    expect(list?.parentElement).toBe(bar)
+    expect(classes(bar)).toEqual(
+      expect.arrayContaining(['overflow-x-auto', 'overflow-y-hidden']),
+    )
+    // The tablist is as wide as its tabs, at least the bar: its foot line
+    // spans every tab however far the bar scrolls.
+    expect(classes(list)).toEqual(
+      expect.arrayContaining(['w-max', 'min-w-full', 'before:inset-x-0']),
+    )
   })
 })
 

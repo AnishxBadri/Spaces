@@ -40,6 +40,13 @@ import { ListZeroRow } from './list-states'
 import type { RowSelection } from './selection-bar'
 import { cn } from '#/lib/utils'
 
+declare module 'react' {
+  interface CSSProperties {
+    /** The columns' total width, which each row takes when the table splits below `md`. */
+    '--table-width'?: string | undefined
+  }
+}
+
 declare module '@tanstack/react-table' {
   // A column of comparable figures: its head right-aligns over `numeric` cells.
   interface ColumnMeta<TData extends RowData, TValue> {
@@ -67,6 +74,8 @@ declare module '@tanstack/react-table' {
  * foot its bottom, the name column its left and a row's trailing lane (its
  * `···`) its right; everything else scrolls under them. The cells keep their
  * own borders (`border-separate`) so a pinned cell's rules travel with it.
+ * Below `md` a list page scrolls with the window, and the stylesheet splits
+ * the same table so its head pins under the top bar (`useSplitHead`).
  * - Every cell's content is bounded to the 36px row.
  * - The table is the page's folder body (`folder`: a hairline frame under
  *   its tab bar) or, with no tabs over it, a rule card; a line between
@@ -211,7 +220,7 @@ export function RecordTable<T>({
     columns: visible.length,
     endWidth: rowEndWidth,
   })
-  useHeadTravel(scrollRef)
+  useSplitHead(scrollRef, overflow.check)
   // ← → move by about one column: the mean of the columns that scroll.
   const scrolling = visible.filter((c) => c.id !== stickyColumnId)
   const columnStep =
@@ -268,9 +277,12 @@ export function RecordTable<T>({
   const stickyLeft = select ? 'left-9' : 'left-0'
   // The columns at their widths plus the trailing lane, never narrower than
   // the card — the trailing lane takes the slack.
+  const tableWidth =
+    table.getTotalSize() + (select ? SELECT_WIDTH : 0) + rowEndWidth
   const tableStyle = {
-    width: table.getTotalSize() + (select ? SELECT_WIDTH : 0) + rowEndWidth,
+    width: tableWidth,
     minWidth: '100%',
+    '--table-width': `${String(tableWidth)}px`,
   }
 
   // `isolate`: the pinned head, column and lane order themselves with small
@@ -351,7 +363,7 @@ export function RecordTable<T>({
                 </tr>
               ))}
             </thead>
-            <tbody role="rowgroup">
+            <tbody role="rowgroup" data-table-body>
               {instead !== null
                 ? null
                 : rows.map((row) => (
@@ -473,7 +485,8 @@ export function RecordTable<T>({
 
 /**
  * Every head cell: pinned to the card's top, opaque over the rows. Below
- * `md` on a list page `list-head-drop` carries it down under the top bar.
+ * `md` on a list page the whole head pins under the top bar instead
+ * (`useSplitHead`).
  */
 const HEAD_CELL = 'sticky top-0 border-b border-rule bg-paper'
 
@@ -500,9 +513,10 @@ function ResizeGuide({
 }) {
   const ref = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
-    const el = scroller.current
+    const root = scroller.current
     const guide = ref.current
-    if (!el || !guide) return
+    if (!root || !guide) return
+    const el = sideScroller(root)
     const place = () => {
       guide.style.left = `${at - 1 - el.scrollLeft}px`
     }
@@ -551,11 +565,12 @@ function useColumnOverflow(
   const [hidden, setHidden] = useState(0)
   const [scrolled, setScrolled] = useState(false)
   const past = useCallback(
-    (el: HTMLDivElement) => {
+    (root: HTMLDivElement) => {
+      const el = sideScroller(root)
       // Not laid out (hidden, or a DOM with no layout): nothing to count.
       if (el.clientWidth === 0) return []
       const edge = el.scrollLeft + el.clientWidth - endWidth
-      return [...el.querySelectorAll('[data-column]')].filter(
+      return [...root.querySelectorAll('[data-column]')].filter(
         (th): th is HTMLElement =>
           th instanceof HTMLElement &&
           th.offsetLeft + th.offsetWidth > edge + 1,
@@ -567,7 +582,7 @@ function useColumnOverflow(
     const el = ref.current
     if (!el) return
     setHidden(past(el).length)
-    setScrolled(el.scrollLeft > 0)
+    setScrolled(sideScroller(el).scrollLeft > 0)
   }, [ref, past])
   useEffect(() => {
     const el = ref.current
@@ -586,38 +601,53 @@ function useColumnOverflow(
     const el = ref.current
     const next = el ? past(el).at(0) : undefined
     if (!el || !next) return
-    el.scrollTo({ left: next.offsetLeft - pinnedWidth, behavior: behavior() })
+    sideScroller(el).scrollTo({
+      left: next.offsetLeft - pinnedWidth,
+      behavior: behavior(),
+    })
   }
-  const scrollBy = (left: number) =>
-    ref.current?.scrollBy({ left, behavior: behavior() })
+  const scrollBy = (left: number) => {
+    const el = ref.current
+    if (el) sideScroller(el).scrollBy({ left, behavior: behavior() })
+  }
   return { hidden, scrolled, check, reveal, scrollBy }
 }
 
 /**
- * How far the column head may ride down the rows (`--head-travel` on the
- * scroller): its height less the head's, so the head stops on the last row.
- * Below `md` a list scrolls with the window and the sideways scroller traps
- * `sticky`, so the head travels by a scroll-driven animation instead
- * (`list-head-drop` in the stylesheet); this is the one length CSS cannot
- * read for itself.
+ * What scrolls the columns sideways: the scroller, or, where the stylesheet
+ * splits the table below `md` on a list page, the body under its pinned
+ * head. The computed style decides, so the breakpoint lives in one place.
  */
-function useHeadTravel(ref: RefObject<HTMLDivElement | null>) {
+function sideScroller(scroller: HTMLDivElement): HTMLElement {
+  const body = scroller.querySelector('[data-table-body]')
+  if (!(body instanceof HTMLElement)) return scroller
+  const x = getComputedStyle(body).overflowX
+  return x === 'auto' || x === 'scroll' ? body : scroller
+}
+
+/**
+ * The split table's head follows its body sideways. Below `md` a list
+ * scrolls with the window and a head inside a sideways scroller could only
+ * stick to that scroller, so the stylesheet pins the head as its own box
+ * and only the body scrolls; this mirrors the body's `scrollLeft` onto the
+ * head and tells the overflow count. The body's scroll event does not
+ * reach the scroller's own `onScroll`.
+ */
+function useSplitHead(
+  ref: RefObject<HTMLDivElement | null>,
+  onScroll: () => void,
+) {
   useEffect(() => {
-    const el = ref.current
-    const head = el?.querySelector('[data-table-head]')
-    if (!el || !(head instanceof HTMLElement)) return
-    if (typeof ResizeObserver === 'undefined') return
-    const measure = () =>
-      el.style.setProperty(
-        '--head-travel',
-        `${Math.max(0, el.clientHeight - head.offsetHeight)}px`,
-      )
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(el)
-    observer.observe(head)
-    return () => observer.disconnect()
-  }, [ref])
+    const body = ref.current?.querySelector('[data-table-body]')
+    const head = ref.current?.querySelector('[data-table-head]')
+    if (!(body instanceof HTMLElement) || !(head instanceof HTMLElement)) return
+    const follow = () => {
+      head.scrollLeft = body.scrollLeft
+      onScroll()
+    }
+    body.addEventListener('scroll', follow, { passive: true })
+    return () => body.removeEventListener('scroll', follow)
+  }, [ref, onScroll])
 }
 
 /** One row's checkbox, shown on hover, focus, or while any row is checked. */

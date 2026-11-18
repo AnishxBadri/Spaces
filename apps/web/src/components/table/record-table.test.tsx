@@ -198,38 +198,65 @@ describe('the pane', () => {
     expect(classes(company)).toEqual(expect.arrayContaining(['z-30', 'left-0']))
   })
 
-  it('measures how far the head may ride down the rows: the pane less the head', () => {
-    // happy-dom lays nothing out, so the two heights are given.
-    const client = vi
-      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
-      .mockReturnValue(400)
-    const offset = vi
-      .spyOn(HTMLElement.prototype, 'offsetHeight', 'get')
-      .mockReturnValue(32)
-    try {
-      mount()
-      expect(
-        one('[data-table-scroller]').style.getPropertyValue('--head-travel'),
-      ).toBe('368px')
-    } finally {
-      client.mockRestore()
-      offset.mockRestore()
-    }
+  it('hands every row the columns’ total width, for the table split below md', () => {
+    mount()
+    const table = one('table[role="table"]')
+    const width = table.style.getPropertyValue('--table-width')
+    expect(width).toMatch(/^\d+px$/)
+    expect(table.style.width).toBe(width)
   })
 
-  it('below md, on a list page, carries the head down under the top bar', () => {
+  it('below md, on a list page, pins the head as its own box under the top bar and scrolls the body under it', () => {
     const css = readFileSync(
       fileURLToPath(new URL('../../styles.css', import.meta.url)),
       'utf8',
     )
-    const block = css.slice(css.indexOf('@keyframes list-head-drop'))
-    expect(block).toMatch(/@media \(width < 48rem\)/)
-    // A list page only: a record page pins its own bar and tabs there.
-    expect(block).toContain(
-      "[data-list-page='true']:not([data-pane-from]) [data-table-head] th",
+    // The breakpoint that holds the split.
+    const at = css.lastIndexOf(
+      '@media (width < 48rem)',
+      css.indexOf('[data-table-body]'),
     )
-    expect(block).toContain('view-timeline-inset: 3rem 0')
-    expect(block).toContain('translate: 0 var(--head-travel, 0px)')
+    const block = css.slice(at, css.indexOf('\n}\n', at))
+    // A list page only: a record page pins its own bar and tabs there.
+    const list = "[data-list-page='true']:not([data-pane-from])"
+    expect(block).toContain(
+      `${list} [data-table-scroller] {\n    overflow: visible;`,
+    )
+    expect(block).toMatch(
+      /\[data-table-head\] \{\n\s+display: block;\n\s+position: sticky;\n\s+top: 3rem;/,
+    )
+    expect(block).toContain(
+      `${list} [data-table-body] {\n    display: block;\n    overflow-x: auto;`,
+    )
+    expect(block).toContain('width: var(--table-width);')
+    // Plain sticky: no scroll-driven animation that Firefox and older Safari skip.
+    expect(css).not.toContain('animation-timeline')
+  })
+
+  it('split, mirrors the body’s sideways scroll onto the head and counts columns against the body', () => {
+    mount()
+    const body = one('[data-table-body]')
+    const head = one('[data-table-head]')
+    const invested = [...document.querySelectorAll('[data-column]')].at(0)
+    if (!(invested instanceof HTMLElement)) throw new Error('no column')
+    // What the stylesheet does below md: only the body scrolls sideways.
+    body.style.overflowX = 'auto'
+    Object.defineProperty(body, 'clientWidth', { value: 300 })
+    Object.defineProperty(body, 'scrollLeft', { value: 40, writable: true })
+    Object.defineProperty(invested, 'offsetLeft', { value: 240 })
+    Object.defineProperty(invested, 'offsetWidth', { value: 130 })
+    const scrollBy = vi.fn()
+    body.scrollBy = scrollBy
+    act(() => {
+      body.dispatchEvent(new Event('scroll'))
+    })
+    expect(head.scrollLeft).toBe(40)
+    expect(one('[data-more-columns]').textContent).toBe('1 more column →')
+    // The arrows move the body, the one thing that scrolls sideways.
+    press(one('[data-table-scroller]'), 'ArrowRight')
+    expect(scrollBy).toHaveBeenCalledWith(
+      expect.objectContaining({ left: expect.any(Number) }),
+    )
   })
 
   it('is one table to assistive tech: column heads and cells under one name', () => {

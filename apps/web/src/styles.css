@@ -867,38 +867,54 @@
 }
 
 /**
- * Below `md` a list page scrolls with the window (`ListPage`), and its
- * table's scroller, which scrolls sideways only, still traps `sticky`: the
- * column head could only pin inside it. So the head rides a scroll-driven
- * animation instead, travelling down with the window from the moment the
- * rows reach the top bar's foot (3rem) until it sits on the last row
- * (`--head-travel`, measured by `RecordTable`). It runs on the compositor,
- * so it never lags the scroll. A record page is left out: below `xl` its
- * own folded bar and tabs pin there. Without scroll timelines the head
- * scrolls away with the rows.
+ * Below `md` a list page scrolls with the window (`ListPage`). A sticky head
+ * inside the table's sideways scroller would stick to that scroller, never
+ * the window, so there the table splits in place: the scroller lets go of
+ * overflow, the head becomes its own box pinned under the top bar (3rem),
+ * and the body scrolls sideways under it, `RecordTable` mirroring the body's
+ * `scrollLeft` onto the head. Each row lays itself out as a fixed table at
+ * the columns' total width (`--table-width`), so the head's cells stay
+ * over the body's. Plain `sticky` and `overflow`, so Firefox and every
+ * Safari pin it too. A record page is left out: below `xl` its own folded
+ * bar and tabs pin there.
  */
-@keyframes list-head-drop {
-  from {
-    translate: 0 0;
+@media (width < 48rem) {
+  [data-list-page='true']:not([data-pane-from]) [data-table-scroller] {
+    overflow: visible;
   }
-  to {
-    translate: 0 var(--head-travel, 0px);
+
+  [data-list-page='true']:not([data-pane-from]) [data-table-scroller] > table {
+    display: block;
+    max-width: 100%;
   }
-}
 
-@supports (animation-timeline: view()) {
-  @media (width < 48rem) {
-    [data-list-page='true']:not([data-pane-from]) [data-table-scroller] {
-      view-timeline-name: --list-rows;
-      view-timeline-axis: block;
-      view-timeline-inset: 3rem 0;
-    }
+  [data-list-page='true']:not([data-pane-from]) [data-table-head] {
+    display: block;
+    position: sticky;
+    top: 3rem;
+    z-index: 20;
+    overflow: hidden;
+  }
 
-    [data-list-page='true']:not([data-pane-from]) [data-table-head] th {
-      animation: list-head-drop auto linear both;
-      animation-timeline: --list-rows;
-      animation-range: exit-crossing 0% exit-crossing var(--head-travel, 0px);
-    }
+  /* The head box is what pins; its cells pin only sideways inside it. */
+  [data-list-page='true']:not([data-pane-from]) [data-table-head] th {
+    top: auto;
+  }
+
+  [data-list-page='true']:not([data-pane-from]) [data-table-body] {
+    display: block;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  [data-list-page='true']:not([data-pane-from]) [data-table-head] > tr,
+  [data-list-page='true']:not([data-pane-from]) [data-table-body] > tr {
+    display: table;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    width: var(--table-width);
+    min-width: 100%;
   }
 }
 
