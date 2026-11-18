@@ -6,6 +6,11 @@ import { entity, space, term } from '@spaces/db/schema'
 import { requireUser } from './shared'
 import { input } from './input'
 import { serverQuery } from './query'
+import {
+  createTermInput,
+  termPatchOf,
+  updateTermInput,
+} from '../glossary/term-input'
 
 /**
  * Terms are scoped to a space because "stage" means something different in
@@ -15,24 +20,6 @@ import { serverQuery } from './query'
  */
 
 const uuid = Schema.String.check(Schema.isUUID())
-
-const termName = Schema.Trim.check(
-  Schema.isMinLength(1),
-  Schema.isMaxLength(120),
-)
-
-// An absent list or definition reads as empty, on update as on create.
-const termFields = {
-  aliases: Schema.Array(termName)
-    .check(Schema.isMaxLength(20))
-    .pipe(
-      Schema.withDecodingDefault(Effect.succeed<ReadonlyArray<string>>([])),
-    ),
-  definitionMd: Schema.Trim.check(Schema.isMaxLength(4000)).pipe(
-    Schema.withDecodingDefault(Effect.succeed('')),
-  ),
-  spaceId: Schema.optional(Schema.NullOr(uuid)),
-}
 
 const listTermsProgram = Effect.fn('listTermsProgram')(function* (
   spaceId: string | null | undefined,
@@ -113,7 +100,7 @@ export const listTermsForNote = createServerFn()
  * aliases into `entity_alias` so search finds a term by its abbreviation. This is the request half only.
  */
 export const createTerm = createServerFn({ method: 'POST' })
-  .validator(input(Schema.Struct({ name: termName, ...termFields })))
+  .validator(input(createTermInput))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { createTermProgram } = await import('../glossary/write-term')
@@ -127,26 +114,12 @@ export const createTerm = createServerFn({ method: 'POST' })
   })
 
 export const updateTerm = createServerFn({ method: 'POST' })
-  .validator(
-    input(
-      Schema.Struct({
-        id: uuid,
-        name: Schema.optional(termName),
-        ...termFields,
-      }),
-    ),
-  )
+  .validator(input(updateTermInput))
   .handler(async ({ data }) => {
     await requireUser()
     const { updateTermProgram } = await import('../glossary/write-term')
     const { effectFn } = await import('./effect')
-    return effectFn(updateTermProgram)({
-      id: data.id,
-      name: data.name,
-      aliases: [...data.aliases],
-      definitionMd: data.definitionMd,
-      ...(data.spaceId !== undefined ? { spaceId: data.spaceId } : {}),
-    })
+    return effectFn(updateTermProgram)(termPatchOf(data))
   })
 
 /**
