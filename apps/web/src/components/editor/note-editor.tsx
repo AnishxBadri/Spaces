@@ -152,9 +152,10 @@ export function NoteEditor({
   }) => void
   /**
    * Opt-in: omitted, this editor is not a file drop target at all and the
-   * browser and BlockNote handle a drop as usual. Only the note page passes it — an interaction
-   * write-up or a template body has no filing of its own to hand a document,
-   * so giving them the gesture would mean inventing an answer for them.
+   * browser and BlockNote handle a drop as usual. Only a note passes it, on
+   * its page and in its window — an interaction write-up or a template body
+   * has no filing of its own to hand a document, so giving them the gesture
+   * would mean inventing an answer for them.
    */
   onFileDrop?: FileDropHandler
   /**

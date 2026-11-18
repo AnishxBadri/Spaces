@@ -4,6 +4,7 @@ import type { Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ClockProvider } from '#/components/clock'
+import { documentPreviewEvent } from '#/lib/editor/document-preview-event'
 import type { NoteData } from './note-head'
 import {
   NoteWindow,
@@ -16,9 +17,10 @@ import type { NoteWindowData } from './note-window'
 /**
  * A note's window over a record: the head (mark, title, people and day),
  * the foot's words, the editor's floating menus mounted inside the sheet,
- * a stale link's one line, and the rule that Done, Esc and Open as page land
- * the last edit before the window lets go. Radix runs in happy-dom; the
- * editor is a stub that hands back its props.
+ * a stale link's one line, the rule that Done, Esc, Open as page and a
+ * confirmed leave land the last edit before the window lets go, and what it
+ * shares with the note page: a file chip's viewer and a dropped file. Radix
+ * runs in happy-dom; the editor is a stub that hands back its props.
  */
 
 await vi.hoisted(async () => {
@@ -56,30 +58,81 @@ const fns = vi.hoisted(() => ({
   listTermsForNote: vi.fn(() => Promise.resolve([])),
   saveNote: vi.fn((_: unknown) => Promise.resolve()),
   setNoteKind: vi.fn(() => Promise.resolve()),
+  getDocumentPreview: vi.fn((_: { data: { id: string } }) =>
+    Promise.resolve({ id: 'd1', filename: 'Flent deck.pdf' }),
+  ),
 }))
+
+const upload = vi.hoisted(() => ({
+  uploadDocument: vi.fn(
+    (_: {
+      file: File
+      fileAgainst: Array<{ kind: 'space'; entityId: string }>
+    }): Promise<{ id: string }> => Promise.resolve({ id: 'd9' }),
+  ),
+}))
+
+/** What the note registered with the router's blocker. */
+const blocker = vi.hoisted(
+  (): {
+    shouldBlockFn:
+      | ((args: {
+          current: { pathname: string }
+          next: { pathname: string }
+        }) => boolean | Promise<boolean>)
+      | null
+  } => ({ shouldBlockFn: null }),
+)
 
 /** The editor stub's last props: its change callback and portal root. */
 const editor = vi.hoisted(
   (): {
     onChange: ((snap: unknown) => void) | null
+    onFileDrop: ((file: File) => Promise<unknown>) | null
     portalRoot: HTMLElement | null
-  } => ({ onChange: null, portalRoot: null }),
+  } => ({ onChange: null, onFileDrop: null, portalRoot: null }),
 )
 
 vi.mock('#/lib/server-fns', () => fns)
-vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }))
+vi.mock('#/lib/documents/upload', () => upload)
+vi.mock('sonner', () => ({
+  toast: Object.assign(vi.fn(), {
+    error: vi.fn(),
+    loading: vi.fn(() => 't1'),
+    success: vi.fn(),
+    message: vi.fn(),
+  }),
+}))
 vi.mock('@tanstack/react-router', () => ({
   useRouter: () => ({ invalidate: () => Promise.resolve() }),
   useNavigate: () => () => Promise.resolve(),
   useSearch: () => ({}),
-  useBlocker: () => undefined,
+  useBlocker: (opts: { shouldBlockFn: typeof blocker.shouldBlockFn }) => {
+    blocker.shouldBlockFn = opts.shouldBlockFn
+  },
 }))
+// The viewer as a bare window: which file, and how deep it stacks.
+vi.mock('#/components/document-preview', async () => {
+  const { Dialog, DialogContent, DialogTitle } =
+    await import('#/components/ui/dialog')
+  return {
+    DocumentPreview: ({ doc }: { doc: { filename: string } | null }) => (
+      <Dialog open={doc !== null}>
+        <DialogContent size="viewer" aria-describedby={undefined}>
+          <DialogTitle data-viewer-stub>{doc?.filename}</DialogTitle>
+        </DialogContent>
+      </Dialog>
+    ),
+  }
+})
 vi.mock('#/components/editor/note-editor', () => ({
   NoteEditor: (props: {
     onChange: (snap: unknown) => void
+    onFileDrop?: (file: File) => Promise<unknown>
     portalRoot?: HTMLElement
   }) => {
     editor.onChange = props.onChange
+    editor.onFileDrop = props.onFileDrop ?? null
     editor.portalRoot = props.portalRoot ?? null
     return <div data-editor-stub />
   },
@@ -126,12 +179,17 @@ afterEach(async () => {
   root = null
   host = null
   editor.onChange = null
+  editor.onFileDrop = null
   editor.portalRoot = null
+  blocker.shouldBlockFn = null
   // An unmount with an edit pending still saves it; let that land first.
   await new Promise((resolve) => setTimeout(resolve, 10))
   fns.getNoteWindow.mockReset()
   fns.saveNote.mockReset()
   fns.saveNote.mockImplementation(() => Promise.resolve())
+  fns.getDocumentPreview.mockClear()
+  upload.uploadDocument.mockClear()
+  Reflect.deleteProperty(window, 'confirm')
 })
 
 const flush = () => act(() => new Promise((r) => setTimeout(r, 0)))
@@ -330,6 +388,108 @@ describe('closing', () => {
     await click(button(/^Done$/))
     expect(fns.saveNote).not.toHaveBeenCalled()
     expect(onClose).toHaveBeenCalledOnce()
+  })
+})
+
+/** The browser's leave confirm, answered. */
+function answer(yes: boolean) {
+  const confirm = vi.fn(() => yes)
+  Reflect.set(window, 'confirm', confirm)
+  return confirm
+}
+
+describe('leaving the record', () => {
+  const away = {
+    current: { pathname: '/companies/c1' },
+    next: { pathname: '/today' },
+  }
+
+  it('lands an edit still inside the debounce once leaving is confirmed', async () => {
+    const confirm = answer(true)
+    await open(data())
+    type()
+    const shouldBlock = blocker.shouldBlockFn
+    if (shouldBlock === null) throw new Error('no blocker')
+    let blocked: boolean | null = null
+    await act(async () => {
+      blocked = await shouldBlock(away)
+    })
+    expect(confirm).toHaveBeenCalledOnce()
+    // The save ran before the navigation was let through, not after.
+    expect(fns.saveNote).toHaveBeenCalledOnce()
+    expect(blocked).toBe(false)
+  })
+
+  it('stays, saving nothing yet, when leaving is refused', async () => {
+    answer(false)
+    await open(data())
+    type()
+    const shouldBlock = blocker.shouldBlockFn
+    if (shouldBlock === null) throw new Error('no blocker')
+    expect(await shouldBlock(away)).toBe(true)
+    expect(fns.saveNote).not.toHaveBeenCalled()
+  })
+
+  it('never asks for a change on the same page, or with nothing to save', async () => {
+    const confirm = answer(true)
+    await open(data())
+    const shouldBlock = blocker.shouldBlockFn
+    if (shouldBlock === null) throw new Error('no blocker')
+    expect(await shouldBlock(away)).toBe(false)
+    type()
+    expect(
+      await shouldBlock({ current: away.current, next: away.current }),
+    ).toBe(false)
+    expect(confirm).not.toHaveBeenCalled()
+  })
+})
+
+describe('files', () => {
+  it('opens a file mention’s viewer stepped down over the window', async () => {
+    await open(data())
+    act(() => {
+      part('body')
+        ?.querySelector('[data-editor-stub]')
+        ?.dispatchEvent(
+          documentPreviewEvent({ entityId: 'd1', label: 'Flent deck.pdf' }),
+        )
+    })
+    await flush()
+    expect(fns.getDocumentPreview).toHaveBeenCalledWith({ data: { id: 'd1' } })
+    const viewer = document.querySelector('[data-viewer-stub]')
+    expect(viewer?.textContent).toBe('Flent deck.pdf')
+    expect(
+      viewer?.closest('[data-window-depth]')?.getAttribute('data-window-depth'),
+    ).toBe('2')
+    // The note stays open beneath it.
+    expect(sheet()).not.toBeNull()
+  })
+
+  it('files a dropped file where the note is filed and hands the editor its chip', async () => {
+    await open(
+      data({
+        spaces: [
+          { id: 's1', name: 'Fund II', archived: false },
+          { id: 's2', name: 'Climate', archived: false },
+        ],
+      }),
+    )
+    const drop = editor.onFileDrop
+    if (drop === null) throw new Error('the window took no drops')
+    const file = new File(['%PDF'], 'Flent deck.pdf')
+    let dropped: unknown = null
+    await act(async () => {
+      dropped = await drop(file)
+    })
+    expect(upload.uploadDocument).toHaveBeenCalledOnce()
+    expect(upload.uploadDocument.mock.calls.at(0)?.[0]).toMatchObject({
+      file,
+      fileAgainst: [
+        { kind: 'space', entityId: 's1' },
+        { kind: 'space', entityId: 's2' },
+      ],
+    })
+    expect(dropped).toEqual({ entityId: 'd9', label: 'Flent deck.pdf' })
   })
 })
 

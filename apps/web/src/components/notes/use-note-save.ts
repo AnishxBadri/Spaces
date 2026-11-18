@@ -180,15 +180,23 @@ const LEAVE_QUESTION = 'Your last edit has not been saved. Leave anyway?'
  * navigation through the router's blocker, closing or reloading the tab
  * through `beforeunload`. A search change on the same path (`?modal=`, or
  * Back out of a note's window) is not leaving.
+ * - Confirmed, the navigation waits for `flush` while the editor is still
+ *   mounted, so an edit inside the debounce lands; it leaves whether or not
+ *   that save did, since the reader said to.
  */
-export function useNoteLeaveGuard(hasPending: () => boolean) {
+export function useNoteLeaveGuard(
+  hasPending: () => boolean,
+  flush: () => Promise<boolean>,
+) {
   // Stable, so the blocker registers once rather than on every keystroke.
   const shouldBlockFn = useCallback<ShouldBlockFn>(
-    ({ current, next }) => {
+    async ({ current, next }) => {
       if (next.pathname === current.pathname || !hasPending()) return false
-      return !window.confirm(LEAVE_QUESTION)
+      if (!window.confirm(LEAVE_QUESTION)) return true
+      await flush()
+      return false
     },
-    [hasPending],
+    [hasPending, flush],
   )
   useBlocker({ shouldBlockFn, enableBeforeUnload: hasPending })
 }
