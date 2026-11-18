@@ -22,17 +22,20 @@ import { movingProgram } from '#/lib/records/moving'
 import { failingBindingsForProgram } from '#/lib/documents/binding-health'
 import type { FailingBinding } from '#/lib/documents/binding-health'
 import type { MovingSignal } from '#/lib/records/moving'
+import { stagedImportsProgram } from '#/lib/import/staged'
+import type { StagedImport } from '#/lib/import/staged'
 
 /**
  * What Today reads beyond the existing lists: the open Review queue (flattened
  * into rows on the client, after the held decisions leave it), the reader's
  * broken connections, the invitation to connect Google and the grants about
  * to lapse, auto-enrich runs parked at a source's cap, folder bindings that
- * cannot sync, and What's moving.
+ * cannot sync, the reader's staged imports nobody committed, and What's
+ * moving.
  * Outside the server-fn barrel so tests can call the programs without a request.
  */
 
-export type { FailingBinding, MovingSignal, ParkedSource }
+export type { FailingBinding, MovingSignal, ParkedSource, StagedImport }
 
 export class ConnectionsReadFailed extends Schema.TaggedError<ConnectionsReadFailed>()(
   'ConnectionsReadFailed',
@@ -91,6 +94,8 @@ export type TodayAttention = {
   parked: ParkedSource[]
   waiting: WaitingExport[]
   failing: ReadonlyArray<FailingBinding>
+  /** The reader's own batches still `staged`, oldest first. */
+  imports: StagedImport[]
 }
 
 /** The files product's short name under a provider: `Drive` under Google. */
@@ -250,6 +255,7 @@ export const todayAttentionProgram = Effect.fn('todayAttentionProgram')(
       parked,
       waiting,
       failing,
+      imports,
     ] = yield* Effect.all(
       [
         reviewProgram(userId),
@@ -259,6 +265,7 @@ export const todayAttentionProgram = Effect.fn('todayAttentionProgram')(
         parkedEnrichmentProgram(),
         waitingExportsForToday(),
         failingBindingsForProgram(userId),
+        stagedImportsProgram(userId),
       ],
       { concurrency: 'unbounded' },
     )
@@ -272,6 +279,7 @@ export const todayAttentionProgram = Effect.fn('todayAttentionProgram')(
       parked,
       waiting,
       failing,
+      imports,
     }
     return out
   },

@@ -8,6 +8,7 @@ import {
   foldSummary,
   inFilter,
   NEEDS_YOU_FOLD,
+  NEEDS_YOU_KINDS,
   todayFoldStamp,
   todayStamp,
 } from './needs-you'
@@ -58,6 +59,40 @@ describe('byUrgency', () => {
       'm-newer',
       'r-big',
       'r-small',
+    ])
+  })
+
+  it('ranks an import nobody committed after meetings and before deals, oldest first', () => {
+    const rows = [
+      row('deal', 'd', 30),
+      row('import', 'i-new', -2000),
+      row('review', 'r', 3),
+      row('meeting', 'mt', 1),
+      row('import', 'i-old', -1000),
+      row('task', 't', 0),
+    ]
+    expect(byUrgency(rows).map((r) => r.key)).toEqual([
+      't',
+      'mt',
+      'i-old',
+      'i-new',
+      'd',
+      'r',
+    ])
+    expect(NEEDS_YOU_KINDS).toEqual([
+      'task',
+      'meeting',
+      'import',
+      'deal',
+      'mark',
+      'review',
+    ])
+    expect(foldSummary([row('import', 'a', 1), row('task', 'b', 1)])).toBe(
+      '2 more · 1 task · 1 import',
+    )
+    expect(inFilter(rows, 'import').map((r) => r.key)).toEqual([
+      'i-new',
+      'i-old',
     ])
   })
 

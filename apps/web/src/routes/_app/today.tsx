@@ -53,7 +53,7 @@ import { flattenInbox } from '#/lib/today/proposals'
 import { useSettled } from '#/lib/today/use-settled'
 import { useHeldView } from '#/lib/held-decisions'
 import { withoutHeld } from '#/lib/inbox/held'
-import { dayKey, formatAge, formatTime } from '@spaces/core/format'
+import { dayKey, formatAge, formatTime, formatWhen } from '@spaces/core/format'
 import { fmtMoney } from '@spaces/core/portfolio/format'
 import { useClock } from '#/components/clock'
 import { modalSearch, openModalId } from '#/lib/modal-search'
@@ -64,9 +64,9 @@ const DAY_MS = 86_400_000
 
 /**
  * Today: the one surface that gathers what needs the reader — tasks, idle
- * deals, stale marks, meetings nobody wrote up and Review — in one ranked
- * ledger, with what stops the machine above it, the day's meetings under
- * it and the portfolio and what's moving beside it.
+ * deals, stale marks, meetings nobody wrote up, imports nobody committed and
+ * Review — in one ranked ledger, with what stops the machine above it, the
+ * day's meetings under it and the portfolio and what's moving beside it.
  * With no company yet it is the three ways in and nothing else.
  */
 export const Route = createFileRoute('/_app/today')({
@@ -356,6 +356,19 @@ function TodayLedger({
       who: m.who,
       figure: now === null ? null : sinceFigure(m.startsAt, now),
     })),
+    ...(attention.state === 'done' ? attention.value.imports : []).map(
+      (b): NeedsYouRow => ({
+        kind: 'import',
+        key: `import:${b.batchId}`,
+        // Oldest first: the import left longest leads.
+        weight: -Date.parse(b.stagedAt),
+        sensitive: null,
+        batchId: b.batchId,
+        filename: b.filename,
+        rows: `${b.rowCount} ${b.rowCount === 1 ? 'row' : 'rows'}`,
+        figure: now === null ? null : formatWhen(b.stagedAt, now),
+      }),
+    ),
   ])
 
   const readouts = todayReadouts({

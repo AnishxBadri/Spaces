@@ -87,6 +87,17 @@ const meeting: NeedsYouRow = {
   figure: '2d',
 }
 
+const staged: NeedsYouRow = {
+  kind: 'import',
+  key: 'import:b1',
+  weight: -1,
+  sensitive: null,
+  batchId: '00000000-0000-4000-8000-0000000000e1',
+  filename: 'pipeline.csv',
+  rows: '214 rows',
+  figure: '13 Oct',
+}
+
 const ACTIONS: ProposalActions = {
   decide: () => {},
   acceptAll: () => {},
@@ -199,6 +210,25 @@ describe('the Needs-you lanes', () => {
     expect(html).not.toContain('record mark')
     expect(html).toMatch(/text-destructive[^>]*>214d</)
     expect(html).toContain('aria-label="Sensitive · AI never reads Northgate"')
+  })
+
+  it('draws an import: the file, the rows waiting, the day, and opens the batch', async () => {
+    const html = rowOf(await render([staged]), 'import')
+    expect(html).toMatch(/w-16[^"]*label-caps[^>]*>import</)
+    expect(html).not.toContain('data-icon="document--import"')
+    expect(html).toContain(
+      'href="/import/00000000-0000-4000-8000-0000000000e1"',
+    )
+    expect(html).toMatch(/text-body text-foreground[^>]*>pipeline\.csv</)
+    expect(html).toMatch(/w-30[^>]*>214 rows</)
+    expect(html).toMatch(/w-12[^"]*text-graphite[^>]*>13 Oct</)
+  })
+
+  it('gives imports their own tab, and says so when none wait', async () => {
+    const html = await render([staged])
+    expect(html).toMatch(/>Imports<span data-tab-count[^>]*>1</)
+    const empty = await render([], { filter: 'import' })
+    expect(empty).toContain('No imports waiting.')
   })
 
   it('draws a meeting: Write in the action lane, the first external participant', async () => {

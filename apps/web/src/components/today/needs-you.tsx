@@ -97,6 +97,15 @@ export type NeedsYouRow =
       /** `2d`, or the time for a meeting today; null until the clock is read. */
       figure: string | null
     })
+  | (RowBase & {
+      kind: 'import'
+      batchId: string
+      filename: string
+      /** The rows waiting: `214 rows`. */
+      rows: string
+      /** The day it was staged, or the time today; null until the clock is read. */
+      figure: string | null
+    })
 
 const SEGMENT_LABEL: Record<NeedsYouKind, string> = {
   task: 'Tasks',
@@ -104,6 +113,7 @@ const SEGMENT_LABEL: Record<NeedsYouKind, string> = {
   deal: 'Deals',
   mark: 'Marks',
   review: 'Review',
+  import: 'Imports',
 }
 
 const EMPTY: Record<NeedsFilter, string> = {
@@ -113,6 +123,7 @@ const EMPTY: Record<NeedsFilter, string> = {
   deal: 'No idle deals.',
   mark: 'No stale marks.',
   review: 'Nothing to review.',
+  import: 'No imports waiting.',
   overdue: 'Nothing overdue.',
   pastMedian: 'No deals past their stage median.',
   oldestMark: 'No stale marks.',
@@ -581,6 +592,26 @@ function RowLanes({
           <span className={LANE.more} />
         </>
       )
+    case 'import':
+      return (
+        <>
+          {/* Never sensitive: a staged batch names no record yet. The kind
+              lane already says IMPORT, so no glyph beside it (Kinds). */}
+          <span className={LANE.mark} />
+          <Link
+            to="/import/$batchId"
+            params={{ batchId: row.batchId }}
+            className={rowTarget}
+          >
+            <Body primary={row.filename} />
+            <span className={LANE.who}>{row.rows}</span>
+            <span className={cn(LANE.figure, 'text-graphite')}>
+              {row.figure}
+            </span>
+          </Link>
+          <span className={LANE.more} />
+        </>
+      )
   }
 }
 
@@ -715,6 +746,17 @@ export function NeedsYou({
               void router.navigate({
                 to: '/deals/$dealId',
                 params: { dealId: row.id },
+              }),
+          ],
+        ])
+      case 'import':
+        return new Map([
+          [
+            'Enter',
+            () =>
+              void router.navigate({
+                to: '/import/$batchId',
+                params: { batchId: row.batchId },
               }),
           ],
         ])

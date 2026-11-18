@@ -6,11 +6,13 @@
 
 import { formatWeekday } from '@spaces/core/format'
 
-/** A task due today or earlier, a past meeting nobody wrote up, a deal idle
- *  past its stage median, a stale mark, a group of open Review cards. */
+/** A task due today or earlier, a past meeting nobody wrote up, an import
+ *  the reader staged and never committed, a deal idle past its stage
+ *  median, a stale mark, a group of open Review cards. */
 export const NEEDS_YOU_KINDS = [
   'task',
   'meeting',
+  'import',
   'deal',
   'mark',
   'review',
@@ -29,8 +31,8 @@ export type Ranked = { kind: NeedsYouKind; key: string; weight: number }
 
 /**
  * The urgency order: kinds in `NEEDS_YOU_KINDS` order — tasks by days
- * overdue (due today is 0), meetings by days since they happened, deals by
- * days past their stage median, marks by
+ * overdue (due today is 0), meetings by days since they happened, imports
+ * oldest first, deals by days past their stage median, marks by
  * days since the last mark, Review groups by card count — each kind's
  * largest weight first, ties by key so the order is stable.
  */
@@ -175,6 +177,7 @@ export const FILTER_ORDER: ReadonlyArray<NeedsYouKind> = [
   'meeting',
   'deal',
   'mark',
+  'import',
 ]
 
 const KIND_NOUN: Record<NeedsYouKind, readonly [string, string]> = {
@@ -183,6 +186,7 @@ const KIND_NOUN: Record<NeedsYouKind, readonly [string, string]> = {
   review: ['review', 'review'],
   deal: ['deal', 'deals'],
   mark: ['mark', 'marks'],
+  import: ['import', 'imports'],
 }
 
 /** The fold's line: `6 more · 3 tasks · 2 review · 1 deal`. */

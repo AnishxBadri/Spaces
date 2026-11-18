@@ -62,6 +62,7 @@ const attention = {
   parked: [],
   waiting: [],
   failing: [],
+  imports: [],
 }
 
 function loadedWith(over: {
