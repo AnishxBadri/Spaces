@@ -715,8 +715,11 @@ function MeetingWindow({
 
         {writeUpNote === null ? (
           <section aria-label="Write-up" className="flex flex-col gap-2">
+            {/* A filled row is a box: its edge stands on the window's line
+                and its text pads inside the fill (E3). */}
             <EmptyRow
               name="Write-up"
+              className="px-3"
               disabled={writing}
               onAdd={() => void writeUp()}
             />
