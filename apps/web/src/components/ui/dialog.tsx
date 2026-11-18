@@ -47,8 +47,8 @@ function DialogOverlay({
 
 /**
  * The five window widths: a confirm, a form, a reading window, a note, the
- * file viewer. A note's window is the window's height less 80px and lays out
- * its own head and foot, so it takes no padding.
+ * file viewer. A note's window is the window's height less 80px; it and the
+ * viewer lay out their own head and foot, so both are flush.
  */
 export type WindowSize = 's' | 'm' | 'l' | 'note' | 'viewer'
 
@@ -56,9 +56,12 @@ const WINDOW_SIZE: Record<WindowSize, string> = {
   s: 'sm:max-w-[27.5rem]',
   m: 'sm:max-w-[35rem]',
   l: 'sm:max-w-[48rem] max-h-[85vh] flex flex-col',
-  note: 'sm:max-w-[min(56.25rem,calc(100%-2rem))] h-[calc(100dvh-80px)] p-0 flex flex-col',
-  viewer: 'sm:max-w-[72rem] h-[85vh] p-0 flex flex-col',
+  note: 'sm:max-w-[min(56.25rem,calc(100%-2rem))] h-[calc(100dvh-80px)] flex flex-col',
+  viewer: 'sm:max-w-[72rem] h-[85vh] flex flex-col',
 }
+
+/** The sizes whose window lays out its own head and foot, edge to edge. */
+const FLUSH_SIZES: ReadonlySet<WindowSize> = new Set(['note', 'viewer'])
 
 /** How far a window opened from a window sits below its parent's top edge. */
 export const STACK_STEP_PX = 56
@@ -81,6 +84,9 @@ function useWindowSheet(): HTMLElement | null {
 
 /**
  * A window; `size` is its width, which a caller never spells.
+ * - Its text stands on one 16px line (E3): the sheet pads 16px and a row in
+ *   it insets nothing more. A `flush` window pads nothing and its rows run to
+ *   the edge, insetting 16px themselves (`--inset`).
  * - Opened from inside another window it steps down under its parent:
  *   `STACK_STEP_PX` below the parent's top, over a lighter scrim of its own.
  * - A third window is refused: in development opening one throws.
@@ -88,6 +94,7 @@ function useWindowSheet(): HTMLElement | null {
  */
 function DialogContent({
   size,
+  flush: flushProp = false,
   className,
   overlayClassName,
   style,
@@ -96,6 +103,8 @@ function DialogContent({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   size: WindowSize
+  /** No body padding: the window lays out its own head, rows and foot. */
+  flush?: boolean
   /** The scrim's ground, when the window asks for its own. */
   overlayClassName?: string
 }) {
@@ -105,6 +114,7 @@ function DialogContent({
       `A window was opened from a stacked window: at most ${MAX_WINDOWS} are open at once.`,
     )
   const nested = parent.depth > 0
+  const flush = flushProp || FLUSH_SIZES.has(size)
   const [sheet, setSheet] = React.useState<HTMLElement | null>(null)
   const [top, setTop] = React.useState<number | null>(null)
   // Measured before paint, so a stacked window never lands centred first.
@@ -133,14 +143,16 @@ function DialogContent({
         ref={sheetRef}
         data-slot="dialog-content"
         data-window-depth={frame.depth}
+        {...(flush ? { 'data-flush': '' } : {})}
         className={cn(
           // Overlay anatomy: paper sheet, 1px ink, the solid shadow of a
-          // window over the scrim (dither would vanish there). The 20px body
+          // window over the scrim (dither would vanish there). The 16px body
           // padding is the sheet's; DialogHeader and DialogFooter break out
           // of it to run edge to edge. It lands by its solid offset growing
           // 0→3px in three steps (`window-land`), never by scaling.
           'fixed top-[50%] left-[50%] z-modal flex w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col rounded-none border border-hairline bg-paper p-4 shadow-solid ease-out-quart outline-none data-[state=closed]:animate-out data-[state=closed]:duration-[120ms] data-[state=closed]:fade-out-0 data-[state=open]:window-land',
           WINDOW_SIZE[size],
+          flush && 'p-0',
           nested && 'translate-y-0',
           className,
         )}

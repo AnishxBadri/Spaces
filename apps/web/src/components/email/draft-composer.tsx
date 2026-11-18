@@ -503,7 +503,7 @@ export function DraftComposer({
           />
           <div
             data-tool-row
-            className="flex h-9 shrink-0 items-center gap-1 border-t border-rule px-3"
+            className="flex h-9 shrink-0 items-center gap-1 border-t border-rule px-4"
           >
             <TemplatePicker
               kind="email"

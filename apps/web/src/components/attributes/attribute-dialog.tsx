@@ -287,7 +287,8 @@ export function AttributeDialog(props: Props) {
           A size exception: the fixed height wants its own width too. */}
       <DialogContent
         size="l"
-        className="h-[33.25rem] overflow-hidden p-0 sm:max-w-[41.25rem]"
+        flush
+        className="h-[33.25rem] overflow-hidden sm:max-w-[41.25rem]"
       >
         {/* Remount per open so a cancelled draft never leaks into the next. */}
         {open ? (
@@ -865,7 +866,7 @@ function AttributeForm({
       className="flex min-h-0 flex-1 flex-col"
     >
       {/* 44px head: serif title, mono context, nothing right. */}
-      <div className="flex h-11 shrink-0 items-baseline gap-3 border-b border-hairline px-5 pt-[0.6875rem]">
+      <div className="flex h-11 shrink-0 items-baseline gap-3 border-b border-hairline px-4 pt-[0.6875rem]">
         <DialogTitle>
           {mode === 'create' ? 'New attribute' : `Edit ${attr?.name}`}
         </DialogTitle>
@@ -875,7 +876,7 @@ function AttributeForm({
       <div className="flex min-h-0 flex-1">
         <TypePane value={type} fixed={mode === 'edit'} onPick={pickType} />
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 overflow-y-auto px-5 py-4">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 overflow-y-auto px-4 py-4">
           <Field label="Name" htmlFor="attr-name">
             <Input
               ref={nameRef}
@@ -1065,7 +1066,7 @@ function TypePane({
       onValueChange={setCursor}
       className="flex w-59 shrink-0 flex-col border-r border-rule"
     >
-      <div className="flex h-8 shrink-0 items-center gap-2 border-b border-rule px-3">
+      <div className="flex h-8 shrink-0 items-center gap-2 border-b border-rule px-4">
         <span aria-hidden className="mono text-micro text-primary">
           ›
         </span>
@@ -1093,7 +1094,7 @@ function TypePane({
                 if (!fixed) onPick(t.id)
               }}
               className={cn(
-                'h-[1.625rem] min-h-0 gap-2 px-2 py-0',
+                'h-[1.625rem] min-h-0 gap-2 px-3 py-0',
                 on && 'bg-bone font-medium',
               )}
             >

@@ -143,7 +143,7 @@ function Group({
 }
 
 const rowLink =
-  'focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 px-3 text-left hover:bg-bone'
+  'focus-ring-inset -mx-(--inset) flex h-full min-w-0 flex-1 items-center gap-3 px-(--inset) text-left hover:bg-bone'
 
 /** A task the meeting proposed: its due day, then Skip and Add task. */
 function ActionItem({
@@ -219,7 +219,7 @@ function PrepBody({ prep }: { prep: PrepState }) {
     case 'done': {
       const text = prep.phase === 'done' ? prep.markdown : prep.text
       return (
-        <li className="flex flex-col gap-2 px-3 py-2.5">
+        <li className="flex flex-col gap-2 px-(--inset) py-2.5">
           {prep.line === null ? (
             <Twinkle size={14} />
           ) : (
@@ -698,7 +698,7 @@ function MeetingWindow({
               </LedgerRow>
             )
           })}
-          <li className="px-3">
+          <li className="px-(--inset)">
             <DetailsPickRow
               label="Pin a record…"
               placeholder="Company, person or deal…"
@@ -746,7 +746,7 @@ function MeetingWindow({
               </span>
               <OpenIn link={writeUpNote.openIn} />
             </LabelHead>
-            <div className="flex flex-col gap-3 px-3 py-3">
+            <div className="flex flex-col gap-3 px-(--inset) py-3">
               {writeUpNote.title === null ? (
                 <p className="text-ui text-graphite">Private to its author.</p>
               ) : (

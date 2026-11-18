@@ -409,7 +409,7 @@ export function MoveStageDialog({
           <DialogTitle>Move stage</DialogTitle>
           <DialogDescription>{dealName}</DialogDescription>
         </DialogHeader>
-        <ol className="-mx-3 -mt-3 flex flex-col">
+        <ol className="window-bleed -mt-4 flex flex-col">
           {stages.map((stage, i) => {
             const isCurrent = stage.id === currentId
             const isNext = i === currentIndex + 1
@@ -421,7 +421,7 @@ export function MoveStageDialog({
                   onClick={() => setPicked(stage.id)}
                   aria-pressed={isPicked}
                   className={cn(
-                    'focus-ring-inset flex h-8 w-full items-center justify-between gap-3 px-3 text-left transition-colors',
+                    'focus-ring-inset flex h-8 w-full items-center justify-between gap-3 px-(--inset) text-left transition-colors',
                     isPicked
                       ? 'bg-selected'
                       : isCurrent

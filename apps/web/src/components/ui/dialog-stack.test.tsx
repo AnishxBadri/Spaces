@@ -1,3 +1,6 @@
+import { readFileSync, readdirSync } from 'node:fs'
+import { join, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Window } from 'happy-dom'
 import { act } from 'react'
 import type { ReactNode } from 'react'
@@ -12,6 +15,7 @@ import {
   vi,
 } from 'vitest'
 
+import type * as LedgerModule from '../ledger-section'
 import type * as ConfirmModule from './confirm-dialog'
 import type * as DialogModule from './dialog'
 
@@ -25,6 +29,7 @@ const win = new Window({ url: 'http://localhost/' })
 let createRoot: typeof CreateRoot
 let ui: typeof DialogModule
 let confirm: typeof ConfirmModule
+let ledger: typeof LedgerModule
 
 /** Where the parent window's sheet sits, as its rect reports it. */
 const PARENT_TOP = 120
@@ -63,6 +68,7 @@ beforeAll(async () => {
   ;({ createRoot } = await import('react-dom/client'))
   ui = await import('./dialog')
   confirm = await import('./confirm-dialog')
+  ledger = await import('../ledger-section')
 })
 
 afterAll(async () => {
@@ -123,6 +129,130 @@ const overlays = () =>
   [...document.querySelectorAll('[data-slot="dialog-overlay"]')].map(
     (el) => el.className,
   )
+
+/** A window holding whatever head, body and foot the test hands it. */
+function Frame({
+  size,
+  children,
+}: {
+  size: DialogModule.WindowSize
+  children: ReactNode
+}) {
+  const { Dialog, DialogContent } = ui
+  return (
+    <Dialog open>
+      <DialogContent size={size} aria-describedby={undefined}>
+        {children}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/*
+ * happy-dom lays nothing out, so a left offset is read the way the browser
+ * would compute it from the classes that decide it: each box's left margin,
+ * and the left padding and border of every box it sits in, with `--inset`
+ * taken from the stylesheet rule that sets it where the box stands.
+ */
+
+const SRC = fileURLToPath(new URL('../..', import.meta.url))
+const css = readFileSync(join(SRC, 'styles.css'), 'utf8')
+
+function remPx(pattern: RegExp): number {
+  const m = pattern.exec(css)
+  if (m === null) throw new Error(`no rule ${String(pattern)}`)
+  return Number(m[1]) * 16
+}
+
+const WINDOW_INSET = remPx(
+  /\[data-slot='dialog-content'\] \{\s*--inset: ([\d.]+)rem/,
+)
+const FLUSH_INSET = remPx(
+  /\[data-slot='dialog-content'\]\[data-flush\] \{\s*--inset: ([\d.]+)rem/,
+)
+const BLEED_INSET = remPx(/@utility window-bleed \{[^}]*--inset: ([\d.]+)rem/)
+const BLEED_MARGIN = remPx(
+  /@utility window-bleed \{[^}]*margin-inline: -([\d.]+)rem/,
+)
+
+/** The `--inset` a box sees: the nearest rule that sets it. */
+function insetAt(el: Element): number {
+  for (let n: Element | null = el; n !== null; n = n.parentElement) {
+    if (n.classList.contains('window-bleed')) return BLEED_INSET
+    if (n.getAttribute('data-slot') === 'dialog-content')
+      return n.hasAttribute('data-flush') ? FLUSH_INSET : WINDOW_INSET
+  }
+  throw new Error('not inside a window')
+}
+
+/** A spacing class's px: `4` is 16, `(--inset)` the box's `--inset`. */
+function stepPx(el: Element, step: string): number {
+  return step === '(--inset)' ? insetAt(el) : Number(step) * 4
+}
+
+/** The px of the last class matching one of `sides`, most specific first. */
+function sidePx(el: Element, sides: ReadonlyArray<string>): number {
+  const classes = [...el.classList]
+  for (const side of sides) {
+    const hit = classes
+      .map((c) => new RegExp(`^(-?)${side}-([\\d.]+|\\(--inset\\))$`).exec(c))
+      .filter((m) => m !== null)
+      .at(-1)
+    if (hit !== undefined) return (hit[1] === '-' ? -1 : 1) * stepPx(el, hit[2])
+  }
+  if (sides.includes('mx') && el.classList.contains('window-bleed'))
+    return -BLEED_MARGIN
+  return 0
+}
+
+const borderLeft = (el: Element) =>
+  ['border', 'border-x', 'border-l'].some((c) => el.classList.contains(c)) &&
+  !el.classList.contains('border-l-0')
+    ? 1
+    : 0
+
+/** A box that lays its children side by side. */
+const isRow = (el: Element) =>
+  (el.classList.contains('flex') || el.classList.contains('inline-flex')) &&
+  !el.classList.contains('flex-col')
+
+/**
+ * How far the box marked `data-at` starts from the inside of its window's
+ * 1px frame. A box in a row is its row's first, so nothing beside it pushes
+ * it right.
+ */
+function offsetOf(at: string): number {
+  const el = document.querySelector(`[data-at="${at}"]`)
+  if (el === null) throw new Error(`no ${at}`)
+  let px = 0
+  for (let n: Element = el; ;) {
+    const parent = n.parentElement
+    if (parent === null) throw new Error(`${at} is not in a window`)
+    if (isRow(parent))
+      expect(n.previousElementSibling?.tagName ?? null, at).toBeNull()
+    px += sidePx(n, ['ml', 'mx', 'm'])
+    px += sidePx(parent, ['pl', 'px', 'p'])
+    if (parent.getAttribute('data-slot') === 'dialog-content') return px
+    px += borderLeft(parent)
+    n = parent
+  }
+}
+
+const offsets = (marks: ReadonlyArray<string>) => marks.map(offsetOf)
+
+function windowSources(dir: string): Array<{ file: string; text: string }> {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) return windowSources(path)
+    if (!entry.name.endsWith('.tsx') || entry.name.includes('.test.')) return []
+    const text = readFileSync(path, 'utf8')
+    return /<DialogContent\b/.test(text)
+      ? [{ file: relative(SRC, path), text }]
+      : []
+  })
+}
+
+const WINDOW_FILES = windowSources(SRC)
 
 describe('a window opened from a window', () => {
   it('steps down 56px under its parent, over a lighter scrim', () => {
@@ -220,6 +350,87 @@ describe('the window inset', () => {
     expect(foot?.className.split(' ')).toEqual(
       expect.arrayContaining(['-mx-4', '-mb-4', 'px-4']),
     )
+  })
+
+  it('stands a ledger body’s row text on the title’s line', () => {
+    const { DialogFooter, DialogHeader, DialogTitle } = ui
+    const { LabelHead, LedgerRow } = ledger
+    mount(
+      <Frame size="l">
+        <DialogHeader>
+          <DialogTitle data-at="title">Partner sync</DialogTitle>
+        </DialogHeader>
+        <div className="-mx-4 flex flex-col gap-6 overflow-y-auto px-4">
+          <section>
+            <LabelHead label={<span data-at="label">Linked records</span>} />
+            <ol>
+              <LedgerRow>
+                <span data-at="row">Flent</span>
+              </LedgerRow>
+            </ol>
+          </section>
+        </div>
+        <DialogFooter note={<span data-at="note">Not kept unless saved</span>}>
+          <button type="button">Done</button>
+        </DialogFooter>
+      </Frame>,
+    )
+    expect(offsets(['title', 'label', 'row', 'note'])).toEqual([16, 16, 16, 16])
+  })
+
+  it('runs a bleed list to the edges with its row text on the line', () => {
+    const { DialogHeader, DialogTitle } = ui
+    mount(
+      <Frame size="s">
+        <DialogHeader>
+          <DialogTitle data-at="title">Move stage</DialogTitle>
+        </DialogHeader>
+        <ol data-at="bleed" className="window-bleed -mt-4 flex flex-col">
+          <li>
+            <button type="button" className="flex h-8 w-full px-(--inset)">
+              <span data-at="row">Diligence</span>
+            </button>
+          </li>
+        </ol>
+      </Frame>,
+    )
+    expect(offsets(['title', 'row'])).toEqual([16, 16])
+    // The list's own box starts at the sheet's inside edge.
+    expect(offsets(['bleed'])).toEqual([0])
+  })
+
+  it('insets a flush window’s rows 16px themselves, onto its head’s line', () => {
+    const { DialogHeader, DialogTitle } = ui
+    const { LedgerRow } = ledger
+    mount(
+      <Frame size="viewer">
+        <DialogHeader className="mx-0 mt-0 mb-0">
+          <DialogTitle data-at="title">pitch.pdf</DialogTitle>
+        </DialogHeader>
+        <ol data-at="list">
+          <LedgerRow>
+            <span data-at="row">v2 · pitch.pdf</span>
+          </LedgerRow>
+        </ol>
+      </Frame>,
+    )
+    const sheet = sheets().at(0)
+    expect(sheet?.dataset.flush).toBe('')
+    expect(offsets(['title', 'row', 'list'])).toEqual([16, 16, 0])
+  })
+})
+
+describe('the window line across the app', () => {
+  it('no window spells its own padding: an edge-to-edge one is `flush`', () => {
+    const spelled = WINDOW_FILES.flatMap(({ file, text }) =>
+      [...text.matchAll(/<DialogContent\b[^>]*?\bp-0\b/g)].map(() => file),
+    )
+    expect(spelled).toEqual([])
+  })
+
+  it('no window row breaks out by the old 12px inset', () => {
+    const old = WINDOW_FILES.filter(({ text }) => /\s-mx-3\s/.test(text))
+    expect(old.map((f) => f.file)).toEqual([])
   })
 })
 

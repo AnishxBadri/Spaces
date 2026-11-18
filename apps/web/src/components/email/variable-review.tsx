@@ -126,7 +126,7 @@ export function ReviewPanes({
                 aria-current={r.email === picked ? 'true' : undefined}
                 onClick={() => setPicked(r.email)}
                 className={cn(
-                  'focus-ring-inset flex h-9 w-full items-center gap-2 border-b border-rule px-3 text-left text-ui hover:bg-bone-deep',
+                  'focus-ring-inset flex h-9 w-full items-center gap-2 border-b border-rule px-4 text-left text-ui hover:bg-bone-deep',
                   r.email === picked && 'bg-paper',
                 )}
               >

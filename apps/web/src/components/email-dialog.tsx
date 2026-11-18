@@ -535,7 +535,7 @@ function EarlierMessage({
   return (
     <div
       data-message={id}
-      className="flex flex-col gap-3 border-b border-rule px-3 py-3"
+      className="flex flex-col gap-3 border-b border-rule px-(--inset) py-3"
     >
       {email === null ? (
         error === null ? (
@@ -579,7 +579,7 @@ function ThreadLine({
         aria-expanded={open}
         onClick={onToggle}
         className={cn(
-          'focus-ring-inset flex h-9 w-full items-center gap-3 border-b border-rule px-3 text-left hover:bg-bone',
+          'focus-ring-inset flex h-9 w-full items-center gap-3 border-b border-rule px-(--inset) text-left hover:bg-bone',
           open && 'bg-bone',
         )}
       >
@@ -640,7 +640,7 @@ function Thread({
             type="button"
             data-folded-earlier
             onClick={() => setUnfolded(true)}
-            className="focus-ring-inset flex h-9 w-full items-center border-b border-rule px-3 text-left text-ui text-graphite hover:bg-bone hover:text-foreground"
+            className="focus-ring-inset flex h-9 w-full items-center border-b border-rule px-(--inset) text-left text-ui text-graphite hover:bg-bone hover:text-foreground"
           >
             {plural(folded, 'earlier message')}
           </button>
@@ -686,7 +686,7 @@ function AttachmentRow({
       <button
         type="button"
         onClick={onOpen}
-        className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 px-3 text-left hover:bg-bone"
+        className="focus-ring-inset -mx-(--inset) flex h-full min-w-0 flex-1 items-center gap-3 px-(--inset) text-left hover:bg-bone"
       >
         <FileGlyph
           type={fileType({

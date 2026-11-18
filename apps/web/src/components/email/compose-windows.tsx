@@ -123,7 +123,7 @@ export function DraftsDialog({
               <p className="text-ui text-destructive">{error}</p>
             )
           ) : rows.length === 0 ? (
-            <p className="px-3 py-2 text-ui text-graphite">No drafts.</p>
+            <p className="py-2 text-ui text-graphite">No drafts.</p>
           ) : (
             <section aria-label="Drafts" className="flex flex-col">
               <LabelHead label="Subject">
@@ -145,7 +145,7 @@ export function DraftsDialog({
                       type="button"
                       data-draft={r.id}
                       onClick={() => openCompose({ draftId: r.id })}
-                      className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-2.5 px-3 text-left hover:bg-bone"
+                      className="focus-ring-inset -mx-(--inset) flex h-full min-w-0 flex-1 items-center gap-2.5 px-(--inset) text-left hover:bg-bone"
                     >
                       <span
                         className={

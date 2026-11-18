@@ -572,18 +572,38 @@
   z-index: var(--z-toast);
 }
 
-/* A window, a popover and Ask's working surface are not on the page's
-   grid: their rows keep the 12px inset they had before the page edge moved. */
-[data-slot='dialog-content'],
+/* A popover and Ask's working surface are not on the page's grid: their
+   rows inset 12px. */
 [data-slot='popover-content'],
 [data-ask-surface] {
   --inset: 0.75rem;
+}
+
+/* A window's text stands on one 16px line (E3). A padded window's body is
+   already on it, so a row inside insets nothing more; a flush window, and a
+   region that runs to a padded window's edge (`window-bleed`), insets its
+   rows the 16px itself. */
+[data-slot='dialog-content'] {
+  --inset: 0rem;
+}
+[data-slot='dialog-content'][data-flush] {
+  --inset: 1rem;
 }
 
 /* A record's rail is padded onto the 24px edge already: a row inside it
    that insets itself would stand in twice. */
 [data-record-rail] {
   --inset: 0rem;
+}
+
+/**
+ * A region of a padded window that runs to the sheet's edges: a composer, a
+ * list whose rows are full width. Its rows inset 16px, onto the line the
+ * window's head and foot stand on.
+ */
+@utility window-bleed {
+  margin-inline: -1rem;
+  --inset: 1rem;
 }
 
 /**

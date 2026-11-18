@@ -56,7 +56,8 @@ function CommandDialog({
       {/* A size exception: Cmd-K owns its own size, its caller's className. */}
       <DialogContent
         size="m"
-        className={cn('overflow-hidden p-0 sm:max-w-none', className)}
+        flush
+        className={cn('overflow-hidden sm:max-w-none', className)}
         {...(overlayClassName === undefined ? {} : { overlayClassName })}
       >
         <Command {...(shouldFilter === undefined ? {} : { shouldFilter })}>

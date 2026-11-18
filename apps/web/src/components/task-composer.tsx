@@ -149,7 +149,7 @@ export function TaskComposer({
       </DialogTrigger>
       {/* Quick task: no title bar — the input is the title. 48px prompt row
           with a pine +, chips under it, a bone foot. */}
-      <DialogContent size="s" className="top-[20%] translate-y-0 p-0">
+      <DialogContent size="s" flush className="top-[20%] translate-y-0">
         <DialogTitle className="sr-only">Create task</DialogTitle>
         <form
           onSubmit={(e) => {
@@ -163,7 +163,7 @@ export function TaskComposer({
             }
           }}
         >
-          <div className="flex h-12 items-center gap-2.5 border-b border-hairline px-5">
+          <div className="flex h-12 items-center gap-2.5 border-b border-hairline px-4">
             <span className="mono text-ui text-primary">+</span>
             {/* The input is the title: no reticle here — the caret in a
                 sheet that just opened is the focus, and marks at the
@@ -179,14 +179,14 @@ export function TaskComposer({
             />
           </div>
           {error ? (
-            <p role="alert" className="px-5 pt-3 text-label text-destructive">
+            <p role="alert" className="px-4 pt-3 text-label text-destructive">
               {error}
             </p>
           ) : null}
-          <div className="flex flex-wrap items-center gap-2 px-5 py-4">
+          <div className="flex flex-wrap items-center gap-2 px-4 py-4">
             {chips}
           </div>
-          <div className="flex min-h-11 items-center gap-4 border-t border-rule bg-bone px-5 py-2">
+          <div className="flex min-h-11 items-center gap-4 border-t border-rule bg-bone px-4 py-2">
             <Switch checked={keepOpen} onCheckedChange={setKeepOpen}>
               Keep open
             </Switch>
