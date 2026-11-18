@@ -79,10 +79,8 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 - `SPA-470` `zod-4` — zod leaves every `package.json` and lint refuses it in every package (D85). Project 37; `afk`, last.
 - `SPA-471` `deps-1` — drop `@tailwindcss/typography` (unused) and `dotenv`/`dotenv-cli` (Node 22 reads env files); the site sets in IBM Plex. `afk`.
 - `SPA-472` `errors-1` — a failed query shows its area's plain line and logs the cause; every failure class carries a message; one query failure per area; unknown `/api` paths answer 404 (D117). `afk`.
-- `SPA-473` `data-1` — Portfolio reads through keyed queries; its writes invalidate only their keys (D104). Project 42; `afk`.
 - `SPA-478` `export-1` — an admin downloads the workspace as one zip (D42). `afk`.
 - `SPA-483` `icons-2` — the last Lucide names and text arrows go. `afk`.
-- `SPA-485` `rail-menus` — a deal's Company reads as Change, Reset to default order, a check lane for a current menu item. `afk`.
 - `SPA-188` `ship-10` — install, upgrade and rollback docs. Project 16, In Progress. `docs/install.md` and `docs/upgrade.md` exist; check what is left.
 - `SPA-190` `ship-12` — one-click templates for Coolify, Railway, Render and Unraid. Project 16, In Progress; each needs a human deploy.
 
@@ -97,6 +95,8 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 
 ## Unticketed follow-ups
 
+- Data layer, after `data-1`: setting an FX rate, the base currency or renaming a company does not invalidate the Portfolio keys, so Portfolio opened afterwards paints the cached figures until the loader's background read lands; Today's mark window refreshes Today through an `onSaved` callback, since Today still reads through its loader.
+- Records, after `rail-menus`: the dev database's Companies attributes are not in the default order (the reset item is enabled there); the swap glyph is Carbon `Repeat`, since `ArrowsHorizontal` already means merge.
 - Notes, after `note-window-2`: a confirmed leave waits for the last save, so a save the server never answers holds the navigation; closing or reloading the tab still shows only the browser's prompt. A file chip's viewer and a drop in the note window were not seen live.
 - Settings, after `settings-3b`: the fold now measures the actions' right edge in the shared head, so record and page heads use it too (they still land 24px in).
 - Windows, after `windows-1`: a filled row (the meeting window's Write-up, any `EmptyRow` in a window) stands its fill on the 16px line and pads its text inside, so its text sits at 28px; the meeting window's `+ Pin a record…` text stands 4px left of the linked rows' text. The confirm was not opened live.
