@@ -81,8 +81,6 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 - `SPA-472` `errors-1` — a failed query shows its area's plain line and logs the cause; every failure class carries a message; one query failure per area; unknown `/api` paths answer 404 (D117). `afk`.
 - `SPA-473` `data-1` — Portfolio reads through keyed queries; its writes invalidate only their keys (D104). Project 42; `afk`.
 - `SPA-478` `export-1` — an admin downloads the workspace as one zip (D42). `afk`.
-- `SPA-480` `windows-1` — every window's text on one 16px line (E3). `afk`.
-- `SPA-481` `phone-1` — a space page fits 390px; a list's column head stays pinned on Firefox and Safari before 26. `afk`.
 - `SPA-482` `note-window-2` — the note window previews file chips, attaches drops, keeps the last edit. `afk`.
 - `SPA-483` `icons-2` — the last Lucide names and text arrows go. `afk`.
 - `SPA-484` `settings-3b` — the folded head's actions end at the 800px column; invariant lines become tooltips. `afk`.
@@ -101,6 +99,8 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 
 ## Unticketed follow-ups
 
+- Windows, after `windows-1`: a filled row (the meeting window's Write-up, any `EmptyRow` in a window) stands its fill on the 16px line and pads its text inside, so its text sits at 28px; the meeting window's `+ Pin a record…` text stands 4px left of the linked rows' text. The confirm was not opened live.
+- Phone, after `phone-1`: at 390px a list page still scrolls sideways, because the toolbar's search field runs to 481px; the shared `Tabs` bar now scrolls inside itself on record pages too; Firefox and WebKit run only the phone e2e specs, and only where they are installed (CI installs Chromium alone).
 - Sign-in limit, after `sign-in-limit`: the Railway, Render and Coolify templates under `deploy/` do not set `TRUST_PROXY`, so behind their proxies every sign-in shares one count; the site's docs do not mention `TRUST_PROXY`. Better Auth's limiter is now on in every environment, so its default rules (100 requests per 10 seconds per path, 3 per 10 seconds on sign-up and change-password) apply in dev too.
 - Today, after `import-today`: a batch abandoned at the preview (`planned`) does not show on Needs you, only `staged`; the row carries no glyph beside its `IMPORT` kind word (Kinds), though the issue asked for one.
 - Portfolio, after `portfolio-shares`: the dev database shows the seeded Tejas Sensing holding (a sale point) only after `pnpm db:seed`; the site's landing copy still says twelve holdings, and the seed now has thirteen.
