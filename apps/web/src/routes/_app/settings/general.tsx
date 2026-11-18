@@ -40,7 +40,7 @@ import { SETUP_ITEMS } from '#/lib/setup/whats-set-up'
 import type { SetupState } from '#/lib/setup/whats-set-up'
 import { cn } from '#/lib/utils'
 import { formatBytes } from '@spaces/core/documents'
-import { formatTime } from '@spaces/core/format'
+import { formatDay, formatTime } from '@spaces/core/format'
 
 const shell = getRouteApi('/_app/settings')
 
@@ -161,7 +161,9 @@ function ExportRow({ initial }: { initial: WorkspaceExport }) {
           <SettingsState tone="wait">Exporting</SettingsState>
         ) : view.state === 'ready' ? (
           <SettingsState tone="ok">
-            Ready until {formatTime(view.expiresAt)}
+            {/* A day ahead: the time alone reads as now. */}
+            Ready until {formatDay(view.expiresAt, view.expiresAt)},{' '}
+            {formatTime(view.expiresAt)}
           </SettingsState>
         ) : view.state === 'failed' ? (
           <SettingsState tone="bad" className="max-w-64">
