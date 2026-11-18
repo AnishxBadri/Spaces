@@ -46,9 +46,10 @@ function LoginPage() {
     setPending(false)
     if (err) {
       setForgot(err.status !== 429)
+      // 429 is the sign-in rate limit: 5 attempts a minute per address.
       setError(
         err.status === 429
-          ? 'Too many attempts. Wait a minute and try again.'
+          ? 'Too many attempts. Try again in a minute.'
           : 'Wrong email or password.',
       )
       return

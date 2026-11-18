@@ -666,6 +666,13 @@
       "when": 1794926615852,
       "tag": "0094_feeds_photos_retry",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1794986164497,
+      "tag": "0095_auth_rate_limit",
+      "breakpoints": true
     }
   ]
 }

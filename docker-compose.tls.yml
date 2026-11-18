@@ -3,8 +3,10 @@
 # The app never terminates TLS. Caddy sits in front, gets a certificate on
 # its own, and talks plain HTTP to `app` on the compose network. APP_URL is
 # the single source of truth for scheme, cookies and every external link —
-# the app reads no forwarded headers at all (pinned by a test), so getting
-# APP_URL right is the whole configuration.
+# the app reads no forwarded proto or host header (pinned by a test), so
+# getting APP_URL right is the whole configuration. The one forwarded header
+# it reads is X-Forwarded-For, for sign-in's rate limit, and only because
+# TRUST_PROXY below says Caddy is the only way in.
 #
 #   SPACES_DOMAIN=deals.example.com \
 #   APP_URL=https://deals.example.com \
@@ -35,6 +37,10 @@ services:
     ports: !reset []
     expose:
       - '3000'
+    environment:
+      # Every request now arrives from Caddy, so the socket address is
+      # Caddy's: the sign-in limit counts the address Caddy forwards instead.
+      TRUST_PROXY: 'true'
 
   caddy:
     image: caddy:2.10.2-alpine

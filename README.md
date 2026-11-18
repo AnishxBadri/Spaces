@@ -211,6 +211,7 @@ app.
 | `APP_URL`                | yes      | The origin the browser sees, e.g. `https://deals.example.com`.                                                                                                            |
 | `MASTER_KEY`             | no       | Encrypts stored credentials. Auto-generated to `/data/secret.key`.                                                                                                        |
 | `STORAGE_DRIVER`         | no       | `local` (default) or `s3`, then `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`.                               |
+| `TRUST_PROXY`            | no       | `true` when every request comes through your reverse proxy, so sign-in's limit of 5 attempts a minute counts the forwarded client address. The HTTPS overlay sets it.     |
 | `SPACES_PLUGINS`         | no       | Plugins to install on first boot, e.g. `apollo,exa`, from the image's registry snapshot. A plugin already installed is skipped; removing the variable uninstalls nothing. |
 | `SPACES_CREDENTIAL_<ID>` | no       | Seeds a plugin's workspace key (`SPACES_CREDENTIAL_APOLLO`) once, when none is stored. A key changed in Settings wins from then on.                                       |
 

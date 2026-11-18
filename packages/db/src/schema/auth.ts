@@ -1,4 +1,11 @@
-import { boolean, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+import {
+  bigint,
+  boolean,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+} from 'drizzle-orm/pg-core'
 
 /**
  * Better Auth tables (core + admin plugin) — the app-session store.
@@ -108,4 +115,16 @@ export const verification = pgTable('verification', {
   updatedAt: timestamp('updated_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
+})
+
+/**
+ * better-auth's rate-limit store, one row per `<client address>|<path>`.
+ * In Postgres rather than memory so every app process shares one count.
+ * `last_request` is epoch milliseconds, as better-auth writes it. @public
+ */
+export const rateLimit = pgTable('rate_limit', {
+  id: text('id').primaryKey(),
+  key: text('key').notNull().unique(),
+  count: integer('count').notNull(),
+  lastRequest: bigint('last_request', { mode: 'number' }).notNull(),
 })

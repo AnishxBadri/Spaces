@@ -7,6 +7,7 @@ import { and, count, eq, gt, isNull } from 'drizzle-orm'
 // eslint-disable-next-line effect/io-is-effect -- better-auth's configuration, not a program: its database hooks are callbacks better-auth runs and awaits.
 import { db } from '@spaces/db'
 import { invite, user } from '@spaces/db/schema/auth'
+import { CLIENT_IP_HEADER } from '#/lib/client-ip'
 import { clearSetupToken, verifySetupToken } from '#/lib/setup-token'
 import { loadMasterKey } from '@spaces/core/writes/vault/key'
 
@@ -33,6 +34,10 @@ function authSecret(): string {
  * - APP_URL drives baseURL, cookie security, and OAuth redirect URIs —
  *   the reverse-proxy trap (proxy terminates TLS, app sees http) is solved
  *   by trusting APP_URL, not the request.
+ * - Sign-in is rate limited per client address, counted in Postgres so every
+ *   app process shares the count. The address is the one `/api/auth/$`
+ *   writes into `CLIENT_IP_HEADER`: whether a forwarded header is believed is
+ *   the same trap, answered by `TRUST_PROXY`, not by the request.
  */
 export const auth = betterAuth({
   baseURL: process.env.APP_URL ?? 'http://localhost:3000',
@@ -45,6 +50,18 @@ export const auth = betterAuth({
     // `sendResetPassword` unset keeps `/request-password-reset` refusing, so
     // nobody can start a reset for someone else's address.
     revokeSessionsOnPasswordReset: true,
+  },
+  rateLimit: {
+    // On everywhere, not only under NODE_ENV=production: a self-hosted box's
+    // NODE_ENV is not a security switch.
+    enabled: true,
+    storage: 'database',
+    // Only email-and-password sign-in gets its own rule; every other path
+    // keeps Better Auth's defaults.
+    customRules: { '/sign-in/email': { window: 60, max: 5 } },
+  },
+  advanced: {
+    ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
   },
   verification: {
     // A reset row stores only the hash of `reset-password:<token>`, as an

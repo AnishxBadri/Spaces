@@ -82,14 +82,15 @@ it was the first time.
 
 Everything else is optional and has a default:
 
-| variable                 | default                     | what it does                                                                                                                                                       |
-| ------------------------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `MASTER_KEY`             | generated on first boot     | the key every stored credential is encrypted with; see _What lives in ./data_                                                                                      |
-| `STORAGE_DRIVER`         | `local`                     | `s3` puts blobs in a bucket instead of `./data` (`S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`)       |
-| `BETTER_AUTH_SECRET`     | derived from the master key | set it only if you want the session-signing secret rotated separately                                                                                              |
-| `ROLE`                   | `all`                       | the shipped compose sets `web` and `worker`; `all` runs both in one container, for hosts that run only one (see _Web and worker_, below)                           |
-| `SPACES_PLUGINS`         | unset                       | plugins to install on first boot (`apollo,exa`) from the image's registry snapshot; one already installed is skipped, and removing the variable uninstalls nothing |
-| `SPACES_CREDENTIAL_<ID>` | unset                       | seeds a plugin's workspace key once, when none is stored (`SPACES_CREDENTIAL_APOLLO`); a key changed in Settings wins from then on                                 |
+| variable                 | default                     | what it does                                                                                                                                                                                            |
+| ------------------------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MASTER_KEY`             | generated on first boot     | the key every stored credential is encrypted with; see _What lives in ./data_                                                                                                                           |
+| `STORAGE_DRIVER`         | `local`                     | `s3` puts blobs in a bucket instead of `./data` (`S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`)                                            |
+| `BETTER_AUTH_SECRET`     | derived from the master key | set it only if you want the session-signing secret rotated separately                                                                                                                                   |
+| `TRUST_PROXY`            | unset                       | `true` when every request reaches the app through your reverse proxy: sign-in's limit of 5 attempts a minute then counts the address the proxy forwards, not the proxy's own. The HTTPS overlay sets it |
+| `ROLE`                   | `all`                       | the shipped compose sets `web` and `worker`; `all` runs both in one container, for hosts that run only one (see _Web and worker_, below)                                                                |
+| `SPACES_PLUGINS`         | unset                       | plugins to install on first boot (`apollo,exa`) from the image's registry snapshot; one already installed is skipped, and removing the variable uninstalls nothing                                      |
+| `SPACES_CREDENTIAL_<ID>` | unset                       | seeds a plugin's workspace key once, when none is stored (`SPACES_CREDENTIAL_APOLLO`); a key changed in Settings wins from then on                                                                      |
 
 AI providers, enrichment keys and everything a user can configure are set
 in the app under Settings, never in the environment. The two `SPACES_*`

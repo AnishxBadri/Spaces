@@ -1,7 +1,8 @@
 /**
  * What the app decided its public identity is.
- * - The app never terminates TLS and never reads a forwarded header (a test
- *   pins that no source file does), so `APP_URL` alone decides the scheme.
+ * - The app never terminates TLS and never reads a forwarded proto or host
+ *   header (a test pins that no source file does), so `APP_URL` alone
+ *   decides the scheme.
  * - It is the auth `baseURL` (which makes the session cookie Secure), the
  *   origin of invite links and of local blob presign URLs. All three strip a
  *   trailing slash and nothing else, so this module does the same.
