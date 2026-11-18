@@ -12,6 +12,8 @@ import { cn } from '#/lib/utils'
  * - The actions are never rendered twice. The head's own element turns
  *   `fixed` into the bar's right lane while its slot keeps the measured size,
  *   so every hotkey and every effect inside it stays bound once.
+ * - Folded, the actions end where they ended unfolded: on the 24px edge, or
+ *   on a settings page where the 800px column ends (`SETTINGS_HEAD_CAP`).
  */
 
 /**
@@ -57,10 +59,32 @@ export function useXlPane(): boolean {
 }
 
 export type HeadFold =
-  { folded: false } | { folded: true; width: number; height: number }
+  | { folded: false }
+  | {
+      folded: true
+      width: number
+      height: number
+      /** The slot's right edge from the viewport's, in px: where the folded actions end. */
+      right: number
+    }
 
 /** The head as drawn, unfolded: a list page's head always is. */
 export const OPEN: HeadFold = { folded: false }
+
+/** The 24px every head keeps from the page's edge: the fallback when unmeasured. */
+const EDGE_PX = 24
+
+/**
+ * How far the slot's right edge stands from the viewport's: the `right` of
+ * the folded actions, which are `fixed`. The viewport here excludes the
+ * scrollbar, as a fixed box's containing block does.
+ */
+function rightOf(slot: HTMLElement | null): number {
+  if (!slot) return EDGE_PX
+  return (
+    document.documentElement.clientWidth - slot.getBoundingClientRect().right
+  )
+}
 
 /**
  * Watch the head's title; measure the actions slot at the moment it folds.
@@ -91,13 +115,31 @@ export function useHeadFold(enabled = true) {
             folded: true,
             width: slot?.width ?? 0,
             height: slot?.height ?? 0,
+            right: rightOf(actionsRef.current),
           }
         })
       },
       { rootMargin: `-${FOLD_LINE_PX}px 0px 0px 0px` },
     )
     observer.observe(title)
-    return () => observer.disconnect()
+    // The slot stays in the head's flow at its folded size, so when the
+    // pane's width changes (the window, the sidebar) its edge is re-read.
+    const head = actionsRef.current?.parentElement
+    const resize =
+      head && typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(() =>
+            setFold((prev) => {
+              if (!prev.folded) return prev
+              const right = rightOf(actionsRef.current)
+              return right === prev.right ? prev : { ...prev, right }
+            }),
+          )
+        : null
+    if (head) resize?.observe(head)
+    return () => {
+      observer.disconnect()
+      resize?.disconnect()
+    }
   }, [enabled])
 
   return { titleRef, actionsRef, fold }
@@ -140,7 +182,7 @@ export function HeadBar({
         className="absolute inset-x-0 top-0 isolate flex h-12 -translate-y-full items-center gap-3 border-b border-hairline bg-paper px-6 opacity-0 transition-[transform,opacity] duration-[120ms] ease-out-quart data-[folded=true]:pointer-events-auto data-[folded=true]:translate-y-0 data-[folded=true]:opacity-100 data-[folded=true]:duration-[180ms] motion-reduce:transition-none"
         style={
           fold.folded
-            ? { paddingRight: `calc(2.25rem + ${fold.width}px)` }
+            ? { paddingRight: `calc(0.75rem + ${fold.right + fold.width}px)` }
             : undefined
         }
       >
@@ -170,8 +212,9 @@ export function HeadBar({
 
 /**
  * The head's actions, rendered once. Folded, the element is lifted into the
- * bar's right lane and its slot holds the size it had, so the head below
- * keeps its height and nothing after it moves.
+ * bar's right lane, its right edge where the slot's is, and its slot holds
+ * the size it had, so the head below keeps its height and nothing after it
+ * moves.
  */
 export function HeadActions({
   fold,
@@ -194,9 +237,10 @@ export function HeadActions({
       <div
         data-head-actions
         data-folded={fold.folded}
+        style={fold.folded ? { right: fold.right } : undefined}
         className={cn(
           'flex items-center gap-2',
-          'data-[folded=true]:fixed data-[folded=true]:top-12 data-[folded=true]:right-6 data-[folded=true]:z-sticky data-[folded=true]:h-12 md:data-[folded=true]:top-0',
+          'data-[folded=true]:fixed data-[folded=true]:top-12 data-[folded=true]:z-sticky data-[folded=true]:h-12 md:data-[folded=true]:top-0',
           // Folded, every action steps down to 26px to sit inside the bar.
           'data-[folded=true]:[&_[data-size=icon]]:w-6.5 data-[folded=true]:[&_[data-slot=button]]:h-6.5',
           'data-[folded=true]:animate-in data-[folded=true]:duration-[180ms] data-[folded=true]:fade-in-0 motion-reduce:animate-none',

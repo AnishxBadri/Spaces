@@ -531,7 +531,6 @@ function RoutingGroup({
     <SettingsGroup
       title="Routing"
       count={`${routed} of ${MODELS_GRID_LANES.length * AI_SENSITIVITIES.length} set`}
-      action="sensitive lists local models only"
     >
       <SettingsColumns>
         <span className="w-4 shrink-0" />
@@ -653,7 +652,7 @@ function RouteCellSelect({
     }
   }
 
-  return (
+  const select = (
     <Select<CellValue>
       value={live}
       onChange={(v) => void choose(v)}
@@ -664,5 +663,16 @@ function RouteCellSelect({
       aria-label={`${lane} lane, ${sensitivity}`}
       className="w-52 shrink-0"
     />
+  )
+  // A sensitive cell offers local providers only; its tooltip says why the
+  // list is shorter than the cell beside it.
+  return sensitivity === 'sensitive' ? (
+    <SettingsTip tip="Sensitive records list local models only.">
+      <span data-route-tip className="flex w-52 shrink-0">
+        {select}
+      </span>
+    </SettingsTip>
+  ) : (
+    select
   )
 }

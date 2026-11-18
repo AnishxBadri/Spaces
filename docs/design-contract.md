@@ -114,8 +114,9 @@ folder bar and, given `children`, its body; `FolderBody` is the body when the ba
 drawn apart from it (a list's view bar, Notes, Meetings, Review); `plain` is the inner
 bar inside a rule card. `RecordTable`'s `folder` frames a list's table in hairline;
 without it a table is a rule card. `RecordBody` (`components/record/record-parts.tsx`)
-is the record chassis. On a page that scrolls the head folds; its bar and pinned actions
-sit on the 24px edge (`components/head-fold.tsx`).
+is the record chassis. On a page that scrolls the head folds; its bar sits on the 24px
+edge and its pinned actions end where they ended unfolded — the 24px edge, or a settings
+page's 800px column (E4) (`components/head-fold.tsx`).
 
 - **E1 · The content edge is 24px.** The page title sits on it, and so does every
   card's content: the body gutter is 12px, a card is a 1px box with 12px between cards

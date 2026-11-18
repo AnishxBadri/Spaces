@@ -64,13 +64,13 @@ type BackfillView = Awaited<ReturnType<typeof getEmbedBackfill>>
  * Settings → AI → Search — the embedding pin: three readouts (how much is
  * searchable by meaning, what waits, where sensitive records go), then
  * Model (the provider, its models as radios, the key, Test and Pin),
- * Sensitive records and Catch up. Its words are its safety mechanism:
+ * Sensitive records and Coverage. Its words are its safety mechanism:
  * - A model that cannot emit the workspace's width stays listed, greyed with
  *   its note and no control; the server refuses it `PinLocked` regardless.
  * - Once pinned, another same-width model is a swap: it says what it does to
  *   the stored vectors, asks first, and offers the backfill, never starts it.
  * - Ollama is flagged local with no key; its row is the address it borrows.
- * - Catch up asks with its estimate before anything is queued, pricing
+ * - Coverage's Embed asks with its estimate before anything is queued, pricing
  *   sensitive chunks on a local route "free — local model".
  */
 export function EmbeddingsSection({
@@ -158,7 +158,7 @@ export function EmbeddingsSection({
       })
       toast(
         swapFrom
-          ? `${pinHeadline(pinned, today)} Catch up re-embeds what is stored.`
+          ? `${pinHeadline(pinned, today)} Embed under Coverage re-embeds what is stored.`
           : pinHeadline(pinned, today),
       )
       void router.invalidate()
@@ -554,7 +554,7 @@ function Backfill({
 
   return (
     <SettingsGroup
-      title="Catch up"
+      title="Coverage"
       action={<span className="tabular">{runLine(view)}</span>}
     >
       <SettingsRow

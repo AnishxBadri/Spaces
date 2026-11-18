@@ -92,7 +92,6 @@ describe('listStatusOf — a Connections row', () => {
     [
       'set up',
       listRow(),
-      'graphite',
       'Set up · 4 of 6 members connected',
       'Open ›',
       'in-use',
@@ -100,7 +99,6 @@ describe('listStatusOf — a Connections row', () => {
     [
       'not set up',
       listRow({ configured: false, membersConnected: 0 }),
-      'ink',
       'Not set up',
       'Set up ›',
       'setup',
@@ -108,7 +106,6 @@ describe('listStatusOf — a Connections row', () => {
     [
       'in Testing',
       listRow({ testing: true }),
-      'graphite',
       'Testing · reconnects weekly',
       'Open ›',
       'in-use',
@@ -116,13 +113,12 @@ describe('listStatusOf — a Connections row', () => {
     [
       'refused by the provider',
       listRow({ testing: true, error: 'Google said: invalid_client' }),
-      'bad',
       'Google said: invalid_client',
       'Fix ›',
       'setup',
     ],
-  ] as const)('%s', (_state, row, tone, text, label, tab) => {
-    expect(listStatusOf(row)).toEqual({ tone, text, link: { label, tab } })
+  ] as const)('%s', (_state, row, text, label, tab) => {
+    expect(listStatusOf(row)).toEqual({ text, link: { label, tab } })
   })
 })
 

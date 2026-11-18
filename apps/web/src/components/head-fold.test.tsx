@@ -17,6 +17,7 @@ import { useHotkey } from '#/lib/use-hotkey'
 
 import { PageHeader } from './page-header'
 import { RecordHeader } from './record/record-parts'
+import { SettingsSection } from './settings/settings-section'
 
 /**
  * The sticky head, mounted the way a route mounts it: the head, then the
@@ -50,6 +51,21 @@ class StubObserver {
   }
 }
 
+/** `ResizeObserver`, fired by hand: the pane's width changing. */
+class StubResize {
+  static last: StubResize | null = null
+  readonly observed: Array<Element> = []
+  constructor(readonly callback: () => void) {
+    StubResize.last = this
+  }
+  observe(el: Element) {
+    this.observed.push(el)
+  }
+  disconnect() {
+    this.observed.length = 0
+  }
+}
+
 const win = new Window()
 let createRoot: typeof CreateRoot
 
@@ -59,6 +75,7 @@ beforeAll(async () => {
   vi.stubGlobal('HTMLElement', win.HTMLElement)
   vi.stubGlobal('KeyboardEvent', win.KeyboardEvent)
   vi.stubGlobal('IntersectionObserver', StubObserver)
+  vi.stubGlobal('ResizeObserver', StubResize)
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   ;({ createRoot } = await import('react-dom/client'))
 })
@@ -103,8 +120,20 @@ function titleVisible(visible: boolean) {
   )
 }
 
-/** The slot measures 312 × 32 — what a real layout would report. */
+/** The viewport's width without its scrollbar, as a layout reports it. */
+function viewportWidth(px: number) {
+  Object.defineProperty(document.documentElement, 'clientWidth', {
+    configurable: true,
+    get: () => px,
+  })
+}
+
+/**
+ * The slot measures 312 × 32 and ends 24px from the viewport's right edge —
+ * what a real layout would report.
+ */
 function measureSlot() {
+  viewportWidth(1236)
   const slot = q('[data-head-actions-slot]')
   slot.getBoundingClientRect = () => new win.DOMRect(900, 20, 312, 32)
   return slot
@@ -140,6 +169,7 @@ const record = (
 beforeEach(() => {
   logged.mockReset()
   StubObserver.last = null
+  StubResize.last = null
   const host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -227,7 +257,11 @@ describe('the folded head', () => {
     expect(actions.className).toContain('data-[folded=true]:fixed')
     expect(actions.className).toContain('data-[folded=true]:h-12')
     expect(actions.className).toContain('data-[folded=true]:z-sticky')
-    expect(actions.className).toContain('data-[folded=true]:right-6')
+    // Its right edge where the slot's was: 24px in on a record.
+    expect(actions.style.right).toBe('24px')
+    expect(q('[data-head-bar]').style.paddingRight).toBe(
+      'calc(0.75rem + 336px)',
+    )
     // Folded, every action steps down to 26px.
     expect(actions.className).toContain(
       'data-[folded=true]:[&_[data-slot=button]]:h-6.5',
@@ -315,6 +349,88 @@ describe('the folded head', () => {
     expect(q('[data-head-actions]').dataset.folded).toBe('false')
     press('l')
     expect(logged).toHaveBeenCalledTimes(1)
+  })
+})
+
+/**
+ * A settings page's head, laid out as a browser lays it: a pane beside a
+ * 240px sidebar, the head's right padding `SETTINGS_HEAD_CAP`'s
+ * `max(24px, 100% − 800px)`, the 800px column 12px in from the pane with its
+ * content ending 12px inside its right edge (the card's 1px rule, its 11px
+ * inset). The test DOM lays nothing out, so each box reports that geometry.
+ */
+describe('a settings head, folded', () => {
+  const SIDEBAR = 240
+  const VIEWPORT = 1440
+
+  function layOut(paneWidth: number) {
+    viewportWidth(VIEWPORT)
+    const paneRight = SIDEBAR + paneWidth
+    const slotRight = paneRight - Math.max(24, paneWidth - 800)
+    const slot = q('[data-head-actions-slot]')
+    slot.getBoundingClientRect = () =>
+      new win.DOMRect(slotRight - 120, 28, 120, 32)
+    const column = q('[data-settings-body]')
+    const columnWidth = Math.min(800, paneWidth - 24)
+    column.getBoundingClientRect = () =>
+      new win.DOMRect(SIDEBAR + 12, 116, columnWidth, 600)
+  }
+
+  /** Where the column's content ends: inside the card's rule and inset. */
+  const columnEnd = () =>
+    q('[data-settings-body]').getBoundingClientRect().right - 1 - 11
+
+  /** The last action's right edge: the fixed row ends where its last child does. */
+  function lastActionEnd() {
+    const actions = q('[data-head-actions]')
+    // The section's fieldset is the row's last child, the action its last.
+    expect(actions.lastElementChild?.lastElementChild?.textContent).toBe(
+      'Add rate',
+    )
+    return VIEWPORT - Number.parseFloat(actions.style.right)
+  }
+
+  const page = (
+    <SettingsSection
+      title="Currency & FX"
+      action={
+        <>
+          <button type="button">Import</button>
+          <button type="button">Add rate</button>
+        </>
+      }
+    >
+      <p>Rates</p>
+    </SettingsSection>
+  )
+
+  it('ends the last action where the 800px column ends, as it does unfolded', () => {
+    mount(page)
+    layOut(1200)
+    titleVisible(false)
+    expect(q('[data-head-actions]').dataset.folded).toBe('true')
+    expect(lastActionEnd()).toBe(columnEnd())
+    expect(lastActionEnd()).toBe(SIDEBAR + 800)
+  })
+
+  it('keeps the 24px edge on a pane narrower than the column and its edge', () => {
+    mount(page)
+    layOut(700)
+    titleVisible(false)
+    expect(lastActionEnd()).toBe(SIDEBAR + 700 - 24)
+    expect(lastActionEnd()).toBe(columnEnd())
+  })
+
+  it('follows the column when the pane’s width changes while folded', () => {
+    mount(page)
+    layOut(1200)
+    titleVisible(false)
+    expect(StubResize.last?.observed).toEqual([q('header')])
+
+    layOut(1000)
+    act(() => StubResize.last?.callback())
+    expect(lastActionEnd()).toBe(columnEnd())
+    expect(lastActionEnd()).toBe(SIDEBAR + 800)
   })
 })
 

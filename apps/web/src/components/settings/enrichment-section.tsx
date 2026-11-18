@@ -127,9 +127,13 @@ function SourceMark({ name }: { name: string }) {
 const LINK =
   'focus-ring rounded-md mono text-micro text-primary hover:text-foreground'
 
+/** What the order means, on the controls that change it. */
+const ORDER_TIP = 'Sources are asked in this order; the first answer wins.'
+
 /**
- * Sources, in order: the first answer wins. The order is optimistic — the
- * move shows at once and snaps back if the write fails.
+ * Sources, in order: the first answer wins, which the move buttons' tooltip
+ * says. The order is optimistic — the move shows at once and snaps back if
+ * the write fails.
  */
 function SourcesBlock({
   sources,
@@ -159,11 +163,7 @@ function SourcesBlock({
   }
 
   return (
-    <SettingsGroup
-      data-block="sources"
-      title="Sources"
-      action="first answer wins"
-    >
+    <SettingsGroup data-block="sources" title="Sources">
       <ol aria-label="Enrichment sources">
         {rows.map((source, idx) => (
           <li
@@ -238,28 +238,32 @@ function SourcesBlock({
               {source.state}
             </span>
             <span className="flex w-28 shrink-0 items-center justify-end gap-2">
-              <button
-                type="button"
-                aria-label={`Move ${source.name} up`}
-                disabled={idx === 0}
-                onClick={() =>
-                  void persist(moveItem(rows, idx, idx - 1), 'Order saved')
-                }
-                className="focus-ring mono text-micro text-graphite hover:text-foreground disabled:opacity-30"
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                aria-label={`Move ${source.name} down`}
-                disabled={idx === rows.length - 1}
-                onClick={() =>
-                  void persist(moveItem(rows, idx, idx + 1), 'Order saved')
-                }
-                className="focus-ring mono text-micro text-graphite hover:text-foreground disabled:opacity-30"
-              >
-                ↓
-              </button>
+              <SettingsTip tip={ORDER_TIP}>
+                <button
+                  type="button"
+                  aria-label={`Move ${source.name} up`}
+                  disabled={idx === 0}
+                  onClick={() =>
+                    void persist(moveItem(rows, idx, idx - 1), 'Order saved')
+                  }
+                  className="focus-ring mono text-micro text-graphite hover:text-foreground disabled:opacity-30"
+                >
+                  ↑
+                </button>
+              </SettingsTip>
+              <SettingsTip tip={ORDER_TIP}>
+                <button
+                  type="button"
+                  aria-label={`Move ${source.name} down`}
+                  disabled={idx === rows.length - 1}
+                  onClick={() =>
+                    void persist(moveItem(rows, idx, idx + 1), 'Order saved')
+                  }
+                  className="focus-ring mono text-micro text-graphite hover:text-foreground disabled:opacity-30"
+                >
+                  ↓
+                </button>
+              </SettingsTip>
               {source.builtIn ? (
                 <span title="The Website is always asked">
                   <Switch

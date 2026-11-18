@@ -64,7 +64,6 @@ export function healthOf(use: ProviderUse): {
 }
 
 export type ListStatus = {
-  readonly tone: 'ink' | 'graphite' | 'bad'
   readonly text: string
   readonly link: { readonly label: string; readonly tab: ProviderTab }
 }
@@ -73,24 +72,20 @@ export type ListStatus = {
 export function listStatusOf(row: ConnectionsListRow): ListStatus {
   if (!row.configured)
     return {
-      tone: 'ink',
       text: 'Not set up',
       link: { label: 'Set up ›', tab: 'setup' },
     }
   if (row.error !== null)
     return {
-      tone: 'bad',
       text: row.error,
       link: { label: 'Fix ›', tab: 'setup' },
     }
   if (row.testing)
     return {
-      tone: 'graphite',
       text: 'Testing · reconnects weekly',
       link: { label: 'Open ›', tab: 'in-use' },
     }
   return {
-    tone: 'graphite',
     text: `Set up · ${String(row.membersConnected)} of ${String(row.members)} members connected`,
     link: { label: 'Open ›', tab: 'in-use' },
   }

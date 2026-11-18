@@ -2637,7 +2637,7 @@ describe('Search, Usage and Plugins, by sheets 04 and 07', () => {
       const heads = Array.from(document.querySelectorAll('h3')).map((h) =>
         h.textContent.trim(),
       )
-      expect(heads).toEqual(['Model', 'Sensitive records', 'Catch up'])
+      expect(heads).toEqual(['Model', 'Sensitive records', 'Coverage'])
       expect(byText('Embed 16')).toBeDefined()
       const radios = document.querySelectorAll(
         '[role="radiogroup"] [role="radio"]',
@@ -2959,5 +2959,76 @@ describe('the sheet differences, page by page', () => {
     await mount('/settings/enrichment')
     const card = groupHead('Auto-enrich')?.closest('.card')
     expect(card?.textContent).toContain('When a record')
+  })
+})
+
+describe('a line that reads the same on every page is a tooltip', () => {
+  /** Focuses a control the way Tab does, which opens its tooltip. */
+  async function focus(el: Element | null) {
+    if (!(el instanceof HTMLElement)) throw new Error('nothing to focus')
+    await act(async () => {
+      el.focus()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+  }
+
+  const text = () => document.body.textContent
+
+  it('Enrichment: the sources’ order is explained on the move buttons, not in the head', async () => {
+    await mount('/settings/enrichment')
+    const head = document.querySelector(
+      '[data-block="sources"] [data-settings-group]',
+    )
+    expect(head?.textContent).toBe('Sources')
+    expect(text()).not.toContain('first answer wins')
+    await focus(document.querySelector('button[aria-label="Move Apollo up"]'))
+    expect(text()).toContain('the first answer wins')
+  })
+
+  it('Models: the sensitive column’s local-only list is explained on its cells, not in the head', async () => {
+    await mount('/settings/models')
+    expect(text()).not.toContain('local models only')
+    const cell = document.querySelector('[data-route-tip] button')
+    expect(cell?.getAttribute('aria-label')).toBe('extract lane, sensitive')
+    // Everyday cells list every provider, so they carry no such tooltip.
+    expect(
+      document
+        .querySelector('button[aria-label="extract lane, normal"]')
+        ?.closest('[data-route-tip]'),
+    ).toBeNull()
+    await focus(cell)
+    expect(text()).toContain('Sensitive records list local models only.')
+  })
+
+  it('Search: the embedding card is named for the state it reports, its verb on the button', async () => {
+    const original = loaders.search
+    const pin = {
+      provider: 'openai',
+      model: 'text-embedding-3-small',
+      dims: 768,
+      pinnedAt: '2026-09-20T10:00:00.000Z',
+    }
+    loaders.search = () => ({
+      settings: { pin, slot: null, keys: [] },
+      backfill: {
+        pin,
+        total: 200,
+        embedded: 184,
+        estimate: { chunks: 16, tokens: 4000, cost: 'under $0.01' },
+        sensitive: null,
+        run: { state: 'idle' },
+      },
+    })
+    try {
+      await mount('/settings/search')
+      expect(text()).not.toMatch(/catch up/i)
+      const coverage = Array.from(
+        document.querySelectorAll('[data-settings-group]'),
+      ).find((g) => g.querySelector('h3')?.textContent === 'Coverage')
+      expect(coverage?.textContent).toContain('embedded 184 of 200')
+      expect(byText('Embed 16')).toBeDefined()
+    } finally {
+      loaders.search = original
+    }
   })
 })
