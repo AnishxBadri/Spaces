@@ -8,11 +8,17 @@ import {
   useHeadFold,
   useXlPane,
 } from '#/components/head-fold'
+import { icon } from '#/components/icons'
 import { EmptyRow, SectionHead } from '#/components/ledger-section'
 import { Card, PageBody } from '#/components/page-header'
 import { Twinkle } from '#/components/twinkle'
 import { Button } from '#/components/ui/button'
 import { Stamp } from '#/components/ui/stamp'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '#/components/ui/tooltip'
 import type { StampProps } from '#/components/ui/stamp'
 import type { ShownReadout } from '#/lib/records/overview'
 import { cn } from '#/lib/utils'
@@ -786,18 +792,23 @@ export function RailSection({
  * - `add` wraps a trigger in whatever adds a row (a popover, a window):
  *   the head's `+`, or the group's one `Name +` row while it is empty.
  * - Empty with nothing to add, the group draws nothing.
+ * - `change` names a group that holds one value its control swaps rather
+ *   than adds to (a deal's Company): the head draws the swap glyph, named and
+ *   tipped with it, in place of the `+`.
  */
 export function RailGroup({
   label,
   count,
   empty = false,
   add,
+  change,
   children,
 }: {
   label: string
   count?: ReactNode
   empty?: boolean | undefined
   add?: ((trigger: ReactElement) => ReactNode) | undefined
+  change?: string | undefined
   children?: ReactNode
 }) {
   if (empty)
@@ -812,13 +823,17 @@ export function RailGroup({
         <h2 className="min-w-0 truncate text-ui text-graphite">{label}</h2>
         {add ? (
           add(
-            <button
-              type="button"
-              aria-label={`Add to ${label}`}
-              className="focus-ring flex size-6 shrink-0 items-center justify-center text-title text-graphite transition-colors duration-150 ease-out-quart hover:text-foreground"
-            >
-              +
-            </button>,
+            change === undefined ? (
+              <button
+                type="button"
+                aria-label={`Add to ${label}`}
+                className="focus-ring flex size-6 shrink-0 items-center justify-center text-title text-graphite transition-colors duration-150 ease-out-quart hover:text-foreground"
+              >
+                +
+              </button>
+            ) : (
+              <ChangeButton label={change} />
+            ),
           )
         ) : count === undefined ? null : (
           <span className="tabular mono text-micro text-graphite">{count}</span>
@@ -826,6 +841,33 @@ export function RailGroup({
       </div>
       <ul className="flex flex-col border-t border-rule">{children}</ul>
     </section>
+  )
+}
+
+/**
+ * A `RailGroup` head's swap control, its name in its tooltip. What a
+ * wrapping trigger's `asChild` hands it (the ref, the click, the state)
+ * goes on to the button, or the popover never opens.
+ */
+function ChangeButton({
+  label,
+  ...props
+}: ComponentProps<'button'> & { label: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          data-rail-change
+          {...props}
+          className="focus-ring flex size-6 shrink-0 items-center justify-center text-graphite transition-colors duration-150 ease-out-quart hover:text-foreground"
+        >
+          <icon.swap aria-hidden className="size-4" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   )
 }
 

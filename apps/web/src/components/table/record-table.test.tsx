@@ -697,3 +697,71 @@ describe('the pinned column', () => {
     }
   })
 })
+
+describe('a menu with a current item (E12)', () => {
+  async function openTool(selector: string) {
+    act(() => {
+      one(selector).dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      )
+    })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0))
+    })
+  }
+
+  const items = () => [
+    ...document.querySelectorAll(
+      '[role="menu"] [role="menuitem"], [role="menu"] [role="menuitemcheckbox"]',
+    ),
+  ]
+
+  /** The open menu's item labelled `text`. */
+  function item(text: string): Element {
+    const el = items().find((i) => i.textContent === text)
+    if (el === undefined) throw new Error(`no ${text}`)
+    return el
+  }
+
+  it('leads Sort’s columns with a check on the sorted one and an empty lane on the rest, never a verb glyph', async () => {
+    mount({ sorting: [{ id: 'invested', desc: false }] })
+    await openTool('[data-tool="sort"]')
+    expect(items().map((el) => el.textContent)).toEqual([
+      'Company',
+      'Invested↑',
+      'Clear sort',
+    ])
+    const company = item('Company')
+    const invested = item('Invested↑')
+    for (const el of [company, invested]) {
+      const lead = el.firstElementChild
+      expect(lead?.hasAttribute('data-menu-lead')).toBe(true)
+      expect(lead?.className).toMatch(/\bsize-4\b/)
+    }
+    // The current column carries the check, the other an empty 16px lane.
+    const check = invested.querySelector('[data-menu-lead] svg')
+    expect(check?.hasAttribute('data-menu-check')).toBe(true)
+    expect(check?.getAttribute('data-icon')).toBe('checkmark')
+    expect(company.querySelector('[data-menu-lead]')?.childElementCount).toBe(0)
+    // Clear sort is a verb, under the rule, so it keeps its glyph.
+    expect(
+      item('Clear sort')
+        .querySelector('[data-menu-lead] svg')
+        ?.getAttribute('data-icon'),
+    ).toBe('erase')
+  })
+
+  it('leads a view’s columns with each one’s box, never a verb glyph', async () => {
+    mount()
+    await openTool('thead [data-columns-menu]')
+    const shown = items()
+    expect(shown.map((el) => el.textContent)).toEqual(['Company', 'Invested'])
+    for (const el of shown) {
+      expect(el.getAttribute('role')).toBe('menuitemcheckbox')
+      expect(el.getAttribute('aria-checked')).toBe('true')
+      const lead = el.firstElementChild
+      expect(lead?.hasAttribute('data-menu-lead')).toBe(true)
+      expect(lead?.querySelector('svg:not([data-icon="checkmark"])')).toBe(null)
+    }
+  })
+})

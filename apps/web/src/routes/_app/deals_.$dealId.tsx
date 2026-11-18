@@ -425,7 +425,9 @@ function DealRecordPage() {
               label="Company"
               rows={company}
               mark={() => <DitherMark size={14} />}
-              // Required, so the group swaps the company and never clears it.
+              // Required and single: the group swaps the company and never
+              // clears it.
+              change="Change company…"
               add={(trigger) => (
                 <PickPopover
                   trigger={trigger}

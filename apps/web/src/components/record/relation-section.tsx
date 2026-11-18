@@ -61,6 +61,9 @@ export function relationRows(
  *   `PickPopover`, a create window. Without it the head carries the count.
  * - `onRemove` puts an unlink at a row's end on hover and focus: the group
  *   is the relationship's only place on the page, so it must also undo it.
+ * - `change` is a required single relationship (a deal's Company): `add`
+ *   swaps the one record, the head reads as that, and there is no unlink,
+ *   so the group never clears.
  */
 export function RelationSection({
   label,
@@ -68,6 +71,7 @@ export function RelationSection({
   mark,
   lane,
   add,
+  change,
   onRemove,
 }: {
   label: string
@@ -75,14 +79,17 @@ export function RelationSection({
   mark?: (row: RelationRow) => ReactNode
   lane?: (row: RelationRow, index: number) => ReactNode
   add?: ((trigger: ReactElement) => ReactNode) | undefined
-  onRemove?: ((row: RelationRow) => void) | undefined
-}) {
+} & (
+  | { change?: undefined; onRemove?: ((row: RelationRow) => void) | undefined }
+  | { change: string; onRemove?: never }
+)) {
   return (
     <RailGroup
       label={label}
       count={rows.length}
       empty={rows.length === 0}
       add={add}
+      change={change}
     >
       {rows.map((row, i) => {
         const href = recordPath(row)

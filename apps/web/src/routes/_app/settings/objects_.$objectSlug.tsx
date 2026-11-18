@@ -21,11 +21,14 @@ import { MENU_RULE, MoreMenu } from '#/components/ui/more-menu'
 import {
   IDENTITY_KEYS,
   IDENTITY_KEY_ATTRIBUTES,
+  coreKindOf,
 } from '@spaces/core/attributes/registry'
+import { defaultAttributeOrder } from '#/lib/attributes/default-order'
 import {
   getEnrichmentPage,
   getObject,
   listRegistry,
+  reorderAttributes,
   updateObject,
 } from '#/lib/server-fns'
 import { useHotkey } from '#/lib/use-hotkey'
@@ -100,6 +103,33 @@ function ObjectAttributesPage() {
   // A custom object's own shape — its names and whether it is archived — is
   // the admin's; a built-in one's is core's.
   const reshapes = isAdmin && !object.isSystem
+  // Only a core object has a registry order to go back to; a fresh seed is
+  // the one that lays it out, so an older install keeps whatever it had.
+  const kind = coreKindOf(object)
+  const defaultOrder =
+    kind === null ? null : defaultAttributeOrder(kind, registry)
+  const inDefaultOrder =
+    defaultOrder !== null &&
+    defaultOrder.join(',') === registry.map((a) => a.id).join(',')
+
+  async function resetOrder() {
+    if (defaultOrder === null) return
+    const ok = await confirm({
+      title: `Reset ${object.plural} to the default order?`,
+      body: `The built-in attributes go back to the order a new workspace starts with, and yours follow them in the order they have now. Table columns and record pages follow.`,
+      action: 'Reset order',
+    })
+    if (!ok) return
+    try {
+      await reorderAttributes({
+        data: { objectId: object.id, ids: defaultOrder },
+      })
+      toast(`${object.plural} attributes are in the default order`)
+      void router.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not reorder')
+    }
+  }
 
   async function toggleArchived() {
     if (!object.archived) {
@@ -201,6 +231,20 @@ function ObjectAttributesPage() {
                       icon: <icon.edit />,
                       opens: true,
                       onSelect: () => setEditingObject(true),
+                    },
+                  ]
+                : []),
+              ...(isAdmin && defaultOrder !== null
+                ? [
+                    {
+                      label: 'Reset to default order',
+                      icon: <icon.restore />,
+                      opens: true,
+                      disabled: inDefaultOrder,
+                      title: inDefaultOrder
+                        ? 'Already in the default order'
+                        : undefined,
+                      onSelect: () => void resetOrder(),
                     },
                   ]
                 : []),

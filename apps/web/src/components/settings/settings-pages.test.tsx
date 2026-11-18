@@ -42,6 +42,7 @@ const writes = vi.hoisted(() => ({
   revokeApiToken: vi.fn(async () => ({ ok: true })),
   updateObject: vi.fn(async () => ({ ok: true })),
   updateAttribute: vi.fn(async () => ({ ok: true })),
+  reorderAttributes: vi.fn(async () => ({ ok: true })),
   createRelationship: vi.fn(async () => ({
     a: { id: 'a', slug: 'portfolio' },
     b: { id: 'b', slug: 'funds' },
@@ -2470,6 +2471,105 @@ describe('Objects, by sheet 06', () => {
           i.textContent.trim(),
         ),
       ).toEqual(['New relationship…', 'Copy link'])
+    } finally {
+      loaders['objects/$objectSlug'] = original
+    }
+  })
+
+  it('resets a built-in object to the registry’s order, custom attributes after, once asked', async () => {
+    const original = loaders['objects/$objectSlug']
+    const attr = (n: number, slug: string, isSystem: boolean) => ({
+      id: `00000000-0000-4000-8000-0000000000d${n}`,
+      slug,
+      name: slug,
+      description: null,
+      type: 'text',
+      options: {},
+      isSystem,
+      archived: false,
+      sortOrder: n * 10,
+      filterable: false,
+      sortable: false,
+      pair: null,
+    })
+    // An install seeded before identity and contact led: domains last.
+    const registry = [
+      attr(1, 'thesis', false),
+      attr(2, 'location', true),
+      attr(3, 'linkedin', true),
+      attr(4, 'fund_size', false),
+      attr(5, 'domains', true),
+    ]
+    loaders['objects/$objectSlug'] = () => {
+      const page = original()
+      return 'object' in page && typeof page.object === 'object'
+        ? {
+            ...page,
+            object: {
+              ...page.object,
+              slug: 'companies',
+              singular: 'Company',
+              plural: 'Companies',
+              isSystem: true,
+            },
+            registry,
+          }
+        : page
+    }
+    const dialog = () => document.querySelector('[role="dialog"]')
+    try {
+      await mount('/settings/objects/funds')
+      await openMenu('More for Companies')
+      await click(menuItem('Reset to default order'))
+      await vi.waitFor(() =>
+        expect(dialog()?.textContent).toContain(
+          'Reset Companies to the default order?',
+        ),
+      )
+      expect(writes.reorderAttributes).not.toHaveBeenCalled()
+      await click(byText('Reset order', dialog() ?? document))
+      expect(writes.reorderAttributes).toHaveBeenCalledWith({
+        data: {
+          objectId: OBJECT_ID,
+          ids: [5, 3, 2, 1, 4].map(
+            (n) => `00000000-0000-4000-8000-0000000000d${n}`,
+          ),
+        },
+      })
+    } finally {
+      loaders['objects/$objectSlug'] = original
+    }
+  })
+
+  it('offers no reset on a custom object: it has no registry order', async () => {
+    await mount('/settings/objects/funds')
+    await openMenu('More for Funds')
+    expect(menuItem('Archive…')).toBeDefined()
+    expect(menuItem('Reset to default order')).toBeUndefined()
+  })
+
+  it('disables the reset on a built-in object already in the default order', async () => {
+    const original = loaders['objects/$objectSlug']
+    loaders['objects/$objectSlug'] = () => {
+      const page = original()
+      return 'object' in page && typeof page.object === 'object'
+        ? {
+            ...page,
+            object: {
+              ...page.object,
+              slug: 'deals',
+              plural: 'Deals',
+              isSystem: true,
+            },
+          }
+        : page
+    }
+    try {
+      await mount('/settings/objects/funds')
+      await openMenu('More for Deals')
+      expect(
+        menuItem('Reset to default order')?.hasAttribute('data-disabled'),
+      ).toBe(true)
     } finally {
       loaders['objects/$objectSlug'] = original
     }

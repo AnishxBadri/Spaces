@@ -93,6 +93,7 @@ import {
   Portfolio,
   Power,
   Renew,
+  Repeat,
   Reply,
   ReplyAll,
   Reset,
@@ -218,6 +219,8 @@ export const icon = {
   enable: carbon(Power, 'power'),
   color: carbon(ColorPalette, 'color-palette'),
   split: carbon(Split, 'split'),
+  /** Swaps the one value a single field holds for another. */
+  swap: carbon(Repeat, 'repeat'),
 } as const satisfies Record<string, IconComponent>
 
 // Nouns and drawing glyphs, by name. Two names share a glyph only where they

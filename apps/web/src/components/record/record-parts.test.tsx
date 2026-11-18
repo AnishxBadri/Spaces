@@ -1,5 +1,5 @@
 import { Window } from 'happy-dom'
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
@@ -21,6 +21,7 @@ import {
 } from './record-parts.tsx'
 import { ListPage } from '../page-header.tsx'
 import { RecordTabs } from './record-tabs.tsx'
+import type { RelationSection } from './relation-section.tsx'
 
 /**
  * A record's body: the 300px rail on bone left — the property grid as
@@ -179,6 +180,42 @@ describe('the details slot', () => {
     expect(sections[0].textContent).toBe('Spaces+')
     expect(sections[0].querySelector('[data-empty-row]')).not.toBeNull()
     expect(doc.body.textContent).not.toMatch(/0/)
+  })
+
+  it('heads a group that swaps its one record with the swap glyph, named Change, never a +', () => {
+    const doc = render(
+      <RailGroup
+        label="Company"
+        count={1}
+        change="Change company…"
+        add={(trigger) => trigger}
+      >
+        <RailGroupRow>Flent</RailGroupRow>
+      </RailGroup>,
+    )
+    const section = doc.querySelector('section[aria-label="Company"]')
+    expect(section?.querySelector('button[aria-label="Add to Company"]')).toBe(
+      null,
+    )
+    const change = section?.querySelector('[data-rail-change]')
+    expect(change?.getAttribute('aria-label')).toBe('Change company…')
+    expect(change?.textContent).toBe('')
+    expect(change?.querySelector('svg')?.getAttribute('data-icon')).toBe(
+      'repeat',
+    )
+    // The tooltip is armed on the same button the popover opens from.
+    expect(change?.getAttribute('data-slot')).toBe('tooltip-trigger')
+  })
+
+  it('gives a group that swaps its one record no way to clear it', () => {
+    // @ts-expect-error a required single relationship takes no unlink
+    const props: ComponentProps<typeof RelationSection> = {
+      label: 'Company',
+      rows: [],
+      change: 'Change company…',
+      onRemove: () => {},
+    }
+    expect(props.change).toBe('Change company…')
   })
 
   it('hints the edit keys under the grid only while a cell has the caret', () => {
