@@ -80,9 +80,6 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 - `SPA-471` `deps-1` — drop `@tailwindcss/typography` (unused) and `dotenv`/`dotenv-cli` (Node 22 reads env files); the site sets in IBM Plex. `afk`.
 - `SPA-472` `errors-1` — a failed query shows its area's plain line and logs the cause; every failure class carries a message; one query failure per area; unknown `/api` paths answer 404 (D117). `afk`.
 - `SPA-473` `data-1` — Portfolio reads through keyed queries; its writes invalidate only their keys (D104). Project 42; `afk`.
-- `SPA-474` `portfolio-shares` — the AI's ledger read subtracts sales from the shares held; a seeded sale. `afk`.
-- `SPA-475` `glossary-update` — editing a term keeps the aliases and definition it left out. `afk`.
-- `SPA-476` `guards-1` — `buildRequest` refuses a negative budget; two `no-shadow` warnings go. `afk`.
 - `SPA-477` `sign-in-limit` — 5 sign-in attempts per 60 seconds per IP. `afk`.
 - `SPA-478` `export-1` — an admin downloads the workspace as one zip (D42). `afk`.
 - `SPA-479` `import-today` — a staged import shows on Today's Needs you (D43). `afk`.
@@ -106,6 +103,7 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 
 ## Unticketed follow-ups
 
+- Portfolio, after `portfolio-shares`: the dev database shows the seeded Tejas Sensing holding (a sale point) only after `pnpm db:seed`; the site's landing copy still says twelve holdings, and the seed now has thirteen.
 - Feeds, after the backlog run: a headline photo that failed before the retry count existed is never retried, and the Feeds page's photo-pending flag does not cover a photo that arrives by a late retry; a refetch after a feed's address changes still counts as new on Today.
 - Brand marks: Granola, Apollo and Exa marks were not seen on a live screen (no such rows in the dev database); `Voyage` has no mark.
 - Edges: Import's inner grids and the empty-state pages are not carded.
