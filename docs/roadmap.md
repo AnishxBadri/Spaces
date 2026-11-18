@@ -79,14 +79,25 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 - `SPA-470` `zod-4` — zod leaves every `package.json` and lint refuses it in every package (D85). Project 37; `afk`, last.
 - `SPA-471` `deps-1` — drop `@tailwindcss/typography` (unused) and `dotenv`/`dotenv-cli` (Node 22 reads env files); the site sets in IBM Plex. `afk`.
 - `SPA-472` `errors-1` — a failed query shows its area's plain line and logs the cause; every failure class carries a message; one query failure per area; unknown `/api` paths answer 404 (D117). `afk`.
+- `SPA-473` `data-1` — Portfolio reads through keyed queries; its writes invalidate only their keys (D104). Project 42; `afk`.
+- `SPA-474` `portfolio-shares` — the AI's ledger read subtracts sales from the shares held; a seeded sale. `afk`.
+- `SPA-475` `glossary-update` — editing a term keeps the aliases and definition it left out. `afk`.
+- `SPA-476` `guards-1` — `buildRequest` refuses a negative budget; two `no-shadow` warnings go. `afk`.
+- `SPA-477` `sign-in-limit` — 5 sign-in attempts per 60 seconds per IP. `afk`.
+- `SPA-478` `export-1` — an admin downloads the workspace as one zip (D42). `afk`.
+- `SPA-479` `import-today` — a staged import shows on Today's Needs you (D43). `afk`.
+- `SPA-480` `windows-1` — every window's text on one 16px line (E3). `afk`.
+- `SPA-481` `phone-1` — a space page fits 390px; a list's column head stays pinned on Firefox and Safari before 26. `afk`.
+- `SPA-482` `note-window-2` — the note window previews file chips, attaches drops, keeps the last edit. `afk`.
+- `SPA-483` `icons-2` — the last Lucide names and text arrows go. `afk`.
+- `SPA-484` `settings-3b` — the folded head's actions end at the 800px column; invariant lines become tooltips. `afk`.
+- `SPA-485` `rail-menus` — a deal's Company reads as Change, Reset to default order, a check lane for a current menu item. `afk`.
 - `SPA-188` `ship-10` — install, upgrade and rollback docs. Project 16, In Progress. `docs/install.md` and `docs/upgrade.md` exist; check what is left.
 - `SPA-190` `ship-12` — one-click templates for Coolify, Railway, Render and Unraid. Project 16, In Progress; each needs a human deploy.
 
 ## Next, in order
 
 1. **The Ask set**, which the owner has not picked from yet.
-2. **Hybrid data layer** — route loaders own navigation, auth and route context; TanStack Query owns page data, freshness and mutations (`ensureQueryData` in the loader, `useSuspenseQuery` in the component, `invalidateQueries` by key after a write). Decided, not ticketed.
-3. **Small decided slices** (not ticketed): the sign-in rate rule, 5 per 60 seconds per IP, in `apps/web/src/lib/auth.ts`; workspace export (D42); a staged import on Today's Needs-you (D43).
 
 ## Owner calls
 
@@ -95,24 +106,12 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 
 ## Unticketed follow-ups
 
-- Phone and feeds, after the backlog run: a phone list's column head pins by a scroll-driven animation, so Firefox and Safari before 26 let it scroll away with the rows; a space page at 390px scrolls sideways (its tab bar and readouts strip overflow); a headline photo that failed before the retry count existed is never retried, and the Feeds page's photo-pending flag does not cover a photo that arrives by a late retry; a refetch after a feed's address changes still counts as new on Today.
-- Menus (E12): a list where one item is current (Sort's columns, a view's columns) leads with a check or an empty lane, not a glyph; the editor's block and table menus take their marks by BlockNote's English label, and a label BlockNote adds later keeps an empty lane.
-- Notes: in the note window a file-mention chip does not open its preview and a dropped file does nothing (the note page does both); an edit still inside the 800ms debounce is dropped when you confirm leaving.
-- Icons: export names in `components/icons.ts` are still Lucide's; the list's menus and Sort button keep `↑`/`↓` text glyphs; `apps/web/components.json` still says `lucide`.
+- Feeds, after the backlog run: a headline photo that failed before the retry count existed is never retried, and the Feeds page's photo-pending flag does not cover a photo that arrives by a late retry; a refetch after a feed's address changes still counts as new on Today.
 - Brand marks: Granola, Apollo and Exa marks were not seen on a live screen (no such rows in the dev database); `Voyage` has no mark.
 - Edges: Import's inner grids and the empty-state pages are not carded.
-- Windows (E3): a window's head, body and foot pad 16px, but a ledger row inside a padded body insets a further 12px, so its text stands at 28px while the title stands at 16px (the meeting window's Linked records); edge-to-edge windows (the file viewer) need the row inset itself to be 16px. One sweep over the 40 windows, `windows-1`: every window's text on one 16px line.
-- Record rail: a deal's Company group swaps the company from its `+` (the attribute is required), which reads as add; an existing install keeps its attribute order (only a fresh seed leads with identity), so a one-off `Reset to default order` on the object's settings page would let it catch up.
-- Settings: the folded head's actions pin to the page edge, not the 800px column; `listStatusOf`'s `tone` is unused.
-- Settings heads, after `settings-2`: Search's `Catch up` reads as a verb and the account page's `Used for` is borderline; Enrichment Sources' `first answer wins` and Routing's `sensitive lists local models only` print the same on every instance, which the invariant-line rule says is documentation.
-- Portfolio, after `ownership-1`: `holdingNow().ourShares` in `lib/ai/ledger-event.ts` sums the shares bought and never subtracts a sale; the dev seed has no priced holding with both a counted round before its check and a sale, so no seeded page shows a sale point (Aarogya's check postdates its only counted round, Garuda is a SAFE); the holding page's `Sale` label has no render test.
 - Plugins, after `schema-2`: zod is still imported by host-internal plugin files it did not have to touch (`core/plugins/{credit,lock,auto-enrich}.ts`, the worker's `host.ts`, `queues.ts`, `credit.ts`, `plugin-db.ts`, `run-job.ts`); the pre-commit eslint hook runs out of memory on a 200-file commit (the per-package `turbo run lint` is the gate that passed).
-- `updateTerm` takes a partial input whose defaults still fill, so an update that omits `aliases` or `definitionMd` clears them.
 - Effect Schema, after `schema-3`: `/api/v1` has no endpoint that takes record values (capture, `registry.list`, `records.list`, `records.get` only), so there was no zod bridge to remove and nothing yet composes `valueValidator` there; it returns a `Schema.Decoder<Json>` ready for the first write endpoint. `packages/core/src/ai/schema.ts` keeps zod for its claim and envelope checks: `ai/schema.test.ts` lists `zod` as an expected import, and an Effect port failed four characterisation rows. `jsonValueZod` in `packages/core/src/json-zod.ts` is a twin for five zod shapes that still compose it (`writes/ports/content.ts`, `writes/vault/index.ts`, `mcp/registry.ts`, the worker's `plugins/queues.ts`). 31 files in core still import zod (`ai` 11, `enrichment` 3, `plugins` 3, the rest one or two a folder). `Schema.Record` accepts a Date, a Map or a class instance and keeps a `__proto__` key where zod refused them; `jsonValue` guards against it, and any other record shape converted later must too.
-- Two `no-shadow` warnings in `record-details.test.tsx`.
 - Note page: `Edited` and `Replaced by` history rows carry no who (nothing records it); a tool-landed note shows `Landed from` and `Written` at one instant; the `+ File on…` picker prints `record` for a custom object because search returns no singular.
-- `buildRequest` hands `renderPrompt` a negative budget when a lane's system part alone exceeds `budgetChars`, and the subject is then dropped silently; guard it (every lane's budget is far above its instructions today).
-- `MoreMenu` draws Carbon's `overflow-menu--horizontal` now, not the mono `···` text; the contract's wording still says `···`.
 - The `···`/last-control alignment is proved by shared padding, not a measured box; a Playwright check at 1280px would make it mechanical.
 - Watch delete path.
 - Today and search links to `?modal=email`.
@@ -120,7 +119,4 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 - MCP interactions read through `emailListing`.
 - `removeRecordedNotesProgram` assumes one note per member per meeting.
 - No stored `References` chain; threading is root + parent.
-- Review fills are lost when the composer closes.
-- A draft is deleted after send without checking the row landed.
-- `labelNames` on the sent copy gets an empty label map (cosmetic).
 - From-meetings rows carry no meeting id, title or time.
