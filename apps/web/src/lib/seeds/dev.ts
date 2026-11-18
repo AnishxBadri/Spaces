@@ -625,6 +625,19 @@ const COMPANIES: Array<CompanySpec> = [
       business_model: ['b2b', 'deep_tech'],
     },
   },
+  {
+    name: 'Tejas Sensing',
+    domain: 'tejassensing.com',
+    space: 'industrial.photonics',
+    added: 760,
+    values: {
+      description: 'Fibre-optic strain sensing for bridges and pipelines.',
+      funding_stage: 'series_a',
+      location: 'Hyderabad',
+      founded_year: 2019,
+      business_model: ['b2b', 'hardware'],
+    },
+  },
 ]
 
 /**
@@ -1298,6 +1311,19 @@ const DEALS: Array<DealSpec> = [
       ['lost', 200],
     ],
   },
+  {
+    company: 'Tejas Sensing',
+    name: 'Tejas Sensing — Seed',
+    owner: 'lead',
+    value: 200000,
+    source: 'referral',
+    path: [
+      ['pre_lead', 750],
+      ['meeting', 740],
+      ['diligence', 730],
+      ['invested', 720],
+    ],
+  },
 ]
 
 type Instrument = 'priced' | 'safe_post_money' | 'safe_pre_money' | 'ccd'
@@ -1344,10 +1370,12 @@ type HoldingSpec = {
 }
 
 /**
- * Twelve holdings covering the shapes the metrics code has to survive:
+ * Thirteen holdings covering the shapes the metrics code has to survive:
  * four instruments, four currencies (one of them deliberately unrated in
  * fx_rate, so the gap surfaces instead of being faked), follow-ons, marks
- * that have gone stale, a full exit, a secondary, a dividend, a write-off.
+ * that have gone stale, a full exit, a secondary, a dividend, a write-off,
+ * and a partial sale after a counted round, so the ownership rail has a
+ * `Sale` row.
  */
 const HOLDINGS: Array<HoldingSpec> = [
   {
@@ -1771,6 +1799,60 @@ const HOLDINGS: Array<HoldingSpec> = [
       { days: 500, fairValue: 300000, currency: 'USD', basis: 'round_price' },
       { days: 260, fairValue: 600000, currency: 'USD', basis: 'round_price' },
       { days: 45, fairValue: 780000, currency: 'USD', basis: '409a' },
+    ],
+  },
+  {
+    // The Seed closes before the check, so it adds no point; the Series A
+    // counts our shares and the secondary after it is the rail's `Sale`.
+    company: 'Tejas Sensing',
+    opened: 720,
+    vehicle: 'Fund I',
+    rounds: [
+      {
+        days: 725,
+        kind: 'Seed',
+        raised: 2000000,
+        currency: 'USD',
+        postMoney: 10000000,
+        pricePerShare: 2,
+        sharesOutstanding: 5000000,
+      },
+      {
+        days: 330,
+        kind: 'Series A',
+        raised: 12000000,
+        currency: 'USD',
+        preMoney: 36000000,
+        postMoney: 48000000,
+        pricePerShare: 6,
+        sharesOutstanding: 8000000,
+        coInvestors: ['Sona Capital'],
+      },
+    ],
+    investments: [
+      {
+        days: 720,
+        amount: 200000,
+        currency: 'USD',
+        instrument: 'priced',
+        shares: 100000,
+        roundIdx: 0,
+      },
+    ],
+    marks: [
+      { days: 720, fairValue: 200000, currency: 'USD', basis: 'round_price' },
+      { days: 330, fairValue: 600000, currency: 'USD', basis: 'round_price' },
+      { days: 50, fairValue: 450000, currency: 'USD', basis: 'manual' },
+    ],
+    distributions: [
+      {
+        days: 75,
+        amount: 300000,
+        currency: 'USD',
+        kind: 'secondary',
+        sharesSold: 40000,
+        pricePerShare: 7.5,
+      },
     ],
   },
 ]

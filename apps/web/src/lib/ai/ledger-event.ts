@@ -26,6 +26,7 @@ import {
   proposeProgram,
 } from '@spaces/core/writes/suggestions/propose'
 import { fmtPct } from '@spaces/core/portfolio/format'
+import { liveAt } from '@spaces/core/portfolio/reversal'
 import { loadHoldingDetail } from '#/lib/portfolio/detail'
 import { completeMessage } from './complete'
 import type { CompleteFailure } from './complete'
@@ -196,13 +197,60 @@ export async function ledgerTargetOf(
 export type HoldingNow = {
   holdingId: string
   ownershipPct: number | null
-  /** Live priced shares on the ledger. */
+  /** Priced shares bought less shares sold, voided events left out. */
   ourShares: number
   latestMark: { date: string; fairValue: number; currency: string } | null
   latestRound: { date: string; kind: string } | null
   roundDates: ReadonlyArray<string>
   /** The currency a mark falls back to: the last mark's, else a cheque's. */
   currency: string | null
+}
+
+/**
+ * The priced shares we hold at `asOf` (absent: every event and every void):
+ * bought on or before it less sold on or before it, floored at 0 as
+ * `ownership()` floors them. A voided check or sale drops out once the as-of
+ * day reaches its void; a compensating row is never counted.
+ */
+export function sharesHeld(
+  investments: ReadonlyArray<{
+    date: string
+    instrument: string
+    shares: number | null
+    reversesId: string | null
+    reversedAt: string | null
+  }>,
+  distributions: ReadonlyArray<{
+    date: string
+    sharesSold: number | null
+    reversesId: string | null
+    reversedAt: string | null
+  }>,
+  asOf?: string,
+): number {
+  const standing = <
+    T extends {
+      date: string
+      reversesId: string | null
+      reversedAt: string | null
+    },
+  >(
+    rows: ReadonlyArray<T>,
+  ) =>
+    liveAt(
+      rows.filter(
+        (r) => r.reversesId === null && (asOf === undefined || r.date <= asOf),
+      ),
+      asOf,
+    )
+  const bought = standing(investments)
+    .filter((i) => i.instrument === 'priced')
+    .reduce((sum, i) => sum + (i.shares ?? 0), 0)
+  const sold = standing(distributions).reduce(
+    (sum, s) => sum + (s.sharesSold ?? 0),
+    0,
+  )
+  return Math.max(0, bought - sold)
 }
 
 async function holdingNow(holdingId: string): Promise<HoldingNow> {
@@ -224,9 +272,7 @@ async function holdingNow(holdingId: string): Promise<HoldingNow> {
         : d.ownership.kind === 'implied'
           ? d.ownership.pct
           : null,
-    ourShares: investments
-      .filter((i) => i.instrument === 'priced')
-      .reduce((sum, i) => sum + (i.shares ?? 0), 0),
+    ourShares: sharesHeld(d.investments, d.distributions),
     latestMark:
       mark === undefined
         ? null

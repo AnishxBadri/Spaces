@@ -346,7 +346,11 @@ const COST_BASIS_WHY: Record<CostBasisReason, { figure: string; why: string }> =
  * the shares outstanding, and the percentage. Without one, cost basis
  * only, and why.
  */
-function OwnershipBlock({ ownership }: { ownership: Holding['ownership'] }) {
+export function OwnershipBlock({
+  ownership,
+}: {
+  ownership: Holding['ownership']
+}) {
   const { today } = useClock()
   if (ownership.kind === 'cost_basis_only') {
     const { figure, why } = COST_BASIS_WHY[ownership.reason]

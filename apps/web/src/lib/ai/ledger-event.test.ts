@@ -44,6 +44,7 @@ import {
   chooseLedgerEvent,
   ledgerTargetOf,
   proposeLedgerEventProgram,
+  sharesHeld,
 } from './ledger-event'
 import type { HoldingNow } from './ledger-event'
 
@@ -398,6 +399,68 @@ describe('chooseLedgerEvent', () => {
         NOW,
       ).event,
     ).toBeNull()
+  })
+})
+
+describe('sharesHeld', () => {
+  // The rows as the holding detail hands them over: each original stamped
+  // with its void instant, the compensating row beneath it.
+  const buy = {
+    date: '2025-01-10',
+    instrument: 'priced',
+    shares: 100_000,
+    reversesId: null,
+    reversedAt: null,
+  }
+  const sale = {
+    date: '2025-06-01',
+    sharesSold: 40_000,
+    reversesId: null,
+    reversedAt: null,
+  }
+  const voidedSale = {
+    date: '2025-09-01',
+    sharesSold: 20_000,
+    reversesId: null,
+    reversedAt: '2025-10-15T09:30:00.000Z',
+  }
+  const voidingRow = {
+    date: '2025-09-01',
+    sharesSold: -20_000,
+    reversesId: 'voided-sale',
+    reversedAt: null,
+  }
+  const held = (asOf?: string) =>
+    sharesHeld([buy], [sale, voidedSale, voidingRow], asOf)
+
+  it('reads bought less sold as of each day, a voided sale dropping out once voided', () => {
+    expect(held('2025-01-09')).toBe(0)
+    expect(held('2025-01-10')).toBe(100_000)
+    expect(held('2025-06-01')).toBe(60_000)
+    // The second sale stands until the day it was voided.
+    expect(held('2025-09-01')).toBe(40_000)
+    expect(held('2025-10-14')).toBe(40_000)
+    expect(held('2025-10-15')).toBe(60_000)
+    // No day: every event and every void.
+    expect(held()).toBe(60_000)
+  })
+
+  it('counts priced checks only, and never reads below nothing', () => {
+    const safe = {
+      date: '2024-06-01',
+      instrument: 'safe_post_money',
+      shares: null,
+      reversesId: null,
+      reversedAt: null,
+    }
+    const exit = {
+      date: '2025-12-01',
+      sharesSold: 150_000,
+      reversesId: null,
+      reversedAt: null,
+    }
+    expect(sharesHeld([safe, buy], [])).toBe(100_000)
+    expect(sharesHeld([buy], [exit])).toBe(0)
   })
 })
 
