@@ -7,7 +7,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
-import { Handshake } from '#/components/icons'
+import { Partnership } from '#/components/icons'
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -353,7 +353,7 @@ function DealsPage() {
             to="/deals/$dealId"
             params={{ dealId: info.row.original.id }}
             name={String(info.getValue())}
-            badge={<IconBadge icon={Handshake} />}
+            badge={<IconBadge icon={Partnership} />}
           />
         ),
       }),

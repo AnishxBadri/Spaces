@@ -1,18 +1,17 @@
 import {
-  AtSign,
+  At,
   Calendar,
-  Coins,
-  Globe,
-  Hash,
-  Kanban,
+  CheckboxChecked,
+  Column,
+  Currency,
+  Earth,
+  Hashtag,
   Link,
-  Link2,
   List,
-  ListChecks,
+  ListChecked,
   Phone,
-  SquareCheck,
   Star,
-  Type,
+  TextFont,
   User,
 } from '#/components/icons'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -78,7 +77,7 @@ type TypeMeta = {
   id: AttributeType
   label: string
   hint: string
-  icon: typeof Type
+  icon: typeof TextFont
   keywords?: string
 }
 
@@ -98,36 +97,46 @@ const MAX_ITEMS: Array<SelectItem<string>> = [3, 4, 5, 6, 7, 8, 9, 10].map(
 )
 
 const TYPES: Array<TypeMeta> = [
-  { id: 'text', label: 'Text', hint: 'A line of text', icon: Type },
-  { id: 'number', label: 'Number', hint: 'Plain number', icon: Hash },
-  { id: 'currency', label: 'Currency', hint: 'Money in one code', icon: Coins },
+  { id: 'text', label: 'Text', hint: 'A line of text', icon: TextFont },
+  { id: 'number', label: 'Number', hint: 'Plain number', icon: Hashtag },
+  {
+    id: 'currency',
+    label: 'Currency',
+    hint: 'Money in one code',
+    icon: Currency,
+  },
   { id: 'date', label: 'Date', hint: 'A calendar day', icon: Calendar },
-  { id: 'checkbox', label: 'Checkbox', hint: 'Yes or no', icon: SquareCheck },
+  {
+    id: 'checkbox',
+    label: 'Checkbox',
+    hint: 'Yes or no',
+    icon: CheckboxChecked,
+  },
   { id: 'select', label: 'Select', hint: 'One of your options', icon: List },
   {
     id: 'multi_select',
     label: 'Multi-select',
     hint: 'Several of your options',
-    icon: ListChecks,
+    icon: ListChecked,
     keywords: 'tags',
   },
   {
     id: 'status',
     label: 'Status',
     hint: 'Options in active, parked, closed groups',
-    icon: Kanban,
+    icon: Column,
     keywords: 'stage funnel',
   },
   { id: 'rating', label: 'Rating', hint: 'Stars, 1 to max', icon: Star },
   { id: 'url', label: 'URL', hint: 'A link', icon: Link },
-  { id: 'email', label: 'Email', hint: 'An email address', icon: AtSign },
+  { id: 'email', label: 'Email', hint: 'An email address', icon: At },
   { id: 'phone', label: 'Phone', hint: 'A phone number', icon: Phone },
-  { id: 'domain', label: 'Domain', hint: 'A web domain', icon: Globe },
+  { id: 'domain', label: 'Domain', hint: 'A web domain', icon: Earth },
   {
     id: 'record_reference',
     label: 'Relationship',
     hint: 'Points at a company, person, or deal',
-    icon: Link2,
+    icon: Link,
     keywords: 'reference record link',
   },
   {

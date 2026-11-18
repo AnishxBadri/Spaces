@@ -1,4 +1,4 @@
-import { Lock } from '#/components/icons'
+import { Locked } from '#/components/icons'
 import { formatDay } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 
@@ -49,7 +49,7 @@ export function Stamp(props: StampProps) {
       {props.kind}
       {props.state === 'sensitive' ? (
         <>
-          <Lock aria-hidden className="size-4" />
+          <Locked aria-hidden className="size-4" />
           Sensitive
         </>
       ) : null}

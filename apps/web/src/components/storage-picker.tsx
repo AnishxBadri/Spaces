@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Checkbox } from './ui/checkbox'
-import { File, Folder } from './icons'
+import { DocumentBlank, Folder } from './icons'
 import { ProviderMark } from './provider-mark'
 import {
   Dialog,
@@ -418,7 +418,10 @@ export function FakePickList({
               {folders ? (
                 <Folder aria-hidden className="size-4 shrink-0 text-graphite" />
               ) : (
-                <File aria-hidden className="size-4 shrink-0 text-graphite" />
+                <DocumentBlank
+                  aria-hidden
+                  className="size-4 shrink-0 text-graphite"
+                />
               )}
               <span className="min-w-0 flex-1 truncate">{f.name}</span>
               {f.path === null ? null : (

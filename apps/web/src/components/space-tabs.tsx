@@ -1,5 +1,5 @@
 import { Link, useRouter } from '@tanstack/react-router'
-import { Boxes, FileText, icon } from '#/components/icons'
+import { CubeView, icon, Page } from '#/components/icons'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -591,7 +591,7 @@ function NotesTab({
                 params={{ noteId: n.id }}
                 className={cn(rowLink, '-mr-3 pr-3')}
               >
-                <FileText className="size-4 shrink-0 text-graphite" />
+                <Page className="size-4 shrink-0 text-graphite" />
                 <span className={cn('min-w-0 flex-1 truncate text-body', ink)}>
                   {n.title}
                 </span>
@@ -661,7 +661,7 @@ function RecordsTab({ spc }: { spc: Space }) {
               params={{ objectSlug: r.objectSlug, recordId: r.id }}
               className={cn(rowLink, '-mr-3 pr-3')}
             >
-              <Boxes className="size-4 shrink-0 text-foreground" />
+              <CubeView className="size-4 shrink-0 text-foreground" />
               <span className="min-w-0 flex-1 truncate text-body font-medium">
                 {r.name}
               </span>

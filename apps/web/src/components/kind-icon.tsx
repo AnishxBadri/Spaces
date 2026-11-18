@@ -1,4 +1,4 @@
-import { Boxes, KIND_ICONS } from '#/components/icons'
+import { CubeView, KIND_ICONS } from '#/components/icons'
 import { NOTE_KIND_LABEL, NoteKindIcon } from '#/components/note-kind-icon'
 import type { NoteKind } from '#/lib/notes/ordering'
 import { objectIcon } from '#/lib/object-icons'
@@ -51,7 +51,7 @@ export function KindIcon({
   const Glyph =
     of.kind === 'custom'
       ? objectIcon({ icon: of.objectIcon ?? null })
-      : (KIND_ICONS[of.kind] ?? Boxes)
+      : (KIND_ICONS[of.kind] ?? CubeView)
   return (
     <span
       role="img"

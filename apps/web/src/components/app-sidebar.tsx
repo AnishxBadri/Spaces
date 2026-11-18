@@ -1,22 +1,22 @@
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import {
-  Briefcase,
-  Building2,
-  CalendarDays,
-  CheckSquare,
+  Attachment,
+  Building,
+  ChatOperational,
+  CheckboxChecked,
+  Column,
   Compass,
-  FileText,
+  Email,
   icon,
-  Kanban,
   Keyboard,
   Layers,
-  Mail,
-  MessageSquareText,
-  Paperclip,
+  Meeting,
+  Page,
+  Portfolio,
   Rss,
   Settings,
   Sunrise,
-  Users,
+  UserMultiple,
 } from '#/components/icons'
 import type { IconComponent } from '#/components/icons'
 import { useEffect, useId, useMemo, useState } from 'react'
@@ -108,7 +108,7 @@ export const NAV_ITEMS = [
   {
     to: '/tasks',
     label: 'Tasks',
-    icon: CheckSquare,
+    icon: CheckboxChecked,
     key: 'G K',
     group: 'work',
   },
@@ -116,7 +116,7 @@ export const NAV_ITEMS = [
   {
     to: '/notes',
     label: 'Notes',
-    icon: FileText,
+    icon: Page,
     key: 'G N',
     group: 'library',
   },
@@ -124,7 +124,7 @@ export const NAV_ITEMS = [
   {
     to: '/meetings',
     label: 'Meetings',
-    icon: CalendarDays,
+    icon: Meeting,
     key: 'G E',
     group: 'library',
   },
@@ -132,7 +132,7 @@ export const NAV_ITEMS = [
   {
     to: '/files',
     label: 'Files',
-    icon: Paperclip,
+    icon: Attachment,
     key: 'G L',
     group: 'library',
   },
@@ -141,17 +141,23 @@ export const NAV_ITEMS = [
   {
     to: '/companies',
     label: 'Companies',
-    icon: Building2,
+    icon: Building,
     key: 'G C',
     group: 'objects',
   },
-  { to: '/people', label: 'People', icon: Users, key: 'G P', group: 'objects' },
-  { to: '/deals', label: 'Deals', icon: Kanban, key: 'G D', group: 'objects' },
+  {
+    to: '/people',
+    label: 'People',
+    icon: UserMultiple,
+    key: 'G P',
+    group: 'objects',
+  },
+  { to: '/deals', label: 'Deals', icon: Column, key: 'G D', group: 'objects' },
   // Portfolio takes F (fund) because People has P.
   {
     to: '/portfolio',
     label: 'Portfolio',
-    icon: Briefcase,
+    icon: Portfolio,
     key: 'G F',
     group: 'capital',
   },
@@ -574,7 +580,7 @@ export function AppSidebar({
       <div data-ask-row className="shrink-0 px-3 pt-1 pb-2">
         <NavLink
           to="/ask"
-          icon={MessageSquareText}
+          icon={ChatOperational}
           hint={chord(mod('J'))}
           onClick={onNavigate}
         >
@@ -751,7 +757,7 @@ function MembersItem({ onSelect }: { onSelect: () => void }) {
     refetchOnMount: 'always',
   })
   return (
-    <DropdownMenuItem icon={<Users />} onSelect={onSelect}>
+    <DropdownMenuItem icon={<UserMultiple />} onSelect={onSelect}>
       Members
       {data === undefined ? null : (
         <span
@@ -845,7 +851,7 @@ function DraftsRow({
       }}
       className="focus-ring flex h-[1.875rem] shrink-0 items-center gap-2.5 rounded-md border border-transparent pr-2.5 pl-2.5 text-left text-ui text-foreground transition-colors hover:bg-bone-deep"
     >
-      <Mail className="size-4 shrink-0" />
+      <Email className="size-4 shrink-0" />
       <span className="min-w-0 flex-1 truncate">Drafts</span>
       <span
         data-lane="count"
@@ -962,7 +968,7 @@ function CollapsedSidebar({
               aria-label={`Drafts · ${String(drafts)}`}
               className="focus-ring flex h-[1.875rem] w-8 shrink-0 items-center justify-center rounded-md border border-transparent transition-colors hover:bg-bone-deep"
             >
-              <Mail className="size-4 shrink-0" />
+              <Email className="size-4 shrink-0" />
             </button>
           </IconTip>
         ) : null}
@@ -1009,7 +1015,7 @@ function CollapsedSidebar({
             className="focus-ring-inset flex h-10 w-12 items-center justify-center text-graphite transition-colors hover:bg-bone-deep hover:text-foreground aria-[current=page]:text-foreground"
             activeProps={{ 'aria-current': 'page' }}
           >
-            <MessageSquareText className="size-4" />
+            <ChatOperational className="size-4" />
           </Link>
         </IconTip>
         <DropdownMenu>

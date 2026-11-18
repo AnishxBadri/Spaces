@@ -1,4 +1,4 @@
-import { icon, Link2, MessageSquareText } from '#/components/icons'
+import { ChatOperational, icon } from '#/components/icons'
 import { useState } from 'react'
 import { useSensitiveItem } from '#/components/sensitive-toggle'
 import type { SensitivityState } from '#/components/sensitive-toggle'
@@ -69,12 +69,12 @@ function Menu({
   const items: Array<MoreMenuEntry> = [
     {
       label: 'Ask about this',
-      icon: <MessageSquareText className="size-4" />,
+      icon: <ChatOperational className="size-4" />,
       onSelect: () => openAsk(),
     },
     {
       label: 'Copy link',
-      icon: <Link2 className="size-4" />,
+      icon: <icon.copyLink className="size-4" />,
       copy: () => window.location.href,
     },
     ...verbs,

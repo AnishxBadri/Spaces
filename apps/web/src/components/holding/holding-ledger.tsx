@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, icon, Link2 } from '#/components/icons'
+import { ChevronDown, icon } from '#/components/icons'
 import { useRef } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -260,7 +260,7 @@ export function EventSection({
                     items={[
                       {
                         label: 'Copy link',
-                        icon: <Link2 className="size-4" />,
+                        icon: <icon.copyLink className="size-4" />,
                         copy: () =>
                           `${window.location.origin}${window.location.pathname}#event-${r.id}`,
                       },

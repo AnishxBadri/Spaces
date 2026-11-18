@@ -1,4 +1,4 @@
-import { FileWarning } from '#/components/icons'
+import { WarningAlt } from '#/components/icons'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { PDFDocumentProxy } from 'unpdf/pdfjs'
@@ -411,7 +411,7 @@ function Notice({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-full items-center justify-center p-8">
       <div className="flex max-w-sm flex-col items-center text-center">
-        <FileWarning className="mb-3 size-5 text-graphite" />
+        <WarningAlt className="mb-3 size-5 text-graphite" />
         <p className="text-ui text-graphite">{children}</p>
       </div>
     </div>

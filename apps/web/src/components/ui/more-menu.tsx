@@ -36,8 +36,11 @@ import { cn } from '#/lib/utils'
 
 type ItemBase = {
   label: string
-  /** Mono micro in the item's end lane: `keeps revisions`. Never a key. */
-  hint?: string | undefined
+  /**
+   * Mono micro in the item's end lane: `keeps revisions`, or a 16px glyph
+   * (a sort's `SortArrow`). Never a key.
+   */
+  hint?: string | ReactElement | undefined
   disabled?: boolean | undefined
   /** What the item does, on hover. */
   title?: string | undefined
@@ -133,9 +136,12 @@ export function menuLayout(
   return rest.length === 0 ? destructive : [...rest, MENU_RULE, ...destructive]
 }
 
-function Hint({ hint }: { hint: string | undefined }) {
-  return hint === undefined ? null : (
+function Hint({ hint }: { hint: string | ReactElement | undefined }) {
+  if (hint === undefined) return null
+  return typeof hint === 'string' ? (
     <span className="ml-auto pl-3 mono text-micro text-graphite">{hint}</span>
+  ) : (
+    <span className="ml-auto flex pl-3">{hint}</span>
   )
 }
 

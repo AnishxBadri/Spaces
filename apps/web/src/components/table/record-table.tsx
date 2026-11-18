@@ -17,7 +17,7 @@ import type {
   RefObject,
 } from 'react'
 import { FolderGround } from '#/components/page-header'
-import { ArrowDown, ArrowUp, ChevronsUpDown, icon } from '#/components/icons'
+import { ArrowDown, ArrowUp, ChevronSort, icon } from '#/components/icons'
 import type { IconComponent } from '#/components/icons'
 import { useHotkey } from '#/lib/use-hotkey'
 import {
@@ -685,10 +685,35 @@ function SelectCell({
   )
 }
 
+/**
+ * A sort's direction at the end of a menu item or the Sort tool, in
+ * graphite. With a `label` it says the direction to a screen reader (the
+ * current column in a Sort menu); without one it repeats the item's words.
+ */
+export function SortArrow({
+  desc,
+  label,
+  className,
+}: {
+  desc: boolean
+  label?: boolean | undefined
+  className?: string | undefined
+}) {
+  const Arrow = desc ? ArrowDown : ArrowUp
+  return (
+    <Arrow
+      {...(label === true
+        ? { 'aria-label': desc ? 'descending' : 'ascending' }
+        : { 'aria-hidden': true })}
+      className={cn('size-4 shrink-0 text-graphite', className)}
+    />
+  )
+}
+
 /** The head menu's affordance, shown on hover, focus or while open. */
 function SortChevron({ className }: { className: string }) {
   return (
-    <ChevronsUpDown
+    <ChevronSort
       className={cn(
         'size-4 shrink-0 opacity-0 transition-opacity duration-150 ease-out-quart group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100 group-data-[state=open]/sort:opacity-100',
         className,
@@ -797,18 +822,14 @@ function HeaderCell<T>({
                   onSelect={() => column.toggleSorting(false)}
                 >
                   Sort A → Z
-                  <span className="ml-auto mono text-micro text-graphite">
-                    ↑
-                  </span>
+                  <SortArrow desc={false} className="ml-auto" />
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   icon={<icon.sortDescending />}
                   onSelect={() => column.toggleSorting(true)}
                 >
                   Sort Z → A
-                  <span className="ml-auto mono text-micro text-graphite">
-                    ↓
-                  </span>
+                  <SortArrow desc className="ml-auto" />
                 </DropdownMenuItem>
                 {sorted ? (
                   <DropdownMenuItem
@@ -1018,7 +1039,12 @@ export function SortMenu<T>({ table }: { table: Table<T> }) {
           label="Sort"
           data-tool="sort"
         >
-          {active ? `${columnTitle(active)} ${desc ? '↓' : '↑'}` : null}
+          {active ? (
+            <>
+              {columnTitle(active)}
+              <SortArrow desc={desc} />
+            </>
+          ) : null}
         </ToolButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -1035,11 +1061,7 @@ export function SortMenu<T>({ table }: { table: Table<T> }) {
               onSelect={() => c.toggleSorting(on && !desc)}
             >
               {columnTitle(c)}
-              {on ? (
-                <span className="ml-auto mono text-micro text-graphite">
-                  {desc ? '↓' : '↑'}
-                </span>
-              ) : null}
+              {on ? <SortArrow desc={desc} label className="ml-auto" /> : null}
             </DropdownMenuItem>
           )
         })}

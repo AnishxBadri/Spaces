@@ -1,5 +1,5 @@
 import { useRouter } from '@tanstack/react-router'
-import { Check, icon } from '#/components/icons'
+import { Checkmark, icon } from '#/components/icons'
 import { useCallback, useEffect, useReducer, useState } from 'react'
 import { heldDecisions } from '#/lib/held-decisions'
 import { PluginMark } from '#/components/integrations/integration-ledger'
@@ -173,7 +173,7 @@ export function DiscoveryEntry({
             {words.reject}
           </Button>
           <Button size="xs" disabled={pending} onClick={onAccept}>
-            <Check className="size-4" />
+            <Checkmark className="size-4" />
             {words.accept}
           </Button>
         </div>

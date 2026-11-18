@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { Check } from '#/components/icons'
+import { Checkmark } from '#/components/icons'
 import type { ReactNode } from 'react'
 import {
   alsoCreateWhy,
@@ -390,7 +390,9 @@ function CollisionBlock({
                 d !== 'keep-first' && taken === d && 'bg-selected',
               )}
             >
-              {taken === d ? <Check className="size-4" aria-hidden /> : null}
+              {taken === d ? (
+                <Checkmark className="size-4" aria-hidden />
+              ) : null}
               {decisionLabel(d, first.rowNum, second.rowNum)}
             </Button>
           ))}

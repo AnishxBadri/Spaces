@@ -1,5 +1,5 @@
 import { useNavigate, useRouter, useSearch } from '@tanstack/react-router'
-import { icon, Mail, Paperclip } from '#/components/icons'
+import { Attachment, Email, icon } from '#/components/icons'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -591,7 +591,7 @@ function ThreadLine({
         </span>
         {line.attachments > 0 ? (
           <span className="flex shrink-0 items-center gap-1 mono text-micro text-graphite">
-            <Paperclip aria-label="Attachments" className="size-4" />
+            <Attachment aria-label="Attachments" className="size-4" />
             {line.attachments}
           </span>
         ) : null}
@@ -1022,7 +1022,7 @@ function EmailWindow({
     return (
       <>
         <DialogHeader>
-          <Mail aria-hidden className="size-5 self-center text-graphite" />
+          <Email aria-hidden className="size-5 self-center text-graphite" />
           <DialogTitle>Email</DialogTitle>
         </DialogHeader>
         <DialogDescription className="sr-only">
@@ -1136,7 +1136,7 @@ function EmailWindow({
   )
   const head = (
     <DialogHeader>
-      <Mail
+      <Email
         data-window-mark
         aria-hidden
         className="size-5 self-center text-graphite"

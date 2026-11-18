@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useSearch } from '@tanstack/react-router'
-import { CalendarDays, Mail, Paperclip, Phone } from '#/components/icons'
+import { Attachment, Email, Meeting, Phone } from '#/components/icons'
 import { Day } from '#/components/ledger-section'
 import { openModalId } from '#/lib/modal-search'
 import type { RecordTab } from '#/lib/records/record-tabs'
@@ -53,9 +53,9 @@ export function useThreadHighlight(): (
     row.id === logged
 }
 
-export const KIND_GLYPHS: Record<string, typeof Mail> = {
-  email: Mail,
-  meeting: CalendarDays,
+export const KIND_GLYPHS: Record<string, typeof Email> = {
+  email: Email,
+  meeting: Meeting,
   call: Phone,
 }
 
@@ -147,7 +147,7 @@ export function ThreadRow({
   /** How many lines line two runs to: two in the Interactions tab, one elsewhere. */
   summaryLines?: 1 | 2
 }) {
-  const Glyph = KIND_GLYPHS[item.kind] ?? Mail
+  const Glyph = KIND_GLYPHS[item.kind] ?? Email
   const people = threadPeople(item)
   // Body-derived, so private with the body.
   const summary = item.privateBody ? null : item.summary
@@ -223,7 +223,7 @@ export function ThreadRow({
               data-clip
               className="flex w-22 shrink-0 items-center justify-end gap-1 mono text-micro text-graphite"
             >
-              <Paperclip aria-label="attachments" className="size-4" />
+              <Attachment aria-label="attachments" className="size-4" />
               {item.attachments}
             </span>
           ) : null}

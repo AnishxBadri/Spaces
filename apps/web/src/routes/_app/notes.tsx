@@ -7,7 +7,7 @@ import {
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { EmptyState } from '#/components/empty-state'
-import { FileText } from '#/components/icons'
+import { Page } from '#/components/icons'
 import { Band, Day, FoldRow, LedgerRow } from '#/components/ledger-section'
 import { NewButton, SplitNewButton } from '#/components/new-button'
 import { NOTE_KIND_LABEL, NoteKindIcon } from '#/components/note-kind-icon'
@@ -149,7 +149,7 @@ function NotesPage() {
 
       {notes.length === 0 ? (
         <EmptyState
-          icon={FileText}
+          icon={Page}
           title="No notes yet"
           body="Write in blocks, @mention any company or space, and the graph builds itself — backlinks land on every mentioned record."
           action={<NewButton noun="note" shortcut="N" onClick={newNote} />}

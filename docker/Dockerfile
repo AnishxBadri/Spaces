@@ -24,7 +24,7 @@
 # .output/server/node_modules is a few kB of traced files). /app/node_modules
 # serves only the three node bundles — the boot entry, the worker, its health
 # command — whose npm imports stay runtime imports, so apps/web's own
-# dependency list (vite, rolldown, blocknote, lucide, the
+# dependency list (vite, rolldown, blocknote, carbon icons, the
 # radix set, fonts, typescript through peers) has no business being
 # installed. apps/worker/package.json declares everything the worker process
 # loads, including what it reaches through the `#web/*` crossings, and the

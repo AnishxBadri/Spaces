@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { Check } from '#/components/icons'
+import { Checkmark } from '#/components/icons'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { ReactNode } from 'react'
@@ -236,7 +236,7 @@ export function StepStrip({
               )}
             >
               {done ? (
-                <Check
+                <Checkmark
                   className="size-4 shrink-0 text-success"
                   aria-label="done"
                 />

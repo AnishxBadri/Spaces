@@ -8,12 +8,12 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef, SortingState, Table } from '@tanstack/react-table'
-import { Briefcase, icon } from '#/components/icons'
+import { icon, Portfolio } from '#/components/icons'
 import { useMemo, useState } from 'react'
 import { RecordCheckDialog } from '#/components/holding/record-check-dialog'
 import { EmptyRow } from '#/components/ledger-section'
 import { IconBadge, RecordLinkCell } from '#/components/table/cells'
-import { RecordTable } from '#/components/table/record-table'
+import { RecordTable, SortArrow } from '#/components/table/record-table'
 import {
   Card,
   HeadCount,
@@ -116,7 +116,7 @@ function headMenu(
             return {
               label: titleOf(c),
               icon: <MenuCheck checked={on} />,
-              ...(on ? { hint: desc ? '↓' : '↑' } : {}),
+              ...(on ? { hint: <SortArrow desc={desc} label /> } : {}),
               // A second pick of the sorted column turns it round.
               onSelect: () => c.toggleSorting(on && !desc),
             }
@@ -164,7 +164,7 @@ function PortfolioPage() {
             to="/portfolio/$holdingId"
             params={{ holdingId: info.row.original.id }}
             name={info.row.original.companyName}
-            badge={<IconBadge icon={Briefcase} />}
+            badge={<IconBadge icon={Portfolio} />}
           />
         ),
       }),

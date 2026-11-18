@@ -1,4 +1,4 @@
-import { File, FileText, KIND_ICONS, Pilcrow } from '#/components/icons'
+import { DocumentBlank, KIND_ICONS, Page, Paragraph } from '#/components/icons'
 import type { IconComponent } from '#/components/icons'
 import { forwardRef } from 'react'
 import type { KeyboardEvent } from 'react'
@@ -297,7 +297,7 @@ function RecordPane({
           hit.picture ? (
             <PictureMark src={hit.picture} size={16} />
           ) : (
-            <Glyph icon={KIND_ICONS[hit.kind] ?? FileText} />
+            <Glyph icon={KIND_ICONS[hit.kind] ?? Page} />
           )
         }
         name={data?.name ?? hit.name}
@@ -443,7 +443,7 @@ function PassagePane({
   actions: ReadonlyArray<PaneAction>
 }) {
   const { today } = useClock()
-  const Icon = passage.kind === 'document' ? File : Pilcrow
+  const Icon = passage.kind === 'document' ? DocumentBlank : Paragraph
   // Until the page arrives, the snippet the row carries stands in for it.
   const parts =
     data && data.parts.length > 0

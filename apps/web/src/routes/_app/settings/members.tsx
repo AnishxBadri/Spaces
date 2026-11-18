@@ -1,5 +1,5 @@
 import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
-import { Link2, Lock, Mail, icon } from '#/components/icons'
+import { Email, icon, Link, Locked } from '#/components/icons'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -266,7 +266,7 @@ function MembersSection({
                           ]),
                       {
                         label: m.banned ? 'Restore access' : 'Suspend access…',
-                        icon: m.banned ? <icon.restore /> : <Lock />,
+                        icon: m.banned ? <icon.restore /> : <Locked />,
                         destructive: !m.banned,
                         opens: true,
                         onSelect: () => void setBanned(m),
@@ -338,7 +338,7 @@ function MembersSection({
 
 /** An invite's lead mark: the mail it went to, or an open link. */
 function InviteMark({ open }: { open: boolean }) {
-  const Glyph = open ? Link2 : Mail
+  const Glyph = open ? Link : Email
   return (
     <Glyph
       aria-hidden

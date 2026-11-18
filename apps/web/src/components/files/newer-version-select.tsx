@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { Select } from '../ui/select'
 import { formatDay } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
-import { File } from '#/components/icons'
+import { DocumentBlank } from '#/components/icons'
 import { markNewerVersion } from '#/lib/server-fns'
 import { linkReady } from '#/lib/documents/newer-version'
 import type {
@@ -64,7 +64,10 @@ export function NewerVersionSelect({
             label: c.filename,
             render: (
               <span className="flex min-w-0 items-center gap-2">
-                <File aria-hidden className="size-4 shrink-0 text-graphite" />
+                <DocumentBlank
+                  aria-hidden
+                  className="size-4 shrink-0 text-graphite"
+                />
                 <span className="min-w-0 truncate">{c.filename}</span>
                 <span className="shrink-0 mono text-micro text-graphite">
                   {formatDay(c.createdAt, today)}

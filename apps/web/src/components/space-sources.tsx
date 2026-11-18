@@ -1,5 +1,5 @@
 import { Link, useRouter } from '@tanstack/react-router'
-import { ChevronRight, FileText, icon } from '#/components/icons'
+import { ChevronRight, icon, Page } from '#/components/icons'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { LedgerFigure, LedgerRow, LedgerSection } from './ledger-section'
@@ -171,7 +171,7 @@ export function SpaceSources({
           <LedgerRow key={p.key}>
             <span className="w-3.5 shrink-0 text-center">
               {p.error ? (
-                <FileText className="size-4 text-destructive" />
+                <Page className="size-4 text-destructive" />
               ) : (
                 <Twinkle />
               )}
@@ -310,7 +310,7 @@ function SourceRow({
 
   return (
     <li className="group flex items-center gap-3 border-b border-rule px-(--inset) py-2.5">
-      <FileText className="size-4 shrink-0 text-graphite" />
+      <Page className="size-4 shrink-0 text-graphite" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <button
           type="button"
@@ -407,7 +407,7 @@ function InheritedRow({
 
   return (
     <li className="group flex items-center gap-3 border-b border-rule px-(--inset) py-2.5">
-      <FileText className="size-4 shrink-0 text-graphite" />
+      <Page className="size-4 shrink-0 text-graphite" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <button
           type="button"

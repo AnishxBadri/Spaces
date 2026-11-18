@@ -1,9 +1,9 @@
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
 import {
-  BookOpen,
-  CornerDownRight,
+  ArrowDownRight,
   icon,
   Layers,
+  Notebook,
   Star,
 } from '#/components/icons'
 import { useEffect, useRef, useState } from 'react'
@@ -430,7 +430,7 @@ export function SpaceMenu({
         },
         {
           label: 'Move to…',
-          icon: <CornerDownRight className="size-4" />,
+          icon: <ArrowDownRight className="size-4" />,
           onSelect: onMove,
           opens: true,
         },
@@ -448,7 +448,7 @@ export function SpaceMenu({
         },
         {
           label: 'Glossary…',
-          icon: <BookOpen className="size-4" />,
+          icon: <Notebook className="size-4" />,
           onSelect: onGlossary,
           opens: true,
         },

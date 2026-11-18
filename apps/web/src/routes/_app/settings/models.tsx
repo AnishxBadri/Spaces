@@ -15,7 +15,7 @@ import {
 } from '#/components/settings/settings-section'
 import type { SettingsTone } from '#/components/settings/settings-section'
 import { LedgerRow } from '#/components/ledger-section'
-import { FileText, Globe, Hash, Image, PenLine, Tags } from '#/components/icons'
+import { Earth, Hashtag, icon, Image, Page, TagGroup } from '#/components/icons'
 import type { IconComponent } from '#/components/icons'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
@@ -464,12 +464,12 @@ const LANE_JOB: Record<AiLane, string> = {
 
 /** Each job's glyph, the one mark that tells the grid's rows apart. */
 const LANE_ICON: Record<AiLane, IconComponent> = {
-  extract: FileText,
-  classify: Tags,
-  synthesize: PenLine,
-  embed: Hash,
+  extract: Page,
+  classify: TagGroup,
+  synthesize: icon.writeUp,
+  embed: Hashtag,
   vision: Image,
-  research: Globe,
+  research: Earth,
 }
 
 function LaneIcon({ lane }: { lane: AiLane }) {

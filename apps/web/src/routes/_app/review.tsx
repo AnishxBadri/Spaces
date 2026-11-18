@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { Check, icon, Inbox } from '#/components/icons'
+import { Checkmark, icon, MailAll } from '#/components/icons'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -289,13 +289,13 @@ function InboxPage() {
 
           {rows.length === 0 ? (
             <EmptyState
-              icon={Inbox}
+              icon={MailAll}
               title="Nothing to review"
               body="Nothing waits on you. Duplicate pairs appear here when two records claim the same domain or their names look alike; suggestions appear when a provider proposes a value."
             />
           ) : visible.length === 0 ? (
             <EmptyState
-              icon={Inbox}
+              icon={MailAll}
               title="Nothing in this lane"
               body="The other lane still has open items — switch to All to see them."
             />
@@ -495,7 +495,7 @@ function SideHead({
           keep ? 'bg-primary text-paper' : 'bg-paper',
         )}
       >
-        {keep ? <Check className="size-2.5" /> : null}
+        {keep ? <Checkmark className="size-2.5" /> : null}
       </span>
       <span className="text-label text-foreground">
         {keep ? 'Keep' : 'Merge in'} · {letter}

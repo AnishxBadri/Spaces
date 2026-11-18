@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Check } from '#/components/icons'
+import { Checkmark } from '#/components/icons'
 
 import { cn } from '#/lib/utils.ts'
 
@@ -58,7 +58,7 @@ function Checkbox({
       className={checkboxClasses({ checked, className })}
       {...props}
     >
-      {checked ? <Check className="size-2.5" /> : null}
+      {checked ? <Checkmark className="size-2.5" /> : null}
     </button>
   )
 }

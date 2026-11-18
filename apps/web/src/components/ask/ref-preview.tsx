@@ -1,4 +1,4 @@
-import { File, Hash, MessageSquare, Pilcrow } from '#/components/icons'
+import { Chat, DocumentBlank, Hashtag, Paragraph } from '#/components/icons'
 import { HoverCard } from 'radix-ui'
 import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
@@ -60,10 +60,10 @@ function useRefPreview(ref: string, open: boolean): Loaded | undefined {
 }
 
 const GLYPH = {
-  file: File,
-  note: Pilcrow,
-  interaction: MessageSquare,
-  attribute: Hash,
+  file: DocumentBlank,
+  note: Paragraph,
+  interaction: Chat,
+  attribute: Hashtag,
 } as const
 
 /** The sheet's body once the read is back; exported for its test. */

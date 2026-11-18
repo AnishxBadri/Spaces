@@ -1,7 +1,7 @@
 import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { icon, Layers, Mail } from '#/components/icons'
+import { Email, icon, Layers } from '#/components/icons'
 import { NoteKindIcon } from '#/components/note-kind-icon'
 import {
   SettingsColumns,
@@ -110,7 +110,7 @@ function TemplateKindMark({
     template.kind === 'space'
       ? Layers
       : template.kind === 'email'
-        ? Mail
+        ? Email
         : objectIcon({ slug: OBJECT_SLUG[template.objectKind ?? ''] ?? null })
   return (
     <Glyph aria-hidden data-template-kind={template.kind} className={ink} />

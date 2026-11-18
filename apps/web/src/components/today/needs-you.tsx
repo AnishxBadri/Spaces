@@ -1,5 +1,5 @@
 import { Link, useRouter } from '@tanstack/react-router'
-import { Lock } from '#/components/icons'
+import { Locked } from '#/components/icons'
 import { Fragment, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactElement, ReactNode } from 'react'
 import { ReferenceBar } from '#/components/ledger-section'
@@ -191,7 +191,7 @@ function SensitiveMark({ name }: { name: string }) {
           aria-label={`Sensitive · AI never reads ${name}`}
           className="focus-ring flex text-graphite"
         >
-          <Lock className="size-4" aria-hidden />
+          <Locked className="size-4" aria-hidden />
         </span>
       </TooltipTrigger>
       <TooltipContent>Sensitive · AI never reads {name}</TooltipContent>

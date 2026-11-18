@@ -4,7 +4,7 @@ import {
   useRouteContext,
   useRouter,
 } from '@tanstack/react-router'
-import { CheckSquare, icon } from '#/components/icons'
+import { CheckboxChecked, icon } from '#/components/icons'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -301,7 +301,7 @@ function TasksPage() {
 
       {empty ? (
         <EmptyState
-          icon={CheckSquare}
+          icon={CheckboxChecked}
           title="Nothing to chase yet"
           body={
             'Tasks put dates on judgment calls — "revisit when their round closes", "chase the data room", "re-mark after the bridge". Link them to records so they show up where you work.'

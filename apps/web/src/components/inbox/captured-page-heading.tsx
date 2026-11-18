@@ -1,4 +1,4 @@
-import { Globe } from '#/components/icons'
+import { Earth } from '#/components/icons'
 import type { CapturedPage } from '#/lib/server-fns'
 
 /**
@@ -16,7 +16,7 @@ export function CapturedPageHeading({ page }: { page: CapturedPage }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
       <div className="flex min-w-0 items-center gap-2">
-        <Globe className="size-4 shrink-0 text-graphite" />
+        <Earth className="size-4 shrink-0 text-graphite" />
         <h2 className="min-w-0 truncate font-serif text-lg leading-5.5 font-semibold">
           {page.title}
         </h2>

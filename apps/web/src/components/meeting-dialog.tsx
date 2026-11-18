@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { dayKey, formatDay, formatTime } from '@spaces/core/format'
 import { DocumentPreview } from '#/components/document-preview'
-import { CalendarDays } from '#/components/icons'
+import { Meeting } from '#/components/icons'
 import { ProviderMark } from '#/components/provider-mark'
 import { KindIcon } from '#/components/kind-icon'
 import { EmptyRow, LabelHead, LedgerRow } from '#/components/ledger-section'
@@ -561,10 +561,7 @@ function MeetingWindow({
     return (
       <>
         <DialogHeader>
-          <CalendarDays
-            aria-hidden
-            className="size-5 self-center text-graphite"
-          />
+          <Meeting aria-hidden className="size-5 self-center text-graphite" />
           <DialogTitle>Meeting</DialogTitle>
         </DialogHeader>
         <DialogDescription className="sr-only">
@@ -599,7 +596,7 @@ function MeetingWindow({
   return (
     <>
       <DialogHeader>
-        <CalendarDays
+        <Meeting
           data-window-mark
           aria-hidden
           className="size-5 self-center text-graphite"

@@ -5,8 +5,11 @@
  *   reads its icon from here by the verb's name. The verb glyphs are not
  *   exported by their Carbon names, so a call site cannot pick another.
  * - The nouns below (objects, nav pages, attribute types, file and thread
- *   kinds) and a few drawing glyphs (chevrons, the check) are exported by
- *   name; `Link2` is both the link noun and the Copy link verb.
+ *   kinds) and a few drawing glyphs (chevrons, the checkmark, the sort
+ *   arrows) are exported by their Carbon names, as the contract names them
+ *   (company `Building`, deal `Column`). Where Carbon's name is already a
+ *   global or an app component's, the noun takes a plain name: `Page` for
+ *   Carbon's `Document`, `Meeting` for `Event`, `Square` for `Checkbox`.
  * - Carbon glyphs are filled shapes on a 32px grid: they draw at 16px
  *   unless a `size-*` class says 20, and take no stroke props.
  * - Our own concepts are not Carbon's: the note kinds are `NoteKindIcon`,
@@ -17,52 +20,52 @@ import {
   Add,
   Archive,
   ArrowDown as CarbonArrowDown,
-  ArrowDownRight,
+  ArrowDownRight as CarbonArrowDownRight,
   ArrowLeft,
   ArrowsHorizontal,
   ArrowsVertical,
   ArrowUp as CarbonArrowUp,
-  At,
-  Attachment,
-  Book,
-  Building,
+  At as CarbonAt,
+  Attachment as CarbonAttachment,
+  Book as CarbonBook,
+  Building as CarbonBuilding,
   Calendar as CarbonCalendar,
   Category,
-  Chat,
-  ChatOperational,
+  Chat as CarbonChat,
+  ChatOperational as CarbonChatOperational,
   Checkbox,
-  CheckboxChecked,
-  Checkmark,
+  CheckboxChecked as CarbonCheckboxChecked,
+  Checkmark as CarbonCheckmark,
   CheckmarkOutline,
   ChevronDown as CarbonChevronDown,
   ChevronRight as CarbonChevronRight,
-  ChevronSort,
+  ChevronSort as CarbonChevronSort,
   Close,
   ColorPalette,
-  Column,
+  Column as CarbonColumn,
   ColumnInsert,
   Compass as CarbonCompass,
   Copy,
-  CubeView,
-  Currency,
+  CubeView as CarbonCubeView,
+  Currency as CarbonCurrency,
   DataRefinery,
-  Document,
-  DocumentBlank,
+  Document as CarbonDocument,
+  DocumentBlank as CarbonDocumentBlank,
   DocumentImport,
   DocumentView,
   Download,
-  Earth,
+  Earth as CarbonEarth,
   Edit,
-  Email,
+  Email as CarbonEmail,
   Erase,
   Event,
   Filter,
-  Finance,
+  Finance as CarbonFinance,
   Flag as CarbonFlag,
   Folder as CarbonFolder,
   FolderAdd,
   FolderMoveTo,
-  Hashtag,
+  Hashtag as CarbonHashtag,
   Image as CarbonImage,
   ImageSearch,
   Keyboard as CarbonKeyboard,
@@ -70,27 +73,27 @@ import {
   Layers as CarbonLayers,
   Link as CarbonLink,
   List as CarbonList,
-  ListChecked,
-  Locked,
+  ListChecked as CarbonListChecked,
+  Locked as CarbonLocked,
   Logout,
   MagicWand,
-  MailAll,
+  MailAll as CarbonMailAll,
   Menu,
   MisuseOutline,
-  Money,
-  Notebook,
+  Money as CarbonMoney,
+  Notebook as CarbonNotebook,
   Notification,
   NotificationOff,
   OverflowMenuHorizontal,
-  Paragraph,
-  Partnership,
+  Paragraph as CarbonParagraph,
+  Partnership as CarbonPartnership,
   Password,
   Pen,
   Phone as CarbonPhone,
   Pin,
   Play,
   Plug as CarbonPlug,
-  Portfolio,
+  Portfolio as CarbonPortfolio,
   Power,
   Renew,
   Repeat,
@@ -108,10 +111,10 @@ import {
   Split,
   Star as CarbonStar,
   Sunrise as CarbonSunrise,
-  Table,
-  TagGroup,
+  Table as CarbonTable,
+  TagGroup as CarbonTagGroup,
   Template,
-  TextFont,
+  TextFont as CarbonTextFont,
   TextLongParagraph,
   TrashCan,
   Unlink,
@@ -120,11 +123,11 @@ import {
   UserAccess,
   UserAdmin,
   UserFollow,
-  UserMultiple,
+  UserMultiple as CarbonUserMultiple,
   Version,
   View,
   ViewOff,
-  WarningAlt,
+  WarningAlt as CarbonWarningAlt,
 } from '@carbon/icons-react'
 import type { CarbonIconProps, CarbonIconType } from '@carbon/icons-react'
 import { createElement, forwardRef } from 'react'
@@ -223,67 +226,73 @@ export const icon = {
   swap: carbon(Repeat, 'repeat'),
 } as const satisfies Record<string, IconComponent>
 
-// Nouns and drawing glyphs, by name. Two names share a glyph only where they
-// mean the same thing: `Link` and `Link2`, `CheckSquare` and `SquareCheck`.
+// Nouns and drawing glyphs, by Carbon's name. `Link` is the Copy link verb's
+// glyph too: a link is the same thing in both.
 export const ArrowDown = carbon(CarbonArrowDown, 'arrow--down')
+export const ArrowDownRight = carbon(CarbonArrowDownRight, 'arrow--down-right')
 export const ArrowUp = carbon(CarbonArrowUp, 'arrow--up')
-export const AtSign = carbon(At, 'at')
-export const BookA = carbon(Book, 'book')
-export const BookOpen = carbon(Notebook, 'notebook')
-export const Boxes = carbon(CubeView, 'cube-view')
-export const Briefcase = carbon(Portfolio, 'portfolio')
-export const Building2 = carbon(Building, 'building')
+export const At = carbon(CarbonAt, 'at')
+export const Attachment = carbon(CarbonAttachment, 'attachment')
+export const Book = carbon(CarbonBook, 'book')
+export const Building = carbon(CarbonBuilding, 'building')
 export const Calendar = carbon(CarbonCalendar, 'calendar')
-export const CalendarDays = carbon(Event, 'event')
-export const Check = carbon(Checkmark, 'checkmark')
-export const CheckSquare = carbon(CheckboxChecked, 'checkbox--checked')
+export const Chat = carbon(CarbonChat, 'chat')
+export const ChatOperational = carbon(
+  CarbonChatOperational,
+  'chat--operational',
+)
+export const CheckboxChecked = carbon(
+  CarbonCheckboxChecked,
+  'checkbox--checked',
+)
+export const Checkmark = carbon(CarbonCheckmark, 'checkmark')
 export const ChevronDown = carbon(CarbonChevronDown, 'chevron--down')
 export const ChevronRight = carbon(CarbonChevronRight, 'chevron--right')
-export const ChevronsUpDown = carbon(ChevronSort, 'chevron--sort')
-export const Coins = carbon(Currency, 'currency')
+export const ChevronSort = carbon(CarbonChevronSort, 'chevron--sort')
+export const Column = carbon(CarbonColumn, 'column')
 export const Compass = carbon(CarbonCompass, 'compass')
-export const CornerDownRight = carbon(ArrowDownRight, 'arrow--down-right')
-export const File = carbon(DocumentBlank, 'document--blank')
-export const FileText = carbon(Document, 'document')
-export const FileWarning = carbon(WarningAlt, 'warning--alt')
+export const CubeView = carbon(CarbonCubeView, 'cube-view')
+export const Currency = carbon(CarbonCurrency, 'currency')
+export const DocumentBlank = carbon(CarbonDocumentBlank, 'document--blank')
+export const Earth = carbon(CarbonEarth, 'earth')
+export const Email = carbon(CarbonEmail, 'email')
+export const Finance = carbon(CarbonFinance, 'finance')
 export const Flag = carbon(CarbonFlag, 'flag')
 export const Folder = carbon(CarbonFolder, 'folder')
-export const Globe = carbon(Earth, 'earth')
-export const HandCoins = carbon(Money, 'money')
-export const Handshake = carbon(Partnership, 'partnership')
-export const Hash = carbon(Hashtag, 'hashtag')
+export const Hashtag = carbon(CarbonHashtag, 'hashtag')
 export const Image = carbon(CarbonImage, 'image')
 export const Keyboard = carbon(CarbonKeyboard, 'keyboard')
-export const Inbox = carbon(MailAll, 'mail--all')
-export const Kanban = carbon(Column, 'column')
-export const Landmark = carbon(Finance, 'finance')
 export const Layers = carbon(CarbonLayers, 'layers')
 export const Link = icon.copyLink
-export const Link2 = icon.copyLink
 export const List = carbon(CarbonList, 'list')
-export const ListChecks = carbon(ListChecked, 'list--checked')
-export const Lock = carbon(Locked, 'locked')
-export const Mail = carbon(Email, 'email')
-export const MessageSquare = carbon(Chat, 'chat')
-export const MessageSquareText = carbon(ChatOperational, 'chat--operational')
-export const Paperclip = carbon(Attachment, 'attachment')
-export const PenLine = carbon(Pen, 'pen')
+export const ListChecked = carbon(CarbonListChecked, 'list--checked')
+export const Locked = carbon(CarbonLocked, 'locked')
+export const MailAll = carbon(CarbonMailAll, 'mail--all')
+/** Carbon's `Event`, named for what it marks: the global `Event` is taken. */
+export const Meeting = carbon(Event, 'event')
+export const Money = carbon(CarbonMoney, 'money')
+export const Notebook = carbon(CarbonNotebook, 'notebook')
+/** Carbon's `Document`, a page of text: the global `Document` is taken. */
+export const Page = carbon(CarbonDocument, 'document')
+export const Paragraph = carbon(CarbonParagraph, 'paragraph')
+export const Partnership = carbon(CarbonPartnership, 'partnership')
 export const Phone = carbon(CarbonPhone, 'phone')
-export const Pilcrow = carbon(Paragraph, 'paragraph')
 /** A plugin with no mark of its own, where its action leads a menu item. */
 export const Plug = carbon(CarbonPlug, 'plug')
+export const Portfolio = carbon(CarbonPortfolio, 'portfolio')
 export const Rocket = carbon(CarbonRocket, 'rocket')
 export const Rss = carbon(CarbonRss, 'rss')
 export const Settings = carbon(CarbonSettings, 'settings')
+/** Carbon's empty `Checkbox`, a bare square: `Checkbox` is the control's. */
 export const Square = carbon(Checkbox, 'checkbox')
-export const SquareCheck = carbon(CheckboxChecked, 'checkbox--checked')
 export const Star = carbon(CarbonStar, 'star')
 export const Sunrise = carbon(CarbonSunrise, 'sunrise')
-export const Table2 = carbon(Table, 'table')
-export const Tags = carbon(TagGroup, 'tag--group')
-export const Type = carbon(TextFont, 'text--font')
+export const Table = carbon(CarbonTable, 'table')
+export const TagGroup = carbon(CarbonTagGroup, 'tag--group')
+export const TextFont = carbon(CarbonTextFont, 'text--font')
 export const User = carbon(CarbonUser, 'user')
-export const Users = carbon(UserMultiple, 'user--multiple')
+export const UserMultiple = carbon(CarbonUserMultiple, 'user--multiple')
+export const WarningAlt = carbon(CarbonWarningAlt, 'warning--alt')
 
 /**
  * Each entity kind's glyph, wherever a row, a chip or a picker names a
@@ -291,12 +300,12 @@ export const Users = carbon(UserMultiple, 'user--multiple')
  * (`objectIcon`); `custom` is the fallback for one whose object is unknown.
  */
 export const KIND_ICONS: Readonly<Partial<Record<string, IconComponent>>> = {
-  company: Building2,
+  company: Building,
   person: User,
-  deal: Kanban,
+  deal: Column,
   space: Layers,
   note: NoteIcon,
-  document: Paperclip,
-  custom: Boxes,
-  term: BookA,
+  document: Attachment,
+  custom: CubeView,
+  term: Book,
 }

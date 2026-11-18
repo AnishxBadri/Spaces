@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { HandCoins, Layers } from '#/components/icons'
+import { Layers, Money } from '#/components/icons'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { EmptyRow } from '#/components/ledger-section'
@@ -132,7 +132,7 @@ function HoldingPage() {
             more={[
               {
                 label: 'Record a distribution…',
-                icon: <HandCoins className="size-4" />,
+                icon: <Money className="size-4" />,
                 onSelect: () => setAdding('distribution'),
                 opens: true,
               },

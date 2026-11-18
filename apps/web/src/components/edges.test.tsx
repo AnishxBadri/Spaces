@@ -672,10 +672,32 @@ describe('E7 · one icon list, one brand mark', () => {
       )
       .map((f) => relative(src, f))
     expect(importers).toEqual(['components/icons.ts'])
-    const lucide = sourceFiles(src)
-      .filter((f) => /from ['"]lucide-react['"]/.test(readFileSync(f, 'utf8')))
-      .map((f) => relative(src, f))
-    expect(lucide).toEqual([])
+  })
+
+  it('names each noun by its Carbon glyph, or a plain noun where that name is taken', () => {
+    const plain: Record<string, string> = {
+      Page: 'document',
+      Meeting: 'event',
+      Square: 'checkbox',
+    }
+    // Each glyph's display name is its Carbon name in kebab case.
+    const nouns = Object.entries(icons).flatMap(([name, v]) =>
+      'displayName' in v && typeof v.displayName === 'string'
+        ? [{ name, glyph: v.displayName }]
+        : [],
+    )
+    expect(nouns.length).toBeGreaterThan(40)
+    const pascal = (kebab: string) =>
+      kebab
+        .split(/-+/)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join('')
+    const misnamed = nouns
+      .filter(({ name, glyph }) =>
+        name in plain ? plain[name] !== glyph : pascal(glyph) !== name,
+      )
+      .map(({ name, glyph }) => `${name} draws ${glyph}`)
+    expect(misnamed).toEqual([])
   })
 
   it('draws a glyph at 16px unless a class says otherwise, filled, named by Carbon', () => {
@@ -686,7 +708,7 @@ describe('E7 · one icon list, one brand mark', () => {
     expect(html).toContain('fill="currentColor"')
     expect(html).toContain('data-icon="add"')
     expect(html).toContain('aria-hidden="true"')
-    const sized = renderToStaticMarkup(<icons.FileText className="size-5" />)
+    const sized = renderToStaticMarkup(<icons.Page className="size-5" />)
     expect(sized).toContain('class="size-5"')
     expect(sized).toContain('data-icon="document"')
   })

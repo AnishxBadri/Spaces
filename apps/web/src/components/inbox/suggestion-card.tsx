@@ -1,5 +1,5 @@
 import { Link, useRouter } from '@tanstack/react-router'
-import { Check, icon } from '#/components/icons'
+import { Checkmark, icon } from '#/components/icons'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { OptionChip } from '#/components/attributes/value-editor'
@@ -540,7 +540,7 @@ export function ProposedValue({
           aria-label={on ? 'Checked' : 'Unchecked'}
           className={checkboxClasses({ checked: on })}
         >
-          {on ? <Check className="size-2.5" /> : null}
+          {on ? <Checkmark className="size-2.5" /> : null}
         </span>
       )
     }

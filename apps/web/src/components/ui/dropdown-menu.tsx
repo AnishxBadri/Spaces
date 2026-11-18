@@ -1,6 +1,6 @@
 import * as React from 'react'
 import {
-  Check as CheckIcon,
+  Checkmark as CheckIcon,
   ChevronRight as ChevronRightIcon,
 } from '#/components/icons'
 import { DropdownMenu as DropdownMenuPrimitive, Slot } from 'radix-ui'

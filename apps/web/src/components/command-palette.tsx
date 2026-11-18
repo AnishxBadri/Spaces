@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import {
-  CheckSquare,
+  CheckboxChecked,
+  Email,
   icon,
   KIND_ICONS,
-  Mail,
   Settings,
-  Table2,
+  Table,
 } from '#/components/icons'
 import type { IconComponent } from '#/components/icons'
 import { useCommandState } from 'cmdk'
@@ -267,7 +267,7 @@ function Lanes({
  */
 export function HitLine({ hit, today }: { hit: Hit; today: string }) {
   const glyph =
-    hit.rowKind === 'task' ? CheckSquare : (KIND_ICONS[hit.kind] ?? Table2)
+    hit.rowKind === 'task' ? CheckboxChecked : (KIND_ICONS[hit.kind] ?? Table)
   const done = hit.rowKind === 'task' && hit.task.done
   return (
     <>
@@ -306,7 +306,7 @@ export function PassageLine({
 }) {
   return (
     <>
-      <Glyph icon={KIND_ICONS[passage.kind] ?? Table2} />
+      <Glyph icon={KIND_ICONS[passage.kind] ?? Table} />
       <span data-name className="min-w-0 flex-1 truncate font-serif">
         {passage.snippet ? (
           <>
@@ -368,7 +368,7 @@ export function jumpTargets(
       words: `view ${v.objectPlural}`,
       href: `${v.path}?view=${v.id}`,
       lane: v.objectPlural,
-      icon: Table2,
+      icon: Table,
     })),
     {
       id: 'settings',
@@ -1239,7 +1239,7 @@ export function CommandPalette({
       {
         id: 'new-email',
         label: 'New email…',
-        icon: Mail,
+        icon: Email,
         words: 'email mail compose write send draft message',
         run: () => openCompose({ draftId: null }),
       },

@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Check } from '#/components/icons'
+import { Checkmark } from '#/components/icons'
 import { useSettingsDraft } from '#/components/settings/settings-form'
 import {
   SETTINGS_LINK,
@@ -279,7 +279,7 @@ function Setup({ state }: { state: SetupState }) {
           onOpen={() => void navigate({ to: item.to })}
           end={
             state[item.id] ? (
-              <Check
+              <Checkmark
                 data-setup-done
                 aria-label="Set up"
                 className="size-4 text-primary"

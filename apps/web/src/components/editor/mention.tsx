@@ -1,5 +1,5 @@
 import { createReactInlineContentSpec } from '@blocknote/react'
-import { Boxes, KIND_ICONS } from '#/components/icons'
+import { CubeView, KIND_ICONS } from '#/components/icons'
 import { documentPreviewEvent } from '#/lib/editor/document-preview-event'
 import { recordPath } from '#/lib/record-path'
 
@@ -24,7 +24,7 @@ export const Mention = createReactInlineContentSpec(
   {
     render: (props) => {
       const { entityId, label, kind, objectSlug } = props.inlineContent.props
-      const Icon = KIND_ICONS[kind] ?? Boxes
+      const Icon = KIND_ICONS[kind] ?? CubeView
       // Plain anchor, not router Link — renders inside BlockNote's tree.
       // One route table for the whole app: a chip whose kind has no record
       // page renders as text rather than guessing a page it might have.

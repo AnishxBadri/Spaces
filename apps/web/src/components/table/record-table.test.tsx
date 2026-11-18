@@ -725,14 +725,22 @@ describe('a menu with a current item (E12)', () => {
 
   it('leads Sort’s columns with a check on the sorted one and an empty lane on the rest, never a verb glyph', async () => {
     mount({ sorting: [{ id: 'invested', desc: false }] })
+    // The tool reads its state as the column and Carbon's arrow.
+    const tool = one('[data-tool="sort"]')
+    expect(tool.textContent).toBe('Invested')
+    expect(tool.querySelector('svg[data-icon="arrow--up"]')).not.toBeNull()
     await openTool('[data-tool="sort"]')
     expect(items().map((el) => el.textContent)).toEqual([
       'Company',
-      'Invested↑',
+      'Invested',
       'Clear sort',
     ])
     const company = item('Company')
-    const invested = item('Invested↑')
+    const invested = item('Invested')
+    // The direction is Carbon's arrow, named for a screen reader, not a glyph.
+    const arrow = invested.querySelector('svg[data-icon="arrow--up"]')
+    expect(arrow?.getAttribute('aria-label')).toBe('ascending')
+    expect(arrow?.getAttribute('class')).toMatch(/\bsize-4\b/)
     for (const el of [company, invested]) {
       const lead = el.firstElementChild
       expect(lead?.hasAttribute('data-menu-lead')).toBe(true)
