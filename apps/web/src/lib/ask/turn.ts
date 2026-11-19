@@ -1,7 +1,6 @@
 import { Cause, Effect, Exit, Option } from 'effect'
 import { jsonSchema, tool } from 'ai'
 import type { LanguageModel, ToolSet } from 'ai'
-import { z } from 'zod'
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { jsonRecord, readJson } from '@spaces/core/json'
@@ -20,7 +19,7 @@ import { openStreamProgram } from '#/lib/ai/stream'
 import type { PromptTurn } from '#/lib/ai/prompt'
 import type { OpenedStream, StreamOpenFailure } from '#/lib/ai/stream'
 import { citationLabels } from '#/lib/ai/summarize'
-import { entityOfRef, toolRegistry } from '#/lib/mcp/registry'
+import { entityOfRef, modelInputSchema, toolRegistry } from '#/lib/mcp/registry'
 import type { ToolCaller } from '#/lib/mcp/registry'
 import { recordPath } from '#/lib/record-path'
 import { citedRefs } from './answer'
@@ -30,7 +29,7 @@ import {
   SHOW_COMPANIES,
   SHOW_COMPANIES_DESCRIPTION,
   findTableProgram,
-  showCompaniesShape,
+  showCompaniesInput,
   urlKey,
 } from './find'
 import {
@@ -611,7 +610,7 @@ export async function* askEvents(asked: AskInput): AsyncGenerator<AskEvent> {
       for (const t of toolRegistry.askTools)
         tools[t.name] = tool({
           description: t.description,
-          inputSchema: z.object(t.inputSchema),
+          inputSchema: modelInputSchema(t),
           execute: async (raw, { toolCallId }) => {
             // A cloud route takes no neighbour's sensitive chunks.
             const local =
@@ -770,7 +769,7 @@ export async function* askEvents(asked: AskInput): AsyncGenerator<AskEvent> {
       if (!gate.sensitive && servers.length > 0)
         tools[SHOW_COMPANIES] = tool({
           description: SHOW_COMPANIES_DESCRIPTION,
-          inputSchema: z.object(showCompaniesShape),
+          inputSchema: showCompaniesInput,
           execute: async ({ companies }, { toolCallId }) => {
             const made = await Effect.runPromise(
               findTableProgram(companies, {

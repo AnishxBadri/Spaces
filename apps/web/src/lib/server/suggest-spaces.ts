@@ -1,6 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
+import { uuidString } from '@spaces/core/attributes/registry'
 import { requireUser } from './shared'
+import { input } from './input'
 
 /**
  * The Spaces rail's "Suggest spaces". Pressing it checks the
@@ -11,7 +13,7 @@ import { requireUser } from './shared'
  * active.
  */
 
-const byRecord = z.object({ entityId: z.string().uuid() })
+const byRecord = Schema.Struct({ entityId: uuidString })
 
 export type {
   SuggestSpacesEnqueued,
@@ -20,7 +22,7 @@ export type {
 } from '../ai/suggest-spaces'
 
 export const suggestSpaces = createServerFn({ method: 'POST' })
-  .validator(byRecord)
+  .validator(input(byRecord))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { pressSuggestSpacesProgram } = await import('../ai/suggest-spaces')
@@ -30,7 +32,7 @@ export const suggestSpaces = createServerFn({ method: 'POST' })
 
 /** Where the record's latest run stands — polled while one is running. */
 export const suggestSpacesStatus = createServerFn()
-  .validator(byRecord)
+  .validator(input(byRecord))
   .handler(async ({ data }) => {
     await requireUser()
     const { suggestSpacesStatusProgram } = await import('../ai/suggest-spaces')

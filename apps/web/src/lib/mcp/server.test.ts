@@ -1,12 +1,11 @@
 import { createHash } from 'node:crypto'
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { eq } from 'drizzle-orm'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { company, entity, link, note } from '@spaces/db/schema'
 import { holding, investment, mark } from '@spaces/db/schema/portfolio'
@@ -100,18 +99,26 @@ const mint = (userId: string, name: string) =>
   Effect.runPromise(createApiTokenProgram({ userId, name }))
 
 /** Just enough of `McpRecord` to read the answer without asserting a type. */
-const RecordShape = z.object({
-  attributes: z.array(
-    z.object({ slug: z.string(), name: z.string(), type: z.string() }),
+const RecordShape = Schema.Struct({
+  attributes: Schema.Array(
+    Schema.Struct({
+      slug: Schema.String,
+      name: Schema.String,
+      type: Schema.String,
+    }),
   ),
-  links: z.array(
-    z.object({
-      direction: z.enum(['in', 'out']),
-      relation: z.string(),
-      entity: z.object({ id: z.string() }),
+  links: Schema.Array(
+    Schema.Struct({
+      direction: Schema.Literals(['in', 'out']),
+      relation: Schema.String,
+      entity: Schema.Struct({ id: Schema.String }),
     }),
   ),
 })
+
+/** `value` read as `shape`; a mismatch throws, naming what is off. */
+const read = <T>(shape: Schema.Decoder<T>, value: unknown) =>
+  Schema.decodeUnknownSync(shape)(value)
 
 const TEAMMATE = {
   id: 'spa23-teammate',
@@ -438,7 +445,7 @@ describe('an MCP client with a per-user token', () => {
       mergedFrom: null,
       object: { slug: 'companies' },
     })
-    const { attributes, links } = z.parse(RecordShape, rec)
+    const { attributes, links } = read(RecordShape, rec)
     expect(attributes.length).toBeGreaterThan(0)
     expect(attributes.every((a) => a.slug && a.name && a.type)).toBe(true)
     expect(links).toContainEqual(
@@ -466,29 +473,31 @@ describe('SPA-28: search_records and list_registry', () => {
   }
   const COOLING = 'Submersa Immersion Cooling'
 
-  const HitsShape = z.array(
-    z.object({
-      id: z.string(),
-      kind: z.string(),
-      name: z.string(),
-      objectSlug: z.string().nullable(),
-      matchedIn: z.string(),
-      rowKind: z.enum(['entity', 'task']),
+  const HitsShape = Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      kind: Schema.String,
+      name: Schema.String,
+      objectSlug: Schema.NullOr(Schema.String),
+      matchedIn: Schema.String,
+      rowKind: Schema.Literals(['entity', 'task']),
     }),
   )
-  const RegistryShape = z.array(
-    z.object({
-      slug: z.string(),
-      singular: z.string(),
-      isSystem: z.boolean(),
-      attributes: z.array(
-        z.object({
-          slug: z.string(),
-          name: z.string(),
-          type: z.string(),
-          target: z.string().nullable(),
-          options: z.object({
-            options: z.array(z.object({ label: z.string() })).optional(),
+  const RegistryShape = Schema.Array(
+    Schema.Struct({
+      slug: Schema.String,
+      singular: Schema.String,
+      isSystem: Schema.Boolean,
+      attributes: Schema.Array(
+        Schema.Struct({
+          slug: Schema.String,
+          name: Schema.String,
+          type: Schema.String,
+          target: Schema.NullOr(Schema.String),
+          options: Schema.Struct({
+            options: Schema.optional(
+              Schema.Array(Schema.Struct({ label: Schema.String })),
+            ),
           }),
         }),
       ),
@@ -561,7 +570,7 @@ describe('SPA-28: search_records and list_registry', () => {
 
     // …and the hits are real: the company by a word of its name.
     const client = await connect((await mint(FIXTURE_ACTOR.id, 's')).token)
-    const hits = z.parse(
+    const hits = read(
       HitsShape,
       await call(client, 'search_records', { query: 'immersion cooling' }),
     )
@@ -595,14 +604,14 @@ describe('SPA-28: search_records and list_registry', () => {
 
   it('search_records narrows to one object by slug or name, and refuses an unknown one', async () => {
     const client = await connect((await mint(FIXTURE_ACTOR.id, 'o')).token)
-    const all = z.parse(
+    const all = read(
       HitsShape,
       await call(client, 'search_records', { query: 'orbital' }),
     )
     // Unnarrowed, the company and its notes both come back…
     expect(all.some((h) => h.kind === 'note')).toBe(true)
     for (const object of ['companies', 'Company', 'COMPANIES']) {
-      const narrowed = z.parse(
+      const narrowed = read(
         HitsShape,
         await call(client, 'search_records', { query: 'orbital', object }),
       )
@@ -619,7 +628,7 @@ describe('SPA-28: search_records and list_registry', () => {
     expect(textOf(unknown)).toContain('companies')
   })
 
-  it('query_records is registered beside them, validated by zod, and refuses an unknown slug by name', async () => {
+  it('query_records is registered beside them, decoded at the boundary, and refuses an unknown slug by name', async () => {
     const client = await connect((await mint(FIXTURE_ACTOR.id, 'q')).token)
     const { tools } = await client.listTools()
     const tool = tools.find((t) => t.name === 'query_records')
@@ -642,18 +651,18 @@ describe('SPA-28: search_records and list_registry', () => {
       },
     })
     expect(answered.isError).not.toBe(true)
-    const body = z.parse(
-      z.object({
-        object: z.string(),
-        total: z.number(),
-        rows: z.array(z.object({ id: z.string() })),
+    const body = read(
+      Schema.Struct({
+        object: Schema.String,
+        total: Schema.Number,
+        rows: Schema.Array(Schema.Struct({ id: Schema.String })),
       }),
       JSON.parse(textOf(answered)),
     )
     expect(body.object).toBe('companies')
     expect(body.rows.map((r) => r.id)).toContain(fixture.companyId)
 
-    // zod at the boundary: an op the grammar has not got never reaches SQL.
+    // The input schema at the boundary: an op the grammar has not got never reaches SQL.
     const badOp = await client.callTool({
       name: 'query_records',
       arguments: {
@@ -674,10 +683,7 @@ describe('SPA-28: search_records and list_registry', () => {
 
   it('list_registry shows a custom object created after the client connected, with no restart', async () => {
     const client = await connect((await mint(FIXTURE_ACTOR.id, 'reg')).token)
-    const before = z.parse(
-      RegistryShape,
-      await call(client, 'list_registry', {}),
-    )
+    const before = read(RegistryShape, await call(client, 'list_registry', {}))
     expect(before.map((o) => o.slug).slice(0, 3)).toEqual([
       'companies',
       'people',
@@ -717,7 +723,7 @@ describe('SPA-28: search_records and list_registry', () => {
     )
 
     for (const object of ['Fund', 'funds']) {
-      const after = z.parse(
+      const after = read(
         RegistryShape,
         await call(client, 'list_registry', { object }),
       )
@@ -742,7 +748,7 @@ describe('SPA-28: search_records and list_registry', () => {
         'companies',
       )
     }
-    const everything = z.parse(
+    const everything = read(
       RegistryShape,
       await call(client, 'list_registry', {}),
     )
@@ -860,20 +866,23 @@ describe('portfolio_summary and holding_detail over the wire', () => {
       arguments: { asOf: '2025-06-30' },
     })
     expect(summary.isError).not.toBe(true)
-    const Figures = z.object({
-      currency: z.string(),
-      invested: z.number(),
-      value: z.number(),
-      distributions: z.number(),
-      tvpi: z.number().nullable(),
-      irr: z.number().nullable(),
+    const Figures = Schema.Struct({
+      currency: Schema.String,
+      invested: Schema.Number,
+      value: Schema.Number,
+      distributions: Schema.Number,
+      tvpi: Schema.NullOr(Schema.Number),
+      irr: Schema.NullOr(Schema.Number),
     })
-    const book = z.parse(
-      z.object({
-        baseCurrency: z.string(),
+    const book = read(
+      Schema.Struct({
+        baseCurrency: Schema.String,
         total: Figures,
-        holdings: z.array(
-          z.object({ holdingId: z.string(), figures: Figures.nullable() }),
+        holdings: Schema.Array(
+          Schema.Struct({
+            holdingId: Schema.String,
+            figures: Schema.NullOr(Figures),
+          }),
         ),
       }),
       JSON.parse(textOf(summary)),
@@ -895,10 +904,10 @@ describe('portfolio_summary and holding_detail over the wire', () => {
       arguments: { holdingId: open },
     })
     expect(ledger.isError).not.toBe(true)
-    const detail = z.parse(
-      z.object({
-        investments: z.array(z.object({ amount: z.number() })),
-        marks: z.array(z.object({ fairValue: z.number() })),
+    const detail = read(
+      Schema.Struct({
+        investments: Schema.Array(Schema.Struct({ amount: Schema.Number })),
+        marks: Schema.Array(Schema.Struct({ fairValue: Schema.Number })),
       }),
       JSON.parse(textOf(ledger)),
     )
@@ -914,7 +923,7 @@ describe('portfolio_summary and holding_detail over the wire', () => {
       `No holding ${hushed} — portfolio_summary lists them`,
     )
 
-    // zod at the boundary: a day that is not YYYY-MM-DD never reaches the loader.
+    // The input schema at the boundary: a day that is not YYYY-MM-DD never reaches the loader.
     const badDay = await client.callTool({
       name: 'portfolio_summary',
       arguments: { asOf: 'last quarter' },

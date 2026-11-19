@@ -1,5 +1,5 @@
+import { Option, Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { DOCS_PATH, OPENAPI_PATH, handleApiRequest } from './api'
 import { API_PREFIX, API_VERSION } from './versions'
 
@@ -38,39 +38,60 @@ const METHODS = [
   'trace',
 ] as const
 
-/** OAS 3.1 §4.8.16: a response code is a status, a `1XX`-style range, or `default`. */
-const StatusKey = z.string().regex(/^(?:[1-5](?:\d\d|XX)|default)$/)
+const nonEmpty = Schema.String.check(Schema.isMinLength(1))
 
-const Parameter = z.object({
-  name: z.string().min(1),
-  in: z.enum(['query', 'header', 'path', 'cookie']),
-  required: z.boolean().optional(),
+/** A record whose every key matches `key`: a stray key refuses, never drops. */
+const keyedBy = <TValue extends Schema.Top>(key: RegExp, value: TValue) =>
+  Schema.Record(Schema.String, value).check(
+    Schema.isPropertyNames(Schema.String.check(Schema.isPattern(key))),
+  )
+
+const Parameter = Schema.Struct({
+  name: nonEmpty,
+  in: Schema.Literals(['query', 'header', 'path', 'cookie']),
+  required: Schema.optional(Schema.Boolean),
 })
 
-const Operation = z.object({
-  operationId: z.string().min(1).optional(),
-  tags: z.array(z.string()).optional(),
-  parameters: z.array(Parameter).optional(),
+const Operation = Schema.Struct({
+  operationId: Schema.optional(nonEmpty),
+  tags: Schema.optional(Schema.Array(Schema.String)),
+  parameters: Schema.optional(Schema.Array(Parameter)),
+  // §4.8.16: a response code is a status, a `1XX`-style range, or `default`;
   // §4.8.17: every Response Object requires a description.
-  responses: z
-    .record(StatusKey, z.object({ description: z.string() }))
-    .refine((responses) => Object.keys(responses).length > 0, {
+  responses: keyedBy(
+    /^(?:[1-5](?:\d\d|XX)|default)$/,
+    Schema.Struct({ description: Schema.String }),
+  ).check(
+    Schema.isMinProperties(1, {
       message: 'an operation declares at least one response',
     }),
+  ),
 })
 
-const PathItem = z.object(
-  Object.fromEntries(METHODS.map((m) => [m, Operation.optional()])),
-)
+const PathItem = Schema.Struct({
+  get: Schema.optional(Operation),
+  put: Schema.optional(Operation),
+  post: Schema.optional(Operation),
+  delete: Schema.optional(Operation),
+  options: Schema.optional(Operation),
+  head: Schema.optional(Operation),
+  patch: Schema.optional(Operation),
+  trace: Schema.optional(Operation),
+})
 
-const Document = z.object({
-  openapi: z.string().regex(/^3\.1\.\d+$/),
-  info: z.object({ title: z.string().min(1), version: z.string().min(1) }),
+const Document = Schema.Struct({
+  openapi: Schema.String.check(Schema.isPattern(/^3\.1\.\d+$/)),
+  info: Schema.Struct({ title: nonEmpty, version: nonEmpty }),
   // §4.8.8: a path key begins with a slash.
-  paths: z.record(z.string().regex(/^\//), PathItem),
-  components: z.object({ schemas: z.record(z.string(), z.unknown()) }),
-  tags: z.array(z.object({ name: z.string().min(1) })).optional(),
+  paths: keyedBy(/^\//, PathItem),
+  components: Schema.Struct({
+    schemas: Schema.Record(Schema.String, Schema.Unknown),
+  }),
+  tags: Schema.optional(Schema.Array(Schema.Struct({ name: nonEmpty }))),
 })
+
+/** The document, or a throw naming every rule it breaks. */
+const readDocument = Schema.decodeUnknownSync(Document, { errors: 'all' })
 
 /** Every `$ref` in the document, wherever it sits. */
 function refsIn(node: unknown, out: Array<string> = []): Array<string> {
@@ -100,9 +121,7 @@ function resolvePointer(doc: unknown, ref: string): unknown {
 describe(`GET ${OPENAPI_PATH}`, () => {
   it('is a structurally valid OpenAPI 3.1 document', async () => {
     const raw = await fetchDocument()
-    const result = Document.safeParse(raw)
-    expect(result.error?.issues ?? []).toEqual([])
-    const doc = Document.parse(raw)
+    const doc = readDocument(raw)
 
     expect(doc.info.version).toBe(String(API_VERSION))
 
@@ -144,24 +163,26 @@ describe(`GET ${OPENAPI_PATH}`, () => {
 
   it('lists the handshake with a 200 carrying both clocks', async () => {
     const raw = await fetchDocument()
-    expect(Document.parse(raw).paths).toHaveProperty([HELLO_PATH, 'get'])
+    expect(readDocument(raw).paths).toHaveProperty([HELLO_PATH, 'get'])
 
-    const Ok = z.object({
-      content: z.object({
-        'application/json': z.object({ schema: z.unknown() }),
+    const Ok = Schema.Struct({
+      content: Schema.Struct({
+        'application/json': Schema.Struct({ schema: Schema.Unknown }),
       }),
     })
-    const ok = Ok.parse(
+    const ok = Schema.decodeUnknownSync(Ok)(
       resolvePointer(
         raw,
         `#/paths/${HELLO_PATH.replaceAll('/', '~1')}/get/responses/200`,
       ),
     )
     const schema = ok.content['application/json'].schema
-    const asRef = z.object({ $ref: z.string() }).safeParse(schema)
+    const asRef = Schema.decodeUnknownOption(
+      Schema.Struct({ $ref: Schema.String }),
+    )(schema)
 
     expect(
-      asRef.success ? resolvePointer(raw, asRef.data.$ref) : schema,
+      Option.isSome(asRef) ? resolvePointer(raw, asRef.value.$ref) : schema,
     ).toMatchObject({
       type: 'object',
       properties: {

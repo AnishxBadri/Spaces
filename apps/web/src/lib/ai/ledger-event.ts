@@ -1,6 +1,5 @@
-import { Effect, Schema } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import { and, asc, eq, isNull, sql } from 'drizzle-orm'
-import { z } from 'zod'
 import type { LanguageModel } from 'ai'
 import { db } from '@spaces/db'
 import {
@@ -20,6 +19,7 @@ import type {
 import { JSON_SCHEMA_DRAFT } from '@spaces/core/ai/schema'
 import type { JsonSchema } from '@spaces/core/ai/schema'
 import { ref } from '@spaces/core/context/ref'
+import { finite } from '@spaces/core/attributes/registry'
 import { readJson } from '@spaces/core/json'
 import {
   heldLedgerEvent,
@@ -290,33 +290,40 @@ async function holdingNow(holdingId: string): Promise<HoldingNow> {
 
 // ---------- the read ----------
 
-const num = z.number().finite()
+const num = Schema.optional(Schema.Number.check(finite))
 
 /** The model's answer, read leniently: the choice below checks it. */
-export const capTableReadSchema = z.object({
-  round: z
-    .object({
-      date: z.string(),
-      kind: z.string(),
-      raised: num.optional(),
-      currency: z.string().optional(),
-      preMoney: num.optional(),
-      postMoney: num.optional(),
-      pricePerShare: num.optional(),
-      sharesOutstanding: num.optional(),
-    })
-    .optional(),
-  ownership: z
-    .object({
-      ourShares: num.optional(),
-      fullyDilutedShares: num.optional(),
-      pct: num.optional(),
-    })
-    .optional(),
-  reason: z.string().optional(),
+const capTableReadSchema = Schema.Struct({
+  round: Schema.optional(
+    Schema.Struct({
+      date: Schema.String,
+      kind: Schema.String,
+      raised: num,
+      currency: Schema.optional(Schema.String),
+      preMoney: num,
+      postMoney: num,
+      pricePerShare: num,
+      sharesOutstanding: num,
+    }),
+  ),
+  ownership: Schema.optional(
+    Schema.Struct({
+      ourShares: num,
+      fullyDilutedShares: num,
+      pct: num,
+    }),
+  ),
+  reason: Schema.optional(Schema.String),
 })
 
-export type CapTableRead = z.infer<typeof capTableReadSchema>
+export type CapTableRead = typeof capTableReadSchema.Type
+
+const decodeCapTable = Schema.decodeUnknownOption(capTableReadSchema)
+
+/** The model's cap-table answer; null when it is in no shape to be read. */
+export function readCapTable(output: unknown): CapTableRead | null {
+  return Option.getOrNull(decodeCapTable(output))
+}
 
 function outputSchema(): JsonSchema {
   const number = (description: string): JsonSchema => ({
@@ -597,17 +604,17 @@ const proposeInRun = Effect.fn('proposeLedgerEvent.inRun')(function* (
   const step = (outputRef: string | null) =>
     run.step(callStep('extract', [cite], answered, outputRef, input.jobRunId))
 
-  const parsed = capTableReadSchema.safeParse(
+  const parsed = readCapTable(
     answered.output.kind === 'object' ? answered.output.object : undefined,
   )
-  if (!parsed.success) {
+  if (parsed === null) {
     yield* step(null)
     return {
       status: 'skipped',
       reason: 'The model answered in no shape a cap table can be read from',
     }
   }
-  const choice = chooseLedgerEvent(parsed.data, now)
+  const choice = chooseLedgerEvent(parsed, now)
   if (choice.event === null) {
     yield* step(null)
     return { status: 'skipped', reason: choice.reason }
@@ -633,7 +640,7 @@ const proposeInRun = Effect.fn('proposeLedgerEvent.inRun')(function* (
     yield* step(null)
     return { status: 'skipped', reason: 'The proposal is not JSON' }
   }
-  const reason = parsed.data.reason?.trim()
+  const reason = parsed.reason?.trim()
   const proposed = yield* proposeProgram({
     entityId: target.companyId,
     kind: 'ledger_event',

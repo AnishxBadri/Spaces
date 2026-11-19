@@ -1,6 +1,5 @@
-import { Effect } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import { and, asc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
   attribute,
@@ -11,7 +10,12 @@ import {
 } from '@spaces/db/schema'
 import { holding, investment } from '@spaces/db/schema/portfolio'
 import type { AttributeOptions, EntityValues } from '@spaces/db/schema'
-import { CORE_OBJECTS } from '@spaces/core/attributes/registry'
+import {
+  CORE_OBJECTS,
+  finite,
+  int,
+  uuidString,
+} from '@spaces/core/attributes/registry'
 import type { IdentityKey } from '@spaces/core/attributes/registry'
 import type { HoldingMetrics } from '@spaces/core/portfolio/metrics'
 import type { Ownership } from '@spaces/core/portfolio/ownership'
@@ -37,6 +41,9 @@ import type { FieldResolver } from '#/lib/views/sql'
 import { interactionStatField } from '#/lib/views/stat-fields'
 import type { InteractionStatField } from '#/lib/views/stat-fields'
 import type { SQL } from 'drizzle-orm'
+import type { JSONSchema7 } from 'ai'
+import { DRAFT_07, ISO_DAY, UUID_PATTERN } from './input-schema'
+import type { ToolInputSchema } from './input-schema'
 import {
   McpToolQueryFailed,
   McpToolRefused,
@@ -281,76 +288,139 @@ const CONDITION_OPS = [
   'lt',
 ] as const satisfies ReadonlyArray<ConditionOp>
 
-const conditionValue = z.union([
-  z.string(),
-  z.number(),
-  z.boolean(),
-  z.null(),
-  z.array(z.string()),
+const nonEmpty = Schema.String.check(Schema.isMinLength(1))
+
+const conditionValue = Schema.Union([
+  Schema.String,
+  Schema.Number.check(finite),
+  Schema.Boolean,
+  Schema.Null,
+  Schema.mutable(Schema.Array(Schema.String)),
 ])
-const opCondition = z.object({
-  op: z.enum(CONDITION_OPS),
-  value: conditionValue.optional(),
+const opCondition = Schema.Struct({
+  op: Schema.Literals(CONDITION_OPS),
+  value: Schema.optional(conditionValue),
 })
-const spaceCondition = z.object({
-  id: z.string().min(1),
-  includeDescendants: z.boolean().optional(),
+const spaceCondition = Schema.Struct({
+  id: nonEmpty,
+  includeDescendants: Schema.optional(Schema.Boolean),
 })
 
-/** The tool's input, validated by zod at the MCP boundary. */
-export const queryRecordsShape = {
-  object: z
-    .string()
-    .min(1)
-    .describe(
-      'An object’s slug, singular or plural name (see list_registry): companies, people, deals or a custom object',
-    ),
-  conditions: z
-    .object({
-      space: spaceCondition
-        .optional()
-        .describe(
-          'Records filed in this space (its id, or its exact name). includeDescendants, default true, also takes records filed in any space below it',
+const decodeConditionValue = Schema.decodeUnknownOption(conditionValue)
+const decodeOpCondition = Schema.decodeUnknownOption(opCondition)
+const decodeSpaceCondition = Schema.decodeUnknownOption(spaceCondition)
+
+/** The tool's input, decoded at the MCP boundary. */
+export const queryRecordsInput = Schema.Struct({
+  object: nonEmpty,
+  conditions: Schema.optional(
+    Schema.StructWithRest(
+      Schema.Struct({ space: Schema.optional(spaceCondition) }),
+      // The rest names `spaceCondition` too only so the index signature
+      // admits `space`; `splitConditions` refuses it on any other key.
+      [
+        Schema.Record(
+          Schema.String,
+          Schema.Union([
+            conditionValue,
+            opCondition,
+            Schema.Array(opCondition).check(Schema.isMinLength(1)),
+            spaceCondition,
+          ]),
         ),
-    })
-    // The catchall names `spaceCondition` too only so the inferred index
-    // signature admits `space`; `splitConditions` refuses it on any other key.
-    .catchall(
-      z.union([
-        conditionValue,
-        opCondition,
-        z.array(opCondition).min(1),
-        spaceCondition,
-      ]),
-    )
-    .optional()
-    .describe(
-      `{[attribute slug]: value | {op, value} | [{op, value}, …]}, all ANDed; a bare value means op "is". Ops: is, is_not, contains, empty, not_empty (no value), gt, lt. Select and status values are option ids (see list_registry). Also the interaction columns ${STAT_NAMES}, compared as YYYY-MM-DD days`,
+      ],
     ),
-  sort: z
-    .object({
-      by: z
-        .string()
-        .min(1)
-        .describe(
-          `An attribute flagged filterable or sortable, or one of ${STAT_NAMES}`,
-        ),
-      direction: z.enum(['asc', 'desc']).optional(),
-    })
-    .optional()
-    .describe('Default: newest records first. Empty values sort last'),
-  limit: z
-    .number()
-    .int()
-    .min(1)
-    .optional()
-    .describe(
-      `Rows to return; default 50, at most ${QUERY_RECORDS_MAX} (more is clamped)`,
-    ),
+  ),
+  sort: Schema.optional(
+    Schema.Struct({
+      by: nonEmpty,
+      direction: Schema.optional(Schema.Literals(['asc', 'desc'])),
+    }),
+  ),
+  limit: Schema.optional(
+    Schema.Number.check(int, Schema.isGreaterThanOrEqualTo(1)),
+  ),
+})
+export type QueryRecordsInput = typeof queryRecordsInput.Type
+
+const conditionValueJson: JSONSchema7 = {
+  anyOf: [
+    { type: 'string' },
+    { type: 'number' },
+    { type: 'boolean' },
+    { type: 'null' },
+    { type: 'array', items: { type: 'string' } },
+  ],
+}
+const opConditionJson: JSONSchema7 = {
+  type: 'object',
+  properties: {
+    op: { type: 'string', enum: [...CONDITION_OPS] },
+    value: conditionValueJson,
+  },
+  required: ['op'],
+}
+const spaceConditionJson: JSONSchema7 = {
+  type: 'object',
+  properties: {
+    id: { type: 'string', minLength: 1 },
+    includeDescendants: { type: 'boolean' },
+  },
+  required: ['id'],
 }
 
-const queryRecordsInput = z.object(queryRecordsShape)
-export type QueryRecordsInput = z.infer<typeof queryRecordsInput>
+/** `queryRecordsInput` as a client is shown it. */
+export const queryRecordsJsonSchema: ToolInputSchema = {
+  $schema: DRAFT_07,
+  type: 'object',
+  properties: {
+    object: {
+      type: 'string',
+      minLength: 1,
+      description:
+        'An object’s slug, singular or plural name (see list_registry): companies, people, deals or a custom object',
+    },
+    conditions: {
+      description: `{[attribute slug]: value | {op, value} | [{op, value}, …]}, all ANDed; a bare value means op "is". Ops: is, is_not, contains, empty, not_empty (no value), gt, lt. Select and status values are option ids (see list_registry). Also the interaction columns ${STAT_NAMES}, compared as YYYY-MM-DD days`,
+      type: 'object',
+      properties: {
+        space: {
+          description:
+            'Records filed in this space (its id, or its exact name). includeDescendants, default true, also takes records filed in any space below it',
+          ...spaceConditionJson,
+        },
+      },
+      additionalProperties: {
+        anyOf: [
+          conditionValueJson,
+          opConditionJson,
+          { minItems: 1, type: 'array', items: opConditionJson },
+          spaceConditionJson,
+        ],
+      },
+    },
+    sort: {
+      description: 'Default: newest records first. Empty values sort last',
+      type: 'object',
+      properties: {
+        by: {
+          type: 'string',
+          minLength: 1,
+          description: `An attribute flagged filterable or sortable, or one of ${STAT_NAMES}`,
+        },
+        direction: { type: 'string', enum: ['asc', 'desc'] },
+      },
+      required: ['by'],
+    },
+    limit: {
+      description: `Rows to return; default 50, at most ${String(QUERY_RECORDS_MAX)} (more is clamped)`,
+      type: 'integer',
+      minimum: 1,
+      maximum: Number.MAX_SAFE_INTEGER,
+    },
+  },
+  required: ['object'],
+}
 
 export type QueryRecordsRow = {
   id: string
@@ -430,24 +500,25 @@ function splitConditions(
   let filed: SpaceFilter | null = null
   for (const [slug, raw] of Object.entries(conditions ?? {})) {
     if (slug === 'space') {
-      const parsed = spaceCondition.safeParse(raw)
-      if (!parsed.success)
+      const parsed = decodeSpaceCondition(raw)
+      if (Option.isNone(parsed))
         return { refused: 'The space condition takes {id, includeDescendants}' }
       filed = {
-        ref: parsed.data.id,
-        includeDescendants: parsed.data.includeDescendants ?? true,
+        ref: parsed.value.id,
+        includeDescendants: parsed.value.includeDescendants ?? true,
       }
       continue
     }
     const each =
       Array.isArray(raw) && raw.some((x) => typeof x === 'object') ? raw : [raw]
     for (const c of each) {
-      const withOp = opCondition.safeParse(c)
-      const bare = conditionValue.safeParse(c)
-      if (withOp.success) {
-        const { op, value } = withOp.data
+      const withOp = decodeOpCondition(c)
+      const bare = decodeConditionValue(c)
+      if (Option.isSome(withOp)) {
+        const { op, value } = withOp.value
         list.push(value === undefined ? { slug, op } : { slug, op, value })
-      } else if (bare.success) list.push({ slug, op: 'is', value: bare.data })
+      } else if (Option.isSome(bare))
+        list.push({ slug, op: 'is', value: bare.value })
       else
         return {
           refused: `The condition on "${slug}" is not a value, {op, value} or a list of them`,
@@ -617,23 +688,47 @@ export const queryRecordsProgram = Effect.fn('queryRecordsProgram')(function* (
 // ---------------------------------------------------------------------------
 // portfolio_summary and holding_detail
 
-const isoDay = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
-  .describe(
+const isoDay = Schema.String.check(
+  Schema.isPattern(ISO_DAY, { message: 'Expected YYYY-MM-DD' }),
+)
+
+const isoDayJson: JSONSchema7 = {
+  type: 'string',
+  pattern: ISO_DAY.source,
+  description:
     'As-of day, YYYY-MM-DD: events dated after it are left out, and a void written after it had not happened yet. Omit for everything',
-  )
+}
 
-/** `portfolio_summary`'s input, validated by zod at the MCP boundary. */
-export const portfolioSummaryShape = { asOf: isoDay.optional() }
+/** `portfolio_summary`'s input, decoded at the MCP boundary. */
+export const portfolioSummaryInput = Schema.Struct({
+  asOf: Schema.optional(isoDay),
+})
 
-/** `holding_detail`'s input, validated by zod at the MCP boundary. */
-export const holdingDetailShape = {
-  holdingId: z
-    .string()
-    .uuid()
-    .describe('A holding id, as portfolio_summary lists it'),
-  asOf: isoDay.optional(),
+export const portfolioSummaryJsonSchema: ToolInputSchema = {
+  $schema: DRAFT_07,
+  type: 'object',
+  properties: { asOf: isoDayJson },
+}
+
+/** `holding_detail`'s input, decoded at the MCP boundary. */
+export const holdingDetailInput = Schema.Struct({
+  holdingId: uuidString,
+  asOf: Schema.optional(isoDay),
+})
+
+export const holdingDetailJsonSchema: ToolInputSchema = {
+  $schema: DRAFT_07,
+  type: 'object',
+  properties: {
+    holdingId: {
+      type: 'string',
+      format: 'uuid',
+      pattern: UUID_PATTERN,
+      description: 'A holding id, as portfolio_summary lists it',
+    },
+    asOf: isoDayJson,
+  },
+  required: ['holdingId'],
 }
 
 /** The money a holding or the book is read as, in `currency`. */

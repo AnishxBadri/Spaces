@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import type { AiLane, AiSensitivity } from '@spaces/db/schema/ai'
 import { LLM_PROVIDERS } from './providers/ids'
 
@@ -40,31 +40,31 @@ void sensitivitiesExact
 export type { AiLane, AiSensitivity }
 
 const aiRouteCell = {
-  lane: z.enum(AI_LANES),
-  sensitivity: z.enum(AI_SENSITIVITIES),
+  lane: Schema.Literals(AI_LANES),
+  sensitivity: Schema.Literals(AI_SENSITIVITIES),
 }
 
 /** One cell of the lane × sensitivity grid, routed to a provider's model. */
-export const aiRouteSetInput = z.object({
+export const aiRouteSetInput = Schema.Struct({
   ...aiRouteCell,
-  provider: z.enum(LLM_PROVIDERS),
-  model: z.string().trim().min(1).max(200),
+  provider: Schema.Literals(LLM_PROVIDERS),
+  model: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(200)),
 })
-export type AiRouteSetInput = z.infer<typeof aiRouteSetInput>
+export type AiRouteSetInput = typeof aiRouteSetInput.Type
 
 /**
  * `setAiRoute`'s input: a cell set to a provider and model, or cleared with
  * `provider: null` — which deletes the row, leaving the lane unrouted at that
  * sensitivity.
  */
-export const aiRouteInput = z.union([
+export const aiRouteInput = Schema.Union([
   aiRouteSetInput,
-  z.object({ ...aiRouteCell, provider: z.null() }),
+  Schema.Struct({ ...aiRouteCell, provider: Schema.Null }),
 ])
-export type AiRouteInput = z.infer<typeof aiRouteInput>
+export type AiRouteInput = typeof aiRouteInput.Type
 
 /** `isLaneRouted`'s input: the lane a trigger belongs to. */
-export const aiLaneInput = z.object({ lane: z.enum(AI_LANES) })
+export const aiLaneInput = Schema.Struct({ lane: Schema.Literals(AI_LANES) })
 
 /**
  * The lanes the Models routing grid draws: every lane but `embed`, which
@@ -76,7 +76,7 @@ export const MODELS_GRID_LANES = AI_LANES.filter((lane) => lane !== 'embed')
  * `setSensitivityDefault`'s input: the workspace floor, which can only raise
  * a record's sensitivity, never lower it.
  */
-export const sensitivityDefaultInput = z.object({
-  sensitivity: z.enum(AI_SENSITIVITIES),
+export const sensitivityDefaultInput = Schema.Struct({
+  sensitivity: Schema.Literals(AI_SENSITIVITIES),
 })
-export type SensitivityDefaultInput = z.infer<typeof sensitivityDefaultInput>
+export type SensitivityDefaultInput = typeof sensitivityDefaultInput.Type

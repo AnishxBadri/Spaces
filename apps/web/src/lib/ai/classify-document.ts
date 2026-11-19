@@ -1,6 +1,5 @@
-import { Effect, Schema } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import { and, eq } from 'drizzle-orm'
-import { z } from 'zod'
 import type { LanguageModel } from 'ai'
 import { db } from '@spaces/db'
 import { document, documentKind, entity, suggestion } from '@spaces/db/schema'
@@ -9,6 +8,7 @@ import type { DocumentKindPayload } from '@spaces/core/ai/document-kind'
 import { JSON_SCHEMA_DRAFT } from '@spaces/core/ai/schema'
 import type { JsonSchema } from '@spaces/core/ai/schema'
 import { ref } from '@spaces/core/context/ref'
+import { between, finite } from '@spaces/core/attributes/registry'
 import { completeMessage, completeProgram } from './complete'
 import { callStep, suggestionOutputRef, withRun } from './run'
 import type { RunScope } from './run'
@@ -111,15 +111,22 @@ export type ClassifyResult =
   | { status: 'skipped'; reason: string }
 
 /** The answer's shape, read leniently: the options are checked after. */
-const answerSchema = z.object({
-  kinds: z.array(
-    z.object({
-      kind: z.string(),
-      confidence: z.number().min(0).max(1).optional(),
-    }),
-  ),
-  reason: z.string().optional(),
-})
+const answerSchema = Schema.decodeUnknownOption(
+  Schema.Struct({
+    kinds: Schema.Array(
+      Schema.Struct({
+        kind: Schema.String,
+        confidence: Schema.optional(Schema.Number.check(finite, between(0, 1))),
+      }),
+    ),
+    reason: Schema.optional(Schema.String),
+  }),
+)
+
+/** The model's answer, read leniently; null when it is in no shape to be read. */
+export function readKindsAnswer(output: unknown) {
+  return Option.getOrNull(answerSchema(output))
+}
 
 function outputSchema(): JsonSchema {
   return {
@@ -267,10 +274,10 @@ const classifyInRun = Effect.fn('classifyDocument.inRun')(function* (
       ),
     )
 
-  const parsed = answerSchema.safeParse(
+  const parsed = readKindsAnswer(
     answered.output.kind === 'object' ? answered.output.object : undefined,
   )
-  const answers = parsed.success ? parsed.data.kinds : []
+  const answers = parsed?.kinds ?? []
   const dropped: Array<string> = []
   let pick: DocumentKindPayload | null = null
   for (const a of answers) {
@@ -293,7 +300,7 @@ const classifyInRun = Effect.fn('classifyDocument.inRun')(function* (
     return {
       status: 'skipped',
       reason: [
-        parsed.success
+        parsed !== null
           ? 'The model named no kind it may propose'
           : 'The model answered in no shape a kind can be read from',
         droppedLine,
@@ -303,7 +310,7 @@ const classifyInRun = Effect.fn('classifyDocument.inRun')(function* (
     }
   }
 
-  const reason = parsed.success ? parsed.data.reason?.trim() : undefined
+  const reason = parsed?.reason?.trim()
   const rationale = [
     `Read from the first ${String(head.length)} characters of ${filename}: this looks like ${articled(DOCUMENT_KIND_LABELS[pick.kind])}.`,
     reason === undefined || reason === '' ? null : reason,

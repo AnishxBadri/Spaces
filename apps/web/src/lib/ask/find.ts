@@ -1,6 +1,5 @@
 import { Effect, Schema } from 'effect'
 import { and, eq, inArray, sql } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
   askThread,
@@ -24,6 +23,7 @@ import {
   suggestionMessage,
 } from '#/lib/ai/propose'
 import { emitDomainEvent } from '#/lib/events/emit'
+import { DRAFT_07, decoderFor, modelSchema } from '#/lib/mcp/input-schema'
 import { askQuery } from './query'
 import type { AskQueryFailed } from './query'
 import type { AskCall, AskFindRow, AskFindTable, AskVia } from './types'
@@ -46,42 +46,78 @@ export const SHOW_COMPANIES = 'show_companies'
 /** The most rows one table holds. */
 export const FIND_MAX_ROWS = 50
 
-export const showCompaniesShape = {
-  companies: z
-    .array(
-      z.object({
-        name: z.string().trim().min(1).max(300),
-        domain: z.string().trim().min(1).max(253),
-        line: z
-          .string()
-          .trim()
-          .max(300)
-          .describe('What the company does, in one line'),
-        place: z
-          .string()
-          .trim()
-          .max(120)
-          .nullable()
-          .describe('Where it is based; null when the pages do not say'),
-        sources: z
-          .array(z.string().url().max(2000))
-          .min(1)
-          .max(3)
-          .describe(
-            'One to three page URLs, exactly as a web tool returned them',
-          ),
-      }),
-    )
-    .min(1)
-    .max(FIND_MAX_ROWS),
-}
+/** Trimmed, then between `min` and `max` long. */
+const trimmed = (min: number, max: number) =>
+  Schema.Trim.check(Schema.isMinLength(min), Schema.isMaxLength(max))
+
+const showCompanies = Schema.Struct({
+  companies: Schema.Array(
+    Schema.Struct({
+      name: trimmed(1, 300),
+      domain: trimmed(1, 253),
+      line: trimmed(0, 300),
+      place: Schema.NullOr(trimmed(0, 120)),
+      // Held trimmed, as anything `URL` parses once trimmed.
+      sources: Schema.Array(
+        Schema.Trim.check(
+          Schema.makeFilter((u: string) => URL.canParse(u), {
+            expected: 'a URL',
+          }),
+          Schema.isMaxLength(2000),
+        ),
+      ).check(Schema.isMinLength(1), Schema.isMaxLength(3)),
+    }),
+  ).check(Schema.isMinLength(1), Schema.isMaxLength(FIND_MAX_ROWS)),
+})
+
+/** The `show_companies` tool's input, as the model is shown it and its call checked. */
+export const showCompaniesInput = modelSchema(
+  {
+    $schema: DRAFT_07,
+    type: 'object',
+    properties: {
+      companies: {
+        minItems: 1,
+        maxItems: FIND_MAX_ROWS,
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', minLength: 1, maxLength: 300 },
+            domain: { type: 'string', minLength: 1, maxLength: 253 },
+            line: {
+              type: 'string',
+              maxLength: 300,
+              description: 'What the company does, in one line',
+            },
+            place: {
+              anyOf: [{ type: 'string', maxLength: 120 }, { type: 'null' }],
+              description: 'Where it is based; null when the pages do not say',
+            },
+            sources: {
+              minItems: 1,
+              maxItems: 3,
+              type: 'array',
+              items: { type: 'string', maxLength: 2000, format: 'uri' },
+              description:
+                'One to three page URLs, exactly as a web tool returned them',
+            },
+          },
+          required: ['name', 'domain', 'line', 'place', 'sources'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['companies'],
+    additionalProperties: false,
+  },
+  decoderFor(showCompanies),
+)
 
 export const SHOW_COMPANIES_DESCRIPTION =
   'Show the reader the companies a web search found, as a table — never list them as prose. For each company: its name, its domain, what it does in one line, where it is based, and one to three source URLs exactly as a web tool returned them. Each row is checked against the workspace: already filed here, held elsewhere, or new, and the reader adds or files from the table. Call it once per question, after searching.'
 
-type ShownCompany = z.infer<
-  z.ZodObject<typeof showCompaniesShape>
->['companies'][number]
+type ShownCompany = (typeof showCompanies.Type)['companies'][number]
 
 /** A URL as compared against what a call returned: no fragment, no trailing slash. */
 export const urlKey = (url: string): string =>

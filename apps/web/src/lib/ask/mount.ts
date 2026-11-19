@@ -1,7 +1,6 @@
-import { Clock, Effect, Schema } from 'effect'
+import { Clock, Effect, Option, Schema } from 'effect'
 import { and, asc, eq, gte, sql } from 'drizzle-orm'
 import type { JSONSchema7 } from 'ai'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { aiUsage, enrichmentRecord, integration } from '@spaces/db/schema'
 import type { IntegrationConfig } from '@spaces/db/schema'
@@ -113,39 +112,89 @@ export const webSourcesProgram = Effect.fn('ask.webSources')(function* () {
 
 // ---------- the wire: JSON-RPC over streamable HTTP ----------
 
-const toolInputSchema = z.custom<JSONSchema7>(
-  (v) => z.looseObject({ type: z.literal('object') }).safeParse(v).success,
-  { error: 'a tool input schema is a JSON Schema object' },
+const isObjectSchema = Schema.is(
+  Schema.Struct({ type: Schema.Literal('object') }),
 )
 
-const toolList = z.looseObject({
-  tools: z.array(
-    z.looseObject({
-      name: z.string().min(1),
-      description: z.string().optional(),
-      inputSchema: toolInputSchema,
+/**
+ * A tool's input schema, handed on as the server sent it: any JSON Schema
+ * whose `type` is `object` is taken at its word, as the AI SDK reads it.
+ */
+const toolInputSchema = Schema.declare(
+  (u: unknown): u is JSONSchema7 => isObjectSchema(u),
+  { expected: 'a tool input schema is a JSON Schema object' },
+)
+
+const toolList = Schema.decodeUnknownOption(
+  Schema.Struct({
+    tools: Schema.Array(
+      Schema.Struct({
+        name: Schema.String.check(Schema.isMinLength(1)),
+        description: Schema.optional(Schema.String),
+        inputSchema: toolInputSchema,
+      }),
+    ),
+  }),
+)
+
+const toolResult = Schema.decodeUnknownOption(
+  Schema.Struct({
+    content: Schema.Array(
+      Schema.Struct({
+        type: Schema.String,
+        text: Schema.optional(Schema.String),
+      }),
+    ),
+    isError: Schema.optional(Schema.Boolean),
+  }),
+)
+
+/** Keys a message carries beyond the ones read here are kept, not dropped. */
+const loose = { parseOptions: { onExcessProperty: 'preserve' } } as const
+
+const rpcMessage = Schema.Struct({
+  id: Schema.optional(Schema.Union([Schema.Number, Schema.String])),
+  result: Schema.optional(Schema.Unknown),
+  error: Schema.optional(
+    Schema.Struct({ message: Schema.String }).annotate(loose),
+  ),
+}).annotate(loose)
+
+const decodeRpcMessage = Schema.decodeUnknownOption(rpcMessage)
+
+/** A `tools/list` result as the turn keeps it; null when it is unreadable. */
+export function readToolList(result: unknown): Array<McpTool> | null {
+  return Option.match(toolList(result), {
+    onNone: () => null,
+    onSome: (listed) =>
+      listed.tools.map((t) => ({
+        name: t.name,
+        description: t.description ?? t.name,
+        inputSchema: t.inputSchema,
+      })),
+  })
+}
+
+/** A `tools/call` result as its text blocks and error flag; null when unreadable. */
+export function readToolResult(
+  result: unknown,
+): { text: string; isError: boolean } | null {
+  return Option.match(toolResult(result), {
+    onNone: () => null,
+    onSome: (answered) => ({
+      text: answered.content
+        .flatMap((c) => (c.text === undefined ? [] : [c.text]))
+        .join('\n\n'),
+      isError: answered.isError === true,
     }),
-  ),
-})
-
-const toolResult = z.looseObject({
-  content: z.array(
-    z.looseObject({ type: z.string(), text: z.string().optional() }),
-  ),
-  isError: z.boolean().optional(),
-})
-
-const rpcMessage = z.looseObject({
-  id: z.union([z.number(), z.string()]).optional(),
-  result: z.unknown().optional(),
-  error: z.looseObject({ message: z.string() }).optional(),
-})
+  })
+}
 
 /** The JSON-RPC messages a response carries: one JSON body, or SSE events. */
 export function rpcMessages(
   contentType: string,
   body: string,
-): Array<z.infer<typeof rpcMessage>> {
+): Array<typeof rpcMessage.Type> {
   const payloads = contentType.includes('text/event-stream')
     ? body.split(/\r?\n\r?\n/).flatMap((event) => {
         const data = event
@@ -165,8 +214,8 @@ export function rpcMessages(
     }
     const list = Array.isArray(parsed) ? parsed : [parsed]
     return list.flatMap((m) => {
-      const msg = rpcMessage.safeParse(m)
-      return msg.success ? [msg.data] : []
+      const msg = decodeRpcMessage(m)
+      return Option.isSome(msg) ? [msg.value] : []
     })
   })
 }
@@ -318,15 +367,11 @@ const mountOne = Effect.fn('ask.mountOne')(function* (
     tools = cached.tools
   else {
     yield* initialize
-    const listed = toolList.safeParse(
+    const listed = readToolList(
       yield* post({ method: 'tools/list', params: {} }, true),
     )
-    if (!listed.success) return yield* fail('listed its tools unreadably')
-    tools = listed.data.tools.map((t) => ({
-      name: t.name,
-      description: t.description ?? t.name,
-      inputSchema: t.inputSchema,
-    }))
+    if (listed === null) return yield* fail('listed its tools unreadably')
+    tools = listed
     toolLists.set(cacheKey, { at: now, tools })
   }
 
@@ -409,16 +454,14 @@ const mountOne = Effect.fn('ask.mountOne')(function* (
           message: capRefusal(charged.refused),
         })
       yield* initialize
-      const answered = toolResult.safeParse(
+      const answered = readToolResult(
         yield* post(
           { method: 'tools/call', params: { name: tool, arguments: args } },
           true,
         ),
       )
-      if (!answered.success) return yield* fail(`answered ${tool} unreadably`)
-      const text = answered.data.content
-        .flatMap((c) => (c.text === undefined ? [] : [c.text]))
-        .join('\n\n')
+      if (answered === null) return yield* fail(`answered ${tool} unreadably`)
+      const { text } = answered
       // The answer joins its receipt; the credit was spent either way.
       yield* Effect.ignore(
         Effect.tryPromise(() =>
@@ -432,7 +475,7 @@ const mountOne = Effect.fn('ask.mountOne')(function* (
       )
       return {
         text: text.slice(0, ANSWER_MAX_CHARS),
-        isError: answered.data.isError === true,
+        isError: answered.isError,
         urls: urlsIn(text),
       }
     })

@@ -1,4 +1,5 @@
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { plainRecord } from '#/lib/plain-record'
 import type { Json } from '@spaces/core/json'
 
 /**
@@ -20,21 +21,34 @@ import type { Json } from '@spaces/core/json'
  *   embedding half reuses the LLM row, and one Test must not answer for the
  *   other; the sensitive slot is offered on a green one.
  */
-export const providerMeta = z.object({
-  baseUrl: z.string().url().optional().catch(undefined),
-  headers: z.record(z.string(), z.string()).optional().catch(undefined),
-  display: z.string().optional().catch(undefined),
-  lastTestedAt: z.string().optional().catch(undefined),
-  lastTestOk: z.boolean().optional().catch(undefined),
-  embedTestedAt: z.string().optional().catch(undefined),
-  embedTestOk: z.boolean().optional().catch(undefined),
-  embedTestModel: z.string().optional().catch(undefined),
+/** A key read if it decodes; a value it cannot read leaves the key out. */
+const lenient = <TSchema extends Schema.Top>(schema: TSchema) =>
+  Schema.optionalKey(
+    schema.pipe(Schema.catchDecoding(() => Effect.succeedNone)),
+  )
+
+const providerMeta = Schema.Struct({
+  // Held trimmed, as anything `URL` parses once trimmed.
+  baseUrl: lenient(
+    Schema.Trim.check(
+      Schema.makeFilter((s: string) => URL.canParse(s), { expected: 'a URL' }),
+    ),
+  ),
+  headers: lenient(plainRecord(Schema.String)),
+  display: lenient(Schema.String),
+  lastTestedAt: lenient(Schema.String),
+  lastTestOk: lenient(Schema.Boolean),
+  embedTestedAt: lenient(Schema.String),
+  embedTestOk: lenient(Schema.Boolean),
+  embedTestModel: lenient(Schema.String),
 })
 
-export type ProviderMeta = z.infer<typeof providerMeta>
+export type ProviderMeta = typeof providerMeta.Type
+
+const decodeMeta = Schema.decodeUnknownSync(providerMeta)
 
 export function readProviderMeta(meta: { [k: string]: Json }): ProviderMeta {
-  return providerMeta.parse(meta)
+  return decodeMeta(meta)
 }
 
 /** A header name as RFC 9110 spells a token. */

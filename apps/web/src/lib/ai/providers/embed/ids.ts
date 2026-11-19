@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { formatDay, formatNumber } from '@spaces/core/format'
 import { LLM_PROVIDERS, PROVIDERS } from '../ids'
 import type { LlmProvider } from '../ids'
@@ -407,14 +407,18 @@ export const backfillProgressLine = (embedded: number, total: number): string =>
 
 // The server fns' inputs.
 
-export const embeddingKeyInput = z.object({
-  provider: z.enum(KEYED_EMBEDDING_PROVIDERS),
-  key: z.string().trim().min(1).max(4000),
-})
-export type EmbeddingKeyInput = z.infer<typeof embeddingKeyInput>
+/** Trimmed, then between `min` and `max` long. */
+const trimmed = (min: number, max: number) =>
+  Schema.Trim.check(Schema.isMinLength(min), Schema.isMaxLength(max))
 
-export const embeddingTargetInput = z.object({
-  provider: z.enum(EMBEDDING_PROVIDERS),
-  model: z.string().trim().min(1).max(200),
+export const embeddingKeyInput = Schema.Struct({
+  provider: Schema.Literals(KEYED_EMBEDDING_PROVIDERS),
+  key: trimmed(1, 4000),
 })
-export type EmbeddingTarget = z.infer<typeof embeddingTargetInput>
+export type EmbeddingKeyInput = typeof embeddingKeyInput.Type
+
+export const embeddingTargetInput = Schema.Struct({
+  provider: Schema.Literals(EMBEDDING_PROVIDERS),
+  model: trimmed(1, 200),
+})
+export type EmbeddingTarget = typeof embeddingTargetInput.Type

@@ -1,6 +1,5 @@
-import { Effect, Schema } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
-import { z } from 'zod'
 import type { LanguageModel } from 'ai'
 import { db } from '@spaces/db'
 import {
@@ -136,14 +135,20 @@ function itemsSchema(): JsonSchema {
   }
 }
 
-const itemsAnswer = z.object({
-  items: z.array(
-    z.object({
-      title: z.string(),
-      due: z.string().nullable().optional().catch(null),
-    }),
-  ),
-})
+// A due the model mangled reads as none, not as a refused answer.
+const itemsAnswer = Schema.decodeUnknownOption(
+  Schema.Struct({
+    items: Schema.Array(
+      Schema.Struct({
+        title: Schema.String,
+        due: Schema.NullOr(Schema.String).pipe(
+          Schema.catchDecoding(() => Effect.succeedSome(null)),
+          Schema.withDecodingDefault(Effect.succeed(null)),
+        ),
+      }),
+    ),
+  }),
+)
 
 type Answer =
   | { kind: 'answered'; output: CompleteOutput }
@@ -156,11 +161,11 @@ const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
 export function actionItemsOf(
   answer: unknown,
 ): Array<{ title: string; due: string | null }> | null {
-  const parsed = itemsAnswer.safeParse(answer)
-  if (!parsed.success) return null
+  const parsed = itemsAnswer(answer)
+  if (Option.isNone(parsed)) return null
   const seen = new Set<string>()
   const out: Array<{ title: string; due: string | null }> = []
-  for (const item of parsed.data.items) {
+  for (const item of parsed.value.items) {
     const title = item.title.trim().replace(/\s+/g, ' ').slice(0, 500)
     if (title === '' || seen.has(title.toLowerCase())) continue
     seen.add(title.toLowerCase())

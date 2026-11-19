@@ -1,6 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
+import { uuidString } from '@spaces/core/attributes/registry'
 import { requireAdmin, requireUser } from './shared'
+import { input } from './input'
 
 /**
  * AI attribute cells. A cell's trigger — on the record rail or in the table,
@@ -12,9 +14,14 @@ import { requireAdmin, requireUser } from './shared'
  * proposal.
  */
 
-const byCell = z.object({
-  entityId: z.string().uuid(),
-  attributeId: z.string().uuid(),
+const byCell = Schema.Struct({
+  entityId: uuidString,
+  attributeId: uuidString,
+})
+
+/** The records a surface shows, at most a page of them. */
+const byRecords = Schema.Struct({
+  entityIds: Schema.Array(uuidString).check(Schema.isMaxLength(500)),
 })
 
 export type {
@@ -27,7 +34,7 @@ export type {
 } from '../ai/attribute-run'
 
 export const runAttributeCell = createServerFn({ method: 'POST' })
-  .validator(byCell)
+  .validator(input(byCell))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { pressAttributeRunProgram } = await import('../ai/attribute-run')
@@ -41,7 +48,7 @@ export const runAttributeCell = createServerFn({ method: 'POST' })
 
 /** Where the cell's latest run stands — polled while one is running. */
 export const attributeCellStatus = createServerFn()
-  .validator(byCell)
+  .validator(input(byCell))
   .handler(async ({ data }) => {
     await requireUser()
     const { attributeRunStatusProgram } = await import('../ai/attribute-run')
@@ -51,7 +58,7 @@ export const attributeCellStatus = createServerFn()
 
 /** Every (record, slug) with an open proposal, for the records on screen. */
 export const openCellProposals = createServerFn()
-  .validator(z.object({ entityIds: z.array(z.string().uuid()).max(500) }))
+  .validator(input(byRecords))
   .handler(async ({ data }) => {
     await requireUser()
     const { openCellProposalsProgram } = await import('../ai/attribute-run')
@@ -61,7 +68,7 @@ export const openCellProposals = createServerFn()
 
 /** The latest accepted AI value per (record, slug), for the records on screen. */
 export const aiWrittenCells = createServerFn()
-  .validator(z.object({ entityIds: z.array(z.string().uuid()).max(500) }))
+  .validator(input(byRecords))
   .handler(async ({ data }) => {
     await requireUser()
     const { aiWrittenCellsProgram } = await import('../ai/attribute-run')
@@ -71,9 +78,9 @@ export const aiWrittenCells = createServerFn()
 
 export type { ColumnRunEnqueued, ColumnRunEstimate } from '../ai/column-run'
 
-const byColumn = z.object({
-  viewId: z.string().uuid(),
-  attributeId: z.string().uuid(),
+const byColumn = Schema.Struct({
+  viewId: uuidString,
+  attributeId: uuidString,
 })
 
 /**
@@ -83,7 +90,7 @@ const byColumn = z.object({
  * dialog opens; nothing is queued.
  */
 export const estimateColumnRun = createServerFn()
-  .validator(byColumn)
+  .validator(input(byColumn))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { estimateColumnRunProgram } = await import('../ai/column-run')
@@ -97,7 +104,7 @@ export const estimateColumnRun = createServerFn()
 
 /** The dialog's confirm: one `attribute.column-run` job, or the refusal. */
 export const runColumn = createServerFn({ method: 'POST' })
-  .validator(byColumn)
+  .validator(input(byColumn))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { pressColumnRunProgram } = await import('../ai/column-run')
@@ -111,10 +118,12 @@ export const runColumn = createServerFn({ method: 'POST' })
  */
 export const addProposedOption = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      suggestionId: z.string().uuid(),
-      label: z.string().trim().min(1).max(60),
-    }),
+    input(
+      Schema.Struct({
+        suggestionId: uuidString,
+        label: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(60)),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireAdmin()

@@ -1,6 +1,12 @@
-import { Cause, Effect, Exit, Option } from 'effect'
+import { Cause, Effect, Exit, Option, Result } from 'effect'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
+import {
+  CallToolRequestSchema,
+  ErrorCode,
+  ListToolsRequestSchema,
+  McpError,
+} from '@modelcontextprotocol/sdk/types.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { authenticateBearerProgram } from '#/lib/tokens/store'
 import type { TokenUser } from '#/lib/tokens/store'
@@ -18,6 +24,9 @@ import type { ToolCaller } from './registry'
  *   revoked one is a 401 before the MCP layer sees the request, so an
  *   unauthenticated client never learns the tool list.
  * - Every tool runs as the token's user: canRead is theirs.
+ * - `tools/list` and `tools/call` are answered on the SDK's underlying
+ *   server, from the registry's own JSON Schema and decode, so the SDK never
+ *   reads a tool's schema; the answers are the ones its `registerTool` gave.
  */
 
 const SERVER_INFO = { name: 'spaces', version: '0.1.0' }
@@ -44,32 +53,45 @@ async function answer<TValue, TError extends { message: string }>(
   return text('The tool failed on the server', true)
 }
 
+/** A refusal in the words and code the SDK's own tool handler used. */
+const invalidParams = (message: string) =>
+  text(new McpError(ErrorCode.InvalidParams, message).message, true)
+
 export function buildMcpServer(reader: TokenUser): McpServer {
-  const server = new McpServer(SERVER_INFO)
+  const mcp = new McpServer(SERVER_INFO)
   const caller: ToolCaller = {
     userId: reader.id,
     proposer: { kind: 'token', tokenId: reader.tokenId },
   }
+  mcp.server.registerCapabilities({ tools: { listChanged: true } })
+  mcp.server.setRequestHandler(ListToolsRequestSchema, () => ({
+    tools: toolRegistry.tools.map((tool) => ({
+      name: tool.name,
+      title: tool.title,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+      annotations: tool.annotations,
+      execution: { taskSupport: 'forbidden' as const },
+    })),
+  }))
   // Called through the registry at request time, never captured here, so
   // the external client and Ask share one door.
-  for (const tool of toolRegistry.tools) {
-    server.registerTool(
-      tool.name,
-      {
-        title: tool.title,
-        description: tool.description,
-        inputSchema: tool.inputSchema,
-        annotations: tool.annotations,
-      },
-      async (input) =>
-        answer(
-          toolRegistry
-            .call(tool.name, caller, input)
-            .pipe(Effect.map((a) => a.value)),
-        ),
+  mcp.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name } = request.params
+    const tool = toolRegistry.tools.find((t) => t.name === name)
+    if (tool === undefined) return invalidParams(`Tool ${name} not found`)
+    const input = tool.decode(request.params.arguments)
+    if (Result.isFailure(input))
+      return invalidParams(
+        `Input validation error: Invalid arguments for tool ${name}: ${input.failure}`,
+      )
+    return answer(
+      toolRegistry
+        .call(name, caller, input.success)
+        .pipe(Effect.map((a) => a.value)),
     )
-  }
-  return server
+  })
+  return mcp
 }
 
 const unauthorized = () =>

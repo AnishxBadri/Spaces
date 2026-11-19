@@ -1,10 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { and, eq } from 'drizzle-orm'
 import { FetchHttpClient } from 'effect/unstable/http'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { company, document, entity, link, note } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
@@ -92,10 +91,14 @@ const post = (body: unknown, token = fixture.captureToken) =>
     }),
   )
 
-const Captured = z.object({ documentId: z.string(), url: z.string() })
-const Failure = z.object({
-  error: z.object({ tag: z.string(), message: z.string() }),
-})
+const Captured = Schema.decodeUnknownSync(
+  Schema.Struct({ documentId: Schema.String, url: Schema.String }),
+)
+const Failure = Schema.decodeUnknownSync(
+  Schema.Struct({
+    error: Schema.Struct({ tag: Schema.String, message: Schema.String }),
+  }),
+)
 
 const documentsWithSha = (sha: string) =>
   db
@@ -167,7 +170,7 @@ describe('POST /api/v1/capture — unfiled', () => {
     const body = page()
     const response = await post(body)
     expect(response.status).toBe(200)
-    const answer = Captured.parse(await response.json())
+    const answer = Captured(await response.json())
     expect(answer.url).toBe(`${APP}/files?filed=unfiled`)
 
     const sha = sha256(body.text)
@@ -254,7 +257,7 @@ describe('POST /api/v1/capture — filed on a record', () => {
     const body = page({ target: fixture.companyId })
     const response = await post(body)
     expect(response.status).toBe(200)
-    const answer = Captured.parse(await response.json())
+    const answer = Captured(await response.json())
     expect(answer.url).toBe(`${APP}/companies/${fixture.companyId}`)
 
     // What the Files tab reads: the tagged_in edge onto the record, joined
@@ -275,8 +278,8 @@ describe('POST /api/v1/capture — filed on a record', () => {
 
   it('re-posting the same page is birth’s sha+target dedupe, not a second row', async () => {
     const body = page({ target: fixture.companyId })
-    const first = Captured.parse(await (await post(body)).json())
-    const again = Captured.parse(
+    const first = Captured(await (await post(body)).json())
+    const again = Captured(
       await (
         await post({ ...body, capturedAt: '2026-09-29T10:00:00Z' })
       ).json(),
@@ -300,7 +303,7 @@ describe('POST /api/v1/capture — filed on a record', () => {
   it('resolves an exact name, case-insensitively, as SPA-23/31 do', async () => {
     const response = await post(page({ target: 'orbital composites' }))
     expect(response.status).toBe(200)
-    const answer = Captured.parse(await response.json())
+    const answer = Captured(await response.json())
     const edge = await db
       .select({ to: link.toEntityId })
       .from(link)
@@ -312,7 +315,7 @@ describe('POST /api/v1/capture — filed on a record', () => {
     const body = page({ target: 'No Such Company Anywhere' })
     const response = await post(body)
     expect(response.status).toBe(404)
-    expect(Failure.parse(await response.json()).error.tag).toBe('NotFound')
+    expect(Failure(await response.json()).error.tag).toBe('NotFound')
     expect(await documentsWithSha(sha256(body.text))).toEqual([])
     expect(await storage().exists(sha256(body.text))).toBe(false)
   })
@@ -349,7 +352,7 @@ describe('captureSchemaVersion', () => {
     const body = page({ captureSchemaVersion: 999 })
     const response = await post(body)
     expect(response.status).toBe(422)
-    const { error } = Failure.parse(await response.json())
+    const { error } = Failure(await response.json())
     expect(error.tag).toBe('UnsupportedCaptureSchemaVersion')
     expect(error.message).toContain('update the extension')
     expect(error.message).toContain(
@@ -384,7 +387,7 @@ describe('the cap', () => {
     const text = 'a'.repeat(MAX_CAPTURE_BYTES + 1)
     const response = await post(page({ text, target: fixture.companyId }))
     expect(response.status).toBe(413)
-    const { error } = Failure.parse(await response.json())
+    const { error } = Failure(await response.json())
     expect(error.tag).toBe('PayloadTooLarge')
     expect(error.message).toContain(formatBytes(MAX_CAPTURE_BYTES))
     expect(error.message).toContain(String(MAX_CAPTURE_BYTES))
@@ -414,7 +417,7 @@ describe('the payload schema', () => {
     ]) {
       const response = await post(body)
       expect(response.status, JSON.stringify(body).slice(0, 80)).toBe(400)
-      expect(Failure.parse(await response.json()).error.tag).toBe('BadRequest')
+      expect(Failure(await response.json()).error.tag).toBe('BadRequest')
     }
   })
 
@@ -427,18 +430,21 @@ describe('the payload schema', () => {
     const doc: unknown = await (
       await handleApiRequest(new Request(`${ORIGIN}${OPENAPI_PATH}`))
     ).json()
-    const Doc = z.object({
-      paths: z.object({
-        [`${API_PREFIX}/capture`]: z.object({
-          post: z.object({
-            operationId: z.string(),
-            security: z.array(z.record(z.string(), z.unknown())).min(1),
-            requestBody: z.object({ required: z.literal(true) }),
+    const Doc = Schema.Struct({
+      paths: Schema.Struct({
+        [`${API_PREFIX}/capture`]: Schema.Struct({
+          post: Schema.Struct({
+            operationId: Schema.String,
+            security: Schema.Array(
+              Schema.Record(Schema.String, Schema.Unknown),
+            ).check(Schema.isMinLength(1)),
+            requestBody: Schema.Struct({ required: Schema.Literal(true) }),
           }),
         }),
       }),
     })
-    const op = Doc.parse(doc).paths[`${API_PREFIX}/capture`].post
+    const op =
+      Schema.decodeUnknownSync(Doc)(doc).paths[`${API_PREFIX}/capture`].post
     expect(op.operationId).toBe('capture.capture')
   })
 })

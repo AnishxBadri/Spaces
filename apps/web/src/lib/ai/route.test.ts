@@ -1,4 +1,4 @@
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { eq, isNotNull } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
@@ -120,19 +120,16 @@ describe('setAiRoute / clearAiRoute', () => {
   })
 
   it('the input accepts a null provider as a clear, and refuses a set without a model', () => {
+    const accepts = Schema.is(aiRouteInput)
     expect(
-      aiRouteInput.safeParse({
-        lane: 'extract',
-        sensitivity: 'normal',
-        provider: null,
-      }).success,
+      accepts({ lane: 'extract', sensitivity: 'normal', provider: null }),
     ).toBe(true)
     expect(
-      aiRouteInput.safeParse({
+      accepts({
         lane: 'extract',
         sensitivity: 'normal',
         provider: 'anthropic',
-      }).success,
+      }),
     ).toBe(false)
   })
 })

@@ -1,8 +1,7 @@
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { eq } from 'drizzle-orm'
 import { FetchHttpClient } from 'effect/unstable/http'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { document, entity, note } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
@@ -234,9 +233,9 @@ describe('403 — a live token without the procedure’s scope', () => {
     const created = await mint(TEAMMATE.id, ['capture:write'])
     const response = await call(CAPTURE, bearer(created.token))
     expect(response.status).toBe(200)
-    const { documentId } = z
-      .object({ documentId: z.string() })
-      .parse(await response.json())
+    const { documentId } = Schema.decodeUnknownSync(
+      Schema.Struct({ documentId: Schema.String }),
+    )(await response.json())
     const row = (
       await db
         .select({ uploadedBy: document.uploadedBy })

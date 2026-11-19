@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 
 /**
  * Provider ids, their descriptors and the settings inputs, with nothing
@@ -105,12 +105,22 @@ export const PROVIDER_LABEL: Record<LlmProvider, string> = {
  * `baseUrl` clears it, and `headers` is the raw `Name: value` lines, parsed
  * server-side by `parseHeaderLines` so the refusal names the line.
  */
-export const aiKeyInput = z.object({
-  provider: z.enum(LLM_PROVIDERS),
-  key: z.string().trim().max(4000).optional(),
-  baseUrl: z.union([z.literal(''), z.string().trim().url()]).default(''),
-  headers: z.string().max(4000).default(''),
+export const aiKeyInput = Schema.Struct({
+  provider: Schema.Literals(LLM_PROVIDERS),
+  key: Schema.optional(Schema.Trim.check(Schema.isMaxLength(4000))),
+  // Trimmed, then anything `URL` parses: an Ollama box on any scheme passes.
+  baseUrl: Schema.Union([
+    Schema.Literal(''),
+    Schema.Trim.check(
+      Schema.makeFilter((s: string) => URL.canParse(s), { expected: 'a URL' }),
+    ),
+  ]).pipe(Schema.withDecodingDefault(Effect.succeed(''))),
+  headers: Schema.String.check(Schema.isMaxLength(4000)).pipe(
+    Schema.withDecodingDefault(Effect.succeed('')),
+  ),
 })
-export type AiKeyInput = z.infer<typeof aiKeyInput>
+export type AiKeyInput = typeof aiKeyInput.Type
 
-export const aiProviderInput = z.object({ provider: z.enum(LLM_PROVIDERS) })
+export const aiProviderInput = Schema.Struct({
+  provider: Schema.Literals(LLM_PROVIDERS),
+})

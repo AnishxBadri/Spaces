@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
+import { int, uuidString } from '@spaces/core/attributes/registry'
+import { plainRecord } from '../plain-record'
 import { requireUser } from './shared'
+import { input } from './input'
 
 export type {
   AskCall,
@@ -30,22 +33,36 @@ export type { AskRefPreview } from '../ask/ref-preview'
  * reaches the client bundle.
  */
 
-const scopeChip = z.object({
-  kind: z.enum(['record', 'space', 'person', 'view', 'file', 'page', 'web']),
-  id: z.uuid().nullable(),
-  name: z.string().min(1).max(300),
-  href: z.string().max(500).nullable(),
+/** Trimmed, then between `min` and `max` long. */
+const trimmed = (min: number, max: number) =>
+  Schema.Trim.check(Schema.isMinLength(min), Schema.isMaxLength(max))
+
+const scopeChip = Schema.Struct({
+  kind: Schema.Literals([
+    'record',
+    'space',
+    'person',
+    'view',
+    'file',
+    'page',
+    'web',
+  ]),
+  id: Schema.NullOr(uuidString),
+  name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(300)),
+  href: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
 })
 
 /** One turn, streamed: the rows, the route, calls and text, then the stored turn. */
 export const askQuestion = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      threadId: z.uuid().nullable(),
-      question: z.string().trim().min(1).max(4000),
-      // Four chips the reader chose, and the web.
-      scope: z.array(scopeChip).max(5),
-    }),
+    input(
+      Schema.Struct({
+        threadId: Schema.NullOr(uuidString),
+        question: trimmed(1, 4000),
+        // Four chips the reader chose, and the web.
+        scope: Schema.Array(scopeChip).check(Schema.isMaxLength(5)),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const user = await requireUser()
@@ -58,7 +75,7 @@ export const askQuestion = createServerFn({ method: 'POST' })
     })
   })
 
-const byThread = z.object({ threadId: z.uuid() })
+const byThread = Schema.Struct({ threadId: uuidString })
 
 async function run<T>(f: () => Promise<T>): Promise<T> {
   const { askMessage } = await import('../ask/threads')
@@ -77,7 +94,7 @@ export const listAskThreads = createServerFn().handler(async () => {
 })
 
 export const getAskThread = createServerFn()
-  .validator(byThread)
+  .validator(input(byThread))
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { getThreadProgram } = await import('../ask/threads')
@@ -86,7 +103,9 @@ export const getAskThread = createServerFn()
   })
 
 export const renameAskThread = createServerFn({ method: 'POST' })
-  .validator(byThread.extend({ title: z.string().trim().min(1).max(200) }))
+  .validator(
+    input(Schema.Struct({ ...byThread.fields, title: trimmed(1, 200) })),
+  )
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { renameThreadProgram } = await import('../ask/threads')
@@ -98,7 +117,7 @@ export const renameAskThread = createServerFn({ method: 'POST' })
 
 /** What a delete takes with it, printed in the confirm's foot. */
 export const getAskThreadCounts = createServerFn()
-  .validator(byThread)
+  .validator(input(byThread))
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { threadCountsProgram } = await import('../ask/threads')
@@ -107,7 +126,7 @@ export const getAskThreadCounts = createServerFn()
   })
 
 export const deleteAskThread = createServerFn({ method: 'POST' })
-  .validator(byThread)
+  .validator(input(byThread))
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { deleteThreadProgram } = await import('../ask/threads')
@@ -117,7 +136,7 @@ export const deleteAskThread = createServerFn({ method: 'POST' })
 
 /** "Save as note": one answer, filed on the records it cited. */
 export const saveAskAnswerAsNote = createServerFn({ method: 'POST' })
-  .validator(z.object({ turnId: z.uuid() }))
+  .validator(input(Schema.Struct({ turnId: uuidString })))
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { saveAnswerNoteProgram } = await import('../ask/threads')
@@ -130,7 +149,16 @@ export const saveAskAnswerAsNote = createServerFn({ method: 'POST' })
  * names, read as the reader — null when they may not read it.
  */
 export const previewAskRef = createServerFn()
-  .validator(z.object({ ref: z.string().min(1).max(300) }))
+  .validator(
+    input(
+      Schema.Struct({
+        ref: Schema.String.check(
+          Schema.isMinLength(1),
+          Schema.isMaxLength(300),
+        ),
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { askRefPreviewProgram } = await import('../ask/ref-preview')
@@ -138,7 +166,7 @@ export const previewAskRef = createServerFn()
     return run(() => effectFn(askRefPreviewProgram)(user.id, data.ref))
   })
 
-const byCard = z.object({ suggestionId: z.uuid() })
+const byCard = Schema.Struct({ suggestionId: uuidString })
 
 /**
  * An action card's two verbs, as the reader. Apply runs the writer a person
@@ -146,7 +174,7 @@ const byCard = z.object({ suggestionId: z.uuid() })
  * the card with its outcome; Skip closes it and writes nothing.
  */
 export const applyAskCard = createServerFn({ method: 'POST' })
-  .validator(byCard)
+  .validator(input(byCard))
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { applyCardProgram } = await import('../ask/card-store')
@@ -155,7 +183,7 @@ export const applyAskCard = createServerFn({ method: 'POST' })
   })
 
 export const skipAskCard = createServerFn({ method: 'POST' })
-  .validator(byCard)
+  .validator(input(byCard))
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { skipCardProgram } = await import('../ask/card-store')
@@ -180,11 +208,16 @@ export const askWebSources = createServerFn().handler(async () => {
  */
 export const actOnFindRow = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      turnId: z.uuid(),
-      domain: z.string().min(1).max(253),
-      act: z.enum(['add', 'file', 'dismiss']),
-    }),
+    input(
+      Schema.Struct({
+        turnId: uuidString,
+        domain: Schema.String.check(
+          Schema.isMinLength(1),
+          Schema.isMaxLength(253),
+        ),
+        act: Schema.Literals(['add', 'file', 'dismiss']),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const user = await requireUser()
@@ -229,17 +262,21 @@ export const getSaveWatchSetup = createServerFn().handler(async () => {
  */
 export const saveFindAsWatch = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      turnId: z.uuid(),
-      callIndex: z.int().min(0),
-      space: z.union([
-        z.object({ id: z.uuid() }),
-        z.object({ create: z.string().trim().min(1).max(300) }),
-      ]),
-      integrationId: z.uuid(),
-      values: z.record(z.string(), z.union([z.string(), z.boolean()])),
-      cadenceMinutes: z.int().positive().nullable(),
-    }),
+    input(
+      Schema.Struct({
+        turnId: uuidString,
+        callIndex: Schema.Number.check(int, Schema.isGreaterThanOrEqualTo(0)),
+        space: Schema.Union([
+          Schema.Struct({ id: uuidString }),
+          Schema.Struct({ create: trimmed(1, 300) }),
+        ]),
+        integrationId: uuidString,
+        values: plainRecord(Schema.Union([Schema.String, Schema.Boolean])),
+        cadenceMinutes: Schema.NullOr(
+          Schema.Number.check(int, Schema.isGreaterThan(0)),
+        ),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const user = await requireUser()

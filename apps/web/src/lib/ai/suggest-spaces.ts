@@ -1,6 +1,5 @@
-import { Effect, Schema } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import { and, asc, eq, isNull } from 'drizzle-orm'
-import { z } from 'zod'
 import type { LanguageModel } from 'ai'
 import { db } from '@spaces/db'
 import { entity, entitySpace, space, suggestion } from '@spaces/db/schema'
@@ -9,6 +8,7 @@ import type { SpaceTagPayload } from '@spaces/core/ai/space-tag'
 import { JSON_SCHEMA_DRAFT } from '@spaces/core/ai/schema'
 import type { JsonSchema } from '@spaces/core/ai/schema'
 import { QUEUES } from '@spaces/core/queue/names'
+import { between, finite } from '@spaces/core/attributes/registry'
 import { enqueue, jobsByKey } from '#/lib/queue'
 import { liveSpaceSql } from '#/lib/spaces/live'
 import type { QueuedJob } from '#/lib/queue'
@@ -140,15 +140,22 @@ const readTree = () =>
   })
 
 /** The answer's shape, read leniently: the ids are checked after. */
-const answerSchema = z.object({
-  spaces: z.array(
-    z.object({
-      spaceId: z.string(),
-      confidence: z.number().min(0).max(1).optional(),
-    }),
-  ),
-  reason: z.string().optional(),
-})
+const answerSchema = Schema.decodeUnknownOption(
+  Schema.Struct({
+    spaces: Schema.Array(
+      Schema.Struct({
+        spaceId: Schema.String,
+        confidence: Schema.optional(Schema.Number.check(finite, between(0, 1))),
+      }),
+    ),
+    reason: Schema.optional(Schema.String),
+  }),
+)
+
+/** The model's answer, read leniently; null when it is in no shape to be read. */
+export function readSpacesAnswer(output: unknown) {
+  return Option.getOrNull(answerSchema(output))
+}
 
 function outputSchema(options: ReadonlyArray<TreeSpace>): JsonSchema {
   return {
@@ -385,13 +392,14 @@ const suggestSpacesInRun = Effect.fn('suggestSpaces.inRun')(function* (
       ),
     )
 
-  const parsed = answerSchema.safeParse(
+  const parsed = readSpacesAnswer(
     answered.output.kind === 'object' ? answered.output.object : undefined,
   )
-  const { picks, dropped } = keepValid(
-    parsed.success ? parsed.data.spaces : [],
-    { tree, carried, decided },
-  )
+  const { picks, dropped } = keepValid(parsed?.spaces ?? [], {
+    tree,
+    carried,
+    decided,
+  })
   const droppedLine =
     dropped.length === 0
       ? null
@@ -403,7 +411,7 @@ const suggestSpacesInRun = Effect.fn('suggestSpaces.inRun')(function* (
       suggestions: [],
       dropped,
       skipped: [
-        parsed.success
+        parsed !== null
           ? 'The model placed the record in no space it may propose'
           : 'The model answered in no shape a space can be read from',
         droppedLine,
@@ -413,7 +421,7 @@ const suggestSpacesInRun = Effect.fn('suggestSpaces.inRun')(function* (
     }
   }
 
-  const reason = parsed.success ? parsed.data.reason?.trim() : undefined
+  const reason = parsed?.reason?.trim()
   const refs = context.items.map((i) => i.ref)
   const suggestions: Array<Suggestion> = []
   for (const pick of picks) {

@@ -1,6 +1,5 @@
-import { Effect, Schema } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import { and, asc, eq, gt, isNotNull, sql } from 'drizzle-orm'
-import { z } from 'zod'
 import type { LanguageModel } from 'ai'
 import { db } from '@spaces/db'
 import { interaction, interactionEntity, note } from '@spaces/db/schema'
@@ -132,13 +131,15 @@ function categorySchema(): JsonSchema {
   }
 }
 
-const categoryAnswer = z.object({ categories: z.array(z.string()) })
+const categoryAnswer = Schema.decodeUnknownOption(
+  Schema.Struct({ categories: Schema.Array(Schema.String) }),
+)
 
 /** The categories an answer names that are categories, deduped, capped. */
 export function categoriesOf(answer: unknown): Array<EmailCategory> | null {
-  const parsed = categoryAnswer.safeParse(answer)
-  if (!parsed.success) return null
-  return [...new Set(parsed.data.categories.filter(isEmailCategory))].slice(
+  const parsed = categoryAnswer(answer)
+  if (Option.isNone(parsed)) return null
+  return [...new Set(parsed.value.categories.filter(isEmailCategory))].slice(
     0,
     EMAIL_CATEGORIES_MAX,
   )

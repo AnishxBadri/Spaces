@@ -1,5 +1,4 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity, entitySpace, objectDef, space } from '@spaces/db/schema'
@@ -15,6 +14,8 @@ import {
   McpToolRefused,
 } from '@spaces/core/writes/read/record'
 import { proposableEntity } from './tools-propose'
+import { DRAFT_07, ISO_DAY } from './input-schema'
+import type { ToolInputSchema } from './input-schema'
 import type { ProposeCaller } from './tools-propose'
 
 /**
@@ -37,53 +38,83 @@ const CARD_KINDS = [
   'save_as_watch',
 ] as const satisfies ReadonlyArray<AskCardKind>
 
-export const proposeCardShape = {
-  kind: z
-    .enum(CARD_KINDS)
-    .describe(
-      'task (create a task on the record), move_stage (a deal to another pipeline stage), file_into_space (file the record in a space)',
-    ),
-  record: z
-    .string()
-    .min(1)
-    .describe('The record the card acts on: id (uuid) or exact name'),
-  title: z
-    .string()
-    .trim()
-    .min(1)
-    .max(500)
-    .optional()
-    .describe('task: what to do, as the task will read'),
-  due: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
-    .optional()
-    .describe('task: due date, YYYY-MM-DD'),
-  stage: z
-    .string()
-    .min(1)
-    .optional()
-    .describe('move_stage: the stage to move to, by id or label'),
-  space: z
-    .string()
-    .min(1)
-    .optional()
-    .describe('file_into_space: the space, by id or exact name'),
-  refs: z
-    .array(z.string().min(1))
-    .min(1)
-    .describe(
-      'Evidence: refs this turn retrieved — [record:<id>] or a context ref as written. A card without evidence is not shown.',
-    ),
-  rationale: z
-    .string()
-    .trim()
-    .min(1)
-    .max(1000)
-    .describe('Why, in one sentence, for the reader'),
-}
+const nonEmpty = Schema.String.check(Schema.isMinLength(1))
 
-export type ProposeCardInput = z.infer<z.ZodObject<typeof proposeCardShape>>
+/** Trimmed, then between 1 and `max` long. */
+const trimmed = (max: number) =>
+  Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(max))
+
+/** `propose_card`'s input, decoded where Ask calls it. */
+export const proposeCardInput = Schema.Struct({
+  kind: Schema.Literals(CARD_KINDS),
+  record: nonEmpty,
+  title: Schema.optional(trimmed(500)),
+  due: Schema.optional(
+    Schema.String.check(
+      Schema.isPattern(ISO_DAY, { message: 'Expected YYYY-MM-DD' }),
+    ),
+  ),
+  stage: Schema.optional(nonEmpty),
+  space: Schema.optional(nonEmpty),
+  refs: Schema.Array(nonEmpty).check(Schema.isMinLength(1)),
+  rationale: trimmed(1000),
+})
+
+export type ProposeCardInput = typeof proposeCardInput.Type
+
+/** `proposeCardInput` as the model is shown it. */
+export const proposeCardJsonSchema: ToolInputSchema = {
+  $schema: DRAFT_07,
+  type: 'object',
+  properties: {
+    kind: {
+      type: 'string',
+      enum: [...CARD_KINDS],
+      description:
+        'task (create a task on the record), move_stage (a deal to another pipeline stage), file_into_space (file the record in a space)',
+    },
+    record: {
+      type: 'string',
+      minLength: 1,
+      description: 'The record the card acts on: id (uuid) or exact name',
+    },
+    title: {
+      description: 'task: what to do, as the task will read',
+      type: 'string',
+      minLength: 1,
+      maxLength: 500,
+    },
+    due: {
+      description: 'task: due date, YYYY-MM-DD',
+      type: 'string',
+      pattern: ISO_DAY.source,
+    },
+    stage: {
+      description: 'move_stage: the stage to move to, by id or label',
+      type: 'string',
+      minLength: 1,
+    },
+    space: {
+      description: 'file_into_space: the space, by id or exact name',
+      type: 'string',
+      minLength: 1,
+    },
+    refs: {
+      minItems: 1,
+      type: 'array',
+      items: { type: 'string', minLength: 1 },
+      description:
+        'Evidence: refs this turn retrieved — [record:<id>] or a context ref as written. A card without evidence is not shown.',
+    },
+    rationale: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 1000,
+      description: 'Why, in one sentence, for the reader',
+    },
+  },
+  required: ['kind', 'record', 'refs', 'rationale'],
+}
 
 /** A card as the turn holds it until the answer lands. */
 export type CardDraft = {

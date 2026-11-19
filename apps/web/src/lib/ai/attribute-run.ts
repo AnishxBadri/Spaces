@@ -1,6 +1,5 @@
-import { Effect, Schema } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm'
-import { z } from 'zod'
 import type { LanguageModel } from 'ai'
 import { db } from '@spaces/db'
 import { entity, suggestion } from '@spaces/db/schema'
@@ -20,10 +19,12 @@ import {
 } from '@spaces/core/ai/schema'
 import type { JsonSchema } from '@spaces/core/ai/schema'
 import { liveOptions } from '@spaces/core/attributes/options'
+import { between, finite } from '@spaces/core/attributes/registry'
 import type { AttributeDef } from '@spaces/core/attributes/registry'
 import { QUEUES } from '@spaces/core/queue/names'
 import { jsonRecord, readJson } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
+import { plainRecord } from '#/lib/plain-record'
 import { enqueue, jobsByKey } from '#/lib/queue'
 import type { QueuedJob } from '#/lib/queue'
 import { recordContextProgram } from '@spaces/core/writes/context/record'
@@ -416,16 +417,37 @@ function outputSchema(cell: Cell): JsonSchema {
   }
 }
 
-const answerSchema = z.object({
-  reason: z.string().optional(),
-  newOption: z.string().optional(),
-})
+const decodeRecord = Schema.decodeUnknownOption(plainRecord(Schema.Unknown))
 
-const fieldSchema = z.object({
-  value: z.unknown(),
-  refs: z.array(z.string()).optional(),
-  confidence: z.number().min(0).max(1),
-})
+const decodeNotes = Schema.decodeUnknownOption(
+  Schema.Struct({
+    reason: Schema.optional(Schema.String),
+    newOption: Schema.optional(Schema.String),
+  }),
+)
+
+const decodeField = Schema.decodeUnknownOption(
+  Schema.Struct({
+    value: Schema.Unknown,
+    refs: Schema.optional(Schema.Array(Schema.String)),
+    confidence: Schema.Number.check(finite, between(0, 1)),
+  }),
+)
+
+/** The model's answer as a record keyed by field; null when it is not one. */
+export function answerRecord(output: unknown) {
+  return Option.getOrNull(decodeRecord(output))
+}
+
+/** The answer's reason and proposed option, read leniently; null when malformed. */
+export function answerNotes(answer: { readonly [k: string]: unknown }) {
+  return Option.getOrNull(decodeNotes(answer))
+}
+
+/** One field's `{value, refs, confidence}` envelope; null when mangled. */
+export function answerField(field: unknown) {
+  return Option.getOrNull(decodeField(field))
+}
 
 // ---------- the run (worker) ----------
 
@@ -549,20 +571,18 @@ const attributeRunInRun = Effect.fn('attributeRun.inRun')(function* (
       .pipe(Effect.as(result))
   }
 
-  const raw = z
-    .record(z.string(), z.unknown())
-    .safeParse(
-      answered.output.kind === 'object' ? answered.output.object : undefined,
-    )
-  if (!raw.success)
+  const raw = answerRecord(
+    answered.output.kind === 'object' ? answered.output.object : undefined,
+  )
+  if (raw === null)
     return yield* settle({
       suggestions: [],
       proposedOptions: [],
       dropped: [],
       skipped: `The model answered in no shape ${def.name} can be read from`,
     })
-  const answer = answerSchema.safeParse(raw.data)
-  const reason = answer.success ? (answer.data.reason?.trim() ?? '') : ''
+  const answer = answerNotes(raw)
+  const reason = answer?.reason?.trim() ?? ''
   const dropped: Array<string> = []
 
   // The field, read leniently: an envelope the model mangled is one line
@@ -570,17 +590,17 @@ const attributeRunInRun = Effect.fn('attributeRun.inRun')(function* (
   let value: unknown = undefined
   let fieldRefs: Array<string> = []
   let confidence = 0
-  if (def.slug in raw.data) {
-    const field = fieldSchema.safeParse(raw.data[def.slug])
-    if (!field.success)
+  if (def.slug in raw) {
+    const field = answerField(raw[def.slug])
+    if (field === null)
       dropped.push(
         `the answer for ${def.name} was not {value, refs, confidence}`,
       )
     else {
-      value = field.data.value
-      confidence = field.data.confidence
+      value = field.value
+      confidence = field.confidence
       const known = new Set(contextRefs)
-      const cited = field.data.refs ?? []
+      const cited = field.refs ?? []
       fieldRefs = cited.filter((r) => known.has(r))
       if (fieldRefs.length < cited.length)
         dropped.push(
@@ -596,7 +616,7 @@ const attributeRunInRun = Effect.fn('attributeRun.inRun')(function* (
     value = split.value
     dropped.push(...split.dropped)
     wanted = split.wanted
-    const extra = answer.success ? answer.data.newOption?.trim() : undefined
+    const extra = answer?.newOption?.trim()
     if (extra !== undefined && extra !== '') {
       const check = splitClassifyValue({ ...def, type: 'select' }, extra)
       // A "new" option that is already an option adds nothing.

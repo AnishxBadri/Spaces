@@ -1,5 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
+import { uuidString } from '@spaces/core/attributes/registry'
 import { aiKeyInput, aiProviderInput } from '../ai/providers/ids'
 import { aiLaneInput, aiRouteInput, sensitivityDefaultInput } from '../ai/lanes'
 import { aiCapsInput } from '../ai/caps-input'
@@ -7,6 +8,7 @@ import {
   embeddingKeyInput,
   embeddingTargetInput,
 } from '../ai/providers/embed/ids'
+import { input } from './input'
 
 /**
  * Settings → AI. Every write is admin-only (`requireAdmin()`); the reads are
@@ -22,7 +24,7 @@ export const listAiProviders = createServerFn().handler(async () => {
 
 /** Stores (or replaces) the workspace key for a provider; returns only the redacted display. */
 export const saveAiKey = createServerFn({ method: 'POST' })
-  .validator(aiKeyInput)
+  .validator(input(aiKeyInput))
   .handler(async ({ data }) => {
     const { saveAiKeyHandler } = await import('../ai/providers/settings')
     return saveAiKeyHandler(data)
@@ -33,7 +35,7 @@ export const saveAiKey = createServerFn({ method: 'POST' })
  * provider's own error text (a wrong key reads its 401), not a generic one.
  */
 export const testAiProvider = createServerFn({ method: 'POST' })
-  .validator(aiProviderInput)
+  .validator(input(aiProviderInput))
   .handler(async ({ data }) => {
     const { testAiProviderHandler } = await import('../ai/providers/settings')
     return testAiProviderHandler(data)
@@ -46,7 +48,7 @@ export const testAiProvider = createServerFn({ method: 'POST' })
  * `{lane: 'classify', sensitivity: 'normal', provider: 'anthropic', model}`.
  */
 export const setAiRoute = createServerFn({ method: 'POST' })
-  .validator(aiRouteInput)
+  .validator(input(aiRouteInput))
   .handler(async ({ data }) => {
     const { setAiRouteHandler } = await import('../ai/route')
     return setAiRouteHandler(data)
@@ -68,7 +70,7 @@ export const listAiRoutes = createServerFn().handler(async () => {
  * is gone, reads `false`.
  */
 export const isLaneRouted = createServerFn()
-  .validator(aiLaneInput)
+  .validator(input(aiLaneInput))
   .handler(async ({ data }) => {
     const { isLaneRoutedHandler } = await import('../ai/route')
     return isLaneRoutedHandler(data)
@@ -84,7 +86,7 @@ export const getSensitivityDefault = createServerFn().handler(async () => {
 })
 
 export const setSensitivityDefault = createServerFn({ method: 'POST' })
-  .validator(sensitivityDefaultInput)
+  .validator(input(sensitivityDefaultInput))
   .handler(async ({ data }) => {
     const { setSensitivityDefaultHandler } = await import('../ai/route')
     return setSensitivityDefaultHandler(data)
@@ -101,7 +103,7 @@ export const getAiCaps = createServerFn().handler(async () => {
 
 /** Both ceilings at once; a null is no cap on that axis. */
 export const setAiCaps = createServerFn({ method: 'POST' })
-  .validator(aiCapsInput)
+  .validator(input(aiCapsInput))
   .handler(async ({ data }) => {
     const { setAiCapsHandler } = await import('../ai/caps')
     return setAiCapsHandler(data)
@@ -125,7 +127,7 @@ export const getAiUsage = createServerFn().handler(async () => {
 
 /** One run opened: its steps, refs resolved, and what it proposed. */
 export const getAiRun = createServerFn()
-  .validator(z.object({ runId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ runId: uuidString })))
   .handler(async ({ data }) => {
     const { getAiRunHandler } = await import('../ai/usage')
     return getAiRunHandler(data.runId)
@@ -143,7 +145,7 @@ export const getEmbeddingSettings = createServerFn().handler(async () => {
 
 /** Stores the workspace embedding key (`kind: 'embedding'`); returns only the redacted display. */
 export const saveEmbeddingKey = createServerFn({ method: 'POST' })
-  .validator(embeddingKeyInput)
+  .validator(input(embeddingKeyInput))
   .handler(async ({ data }) => {
     const { saveEmbeddingKeyHandler } =
       await import('../ai/providers/embed/settings')
@@ -152,7 +154,7 @@ export const saveEmbeddingKey = createServerFn({ method: 'POST' })
 
 /** Embeds "Spaces" with one model: the width, the first four values, the model id. */
 export const testEmbedding = createServerFn({ method: 'POST' })
-  .validator(embeddingTargetInput)
+  .validator(input(embeddingTargetInput))
   .handler(async ({ data }) => {
     const { testEmbeddingHandler } =
       await import('../ai/providers/embed/settings')
@@ -166,7 +168,7 @@ export const testEmbedding = createServerFn({ method: 'POST' })
  * new model would change the width.
  */
 export const pinEmbedding = createServerFn({ method: 'POST' })
-  .validator(embeddingTargetInput)
+  .validator(input(embeddingTargetInput))
   .handler(async ({ data }) => {
     const { pinEmbeddingHandler } =
       await import('../ai/providers/embed/settings')
@@ -203,7 +205,7 @@ export const startEmbedBackfill = createServerFn({ method: 'POST' }).handler(
  * width. Admin-only; the bodies open with `requireAdmin()`.
  */
 export const setSensitiveSlot = createServerFn({ method: 'POST' })
-  .validator(embeddingTargetInput)
+  .validator(input(embeddingTargetInput))
   .handler(async ({ data }) => {
     const { setSensitiveSlotHandler } =
       await import('../ai/providers/embed/settings')

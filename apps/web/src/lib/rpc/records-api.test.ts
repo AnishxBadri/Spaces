@@ -1,8 +1,7 @@
-import { Effect } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import { eq } from 'drizzle-orm'
 import { FetchHttpClient } from 'effect/unstable/http'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
   company,
@@ -242,30 +241,37 @@ const OPERATIONS = [
   { id: 'records.get', path: `${API_PREFIX}/records/{id}` },
 ] as const
 
-const Operation = z.object({
-  operationId: z.string(),
-  tags: z.array(z.string()),
-  parameters: z
-    .array(z.object({ name: z.string(), in: z.string() }))
-    .default([]),
-  requestBody: z.unknown().optional(),
-  security: z.array(z.record(z.string(), z.array(z.string()))),
-  responses: z.record(
-    z.string(),
-    z.object({
-      content: z
-        .object({ 'application/json': z.object({ schema: z.unknown() }) })
-        .optional(),
+const Operation = Schema.Struct({
+  operationId: Schema.String,
+  tags: Schema.Array(Schema.String),
+  parameters: Schema.Array(
+    Schema.Struct({ name: Schema.String, in: Schema.String }),
+  ).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+  requestBody: Schema.optional(Schema.Unknown),
+  security: Schema.Array(
+    Schema.Record(Schema.String, Schema.Array(Schema.String)),
+  ),
+  responses: Schema.Record(
+    Schema.String,
+    Schema.Struct({
+      content: Schema.optional(
+        Schema.Struct({
+          'application/json': Schema.Struct({ schema: Schema.Unknown }),
+        }),
+      ),
     }),
   ),
 })
 
-const Document = z.object({
-  paths: z.record(z.string(), z.record(z.string(), z.unknown())),
+const Document = Schema.Struct({
+  paths: Schema.Record(
+    Schema.String,
+    Schema.Record(Schema.String, Schema.Unknown),
+  ),
 })
 
 const fetchDocument = async () =>
-  Document.parse(
+  Schema.decodeUnknownSync(Document)(
     await (
       await handleApiRequest(new Request(`${ORIGIN}${OPENAPI_PATH}`))
     ).json(),
@@ -276,7 +282,7 @@ describe('the OpenAPI document', () => {
     const doc = await fetchDocument()
     for (const { id, path } of OPERATIONS) {
       expect(doc.paths, id).toHaveProperty([path, 'get'])
-      const op = Operation.parse(doc.paths[path].get)
+      const op = Schema.decodeUnknownSync(Operation)(doc.paths[path].get)
       expect(op.operationId).toBe(id)
       expect(op.security).toEqual([{ bearer: [] }])
       expect(op.responses, id).toHaveProperty('200')
@@ -330,20 +336,20 @@ describe('records.list — paging', () => {
       fixture.readToken,
     )
     expect(response.status).toBe(200)
-    const body = z
-      .object({
-        object: z.string(),
-        total: z.number(),
-        rows: z.array(
-          z.object({
-            id: z.string(),
-            name: z.string(),
-            values: z.record(z.string(), z.unknown()),
-            domains: z.array(z.string()),
+    const body = Schema.decodeUnknownSync(
+      Schema.Struct({
+        object: Schema.String,
+        total: Schema.Number,
+        rows: Schema.Array(
+          Schema.Struct({
+            id: Schema.String,
+            name: Schema.String,
+            values: Schema.Record(Schema.String, Schema.Unknown),
+            domains: Schema.Array(Schema.String),
           }),
         ),
-      })
-      .parse(await response.json())
+      }),
+    )(await response.json())
     expect(body.object).toBe('companies')
     expect(body.total).toBe(11)
     const first = body.rows.find((r) => r.id === fixture.orbitalId)
@@ -511,17 +517,19 @@ describe('records.get', () => {
 })
 
 describe('registry.list', () => {
-  const Registry = z.object({
-    objects: z.array(
-      z.object({
-        slug: z.string(),
-        attributes: z.array(z.object({ slug: z.string() })),
-      }),
-    ),
-  })
+  const Registry = Schema.decodeUnknownSync(
+    Schema.Struct({
+      objects: Schema.Array(
+        Schema.Struct({
+          slug: Schema.String,
+          attributes: Schema.Array(Schema.Struct({ slug: Schema.String })),
+        }),
+      ),
+    }),
+  )
 
   it('reflects a custom object created minutes earlier, with no restart', async () => {
-    const before = Registry.parse(
+    const before = Registry(
       await (await get('/registry', fixture.readToken)).json(),
     )
     expect(before.objects.map((o) => o.slug)).toEqual(
@@ -580,10 +588,10 @@ describe('no filter, search or write on records/registry — owned by docsurf-12
     const doc = await fetchDocument()
     const ours = Object.entries(doc.paths).flatMap(([path, item]) =>
       Object.entries(item).flatMap(([method, raw]) => {
-        const op = Operation.safeParse(raw)
-        return op.success &&
-          op.data.tags.some((t) => t === 'records' || t === 'registry')
-          ? [{ path, method, op: op.data }]
+        const op = Schema.decodeUnknownOption(Operation)(raw)
+        return Option.isSome(op) &&
+          op.value.tags.some((t) => t === 'records' || t === 'registry')
+          ? [{ path, method, op: op.value }]
           : []
       }),
     )
