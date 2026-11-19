@@ -1,4 +1,4 @@
-import { Effect, Schema } from 'effect'
+import { Effect, Result, Schema } from 'effect'
 import { and, eq, ne, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { db } from '@spaces/db'
@@ -21,7 +21,7 @@ import { taskPayloadSchema } from '../../ai/task'
 import { supersedesPayloadSchema } from '../../ai/supersedes'
 import type { SupersedesPayload } from '../../ai/supersedes'
 import type { TaskPayload } from '../../ai/task'
-import { refileDocumentPayloadSchema } from '../../documents/refile'
+import { decodeRefileDocumentPayload } from '../../documents/refile'
 import { ledgerEventPayloadSchema } from '../../ai/ledger-event'
 import type { LedgerEventPayload } from '../../ai/ledger-event'
 import type { RefileDocumentPayload } from '../../documents/refile'
@@ -297,11 +297,11 @@ export function supersedesOf(payload: Json): SupersedesPayload {
 
 /** A re-file payload, decoded — or the validator's refusal, by field. */
 export function refileDocumentOf(payload: Json): RefileDocumentPayload {
-  const parsed = refileDocumentPayloadSchema.safeParse(payload)
-  if (parsed.success) return parsed.data
+  const parsed = decodeRefileDocumentPayload(payload)
+  if (Result.isSuccess(parsed)) return parsed.success
   throw invalid(
-    parsed.error.issues.map((i) => {
-      const slug = i.path.map(String).join('.') || 'refile_document'
+    parsed.failure.map((i) => {
+      const slug = i.path || 'refile_document'
       return { slug, message: `${slug}: ${i.message}` }
     }),
   )

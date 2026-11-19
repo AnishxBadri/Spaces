@@ -12,15 +12,15 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import path from 'node:path'
-import { Effect, Schema } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import { desc, eq, sql } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
 import type { IntegrationManifest } from '@spaces/db/schema/integrations'
 import { decodeManifest, isVersion } from '@spaces/sdk'
 import { LOCK_FILE, bundleSha256, lockSchema } from '@spaces/core/plugins/lock'
 import type { Lock } from '@spaces/core/plugins/lock'
+import { jsonObject } from '@spaces/core/json'
 import { CORE_VERSION } from '@spaces/core/plugins/core-version'
 import { verifyPlugin } from '@spaces/core/plugins/verify'
 import type {
@@ -112,17 +112,20 @@ const STAGING = '.staging'
 /** One key for every installer run, beside keyIntegration's per-plugin key. */
 const INSTALLER_LOCK = 'plugins:installer'
 
-const jsonRecord = z.record(z.string(), z.json())
+/** A verified manifest as the row stores it: an object of JSON values. */
+export const storedManifest = jsonObject
 
 const readLock = async (root: string): Promise<Lock> => {
   const file = path.join(root, LOCK_FILE)
   if (!existsSync(file)) return { plugins: {} }
-  const parsed = lockSchema.safeParse(JSON.parse(await readFile(file, 'utf8')))
-  if (!parsed.success)
+  const parsed = Schema.decodeUnknownOption(lockSchema)(
+    JSON.parse(await readFile(file, 'utf8')),
+  )
+  if (Option.isNone(parsed))
     throw new InstallRefused({
       message: `${file} is invalid; fix or remove it before installing`,
     })
-  return parsed.data
+  return parsed.value
 }
 
 const writeLock = async (root: string, lock: Lock): Promise<void> => {
@@ -426,7 +429,7 @@ export const runInstaller = Effect.fn('runInstaller')(function* (
   })
   // Stored only as the loader would store it; the loader rewrites it on load.
   const manifest = decodeManifest(verified.manifest).success
-    ? jsonRecord.parse(verified.manifest)
+    ? Schema.decodeUnknownSync(storedManifest)(verified.manifest)
     : null
   const done = yield* Effect.tryPromise({
     try: () =>

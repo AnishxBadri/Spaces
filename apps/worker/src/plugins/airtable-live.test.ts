@@ -3,7 +3,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Cause, Effect, Exit, Layer, Option } from 'effect'
+import { Cause, Effect, Exit, Layer, Option, Schema } from 'effect'
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { JobWithMetadata } from 'pg-boss'
@@ -194,7 +194,12 @@ describe('the airtable dialect plugin, on the live ports', () => {
     const queue = pluginQueues(plugin.manifest, plugin.jobs).at(0)
     if (!queue) throw new Error('no queue')
     const summary = await Effect.runPromise(
-      runFileJob(row.id, queue, host.invoke, fileJobData.parse(sent?.data)),
+      runFileJob(
+        row.id,
+        queue,
+        host.invoke,
+        Schema.decodeUnknownSync(fileJobData)(sent?.data),
+      ),
     )
     expect(summary).toBe(
       `batch ${airtableBatch} · 30 rows staged by plugin.airtable.stage`,
@@ -294,7 +299,7 @@ describe('the airtable dialect plugin, on the live ports', () => {
     const { row, plugin } = await loadAirtable()
     const host = await wire(plugin)
     const batchId = await stage('Empty-Grid view.csv', new Uint8Array([10]))
-    const data = fileJobData.parse(enqueued.at(0)?.data)
+    const data = Schema.decodeUnknownSync(fileJobData)(enqueued.at(0)?.data)
     const queue = pluginQueues(plugin.manifest, plugin.jobs).at(0)
     if (!queue) throw new Error('no queue')
     const settled: Array<string> = []

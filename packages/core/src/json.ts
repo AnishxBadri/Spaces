@@ -104,6 +104,23 @@ export const jsonValue: Schema.Decoder<Json> = Schema.Union([
   ),
 ])
 
+/**
+ * A string-keyed record whose every value decodes through `value`.
+ * `Schema.Record` alone takes a date, a map or a class instance as a record
+ * and keeps a `__proto__` key; this refuses the first three and drops the
+ * key.
+ */
+export const plainRecord = <TValue extends Schema.Top>(value: TValue) =>
+  plainObject.pipe(
+    Schema.decodeTo(
+      Schema.Record(Schema.String, value),
+      SchemaTransformation.passthroughSupertype(),
+    ),
+  )
+
+/** A plain object of JSON values, copied, as a jsonb object column holds. */
+export const jsonObject = plainRecord(Schema.mutableKey(jsonItem))
+
 /** `raw` decoded as JSON: `success` and `data`, or a refusal's message. */
 export const readJson = (raw: unknown): DecodedValue<Json> =>
   decodeValue(jsonValue, raw)

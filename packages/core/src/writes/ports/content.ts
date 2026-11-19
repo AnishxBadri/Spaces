@@ -1,6 +1,14 @@
 import { Readable } from 'node:stream'
-import { Effect, Layer } from 'effect'
-import { z } from 'zod'
+import {
+  Effect,
+  Layer,
+  Predicate,
+  Result,
+  Schema,
+  SchemaIssue,
+  SchemaParser,
+  SchemaTransformation,
+} from 'effect'
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
@@ -32,8 +40,8 @@ import type {
 } from '@spaces/sdk'
 import { ref } from '../../context/ref'
 import { DOCUMENT_KINDS } from '../../documents'
-import { toJson } from '../../json'
-import { jsonValueZod } from '../../json-zod'
+import { finite, int, uuidString } from '../../attributes/registry'
+import { jsonValue, toJson } from '../../json'
 import {
   documentIntakeMessage,
   intakeDocumentProgram,
@@ -187,62 +195,145 @@ const parseTimestamp = (what: string, iso: string) => {
 /** Gmail's own ceiling on a message, attachments included. */
 export const MAX_EMAIL_BYTES = 35 * 1024 * 1024
 
+/** Unknown keys refuse the claim rather than being dropped. */
+const strict = { parseOptions: { onExcessProperty: 'error' } } as const
+
+const maxLength = (max: number) => Schema.String.check(Schema.isMaxLength(max))
+
+/** A string trimmed, then held to `max` characters. */
+const trimmedTo = (max: number) => Schema.Trim.check(Schema.isMaxLength(max))
+
+/**
+ * An ISO 8601 instant with a zone: a real calendar day, `T`, hours and
+ * minutes, optional seconds and fraction, then `Z` or a `±hh:mm` offset.
+ */
+const ISO_INSTANT =
+  /^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|02-(?:0[1-9]|1\d|2[0-8])))T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/
+
 /** A bundle is JavaScript: the claim is checked field by field. */
-const emailClaim = z.object({
-  providerMessageId: z.string().trim().min(1).max(512),
-  raw: z.string().regex(/^[A-Za-z0-9_-]+={0,2}$/, 'not base64url'),
-  receivedAt: z.iso.datetime({ offset: true }),
-  labels: z.array(z.string().trim().max(256)).max(200),
-  snippet: z.string().trim().max(1000).optional(),
+export const emailClaim = Schema.Struct({
+  providerMessageId: Schema.Trim.check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(512),
+  ),
+  raw: Schema.String.check(
+    Schema.isPattern(/^[A-Za-z0-9_-]+={0,2}$/, { message: 'not base64url' }),
+  ),
+  receivedAt: Schema.String.check(
+    Schema.isPattern(ISO_INSTANT, { message: 'Invalid ISO datetime' }),
+  ),
+  labels: Schema.mutable(Schema.Array(trimmedTo(256))).check(
+    Schema.isMaxLength(200),
+  ),
+  snippet: Schema.optional(trimmedTo(1000)),
 })
 
-const text = z.string().trim().min(1).max(2000)
-const instant = z
-  .string()
-  .refine((iso) => !Number.isNaN(new Date(iso).getTime()), 'an ISO timestamp')
-  .transform((iso) => new Date(iso))
+const text = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(2000))
+
+/** Anything `new Date` reads as a real instant, handed on as that Date. */
+const instant = Schema.String.pipe(
+  Schema.decodeTo(
+    Schema.Date,
+    SchemaTransformation.transformOrFail({
+      decode: (iso: string) => {
+        const at = new Date(iso)
+        return Number.isNaN(at.getTime())
+          ? Effect.fail(
+              new SchemaIssue.InvalidValue({
+                message: 'an ISO timestamp',
+              }),
+            )
+          : Effect.succeed(at)
+      },
+      encode: (at: Date) => Effect.succeed(at.toISOString()),
+    }),
+  ),
+)
+
+/**
+ * An http(s) URL with its `//`, `new URL` parsing it once trimmed; handed on
+ * trimmed, not normalized, and held to 2000 characters.
+ */
+const httpUrl = Schema.String.pipe(
+  Schema.decodeTo(
+    maxLength(2000),
+    SchemaTransformation.transformOrFail({
+      decode: (raw: string) => {
+        const url = raw.trim()
+        return /^https?:\/\//i.test(url) && URL.canParse(url)
+          ? Effect.succeed(url)
+          : Effect.fail(
+              new SchemaIssue.InvalidValue({
+                message: 'Invalid URL',
+              }),
+            )
+      },
+      encode: (url: string) => Effect.succeed(url),
+    }),
+  ),
+)
 
 /** What a meeting claim must be, read at runtime; an unknown field is refused. */
-const meetingClaim = z.discriminatedUnion('_tag', [
-  z
-    .object({
-      _tag: z.literal('meeting'),
-      uid: text,
-      eventId: text,
-      status: z.enum(['scheduled', 'cancelled']),
-      startsAt: instant,
-      endsAt: instant,
-      subject: z.string().max(2000).optional(),
-      organizer: text.optional(),
-      conferenceUrl: text.optional(),
-      recurringInstanceId: text.optional(),
-      attendees: z
-        .array(
-          z
-            .object({
-              email: text,
-              name: z.string().max(400).optional(),
-              rsvp: z.enum([
-                'accepted',
-                'declined',
-                'tentative',
-                'needs_action',
-              ]),
-              self: z.boolean().optional(),
-            })
-            .strict(),
-        )
-        .max(1000),
-    })
-    .strict(),
-  z
-    .object({
-      _tag: z.literal('meeting-cancelled'),
-      eventId: text,
-      uid: text.optional(),
-    })
-    .strict(),
+const meetingClaim = Schema.Union([
+  Schema.Struct({
+    _tag: Schema.Literal('meeting'),
+    uid: text,
+    eventId: text,
+    status: Schema.Literals(['scheduled', 'cancelled']),
+    startsAt: instant,
+    endsAt: instant,
+    subject: Schema.optional(maxLength(2000)),
+    organizer: Schema.optional(text),
+    conferenceUrl: Schema.optional(text),
+    recurringInstanceId: Schema.optional(text),
+    attendees: Schema.Array(
+      Schema.Struct({
+        email: text,
+        name: Schema.optional(maxLength(400)),
+        rsvp: Schema.Literals([
+          'accepted',
+          'declined',
+          'tentative',
+          'needs_action',
+        ]),
+        self: Schema.optional(Schema.Boolean),
+      }).annotate(strict),
+    ).check(Schema.isMaxLength(1000)),
+  }).annotate(strict),
+  Schema.Struct({
+    _tag: Schema.Literal('meeting-cancelled'),
+    eventId: text,
+    uid: Schema.optional(text),
+  }).annotate(strict),
 ])
+
+const formatIssues = SchemaIssue.makeFormatterStandardSchemaV1()
+
+/**
+ * Every refusal in one line, each named by its dotted path under `at`:
+ * `recorder.artifacts.0.url: Invalid URL`. A refusal of the whole value
+ * is named `at` alone, or `fallback` when there is no `at`.
+ */
+const issueLine = (
+  issue: SchemaIssue.Issue,
+  at: string | null,
+  fallback = 'claim',
+) =>
+  formatIssues(issue)
+    .issues.map(({ path, message }) => {
+      const keys = (path ?? []).map((s) =>
+        String(Predicate.isObject(s) ? s.key : s),
+      )
+      const named = (at === null ? keys : [at, ...keys]).join('.')
+      return `${named === '' ? fallback : named}: ${message}`
+    })
+    .join('; ')
+
+/** `raw` decoded by `schema`, every refusal at once. */
+const decodeAll = <TSchema extends Schema.Decoder<unknown>>(
+  schema: TSchema,
+  raw: unknown,
+) => SchemaParser.decodeUnknownResult(schema, { errors: 'all' })(raw)
 
 const blankToNull = (value: string | undefined): string | null => {
   const trimmed = value?.trim() ?? ''
@@ -253,15 +344,10 @@ const blankToNull = (value: string | undefined): string | null => {
 export const readMeetingClaim = (
   claim: MeetingClaim | MeetingCancellation,
 ): { ok: true; input: MeetingInput } | { ok: false; reason: string } => {
-  const parsed = meetingClaim.safeParse(claim)
-  if (!parsed.success)
-    return {
-      ok: false,
-      reason: parsed.error.issues
-        .map((i) => `${i.path.map(String).join('.') || 'claim'}: ${i.message}`)
-        .join('; '),
-    }
-  const c = parsed.data
+  const parsed = decodeAll(meetingClaim, claim)
+  if (Result.isFailure(parsed))
+    return { ok: false, reason: issueLine(parsed.failure, null) }
+  const c = parsed.success
   if (c._tag === 'meeting-cancelled')
     return {
       ok: true,
@@ -296,36 +382,42 @@ export const readMeetingClaim = (
 const dispatchAll = (events: ReadonlyArray<DomainEvent>) =>
   Effect.forEach(events, (event) => dispatchDomainEvent(event))
 
-const participantShape = z
-  .object({ email: text, name: z.string().max(400).optional() })
-  .strict()
+const participantShape = Schema.Struct({
+  email: text,
+  name: Schema.optional(maxLength(400)),
+}).annotate(strict)
 
-const artifactShape = z.union([
-  z
-    .object({
-      role: z.literal('recording_link'),
-      url: z.url({ protocol: /^https?$/ }).max(2000),
-      title: z.string().max(400).optional(),
-    })
-    .strict(),
-  z
-    .object({
-      role: z.literal(['transcript', 'attachment']),
-      documentId: z.uuid(),
-    })
-    .strict(),
+const participantList = Schema.Array(participantShape).check(
+  Schema.isMaxLength(1000),
+)
+
+const artifactShape = Schema.Union([
+  Schema.Struct({
+    role: Schema.Literal('recording_link'),
+    url: httpUrl,
+    title: Schema.optional(maxLength(400)),
+  }).annotate(strict),
+  Schema.Struct({
+    role: Schema.Literals(['transcript', 'attachment']),
+    documentId: uuidString,
+  }).annotate(strict),
 ])
 
-const recorderShape = z
-  .object({
-    providerEventId: text,
-    icalUid: text.optional(),
-    calendarEventId: text.optional(),
-    durationSeconds: z.number().int().nonnegative().optional(),
-    raw: jsonValueZod,
-    artifacts: z.array(artifactShape).max(50).optional(),
-  })
-  .strict()
+/** Stored as the bundle sent it: a required key, any JSON value. */
+const rawJson = Schema.suspend((): Schema.Decoder<Json> => jsonValue)
+
+const recorderShape = Schema.Struct({
+  providerEventId: text,
+  icalUid: Schema.optional(text),
+  calendarEventId: Schema.optional(text),
+  durationSeconds: Schema.optional(
+    Schema.Number.check(finite, int, Schema.isGreaterThanOrEqualTo(0)),
+  ),
+  raw: rawJson,
+  artifacts: Schema.optional(
+    Schema.Array(artifactShape).check(Schema.isMaxLength(50)),
+  ),
+}).annotate(strict)
 
 /** A recorder payload, checked: the writer's keys and artifacts. */
 type RecorderInput = {
@@ -336,11 +428,6 @@ type RecorderInput = {
   raw: Json
   artifacts: Array<RecordedArtifact>
 }
-
-const issuesOf = (error: z.ZodError, at: string) =>
-  error.issues
-    .map((i) => `${[at, ...i.path.map(String)].join('.')}: ${i.message}`)
-    .join('; ')
 
 /**
  * The parts of an interaction claim a bundle could get wrong at runtime: its
@@ -355,15 +442,12 @@ export const readInteractionShape = (
       recorder: RecorderInput | null
     }
   | { ok: false; reason: string } => {
-  const people = z
-    .array(participantShape)
-    .max(1000)
-    .safeParse(claim.participants ?? [])
-  if (!people.success)
-    return { ok: false, reason: issuesOf(people.error, 'participants') }
+  const people = decodeAll(participantList, claim.participants ?? [])
+  if (Result.isFailure(people))
+    return { ok: false, reason: issueLine(people.failure, 'participants') }
   const participants = [
     ...new Map(
-      people.data.map((p) => {
+      people.success.map((p) => {
         const email = p.email.toLowerCase()
         return [email, { email, name: blankToNull(p.name) }]
       }),
@@ -382,10 +466,10 @@ export const readInteractionShape = (
       ok: false,
       reason: "a recorder's payload carries no body: its notes are the host's",
     }
-  const parsed = recorderShape.safeParse(claim.recorder)
-  if (!parsed.success)
-    return { ok: false, reason: issuesOf(parsed.error, 'recorder') }
-  const r = parsed.data
+  const parsed = decodeAll(recorderShape, claim.recorder)
+  if (Result.isFailure(parsed))
+    return { ok: false, reason: issueLine(parsed.failure, 'recorder') }
+  const r = parsed.success
   return {
     ok: true,
     participants,
@@ -408,39 +492,34 @@ export const readInteractionShape = (
   }
 }
 
-const longText = z.string().max(1_000_000)
+const longText = maxLength(1_000_000)
 
 /** What a recorded note must be, read at runtime; an unknown field is refused. */
-const recordedNoteShape = z.discriminatedUnion('_tag', [
-  z
-    .object({
-      _tag: z.literal('recorded-note'),
-      providerNoteId: text,
-      title: z.string().max(2000).optional(),
-      startedAt: instant,
-      endedAt: instant.optional(),
-      attendees: z.array(participantShape).max(1000),
-      calendarEventId: text.optional(),
-      icalUid: text.optional(),
-      summary: longText.optional(),
-      typedNotes: longText.optional(),
-      transcript: longText.optional(),
-      webUrl: z
-        .url({ protocol: /^https?$/ })
-        .max(2000)
-        .optional(),
-      recordingUrl: z
-        .url({ protocol: /^https?$/ })
-        .max(2000)
-        .optional(),
-      folderIds: z.array(text).max(1000).optional(),
-      deletedAt: instant.optional(),
-      raw: jsonValueZod,
-    })
-    .strict(),
-  z
-    .object({ _tag: z.literal('recorded-note-gone'), providerNoteId: text })
-    .strict(),
+const recordedNoteShape = Schema.Union([
+  Schema.Struct({
+    _tag: Schema.Literal('recorded-note'),
+    providerNoteId: text,
+    title: Schema.optional(maxLength(2000)),
+    startedAt: instant,
+    endedAt: Schema.optional(instant),
+    attendees: participantList,
+    calendarEventId: Schema.optional(text),
+    icalUid: Schema.optional(text),
+    summary: Schema.optional(longText),
+    typedNotes: Schema.optional(longText),
+    transcript: Schema.optional(longText),
+    webUrl: Schema.optional(httpUrl),
+    recordingUrl: Schema.optional(httpUrl),
+    folderIds: Schema.optional(
+      Schema.Array(text).check(Schema.isMaxLength(1000)),
+    ),
+    deletedAt: Schema.optional(instant),
+    raw: rawJson,
+  }).annotate(strict),
+  Schema.Struct({
+    _tag: Schema.Literal('recorded-note-gone'),
+    providerNoteId: text,
+  }).annotate(strict),
 ])
 
 /** The note, checked: gone, or the writer's input with its participants. */
@@ -455,10 +534,10 @@ export const readRecordedNote = (
       participants: Array<ParticipantInput>
     }
   | { ok: false; reason: string } => {
-  const parsed = recordedNoteShape.safeParse(claim)
-  if (!parsed.success)
-    return { ok: false, reason: issuesOf(parsed.error, 'note') }
-  const c = parsed.data
+  const parsed = decodeAll(recordedNoteShape, claim)
+  if (Result.isFailure(parsed))
+    return { ok: false, reason: issueLine(parsed.failure, 'note') }
+  const c = parsed.success
   if (c._tag === 'recorded-note-gone' || c.deletedAt !== undefined)
     return { ok: true, gone: c.providerNoteId }
   if (c.endedAt !== undefined && c.endedAt.getTime() < c.startedAt.getTime())
@@ -953,17 +1032,14 @@ export const ContentLive = (
   const logEmail = Effect.fn('Content.logEmail')(function* (
     claim: EmailClaim,
   ): Effect.fn.Return<EmailResult, JobError, EmailLane> {
-    const read = emailClaim.safeParse(claim)
-    if (!read.success) {
+    const decoded = decodeAll(emailClaim, claim)
+    if (Result.isFailure(decoded)) {
       return yield* new JobPermanent({
-        reason: `Content.logEmail: ${read.error.issues
-          .map(
-            (i) => `${i.path.map(String).join('.') || 'claim'}: ${i.message}`,
-          )
-          .join('; ')}`,
+        reason: `Content.logEmail: ${issueLine(decoded.failure, null)}`,
       })
     }
-    const raw = Buffer.from(read.data.raw, 'base64url')
+    const email = decoded.success
+    const raw = Buffer.from(email.raw, 'base64url')
     if (raw.length === 0 || raw.length > MAX_EMAIL_BYTES) {
       return yield* new JobPermanent({
         reason: `Content.logEmail: a message of 1 byte to ${MAX_EMAIL_BYTES / 1024 / 1024} MB is required`,
@@ -972,11 +1048,11 @@ export const ContentLive = (
     return yield* (yield* EmailLane).log(
       { integrationId: row.id },
       {
-        providerMessageId: read.data.providerMessageId,
+        providerMessageId: email.providerMessageId,
         raw,
-        receivedAt: new Date(read.data.receivedAt),
-        labels: read.data.labels.filter((l) => l.length > 0),
-        ...(read.data.snippet ? { snippet: read.data.snippet } : {}),
+        receivedAt: new Date(email.receivedAt),
+        labels: email.labels.filter((l) => l.length > 0),
+        ...(email.snippet ? { snippet: email.snippet } : {}),
       },
     )
   })

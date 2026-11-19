@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import { PROVIDERS, PROVIDER_IDS, redirectUri, unknownScopes } from './registry'
 
 const ROOT = path.resolve(
@@ -11,24 +11,31 @@ const ROOT = path.resolve(
 )
 
 /** The part of a manifest this registry answers for. */
-const connectionOf = z.looseObject({
-  manifest: z.looseObject({
-    id: z.string(),
-    requires: z
-      .looseObject({
-        // A keyed connection (a member's pasted key) asks for no scopes.
-        connection: z
-          .object({
-            provider: z.string(),
-            scopes: z.array(z.string()).default([]),
-          })
-          .optional(),
-      })
-      .optional(),
+const connectionOf = Schema.decodeUnknownSync(
+  Schema.Struct({
+    manifest: Schema.Struct({
+      id: Schema.String,
+      requires: Schema.optional(
+        Schema.Struct({
+          // A keyed connection (a member's pasted key) asks for no scopes.
+          connection: Schema.optional(
+            Schema.Struct({
+              provider: Schema.String,
+              scopes: Schema.Array(Schema.String).pipe(
+                Schema.withDecodingDefault(Effect.succeed([])),
+              ),
+            }),
+          ),
+        }),
+      ),
+    }),
   }),
-})
+)
 
-type Connection = { provider: string; scopes: Array<string> }
+type Connection = {
+  readonly provider: string
+  readonly scopes: ReadonlyArray<string>
+}
 
 /** Every scope a connection asks for that its provider's vocabulary lacks. */
 function strays(id: string, connection: Connection | undefined) {
@@ -54,7 +61,7 @@ describe('the scope vocabulary', () => {
   it('lists every scope any shipped manifest requests, under its provider', async () => {
     const found: Array<string> = []
     for (const file of shipped) {
-      const mod = connectionOf.parse(
+      const mod = connectionOf(
         await import(/* @vite-ignore */ pathToFileURL(file).href),
       )
       found.push(...strays(mod.manifest.id, mod.manifest.requires?.connection))

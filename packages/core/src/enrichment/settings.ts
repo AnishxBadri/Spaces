@@ -1,9 +1,10 @@
-import { z } from 'zod'
+import { Effect, Option, Schema } from 'effect'
 import { decodeManifest } from '@spaces/sdk'
 import { autoEnrichScopeOf } from '@spaces/core/plugins/auto-enrich'
 import type { AutoEnrichScope } from '@spaces/core/plugins/auto-enrich'
 import type { Json } from '@spaces/db/json'
-import { jsonRecord } from '../json'
+import { between, int, uuidString } from '../attributes/registry'
+import { jsonRecord, plainRecord } from '../json'
 
 /**
  * The owner's enrichment settings, `workspace.settings.enrichment`:
@@ -22,26 +23,36 @@ export type EnrichmentSettings = {
   readonly scopes: ReadonlyMap<string, AutoEnrichScope>
 }
 
-const storedScope = z.object({
-  scopes: z.array(z.unknown()).optional(),
-  spaces: z.array(z.unknown()).optional(),
+/** An optional key whose malformed value reads as unset. */
+const unsetWhenBad = <TSchema extends Schema.Top>(schema: TSchema) =>
+  Schema.optionalKey(
+    Schema.UndefinedOr(schema).pipe(
+      Schema.catchDecoding(() => Effect.succeedSome(undefined)),
+    ),
+  )
+
+/** One integration's scope; a malformed one reads as nothing ticked. */
+const storedScope = Schema.Struct({
+  scopes: Schema.optional(Schema.Array(Schema.Unknown)),
+  spaces: Schema.optional(Schema.Array(Schema.Unknown)),
+}).pipe(Schema.catchDecoding(() => Effect.succeedSome({})))
+
+const stored = Schema.Struct({
+  sources: unsetWhenBad(Schema.Array(uuidString)),
+  reuseDays: unsetWhenBad(Schema.Number.check(int, between(0, 3650))),
+  scopes: unsetWhenBad(plainRecord(storedScope)),
 })
 
-const stored = z.object({
-  sources: z.array(z.uuid()).optional().catch(undefined),
-  reuseDays: z.int().min(0).max(3650).optional().catch(undefined),
-  scopes: z
-    .record(z.string(), storedScope.catch({}))
-    .optional()
-    .catch(undefined),
-})
+const unset: typeof stored.Type = {}
 
 /** Read cautiously: a malformed part reads as unset, never as a refusal. */
 export const enrichmentSettingsOf = (settings: {
   readonly [key: string]: unknown
 }): EnrichmentSettings => {
-  const parsed = stored.safeParse(settings['enrichment'])
-  const data = parsed.success ? parsed.data : {}
+  const data = Option.getOrElse(
+    Schema.decodeUnknownOption(stored)(settings['enrichment']),
+    () => unset,
+  )
   const scopes = new Map<string, AutoEnrichScope>()
   for (const [id, scope] of Object.entries(data.scopes ?? {}))
     scopes.set(

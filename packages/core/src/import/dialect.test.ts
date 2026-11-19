@@ -1,3 +1,4 @@
+import { Option, Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { fileJobData, importReaderOf } from './dialect'
 
@@ -55,15 +56,18 @@ describe('importReaderOf', () => {
 describe('fileJobData', () => {
   it('takes a digest, a name, a mime and an optional batch', () => {
     const blobSha = 'a'.repeat(64)
+    const decode = Schema.decodeUnknownOption(fileJobData)
     expect(
-      fileJobData.safeParse({ blobSha, filename: 'x.csv', mime: null }).success,
+      Option.isSome(decode({ blobSha, filename: 'x.csv', mime: null })),
     ).toBe(true)
     expect(
-      fileJobData.safeParse({
-        blobSha: 'nope',
-        filename: 'x.csv',
-        mime: null,
-      }).success,
+      Option.isSome(
+        decode({
+          blobSha: 'nope',
+          filename: 'x.csv',
+          mime: null,
+        }),
+      ),
     ).toBe(false)
   })
 })

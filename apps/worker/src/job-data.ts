@@ -7,7 +7,6 @@ import {
   SchemaParser,
   SchemaTransformation,
 } from 'effect'
-import type { StandardSchemaV1 } from 'effect/StandardSchema'
 import { finite, int, uuidString } from '@spaces/core/attributes/registry'
 import { jsonValue } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
@@ -17,25 +16,15 @@ import type { Json } from '@spaces/core/json'
  * one decode every payload takes at the job's entry.
  */
 
-/**
- * A job's payload schema. An Effect schema, or a Standard Schema for the
- * payloads core still declares in zod: the worker decodes those as they are
- * rather than keeping a second copy of a shape core owns.
- */
-export type JobSchema<T> = Schema.Decoder<T> | StandardSchemaV1<unknown, T>
+/** A job's payload schema: synchronous, reading no service. */
+export type JobSchema<T> = Schema.Decoder<T>
 
 const standardIssues = SchemaIssue.makeFormatterStandardSchemaV1()
 
-type Issue = {
-  readonly message: string
-  readonly path?:
-    ReadonlyArray<PropertyKey | { readonly key: PropertyKey }> | undefined
-}
-
 /** `documentId: Invalid UUID; userId: Missing key` — a root issue says `(root)`. */
-const describe = (issues: ReadonlyArray<Issue>): string =>
-  issues
-    .map(({ message, path }) => {
+const describe = (issue: SchemaIssue.Issue): string =>
+  standardIssues(issue)
+    .issues.map(({ message, path }) => {
       const field = (path ?? [])
         .map((s) => String(Predicate.isObject(s) ? s.key : s))
         .join('.')
@@ -43,33 +32,17 @@ const describe = (issues: ReadonlyArray<Issue>): string =>
     })
     .join('; ')
 
-const isStandard = <T>(
-  schema: JobSchema<T>,
-): schema is StandardSchemaV1<unknown, T> => !Schema.isSchema(schema)
-
-/**
- * `data` decoded by `schema`, or every refusal in one line. Synchronous: a
- * payload schema reads no service and awaits nothing, so one that answers
- * with a promise is refused rather than awaited.
- */
+/** `data` decoded by `schema`, or every refusal in one line. */
 export const decodeJobData = <T>(
   schema: JobSchema<T>,
   data: unknown,
 ): Result.Result<T, string> => {
-  if (isStandard(schema)) {
-    const out = schema['~standard'].validate(data)
-    if (out instanceof Promise)
-      return Result.fail('(root): the schema decodes asynchronously')
-    return out.issues === undefined
-      ? Result.succeed(out.value)
-      : Result.fail(describe(out.issues))
-  }
   const decoded = SchemaParser.decodeUnknownResult(schema, { errors: 'all' })(
     data,
   )
   return Result.isSuccess(decoded)
     ? Result.succeed(decoded.success)
-    : Result.fail(describe(standardIssues(decoded.failure).issues))
+    : Result.fail(describe(decoded.failure))
 }
 
 // ---------------------------------------------------------------------------

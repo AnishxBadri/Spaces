@@ -1,7 +1,7 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { DOMAIN_EVENTS } from '@spaces/sdk'
 import type { DomainEventName } from '@spaces/sdk'
-import { CORE_IDENTITY } from '../attributes/registry'
+import { CORE_IDENTITY, uuidString } from '../attributes/registry'
 import { DEFAULT_CACHE_DAYS } from '@spaces/core/plugins/credit'
 
 /**
@@ -49,19 +49,21 @@ export type AutoEnrichOutcome =
     }
 
 /** `enrichment.run`'s payload: the Enrich button sends the first two only. */
-export const enrichmentRunData = z.object({
-  entityId: z.uuid(),
-  reason: z.string().min(1).max(100),
+export const enrichmentRunData = Schema.Struct({
+  entityId: uuidString,
+  reason: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
   /** Ask only these sources; absent asks every source in the owner's order. */
-  sources: z.array(z.uuid()).min(1).optional(),
+  sources: Schema.optional(
+    Schema.mutable(Schema.Array(uuidString)).check(Schema.isMinLength(1)),
+  ),
   /** The domain event that queued it: an auto run, which parks at a cap. */
-  trigger: z.enum(DOMAIN_EVENTS).optional(),
+  trigger: Schema.optional(Schema.Literals(DOMAIN_EVENTS)),
   /** Set on a parked run: the source whose daily cap it waits out. */
-  parkedBy: z.uuid().optional(),
+  parkedBy: Schema.optional(uuidString),
   /** Sent from a list's Enrich…: parks at a cap like an auto run. */
-  bulk: z.literal(true).optional(),
+  bulk: Schema.optional(Schema.Literal(true)),
 })
-export type EnrichmentRunData = z.infer<typeof enrichmentRunData>
+export type EnrichmentRunData = typeof enrichmentRunData.Type
 
 /** The reason an auto run is logged with. */
 export const autoReason = (trigger: DomainEventName): string =>

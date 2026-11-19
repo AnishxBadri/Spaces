@@ -215,7 +215,7 @@ const jobsFor = (entityId: string) =>
 
 /** Run one fetched job the way the worker's handler does. */
 const runJob = (data: unknown, now: number) => {
-  const job = enrichmentRunData.parse(data)
+  const job = Schema.decodeUnknownSync(enrichmentRunData)(data)
   return at(
     runEnrichment(job.entityId, job.reason, {
       ...(job.sources === undefined ? {} : { only: job.sources }),

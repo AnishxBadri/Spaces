@@ -1,10 +1,10 @@
+import { Schema } from 'effect'
 import { and, eq, isNull, sql } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { credential } from '@spaces/db/schema'
 import { credentialKind, credentialScope } from '@spaces/db/schema/vault'
 import type { CredentialMeta } from '@spaces/db/schema/vault'
-import { jsonValueZod } from '../../json-zod'
+import { jsonObject } from '../../json'
 import { decryptSecret, encryptSecret, redact } from './crypto'
 
 export { redact }
@@ -15,45 +15,43 @@ export { redact }
  */
 export const CREDENTIAL_KINDS = credentialKind.enumValues
 
+const nonEmpty = Schema.String.check(Schema.isMinLength(1))
+
 /**
  * The vault's write boundary. A kind Postgres would reject is rejected here
- * first, with a field-named Zod error instead of a 22P02 from the driver —
+ * first, with a field-named schema error instead of a 22P02 from the driver —
  * the database is the backstop, not the validator.
  */
-export const credentialInput = z
-  .object({
-    scope: z.enum(credentialScope.enumValues),
-    userId: z.string().optional(),
-    provider: z.string().min(1),
-    kind: z.enum(CREDENTIAL_KINDS),
-    secret: z.string().max(4000),
-    /**
-     * A provider that authenticates nobody (a local Ollama). Its row
-     * still carries `secret_enc` — the column stays not-null — holding the
-     * encryption of the empty string. Saying so is the only way to store an
-     * empty secret: without the flag an empty one is refused, so a blank
-     * paste into a keyed provider's field cannot pass for a key.
-     */
-    keyless: z.literal(true).optional(),
-    meta: z.record(z.string(), jsonValueZod).optional(),
-    createdBy: z.string().min(1),
-  })
-  .superRefine((input, ctx) => {
-    if (input.keyless && input.secret !== '')
-      ctx.addIssue({
-        code: 'custom',
+export const credentialInput = Schema.Struct({
+  scope: Schema.Literals(credentialScope.enumValues),
+  userId: Schema.optional(Schema.String),
+  provider: nonEmpty,
+  kind: Schema.Literals(CREDENTIAL_KINDS),
+  secret: Schema.String.check(Schema.isMaxLength(4000)),
+  /**
+   * A provider that authenticates nobody (a local Ollama). Its row
+   * still carries `secret_enc` — the column stays not-null — holding the
+   * encryption of the empty string. Saying so is the only way to store an
+   * empty secret: without the flag an empty one is refused, so a blank
+   * paste into a keyed provider's field cannot pass for a key.
+   */
+  keyless: Schema.optional(Schema.Literal(true)),
+  meta: Schema.optional(jsonObject),
+  createdBy: nonEmpty,
+}).check(
+  Schema.makeFilter((input) => {
+    if (input.keyless === true && input.secret !== '')
+      return {
         path: ['secret'],
-        message: 'A keyless credential stores no secret',
-      })
-    if (!input.keyless && input.secret === '')
-      ctx.addIssue({
-        code: 'custom',
-        path: ['secret'],
-        message: 'Secret is required',
-      })
-  })
+        issue: 'A keyless credential stores no secret',
+      }
+    if (input.keyless !== true && input.secret === '')
+      return { path: ['secret'], issue: 'Secret is required' }
+    return undefined
+  }),
+)
 
-export type CredentialInput = z.infer<typeof credentialInput>
+export type CredentialInput = typeof credentialInput.Type
 
 /** What a row holds. A lookup names it: one provider may hold several kinds. */
 export type CredentialKind = CredentialInput['kind']
@@ -81,7 +79,7 @@ function workspaceRow(provider: string, kind: CredentialKind) {
  *   Gemini `llm` key on provider `google`.
  */
 export async function storeCredential(rawInput: CredentialInput) {
-  const input = credentialInput.parse(rawInput)
+  const input = Schema.decodeUnknownSync(credentialInput)(rawInput)
   const secretEnc = encryptSecret(
     input.secret,
     aadFor(input.scope, input.provider),

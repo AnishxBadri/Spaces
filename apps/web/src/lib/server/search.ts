@@ -1,7 +1,11 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
+import { int, uuidString } from '@spaces/core/attributes/registry'
 import { entitySearchInput } from '@spaces/core/search/entity-search-input'
+import { input } from './input'
 import { requireUser } from './shared'
+
+const query = Schema.Struct({ q: Schema.String.check(Schema.isMaxLength(200)) })
 
 /**
  * The validator's schema is core's pure entity-search input: a server fn's
@@ -12,7 +16,7 @@ export type { EntitySearchInput } from '@spaces/core/search/entity-search-input'
 
 /** Autocomplete over entities — mentions and reference pickers share it. */
 export const searchEntities = createServerFn()
-  .validator(entitySearchInput)
+  .validator(input(entitySearchInput))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { entitySearchRows } =
@@ -26,7 +30,7 @@ export const searchEntities = createServerFn()
  * query states its own invariants.
  */
 export const searchAll = createServerFn()
-  .validator(z.object({ q: z.string().max(200) }))
+  .validator(input(query))
   .handler(async ({ data }) => {
     const { paletteRecordsHandler } =
       await import('#/lib/search/palette-records')
@@ -38,7 +42,7 @@ export const searchAll = createServerFn()
  * Embeds the query as the searching user; no pin answers nothing.
  */
 export const searchPassages = createServerFn()
-  .validator(z.object({ q: z.string().max(200) }))
+  .validator(input(query))
   .handler(async ({ data }) => {
     const { searchPassagesHandler } =
       await import('#/lib/search/passages-handler')
@@ -50,7 +54,7 @@ export const searchPassages = createServerFn()
  * palette for its life.
  */
 export const previewRecord = createServerFn()
-  .validator(z.object({ id: z.string().uuid() }))
+  .validator(input(Schema.Struct({ id: uuidString })))
   .handler(async ({ data }) => {
     const { previewRecordHandler } =
       await import('#/lib/search/preview-handler')
@@ -58,7 +62,16 @@ export const previewRecord = createServerFn()
   })
 
 export const previewObject = createServerFn()
-  .validator(z.object({ slug: z.string().min(1).max(80) }))
+  .validator(
+    input(
+      Schema.Struct({
+        slug: Schema.String.check(
+          Schema.isMinLength(1),
+          Schema.isMaxLength(80),
+        ),
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     const { previewObjectHandler } =
       await import('#/lib/search/preview-handler')
@@ -67,11 +80,13 @@ export const previewObject = createServerFn()
 
 export const previewPassage = createServerFn()
   .validator(
-    z.object({
-      id: z.string().uuid(),
-      page: z.number().int().positive().nullable(),
-      snippet: z.string().max(400),
-    }),
+    input(
+      Schema.Struct({
+        id: uuidString,
+        page: Schema.NullOr(Schema.Number.check(int, Schema.isGreaterThan(0))),
+        snippet: Schema.String.check(Schema.isMaxLength(400)),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const { previewPassageHandler } =

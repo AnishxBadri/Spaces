@@ -1,6 +1,4 @@
-import { Context } from 'effect'
-import type { Effect } from 'effect'
-import { z } from 'zod'
+import { Context, Effect, Schema } from 'effect'
 import type { JobError } from '@spaces/sdk'
 import { vocabularyProblem } from '@spaces/sdk/vocabulary'
 import type { VocabularyKey } from '@spaces/sdk/vocabulary'
@@ -368,10 +366,14 @@ export const WEBSITE_SCHEMA: JsonSchema = {
   },
 }
 
-const text = z.string().catch('')
+/** A field that reads as empty when it is missing, undefined or not a string. */
+const text = Schema.String.pipe(
+  Schema.withDecodingDefault(Effect.succeed('')),
+  Schema.catchDecoding(() => Effect.succeedSome('')),
+)
 
 /** The Extract lane's answer, read leniently: a missing field is empty. */
-export const websiteOutput = z.object({
+export const websiteOutput = Schema.Struct({
   description: text,
   location: text,
   linkedin: text,
@@ -381,7 +383,7 @@ export const websiteOutput = z.object({
   logo: text,
 })
 
-export type WebsiteOutput = z.infer<typeof websiteOutput>
+export type WebsiteOutput = typeof websiteOutput.Type
 
 /** The comparable form of a URL: no trailing slash, host lower-cased. */
 const comparable = (url: string) => {

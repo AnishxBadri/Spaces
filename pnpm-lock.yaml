@@ -599,6 +599,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.1
         version: 0.45.2(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0)
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
       pg:
         specifier: ^8.16.3
         version: 8.22.0

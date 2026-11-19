@@ -2,7 +2,8 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { getPackages } from '@manypkg/get-packages'
 import type { Package, Packages } from '@manypkg/get-packages'
-import { z } from 'zod'
+import { Schema } from 'effect'
+import { plainRecord } from '@spaces/core/json'
 
 /**
  * Release versioning: which packages carry a version line, what their tags
@@ -25,15 +26,15 @@ const PLUGIN_PACKAGE = /^@spaces\/plugin-([a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
 
 /** The fields of a package.json the release scripts read. */
-export const packageJsonSchema = z.object({
-  name: z.string(),
-  version: z.string(),
-  scripts: z.record(z.string(), z.string()).optional(),
+export const packageJsonSchema = Schema.Struct({
+  name: Schema.String,
+  version: Schema.String,
+  scripts: Schema.optional(plainRecord(Schema.String)),
 })
-export type PackageJson = z.output<typeof packageJsonSchema>
+export type PackageJson = typeof packageJsonSchema.Type
 
 export const parsePackageJson = (text: string): PackageJson =>
-  packageJsonSchema.parse(JSON.parse(text))
+  Schema.decodeUnknownSync(packageJsonSchema)(JSON.parse(text))
 
 export const readPackageJson = (dir: string): PackageJson =>
   parsePackageJson(readFileSync(path.join(dir, 'package.json'), 'utf8'))

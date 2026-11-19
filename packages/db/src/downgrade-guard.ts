@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
+import { Schema } from 'effect'
 import { readMigrationFiles } from 'drizzle-orm/migrator'
-import { z } from 'zod'
 
 /**
  * Downgrade guard — an image refuses a database from the future.
@@ -30,8 +30,10 @@ const REMEDY =
   'run against a newer schema, and there is no override.'
 
 /** The journal is data crossing a boundary, so it is decoded, not trusted. */
-const journalSchema = z.object({
-  entries: z.array(z.object({ when: z.number(), tag: z.string() })),
+const journalSchema = Schema.Struct({
+  entries: Schema.Array(
+    Schema.Struct({ when: Schema.Finite, tag: Schema.String }),
+  ),
 })
 
 /**
@@ -45,7 +47,7 @@ export function readImageJournal(
   migrationsFolder: string,
 ): Array<JournalEntry> {
   const raw = readFileSync(`${migrationsFolder}/meta/_journal.json`, 'utf8')
-  const journal = journalSchema.parse(JSON.parse(raw))
+  const journal = Schema.decodeUnknownSync(journalSchema)(JSON.parse(raw))
   const files = readMigrationFiles({ migrationsFolder })
   return journal.entries.map((entry, i) => {
     const file = files.at(i)

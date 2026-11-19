@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { aiLanesFor, toJsonSchema } from './ai'
 
 /**
@@ -17,14 +16,26 @@ describe('aiLanesFor', () => {
 })
 
 describe('toJsonSchema', () => {
-  it("reads a plugin's zod schema into the subset core hands a provider", () => {
-    const schema = z.object({
-      topic: z.enum(['funding', 'hiring']).describe('What it is about'),
-      score: z.number().min(0).max(1),
-      tags: z.array(z.string().min(1)),
-      note: z.string().nullable(),
-    })
-    expect(toJsonSchema(z.toJSONSchema(schema))).toEqual({
+  it("reads a plugin's JSON Schema into the subset core hands a provider", () => {
+    // A generator's draft 2020-12 output for four fields, nullable `note`
+    // spelled as `anyOf`.
+    const schema = {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      properties: {
+        topic: {
+          type: 'string',
+          enum: ['funding', 'hiring'],
+          description: 'What it is about',
+        },
+        score: { type: 'number', minimum: 0, maximum: 1 },
+        tags: { type: 'array', items: { type: 'string', minLength: 1 } },
+        note: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+      },
+      required: ['topic', 'score', 'tags', 'note'],
+      additionalProperties: false,
+    }
+    expect(toJsonSchema(schema)).toEqual({
       type: 'object',
       additionalProperties: false,
       required: ['topic', 'score', 'tags', 'note'],

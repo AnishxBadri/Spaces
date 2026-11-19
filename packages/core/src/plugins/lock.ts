@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { plainRecord } from '../json'
 
 /**
  * `<dataDir>/plugins/lock.json` — what this box pinned, beside the row
@@ -13,18 +14,27 @@ import { z } from 'zod'
 
 const SHA256_HEX = /^[0-9a-f]{64}$/
 
-export const lockEntrySchema = z.strictObject({
-  version: z.string().min(1),
-  sha256: z.string().regex(SHA256_HEX, {
-    error: 'sha256 is 64 lowercase hex characters',
-  }),
-})
+/** Unknown keys refuse the lock rather than being dropped. */
+const strict = { parseOptions: { onExcessProperty: 'error' } } as const
 
-export const lockSchema = z.strictObject({
-  core: z.string().min(1).optional(),
-  plugins: z.record(z.string(), lockEntrySchema).default({}),
-})
-export type Lock = z.infer<typeof lockSchema>
+const nonEmpty = Schema.String.check(Schema.isMinLength(1))
+
+export const lockEntrySchema = Schema.Struct({
+  version: nonEmpty,
+  sha256: Schema.String.check(
+    Schema.isPattern(SHA256_HEX, {
+      message: 'sha256 is 64 lowercase hex characters',
+    }),
+  ),
+}).annotate(strict)
+
+export const lockSchema = Schema.Struct({
+  core: Schema.optional(nonEmpty),
+  plugins: plainRecord(Schema.mutableKey(lockEntrySchema)).pipe(
+    Schema.withDecodingDefault(Effect.succeed({})),
+  ),
+}).annotate(strict)
+export type Lock = typeof lockSchema.Type
 
 /** Hex sha256 of a bundle's bytes — the value a lock entry pins. */
 export const bundleSha256 = (bytes: Uint8Array): string =>

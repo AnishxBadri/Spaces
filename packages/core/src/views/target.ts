@@ -1,5 +1,6 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import type { ViewSurface } from '@spaces/db/schema/views'
+import { uuidString } from '../attributes/registry'
 
 export type { ViewSurface }
 
@@ -30,27 +31,31 @@ export const viewTarget = (objectId: string | null): ViewTarget =>
  * 'company'.
  */
 export const objectKeyFields = {
-  surface: z.literal('object'),
-  kind: z.enum(['company', 'person', 'deal']).optional(),
-  objectId: z.string().uuid().optional(),
+  surface: Schema.Literal('object'),
+  kind: Schema.optional(Schema.Literals(['company', 'person', 'deal'])),
+  objectId: Schema.optional(uuidString),
 }
 
-export const documentKeyFields = { surface: z.literal('document') }
+export const documentKeyFields = { surface: Schema.Literal('document') }
 
 export const exactlyOneObjectRef = (v: {
-  kind?: string | undefined
-  objectId?: string | undefined
+  readonly kind?: string | undefined
+  readonly objectId?: string | undefined
 }) => (v.kind === undefined) !== (v.objectId === undefined)
 
 export const exactlyOneObjectRefMessage = {
   message: 'Give exactly one of kind or objectId',
 }
 
-export const surfaceKey = z.discriminatedUnion('surface', [
-  z
-    .object(objectKeyFields)
-    .refine(exactlyOneObjectRef, exactlyOneObjectRefMessage),
-  z.object(documentKeyFields),
+/** The check every object-surface key takes beside `objectKeyFields`. */
+export const oneObjectRef = Schema.makeFilter(
+  (v: Parameters<typeof exactlyOneObjectRef>[0]) =>
+    exactlyOneObjectRef(v) || exactlyOneObjectRefMessage.message,
+)
+
+export const surfaceKey = Schema.Union([
+  Schema.Struct(objectKeyFields).check(oneObjectRef),
+  Schema.Struct(documentKeyFields),
 ])
 
-export type SurfaceKey = z.infer<typeof surfaceKey>
+export type SurfaceKey = typeof surfaceKey.Type

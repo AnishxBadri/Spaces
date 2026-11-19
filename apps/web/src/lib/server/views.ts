@@ -1,50 +1,69 @@
 import { createServerFn } from '@tanstack/react-start'
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { finite, uuidString } from '@spaces/core/attributes/registry'
 import {
   documentKeyFields,
-  exactlyOneObjectRef,
   exactlyOneObjectRefMessage,
   objectKeyFields,
+  oneObjectRef,
   surfaceKey,
 } from '@spaces/core/views/target'
 import type { SurfaceKey, ViewTarget } from '@spaces/core/views/target'
+import { plainRecord } from '../plain-record'
 import type { ViewCount } from '../views/counts'
+import { input } from './input'
 import { requireUser } from './shared'
 
-const condition = z.object({
-  slug: z.string().min(1).max(80),
-  op: z.enum(['is', 'is_not', 'contains', 'empty', 'not_empty', 'gt', 'lt']),
-  value: z
-    .union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())])
-    .optional(),
+const finiteNumber = Schema.Number.check(finite)
+
+const condition = Schema.Struct({
+  slug: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
+  op: Schema.Literals([
+    'is',
+    'is_not',
+    'contains',
+    'empty',
+    'not_empty',
+    'gt',
+    'lt',
+  ]),
+  value: Schema.optional(
+    Schema.Union([
+      Schema.String,
+      finiteNumber,
+      Schema.Boolean,
+      Schema.Null,
+      Schema.mutable(Schema.Array(Schema.String)),
+    ]),
+  ),
 })
 
+const conditions = Schema.mutable(Schema.Array(condition)).check(
+  Schema.isMaxLength(20),
+)
+
 const viewBody = {
-  id: z.string().uuid().optional(),
-  name: z.string().trim().min(1).max(80),
-  filter: z.array(condition).max(20),
-  sort: z.object({ id: z.string(), desc: z.boolean() }).nullable(),
-  columns: z.record(z.string(), z.boolean()),
-  extra: z.record(
-    z.string(),
-    z.union([z.string(), z.number(), z.boolean(), z.null()]),
+  id: Schema.optional(uuidString),
+  name: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
+  filter: conditions,
+  sort: Schema.NullOr(
+    Schema.Struct({ id: Schema.String, desc: Schema.Boolean }),
   ),
-  visibility: z.enum(['shared', 'private']),
+  columns: plainRecord(Schema.Boolean),
+  extra: plainRecord(
+    Schema.Union([Schema.String, finiteNumber, Schema.Boolean, Schema.Null]),
+  ),
+  visibility: Schema.Literals(['shared', 'private']),
 }
 
-const saveKey = z.discriminatedUnion('surface', [
-  z
-    .object({ ...objectKeyFields, ...viewBody })
-    .refine(exactlyOneObjectRef, exactlyOneObjectRefMessage),
-  z.object({ ...documentKeyFields, ...viewBody }),
+const saveKey = Schema.Union([
+  Schema.Struct({ ...objectKeyFields, ...viewBody }).check(oneObjectRef),
+  Schema.Struct({ ...documentKeyFields, ...viewBody }),
 ])
 
-const deleteKey = z.discriminatedUnion('surface', [
-  z
-    .object({ ...objectKeyFields, id: z.string().uuid() })
-    .refine(exactlyOneObjectRef, exactlyOneObjectRefMessage),
-  z.object({ ...documentKeyFields, id: z.string().uuid() }),
+const deleteKey = Schema.Union([
+  Schema.Struct({ ...objectKeyFields, id: uuidString }).check(oneObjectRef),
+  Schema.Struct({ ...documentKeyFields, id: uuidString }),
 ])
 
 /**
@@ -65,7 +84,7 @@ const resolveTarget = async (key: SurfaceKey): Promise<ViewTarget> => {
 }
 
 export const listViews = createServerFn()
-  .validator(surfaceKey)
+  .validator(input(surfaceKey))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { listViewsProgram } = await import('@spaces/core/writes/views/store')
@@ -81,7 +100,7 @@ export const listViews = createServerFn()
   })
 
 export const saveView = createServerFn({ method: 'POST' })
-  .validator(saveKey)
+  .validator(input(saveKey))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { saveViewProgram } = await import('@spaces/core/writes/views/store')
@@ -103,7 +122,7 @@ export const saveView = createServerFn({ method: 'POST' })
   })
 
 export const deleteView = createServerFn({ method: 'POST' })
-  .validator(deleteKey)
+  .validator(input(deleteKey))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { deleteViewProgram } =
@@ -121,7 +140,15 @@ export const deleteView = createServerFn({ method: 'POST' })
  * is pruned by the sidebar.
  */
 export const listPinnedViews = createServerFn()
-  .validator(z.object({ ids: z.array(z.string().uuid()).max(100) }))
+  .validator(
+    input(
+      Schema.Struct({
+        ids: Schema.mutable(Schema.Array(uuidString)).check(
+          Schema.isMaxLength(100),
+        ),
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { pinnedViewsProgram } = await import('../views/pinned')
@@ -149,20 +176,17 @@ export const listJumpViews = createServerFn().handler(async () => {
  */
 export const countViews = createServerFn()
   .validator(
-    z.discriminatedUnion('surface', [
-      z
-        .object({
-          ...objectKeyFields,
-          viewIds: z.array(z.string().uuid()).max(100),
-          live: z
-            .object({
-              viewId: z.string().uuid(),
-              filter: z.array(condition).max(20),
-            })
-            .optional(),
-        })
-        .refine(exactlyOneObjectRef, exactlyOneObjectRefMessage),
-    ]),
+    input(
+      Schema.Struct({
+        ...objectKeyFields,
+        viewIds: Schema.mutable(Schema.Array(uuidString)).check(
+          Schema.isMaxLength(100),
+        ),
+        live: Schema.optional(
+          Schema.Struct({ viewId: uuidString, filter: conditions }),
+        ),
+      }).check(oneObjectRef),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()

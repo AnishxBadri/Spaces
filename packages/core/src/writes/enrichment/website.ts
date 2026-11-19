@@ -1,4 +1,4 @@
-import { Effect } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity } from '@spaces/db/schema'
@@ -208,12 +208,12 @@ const readWithModel = Effect.fn('website.model')(function* (
           reason: `${called.refused.tag}: ${called.refused.message}`,
           failed: true,
         }
-  const output = websiteOutput.safeParse(
+  const output = Schema.decodeUnknownOption(websiteOutput)(
     called.output.kind === 'object'
       ? called.output.object
       : parsedText(called.output.text),
   )
-  if (!output.success)
+  if (Option.isNone(output))
     return {
       ran: false,
       reason: 'the Extract lane answered outside the schema',
@@ -222,8 +222,8 @@ const readWithModel = Effect.fn('website.model')(function* (
   return {
     ran: true,
     pages,
-    extracted: output.data,
-    answers: websiteAnswers(output.data, pages, keys),
+    extracted: output.value,
+    answers: websiteAnswers(output.value, pages, keys),
   }
 })
 

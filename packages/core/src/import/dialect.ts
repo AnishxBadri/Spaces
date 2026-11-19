@@ -1,5 +1,6 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { decodeManifest } from '@spaces/sdk'
+import { uuidString } from '../attributes/registry'
 import { pluginQueueName } from '../queue/names'
 import type { PluginQueueName } from '../queue/names'
 
@@ -14,14 +15,14 @@ import type { PluginQueueName } from '../queue/names'
  * What a queued `file` job carries: the stored bytes by digest, and the
  * waiting batch when the import wizard sent it.
  */
-export const fileJobData = z.object({
-  blobSha: z.string().regex(/^[0-9a-f]{64}$/),
-  filename: z.string().min(1),
-  mime: z.string().nullable(),
-  batchId: z.uuid().optional(),
+export const fileJobData = Schema.Struct({
+  blobSha: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/)),
+  filename: Schema.String.check(Schema.isMinLength(1)),
+  mime: Schema.NullOr(Schema.String),
+  batchId: Schema.optional(uuidString),
 })
 
-export type FileJobData = z.infer<typeof fileJobData>
+export type FileJobData = typeof fileJobData.Type
 
 export type ImportReader = {
   readonly pluginId: string

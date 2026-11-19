@@ -1,8 +1,8 @@
-import { Effect, Redacted, Schema } from 'effect'
-import { z } from 'zod'
+import { Effect, Option, Redacted, Schema } from 'effect'
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { accountConnection } from '@spaces/db/schema'
+import { emailString } from '../../attributes/registry'
 import { readRecorderSettings, recorderSettingsJson } from '../../json'
 import type { RecorderSettings } from '../../json'
 import { KEYED_PROVIDERS, KEYED_PROVIDER_IDS } from '../../providers/keyed'
@@ -51,9 +51,17 @@ export type KeyedOptions = {
 const networkFetch: FetchLike = (url, init) =>
   fetch(url, { method: init.method, headers: init.headers })
 
-const owner = z.object({ email: z.email() })
-const folders = z.object({
-  folders: z.array(z.object({ id: z.string().min(1), name: z.string() })),
+/** The provider's `/me` answer: the account a key belongs to. */
+export const keyedOwner = Schema.Struct({ email: emailString })
+
+/** The provider's `/folders` answer. */
+export const keyedFolders = Schema.Struct({
+  folders: Schema.Array(
+    Schema.Struct({
+      id: Schema.String.check(Schema.isMinLength(1)),
+      name: Schema.String,
+    }),
+  ),
 })
 
 /** One read with the key; its JSON, or why not. */
@@ -107,9 +115,11 @@ const keyOwner = Effect.fn('keyed.owner')(function* (
   key: string,
   options: KeyedOptions,
 ) {
-  const parsed = owner.safeParse(yield* read(provider, '/me', key, options))
-  if (!parsed.success) return yield* unreadable(provider, 'an account')
-  return parsed.data.email.toLowerCase()
+  const parsed = Schema.decodeUnknownOption(keyedOwner)(
+    yield* read(provider, '/me', key, options),
+  )
+  if (Option.isNone(parsed)) return yield* unreadable(provider, 'an account')
+  return parsed.value.email.toLowerCase()
 })
 
 /**
@@ -253,9 +263,9 @@ export const recorderAccountProgram = Effect.fn('recorderAccount')(function* (
       read(row.provider, '/folders', Redacted.value(key), options),
     ),
     Effect.flatMap((json) => {
-      const parsed = folders.safeParse(json)
-      return parsed.success
-        ? Effect.succeed(parsed.data.folders)
+      const parsed = Schema.decodeUnknownOption(keyedFolders)(json)
+      return Option.isSome(parsed)
+        ? Effect.succeed(parsed.value.folders)
         : Effect.fail(unreadable(row.provider, 'folders'))
     }),
     Effect.result,

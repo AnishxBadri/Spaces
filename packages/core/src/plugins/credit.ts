@@ -1,5 +1,7 @@
-import { z } from 'zod'
+import { Option, Schema } from 'effect'
 import type { Manifest } from '@spaces/sdk'
+import { finite } from '../attributes/registry'
+import { plainRecord } from '../json'
 
 /**
  * A source's credit policy: how long its receipt is reused and its
@@ -29,20 +31,31 @@ export type CreditPolicy = {
   readonly dailyCreditCap: number | null
 }
 
-const nonNegative = z.number().nonnegative()
-const declaredSettings = z.object({
-  properties: z.record(z.string(), z.object({ default: z.unknown() }).loose()),
-})
+const nonNegative = Schema.decodeUnknownOption(
+  Schema.Number.check(finite, Schema.isGreaterThanOrEqualTo(0)),
+)
 
-const numberOr = <T>(value: unknown, fallback: T): number | T => {
-  const parsed = nonNegative.safeParse(value)
-  return parsed.success ? parsed.data : fallback
-}
+/**
+ * The settings' JSON Schema properties. `default` is a required key: one
+ * property that declares no default leaves every setting undeclared.
+ */
+const declaredSettings = Schema.decodeUnknownOption(
+  Schema.Struct({
+    properties: plainRecord(Schema.Struct({ default: Schema.Unknown })),
+  }),
+)
+
+const numberOr = <T>(value: unknown, fallback: T): number | T =>
+  Option.getOrElse(nonNegative(value), (): number | T => fallback)
 
 /** The manifest's declared defaults: `cacheDays` 90 and no cap when it declares none. */
 export const creditDefaults = (manifest: Manifest): CreditPolicy => {
-  const parsed = declaredSettings.safeParse(manifest.settings)
-  const declared = parsed.success ? parsed.data.properties : {}
+  const declared = Option.match(declaredSettings(manifest.settings), {
+    onNone: (): {
+      readonly [key: string]: { readonly default: unknown }
+    } => ({}),
+    onSome: (settings) => settings.properties,
+  })
   const defaultOf = (key: string): unknown =>
     Object.hasOwn(declared, key) ? declared[key].default : undefined
   return {

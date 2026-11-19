@@ -1,6 +1,6 @@
 import { count, eq, inArray } from 'drizzle-orm'
+import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { credential } from '@spaces/db/schema'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
@@ -17,7 +17,7 @@ import type { CredentialInput } from './index'
  * `credential_kind` beyond `llm | enrichment | search`. Two things must hold:
  * - A row written under the narrower enum still decrypts: the AAD is
  *   `scope:provider`, so `kind` is never an encryption input.
- * - An unknown kind is refused at the vault's Zod boundary, not by Postgres.
+ * - An unknown kind is refused at the vault's schema boundary, not by Postgres.
  */
 
 const base = {
@@ -133,7 +133,7 @@ describe('the vault write path', () => {
     )
   })
 
-  it('rejects an unknown kind at the Zod boundary, not at the database', async () => {
+  it('rejects an unknown kind at the schema boundary, not at the database', async () => {
     // What actually reaches a server fn is untyped, so the rogue value is
     // laundered through JSON exactly as the wire would deliver it — the
     // compiler cannot be the thing that catches this, which is why the
@@ -143,7 +143,7 @@ describe('the vault write path', () => {
     )
 
     await expect(storeCredential(fromTheWire)).rejects.toBeInstanceOf(
-      z.ZodError,
+      Schema.SchemaError,
     )
 
     const [{ value }] = await db

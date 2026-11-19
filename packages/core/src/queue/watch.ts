@@ -1,5 +1,6 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { decodeManifest } from '@spaces/sdk'
+import { uuidString } from '../attributes/registry'
 import { pluginQueueName } from './names'
 import type { PluginQueueName } from './names'
 
@@ -11,11 +12,11 @@ import type { PluginQueueName } from './names'
  */
 
 /** What a watch run is sent with. `spaceId` rides along for the ledger. */
-export const watchRunData = z.object({
-  watchId: z.uuid(),
-  spaceId: z.uuid(),
+export const watchRunData = Schema.Struct({
+  watchId: uuidString,
+  spaceId: uuidString,
 })
-export type WatchRunData = z.output<typeof watchRunData>
+export type WatchRunData = typeof watchRunData.Type
 
 /** The plugin's watch job and its queue; null when it declares none. */
 export const watchJobOf = (

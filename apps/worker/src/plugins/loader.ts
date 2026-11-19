@@ -2,7 +2,15 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { pathToFileURL } from 'node:url'
-import { Data, Effect, Option, Schema } from 'effect'
+import {
+  Data,
+  Effect,
+  Option,
+  Result,
+  Schema,
+  SchemaIssue,
+  SchemaParser,
+} from 'effect'
 import { and, eq, isNull, notLike } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
@@ -156,15 +164,19 @@ const realpathOr = (p: string): string => {
   }
 }
 
+const lockIssues = SchemaIssue.makeFormatterStandardSchemaV1()
+
 /** lock.json, or why it cannot be read. Absent is not an error: unpinned. */
 const readLock = (pluginsRoot: string): Lock | Degraded => {
   const file = path.join(pluginsRoot, LOCK_FILE)
   if (!existsSync(file)) return { plugins: {} }
   try {
-    const parsed = lockSchema.safeParse(JSON.parse(readFileSync(file, 'utf8')))
-    if (parsed.success) return parsed.data
+    const parsed = SchemaParser.decodeUnknownResult(lockSchema)(
+      JSON.parse(readFileSync(file, 'utf8')),
+    )
+    if (Result.isSuccess(parsed)) return parsed.success
     return new Degraded({
-      reason: `${file} is invalid: ${parsed.error.issues.at(0)?.message ?? 'unreadable'}`,
+      reason: `${file} is invalid: ${lockIssues(parsed.failure).issues.at(0)?.message ?? 'unreadable'}`,
     })
   } catch (error) {
     return new Degraded({ reason: truncate(`${file}: ${messageOf(error)}`) })

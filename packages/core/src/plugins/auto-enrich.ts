@@ -1,5 +1,6 @@
-import { z } from 'zod'
+import { Option, Schema } from 'effect'
 import type { DomainEvent } from '@spaces/sdk'
+import { uuidString } from '../attributes/registry'
 
 /**
  * Auto-enrich scopes: which of a record's triggers run an integration's
@@ -28,21 +29,20 @@ export type AutoEnrichScope = {
   readonly spaces: ReadonlyArray<string>
 }
 
-const scopeList = z.array(z.unknown())
-const spaceList = z.array(z.uuid())
+const scopeList = Schema.decodeUnknownOption(Schema.Array(Schema.Unknown))
+const spaceList = Schema.decodeUnknownOption(Schema.Array(uuidString))
 
 /** The scope a row's config holds, in `AUTO_ENRICH_SCOPES` order. */
 export const autoEnrichScopeOf = (config: {
   readonly [key: string]: unknown
 }): AutoEnrichScope => {
-  const listed = scopeList.safeParse(config[SCOPES_KEY])
-  const spaces = spaceList.safeParse(config[SPACES_KEY])
-  const chosen: ReadonlyArray<unknown> = listed.success
-    ? listed.data
-    : DEFAULT_SCOPES
+  const chosen = Option.getOrElse(
+    scopeList(config[SCOPES_KEY]),
+    (): ReadonlyArray<unknown> => DEFAULT_SCOPES,
+  )
   return {
     scopes: AUTO_ENRICH_SCOPES.filter((s) => chosen.includes(s)),
-    spaces: spaces.success ? spaces.data : [],
+    spaces: Option.getOrElse(spaceList(config[SPACES_KEY]), () => []),
   }
 }
 

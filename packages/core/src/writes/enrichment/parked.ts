@@ -1,7 +1,7 @@
-import { Clock, Effect, Schema } from 'effect'
+import { Clock, Effect, Schema, SchemaTransformation } from 'effect'
 import { sql } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
+import { finite } from '../../attributes/registry'
 import { QUEUES } from '../../queue/names'
 
 /**
@@ -29,11 +29,32 @@ export type ParkedSource = {
   readonly resumesAt: string
 }
 
-const row = z.object({
-  integration_id: z.string(),
-  source: z.string(),
-  waiting: z.coerce.number(),
-  resumes_ms: z.coerce.number(),
+/** `Number(value)`, or NaN for a value `Number` throws on. */
+const toNumber = (value: unknown): number => {
+  try {
+    return Number(value)
+  } catch {
+    return Number.NaN
+  }
+}
+
+/** Any value read as `Number(value)`, refused unless finite. */
+const coercedNumber = Schema.Unknown.pipe(
+  Schema.decodeTo(
+    Schema.Number.check(finite),
+    SchemaTransformation.transform({
+      decode: toNumber,
+      encode: (n: number): unknown => n,
+    }),
+  ),
+)
+
+/** One grouped row of the parked-run read; pg hands counts back as text. */
+export const parkedRow = Schema.Struct({
+  integration_id: Schema.String,
+  source: Schema.String,
+  waiting: coercedNumber,
+  resumes_ms: coercedNumber,
 })
 
 export const parkedEnrichmentProgram = Effect.fn('parkedEnrichmentProgram')(
@@ -61,7 +82,7 @@ export const parkedEnrichmentProgram = Effect.fn('parkedEnrichmentProgram')(
           group by 1, 2
           order by 2`)
         return result.rows.map((r): ParkedSource => {
-          const parsed = row.parse(r)
+          const parsed = Schema.decodeUnknownSync(parkedRow)(r)
           return {
             integrationId: parsed.integration_id,
             source: parsed.source,
